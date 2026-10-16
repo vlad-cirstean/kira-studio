@@ -1,0 +1,72 @@
+package gitops
+
+import "regexp"
+
+// RefUpdate mirrors @kira/git-ipc's own RefUpdate field for field (D5's encoding rule: null, not
+// omitted, for "created"/"deleted") — lives here rather than in gitsession since both producers,
+// this package's own porcelain parser (push.go) and gitsession's ref-snapshot diff, need it (D13).
+type RefUpdate struct {
+	Ref    string  `json:"ref"`
+	From   *string `json:"from"`
+	To     *string `json:"to"`
+	Forced bool    `json:"forced"`
+}
+
+// RemotesArgs builds `git remote` — one name per line, D23's auto-fetch remote-selection read.
+func RemotesArgs() []string {
+	return []string{"remote"}
+}
+
+// HeadRefArgs builds `git rev-parse --symbolic-full-name HEAD`: the checked-out ref, "HEAD" when detached.
+func HeadRefArgs() []string {
+	return []string{"rev-parse", "--symbolic-full-name", "HEAD"}
+}
+
+// RemoteGetURLArgs builds `git remote get-url <name>` — G24 D15's own one-git-spawn "is this a
+// GitHub repository" check, upstream verbatim. Tolerated through the caller's own
+// runAllowingExit (exit 128 == no such remote, F15's own precedent).
+func RemoteGetURLArgs(name string) []string {
+	return []string{"remote", "get-url", name}
+}
+
+// RemoteTipArgs builds `git rev-parse -q --verify refs/remotes/<remote>/<branch>` — tolerated
+// through the caller's own runAllowingExit (exit 1 == the remote-tracking ref does not exist,
+// F15).
+func RemoteTipArgs(remote, branch string) []string {
+	return []string{"rev-parse", "-q", "--verify", "refs/remotes/" + remote + "/" + branch}
+}
+
+// AheadBehindArgs builds `git rev-list --left-right --count <branch>...<upstream>` (probe P11:
+// "1\t0" = ahead, behind). The caller must guard this on upstream actually resolving first (F15) —
+// run against a nonexistent ref it exits 128 with "fatal: ambiguous argument".
+func AheadBehindArgs(branch, upstream string) []string {
+	return []string{"rev-list", "--left-right", "--count", branch + "..." + upstream}
+}
+
+// PullConfigArgs builds the strategy ladder's own single spawn (D18/F16):
+// `git config --null --get-regexp '^(pull\.(rebase|ff)|branch\.<branch>\.rebase)$'`. --null frames
+// records with NUL and separates key from value with a newline (probe P10) — not the space-
+// separated form gitops.BranchConfigRegexpArgs' own caller already parses, a different format.
+//
+// P108 Part 15 F5 fix: branch is escaped with regexp.QuoteMeta, the same precedent
+// BranchConfigRegexpArgs already established (branch.go) — before this fix, an unescaped branch
+// name spliced straight into the pattern either silently matched the wrong key (a branch name
+// containing an ERE metacharacter, e.g. "feat+x", widens or narrows the match unpredictably) or
+// made `git config` exit 6 with "invalid key pattern" (an unbalanced one, e.g. "a(b" — a legal git
+// refname), failing the whole PullPreflight.
+func PullConfigArgs(branch string) []string {
+	pattern := `^(pull\.(rebase|ff)|branch\.` + regexp.QuoteMeta(branch) + `\.rebase)$`
+	return []string{"config", "--null", "--get-regexp", pattern}
+}
+
+// CoreAskPassArgs builds `git config --get core.askPass` — D10's own per-entry, lazy,
+// once-per-RepoEntry read (tolerated exit 1: no such config is the common case).
+func CoreAskPassArgs() []string {
+	return []string{"config", "--get", "core.askPass"}
+}
+
+// IsAncestorArgs builds `git merge-base --is-ancestor <a> <b>` — D13's fetch-side "was this
+// ref-move a fast-forward" check (exit 0 == a is an ancestor of b, not forced; exit 1 == forced).
+func IsAncestorArgs(a, b string) []string {
+	return []string{"merge-base", "--is-ancestor", a, b}
+}

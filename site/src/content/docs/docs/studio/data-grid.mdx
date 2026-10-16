@@ -1,0 +1,52 @@
+---
+title: Data grid
+description: Browse, filter, edit and commit table rows in the data grid.
+sources:
+  - README.md
+  - apps/kira-studio/frontend/src/views/grid
+  - apps/kira-studio/frontend/src/views/documents
+  - apps/kira-studio/frontend/src/views/keyvalue
+  - apps/kira-studio/frontend/src/views/stream
+  - apps/kira-studio/frontend/src/state/settingsDomain.ts
+  - packages/theme/src/i18n/en.json
+sidebar:
+  order: 2
+---
+
+import DocShot from '../../../../components/DocShot.astro';
+
+<DocShot id="studio-data-grid" />
+
+## Browse
+
+The grid is virtualized in both directions. Page sizes are 10, 100, 1000 and 10000. The default is 100; change it in `Settings > Data`.
+
+- The total row count runs on request. Click the count in the pager, tooltip "Count all rows".
+- Column projection limits which columns load.
+- Find searches the current page.
+
+## Filter and sort
+
+Type a server-side `WHERE` and `ORDER BY`. The app keeps a history of filters and lets you save them.
+
+## Edit
+
+SQL tables stage edits. Add, delete and edit rows as a pending change set. The preview shows the exact command.
+
+Nothing reaches the database until you click **Commit pending changes**. Document, key/value and stream writes apply immediately.
+
+## Cell editor
+
+A Monaco panel detects JSON, XML, CSV, SQL, ISO-8601 timestamps, epoch seconds, epoch milliseconds, base64 and hex. Pick a format by hand to override detection. Beautify and compact work for JSON and XML.
+
+## Foreign keys
+
+Preview a referenced row in a popover. Open it from there in a new pre-filtered tab. The cell menu has **Edit referenced row** to edit it in place. This works on engines that report foreign keys: PostgreSQL, MySQL, MariaDB and SQLite.
+
+## Generate data
+
+Fill a SQL table with fake rows. The app proposes a recipe per column from its type. Read-only connections do not offer it.
+
+## Operations panel
+
+The panel lists every database operation live. Each row shows duration, rows and command. Cancel a running operation from its menu. Re-run a SQL operation from its menu; a truncated command cannot re-run. A persisted log keeps older operations; `Settings > Advanced` sets retention, 1 to 365 days, default 30.

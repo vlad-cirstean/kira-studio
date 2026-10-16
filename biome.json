@@ -1,0 +1,422 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "**",
+      "!dist",
+      "!test-results",
+      "!playwright-report",
+      "!node_modules",
+      "!apps/kira-studio/tests/contract",
+      "!apps/kira-space/tests/contract",
+      "!docs/design",
+      "!docs/v2.5/plans/P285-corpus",
+      "!docs/v2.5/plans/P285-runs",
+      "!docs/v2.5/plans/P291-runs",
+      "!apps/kira-space/tests/unit/support/fixtures/ade-v2-mockup-logic.js",
+      "!.claude",
+      "!packages/shared/protocol/wire.ts",
+      "!packages/shared/protocol/wire",
+      "!packages/git-ipc/src/generated"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "suspicious": { "noConsole": "error" },
+      "performance": {
+        "noAccumulatingSpread": "error",
+        "noDelete": "error",
+        "noDynamicNamespaceImportAccess": "error",
+        "noReExportAll": "error"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": {
+          "level": "error",
+          "options": { "maxAllowedComplexity": 30 }
+        }
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always"
+    }
+  },
+  "css": {
+    "parser": {
+      "cssModules": false,
+      "tailwindDirectives": true
+    }
+  },
+  "html": {
+    "experimentalFullSupportEnabled": true,
+    "formatter": { "enabled": true, "whitespaceSensitivity": "strict" }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.html", "**/*.svg"],
+      "html": { "formatter": { "enabled": false } }
+    },
+    {
+      "includes": [
+        "packages/workbench/src/bridge/log.ts",
+        "apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts",
+        "packages/workbench/src/testing/**",
+        "**/tests/**",
+        "**/test/**",
+        "**/*.spec.ts",
+        "scripts/**",
+        "tools/mutation/**",
+        "apps/kira-studio/frontend/proto/**"
+      ],
+      "linter": { "rules": { "suspicious": { "noConsole": "off" } } }
+    },
+    {
+      "includes": ["**/tests/**", "**/test/**", "**/*.spec.ts"],
+      "linter": {
+        "rules": {
+          "complexity": { "noExcessiveCognitiveComplexity": "off" },
+          "style": { "noNonNullAssertion": "off" }
+        }
+      }
+    },
+    {
+      "includes": ["packages/theme/src/i18n/*.json"],
+      "assist": {
+        "actions": {
+          "source": {
+            "useSortedKeys": { "level": "on", "options": { "sortOrder": "natural" } }
+          }
+        }
+      },
+      "json": {
+        "formatter": { "expand": "always" }
+      }
+    },
+    {
+      "includes": ["knip.json"],
+      "json": {
+        "parser": { "allowComments": true }
+      }
+    },
+    {
+      "includes": ["**/*.vue"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useVueHyphenatedAttributes": "off",
+            "useVueMultiWordComponentNames": "off",
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/kira-studio/frontend/src/views/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/workbench/**"],
+                    "message": "SPEC §11: views/* must not import from workbench/* — the dependency graph stays a tree."
+                  },
+                  {
+                    "group": [
+                      "../grid/**",
+                      "../documents/**",
+                      "../keyvalue/**",
+                      "../stream/**",
+                      "../console/**",
+                      "../definition/**",
+                      "../browse/**",
+                      "../httprequest/**",
+                      "../grpcrequest/**",
+                      "../../grid/**",
+                      "../../documents/**",
+                      "../../keyvalue/**",
+                      "../../stream/**",
+                      "../../console/**",
+                      "../../definition/**",
+                      "../../browse/**",
+                      "../../httprequest/**",
+                      "../../grpcrequest/**"
+                    ],
+                    "message": "SPEC §11: views/<kind>/* must not import another views/<kind>/* — use views/shared/ instead."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/kira-studio/frontend/src/project/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/views/**"],
+                    "message": "SPEC §11: project/ must not import views/ directly — dispatch through state/viewCommands.ts instead."
+                  },
+                  {
+                    "group": ["**/http/**", "**/api/**"],
+                    "message": "P12 D16(c): project/ must not import http/ or api/ — the mirror of the rule that already stopped api/ importing project/."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/kira-space/frontend/src/repo/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/views/**"],
+                    "message": "C5 §2: repo/ must not import views/ directly — dispatch through state/repoTabs.ts instead, mirroring project/'s own state/viewCommands.ts rule."
+                  },
+                  {
+                    "group": ["**/http/**", "**/api/**"],
+                    "message": "C5 §2: repo/ must not import http/ or api/ — mirrors project/'s own rule against the same two modules."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/kira-studio/frontend/src/api/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/project/**"],
+                    "message": "P1 D7: api/ must not import project/ — Studio's connection tree is not Api's to reach into."
+                  },
+                  {
+                    "group": ["**/views/**"],
+                    "message": "P1 D7: api/ must not import views/ directly, mirroring project/'s own rule — dispatch through state/viewCommands.ts instead."
+                  },
+                  {
+                    "group": ["**/workbench/**"],
+                    "message": "P12 D16(a)/D10: api/ must not import workbench/ — PanelShell is a theme primitive now, so this ban is exception-free."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/kira-studio/frontend/src/state/**",
+        "apps/kira-studio/frontend/src/shortcuts/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/views/httprequest/**", "**/views/grpcrequest/**"],
+                    "message": "P12 D16(b): state/ and shortcuts/ must not reach into the Api module's own views — go through api/tabs.ts instead. (Not a blanket views/ ban: state/tabKinds.ts and state/schemas.ts legitimately import Studio's own view modules.)"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/kira-studio/frontend/src/views/httprequest/**",
+        "apps/kira-studio/frontend/src/views/grpcrequest/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/project/**"],
+                    "message": "P12 D16(d): views/httprequest/ and views/grpcrequest/ must not import project/ — Studio's connection tree is not the Api views' to reach into either."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/api-core/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["vue", "@codemirror/*", "**/apps/**", "@bindings*/**"],
+                    "message": "P12 D16(e): packages/api-core is pure, DOM-free logic — no Vue, no CodeMirror, no app, no bindings."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/shared/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/apps/**", "@kira/api-core"],
+                    "message": "P12 D16(f): packages/shared is the base layer (shared -> api-core -> app) — it must not import the app or the package built on top of it."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/git-ipc/**", "packages/git-core/**", "packages/git-ui/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@kira/shared", "@kira/api-core", "**/apps/kira-studio/**"],
+                    "message": "SPEC §7: the git module is its own package family — it must not import Studio's or Api's code."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/docker-ui/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/apps/**", "@kira/api-core"],
+                    "message": "The Docker module is a shared package — it must not import app code; each app injects its bindings."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/git-ipc/**", "packages/git-core/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["vue"],
+                    "message": "G1 §5.2: git-ipc and git-core are pure, host-free logic: no Vue."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/workbench/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/apps/**", "@/*", "@bindings*/**"],
+                    "message": "P103 §10/P127: packages/workbench is shared between both apps — it must not import either app's own code or a Wails binding directly, only through an injected control seam."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "AdeTaskService.Board#repo-noremote-after": {
+    "codeRepoId": "<id:2>",
+    "lastFetchAt": null,
+    "mainName": "main",
+    "remote": ""
+  },
+  "AdeTaskService.Board#repo-noremote-before": {
+    "codeRepoId": "<id:2>",
+    "lastFetchAt": null,
+    "mainName": "main",
+    "remote": ""
+  },
+  "AdeTaskService.Board#repo-tracked-after": {
+    "codeRepoId": "<id:1>",
+    "lastFetchAt": 0,
+    "mainName": "main",
+    "remote": "origin"
+  },
+  "AdeTaskService.Board#repo-tracked-before": {
+    "codeRepoId": "<id:1>",
+    "lastFetchAt": null,
+    "mainName": "main",
+    "remote": "origin"
+  },
+  "AdeTaskService.Refresh#noremote": {
+    "codeRepoId": "<id:2>",
+    "error": null,
+    "mergedInto": [],
+    "refsChanged": 0
+  },
+  "AdeTaskService.Refresh#tracked": {
+    "codeRepoId": "<id:1>",
+    "error": null,
+    "mergedInto": [],
+    "refsChanged": 1
+  }
+}

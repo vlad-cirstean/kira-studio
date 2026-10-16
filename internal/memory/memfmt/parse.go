@@ -1,0 +1,436 @@
+package memfmt
+
+import (
+	"fmt"
+	"regexp"
+	"strings"
+	"time"
+)
+
+var (
+	sourceTag   = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
+	factLine    = regexp.MustCompile(`^(` + FactID + `) (.*)$`)
+	retiredLine = regexp.MustCompile(`^` + FactID + ` (fact|reason|keywords): `)
+	docFactLine = regexp.MustCompile(`^- (` + FactID + `) (.*)$`)
+	headingLine = regexp.MustCompile(`^#{1,6} (\S.*)$`)
+	dateLine    = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+)
+
+func splitLines(src []byte) []string {
+	lines := strings.Split(string(src), "\n")
+	for i, l := range lines {
+		lines[i] = strings.TrimSuffix(l, "\r")
+	}
+	return lines
+}
+
+func validOrigin(o string) bool { return o == "user" || o == "agent" || o == "external" }
+func validScope(s string) bool  { return s == "company" || s == "project" || s == "personal" }
+
+// commentText strips the marker of one line. ok is false when the line is not a comment of m;
+// closed is false for a wrapped marker missing its closer.
+func commentText(line string, m Marker) (indent, text string, closed, ok bool) {
+	trim := strings.TrimLeft(line, " \t")
+	indent = line[:len(line)-len(trim)]
+	if !strings.HasPrefix(trim, m.Open+" ") {
+		return "", "", false, false
+	}
+	text = trim[len(m.Open)+1:]
+	if m.Close == "" {
+		return indent, text, true, true
+	}
+	if strings.HasSuffix(text, " "+m.Close) {
+		return indent, strings.TrimSuffix(text, " "+m.Close), true, true
+	}
+	return indent, text, false, true
+}
+
+func inScopeText(t string) bool {
+	return strings.HasPrefix(t, "kira-memory ") || strings.HasPrefix(t, "km_")
+}
+
+// isReasonText reports whether t is a reason line: exactly two spaces, then text.
+func isReasonText(t string) bool {
+	return len(t) > 2 && strings.HasPrefix(t, "  ") && t[2] != ' ' && t[2] != '\t'
+}
+
+const retiredCommentMsg = "'<id> fact:' and '<id> reason:' lines are the retired P273 format; write '<id> <fact>' and an indented reason line"
+
+type blockState struct {
+	block  Block
+	marker Marker
+	indent string
+	// afterFact: the previous line of this block was a fact line, so an indented line is its reason.
+	afterFact bool
+}
+
+type commentParser struct {
+	markers  []Marker
+	blocks   []Block
+	problems []Problem
+	cur      *blockState
+	seen     map[string]int
+}
+
+func (p *commentParser) add(line int, f string, a ...any) {
+	p.problems = append(p.problems, Problem{line, fmt.Sprintf(f, a...)})
+}
+
+func (p *commentParser) finish() {
+	c := p.cur
+	if c == nil {
+		return
+	}
+	if len(c.block.Facts) == 0 {
+		p.add(c.block.Line, "empty kira-memory block")
+	}
+	p.blocks = append(p.blocks, c.block)
+	p.cur = nil
+}
+
+// ParseComments parses the kira-memory blocks of a source file. Only in-scope lines (text after
+// the marker starting "kira-memory " or "km_", or an indented reason line directly after a fact
+// line) are read or flagged; other comments are legacy and end the block. An unsupported path
+// yields nothing.
+func ParseComments(path string, src []byte) ([]Block, []Problem) {
+	markers, ok := MarkersFor(path)
+	if !ok {
+		return nil, nil
+	}
+	p := &commentParser{markers: markers, seen: map[string]int{}}
+	for i, line := range splitLines(src) {
+		p.line(i+1, line)
+	}
+	p.finish()
+	return p.blocks, p.problems
+}
+
+func (p *commentParser) line(n int, line string) {
+	for _, m := range p.markers {
+		indent, text, closed, ok := commentText(line, m)
+		if !ok {
+			continue
+		}
+		if !inScopeText(text) && !(p.cur != nil && p.cur.afterFact && isReasonText(text)) {
+			break
+		}
+		p.scoped(n, m, indent, text, closed)
+		return
+	}
+	p.finish()
+}
+
+func (p *commentParser) scoped(n int, m Marker, indent, text string, closed bool) {
+	if m.Close != "" {
+		if !closed {
+			p.add(n, "comment is not closed with %s", m.Close)
+		}
+		if strings.Contains(text, m.Close) {
+			p.add(n, "text contains %s", m.Close)
+		}
+	}
+	if m.NoDashes && strings.Contains(text, "--") {
+		p.add(n, "text contains -- (not allowed in XML comments)")
+	}
+	if strings.HasPrefix(text, "kira-memory ") {
+		p.finish()
+		prov, msg := parseHeader(text)
+		if msg != "" {
+			p.add(n, "%s", msg)
+		}
+		p.cur = &blockState{block: Block{Provenance: prov, Line: n}, marker: m, indent: indent}
+		return
+	}
+	c := p.cur
+	if retiredLine.MatchString(text) {
+		p.add(n, "%s", retiredCommentMsg)
+		if c != nil {
+			c.afterFact = false
+		}
+		return
+	}
+	reason := isReasonText(text)
+	sm := factLine.FindStringSubmatch(text)
+	if !reason && sm == nil {
+		p.add(n, "line must be '<id> <fact>' or an indented reason line")
+		if c != nil {
+			c.afterFact = false
+		}
+		return
+	}
+	if c == nil {
+		p.add(n, "fact line without kira-memory header")
+		return
+	}
+	if m != c.marker || indent != c.indent {
+		p.add(n, "marker or indentation differs from the block header")
+	}
+	if reason {
+		p.reason(n, text[2:])
+		return
+	}
+	p.fact(n, sm[1], sm[2])
+}
+
+func (p *commentParser) fact(n int, id, body string) {
+	c := p.cur
+	if msg := CheckText(body); msg != "" {
+		p.add(n, "%s fact: %s", id, msg)
+	}
+	if first, dup := p.seen[id]; dup {
+		p.add(n, "%s already a fact at line %d", id, first)
+	}
+	p.seen[id] = n
+	c.block.Facts = append(c.block.Facts, Fact{ID: id, Fact: body, Line: n})
+	c.afterFact = true
+}
+
+func (p *commentParser) reason(n int, body string) {
+	c := p.cur
+	last := &c.block.Facts[len(c.block.Facts)-1]
+	if msg := CheckText(body); msg != "" {
+		p.add(n, "%s reason: %s", last.ID, msg)
+	}
+	last.Reason = body
+	c.afterFact = false
+}
+
+// parseHeader reads "kira-memory origin=<o> [source=<tag>] scope=<s>".
+func parseHeader(text string) (Provenance, string) {
+	var p Provenance
+	toks := strings.Fields(text)[1:]
+	val := func(key string) (string, bool) {
+		if len(toks) == 0 || !strings.HasPrefix(toks[0], key+"=") {
+			return "", false
+		}
+		v := strings.TrimPrefix(toks[0], key+"=")
+		toks = toks[1:]
+		return v, true
+	}
+	const form = "header must be 'kira-memory origin=<user|agent|external> [source=<tag>] scope=<company|project|personal>'"
+	var ok bool
+	if p.Origin, ok = val("origin"); !ok || !validOrigin(p.Origin) {
+		return p, form
+	}
+	if p.Origin == "external" {
+		if p.Source, ok = val("source"); !ok || !sourceTag.MatchString(p.Source) {
+			return p, "origin external needs source=<tag> of 1 to 32 characters from a-z, 0-9 and -"
+		}
+	} else if len(toks) > 0 && strings.HasPrefix(toks[0], "source=") {
+		return p, "source is only for origin external"
+	}
+	if p.Scope, ok = val("scope"); !ok || !validScope(p.Scope) || len(toks) > 0 || strings.Count(text, "  ") > 0 {
+		return p, form
+	}
+	return p, ""
+}
+
+var docKeys = []string{"group", "title", "from", "origin", "source", "scope", "project", "session", "keywords", "updated"}
+
+// headerValue returns why a front matter value is not YAML-safe, or "".
+func headerValue(v string) string {
+	switch {
+	case v == "" || strings.TrimSpace(v) != v:
+		return "value is empty or has leading or trailing space"
+	case strings.Contains(v, ": "):
+		return "value contains ': '"
+	case strings.Contains(v, " #"):
+		return "value contains ' #'"
+	case strings.ContainsAny(v[:1], "[{&*!|>'\"%@`"):
+		return "value starts with a YAML indicator"
+	}
+	return ""
+}
+
+// HeaderSafe reports whether v is a legal front matter value.
+func HeaderSafe(v string) bool { return headerValue(v) == "" }
+
+func splitKeywords(v string) []string {
+	var out []string
+	for _, k := range strings.Split(v, ",") {
+		if k = strings.TrimSpace(k); k != "" {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+type docParser struct {
+	doc      Doc
+	problems []Problem
+	vals     map[string]string
+
+	section string
+	// last: the previous line was a fact line, so an indented line is its reason.
+	last bool
+	seen map[string]int
+}
+
+func (p *docParser) add(line int, f string, a ...any) {
+	p.problems = append(p.problems, Problem{line, fmt.Sprintf(f, a...)})
+}
+
+// ParseDoc parses a doc file. inScope is false when line 1 is not "---" followed by
+// "kira-memory: 2" (or "kira-memory: 1", the retired format, which yields one problem and its front
+// matter); such a file is legacy and yields no problems.
+func ParseDoc(src []byte) (Doc, bool, []Problem) {
+	lines := splitLines(src)
+	if len(lines) < 2 || lines[0] != "---" || (lines[1] != "kira-memory: 2" && lines[1] != "kira-memory: 1") {
+		return Doc{}, false, nil
+	}
+	p := &docParser{vals: map[string]string{}, seen: map[string]int{}}
+	p.doc.Version = int(lines[1][len(lines[1])-1] - '0')
+	closeAt := p.front(lines)
+	if closeAt < 0 {
+		p.add(len(lines), "front matter is not closed with ---")
+		return p.doc, true, p.problems
+	}
+	p.checkFront()
+	if p.doc.Version == 1 {
+		p.add(2, "kira-memory: 1 is the retired P273 format; rewrite it as kira-memory: 2")
+		return p.doc, true, p.problems
+	}
+	for i := closeAt + 1; i < len(lines); i++ {
+		p.body(i+1, lines[i])
+	}
+	return p.doc, true, p.problems
+}
+
+// front reads the front matter fields and returns the line index of the closing fence, or -1.
+func (p *docParser) front(lines []string) int {
+	last := -1
+	for i := 2; i < len(lines); i++ {
+		n := i + 1
+		if lines[i] == "---" {
+			return i
+		}
+		k, v, ok := strings.Cut(lines[i], ": ")
+		idx := indexOf(docKeys, k)
+		switch {
+		case !ok || idx < 0:
+			p.add(n, "front matter line must be '<key>: <value>' with key %s", strings.Join(docKeys, ", "))
+			continue
+		case idx <= last:
+			p.add(n, "%s is repeated or out of order", k)
+			continue
+		}
+		last = idx
+		if msg := headerValue(v); msg != "" {
+			p.add(n, "%s: %s", k, msg)
+		}
+		p.vals[k] = v
+	}
+	return -1
+}
+
+func (p *docParser) checkFront() {
+	vals, d := p.vals, &p.doc
+	for _, k := range []string{"group", "title", "origin", "scope"} {
+		if _, ok := vals[k]; !ok {
+			p.add(2, "front matter lacks %s", k)
+		}
+	}
+	d.Group, d.Title, d.From = vals["group"], vals["title"], vals["from"]
+	if _, ok := vals["group"]; ok && !IsGroupID(d.Group) {
+		p.add(2, "group must be a kg_ id")
+	}
+	d.Origin, d.Source, d.Scope, d.Project, d.Session = vals["origin"], vals["source"], vals["scope"], vals["project"], vals["session"]
+	if _, ok := vals["origin"]; ok {
+		p.checkOrigin()
+	}
+	if _, ok := vals["scope"]; ok {
+		p.checkScope()
+	}
+	if v, ok := vals["keywords"]; ok {
+		d.Keywords = splitKeywords(v)
+	}
+	if v, ok := vals["updated"]; ok {
+		d.Updated = v
+		if _, err := time.Parse("2006-01-02", v); err != nil || !dateLine.MatchString(v) {
+			p.add(2, "updated must be YYYY-MM-DD")
+		}
+	}
+}
+
+func (p *docParser) checkOrigin() {
+	d := &p.doc
+	_, hasSource := p.vals["source"]
+	switch {
+	case !validOrigin(d.Origin):
+		p.add(2, "origin must be user, agent or external")
+	case d.Origin == "external" && (!hasSource || !sourceTag.MatchString(d.Source)):
+		p.add(2, "origin external needs source of 1 to 32 characters from a-z, 0-9 and -")
+	case d.Origin != "external" && hasSource:
+		p.add(2, "source is only for origin external")
+	case d.Origin == "external" && d.Session != "":
+		p.add(2, "session is only for origin user or agent")
+	}
+}
+
+func (p *docParser) checkScope() {
+	d := &p.doc
+	_, hasProject := p.vals["project"]
+	switch {
+	case !validScope(d.Scope):
+		p.add(2, "scope must be company, project or personal")
+	case d.Scope == "project" && !hasProject:
+		p.add(2, "scope project needs project")
+	case d.Scope != "project" && hasProject:
+		p.add(2, "project is only for scope project")
+	}
+}
+
+func (p *docParser) body(n int, line string) {
+	reason := isReasonText(line)
+	wasFact := p.last
+	p.last = false
+	switch {
+	case line == "":
+	case reason:
+		if !wasFact {
+			p.add(n, "reason line must directly follow a fact line")
+			return
+		}
+		last := &p.doc.Facts[len(p.doc.Facts)-1]
+		if msg := CheckText(line[2:]); msg != "" {
+			p.add(n, "%s reason: %s", last.ID, msg)
+		}
+		last.Reason = line[2:]
+	default:
+		if hm := headingLine.FindStringSubmatch(line); hm != nil {
+			p.section = strings.TrimSpace(hm[1])
+			return
+		}
+		if retiredLine.MatchString(line) {
+			p.add(n, "%s", retiredCommentMsg)
+			return
+		}
+		sm := docFactLine.FindStringSubmatch(line)
+		if sm == nil {
+			p.add(n, "body allows only blank lines, headings, '- <id> <fact>' lines and an indented reason line")
+			return
+		}
+		p.fact(n, sm[1], sm[2])
+	}
+}
+
+func (p *docParser) fact(n int, id, text string) {
+	if msg := CheckText(text); msg != "" {
+		p.add(n, "%s fact: %s", id, msg)
+	}
+	if first, dup := p.seen[id]; dup {
+		p.add(n, "%s already a fact at line %d", id, first)
+	}
+	p.seen[id] = n
+	p.doc.Facts = append(p.doc.Facts, Fact{ID: id, Fact: text, Line: n, Section: p.section})
+	p.last = true
+}
+
+func indexOf(list []string, s string) int {
+	for i, v := range list {
+		if v == s {
+			return i
+		}
+	}
+	return -1
+}

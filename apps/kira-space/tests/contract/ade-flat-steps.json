@@ -1,0 +1,1489 @@
+{
+  "AdeTaskService.Run#implement-done": {
+    "attempt": 1,
+    "branchId": "<id:1>",
+    "exitCode": 0,
+    "finishedAt": 0,
+    "id": "<id:2>",
+    "loops": 0,
+    "note": "",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "",
+      "reported": true,
+      "result": "done",
+      "route": "next",
+      "source": "agent",
+      "status": "done",
+      "summary": "summary-done"
+    },
+    "purpose": "",
+    "resumable": false,
+    "returns": 0,
+    "review": null,
+    "sandbox": {
+      "access": "write",
+      "denials": 0,
+      "enforced": false,
+      "last": ""
+    },
+    "sessionId": "<masked>",
+    "startedAt": 0,
+    "state": "done",
+    "stepId": "implement",
+    "summary": "summary-done",
+    "taskId": "<id:3>"
+  },
+  "AdeTaskService.Run#release-done": {
+    "attempt": 1,
+    "branchId": "<id:1>",
+    "exitCode": 0,
+    "finishedAt": 0,
+    "id": "<id:5>",
+    "loops": 0,
+    "note": "",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "",
+      "reported": false,
+      "result": "done",
+      "route": "next",
+      "source": "exit",
+      "status": "done"
+    },
+    "purpose": "",
+    "resumable": false,
+    "returns": 0,
+    "review": null,
+    "sandbox": null,
+    "sessionId": "<masked>",
+    "startedAt": 0,
+    "state": "done",
+    "stepId": "release",
+    "summary": "",
+    "taskId": "<id:3>"
+  },
+  "AdeTaskService.Run#review-waiting": {
+    "attempt": 1,
+    "branchId": "<id:1>",
+    "exitCode": null,
+    "finishedAt": null,
+    "id": "<id:4>",
+    "loops": 0,
+    "note": "",
+    "outcome": null,
+    "purpose": "",
+    "resumable": false,
+    "returns": 0,
+    "review": {
+      "note": "",
+      "phase": "waiting",
+      "round": 0,
+      "route": "implementer"
+    },
+    "sandbox": null,
+    "sessionId": "<masked>",
+    "startedAt": 0,
+    "state": "review",
+    "stepId": "review",
+    "summary": "",
+    "taskId": "<id:3>"
+  },
+  "AdeTaskService.SaveWorkflow#workflow": {
+    "error": null,
+    "fileName": "flow.yaml",
+    "hash": "<masked>",
+    "path": "<space>/workflows/flow.yaml",
+    "usedBy": 1,
+    "workflow": {
+      "id": "flow",
+      "kiraSpaceMcp": false,
+      "name": "Flow",
+      "steps": [
+        {
+          "allowedTools": [],
+          "before": "",
+          "command": "",
+          "id": "spec",
+          "kind": "manual",
+          "maxReturns": 0,
+          "name": "Spec",
+          "params": {},
+          "prompt": "Write the spec for {task}",
+          "results": [],
+          "review": null,
+          "runsOn": "",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": true,
+          "skip": false,
+          "smartScript": "",
+          "status": "To do",
+          "timeout": ""
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "implement",
+          "kind": "agent",
+          "maxReturns": 3,
+          "name": "Build it",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
+            {
+              "description": "",
+              "id": "done",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "failed",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "review",
+          "kind": "review",
+          "maxReturns": 2,
+          "name": "review",
+          "params": {},
+          "prompt": "",
+          "results": [
+            {
+              "description": "",
+              "id": "approved",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "rework",
+              "loop": true,
+              "next": "implement",
+              "ok": false
+            },
+            {
+              "description": "",
+              "id": "rejected",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": {
+            "implementer": "",
+            "sendTo": "implementer"
+          },
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In review",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "exit 0",
+          "id": "release",
+          "kind": "script",
+          "maxReturns": 3,
+          "name": "release",
+          "params": {},
+          "prompt": "",
+          "results": [
+            {
+              "description": "",
+              "id": "done",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "failed",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        }
+      ]
+    }
+  },
+  "AdeTaskService.Task#created": {
+    "branchIds": [],
+    "color": 0,
+    "createdAt": 0,
+    "entryStepId": "spec",
+    "est": "",
+    "githubUrl": "",
+    "id": "<masked>",
+    "jira": null,
+    "kind": "task",
+    "notes": "",
+    "owner": "",
+    "runs": [],
+    "since": {},
+    "title": "Fix login",
+    "workflow": null,
+    "workflowId": "flow",
+    "workflowOutdated": false
+  },
+  "AdeTaskService.Task#done": {
+    "branchIds": [],
+    "color": 0,
+    "createdAt": 0,
+    "entryStepId": "done",
+    "est": "",
+    "githubUrl": "",
+    "id": "<masked>",
+    "jira": null,
+    "kind": "task",
+    "notes": "",
+    "owner": "",
+    "runs": [
+      {
+        "attempt": 1,
+        "branchId": "<masked>",
+        "exitCode": 0,
+        "finishedAt": 0,
+        "id": "<masked>",
+        "loops": 0,
+        "note": "",
+        "outcome": {
+          "exitCode": 0,
+          "reason": "",
+          "reported": true,
+          "result": "done",
+          "route": "next",
+          "source": "agent",
+          "status": "done",
+          "summary": "summary-done"
+        },
+        "purpose": "",
+        "resumable": false,
+        "returns": 0,
+        "review": null,
+        "sandbox": {
+          "access": "write",
+          "denials": 0,
+          "enforced": false,
+          "last": ""
+        },
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "done",
+        "stepId": "implement",
+        "summary": "summary-done",
+        "taskId": "<masked>"
+      },
+      {
+        "attempt": 1,
+        "branchId": "<masked>",
+        "exitCode": null,
+        "finishedAt": 0,
+        "id": "<masked>",
+        "loops": 0,
+        "note": "",
+        "outcome": {
+          "reason": "",
+          "reported": true,
+          "result": "approved",
+          "route": "next",
+          "source": "user",
+          "status": "done",
+          "summary": "lgtm"
+        },
+        "purpose": "",
+        "resumable": false,
+        "returns": 0,
+        "review": {
+          "note": "",
+          "phase": "done",
+          "round": 0,
+          "route": "implementer"
+        },
+        "sandbox": null,
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "done",
+        "stepId": "review",
+        "summary": "lgtm",
+        "taskId": "<masked>"
+      },
+      {
+        "attempt": 1,
+        "branchId": "<masked>",
+        "exitCode": 0,
+        "finishedAt": 0,
+        "id": "<masked>",
+        "loops": 0,
+        "note": "",
+        "outcome": {
+          "exitCode": 0,
+          "reason": "",
+          "reported": false,
+          "result": "done",
+          "route": "next",
+          "source": "exit",
+          "status": "done"
+        },
+        "purpose": "",
+        "resumable": false,
+        "returns": 0,
+        "review": null,
+        "sandbox": null,
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "done",
+        "stepId": "release",
+        "summary": "",
+        "taskId": "<masked>"
+      }
+    ],
+    "since": {},
+    "title": "Fix login",
+    "workflow": {
+      "id": "<masked>",
+      "kiraSpaceMcp": false,
+      "name": "Flow",
+      "steps": [
+        {
+          "allowedTools": [],
+          "before": "",
+          "command": "",
+          "id": "<masked>",
+          "kind": "manual",
+          "maxReturns": 0,
+          "name": "Spec",
+          "params": {},
+          "prompt": "Write the spec for {task}",
+          "results": [],
+          "review": null,
+          "runsOn": "",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": true,
+          "skip": false,
+          "smartScript": "",
+          "status": "To do",
+          "timeout": ""
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "<masked>",
+          "kind": "agent",
+          "maxReturns": 3,
+          "name": "implement",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "<masked>",
+          "kind": "review",
+          "maxReturns": 2,
+          "name": "review",
+          "params": {},
+          "prompt": "",
+          "results": [
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": true,
+              "next": "implement",
+              "ok": false
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": {
+            "implementer": "",
+            "sendTo": "implementer"
+          },
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In review",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "exit 0",
+          "id": "<masked>",
+          "kind": "script",
+          "maxReturns": 3,
+          "name": "release",
+          "params": {},
+          "prompt": "",
+          "results": [
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        }
+      ]
+    },
+    "workflowId": "flow",
+    "workflowOutdated": false
+  },
+  "AdeTaskService.Task#manual": {
+    "branchIds": [],
+    "color": 0,
+    "createdAt": 0,
+    "entryStepId": "spec",
+    "est": "",
+    "githubUrl": "",
+    "id": "<masked>",
+    "jira": null,
+    "kind": "task",
+    "notes": "",
+    "owner": "",
+    "runs": [],
+    "since": {},
+    "title": "Fix login",
+    "workflow": {
+      "id": "<masked>",
+      "kiraSpaceMcp": false,
+      "name": "Flow",
+      "steps": [
+        {
+          "allowedTools": [],
+          "before": "",
+          "command": "",
+          "id": "<masked>",
+          "kind": "manual",
+          "maxReturns": 0,
+          "name": "Spec",
+          "params": {},
+          "prompt": "Write the spec for {task}",
+          "results": [],
+          "review": null,
+          "runsOn": "",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": true,
+          "skip": false,
+          "smartScript": "",
+          "status": "To do",
+          "timeout": ""
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "<masked>",
+          "kind": "agent",
+          "maxReturns": 3,
+          "name": "implement",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "<masked>",
+          "kind": "review",
+          "maxReturns": 2,
+          "name": "review",
+          "params": {},
+          "prompt": "",
+          "results": [
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": true,
+              "next": "implement",
+              "ok": false
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": {
+            "implementer": "",
+            "sendTo": "implementer"
+          },
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In review",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "exit 0",
+          "id": "<masked>",
+          "kind": "script",
+          "maxReturns": 3,
+          "name": "release",
+          "params": {},
+          "prompt": "",
+          "results": [
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        }
+      ]
+    },
+    "workflowId": "flow",
+    "workflowOutdated": false
+  },
+  "AdeTaskService.Task#moved": {
+    "branchIds": [],
+    "color": 0,
+    "createdAt": 0,
+    "entryStepId": "implement",
+    "est": "",
+    "githubUrl": "",
+    "id": "<masked>",
+    "jira": null,
+    "kind": "task",
+    "notes": "",
+    "owner": "",
+    "runs": [
+      {
+        "attempt": 1,
+        "branchId": "<masked>",
+        "exitCode": 0,
+        "finishedAt": 0,
+        "id": "<masked>",
+        "loops": 0,
+        "note": "",
+        "outcome": {
+          "exitCode": 0,
+          "reason": "",
+          "reported": true,
+          "result": "done",
+          "route": "next",
+          "source": "agent",
+          "status": "done",
+          "summary": "summary-done"
+        },
+        "purpose": "",
+        "resumable": false,
+        "returns": 0,
+        "review": null,
+        "sandbox": {
+          "access": "write",
+          "denials": 0,
+          "enforced": false,
+          "last": ""
+        },
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "done",
+        "stepId": "implement",
+        "summary": "summary-done",
+        "taskId": "<masked>"
+      },
+      {
+        "attempt": 1,
+        "branchId": "<masked>",
+        "exitCode": null,
+        "finishedAt": null,
+        "id": "<masked>",
+        "loops": 0,
+        "note": "",
+        "outcome": null,
+        "purpose": "",
+        "resumable": false,
+        "returns": 0,
+        "review": {
+          "note": "",
+          "phase": "waiting",
+          "round": 0,
+          "route": "implementer"
+        },
+        "sandbox": null,
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "review",
+        "stepId": "review",
+        "summary": "",
+        "taskId": "<masked>"
+      }
+    ],
+    "since": {
+      "implement/<id:1>": 1,
+      "review/<id:1>": 1
+    },
+    "title": "Fix login",
+    "workflow": {
+      "id": "<masked>",
+      "kiraSpaceMcp": false,
+      "name": "Flow",
+      "steps": [
+        {
+          "allowedTools": [],
+          "before": "",
+          "command": "",
+          "id": "<masked>",
+          "kind": "manual",
+          "maxReturns": 0,
+          "name": "Spec",
+          "params": {},
+          "prompt": "Write the spec for {task}",
+          "results": [],
+          "review": null,
+          "runsOn": "",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": true,
+          "skip": false,
+          "smartScript": "",
+          "status": "To do",
+          "timeout": ""
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "<masked>",
+          "kind": "agent",
+          "maxReturns": 3,
+          "name": "implement",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "<masked>",
+          "kind": "review",
+          "maxReturns": 2,
+          "name": "review",
+          "params": {},
+          "prompt": "",
+          "results": [
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": true,
+              "next": "implement",
+              "ok": false
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": {
+            "implementer": "",
+            "sendTo": "implementer"
+          },
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In review",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "exit 0",
+          "id": "<masked>",
+          "kind": "script",
+          "maxReturns": 3,
+          "name": "release",
+          "params": {},
+          "prompt": "",
+          "results": [
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        }
+      ]
+    },
+    "workflowId": "flow",
+    "workflowOutdated": false
+  },
+  "AdeTaskService.Task#return": {
+    "branchIds": [],
+    "color": 0,
+    "createdAt": 0,
+    "entryStepId": "implement",
+    "est": "",
+    "githubUrl": "",
+    "id": "<masked>",
+    "jira": null,
+    "kind": "task",
+    "notes": "",
+    "owner": "",
+    "runs": [
+      {
+        "attempt": 1,
+        "branchId": "<masked>",
+        "exitCode": 0,
+        "finishedAt": 0,
+        "id": "<masked>",
+        "loops": 0,
+        "note": "",
+        "outcome": {
+          "exitCode": 0,
+          "reason": "",
+          "reported": true,
+          "result": "done",
+          "route": "next",
+          "source": "agent",
+          "status": "done",
+          "summary": "summary-done"
+        },
+        "purpose": "",
+        "resumable": false,
+        "returns": 0,
+        "review": null,
+        "sandbox": {
+          "access": "write",
+          "denials": 0,
+          "enforced": false,
+          "last": ""
+        },
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "done",
+        "stepId": "implement",
+        "summary": "summary-done",
+        "taskId": "<masked>"
+      },
+      {
+        "attempt": 1,
+        "branchId": "<masked>",
+        "exitCode": null,
+        "finishedAt": null,
+        "id": "<masked>",
+        "loops": 0,
+        "note": "",
+        "outcome": null,
+        "purpose": "",
+        "resumable": false,
+        "returns": 0,
+        "review": {
+          "note": "",
+          "phase": "waiting",
+          "round": 0,
+          "route": "implementer"
+        },
+        "sandbox": null,
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "review",
+        "stepId": "review",
+        "summary": "",
+        "taskId": "<masked>"
+      },
+      {
+        "attempt": 2,
+        "branchId": "<masked>",
+        "exitCode": null,
+        "finishedAt": 0,
+        "id": "<masked>",
+        "loops": 0,
+        "note": "rename foo → back to implement (1 of 2)",
+        "outcome": {
+          "reason": "rename foo → back to implement (1 of 2)",
+          "reported": true,
+          "result": "rework",
+          "route": "back:implement",
+          "source": "user",
+          "status": "failed",
+          "summary": "rename foo"
+        },
+        "purpose": "",
+        "resumable": false,
+        "returns": 1,
+        "review": {
+          "note": "",
+          "phase": "done",
+          "round": 0,
+          "route": "implementer"
+        },
+        "sandbox": null,
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "back",
+        "stepId": "review",
+        "summary": "rename foo",
+        "taskId": "<masked>"
+      },
+      {
+        "attempt": 2,
+        "branchId": "<masked>",
+        "exitCode": 0,
+        "finishedAt": 0,
+        "id": "<masked>",
+        "loops": 1,
+        "note": "",
+        "outcome": {
+          "exitCode": 0,
+          "reason": "",
+          "reported": true,
+          "result": "done",
+          "route": "next",
+          "source": "agent",
+          "status": "done",
+          "summary": "summary-done"
+        },
+        "purpose": "",
+        "resumable": false,
+        "returns": 0,
+        "review": null,
+        "sandbox": {
+          "access": "write",
+          "denials": 0,
+          "enforced": false,
+          "last": ""
+        },
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "done",
+        "stepId": "implement",
+        "summary": "summary-done",
+        "taskId": "<masked>"
+      },
+      {
+        "attempt": 3,
+        "branchId": "<masked>",
+        "exitCode": null,
+        "finishedAt": null,
+        "id": "<masked>",
+        "loops": 1,
+        "note": "",
+        "outcome": null,
+        "purpose": "",
+        "resumable": false,
+        "returns": 1,
+        "review": {
+          "note": "",
+          "phase": "waiting",
+          "round": 0,
+          "route": "implementer"
+        },
+        "sandbox": null,
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "review",
+        "stepId": "review",
+        "summary": "",
+        "taskId": "<masked>"
+      }
+    ],
+    "since": {
+      "review/<id:1>": 1
+    },
+    "title": "Fix login",
+    "workflow": {
+      "id": "<masked>",
+      "kiraSpaceMcp": false,
+      "name": "Flow",
+      "steps": [
+        {
+          "allowedTools": [],
+          "before": "",
+          "command": "",
+          "id": "<masked>",
+          "kind": "manual",
+          "maxReturns": 0,
+          "name": "Spec",
+          "params": {},
+          "prompt": "Write the spec for {task}",
+          "results": [],
+          "review": null,
+          "runsOn": "",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": true,
+          "skip": false,
+          "smartScript": "",
+          "status": "To do",
+          "timeout": ""
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "<masked>",
+          "kind": "agent",
+          "maxReturns": 3,
+          "name": "implement",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "<masked>",
+          "kind": "review",
+          "maxReturns": 2,
+          "name": "review",
+          "params": {},
+          "prompt": "",
+          "results": [
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": true,
+              "next": "implement",
+              "ok": false
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": {
+            "implementer": "",
+            "sendTo": "implementer"
+          },
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In review",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "exit 0",
+          "id": "<masked>",
+          "kind": "script",
+          "maxReturns": 3,
+          "name": "release",
+          "params": {},
+          "prompt": "",
+          "results": [
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "<masked>",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        }
+      ]
+    },
+    "workflowId": "flow",
+    "workflowOutdated": false
+  },
+  "args:AdeTaskService.SaveWorkflow": {
+    "baseHash": "<masked>",
+    "fileName": "flow.yaml",
+    "workflow": {
+      "id": "flow",
+      "kiraSpaceMcp": false,
+      "name": "Flow",
+      "steps": [
+        {
+          "allowedTools": [],
+          "before": "",
+          "command": "",
+          "id": "spec",
+          "kind": "manual",
+          "maxReturns": 0,
+          "name": "Spec",
+          "params": {},
+          "prompt": "Write the spec for {task}",
+          "results": [],
+          "review": null,
+          "runsOn": "",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": true,
+          "skip": false,
+          "smartScript": "",
+          "status": "To do",
+          "timeout": ""
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "implement",
+          "kind": "agent",
+          "maxReturns": 3,
+          "name": "Build it",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
+            {
+              "description": "",
+              "id": "done",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "failed",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "review",
+          "kind": "review",
+          "maxReturns": 2,
+          "name": "review",
+          "params": {},
+          "prompt": "",
+          "results": [
+            {
+              "description": "",
+              "id": "approved",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "rework",
+              "loop": true,
+              "next": "implement",
+              "ok": false
+            },
+            {
+              "description": "",
+              "id": "rejected",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": {
+            "implementer": "",
+            "sendTo": "implementer"
+          },
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In review",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "exit 0",
+          "id": "release",
+          "kind": "script",
+          "maxReturns": 3,
+          "name": "release",
+          "params": {},
+          "prompt": "",
+          "results": [
+            {
+              "description": "",
+              "id": "done",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "failed",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        }
+      ]
+    }
+  }
+}

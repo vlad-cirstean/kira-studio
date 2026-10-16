@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Redacted fixture (P25 §4.3, F1's IDE-level variant): the same <data-source> element wrapped in
+     <application><component name="dataSourceStorage">…</component></application> instead of
+     <project><component name="DataSourceManagerImpl">…</component></project> — the shape
+     JamesNurden/java_spring_microservices_app, mdevizi-byte/MicroservizioMoto and
+     grahamcrowell/idea-intellij-settings all use for their IDE-level (not per-project) data
+     source list. Case 4: the parser accepts both root shapes identically. -->
+<application>
+  <component name="dataSourceStorage">
+    <data-source source="LOCAL" name="ide-level-pg" uuid="22222222-0000-0000-0000-000000000001">
+      <driver-ref>postgresql</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.postgresql.Driver</jdbc-driver>
+      <jdbc-url>jdbc:postgresql://ide-pg.example.internal:5432/globaldb</jdbc-url>
+    </data-source>
+  </component>
+</application>

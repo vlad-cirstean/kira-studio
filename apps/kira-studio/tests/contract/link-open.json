@@ -1,0 +1,5 @@
+{
+  "args:LinkService.OpenExternal": {
+    "url": "https://hub.docker.com/_/alpine"
+  }
+}

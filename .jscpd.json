@@ -1,0 +1,14 @@
+{
+  "path": ["apps", "packages"],
+  "format": ["typescript", "vue"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/generated/**",
+    "**/protocol/wire/**",
+    "**/bindings/**",
+    "**/*.d.ts"
+  ],
+  "reporters": ["console"],
+  "noTips": true
+}

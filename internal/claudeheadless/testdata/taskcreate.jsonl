@@ -1,0 +1,15 @@
+{"type": "system", "subtype": "init", "cwd": "/work", "session_id": "33f903aa-fd9f-458a-8f0e-7776cb029e6e"}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01VSng2qHAbw8C5yPe47t5kX", "name": "ToolSearch", "input": {"query": "select:TaskCreate,TaskUpdate,TaskList", "max_results": 5}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01VSng2qHAbw8C5yPe47t5kX", "content": [{"type": "tool_reference", "tool_name": "TaskCreate"}, {"type": "tool_reference", "tool_name": "TaskUpdate"}, {"type": "tool_reference", "tool_name": "TaskList"}]}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01BM7nokFDGqFV4JnVyvwv9i", "name": "Bash", "input": {"command": "echo hi", "description": "Run the echo command"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"tool_use_id": "toolu_01BM7nokFDGqFV4JnVyvwv9i", "type": "tool_result", "content": "hi", "is_error": false}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01SMcnQVvqExZMXLxMrFDAsP", "name": "TaskCreate", "input": {"subject": "First todo item", "description": "This is the first item on the todo list"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"tool_use_id": "toolu_01SMcnQVvqExZMXLxMrFDAsP", "type": "tool_result", "content": "Task #1 created successfully: First todo item"}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_015Tt1pTXWSGvy3W8N7op5sC", "name": "TaskCreate", "input": {"subject": "Second todo item", "description": "This is the second item on the todo list"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"tool_use_id": "toolu_015Tt1pTXWSGvy3W8N7op5sC", "type": "tool_result", "content": "Task #2 created successfully: Second todo item"}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_012P9bRzv7V56GW8SGdRRs9p", "name": "TaskUpdate", "input": {"taskId": "1", "status": "completed"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"tool_use_id": "toolu_012P9bRzv7V56GW8SGdRRs9p", "type": "tool_result", "content": "Updated task #1 status"}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01N41ipdK4xG8eWSRpig3Ug4", "name": "TaskUpdate", "input": {"taskId": "2", "status": "completed"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"tool_use_id": "toolu_01N41ipdK4xG8eWSRpig3Ug4", "type": "tool_result", "content": "Updated task #2 status"}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "Done."}]}}
+{"type": "result", "subtype": "success", "num_turns": 7, "is_error": false, "permission_denials": []}

@@ -1,0 +1,30 @@
+/* P103 Part 1 set out to fix Tailwind v4's automatic content scan rooting at the consuming app's
+ * own Vite project and never reaching a sibling package, with `@source "./";` below plus each
+ * app's main.ts importing this file as a second, independent stylesheet straight after
+ * `@theme/base.css`. P104 found that half didn't actually work: `@tailwindcss/vite` compiles each
+ * CSS file Vite imports as its own independent root, and only follows a file's *own* `@import`
+ * chain to collect `@source` directives — a file with no `@import "tailwindcss"` of its own (this
+ * one) has no Tailwind engine running over it at all, so `@source` here was inert the whole time.
+ * Confirmed empirically: a canary utility class used only in this package (nothing else in the
+ * repo referencing it) generated no CSS before this fix, and does after.
+ *
+ * Fix: pull this file into the *same* compiled root as `@theme/base.css` via a real CSS `@import`,
+ * so the compiler that already runs over base.css follows into this file's own `@source` too. This
+ * package already depends on packages/theme (CodiconIcon, components/ui/*), so workbench.css
+ * importing theme's base.css is the existing dependency direction, not a new one — P103's own
+ * "don't couple theme to workbench" rule is about the reverse edge (base.css importing this file)
+ * and still holds; nothing here adds that edge. Each app's main.ts now imports only this file, not
+ * `@theme/base.css` directly — importing both would compile base.css as two separate roots and
+ * double every one of its utilities in the output.
+ *
+ * P110 B7-B13 emptied every rule this file used to carry (dead selectors, the settings field
+ * vocabulary, the title bar/tab-strip chrome) onto Tailwind utility classes and `Button` variants
+ * directly in their own consumers' templates -- this file's own job is now only pulling the
+ * compiled Tailwind root in, per the comment above. Kept as its own file (not folded into
+ * `@theme/base.css`) since this package's own `@source "./"` scan root, scoped to this package's
+ * files, only takes effect through a file that itself imports the Tailwind root -- exactly what
+ * this file's own history above already explains. */
+@import "@theme/base.css";
+@import "./editor/edDecorations.css";
+@source "./";
+@source "../../docker-ui/src";

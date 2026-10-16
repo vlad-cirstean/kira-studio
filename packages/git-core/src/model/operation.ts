@@ -1,0 +1,505 @@
+/**
+ * §7.11's in-progress state machine and §7's `OpRequest`/`OpResult` union — the types the whole
+ * phase is typed against. Pure data and pure functions only; `git/src/ops/conflict.ts` is the
+ * only thing that reads `.git`'s state files off disk, and it hands its result to
+ * `classifyInProgress` below as plain data (`InProgressStateFiles`), which is what makes the
+ * precedence table a named unit test per row instead of an integration-only fact.
+ */
+
+/** `HeadState` is already `core`'s own (`model/repo.ts`) — not re-declared here. */
+import { shortSha } from '../lib/sha.ts';
+import type { TextRef } from '../lib/textRef.ts';
+import type { HeadState } from './repo.ts';
+
+export type InProgressKind =
+  | 'merge'
+  | 'cherryPick'
+  | 'revert'
+  | 'rebase'
+  | 'bisect'
+  | 'unmergedOnly';
+
+export interface InProgressOperation {
+  readonly kind: InProgressKind;
+  /** MERGE_HEAD / CHERRY_PICK_HEAD / REVERT_HEAD's content, or rebase's `onto`. */
+  readonly otherSha: string | undefined;
+  /** rebase only: `rebase-merge/head-name`'s content, e.g. `refs/heads/side`. */
+  readonly headName: string | undefined;
+  readonly conflictedPaths: readonly string[];
+  /** True only where `git <op> --continue` exists AND v1 offers it — false only for bisect and
+   *  unmergedOnly. Rebase was false through G25 (§9's "report-only posture"); G26 D12 flips it to
+   *  true once `stack.restack` can start one. Kept independent of `unmergedCount`: the
+   *  *enablement* is
+   *  `canContinue && unmergedCount === 0`, which is what lets the banner say "resolve the
+   *  remaining N files, then Continue" rather than hiding the button outright. */
+  readonly canContinue: boolean;
+  readonly canAbort: boolean;
+  /** `.git/sequencer/` present: a multi-commit revert or cherry-pick mid-run, where `--abort`
+   *  is what delivers §7.10's all-or-nothing. */
+  readonly isSequence: boolean;
+  /** Continue is *enabled* only when this is 0 (§7.11). Kept separate from
+   *  `conflictedPaths.length` so a host that caps the path list cannot accidentally enable it. */
+  readonly unmergedCount: number;
+  /** P10 probe 6: true for `cherryPick` and `revert` — the two sequencer operations git gives a
+   *  `--skip` — and, since G26 D12, `rebase` too. Without this the banner would offer a Continue
+   *  that cannot succeed on an empty pick (`CHERRY_PICK_HEAD` present, zero unmerged paths —
+   *  Continue refuses, `--skip` is git's own named remedy). */
+  readonly canSkip: boolean;
+}
+
+/** What `git/src/ops/conflict.ts` reads off disk (per-worktree `gitDir`, never `commonDir` —
+ *  D12) — deliberately plain data, so `classifyInProgress` needs no I/O to test. A missing file
+ *  is `undefined`/`false`, never a throw. */
+export interface InProgressStateFiles {
+  /** `MERGE_HEAD`'s content, trimmed. */
+  readonly mergeHead: string | undefined;
+  readonly cherryPickHead: string | undefined;
+  readonly revertHead: string | undefined;
+  /** Presence only — v1 never reads `BISECT_LOG`'s content (report-only, §9). */
+  readonly bisectLog: boolean;
+  readonly rebaseMergeDir: boolean;
+  readonly rebaseApplyDir: boolean;
+  /** `rebase-apply/applying`'s own presence (F3) — git's own marker (mirrored from wt-status.c)
+   *  distinguishing a plain `git am` (present) from an apply-backend `git rebase` (absent), both
+   *  of which use the SAME `rebase-apply/` directory. */
+  readonly rebaseApplyApplying: boolean;
+  /** `rebase-merge/head-name`'s content, trimmed, e.g. `refs/heads/side` — or `rebase-apply/`'s
+   *  own copy when it is the apply backend (or `git am`) that is in progress instead. */
+  readonly rebaseHeadName: string | undefined;
+  /** `rebase-merge/onto`'s content, trimmed — a sha — or `rebase-apply/`'s own copy, same rule. */
+  readonly rebaseOnto: string | undefined;
+  readonly sequencerDir: boolean;
+  /** F2's own re-derived kind: when `sequencerDir` is set but every `*Head` field above is already
+   *  `undefined` (a paused multi-commit revert/cherry-pick whose current commit was finished with
+   *  a plain `git commit` instead of `--continue`), git's own sequencer state machine is still
+   *  mid-run — this is `'revert'` or `'cherryPick'`, read from `sequencer/todo`'s first pending
+   *  command, the same source git's own wt-status.c consults for exactly this state. `undefined`
+   *  when `sequencerDir` is false, or its todo does not name either. */
+  readonly sequencerTodoKind: 'revert' | 'cherryPick' | undefined;
+}
+
+function operationOf(
+  kind: InProgressKind,
+  input: {
+    readonly otherSha: string | undefined;
+    readonly headName: string | undefined;
+    readonly canContinue: boolean;
+    readonly canAbort: boolean;
+    readonly isSequence: boolean;
+    readonly unmergedPaths: readonly string[];
+  },
+): InProgressOperation {
+  return {
+    kind,
+    otherSha: input.otherSha,
+    headName: input.headName,
+    conflictedPaths: input.unmergedPaths,
+    canContinue: input.canContinue,
+    canAbort: input.canAbort,
+    isSequence: input.isSequence,
+    unmergedCount: input.unmergedPaths.length,
+    // G26 D12: rebase joins cherryPick/revert in offering Skip.
+    canSkip: kind === 'cherryPick' || kind === 'revert' || kind === 'rebase',
+  };
+}
+
+/**
+ * §7.11's precedence table, exactly: rebase shadows everything else (a rebase stopped on a
+ * conflict also leaves the sequencer files a cherry-pick would), then merge, cherry-pick,
+ * revert, bisect, and finally a bare "unmerged paths with none of the six state files present"
+ * fallback (a resolved-then-reset state, or `git checkout -m`). `AUTO_MERGE` is deliberately not
+ * an input here — probe P4 found it left behind after an aborted cherry-pick, so it is a stale
+ * artefact, not a state signal.
+ */
+export function classifyInProgress(input: {
+  readonly stateFiles: InProgressStateFiles;
+  readonly unmergedPaths: readonly string[];
+}): InProgressOperation | null {
+  const { stateFiles: s, unmergedPaths } = input;
+
+  if (s.rebaseMergeDir || s.rebaseApplyDir) {
+    if (s.rebaseApplyDir && s.rebaseApplyApplying) {
+      // F3: rebase-apply/ with an "applying" marker is a plain `git am`, not a rebase at all --
+      // `rebase --continue`/`--abort`/`--skip` all refuse outright ("It looks like 'git am' is in
+      // progress. Cannot rebase."). Report-only: every Can* flag false. A dedicated `am`
+      // InProgressKind would be a git-ipc wire-contract change -- out of scope here, so this
+      // reuses `'rebase'`'s own kind with every action gated off rather than widening the union.
+      const op = operationOf('rebase', {
+        otherSha: s.rebaseOnto,
+        headName: s.rebaseHeadName,
+        canContinue: false,
+        canAbort: false,
+        isSequence: s.sequencerDir,
+        unmergedPaths,
+      });
+      return { ...op, canSkip: false }; // operationOf's own kind-based default is true; not here.
+    }
+    return operationOf('rebase', {
+      otherSha: s.rebaseOnto,
+      headName: s.rebaseHeadName,
+      // G26 D12: true — retires G5's "report-only posture", now that stack.restack can START one.
+      canContinue: true,
+      canAbort: true,
+      isSequence: s.sequencerDir,
+      unmergedPaths,
+    });
+  }
+  if (s.mergeHead !== undefined) {
+    return operationOf('merge', {
+      otherSha: s.mergeHead,
+      headName: undefined,
+      canContinue: true,
+      canAbort: true,
+      isSequence: s.sequencerDir,
+      unmergedPaths,
+    });
+  }
+  if (s.cherryPickHead !== undefined) {
+    return operationOf('cherryPick', {
+      otherSha: s.cherryPickHead,
+      headName: undefined,
+      canContinue: true,
+      canAbort: true,
+      isSequence: s.sequencerDir,
+      unmergedPaths,
+    });
+  }
+  if (s.revertHead !== undefined) {
+    return operationOf('revert', {
+      otherSha: s.revertHead,
+      headName: undefined,
+      canContinue: true,
+      canAbort: true,
+      isSequence: s.sequencerDir,
+      unmergedPaths,
+    });
+  }
+  if (s.sequencerDir && s.sequencerTodoKind !== undefined) {
+    // F2: no `*Head` field is left (the paused commit was finished with a plain `git commit`
+    // instead of `--continue`), but git's own sequencer state machine is still mid-run --
+    // `git status`/`--continue` both still see it. `sequencerTodoKind` names which one.
+    return operationOf(s.sequencerTodoKind, {
+      otherSha: undefined,
+      headName: undefined,
+      canContinue: true,
+      canAbort: true,
+      isSequence: true,
+      unmergedPaths,
+    });
+  }
+  if (s.bisectLog) {
+    return operationOf('bisect', {
+      otherSha: undefined,
+      headName: undefined,
+      canContinue: false,
+      canAbort: true,
+      isSequence: s.sequencerDir,
+      unmergedPaths,
+    });
+  }
+  if (unmergedPaths.length > 0) {
+    return operationOf('unmergedOnly', {
+      otherSha: undefined,
+      headName: undefined,
+      canContinue: false,
+      canAbort: false,
+      isSequence: s.sequencerDir,
+      unmergedPaths,
+    });
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------------------
+// §7's op.run union, and the undo slot's own wire-shaped snapshot (structurally copied onto
+// the wire by packages/ipc — see that package's contract.ts).
+// ---------------------------------------------------------------------------------------
+
+/** §7.7's three reset modes, named exactly as git's own flags. */
+export type ResetMode = 'soft' | 'mixed' | 'hard';
+
+export type OpRequest =
+  | {
+      readonly kind: 'checkout';
+      readonly target: string;
+      readonly mode: 'switch' | 'detach';
+      /** §7.5's "discard" route: `git switch --discard-changes`. Cannot clear an untracked
+       *  block (probe P9) — the UI never offers it for one. */
+      readonly discardLocalChanges: boolean;
+      /** G28 D3: prepend a whole-tree `stash push [-u]` tagged with the CURRENT branch, so the
+       *  switch cannot be blocked by a dirty tree. Never popped back (D1). Mutually exclusive
+       *  with `discardLocalChanges`. */
+      readonly autoStash: boolean;
+    }
+  | {
+      readonly kind: 'branchCreate';
+      readonly name: string;
+      readonly startPoint: string;
+      readonly checkout: boolean;
+      readonly track: string | undefined;
+    }
+  | { readonly kind: 'branchDelete'; readonly name: string; readonly force: boolean }
+  | { readonly kind: 'branchRename'; readonly from: string; readonly to: string }
+  | {
+      readonly kind: 'tagCreate';
+      readonly name: string;
+      readonly target: string;
+      /** Present ⇒ annotated (`-a -m`). Absent ⇒ lightweight. On `force`, an annotated tag
+       *  MUST re-supply this or `-f` downgrades it to lightweight (probe P3). */
+      readonly message: string | undefined;
+      readonly force: boolean;
+    }
+  | { readonly kind: 'tagDelete'; readonly name: string }
+  | { readonly kind: 'tagPush'; readonly remote: string; readonly names: readonly string[] | 'all' }
+  | { readonly kind: 'tagDeleteRemote'; readonly remote: string; readonly name: string }
+  | {
+      readonly kind: 'revert';
+      readonly shas: readonly string[];
+      readonly mainline: number | undefined;
+      readonly noCommit: boolean;
+    }
+  | { readonly kind: 'opContinue' }
+  | { readonly kind: 'opAbort' }
+  | {
+      readonly kind: 'stashPush';
+      /** Undefined → git's own `WIP on <branch>: …`. */
+      readonly message: string | undefined;
+      readonly includeUntracked: boolean;
+      readonly keepIndex: boolean;
+      /** Joined after a literal `--`. Empty ⇒ the whole worktree. */
+      readonly paths: readonly string[];
+    }
+  /** `apply` accepts a raw sha, so this addresses by sha and needs no index guard (probe 8). */
+  | { readonly kind: 'stashApply'; readonly sha: string; readonly restoreIndex: boolean }
+  /** `pop` REFUSES a raw sha, so the argv must use `stash@{index}` and the service verifies
+   *  `rev-parse stash@{index} === sha` immediately before writing (probe 8). */
+  | {
+      readonly kind: 'stashPop';
+      readonly sha: string;
+      readonly index: number;
+      readonly restoreIndex: boolean;
+    }
+  | { readonly kind: 'stashDrop'; readonly sha: string; readonly index: number }
+  /** Addressed by `stash@{index}`: given a raw sha, `stash branch` applies but silently never
+   *  drops (probe 8). G28 D12: `scope: 'global'` skips the stack-position verification entirely. */
+  | {
+      readonly kind: 'stashBranch';
+      readonly branch: string;
+      readonly sha: string;
+      readonly index: number;
+      readonly scope?: 'stack' | 'global';
+    }
+  | {
+      readonly kind: 'reset';
+      readonly mode: ResetMode;
+      /** A sha, always — resolved by the caller from the graph row. Never a ref name: the
+       *  pre-flight resolved and counted against this exact object, and re-resolving a name
+       *  host-side could move the target between advice and act. */
+      readonly target: string;
+      /** §7.7's typed confirmation, required (and re-checked host-side, hard part 2) exactly when
+       *  `mode === "hard"` and the pre-flight's `destroys` was non-empty. The short sha of
+       *  `target`, mirroring `ForcePushDialog`'s branch-name token (D19/D52). */
+      readonly confirmToken: string | undefined;
+    }
+  | {
+      readonly kind: 'cherryPick';
+      readonly sha: string;
+      /** Required for a merge commit — probe 8: `is a merge but no -m option was given`. */
+      readonly mainline: number | undefined;
+      readonly noCommit: boolean;
+    }
+  /** §7.13/probe 6: the sequencer's own named remedy for an empty pick or revert — distinct from
+   *  `opContinue`, which git refuses outright when `CHERRY_PICK_HEAD`/`REVERT_HEAD` is present but
+   *  the change is already applied (`canSkip` is what the banner uses to know this is offered). */
+  | { readonly kind: 'opSkip' }
+  /** G25 D2/D3: three explicit creation modes, always with an explicit commit-ish — bare DWIM
+   *  (probe M8) is never relied on. Deliberately no `force` (G28 owns the "already checked out
+   *  elsewhere" auto-detach answer). */
+  | {
+      readonly kind: 'worktreeAdd';
+      readonly path: string;
+      readonly mode: 'existingBranch' | 'newBranch' | 'detach';
+      readonly branch: string | undefined;
+      readonly startPoint: string | undefined;
+    }
+  /** G25 D2/D8: `force`/`confirmToken` are both re-derived and re-checked host-side immediately
+   *  before the write, never trusted as the client's own claim. */
+  | {
+      readonly kind: 'worktreeRemove';
+      readonly path: string;
+      readonly force: boolean;
+      readonly confirmToken: string | undefined;
+    }
+  /** G26 D10: sets or clears a branch's stack parent — always exactly two `git config --local`
+   *  writes, always exit 0 (D2). `parent: undefined` removes `branch` from its stack. */
+  | { readonly kind: 'stackSet'; readonly branch: string; readonly parent: string | undefined }
+  /** G28 D10: saves an entry into the global stash bucket — ALWAYS COPIES, never drops its
+   *  source. `sha: undefined` snapshots the current working tree; otherwise the sha of an
+   *  existing stash-stack or global entry to promote. */
+  | { readonly kind: 'globalStashSave'; readonly label: string; readonly sha: string | undefined }
+  /** G28 D11: removes one entry from the global bucket. */
+  | { readonly kind: 'globalStashRemove'; readonly sha: string };
+
+export type OpErrorKind =
+  | 'AuthFailed'
+  | 'NonFastForward'
+  | 'Conflict'
+  | 'DirtyWorktree'
+  | 'UntrackedWouldBeOverwritten'
+  | 'LockHeld'
+  | 'NotFound'
+  | 'AlreadyExists'
+  | 'NotFullyMerged'
+  | 'WorktreeConflict'
+  | 'OperationInProgress'
+  | 'RemoteRefMissing'
+  | 'HookRejected'
+  /** P8: `git`'s own `(stale info)` — the bare `--force-with-lease` lease was violated because
+   *  the remote moved and we never fetched it. Probe 1, rows 1-2. */
+  | 'LeaseViolation'
+  /** P8: `git`'s own `(remote ref updated since checkout)` — `--force-if-includes` caught a
+   *  remote move we DID fetch but have not integrated. Probe 1, row 3. Kept distinct from
+   *  `LeaseViolation`: the remedies differ (fetch-and-look vs. you-already-saw-this). */
+  | 'RemoteRefUpdated'
+  /** P8: a transport-level failure (`Could not resolve host`, `Connection refused/timed out`) —
+   *  never git's own decision, always the network. */
+  | 'NetworkFailed'
+  /** P8: the remote itself does not exist (`Repository not found`, "does not appear to be a
+   *  git repository"). */
+  | 'RemoteNotFound'
+  /** P8: neither git says this nor could it — the confirmation token `remote.run` requires for
+   *  a protected-branch force-push/delete was absent or did not match (D52). */
+  | 'ProtectedBranch'
+  /** P8: a remote op was cancelled mid-flight (D50) — never a git-reported failure either. */
+  | 'Cancelled'
+  /** P9: a pop/apply merged with conflicts. Deliberately NOT detected from a stderr pattern — a
+   *  conflicting pop writes to stdout and leaves stderr empty (probe 5) — `RepoService`
+   *  classifies it from `exitCode !== 0` plus a post-op status read-back finding unmerged paths.
+   *  The stash is ALWAYS kept (§7.6); the message says so. */
+  | 'StashConflict'
+  /** P9: `apply --index`/`pop --index` onto an already-conflicted index —
+   *  `error: conflicts in index. Try without --index.` (probe 10). Distinct from `StashConflict`
+   *  because the remedy is different and git names it exactly: retry the same op with
+   *  `restoreIndex: false`. */
+  | 'StashIndexConflict'
+  /** P9: untracked files in the way of restoring the stash's own untracked half — the ONE
+   *  non-atomic failure in the phase: the tracked half was already applied and the stash was
+   *  kept (probe 3). */
+  | 'StashUntrackedCollision'
+  /** P10 probe 6: `cherry-pick`/`revert` refused because the change is already present — nothing
+   *  left to commit, and `--skip` (not `--continue`) is git's own remedy (`canSkip`). */
+  | 'EmptyCherryPick'
+  /** P10: the typed confirmation a destructive `reset --hard` requires was absent or did not
+   *  match, re-checked host-side. Deliberately NOT `ProtectedBranch` (D52's pattern is reused;
+   *  its kind is not — the taxonomy should not claim a branch protection that does not exist). */
+  | 'ConfirmationRequired'
+  /** P10 probe 2: cherry-picking/reverting a merge commit without `-m` — git's own
+   *  `is a merge but no -m option was given`. */
+  | 'MainlineRequired'
+  /** G25 D15, probe M5: `fatal: cannot remove a locked working tree, lock reason: <reason>`.
+   *  Kept distinct from `LockHeld` (another process holds index.lock — a different remedy). */
+  | 'WorktreeLocked'
+  /** G26 D5/D10: this phase's own one new `OpErrorKind`, produced EXCLUSIVELY by `stackSet`'s
+   *  own cycle check — never by rebase itself (D5: rebase's own two new stderr patterns both map
+   *  onto the EXISTING `DirtyWorktree`/`NotFound` kinds above). */
+  | 'StackCycle'
+  /** G28 D10: `globalStashSave` from the current working tree with nothing dirty — `git stash
+   *  create` answers exit 0 with empty output on a clean tree (probe P4). */
+  | 'NothingToStash'
+  /** G30 round-1 functional-correctness review, finding #2: `remote.run`'s pull integrate phase
+   *  (merge/rebase) re-checks HEAD is still the branch the pull was started for, immediately
+   *  before that write — a fetch can take arbitrary wall-clock time, during which another
+   *  window/terminal can check out a different branch, and without this the merge/rebase would
+   *  silently land on whatever is checked out now instead. */
+  | 'BranchChanged'
+  | 'Unknown';
+
+export interface UndoSlotSnapshot {
+  readonly id: string;
+  /** "Deleted branch feature" — §7.12's "labelled with what it will undo". */
+  readonly label: string;
+  /** "was d657c6e" — §7.12's "captured recovery sha is shown alongside the button". */
+  readonly recoverySha: string;
+  readonly createdAt: number;
+}
+
+export interface OpResult {
+  readonly ok: boolean;
+  readonly error: { readonly kind: OpErrorKind; readonly message: string } | undefined;
+  /** The slot AFTER this op: a new record for an undoable op, `null` for any other (which
+   *  clears it — §7.12's "performing another operation clears the undo slot"). */
+  readonly undo: UndoSlotSnapshot | null;
+  /** Read back after the op, success or failure — the reconcile step. */
+  readonly head: HeadState;
+  readonly inProgress: InProgressOperation | null;
+}
+
+// ---------------------------------------------------------------------------------------
+// The gate (§7.11): "operations that git would refuse anyway" while an operation is in
+// progress. Probed exhaustively — git refuses switch during merge/cherry-pick/rebase/revert,
+// and would refuse reset and another revert; it does NOT refuse branch/tag creation. So the
+// gate is scoped to exactly checkout and revert at P6, plus, at P9, stashPop/stashApply/
+// stashBranch — `classifyStashPop` already emits an `inProgressOperation` blocker for these
+// three, and GATED_OP_KINDS is what additionally makes the toolbar disable them. `stashPush`
+// and `stashDrop` are deliberately NOT gated: stashing during a conflicted state is a
+// legitimate escape hatch, and dropping touches only the stash stack, never the worktree.
+// P10 probe 3 adds `reset`: git does NOT refuse `reset --mixed`/`--hard` mid-merge/mid-pick — it
+// silently succeeds and abandons the sequencer state — so this gate is the ONLY thing standing
+// between a user and that data loss, unlike every op above it, which merely mirrors git's own
+// refusal. `cherryPick` is gated for the ordinary reason (git does refuse a second cherry-pick
+// mid-sequence). `opSkip` is deliberately NOT gated: it is only ever offered *from within* the
+// gated state itself (`canSkip`), never a way to bypass it.
+// ---------------------------------------------------------------------------------------
+
+const GATED_OP_KINDS: ReadonlySet<OpRequest['kind']> = new Set([
+  'checkout',
+  'revert',
+  'stashPop',
+  'stashApply',
+  'stashBranch',
+  'reset',
+  'cherryPick',
+]);
+
+/** Pure predicate over `(inProgress, opKind)` — no component may reimplement this as a chain of
+ *  `v-if`s (W12's own "Done when"). */
+export function canRunOp(
+  inProgress: InProgressOperation | null,
+  opKind: OpRequest['kind'],
+): boolean {
+  if (inProgress === null) return true;
+  return !GATED_OP_KINDS.has(opKind);
+}
+
+/** The one sentence naming an in-progress operation in the user's terms — shared by the banner
+ *  and every gated control's disabled tooltip, so the two can never disagree about the reason
+ *  (§7.11: "disabled with the banner as the explanation"). */
+export function describeInProgress(op: InProgressOperation): TextRef {
+  switch (op.kind) {
+    case 'rebase': {
+      const branch = op.headName?.replace(/^refs\/heads\//, '');
+      return branch
+        ? { key: 'git.op.inProgress.rebase.withBranch.label', params: { branch } }
+        : { key: 'git.op.inProgress.rebase.label' };
+    }
+    case 'unmergedOnly':
+      return { key: 'git.op.inProgress.unmergedOnly.label' };
+    case 'bisect':
+      return { key: 'git.op.inProgress.bisect.label' };
+    case 'merge':
+      return op.otherSha
+        ? { key: 'git.op.inProgress.merge.withSha.label', params: { sha: shortSha(op.otherSha) } }
+        : { key: 'git.op.inProgress.merge.label' };
+    case 'cherryPick':
+      return op.otherSha
+        ? {
+            key: 'git.op.inProgress.cherryPick.withSha.label',
+            params: { sha: shortSha(op.otherSha) },
+          }
+        : { key: 'git.op.inProgress.cherryPick.label' };
+    case 'revert':
+      return op.otherSha
+        ? { key: 'git.op.inProgress.revert.withSha.label', params: { sha: shortSha(op.otherSha) } }
+        : { key: 'git.op.inProgress.revert.label' };
+  }
+}

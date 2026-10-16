@@ -1,0 +1,5 @@
+{
+  "kind": "mariadb",
+  "thresholdRows": 100000,
+  "truncatedFirstCell": true
+}

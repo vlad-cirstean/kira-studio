@@ -1,0 +1,14 @@
+{
+  "kind": "mariadb",
+  "thresholdRows": 100000,
+  "pages": [
+    {
+      "columns": ["QUERY PLAN"],
+      "rows": [
+        [
+          "{\"query_block\":{\"select_id\":1,\"cost\":16.5855622,\"nested_loop\":[{\"table\":{\"table_name\":\"t\",\"access_type\":\"ALL\",\"loops\":1,\"rows\":100175,\"cost\":16.5855622,\"filtered\":100,\"attached_condition\":\"t.`name` = 'n5'\"}}]}}"
+        ]
+      ]
+    }
+  ]
+}

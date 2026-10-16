@@ -76,7 +76,6 @@ web_modules/
 
 # Next.js build output
 .next
-out
 
 # Nuxt.js build / generate output
 .nuxt
@@ -122,9 +121,6 @@ dist
 # TernJS port file
 .tern-port
 
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test
-
 # pnpm
 .pnpm-store
 
@@ -141,3 +137,60 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Playwright
+test-results/
+test-results-perf/
+test-results-proto/
+playwright-report/
+
+# tests/e2e-real/fixtures.ts's own cross-process build lock (F10, P108 Part 6) — reclaimed
+# automatically by a stale-lock check, but never repo content either way.
+.e2e-real-build.lock
+
+# macOS
+.DS_Store
+
+# Claude Code agent worktrees — isolated scratch checkouts for background
+# subagents (see .claude/worktrees/*), never repo content. Project-level hook
+# config (settings.json, hooks/) is repo content and stays tracked.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+!.claude/hooks/*
+
+# Design canvas — the seeded page is a 3 MB build product (it bundles the
+# canvas editor). Rebuild it with docs/design/kira-design-system/build.mjs
+# and the design skill's seed-canvas.mjs; the design itself lives in parts/.
+docs/design/*/[a-z]*-design-system.html
+
+# SQLite demo database — a build product of scripts/demo-dbs/sqlite/seed.ts,
+# regenerated on demand (P35 D36); the other seven engines' demo data lives
+# in containers instead, so this is the one on-disk artifact of the set.
+scripts/demo-dbs/sqlite/*.sqlite
+
+# flatc compiler, fetched on demand by scripts/generate-wire.sh (P11 D12) — the code it
+# generates is committed, the compiler itself is not.
+.tools/
+
+# kira-repo-map headless dev binary — built on demand by scripts/mcp-repo-map.ts (C3 §3.1),
+# never packaged (the embedded instance is the app's own executable, C3 §3.2).
+apps/kira-studio/bin/
+
+# CodeGraph local index (machine-local, rebuilt by scripts/codegraph-setup.sh)
+.codegraph/
+
+# P163 prototype build (apps/kira-studio/frontend/vite.proto.config.ts), never shipped.
+dist-proto/
+dist-proto-hooks/
+
+# Root-level go build output (go build ./apps/...), never repo content.
+/kira-space
+/kira-studio
+apps/kira-space/bin/
+
+# flow coverage gate (the "coverage" rule above would hide it)
+!apps/*/internal/flows/coverage/
+
+# Astro generated types (site/)
+site/.astro/

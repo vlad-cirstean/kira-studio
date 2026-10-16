@@ -1,0 +1,10 @@
+{
+  "name": "@kira/workbench",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "anser": "2.3.5",
+    "vue": "3.5.42"
+  }
+}

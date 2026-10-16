@@ -1,0 +1,34 @@
+{
+  "AdeTaskService.ArchiveRisk#at-risk": {
+    "branches": [
+      {
+        "blocked": "",
+        "branchId": "<id:1>",
+        "dirty": [
+          {
+            "code": "??",
+            "path": "wip.txt"
+          }
+        ],
+        "unmerged": 1,
+        "worktree": "<home>/wt/api/api-risk"
+      }
+    ],
+    "taskId": "<id:2>"
+  },
+  "AdeTaskService.ArchiveRisk#clean": {
+    "branches": [
+      {
+        "blocked": "",
+        "branchId": "<id:1>",
+        "dirty": [],
+        "unmerged": 0,
+        "worktree": "<home>/wt/api/api-risk"
+      }
+    ],
+    "taskId": "<id:2>"
+  },
+  "args:AdeTaskService.ArchiveTask": {
+    "taskId": "<id:2>"
+  }
+}

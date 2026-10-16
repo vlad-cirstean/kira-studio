@@ -1,0 +1,12 @@
+Review of task Add login form
+- Jira: KIRA-42 https://jira.example.com/browse/KIRA-42
+Repo kira-space, branch feat/login (base main), worktree /work/kira-space/feat-login.
+Read the branch diff against the base first. The reviewer left these comments:
+#3 change src/login.ts:12-14
+Rename this to isValid.
+#4 question src/login.ts:30
+Why retry twice?
+Per comment, call reply_review_comment once.
+change: make the change, commit it, reply what changed, resolved true.
+question: answer in the reply, change no file for it, resolved true.
+Cannot do it: reply why, resolved false.

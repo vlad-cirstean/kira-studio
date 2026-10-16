@@ -1,0 +1,179 @@
+@import "tailwindcss";
+@import "@vscode/codicons/dist/codicon.css";
+@import "@theme/tokens.css";
+@import "@theme/primitives.css";
+@import "@theme/review-decorations.css";
+@import "@theme/blame-annotation.css";
+/* P131 Part 1 §3.1: the host-neutral Tailwind core (shadcn-bridge's tokens, the @theme mapping,
+   @utility helpers, the at-rest focus ring) -- split out of this file so a host root can import
+   the mapping without this app's own --kira-* token definitions or host rules.
+   Must come after every other @import -- CSS requires @import rules to precede all other at-rules
+   (noInvalidPositionAtImportRule) -- and before @source below. */
+@import "@theme/tailwind-core.css";
+
+/* P100 Part 2 (P103's byte-identical tier, folded in): this package sits outside either app's own
+   frontend/ tree, which is where Tailwind v4's automatic content detection roots itself when
+   driven by @tailwindcss/vite -- so a utility class used only inside a packages/theme/src file
+   (e.g. VirtualList.vue's z-2) silently generated no CSS at all until this directive named the
+   directory explicitly. Path is relative to this file. Must come after every @import -- CSS
+   requires @import rules to precede all other at-rules (noInvalidPositionAtImportRule). */
+@source "./";
+
+/* P131 Part 1 §3.1: shadcn-bridge.css's own dark-mode variant -- host-specific (this app renders
+   `.dark` on <html>; the webview instead branches on VS Code's own body classes), so it stays
+   here rather than moving into the host-neutral core. */
+@custom-variant dark (&:is(.dark *));
+
+html,
+body,
+#app {
+  @apply h-full m-0 overflow-hidden;
+}
+
+body {
+  /* P26: was --kira-font-family (the data font). Chrome — everything with no font-family of its
+     own, which preflight's `font: inherit` extends to every form control too — now renders in the
+     fixed interface font; every genuinely-data surface names --kira-font-data explicitly. */
+  @apply font-ui text-kira-md text-fg bg-chrome antialiased select-none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.cm-editor {
+  user-select: text;
+}
+
+/* Touch devices (mobile, iPad) keep native overlay scrollbars. */
+@media (pointer: fine) {
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--kira-scrollbar);
+    border-radius: var(--kira-radius);
+    border: 3px solid transparent;
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--kira-scrollbar-hover);
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: var(--kira-scrollbar-active);
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Chromium's own unstyled defaults for these two are opaque white, which survives every theme —
+     most visible where a scroll container shows both scrollbars at once (P42). */
+  ::-webkit-scrollbar-corner,
+  ::-webkit-resizer {
+    background: transparent;
+  }
+}
+
+/* P266: reduced motion. Spinner keeps rotating (the loading signal); StatusDot pulse stops. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+  }
+
+  .animate-spin {
+    animation-duration: 1s;
+    animation-iteration-count: infinite;
+  }
+
+  [data-slot="status-dot"] {
+    animation: none;
+  }
+}
+
+/* P267: while a pane-resize drag runs, usePaneResize marks <html> so the resize cursor shows
+   everywhere, over every surface the pointer crosses. */
+html.kira-resizing-x,
+html.kira-resizing-x * {
+  cursor: ew-resize;
+  user-select: none;
+}
+
+html.kira-resizing-y,
+html.kira-resizing-y * {
+  cursor: ns-resize;
+  user-select: none;
+}
+
+/* P267: the one rendered-prose layer (markdown reading view, notes editor). Headings scale in em, so
+   the scale follows the Appearance font size. Uses @layer components so utility classes on the
+   host still win. Tailwind's preflight zeroes margins, heading sizes and list styles, so each block
+   restates its own. */
+@layer components {
+  .kira-prose :is(h1, h2, h3, h4, h5, h6) {
+    @apply font-medium leading-tight mt-4 mx-0 mb-1.5;
+  }
+  .kira-prose h1 {
+    @apply border-b border-border text-[1.6em] pb-1.5;
+  }
+  .kira-prose h2 {
+    @apply text-[1.4em];
+  }
+  .kira-prose h3 {
+    @apply text-[1.2em];
+  }
+  .kira-prose h4 {
+    @apply text-[1.05em];
+  }
+  .kira-prose :is(h5, h6) {
+    @apply text-[1em];
+  }
+  .kira-prose p {
+    @apply mt-0 mx-0 mb-2;
+  }
+  .kira-prose :is(ul, ol) {
+    @apply list-[revert] mt-0 mx-0 mb-2 pl-4;
+  }
+  .kira-prose li {
+    @apply my-0.5 mx-0;
+  }
+  .kira-prose a {
+    @apply text-info;
+  }
+  .kira-prose blockquote {
+    @apply border-l-4 border-border text-muted-foreground mt-0 mx-0 mb-2 py-0 px-2;
+  }
+  .kira-prose hr {
+    @apply border-0 border-t border-border my-4 mx-0;
+  }
+  .kira-prose code {
+    @apply bg-field rounded-kira-sm font-data text-kira-sm py-[0.1em] px-[0.35em];
+  }
+  .kira-prose pre {
+    @apply overflow-auto bg-field rounded-kira-sm mt-0 mx-0 mb-2 p-2;
+  }
+  .kira-prose pre code {
+    @apply bg-none p-0 text-kira-md;
+  }
+  .kira-prose table {
+    @apply border-collapse mt-0 mx-0 mb-2;
+  }
+  .kira-prose :is(th, td) {
+    @apply border border-border text-left py-1 px-2;
+  }
+  .kira-prose thead {
+    @apply border-b border-border;
+  }
+  .kira-prose img {
+    @apply max-w-full;
+  }
+}

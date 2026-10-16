@@ -1,0 +1,224 @@
+name: PR
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.ref }}
+  cancel-in-progress: true
+
+# No job `needs` another: nothing consumes another job's output, so every job starts at once.
+# Shared setup lives in .github/actions/setup.
+jobs:
+  # Only the work that genuinely needs macOS: cgo-aware go vet/build (catches darwin build-tag
+  # breaks) and the darwin&&cgo-only test packages.
+  checks:
+    name: checks (macOS)
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup
+        with:
+          go-cache: macos
+      - name: Build frontend bundle (main.go's `//go:embed all:frontend/dist` needs this directory to exist before Go can compile the root package for both apps)
+        run: bun run build:studio
+      - run: bun run build:space
+      - name: Cache golangci-lint binary (keyed on the install script, which pins the version, and go.mod, which pins the toolchain it's built against)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/go/bin/golangci-lint
+          key: golangci-lint-${{ runner.os }}-${{ hashFiles('scripts/install-golangci-lint.sh', 'go.mod') }}
+      - run: bun run lint:go
+      - name: Go compile check, every package (darwin build-tag breaks caught here even though the test run below is scoped)
+        run: go build ./...
+      - name: Go unit tests, darwin-relevant packages only (secrets, metrics, localauth, gitclient, datagrip have darwin&&cgo files; the Linux jobs run every other package)
+        run: |
+          go test \
+            ./apps/kira-studio/internal/secrets/... \
+            ./internal/metrics/... \
+            ./apps/kira-studio/internal/localauth/... \
+            ./apps/kira-space/internal/gitclient \
+            ./apps/kira-studio/internal/datagrip/...
+
+  # Lint, typecheck, frontend builds, lint:dead, verify:packaging and the bun unit tests: nothing
+  # here touches cgo or darwin build tags.
+  checks-linux:
+    name: checks (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup
+        with:
+          go-cache: checks
+          gtk: "true"
+      - run: bun run lint
+      - name: Cache tsbuildinfo (tsc and vue-tsc incremental mode key on file content hashes, so a fresh checkout reuses entries)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: node_modules/.cache/tsbuildinfo
+          key: tsbuildinfo-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: |
+            tsbuildinfo-${{ hashFiles('bun.lock') }}-
+      - run: bun run typecheck
+      - run: bun run build:studio
+      - run: bun run build:space
+      - run: bun run lint:dead
+      - run: bun run verify:packaging
+      - run: bun run test:unit
+
+  # Playwright `ui` project in 4 shards. fail-fast off: a red shard must not hide the others.
+  ui:
+    name: ui (Linux, shard ${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup
+      - name: Cache Playwright browsers (keyed on the lockfile, which pins the @playwright/test version)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-webkit-${{ hashFiles('bun.lock') }}
+      - name: Install WebKit with its system libraries
+        run: bunx playwright install --with-deps webkit
+      - run: bun run build:test:studio
+      - run: bunx playwright test --config=apps/kira-studio/playwright.config.ts --project=ui --shard=${{ matrix.shard }}/4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: failure()
+        with:
+          name: playwright-report-ui-${{ matrix.shard }}
+          path: |
+            playwright-report/
+            test-results/
+            apps/kira-studio/playwright-report/
+            apps/kira-studio/test-results/
+          retention-days: 7
+
+  # ipc-frontend (chromium), visual (webkit), then ui-timing alone on an idle machine. `--no-deps`
+  # skips the `ui` project that ui-timing depends on in local runs.
+  ui-extra:
+    name: ui-extra (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup
+        with:
+          visual-fonts: "true"
+      - name: Cache Playwright browsers (keyed on the lockfile, which pins the @playwright/test version)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-webkit-chromium-${{ hashFiles('bun.lock') }}
+      - name: Install WebKit and Chromium with their system libraries
+        run: bunx playwright install --with-deps webkit chromium
+      - run: bun run build:test:studio
+      - name: IPC frontend tests (consume the fixtures internal/adapters/*'s own suites generate)
+        run: bunx playwright test --config=apps/kira-studio/playwright.config.ts --project=ipc-frontend
+      - name: Visual regression tests (baselines are only ever captured from this environment, see tests/visual/README.md)
+        run: bunx playwright test --config=apps/kira-studio/playwright.config.ts --project=visual
+      - name: Wall-clock budget tests (alone, no other browser contending for the CPU)
+        run: bunx playwright test --config=apps/kira-studio/playwright.config.ts --project=ui-timing --no-deps
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: failure()
+        with:
+          name: playwright-report-extra
+          path: |
+            playwright-report/
+            test-results/
+            apps/kira-studio/playwright-report/
+            apps/kira-studio/test-results/
+          retention-days: 7
+
+  # Go packages that start no container, plus every package the container split does not name.
+  go:
+    name: go (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup
+        with:
+          go-cache: go-rest
+          gtk: "true"
+      - name: Give git a global author identity (gitsession exercises production code that shells out to real git commit-creating commands through gitclient's own exec runner, which never sets GIT_AUTHOR_*/GIT_COMMITTER_* itself; a fresh runner has none)
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@kira-studio.test"
+      - name: Raise the inotify instance limit (internal/gitsession runs t.Parallel(); each open repo holds one inotify instance, and Ubuntu's stock 128 can hang the parallel suite)
+        run: sudo sysctl -w fs.inotify.max_user_instances=8192
+      - name: Build frontend bundles (the root main packages embed frontend/dist)
+        run: bun run build:studio
+      - run: bun run build:space
+      - run: bun run test:go:rest
+
+  # Go packages that start Testcontainers. No bun, bindings or real frontend build: these
+  # packages never link the root main packages that embed frontend/dist.
+  go-containers:
+    name: go-containers (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Placeholder frontend/dist (go list ./... in scripts/go-test-split.sh enumerates every package in the module, including the two root mains — their `//go:embed` directives fail the whole listing if the directories don't exist at all, even though nothing here imports or tests those packages)
+        run: |
+          mkdir -p apps/kira-space/frontend/dist apps/kira-space/frontend/dist-mobile apps/kira-studio/frontend/dist
+          touch apps/kira-space/frontend/dist/.keep apps/kira-space/frontend/dist-mobile/.keep apps/kira-studio/frontend/dist/.keep
+      - name: Restore cached Testcontainers images (keyed on the pinned image tags, so an unchanged adapter-test image set skips re-pulling)
+        id: docker-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/docker-images.tar
+          key: docker-${{ runner.os }}-${{ hashFiles('apps/kira-studio/internal/adapters/testsupport/*.go') }}
+      - name: Load the cached images in the background (overlaps setup and the test compile)
+        if: steps.docker-cache.outputs.cache-hit == 'true'
+        run: |
+          nohup docker load -i ~/docker-images.tar > "$RUNNER_TEMP/images.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/images.pid"
+      - uses: ./.github/actions/setup
+        with:
+          bun: "false"
+          bindings: "false"
+          go-cache: go-ct
+          gtk: "true"
+      - name: Pull the images in parallel on a cache miss (mirror.gcr.io avoids Docker Hub rate limits on shared runner IPs)
+        if: steps.docker-cache.outputs.cache-hit != 'true'
+        run: |
+          nohup sh scripts/pull-test-images.sh > "$RUNNER_TEMP/images.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/images.pid"
+      - name: Give git a global author identity (see the go job)
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@kira-studio.test"
+      - name: Raise the inotify instance limit (see the go job)
+        run: sudo sysctl -w fs.inotify.max_user_instances=8192
+      - name: Wait for the images
+        run: |
+          while kill -0 "$(cat "$RUNNER_TEMP/images.pid")" 2>/dev/null; do sleep 2; done
+          cat "$RUNNER_TEMP/images.log"
+      - name: Go adapter and Docker flow tests against real Testcontainers
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+        run: sh scripts/go-test-split.sh containers
+      - name: Save pulled Testcontainers images (always() so a partial pull from a failed run still seeds the next one)
+        if: always() && steps.docker-cache.outputs.cache-hit != 'true'
+        run: docker save $(docker images -q) -o ~/docker-images.tar
+      - name: Cache pulled Testcontainers images
+        if: always() && steps.docker-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/docker-images.tar
+          key: docker-${{ runner.os }}-${{ hashFiles('apps/kira-studio/internal/adapters/testsupport/*.go') }}

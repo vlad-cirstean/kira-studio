@@ -1,0 +1,77 @@
+{
+  "HttpService.Send": {
+    "bodyBytes": 0,
+    "bodyEncoding": "utf8",
+    "bodyTruncated": false,
+    "elapsedMs": 0,
+    "finalUrl": "<http>/status?code=200&t={{token}}",
+    "proto": "HTTP/1.1",
+    "redirects": [],
+    "status": 200,
+    "statusText": "OK"
+  },
+  "ResponseHistoryService.List": [
+    {
+      "bodyBytes": 0,
+      "elapsedMs": 0,
+      "environment": "dev",
+      "id": "<id:4>",
+      "itemId": null,
+      "method": "GET",
+      "sentAt": "<time>",
+      "status": 200,
+      "statusText": "OK",
+      "storedBytes": 0,
+      "tabId": "tab-1",
+      "url": "<http>/status?code=200&t={{token}}"
+    }
+  ],
+  "VariablesService.List": [
+    {
+      "description": "",
+      "id": "<id:2>",
+      "isSecret": true,
+      "name": "token",
+      "ownerId": "<id:1>",
+      "scope": "environment",
+      "sortOrder": 0,
+      "value": ""
+    }
+  ],
+  "VariablesService.ListEnvironments": [
+    {
+      "color": "none",
+      "description": "",
+      "id": "<id:1>",
+      "isActive": true,
+      "name": "dev",
+      "sortOrder": 0
+    }
+  ],
+  "args:HttpService.Send": {
+    "body": {
+      "code": "",
+      "codeLanguage": "",
+      "file": "",
+      "formData": null,
+      "mode": "",
+      "raw": "",
+      "urlEncoded": null
+    },
+    "collectionId": "<id:3>",
+    "environmentId": "<id:1>",
+    "headers": [
+      {
+        "name": "Authorization",
+        "value": "Bearer {{token}}"
+      }
+    ],
+    "incognito": false,
+    "itemId": "",
+    "method": "GET",
+    "opId": "<masked>",
+    "options": {},
+    "tabId": "<masked>",
+    "url": "<http>/status?code=200&t={{token}}"
+  }
+}

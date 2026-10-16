@@ -1,0 +1,9 @@
+{
+  "rule": {
+    "kind": "date",
+    "keepHint": true,
+    "correlate": false
+  },
+  "key": null,
+  "value": "not a date, just prose"
+}

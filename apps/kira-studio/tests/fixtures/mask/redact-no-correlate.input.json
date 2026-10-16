@@ -1,0 +1,9 @@
+{
+  "rule": {
+    "kind": "redact",
+    "keepHint": false,
+    "correlate": false
+  },
+  "key": null,
+  "value": "anything at all"
+}

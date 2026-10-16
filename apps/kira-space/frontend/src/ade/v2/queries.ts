@@ -1,0 +1,440 @@
+import type { LlmPromptPreview } from '@shared/domain/llmPrompts';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/vue-query';
+import { optimisticUpdate } from '@workbench/behaviour/optimistic';
+import { queryClient } from '@workbench/state/queryClient';
+import type { MaybeRefOrGetter } from 'vue';
+import { computed, toValue } from 'vue';
+import { control } from '../../bridge/control';
+import { withMovedItem } from './backlogOrder';
+import { backlogKey, boardKey, runSandboxKey, useWorkflows } from './readQueries';
+import type {
+  AddBacklogItemArgs,
+  AddExistingBranchArgs,
+  AddTaskRepoArgs,
+  BacklogItemArgs,
+  BacklogResult,
+  Board,
+  BranchArgs,
+  CreateTaskArgs,
+  FinishReviewArgs,
+  FocusSessionArgs,
+  GhSyncPlan,
+  GhSyncResult,
+  ImportWorkflowArgs,
+  LaunchStepArgs,
+  MoveBacklogItemArgs,
+  NewWorkflowArgs,
+  OntoArgs,
+  RebaseArgs,
+  RebasePreview,
+  RebaseStart,
+  RecordMergeArgs,
+  RefreshArgs,
+  RepoBranches,
+  RepoBranchesArgs,
+  ReviewAgentLaunch,
+  RunArgs,
+  SaveWorkflowArgs,
+  SaveWorkflowYamlArgs,
+  SendArgs,
+  SendReviewArgs,
+  SetBranchBaseArgs,
+  SetPlanArgs,
+  SetTaskStepArgs,
+  SetTaskWorkflowArgs,
+  StartBranchArgs,
+  StartRunArgs,
+  StepArgs,
+  TakeOverArgs,
+  Task,
+  TaskArgs,
+  UpdateBacklogItemArgs,
+  UpdateTaskArgs,
+  ValidateWorkflowYamlArgs,
+} from './wire';
+
+export {
+  logKey,
+  useBacklog,
+  useBoard,
+  usePrs,
+  useSessions,
+  useWorkflows,
+} from './readQueries';
+
+// Board state is push-driven (`kira:adetask:board`, subscribed once in `ade/queries.ts`), so the
+// client default keeps data fresh forever and a write relies on the backend's own push instead of
+// invalidating. The two exceptions refetch on their own: the candidate list (`staleTime: 0`, the
+// popover opens on demand) and a failed optimistic write.
+
+export const workflowYamlKey = ['adetask', 'workflowYaml'] as const;
+const candidatesKey = ['adetask', 'candidates'] as const;
+export const ghSyncPlanPrefix = ['adetask', 'ghSyncPlan'] as const;
+export const reviewStepPrefix = ['adetask', 'reviewStep'] as const;
+export const reviewTargetKey = (windowKey: string) =>
+  ['adetask', 'reviewTarget', windowKey] as const;
+
+/** Whether the workflow turns the Kira Space tools on; the agent then names its own branches. */
+export function useSpaceTools(workflowId: MaybeRefOrGetter<string>) {
+  const workflows = useWorkflows();
+  return computed(
+    () =>
+      workflows.data.value?.workflows.find((e) => e.workflow?.id === toValue(workflowId))?.workflow
+        ?.kiraSpaceMcp ?? false,
+  );
+}
+
+/** Branches that can join the plan; refetched on every open so a just-pushed branch shows. */
+export function useCandidates(enabled: () => boolean) {
+  return useQuery(() => ({
+    queryKey: candidatesKey,
+    queryFn: () => control.adeTaskCandidateBranches(),
+    staleTime: 0,
+    enabled: enabled(),
+  }));
+}
+
+export function useRefresh() {
+  return useMutation({
+    mutationKey: ['adetask', 'refresh'],
+    mutationFn: (args: RefreshArgs) => control.adeTaskRefresh(args),
+  });
+}
+
+export function useForcePush() {
+  return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskForcePush(args) });
+}
+
+export function useCreateTask() {
+  return useMutation({ mutationFn: (args: CreateTaskArgs) => control.adeTaskCreateTask(args) });
+}
+
+export function useAddExistingBranch() {
+  return useMutation({
+    mutationFn: (args: AddExistingBranchArgs) => control.adeTaskAddExistingBranch(args),
+  });
+}
+
+export function useAddBacklogItem() {
+  return useMutation({
+    mutationFn: (args: AddBacklogItemArgs) => control.adeTaskAddBacklogItem(args),
+  });
+}
+
+export function useAddTaskRepo() {
+  return useMutation({ mutationFn: (args: AddTaskRepoArgs) => control.adeTaskAddTaskRepo(args) });
+}
+
+/** Applies a task patch to a board snapshot: a `null` field is unchanged, `clearJira` drops Jira. */
+function withTaskPatch(board: Board, args: UpdateTaskArgs): Board {
+  const p = args.patch;
+  const tasks = board.tasks.map((t): Task => {
+    if (t.id !== args.taskId) return t;
+    return {
+      ...t,
+      title: p.title ?? t.title,
+      jira: p.clearJira ? null : (p.jira ?? t.jira),
+      githubUrl: p.githubUrl ?? t.githubUrl,
+      est: p.est ?? t.est,
+      notes: p.notes ?? t.notes,
+      color: p.color ?? t.color,
+      kind: p.kind ?? t.kind,
+    };
+  });
+  return { ...board, tasks };
+}
+
+export function useUpdateTask() {
+  return useMutation({
+    mutationFn: (args: UpdateTaskArgs) => control.adeTaskUpdateTask(args),
+    ...optimisticUpdate<Board, UpdateTaskArgs>(queryClient, boardKey, withTaskPatch),
+  });
+}
+
+export function useUpdateBacklogItem() {
+  return useMutation({
+    mutationFn: (args: UpdateBacklogItemArgs) => control.adeTaskUpdateBacklogItem(args),
+  });
+}
+
+export function useMoveBacklogItem() {
+  return useMutation({
+    mutationFn: (args: MoveBacklogItemArgs) => control.adeTaskMoveBacklogItem(args),
+    ...optimisticUpdate<BacklogResult, MoveBacklogItemArgs>(queryClient, backlogKey, withMovedItem),
+  });
+}
+
+export function useDeleteBacklogItem() {
+  return useMutation({
+    mutationFn: (args: BacklogItemArgs) => control.adeTaskDeleteBacklogItem(args),
+  });
+}
+
+export function usePromoteBacklogItem() {
+  return useMutation({
+    mutationFn: (args: BacklogItemArgs) => control.adeTaskPromoteBacklogItem(args),
+  });
+}
+
+/** Applies a plan write to a board snapshot the way the backend does: `order` replaces, a `null`
+ *  day sends the task to Later. */
+function withPlan(board: Board, args: SetPlanArgs): Board {
+  const day = { ...board.plan.day };
+  for (const [id, iso] of Object.entries(args.days)) {
+    if (iso === null) delete day[id];
+    else day[id] = iso;
+  }
+  return { ...board, plan: { ...board.plan, order: args.order, day } };
+}
+
+export function useSetPlan() {
+  return useMutation({
+    mutationFn: (args: SetPlanArgs) => control.adeTaskSetPlan(args),
+    ...optimisticUpdate<Board, SetPlanArgs>(queryClient, boardKey, withPlan),
+  });
+}
+
+/** The stored sandbox of a run; the badge popover and profile dialog read it. */
+export function useRunSandbox(runId: MaybeRefOrGetter<string>, enabled: MaybeRefOrGetter<boolean>) {
+  return useQuery(() => ({
+    queryKey: [...runSandboxKey, toValue(runId)] as const,
+    queryFn: () => control.adeTaskRunSandbox({ runId: toValue(runId) }),
+    enabled: toValue(enabled) && toValue(runId) !== '',
+  }));
+}
+
+export function useWorkflowYaml(fileName: MaybeRefOrGetter<string>) {
+  return useQuery(() => ({
+    queryKey: [...workflowYamlKey, toValue(fileName)] as const,
+    queryFn: () => control.adeTaskWorkflowYaml({ fileName: toValue(fileName) }),
+    enabled: toValue(fileName) !== '',
+  }));
+}
+
+export function useValidateWorkflowYaml() {
+  return useMutation({
+    mutationFn: (args: ValidateWorkflowYamlArgs) => control.adeTaskValidateWorkflowYaml(args),
+  });
+}
+
+/** Saves run one at a time, in call order: a debounce, a blur and an unmount can overlap, and an
+ *  older text landing last would be pushed back into the editor. */
+const workflowSaveScope = { id: 'ade-workflow-save' } as const;
+
+export function useSaveWorkflow() {
+  return useMutation({
+    mutationFn: (args: SaveWorkflowArgs) => control.adeTaskSaveWorkflow(args),
+    scope: workflowSaveScope,
+  });
+}
+
+export function useSaveWorkflowYaml() {
+  return useMutation({
+    mutationFn: (args: SaveWorkflowYamlArgs) => control.adeTaskSaveWorkflowYaml(args),
+    scope: workflowSaveScope,
+  });
+}
+
+export function useImportWorkflow() {
+  return useMutation({
+    mutationFn: (args: ImportWorkflowArgs) => control.adeTaskImportWorkflow(args),
+  });
+}
+
+export function useNewWorkflow() {
+  return useMutation({ mutationFn: (args: NewWorkflowArgs) => control.adeTaskNewWorkflow(args) });
+}
+
+export function useSetTaskWorkflow() {
+  return useMutation({
+    mutationFn: (args: SetTaskWorkflowArgs) => control.adeTaskSetTaskWorkflow(args),
+  });
+}
+
+export function useStartRun() {
+  return useMutation({ mutationFn: (args: StartRunArgs) => control.adeTaskStartRun(args) });
+}
+
+export function useApprove() {
+  return useMutation({ mutationFn: (args: StepArgs) => control.adeTaskApprove(args) });
+}
+
+export function useRetryRun() {
+  return useMutation({ mutationFn: (args: RunArgs) => control.adeTaskRetryRun(args) });
+}
+
+export function useResumeRun() {
+  return useMutation({ mutationFn: (args: RunArgs) => control.adeTaskResumeRun(args) });
+}
+
+export function useStepDone() {
+  return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskStepDone(args) });
+}
+
+/** Applies a step move to a board snapshot; the backend's push reconciles the run-derived fields. */
+function withStep(board: Board, args: SetTaskStepArgs): Board {
+  const tasks = board.tasks.map(
+    (t): Task => (t.id === args.taskId ? { ...t, entryStepId: args.stepId } : t),
+  );
+  return { ...board, tasks };
+}
+
+export function useSetTaskStep() {
+  return useMutation({
+    mutationFn: (args: SetTaskStepArgs) => control.adeTaskSetTaskStep(args),
+    ...optimisticUpdate<Board, SetTaskStepArgs>(queryClient, boardKey, withStep),
+  });
+}
+
+export function useRetrySetup() {
+  return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskRetrySetup(args) });
+}
+
+export function useOpenReviewWindow() {
+  return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskOpenReviewWindow(args) });
+}
+
+export function useTakeOver() {
+  return useMutation({ mutationFn: (args: TakeOverArgs) => control.adeTaskTakeOver(args) });
+}
+
+export function useLaunchStep() {
+  return useMutation({ mutationFn: (args: LaunchStepArgs) => control.adeTaskLaunchStep(args) });
+}
+
+export function useStartBranch() {
+  return useMutation({ mutationFn: (args: StartBranchArgs) => control.adeTaskStartBranch(args) });
+}
+
+export function useSend() {
+  return useMutation({ mutationFn: (args: SendArgs) => control.adeTaskSend(args) });
+}
+
+export function useStopRun() {
+  return useMutation({ mutationFn: (args: RunArgs) => control.adeTaskStopRun(args) });
+}
+
+export function useRecordMerge() {
+  return useMutation({ mutationFn: (args: RecordMergeArgs) => control.adeTaskRecordMerge(args) });
+}
+
+export function useArchiveRisk() {
+  return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskArchiveRisk(args) });
+}
+
+export function useArchiveTask() {
+  return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskArchiveTask(args) });
+}
+
+export function useFocusSession() {
+  return useMutation({ mutationFn: (args: FocusSessionArgs) => control.adeTaskFocusSession(args) });
+}
+
+/** The task's review agent and where it runs; a sessions push refetches it. */
+export function useReviewAgent(taskId: MaybeRefOrGetter<string>) {
+  return useQuery({
+    queryKey: ['adetask', 'reviewAgent', taskId] as const,
+    queryFn: () => control.adeTaskReviewAgent({ taskId: toValue(taskId) }),
+  });
+}
+
+/** A branch's review step for its review window; the review, board and runs pushes refetch it. */
+export function useReviewStep(branchId: MaybeRefOrGetter<string>) {
+  return useQuery({
+    queryKey: [...reviewStepPrefix, branchId] as const,
+    queryFn: () => control.adeTaskReviewStep({ branchId: toValue(branchId) }),
+  });
+}
+
+export function useSendReview() {
+  return useMutation({ mutationFn: (args: SendReviewArgs) => control.adeTaskSendReview(args) });
+}
+
+export function useFinishReview() {
+  return useMutation({ mutationFn: (args: FinishReviewArgs) => control.adeTaskFinishReview(args) });
+}
+
+export function useLaunchReviewAgent() {
+  return useMutation({
+    mutationFn: (args: TaskArgs): Promise<ReviewAgentLaunch> =>
+      control.adeTaskLaunchReviewAgent(args),
+  });
+}
+
+/** What a GitHub sync would do for the branch; re-asked on focus, mark and popover open, not on board pushes (each load pages the PR's files). */
+export function useGhSyncPlan(branchId: MaybeRefOrGetter<string>) {
+  return useQuery({
+    queryKey: ['adetask', 'ghSyncPlan', branchId] as const,
+    queryFn: (): Promise<GhSyncPlan> =>
+      control.adeTaskGitHubSyncPlan({ branchId: toValue(branchId) }),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useGitHubSyncApply() {
+  return useMutation({
+    mutationFn: (args: BranchArgs): Promise<GhSyncResult> => control.adeTaskGitHubSyncApply(args),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ghSyncPlanPrefix }),
+  });
+}
+
+/** The bases the picker offers for a repo; read on open (git moves between opens), never pushed. */
+export function useRepoBranches(args: MaybeRefOrGetter<RepoBranchesArgs | null>) {
+  return useQuery(() => {
+    const a = toValue(args);
+    return {
+      queryKey: ['adetask', 'repoBranches', a] as const,
+      queryFn: (): Promise<RepoBranches> => control.adeTaskRepoBranches(a as RepoBranchesArgs),
+      staleTime: 0,
+      enabled: a !== null,
+    };
+  });
+}
+
+/** The prompt, stack and blockers a Rebase would use; the key holds the pick, so a pick refetches. */
+export function useRebasePreview(args: MaybeRefOrGetter<OntoArgs | null>) {
+  return useQuery(() => {
+    const a = toValue(args);
+    return {
+      queryKey: ['adetask', 'rebasePreview', a] as const,
+      queryFn: (): Promise<RebasePreview> => control.adeTaskRebasePreview(a as OntoArgs),
+      staleTime: 0,
+      enabled: a !== null,
+    };
+  });
+}
+
+export function useRebase() {
+  return useMutation({
+    mutationFn: (args: RebaseArgs): Promise<RebaseStart> => control.adeTaskRebase(args),
+  });
+}
+
+export function useAbortRebase() {
+  return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskAbortRebase(args) });
+}
+
+export function useSetBranchBase() {
+  return useMutation({
+    mutationFn: (args: SetBranchBaseArgs) => control.adeTaskSetBranchBase(args),
+  });
+}
+
+/** Renders registry prompt `id` in Go for `vars`; idle while `vars` is null. */
+export function useAdePromptPreview(
+  id: string,
+  vars: MaybeRefOrGetter<Record<string, unknown> | null>,
+) {
+  return useQuery(() => {
+    const v = toValue(vars);
+    return {
+      queryKey: ['llmPrompts', 'adePreview', id, v] as const,
+      queryFn: (): Promise<LlmPromptPreview> =>
+        control.llmPromptsPreview({ id, vars: v as Record<string, unknown> }),
+      enabled: v !== null,
+      placeholderData: keepPreviousData,
+      staleTime: 0,
+    };
+  });
+}

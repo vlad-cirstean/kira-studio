@@ -1,0 +1,9 @@
+{
+  "rule": {
+    "kind": "name",
+    "keepHint": true,
+    "correlate": true
+  },
+  "key": "6b6579",
+  "value": "Maria Gonzalez"
+}

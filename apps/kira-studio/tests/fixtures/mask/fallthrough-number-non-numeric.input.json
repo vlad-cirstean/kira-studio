@@ -1,0 +1,9 @@
+{
+  "rule": {
+    "kind": "number",
+    "keepHint": false,
+    "correlate": true
+  },
+  "key": "6b6579",
+  "value": "not-a-number"
+}

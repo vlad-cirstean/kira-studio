@@ -1,0 +1,242 @@
+package gitsearch
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"time"
+
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
+)
+
+// Deps is what Scan needs to spawn one process — logsession.Deps's own shape, minus the Read
+// gate: D12's caller (gitsession's (*Walk).Search) runs Scan itself inside entry.Repo.Read, so a
+// second, nested gate here would be redundant and layered wrong.
+type Deps struct {
+	Runner  gitclient.Runner
+	GitPath string
+	Dir     string
+}
+
+// Options configures one Scan call.
+type Options struct {
+	// Args is the full argv — porcelain.LogScanArgs(spec)'s own output, never a user pattern
+	// (D0's own ground rule: the pattern never reaches git).
+	Args []string
+	// Matcher is Compile's own result. Must not be nil.
+	Matcher *Matcher
+	// Limit caps how many Hits are collected; <= 0 -> DefaultLimit. Total keeps counting past it.
+	Limit int
+	// Budget bounds the scan's own wall-clock time; <= 0 -> DefaultScanBudget.
+	Budget time.Duration
+}
+
+// Hit is one matched commit — the Go-side twin of @kira/git-ipc's own CommitSearchHit.
+type Hit struct {
+	SHA         string
+	Subject     string
+	AuthorName  string
+	AuthorEmail string
+	AuthorTime  int64
+	Fields      []Field
+}
+
+// Result is one Scan call's outcome — the Go-side twin of SearchRunResult's 'ok' member.
+type Result struct {
+	// Hits is walk order (upstream probe 11), capped at Limit.
+	Hits []Hit
+	// Total is EXACT, counted over every commit scanned — never just len(Hits) (D11: the scan
+	// runs to git's own end regardless of Limit, so this stays exact even once Hits is full).
+	Total int
+	// Truncated is Total > len(Hits).
+	Truncated bool
+	Scanned   int
+	// Complete is false when the host-side time box fired before git's own end.
+	Complete bool
+}
+
+// DefaultScanBudget is upstream's own SEARCH_SCAN_BUDGET_MS. Checked every 1024 scanned records and while a read blocks.
+//
+// One Go-specific note: RE2 has no backtracking and is linear in input, so upstream's own
+// probe-10 catastrophic-backtracking hazard (a pathological pattern taking 853ms against a
+// 31-character string in JS) cannot occur on this side at all — this budget guards against a very
+// large repository, never against a pathological pattern.
+const DefaultScanBudget = 5 * time.Second
+
+// DefaultLimit is upstream's own DEFAULT_SEARCH_LIMIT — 200 tail hits.
+const DefaultLimit = 200
+
+const scanReadChunkSize = 64 * 1024
+
+var errScanBudget = errors.New("gitsearch: scan budget exhausted")
+
+// Scan runs one streaming, cancellable, time-boxed tail scan: Runner.Start -> a 64 KiB read loop
+// (cancellable exactly like logsession.readChunkLocked) -> porcelain.RecordSplitter.Push (NUL-
+// delimited fields, F3) -> porcelain.FieldGrouper.Push (groups into records) ->
+// porcelain.ParseScanRecord -> Matcher.MatchFields — the same spawn/split/group/classify pieces
+// logsession already composes, built fresh rather than reused (F9: a paused logsession cannot be
+// read from without consuming the paging walk's own records, and its argv differs anyway).
+//
+// Never buffers the whole of stdout (unlike gitclient.Run): upstream probe 5b measured the scan's
+// own output at ~20 MB over 100k commits, and the matcher is a streaming fold that has no reason
+// to hold all of it in memory at once.
+func Scan(ctx context.Context, deps Deps, opts Options) (Result, error) {
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = DefaultLimit
+	}
+	budget := opts.Budget
+	if budget <= 0 {
+		budget = DefaultScanBudget
+	}
+
+	proc, err := deps.Runner.Start(ctx, deps.GitPath, gitclient.Spec{Dir: deps.Dir, Args: opts.Args, ReadOnly: true})
+	if err != nil {
+		return Result{}, err
+	}
+
+	result := Result{Complete: true}
+	// splitter yields NUL-delimited FIELDS (F3: ScanFormat is %x00-delimited, not %x1f), grouper
+	// finds each record's own boundary by counting to ScanFieldCount — see porcelain.FieldGrouper's
+	// own doc comment for why field and record delimiters being the same byte means a fixed count
+	// is the only way to tell them apart.
+	splitter := porcelain.NewRecordSplitter(0)
+	grouper := porcelain.NewFieldGrouper(porcelain.ScanFieldCount)
+	deadline := time.Now().Add(budget)
+	// expired wakes a read blocked while git emits nothing (a --topo-order walk with no
+	// commit-graph prints nothing until it has walked everything).
+	timer := time.NewTimer(budget)
+	defer timer.Stop()
+
+	for {
+		cont, roundErr := scanRound(ctx, proc, splitter, grouper, opts, limit, deadline, timer.C, &result)
+		if roundErr != nil {
+			return Result{}, roundErr
+		}
+		if !cont {
+			break
+		}
+	}
+	if !result.Complete {
+		// scanRound already closed proc and set Truncated before reporting "stop" this way —
+		// the only path that leaves Complete false.
+		return result, nil
+	}
+
+	// git's own failure (its stderr) outranks the partial record it left behind, as in
+	// logsession.finishEOFLocked.
+	var protoErr error
+	if flushed := splitter.Flush(); len(flushed) > 0 {
+		protoErr = fmt.Errorf("gitsearch: unterminated trailing field at EOF (%d bytes)", len(flushed))
+	} else if pending := grouper.Flush(); len(pending) > 0 {
+		protoErr = fmt.Errorf("gitsearch: unterminated trailing record at EOF (%d fields short of a full record)", len(pending))
+	}
+	res, waitErr := proc.Wait()
+	if cerr := gitclient.Classify(ctx, opts.Args, res, waitErr); cerr != nil {
+		return Result{}, cerr
+	}
+	if protoErr != nil {
+		return Result{}, protoErr
+	}
+	result.Truncated = result.Total > len(result.Hits)
+	return result, nil
+}
+
+// scanRound is Scan's own loop body — one read of proc's stdout, split into records, each matched
+// and folded into result. Returns whether Scan's loop should read another chunk: false on a clean
+// EOF, a read/split/parse error (returned alongside), or the scan running past deadline (checked
+// every 1024 scanned records, same as the unextracted loop) — that last case leaves result.Complete
+// false, which the caller uses to skip the post-loop flush/Wait and return result immediately, byte
+// for byte as the original inline loop did.
+func scanRound(ctx context.Context, proc gitclient.Process, splitter *porcelain.RecordSplitter, grouper *porcelain.FieldGrouper, opts Options, limit int, deadline time.Time, expired <-chan time.Time, result *Result) (bool, error) {
+	chunk, readErr := readScanChunk(ctx, proc, expired)
+	if len(chunk) > 0 {
+		toks, splitErr := splitter.Push(chunk)
+		if splitErr != nil {
+			_ = proc.Close()
+			return false, splitErr
+		}
+		for _, fields := range grouper.Push(toks) {
+			result.Scanned++
+			cr, perr := porcelain.ParseScanRecord(fields)
+			if perr != nil {
+				_ = proc.Close()
+				return false, perr
+			}
+			fields := opts.Matcher.MatchFields(CommitFields{
+				SHA: cr.SHA, Subject: cr.Subject, Body: cr.Body,
+				AuthorName: cr.Author.Name, AuthorEmail: cr.Author.Email,
+				CommitterName: cr.Committer.Name, CommitterEmail: cr.Committer.Email,
+			})
+			if len(fields) > 0 {
+				result.Total++
+				if len(result.Hits) < limit {
+					result.Hits = append(result.Hits, Hit{
+						SHA: cr.SHA, Subject: cr.Subject,
+						AuthorName: cr.Author.Name, AuthorEmail: cr.Author.Email,
+						AuthorTime: cr.Author.Timestamp, Fields: fields,
+					})
+				}
+			}
+			// Every 1024 records — a power-of-two boundary so the check itself is not the
+			// cost — test the deadline. The scan still stops running rather than continuing
+			// to git's own end: unlike the exact-Total-past-Limit rule, a time-boxed scan
+			// genuinely has not seen the rest of the walk.
+			if result.Scanned%1024 == 0 && time.Now().After(deadline) {
+				result.Complete = false
+				result.Truncated = result.Total > len(result.Hits)
+				_ = proc.Close()
+				return false, nil
+			}
+		}
+	}
+	if readErr != nil {
+		if errors.Is(readErr, io.EOF) {
+			return false, nil
+		}
+		if errors.Is(readErr, errScanBudget) {
+			result.Complete = false
+			result.Truncated = result.Total > len(result.Hits)
+			return false, nil
+		}
+		if ctx.Err() != nil {
+			// A caller cancellation (supersede, or the connection tearing down) — classified
+			// the same way every other read in this app is (gitclient.Classify), so a
+			// generic error-mapping layer sees the same Cancelled kind regardless of which
+			// package produced it. readScanChunk has already killed the child.
+			return false, gitclient.Classify(ctx, opts.Args, gitclient.Result{}, readErr)
+		}
+		_ = proc.Close()
+		return false, readErr
+	}
+	return true, nil
+}
+
+// readScanChunk reads one raw chunk off proc's stdout, cancellable by ctx — mirrors
+// logsession.readChunkLocked exactly: a cancelled ctx kills the child (Process.Close) and returns
+// promptly rather than leaving the read (and the caller) blocked indefinitely.
+func readScanChunk(ctx context.Context, proc gitclient.Process, expired <-chan time.Time) ([]byte, error) {
+	type readResult struct {
+		b   []byte
+		err error
+	}
+	stdout := proc.Stdout()
+	ch := make(chan readResult, 1)
+	go func() {
+		buf := make([]byte, scanReadChunkSize)
+		n, err := stdout.Read(buf)
+		ch <- readResult{b: buf[:n], err: err}
+	}()
+	select {
+	case r := <-ch:
+		return r.b, r.err
+	case <-ctx.Done():
+		_ = proc.Close()
+		return nil, ctx.Err()
+	case <-expired:
+		_ = proc.Close()
+		return nil, errScanBudget
+	}
+}

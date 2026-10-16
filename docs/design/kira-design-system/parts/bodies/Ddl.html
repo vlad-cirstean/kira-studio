@@ -1,0 +1,96 @@
+<div class="app">
+  <div class="workbench">
+{{SIDEBAR}}
+    <div class="col">
+      <div class="p-panel editor" style="--rail:var(--conn-red)">
+
+
+        <div class="tabstrip">
+          <span class="p-tab"><span class="tab-rail" style="background:var(--conn-red)"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tab-name"><span class="tab-schema">public.</span>orders</span></span>
+          <span class="p-tab is-active"><span class="tab-rail" style="background:var(--conn-red)"></span><span class="icon-box"><svg class="icon"><use href="#i-code"/></svg></span><span class="tab-name"><span class="tab-schema">public.</span>orders DDL</span><span class="icon-box" style="opacity:.6"><svg class="icon"><use href="#i-close"/></svg></span></span>
+          <button class="p-iconbtn" style="margin-left:var(--s-2)"><svg class="icon"><use href="#i-plus"/></svg></button>
+        </div>
+
+        <div class="view-head">
+          <span class="conn-dot" style="--rail:var(--conn-red)" title="Connection colour"></span>
+          <span class="icon-box"><svg class="icon"><use href="#i-code"/></svg></span>
+          <span class="view-target"><span class="path">prod-analytics / analytics / public / </span>orders</span>
+          <span class="p-badge">table</span>
+          <span class="p-badge">9 columns</span>
+          <span class="p-badge">2 indexes</span>
+          <span class="p-badge">4 constraints</span>
+          <!-- Read-only is stated as a fact with its reason, not as a disabled -->
+          <span class="p-chip" style="background:var(--bg-input); color:var(--fg-muted)"><svg class="icon" style="width:11px;height:11px"><use href="#i-lock"/></svg>read-only — generated from the catalog</span>
+        </div>
+
+        <!-- LAW 07 — the connection's colour caps the toolbar, not the panel.
+             The tab strip carries tabs from several connections at once, so a
+             rail above it would be claiming the whole panel for one of them;
+             the toolbar belongs to the view in front of you and nothing else.
+             With no colour the slot is still 2px, so nothing shifts. -->
+        <div class="toolbar-rail"></div>
+        <div class="toolbar">
+          <div class="group">
+            <button class="p-iconbtn is-hover" title="Refresh"><svg class="icon"><use href="#i-refresh"/></svg></button>
+            <button class="p-iconbtn is-disabled" title="Nothing running"><svg class="icon"><use href="#i-stop"/></svg></button>
+            <span class="run-state" title="Read from the catalog in 6 ms"><span class="ring"></span>6 ms</span>
+          </div>
+          <div class="sep"></div>
+          <div class="group">
+            <span class="p-seg"><span class="on">Definition</span><span>Columns</span><span>Indexes</span><span>Constraints</span></span>
+          </div>
+          <div class="sep"></div>
+          <div class="group">
+            <span class="p-select">include: comments, grants<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span>
+          </div>
+          <div class="group push">
+            <button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-save"/></svg></span>Copy</button>
+            <button class="p-btn"><span class="icon-box"><svg class="icon"><use href="#i-terminal"/></svg></span>Open in console</button>
+          </div>
+        </div>
+
+        <!-- Notes are the honest part of a generated DDL: what the app could NOT
+             reproduce exactly. They belong above the code, not in a tooltip. -->
+        <div class="strip note">
+          <span class="icon-box"><svg class="icon"><use href="#i-info"/></svg></span>
+          <span>Generated from <span class="mono">pg_catalog</span>, not captured from the original migration. Two things are approximations: the <span class="mono">status</span> check constraint is normalised by Postgres, and row-level security policies are listed but not reproduced.</span>
+        </div>
+
+        <div class="code">
+          <div class="gutter-col">1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9<br>10<br>11<br>12<br>13<br>14<br>15<br>16<br>17<br>18<br>19<br>20<br>21<br>22<br>23<br>24<br>25<br>26<br>27<br>28</div>
+<pre><span class="k">CREATE TABLE</span> public<span class="o">.</span>orders <span class="o">(</span>
+    id            <span class="k">uuid</span>        <span class="k">NOT NULL DEFAULT</span> <span class="f">gen_random_uuid</span><span class="o">()</span><span class="o">,</span>
+    customer_id   <span class="k">uuid</span>        <span class="k">NOT NULL</span><span class="o">,</span>
+    status        <span class="k">text</span>        <span class="k">NOT NULL DEFAULT</span> <span class="s">'pending'</span><span class="o">,</span>
+    total         <span class="k">numeric</span><span class="o">(</span><span class="n">12</span><span class="o">,</span><span class="n">2</span><span class="o">)</span> <span class="k">NOT NULL DEFAULT</span> <span class="n">0</span><span class="o">,</span>
+    currency      <span class="k">char</span><span class="o">(</span><span class="n">3</span><span class="o">)</span>     <span class="k">NOT NULL</span><span class="o">,</span>
+    placed_at     <span class="k">timestamptz</span> <span class="k">NOT NULL DEFAULT</span> <span class="f">now</span><span class="o">()</span><span class="o">,</span>
+    shipped_at    <span class="k">timestamptz</span><span class="o">,</span>
+    notes         <span class="k">text</span><span class="o">,</span>
+
+    <span class="k">CONSTRAINT</span> orders_pkey <span class="k">PRIMARY KEY</span> <span class="o">(</span>id<span class="o">)</span><span class="o">,</span>
+    <span class="k">CONSTRAINT</span> orders_customer_id_fkey <span class="k">FOREIGN KEY</span> <span class="o">(</span>customer_id<span class="o">)</span>
+        <span class="k">REFERENCES</span> public<span class="o">.</span>customers <span class="o">(</span>id<span class="o">)</span> <span class="k">ON DELETE RESTRICT</span><span class="o">,</span>
+    <span class="k">CONSTRAINT</span> orders_status_check <span class="k">CHECK</span> <span class="o">(</span>status <span class="o">=</span> <span class="k">ANY</span> <span class="o">(</span><span class="k">ARRAY</span><span class="o">[</span>
+        <span class="s">'pending'</span><span class="o">,</span> <span class="s">'paid'</span><span class="o">,</span> <span class="s">'refunded'</span><span class="o">,</span> <span class="s">'cancelled'</span><span class="o">]</span><span class="o">)</span><span class="o">)</span><span class="o">,</span>
+    <span class="k">CONSTRAINT</span> orders_total_nonneg <span class="k">CHECK</span> <span class="o">(</span>total <span class="o">&gt;=</span> <span class="n">0</span><span class="o">)</span>
+<span class="o">);</span>
+
+<span class="k">CREATE INDEX</span> orders_placed_at_idx
+    <span class="k">ON</span> public<span class="o">.</span>orders <span class="k">USING</span> btree <span class="o">(</span>placed_at <span class="k">DESC</span><span class="o">);</span>
+
+<span class="k">CREATE INDEX</span> orders_customer_status_idx
+    <span class="k">ON</span> public<span class="o">.</span>orders <span class="k">USING</span> btree <span class="o">(</span>customer_id<span class="o">,</span> status<span class="o">);</span>
+
+<span class="k">COMMENT ON TABLE</span> public<span class="o">.</span>orders
+    <span class="k">IS</span> <span class="s">'One row per customer order. Money is stored in the order currency.'</span><span class="o">;</span>
+
+<span class="cm">-- policy orders_tenant_isolation is enabled but not reproduced above</span></pre>
+        </div>
+
+      </div>
+{{OPS}}
+    </div>
+  </div>
+{{STATUSBAR}}
+</div>

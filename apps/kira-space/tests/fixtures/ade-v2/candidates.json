@@ -1,0 +1,36 @@
+{
+  "branches": [
+    {
+      "codeRepoId": "repo-web-app",
+      "name": "fix/invoice-rounding",
+      "author": "you",
+      "lastCommitAt": 1790066400000,
+      "remoteOnly": false,
+      "mine": true
+    },
+    {
+      "codeRepoId": "repo-api",
+      "name": "li/auth-scopes",
+      "author": "li",
+      "lastCommitAt": 1790064000000,
+      "remoteOnly": true,
+      "mine": false
+    },
+    {
+      "codeRepoId": "repo-api",
+      "name": "feat/export-endpoint",
+      "author": "you",
+      "lastCommitAt": 1789977600000,
+      "remoteOnly": false,
+      "mine": true
+    },
+    {
+      "codeRepoId": "repo-web-app",
+      "name": "omar/rate-limits",
+      "author": "omar",
+      "lastCommitAt": 1789893600000,
+      "remoteOnly": true,
+      "mine": false
+    }
+  ]
+}

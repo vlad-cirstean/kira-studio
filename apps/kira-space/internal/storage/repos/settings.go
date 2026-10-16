@@ -1,0 +1,257 @@
+// Package repos is Kira Space's own analogue of apps/kira-studio/internal/storage/repos — its
+// trimmed subset, since this app has no connections/queries/collections/history tables of its own.
+package repos
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/appsettings"
+	"github.com/kirathecat/kira-studio/internal/appstorage"
+)
+
+// SettingsRepo reads and writes the `settings` table, one JSON-valued row per leaf
+// (`${section}.${key}`), never a blob per section — same shape as Kira Studio's own SettingsRepo,
+// trimmed to the three sections model.Settings actually has here (appearance/advanced/git).
+const settingsSelectAllSQL = `SELECT key, value FROM settings`
+
+type SettingsRepo struct {
+	DB *sql.DB
+
+	// selectAll is prepared once by repos.New. nil when a SettingsRepo is constructed directly
+	// (e.g. in tests), which falls back to an ad-hoc query with identical SQL.
+	selectAll *sql.Stmt
+}
+
+func (r *SettingsRepo) GetAll() (model.Settings, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	if r.selectAll != nil {
+		rows, err = r.selectAll.Query()
+	} else {
+		rows, err = r.DB.Query(settingsSelectAllSQL)
+	}
+	stored, err := appstorage.ScanLeafRows(rows, err)
+	if err != nil {
+		return model.Settings{}, err
+	}
+
+	result := model.DefaultSettings()
+	result.Appearance = readAppearance(stored)
+	result.Git = readGit(stored)
+	result.Ade = readAde(stored)
+	result.Mobile = readMobile(stored)
+	readClaudeCode(stored, &result.ClaudeCode)
+	appsettings.LeafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
+	appsettings.Leaf(stored, "advanced.notifyPrompts", &result.Advanced.NotifyPrompts)
+	return result, nil
+}
+
+// readAppearance reads the shared appearance.* leaves plus this app's own two (inlineBlame/
+// dateFormat) on top of model.DefaultSettings().Appearance, mirroring the former
+// appsettings.ReadAppearance's own inlineBlame/dateFormat block (P120: only this app's git module
+// uses either leaf).
+func readAppearance(stored map[string]json.RawMessage) model.Appearance {
+	result := model.DefaultSettings().Appearance
+	result.Appearance = appsettings.ReadAppearance(stored)
+	appsettings.Leaf(stored, "appearance.inlineBlame", &result.InlineBlame)
+	appsettings.LeafValid(stored, "appearance.dateFormat", &result.DateFormat, model.ValidDateFormat)
+	return result
+}
+
+// readGit reads every git.* leaf from stored on top of model.DefaultGitSettings(), mirroring the
+// former appsettings.ReadGit verbatim (P120: Git is this app's own model, the only app with a git
+// module).
+func readGit(stored map[string]json.RawMessage) model.GitSettings {
+	result := model.DefaultGitSettings()
+	appsettings.Leaf(stored, "git.protectedBranches", &result.ProtectedBranches)
+	appsettings.LeafValid(stored, "git.fetchAutoIntervalMinutes", &result.FetchAutoIntervalMinutes, model.ValidFetchAutoIntervalMinutes)
+	appsettings.Leaf(stored, "git.path", &result.GitPath)
+	appsettings.LeafValid(stored, "git.graphFontSize", &result.GraphFontSize, model.ValidGraphFontSize)
+	return result
+}
+
+// readAde reads every ade.* leaf from stored on top of model.DefaultAdeSettings() (P129 Part 2 §7).
+func readAde(stored map[string]json.RawMessage) model.AdeSettings {
+	result := model.DefaultAdeSettings()
+	appsettings.LeafValid(stored, "ade.horizonDays", &result.HorizonDays, model.ValidAdeHorizonDays)
+	appsettings.LeafValid(stored, "ade.historyDays", &result.HistoryDays, model.ValidAdeHistoryDays)
+	appsettings.LeafValid(stored, "ade.extraDays", &result.ExtraDays, model.ValidAdeDateList)
+	appsettings.LeafValid(stored, "ade.offDays", &result.OffDays, model.ValidAdeDateList)
+	appsettings.LeafValid(stored, "ade.workWeekendDays", &result.WorkWeekendDays, model.ValidAdeDateList)
+	appsettings.LeafValid(stored, "ade.workdayHours", &result.WorkdayHours, model.ValidAdeWorkdayHours)
+	appsettings.LeafValid(stored, "ade.spanDayShare", &result.SpanDayShare, model.ValidAdeSpanDayShare)
+	appsettings.LeafValid(stored, "ade.headlessSettingSources", &result.HeadlessSettingSources, model.ValidAdeHeadlessSettingSources)
+	appsettings.Leaf(stored, "ade.sandboxKeychain", &result.SandboxKeychain)
+	return result
+}
+
+// readMobile reads every mobile.* leaf on top of model.DefaultMobileSettings().
+func readMobile(stored map[string]json.RawMessage) model.MobileSettings {
+	result := model.DefaultMobileSettings()
+	appsettings.Leaf(stored, "mobile.enabled", &result.Enabled)
+	appsettings.LeafValid(stored, "mobile.port", &result.Port, model.ValidMobilePort)
+	appsettings.Leaf(stored, "mobile.agentInput", &result.AgentInput)
+	return result
+}
+
+func upsertMobile(tx *sql.Tx, m *model.MobilePatch) error {
+	if m == nil {
+		return nil
+	}
+	if err := appsettings.UpsertOptional(tx, "mobile.enabled", m.Enabled); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "mobile.port", m.Port); err != nil {
+		return err
+	}
+	return appsettings.UpsertOptional(tx, "mobile.agentInput", m.AgentInput)
+}
+
+// upsertAde mirrors upsertGit's own shape.
+func upsertAde(tx *sql.Tx, a *model.AdePatch) error {
+	if a == nil {
+		return nil
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.horizonDays", a.HorizonDays); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.historyDays", a.HistoryDays); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.extraDays", a.ExtraDays); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.offDays", a.OffDays); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.workWeekendDays", a.WorkWeekendDays); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.workdayHours", a.WorkdayHours); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.spanDayShare", a.SpanDayShare); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.headlessSettingSources", a.HeadlessSettingSources); err != nil {
+		return err
+	}
+	return appsettings.UpsertOptional(tx, "ade.sandboxKeychain", a.SandboxKeychain)
+}
+
+// upsertGit mirrors the former appsettings.UpsertGit verbatim — "git.path" (not "git.gitPath") is
+// the stored key for GitPath, matching this app's pre-existing row shape.
+func upsertGit(tx *sql.Tx, g *model.GitPatch) error {
+	if g == nil {
+		return nil
+	}
+	if err := appsettings.UpsertOptional(tx, "git.protectedBranches", g.ProtectedBranches); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "git.fetchAutoIntervalMinutes", g.FetchAutoIntervalMinutes); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "git.path", g.GitPath); err != nil {
+		return err
+	}
+	return appsettings.UpsertOptional(tx, "git.graphFontSize", g.GraphFontSize)
+}
+
+// upsertAppearance upserts the shared appearance.* leaves plus this app's own two (inlineBlame/
+// dateFormat) — mirrors the former appsettings.UpsertAppearance's own inlineBlame/dateFormat block.
+func upsertAppearance(tx *sql.Tx, a *model.AppearancePatch) error {
+	if a == nil {
+		return nil
+	}
+	if err := appsettings.UpsertAppearance(tx, &a.AppearancePatch); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "appearance.inlineBlame", a.InlineBlame); err != nil {
+		return err
+	}
+	return appsettings.UpsertOptional(tx, "appearance.dateFormat", a.DateFormat)
+}
+
+func upsertAdvancedSection(tx *sql.Tx, a *model.AdvancedPatch) error {
+	if a == nil {
+		return nil
+	}
+	if err := appsettings.UpsertOptional(tx, "advanced.gitLogLevel", a.GitLogLevel); err != nil {
+		return err
+	}
+	return appsettings.UpsertOptional(tx, "advanced.notifyPrompts", a.NotifyPrompts)
+}
+
+// Set validates the patch, writes only the leaves the caller actually patched in one transaction,
+// and returns GetAll() afterwards.
+func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
+	if err := patch.Validate(); err != nil {
+		return model.Settings{}, fmt.Errorf("repos: %w", err)
+	}
+
+	err := appstorage.UpdateLeaves(r.DB, r.selectAll, settingsSelectAllSQL, func(tx *sql.Tx, _ map[string]json.RawMessage) error {
+		if err := upsertAppearance(tx, patch.Appearance); err != nil {
+			return err
+		}
+		if err := upsertAdvancedSection(tx, patch.Advanced); err != nil {
+			return err
+		}
+		if err := upsertGit(tx, patch.Git); err != nil {
+			return err
+		}
+		if err := upsertAde(tx, patch.Ade); err != nil {
+			return err
+		}
+		if err := upsertMobile(tx, patch.Mobile); err != nil {
+			return err
+		}
+		return upsertClaudeCode(tx, patch.ClaudeCode)
+	})
+	if err != nil {
+		return model.Settings{}, err
+	}
+	return r.GetAll()
+}
+
+// claudeCodeLeaf pairs one claudeCode.<key> bool leaf with its read target and patch field.
+type claudeCodeLeaf struct {
+	key string
+	dst *bool
+	set *bool
+}
+
+func claudeCodeLeaves(c *model.ClaudeCodeSettings, p model.ClaudeCodePatch) []claudeCodeLeaf {
+	return []claudeCodeLeaf{
+		{"keepAwakeWithAgents", &c.KeepAwakeWithAgents, p.KeepAwakeWithAgents},
+		{"notifyEnabled", &c.NotifyEnabled, p.NotifyEnabled},
+		{"notifyOnFinished", &c.NotifyOnFinished, p.NotifyOnFinished},
+		{"notifyOnNeedsInput", &c.NotifyOnNeedsInput, p.NotifyOnNeedsInput},
+		{"notifyOnRunEnded", &c.NotifyOnRunEnded, p.NotifyOnRunEnded},
+		{"notifyIncludeMessage", &c.NotifyIncludeMessage, p.NotifyIncludeMessage},
+		{"usageEnabled", &c.UsageEnabled, p.UsageEnabled},
+	}
+}
+
+func readClaudeCode(stored map[string]json.RawMessage, c *model.ClaudeCodeSettings) {
+	for _, l := range claudeCodeLeaves(c, model.ClaudeCodePatch{}) {
+		appsettings.Leaf(stored, "claudeCode."+l.key, l.dst)
+	}
+}
+
+func upsertClaudeCode(tx *sql.Tx, p *model.ClaudeCodePatch) error {
+	if p == nil {
+		return nil
+	}
+	var unused model.ClaudeCodeSettings
+	for _, l := range claudeCodeLeaves(&unused, *p) {
+		if err := appsettings.UpsertOptional(tx, "claudeCode."+l.key, l.set); err != nil {
+			return err
+		}
+	}
+	return nil
+}

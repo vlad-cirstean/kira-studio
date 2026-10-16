@@ -1,0 +1,235 @@
+package gitpreflight_test
+
+import (
+	"testing"
+
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
+)
+
+func strp(s string) *string { return &s }
+
+func TestClassifyInProgress_NoState(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{}, nil)
+	if op != nil {
+		t.Fatalf("op = %+v, want nil", op)
+	}
+}
+
+func TestClassifyInProgress_Merge(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{MergeHead: strp("abc123")}, nil)
+	if op == nil || op.Kind != gitpreflight.InProgressMerge {
+		t.Fatalf("op = %+v", op)
+	}
+	if !op.CanContinue || !op.CanAbort || op.CanSkip {
+		t.Fatalf("op = %+v, want canContinue/canAbort true, canSkip false", op)
+	}
+	if op.OtherSha == nil || *op.OtherSha != "abc123" {
+		t.Fatalf("otherSha = %v", op.OtherSha)
+	}
+}
+
+func TestClassifyInProgress_CherryPick(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{CherryPickHead: strp("c1")}, nil)
+	if op == nil || op.Kind != gitpreflight.InProgressCherryPick || !op.CanSkip {
+		t.Fatalf("op = %+v, want cherryPick with canSkip", op)
+	}
+}
+
+func TestClassifyInProgress_Revert(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{RevertHead: strp("r1")}, nil)
+	if op == nil || op.Kind != gitpreflight.InProgressRevert || !op.CanSkip {
+		t.Fatalf("op = %+v, want revert with canSkip", op)
+	}
+}
+
+// TestClassifyInProgress_RebaseOffersContinueAndSkip_G26 inverts G5's original
+// TestClassifyInProgress_Rebase, which asserted canContinue/canSkip both false under "§9's
+// report-only posture". G26 D12 retires that posture: G26's own restack executor is the first
+// thing in this app that can START a rebase, so a paused restack needs Continue (and Skip, for an
+// already-applied commit) to have any exit besides a terminal. Renamed, not deleted, per plan §6
+// step 3/D12's own instruction.
+func TestClassifyInProgress_RebaseOffersContinueAndSkip_G26(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{
+		RebaseMergeDir: true, RebaseHeadName: strp("refs/heads/side"), RebaseOnto: strp("onto-sha"),
+	}, nil)
+	if op == nil || op.Kind != gitpreflight.InProgressRebase {
+		t.Fatalf("op = %+v", op)
+	}
+	if !op.CanContinue {
+		t.Fatal("G26 D12: rebase must now offer Continue (retires §9's report-only posture)")
+	}
+	if !op.CanAbort {
+		t.Fatal("rebase should offer Abort")
+	}
+	if !op.CanSkip {
+		t.Fatal("G26 D12: rebase must now offer Skip (probe P10's own hint names it)")
+	}
+	if op.HeadName == nil || *op.HeadName != "refs/heads/side" {
+		t.Fatalf("headName = %v", op.HeadName)
+	}
+}
+
+// TestClassifyInProgress_RebaseShadowsSequencerFiles proves the precedence table's own shadowing
+// rule: a rebase stopped on a conflict can ALSO leave sequencer-shaped files behind, but rebase
+// must still win.
+func TestClassifyInProgress_RebaseShadowsSequencerFiles(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{
+		RebaseMergeDir: true, CherryPickHead: strp("would-be-cherry-pick"), SequencerDir: true,
+	}, nil)
+	if op == nil || op.Kind != gitpreflight.InProgressRebase {
+		t.Fatalf("op = %+v, want rebase to shadow cherryPick", op)
+	}
+	if !op.IsSequence {
+		t.Fatal("isSequence should still be true")
+	}
+}
+
+// TestClassifyInProgress_RebaseApplyDirAmMarker_ReportOnly is P108 Part 15 F3's own regression
+// proof: a plain `git am` shares rebase-apply/ with an apply-backend rebase, distinguished only by
+// the "applying" marker file. Before the fix this was classified as an ordinary rebase, every
+// Can* flag true — but `rebase --continue`/`--abort`/`--skip` all refuse outright against a real
+// `git am` ("It looks like 'git am' is in progress. Cannot rebase.").
+func TestClassifyInProgress_RebaseApplyDirAmMarker_ReportOnly(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{
+		RebaseApplyDir: true, RebaseApplyApplying: true,
+		RebaseHeadName: strp("refs/heads/side"), RebaseOnto: strp("onto-sha"),
+	}, nil)
+	if op == nil || op.Kind != gitpreflight.InProgressRebase {
+		t.Fatalf("op = %+v, want kind=rebase (no dedicated am kind — a git-ipc wire change out of scope)", op)
+	}
+	if op.CanContinue || op.CanAbort || op.CanSkip {
+		t.Fatalf("op = %+v, want every Can* flag false for a git am in progress", op)
+	}
+	// head-name/onto still read from rebase-apply/ (not only rebase-merge/) so the report-only
+	// case is not also missing its own HeadName/OtherSha.
+	if op.HeadName == nil || *op.HeadName != "refs/heads/side" {
+		t.Fatalf("headName = %v, want refs/heads/side even in the report-only case", op.HeadName)
+	}
+	if op.OtherSha == nil || *op.OtherSha != "onto-sha" {
+		t.Fatalf("otherSha = %v, want onto-sha even in the report-only case", op.OtherSha)
+	}
+}
+
+// TestClassifyInProgress_RebaseApplyDirWithoutAmMarker_StillRebase confirms F3's fix is additive:
+// an apply-backend rebase (no "applying" marker) is unaffected, still an ordinary offer-everything
+// rebase, matching G26 D12.
+func TestClassifyInProgress_RebaseApplyDirWithoutAmMarker_StillRebase(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{RebaseApplyDir: true}, nil)
+	if op == nil || op.Kind != gitpreflight.InProgressRebase || !op.CanContinue || !op.CanAbort || !op.CanSkip {
+		t.Fatalf("op = %+v, want an ordinary rebase (apply backend, no am marker)", op)
+	}
+}
+
+// TestClassifyInProgress_SequencerTodoKind_Revert is P108 Part 15 F2's own regression proof: a
+// paused multi-commit revert whose current commit was finished with a plain `git commit` (instead
+// of `--continue`) clears REVERT_HEAD but leaves sequencer/ (and its todo) behind — git's own
+// state machine is still mid-run, so this must not fall through to unmergedOnly or nil.
+func TestClassifyInProgress_SequencerTodoKind_Revert(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{
+		SequencerDir: true, SequencerTodoKind: gitpreflight.InProgressRevert,
+	}, nil)
+	if op == nil || op.Kind != gitpreflight.InProgressRevert {
+		t.Fatalf("op = %+v, want revert re-derived from sequencer/todo, not nil/unmergedOnly", op)
+	}
+	if !op.CanContinue || !op.CanAbort || !op.CanSkip || !op.IsSequence {
+		t.Fatalf("op = %+v, want continue/abort/skip/isSequence all true", op)
+	}
+}
+
+func TestClassifyInProgress_SequencerTodoKind_CherryPick(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{
+		SequencerDir: true, SequencerTodoKind: gitpreflight.InProgressCherryPick,
+	}, nil)
+	if op == nil || op.Kind != gitpreflight.InProgressCherryPick || !op.IsSequence {
+		t.Fatalf("op = %+v, want cherryPick re-derived from sequencer/todo", op)
+	}
+}
+
+// TestClassifyInProgress_SequencerDirAloneUnrecognisedTodo_FallsThrough confirms F2's fix is
+// additive: sequencerDir alone, with no re-derivable kind (an empty/unreadable todo) and no
+// unmerged paths, still falls all the way through to nil — same as before the fix.
+func TestClassifyInProgress_SequencerDirAloneUnrecognisedTodo_FallsThrough(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{SequencerDir: true}, nil)
+	if op != nil {
+		t.Fatalf("op = %+v, want nil (no re-derivable kind, no unmerged paths)", op)
+	}
+}
+
+func TestClassifyInProgress_Bisect(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{BisectLog: true}, nil)
+	if op == nil || op.Kind != gitpreflight.InProgressBisect {
+		t.Fatalf("op = %+v", op)
+	}
+	if op.CanContinue || op.CanSkip {
+		t.Fatal("bisect offers neither continue nor skip")
+	}
+}
+
+// TestClassifyInProgress_UnmergedOnlyWithNoStateFile proves the fallback case: unmerged paths with
+// none of the six state files present (a resolved-then-reset state, or `checkout -m`).
+func TestClassifyInProgress_UnmergedOnlyWithNoStateFile(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{}, []string{"a.txt", "b.txt"})
+	if op == nil || op.Kind != gitpreflight.InProgressUnmergedOnly {
+		t.Fatalf("op = %+v", op)
+	}
+	if op.CanContinue || op.CanAbort {
+		t.Fatal("unmergedOnly offers neither continue nor abort")
+	}
+	if op.UnmergedCount != 2 {
+		t.Fatalf("unmergedCount = %d, want 2", op.UnmergedCount)
+	}
+}
+
+// TestClassifyInProgress_CanContinueIndependentOfUnmergedCount proves canContinue/canSkip are
+// kind-level facts, never derived from conflictedPaths/unmergedCount — the banner's own enablement
+// rule (canContinue && unmergedCount === 0) depends on the two staying independent.
+func TestClassifyInProgress_CanContinueIndependentOfUnmergedCount(t *testing.T) {
+	t.Parallel()
+	withConflicts := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{MergeHead: strp("m")}, []string{"x.txt"})
+	withoutConflicts := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{MergeHead: strp("m")}, nil)
+	if !withConflicts.CanContinue || !withoutConflicts.CanContinue {
+		t.Fatalf("canContinue should be true regardless of unmergedCount: %+v / %+v", withConflicts, withoutConflicts)
+	}
+	if withConflicts.UnmergedCount != 1 || withoutConflicts.UnmergedCount != 0 {
+		t.Fatalf("unmergedCount mismatch: %+v / %+v", withConflicts, withoutConflicts)
+	}
+}
+
+func TestDescribeInProgress_Rebase(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{
+		RebaseMergeDir: true, RebaseHeadName: strp("refs/heads/side"),
+	}, nil)
+	if got := gitpreflight.DescribeInProgress(op); got != "Rebasing side" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestDescribeInProgress_RevertWithSha(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{RevertHead: strp("d657c6ef00000000")}, nil)
+	if got := gitpreflight.DescribeInProgress(op); got != "Reverting `d657c6e`" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestDescribeInProgress_UnmergedOnly(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{}, []string{"a.txt"})
+	if got := gitpreflight.DescribeInProgress(op); got != "Unresolved conflict" {
+		t.Fatalf("got %q", got)
+	}
+}

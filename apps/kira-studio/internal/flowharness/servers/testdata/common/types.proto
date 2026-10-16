@@ -1,0 +1,7 @@
+syntax = "proto3";
+package kira.flow.common;
+
+message Meta {
+  string origin = 1;
+  int32 hops = 2;
+}

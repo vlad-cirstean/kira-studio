@@ -1,0 +1,12 @@
+{
+  "kind": "postgres",
+  "thresholdRows": 100000,
+  "pages": [
+    {
+      "columns": ["QUERY PLAN"],
+      "rows": [
+        ["[{\"Plan\":{\"Node Type\":\"Index Only Scan\",\"Relation Name\":\"u\",\"Plan Rows\":5}}]"]
+      ]
+    }
+  ]
+}

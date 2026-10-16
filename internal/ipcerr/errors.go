@@ -1,0 +1,97 @@
+// Package ipcerr is the Go analogue of src/main/ipc/errors.ts — retired, not ported (P52 §5.3).
+// The `[CODE] message` folding existed solely because Electron's IPC error serialisation
+// preserves only `.message`; Wails has no such constraint, so every bound service method here
+// returns a structured {code, message} error instead.
+package ipcerr
+
+import (
+	"encoding/json"
+	"errors"
+)
+
+// Error is the one error type every bound service method returns on failure. Its Error() method
+// returns the JSON encoding {"code":"...","message":"..."} — the single shape the renderer's
+// control.ts wrapper parses back into {code, message} (P52 §5.3).
+type Error struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	// Details is P10 D15's own addition: optional structured context for one specific failure, for
+	// a renderer that knows how to read it (HttpService.Send's own failed-send timeline, so far the
+	// only producer). omitempty keeps Error()'s JSON byte-identical for every other bound method,
+	// which leaves this nil.
+	Details json.RawMessage `json:"details,omitempty"`
+}
+
+func (e *Error) Error() string {
+	b, err := json.Marshal(e)
+	if err != nil {
+		// Code/Message are plain strings and cannot fail Marshal on their own, but Details is a
+		// json.RawMessage (P10) that can hold invalid raw JSON — retry without it so the code the
+		// renderer branches on still survives, before falling back to the bare message.
+		if e.Details != nil {
+			if b2, err2 := json.Marshal(&Error{Code: e.Code, Message: e.Message}); err2 == nil {
+				return string(b2)
+			}
+		}
+		return e.Message
+	}
+	return string(b)
+}
+
+func New(code, message string) *Error { return &Error{Code: code, Message: message} }
+
+func Internal(message string) *Error   { return New(string(CodeInternal), message) }
+func BadRequest(message string) *Error { return New(string(CodeBadRequest), message) }
+
+// NotFound reports an object the caller named that does not exist (a deleted item), so a renderer
+// can tell it from a transient E_INTERNAL failure.
+func NotFound(message string) *Error { return New(string(CodeNotFound), message) }
+
+// Disconnected reports a connection the caller named that is not currently connected.
+func Disconnected(name string) *Error {
+	return T(CodeDisconnected, "backend.error.disconnected.body", map[string]string{"name": name})
+}
+
+// NotFoundNamed reports a named object that no longer exists.
+func NotFoundNamed(name string) *Error {
+	return T(CodeNotFound, "backend.error.notFound.body", map[string]string{"name": name})
+}
+
+// SecretStore mirrors secret-cipher.ts's SecretStoreError code.
+func SecretStore(message string) *Error { return New(string(CodeSecretStore), message) }
+
+// Wrap returns err unchanged if it already carries a structured *Error (connections/service.go
+// and tree/service.go's own wrapErr), or folds any other error into Internal(err.Error()). Returns
+// nil for a nil err.
+func Wrap(err error) error {
+	if err == nil {
+		return nil
+	}
+	var ie *Error
+	if errors.As(err, &ie) {
+		return ie
+	}
+	return Internal(err.Error())
+}
+
+// InternalResult is the bridge layer's dominant shape (P113 G3): a bound method that calls a repo/
+// service method and, on error, folds it into Internal(err.Error()) verbatim — never Wrap's
+// structured-error passthrough. A call site reads `return ipcerr.InternalResult(svc.X(...))`
+// instead of the five-line if-err block. On error it returns T's zero value, matching every
+// existing call site's own `return zero, ipcerr.Internal(err.Error())`.
+func InternalResult[T any](v T, err error) (T, error) {
+	if err != nil {
+		var zero T
+		return zero, Internal(err.Error())
+	}
+	return v, nil
+}
+
+// InternalErr is InternalResult's error-only counterpart, for bound methods that return only
+// error. Nil-safe: nil in, nil out.
+func InternalErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	return Internal(err.Error())
+}

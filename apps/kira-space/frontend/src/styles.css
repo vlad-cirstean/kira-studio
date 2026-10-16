@@ -1,0 +1,7 @@
+/* This app's Tailwind root, on top of @workbench/workbench.css's base.css import. It also scans
+   packages/git-ui/src (the git module mounts into this document) and imports its graph tokens.
+   Paths are relative to this file. */
+@import "@workbench/workbench.css";
+@import "./ade/v2/tones.css";
+@import "../../../../packages/git-ui/src/theme/git.css";
+@source "../../../../packages/git-ui/src";

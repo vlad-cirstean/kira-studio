@@ -1,0 +1,37 @@
+<script setup lang="ts">
+import Spinner from '@theme/components/Spinner.vue';
+import { cn } from '@theme/lib/utils';
+import type { PrimitiveProps } from 'reka-ui';
+import { Primitive } from 'reka-ui';
+import type { HTMLAttributes } from 'vue';
+import type { ButtonVariants } from '.';
+import { buttonVariants } from '.';
+
+interface Props extends PrimitiveProps {
+  variant?: ButtonVariants['variant'];
+  size?: ButtonVariants['size'];
+  class?: HTMLAttributes['class'];
+  /** An async action is running: disabled, `aria-busy`, and a spinner replaces the button's icon. */
+  pending?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  as: 'button',
+});
+</script>
+
+<template>
+  <Primitive
+    data-slot="button"
+    :data-variant="variant"
+    :data-size="size"
+    :as="as"
+    :as-child="asChild"
+    :disabled="pending || undefined"
+    :aria-busy="pending || undefined"
+    :class="cn(buttonVariants({ variant, size }), pending && '[&_.codicon:not(.animate-spin)]:hidden', props.class)"
+  >
+    <Spinner v-if="pending && !asChild" label="" />
+    <slot />
+  </Primitive>
+</template>

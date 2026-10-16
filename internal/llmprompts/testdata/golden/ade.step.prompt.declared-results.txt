@@ -1,0 +1,6 @@
+Task: Add login form
+- Repo: kira-space · Branch: feat/login · Worktree: /wt/kira-space/feat-login
+Step 2/5: Implement
+Implement Add login form in kira-space on feat/login.
+
+When this step ends, call finish_step once with status one of: pass (ok: All checks green), fail (not ok: A check is red), skip (ok). Add a one-line summary; for a not-ok status add the reason. If you need a decision from me, use status "needs_input" with your question.

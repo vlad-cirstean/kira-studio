@@ -1,0 +1,60 @@
+version: "2"
+
+run:
+  timeout: 10m
+
+linters:
+  default: none
+  enable:
+    - bodyclose      # perf/leak: an unclosed HTTP body holds a connection. 0 findings — keeps it so.
+    - copyloopvar    # Go 1.22+ made the loop-var copy redundant. 5.
+    - gocognit       # SonarSource cognitive complexity, threshold 30. 46 non-test at pass 2 start.
+    - gocritic       # perf tag only, minus hugeParam + rangeValCopy. 34.
+    - gocyclo        # cyclomatic complexity, same threshold. 22 non-test at pass 2 start.
+    - govet          # already run standalone; free here, and catches the same set.
+    - ineffassign    # dead stores — dead code, statement level. 1.
+    - makezero       # make([]T, n) then append. 0 findings — keeps it so.
+    - prealloc       # perf: a growable slice with a known length. 4 (non-test).
+    - sloglint       # P266: static messages, camelCase keys, errors under "err" (scope presence: internal/conventiontest).
+    - unconvert      # redundant conversions. 1.
+    - unused         # SPEC's Go dead-code answer, staticcheck-based. 11.
+  settings:
+    sloglint:
+      static-msg: true
+      key-naming-case: camel
+      forbidden-keys:
+        - error
+    gocognit:
+      min-complexity: 30
+    gocyclo:
+      min-complexity: 30
+    gocritic:
+      enabled-tags:
+        - performance
+      disabled-checks:
+        - hugeParam
+        - rangeValCopy
+  exclusions:
+    generated: lax
+    rules:
+      - path: _test\.go
+        linters: [gocognit, gocyclo, prealloc]
+      # Vendored Go stdlib net/http/cookiejar, kept verbatim for resync (see cookiejar/jar.go).
+      - path: internal/httpclient/cookiejar/(jar|punycode|example_test)\.go
+        linters: [gocognit, gocyclo, gocritic, bodyclose]
+
+# Guard for P139: gofmt drift landed silently until pre-push began running this.
+formatters:
+  enable:
+    - gofmt
+
+issues:
+  # golangci-lint truncates at 50 per linter / 3 per message by default and still
+  # prints a tidy total. That hid 507 of gocritic's 541 findings on the first run
+  # for this plan. Never leave these at their defaults.
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  # Same trap, second mechanism: the default drops a finding whose file+line another
+  # linter already reported, which hid 28 of gocyclo's 32 behind gocognit's own
+  # finding on the same func line. Both metrics must always report independently.
+  uniq-by-line: false

@@ -1,0 +1,49 @@
+{
+  "CustomScriptsService.List#grouped": {
+    "collections": [
+      {
+        "createdAt": "<time>",
+        "id": "<id:1>",
+        "name": "Build",
+        "sortOrder": 0,
+        "updatedAt": "<time>"
+      }
+    ],
+    "scripts": [
+      {
+        "collectionId": "<id:1>",
+        "color": "blue",
+        "command": "echo keep",
+        "createdAt": "<time>",
+        "dirMode": "kira",
+        "id": "<id:2>",
+        "kind": "script",
+        "name": "keep",
+        "params": [],
+        "schedule": null,
+        "smart": null,
+        "sortOrder": 0,
+        "updatedAt": "<time>",
+        "useAdeDir": false,
+        "workingDir": ""
+      },
+      {
+        "collectionId": "<id:1>",
+        "color": "blue",
+        "command": "echo drop",
+        "createdAt": "<time>",
+        "dirMode": "kira",
+        "id": "<id:3>",
+        "kind": "script",
+        "name": "drop",
+        "params": [],
+        "schedule": null,
+        "smart": null,
+        "sortOrder": 1,
+        "updatedAt": "<time>",
+        "useAdeDir": false,
+        "workingDir": ""
+      }
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+.task
+bin
+frontend/dist
+frontend/bindings
+frontend/node_modules
+build/onnxruntime
+frontend/dist-mobile

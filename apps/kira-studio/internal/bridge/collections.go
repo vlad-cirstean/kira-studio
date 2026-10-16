@@ -1,0 +1,482 @@
+package bridge
+
+import (
+	"errors"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"strconv"
+
+	"github.com/google/renameio/v2"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/postman"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
+)
+
+// CollectionsService is P4 D11 — the QueriesService shape (a typed-struct wrapper per method, with
+// an explicit guard and an ipcerr translation) over Deps.Repos.Collections, plus the two file
+// methods.
+//
+// **Go reads and writes the file.** P3 §2 F7 measured the control plane: CHUNK_THRESHOLD is
+// 512 KiB with a serial fetch per chunk and an outright refusal above a 64 MiB assembled body, so
+// a 10-50 MB collection through the renderer would be 20-100 serial round trips and, above the
+// ceiling, an unattributable "assembled body too large". The renderer's whole involvement is a
+// path string from FilesService.ChooseOpen/ChooseSave — the identical shape P3 D4 established for
+// a request body's file.
+//
+// **No op-log row and no new op kind.** The ring-and-Stop machinery ARCHITECTURE.md's ~150 ms
+// invariant refers to is ViewChrome + useRunState(tabId), which is per tab; an import initiated
+// from the left panel has no tab, so joining the op log would buy an Operations-panel row and
+// nothing the user is looking at. Cancelling a single all-or-nothing local transaction has no
+// useful semantics either. The panel's own header action carries a spinner instead, and Wails
+// handles each bound call in its own goroutine (P2 §2 F12), so a long import blocks that call and
+// nothing else.
+type CollectionsService struct{ Deps appcore.Deps }
+
+// CollectionSummary and ItemSummary are the two flat row shapes the tree renders from — the
+// renderer builds the tree, mirroring how TreeService.Children returns flat nodes.
+type CollectionSummary = model.Collection
+
+// ItemSummary is model.CollectionItem under the name the renderer's own mirror uses.
+type ItemSummary = model.CollectionItem
+
+// CollectionsTree is one List() answer: flat arrays, one call per panel mount, no N+1.
+type CollectionsTree struct {
+	Collections []CollectionSummary `json:"collections"`
+	Items       []ItemSummary       `json:"items"`
+}
+
+func (s *CollectionsService) List() (CollectionsTree, error) {
+	collections, items, err := s.Deps.Repos.Collections.List()
+	if err != nil {
+		return CollectionsTree{}, ipcerr.InternalErr(err)
+	}
+	return CollectionsTree{Collections: collections, Items: items}, nil
+}
+
+type CollectionsItemArgs struct {
+	ItemID string `json:"itemId"`
+}
+
+// readErr maps a saved-request read failure: a missing item is E_NOT_FOUND, a folder or
+// other-protocol item is E_BAD_REQUEST, everything else (including corrupt stored JSON) E_INTERNAL.
+func readErr[T any](v T, err error) (T, error) {
+	var zero T
+	switch {
+	case err == nil:
+		return v, nil
+	case errors.Is(err, repos.ErrItemNotFound):
+		return zero, ipcerr.NotFound(err.Error())
+	case errors.Is(err, repos.ErrNotARequest):
+		return zero, ipcerr.BadRequest(err.Error())
+	}
+	return zero, ipcerr.Internal(err.Error())
+}
+
+func (s *CollectionsService) GetRequest(args CollectionsItemArgs) (model.SavedRequest, error) {
+	if args.ItemID == "" {
+		return model.SavedRequest{}, ipcerr.Required("itemId")
+	}
+	return readErr(s.Deps.Repos.Collections.GetRequest(args.ItemID))
+}
+
+// GetGrpcRequest is GetRequest's own gRPC sibling (P11 D12).
+func (s *CollectionsService) GetGrpcRequest(args CollectionsItemArgs) (model.SavedGrpcRequest, error) {
+	if args.ItemID == "" {
+		return model.SavedGrpcRequest{}, ipcerr.Required("itemId")
+	}
+	return readErr(s.Deps.Repos.Collections.GetGrpcRequest(args.ItemID))
+}
+
+type CollectionsSaveRequestArgs struct {
+	ItemID  string             `json:"itemId"`
+	Name    string             `json:"name"`
+	Request model.SavedRequest `json:"request"`
+}
+
+func (s *CollectionsService) SaveRequest(args CollectionsSaveRequestArgs) (ItemSummary, error) {
+	if args.ItemID == "" {
+		return ItemSummary{}, ipcerr.Required("itemId")
+	}
+	if args.Name == "" {
+		return ItemSummary{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.validation.nameRequired.body", nil)
+	}
+	item, err := s.Deps.Repos.Collections.SaveRequest(args.ItemID, args.Name, args.Request)
+	if err != nil {
+		return ItemSummary{}, ipcerr.InternalErr(err)
+	}
+	emitApiData(s.Deps.Events, treeChange(), savedRequestChange(args.ItemID))
+	return item, nil
+}
+
+type CollectionsSaveGrpcRequestArgs struct {
+	ItemID  string                 `json:"itemId"`
+	Name    string                 `json:"name"`
+	Request model.SavedGrpcRequest `json:"request"`
+}
+
+// SaveGrpcRequest is SaveRequest's own gRPC sibling (P11 D12).
+func (s *CollectionsService) SaveGrpcRequest(args CollectionsSaveGrpcRequestArgs) (ItemSummary, error) {
+	if args.ItemID == "" {
+		return ItemSummary{}, ipcerr.Required("itemId")
+	}
+	if args.Name == "" {
+		return ItemSummary{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.validation.nameRequired.body", nil)
+	}
+	item, err := s.Deps.Repos.Collections.SaveGrpcRequest(args.ItemID, args.Name, args.Request)
+	if err != nil {
+		return ItemSummary{}, ipcerr.InternalErr(err)
+	}
+	emitApiData(s.Deps.Events, treeChange(), savedRequestChange(args.ItemID))
+	return item, nil
+}
+
+type CollectionsCreateCollectionArgs struct {
+	Name string `json:"name"`
+}
+
+func (s *CollectionsService) CreateCollection(args CollectionsCreateCollectionArgs) (CollectionSummary, error) {
+	if args.Name == "" {
+		return CollectionSummary{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.validation.nameRequired.body", nil)
+	}
+	c, err := s.Deps.Repos.Collections.CreateCollection(args.Name)
+	if err != nil {
+		return CollectionSummary{}, ipcerr.InternalErr(err)
+	}
+	emitApiData(s.Deps.Events, treeChange())
+	return c, nil
+}
+
+type CollectionsCreateItemArgs struct {
+	CollectionID string              `json:"collectionId"`
+	ParentID     *string             `json:"parentId"`
+	Kind         string              `json:"kind"`
+	Name         string              `json:"name"`
+	Request      *model.SavedRequest `json:"request"`
+}
+
+func (s *CollectionsService) CreateItem(args CollectionsCreateItemArgs) (ItemSummary, error) {
+	if args.CollectionID == "" {
+		return ItemSummary{}, ipcerr.Required("collectionId")
+	}
+	if !model.IsCollectionItemKind(args.Kind) {
+		return ItemSummary{}, ipcerr.Contract("kind must be 'folder' or 'request'")
+	}
+	if args.Name == "" {
+		return ItemSummary{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.validation.nameRequired.body", nil)
+	}
+	item, err := s.Deps.Repos.Collections.CreateItem(args.CollectionID, args.ParentID, args.Kind, args.Name, args.Request)
+	if err != nil {
+		return ItemSummary{}, ipcerr.InternalErr(err)
+	}
+	emitApiData(s.Deps.Events, treeChange())
+	return item, nil
+}
+
+type CollectionsCreateGrpcItemArgs struct {
+	CollectionID string                  `json:"collectionId"`
+	ParentID     *string                 `json:"parentId"`
+	Name         string                  `json:"name"`
+	Request      *model.SavedGrpcRequest `json:"request"`
+}
+
+// CreateGrpcItem is CreateItem's own gRPC sibling (P11 D12) — always a request, never a folder (a
+// gRPC request has no folder distinction of its own).
+func (s *CollectionsService) CreateGrpcItem(args CollectionsCreateGrpcItemArgs) (ItemSummary, error) {
+	if args.CollectionID == "" {
+		return ItemSummary{}, ipcerr.Required("collectionId")
+	}
+	if args.Name == "" {
+		return ItemSummary{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.validation.nameRequired.body", nil)
+	}
+	item, err := s.Deps.Repos.Collections.CreateGrpcItem(args.CollectionID, args.ParentID, args.Name, args.Request)
+	if err != nil {
+		return ItemSummary{}, ipcerr.InternalErr(err)
+	}
+	emitApiData(s.Deps.Events, treeChange())
+	return item, nil
+}
+
+// CollectionsTargetArgs names a row in either table — 'collection' or 'item' — so the renderer
+// never has to know which one a tree row lives in.
+type CollectionsTargetArgs struct {
+	ID     string `json:"id"`
+	Target string `json:"target"`
+	Name   string `json:"name,omitempty"`
+}
+
+func (s *CollectionsService) Rename(args CollectionsTargetArgs) error {
+	if err := validTarget(args); err != nil {
+		return err
+	}
+	if args.Name == "" {
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.validation.nameRequired.body", nil)
+	}
+	if err := s.Deps.Repos.Collections.Rename(args.ID, args.Target, args.Name); err != nil {
+		return ipcerr.InternalErr(err)
+	}
+	emitApiData(s.Deps.Events, treeChange())
+	return nil
+}
+
+func (s *CollectionsService) Delete(args CollectionsTargetArgs) error {
+	if err := validTarget(args); err != nil {
+		return err
+	}
+	if err := s.Deps.Repos.Collections.Delete(args.ID, args.Target); err != nil {
+		return ipcerr.InternalErr(err)
+	}
+	if args.Target == "collection" {
+		emitApiData(s.Deps.Events, treeChange(), variablesChange(model.VariableScopeCollection, args.ID))
+	} else {
+		emitApiData(s.Deps.Events, treeChange())
+	}
+	return nil
+}
+
+type CollectionsMoveItemArgs struct {
+	ItemID       string `json:"itemId"`
+	CollectionID string `json:"collectionId"`
+}
+
+// MoveItem moves a request or folder, with its subtree, to the root of another collection.
+func (s *CollectionsService) MoveItem(args CollectionsMoveItemArgs) error {
+	if args.ItemID == "" {
+		return ipcerr.Required("itemId")
+	}
+	if args.CollectionID == "" {
+		return ipcerr.Required("collectionId")
+	}
+	if err := s.Deps.Repos.Collections.MoveItem(args.ItemID, args.CollectionID); err != nil {
+		return ipcerr.InternalErr(err)
+	}
+	emitApiData(s.Deps.Events, treeChange())
+	return nil
+}
+
+func validTarget(args CollectionsTargetArgs) error {
+	if args.ID == "" {
+		return ipcerr.Required("id")
+	}
+	if args.Target != "collection" && args.Target != "item" {
+		return ipcerr.Contract("target must be 'collection' or 'item'")
+	}
+	return nil
+}
+
+// ImportWarning is one counted class of "the app quietly did something other than what the file
+// said" (D12). Counted rather than listed per-item: the point is that the user learns it at import
+// time rather than from a confusing 401 or an E_BAD_REQUEST minutes later.
+type ImportWarning struct {
+	Kind   string `json:"kind"`
+	Count  int    `json:"count"`
+	Detail string `json:"detail"`
+}
+
+// ImportReport is what Import answers with — part of the feature, not decoration.
+type ImportReport struct {
+	CollectionID string          `json:"collectionId"`
+	Name         string          `json:"name"`
+	Folders      int             `json:"folders"`
+	Requests     int             `json:"requests"`
+	Warnings     []ImportWarning `json:"warnings"`
+}
+
+// importWarningKinds is D12's order: warnings are reported in this order.
+var importWarningKinds = []string{
+	postman.WarnScriptsInert, postman.WarnAuthInert, postman.WarnVariablesInert, postman.WarnVariablesImported,
+	postman.WarnGraphQLBody, postman.WarnUnsupportedMethod, postman.WarnUnresolvedFile,
+	postman.WarnInlineFileContent, postman.WarnDisabledBody, postman.WarnMalformedItem,
+}
+
+// importWarningDetail is D12's table: one sentence per warning kind. The messages live here rather
+// than in internal/postman because they are UI text — that package only knows what it did.
+func importWarningDetail(kind string, n int) string {
+	c := strconv.Itoa(n)
+	switch kind {
+	case postman.WarnScriptsInert:
+		return i18n.T("backend.studio.collection.import.scriptsInert.body", map[string]string{"count": c})
+	case postman.WarnAuthInert:
+		return i18n.T("backend.studio.collection.import.authInert.body", map[string]string{"count": c})
+	case postman.WarnVariablesInert:
+		return i18n.T("backend.studio.collection.import.variablesInert.body", map[string]string{"count": c})
+	case postman.WarnVariablesImported:
+		return i18n.T("backend.studio.collection.import.variablesImported.body", map[string]string{"count": c})
+	case postman.WarnGraphQLBody:
+		return i18n.T("backend.studio.collection.import.graphqlBody.body", map[string]string{"count": c, "format": "GraphQL"})
+	case postman.WarnUnsupportedMethod:
+		return i18n.T("backend.studio.collection.import.unsupportedMethod.body", map[string]string{"count": c, "method": "GET"})
+	case postman.WarnUnresolvedFile:
+		return i18n.T("backend.studio.collection.import.unresolvedFile.body", map[string]string{"count": c})
+	case postman.WarnInlineFileContent:
+		return i18n.T("backend.studio.collection.import.inlineFileContent.body", map[string]string{"count": c})
+	case postman.WarnDisabledBody:
+		return i18n.T("backend.studio.collection.import.disabledBody.body", map[string]string{"count": c})
+	case postman.WarnMalformedItem:
+		return i18n.T("backend.studio.collection.import.malformedItem.body", map[string]string{"count": c})
+	}
+	return ""
+}
+
+type CollectionsImportArgs struct {
+	Path string `json:"path"`
+}
+
+// Import parses the file at path and writes it as rows in one transaction. Only the path crosses
+// the bridge — never the file's bytes (F16).
+func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportReport, error) {
+	if args.Path == "" {
+		return ImportReport{}, ipcerr.Required("path")
+	}
+	f, err := os.Open(args.Path)
+	if err != nil {
+		return ImportReport{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.file.readFailed.error",
+			map[string]string{"path": args.Path, "detail": err.Error()})
+	}
+	defer f.Close()
+
+	tree, err := postman.Parse(f)
+	if err != nil {
+		// A refusal here is about the file's own content (D10's version gate, or JSON that is not
+		// a collection at all), which is the user's to fix — not an internal failure.
+		return ImportReport{}, ipcerr.BadRequest(err.Error())
+	}
+	collection, err := s.Deps.Repos.Collections.ImportTree(tree)
+	if err != nil {
+		return ImportReport{}, ipcerr.InternalErr(err)
+	}
+	// P112: ImportTree committed here, on every path below — success, rollback success (net-zero
+	// change, one harmless refetch) and rollback failure (the partially imported collection stays
+	// visible, and other windows must see it too).
+	defer emitApiData(s.Deps.Events, treeChange())
+	// D15/F13: a second call, deliberately — encrypting a secret variable needs VariablesRepo's
+	// own Cipher, which CollectionsRepo does not have (D4/F4's module boundary). See
+	// VariablesRepo.ImportVariables' own comment for why this cannot join ImportTree's transaction.
+	//
+	// P21 round 1 architecture/security finding 10: the two commits are not atomic across that
+	// boundary. If this second one fails — the realistic case is a `type: "secret"` variable on a
+	// machine where secret storage is unavailable — the collection and its whole request tree
+	// ImportTree just committed would otherwise be left behind, visible in the panel, while the
+	// renderer reports the import as failed. Deleting it (ON DELETE CASCADE on api_items makes this
+	// one statement) keeps what's on disk matching the reported outcome.
+	if len(tree.Variables) > 0 {
+		if err := s.Deps.Repos.Variables.ImportVariables(collection.ID, tree.Variables); err != nil {
+			// P108 F19: a failed compensating Delete used to only be logged — the returned error
+			// still just named ImportVariables' own failure, so the renderer reported "import
+			// failed" while the collection ImportTree already committed stayed in the tree,
+			// visible in the panel, with nothing telling the user it was there. Folding the delete
+			// failure into the returned error message lets the UI say so.
+			if delErr := s.Deps.Repos.Collections.Delete(collection.ID, "collection"); delErr != nil {
+				slog.Error("rolling back a collection import after ImportVariables failed",
+					"scope", "bridge/collections", "collectionId", collection.ID, "importVariablesErr", err, "deleteErr", delErr)
+				return ImportReport{}, ipcerr.T(ipcerr.CodeInternal, "backend.studio.collection.importRollbackFailed.error",
+					map[string]string{"detail": err.Error(), "name": collection.Name, "rollbackDetail": delErr.Error()})
+			}
+			return ImportReport{}, ipcerr.InternalErr(err)
+		}
+	}
+
+	report := ImportReport{
+		CollectionID: collection.ID, Name: collection.Name,
+		Folders: tree.Report.Folders, Requests: tree.Report.Requests,
+		Warnings: []ImportWarning{},
+	}
+	for _, kind := range importWarningKinds {
+		count := tree.Report.Warnings[kind]
+		if count == 0 {
+			continue
+		}
+		report.Warnings = append(report.Warnings, ImportWarning{
+			Kind: kind, Count: count, Detail: importWarningDetail(kind, count),
+		})
+	}
+	return report, nil
+}
+
+type CollectionsExportArgs struct {
+	CollectionID string `json:"collectionId"`
+	Path         string `json:"path"`
+}
+
+// writeExportFile writes to a renameio temp file next to the target and renames it over the target
+// only once write has fully succeeded, so a failed re-export never destroys a good file.
+//
+// The target is path with any symlink resolved first (EvalSymlinks errors when path doesn't exist
+// yet, in which case path is used as-is), so the rename writes through a link instead of replacing
+// it. An existing target keeps its mode; a fresh one is private (0600).
+func writeExportFile(path string, write func(*os.File) error) error {
+	target := path
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		target = resolved
+	}
+	f, err := renameio.NewPendingFile(target, renameio.WithExistingPermissions())
+	if err != nil {
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.collection.writeFailed.error",
+			map[string]string{"path": path, "detail": err.Error()})
+	}
+	defer func() { _ = f.Cleanup() }()
+
+	if err := write(f.File); err != nil {
+		return ipcerr.InternalErr(err)
+	}
+	if err := f.CloseAtomicallyReplace(); err != nil {
+		return ipcerr.T(ipcerr.CodeInternal, "backend.studio.collection.finishWriteFailed.error",
+			map[string]string{"path": path, "detail": err.Error()})
+	}
+	return nil
+}
+
+// ExportReport is Export's answer — D16: a secret is written valueless, and SecretCount is what
+// lets the renderer say so once, rather than that being a fact only discoverable by opening the
+// file. SkippedGrpc is P11 D12/F22's own addition: Postman Collection v2.1 has no representation
+// for a gRPC request, so every protocol='grpc' item is skipped and the skip is reported — silently
+// dropping requests from an export would be the worst possible reading of "faithful round-trip"
+// (P4 D12's own rule, applied again).
+type ExportReport struct {
+	SecretCount int `json:"secretCount"`
+	SkippedGrpc int `json:"skippedGrpc"`
+}
+
+// Export writes the collection at path as Collection v2.1 JSON. The file is written whole rather
+// than streamed: a collection is rows in a local table and the writer needs the tree in memory to
+// rebuild the nested arrays anyway.
+//
+// P21 round 3 finding 7: this used to os.Create(args.Path) directly — truncate-or-create — and
+// stream postman.Write straight into it, so a marshal error, a full disk, or the process dying
+// mid-write left the destination empty or half-written with no cleanup, silently destroying
+// whatever was there before (a re-export is exactly the kind of save people make over last week's
+// file). Now writeExportFile writes a temp file and renames it onto the destination — the
+// destination is only ever replaced by a complete, fully-flushed file.
+func (s *CollectionsService) Export(args CollectionsExportArgs) (ExportReport, error) {
+	if args.CollectionID == "" {
+		return ExportReport{}, ipcerr.Required("collectionId")
+	}
+	if args.Path == "" {
+		return ExportReport{}, ipcerr.Required("path")
+	}
+	tree, err := s.Deps.Repos.Collections.LoadTree(args.CollectionID)
+	if err != nil {
+		return ExportReport{}, ipcerr.InternalErr(err)
+	}
+
+	if err := writeExportFile(args.Path, func(f *os.File) error { return postman.Write(f, tree) }); err != nil {
+		return ExportReport{}, err
+	}
+
+	secretCount := 0
+	for _, v := range tree.Variables {
+		if v.Secret {
+			secretCount++
+		}
+	}
+	skippedGrpc := 0
+	for _, item := range tree.Items {
+		if item.Protocol == "grpc" {
+			skippedGrpc++
+		}
+	}
+	return ExportReport{SecretCount: secretCount, SkippedGrpc: skippedGrpc}, nil
+}

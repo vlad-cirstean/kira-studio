@@ -1,0 +1,13 @@
+{
+  "kind": "sqlite",
+  "thresholdRows": 100000,
+  "pages": [
+    {
+      "columns": ["id", "parent", "detail"],
+      "rows": [
+        ["4", "0", "SEARCH t USING INDEX t_cat (cat=?)"],
+        ["15", "0", "USE TEMP B-TREE FOR ORDER BY"]
+      ]
+    }
+  ]
+}

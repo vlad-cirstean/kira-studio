@@ -1,0 +1,25 @@
+{
+  "repos": [
+    {
+      "codeRepoId": "repo-web-app",
+      "refsChanged": 3,
+      "mergedInto": [
+        {
+          "branchId": "b_cart",
+          "target": "develop"
+        }
+      ],
+      "error": null
+    },
+    {
+      "codeRepoId": "repo-mobile",
+      "refsChanged": 0,
+      "mergedInto": [],
+      "error": {
+        "kind": "network",
+        "message": "Could not fetch origin",
+        "remoteMessage": "fatal: unable to access https://github.com/acme/mobile.git/: Could not resolve host: github.com"
+      }
+    }
+  ]
+}

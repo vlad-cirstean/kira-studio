@@ -1,0 +1,193 @@
+<style>
+  body { overflow: auto; }
+  .sheet { padding: var(--s-6) 28px 40px; display: flex; flex-direction: column; gap: 28px; }
+  .sheet h1 { font-size: 20px; font-weight: 500; margin: 0; letter-spacing: -0.01em; }
+  .sheet .lede { font-size: var(--t-lg); color: var(--fg-muted); margin-top: var(--s-3); line-height: 1.55; max-width: 780px; }
+  .grid2 { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+  .cell { display: flex; flex-direction: column; gap: var(--s-3); }
+  .cell > h2 { font-size: var(--t-sm); color: var(--fg-disabled); text-transform: uppercase; letter-spacing: 0.07em; margin: 0; }
+  .cell .note { font-size: var(--t-sm); color: var(--fg-muted); line-height: 1.5; max-width: 320px; }
+  .mrow { height: var(--h-row); display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-3); border-radius: var(--r-sm); font-size: var(--t-md); color: var(--fg); cursor: pointer; }
+  .mrow.on { background: var(--select); }
+  .mrow.hov { background: var(--hover); }
+  .mrow.off { color: var(--fg-disabled); }
+  .mrow .kbd { margin-left: auto; font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-disabled); }
+  .mpad { padding: var(--s-2); display: flex; flex-direction: column; gap: 1px; }
+  .sw2 { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+</style>
+<div class="sheet">
+  <div>
+    <h1>Menus &amp; popovers</h1>
+    <p class="lede">Every floating surface is one primitive: <b>bg-elevated</b>, a 1&nbsp;px <b>border-strong</b> outline, a 6&nbsp;px radius and the single dialog shadow. Rows are the same 22&nbsp;px row used in the tree and the operations list, so a menu row and a tree row highlight identically.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="cell">
+      <h2>Command palette — ⇧⌘P</h2>
+      <p class="note">One input, one list. Each command shows where it applies, so "Refresh" is never ambiguous between the tree and the grid.</p>
+      <div class="p-float" style="width:440px">
+        <div style="padding:var(--s-3)"><span class="p-input ui md is-focus" style="width:100%"><span>conn</span></span></div>
+        <div class="mpad" style="border-top:var(--bw) solid var(--border)">
+          <div class="mrow on"><span class="icon-box"><svg class="icon"><use href="#i-plus"/></svg></span>New connection…<span class="kbd">⌘⇧N</span></div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-plug"/></svg></span>Connect <span class="dim">prod-analytics</span><span class="kbd">⌘⏎</span></div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-close"/></svg></span>Disconnect <span class="dim">prod-analytics</span></div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-edit"/></svg></span>Edit connection…</div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-refresh"/></svg></span>Reload connection tree<span class="kbd">⌘R</span></div>
+          <div class="mrow off"><span class="icon-box"><svg class="icon"><use href="#i-trash"/></svg></span>Delete connection <span class="dim">— select one first</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <h2>Tree context menu</h2>
+      <p class="note">Destructive items are last, red, and separated. Colour is a submenu of swatches — the same twelve the connection dialog offers.</p>
+      <div class="p-float" style="width:250px">
+        <div class="mpad">
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-table"/></svg></span>Open data<span class="kbd">⏎</span></div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-code"/></svg></span>Open DDL</div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-terminal"/></svg></span>New console here</div>
+          <div class="p-sep"></div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-refresh"/></svg></span>Refresh<span class="kbd">⌘R</span></div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-save"/></svg></span>Copy qualified name</div>
+          <div class="mrow hov" style="position:relative"><span class="icon-box"><span class="sw2" style="background:var(--conn-red)"></span></span>Colour<span class="icon-box" style="margin-left:auto"><svg class="icon"><use href="#i-chevron-right"/></svg></span></div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-filter"/></svg></span>Hide with a rule…</div>
+          <div class="p-sep"></div>
+          <div class="mrow" style="color:var(--error)"><span class="icon-box"><svg class="icon"><use href="#i-trash"/></svg></span>Drop table…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <h2>Colour submenu</h2>
+      <p class="note">Named, not just swatched — a colour you cannot say out loud is a colour you cannot ask a teammate about.</p>
+      <div class="p-float" style="width:186px">
+        <div class="mpad">
+          <div class="mrow on"><span class="icon-box"><span class="sw2" style="background:var(--conn-red)"></span></span>Red<span class="icon-box" style="margin-left:auto"><svg class="icon"><use href="#i-check"/></svg></span></div>
+          <div class="mrow"><span class="icon-box"><span class="sw2" style="background:var(--conn-orange)"></span></span>Orange</div>
+          <div class="mrow"><span class="icon-box"><span class="sw2" style="background:var(--conn-amber)"></span></span>Amber</div>
+          <div class="mrow"><span class="icon-box"><span class="sw2" style="background:var(--conn-olive)"></span></span>Olive</div>
+          <div class="mrow"><span class="icon-box"><span class="sw2" style="background:var(--conn-green)"></span></span>Green</div>
+          <div class="mrow"><span class="icon-box"><span class="sw2" style="background:var(--conn-teal)"></span></span>Teal</div>
+          <div class="mrow"><span class="icon-box"><span class="sw2" style="background:var(--conn-cyan)"></span></span>Cyan</div>
+          <div class="mrow"><span class="icon-box"><span class="sw2" style="background:var(--conn-blue)"></span></span>Blue</div>
+          <div class="mrow"><span class="icon-box"><span class="sw2" style="background:var(--conn-indigo)"></span></span>Indigo</div>
+          <div class="mrow"><span class="icon-box"><span class="sw2" style="background:var(--conn-violet)"></span></span>Violet</div>
+          <div class="mrow"><span class="icon-box"><span class="sw2" style="background:var(--conn-magenta)"></span></span>Magenta</div>
+          <div class="mrow"><span class="icon-box"><span class="sw2" style="background:var(--conn-grey)"></span></span>Grey</div>
+          <div class="p-sep"></div>
+          <div class="mrow"><span class="icon-box"><span class="sw2" style="border:1.5px solid var(--fg-disabled)"></span></span>None</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <h2>Columns</h2>
+      <p class="note">The footer answers the only question this menu raises: is hiding a column a cheaper query, or just a narrower view?</p>
+      <div class="p-float" style="width:250px">
+        <div class="toolbar" style="height:var(--h-lg); border-bottom:var(--bw) solid var(--border)">
+          <span class="p-input ui" style="flex:1"><span class="icon-box"><svg class="icon"><use href="#i-search"/></svg></span><span class="ph">Filter columns</span></span>
+        </div>
+        <div class="mpad">
+          <div class="mrow"><span class="icon-box"><span class="box" style="width:12px;height:12px;border-radius:3px;background:var(--accent);display:flex;align-items:center;justify-content:center"><svg class="icon" style="width:9px;height:9px;color:#fff"><use href="#i-check"/></svg></span></span>id<span class="p-badge" style="margin-left:auto">uuid</span></div>
+          <div class="mrow"><span class="icon-box"><span class="box" style="width:12px;height:12px;border-radius:3px;background:var(--accent);display:flex;align-items:center;justify-content:center"><svg class="icon" style="width:9px;height:9px;color:#fff"><use href="#i-check"/></svg></span></span>customer_id<span class="p-badge" style="margin-left:auto">uuid</span></div>
+          <div class="mrow"><span class="icon-box"><span class="box" style="width:12px;height:12px;border-radius:3px;background:var(--accent);display:flex;align-items:center;justify-content:center"><svg class="icon" style="width:9px;height:9px;color:#fff"><use href="#i-check"/></svg></span></span>status<span class="p-badge" style="margin-left:auto">text</span></div>
+          <div class="mrow off"><span class="icon-box"><span class="box" style="width:12px;height:12px;border-radius:3px;border:1px solid var(--border-strong);background:var(--bg-input)"></span></span>internal_notes<span class="p-badge" style="margin-left:auto">text</span></div>
+          <div class="mrow off"><span class="icon-box"><span class="box" style="width:12px;height:12px;border-radius:3px;border:1px solid var(--border-strong);background:var(--bg-input)"></span></span>legacy_ref<span class="p-badge" style="margin-left:auto">text</span></div>
+          <div class="mrow off"><span class="icon-box"><span class="box" style="width:12px;height:12px;border-radius:3px;border:1px solid var(--border-strong);background:var(--bg-input)"></span></span>etl_batch_id<span class="p-badge" style="margin-left:auto">bigint</span></div>
+        </div>
+        <div class="toolbar last" style="border-top:var(--bw) solid var(--border)">
+          <button class="p-btn">All</button><button class="p-btn">None</button>
+          <span class="xs dim push">projected server-side</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <h2>Saved &amp; recent filters</h2>
+      <p class="note">Saved and recent are one list with two headers, because they answer the same question. Recent entries show the SQL, saved ones show the name you gave them.</p>
+      <div class="p-float" style="width:340px">
+        <div class="mpad">
+          <div class="p-menu-label">Saved</div>
+          <div class="mrow hov"><span class="icon-box" style="color:var(--warn)"><svg class="icon"><use href="#i-star-on"/></svg></span>Paid, last 30 days<span style="margin-left:auto; display:flex; gap:var(--s-1)"><button class="p-iconbtn"><svg class="icon"><use href="#i-edit"/></svg></button><button class="p-iconbtn"><svg class="icon"><use href="#i-trash"/></svg></button></span></div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-star"/></svg></span>Refunds to chase</div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-star"/></svg></span>High-value pending</div>
+          <div class="p-sep"></div>
+          <div class="p-menu-label">Recent</div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-history"/></svg></span><span class="mono sm" style="overflow:hidden; text-overflow:ellipsis">status = 'paid' AND total &gt; 50</span></div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-history"/></svg></span><span class="mono sm" style="overflow:hidden; text-overflow:ellipsis">currency = 'GBP' · placed_at DESC</span></div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-history"/></svg></span><span class="mono sm" style="overflow:hidden; text-overflow:ellipsis">shipped_at IS NULL</span></div>
+          <div class="p-sep"></div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-plus"/></svg></span>Save the current filter…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <h2>Preview SQL</h2>
+      <p class="note">Replaces "Preview command", which never said whose command. It shows exactly what Commit will send, in the order it will send it.</p>
+      <div class="p-float" style="width:520px">
+        <div class="toolbar" style="height:var(--h-lg); border-bottom:var(--bw) solid var(--border)">
+          <span class="icon-box muted"><svg class="icon"><use href="#i-code"/></svg></span>
+          <span class="sm">Statements Commit will send</span>
+          <span class="p-count">2</span>
+          <button class="p-iconbtn push"><svg class="icon"><use href="#i-close"/></svg></button>
+        </div>
+        <div class="code" style="height:150px; background:var(--bg)">
+          <div class="gutter-col">1<br>2<br>3<br>4<br>5<br>6<br>7</div>
+<pre><span class="k">UPDATE</span> public<span class="o">.</span>orders
+   <span class="k">SET</span> status <span class="o">=</span> <span class="s">'refunded'</span><span class="o">,</span> notes <span class="o">=</span> <span class="s">'customer requested refund'</span>
+ <span class="k">WHERE</span> id <span class="o">=</span> <span class="s">'c9e1f207-3aa6-41c0-b512'</span><span class="o">;</span>
+
+<span class="k">UPDATE</span> public<span class="o">.</span>orders
+   <span class="k">SET</span> status <span class="o">=</span> <span class="s">'cancelled'</span>
+ <span class="k">WHERE</span> id <span class="o">=</span> <span class="s">'0b8d41fa-6c23-4e19-97ab'</span><span class="o">;</span></pre>
+        </div>
+        <div class="toolbar last" style="border-top:var(--bw) solid var(--border)">
+          <span class="p-chip warn">2 rows · 1 transaction</span>
+          <span class="push" style="display:flex; gap:var(--s-3)"><button class="p-btn">Copy</button><button class="p-btn primary">Commit now</button></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <h2>Saved queries</h2>
+      <p class="note">Same list object as saved filters — pinned first, name, then the actions on hover. Learn it once.</p>
+      <div class="p-float" style="width:320px">
+        <div class="mpad">
+          <div class="p-menu-label">Pinned</div>
+          <div class="mrow hov"><span class="icon-box" style="color:var(--warn)"><svg class="icon"><use href="#i-star-on"/></svg></span>Revenue by currency<span style="margin-left:auto; display:flex; gap:var(--s-1)"><button class="p-iconbtn"><svg class="icon"><use href="#i-edit"/></svg></button><button class="p-iconbtn"><svg class="icon"><use href="#i-trash"/></svg></button></span></div>
+          <div class="mrow"><span class="icon-box" style="color:var(--warn)"><svg class="icon"><use href="#i-star-on"/></svg></span>Orders stuck in pending</div>
+          <div class="p-sep"></div>
+          <div class="p-menu-label">All</div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-star"/></svg></span>Customer lifetime value</div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-star"/></svg></span>Daily signups</div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-star"/></svg></span>Table bloat check</div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-star"/></svg></span>Slow queries (pg_stat_statements)</div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-star"/></svg></span>Index usage</div>
+          <div class="p-sep"></div>
+          <div class="mrow"><span class="icon-box"><svg class="icon"><use href="#i-plus"/></svg></span>Save the current query…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cell">
+      <h2>Confirm — the one destructive shape</h2>
+      <p class="note">Naming the object and the count is what makes it safe; a red button on its own is not a confirmation.</p>
+      <div class="p-float" style="width:400px">
+        <div style="padding:var(--s-5); display:flex; flex-direction:column; gap:var(--s-4)">
+          <div style="display:flex; gap:var(--s-4); align-items:flex-start">
+            <span style="color:var(--error); display:flex"><svg viewBox="0 0 16 16" width="20" height="20"><use href="#i-warning"/></svg></span>
+            <div>
+              <div style="font-size:var(--t-lg); color:var(--fg)">Delete <span class="mono">session:a44c</span>?</div>
+              <div class="help" style="margin-top:var(--s-3)">This runs <span class="mono">DEL</span> on <b>local-redis / db0</b> immediately. The key holds 14 fields and has no backup — Redis will not let you undo this.</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:var(--s-3); justify-content:flex-end">
+            <button class="p-dlgbtn">Cancel</button>
+            <button class="p-dlgbtn" style="background:var(--error); border-color:var(--error); color:#fff">Delete key</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

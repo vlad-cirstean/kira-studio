@@ -1,0 +1,12 @@
+{
+  "status": "ok",
+  "message": "",
+  "marked": ["src/a.ts"],
+  "unmarked": ["src/b.ts"],
+  "failed": [
+    {
+      "path": "src/z.ts",
+      "error": "Could not resolve to a PullRequestChangedFile"
+    }
+  ]
+}

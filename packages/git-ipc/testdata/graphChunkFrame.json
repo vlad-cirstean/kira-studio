@@ -1,0 +1,44 @@
+{
+  "envelope": {
+    "repoId": "/tmp/ksf2876931641/work/fixture",
+    "seq": 0,
+    "from": 0,
+    "to": 3,
+    "source": "git",
+    "remaining": 0,
+    "exhausted": true
+  },
+  "commits": {
+    "from": 0,
+    "to": 3,
+    "shaWidthBytes": 20,
+    "shas": [
+      "b8f10beece9fccfc1b1b4a0384b0c7ed52964b54",
+      "37d1512b1a8ec7ee0c4cbcf133fe2e027802fbd4",
+      "d64d8b49e85f621fe4c2ce424b78d0bd243fd417"
+    ],
+    "parentOffsets": [0, 1, 2, 2],
+    "parentShas": [
+      "37d1512b1a8ec7ee0c4cbcf133fe2e027802fbd4",
+      "d64d8b49e85f621fe4c2ce424b78d0bd243fd417"
+    ],
+    "identityIds": [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+    "times": [1700000180, 1700000180, 1700000120, 1700000120, 1700000060, 1700000060],
+    "subjects": ["commit 2", "commit 1", "commit 0"],
+    "subjectOffsets": [0, 8, 16, 24],
+    "dictionaryBase": 0,
+    "dictionary": ["Test Author", "author@example.com"],
+    "decorations": [
+      {
+        "row": 0,
+        "refs": [
+          {
+            "kind": "branch",
+            "name": "main",
+            "isHead": true
+          }
+        ]
+      }
+    ]
+  }
+}

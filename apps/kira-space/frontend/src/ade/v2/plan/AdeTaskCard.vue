@@ -1,0 +1,290 @@
+<script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Button } from '@theme/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@theme/components/ui/dropdown-menu';
+import { Kbd } from '@theme/components/ui/kbd';
+import VarText from '@theme/components/VarText.vue';
+import { t } from '@theme/i18n';
+import { formatPercent } from '@workbench/behaviour/format';
+import { errorText } from '@workbench/bridge/codedError';
+import { formatShortcut } from '@workbench/shortcuts/keys';
+import { useShortcut } from '@workbench/shortcuts/useShortcut';
+import { computed, useTemplateRef } from 'vue';
+import AdeTip from '../AdeTip.vue';
+import AdeAutomationChip from '../automation/AdeAutomationChip.vue';
+import type { BranchAction } from '../board/actions';
+import { changeBaseChoices } from '../board/changeBase';
+import { taskReviewTip } from '../board/reviewCode';
+import { useReviewCode } from '../review/useReviewCode';
+import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
+import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { useAdeDialogsStore } from '../state/adeDialogs';
+import { useAdeTakeOverStore } from '../state/adeTakeOver';
+import { TONE_SOLID_CLASS, TONE_TAG_CLASS } from '../tones';
+import AdeActionCell from './AdeActionCell.vue';
+import AdeAttention from './AdeAttention.vue';
+import AdeBranchRow from './AdeBranchRow.vue';
+import { type BranchRowModel, type CardModel, usePlanModel } from './usePlanModel';
+import { useTaskMenu } from './useTaskMenu';
+
+const props = defineProps<{ card: CardModel }>();
+const emit = defineEmits<{ select: []; forcePush: [row: BranchRowModel] }>();
+
+const ui = useAdeBoardUiStore();
+const dialogs = useAdeDialogsStore();
+const takeOver = useAdeTakeOverStore();
+const { model } = usePlanModel();
+const taskMenu = useTaskMenu(() => props.card);
+const reviewCode = useReviewCode();
+const choices = computed(() => reviewCode.choicesOf(props.card));
+const reviewTip = computed(() => taskReviewTip(choices.value));
+
+const head = useTemplateRef<HTMLElement>('head');
+useShortcut(head, ['menu.open'], () => {
+  if (head.value) taskMenu.openAt(head.value);
+});
+
+// One branch opens Change base at once; several ask which.
+const baseChoices = computed(() => {
+  const m = model.value;
+  return m
+    ? changeBaseChoices(props.card, { graph: m.view.graph, after: m.view.after, board: m.board })
+    : [];
+});
+
+function act(row: BranchRowModel, a: BranchAction): void {
+  if (a.act) dialogs.act(a.act);
+  else if (a.kind === 'forcePush') emit('forcePush', row);
+  else if (a.kind === 'seeError') {
+    ui.selectBranch(row.branch.taskId, row.id);
+    ui.focusSetup = true;
+  } else if (a.kind === 'seeLog') {
+    ui.selectBranch(row.branch.taskId, row.id);
+    ui.branchTab = 'details';
+    ui.focusRebaseLog = true;
+  } else if (a.kind === 'takeOver') {
+    delete ui.actionError[row.branch.taskId];
+    takeOver.request(a.sessionId ?? '').catch((err: unknown) => {
+      ui.actionError[row.branch.taskId] = errorText(err);
+      ui.select(row.branch.taskId);
+    });
+  } else if (a.kind === 'start') dialogs.start(row.id);
+}
+
+const p = computed(() => props.card.progress);
+const segClass = (state: string): string => {
+  if (state === 'done') return 'bg-tone-green-solid';
+  if (state === 'todo') return 'bg-border-strong';
+  if (state === 'skipped') return 'bg-border';
+  return p.value.bad ? 'bg-tone-red-solid' : 'bg-tone-amber-solid';
+};
+const labelClass = computed(() => {
+  if (p.value.finished) return TONE_TAG_CLASS.green;
+  if (p.value.bad) return TONE_SOLID_CLASS.red;
+  return TONE_TAG_CLASS.amber;
+});
+
+// The left border colour is task data (`card.color`) except on a review card, which wears blue.
+const boxStyle = computed(() =>
+  props.card.review ? undefined : { borderLeftColor: props.card.color },
+);
+const boxClass = computed(() => {
+  const c = props.card;
+  return [
+    c.parked
+      ? 'border-dashed bg-[repeating-linear-gradient(135deg,var(--kira-bg-elevated)_0_7px,var(--kira-bg-chrome)_7px_14px)]'
+      : '',
+    c.review ? 'cursor-default border-l-tone-blue-solid' : 'cursor-grab',
+    c.allMerged ? 'border-y-tone-purple-solid/60 border-r-tone-purple-solid/60' : '',
+    c.ripple && !c.selected ? 'outline outline-1 outline-dashed outline-tone-amber-solid' : '',
+  ];
+});
+
+const headStyle = computed(() =>
+  props.card.selected ? undefined : { background: `${props.card.color}1c` },
+);
+</script>
+
+<template>
+  <div
+    class="flex items-start gap-2"
+    :data-ade-task="card.review ? undefined : ''"
+    data-testid="ade-task"
+    :data-task-id="card.task.id"
+    :data-selected="card.selected || undefined"
+  >
+    <div class="flex w-52.5 shrink-0 flex-col pt-px" data-testid="ade-task-cells">
+      <AdeActionCell v-if="card.tag" :tag="card.tag" tall @contextmenu="taskMenu.open">
+        <AdeTaskActionButton :card="card" />
+      </AdeActionCell>
+      <AdeActionCell
+        v-for="row in card.rows"
+        :key="row.id"
+        :tag="row.tag"
+        :actions="row.tag.actions"
+        @act="(a) => act(row, a)"
+        @contextmenu="(ev: MouseEvent) => card.review && taskMenu.open(ev)"
+      />
+    </div>
+    <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the keyboard opens the menu from the header. -->
+    <div
+      :data-task-id="card.task.id"
+      class="box-border flex min-w-0 flex-1 flex-col overflow-hidden rounded-kira-pill border border-l-4 border-border-strong bg-elevated shadow-kira"
+      :class="boxClass"
+      :style="boxStyle"
+      data-testid="ade-card"
+      @contextmenu="taskMenu.open"
+    >
+      <!-- biome-ignore lint/a11y/useSemanticElements: the header holds block content a button cannot. -->
+      <div
+        v-if="!card.review"
+        ref="head"
+        class="box-border flex h-17 w-full flex-col justify-center gap-1 border-b border-l-3 border-b-border px-2.5 py-1.5"
+        :class="card.selected ? 'border-l-focus bg-hover' : 'border-l-transparent'"
+        :style="headStyle"
+        role="button"
+        tabindex="0"
+        data-testid="ade-card-head"
+        @click="emit('select')"
+        @keydown.enter.self="emit('select')"
+        @keydown.space.self.prevent="emit('select')"
+      >
+        <div class="flex h-4.5 min-w-0 items-center gap-1.5">
+          <span
+            class="box-border size-3 shrink-0 rounded-kira-xs"
+            :class="card.parked ? 'border-2 border-dashed' : ''"
+            :style="card.parked ? { borderColor: card.color } : { background: card.color }"
+            data-testid="ade-card-dot"
+          />
+          <template v-if="p.hasWorkflow && !card.parked">
+            <AdeTip :text="p.workflowTip">
+              <span
+                class="inline-flex w-20 shrink-0 items-center gap-0.5"
+                data-testid="ade-step-segs"
+              >
+                <span
+                  v-for="seg in p.segments"
+                  :key="seg.id"
+                  class="h-1.5 flex-1 rounded-kira-xs"
+                  :class="segClass(seg.state)"
+                />
+              </span>
+            </AdeTip>
+            <span
+              class="max-w-37.5 shrink-0 truncate rounded-kira-sm px-1.5 py-px text-kira-sm"
+              :class="labelClass"
+              data-testid="ade-step-label"
+              >{{
+                p.label
+              }}</span
+            >
+            <AdeTip v-if="p.showBar" :text="p.barTip">
+              <span class="inline-flex shrink-0 items-center gap-1">
+                <span
+                  class="inline-block h-1.25 w-11.5 overflow-hidden rounded-kira-xs bg-border-strong"
+                >
+                  <span
+                    class="block h-full"
+                    :class="p.bad ? 'bg-tone-red-solid' : 'bg-tone-amber-solid'"
+                    :style="{ width: `${p.percent}%` }"
+                  />
+                </span>
+                <span class="text-kira-sm text-fg">{{ formatPercent(p.percent) }}</span>
+              </span>
+            </AdeTip>
+          </template>
+          <AdeAttention v-if="card.attention" :tip="card.attention" :item="card.attentionItem" />
+          <AdeAutomationChip :task-id="card.task.id" />
+          <AdeTip :text="card.meta">
+            <span
+              class="min-w-0 flex-1 truncate text-kira-sm leading-3.5 text-subtle"
+              data-testid="ade-card-meta"
+              >{{
+                card.meta
+              }}</span
+            >
+          </AdeTip>
+          <DropdownMenu v-if="baseChoices.length > 1">
+            <AdeTip :text="t('space.ade.plan.card.changeBase.tooltip')">
+              <DropdownMenuTrigger as-child>
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  class="size-4.5 shrink-0"
+                  :aria-label="t('space.ade.rebase.changeBase.label')"
+                  data-testid="ade-card-change-base"
+                  @click.stop
+                >
+                  <CodiconIcon name="git-branch" :size="13" />
+                </Button>
+              </DropdownMenuTrigger>
+            </AdeTip>
+            <DropdownMenuContent align="end" data-testid="ade-card-change-base-menu">
+              <DropdownMenuItem
+                v-for="c in baseChoices"
+                :key="c.branchId"
+                :disabled="c.disabled"
+                data-testid="ade-card-change-base-item"
+                @select="dialogs.act(c.act)"
+              >
+                <VarText :parts="c.parts" />
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <TooltipIconButton
+            v-else-if="baseChoices.length === 1"
+            icon="git-branch"
+            :label="t('space.ade.rebase.changeBase.label')"
+            class="size-4.5 shrink-0"
+            disabled-trigger
+            :disabled="baseChoices[0].disabled"
+            data-testid="ade-card-change-base"
+            @click.stop="dialogs.act(baseChoices[0].act)"
+          >
+            <VarText :parts="baseChoices[0].tip" />
+          </TooltipIconButton>
+          <TooltipIconButton
+            v-if="choices.length"
+            icon="git-compare"
+            :label="t('space.ade.board.taskMenu.reviewCode.label')"
+            class="size-4.5 shrink-0"
+            disabled-trigger
+            :disabled="reviewCode.pending.value || choices.every((c) => c.disabled)"
+            data-testid="ade-card-review"
+            @click.stop="(ev: MouseEvent) => reviewCode.openTask(card, ev.currentTarget as HTMLElement)"
+          >
+            <VarText :parts="reviewTip" />
+            <Kbd>{{ formatShortcut('ade.reviewCode') }}</Kbd>
+          </TooltipIconButton>
+        </div>
+        <AdeTip :text="card.title">
+          <Button
+            type="button"
+            variant="link"
+            size="inline"
+            class="line-clamp-2 block justify-start whitespace-normal break-words rounded-none border-0 text-left text-kira-lg leading-4"
+            :class="card.parked ? 'text-muted-foreground' : 'text-fg'"
+            :aria-label="t('space.ade.plan.card.open.aria', { title: card.title })"
+            data-testid="ade-card-title"
+            @click.stop="emit('select')"
+          >
+            {{ card.title }}
+          </Button>
+        </AdeTip>
+      </div>
+      <AdeBranchRow
+        v-for="row in card.rows"
+        :key="row.id"
+        :row="row"
+        :merged="row.branch.mergedIntoMain"
+        @force-push="emit('forcePush', row)"
+      />
+    </div>
+  </div>
+</template>

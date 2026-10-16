@@ -1,0 +1,9 @@
+{
+  "taskId": "T_bill",
+  "branchId": "b_billdash",
+  "codeRepoId": "cr_web",
+  "gitRepoId": "git_web",
+  "branch": "feat/billing-dashboard",
+  "base": "main",
+  "worktree": "~/wt/web-app/billing-dashboard"
+}

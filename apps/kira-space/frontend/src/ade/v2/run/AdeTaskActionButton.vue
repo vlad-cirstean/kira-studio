@@ -1,0 +1,28 @@
+<script setup lang="ts">
+import { Button } from '@theme/components/ui/button';
+import AdeTip from '../AdeTip.vue';
+import type { CardModel } from '../plan/usePlanModel';
+import { ACTION_CLASS } from '../tones';
+import { useTaskAction } from './useTaskAction';
+
+// The task's step action: `▶ Run`, `▶ <Step>`, `Take over`, `Approve`, `Retry`, `Done ›`, `Finish ✓`,
+// `Archive`; nothing otherwise.
+const props = defineProps<{ card: CardModel }>();
+const { action, perform, busy } = useTaskAction(() => props.card);
+</script>
+
+<template>
+  <AdeTip v-if="action" :text="action.tip">
+    <Button
+      variant="dialog"
+      size="kira-lg"
+      class="shrink-0"
+      :class="ACTION_CLASS[action.tone]"
+      :pending="busy"
+      :data-testid="`ade-task-action-${action.kind}`"
+      @click.stop="perform"
+    >
+      {{ action.label }}
+    </Button>
+  </AdeTip>
+</template>

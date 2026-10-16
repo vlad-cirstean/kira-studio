@@ -1,0 +1,9 @@
+{
+  "rule": {
+    "kind": "text",
+    "keepHint": true,
+    "correlate": true
+  },
+  "key": "6b6579",
+  "value": "14 Rue de la Paix, 75002 Paris"
+}

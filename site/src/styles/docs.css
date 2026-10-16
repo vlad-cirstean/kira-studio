@@ -1,0 +1,42 @@
+@layer base, starlight, theme, components, utilities;
+
+@import "@astrojs/starlight-tailwind";
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "./theme.css";
+
+/* Dark palette on :root unconditionally; the apps have no light theme. */
+:root {
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: var(--kira-fg);
+  --sl-color-gray-2: var(--kira-fg-muted);
+  --sl-color-gray-3: var(--kira-fg-subtle);
+  --sl-color-gray-4: #4a4a4a;
+  --sl-color-gray-5: var(--kira-border-strong);
+  --sl-color-gray-6: var(--kira-bg-chrome);
+  --sl-color-gray-7: var(--kira-bg-chrome);
+  --sl-color-black: var(--kira-bg);
+  --sl-color-accent-low: var(--kira-select);
+  --sl-color-accent: var(--kira-accent);
+  --sl-color-accent-high: #75beff;
+  --sl-color-text-accent: var(--kira-info);
+  --sl-color-bg-nav: var(--kira-bg-chrome);
+  --sl-color-bg-sidebar: var(--kira-bg-chrome);
+  --sl-color-hairline: var(--kira-border);
+  --sl-font: "Inter Variable", system-ui, sans-serif;
+  --sl-font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+@media (max-width: 49.99rem) {
+  .sl-markdown-content :is(p, li, td, th) {
+    font-size: 1rem;
+  }
+  header :is(a, button) {
+    min-height: 2.75rem;
+  }
+  .sidebar-content a {
+    display: flex;
+    align-items: center;
+    min-height: 2.75rem;
+  }
+}

@@ -1,0 +1,12 @@
+---
+import { resolveShot } from '../lib/shots';
+import Shot from './Shot.astro';
+
+interface Props {
+  id: string;
+}
+
+const shot = await resolveShot(Astro.props.id);
+---
+
+<Shot shot={shot} />

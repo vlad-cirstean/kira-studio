@@ -1,0 +1,28 @@
+        <div class="conn-group" style="--rail:var(--conn-red)">
+          <div class="p-row"><span class="twist"><svg class="icon"><use href="#i-chevron-down"/></svg></span><span class="icon-box"><span class="state live"></span></span><span class="tree-label" style="font-weight:600">prod-analytics</span><span class="p-badge push">postgres 16</span></div>
+          <div class="p-row" style="padding-left:22px"><span class="twist"><svg class="icon"><use href="#i-chevron-down"/></svg></span><span class="icon-box muted"><svg class="icon"><use href="#i-db"/></svg></span><span class="tree-label">analytics</span></div>
+          <div class="p-row" style="padding-left:38px"><span class="twist"><svg class="icon"><use href="#i-chevron-down"/></svg></span><span class="tree-label muted">public</span></div>
+          <div class="p-row" style="padding-left:54px"><span class="twist"><svg class="icon"><use href="#i-chevron-down"/></svg></span><span class="tree-label muted">Tables</span><span class="p-count push">12</span></div>
+          <div class="p-row" style="padding-left:70px"><span class="twist hidden"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tree-label">customers</span></div>
+          <div class="p-row __SEL_ORDERS__" style="padding-left:70px"><span class="twist hidden"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tree-label">orders</span></div>
+          <div class="p-row" style="padding-left:70px"><span class="twist hidden"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tree-label">order_items</span></div>
+          <div class="p-row" style="padding-left:70px"><span class="twist hidden"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tree-label">products</span></div>
+          <div class="p-row" style="padding-left:70px"><span class="twist hidden"></span><span class="icon-box" style="color:var(--info)"><svg class="icon"><use href="#i-table"/></svg></span><span class="tree-label">shipments</span></div>
+          <div class="p-row" style="padding-left:54px"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="tree-label muted">Views</span><span class="p-count push">3</span></div>
+          <div class="p-row" style="padding-left:54px"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="tree-label muted">Functions</span><span class="p-count push">5</span></div>
+        </div>
+        <div class="conn-group off" style="--rail:var(--conn-violet)">
+          <div class="p-row"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="icon-box"><span class="state off"></span></span><span class="tree-label muted">staging-mongo</span><span class="p-badge push">mongodb 7</span></div>
+        </div>
+        <div class="conn-group off" style="--rail:var(--conn-green)">
+          <div class="p-row"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="icon-box"><span class="state off"></span></span><span class="tree-label muted">local-redis</span><span class="p-badge push">redis 7</span></div>
+        </div>
+        <div class="conn-group off" style="--rail:var(--conn-amber)">
+          <div class="p-row"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="icon-box"><span class="state off"></span></span><span class="tree-label muted">events-kafka</span><span class="p-badge push">kafka</span></div>
+        </div>
+        <!-- No colour at all — the default for a new connection. The rail slot is
+             kept so names stay aligned with the coloured groups above. -->
+        <div class="conn-group nocolour">
+          <div class="p-row"><span class="twist"><svg class="icon"><use href="#i-chevron-right"/></svg></span><span class="icon-box"><span class="state live"></span></span><span class="tree-label">warehouse</span><span class="p-badge push">postgres 16</span></div>
+        </div>
+

@@ -1,0 +1,112 @@
+import type {
+  ScriptRun,
+  ScriptRunArgs,
+  ScriptRunLogChunk,
+  ScriptRunLogPage,
+  ScriptRunPreview,
+  ScriptRunStarted,
+} from '@shared/domain/scriptRuns';
+import type {
+  CustomScript,
+  CustomScriptFields,
+  ScriptCollection,
+  ScriptDir,
+  ScriptMcpServer,
+  ScriptMcpTool,
+} from '@shared/domain/scripts';
+import { type ComputedRef, computed, type InjectionKey, inject } from 'vue';
+import type { TerminalLaunch } from '../state/createTerminalTabs';
+import type { TerminalHostDeps } from '../terminal/terminalHost';
+
+// P128 §2.4: the shared automations module's own injected context — AutomationsPanel.vue/
+// AutomationsStart.vue/AutomationsNewTab.vue read this instead of an app-specific store, so the same
+// three components mount in both apps. `openTerminalTab` binds the app's own module workspace
+// ('terminal' in both) itself, so shared code never names a workspace key.
+
+/** Each app's script store (createCustomScriptsStore.ts), as the panel and its dialog see it. */
+export interface ScriptsSeam {
+  records(): readonly CustomScript[];
+  create(fields: CustomScriptFields): Promise<unknown>;
+  update(id: string, fields: CustomScriptFields): Promise<unknown>;
+  remove(id: string): Promise<void>;
+  collections(): readonly ScriptCollection[];
+  createCollection(name: string): Promise<ScriptCollection>;
+  renameCollection(id: string, name: string): Promise<void>;
+  removeCollection(id: string): Promise<void>;
+  /** collectionId null ungroups. */
+  move(id: string, collectionId: string | null): Promise<void>;
+}
+
+/** The run store's bound calls and push channel (ScriptRunsService), the same in both apps. */
+export interface ScriptRunsSeam {
+  /** A task id narrows to that task's runs (Kira Space). */
+  list(limit?: number, taskId?: string): Promise<ScriptRun[]>;
+  stop(id: string): Promise<void>;
+  /** Where a saved script runs; an empty id answers the app home as `base`, for an unsaved script. */
+  resolveDir(scriptId: string): Promise<ScriptDir>;
+  onChanged(cb: (run: ScriptRun) => void): () => void;
+  /** What a run would do, exactly as `start` does it. */
+  preview(args: ScriptRunArgs): Promise<ScriptRunPreview>;
+  /** `hash` is the preview's; a script edited since answers E_CONFLICT. */
+  start(args: ScriptRunArgs, hash: string): Promise<ScriptRunStarted>;
+  /** Continues the Claude session of a smart run a restart ended, as a new run. */
+  resume(id: string): Promise<ScriptRunStarted>;
+  readLog(id: string, afterSeq: number): Promise<ScriptRunLogPage>;
+  onLog(cb: (push: { runId: string; chunks: ScriptRunLogChunk[] }) => void): () => void;
+  /** Next fire instants (unix ms) of a cron in a timezone; rejects with the Go validation text. */
+  nextFires(cron: string, timezone: string, count?: number): Promise<number[]>;
+  /** The run a script's schedule would start; `secrets` fills secret params the schedule never stores. */
+  schedulePreview(scriptId: string, secrets: Record<string, string[]>): Promise<ScriptRunPreview>;
+  runScheduleNow(
+    scriptId: string,
+    hash: string,
+    secrets: Record<string, string[]>,
+  ): Promise<ScriptRunStarted>;
+  /** Starts a waiting scheduled run; `hash` is the schedule preview's. */
+  confirmAccept(
+    runId: string,
+    hash: string,
+    secrets: Record<string, string[]>,
+  ): Promise<ScriptRunStarted>;
+  confirmDecline(runId: string): Promise<void>;
+  /** Servers of the user's Claude config. */
+  mcpServers(): Promise<ScriptMcpServer[]>;
+  mcpTools(server: string): Promise<ScriptMcpTool[]>;
+}
+
+export interface AutomationsModuleContext {
+  defaultCwd(): string;
+  openTerminalTab(opts: { cwd: string; launch?: TerminalLaunch }): void;
+  /** Opens (or focuses) the tab of one smart script run. */
+  openRunTab(runId: string, label: string): void;
+  host: TerminalHostDeps;
+  scripts: ScriptsSeam;
+  runs: ScriptRunsSeam;
+  /** Focuses the Automations module, e.g. from the status bar. */
+  showAutomations(): void;
+  /** Kira Space: scripts can run for an ADE task. */
+  ade: boolean;
+  /** Native folder dialog; null when cancelled. */
+  chooseFolder(title: string): Promise<string | null>;
+}
+
+export const automationsModuleKey: InjectionKey<AutomationsModuleContext> =
+  Symbol('automationsModule');
+
+export function useAutomationsModule(): AutomationsModuleContext {
+  const ctx = inject(automationsModuleKey);
+  if (!ctx) throw new Error('useAutomationsModule: no AutomationsModuleContext provided');
+  return ctx;
+}
+
+/** The one `cwd === ''` guard AutomationsStart.vue and the tab strip's own "+" menu both used —
+ *  disabled while the resolved default cwd (§7.2) isn't known yet. */
+export function useNewTerminal(): { canOpen: ComputedRef<boolean>; open(): void } {
+  const ctx = useAutomationsModule();
+  const canOpen = computed(() => ctx.defaultCwd() !== '');
+  function open(): void {
+    if (!canOpen.value) return;
+    ctx.openTerminalTab({ cwd: ctx.defaultCwd() });
+  }
+  return { canOpen, open };
+}

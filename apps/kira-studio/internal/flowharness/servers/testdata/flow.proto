@@ -1,0 +1,33 @@
+syntax = "proto3";
+package kira.flow.v1;
+
+import "common/types.proto";
+import "google/protobuf/timestamp.proto";
+
+message Msg {
+  string text = 1;
+  int32 index = 2;
+  // ServerStream: how many messages to send and the pause between them.
+  int32 count = 3;
+  int32 interval_ms = 4;
+  // Unary: reply text is padded to this many bytes.
+  int32 payload_bytes = 5;
+  kira.flow.common.Meta meta = 6;
+  google.protobuf.Timestamp at = 7;
+}
+
+message FailRequest {
+  // A google.rpc.Code number.
+  int32 code = 1;
+  string message = 2;
+}
+
+service Flow {
+  rpc Unary(Msg) returns (Msg);
+  rpc ServerStream(Msg) returns (stream Msg);
+  rpc ClientStream(stream Msg) returns (Msg);
+  rpc Bidi(stream Msg) returns (stream Msg);
+  rpc Fail(FailRequest) returns (Msg);
+  rpc Slow(Msg) returns (Msg);
+  // @extra
+}

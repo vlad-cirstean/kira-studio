@@ -1,0 +1,89 @@
+/* Git module tokens on the app's own Tailwind root. Imported by Kira Space's styles.css only:
+   `@theme` needs that root. Graph scale tracks Settings > Git graph font size, apart from
+   Appearance font size. */
+:root {
+  --kira-graph-t-md: var(--kira-graph-font-size, var(--kira-font-size));
+  --kira-graph-t-xs: calc(var(--kira-graph-t-md) - 2px);
+  --kira-graph-t-sm: calc(var(--kira-graph-t-md) - 1px);
+  --kira-graph-h-xs: calc(var(--kira-graph-t-md) + 6px);
+  --kira-graph-row-h-compact: max(var(--kira-row-height), calc(var(--kira-graph-h-xs) + 2px));
+  --kira-graph-row-h: calc(var(--kira-graph-row-h-compact) + var(--kira-graph-h-xs));
+}
+
+@theme {
+  --text-graph-xs: var(--kira-graph-t-xs);
+  --text-graph-sm: var(--kira-graph-t-sm);
+  --text-graph-md: var(--kira-graph-t-md);
+  --spacing-graph-row-compact: var(--kira-graph-row-h-compact);
+  --spacing-graph-h-xs: var(--kira-graph-h-xs);
+  /* Lanes: the connection palette's categorical hues. */
+  --color-graph-lane-0: var(--kira-conn-blue);
+  --color-graph-lane-1: var(--kira-conn-orange);
+  --color-graph-lane-2: var(--kira-conn-green);
+  --color-graph-lane-3: var(--kira-conn-violet);
+  --color-graph-lane-4: var(--kira-conn-teal);
+  --color-graph-lane-5: var(--kira-conn-red);
+  --color-graph-lane-6: var(--kira-conn-amber);
+  --color-graph-lane-7: var(--kira-conn-cyan);
+}
+
+/* SlickGrid builds these nodes and rewrites their inline styles; no template carries utilities.
+   Its own stylesheets are not imported (Bootstrap/Salesforce palettes). Its dynamic CSS writes only
+   height/left/right, so position must come from here. `outline: 0` and `border: 0` stay raw: the
+   utilities lean on `--tw-*` @property rules. */
+@layer components {
+  .kira-commit-grid .slick-pane {
+    @apply absolute overflow-hidden w-full;
+    outline: 0;
+  }
+
+  .kira-commit-grid .slick-viewport,
+  .kira-commit-grid .grid-canvas {
+    @apply relative bg-bg;
+    outline: 0;
+  }
+
+  /* SlickGrid rewrites inline `overflow-x: auto` on every resizeCanvas. Columns always fit
+     (columnFit.ts); important hidden stops a sideways wheel scrolling the graph off screen. */
+  .kira-commit-grid .slick-viewport {
+    @apply w-full overflow-x-hidden!;
+  }
+
+  /* One stacking context and paint boundary for all rows: no per-row compositing layer. */
+  .kira-commit-grid .grid-canvas {
+    contain: layout paint;
+  }
+
+  /* Opaque, not transparent: a repainted row erases the band it owns. */
+  .kira-commit-grid .slick-row.ui-widget-content {
+    @apply absolute w-full bg-bg cursor-pointer;
+    border: 0;
+  }
+
+  .kira-commit-grid .slick-row:hover {
+    @apply bg-hover;
+  }
+
+  .kira-commit-grid .slick-row.kira-row-selected {
+    @apply bg-select text-fg;
+  }
+
+  .kira-commit-grid .slick-row:focus-visible {
+    @apply focus-ring;
+  }
+
+  /* Placeholder row: the muted tone is the "not a real commit" cue. */
+  .kira-commit-grid .slick-row.kira-row-collapsed {
+    @apply text-muted-foreground;
+  }
+
+  .kira-commit-grid .slick-cell {
+    @apply absolute flex items-center overflow-hidden py-0 px-2;
+    border: none;
+  }
+
+  /* Row overdraw (0.5px past the band, no seam at fractional DPR) draws outside the cell. */
+  .kira-commit-grid .kira-cell-graph {
+    @apply p-0 overflow-visible;
+  }
+}

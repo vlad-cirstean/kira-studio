@@ -1,0 +1,9 @@
+{
+  "rule": {
+    "kind": "email",
+    "keepHint": true,
+    "correlate": true
+  },
+  "key": "6b6579",
+  "value": "@corp.example.com"
+}

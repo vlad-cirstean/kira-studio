@@ -1,0 +1,81 @@
+<style>
+{{DLGCSS}}
+  .dlg-box { max-width: 560px; }
+</style>
+<div class="dlg">
+  <div class="dlg-box">
+    <div class="dlg-title">
+      <!-- The engine is settled by step 1, so it is identity here, not a control.
+           No "Kind" dropdown, and no fields belonging to other engines. -->
+      <span style="color:var(--conn-cyan); display:flex"><svg viewBox="0 0 16 16" width="16" height="16"><use href="#i-postgres"/></svg></span>
+      <span>New PostgreSQL connection</span>
+      <button class="p-btn push" title="Pick a different engine"><span class="icon-box"><svg class="icon"><use href="#i-chev-l"/></svg></span>Change engine</button>
+      <button class="p-iconbtn"><svg class="icon"><use href="#i-close"/></svg></button>
+    </div>
+
+    <div class="dlg-body">
+      <div class="frow">
+        <div class="fld"><label>Name</label><span class="p-input md ui">prod-analytics</span></div>
+        <div class="fld" style="flex:0 0 auto"><label>Colour</label>
+          <div class="swatches">
+          <span class="sw none" title="No colour — the default"></span>
+            <span class="sw on" style="background:var(--conn-red)"></span>
+            <span class="sw" style="background:var(--conn-orange)"></span>
+            <span class="sw" style="background:var(--conn-amber)"></span>
+            <span class="sw" style="background:var(--conn-olive)"></span>
+            <span class="sw" style="background:var(--conn-green)"></span>
+            <span class="sw" style="background:var(--conn-teal)"></span>
+            <span class="sw" style="background:var(--conn-cyan)"></span>
+            <span class="sw" style="background:var(--conn-blue)"></span>
+            <span class="sw" style="background:var(--conn-indigo)"></span>
+            <span class="sw" style="background:var(--conn-violet)"></span>
+            <span class="sw" style="background:var(--conn-magenta)"></span>
+            <span class="sw" style="background:var(--conn-grey)"></span>
+          </div>
+        </div>
+      </div>
+
+      <span class="p-seg md" style="align-self:flex-start"><span class="on">Fields</span><span>Connection URI</span></span>
+
+      <div class="frow">
+        <div class="fld"><label>Host</label><span class="p-input md">analytics.db.internal</span></div>
+        <div class="fld" style="flex:0 0 96px"><label>Port</label><span class="p-input md">5432</span></div>
+      </div>
+      <div class="frow">
+        <div class="fld"><label>Database</label><span class="p-input md">analytics</span></div>
+        <div class="fld"><label>User</label><span class="p-input md">kira_ro</span></div>
+      </div>
+      <div class="fld"><label>Password</label>
+        <span class="p-input md" style="justify-content:space-between"><span>••••••••••••</span><span class="icon-box"><svg class="icon"><use href="#i-eye"/></svg></span></span>
+      </div>
+      <div class="frow">
+        <div class="fld"><label>SSL mode</label><span class="p-select bordered" style="justify-content:space-between">require<span class="icon-box"><svg class="icon"><use href="#i-chevron-down"/></svg></span></span></div>
+        <div class="fld"><label>Schema search path</label><span class="p-input md">public</span></div>
+      </div>
+
+      <div class="chk">
+        <span class="box on"><svg class="icon" style="width:10px;height:10px"><use href="#i-check"/></svg></span>
+        <div class="fld" style="gap:2px">
+          <span style="font-size:var(--t-md); color:var(--fg)">Read-only</span>
+          <span class="help">Blocks every mutation path for this connection — grid edits, DDL, and console writes.</span>
+        </div>
+      </div>
+
+      <div class="fld"><label>Pre-connect command <span class="dim">— optional</span></label>
+        <span class="p-input md">ssh -fN -L 5432:analytics.db.internal:5432 bastion</span>
+        <!-- the warning lives under the field that causes it, and only appears
+             once that field has something in it -->
+        <span class="help" style="color:var(--warn)">Runs on your machine with your permissions every time this connection connects. The connection drops if it exits.</span>
+      </div>
+    </div>
+
+    <div class="dlg-foot">
+      <button class="p-dlgbtn"><span class="icon-box"><svg class="icon"><use href="#i-plug"/></svg></span>Test connection</button>
+      <span class="p-chip ok"><svg class="icon" style="width:11px;height:11px"><use href="#i-check"/></svg>PostgreSQL 16.3 · 41 ms</span>
+      <span class="push" style="display:flex; gap:var(--s-3)">
+        <button class="p-dlgbtn">Cancel</button>
+        <button class="p-dlgbtn primary">Save</button>
+      </span>
+    </div>
+  </div>
+</div>

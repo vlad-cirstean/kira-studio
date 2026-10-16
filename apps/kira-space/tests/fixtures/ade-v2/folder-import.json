@@ -1,0 +1,10 @@
+{
+  "folder": {
+    "path": "~/code/oss",
+    "watch": false,
+    "hidden": false,
+    "repoCount": 2,
+    "hiddenCount": 0
+  },
+  "imported": ["repo-oss-core", "repo-oss-docs"]
+}

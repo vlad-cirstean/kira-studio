@@ -1,0 +1,7 @@
+{
+  "workflow": null,
+  "error": {
+    "line": 0,
+    "message": "✕ step 4: kind must be agent, script, review or manual"
+  }
+}

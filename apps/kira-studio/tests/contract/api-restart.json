@@ -1,0 +1,64 @@
+{
+  "CollectionsService.List": {
+    "collections": [
+      {
+        "createdAt": "<time>",
+        "id": "<id:1>",
+        "name": "persist",
+        "sortOrder": 0,
+        "updatedAt": "<time>"
+      }
+    ],
+    "items": [
+      {
+        "collectionId": "<id:1>",
+        "createdAt": "<time>",
+        "id": "<id:2>",
+        "kind": "folder",
+        "method": "",
+        "name": "folder",
+        "parentId": null,
+        "protocol": "http",
+        "sortOrder": 0,
+        "updatedAt": "<time>",
+        "url": ""
+      },
+      {
+        "collectionId": "<id:1>",
+        "createdAt": "<time>",
+        "id": "<id:3>",
+        "kind": "request",
+        "method": "GET",
+        "name": "req",
+        "parentId": "<id:2>",
+        "protocol": "http",
+        "sortOrder": 0,
+        "updatedAt": "<time>",
+        "url": "<http>/echo"
+      },
+      {
+        "collectionId": "<id:1>",
+        "createdAt": "<time>",
+        "id": "<id:4>",
+        "kind": "request",
+        "method": "/",
+        "name": "rpc",
+        "parentId": null,
+        "protocol": "grpc",
+        "sortOrder": 1,
+        "updatedAt": "<time>",
+        "url": "localhost:1"
+      }
+    ]
+  },
+  "VariablesService.ListEnvironments": [
+    {
+      "color": "none",
+      "description": "",
+      "id": "<id:5>",
+      "isActive": true,
+      "name": "dev",
+      "sortOrder": 0
+    }
+  ]
+}

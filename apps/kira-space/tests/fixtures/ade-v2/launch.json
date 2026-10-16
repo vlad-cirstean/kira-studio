@@ -1,0 +1,6 @@
+{
+  "terminalId": "term-tk01",
+  "sessionId": "tk01",
+  "command": "claude --resume claude-9d10",
+  "cwd": "~/wt/web-app/billing-dashboard"
+}

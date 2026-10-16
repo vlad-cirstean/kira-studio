@@ -1,0 +1,57 @@
+#!/bin/sh
+# Kira Studio pre-push — P94 §5, scoped by P294. The heavier checks, run where a cold
+# multi-minute wait is acceptable and a per-commit one is not. Scoped to the pushed range: Go lint
+# and tests only for changed Go packages, knip only when frontend code or package config changed;
+# `go build ./...` always runs (a link error can sit in an unchanged dependent). Config, lockfile or
+# script changes fall back to the full run.
+# Bypass mid-investigation only: git push --no-verify
+set -e
+
+if [ ! -d node_modules ]; then
+  echo "pre-push: node_modules is missing — run \`bun install\` first." >&2
+  exit 1
+fi
+
+. scripts/hook-scope.sh
+ZERO=0000000000000000000000000000000000000000
+FILES=""
+FULL=0
+while read -r _lref lsha _rref rsha; do
+  [ "$lsha" = "$ZERO" ] && continue
+  if [ "$rsha" = "$ZERO" ]; then
+    base="$(git merge-base "$lsha" origin/main 2>/dev/null || true)"
+  else
+    base="$rsha"
+  fi
+  if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+    FULL=1
+  else
+    FILES="$FILES
+$(git diff --name-only --diff-filter=ACMR "$base" "$lsha")"
+  fi
+done
+FILES="$(printf '%s\n' "$FILES" | sed '/^$/d' | sort -u)"
+if [ "$FULL" = 1 ] || { [ -n "$FILES" ] && is_full "$FILES"; }; then
+  echo "pre-push: config or unknown range, full run"
+  go build ./...
+  bun run lint:go
+  bun run lint:dead
+  exit 0
+fi
+[ -n "$FILES" ] || exit 0
+
+go build ./...
+DIRS="$(go_dirs "$FILES" | while read -r d; do [ -d "$d" ] && echo "$d"; done)"
+if [ -n "$DIRS" ]; then
+  sh scripts/install-golangci-lint.sh
+  # shellcheck disable=SC2086
+  "$(go env GOPATH)/bin/golangci-lint" run $DIRS
+  # Container packages need Docker and run in CI; test the rest.
+  # shellcheck disable=SC2086
+  TESTDIRS="$(echo $DIRS | tr ' ' '\n' | grep -Ev '/internal/adapters/|/internal/ipcfixture|/flows/dockerflow|/flows/dbflow' || true)"
+  # shellcheck disable=SC2086
+  [ -z "$TESTDIRS" ] || go test $TESTDIRS
+fi
+if any "$FILES" '\.(ts|mts|vue)$'; then
+  bun run lint:dead
+fi

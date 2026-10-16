@@ -1,0 +1,41 @@
+#!/bin/sh
+# Kira Studio pre-commit — see docs/v1/plans/P15-gh-tooling.md §3, scoped by P294.
+# Installed by `bun install` (package.json "prepare" sets core.hooksPath).
+# Checks only what the commit stages (biome --staged, the affected typecheck projects); falls back
+# to the full lint + typecheck when config, a lockfile, scripts or a shared package changed.
+# Bypass for a work-in-progress commit with: git commit --no-verify
+set -e
+
+if [ ! -d node_modules ]; then
+  echo "pre-commit: node_modules is missing — run \`bun install\` first." >&2
+  exit 1
+fi
+
+. scripts/hook-scope.sh
+FILES="$(git diff --cached --name-only --diff-filter=ACMR)"
+[ -n "$FILES" ] || exit 0
+
+TARGETS="$(typecheck_targets "$FILES")"
+if is_full "$FILES" || printf '%s\n' "$TARGETS" | grep -qx full; then
+  echo "pre-commit: config or shared files changed, full run"
+  bun run lint
+  bun run typecheck
+  exit 0
+fi
+
+bunx biome check --staged --no-errors-on-unmatched
+if any "$FILES" '\.(ts|mts|vue|css|astro|js)$|^internal/llmprompts/'; then
+  bun run lint:rules
+elif any "$FILES" '\.(md|mdx)$'; then
+  bun site/scripts/check-docs.ts
+fi
+PIDS=""
+for t in $TARGETS; do
+  bun run "typecheck:$t" &
+  PIDS="$PIDS $!"
+done
+fail=0
+for p in $PIDS; do
+  wait "$p" || fail=1
+done
+exit $fail

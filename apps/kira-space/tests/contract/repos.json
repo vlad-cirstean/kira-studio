@@ -1,0 +1,12 @@
+{
+  "CodeWorkspaceService.ImportRepo": {
+    "color": "blue",
+    "createdAt": "<masked>",
+    "hidden": false,
+    "id": "<id:1>",
+    "name": "proj",
+    "repoId": "<work>/proj",
+    "root": "<work>/proj",
+    "sortOrder": 0
+  }
+}

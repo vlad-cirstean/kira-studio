@@ -1,0 +1,96 @@
+// Package memorycli is the `memory-mcp` subcommand body: the stdio MCP server over the shared
+// memory.db, run by Claude Code per session.
+package memorycli
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/google/uuid"
+
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
+	"github.com/kirathecat/kira-studio/internal/memory"
+	"github.com/kirathecat/kira-studio/internal/memory/embed"
+	"github.com/kirathecat/kira-studio/internal/memory/importer"
+	"github.com/kirathecat/kira-studio/internal/memory/mcpserver"
+)
+
+// Run returns the process exit code. promptsPath is the app's llm-prompts.json: the gate, reconcile
+// and server texts it overrides apply here too. Diagnostics go to stderr: stdout is the protocol.
+func Run(args []string, promptsPath string) int {
+	fs := flag.NewFlagSet("memory-mcp", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	importRef := fs.String("import-ref", "", "attribute every stored memory to this bulk-import file id")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *importRef != "" {
+		if _, err := uuid.Parse(*importRef); err != nil {
+			fmt.Fprintln(os.Stderr, "kira-memory: --import-ref must be a UUID")
+			return 2
+		}
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	store := memory.OpenDefault()
+	defer store.Close()
+	embedder := embed.NewClient(embed.ClientOptions{Spec: embed.Default, Home: memory.Home()})
+	var prompts llmprompts.Source = llmprompts.Defaults()
+	if promptsPath != "" {
+		prompts = llmprompts.NewStore(promptsPath)
+	}
+	claude := memory.NewCLIRunner()
+	svc := memory.NewService(store, claude, memory.ServiceOptions{Embedder: embedder, Prompts: prompts})
+	defer svc.Close()
+	opts := mcpserver.Options{ImportRef: *importRef, Prompts: prompts, Project: detectProject(ctx)}
+	if *importRef == "" {
+		opts.Distill = importer.Distiller{Runner: claude, Prompts: prompts}
+		if ing, err := openIngest(store); err != nil {
+			fmt.Fprintln(os.Stderr, "kira-memory: ingest tools off:", err)
+		} else {
+			defer ing.Close()
+			opts.Ingest = ing
+		}
+	}
+	if id := os.Getenv("CLAUDE_CODE_SESSION_ID"); memory.ValidSession(id) {
+		opts.SessionID = id
+	}
+	if err := mcpserver.RunStdio(ctx, svc, opts); err != nil && ctx.Err() == nil {
+		fmt.Fprintln(os.Stderr, "kira-memory:", err)
+		return 1
+	}
+	return 0
+}
+
+// detectProject is the project key of the working directory, empty outside a git repository.
+func detectProject(ctx context.Context) string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	key, err := memory.DetectProject(ctx, dir)
+	if err != nil {
+		return ""
+	}
+	return key
+}
+
+// openIngest is the control side of the import runner for this session's ingest tools. The runner it
+// launches is a detached process: it outlives this session.
+func openIngest(store *memory.Store) (*importer.Engine, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+	return importer.Open(store, importer.Options{
+		Launcher:  importer.SpawnLauncher{Executable: exe, LogPath: importer.DefaultLogPath(store)},
+		Available: memory.NewCLIRunner().Available,
+	})
+}

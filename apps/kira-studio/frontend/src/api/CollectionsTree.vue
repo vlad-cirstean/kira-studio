@@ -1,0 +1,252 @@
+<script setup lang="ts">
+import type { ShortcutId } from '@shared/domain/shortcuts';
+import { t } from '@theme/i18n';
+import { useEventListener } from '@vueuse/core';
+import { copyOrReportError } from '@workbench/behaviour/clipboard';
+import { useListNavigation } from '@workbench/behaviour/listNavigation';
+import { announceApp } from '@workbench/behaviour/liveRegion';
+import { useTreeShortcuts } from '@workbench/behaviour/treeShortcuts';
+import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
+import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
+import { useRowHeight } from '@workbench/lib/rowHeight';
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
+import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
+import { computed, ref, useTemplateRef } from 'vue';
+import CollectionRow from './CollectionRow.vue';
+import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menu';
+import { type CollectionRowVm, useCollectionsStore } from './state/collections';
+import { useImportCurlStore } from './state/curl';
+import { useDynamicValuesStore } from './state/dynamicValues';
+import { useVariablesStore } from './state/variables';
+import { openVariableSetTab } from './tabs';
+
+const confirmDialogStore = useConfirmDialogStore();
+const contextMenuStore = useContextMenuStore();
+const dynamicValuesStore = useDynamicValuesStore();
+const collectionsStore = useCollectionsStore();
+const importCurlStore = useImportCurlStore();
+const variablesStore = useVariablesStore();
+
+// P104 §3.4: TreeHost's own recipe (virtualization + the pinned ancestor band + reveal-scroll),
+// inlined via the shared useTreeVirtualRows composable rather than kept as a wrapper component —
+// the same swap ProjectTree.vue's own call site already made.
+const { single: rowHeight } = useRowHeight();
+const scrollEl = ref<HTMLElement | null>(null);
+const { virtualItems, totalSize, band, onScroll, revealKey } = useTreeVirtualRows({
+  rows: () => collectionsStore.visibleRows,
+  rowHeight: () => rowHeight.value,
+  scrollElement: scrollEl,
+});
+
+/** Called by the panel after a mutation adds a row worth scrolling to. */
+async function reveal(key: string): Promise<void> {
+  await revealKey(key);
+}
+defineExpose({ reveal });
+
+function onSelect(row: CollectionRowVm): void {
+  collectionsStore.selectRow(row.key);
+}
+
+// The twisty always expands/collapses; unlike Studio's tree there is no adapter call behind it and
+// no synthetic group row to special-case (F15) — the whole tree is already in memory.
+function onToggle(row: CollectionRowVm): void {
+  collectionsStore.toggleRow(row);
+}
+
+// A collection and a folder toggle on double-click; a request opens into the existing
+// 'http-request' tab kind (D14), reusing an already-open tab bound to the same row.
+async function onOpen(row: CollectionRowVm): Promise<void> {
+  if (row.kind !== 'request') {
+    collectionsStore.toggleRow(row);
+    return;
+  }
+  await collectionsStore.openRequestRow(row);
+}
+
+// The menu is a description (menus.ts) and this is the one place that knows how to perform any of
+// it — so the actions are injected rather than imported there, which also keeps that module free
+// of both the store's mutation half and the tab-opening path.
+const actions: CollectionMenuActions = {
+  open: (row) => void onOpen(row),
+  newRequest: (row) =>
+    void collectionsStore.createItem(row.collectionId, folderTarget(row), 'request'),
+  newGrpcRequest: (row) =>
+    void collectionsStore.createGrpcItem(row.collectionId, folderTarget(row)),
+  newFolder: (row) =>
+    void collectionsStore.createItem(row.collectionId, folderTarget(row), 'folder'),
+  newCollection: () => void collectionsStore.createCollection(),
+  rename: (row) => contextMenuStore.afterClose(() => collectionsStore.beginRename(row)),
+  collections: () => collectionsStore.collections,
+  moveTo: (row, collectionId) => void collectionsStore.moveRow(row, collectionId),
+  moveToNewCollection: (row) => void collectionsStore.moveRowToNewCollection(row),
+  duplicate: (row) => void collectionsStore.duplicateRow(row),
+  remove: (row) => void confirmAndDelete(row),
+  copyUrl: (row) =>
+    void copyOrReportError(
+      row.url,
+      (message) => {
+        collectionsStore.error = message;
+      },
+      () => announceApp(t('studio.common.copiedUrl.announce')),
+    ),
+  importCollection: () => void collectionsStore.importCollection(),
+  importCurl: () => importCurlStore.openImportCurlDialog(),
+  exportCollection: (row) => void collectionsStore.exportCollection(row.id, row.name),
+  variables: (row) => openVariableSetTab('collection', row.id, row.name),
+  environments: () => variablesStore.openEnvironments(),
+  dynamicValues: () => dynamicValuesStore.openDynamicValuesDialog(),
+};
+
+/** Creating *into* a collection row means the root; into a folder row means that folder. */
+function folderTarget(row: CollectionRowVm): string | null {
+  return row.kind === 'collection' ? null : row.id;
+}
+
+const DELETE_CONFIRM = {
+  collection: {
+    title: 'common.deleteCollectionConfirm.title',
+    body: 'studio.api.collections.deleteTreeConfirm.body',
+  },
+  folder: {
+    title: 'studio.api.collections.deleteFolderConfirm.title',
+    body: 'studio.api.collections.deleteTreeConfirm.body',
+  },
+  request: {
+    title: 'studio.api.collections.deleteRequestConfirm.title',
+    body: 'studio.api.collections.deleteRequestConfirm.body',
+  },
+} as const;
+
+async function confirmAndDelete(row: CollectionRowVm): Promise<void> {
+  // A folder and a collection take their whole subtree with them (the migration's own cascade),
+  // which the prompt says out loud rather than leaving to be discovered.
+  const keys = DELETE_CONFIRM[row.kind];
+  const confirmed = await confirmDialogStore.confirm({
+    title: t(keys.title),
+    message: [t(keys.body, { name: row.name }), t('common.confirm.irreversible.body')].join(' '),
+    confirmLabel: t('common.action.delete.label'),
+    tone: 'danger',
+  });
+  if (!confirmed) return;
+  await collectionsStore.deleteRow(row);
+}
+
+function onContextMenu(row: CollectionRowVm, event: MouseEvent): void {
+  nav.contextMenu(row, event, menuForRow(row, actions));
+}
+
+function onBackgroundContextMenu(event: MouseEvent): void {
+  event.preventDefault();
+  contextMenuStore.openContextMenu(event, backgroundMenu(actions));
+}
+
+function onRename(row: CollectionRowVm, name: string): void {
+  void collectionsStore.renameRow(row, name);
+}
+
+// Arrows, Home/End, Right/Left expand and parent, Enter (the row's primary action, the same one
+// double-click performs), Space and Shift+F10 come from the shared list navigation. The selection
+// is the roving stop. The tree.* chords dispatch through the menu builder a right-click would call,
+// so the printed shortcut and the executed action are the same object.
+const activeKey = computed({
+  get: () => collectionsStore.selected,
+  set: (key) => {
+    if (key) collectionsStore.selectRow(key);
+  },
+});
+const nav = useListNavigation<CollectionRowVm>({
+  container: scrollEl,
+  items: () => collectionsStore.visibleRows,
+  key: (row) => row.key,
+  activeKey,
+  tree: {
+    depth: (row) => row.depth,
+    isExpanded: (row) => row.expanded,
+    hasChildren: (row) => row.hasChildren,
+    expand: collectionsStore.expandRow,
+    collapse: collectionsStore.collapseRow,
+  },
+  onOpen,
+  onSelect,
+  onMenu: (row, rect) =>
+    contextMenuStore.openContextMenuAt(rect.left, rect.bottom, menuForRow(row, actions), {
+      onRestoreFocus: () => void nav.focusKey(row.key),
+    }),
+  scrollToIndex: (_index, key) => revealKey(key),
+  rendered: () => virtualItems.value,
+  rowSelector: () => '[role="treeitem"][tabindex="0"]',
+});
+
+// Dispatches through the menu builder, so disabled gating and the printed chord stay in one place.
+function viaMenu(id: ShortcutId): (key: string) => void {
+  return (key) => {
+    const row = collectionsStore.visibleRows.find((r) => r.key === key);
+    if (row) runMenuShortcut(menuForRow(row, actions), id);
+  };
+}
+useTreeShortcuts(nav, {
+  'tree.rename': viaMenu('tree.rename'),
+  'tree.delete': viaMenu('tree.delete'),
+  'tree.duplicate': viaMenu('tree.duplicate'),
+});
+
+const hasVisibleSelection = computed(() =>
+  collectionsStore.visibleRows.some((r) => r.key === collectionsStore.selected),
+);
+
+// The tree background has no interactive role of its own: bind its listener via VueUse.
+const treeBodyEl = useTemplateRef<HTMLElement>('treeBodyEl');
+useEventListener(treeBodyEl, 'contextmenu', onBackgroundContextMenu);
+</script>
+
+<template>
+  <div class="h-full flex flex-col min-h-0">
+    <div ref="treeBodyEl" class="flex-1 min-h-0" data-testid="tree-background">
+      <div
+        ref="scrollEl"
+        class="virtual-list h-full overflow-auto"
+        data-testid="virtual-list"
+        role="tree"
+        :aria-label="t('studio.api.collections.tree.aria')"
+        @scroll="onScroll"
+      >
+        <div class="virtual-list-sticky sticky top-0 z-2 h-0" data-testid="tree-sticky-band">
+          <template v-for="slot in band" :key="slot.row.key">
+            <CollectionRow
+              :class="STICKY_ROW_CLASS"
+              :style="{ top: `${slot.top}px`, height: `${rowHeight}px` }"
+              :row="slot.row"
+              :selected="collectionsStore.selected === slot.row.key"
+              :sticky="true"
+              @select="onSelect"
+              @toggle="onToggle"
+              @open="onOpen"
+              @contextmenu="onContextMenu"
+              @rename="onRename"
+              @cancel-rename="collectionsStore.cancelRename"
+            />
+          </template>
+        </div>
+        <div class="relative" :style="{ height: `${totalSize}px` }">
+          <template v-for="item in virtualItems" :key="String(item.key)">
+            <CollectionRow
+              :class="VIRTUAL_ROW_CLASS"
+              :style="{ transform: `translateY(${item.start}px)`, height: `${item.size}px` }"
+              :row="collectionsStore.visibleRows[item.index]"
+              :selected="collectionsStore.selected === collectionsStore.visibleRows[item.index].key"
+              :tabbable="!hasVisibleSelection && item.index === 0"
+              :sticky="false"
+              @select="onSelect"
+              @toggle="onToggle"
+              @open="onOpen"
+              @contextmenu="onContextMenu"
+              @rename="onRename"
+              @cancel-rename="collectionsStore.cancelRename"
+            />
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

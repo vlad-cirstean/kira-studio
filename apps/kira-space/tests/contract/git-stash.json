@@ -1,0 +1,42 @@
+{
+  "git:preflight.checkout#dirty": {
+    "blockers": [
+      {
+        "kind": "blockedByTracked",
+        "paths": [
+          "f.txt"
+        ]
+      }
+    ],
+    "carried": [],
+    "detaches": false,
+    "routes": [
+      "discard",
+      "stashAndCarry",
+      "autoStash"
+    ],
+    "target": {
+      "kind": "branch",
+      "name": "feature"
+    },
+    "verdict": "blocked"
+  },
+  "git:stash.list#autostash": {
+    "entries": [
+      {
+        "baseSha": "<masked>",
+        "baseSubject": "base",
+        "branch": "main",
+        "fileCount": 1,
+        "includedUntracked": false,
+        "index": 0,
+        "indexSha": "<masked>",
+        "message": "On main: auto-stash: switching to feature",
+        "ref": "",
+        "scope": "stack",
+        "sha": "<masked>",
+        "timestamp": 0
+      }
+    ]
+  }
+}

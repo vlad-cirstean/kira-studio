@@ -1,0 +1,55 @@
+{
+  "git:refs.list#behind": {
+    "branches": [
+      {
+        "committerDate": 0,
+        "isHead": true,
+        "kind": "branch",
+        "objectId": "<masked>",
+        "refname": "refs/heads/main",
+        "shortName": "main",
+        "track": {
+          "ahead": 0,
+          "behind": 1
+        },
+        "upstream": "refs/remotes/origin/main"
+      }
+    ],
+    "head": {
+      "kind": "branch",
+      "name": "main"
+    },
+    "remoteBranches": [
+      {
+        "committerDate": 0,
+        "isHead": false,
+        "kind": "remoteBranch",
+        "objectId": "<masked>",
+        "refname": "refs/remotes/origin/main",
+        "shortName": "origin/main"
+      }
+    ],
+    "tags": []
+  },
+  "git:remote.pullPreflight#behind": {
+    "ahead": 0,
+    "behind": 1,
+    "blockers": [],
+    "dirty": false,
+    "rebaseMerges": false,
+    "routes": [],
+    "source": "default",
+    "strategy": "ff-only",
+    "upstream": "refs/remotes/origin/main"
+  },
+  "git:remote.pushPreflight#ahead": {
+    "ahead": 1,
+    "behind": 0,
+    "fastForward": true,
+    "protectedBy": "main",
+    "remoteTip": "<masked>",
+    "resolvedBranch": "main",
+    "upstream": "refs/remotes/origin/main",
+    "wouldSetUpstream": false
+  }
+}

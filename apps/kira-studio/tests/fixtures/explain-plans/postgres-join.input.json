@@ -1,0 +1,14 @@
+{
+  "kind": "postgres",
+  "thresholdRows": 100000,
+  "pages": [
+    {
+      "columns": ["QUERY PLAN"],
+      "rows": [
+        [
+          "[{\"Plan\":{\"Node Type\":\"Limit\",\"Startup Cost\":7814.39,\"Total Cost\":7814.41,\"Plan Rows\":10,\"Plan Width\":15,\"Plans\":[{\"Node Type\":\"Sort\",\"Sort Key\":[\"(count(*)) DESC\"],\"Plan Rows\":46038,\"Plans\":[{\"Node Type\":\"Aggregate\",\"Strategy\":\"Hashed\",\"Group Key\":[\"t.name\"],\"Plans\":[{\"Node Type\":\"Hash Join\",\"Join Type\":\"Inner\",\"Hash Cond\":\"(t.id = c.t_id)\",\"Total Cost\":6128.95,\"Plan Rows\":46038,\"Plans\":[{\"Node Type\":\"Seq Scan\",\"Relation Name\":\"t\",\"Alias\":\"t\",\"Total Cost\":3582,\"Plan Rows\":184153,\"Filter\":\"(cat > 3)\"},{\"Node Type\":\"Hash\",\"Plans\":[{\"Node Type\":\"Seq Scan\",\"Relation Name\":\"c\",\"Total Cost\":771,\"Plan Rows\":50000}]}]}]}]}]}}]"
+        ]
+      ]
+    }
+  ]
+}

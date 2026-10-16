@@ -1,0 +1,40 @@
+---
+title: SQL console
+description: Run SQL statements per connection, with plans and saved queries.
+sources:
+  - README.md
+  - apps/kira-studio/frontend/src/views/console
+  - apps/kira-studio/frontend/src/state/settingsDomain.ts
+  - packages/theme/src/i18n/en.json
+sidebar:
+  order: 3
+---
+
+import DocShot from '../../../../components/DocShot.astro';
+
+<DocShot id="studio-sql-console" />
+
+Each connection has its own console. Open it from the project panel with **Open query console**.
+
+## Run
+
+- **Run** runs the statement under the cursor.
+- **Run all** runs every statement in the editor.
+- Separate statements with semicolons, not newlines.
+- A run adds a result set or replaces the current ones. Click the toggle to switch.
+
+Saved queries live in the **Saved queries** menu.
+
+## Format
+
+**Format** changes indentation only. Keywords keep the case you typed.
+
+## Explain
+
+**Explain** shows the plan for the statement under the cursor. It works for `SELECT` and `WITH` statements on PostgreSQL, MySQL, MariaDB, SQLite and ClickHouse. Put the cursor in one first.
+
+Auto-explain checks `SELECT` and `WITH` statements before they run and flags expensive ones. It never blocks the run. It skips runs with more than 10 such statements. Turn it on per connection. The threshold is estimated rows read: `Settings > Advanced`, 1000 to 1000000000, default 100000.
+
+## Completions
+
+SQL completions, diagnostics and hovers come from a DDL document. Open **Edit schema (DDL)…** on the connection and paste the DDL. A table missing from it shows a diagnostic.

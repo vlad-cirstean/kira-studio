@@ -1,0 +1,407 @@
+import type { Page } from '@playwright/test';
+import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
+import {
+  expectCatalogText,
+  setPseudoLocale,
+} from '../../../../packages/workbench/src/testing/ui/copyCoverage';
+import {
+  controlSnapshots as redisControl,
+  portSnapshots as redisPorts,
+} from '../ipc/redis/redis.fixture';
+import { controlSnapshots as sqsControl, portSnapshots as sqsPorts } from '../ipc/sqs/sqs.fixture';
+import { expect, test } from './fixtures';
+import { grpcTab, modeTab, openHttpModeAndNewRequest } from './support/apiMode';
+import { contract } from './support/contract';
+import {
+  connectPostgres,
+  ITEMS_ALLOW,
+  ITEMS_CONTROL,
+  ITEMS_PORT,
+  ITEMS_SQL,
+  openCompositeTable,
+  openContextMenu,
+  openItemsConsole,
+  PG_ALLOW,
+  PG_CONTROL,
+  PG_PORT,
+} from './support/copyScenarios';
+import { typeInto } from './support/editor';
+import { cellText, gridCell, gutterCell, headerCell } from './support/grid';
+import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
+import {
+  DB_PATH as MONGO_DB_PATH,
+  mongoConnectionSummary,
+  WIDGETS_PATH,
+  widgetsFixture,
+} from './support/mongoFixture';
+import { APP_PATH, COMPOSITE_PK_PATH } from './support/postgresFixture';
+import { openSettings } from './support/settings';
+import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
+
+// P265: with the pseudo-locale on, every catalog message shows wrapped in ⟦…⟧, so any letter
+// outside a marker is a literal that skipped t(). Fixture names go through `allow`. Surfaces reuse the fixtures of the existing UI specs.
+
+// Product and typeface names are proper nouns; `1k`/`10k` are page-size numerals.
+const NAMES =
+  /^(PostgreSQL|MariaDB|MySQL|SQLite|ClickHouse|MongoDB|Redis|Kafka|SQS|S3|Courier New|Menlo|SF Mono|Monaco|Andale Mono|PT Mono|JetBrains Mono|Fira Code|Source Code Pro|IBM Plex Mono|Cascadia Code|Hack|Inconsolata|Roboto Mono|\d+k)$/;
+// Column, table and key names from the fixtures: data, not chrome.
+const SCHEMA = /^(id|email|name|text|integer|order_id|product_id|quantity|orders|products)$/;
+const REDIS = /^(Test Redis \/|events|queue|session|tags|counter|leaderboard)$/;
+
+// Palette ids are raw by decision (Stream A); byte sizes are formatted data; the definition scope
+// note is Go-originated (backend text, P266).
+const PALETTE = /^(red|amber|green|cyan|blue|magenta|grey)$/;
+const BYTES = /^[\d.,]+ (B|KB|MB|GB)$/;
+const BACKEND_NOTE = /^Composed from catalog metadata:/;
+
+const ALLOW: RegExp[] = [...PG_ALLOW, NAMES, BYTES];
+const loc = (page: Page, testid: string) => page.locator(`[data-testid="${testid}"]`);
+
+test('title bar, mode switcher and status bar', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.connectionsList, response: [] }],
+  });
+  await setPseudoLocale(page);
+  await expectCatalogText(page.locator('.h-titlebar'), { allow: ALLOW });
+  await expectCatalogText(page.locator('[data-testid="mode-tab"]'), { allow: ALLOW });
+  await expectCatalogText(loc(page, 'status-bar'), { allow: ALLOW });
+});
+
+test('project panel header and empty state', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.connectionsList, response: [] }],
+  });
+  await setPseudoLocale(page);
+  await expectCatalogText(loc(page, 'project-panel'), { allow: ALLOW });
+});
+
+test('connection row menu', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: PG_CONTROL, stream: PG_PORT });
+  await setPseudoLocale(page);
+  await openRowMenu(page, '');
+  await expectCatalogText(loc(page, 'context-menu'), { allow: ALLOW });
+});
+
+test('connection dialog, every tab', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.connectionsList, response: [] }],
+  });
+  await setPseudoLocale(page);
+  await page.click('[data-testid="add-connection"]');
+  const dialog = loc(page, 'connection-dialog');
+  await expect(dialog).toBeVisible();
+  await expectCatalogText(dialog, { allow: [...ALLOW, PALETTE] });
+  await page.click('[data-testid="connection-kind-postgres"]');
+  for (const tab of ['general', 'advanced', 'preconnect', 'mcp']) {
+    await loc(page, `connection-tab-${tab}`).click();
+    await expectCatalogText(dialog, { allow: [...ALLOW, PALETTE] });
+  }
+});
+
+test('settings dialog, every pane', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: [] });
+  await setPseudoLocale(page);
+  await openSettings(page);
+  for (const section of ['Appearance', 'Data', 'Cache', 'Api', 'Database MCP', 'Advanced']) {
+    await loc(page, `settings-section-${section}`).click();
+    await expectCatalogText(loc(page, 'settings-dialog'), { allow: [...ALLOW, SCHEMA] });
+  }
+});
+
+test('data view toolbar, column menu, cell menu and cell editor dock', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: PG_CONTROL, stream: PG_PORT });
+  await setPseudoLocale(page);
+  await openCompositeTable(page);
+  await expectCatalogText(loc(page, 'data-toolbar'), { allow: ALLOW });
+
+  await openContextMenu(headerCell(page, 'name'));
+  await expectCatalogText(loc(page, 'context-menu'), { allow: ALLOW });
+  await page.keyboard.press('Escape');
+
+  await openContextMenu(gridCell(page, 0, 'name'));
+  await expectCatalogText(loc(page, 'context-menu'), { allow: ALLOW });
+  await page.keyboard.press('Escape');
+
+  await openContextMenu(gutterCell(page, 0));
+  await expectCatalogText(loc(page, 'context-menu'), { allow: ALLOW });
+  await page.keyboard.press('Escape');
+
+  await gridCell(page, 0, 'name').click();
+  expect(await cellText(page, 0, 'name')).not.toBe('');
+  await expectCatalogText(loc(page, 'cell-editor'), { allow: ALLOW });
+});
+
+test('generate data dialog', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: PG_CONTROL, stream: PG_PORT });
+  await setPseudoLocale(page);
+  await openCompositeTable(page);
+  await page.click('[data-testid="toolbar-generate-data"]');
+  const dialog = loc(page, 'generate-data-dialog');
+  await expect(dialog).toBeVisible();
+  await expectCatalogText(dialog, { allow: [...ALLOW, SCHEMA] });
+});
+
+test('console toolbar', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: PG_CONTROL, stream: PG_PORT });
+  await setPseudoLocale(page);
+  await connectPostgres(page);
+  await openRowMenu(page, COMPOSITE_PK_PATH);
+  await page.click('[data-testid="menu-item-open-console"]');
+  await expect(loc(page, 'console-view')).toBeVisible();
+  await expectCatalogText(loc(page, 'console-view'), { allow: ALLOW });
+});
+
+test('command palette', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: [] });
+  await setPseudoLocale(page);
+  await emitWailsEvent(page, IPC.commandPalette, null);
+  await expect(loc(page, 'command-palette-input')).toBeVisible();
+  await expectCatalogText(page.locator('[data-slot="dialog-content"]'), { allow: ALLOW });
+});
+
+test('operations panel', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: [] });
+  await setPseudoLocale(page);
+  await page.click('[data-testid="toggle-operations-panel"]');
+  await expect(loc(page, 'operations-panel')).toBeVisible();
+  await expectCatalogText(loc(page, 'operations-panel'), { allow: ALLOW });
+});
+
+test('DB MCP approval dialog', async ({ relaunch }) => {
+  const snap = contract<{ pending: { requestId: string; statement: string } }>(
+    'dbmcp',
+    'DbMcpService.PendingApprovals',
+  );
+  const { window: page } = await relaunch({
+    control: [
+      {
+        channel: IPC.dbMcpPendingApprovals,
+        response: { ...snap, pending: { ...snap.pending, expiresAtMs: Date.now() + 60_000 } },
+      },
+    ],
+  });
+  await setPseudoLocale(page);
+  await emitPrompts(page, [routed('dbmcp', snap.pending.requestId)]);
+  const dialog = loc(page, 'db-mcp-approval-dialog');
+  await expect(dialog).toBeVisible();
+  await expectCatalogText(dialog, {
+    allow: [
+      ...ALLOW,
+      new RegExp(snap.pending.statement.slice(0, 10).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+    ],
+  });
+});
+
+test('HTTP request view, every tab, empty response', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: [] });
+  await setPseudoLocale(page);
+  await openHttpModeAndNewRequest(page);
+  await expectCatalogText(loc(page, 'http-request-view'), { allow: ALLOW });
+  for (const pane of ['params', 'headers', 'body', 'settings', 'cookies']) {
+    await loc(page, `http-request-pane-${pane}`).click();
+    await expectCatalogText(loc(page, 'http-request-view'), { allow: ALLOW });
+  }
+});
+
+test('collections panel empty state', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.collectionsList, response: { collections: [], items: [] } }],
+  });
+  await setPseudoLocale(page);
+  await modeTab(page, 'api').click();
+  await expect(loc(page, 'collections-empty')).toBeVisible();
+  await expectCatalogText(loc(page, 'project-panel'), { allow: ALLOW });
+});
+
+test('environments view', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.collectionsList, response: { collections: [], items: [] } }],
+  });
+  await setPseudoLocale(page);
+  await modeTab(page, 'api').click();
+  await page.click('[data-testid="api-environments"]');
+  await expect(loc(page, 'environments-dialog')).toBeVisible();
+  await expectCatalogText(loc(page, 'environments-dialog'), { allow: ALLOW });
+});
+
+test('saved queries menu', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: ITEMS_CONTROL, stream: ITEMS_PORT });
+  await setPseudoLocale(page);
+  await openItemsConsole(page);
+  await page.click('[data-testid="console-saved-toggle"]');
+  await expect(loc(page, 'console-saved-entry').first()).toBeVisible();
+  await expectCatalogText(loc(page, 'console-saved-menu'), {
+    allow: [...ITEMS_ALLOW, NAMES, SCHEMA],
+  });
+});
+
+test('explain result', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: ITEMS_CONTROL, stream: ITEMS_PORT });
+  await setPseudoLocale(page);
+  await openItemsConsole(page);
+  const view = loc(page, 'console-view');
+  await typeInto(view, page, ITEMS_SQL);
+  await page.click('[data-testid="console-explain"]');
+  const result = view.locator('[data-testid="explain-result-view"]');
+  await expect(result).toBeVisible();
+  await expectCatalogText(result, { allow: [...ITEMS_ALLOW, NAMES, SCHEMA] });
+});
+
+test('definition view, structure and source', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: ITEMS_CONTROL, stream: ITEMS_PORT });
+  await setPseudoLocale(page);
+  await connectPostgres(page);
+  await openRowMenu(page, `${APP_PATH}/table:order_items`);
+  await page.click('[data-testid="menu-item-open-definition"]');
+  const view = loc(page, 'definition-view');
+  await expect(view).toHaveAttribute('data-origin', 'composed', { timeout: 15_000 });
+  await expectCatalogText(view, { allow: [...ITEMS_ALLOW, NAMES, SCHEMA, BACKEND_NOTE] });
+  await view.locator('[data-testid="definition-pane-source"]').click();
+  await expect(view.locator('.monaco-host')).toBeVisible();
+  await expectCatalogText(view, { allow: [...ITEMS_ALLOW, NAMES, SCHEMA, BACKEND_NOTE] });
+});
+
+test('documents toolbar', async ({ relaunch }) => {
+  const conn = mongoConnectionSummary('conn-copy-doc', 'Mongo DB', 'green');
+  const fixture = widgetsFixture(conn.id);
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.connectionsList, response: [conn] }, ...fixture.control],
+    stream: fixture.port,
+  });
+  await setPseudoLocale(page);
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
+    'data-status',
+    'connected',
+    { timeout: 10_000 },
+  );
+  await expandRow(page, '');
+  await expandRow(page, MONGO_DB_PATH);
+  await (await findRow(page, WIDGETS_PATH)).dblclick();
+  await expect(loc(page, 'document-row').first()).toBeVisible({ timeout: 15_000 });
+  await expectCatalogText(loc(page, 'document-view'), {
+    allow: [...ALLOW, /Mongo DB|widget|kira_test|\d/i],
+  });
+});
+
+test('key-value view', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: redisControl, stream: redisPorts });
+  await setPseudoLocale(page);
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
+    'data-status',
+    'connected',
+    { timeout: 10_000 },
+  );
+  await expandRow(page, '');
+  const db0 = 'database:db0';
+  const ns = `${db0}/namespace:user`;
+  const ns1 = `${ns}/namespace:1`;
+  const key = `${ns1}/key:user%3A1%3Abighash`;
+  await (await findRow(page, db0)).dblclick();
+  const browse = loc(page, 'browse-view');
+  await expectCatalogText(browse, { allow: [...ALLOW, REDIS, /user|db0|key|\d/i] });
+  await browse.locator(`[data-testid="browse-row"][data-path="${ns}"]`).dblclick();
+  await browse.locator(`[data-testid="browse-row"][data-path="${ns1}"]`).dblclick();
+  await browse.locator(`[data-testid="browse-row"][data-path="${key}"]`).dblclick();
+  const view = page.locator(`[data-testid="keyvalue-view"][data-path="${key}"]`);
+  await expect(view.locator('[data-testid="keyvalue-row"]').first()).toBeVisible({
+    timeout: 15_000,
+  });
+  await expectCatalogText(view, { allow: [...ALLOW, /user|bighash|field|value|\d/i] });
+});
+
+test('stream view', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: sqsControl, stream: sqsPorts });
+  await setPseudoLocale(page);
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
+    'data-status',
+    'connected',
+    { timeout: 10_000 },
+  );
+  await expandRow(page, '');
+  await (await findRow(page, 'queue:orders-queue')).dblclick();
+  const view = page.locator('[data-testid="stream-view"][data-path="queue:orders-queue"]');
+  await view.locator('[data-testid="stream-poll"]').click();
+  await expect(view.locator('[data-testid="stream-row"]').first()).toBeVisible({
+    timeout: 15_000,
+  });
+  await expectCatalogText(view, { allow: [...ALLOW, /orders|queue|sqs|message|\d/i] });
+});
+
+test('gRPC request view, every tab', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.tabsList, response: [grpcTab({})] },
+      {
+        channel: IPC.grpcHistoryList,
+        args: { itemId: '', tabId: 'tab-grpc-1' },
+        response: [],
+      },
+    ],
+  });
+  await setPseudoLocale(page);
+  const view = loc(page, 'grpc-request-view');
+  await expect(view).toBeVisible();
+  await expectCatalogText(view, { allow: ALLOW });
+  for (const pane of ['message', 'metadata', 'schema']) {
+    await loc(page, `grpc-request-pane-${pane}`).click();
+    await expectCatalogText(view, { allow: ALLOW });
+  }
+  for (const pane of ['messages', 'metadata', 'history']) {
+    await loc(page, `grpc-response-pane-${pane}`).click();
+    await expectCatalogText(view, { allow: ALLOW });
+  }
+});
+
+test('collections panel menu', async ({ relaunch }) => {
+  const now = '2026-01-01T00:00:00.000Z';
+  const { window: page } = await relaunch({
+    control: [
+      {
+        channel: IPC.collectionsList,
+        response: {
+          collections: [
+            { id: 'col-1', name: 'Orders API', sortOrder: 0, createdAt: now, updatedAt: now },
+          ],
+          items: [
+            {
+              id: 'item-health',
+              collectionId: 'col-1',
+              parentId: null,
+              kind: 'request',
+              name: 'Health check',
+              sortOrder: 0,
+              method: 'GET',
+              url: 'https://api.example.com/healthz',
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+        },
+      },
+    ],
+  });
+  await setPseudoLocale(page);
+  await modeTab(page, 'api').click();
+  const fixtureNames = [...ALLOW, /Orders API|Health check|api\.example\.com|GET/];
+  await expectCatalogText(loc(page, 'project-panel'), { allow: fixtureNames });
+
+  await page.locator('[data-testid="collection-row"][data-id="col-1"]').click({ button: 'right' });
+  await expect(loc(page, 'context-menu')).toBeVisible();
+  await expectCatalogText(loc(page, 'context-menu'), { allow: fixtureNames });
+  await page.keyboard.press('Escape');
+
+  await page.locator('[data-testid="collection-row"]').first().focus();
+  await page.keyboard.press('ArrowRight');
+  await page
+    .locator('[data-testid="collection-row"][data-id="item-health"]')
+    .click({ button: 'right' });
+  await expect(loc(page, 'context-menu')).toBeVisible();
+  await expectCatalogText(loc(page, 'context-menu'), { allow: fixtureNames });
+});

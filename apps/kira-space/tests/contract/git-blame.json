@@ -1,0 +1,8 @@
+{
+  "git:blame.line#line-2": {
+    "author": "Test Author",
+    "authorTimeSeconds": 0,
+    "sha": "<masked>",
+    "summary": "alice writes"
+  }
+}

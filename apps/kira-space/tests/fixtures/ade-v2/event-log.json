@@ -1,0 +1,18 @@
+{
+  "kind": "run",
+  "id": "r_T_bill_impl_b_bill",
+  "chunks": [
+    {
+      "seq": 41,
+      "at": 1790067540000,
+      "stream": "event",
+      "text": "Edit src/metering/usage.ts"
+    },
+    {
+      "seq": 42,
+      "at": 1790067540800,
+      "stream": "event",
+      "text": "Bash pnpm test --filter metering"
+    }
+  ]
+}

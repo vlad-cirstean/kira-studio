@@ -1,0 +1,157 @@
+<script setup lang="ts">
+import { Badge } from '@theme/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/ui/tabs';
+import { t } from '@theme/i18n';
+import { computed, onMounted, onScopeDispose } from 'vue';
+import { control } from '../../../bridge/control';
+import AdeAbortRebaseDialog from '../AdeAbortRebaseDialog.vue';
+import AdeAddPopover from '../AdeAddPopover.vue';
+import AdeBacklogPage from '../backlog/AdeBacklogPage.vue';
+import AdeClaudeDialog from '../dialog/AdeClaudeDialog.vue';
+import AdeNeedsPage from '../needs/AdeNeedsPage.vue';
+import AdePanel from '../panel/AdePanel.vue';
+import AdePlanView from '../plan/AdePlanView.vue';
+import { usePlanModel } from '../plan/usePlanModel';
+import { useBacklog } from '../queries';
+import { useReviewCode } from '../review/useReviewCode';
+import AdeRunDialog from '../run/AdeRunDialog.vue';
+import AdeTakeOverDialog from '../sessions/AdeTakeOverDialog.vue';
+import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
+import AdeWorkflowsPage from '../workflows/AdeWorkflowsPage.vue';
+import AdeCaptureBox from './AdeCaptureBox.vue';
+
+// Top bar (tabs, capture box, Add) over the active tab; the Plan opens the panel beside it.
+const ui = useAdeBoardUiStore();
+const wfUi = useAdeWorkflowsUiStore();
+
+async function onView(view: unknown): Promise<void> {
+  if (view === ui.view || (ui.view === 'workflows' && !(await wfUi.leave()))) return;
+  ui.view = view as typeof ui.view;
+}
+const backlog = useBacklog();
+const count = computed(() => backlog.data.value?.items.length ?? 0);
+const { model } = usePlanModel();
+const needsCount = computed(() => model.value?.needs.badge ?? 0);
+
+// Review code on the focused branch or card, else the selected one.
+const reviewCode = useReviewCode();
+function reviewTarget(): { taskId?: string; branchId?: string; el?: HTMLElement } {
+  const active = document.activeElement;
+  const t = active instanceof Element ? active : null;
+  const rowEl = t?.closest<HTMLElement>('[data-testid="ade-branch-row"][data-branch-id]');
+  if (rowEl) return { branchId: rowEl.dataset.branchId, el: rowEl };
+  const cardEl = t?.closest<HTMLElement>('[data-testid="ade-card"][data-task-id]');
+  if (cardEl) {
+    const head = cardEl.querySelector<HTMLElement>('[data-testid="ade-card-head"]');
+    const inside = t instanceof HTMLElement && cardEl.contains(t) ? t : null;
+    return { taskId: cardEl.dataset.taskId, el: inside ?? head ?? cardEl };
+  }
+  if (ui.selectedBranchId) return { branchId: ui.selectedBranchId };
+  return { taskId: ui.selectedTaskId ?? undefined };
+}
+function onReviewCode(): void {
+  if (ui.view !== 'plan') return;
+  const m = model.value;
+  if (!m) return;
+  const target = reviewTarget();
+  if (target.branchId) {
+    const branch = m.board.branches.find((b) => b.id === target.branchId);
+    const card = branch ? m.cardFor(branch.taskId) : null;
+    const row = card?.rows.find((r) => r.id === target.branchId);
+    const choice = row ? reviewCode.choiceOf(row) : null;
+    const anchor =
+      target.el ??
+      document.querySelector<HTMLElement>(
+        `[data-testid="ade-branch-row"][data-branch-id="${target.branchId}"]`,
+      );
+    if (card && choice && !choice.disabled) reviewCode.open(card.task.id, target.branchId, anchor);
+    return;
+  }
+  const card = target.taskId ? m.cardFor(target.taskId) : null;
+  if (!card) return;
+  const head =
+    target.el ??
+    document.querySelector<HTMLElement>(
+      `[data-testid="ade-card"][data-task-id="${card.task.id}"] [data-testid="ade-card-head"]`,
+    );
+  reviewCode.openTask(card, head);
+}
+let offReviewCode: (() => void) | undefined;
+onMounted(() => {
+  offReviewCode = control.onReviewCode(onReviewCode);
+});
+onScopeDispose(() => offReviewCode?.());
+</script>
+
+<template>
+  <Tabs
+    :model-value="ui.view"
+    class="flex min-h-0 flex-1 flex-col gap-0"
+    data-testid="ade-shell"
+    @update:model-value="onView"
+  >
+    <nav class="flex h-tabbar shrink-0 items-center gap-0.5 border-b border-border bg-chrome px-1">
+      <TabsList>
+        <TabsTrigger
+          value="backlog"
+          :class="tabChipVariants({ active: ui.view === 'backlog', size: 'wide' })"
+          data-testid="ade-tab-backlog"
+        >
+          {{ t('space.common.backlog.label') }}
+          <span
+            class="text-kira-sm tabular-nums text-muted-foreground"
+            data-testid="ade-backlog-count"
+            >{{
+              count
+            }}</span
+          >
+        </TabsTrigger>
+        <TabsTrigger
+          value="needs"
+          :class="tabChipVariants({ active: ui.view === 'needs', size: 'wide' })"
+          data-testid="ade-tab-needs"
+        >
+          {{ t('common.needsYou.status') }}
+          <Badge v-if="needsCount > 0" variant="count" data-testid="ade-needs-count">{{
+            needsCount
+          }}</Badge>
+        </TabsTrigger>
+        <TabsTrigger
+          value="plan"
+          :class="tabChipVariants({ active: ui.view === 'plan', size: 'wide' })"
+          data-testid="ade-tab-plan"
+        >
+          {{ t('space.common.plan.label') }}
+        </TabsTrigger>
+      </TabsList>
+      <span class="flex-1" />
+      <div class="mx-2 flex items-center gap-2">
+        <AdeCaptureBox />
+        <AdeAddPopover />
+      </div>
+      <TabsList>
+        <TabsTrigger
+          value="workflows"
+          :class="tabChipVariants({ active: ui.view === 'workflows', size: 'wide' })"
+          data-testid="ade-tab-workflows"
+        >
+          {{ t('space.common.workflows.label') }}
+        </TabsTrigger>
+      </TabsList>
+    </nav>
+    <div class="flex min-h-0 flex-1 gap-0.5">
+      <AdeBacklogPage v-if="ui.view === 'backlog'" />
+      <AdeNeedsPage v-else-if="ui.view === 'needs'" />
+      <AdeWorkflowsPage v-else-if="ui.view === 'workflows'" />
+      <template v-else>
+        <AdePlanView />
+        <AdePanel v-if="ui.selectedTaskId" />
+      </template>
+    </div>
+    <AdeRunDialog />
+    <AdeClaudeDialog />
+    <AdeAbortRebaseDialog />
+    <AdeTakeOverDialog />
+  </Tabs>
+</template>

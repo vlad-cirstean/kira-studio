@@ -1,0 +1,289 @@
+{
+  "AdeTaskService.Run#back": {
+    "attempt": 1,
+    "branchId": "<id:1>",
+    "exitCode": 0,
+    "finishedAt": 0,
+    "id": "<id:2>",
+    "loops": 0,
+    "note": "summary-failed → back to impl (1 of 2)",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "summary-failed → back to impl (1 of 2)",
+      "reported": true,
+      "result": "failed",
+      "route": "back:impl",
+      "source": "agent",
+      "status": "failed",
+      "summary": "summary-failed"
+    },
+    "purpose": "",
+    "resumable": false,
+    "returns": 1,
+    "review": null,
+    "sandbox": {
+      "access": "write",
+      "denials": 0,
+      "enforced": false,
+      "last": ""
+    },
+    "sessionId": "<masked>",
+    "startedAt": 0,
+    "state": "back",
+    "stepId": "test",
+    "summary": "summary-failed",
+    "taskId": "<id:3>"
+  },
+  "AdeTaskService.Run#review": {
+    "attempt": 0,
+    "branchId": "<masked>",
+    "exitCode": null,
+    "finishedAt": null,
+    "id": "<masked>",
+    "loops": 4,
+    "note": "",
+    "outcome": null,
+    "purpose": "",
+    "resumable": false,
+    "returns": 4,
+    "review": {
+      "note": "",
+      "phase": "waiting",
+      "round": 0,
+      "route": "implementer"
+    },
+    "sandbox": null,
+    "sessionId": "<masked>",
+    "startedAt": 0,
+    "state": "review",
+    "stepId": "review",
+    "summary": "",
+    "taskId": "<masked>"
+  },
+  "AdeTaskService.Run#stopped": {
+    "attempt": 3,
+    "branchId": "<id:1>",
+    "exitCode": 0,
+    "finishedAt": 0,
+    "id": "<id:4>",
+    "loops": 2,
+    "note": "Stopped: test reached its limit of 2 returns.",
+    "outcome": {
+      "exitCode": 0,
+      "reason": "Stopped: test reached its limit of 2 returns.",
+      "reported": true,
+      "result": "failed",
+      "route": "stop",
+      "source": "agent",
+      "status": "failed",
+      "summary": "summary-failed"
+    },
+    "purpose": "",
+    "resumable": false,
+    "returns": 2,
+    "review": null,
+    "sandbox": {
+      "access": "write",
+      "denials": 0,
+      "enforced": false,
+      "last": ""
+    },
+    "sessionId": "<masked>",
+    "startedAt": 0,
+    "state": "failed",
+    "stepId": "test",
+    "summary": "summary-failed",
+    "taskId": "<id:3>"
+  },
+  "AdeTaskService.SaveWorkflow#workflow": {
+    "error": null,
+    "fileName": "flow.yaml",
+    "hash": "<masked>",
+    "path": "<space>/workflows/flow.yaml",
+    "usedBy": 1,
+    "workflow": {
+      "id": "flow",
+      "kiraSpaceMcp": false,
+      "name": "Flow",
+      "steps": [
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "impl",
+          "kind": "agent",
+          "maxReturns": 5,
+          "name": "impl",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
+            {
+              "description": "",
+              "id": "done",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "failed",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "gate",
+          "kind": "review",
+          "maxReturns": 0,
+          "name": "Gate",
+          "params": {},
+          "prompt": "",
+          "results": [
+            {
+              "description": "",
+              "id": "done",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "failed",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": {
+            "implementer": "",
+            "sendTo": "new"
+          },
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In review",
+          "timeout": "1m"
+        }
+      ]
+    }
+  },
+  "args:AdeTaskService.SaveWorkflow": {
+    "baseHash": "<masked>",
+    "fileName": "flow.yaml",
+    "workflow": {
+      "id": "flow",
+      "kiraSpaceMcp": false,
+      "name": "Flow",
+      "steps": [
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "impl",
+          "kind": "agent",
+          "maxReturns": 5,
+          "name": "impl",
+          "params": {},
+          "prompt": "work on {branch} in {repo}",
+          "results": [
+            {
+              "description": "",
+              "id": "done",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "failed",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": null,
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In progress",
+          "timeout": "1m"
+        },
+        {
+          "allowedTools": [],
+          "before": "auto",
+          "command": "",
+          "id": "gate",
+          "kind": "review",
+          "maxReturns": 0,
+          "name": "Gate",
+          "params": {},
+          "prompt": "",
+          "results": [
+            {
+              "description": "",
+              "id": "done",
+              "loop": false,
+              "next": "next",
+              "ok": true
+            },
+            {
+              "description": "",
+              "id": "failed",
+              "loop": false,
+              "next": "stop",
+              "ok": false
+            }
+          ],
+          "review": {
+            "implementer": "",
+            "sendTo": "new"
+          },
+          "runsOn": "each repo",
+          "sandbox": {
+            "access": "write",
+            "allow": [],
+            "network": true,
+            "read": []
+          },
+          "session": false,
+          "skip": false,
+          "smartScript": "",
+          "status": "In review",
+          "timeout": "1m"
+        }
+      ]
+    }
+  }
+}

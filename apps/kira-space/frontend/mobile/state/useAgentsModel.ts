@@ -1,0 +1,161 @@
+import { withTuiActivity } from '@ade/activity';
+import { type TaskAction, taskCell } from '@ade/board/actions';
+import { taskTitle } from '@ade/board/labels';
+import { buildNeedsYou } from '@ade/board/needsYou';
+import { buildTaskProgress, type TaskProgress } from '@ade/board/progress';
+import { type DerivedStatus, deriveStatus } from '@ade/board/status';
+import { buildStepBlocks, type StepBlock } from '@ade/board/stepBlocks';
+import { type StepMoves, stepMoves } from '@ade/board/stepMoves';
+import { localIso } from '@ade/localDay';
+import { taskColor } from '@ade/palette';
+import { useBoard, useRepoNames, useSessions, useWorkflows } from '@ade/readQueries';
+import type { Branch, Session, Task, Workflow } from '@ade/wire';
+import { t } from '@theme/i18n';
+import { createSharedComposable, useIntervalFn } from '@vueuse/core';
+import { formatWeekdayDate } from '@workbench/behaviour/format';
+import { compareNatural } from '@workbench/behaviour/match';
+import { TIMING } from '@workbench/behaviour/timing';
+import { computed, ref } from 'vue';
+import { useAgentSessionsStore } from './agentSessions';
+
+export interface PlanCard {
+  task: Task;
+  title: string;
+  color: string;
+  progress: TaskProgress;
+  status: DerivedStatus;
+  blocks: StepBlock[];
+  /** Needs-you headline for this task, '' when none. */
+  attention: string;
+  /** Repo nicknames of the task's branches. */
+  repos: string[];
+  /** The desktop's step action for the task (Run, Step session, Take over, ...), if any. */
+  action: TaskAction | null;
+  /** Where the step buttons can go from here. */
+  moves: StepMoves;
+  /** Running interactive Claude Code sessions of the task. */
+  tuiSessions: Session[];
+}
+
+export interface PlanGroup {
+  key: string;
+  label: string;
+  cards: PlanCard[];
+}
+
+const DAY_MS = 86_400_000;
+
+function dayLabel(iso: string, today: string): string {
+  if (iso < today) return t('space.common.day.earlier.label');
+  if (iso === today) return t('space.common.day.today.label');
+  const date = new Date(`${iso}T00:00:00`);
+  if (localIso(new Date(date.getTime() - DAY_MS)) === today)
+    return t('space.common.day.tomorrow.label');
+  return formatWeekdayDate(date);
+}
+
+/** The three tabs' data, derived from the cached read queries. One instance serves every screen. */
+export const useAgentsModel = createSharedComposable(() => {
+  const board = useBoard();
+  const sessionsQuery = useSessions();
+  const workflowsQuery = useWorkflows();
+  const repoNames = useRepoNames();
+  const agent = useAgentSessionsStore();
+
+  const nowMs = ref(Date.now());
+  useIntervalFn(() => {
+    nowMs.value = Date.now();
+  }, TIMING.pollSlow);
+
+  const sessions = computed(() =>
+    withTuiActivity(sessionsQuery.data.value?.sessions ?? [], agent.activity),
+  );
+
+  function repoLabel(codeRepoId: string): string {
+    const repo = repoNames.data.value?.repos.find((r) => r.codeRepoId === codeRepoId);
+    return repo?.nickname || repo?.name || codeRepoId;
+  }
+
+  const model = computed(() => {
+    const b = board.data.value;
+    if (!b) return null;
+    const workflows = new Map<string, Workflow>();
+    for (const entry of workflowsQuery.data.value?.workflows ?? []) {
+      if (entry.workflow) workflows.set(entry.workflow.id, entry.workflow);
+    }
+    const branchById = new Map<string, Branch>(b.branches.map((br) => [br.id, br]));
+    const input = (task: Task) => ({
+      task,
+      workflow: task.workflow ?? workflows.get(task.workflowId) ?? null,
+      branch: (id: string) => branchById.get(id),
+      repoNick: repoLabel,
+    });
+    const progress = new Map(b.tasks.map((t) => [t.id, buildTaskProgress(input(t))]));
+    const needs = buildNeedsYou({
+      board: b,
+      sessions: sessions.value,
+      progress,
+      repoNick: repoLabel,
+      nowMs: nowMs.value,
+    });
+
+    const cards = new Map<string, PlanCard>();
+    for (const task of b.tasks) {
+      const taskProgress = progress.get(task.id) as TaskProgress;
+      const branches = task.branchIds.flatMap((id) => branchById.get(id) ?? []);
+      const i = input(task);
+      const status = deriveStatus({
+        task,
+        progress: taskProgress,
+        branches,
+        hasSessions: sessions.value.some((s) => s.taskId === task.id),
+      });
+      const taskSessions = sessions.value.filter((s) => s.taskId === task.id);
+      const blocks = buildStepBlocks(taskProgress, i.workflow);
+      cards.set(task.id, {
+        task,
+        title: taskTitle(task, branches[0], ''),
+        color: taskColor(task.color),
+        progress: taskProgress,
+        status,
+        blocks,
+        attention: needs.items.find((n) => n.taskId === task.id)?.what ?? '',
+        repos: [...new Set(branches.map((br) => repoLabel(br.codeRepoId)))],
+        action:
+          taskCell({ task, progress: taskProgress, status, branches, sessions: taskSessions })
+            ?.action ?? null,
+        moves: stepMoves(
+          blocks,
+          taskProgress.finished ? 'done' : (taskProgress.step?.id ?? task.entryStepId),
+          task.runs,
+        ),
+        tuiSessions: taskSessions.filter((s) => s.mode === 'tui' && s.state === 'running'),
+      });
+    }
+
+    // Plan order within a day; tasks with no day sit under Later.
+    const today = localIso(new Date(nowMs.value));
+    const rank = new Map(b.plan.order.map((id, k) => [id, k]));
+    const ordered = [...cards.values()].sort(
+      (a, c) => (rank.get(a.task.id) ?? 1e9) - (rank.get(c.task.id) ?? 1e9),
+    );
+    const groups = new Map<string, PlanGroup>();
+    for (const card of ordered) {
+      const day = b.plan.day[card.task.id] ?? '';
+      const group = groups.get(day) ?? {
+        key: day || 'later',
+        label: day ? dayLabel(day, today) : t('common.later.label'),
+        cards: [],
+      };
+      group.cards.push(card);
+      groups.set(day, group);
+    }
+    const plan = [...groups.entries()]
+      .sort(([a], [c]) => (a === '' ? 1 : c === '' ? -1 : compareNatural(a, c)))
+      .map(([, g]) => g);
+
+    return { needs, cards, plan, today };
+  });
+
+  return { model, repoLabel, boardQuery: board };
+});

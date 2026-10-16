@@ -1,0 +1,583 @@
+<script setup lang="ts">
+import type { ReviewSessionSnapshot, Transport, UiActionKind } from '@kira/git-ipc';
+import { TransportError } from '@kira/git-ipc';
+import EmptyState from '@theme/components/EmptyState.vue';
+import { Button } from '@theme/components/ui/button';
+/**
+ * `docs/plans/P7.md` W11 — the sidebar view's whole root, mounted by `main.ts` in place of
+ * `App.vue` when `view === "review"` (§6.8/D41: same bundle, a different root, selected from the
+ * host's own injected initial state). Five real states, never a blank panel: no branch, ask for a
+ * base, unrelated histories, nothing to review, and the list — plus two states the plan's own text
+ * does not name but a real host can reach: `"resolving"` (a brief request in flight) and
+ * `"error"` (`review.resolveBase` itself failed — a genuine transport/host error, not one of
+ * §6.8's four *answers*, still needs a real rendering rather than nothing at all).
+ *
+ * `NullViewStateStore` (W9) is what the mount call site hands this component's `viewState` prop —
+ * accepted here only because `AppRoot` and `ReviewView` share one `MountOptions` shape; this
+ * component never reads or writes it (§6.8: "the view persists nothing at all").
+ *
+ * How the view learns which branch to review (D40's three arms, all handled here):
+ * 1. `props.target` — the cold-bootstrap arm, read once at mount from `html.ts`'s bootstrap
+ *    island (a `review.open`/the palette command revealed a *new* webview with a target already
+ *    pending).
+ * 2. The `review.target` event — pushed to an *already-open* view by the same `review.open` call,
+ *    or by the palette command's own `reviewBranch(repoId, undefined)` — handled for the whole
+ *    life of this component, not just at mount.
+ * 3. The "no branch" state's own branch picker — the user picks one directly, no host round trip.
+ */
+import { FieldError } from '@theme/components/ui/field';
+import { type MessageKey, t } from '@theme/i18n';
+import CatalogText from '@theme/i18n/CatalogText.vue';
+import { useLiveRegion } from '@workbench/behaviour/liveRegion';
+import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
+import { errorText } from '@workbench/bridge/codedError';
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
+import { BridgeClient } from '../../bridge/client.ts';
+import { createReviewFilesActions } from '../../lib/reviewFilesActions.ts';
+import { useReviewAnnouncements } from '../../lib/useReviewAnnouncements.ts';
+import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts';
+import type { FileListMode } from '../../state/detail.ts';
+import type { DetailActions } from '../../state/detailActions.ts';
+import { RefsState } from '../../state/refs.ts';
+import { type ReviewPane, ReviewSessionState, type ReviewTarget } from '../../state/review.ts';
+import { ReviewCommentsState } from '../../state/reviewComments.ts';
+import { ReviewFilesState } from '../../state/reviewFiles.ts';
+import type { ViewStateStore } from '../../state/viewState.ts';
+import GitViewHead, { type RepoHead } from '../GitViewHead.vue';
+import ReviewBranchPicker from './ReviewBranchPicker.vue';
+import ReviewCommentsPane from './ReviewCommentsPane.vue';
+import ReviewCommitList from './ReviewCommitList.vue';
+import ReviewFilesPane from './ReviewFilesPane.vue';
+import ReviewToolbars from './ReviewToolbars.vue';
+
+const props = defineProps<{
+  transport: Transport;
+  viewState: ViewStateStore;
+  target?: ReviewTarget | null;
+  reviewFilter?: 'all' | 'needsReview';
+  onReviewMarked?: (path: string) => void;
+  onReviewApi?: (api: { selectFile: (path: string) => void }) => void;
+  repoHead?: RepoHead;
+}>();
+
+const bridge = new BridgeClient(props.transport);
+const connectionState = bridge.connectionState;
+const refsState = new RefsState(bridge);
+const review = shallowRef<ReviewSessionState | undefined>(undefined);
+const reviewFiles = shallowRef<ReviewFilesState | undefined>(undefined);
+const reviewComments = shallowRef<ReviewCommentsState | undefined>(undefined);
+// P108 F12: this instance's own root, so a document-level handler below can tell a key/click that
+// landed inside it from one that landed in a sibling mount (a graph tab, another review sidebar).
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+const repoId = ref<string | undefined>(undefined);
+const noActiveRepo = ref(false);
+// G12 D6: same treatment as App.vue's own bootError — "Loading…" forever is not an acceptable
+// rendering of a failed bootstrap() (F7).
+const bootError = ref<string | undefined>(undefined);
+
+watch(repoId, (id) => refsState.setRepoId(id));
+
+let unsubscribeTarget: (() => void) | undefined;
+let unsubscribeUiAction: (() => void) | undefined;
+
+// P108 F6: one target-sequence token, bumped by every `applyTarget` call — the one place every
+// "which repoId/branch is this view now reviewing" transition funnels through (a `review.target`
+// push, a user's own branch/base pick, `recompare`, `resumeSession`, cold bootstrap). Each
+// caller that applies further state after its own additional awaits (`setBase`, `setPane`,
+// `listMode`/`filter`/`diffMode` restores) captures the token `applyTarget` returns and re-checks
+// it before every one of those later writes, skipping any whose token has gone stale — a newer
+// target already superseded it, so an older override base/pane/filter must not land on top of
+// the newer target's own state. Mirrors `GraphViewState`'s own `#loadGeneration` (Part 18 F1) /
+// `RepoState`'s own open-sequence token (P108 F4) for the identical shape.
+let targetSequence = 0;
+
+/** P108 F10: `main.ts` sets no `app.config.errorHandler`, so a `void`-called (or unawaited) async
+ *  operation that rejects becomes a silent, unhandled rejection. Every fire-and-forget call in
+ *  this file routes its own rejection through this, into the same live region this file's other
+ *  `announce(...)` calls already drive. `transport-closed` (the one code
+ *  `bridge.dispose()` itself produces, this file's own `onBeforeUnmount`) is ignored outright —
+ *  this view is already gone by the time it lands, so there is nothing left to announce it to. */
+const { text: liveAnnouncement, announce } = useLiveRegion();
+
+function reportAsyncError(err: unknown, key: MessageKey): void {
+  if (err instanceof TransportError && err.code === 'transport-closed') return;
+  announce(t(key, { error: errorText(err) }));
+}
+
+async function applyTarget(
+  nextRepoId: string,
+  branch: string,
+  open?: { readonly base?: string; readonly pane?: ReviewPane },
+): Promise<number> {
+  const token = ++targetSequence;
+  repoId.value = nextRepoId;
+  await review.value?.setTarget(nextRepoId, branch, open);
+  return token;
+}
+
+/** Re-runs `setTarget` against the same branch: re-resolves the base and re-streams the range from
+ *  scratch. A manually-chosen base (an `'override'` resolution) is re-applied after, mirroring
+ *  `resumeSession`'s own `baseOverride` restore. `repoId` itself is unchanged, so `refsState`'s own
+ *  `watch(repoId, ...)` above never re-fires on its own — re-seeded explicitly here, same as
+ *  `App.vue`'s `applyRepoIdToStates`. A no-op with no review target open yet. */
+async function recompare(): Promise<void> {
+  const id = repoId.value;
+  const branch = review.value?.branch.value;
+  if (!id || !branch) return;
+  const overrideBase =
+    review.value?.resolution.value?.reason === 'override'
+      ? review.value.resolution.value.base
+      : undefined;
+  const token = await applyTarget(id, branch);
+  // P108 F6: a `review.target` push (or another recompare) landed during `applyTarget`'s own
+  // await — that newer target already owns `review`/`repoId` now; applying this stale override
+  // base or re-seeding `refsState` with this call's own (now old) `id` would stomp on it.
+  if (token !== targetSequence) return;
+  if (overrideBase) await review.value?.setBase(overrideBase);
+  if (token !== targetSequence) return;
+  refsState.setRepoId(id);
+}
+
+function retryCompare(): void {
+  recompare().catch((err: unknown) => reportAsyncError(err, 'git.review.async.compare.error'));
+}
+
+async function bootstrap(): Promise<void> {
+  // P108 F7: a retry re-enters here after an earlier run already subscribed and constructed
+  // states — unsubscribe and dispose that run's own before replacing them, so a failed run never
+  // leaves a `review.target`/`ui.action` handler firing twice, or a state object leaking
+  // its own subscription forever.
+  unsubscribeTarget?.();
+  unsubscribeUiAction?.();
+  review.value?.dispose();
+  reviewFiles.value?.dispose();
+  reviewComments.value?.dispose();
+
+  await bridge.init();
+  review.value = new ReviewSessionState(bridge);
+  reviewFiles.value = new ReviewFilesState(bridge);
+  reviewFiles.value.onMarked = (path) => props.onReviewMarked?.(path);
+  reviewComments.value = new ReviewCommentsState(bridge);
+
+  unsubscribeTarget = bridge.on('review.target', (event) => {
+    applyTarget(event.repoId, event.branch).catch((err: unknown) =>
+      reportAsyncError(err, 'git.review.async.switchTarget.error'),
+    );
+  });
+  // G11 D17: the palette's own route into this already-mounted webview — toggles the file
+  // currently open in the Files pane, or announces there is none to toggle.
+  unsubscribeUiAction = bridge.on('ui.action', (event) => {
+    onUiAction(event.action);
+  });
+
+  if (props.target) {
+    const { repoId: targetRepo, branch, base, pane } = props.target;
+    await applyTarget(targetRepo, branch, { base, pane });
+    return;
+  }
+  const list = await bridge.request('repo.list', {});
+  // P108 F6: a `review.target` push can land during this await (the `bridge.on('review.target',
+  // ...)` listener just above is already live) and already call `applyTarget`, setting `repoId`
+  // itself — must not then clobber it with the workspace's own default active repo while
+  // `review` still holds the pushed repo/branch.
+  if (repoId.value !== undefined) return;
+  if (list.activeRepoId) {
+    repoId.value = list.activeRepoId;
+    await resumeSession(list.activeRepoId);
+  } else {
+    noActiveRepo.value = true;
+  }
+}
+
+/**
+ * G19 D11b: the read half of durable persistence — its own round trip, made once `bootstrap()`
+ * has a real `repoId` in hand (right here, alongside `props.target`/`review.target`'s own
+ * priority, both of which still win unchanged: `props.target` already returned above, and a
+ * `review.target` push that races ahead of this call already set `review.branch.value`, checked
+ * again just before applying so it is never clobbered). No commit/diff data is ever restored —
+ * only identifiers `setTarget`/`setBase` already re-ask fresh; a snapshot the extension host
+ * judges too old (14 days) comes back as `{session: null}`, the same as never having saved one.
+ */
+async function resumeSession(id: string): Promise<void> {
+  if (review.value?.branch.value) return;
+  let loaded: { session: ReviewSessionSnapshot | null };
+  try {
+    loaded = await bridge.request('review.session.load', { repoId: id });
+  } catch {
+    return; // best-effort: a failed resume falls back to the ordinary "no branch" picker
+  }
+  const session = loaded.session;
+  if (!session || review.value?.branch.value) return;
+  const token = await applyTarget(id, session.branch);
+  // P108 F6: `session.branch` was checked above the *previous* await (`review.session.load`), not
+  // this one — a `review.target` push or a user's own pick during `applyTarget` itself must still
+  // win over this resume's own base/pane/filter restore.
+  if (token !== targetSequence) return;
+  if (session.baseOverride !== null) await review.value?.setBase(session.baseOverride);
+  if (token !== targetSequence) return;
+  review.value?.setPane(session.pane);
+  listMode.value = session.listMode;
+  filter.value = session.filter;
+  reviewFiles.value?.setDiffMode(session.diffMode);
+}
+
+/** G19 D11b: the write half — one `watch()` over the same fields the snapshot lists, coalesced
+ *  with a trivial `queueMicrotask` (this is not a hot path). `persistSession` reads the *current*
+ *  values itself rather than the watcher's own old/new arguments, so several fields changing in
+ *  the same tick (e.g. `setTarget` resetting `pane` while also changing `branch`) still produce
+ *  exactly one save with everything already settled. */
+let sessionSaveScheduled = false;
+function scheduleSessionSave(): void {
+  if (sessionSaveScheduled) return;
+  sessionSaveScheduled = true;
+  queueMicrotask(() => {
+    sessionSaveScheduled = false;
+    persistSession().catch((err: unknown) =>
+      reportAsyncError(err, 'git.review.async.saveSession.error'),
+    );
+  });
+}
+
+async function persistSession(): Promise<void> {
+  const id = repoId.value;
+  const r = review.value;
+  if (!id || !r?.branch.value) return;
+  const session: ReviewSessionSnapshot = {
+    branch: r.branch.value,
+    baseOverride:
+      r.resolution.value?.reason === 'override' ? (r.resolution.value.base ?? null) : null,
+    pane: r.pane.value,
+    listMode: listMode.value,
+    filter: filter.value,
+    diffMode: reviewFiles.value?.diffMode.value ?? 'sinceReview',
+  };
+  await bridge.request('review.session.save', { repoId: id, session });
+}
+
+/** G19 D11a (item 11): "back to branch selection" — clears the in-memory target and, since this
+ *  is an explicit "go back", also clears the durable resume point (D11b), so the next cold boot
+ *  never silently jumps back into a comparison the user deliberately left. */
+async function goBackToSelection(): Promise<void> {
+  const id = repoId.value;
+  review.value?.clearTarget();
+  if (id) await bridge.request('review.session.save', { repoId: id, session: null });
+}
+
+// The file filter is revealed by the toolbar's search button; `filterVisible` gates it.
+const filterVisible = ref(false);
+
+// Type to search: a printable key in the commit list reveals the file filter and starts it.
+const { showSearch } = usePanelHeaderSearch(rootEl, {
+  searchable: () => review.value?.phase.value === 'listing',
+  getSearch: () => filter.value,
+  setSearch: (value) => {
+    filter.value = value;
+    if (value !== '') filterVisible.value = true;
+  },
+  searchTestid: 'review-file-filter',
+});
+watch(filterVisible, (visible) => {
+  if (!visible) showSearch.value = false;
+});
+
+function onUiAction(action: UiActionKind): void {
+  switch (action) {
+    case 'toggleFileReviewed': {
+      const rf = reviewFiles.value;
+      const path = rf?.selectedPath.value;
+      if (!rf || path === null || path === undefined) {
+        announce(t('git.review.noOpenFile.announce'));
+        return;
+      }
+      const entry = rf.files.value.find((e) => e.change.path === path);
+      const isReviewed = entry ? entry.review.kind !== 'none' : false;
+      void rf.mark(path, !isReviewed);
+      return;
+    }
+    // G13 D19: the palette's own route to the Comments pane's copy-for-AI action.
+    case 'copyReviewComments':
+      void reviewComments.value?.copyForAi();
+      return;
+    // G13 D19: pushed by the extension after an editor-side comment add/delete, so the pane
+    // updates without the user switching away from it.
+    case 'refreshReviewComments':
+      void reviewComments.value?.reload();
+      return;
+    // G15 D9: pushed by the extension after an editor-side range mark, so the Files pane's
+    // reviewed state doesn't sit stale until an unrelated repo.changed comes along — reuses the
+    // existing 'refresh' UiActionKind rather than adding a new contract member (§11.2).
+    case 'refresh':
+      reviewFiles.value?.reload();
+      return;
+    default:
+      return;
+  }
+}
+
+// ---------------------------------------------------------------------------------------
+// The Files pane's own target: kept in step with the review session's resolved (branch, base)
+// rather than owned by ReviewSessionState itself (D16's "state/review.ts — one field: the pane
+// the view is showing" — the file list's own request lifecycle stays here).
+// ---------------------------------------------------------------------------------------
+watch(
+  () => {
+    const r = review.value;
+    if (r?.phase.value !== 'listing') return undefined;
+    const base = r.resolution.value?.base;
+    const branch = r.branch.value;
+    const id = repoId.value;
+    return id && branch && base ? { repoId: id, branch, base } : undefined;
+  },
+  (target) => {
+    reviewFiles.value?.setTarget(target);
+  },
+);
+
+// ---------------------------------------------------------------------------------------
+// The Comments pane's own target (G13 D10) — repoId + branch only, no base: the session key
+// review.comment.* is keyed on has none. setPane/setBase already reset the pane to 'commits', so
+// this never needs its own reset logic beyond ReviewCommentsState.setTarget's own.
+// ---------------------------------------------------------------------------------------
+watch(
+  () => {
+    const r = review.value;
+    if (r?.phase.value !== 'listing') return undefined;
+    const branch = r.branch.value;
+    const id = repoId.value;
+    return id && branch ? { repoId: id, branch } : undefined;
+  },
+  (target) => {
+    reviewComments.value?.setTarget(target);
+  },
+);
+
+// D10's own "on becoming the active pane" — a plain reload against whatever target is already
+// current; setTarget's own initial load (above) already covers the first activation.
+watch(
+  () => review.value?.pane.value,
+  (pane) => {
+    if (pane === 'comments') void reviewComments.value?.reload();
+  },
+);
+
+function onSelectComment(path: string): void {
+  reviewFiles.value?.selectFile(path);
+}
+
+// P75 §1.2: the Commits pane's own row-action bundle — a plain computed (not the raw
+// `review.rowActions` ref) so the template can narrow it once, the same seam `filesActions`
+// below already uses for its own `DetailActions | undefined`.
+const rowActions = computed<DetailActions | undefined>(() => review.value?.rowActions.value);
+
+const filesActions = createReviewFilesActions(bridge, () => repoId.value, announce);
+
+onMounted(() => {
+  props.onReviewApi?.({ selectFile: (path) => reviewFiles.value?.selectFile(path) });
+  // Mirrors `App.vue`'s own first-paint mark (§5.1 — W18's review-view perf metric measures from
+  // this, not merely from `kira:page-parsed`). Unlike the graph panel there is no lane-layout
+  // worker to wait a frame for, so this can mark right after mount rather than waiting on a
+  // `CommitGrid.vue`-equivalent chunk-applied event.
+  requestAnimationFrame(() => {
+    performance.mark('kira:first-paint');
+    performance.measure('kira:first-paint', undefined, 'kira:first-paint');
+  });
+  void bootstrap().catch((err: unknown) => {
+    bootError.value = errorText(err);
+  });
+});
+
+function retryBootstrap(): void {
+  sharedRetryBootstrap(bootError, bootstrap);
+}
+
+onBeforeUnmount(() => {
+  unsubscribeTarget?.();
+  unsubscribeUiAction?.();
+  review.value?.dispose();
+  reviewFiles.value?.dispose();
+  reviewComments.value?.dispose();
+  refsState.dispose();
+  bridge.dispose();
+});
+
+// G12 D13: one panel-level filter/list-mode toolbar, replacing what used to be a separate
+// FileTree toolbar per expanded row (and a third copy in ReviewFilesPane, G11). Owns the state;
+// ReviewCommitRow/ReviewFilesPane's own FileTree instances render no toolbar of their own
+// (show-toolbar="false") and receive these as plain props.
+const listMode = ref<FileListMode>('tree');
+const filter = ref('');
+
+// G19 D11b: the write half of durable persistence — one watch() over the same fields the
+// snapshot lists (listMode/filter live here; branch/resolution/pane/diffMode are read fresh
+// inside persistSession itself). A getter-source watch over an array literal fires on every
+// tracked-dependency change regardless of the array's own contents, which is exactly right here:
+// scheduleSessionSave's own debounce is what keeps several fields changing in the same tick
+// (setTarget resetting pane while also changing branch) down to one save, not this watch's job.
+watch(
+  () => [
+    review.value?.branch.value,
+    review.value?.resolution.value,
+    review.value?.pane.value,
+    listMode.value,
+    filter.value,
+    reviewFiles.value?.diffMode.value,
+  ],
+  scheduleSessionSave,
+);
+
+function pickBranch(name: string): void {
+  const id = repoId.value;
+  if (!id) return;
+  void applyTarget(id, name);
+}
+
+const filesChangedCount = computed(() => reviewFiles.value?.files.value.length ?? 0);
+const commentsCount = computed(() => reviewComments.value?.comments.value.length ?? 0);
+
+useReviewAnnouncements(review, announce);
+</script>
+
+<template>
+  <div
+    ref="rootEl"
+    class="flex flex-col h-full w-full relative bg-bg text-fg font-ui text-graph-md overflow-hidden"
+    :data-connection-state="connectionState"
+  >
+    <!-- P131 Part 3 §5.1: MountRoot.vue's own TooltipProvider (Part 2 §3.5) already wraps this
+         root, so no tooltip surface of this component's own is needed. -->
+    <span class="sr-only" data-testid="connection-state">{{ connectionState }}</span>
+    <div class="sr-only" role="status" aria-live="polite" data-testid="live-announcements">
+      {{ liveAnnouncement }}
+    </div>
+    <GitViewHead v-if="repoHead" :repo="repoHead" />
+
+    <template v-if="bootError">
+      <div class="flex flex-col gap-2 p-3" data-testid="boot-error">
+        <p class="text-muted-foreground">{{
+          t('git.app.bootError.error', { error: bootError })
+        }}</p>
+        <Button
+          variant="dialog"
+          size="kira"
+          class="self-start"
+          data-testid="boot-retry"
+          @click="retryBootstrap"
+        >
+          {{ t('common.action.retry.label') }}
+        </Button>
+      </div>
+    </template>
+
+    <template v-else-if="!review">
+      <EmptyState fill loading :title="t('git.review.loading.loading')" />
+    </template>
+
+    <template v-else-if="noActiveRepo">
+      <div class="flex flex-col gap-1 p-3 min-h-0">
+        <h2 class="text-kira-lg font-medium text-fg">{{ t('git.review.start.title') }}</h2>
+        <p>{{ t('git.review.noRepo.emptyHint') }}</p>
+      </div>
+    </template>
+
+    <template v-else-if="!review.branch.value">
+      <ReviewBranchPicker :refs-state="refsState" @pick="pickBranch" />
+    </template>
+
+    <template v-else>
+      <ReviewToolbars
+        v-model:list-mode="listMode"
+        v-model:filter="filter"
+        v-model:filter-visible="filterVisible"
+        :review="review"
+        :refs-state="refsState"
+        :files-count="filesChangedCount"
+        :comments-count="commentsCount"
+        @back="goBackToSelection"
+      />
+
+      <div class="flex-1 min-h-0 flex flex-col">
+        <p v-if="review.phase.value === 'resolving'" class="p-3 text-muted-foreground">
+          {{ t('git.review.resolving.loading') }}
+        </p>
+
+        <div v-else-if="review.phase.value === 'error'" class="flex flex-col items-start gap-1 p-3">
+          <FieldError>{{
+            t('git.review.async.compare.error', { error: review.resolveError.value ?? '' })
+          }}</FieldError>
+          <Button variant="dialog" size="kira" data-testid="review-retry" @click="retryCompare">
+            {{ t('common.action.retry.label') }}
+          </Button>
+        </div>
+
+        <div
+          v-else-if="review.phase.value === 'ask'"
+          class="p-3 text-muted-foreground"
+          data-testid="review-ask"
+        >
+          <p>
+            <CatalogText k="git.review.ask.body" :params="{ branch: review.branch.value }">
+              <template #branch><strong>{{ review.branch.value }}</strong></template>
+            </CatalogText>
+          </p>
+        </div>
+
+        <p
+          v-else-if="review.phase.value === 'unrelated'"
+          class="p-3 text-muted-foreground"
+          data-testid="review-unrelated"
+        >
+          {{
+            t('git.review.unrelated.body', { branch: review.branch.value, base: review.resolution.value?.base ?? '' })
+          }}
+        </p>
+
+        <p
+          v-else-if="review.phase.value === 'empty'"
+          class="p-3 text-muted-foreground"
+          data-testid="review-empty"
+        >
+          {{
+            t('git.review.empty.body', { branch: review.branch.value, base: review.resolution.value?.base ?? '' })
+          }}
+        </p>
+
+        <template
+          v-else-if="review.phase.value === 'listing' && review.pane.value === 'commits' && rowActions"
+        >
+          <ReviewCommitList
+            :review="review"
+            :actions="rowActions"
+            :list-mode="listMode"
+            :filter="filter"
+            :boundary="rootEl"
+          />
+        </template>
+
+        <ReviewFilesPane
+          v-else-if="
+            review.phase.value === 'listing' &&
+            review.pane.value === 'files' &&
+            reviewFiles &&
+            filesActions
+          "
+          class="flex-1 min-h-0"
+          :review-files="reviewFiles"
+          :store="review.store"
+          :actions="filesActions"
+          :list-mode="listMode"
+          :filter="filter"
+          :review-filter="reviewFilter"
+        />
+
+        <ReviewCommentsPane
+          v-else-if="
+            review.phase.value === 'listing' && review.pane.value === 'comments' && reviewComments
+          "
+          class="flex-1 min-h-0"
+          :review-comments="reviewComments"
+          @select="onSelectComment"
+        />
+      </div>
+    </template>
+  </div>
+</template>

@@ -1,0 +1,12 @@
+{
+  "DockerService.ExecOpen": {
+    "shell": "sh"
+  },
+  "args:DockerService.ExecOpen": {
+    "cols": 80,
+    "containerId": "<masked>",
+    "rows": 24,
+    "terminalId": "x1",
+    "windowKey": "w1"
+  }
+}

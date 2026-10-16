@@ -1,0 +1,9 @@
+diff --git a/nnl.txt b/nnl.txt
+index 20cbb4d..0ba6e66 100644
+--- a/nnl.txt
++++ b/nnl.txt
+@@ -1 +1 @@
+-no newline
+\ No newline at end of file
++no newline changed
+\ No newline at end of file

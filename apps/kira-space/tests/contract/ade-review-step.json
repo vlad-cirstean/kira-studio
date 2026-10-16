@@ -1,0 +1,519 @@
+{
+  "AdeTaskService.ReviewStep#answered": {
+    "candidates": [
+      {
+        "attempt": 0,
+        "finishedAt": 0,
+        "runId": "<masked>",
+        "step": "implement"
+      }
+    ],
+    "defaultTargetRunId": "<masked>",
+    "results": [
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": false,
+        "next": "next",
+        "ok": true
+      },
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": true,
+        "next": "implement",
+        "ok": false
+      },
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": false,
+        "next": "stop",
+        "ok": false
+      }
+    ],
+    "round": {
+      "commits": 1,
+      "fallback": false,
+      "n": 1,
+      "route": "implementer",
+      "run": {
+        "attempt": 0,
+        "branchId": "<masked>",
+        "exitCode": 0,
+        "finishedAt": 0,
+        "id": "<masked>",
+        "loops": 0,
+        "note": "",
+        "outcome": {
+          "exitCode": 0,
+          "reason": "",
+          "reported": true,
+          "result": "done",
+          "source": "agent",
+          "status": "done",
+          "summary": "summary-done"
+        },
+        "purpose": "review",
+        "resumable": false,
+        "returns": 0,
+        "review": null,
+        "sandbox": null,
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "done",
+        "stepId": "review",
+        "summary": "summary-done",
+        "taskId": "<masked>"
+      }
+    },
+    "route": "implementer",
+    "run": {
+      "attempt": 0,
+      "branchId": "<masked>",
+      "exitCode": null,
+      "finishedAt": null,
+      "id": "<masked>",
+      "loops": 0,
+      "note": "",
+      "outcome": null,
+      "purpose": "",
+      "resumable": false,
+      "returns": 0,
+      "review": {
+        "note": "",
+        "phase": "waiting",
+        "round": 1,
+        "route": "implementer"
+      },
+      "sandbox": null,
+      "sessionId": "<masked>",
+      "startedAt": 0,
+      "state": "review",
+      "stepId": "review",
+      "summary": "",
+      "taskId": "<masked>"
+    },
+    "stepName": "review",
+    "targetRunId": "<masked>"
+  },
+  "AdeTaskService.ReviewStep#done": {
+    "candidates": [
+      {
+        "attempt": 0,
+        "finishedAt": 0,
+        "runId": "<masked>",
+        "step": "implement"
+      }
+    ],
+    "defaultTargetRunId": "<masked>",
+    "results": [
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": false,
+        "next": "next",
+        "ok": true
+      },
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": true,
+        "next": "implement",
+        "ok": false
+      },
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": false,
+        "next": "stop",
+        "ok": false
+      }
+    ],
+    "round": null,
+    "route": "implementer",
+    "run": {
+      "attempt": 0,
+      "branchId": "<masked>",
+      "exitCode": null,
+      "finishedAt": 0,
+      "id": "<masked>",
+      "loops": 0,
+      "note": "",
+      "outcome": {
+        "reason": "",
+        "reported": true,
+        "result": "approved",
+        "route": "next",
+        "source": "user",
+        "status": "done",
+        "summary": "lgtm"
+      },
+      "purpose": "",
+      "resumable": false,
+      "returns": 0,
+      "review": {
+        "note": "",
+        "phase": "done",
+        "round": 0,
+        "route": "implementer"
+      },
+      "sandbox": null,
+      "sessionId": "<masked>",
+      "startedAt": 0,
+      "state": "done",
+      "stepId": "review",
+      "summary": "lgtm",
+      "taskId": "<masked>"
+    },
+    "stepName": "review",
+    "targetRunId": "<masked>"
+  },
+  "AdeTaskService.ReviewStep#fallback": {
+    "candidates": [
+      {
+        "attempt": 0,
+        "finishedAt": 0,
+        "runId": "<masked>",
+        "step": "implement"
+      }
+    ],
+    "defaultTargetRunId": "<masked>",
+    "results": [
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": false,
+        "next": "next",
+        "ok": true
+      },
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": true,
+        "next": "implement",
+        "ok": false
+      },
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": false,
+        "next": "stop",
+        "ok": false
+      }
+    ],
+    "round": {
+      "commits": 0,
+      "fallback": true,
+      "n": 1,
+      "route": "new",
+      "run": {
+        "attempt": 0,
+        "branchId": "<masked>",
+        "exitCode": 0,
+        "finishedAt": 0,
+        "id": "<masked>",
+        "loops": 0,
+        "note": "",
+        "outcome": {
+          "exitCode": 0,
+          "reason": "",
+          "reported": true,
+          "result": "done",
+          "source": "agent",
+          "status": "done",
+          "summary": "summary-done"
+        },
+        "purpose": "review",
+        "resumable": false,
+        "returns": 0,
+        "review": null,
+        "sandbox": null,
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "done",
+        "stepId": "review",
+        "summary": "summary-done",
+        "taskId": "<masked>"
+      }
+    },
+    "route": "new",
+    "run": {
+      "attempt": 0,
+      "branchId": "<masked>",
+      "exitCode": null,
+      "finishedAt": null,
+      "id": "<masked>",
+      "loops": 0,
+      "note": "",
+      "outcome": null,
+      "purpose": "",
+      "resumable": false,
+      "returns": 0,
+      "review": {
+        "note": "The implementer session is gone. Sent to a new review agent.",
+        "phase": "waiting",
+        "round": 1,
+        "route": "new"
+      },
+      "sandbox": null,
+      "sessionId": "<masked>",
+      "startedAt": 0,
+      "state": "review",
+      "stepId": "review",
+      "summary": "",
+      "taskId": "<masked>"
+    },
+    "stepName": "review",
+    "targetRunId": "<masked>"
+  },
+  "AdeTaskService.ReviewStep#stuck": {
+    "candidates": [
+      {
+        "attempt": 0,
+        "finishedAt": 0,
+        "runId": "<masked>",
+        "step": "implement"
+      }
+    ],
+    "defaultTargetRunId": "<masked>",
+    "results": [
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": false,
+        "next": "next",
+        "ok": true
+      },
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": true,
+        "next": "implement",
+        "ok": false
+      },
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": false,
+        "next": "stop",
+        "ok": false
+      }
+    ],
+    "round": {
+      "commits": null,
+      "fallback": false,
+      "n": 1,
+      "route": "implementer",
+      "run": {
+        "attempt": 0,
+        "branchId": "<masked>",
+        "exitCode": null,
+        "finishedAt": 0,
+        "id": "<masked>",
+        "loops": 0,
+        "note": "interrupted: Kira Space closed while it ran",
+        "outcome": {
+          "reason": "interrupted: Kira Space closed while it ran",
+          "reported": false,
+          "source": "restart",
+          "status": "failed"
+        },
+        "purpose": "review",
+        "resumable": true,
+        "returns": 0,
+        "review": null,
+        "sandbox": null,
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "stuck",
+        "stepId": "review",
+        "summary": "",
+        "taskId": "<masked>"
+      }
+    },
+    "route": "implementer",
+    "run": {
+      "attempt": 0,
+      "branchId": "<masked>",
+      "exitCode": null,
+      "finishedAt": null,
+      "id": "<masked>",
+      "loops": 0,
+      "note": "",
+      "outcome": null,
+      "purpose": "",
+      "resumable": false,
+      "returns": 0,
+      "review": {
+        "note": "interrupted: Kira Space closed while it ran",
+        "phase": "stuck",
+        "round": 1,
+        "route": "implementer"
+      },
+      "sandbox": null,
+      "sessionId": "<masked>",
+      "startedAt": 0,
+      "state": "review",
+      "stepId": "review",
+      "summary": "",
+      "taskId": "<masked>"
+    },
+    "stepName": "review",
+    "targetRunId": "<masked>"
+  },
+  "AdeTaskService.ReviewStep#waiting": {
+    "candidates": [
+      {
+        "attempt": 0,
+        "finishedAt": 0,
+        "runId": "<masked>",
+        "step": "implement"
+      }
+    ],
+    "defaultTargetRunId": "<masked>",
+    "results": [
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": false,
+        "next": "next",
+        "ok": true
+      },
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": true,
+        "next": "implement",
+        "ok": false
+      },
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": false,
+        "next": "stop",
+        "ok": false
+      }
+    ],
+    "round": null,
+    "route": "implementer",
+    "run": {
+      "attempt": 0,
+      "branchId": "<masked>",
+      "exitCode": null,
+      "finishedAt": null,
+      "id": "<masked>",
+      "loops": 0,
+      "note": "",
+      "outcome": null,
+      "purpose": "",
+      "resumable": false,
+      "returns": 0,
+      "review": {
+        "note": "",
+        "phase": "waiting",
+        "round": 0,
+        "route": "implementer"
+      },
+      "sandbox": null,
+      "sessionId": "<masked>",
+      "startedAt": 0,
+      "state": "review",
+      "stepId": "review",
+      "summary": "",
+      "taskId": "<masked>"
+    },
+    "stepName": "review",
+    "targetRunId": "<masked>"
+  },
+  "AdeTaskService.ReviewStep#working": {
+    "candidates": [
+      {
+        "attempt": 0,
+        "finishedAt": 0,
+        "runId": "<masked>",
+        "step": "implement"
+      }
+    ],
+    "defaultTargetRunId": "<masked>",
+    "results": [
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": false,
+        "next": "next",
+        "ok": true
+      },
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": true,
+        "next": "implement",
+        "ok": false
+      },
+      {
+        "description": "",
+        "id": "<masked>",
+        "loop": false,
+        "next": "stop",
+        "ok": false
+      }
+    ],
+    "round": {
+      "commits": null,
+      "fallback": false,
+      "n": 1,
+      "route": "implementer",
+      "run": {
+        "attempt": 0,
+        "branchId": "<masked>",
+        "exitCode": null,
+        "finishedAt": null,
+        "id": "<masked>",
+        "loops": 0,
+        "note": "review round",
+        "outcome": null,
+        "purpose": "review",
+        "resumable": false,
+        "returns": 0,
+        "review": null,
+        "sandbox": null,
+        "sessionId": "<masked>",
+        "startedAt": 0,
+        "state": "running",
+        "stepId": "review",
+        "summary": "",
+        "taskId": "<masked>"
+      }
+    },
+    "route": "implementer",
+    "run": {
+      "attempt": 0,
+      "branchId": "<masked>",
+      "exitCode": null,
+      "finishedAt": null,
+      "id": "<masked>",
+      "loops": 0,
+      "note": "",
+      "outcome": null,
+      "purpose": "",
+      "resumable": false,
+      "returns": 0,
+      "review": {
+        "note": "",
+        "phase": "working",
+        "round": 1,
+        "route": "implementer"
+      },
+      "sandbox": null,
+      "sessionId": "<masked>",
+      "startedAt": 0,
+      "state": "review",
+      "stepId": "review",
+      "summary": "",
+      "taskId": "<masked>"
+    },
+    "stepName": "review",
+    "targetRunId": "<masked>"
+  }
+}

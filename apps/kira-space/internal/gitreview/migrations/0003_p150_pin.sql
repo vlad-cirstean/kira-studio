@@ -1,0 +1,1 @@
+ALTER TABLE review_session ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;

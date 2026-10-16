@@ -1,0 +1,116 @@
+/**
+ * G15 D5/D6 — pure interval algebra plus the two coordinate mappings the editor-side marking
+ * controller needs (`selectionToRange`, `hunkChangeBlock`). Imports only `./diff.ts` and
+ * `./review.ts`, nothing from `@kira/git-ipc` or an editor API, which is what lets this run under plain `bun test` (D10).
+ *
+ * This algebra is presentation-only (F9): it decides which icon a hunk gets, which of the two
+ * toolbar buttons shows, and what a hover says. G11 D10's server-side union/subtract is what
+ * actually computes the stored state — the client never predicts it and never writes
+ * `reviewedRanges` from this module's output.
+ *
+ * `DiffHunk`/`LineRange` are this
+ * package's own model types (structural copies of `@kira/git-ipc`'s wire shapes) rather than an
+ * import of the wire package itself — no behaviour change.
+ */
+import type { DiffHunk } from './diff.ts';
+import type { LineRange } from './review.ts';
+
+/** A plain `{start,end}×{line,character}` shape — an editor selection narrowed to what
+ *  `selectionToRange` needs, so this module needs no editor import. */
+export interface SelectionShape {
+  readonly start: { readonly line: number; readonly character: number };
+  readonly end: { readonly line: number; readonly character: number };
+}
+
+/** Drops invalid ranges (non-integer, `start < 1`, `end < start`), sorts by `start`, and merges
+ *  overlapping AND adjacent ranges (`end + 1 === next.start`) into one. */
+export function normalizeRanges(ranges: readonly LineRange[]): readonly LineRange[] {
+  const valid = ranges.filter(
+    (r) => Number.isInteger(r.start) && Number.isInteger(r.end) && r.start >= 1 && r.end >= r.start,
+  );
+  if (valid.length === 0) return [];
+  const sorted = [...valid].sort((a, b) => a.start - b.start || a.end - b.end);
+  const merged: LineRange[] = [];
+  for (const r of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && r.start <= last.end + 1) {
+      if (r.end > last.end) merged[merged.length - 1] = { start: last.start, end: r.end };
+    } else {
+      merged.push({ start: r.start, end: r.end });
+    }
+  }
+  return merged;
+}
+
+/** Clamps every range into `1..lineCount`, dropping any that fall entirely outside it — a
+ *  selection past the last line of a document an editor padded is not a range the server should be
+ *  asked to store (D5). */
+export function clampRanges(ranges: readonly LineRange[], lineCount: number): readonly LineRange[] {
+  const clamped: LineRange[] = [];
+  for (const r of normalizeRanges(ranges)) {
+    const start = Math.max(r.start, 1);
+    const end = Math.min(r.end, lineCount);
+    if (start <= end) clamped.push({ start, end });
+  }
+  return clamped;
+}
+
+/** How much of `target` is covered by `ranges` — the presentation-only question of whether a hunk
+ *  or a selection reads as reviewed. Sums overlap length rather than walking line by line.
+ *
+ *  **`ranges` must already be normalized** (sorted, non-overlapping, non-adjacent — exactly what
+ *  `normalizeRanges` produces). Call `normalizeRanges` yourself first if `ranges` might not be.
+ *
+ *  G31 round-2 performance review, finding #4: this used to call `normalizeRanges(ranges)` on
+ *  every invocation, but its one real caller (`reviewMarking.ts`, both directly and through
+ *  `aggregateCoverage`) always passes `state.reviewedRanges` — wire data whose every server-side
+ *  origin (`gitreview.ProjectRanges`, `Union`, `Subtract`) already ends in `Normalize`, so the
+ *  work was pure repetition: a fresh filter+spread+sort+merge for an array that was already
+ *  sorted and merged. `paint`'s own hunk loop calls this once per hunk against the SAME
+ *  `state.reviewedRanges`, and `updateContextKeys` calls it (via `aggregateCoverage`) on every
+ *  selection change with no debounce — an arrow key inside a reviewed diff used to re-normalize
+ *  the whole reviewed-range list on every keypress for no reason. */
+export function coverage(
+  target: LineRange,
+  ranges: readonly LineRange[],
+): 'none' | 'partial' | 'full' {
+  if (target.end < target.start) return 'none';
+  const targetLength = target.end - target.start + 1;
+  let covered = 0;
+  for (const r of ranges) {
+    const start = Math.max(r.start, target.start);
+    const end = Math.min(r.end, target.end);
+    if (start <= end) covered += end - start + 1;
+  }
+  if (covered <= 0) return 'none';
+  return covered >= targetLength ? 'full' : 'partial';
+}
+
+/** D5's selection -> `LineRange` mapping: the modified pane's own line numbers, taken directly —
+ *  the document IS `<branchTip>:<path>` (F6) and `LineRange` is defined in exactly those
+ *  coordinates, so there is no projection to do. */
+export function selectionToRange(sel: SelectionShape): LineRange {
+  const startLine0 = sel.start.line;
+  // A downward drag that lands at column 0 of the next line does not include that line — the usual
+  // convention for a full-line selection. A single-line selection is never collapsed away by this rule.
+  const endLine0 =
+    sel.end.character === 0 && sel.end.line > sel.start.line ? sel.end.line - 1 : sel.end.line;
+  return { start: startLine0 + 1, end: Math.max(endLine0, startLine0) + 1 };
+}
+
+/** D6: the changed-line span of a hunk, not its context. The span runs from the first to the last
+ *  line that both changed (not `context`) and has a new-side image — a `del` line's `newLine` is
+ *  `undefined` (`contract.ts:110-118`), so a pure-deletion hunk (only `del` lines) yields
+ *  `undefined`: there is no branch-tip line left to hang review state on, which is correct rather
+ *  than a gap (G11 D10's own projection already drops ranges whose lines were deleted). */
+export function hunkChangeBlock(hunk: DiffHunk): LineRange | undefined {
+  let start: number | undefined;
+  let end: number | undefined;
+  for (const line of hunk.lines) {
+    if (line.kind === 'context') continue;
+    if (line.newLine === undefined) continue;
+    if (start === undefined) start = line.newLine;
+    end = line.newLine;
+  }
+  return start === undefined || end === undefined ? undefined : { start, end };
+}

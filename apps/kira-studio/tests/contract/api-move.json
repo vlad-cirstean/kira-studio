@@ -1,0 +1,6 @@
+{
+  "args:CollectionsService.MoveItem": {
+    "collectionId": "<id:1>",
+    "itemId": "<id:2>"
+  }
+}

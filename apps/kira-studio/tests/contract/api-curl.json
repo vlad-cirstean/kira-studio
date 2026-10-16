@@ -1,0 +1,45 @@
+{
+  "HttpService.Send": {
+    "bodyBytes": 0,
+    "bodyEncoding": "utf8",
+    "bodyTruncated": false,
+    "elapsedMs": 0,
+    "finalUrl": "<http>/echo?src=curl",
+    "proto": "HTTP/1.1",
+    "redirects": [],
+    "status": 200,
+    "statusText": "OK"
+  },
+  "args:HttpService.Send": {
+    "body": {
+      "code": "{\"sku\":\"A-1\",\"qty\":3}",
+      "codeLanguage": "json",
+      "file": "",
+      "formData": [],
+      "mode": "code",
+      "raw": "",
+      "urlEncoded": []
+    },
+    "collectionId": "",
+    "environmentId": "",
+    "headers": [
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      },
+      {
+        "name": "X-Flow-Probe",
+        "value": "p249"
+      }
+    ],
+    "incognito": false,
+    "itemId": "",
+    "method": "POST",
+    "opId": "<masked>",
+    "options": {},
+    "tabId": "<masked>",
+    "url": "<http>/echo?src=curl"
+  },
+  "curl:generated": "curl -L '<http>/echo?src=curl' \\\n  -H 'Content-Type: application/json' \\\n  -H 'X-Flow-Probe: p249' \\\n  --data-raw '{\"sku\":\"A-1\",\"qty\":3}'",
+  "curl:import": "curl -X POST '<http>/echo?src=curl' -H 'Content-Type: application/json' -H 'X-Flow-Probe: p249' -d '{\"sku\":\"A-1\",\"qty\":3}'"
+}

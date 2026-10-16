@@ -1,0 +1,413 @@
+package repos
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
+)
+
+const connectionSelectColumns = `
+	id, name, kind, color, mode, read_only, host, port, database, username,
+	options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
+	mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode, mcp_auto_explain,
+	sort_order, created_at, updated_at
+`
+
+type ConnectionsRepo struct {
+	DB *sql.DB
+}
+
+// connectionColumns is the connections table's 20 config columns, shared by every write below
+// (P107 I2-9) — id/created_at/updated_at/sort_order/password/uri sit outside it since which of those a
+// statement needs (and how) is exactly what differs between Insert/InsertWithSecret/
+// InsertDuplicateWithSecret and Update/UpdateWithSecret; connectionSetColumns is the same list as
+// an UPDATE "col = ?" clause.
+const connectionColumns = `name, kind, color, mode, read_only, host, port, database, username,
+	options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
+	mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode, mcp_auto_explain`
+
+const connectionSetColumns = `name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
+	database = ?, username = ?, options_json = ?, preconnect = ?,
+	preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, mcp_enabled = ?,
+	mcp_description = ?, mcp_read_mode = ?, mcp_write_mode = ?, mcp_ddl_mode = ?,
+	mcp_auto_explain = ?`
+
+// connectionArgs is connectionColumns's own 20 values off f, in the same order — every write that
+// binds the full column set (Insert, InsertWithSecret, Update, UpdateWithSecret) uses this. It
+// never binds f.URI: the column is ciphertext the caller seals (SecretWrite / uriEnc).
+// InsertDuplicateWithSecret does not use it: it forces mcp_enabled to a SQL literal 0 regardless
+// of f.McpEnabled (see its own doc comment), so one of these 20 values would never actually be
+// bound there — it builds its own arg list by hand instead of trimming this one.
+func connectionArgs(f model.ConnectionFields, optionsJSON string) []any {
+	return []any{
+		f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
+		f.Username, optionsJSON, f.Preconnect, boolToInt(f.PreconnectSidecar),
+		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
+		f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
+	}
+}
+
+// rowScanner is satisfied by both *sql.Rows and *sql.Row, letting scanConnectionRow serve both
+// List (many rows) and Get (one row) with the same column layout and validation.
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+// scanConnectionRow never reads uri (P181): the column is ciphertext only SecretsRepo.GetURI opens,
+// so every summary the repo returns has URI == nil. It scans one row in connectionSelectColumns's order and validates it the same
+// way connections.ts's parseRow does: a hand-mangled row is dropped (nil, nil), not propagated —
+// unlike settings/layout, a bad connection row must not make the whole app unlaunchable.
+func scanConnectionRow(row rowScanner) (*model.ConnectionSummary, error) {
+	var (
+		c                                                          model.ConnectionSummary
+		host, database, username                                   sql.NullString
+		port                                                       sql.NullInt64
+		options                                                    sql.NullString
+		preconnect                                                 sql.NullString
+		readOnly, sidecar, autoExplain, mcpEnabled, mcpAutoExplain int
+	)
+	if err := row.Scan(
+		&c.ID, &c.Name, &c.Kind, &c.Color, &c.Mode, &readOnly, &host, &port, &database,
+		&username, &options, &preconnect, &sidecar, &autoExplain, &c.ThrottlePerSec,
+		&mcpEnabled, &c.McpDescription, &c.McpReadMode, &c.McpWriteMode, &c.McpDdlMode, &mcpAutoExplain,
+		&c.SortOrder, &c.CreatedAt, &c.UpdatedAt,
+	); err != nil {
+		return nil, err
+	}
+
+	if !model.ValidConnectionKind(c.Kind) {
+		slog.Warn("dropping connection row: unrecognised kind", "scope", "storage/connections", "id", c.ID, "kind", c.Kind)
+		return nil, nil
+	}
+	if !model.ValidConnectionColor(c.Color) {
+		slog.Warn("dropping connection row: unrecognised color", "scope", "storage/connections", "id", c.ID, "color", c.Color)
+		return nil, nil
+	}
+	if !model.ValidConnectionMode(c.Mode) {
+		slog.Warn("dropping connection row: unrecognised mode", "scope", "storage/connections", "id", c.ID, "mode", c.Mode)
+		return nil, nil
+	}
+	// M2: an unreadable permission word coerces to the strictest value (deny) rather than dropping
+	// the row — dropping would hide the connection from the app entirely; coercing keeps it visible
+	// and keeps it safe.
+	if !model.ValidMcpPermissionMode(c.McpReadMode) {
+		slog.Warn("coercing connection row: unrecognised MCP read mode", "scope", "storage/connections", "id", c.ID, "mode", c.McpReadMode)
+		c.McpReadMode = "deny"
+	}
+	if !model.ValidMcpPermissionMode(c.McpWriteMode) {
+		slog.Warn("coercing connection row: unrecognised MCP write mode", "scope", "storage/connections", "id", c.ID, "mode", c.McpWriteMode)
+		c.McpWriteMode = "deny"
+	}
+	if !model.ValidMcpPermissionMode(c.McpDdlMode) {
+		slog.Warn("coercing connection row: unrecognised MCP DDL mode", "scope", "storage/connections", "id", c.ID, "mode", c.McpDdlMode)
+		c.McpDdlMode = "deny"
+	}
+
+	c.ReadOnly = readOnly != 0
+	c.PreconnectSidecar = sidecar != 0
+	c.AutoExplain = autoExplain != 0
+	c.McpEnabled = mcpEnabled != 0
+	c.McpAutoExplain = mcpAutoExplain != 0
+	if host.Valid {
+		c.Host = &host.String
+	}
+	if port.Valid {
+		p := int(port.Int64)
+		c.Port = &p
+	}
+	if database.Valid {
+		c.Database = &database.String
+	}
+	if username.Valid {
+		c.Username = &username.String
+	}
+	if preconnect.Valid {
+		c.Preconnect = &preconnect.String
+	}
+
+	c.Options = map[string]any{}
+	if options.Valid && options.String != "" {
+		if err := json.Unmarshal([]byte(options.String), &c.Options); err != nil {
+			slog.Warn("dropping connection row: options_json is not valid JSON", "scope", "storage/connections", "id", c.ID)
+			return nil, nil
+		}
+	}
+	return &c, nil
+}
+
+// List orders by sort_order ASC, name ASC (the name tiebreak connections.ts's own listConnections
+// applies — two rows sharing a sort_order must not come back in arbitrary order) and never selects
+// password.
+func (r *ConnectionsRepo) List() ([]model.ConnectionSummary, error) {
+	rows, err := r.DB.Query(`SELECT ` + connectionSelectColumns + ` FROM connections ORDER BY sort_order ASC, name ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("repos/connections: query: %w", err)
+	}
+	defer rows.Close()
+
+	out := []model.ConnectionSummary{}
+	for rows.Next() {
+		c, err := scanConnectionRow(rows)
+		if err != nil {
+			return nil, fmt.Errorf("repos/connections: scan: %w", err)
+		}
+		if c != nil {
+			out = append(out, *c)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("repos/connections: rows: %w", err)
+	}
+	return out, nil
+}
+
+// KindOf satisfies adapterhost.KindLookup — the router's per-connection native/Node-served
+// routing decision. A plain DB read for now, not the connections service's own in-memory state
+// map: main.go constructs the router before connections.Service exists (the router is one of
+// that service's own Deps), so there is no earlier in-memory source to prefer yet. Worth
+// revisiting once nativeKinds is non-empty and this is on every data op's hot path (M5).
+func (r *ConnectionsRepo) KindOf(connID string) (string, bool) {
+	summary, err := r.Get(connID)
+	if err != nil || summary == nil {
+		return "", false
+	}
+	return summary.Kind, true
+}
+
+// Get returns (nil, nil) when no row with this id exists (or the row failed validation).
+func (r *ConnectionsRepo) Get(connID string) (*model.ConnectionSummary, error) {
+	c, err := sqlitex.QueryOne(r.DB, func(row *sql.Row) (*model.ConnectionSummary, error) {
+		return scanConnectionRow(row)
+	}, `SELECT `+connectionSelectColumns+` FROM connections WHERE id = ?`, connID)
+	if err != nil {
+		return nil, fmt.Errorf("repos/connections: get %s: %w", connID, err)
+	}
+	return c, nil
+}
+
+// insertTx runs the begin/next-sort-order/commit/Get-after frame Insert/InsertWithSecret/
+// InsertDuplicateWithSecret all three share (P113 G11) — insert receives the open tx and the
+// freshly computed next sort_order, and does only the one INSERT statement that actually differs
+// between the three (column list, whether password is bound directly or copied via subquery,
+// InsertDuplicateWithSecret's forced mcp_enabled literal). connID is the row insert is expected to
+// have written, read back via Get once the transaction commits.
+func (r *ConnectionsRepo) insertTx(connID string, insert func(tx *sql.Tx, sortOrder int) error) (model.ConnectionSummary, error) {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: begin: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	sortOrder, err := sqlitex.NextSortOrder(tx, "connections", "")
+	if err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: next sort order: %w", err)
+	}
+	if err := insert(tx, sortOrder); err != nil {
+		return model.ConnectionSummary{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: commit: %w", err)
+	}
+
+	created, err := r.Get(connID)
+	if err != nil {
+		return model.ConnectionSummary{}, err
+	}
+	if created == nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: row %s not readable after insert", connID)
+	}
+	return *created, nil
+}
+
+// Insert is InsertWithSecret with no password or URI — kept for ipcfixture/harness.go's own test-support
+// caller, which never needs one.
+func (r *ConnectionsRepo) Insert(connID string, f model.ConnectionFields, createdAt string) (model.ConnectionSummary, error) {
+	return r.InsertWithSecret(connID, f, createdAt, nil, nil)
+}
+
+func (r *ConnectionsRepo) Update(connID string, f model.ConnectionFields, updatedAt string) (model.ConnectionSummary, error) {
+	optionsJSON, err := json.Marshal(f.Options)
+	if err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: encode options: %w", err)
+	}
+	if _, err := r.DB.Exec(`
+		UPDATE connections
+		   SET `+connectionSetColumns+`, updated_at = ?
+		 WHERE id = ?
+	`,
+		append(append(connectionArgs(f, string(optionsJSON)), updatedAt), connID)...,
+	); err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: update %s: %w", connID, err)
+	}
+
+	updated, err := r.Get(connID)
+	if err != nil {
+		return model.ConnectionSummary{}, err
+	}
+	if updated == nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: row %s not found after update", connID)
+	}
+	return *updated, nil
+}
+
+// InsertWithSecret is Insert plus the row's password column, written in the very same INSERT
+// statement — P21 round 3 finding 4: connections.Service.Create used to Insert the row and then
+// Secrets.Set the password as two separate statements, so a Secrets.Set failure (SQLite busy/IO, a
+// keychain item that vanished between the cipher probe and the write — anything other than "cipher
+// unavailable", which is pre-validated by the caller before either write) left a passwordless
+// connection row committed and visible in the list, with the caller told the create had failed.
+// secretEnc is the already-encrypted ciphertext (or nil for "no password"); this method never
+// touches the cipher itself; uriEnc is the sealed connection URI, bound the same way. Mirrors SecretsRepo's own "one file touches connections.password"
+// discipline as closely as a single combined statement allows.
+func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFields, createdAt string, secretEnc, uriEnc *string) (model.ConnectionSummary, error) {
+	optionsJSON, err := json.Marshal(f.Options)
+	if err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: encode options: %w", err)
+	}
+	return r.insertTx(connID, func(tx *sql.Tx, sortOrder int) error {
+		if _, err := tx.Exec(`
+			INSERT INTO connections (
+				id, `+connectionColumns+`, created_at, updated_at, sort_order, password, uri
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`,
+			append(append([]any{connID}, connectionArgs(f, string(optionsJSON))...), createdAt, createdAt, sortOrder, secretEnc, uriEnc)...,
+		); err != nil {
+			return fmt.Errorf("repos/connections: insert %s: %w", connID, err)
+		}
+		return nil
+	})
+}
+
+// InsertDuplicateWithSecret is InsertWithSecret's own twin for connections.Service.Duplicate,
+// closing the review finding's gap the same way P21 round 3 finding 4 closed it for Create/Update:
+// the new row and its copied password column are written by the very same INSERT statement — the
+// password is copied by a scalar subquery reading fromConnectionID's own column directly, never
+// read into Go and never touching the cipher (mirrors SecretsRepo.Copy's own "no decrypt, no
+// re-encrypt" contract, P25 D11), so a crash between "insert the row" and "copy the secret" can no
+// longer leave a passwordless duplicate behind the way two separate statements could.
+//
+// M5: this INSERT does not name mask_correlation_key, so the duplicate gets the column's own
+// empty-string DEFAULT — deliberately NOT copied from fromConnectionID (unlike password, just above). A
+// copied key would make the duplicate's masked correlation tags linkable back to the original's,
+// silently breaking the "key is scoped to one connection" invariant plan §2.5 states. The
+// duplicate mints its own key lazily, the same as any other connection with no key yet
+// (repos/maskkeys.go's EnsureKey).
+//
+// mcp_enabled is always inserted as 0, regardless of f.McpEnabled (finding #4, M7): a fresh import
+// is never granted MCP access by default. Mask rules live in a separate table this single INSERT
+// cannot also write, so Service.Duplicate copies them in a second statement afterward; inserting
+// the duplicate already-MCP-live here would let a
+// crash or error in that second write commit an MCP-exposed, zero-mask-rule duplicate (M6 finding
+// #6's own gap, reopened via this exact error path). SetMcpEnabled below is what flips it on, once
+// the mask rule copy that must precede any live MCP exposure has actually succeeded.
+func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnectionID string, f model.ConnectionFields, createdAt string) (model.ConnectionSummary, error) {
+	optionsJSON, err := json.Marshal(f.Options)
+	if err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: encode options: %w", err)
+	}
+	return r.insertTx(toConnectionID, func(tx *sql.Tx, sortOrder int) error {
+		if _, err := tx.Exec(`
+			INSERT INTO connections (
+				id, `+connectionColumns+`, created_at, updated_at, sort_order, password, uri
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+				(SELECT password FROM connections WHERE id = ?),
+				(SELECT uri FROM connections WHERE id = ?))
+		`,
+			toConnectionID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
+			f.Username, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
+			boolToInt(f.AutoExplain), f.ThrottlePerSec,
+			f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
+			createdAt, createdAt, sortOrder, fromConnectionID, fromConnectionID,
+		); err != nil {
+			return fmt.Errorf("repos/connections: insert duplicate %s: %w", toConnectionID, err)
+		}
+		return nil
+	})
+}
+
+// SetMcpEnabled flips mcp_enabled alone — Duplicate's own fix (finding #4, M7): the new row is
+// always inserted with MCP forced off (InsertDuplicateWithSecret's own doc comment on this), and
+// this is what flips it on afterward, once the mask rule copy that must precede any live MCP
+// exposure has actually succeeded. A narrow single-column UPDATE rather than a full Update() call
+// with a stale field snapshot, so it can't stomp a concurrent edit made in the brief window between
+// the two writes. Checks RowsAffected and returns the wrapped sql.ErrNoRows sentinel for "not
+// found" rather than silently no-op-succeeding.
+func (r *ConnectionsRepo) SetMcpEnabled(connID string, enabled bool, updatedAt string) error {
+	res, err := r.DB.Exec(`UPDATE connections SET mcp_enabled = ?, updated_at = ? WHERE id = ?`,
+		boolToInt(enabled), updatedAt, connID)
+	if err != nil {
+		return fmt.Errorf("repos/connections: set mcp_enabled %s: %w", connID, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("repos/connections: set mcp_enabled %s: rows affected: %w", connID, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("repos/connections: set mcp_enabled %s: %w", connID, sql.ErrNoRows)
+	}
+	return nil
+}
+
+// SecretWrite is one ciphertext column's write intent: Set false leaves the column as it is,
+// Set true writes Value (nil clears). Value is already sealed by the caller.
+type SecretWrite struct {
+	Set   bool
+	Value *string
+}
+
+// UpdateWithSecret is Update plus, in the same UPDATE statement, the row's password and uri
+// columns — P21 round 3 finding 4: connections.Service.Update used to Secrets.Set the password and
+// then Conns.Update the rest of the row as two separate statements, so a Conns.Update failure
+// after a successful Secrets.Set left the new password stored against the old destination, the
+// state destinationUnchanged exists to prevent. Each SecretWrite distinguishes "leave the stored
+// column exactly as it is" (Set false) from "write Value, which may itself be nil to clear it".
+func (r *ConnectionsRepo) UpdateWithSecret(connID string, f model.ConnectionFields, updatedAt string, password, uri SecretWrite) (model.ConnectionSummary, error) {
+	optionsJSON, err := json.Marshal(f.Options)
+	if err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: encode options: %w", err)
+	}
+
+	set := connectionSetColumns + `, updated_at = ?`
+	args := append(connectionArgs(f, string(optionsJSON)), updatedAt)
+	if password.Set {
+		set += `, password = ?`
+		args = append(args, password.Value)
+	}
+	if uri.Set {
+		set += `, uri = ?`
+		args = append(args, uri.Value)
+	}
+	if _, err := r.DB.Exec(`UPDATE connections SET `+set+` WHERE id = ?`, append(args, connID)...); err != nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: update %s: %w", connID, err)
+	}
+
+	updated, err := r.Get(connID)
+	if err != nil {
+		return model.ConnectionSummary{}, err
+	}
+	if updated == nil {
+		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: row %s not found after update", connID)
+	}
+	return *updated, nil
+}
+
+// Delete relies on the schema's ON DELETE CASCADE (connections.go's referencing tables:
+// saved_queries, metadata_cache, connection_tree_filters, filter_history, and op_log's
+// ON DELETE SET NULL) — no manual cleanup needed here.
+func (r *ConnectionsRepo) Delete(connID string) error {
+	if _, err := r.DB.Exec(`DELETE FROM connections WHERE id = ?`, connID); err != nil {
+		return fmt.Errorf("repos/connections: delete %s: %w", connID, err)
+	}
+	return nil
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}

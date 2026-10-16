@@ -1,0 +1,75 @@
+/* P16 design system (docs/design/kira-design-system), ported 1:1 from parts/_style.css's P1-P12
+   and its named LAWs at P71-P104 into reusable classes on the real token set (tokens.css). P110
+   converted every primitive here to a Tailwind utility string or a component variant — see
+   docs/v1.9/plans/P110-css-tailwind-migration.md §5.11 (commits B14-B30) and
+   scripts/check-theme-classes.sh for the retired-name-to-replacement list. Only the P4 input law's
+   `.p-input.is-grow` remains (B31): no Tailwind utility captures its auto-grow math, and it must
+   stay unlayered CSS to keep beating a layered utility by construction — see its own comment
+   below. */
+
+/* ---------- P4 input ---------- */
+/* P110 B25: the box rule, focus/invalid states, spin-button hide and stepper block that used to
+   live here are folded into InputGroup's own `kira` variant (packages/theme/src/components/ui/
+   input-group) and AutocompleteField.vue's own template utilities — see that variant's doc comment
+   for the full token mapping. `.p-input`/`.is-grow` below are B31's own residue: the class name
+   stays applied (unconditionally, on AutocompleteField's own InputGroup box) purely as this
+   compound selector's own hook — the auto-grow math has no Tailwind utility equivalent (a CSS grid
+   sizing replica, clamped padding-block calc), and this unlayered rule must keep beating the `kira`
+   variant's own `h-control`/`items-center` layered utilities by construction. */
+/* P71 §8: opt-in 4-row auto-grow (AutocompleteField.vue's own `grow` prop) — a CSS
+   grid replica sized by the same text, clamped to 4 lines, with no JS height write per keystroke.
+   `field-sizing: content` is Chromium-only (this app ships on WebKitGTK/WKWebView too) and a JS
+   autosize library writes an inline height per input event across a table that can hold dozens of
+   rows — this is ~15 lines of CSS with no JS, no observer, no per-keystroke layout write. */
+.p-input.is-grow {
+  --grow-lh: 1.45;
+  --grow-rows: 4;
+  height: auto;
+  align-items: flex-start;
+  line-height: var(--grow-lh);
+  /* One row renders at exactly --kira-control-h and vertically centred, so a filled row sits at
+     the same height as every control beside it; each further row adds exactly one line box.
+     max(0px, …) because both the font size and the control height are user-settable tokens. */
+  padding-block: max(
+    0px,
+    calc((var(--kira-control-h) - 2 * var(--kira-border-width) - var(--grow-lh) * 1em) / 2)
+  );
+}
+.p-input.is-grow .input-wrap {
+  display: grid;
+}
+/* The sizing replica: same text, same font, same wrapping, invisible. Its own max-height is the
+   4-row clamp — clamping the replica (not the box) is what keeps the grid track itself at most
+   four lines, so the stretched textarea inside it scrolls rather than overflowing. The trailing
+   space keeps a value ending in a space from collapsing the last line. */
+.p-input.is-grow .input-wrap::after {
+  content: attr(data-value) " ";
+  grid-area: 1 / 1;
+  visibility: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: calc(var(--grow-rows) * var(--grow-lh) * 1em);
+  overflow: hidden;
+  font: inherit;
+}
+.p-input.is-grow .input-wrap > textarea {
+  grid-area: 1 / 1;
+  resize: none;
+  overflow-y: auto;
+  /* CSS Box Alignment §8.3: a grid item's `normal` alignment behaves as `stretch` *except* for a
+     replaced box with an intrinsic size in that axis — and a <textarea> counts, via its `rows`
+     attribute. Unstretched, it sat at its own 1-row intrinsic height inside a track the ::after
+     replica had already grown to fit, so it scrolled from row 2 on, regardless of the padding fix
+     below. This is what makes it fill the track like the replica next to it. */
+  align-self: stretch;
+  /* P90: the UA gives a textarea `padding: 2px`, which AutocompleteField.vue's own `border-0`/
+     utility reset on the real <textarea> does not clear either. The ::after replica that sizes
+     this grid track has none, so the textarea
+     wrapped ~4px earlier than the replica measured and was ~4px shorter than the track it was
+     stretched to — it scrolled before the box finished growing, at a boundary that moved with the
+     font size. These three declarations are what make the replica's box and this one the same
+     box. */
+  padding: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

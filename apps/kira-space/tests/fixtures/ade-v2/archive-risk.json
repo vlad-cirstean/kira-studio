@@ -1,0 +1,17 @@
+{
+  "taskId": "T_bill",
+  "branches": [
+    {
+      "branchId": "b_bill",
+      "worktree": "~/wt/web-app/usage-billing",
+      "dirty": [
+        {
+          "code": "M",
+          "path": "src/payments/invoice.ts"
+        }
+      ],
+      "unmerged": 5,
+      "blocked": ""
+    }
+  ]
+}

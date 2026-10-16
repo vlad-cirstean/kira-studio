@@ -1,0 +1,9 @@
+{
+  "rule": {
+    "kind": "date",
+    "keepHint": true,
+    "correlate": false
+  },
+  "key": null,
+  "value": "2024-06-01T09:31:22Z"
+}

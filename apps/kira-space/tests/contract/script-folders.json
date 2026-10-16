@@ -1,0 +1,27 @@
+{
+  "CustomScriptsService.Create#fixed": {
+    "collectionId": null,
+    "color": "blue",
+    "command": "pwd",
+    "createdAt": "<time>",
+    "dirMode": "fixed",
+    "id": "<id:1>",
+    "kind": "script",
+    "name": "job",
+    "params": [],
+    "schedule": null,
+    "smart": null,
+    "sortOrder": 1,
+    "updatedAt": "<time>",
+    "useAdeDir": false,
+    "workingDir": "<tmp>/gone"
+  },
+  "ScriptRunsService.ResolveDir#legacy": {
+    "base": "<home>",
+    "blocker": "",
+    "branch": "",
+    "mode": "home",
+    "path": "<home>",
+    "pending": false
+  }
+}

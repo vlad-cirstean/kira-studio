@@ -1,0 +1,73 @@
+<style>
+{{DLGCSS}}
+  .dlg-box { max-width: 660px; }
+  .fcols { display: flex; gap: var(--s-6); }
+  .fcol { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+  .fcol-head { display: flex; align-items: center; gap: var(--s-3); padding-bottom: var(--s-2); border-bottom: var(--bw) solid var(--border); }
+  .fcol-head .t { font-size: var(--t-md); color: var(--fg); }
+  .fcol-head .a { font-size: var(--t-sm); color: var(--accent); cursor: pointer; }
+  .clist { display: flex; flex-direction: column; }
+  .crow { height: var(--h-row); display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-2); border-radius: var(--r-sm); cursor: pointer; font-size: var(--t-md); }
+  .crow:hover, .crow.is-hover { background: var(--hover); }
+  .crow .box { margin-top: 0; }
+  .crow .n { color: var(--fg); }
+  .crow.off .n { color: var(--fg-muted); }
+  .crow .c { margin-left: auto; font-family: var(--font-mono); font-size: var(--t-xs); color: var(--fg-disabled); }
+  .crow .sys { font-size: var(--t-xs); color: var(--fg-disabled); }
+</style>
+<div class="dlg">
+  <div class="dlg-box">
+    <div class="dlg-title"><span class="icon-box muted"><svg class="icon"><use href="#i-filter"/></svg></span><span>Tree filters — prod-analytics</span><button class="p-iconbtn push"><svg class="icon"><use href="#i-close"/></svg></button></div>
+    <div class="dlg-body">
+      <!-- Checkboxes, not rules. The old dialog asked you to compose glob/regex
+           show-and-hide rules that ran top to bottom with last-match-wins — you
+           could not tell what the tree would look like without saving and staring
+           at it. Ticking the things you want to see needs no mental evaluation
+           order, and every row carries the count it controls. -->
+      <span class="help">Tick what should appear in the tree for this connection. This never changes what a query returns — only what is listed on the left.</span>
+
+      <div class="fcols">
+        <div class="fcol">
+          <div class="fcol-head"><span class="t">Object types</span><span class="a push">All</span><span class="a">None</span></div>
+          <div class="clist">
+            <div class="crow"><span class="box on"><svg class="icon" style="width:10px;height:10px"><use href="#i-check"/></svg></span><span class="n">Tables</span><span class="c">12</span></div>
+            <div class="crow"><span class="box on"><svg class="icon" style="width:10px;height:10px"><use href="#i-check"/></svg></span><span class="n">Views</span><span class="c">3</span></div>
+            <div class="crow is-hover"><span class="box on"><svg class="icon" style="width:10px;height:10px"><use href="#i-check"/></svg></span><span class="n">Materialised views</span><span class="c">2</span></div>
+            <div class="crow"><span class="box on"><svg class="icon" style="width:10px;height:10px"><use href="#i-check"/></svg></span><span class="n">Functions</span><span class="c">5</span></div>
+            <div class="crow off"><span class="box"></span><span class="n">Procedures</span><span class="c">0</span></div>
+            <div class="crow off"><span class="box"></span><span class="n">Sequences</span><span class="c">7</span></div>
+            <div class="crow off"><span class="box"></span><span class="n">Triggers</span><span class="c">4</span></div>
+            <div class="crow off"><span class="box"></span><span class="n">Indexes</span><span class="c">31</span></div>
+            <div class="crow off"><span class="box"></span><span class="n">Extensions</span><span class="c">6</span></div>
+          </div>
+        </div>
+
+        <div class="fcol">
+          <div class="fcol-head"><span class="t">Schemas</span><span class="a push">All</span><span class="a">None</span></div>
+          <!-- Long lists get a filter of their own rather than forcing a pattern
+               rule; the checkbox list stays the thing you actually operate. -->
+          <span class="p-input md"><span class="icon-box muted"><svg class="icon"><use href="#i-search"/></svg></span><span class="ph">Filter schemas</span></span>
+          <div class="clist">
+            <div class="crow"><span class="box on"><svg class="icon" style="width:10px;height:10px"><use href="#i-check"/></svg></span><span class="n">public</span><span class="c">12</span></div>
+            <div class="crow"><span class="box on"><svg class="icon" style="width:10px;height:10px"><use href="#i-check"/></svg></span><span class="n">analytics</span><span class="c">9</span></div>
+            <div class="crow"><span class="box on"><svg class="icon" style="width:10px;height:10px"><use href="#i-check"/></svg></span><span class="n">billing</span><span class="c">6</span></div>
+            <div class="crow off"><span class="box"></span><span class="n">audit</span><span class="c">3</span></div>
+            <div class="crow off"><span class="box"></span><span class="n">pg_catalog</span><span class="sys">system</span><span class="c">62</span></div>
+            <div class="crow off"><span class="box"></span><span class="n">information_schema</span><span class="sys">system</span><span class="c">21</span></div>
+            <div class="crow off"><span class="box"></span><span class="n">pg_toast</span><span class="sys">system</span><span class="c">18</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- the live consequence, in the same sentence shape as the grid pager -->
+      <div class="strip note" style="border:var(--bw) solid var(--border); border-radius:var(--r-sm)">
+        <span class="icon-box"><svg class="icon"><use href="#i-info"/></svg></span>
+        <span>The tree will show <b>32</b> of <b>612</b> cached nodes. Nothing is deleted — ticking a box brings it straight back.</span>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <span class="help">Applies to <span class="mono">prod-analytics</span> only</span>
+      <span class="push" style="display:flex; gap:var(--s-3)"><button class="p-dlgbtn">Cancel</button><button class="p-dlgbtn primary">Save filters</button></span>
+    </div>
+  </div>
+</div>

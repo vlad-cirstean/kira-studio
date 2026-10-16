@@ -1,0 +1,10 @@
+{
+  "kind": "sqlite",
+  "thresholdRows": 100000,
+  "pages": [
+    {
+      "columns": ["id", "parent", "detail"],
+      "rows": [["3", "0", "SEARCH t USING COVERING INDEX idx_t_a (a=?)"]]
+    }
+  ]
+}

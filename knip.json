@@ -1,0 +1,120 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // `go` is the system Go toolchain, invoked by five scripts in this file's own package.json
+  // (`dev`, `lint:go`, `package`, `test:go`, `typecheck` via `go env`).
+  // It is not an npm bin and never will be. Gated only from pass 3, when `lint:dead` dropped
+  // its `--include` filter and turned the `binaries` rule on.
+  "ignoreBinaries": ["go"],
+  "ignoreDependencies": [
+    // CSS class-name references only (`codicon-*`), never imported as a JS/TS module — used in
+    // both the root devDependency and packages/git-ui's own dependency.
+    "@vscode/codicons",
+    // Consumed transitively through @tailwindcss/vite's plugin and `@tailwind` CSS directives —
+    // never imported by name in TS.
+    "tailwindcss",
+    // tw-animate-css only ever reaches a consumer through shadcn-bridge.css's own `@import
+    // "tw-animate-css"` — a CSS-only reference knip's dependency-usage scan can't see (it traces
+    // JS/TS imports, not CSS `@import`), so it stays ignored regardless of real usage.
+    // @lucide/vue/clsx/tailwind-merge dropped from here (P103, folded into P100 Part 2): now that
+    // packages/theme is its own scanned knip workspace, real usage
+    // (lib/utils.ts/components/ui/**/theme/primitives/*) resolves fine without the ignore.
+    "tw-animate-css"
+    // @tanstack/vue-virtual dropped (P104 A-final, §3.4/§7.3/§8.3): VirtualList/TreeHost's own
+    // Stream A conversion (behaviour/virtualRows.ts, behaviour/treeVirtualRows.ts) now imports it for real —
+    // knip resolves that usage fine without the ignore.
+  ],
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/*.ts",
+        "scripts/copy/*.ts",
+        // Manual, documented run (`scripts/demo-dbs/README.md`) — no package.json script wraps it.
+        "scripts/demo-dbs/sqlite/seed.ts",
+        "packages/db-fixtures/fixtures/*.ts",
+        "packages/db-fixtures/support/*.ts"
+      ],
+      // Project holds no SFC or CSS: drop root's Vue and Tailwind compilers.
+      "vue": false,
+      "tailwind": false,
+      "project": ["scripts/**/*.ts", "packages/db-fixtures/**/*.ts"]
+    },
+    "apps/kira-studio/frontend": {
+      // src/main.ts dropped (P94 pass 3 §3.2): knip already reaches it through package.json's
+      // own field for this workspace — a redundant entry pattern, not a second real entry point.
+      // src/lib/utils.ts and src/components/ui/** both moved out to packages/theme (P103's
+      // byte-identical tier, folded into P100 Part 2) — that workspace's own block below now
+      // carries the equivalent ignore.
+      // P165: the dev-only grid prototype's own page scripts (the proto/grid/*.html Vite entries of
+      // vite.proto.config.ts, which knip does not follow), never in the app build.
+      "entry": ["index.html", "proto/grid/main.ts", "proto/grid/slickMain.ts"],
+      "project": ["src/**/*.{ts,vue}", "proto/**/*.{ts,vue}"]
+    },
+    "apps/kira-space/frontend": {
+      // Mirrors apps/kira-studio/frontend's own block above.
+      "entry": ["index.html", "mobile/index.html"],
+      "project": ["src/**/*.{ts,vue}", "mobile/**/*.{ts,vue}"]
+    },
+    "packages/shared": { "entry": ["**/*.ts"], "project": ["**/*.ts"] },
+    "packages/theme": {
+      // Consumed only through each app's own `@theme/*` alias (vite.config.ts/tsconfig.json),
+      // the same alias-boundary knip can't trace that packages/shared's own block above works
+      // around — every file here is its own entry, not just index.ts, or a component used from
+      // only one app (most of these) reads as unused. Unlike the two apps' own former block
+      // (dropped: P98's shadcn-vue set had no consumer outside components/ui/** itself at the
+      // time), knip resolves real cross-workspace `@theme/lib/utils`/`@theme/components/ui/*`
+      // usage here fine — no ignore needed.
+      "entry": ["src/**/*.{ts,vue}"],
+      "project": ["src/**/*.{ts,vue}"]
+    },
+    "packages/workbench": {
+      // Same alias-boundary reasoning as packages/theme above (`@workbench/*`, P103 Part 1) —
+      // every file here is its own entry. `formatBytes` (behaviour/format.ts) and `runMenuShortcut`
+      // (state/contextMenu.ts) each have exactly one real consumer today (Kira Studio only) — an
+      // expected, not-a-finding shape per the plan's own §9 gate, not an unused export.
+      "entry": ["src/**/*.{ts,vue}"],
+      "project": ["src/**/*.{ts,vue}"]
+    },
+    "packages/api-core": {
+      // src/index.ts dropped (P94 pass 3 §3.2): knip already reaches it through package.json's
+      // own `main`/`exports` field — a redundant entry pattern. test/**/*.test.ts corrected to
+      // test/**/*.spec.ts (P94 pass 3 §3.2): this directory holds *.spec.ts, not *.test.ts — the
+      // original pattern matched nothing since the day it landed.
+      "entry": ["test/**/*.spec.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    },
+    "packages/git-ipc": {
+      // src/index.ts dropped (P94 pass 3 §3.2) — see apps/kira-studio/frontend's own note above.
+      "entry": ["src/**/*.spec.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/git-core": {
+      "entry": [
+        // src/index.ts dropped (P94 pass 3 §3.2) — see apps/kira-studio/frontend's own note above.
+        "src/**/*.spec.ts",
+        // Invoked via `bun run` against its own absolute path, from a Go test
+        // (apps/kira-space/internal/gitsearch/differential_test.go) — never a static import.
+        "src/search/differentialRunner.ts"
+      ],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/git-ui": {
+      // src/index.ts and src/icons/setiFileIcon.ts both dropped (P94 pass 3 §3.2) — knip already
+      // reaches both through package.json's own `main`/`exports` field.
+      "entry": ["src/**/*.spec.ts"],
+      "project": ["src/**/*.{ts,vue,css}"]
+    },
+    "packages/docker-ui": {
+      "entry": ["src/testing/**/*.ts"],
+      "project": ["src/**/*.{ts,vue,css}"]
+    },
+    "site": {
+      "entry": [
+        "src/pages/**/*.astro",
+        "src/pages/**/*.ts",
+        "tests/**/*.spec.ts",
+        "scripts/**/*.spec.ts"
+      ],
+      "project": ["src/**/*.{ts,astro,mdx}", "tests/**/*.ts", "scripts/**/*.ts"]
+    }
+  }
+}

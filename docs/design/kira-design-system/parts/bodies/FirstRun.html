@@ -1,0 +1,51 @@
+<style>
+  .start { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: var(--s-6); }
+  .start-inner { width: 360px; max-width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s-4); }
+  .start-mark { color: var(--fg-disabled); }
+  .start-title { font-size: var(--t-xl); font-weight: 500; color: var(--fg); letter-spacing: -0.01em; }
+  .start-sub { font-size: var(--t-md); color: var(--fg-muted); line-height: 1.5; }
+  .side-empty { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-4); padding: var(--s-6); text-align: center; }
+</style>
+<div class="app">
+  <div class="workbench">
+
+    <div class="p-panel sidebar">
+      <div class="p-panel-head">
+        <span>Connections</span>
+        <span class="push" style="display:flex; gap:var(--s-1)">
+          <button class="p-iconbtn is-disabled"><svg class="icon"><use href="#i-filter"/></svg></button>
+          <button class="p-iconbtn is-hover" title="New connection"><svg class="icon"><use href="#i-plus"/></svg></button>
+        </span>
+      </div>
+      <!-- The empty tree does not repeat the headline that already fills the main
+           area; it says what this panel is for and nothing more. -->
+      <div class="side-empty">
+        <span class="dim"><svg viewBox="0 0 16 16" width="24" height="24"><use href="#i-db"/></svg></span>
+        <span class="xs dim" style="line-height:1.5">Everything you connect to<br>shows up here.</span>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="p-panel editor">
+
+        <div class="tabstrip"><span class="sm dim" style="padding-left:var(--s-2)">No tabs open</span></div>
+
+        <!-- ===== FIRST RUN — one door, no vestibule. The engine grid used to live
+             here as well as in the New connection dialog, so the app opened by
+             asking a question it was about to ask again. There is exactly one
+             thing to do on an empty install, so the page offers exactly that and
+             the picker stays where it belongs — behind the button. ===== -->
+        <div class="start">
+          <div class="start-inner">
+            <span class="start-mark"><svg viewBox="0 0 16 16" width="32" height="32"><use href="#i-db"/></svg></span>
+            <div class="start-title">No connections yet</div>
+            <div class="start-sub">Kira Studio needs somewhere to connect before it can show you anything.</div>
+            <button class="p-dlgbtn primary" style="margin-top:var(--s-2)"><span class="icon-box"><svg class="icon"><use href="#i-plus"/></svg></span>New connection</button>
+            <span class="xs dim" style="line-height:1.6">Credentials are stored unencrypted in <span class="mono">~/.kira-studio/kira.sqlite</span>.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{{STATUSBAR}}
+</div>

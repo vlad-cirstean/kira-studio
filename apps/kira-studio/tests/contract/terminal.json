@@ -1,0 +1,45 @@
+{
+  "CustomScriptsService.Create#fixed": {
+    "collectionId": null,
+    "color": "blue",
+    "command": "ls marker.txt; exit 4",
+    "createdAt": "<time>",
+    "dirMode": "fixed",
+    "id": "<id:1>",
+    "kind": "script",
+    "name": "list",
+    "params": [],
+    "schedule": null,
+    "smart": null,
+    "sortOrder": 0,
+    "updatedAt": "<time>",
+    "useAdeDir": false,
+    "workingDir": "<tmp>/picked"
+  },
+  "FilesService.ChooseFolder#cancelled": {
+    "canceled": true,
+    "path": null
+  },
+  "FilesService.ChooseFolder#picked": {
+    "canceled": false,
+    "path": "<tmp>/picked"
+  },
+  "TerminalService.DefaultCwd": {
+    "path": "<home>"
+  },
+  "TerminalService.Open#claudeMissing": {
+    "code": "E_NOT_FOUND",
+    "message": "Claude Code CLI not found. Install it, then retry. Looked in: claude (on PATH), <home>/.claude/local/claude, <home>/.local/bin/claude, claude (in <bin>/stub-shell login shell)."
+  },
+  "args:TerminalService.Open": {
+    "cols": 80,
+    "command": "",
+    "cwd": "<home>",
+    "launchKind": "",
+    "rows": 24,
+    "scriptId": "",
+    "scriptLaunchToken": "",
+    "terminalId": "t1",
+    "windowKey": "main"
+  }
+}
