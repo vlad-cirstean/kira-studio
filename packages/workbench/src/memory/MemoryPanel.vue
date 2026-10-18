@@ -26,7 +26,7 @@ import ImportMenu from './import/ImportMenu.vue';
 import ImportStatus from './import/ImportStatus.vue';
 import { useImportChangeSync } from './import/importQueries';
 import { useImportUiStore } from './import/importStore';
-import { MATCH_LABEL, originText, SCOPE_LABEL } from './labels';
+import { KIND_LABEL, MATCH_LABEL, originText, SCOPE_LABEL } from './labels';
 import MemoryFilters from './MemoryFilters.vue';
 import MemoryScore from './MemoryScore.vue';
 import MemorySetupHint from './MemorySetupHint.vue';
@@ -184,6 +184,9 @@ const historyToggleId = useId();
                     originText(memory.origin, memory.sourceTag)
                   }}</Badge
                 >
+                <Badge v-if="memory.kind === 'rule'" data-testid="memory-row-kind">{{
+                  t(KIND_LABEL.rule)
+                }}</Badge>
                 <Badge data-testid="memory-row-scope">{{ t(SCOPE_LABEL[memory.scope]) }}</Badge>
                 <span
                   v-if="memory.project"

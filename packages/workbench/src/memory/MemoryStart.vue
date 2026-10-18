@@ -14,7 +14,7 @@ import ModuleStart from '../components/ModuleStart.vue';
 import QueryState from '../components/QueryState.vue';
 import DistillView from './distill/DistillView.vue';
 import ImportView from './import/ImportView.vue';
-import { eventText, GRADE_TEXT, originText, SCOPE_LABEL } from './labels';
+import { eventText, GRADE_TEXT, KIND_LABEL, originText, SCOPE_LABEL } from './labels';
 import MemoryContext from './MemoryContext.vue';
 import { useMemoryHistory } from './queries';
 import { useMemoryUiStore } from './store';
@@ -62,6 +62,9 @@ function eventsFor(id: string) {
                 originText(selected.origin, selected.sourceTag)
               }}</Badge
             >
+            <Badge v-if="selected.kind === 'rule'" data-testid="memory-detail-kind">{{
+              t(KIND_LABEL.rule)
+            }}</Badge>
             <Badge data-testid="memory-detail-scope">{{ t(SCOPE_LABEL[selected.scope]) }}</Badge>
             <Badge v-if="selected.historical" variant="warn">{{
               t('memory.common.historical.status')

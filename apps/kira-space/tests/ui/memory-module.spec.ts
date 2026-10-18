@@ -13,6 +13,7 @@ function memory(over: Record<string, unknown>) {
     lineageId: 'm1',
     version: 1,
     fact: 'The billing API listens on port 9090.',
+    kind: 'fact',
     reason: 'Manifest changed in March.',
     keywords: ['billing', 'port'],
     origin: 'user',
@@ -130,6 +131,36 @@ test('Memory mode lists recent memories, searches, and flags history', async ({ 
   await expect(rows).toHaveCount(2);
   await expect(page.locator('[data-testid="memory-row-m1"]')).toContainText('Historical');
   await expect(page.locator('[data-testid="memory-row-m2"]')).not.toContainText('Historical');
+});
+
+test('a rule carries a Rule badge in the list and detail; a fact carries none', async ({
+  relaunch,
+}) => {
+  const rule = memory({
+    id: 'r1',
+    lineageId: 'r1',
+    fact: 'Never write amounts as floats.',
+    kind: 'rule',
+    reason: 'The ledger rejects fractions.',
+  });
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.memoryRecent, response: [CURRENT, rule] },
+      { channel: IPC.memoryHistory, response: { memories: [rule], events: [] } },
+      { channel: IPC.memoryContext, response: { memory: rule, groups: [] } },
+    ],
+  });
+  await openMemory(page);
+
+  await expect(page.locator('[data-testid="memory-row-kind"]')).toHaveCount(1);
+  await expect(
+    page.locator('[data-testid="memory-row-r1"] [data-testid="memory-row-kind"]'),
+  ).toHaveText('Rule');
+  await expect(
+    page.locator('[data-testid="memory-row-m2"] [data-testid="memory-row-kind"]'),
+  ).toHaveCount(0);
+  await page.locator('[data-testid="memory-row-r1"]').click();
+  await expect(page.locator('[data-testid="memory-detail-kind"]')).toHaveText('Rule');
 });
 
 test('selecting a memory shows its reason and version trail', async ({ relaunch }) => {

@@ -2,6 +2,7 @@ import type {
   Memory,
   MemoryEvent,
   MemoryGroupKind,
+  MemoryKind,
   MemoryOrigin,
   MemoryScope,
 } from '@shared/domain/memory';
@@ -12,6 +13,11 @@ export const ORIGIN_LABEL = {
   agent: 'memory.common.origin.agent.label',
   external: 'memory.common.origin.external.label',
 } as const satisfies Record<MemoryOrigin, MessageKey>;
+
+/** Only a rule is badged; a fact is the default and stays unmarked. */
+export const KIND_LABEL = {
+  rule: 'memory.common.kind.rule.label',
+} as const satisfies Partial<Record<MemoryKind, MessageKey>>;
 
 export const SCOPE_LABEL = {
   company: 'memory.common.scope.company.label',

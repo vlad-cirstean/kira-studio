@@ -5792,6 +5792,11 @@
       "historical": {
         "status": "Historical"
       },
+      "kind": {
+        "rule": {
+          "label": "Rule"
+        }
+      },
       "origin": {
         "agent": {
           "label": "Agent"
