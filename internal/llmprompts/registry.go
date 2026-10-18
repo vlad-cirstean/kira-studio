@@ -484,7 +484,8 @@ Origins rank user, external, agent. An agent fact never replaces a user fact.
 A challenge stores nothing. Ask the user the returned questions or fix the items, then call again with the answers in clarifications.
 
 Files (repo docs, Slack or Jira export): call ingest_files with absolute paths, then ingest_status. Never read, open or paste the content, not even to check it; Kira reads the files. Save external material to a .md, .txt or .json file first.
-Condense long text or a file into short lines without storing: call distill with text or an absolute path; do not Read the file first. Mode instructions for prompts. To store a file use ingest_files.
+Code comments are plain comments. Never write a kira-memory header, fact, reason, origin or scope into one. To tie a comment to a memory, store it first, then cite the returned fact id (km_...) in the comment.
+Condense long text or a file into short lines without storing (for a comment too): call distill with text or an absolute path; do not Read the file first. Mode instructions for prompts. To store a file use ingest_files.
 
 Recall: search_memories matches words and meaning, best first, loosely related results included; drop what is unrelated. Each result is "<id> <fact>", an indented reason line, an indented meta line (version, origin, scope). Cite a memory by fact id (km_...). ctx=N in the meta line: memory_context has N facts stored with it. memory_history shows versions.`,
 }, NoVars{})
@@ -492,7 +493,7 @@ Recall: search_memories matches words and meaning, best first, loosely related r
 // MemoryToolStoreMemory describes the store_memory tool.
 var MemoryToolStoreMemory = define(Entry{
 	ID: "memory.mcp.tool.store_memory", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "store_memory",
-	Default: `Store facts in long-term memory. Each item needs fact, reason, origin and scope. The store splits independent claims into separate facts, keeps a list about one subject as one fact, rewords them, and updates a matching same-scope fact unless the stored one has a higher origin; old versions stay as history. An unclear item or weak reason is challenged: nothing stored, questions returned. Returns each stored fact id.`,
+	Default: `Store facts in long-term memory. Each item needs fact, reason, origin and scope. The store splits independent claims into separate facts, keeps a list about one subject as one fact, rewords them, and updates a matching same-scope fact unless the stored one has a higher origin; old versions stay as history. An unclear item or weak reason is challenged: nothing stored, questions returned. A code comment cites a stored fact by its id only. Returns each stored fact id.`,
 }, NoVars{})
 
 var (
