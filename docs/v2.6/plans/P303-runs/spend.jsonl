@@ -89,3 +89,10 @@
 {"slug":"architecture/testing/02","try":1,"ok":true,"costUsd":0.1089225,"charged":0.1089225,"wallMs":38563}
 {"slug":"architecture/testing/03","try":1,"ok":true,"costUsd":0.10242280000000001,"charged":0.10242280000000001,"wallMs":42674}
 {"slug":"architecture/presentation-site-p280/01","try":1,"ok":true,"costUsd":0.09445500000000001,"charged":0.09445500000000001,"wallMs":32124}
+{"slug":"packaging/2-config-summary/01","try":1,"ok":true,"costUsd":0.0415427,"charged":0.0415427,"wallMs":18207}
+{"slug":"packaging/where-the-version-comes-from/01","try":1,"ok":true,"costUsd":0.06827090000000001,"charged":0.06827090000000001,"wallMs":25885}
+{"slug":"packaging/where-the-version-comes-from/02","try":1,"ok":true,"costUsd":0.065515,"charged":0.065515,"wallMs":25761}
+{"slug":"packaging/5-off-macos-what-this-environment-could-actually-check/01","try":1,"ok":true,"costUsd":0.0358391,"charged":0.0358391,"wallMs":15698}
+{"slug":"packaging/7-ci-releases-install-and-update/01","try":1,"ok":true,"costUsd":0.0327104,"charged":0.0327104,"wallMs":18375}
+{"slug":"packaging/7-ci-releases-install-and-update/02","try":1,"ok":true,"costUsd":0.1449633,"charged":0.1449633,"wallMs":47435}
+{"slug":"packaging/8-kira-space-packaging/01","try":1,"ok":true,"costUsd":0.0665725,"charged":0.0665725,"wallMs":28062}
