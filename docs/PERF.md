@@ -846,275 +846,83 @@ pacing"), rather than average frame rate.
 ### 2.2 Memory budget — `tests/e2e/memory.spec.ts` (removed)
 
 **Status: the budget fails here no matter what, on non-app-controllable process
-overhead — `tests/e2e/memory.spec.ts` was removed rather than kept red forever.** This section stays
-as the documented structural finding that justifies the removal, not a bug report. Per plan decision
-D21 ("If the 350 MB budget still fails after every pre-approved lever in §4 has been pulled, the
-implementing session stops and reports the per-process breakdown. It doesn't relax the assertion,
-re-scope the scenario, or redesign the process model."), the test's assertion was left unmodified
-through every lever pull below and failed every time; carrying a permanently-red assertion in the
-suite stopped being useful once every lever P12 pre-approved had been exhausted, so the spec itself
-was deleted rather than continuing to assert something no code change in this app's scope can fix.
-The measurements and lever analysis below are kept as the record of why.
+overhead — `tests/e2e/memory.spec.ts` was removed rather than kept red forever.** This section is the
+documented structural finding that justifies the removal. Per plan decision D21, the assertion stayed
+unmodified through every pre-approved lever and failed every time; the spec was deleted once the
+levers were exhausted.
 
-Scenario (plan D4): 2× Postgres + MariaDB + MongoDB + Redis = 5 connections; 4 Postgres data tabs
-+ 2 MariaDB data tabs + 2 MongoDB document tabs + 2 Redis key/value tabs = 10 tabs.
+Scenario (D4): 5 connections (2× Postgres, MariaDB, MongoDB, Redis), 10 tabs. Min of 10
+`app.getAppMetrics()` samples: **739.0 MB** at baseline (0 connections), **764.8 MB** loaded (max
+836.2 MB). The assertion `< 350 MB` failed identically across 3 runs (`Received: 801984512`).
 
-**Baseline (0 connections)** — total min=739.0 MB max=739.4 MB (10 samples):
+**Structural finding.** Baseline overhead alone — Browser + GPU + NetworkService + Tab, everything
+except the engine — is ≈ **620–626 MB**, ~270 MB over budget with zero connections and zero data. That
+is Chromium/Electron process overhead no P12 lever acts on. The baseline-to-loaded gap (≈ 25–97 MB
+across the five processes) is where the app's own footprint shows.
 
-| Process | min | max |
-|---|---|---|
-| Browser | 254.8 MB | 255.1 MB |
-| GPU | 149.6 MB | 149.8 MB |
-| Utility: NetworkService | 81.3 MB | 81.4 MB |
-| Utility: NodeService (the engine — see note) | 118.3 MB | 118.3 MB |
-| Tab (renderer) | 134.8 MB | 134.9 MB |
+**Lever L-A (eager driver loading) — fired.** `engine/adapters/registry.ts` imported all six
+adapters statically, so every driver sat in the engine process from boot (engine RSS ~151 MB with
+zero connections, trigger > 100 MB). Per-kind lazy `import()` loaders dropped it to ~119 MB. ~32 MB
+recovered, small next to the ~450 MB gap. Caveat (P32): the Kafka driver became the native
+`@confluentinc/kafka-javascript`, whose compiled code and librdkafka buffers stay resident once loaded
+and are invisible to V8's GC, so lazy loading only defers that cost. Not re-measured.
 
-**Loaded (5 connections / 10 tabs)** — total min=764.8 MB max=836.2 MB (10 samples):
-
-| Process | min | max |
-|---|---|---|
-| Browser | 236.2 MB | 264.9 MB |
-| GPU | 153.2 MB | 156.8 MB |
-| Utility: NetworkService | 81.4 MB | 81.4 MB |
-| Utility: NodeService (the engine) | 141.1 MB | 155.6 MB |
-| Tab (renderer) | 152.9 MB | 177.7 MB |
-
-Assertion: `expect(minTotal).toBeLessThan(350 * 1024 * 1024)` → **fails**, `Expected: < 367001600,
-Received: 801984512` (this run's min total was slightly above the 764.8 MB figure above; both are
-well over budget). Reproduced identically across 3 separate runs — not a flake.
-
-Note on process naming: `engine-host.ts` passes `serviceName: 'kira-engine'` to
-`utilityProcess.fork()`, but `app.getAppMetrics()` reports the internal Mojo service name
-`Utility:node.mojom.NodeService` instead, not the custom name — a known Electron/Chromium behavior
-for Node-hosted utility processes, not a misconfiguration.
-
-**Structural finding.** Baseline (0-connection, 0-tab) overhead alone — Browser + GPU +
-NetworkService + Tab, i.e. everything except the engine — is ≈ 620–626 MB, already ~270 MB over the
-350 MB budget with zero app connections open and zero app data loaded. This is Chromium/Electron
-process overhead (V8 snapshot, GPU compositor, network service, base renderer), not something P12's
-levers act on. The gap between baseline and the loaded scenario (≈ 25–97 MB across the 5 processes)
-is comparatively small and is where the app's own footprint actually shows up.
-
-**Lever L-A (eager driver loading) — fired.** `engine/adapters/registry.ts` statically imported all
-six adapter modules (kafka, mariadb, mongo, postgres, redis, sqs) at the top of the file, so every
-driver (`kafkajs`, `mongodb`, `@aws-sdk/client-sqs`, `mariadb`, `pg`, `ioredis`) was resident in the
-engine process from boot — including for a session with a single Postgres connection. Trigger
-(engine RSS with zero connections > 100 MB) fired: measured baseline engine RSS was ~151 MB before
-the change. Fix: per-kind lazy `async (deps) => (await import('./kind')).createXAdapter(deps)`
-loaders in the registry, `createAdapter()` made async; this is the only importer of the six adapter
-directories, so deferring the import here defers each driver's load until a connection of that kind
-is actually created. Result: baseline engine RSS dropped to ~119 MB (this is the number reflected
-in the baseline table above). ~32 MB recovered — real, but small next to the ~450 MB gap to budget.
-
-**P32 note: the Kafka driver is native, not JS, and its memory isn't reclaimable the way the
-other five drivers' is.** `@confluentinc/kafka-javascript` replaced `kafkajs` as the Kafka driver
-in P32 — the numbers above predate that swap and were measured with the pure-JS `kafkajs`. Once a
-Kafka connection is created and L-A's lazy import pulls the native addon into the engine process,
-its compiled code and librdkafka's own internal buffers (per-connection socket/protocol state, not
-V8 heap) stay resident for the life of the process; V8's garbage collector has no visibility into
-that memory and disconnecting the adapter doesn't release it back to the OS the way closing a
-`pg`/`mongodb`/`ioredis` connection does. This is a property of loading any native Node addon, not
-a P32-specific leak — it just means L-A's "lazy load defers the cost" framing is slightly
-optimistic for Kafka specifically: the deferred cost, once paid, is paid for the rest of the
-process's life. Not yet re-measured against this baseline (needs the macOS/Colima box, same as
-P32's other unverified-in-this-sandbox items).
-
-**Other levers checked, none fired:**
+**Other levers, none fired:**
 
 | Lever | Trigger | Measured | Fired? |
 |---|---|---|---|
-| L-B renderer page retention | Tab RSS(10 tabs) − Tab RSS(0 tabs) > 120 MB and `__kiraGridRetainedBytes()` accounts for < half | delta ≈ 18–43 MB (152.9−134.8 to 177.7−134.9) — already well under the 120 MB trigger on its own, so the AND condition fails regardless of the retained-bytes share | no |
-| L-C L2 budget default | steady state sits at the 64 MB budget and total RSS > 350 MB | L2 usage observed at 0.3 MB / 64 MB (hit rate 44%, 7/16) — far below the budget; total RSS is over budget but not because L2 is full | no |
-| L-D bundle weight | packaged `.app` > 300 MB on disk | **not re-measured for the Wails bundle** — see the note below this table | unknown |
-| L-E engine old-space cap | peak engine RSS > 400 MB in any §3 scenario | peak observed 155.6 MB | no |
+| L-B renderer page retention | Tab RSS delta (10 vs 0 tabs) > 120 MB and retained bytes explain < half | delta ≈ 18–43 MB | no |
+| L-C L2 budget default | steady state at the 64 MB budget and total RSS > 350 MB | L2 at 0.3 MB / 64 MB | no |
+| L-D bundle weight | packaged `.app` > 300 MB on disk | not re-measured for the Wails bundle; the old 252 MB figure was an electron-builder build that no longer exists. `scripts/vendor-node.sh` and the vendored Node are gone (P58f M10). Record `du -sh "apps/kira-studio/bin/Kira Studio.app"` (§3) on the next macOS run | unknown |
+| L-E engine old-space cap | peak engine RSS > 400 MB in any §3 scenario | peak 155.6 MB | no |
 | L-F cached tree expand | p95 > 50 ms | 2.8 ms | no |
 | L-G cell editor populate | p95 > 50 ms | 4.9 ms | no |
-| L-H scroll response | p95 > 8 ms | p95 = 14.2 ms, which reads as "fired" by the letter of the trigger — but per the methodology note in §2.1, this p95 elevation is a frame-scheduling artifact confirmed by the double-rAF test, not app work exceeding budget; the metric the lever is meant to gate (p50, the work-bound figure) is 5.6 ms, comfortably under budget. Pulling the pre-approved remedy (reducing `OVERSCAN_ROWS`) would not address an artifact of frame scheduling, so this is recorded as not fired | no (see caveat) |
+| L-H scroll response | p95 > 8 ms | p95 14.2 ms, a frame-scheduling artifact (§2.1 methodology note); p50 5.6 ms is under budget | no (see caveat) |
 
-**L-D after the Wails/Go migration.** The 252 MB this row used to carry was an electron-builder
-`--dir` arm64 build with `electronLanguages: ['en']` — a build that no longer exists, so the figure
-was retired rather than carried forward against a different bundle. The measurement is now
-`du -sh "apps/kira-studio/bin/Kira Studio.app"` (§3), and it hasn't been taken: no macOS hardware in this
-environment.
-
-**L-D after P58f M10.** `scripts/vendor-node.sh` and the `runtime/` tree it populated are gone
-outright, not merely trimmed — there's no vendored Node runtime or engine-child bundle left to
-weigh at all, only the one Go binary plus its embedded frontend assets. **Not available in this
-session**: no macOS hardware here either, and no projection is offered — a projection built from an
-earlier spike bundle's own different layout was tried once already for this row and wasn't a sound
-basis for declaring the > 300 MB trigger fired or unfired; that reasoning doesn't improve by
-reapplying it. Record the real `du -sh` number in §3 on the next macOS run.
-
-Per D21: every pre-approved lever has been evaluated against real measurements; only L-A fired and
-has been applied; the 350 MB budget still fails, dominated by non-app-controllable Chromium/Electron
-process overhead present even with zero connections. This is reported here for a human decision
-(candidates not in P12's scope: a different process model, e.g. fewer/merged utility processes;
-accepting a higher budget for this class of app; measuring only the app-attributable delta instead
-of total RSS) — not silently patched.
+Per D21: only L-A fired; the 350 MB budget still fails, dominated by Chromium/Electron overhead.
+Candidates left for a human decision, not in P12's scope: a different process model, a higher budget
+for this class of app, or measuring only the app-attributable delta.
 
 ### 2.3 P52 gate G1 — Wails/Go walking-skeleton RSS (Linux sandbox; not the gate's own verdict)
 
-**Status: measured, and explicitly NOT a G1 verdict.** P52 §3.3 defines G1 against a real macOS
-arm64 build (the same machine P51 part 4 used) matching WKWebView's helper processes, because
-that's the platform this migration ships on. This sandbox is Linux x86_64 with WebKitGTK
-2.52.3 — a structurally different webview implementation from WKWebView, not a stand-in for it.
-The numbers below are real, reproducible measurements of the real M1 walking skeleton, kept here
-because they're the first concrete evidence that §0.2's stated risk ("the system-webview saving
-might be smaller than the vendored-Node cost that replaces Electron's own Node") isn't
-hypothetical — but per P52 §15, **P53 doesn't start until this same procedure is re-run on real
-macOS hardware and produces a recorded go/amber/no-go verdict.** Nothing below substitutes for
-that.
+**Status: measured, and explicitly NOT a G1 verdict.** G1 is defined against a real macOS arm64
+build; this sandbox is Linux x86_64 with WebKitGTK 2.52.3, structurally unlike WKWebView. The verdict
+is §2.4.
 
-**Instrument, built and verified as part of this gate (P52 §3.3's "finding the replacement
-instrument is part of the work"):** `apps/kira-studio/cmd/g1measure`, a small standalone tool over
-`internal/metrics`' own `gopsutil`-based `MatchingPIDs`/RSS summation — the same package
-`internal/metrics.Sampler` uses for the app's own `kira:app:metrics` events (§8.4), so the gate is
-measured with the app's real instrument, not a one-off script. **Cross-checked against plain `ps
---forest`**, which is how the process set below was actually discovered (see note below) — a
-single self-reported number is exactly what P51 §3.7 warns against.
+Instrument: `apps/kira-studio/cmd/g1measure` over `internal/metrics`' `gopsutil` RSS summation (the
+same package behind `kira:app:metrics`), cross-checked against `ps --forest`. It is gate-G1
+measurement scaffolding. On Linux, WebKitGTK's `WebKitNetworkProcess` and `WebKitWebProcess` are true
+children of the Go process, with `WebKitWebProcess` re-executed through two `bwrap` wrappers (1.6-2.2
+MB each). Method matches §2.2: 10 samples 1 s apart, idle, minimum.
 
-**The process set wasn't obvious, confirming §3.3's own warning — just not in the way §3.3
-anticipated.** On macOS, the warning is that WKWebView's helper processes are *not* children of
-the app in the pid-tree sense and must be found by matching the `.app` bundle instead. On Linux,
-the opposite structural surprise showed up: WebKitGTK's `WebKitNetworkProcess` and
-`WebKitWebProcess` **are** children of the Go process (confirmed via `ps --forest`), but
-`WebKitWebProcess` itself is re-executed through two layered `bwrap` (bubblewrap sandbox)
-wrapper processes first — trivial RSS themselves (1.6-2.2 MB each) but their presence is easy to
-miss if the match rule is naive. `apps/kira-studio/cmd/g1measure -match` accounts for all of it explicitly:
-`kira-studio-shell,runtime/node/bin/node,webkitgtk,bwrap`.
-
-**Method:** identical to the removed `tests/e2e/memory.spec.ts`'s own methodology (§2.2) —
-10 samples, 1 second apart, after the window is shown and idle, minimum taken — so these numbers
-are directly comparable in shape (not platform) to §2.2's table.
-
-**Configuration (1)'s scaffold was removed in P29.** `apps/kira-studio/blank/` and the
-`KIRA_G1_BLANK=1` swap in `main.go` were dead weight in the shipped binary years after this gate
-closed (§2.4 already recorded the verdict), and had bit-rotted since — the page's hand-copied
-`Call.ByID` numeric id predates `-names` bindings and couldn't be trusted without repair. The
-numbers below are kept as the historical record; rebuilding configuration (1) would need a fresh
-static page written against the current `-names`-generated bindings, not a restore of the deleted
-one.
-
-**Configuration (1) — blank** (`KIRA_G1_BLANK=1`, a static page making the one `AppService.Info()`
-call): **min of 10 samples = 616.3 MB.**
-
-| Process | RSS at min sample |
-|---|---|
-| `kira-studio-shell` (Go) | 266.4 MB |
-| vendored `node` (engine, ping-only) | 45.1 MB |
-| `WebKitNetworkProcess` | 48.3 MB |
-| `WebKitWebProcess` | 252.7 MB |
-| `bwrap` × 2 | 3.7 MB |
-
-**Configuration (2) — real renderer** (the actual `apps/kira-studio/frontend/src` Vue app, the nine boot-path
-reads against a real, empty Go SQLite database — §3.2's actual G1 scenario): **min of 10 samples
-= 689.5 MB.**
-
-| Process | RSS at min sample |
-|---|---|
-| `kira-studio-shell` (Go) | 274.7 MB |
-| vendored `node` (engine, ping-only) | 45.0 MB |
-| `WebKitNetworkProcess` | 48.2 MB |
-| `WebKitWebProcess` | 317.8 MB |
-| `bwrap` × 2 | 3.7 MB |
-
-**Secondary hard check (§3.3): the engine child's own RSS, ping-only idle, must be ≤ 150 MB.**
-Measured 45-46 MB in both configurations — **passes**, and this half of the check is genuinely
-platform-independent (it's the same vendored Node binary answering the same one op, regardless
-of which webview surrounds it), unlike the headline number above.
-
-**What this Linux number does and doesn't say.** Read literally against §2.2's 620-626 MB
-Electron baseline, configuration (2)'s 689.5 MB is *higher*, not lower — on this platform, this
-build isn't smaller than Electron. The reason is legible in the table: `WebKitWebProcess` alone
-(252.7-317.8 MB) is a full, separate WebKitGTK library instance, not a thin OS-supplied surface —
-structurally closer to Electron's own Browser+GPU cost than to what WKWebView is expected to cost
-on macOS, where it's a shared system framework most of whose weight is already resident for any
-app using it. **This is exactly why P52 §0.2 refused to let this migration proceed past a scaffold
-without measuring the real target platform first** — a Linux-only measurement would have made the
-opposite (wrong) case for a "go" here, and the real macOS number could easily go either way from
-what this sandbox shows. Treat this section as motivation for taking the macOS re-run seriously,
-not as a substitute for it.
+Min of 10: blank page **616.3 MB**; real renderer with the nine boot-path reads **689.5 MB**
+(`WebKitWebProcess` 317.8 MB, Go shell 274.7 MB). The engine child alone was 45-46 MB (≤ 150 MB
+check passes, platform-independent). Read against §2.2's 620-626 MB Electron baseline, this build is
+not smaller on Linux, because WebKitGTK is a full separate library instance. That motivated the real
+macOS re-run. The blank-page scaffold (`KIRA_G1_BLANK=1`, `apps/kira-studio/blank/`) was removed in
+P29.
 
 ### 2.4 P52 gate G1 — real macOS arm64 result and verdict: **Go**
 
-**This is the gate's actual verdict.** Re-run per P52 §15 on the same real Apple Silicon Mac (arm64,
-macOS 26.5.2) P51 part 4 used, with the app actually built, signed, and launched — not inferred.
-Same instrument and method as §2.3: `apps/kira-studio/cmd/g1measure` (`internal/metrics`'
-`gopsutil`-based RSS summation), 10 samples 1 s apart after the window is shown and idle, minimum
-taken, cross-checked against plain `ps -o rss=` on the identical process set — both agreed to
-within rounding on every run below.
+Re-run on real Apple Silicon (macOS 26.5.2), app built, signed and launched, same instrument and
+method as §2.3, `g1measure` cross-checked against `ps -o rss=` (agreed to rounding). Min of 10:
+blank **216.3 MB**, real renderer **261.7 MB** (Go shell 103.1, `node` 40.6, WebContent 71.9, GPU
+30.4, Networking 15.2).
 
-| Config (min of 10) | `g1measure` | `ps` cross-check |
-|---|---|---|
-| (1) Blank | 216.3 MB | 216.3 MB |
-| (2) Real renderer (actual Vue app, 9 boot-path DB reads) | **261.7 MB** | 261.6 MB |
+**Verdict: 261.7 MB ≤ 300 MB = Go**, a **≈58% reduction** against §2.2's 620–626 MB Electron
+baseline before any `src/main` port. The engine child alone was 40.6–41.6 MB, under the 150 MB
+ceiling. P53 was authorized.
 
-| Process (config 2, at min sample) | RSS |
-|---|---|
-| `kira-studio-shell` (Go) | 103.1 MB |
-| vendored `node` (engine, ping-only) | 40.6 MB |
-| `com.apple.WebKit.WebContent` | 71.9 MB |
-| `com.apple.WebKit.GPU` | 30.4 MB |
-| `com.apple.WebKit.Networking` | 15.2 MB |
+Getting this number surfaced three bugs, all fixed: `CFBundleExecutable` underscores versus the
+hyphenated binary (broke `codesign --verify`); dangling `bin/npm`/`npx`/`corepack` symlinks left by
+`scripts/vendor-node.sh` (failed `codesign --deep --strict`); and `internal/metrics.MatchingPIDs`'
+substring match counting other apps' WebKit helpers (+~87 MB, ≈300 MB reported for a real 261.7 MB).
+The last is fixed by `internal/metrics.AppProcessSet`, which on darwin counts a helper only when
+`responsibility_get_pid_responsible_for_pid` resolves it to one of this app's anchor pids.
 
-**Verdict per §3.3's thresholds: 261.7 MB ≤ 300 MB = Go.** A real, wide margin under the ceiling —
-confirms §2.3's own hypothesis that WKWebView (a thin, mostly-shared system framework on its actual
-target platform) is nothing like WebKitGTK's full separate library instance on Linux, which read
-above Electron's own baseline. Against `docs/PERF.md` §2.2's 620–626 MB Electron baseline, this is a
-**≈58% reduction** before a single line of `src/main` has been ported. Secondary hard check also
-passes: the engine child alone is 40.6–41.6 MB across both configs, well under the 150 MB ceiling.
-
-**Per P52 §15, this clears the gate: P53 (porting `src/main`'s business logic into the Wails app)
-is authorized to start.**
-
-**Three real bugs surfaced getting this number, all fixed in this pass, not merely worked around:**
-
-1. **`build/darwin/Info.plist` and `Info.dev.plist`'s `CFBundleExecutable` was `kira_studio_shell`
-   (underscores) while the Taskfile's own `APP_NAME` — and the binary it actually builds and copies
-   into the bundle — is `kira-studio-shell` (hyphens).** This mismatch broke `codesign --verify
-   --deep --strict` outright and would have broken a Finder/LaunchServices launch of a distributed
-   build. Fixed by correcting both plists to `kira-studio-shell`, matching the Taskfile's own name
-   rather than the other way around (`APP_NAME` is referenced across dozens of Taskfile paths;
-   the plists were the one place actually wrong).
-2. **`scripts/vendor-node.sh` deleted `lib/node_modules/npm` (P51 part 4's 81 MB trim) but left
-   `bin/npm` and `bin/npx` as dangling symlinks into it** (plus `bin/corepack`, unneeded for the
-   same reason). A dangling symlink anywhere under `Contents/` fails `codesign --deep --strict`'s
-   resource-envelope validation with a bare, unhelpful `No such file or directory`. Fixed by having
-   the vendor script remove all three symlinks itself, at vendor time, so a signed build never
-   contains them in the first place.
-3. **`internal/metrics.MatchingPIDs`' plain executable-path substring match over-counts on macOS.**
-   WKWebView's helper processes (`com.apple.WebKit.WebContent`/`.GPU`/`.Networking`) are reparented
-   to `launchd` (`ppid=1`) — there's no pid-tree relationship to this app — so a naive
-   `"com.apple.WebKit"` substring match also matches *every other running app's* idle WebKit
-   helpers. Confirmed concretely on this machine: it silently added ~87 MB from Messages' and
-   Notes' own background helpers, inflating a real 261.7 MB reading to a reported ≈300 MB — a
-   difference that could flip a borderline result across a threshold, and would equally overcount
-   the shipped app's own future `kira:app:metrics` readout for any user with Mail/Safari/Messages
-   open. Fixed with `internal/metrics.AppProcessSet` (`responsible_darwin.go`/`responsible_other.go`):
-   on darwin, a helper pid is counted only when macOS's own
-   `responsibility_get_pid_responsible_for_pid` — the same private-but-stable mechanism Activity
-   Monitor itself uses to group XPC helpers under their real launching app — resolves it back to
-   one of this app's own anchor pids; on every other platform (where this repo's own Linux findings
-   already confirmed WebKitGTK's helpers are true `ppid` children) helper pids are kept unfiltered,
-   unchanged from before. `g1measure` was updated to use it (`-anchor`/`-helper` flags replacing the
-   old flat `-match`) and re-verified: it now finds exactly this app's 5 processes, zero stray ones,
-   with no manual pid filtering.
-
-**One measurement-methodology note, not a bug:** config (1) must be launched the same way real users
-launch the app — via Finder/`open` (LaunchServices) — for `responsibility_get_pid_responsible_for_pid`
-to attribute WebKit helpers correctly at all; a directly-`exec`'d binary (e.g. `./kira-studio-shell &`
-from a shell) doesn't establish the same responsibility chain, and undercounts by omitting the
-helpers entirely (observed directly: an `exec`'d blank-config run found only 2 of the real 5
-processes). `KIRA_G1_BLANK=1` can still reach a `open`-launched process via `launchctl setenv
-KIRA_G1_BLANK 1` beforehand (`launchctl unsetenv` after) — LaunchServices doesn't otherwise pass
-through a launching shell's own environment.
-
-**What this doesn't close:** `apps/kira-studio/build/darwin/Taskfile.yml`'s directories for `linux`, `windows`,
-`ios`, `android` and `docker` were `wails3 init`'s default scaffold, unconditionally generated
-regardless of target — never wired to anything this macOS-only app needs. Removed in this pass
-(`apps/kira-studio/Taskfile.yml`'s `includes:` now lists only `common`/`darwin`), along with the now-dead
-`build:server`/`build:docker`/`run:docker`/`setup:docker` tasks and their `.gitignore` entries.
-Unrelated to G1 itself, but found and cleaned up in the same session.
+**Methodology note.** Launch via Finder/`open`: a directly `exec`'d binary does not establish the
+responsibility chain and undercounts (2 of 5 processes found). `KIRA_G1_BLANK=1` reaches an
+`open`-launched process via `launchctl setenv`/`unsetenv`.
 
 ### 2.5 P58a M2 — chunk wire-encoding: Go base64 vs the Node engine's index-keyed JSON
 
