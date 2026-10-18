@@ -19,6 +19,11 @@ any() {
 # typecheck_targets <file list>: prints the `typecheck:*` script names the list touches, or the
 # word `full` when a changed TS/Vue file maps to no single project (shared package).
 typecheck_targets() {
+  # MessageKey derives from the catalog, so a catalog change can break any project.
+  if printf '%s\n' "$1" | grep -q '^packages/theme/src/i18n/'; then
+    echo full
+    return 0
+  fi
   _ts="$(printf '%s\n' "$1" | grep -E '\.(ts|mts|vue|js|d\.ts)$' || true)"
   [ -n "$_ts" ] || return 0
   printf '%s\n' "$_ts" | while IFS= read -r _f; do
