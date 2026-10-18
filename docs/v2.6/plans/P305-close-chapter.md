@@ -172,5 +172,11 @@ Done. Restored P299 and P300 plan bodies (283 and 227 lines; `units` P299 3,096 
 `docshistory`: `v2.6` guard removed from `checkChapter`; `planResultChapter` rule (v2.0, v2.5 and later) replaces
 the map; `doc` default `--runs` is `docs/history-runs`. `units v2.6`: 12 phases, 47,160 bytes, no notes unit.
 CLAUDE.md: highest-P rule reads open chapter `SPEC.md` only, start list gains v2.5 and v2.6, rollover rule now
-"Closing a chapter folds it". Fold, repoint and measured numbers follow after the pin, see the
-`DEV_ENVIRONMENT.md` docshistory bullet.
+"Closing a chapter folds it". Measured after the pin:
+- Fold: 12 units ok, 0 fallback, 0 pending. 13 tries: P301 reran once after its first record dropped "7 findings fixed".
+- Spend: 0.776 USD real, 0.776 USD charged (no failed tries), cap 5.
+- HISTORY.md: 962,950 B / 6,474 lines before, 985,781 B / 6,641 lines after repoint render.
+- Repoint: 9 references in 3 files, unmatched only under `docs/history-runs/`. Hand edits: README, biome.json,
+  memory-formats.md, PERF.md. Tool rewrote the PERF line wrongly; reverted by hand.
+- Render idempotent. Commits: c98c6128f, f2ae2a5d9, 61719dd82, ca2fa17c1 (pin), a6f3c2de4 (fold), 6ce85f428 (repoint).
+- Deviation: `git grep docs/v2.6` keeps HISTORY.md tool-generated lines and the PERF `git show` pointer.

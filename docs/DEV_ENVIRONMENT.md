@@ -474,7 +474,8 @@ Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-c
 - `scripts/docshistory` (docs chapter fold, P299): needs the logged-in `claude` CLI, builds `kira-space` itself
   (or `--binary`), gives each unit temp `KIRA_MEMORY_HOME`/`KIRA_SPACE_HOME` and never touches your memory DB.
   Defaults (also `doc`): `--runs docs/history-runs`, `--out -`, `--jobs 1`. Cost per phase 0.02 to 0.25 USD (P299 pilot, mean 0.07);
-  v2.5 (P300): 27 units, 1.45 USD real, 3.20 USD charged (failed tries charge a 0.25 USD estimate). `--max-usd` stops new
+  v2.5 (P300): 27 units, 1.45 USD real, 3.20 USD charged (failed tries charge a 0.25 USD estimate).
+  v2.6 (P305): 12 units (13 tries), 0.78 USD real, 0.78 charged. `--max-usd` stops new
   units, resume reruns the command. `repoint` skips `scripts/docshistory/` and both `testdata/` roots (eval data lives in
   `apps/kira-space/tests/claude/testdata/memory-eval/`, `internal/llmprompts/testdata/`).
 
