@@ -51,8 +51,8 @@ func TestMemoryGate(t *testing.T) {
 		"The billing-api service listens on port 8080 in production.",
 		"Stated in the billing-api deployment manifest.",
 	)}})
-	if res.Status != "stored" || len(res.Outcomes) != 1 || res.Outcomes[0].Action != memory.ActionAdd {
-		t.Fatalf("clear item: %+v", res)
+	if res.Status != "stored" || len(res.Outcomes) != 1 || res.Outcomes[0].Action != memory.ActionAdd || res.Outcomes[0].Kind != memory.KindFact {
+		t.Fatalf("clear item: %+v, want a stored fact", res)
 	}
 	res = do(memory.StoreRequest{Items: []memory.Item{item(
 		"The billing-api service now listens on port 9090 in production, not 8080.",
@@ -67,6 +67,35 @@ func TestMemoryGate(t *testing.T) {
 	}
 
 	assertGateRewritesWordyItem(ctx, t)
+	assertGateKinds(ctx, t)
+}
+
+// assertGateKinds checks the rule kind on a fresh store: a standing imperative with a reason stores as
+// a rule; a one-off task and an imperative with a circular reason are challenged.
+func assertGateKinds(ctx context.Context, t *testing.T) {
+	t.Helper()
+	store := memory.NewStore(filepath.Join(t.TempDir(), "memory.db"))
+	defer store.Close()
+	svc := memory.NewService(store, memory.NewCLIRunner(), memory.ServiceOptions{})
+	store1 := func(it memory.Item) memory.StoreResult {
+		t.Helper()
+		res, err := svc.Store(ctx, memory.StoreRequest{Source: memory.SourceUI, Items: []memory.Item{it}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("%q: %+v", it.Fact, res)
+		return res
+	}
+	if res := store1(item("Never write amounts as floats.", "The ledger rejects fractions.")); res.Status != "stored" ||
+		len(res.Outcomes) != 1 || res.Outcomes[0].Kind != memory.KindRule {
+		t.Errorf("standing rule: %+v, want one stored rule", res)
+	}
+	if res := store1(item("Fix the failing test in billing_test.go now.", "CI is red.")); res.Status != "challenged" {
+		t.Errorf("one-off task: status = %s, want challenged", res.Status)
+	}
+	if res := store1(item("Always run the linter.", "because")); res.Status != "challenged" {
+		t.Errorf("rule with a circular reason: status = %s, want challenged", res.Status)
+	}
 }
 
 // assertGateRewritesWordyItem checks the gate's style rule on a fresh store: filler goes, the number

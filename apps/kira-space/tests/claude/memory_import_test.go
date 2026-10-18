@@ -112,8 +112,11 @@ func TestMemoryImport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	imported := 0
+	imported, rules := 0, 0
 	for _, m := range mems {
+		if m.Kind == memory.KindRule {
+			rules++
+		}
 		h, err := svc.History(context.Background(), m.ID)
 		if err != nil {
 			t.Fatal(err)
@@ -134,5 +137,8 @@ func TestMemoryImport(t *testing.T) {
 	}
 	if imported == 0 {
 		t.Error("no add event with source import")
+	}
+	if rules != 1 {
+		t.Errorf("%d stored rules, want the one restore rule of billing.md", rules)
 	}
 }

@@ -174,9 +174,9 @@ func TestMemoryInstallRegisters(t *testing.T) {
 	t.Logf("claude mcp list:\n%s", out)
 }
 
-// TestMemoryDistill has the real claude call the read-only distill tool on a file path
-// through the memory-mcp server: the tool runs its own nested claude call and returns terse lines;
-// nothing is stored.
+// TestMemoryDistill has the real claude call ingest_files with distill true on a file path through
+// the memory-mcp server: the tool runs its own nested claude calls and returns short lines; nothing
+// is stored.
 func TestMemoryDistill(t *testing.T) {
 	app := newRealApp(t)
 	exe, err := os.Executable()
@@ -193,13 +193,20 @@ func TestMemoryDistill(t *testing.T) {
 	writeFile(t, doc, "# Deploy\n\nThe billing-api service is deployed with Helm charts. Ops standardised on Helm in 2025, so there is no raw kubectl apply in production. Deploys never run on Friday.\n")
 
 	out, _ := app.claudeP(t, app.Work, nil,
-		"Call the distill tool once with path "+doc+" and no other argument, then reply with the word done.",
-		"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", "mcp__"+memoryServer+"__distill",
+		"Call the ingest_files tool once with distill true and paths [\""+doc+"\"] and no other argument, then reply with the word done.",
+		"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", "mcp__"+memoryServer+"__ingest_files",
 		"--output-format", "stream-json", "--verbose")
 	msgs := parseStream(out)
-	uses := toolUses(msgs, "mcp__"+memoryServer+"__distill")
+	uses := toolUses(msgs, "mcp__"+memoryServer+"__ingest_files")
 	if len(uses) == 0 {
-		t.Fatalf("no distill tool use in the stream:\n%s", tail(out, 1500))
+		t.Fatalf("no ingest_files tool use in the stream:\n%s", tail(out, 1500))
+	}
+	var in struct {
+		Distill bool     `json:"distill"`
+		Paths   []string `json:"paths"`
+	}
+	if err := json.Unmarshal(uses[0].Input, &in); err != nil || !in.Distill || len(in.Paths) != 1 || in.Paths[0] != doc {
+		t.Fatalf("ingest_files input = %s (%v), want distill true and path %s", uses[0].Input, err, doc)
 	}
 	text, isErr, ok := toolResult(msgs, uses[0].ID)
 	if !ok || isErr || strings.TrimSpace(text) == "" {
@@ -211,31 +218,50 @@ func TestMemoryDistill(t *testing.T) {
 	if recent, err := app.W.Memory.Recent(ctx); err != nil || len(recent) != 0 {
 		t.Errorf("Recent = %+v, %v, want nothing stored", recent, err)
 	}
+	if jobs, err := app.W.MemoryImport.Jobs(); err != nil || len(jobs) != 0 {
+		t.Errorf("Jobs = %+v, %v, want no import job", jobs, err)
+	}
 }
 
 // TestMemoryDistillBridge calls the Memory module's bridge distill (the UI path) with the real
-// claude: terse lines come back with sizes and cost, and nothing is stored.
+// claude on a text of two parts that state one claim each and one rule: the merge joins the repeated
+// claim into one line, a rule comes back as a rule, and nothing is stored.
 func TestMemoryDistillBridge(t *testing.T) {
 	app := newRealApp(t)
 	mark := app.Events.Mark()
-	text := "# Deploy\n\nThe billing-api service is deployed with Helm charts. Ops standardised on Helm in 2025, so there is no raw kubectl apply in production. Deploys never run on Friday.\n"
+	filler := strings.Repeat("This paragraph holds no decision, name or number.\n\n", 90)
+	text := "# Ports\n\n## Part one\n\nThe billing-api service listens on port 8080 in production.\n\n" + filler +
+		"## Part two\n\nThe billing-api service listens on port 8080 in production. Never expose it directly to customer apps, because the gateway applies the rate limits.\n"
 
 	res, err := app.W.MemoryDistill.Distill(ctx, bridge.MemoryDistillArgs{RequestID: "claude-row", Text: text})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Lines) == 0 || res.Chunks != 1 || res.InChars != len([]rune(text)) || res.OutChars == 0 {
+	if len(res.Lines) == 0 || res.Chunks < 2 || res.InChars != len([]rune(text)) || res.OutChars == 0 {
 		t.Fatalf("result = %+v", res)
 	}
+	var withPort, rules int
 	for _, l := range res.Lines {
-		if strings.TrimSpace(l) == "" {
-			t.Errorf("empty line in %q", res.Lines)
+		if strings.TrimSpace(l.Text) == "" {
+			t.Errorf("empty line in %+v", res.Lines)
+		}
+		if strings.Contains(l.Text, "8080") {
+			withPort++
+		}
+		if l.Kind == memory.KindRule {
+			rules++
 		}
 	}
-	if res.CostUSD <= 0 || res.CostUSD > 0.50 {
-		t.Errorf("cost = %v USD, want above 0 and at most 0.50", res.CostUSD)
+	if withPort != 1 {
+		t.Errorf("%d lines mention port 8080, want the repeated claim merged into one: %+v", withPort, res.Lines)
 	}
-	t.Logf("distill bridge: %d lines, %d to %d chars, %.4f USD", len(res.Lines), res.InChars, res.OutChars, res.CostUSD)
+	if rules < 1 {
+		t.Errorf("no rule line in %+v", res.Lines)
+	}
+	if res.CostUSD <= 0 || res.CostUSD > 1.00 {
+		t.Errorf("cost = %v USD, want above 0 and at most 1.00", res.CostUSD)
+	}
+	t.Logf("distill bridge: %d lines (%d rules), %d parts, %d to %d chars, %.4f USD, lines %+v unresolved %+v", len(res.Lines), rules, res.Chunks, res.InChars, res.OutChars, res.CostUSD, res.Lines, res.Unresolved)
 	if recent, err := app.W.Memory.Recent(ctx); err != nil || len(recent) != 0 {
 		t.Errorf("Recent = %+v, %v, want nothing stored", recent, err)
 	}

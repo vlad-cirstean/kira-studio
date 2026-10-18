@@ -10,4 +10,4 @@ Deployments use blue-green releases. The previous version keeps running for thir
 
 It restarts every night at 02:00 UTC because of a known memory leak in the PDF renderer; the restart was chosen over a fix because the renderer is a vendored library the team does not maintain. The on-call rotation is managed in PagerDuty under the schedule named payments-primary, and pages go to the Payments team channel first.
 
-Backups of the billing database run hourly and are kept for fourteen days. Restores are tested every quarter by the platform team, who own the backup tooling.
+Backups of the billing database run hourly and are kept for fourteen days. Restores are tested every quarter by the platform team, who own the backup tooling. Never restore a backup over the production billing database, because it overwrites invoices issued since the backup.

@@ -693,6 +693,11 @@ func (r *recAgent) Finalize(ctx context.Context, in importer.FinalizeInput) (imp
 	return r.inner.Finalize(ctx, in)
 }
 
+// Merge passes through: the runner never calls it; the recorder satisfies importer.Agent.
+func (r *recAgent) Merge(ctx context.Context, in importer.MergeInput) (importer.MergeOutput, error) {
+	return r.inner.Merge(ctx, in)
+}
+
 func (r *recAgent) fill(rec *runRecord) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

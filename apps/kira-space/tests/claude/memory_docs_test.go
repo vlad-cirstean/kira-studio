@@ -16,7 +16,7 @@ import (
 // TestMemoryMcpFollowsDocs has the real claude use the kira-memory server from goal-only prompts,
 // so the server instructions and tool docs alone must steer it: each stored item carries a reason,
 // origin and scope, a docs folder goes by path with no read of its content, and a request to
-// condense a file goes to distill by path, again with no read of the file. A code comment stays a
+// condense a file goes to ingest_files with distill true and the path, again with no read of the file. A code comment stays a
 // plain comment that cites the stored fact by id, with no asComment call.
 func TestMemoryMcpFollowsDocs(t *testing.T) {
 	app := newRealApp(t)
@@ -40,7 +40,7 @@ func TestMemoryMcpFollowsDocs(t *testing.T) {
 		}},
 	}})))
 	var memTools []string
-	for _, n := range []string{"store_memory", "search_memories", "memory_history", "memory_context", "ingest_files", "ingest_status", "distill"} {
+	for _, n := range []string{"store_memory", "search_memories", "memory_history", "memory_context", "ingest_files", "ingest_status"} {
 		memTools = append(memTools, "mcp__"+memoryServer+"__"+n)
 	}
 
@@ -165,19 +165,20 @@ func TestMemoryMcpFollowsDocs(t *testing.T) {
 			"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", tools,
 			"--output-format", "stream-json", "--verbose")
 		msgs := parseStream(out)
-		uses := toolUses(msgs, "mcp__"+memoryServer+"__distill")
+		uses := toolUses(msgs, "mcp__"+memoryServer+"__ingest_files")
 		if len(uses) == 0 {
-			t.Fatalf("no distill tool use in the stream:\n%s", tail(out, 1500))
+			t.Fatalf("no ingest_files tool use in the stream:\n%s", tail(out, 1500))
 		}
 		var in struct {
-			Path string `json:"path"`
-			Text string `json:"text"`
+			Distill bool     `json:"distill"`
+			Paths   []string `json:"paths"`
+			Text    string   `json:"text"`
 		}
 		if err := json.Unmarshal(uses[0].Input, &in); err != nil {
 			t.Fatal(err)
 		}
-		if in.Path != notes || in.Text != "" {
-			t.Errorf("distill input = %s, want path %s and no text", uses[0].Input, notes)
+		if !in.Distill || len(in.Paths) != 1 || in.Paths[0] != notes || in.Text != "" {
+			t.Errorf("ingest_files input = %s, want distill true, path %s and no text", uses[0].Input, notes)
 		}
 		if got := toolUses(msgs, "mcp__"+memoryServer+"__store_memory"); len(got) != 0 {
 			t.Errorf("claude stored memory in a distill request: %s", got[0].Input)
