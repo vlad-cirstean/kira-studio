@@ -1,0 +1,111 @@
+slug	run	line	class	text
+v1.3-g5	before	0	keep	v1.3 G5 scope: refs/tags/branches, checkout with the Go pre-flight engine, revert, linked-worktree detection, in-progress banner, undo slot.
+v1-p16	before	0	marker	Phase P16 is a batch of user-directed misc fixes surfaced after P15 shipped, grouped into one phase rather than reopening P1/P9/P10/P11/P14.
+v1-p16	before	1	keep	P16 adds an explicit per-connection preconnect-mode checkbox that overrides P11's settle-window auto-detection.
+v1-p16	before	2	keep	P16 adds a connection-kind icon picker and a click-to-open connection-error popover.
+v1-p16	before	3	keep	P16 gives scripts/demo-dbs/ full six-engine coverage.
+v1-p16	before	4	keep	P16 fixes two font-family bugs and adds testcontainers preset packages for Postgres, MariaDB and Redis.
+v1.1-p16	before	0	keep	Each database/queue adapter gets an on-demand compatibility suite, not run in the regular CI/test run, that runs the adapter's existing conformance tests against the oldest and newest server image its Go client library actually supports.
+v1.1-p16	before	1	keep	The connection-add UI shows a note per connection kind stating its minimum supported server version.
+v1.1-p16	before	2	keep	The compatibility suite exists because development against one pinned test-fixture version never catches version-boundary bugs; it is cheap to build once the adapters are stable.
+v2.0-p181	before	0	keep	Studio stores the whole connection URI encrypted (opaque) under cipher scope connection-uri, replacing the refused-keys handling, because sslpassword, tlsCertificateKeyFilePassword and proxyPassword still landed as plaintext in stored URIs on some paths.
+v2.0-p181	before	1	keep	Already-stored URIs are not migrated, because nobody else uses the app; old plaintext rows fail loudly, and the stripping code and startup migration were removed.
+v2.0-p181	before	2	keep	SecretsRepo.GetURI is the only reader of the stored connection URI, and summaries carry uri: null.
+v2.0-p181	before	3	keep	The default view shows the connection URI fully masked and no screen derives display from it; the connection name is what shows.
+v2.0-p181	before	4	keep	A Show button decrypts the URI for viewing and editing, reusing the existing password-reveal flow; Save re-encrypts it. Show and Copy URI go through the gated reveal.
+v2.0-p181	before	5	marker	P181's acceptance criteria require the URI-encryption decision in docs/ARCHITECTURE.md (marked Done); its plan is plans/P181-studio-uri-encryption.md.
+v1.7-m1	before	0	keep	The v1.7 M1 local DB MCP server is a new Go MCP server, sibling to internal/repomap, reusing its transport pattern (go-sdk/mcp, loopback-only streamable HTTP) but with its own process, port and tool set.
+v1.7-m1	before	1	keep	The DB MCP server's tools are list_connections, list_databases, list_schemas, describe_table and run_query.
+v1.7-m1	before	2	keep	The metadata tools (list_databases, list_schemas, describe_table) route through the existing apps/kira-studio/internal/adapters/* layer, with no new metadata path.
+v1.7-m1	before	3	keep	run_query executes through the same adapter query path the console UI uses.
+v1.7-m1	before	4	keep	The DB MCP server authenticates with a static bearer token with a 7-day expiry that rotates.
+v1.7-m1	before	5	keep	Token expiry/rotation is built directly into internal/mcpauth, not a sibling package, so the DB server's token and the repo-map server's token use the same mechanism.
+v1.7-m1	before	6	keep	By explicit instruction, the repo-map server's currently non-expiring token gains the identical 7-day rotation, not a second scheme.
+v1.7-m1	before	7	keep	A client whose token has lapsed must see a distinct, actionable error, not a generic 401.
+v1.7-m1	before	8	keep	The M1 plan designs the rotation trigger (auto-remint on expiry vs. manual remint, and whether it differs between the two servers), plus the DB server's start/stop lifecycle and the storage-root question (share KIRA_HOME with repo-map or use a distinct root).
+v1.7-m1	before	9	keep	The DB MCP server is the first phase of the v1.7 chapter: all later phases (permissions, EXPLAIN, Faker, anonymization) extend its tool set or query path, so nothing else can start before it exists.
+v1.7-m1	before	10	keep	The DB MCP server implementation lands as part of M1ab.
+v2.2-p212-part-1	before	0	keep	P212 added a read-only mobile web app (Vue agents module with mobile layout) served by a local web server in Kira Space.
+v2.2-p212-part-1	before	1	keep	The P212 mobile web scope is three tabs: Backlog, Need You, Plan (narrowed by the user).
+v2.2-p212-part-1	before	2	keep	The mobileweb server allowlist is GET only plus POST /api/pair.
+v2.2-p212-part-1	before	3	keep	Mobile web auth (per-device cookie token, csrfGuard, route table) is built so adding a write endpoint takes one route-table row.
+v2.2-p212-part-1	before	4	keep	The P212 mobile web has no terminal/PTY attach.
+v2.2-p212-part-1	before	5	keep	First load of the mobile web requires device approval in Kira Space, like the git extension pairing.
+v2.2-p212-part-1	before	6	keep	The PWA and local CA added in P212 were removed in P223.
+v2.2-p212-part-1	before	7	trivia	The four Settings dialog snapshots in test:visual:space differ because the nav gained a "Mobile access" row. Baselines were not regenerated because of sandbox fonts and must be regenerated on the reference machine.
+v2.2-p212-part-1	before	8	keep	Design facts for the mobile agents web are in docs/ARCHITECTURE.md under "Mobile agents web (P212, Kira Space)".
+v2.2-p212-part-1	before	9	keep	The P212 Part 2 amendment plans backlog add and reorder, TUI input for stuck agents, start/next/prev workflow stage, and phone attach of the Claude Code terminal (desktop shows disconnected plus a reconnect button).
+v1.2-p15	before	0	keep	P15 part 1 of the request builder UX pass is the presentation half, covering eight of the twelve user-reported items; the editor-behaviour half is split out as P15b.
+v1.2-p15	before	1	keep	The response panel, including chrome and pane switcher, is present from the moment a request tab opens, not only after a first send.
+v1.2-p15	before	2	keep	A status code's meaning is shown on its own always-visible line, not a truncatable caption plus a hover.
+v1.2-p15	before	3	keep	The Studio/Api mode-switch buttons are sized up to the app's own tab metrics and render the icon that modes.ts has declared unused since P1.
+v1.2-p15	before	4	keep	.p-input is inline-flex, so a TextField is about 20 characters wide wherever placed unless its call site says otherwise; this is the root cause of the headers/params/form-data table fields not filling their cells and of the URL field never growing.
+v1.2-p15	before	5	keep	A new shared Checkbox primitive matching the app's design system replaces all fourteen raw checkbox input call sites app-wide, Studio included, because primitives already live in the shared theme layer (AppButton, TextField, SegmentedControl are precedent).
+v1.2-p15	before	6	keep	JSON is promoted to its own top-level body mode as a UI-level promotion over unchanged code+codeLanguage storage, not a new wire/Go/Postman vocabulary and not a data migration.
+v1.2-p15	before	7	marker	A body-present indicator on a request's tab is added via a new optional badge() member on the tab-kind registry, which answers what P4 D15 declined.
+v1.2-p15	before	8	keep	The toolbar is reflowed so Save sits with the request's name in the view head and the URL field takes the row.
+v1.2-p15	before	9	marker	P15 part 1 is sequenced after P12/P13 so it refines a surface already in its final module shape and design-system pass, rather than polishing files about to be renamed or restyled.
+v1.2-p15	before	10	keep	P15 is split from P15b because the halves fail differently, P15b opens with a packages/api-core foundation commit unrelated to these eight fixes, and this half touches Studio (nine checkbox call sites and the title bar) so one review pass carries that risk.
+v1.2-p15	before	11	keep	The plan for P15 is in plans/P15-request-builder-ux.md.
+v1.8-p90	before	0	keep	The Api module has seven request settings, configurable globally in Settings and per request (overriding the global): httpVersion, requestTimeoutMs, maxResponseMb, sslVerify, followRedirects, maxRedirects, disableCookieJar.
+v1.8-p90	before	1	keep	Api setting defaults: HTTP version 2, request timeout 0 (none), max response size 50 MB, SSL verification on, follow redirects on, max redirects 10, disable cookie jar on.
+v1.8-p90	before	2	marker	Go's httpclient.Send takes an all-pointer Options struct (nil means default) instead of reading package constants.
+v1.8-p90	before	3	keep	resolveSendOptions/orGlobal in bridge/http.go resolve a request's seven null-means-inherit tab-state leaves against the global settings row before every send.
+v1.8-p90	before	4	keep	Setting sslVerify to false shows a plain-prose security warning verbatim from the plan, per CLAUDE.md's carve-out for that class of text.
+v1.8-p90	before	5	keep	Cookies use one process-wide publicsuffix-keyed cookiejar.Jar, with a throwaway per-send jar for incognito.
+v1.8-p90	before	6	keep	Response has SentCookies and ReceivedCookies, taken from the trace's WroteHeaderField hook and every hop's own Set-Cookie.
+v1.8-p90	before	7	keep	The request and response Cookies panes reuse one CookiesPane.vue component; request mode shows what the jar would send next (debounced on URL change and after every send), response mode shows sent/received grouped by hop.
+v1.8-p90	before	8	keep	Secrets in the new cookie response fields are masked by maskSecrets, with two new loops, like every other response field.
+v1.8-p90	before	9	keep	Grow-field sizing bug: the user-agent padding of 2px on the textarea was absent from the sizing replica; fixed by matching it.
+v1.8-p90	before	10	keep	A grid item's normal alignment resolves to start, not stretch, for a replaced box with intrinsic size (a textarea via rows), so the grow textarea stayed 1 row tall and scrolled; fixed with align-self: stretch.
+v1.8-p90	before	11	keep	The overlay never painted on a grow textarea because the selector input.has-overlay didn't match a textarea; widened to input.has-overlay, textarea.has-overlay, plus line-height: inherit so overlay lines match the textarea's.
+v1.8-p90	before	12	trivia	The container has no display, so the Playwright ui project is the repo's established substitute for GUI-driven checks.
+v1.9-p98	before	0	keep	P98 is prep only: it adds shadcn-vue, Tailwind CSS, VueUse, Pinia and TanStack Query as standing dependencies with minimal bootstrap wiring, and migrates no existing .vue file.
+v1.9-p98	before	1	marker	Every future phase's planning pass must adapt its design to lean on the P98 libraries (e.g. new UI styling goes through Tailwind, not custom CSS) rather than hand-roll equivalents; CLAUDE.md states this.
+v1.9-p98	before	2	keep	Every Vue component must use script setup lang="ts" (Composition API only, no Options API).
+v1.9-p98	before	3	keep	Pinia stores follow single-responsibility: one store, one concern, never a grab-bag app-wide store.
+v1.9-p98	before	4	marker	P98 lands the dependency and convention baseline before migration so P99 migrates onto libraries already wired and configured instead of doing setup and migration in one pass.
+v1.9-p98	before	5	keep	VueUse (@vueuse/core) needs no bootstrap step; knip.json has an ignore entry for it.
+v1.9-p98	before	6	keep	state/pinia.ts exports the single createPinia() instance, and main.ts registers Pinia and the TanStack Query plugin before directive/mount.
+v1.9-p98	before	7	keep	The shared QueryClient in state/queryClient.ts uses retry: false and refetchOnWindowFocus: false, because every query resolves over the Wails bridge to the local Go process, never the network.
+v1.9-p98	before	8	keep	The @ alias maps to ./src in both vite.config.ts resolve.alias and tsconfig.json compilerOptions.paths; existing source keeps relative imports, and @/ is for shadcn-vue's generated import specifier.
+v1.9-p98	before	9	keep	shadcn-vue is configured with reka-ui base, nova style, neutral base color, lucide icons and CSS variables; components.json, src/lib/utils.ts and src/theme/shadcn-bridge.css were hand-authored.
+v1.9-p98	before	10	keep	Every shadcn-vue variable in src/theme/shadcn-bridge.css maps to an existing --kira-* token, and base.css imports the bridge after ./vscode-bridge.css.
+v1.9-p98	before	11	keep	The shadcn bridge has no .dark block because tokens.css is a single :root and index.html hardcodes class="dark".
+v1.9-p98	before	12	keep	The icon dependency is @lucide/vue 1.47.0, not lucide-vue-next, per the real registry response.
+v1.9-p98	before	13	trivia	bunx shadcn-vue@2.8.2 init fails in the sandbox with a bare TypeError: fetch failed because ofetch passes a real undici ProxyAgent as dispatcher to the runtime's own global fetch, under both Bun and Node 22.22.2 (with NODE_USE_ENV_PROXY=1).
+v1.9-p98	before	14	guard	Never unset HTTPS_PROXY to work around proxy fetch failures, because docs/DEV_ENVIRONMENT.md says this is never the fix.
+v1.9-p98	before	15	keep	shadcn-vue 2.8.2 does not support the --dry-run, --diff or --view options.
+v1.9-p98	before	16	keep	The app has 39 reactive() modules and 200 .vue files that P99 will migrate onto the new libraries.
+v2.0-p131-part-2	before	0	keep	P131 Part 2 moved git-ui's App.vue and every non-dialog, non-review components/*.vue onto shadcn-vue; the plan is docs/v2.0/plans/P131-part2-git-graph.md.
+v2.0-p131-part-2	before	1	keep	badgeVariants lives in a .vue-free module in the theme package so that bun test can import it; git-ui defines it in badgeClass.ts.
+v2.0-p131-part-2	before	2	keep	AttributeTooltip and TooltipAnchorBridge were hoisted from workbench into packages/theme/src/components/; workbench AttributeTooltip.vue and state/tooltip.ts were removed. Studio's SlickGridHost.vue import was updated, and it is wired in git-ui's CommitGrid, CommitMeta, FileTree and BranchPicker.
+v2.0-p131-part-2	before	3	keep	AttributeTooltip opens on keyboard focus as well as hover.
+v2.0-p131-part-2	before	4	keep	The grid tooltip attribute was renamed from data-kui-tip to data-kira-tip; git-ui scope uses only data-kira-tip (written by refBadges.ts and list-row components).
+v2.0-p131-part-2	before	5	keep	git-ui owns its own lib/cn.ts, lib/rowVariants.ts and lib/menuModel.ts, with menuModel.test.ts moved there. Part-2-scope files no longer import these from kira-ui.
+v2.0-p131-part-2	before	6	keep	git-ui's mount() wraps both roots in a TooltipProvider, via MountRoot.vue.
+v2.0-p131-part-2	before	7	keep	Row context menus (MenuSections.vue, RowContextMenu.vue) use reka DropdownMenu with the prioritize-position prop on DropdownMenuContent, because reka's Popper runs shift before flip by default and a 0×0 point anchor lets shift clamp overflow to zero, starving flip of a signal.
+v2.0-p131-part-2	before	8	keep	In App.vue, onClickOutside takes a third argument { ignore: ['[data-reka-popper-content-wrapper]'] }, which stops the force-delete Popover's outside-click from firing the detail-region's dismiss handler.
+v2.0-p131-part-2	before	9	keep	The force-delete confirmation in App.vue is a reka Popover that dismisses on outside-click or Escape; the old hand-rolled popup never did.
+v2.0-p131-part-2	before	10	keep	app-shell.css was deleted after FileTree moved onto shadcn controls made its raw-checkbox rule unused; the remaining app-shell hits are a doc comment in main.ts:116 and unrelated Go files apps/*/internal/appshell/menu.go.
+v2.0-p131-part-2	before	11	keep	Ref badges in refBadges.ts use badgeVariants; REF_BADGE_CLASS and refBadgeClass live in refBadges.ts, and refBadges.test.ts runs under bun test.
+v2.0-p131-part-2	before	12	guard	In concurrent sessions sharing one checkout, commit with an explicit pathspec (git commit -m msg -- files). Never use git add -A or git add . Use a scoped git stash push -u -- <path>, never a bare git stash.
+v2.0-p131-part-2	before	13	keep	Only KuiColumnResizeHandle is still imported from @kira/kira-ui in git-ui scope (App.vue and CommitGrid.vue).
+v2.0-p131-part-2	before	14	keep	The remaining kira-ui residue in git-ui main.ts is the vKuiTooltip import, the 'kui-tooltip' directive registration and the kui-bridge.css import; Review still uses the directive until Part 3 moves it off kira-ui.
+v2.0-p131-part-2	before	15	keep	git-ui adds no wrapper layer over shadcn components: no defineComponent, no non-setup script blocks, no Git*Button-style files.
+v2.0-p131-part-2	before	16	keep	In RowContextMenu, the @contextmenu listener lives on RowActionsButton, not on the row's own checkout button.
+v2.0-p131-part-2	before	17	keep	Search Escape handling is two-stage: first Escape dismisses the dropdown and keeps the query, second Escape clears the query and closes.
+v2.0-p131-part-2	before	18	trivia	The fakeGraphHost.ts test harness does not vary --vscode-* variables between body.vscode-dark and body.vscode-light, so identical host-token readings in both themes are expected.
+v2.0-p131-part-2	before	19	trivia	Some space and studio UI specs (ade-module, cell-editor, mode-switch, slick-grid) fail intermittently in full-suite runs from sandbox worker contention timeouts and pass when re-run with --workers=1; this is a documented flake class, not a regression.
+v2.0-p131-part-2	before	20	keep	apps/kira-studio/frontend has no dependency on @kira/git-ui; the P131 change to SlickGridHost.vue is only an import-path rename plus a comment update.
+v2.0-p131-part-2	before	21	trivia	fakeGraphHost.ts's fixture never sets capabilities.write in its app.init response, so write-gated UI (inline rename, worktree-remove dialog in App.vue/BranchPicker.vue) is unreachable from it.
+v2.0-p131-part-2	before	22	keep	fakeGraphHost.ts never mocks commit.detail (only fakeReviewHost.ts does, for the /review route), so DetailState.detail never resolves on /graph and CommitMeta/FileTree content under v-if="detail" never mounts.
+v2.0-p131-part-2	before	23	marker	commit-meta-clamp.spec.ts uses its own dedicated commitMetaHarnessServer.ts mount instead of fakeGraphHost.ts because fakeGraphHost.ts does not mock commit.detail.
+v2.0-p131-part-2	before	24	trivia	The sandbox has no real VS Code install or display, so the real-VS Code check is left to the user.
+v2.0-p131-part-2	before	25	trivia	Kira Space live check uses the built-test-app form: apps/kira-space/tests/ui/fixtures.ts's relaunch plus a bootMultiBranchGraph-shaped scratch spec using graphStreamFixture.ts's buildMultiBranchChunk/buildMultiBranchRefsList.
+v2.0-p131-part-2	before	26	keep	installGitStreamMock's extraResults mocks commit.detail, so Kira Space tests can render real CommitMeta content in the detail pane.
+v2.0-p131-part-2	before	27	keep	The search toggle Button's color is rgb(157, 157, 157) under Kira Space's unprefixed --kira-* root and rgb(204, 204, 204) in the webview's --kv-* bridge; the difference is intentional because the two hosts' token tables are distinct.
+v2.0-p131-part-2	before	28	trivia	graphStreamFixture.ts's minimal refs.list fixture renders zero .kv-badge, so App.vue's branch-tip-to-badge overlay needs more than that fixture wires; this is a fixture gap, not a regression.
+v2.0-p131-part-2	before	29	guard	A standalone Playwright config outside the real test trees cannot resolve @playwright/test's module graph, so scratch live-check specs must be placed temporarily inside apps/kira-space-vscode/tests/interaction/ or apps/kira-space/tests/ui/ and deleted afterward.
+v2.0-p131-part-2	before	30	trivia	The Graph > Font size setting at a non-default value was not live-checked in P131 Part 2; CommitGrid.vue's font-size-tracking rule is pre-existing and untouched.
+v2.0-p131-part-2	before	31	trivia	The P131 Part 2 push was refused non-fast-forward because origin/claude/unfinished-phases-ru3wo4 had a concurrent P135 planning commit; the fix was a fresh branch from origin's tip with the four phase commits cherry-picked, pushed as a fast-forward.
