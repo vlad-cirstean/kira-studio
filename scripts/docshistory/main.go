@@ -4,17 +4,20 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
 )
 
-const usage = `usage: docshistory <units|render|verify|repoint> [flags] <chapter...>
+const usage = `usage: docshistory <units|distill|render|verify|repoint|fold> [flags] <chapter...>
   units    print the unit list and sizes (no tokens)
+  distill  distill each unit through the memory MCP ingest_files (costs tokens, resumable)
   render   write the chapters' blocks into the history file
   verify   write a sample report to check decisions survived
-  repoint  rewrite docs/<chapter>/ references in the rest of the repo`
+  repoint  rewrite docs/<chapter>/ references in the rest of the repo
+  fold     distill, render and verify`
 
 func main() {
 	if len(os.Args) < 2 {
@@ -39,6 +42,10 @@ func run(cmd string, args []string) error {
 	runs := fs.String("runs", "docs/v2.6/plans/P299-runs", "runs directory")
 	history := fs.String("history", "docs/HISTORY.md", "history file")
 	only := fs.String("only", "", "comma-separated unit slugs")
+	binary := fs.String("binary", "", "prebuilt kira-space binary (default: build one)")
+	jobs := fs.Int("jobs", 3, "concurrent units")
+	maxUSD := fs.Float64("max-usd", 0, "stop starting units when charged plus in-flight estimates would pass this (0 = no cap)")
+	retryFall := fs.Bool("retry-fallback", false, "rerun fallback units")
 	sampleN := fs.Int("sample", 12, "verify sample size")
 	out := fs.String("out", "docs/v2.6/plans/P299-verify.md", "verify report path, - for stdout")
 	dry := fs.Bool("dry-run", false, "repoint: report without writing")
@@ -64,12 +71,22 @@ func run(cmd string, args []string) error {
 	switch cmd {
 	case "units":
 		return cmdUnits(chapters, onlySet)
+	case "distill":
+		return runDistill(context.Background(), distillOpts{runs: *runs, binary: *binary, jobs: *jobs, maxUSD: *maxUSD, retryFall: *retryFall, only: onlySet}, chapters)
 	case "render":
 		return cmdRender(*runs, *history, chapters)
 	case "verify":
 		return cmdVerify(*runs, *out, *sampleN, chapters)
 	case "repoint":
 		return cmdRepoint(*runs, *dry, chapters)
+	case "fold":
+		if err := runDistill(context.Background(), distillOpts{runs: *runs, binary: *binary, jobs: *jobs, maxUSD: *maxUSD, retryFall: *retryFall, only: onlySet}, chapters); err != nil {
+			return err
+		}
+		if err := cmdRender(*runs, *history, chapters); err != nil {
+			return err
+		}
+		return cmdVerify(*runs, *out, *sampleN, chapters)
 	}
 	return fmt.Errorf("unknown command %q\n%s", cmd, usage)
 }
