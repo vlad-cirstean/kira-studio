@@ -1118,85 +1118,35 @@ Unrelated to G1 itself, but found and cleaned up in the same session.
 
 ### 2.5 P58a M2 — chunk wire-encoding: Go base64 vs the Node engine's index-keyed JSON
 
-**Status: measured, re-taking the P52-P57 row's ~11x/48x figures against a controlled fixture, as
-P58 §1.4 and P58a §4.6 required of M2.** Both producers still exist in this phase — the Go codec
-(`apps/kira-studio/internal/page.Chunk`, P58 D5) and the Node engine's plain `JSON.stringify` of a
-`TextColumnChunk`'s typed arrays (`stdio-main.ts`'s `writeFrame`) — so this is the one window in
-the whole P58 migration where a like-for-like measurement is cheap, per the plan's own note.
+Controlled re-take of the P52-P57 ~11x/48x figures (P58 §1.4, P58a §4.6), while both producers still
+existed. Fixture, identical on both sides: a 2000-row `TextColumnChunk`, 49-byte ASCII value per
+non-NULL row, 1 row in 97 NULL, 1 in 53 truncated; raw size **103,394 bytes**. Throwaway programs,
+not committed.
 
-**Fixture, identical on both sides:** a 2000-row `TextColumnChunk` built the same way in Go and
-Node — a fixed 49-byte ASCII value per non-NULL row, 1 row in 97 NULL, 1 row in 53 marked
-truncated. Underlying (unencoded) size: **103,394 bytes** (`data` + `offsets`×4 + `nulls` +
-`truncated`×4) — close enough to "100 KB" to match the figure it replaces, and reproducible from
-the throwaway measurement programs this row was taken from (not committed to the repo, per this
-phase's own "no product code lands in M0/M2 measurement work" convention — the `Chunk`/`Uint32LE`
-encoding logic exercised is a verbatim copy of the real `apps/kira-studio/internal/page` code).
+| Encoding | Wire bytes | Ratio to raw | Transient heap (one encode call) |
+|---|---|---|---|
+| Go, base64 of exact LE bytes (D5) | 137,914 | **1.334x** | 709,312 B (6.86x) |
+| Node engine, index-keyed JSON object | 1,124,081 | **10.872x** | 4,232,600 B (40.9x) |
 
-**Wire bytes** (`len(json.Marshal(chunk))` in Go; `Buffer.byteLength(JSON.stringify(chunk), 'utf8')`
-in Node, `node --expose-gc`, v22.22.2):
-
-| Encoding | Wire bytes | Ratio to raw |
-|---|---|---|
-| Go, base64 of exact LE bytes (D5) | 137,914 | **1.334x** |
-| Node engine, index-keyed JSON object | 1,124,081 | **10.872x** |
-
-Both numbers land almost exactly on the figures they replace (P58 §1.4 predicted ~1.33x and ~11x)
-— this is a confirmation against a controlled fixture, not a new finding.
-
-**Transient heap for the one encode call.** The two runtimes don't expose the same instrument, so
-this is the closest matched pair available, stated with what each one actually measures: Go's
-`runtime.MemStats.TotalAlloc` delta across the single `json.Marshal` call (bytes the allocator
-handed out during that call, most of it reclaimed by the next GC); Node's `process.memoryUsage()
-.heapUsed` delta across the single `JSON.stringify` call, taken immediately after a forced
-`global.gc()` baseline (bytes still resident on the JS heap right after the call, before the next
-collection).
-
-| Encoding | Transient heap bytes | Ratio to raw |
-|---|---|---|
-| Go, base64 | 709,312 | 6.86x |
-| Node engine, index-keyed JSON | 4,232,600 | **40.9x** |
-
-The wire-side comparison (1.33x vs 10.87x) is the one D5 was decided on and reproduces cleanly.
-The heap side confirms the same direction and a similar order of magnitude to the ~48x figure it
-replaces, but the two numbers aren't the same instrument measuring the same call shape as
-whatever produced the original 48x, so treat 40.9x as this fixture's own honest number rather than
-a reproduction of that exact figure. Go's own 6.86x isn't "6.86x worse than raw" in a way that
-matters at runtime — `json.Marshal`'s base64 encoder allocates one intermediate string plus the
-final byte slice, both short-lived, against a Node engine that additionally builds and then walks
-a ~2000-entry-per-buffer JS object graph.
+The wire comparison is the one D5 was decided on and reproduces the predicted ~1.33x/~11x. The heap
+row confirms direction and order of magnitude of the old ~48x, but the two runtimes expose different
+instruments (`runtime.MemStats.TotalAlloc` delta versus `heapUsed` after a forced GC), so 40.9x is
+this fixture's own number, not a reproduction.
 
 ### L2 cache note (D19)
 
-L2's 64 MB default budget and its `> budget / 2` no-cache refusal rule (a single page whose byte
-size exceeds half the budget is never cached, so one huge page can't evict the whole cache) are
-both unchanged — both are §7-mandated and already user-adjustable via Settings → Cache. The
-refusal rule has a real consequence worth knowing: at page size 10 000 rows on a wide table, a
-single page can exceed 32 MB and is then never cached at all, regardless of how much budget
-headroom exists. The user's lever for this is the cache budget input in Settings → Cache.
+L2's 64 MB default budget and its `> budget / 2` no-cache refusal rule (one page larger than half the
+budget is never cached, so it cannot evict everything) are unchanged and user-adjustable in Settings →
+Cache. Consequence: at page size 10 000 rows on a wide table, one page can exceed 32 MB and is then
+never cached, whatever the headroom.
 
 ### 2.6 P4 — page-encode cost, and what the successor binary envelope would additionally buy
 
-**Status: measured, on this tree, before and after `perf(page): encode a page without the nested
-json.Marshal round trips`.** §2.5 measured base64's wire-size cost against raw bytes. This section
-measures a different cost on the same codec: the CPU and allocation `internal/page`'s own encoder
-spent getting there — `encoding/json` calling each page's `MarshalJSON` and `Uint32LE`'s
-`MarshalJSON`, then re-scanning (`compact`) the bytes each one returned into the outer buffer — and
-what removing those two round trips bought, byte-for-byte identically. Full findings, the off-the-
-shelf alternatives weighed against these numbers, and the recommendation are
-`docs/HISTORY.md (v1.1 P4)`'s F10-F21 and §4; this section is that plan's
-§8.4 re-run, not a copy of its own measurements.
-
-**Method.** Four fixtures — the two configurable page sizes, the maximum page size, and a wide
-worst case — built through a verbatim copy of the real `internal/page` codec (`internal/` can't be
-imported outside the module, so a copy is the only way to measure it from a throwaway program; this
-is the P58a M2 / §2.5 convention, and nothing here is committed to the repo). The timed unit is the
-real production call, `json.Marshal(wireResponse{Kind:"res", ID, OK:true, Payload:
-ReadResponse{Page, Source}})` — `adapterhost/dataframe.go`'s exact `respond` expression, not a bare
-chunk. Allocation is `runtime.MemStats.TotalAlloc` delta. Each figure below is the median of
-dozens-to-hundreds of in-process repetitions (300 for the smallest fixture down to 5 for the
-largest, chosen so the total run time per fixture stays in the same ballpark) rather than three
-separate process launches — a noisier instrument at the largest fixture (GC pressure varies run to
-run) but a steadier one at the smallest, and the allocation ratio is stable either way.
+Cost of the JSON+base64 encoder itself, before and after `perf(page): encode a page without the
+nested json.Marshal round trips`, wire bytes unchanged. Timed unit: `json.Marshal(wireResponse{...})`,
+`adapterhost/dataframe.go`'s exact `respond` expression, via a verbatim copy of `internal/page`
+(median of 5-300 in-process repetitions; allocation is the `TotalAlloc` delta). Full findings:
+`docs/HISTORY.md (v1.1 P4)`.
 
 | Fixture | Wire bytes | Before | After | Speedup | Alloc/wire ratio, before → after |
 |---|---|---|---|---|---|
@@ -1205,84 +1155,28 @@ run) but a steadier one at the smallest, and the allocation ratio is stable eith
 | 10,000 × 12 | 4,462,372 | 32.0 ms / 11.9 MB | 4.38 ms / 4.83 MB | 7.3x | 2.67x → 1.08x |
 | 10,000 × 40 | 35,985,413 | 448 ms / 113.1 MB | 30.7 ms / 36.0 MB | 14.6x | 3.14x → 1.00x |
 
-**Every wire-byte count is identical before and after** — the measurement program asserts this
-directly (a wire-byte mismatch would abort the run rather than print a row) — confirming across all
-four fixtures what the P4 plan's own §8.3 proved on eight edge cases (each of the four page kinds,
-an empty result set, a NULL-only column, and — the one case that fails silently rather than loudly
-if fudged — a page with no truncated rows at all, since a nil `[]byte` marshals as `null` where a
-non-nil empty one marshals as `""`, and `port.ts`'s `toTypedArray` hands that straight to
-`Uint8Array.fromBase64`). The wall-clock speedup (7-15x here; the P4 plan's own run on different
-hardware saw 6-12x) isn't the number to lean on given GC noise at the larger sizes; the allocation
-ratio is the steady result, converging from paying 2.4-3.1x the frame's own size in transient
-allocation down to almost exactly 1.00x — one buffer, no intermediate copies.
+Wire bytes are identical before and after on all four fixtures (the program aborts on a mismatch).
+Lean on the allocation ratio, not the wall-clock speedup (GC noise at large sizes): transient
+allocation fell from 2.4-3.1x the frame size to almost exactly 1.00x.
 
-**What base64 itself still costs, and what a binary envelope would additionally buy — unaffected by
-this change, so not re-measured here.** This commit doesn't touch a single byte on the wire, so
-the P4 plan's own wire-size, gzip, and frontend-decode measurements (its F12 and F13) carry over
-unchanged: base64 inflates the wire by **1.33-1.36x** over raw bytes and that inflation **survives
-gzip at roughly the same ratio** (a fixed 4:3 alphabet expansion of already-high-entropy bytes is
-not redundancy a compressor finds), and the frontend's decode pass — `TextDecoder.decode` →
-`JSON.parse` → `reviveChunks`'s base64-to-typed-array materialization — costs **0.2-38 ms per page
-view** under a JavaScriptCore proxy for the app's real WKWebView, scaling with frame size because
-every buffer of every column is copied into a fresh typed array before the first cell is read. A
-binary envelope replacing that copy with a zero-copy view over the received bytes would remove that
-whole pass (down to 0.02-0.14 ms in the same plan's measurement) and the 25-33% of wire bytes base64
-adds — genuine remaining costs this commit doesn't touch. The P4 plan's recommendation (§4, R5) is
-to specify that envelope now (§5) and build it only when one of three named triggers fires — a
-budget regression with frame decode implicated, a page-kind or default-size change that moves the
-typical frame an order of magnitude, or an actual frontend/backend network split — because today's
-numbers, even before this commit, didn't clear that bar, and this commit closes roughly 85-90% of
-the Go-side gap to that binary envelope on its own, with no protocol change, no frontend change, and
-no fixture regeneration.
+Still unaffected by this change: base64 inflates the wire **1.33-1.36x**, surviving gzip at the same
+ratio, and the frontend decode pass (`TextDecoder` → `JSON.parse` → `reviveChunks`) costs
+**0.2-38 ms per page view** under a JavaScriptCore proxy. A binary envelope removes both. The P4 plan
+(§4, R5) specified it but deferred the build until a trigger fires (budget regression with decode
+implicated, a page-kind or default-size change, or a frontend/backend network split). This commit
+closes roughly 85-90% of the Go-side gap to that envelope.
 
 ### 2.7 P11 — the FlatBuffers data-plane measurements
 
-**Status: measured, on this tree, after `feat(protocol)!: carry data-plane responses as
-FlatBuffers instead of JSON+base64`.** §2.6 measured the JSON+base64 encoder's own CPU/allocation
-cost, holding the wire format fixed. This section is the wire-format change itself: the same four
-fixtures, encoded through the real, current FlatBuffers pipeline
-(`internal/page.EncodePage` plus `adapterhost/frame.go`'s frame assembly) and decoded through the
-real, current `packages/shared/protocol/frame.ts`'s `decodeFrame`, against the same fixtures
-encoded and decoded through the pre-change JSON+base64 pipeline at the tip of C2 (commit
-`f1efaab`, immediately before the format switch). Full findings, the off-the-shelf alternatives
-weighed against these numbers, and the decision are
-`docs/HISTORY.md (v1.1 P11)`'s §2/§3/§4; this section is that plan's §8.4
-re-run, not a copy of its own back-of-envelope measurements.
+Wire-format change: the same four fixtures through the real FlatBuffers pipeline
+(`internal/page.EncodePage` plus `adapterhost/frame.go`) and `packages/shared/protocol/frame.ts`'s
+`decodeFrame`, against JSON+base64 at `f1efaab`. Full findings: `docs/HISTORY.md (v1.1 P11)`. Fixtures
+are built with the real `internal/page` builder (12 text columns of 24-byte cells; 40 of 64-byte for
+the wide case; 1 row in 97 NULL); median of repetitions, allocation in a separate pass. Decode runs
+under Bun/JavaScriptCore, a proxy for WKWebView, not an equivalent. Nothing committed.
 
-**Method.** Four fixtures — `100 × 12`, `1,000 × 12`, `10,000 × 12`, `10,000 × 40` — built through
-the real `internal/page` builder API (`NewTabularPageBuilder`/`AppendRow`/`Finish`, unchanged by
-the format switch, P11 D7): 12 text columns of 24-byte cells (40 columns of 64-byte cells for the
-wide case), 1 row in every 97 NULL in one column. The timed unit on the Go side is each codec's
-real production call — pre-change, `adapterhost/dataframe.go`'s exact `respond` expression,
-`json.Marshal(wireResponse{Kind:"res", ID, OK:true, Payload:ReadResponse{Page, Source}})`;
-post-change, the same frame assembly `adapterhost/frame.go`'s `encodeResponse` performs for a
-`ReadResponse` payload (`page.EncodePage` then `wire.ReadResponse`/`wire.Frame`, finished with the
-`"KIF1"` file identifier). Both `wireResponse` and `encodeResponse` are unexported, so each
-program reproduces the exact call shape inline rather than importing it — a verbatim copy of a few
-lines, the P58a M2 / §2.5 convention this section also follows: nothing here is committed to the
-repo. Allocation is `runtime.MemStats.TotalAlloc` delta, timed in a separate pass from wall-clock
-(interleaving `ReadMemStats` calls into the timed loop measurably inflates the smallest fixture).
-Each figure is the median of dozens-to-thousands of in-process repetitions — 500 down to 8 on the
-Go encode side for the same reason §2.6 gave (GC pressure at the largest fixture; the allocation
-pass at `10,000 × 40` can't run hundreds of times in a reasonable session and still ran only 8),
-2,000 down to 50 on the frontend decode side, run under Bun/JavaScriptCore — **this is a proxy for
-the app's real WKWebView, not a claim that the two are identical**, repeating §2.6's own framing of
-that same instrument. Raw buffer bytes are each page's own `ByteSize` field, unchanged by the
-format (P11 D9) — the same number both codecs' overhead is measured against.
-
-**Wire bytes**, against §2.6's own before-numbers so this row is directly comparable to it (that
-section's JSON+base64 figures reproduce here within about 1.5%, the fixture-content/hardware/GC
-noise §2.6 already flagged as expected):
-
-| Fixture | Raw buffer bytes | Wire, before (JSON+base64) | Wire, after (FlatBuffers) | Change |
-|---|---|---|---|---|
-| 100 × 12 | 34,720 | 47,262 (§2.6: 46,558) | 35,000 | **-24.8%** |
-| 1,000 × 12 | 338,248 | 451,953 (§2.6: 448,081) | 338,528 | **-24.4%** |
-| 10,000 × 12 | 3,373,516 | 4,498,980 (§2.6: 4,462,372) | 3,373,784 | **-24.4%** |
-| 10,000 × 40 | 27,246,764 | 36,331,577 (§2.6: 35,985,413) | 27,247,144 | **-24.3%** |
-
-**Overhead vs raw buffer bytes** — the honest replacement for §2.5's single 1.334x, now one number
-per codec instead of one number for a format nothing else uses any more:
+**Wire bytes: -24.3% to -24.8%** at every size (e.g. 10,000 × 12: 4,498,980 → 3,373,784 against
+3,373,516 raw). **Overhead versus raw buffer bytes:**
 
 | Fixture | Before (JSON+base64) | After (FlatBuffers) |
 |---|---|---|
@@ -1291,99 +1185,38 @@ per codec instead of one number for a format nothing else uses any more:
 | 10,000 × 12 | 1.334x | **1.00008x** |
 | 10,000 × 40 | 1.333x | **1.00001x** |
 
-FlatBuffers' own per-frame overhead — the `"KIF1"` identifier, the `Frame`/`ReadResponse`/`Page`
-table wrappers, the `PagePosition`/`ColumnDescriptor` tables — is a fixed few hundred bytes that
-disappears into rounding at anything past the smallest fixture, landing within the range P11 F12's
-own untyped-builder approximation predicted (+1.7% at the default page size there, +0.8% measured
-here through the real schema on a slightly different fixture).
+The fixed per-frame overhead (`"KIF1"` identifier, table wrappers) is a few hundred bytes and
+vanishes at real page sizes.
 
-**Go encode time and `TotalAlloc` delta**, same instrument as §2.6:
+**Frontend decode:** 6x (100 × 12: 0.0650 → 0.0106 ms), 140x, 556x, **1,141x** (10,000 × 40: 41.4034
+→ 0.0363 ms). A FlatBuffers frame decodes to typed-array views over the received bytes, with no
+`JSON.parse` and no base64 materialisation.
 
-| Fixture | Wire bytes, after | Before: time / alloc | After: time / alloc | Alloc/wire ratio, before → after |
-|---|---|---|---|---|
-| 100 × 12 | 35,000 | 41.3 µs / 48.2 KB | 52.9 µs / 221.9 KB | 1.045x → **6.49x** |
-| 1,000 × 12 | 338,528 | 382.8 µs / 448.2 KB | 953.1 µs / 1.74 MB | 1.016x → **5.39x** |
-| 10,000 × 12 | 3,373,784 | 3.96 ms / 4.30 MB | 5.89 ms / 13.44 MB | 1.002x → **4.18x** |
-| 10,000 × 40 | 27,247,144 | 36.95 ms / 34.66 MB | 63.35 ms / 102.63 MB | 1.000x → **3.95x** |
+**Go encode was slower after the switch, 1.3x to 2.5x**, with allocation ratio rising from ~1.0x to
+**3.95-6.49x** the wire size. Two causes, both fixed in §2.8:
 
-**Frontend decode time**, Bun/JavaScriptCore — again, **a proxy for the app's real WKWebView, not
-a claim of equivalence**:
+- `flatbuffers.NewBuilder(0)` starts empty and grows by doubling, copying its whole backing array each
+  time. This is the dominant allocation cost, and the reason the ratio rose rather than converged.
+- The `offsets`/`truncated` `[uint]` vectors (P11 D4) were a `PrependUint32` call per element, about
+  400,000 calls at the widest fixture, which is a meaningful share of the encode-time regression.
 
-| Fixture | Decode, before (JSON+base64) | Decode, after (FlatBuffers) | Speedup |
-|---|---|---|---|
-| 100 × 12 | 0.0650 ms | 0.0106 ms | 6x |
-| 1,000 × 12 | 1.1520 ms | 0.0082 ms | 140x |
-| 10,000 × 12 | 4.4493 ms | 0.0080 ms | 556x |
-| 10,000 × 40 | 41.4034 ms | 0.0363 ms | 1,141x |
-
-**The FlatBuffers builder's own copy cost is real, and it shows up as the encode row above, not as
-a free lunch.** `CreateByteVector` is one `memcpy` of `Data` (the buffer that dominates every
-fixture here) — cheap and unavoidable, the same shape of cost base64 encoding paid too. The
-`offsets`/`truncated` `[uint]` vectors (P11 D4) are a `PrependUint32` loop instead, one function
-call per element rather than one `memcpy` — for the widest fixture here, on the order of 400,000
-individual prepends across all 40 columns, which is where a meaningful share of the encode-time
-regression above comes from. Beyond that, `flatbuffers.NewBuilder(0)` — the exact call
-`adapterhost/frame.go` makes for every response — starts from a zero-length buffer and grows it by
-doubling (`growByteBuffer`'s `make` of the extension plus the `append` that relocates the whole
-buffer into a fresh backing array, both counted by `TotalAlloc`); a from-empty builder measurably
-pays several times its own final wire size in transient allocation before it ever produces its
-first byte of useful output — confirmed directly with an isolated `CreateByteVector`-only
-`NewBuilder(0)` construction across a range of sizes, independent of anything page- or
-frame-specific, giving ratios in the same 3-6x band the table above shows. This is why the
-allocation ratio in the table above *rises* rather than converges to 1.00x the way §2.6's
-JSON-encoder optimization did — the two codecs pay a structurally different kind of cost, and
-neither of these numbers is the prize this phase was taken for. Separately, `"KIF1"` as the frame's
-own file identifier (P11 D5) means `FinishedBytes()` goes straight to `Send` with no further
-framing step: a length-prefixed header design would have needed to write that header in front of
-the already-finished buffer, which — because FlatBuffers builds back-to-front and a header can't be
-prepended in place — would have forced a second copy of the entire frame, doubling the wide
-fixture's ~27 MB `memcpy` on every single response. That copy is what D5 avoids, and it isn't
-visible in either of these two tables precisely because it never happens.
-
-**What this re-run confirms, and what is worth noting as a surprise.** The frontend decode win is
-the prize P11 was taken for, and it lands squarely in the range F15's own hand-built-envelope
-comparison predicted (0.03-0.14 ms) — the whole-frame decode pass genuinely disappears, 6x to
-over 1,000x faster depending on fixture size, because decoding a FlatBuffers frame is a handful of
-typed-array views over the already-received bytes rather than a `JSON.parse` plus a per-buffer
-base64 materialization. The wire-byte reduction (~24-25% at every size, converging toward zero
-absolute overhead as the fixture grows) matches F12's prediction just as closely. The one number
-that does *not* land where a reader might assume it would: **Go-side encode wall-clock time is
-slower after this change, not faster** — 1.3x to 2.5x slower across these four fixtures, driven by
-the allocation cost detailed above, not by anything algorithmically worse. This isn't a surprise
-against what the P11 plan itself said going in — F15 explicitly called the remaining Go-side prize
-"real but modest" and stated plainly that "this phase isn't primarily a Go-side CPU play" — but it
-is worth stating plainly here rather than leaving the encode row to be misread as a win to match
-the decode row. Nothing above changes L2's own accounting: `ChunkByteSize` still returns the
-identical number either format (§8.3's `byteSize` assertion, P11 D9), so this section's numbers are
-additive to §2.6's, not a replacement for the budget L2 already caches against.
+`"KIF1"` as the file identifier lets `FinishedBytes()` go straight to `Send`. A length-prefixed header
+cannot be prepended in place to a back-to-front FlatBuffers build, so it would copy the entire frame
+(~27 MB at the widest fixture) on every response. `ChunkByteSize` is unchanged (P11 D9), so L2
+accounting is unchanged.
 
 ### 2.8 — the Go-side encode regression, fixed
 
-§2.7 traced the regression to two things and stopped short of fixing either. Both turned out
-fixable without touching the wire format at all — same bytes on the wire, same §8.3 correctness
-proof re-run and passing (12 fixtures, including a new 500-row wide one to stress the vector path
-harder than P11's own set did), only how the Go side builds the buffer changed:
+§2.7's regression fixed without touching the wire format (same bytes, §8.3 correctness proof re-run
+on 12 fixtures including a new 500-row wide one):
 
-1. **`adapterhost/frame.go`'s builder is now sized from `page.Page.Size()`** (the same measured
-   `ByteSize` the byteSize-preservation invariant checks) instead of `flatbuffers.NewBuilder(0)`.
-   §2.7 identified this as the dominant cost — a from-empty builder growing by doubling, copying
-   its entire backing array on every doubling — and isolating it confirms that diagnosis exactly:
-   pre-sizing alone, with the old per-element vector loop still in place, already recovers the
-   *entire* allocation regression.
-2. **`internal/page/encode.go`'s `createUint32Vector` now bulk-copies** `offsets`/`truncated`
-   instead of one `PrependUint32` call per element (~400,000 calls at the widest fixture). The Go
-   FlatBuffers runtime has a bulk `CreateByteVector([]byte)` but nothing equivalent for `[]uint32`;
-   on a little-endian host (every platform this app ships or is built on) a `[]uint32`'s own memory
-   layout is already byte-identical to the wire format's little-endian vector layout, so the fast
-   path reinterprets it as `[]byte` via `unsafe.Slice`, reuses `CreateByteVector`'s single-copy
-   `Prep`+`copy`, and patches the byte-count length prefix it wrote into the element count the wire
-   format actually expects. Guarded by a runtime little-endian check with the old per-element loop
-   as a correctness fallback, not a build tag. Isolating this alone (no pre-sizing) shows it
-   contributes nothing to allocation — the doubling happens the same number of times either way —
-   but does meaningfully cut wall-clock time on its own by removing the per-element call overhead.
-
-**Combined result**, same fixtures, same methodology as §2.7 (median of repetitions, separate
-timing/allocation passes):
+1. **`adapterhost/frame.go` sizes the builder from `page.Page.Size()`** (the measured `ByteSize`)
+   instead of `NewBuilder(0)`. Alone, this recovers the entire allocation regression.
+2. **`internal/page/encode.go`'s `createUint32Vector` bulk-copies** `offsets`/`truncated`. On a
+   little-endian host a `[]uint32` already matches the wire layout, so it reinterprets the slice as
+   `[]byte` via `unsafe.Slice`, reuses `CreateByteVector`'s single copy, and patches the length prefix
+   to the element count. A runtime little-endian check falls back to the per-element loop. Alone, it
+   cuts wall-clock time but not allocation.
 
 | Fixture | §2.7 time / alloc-ratio | §2.8 time / alloc-ratio | Time speedup |
 |---|---|---|---|
@@ -1392,16 +1225,9 @@ timing/allocation passes):
 | 10,000 × 12 | 5.89 ms / 4.18x | 685 µs / **1.06x** | 8.6x |
 | 10,000 × 40 | 63.35 ms / 3.95x | 7.09 ms / **1.06x** | 8.9x |
 
-This isn't just a smaller regression — it clears the original §2.6 JSON+base64 baseline outright,
-on both axes that baseline was measured on. Against §2.6's own numbers (41.3 µs/1.045x, 382.8
-µs/1.016x, 3.96 ms/1.002x, 36.95 ms/1.000x), the fixed FlatBuffers encoder is now **5.2-7.7x faster**
-in wall-clock time at every fixture size, with an allocation ratio (1.06-1.18x) in the same band as
-JSON's own (1.00-1.05x) rather than 4-6.5x above it. Combined with §2.7's wire-byte and frontend-
-decode numbers (both unaffected by this section — the wire format didn't change), there's no
-remaining axis on which the pre-P11 JSON+base64 codec beats the current one. §2.7's own framing —
-"this phase isn't primarily a Go-side CPU play" — was right about F15's original C3 scope; this
-follow-up closes the one number that stayed a genuine regression rather than leaving it as accepted
-cost.
+This clears the original §2.6 JSON+base64 baseline: **5.2-7.7x faster** wall-clock at every fixture,
+with an allocation ratio (1.06-1.18x) near JSON's own (1.00-1.05x). No axis remains where the pre-P11
+codec beats the current one.
 
 ### 2.9 P5: the renderer's own memory
 
