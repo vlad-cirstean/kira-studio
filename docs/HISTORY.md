@@ -6104,3 +6104,371 @@ Docs are written in the terse style defined in CLAUDE.md.
 docs/ARCHITECTURE.md had its Known open items section pruned in P270.
 The remaining open items in docs/ARCHITECTURE.md are kept either for P277 or as accepted limitations.
 <!-- /chapter v2.2 -->
+
+<!-- chapter v2.5 -->
+## v2.5
+Source: docs/v2.5/ at b811de651f56. 26 phases.
+P272 (data model) is the base of P273-P276.
+Prompts go first rather than last, following the order of the user's list.
+
+### v2.5 P271 App prompts: one file, visible and editable in Settings. Today every LLM prompt is a Go string constant beside its ca... (Done.)
+All app LLM prompts are centralised in a registry of 85 entries (Space 61, Studio 33) in internal/llmprompts/registry.go.
+Prompt overrides are persisted in <home>/llm-prompts.json.
+Space and Studio each have a Prompts section in Settings, backed by LlmPromptsService, where prompts can be edited.
+The prompt registry package is named internal/llmprompts so it does not clash with internal/prompts (the P246 popup router).
+The checkprompts guard runs in bun run lint to prevent prompt strings living outside the registry file.
+User-authored text (smart-script bodies, workflow stage prompts) is excluded from the app prompt registry.
+The override store must be readable by every consumer, including the memory-mcp stdio subprocess, which runs the gate outside the app process.
+Saving a prompt in Settings validates that required template variables are present and the template parses; a prompt bound to a JSON output schema keeps its schema fixed and only its text is editable.
+Each registry entry has an id, title, owning app, purpose, default text and declared template variables; composed prompts are templates over named variables (text/template by default).
+Callers read the effective prompt through one function, with no prompt string left outside the registry file.
+Known open item: the ADE workflow graph baseline shows the Preview placeholder.
+
+### v2.5 P272 Memory data model: nanoid ids, origin, session, scope, groups. Today `memories` (`internal/memory/migrations/0001_mem... (Done.)
+Memory fact ids are nanoids with a km_ prefix at lineage level; the id cited by a comment or doc stays stable across versions of one fact (migration 0004).
+Migration 0004 gives existing memory rows km_ nanoid lineage ids; legacy ids such as <uuid>-v2 still resolve through Lineage.
+Memory origin has three states: user (user decided it, human-challenged, correct), agent (agent concluded it, reference only), and external with a required source tag such as slack or jira (correct but probably incomplete).
+The store_memory tool asks the writing agent who decided each fact; origin is required with no default.
+Memory scope is one of company (company-wide), project (with the project named), or personal (the user decided it; not binding on others).
+A memory fact can belong to groups (session, task, document, external thread or other kinds); the memory_context MCP read tool takes a fact id and returns its immediate context, the sibling facts of its groups.
+The Claude Code session that added a fact is captured from the CLAUDE_CODE_SESSION_ID environment variable, which a stdio MCP server started by claude -p --strict-mcp-config receives and which equals the run's --session-id.
+uuid.NewString is now used only for requestID and import ids; fact ids come from gonanoid in ids.go via newFactID in commitFact.
+The Go test adapters/clickhouse fails with -count>1 by design because of shared container state; this is owned by P277 and listed as a known open item in docs/ARCHITECTURE.md.
+P272 (the memory data model) is the base of P273-P276.
+P272 depends on P271, whose file supplies the gate prompt (gatePrompt).
+
+### v2.5 P273 Memory text formats: code comment and doc file, grep first, human second. (1) Fact style: facts and reasons short, su... (Done.)
+P273 memory text formats are grep-first, human-second: facts and reasons are short, succinct and easy to read per CLAUDE.md "Communication style"; the gate rewrites accepted facts and reasons to that style without changing meaning.
+The comment format is a strict text form of one or more atomic facts, each with its reason and its nanoid, citing other facts or docs only by id.
+The store_memory prepare flag runs the same split, challenge and wording pipeline but persists nothing and returns the facts formatted as code comments.
+The doc format serialises facts over plain .md and .txt repo docs: a metadata header at file start for grep (ids, scope, project, origin, session or source, group, keywords), then facts each with id and reason, readable by a human.
+A formatted memory file re-ingests by parsing alone, with no LLM (P274).
+Both formats use one fact per line or fixed line block, stable line prefixes and ids as plain tokens, with no Markdown emphasis or other syntax in fact or reason text that breaks a literal grep, and no repeated boilerplate per fact, so an AI reads them efficiently.
+Each format has one regex, and a validator command usable as a git hook in any repo checks that every comment or doc in scope follows the format; scope marking keeps legacy comments from being flagged.
+P273 is implemented as memfmt comment and doc formats, the store_memory prepare flag and the memcheck git hook; it depends on P272 (data model), which is the base of P273-P276.
+memcheck hook install uses renameio.WriteFile instead of os.WriteFile, because TestGoConventions G4 flags os.WriteFile.
+Claude receives the structured JSON (status, comment, prepared) for tool results, not the text content, so the grep-first meta text and the prepared line reach Claude only where a client reads text.
+memcheck --install-hook writes an executable pre-commit hook; it blocks an orphan km_ fact line without a kira-memory header (exit 1), passes legacy comments, and exits 1 printing the hook line when a foreign hook exists.
+The memory formats, regexes, style rule, Prepare/asComment, memory-check and grep-first MCP text are documented in docs/ARCHITECTURE.md; the real-claude row (mcpserver/**, memfmt/**) is in docs/DEV_ENVIRONMENT.md.
+
+### v2.5 P274 Memory ingestion by file path; external sources; docs emitted in the P273 format. Today P211's importer (`internal/me... (Done.)
+P274 adds MCP tools ingest_files and ingest_status: the agent passes a file or folder path plus origin, source tag and scope; content never travels through MCP, so it costs no tokens.
+The ingest tool only instruments: it starts a job and returns its id; the status tool reports progress and result.
+External data (Slack, Jira, ...) is first extracted to a text file (md, json, txt), then ingested by path with origin external and its source tag; its facts are not challenged back to the user.
+The ingest pipeline is chunking, extraction, then a memory-module cross-check of every questionable fact against the source file in an isolated step with file access, then storing. Each ingested file becomes a group (P272).
+A file already in P273's doc format ingests by parse only, idempotent by id. After first processing the module can write the doc back in that format.
+The UI import (ImportView.vue) uses the same engine as MCP ingest and shows MCP-started jobs.
+The cross-check step runs the claude CLI with --restricted --tools Read,Grep --allowedTools Read,Grep --max-turns N --permission-prompts none. --safe-mode is kept off for the tool call, as MCP calls do.
+Without --restricted, claude's Read of an absolute path outside the cwd is not denied, so --safe-mode --tools Read,Grep --allowedTools Read,Grep does not isolate file access. --restricted confines file tools to the working directories and denies the outside Read.
+Variadic claude flags (--tools, --allowedTools) swallow a trailing prompt argument, so the prompt must be sent on stdin, as memory.Call does.
+Ingest jobs cap job groups at 4; the file's own document group takes the fifth slot (memory.CheckJobGroups).
+Start takes a flat MemoryImportStartArgs, and an empty origin keeps the job's provenance. ImportAction no longer has start; the UI starts jobs through useStartImport.
+Group ids are generated per run, so contracts mask groupId and the UI mask reader blanks masked values. The ingest spec injects fixed group ids instead.
+The memdoc file kind is labelled "Memory doc" in the UI.
+flowharness.Main already serves memory-ingest through RunArgvShim, so the detached runner needed no main_test.go logic change.
+Seed Call.Files with renameio.WriteFile, never os.WriteFile, because TestGoConventions rule G4 rejects os.WriteFile.
+The adapters test ConsoleResultCap op id now carries the row count, because reusing one op id for its cap+1 and cap runs made ClickHouse reject the second with QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING.
+
+### v2.5 P275 Memory ranking: real scoring, meaningful full-text and vector fusion, recall bias. Today `Service.Search` (`internal/... (Done.)
+Service.Search in internal/memory/hybrid.go fuses bm25 full-text hits (searchFTS over memories_fts: fact, reason, keywords) and cosine hits (semanticHits), with normalised per-source scores, field weights, an agreement bonus and a recall bias.
+Before P275, memory search used plain reciprocal rank fusion (constant rrfK) with no score cutoff, default limit 25, max 100, and matches tagged keyword, semantic or both.
+Memory ranking is biased to return more rather than less: wider candidate pools per source, a generous default limit, and no hard cutoff that drops a plausible match.
+Search results expose score parts so an agent and the Memory module can see why a fact ranked.
+A fixed evaluation set of 20 query cases over a seeded 72-fact store (keyword-only, paraphrase, mixed, project-scoped) guards ranking; 32 same-topic fillers feed the recall case, and the seed store holds a fifth, personal fact so the scope filter bites.
+Semantic score calibration uses QueryFloor 0.55 and QueryCeil 0.70 for arctic-embed-s-int8; ceiling is about the paraphrase max (a near-certain match). Unrelated cosine p90 is 0.550 and paraphrase median 0.602, so a floor/median rule would give a 0.05 band and a near-binary score.
+searchFTS keeps its []Memory shape for reconcile, while the new searchFTSRows returns bm25 scores; vectorTopK takes a filter value; match.go gains matchTerms.
+Flow and UI contracts for memory search send canonical scope order (company, project) and empty arrays instead of null.
+searchSchema, with closed-set enums for scopes and origins, is wired into the memory search tool registration.
+Memory search uses a decoded-vector cache keyed on (model, dim, count, max seq); it costs about 1.5 KB per fact resident.
+Migration 6 adds index memory_embeddings(model) so the cache stamp count is index-only, because a table-wide count(*) over memory_embeddings is slow (blobs make rows wide); Search no longer calls embeddingCounts twice.
+Search benchmark p50 after the cache and index: 77 ms at 20k facts (budget 150 ms) and 434 ms at 100k facts (budget 600 ms), versus 252 ms and 1261 ms before.
+
+### v2.5 P276 Memory MCP docs: short, clear, say what is expected. Today `kira-memory` `instructions` and tool descriptions (`inter... (Done.)
+P276 rewrites the kira-memory MCP server instructions, every tool and argument description, and the remember prompt for the final tool surface: store with origin, session, scope and group; comment-format flag; ingest by path and status; context lookup; search.
+The memory module extracts and splits facts itself, but every submitted fact must come with its reason, who decided it (user, agent, or external with source) and its scope, so the data is complete even when poorly formatted.
+Content files are ingested by path, never inline.
+Memory MCP docs and tool descriptions follow CLAUDE.md "Communication style" and are kept no longer than needed.
+The kira-memory instructions and tool descriptions live in internal/memory/mcpserver/server.go; docs/ARCHITECTURE.md section "Memory MCP server and module" describes the memory MCP.
+The instructions Files line says: "Never read, open or paste the content, not even to check it", because an agent once used Read on the docs file.
+The project argument (store_memory items.project, ingest_files project) is described as a project key host/owner/repo, such as github.com/acme/billing, never a bare name, because an agent sent project:"billing".
+TestMemoryMcpFollowsDocs is a real claude test checking that an agent follows the new memory MCP docs. Its ingest cancel is best effort and logged, because the ingest job often finishes first.
+P272 (data model) is the base of P273-P276, and P276 depends on P272-P275.
+
+### v2.5 P277 Known open items cleanup. Fix these `docs/ARCHITECTURE.md` "Known open items", then delete each entry as it closes. (... (Done.)
+The Space review window sync popover is fixed; the ade-v2-review spec uses a real click instead of dispatchEvent.
+sql-schema D3 flakiness was fixed by pasting text instead of using keyboard.type (failures 36/40 to 0/40 under load).
+tooltips a11y flakiness was fixed with a fake clock (20/40 to 0/40); refsChanged also uses a fake clock (0/40 after fix).
+Space repo-graph first paint under heavy load remains open: scroll test fails 8+/40 at 8 loops and 8 workers (row 0 wait 5-11 s vs 1.3 s idle), paging 9/48, columns 3/400, workspace 4/252; all pass idle.
+Go TestScheduleADE is fixed: the fake agent writes its counter atomically and claims call numbers atomically (0/40 failures under load).
+TestUnaryDeadline was fixed in product code, not just in the test.
+TestDescribeCancel was only made deterministic (it waits for the connection, no sleep); no product-side reproduction was found.
+Two Studio ui-timing tests fail idle in the WebKit sandbox by 1-12 percent (for example perf.spec.ts frame p95 89-96 vs budget 80, tree expand p95 58 vs 50, keystroke p50 55 vs 50); the item stays open and no budget was changed.
+The ui-timing failures are attributed to WebKit in the sandbox running JS about 1.8x and DOM about 2.9x slower than Chromium; Chromium passes with margin and no hot-path change was found.
+The registry button no longer links local images to Docker Hub when the containerd store keeps a RepoDigest: ImageRegistry is lazy and checks the containerd store plus Hub.
+The semantic model download base URL is injectable via an EmbedSpec option, with a flow test for install.
+A missing claude CLI is detected before launch with toolexec.ResolveClaude, so Kira shows its own error instead of the shell's raw text; contracts are machine-independent.
+Unhiding an imported repo during a folder scan is no longer re-hidden, using a hidden_rev compare-and-set.
+adapters/clickhouse tests at -count>1 are fixed by isolating state per run; mongo, redis, s3, sqs and kafka reset on rerun; MySQL and MariaDB run ANALYZE on all seeded tables.
+The memory ingest scan raced the auto-start rule; the scan and rule now run in one transaction.
+Studio Wails bindings are regenerated with wails3 task common:generate:bindings and are gitignored.
+Out of scope by user decision for P277, entries stay open: quit discarding unsaved edits; visual baselines recorded in the sandbox; English-only backend, git-core and @vue-flow text; no timing budget is reduced.
+Never run Go test suites under nohup, because children inherit an ignored SIGHUP and two internal/terminal Close tests fail; this is not a product bug.
+The load repro recipe for flaky-test investigation is in docs/DEV_ENVIRONMENT.md under "Load repro recipe".
+
+### v2.5 P278 Git graph commits go blank (regression). Symptom (user report): commits in Space git graph go blank on click or scrol... (Done.)
+In packages/git-ui/src/components/CommitGrid.vue, handleChunkLayout must repaint the grid synchronously (grid.invalidateRows() plus render()), because a plan watcher fires on a Vue microtask and a click or scroll in that gap reads stale rows and the commit rows go blank.
+The P278 fix repaints the grid synchronously inside a single plan publish step, so no gap exists between plan publish and grid repaint in which a click selects the wrong commit.
+Git graph refresh swaps the list in a staged way anchored on the commit sha, so the live list and viewport stay stable across refresh.
+A height-only resize of the git graph viewport had to be handled: before the fix, after Show more the host bottom sat 30px below the viewport bottom.
+GraphOrderState skips malformed tip shas, because a ref with no object id made rowOfSha throw.
+The permanent guard for P278 is the Playwright spec graph-blank-rows.spec.ts in Space tests/ui (ui project, mock-bridge native stream fixtures, multi-page history), with 4 tests covering load, scroll to end and back, click, Show more, refresh and the relayout race; it asserts non-empty subjects, non-empty graph canvas and row count equal to loaded count.
+In graph-blank-rows.spec.ts, test 2 scrolls before freezeClock because a frozen clock fakes rAF, and resumes the clock after the refresh.
+P278 required no Go change; the blank-rows cause was entirely in the frontend.
+With history collapse on, the live collapsed row count after new commits equals a fresh page load (1319 before, 459 after in the 5000-row real-backend check); raw history stays 5000 rows.
+
+### v2.5 P279 Resume stuck agent runs; quit confirmation. Today graceful quit kills agents (`b.ctx` cancel; run row stays `running`... (Done.)
+Before P279, graceful quit killed agents by cancelling b.ctx and left the run row in status running.
+apps/kira-space/internal/ade/recover.go marks running ADE runs as stuck at boot; internal/scriptruns Recover marks smart runs failed with a restart outcome.
+RetryRun starts a fresh session, while TakeOver resumes in a TUI via claude --resume.
+Recover keeps a resumable launch spec (stored claude session id as ResumeID) on stuck ADE runs and on failed-by-restart smart-script runs. A Resume UI action requeues the run via Launch.ResumeID with a resume prompt saying the previous session was interrupted and to re-check the state of the last action.
+When agents are live, quit asks for confirmation ("N agents running; quitting stops them") through the shell quit flow (internal/shell/quit.go) and ConfirmDialog, in both apps where agents exist.
+Known limitation: detached runners and PTY survival are out of scope. App crash or quit still stops the process; Resume restores the conversation but the turn in flight is lost, half-applied tool effects are possible, and the kira-db MCP stays app-bound.
+P279 delivered Resume in both apps and a quit gate, with no detached runner.
+The quit gate uses the shared prompts.QuitGate (internal/prompts/quitgate.go) instead of a per-app appwire.quitGate; the confirm dialog title is "Quit {app}?".
+Smart-script resume code lives in internal/scriptruns/resume.go, split from service.go.
+The EndResumeLost reason says "start it again" instead of "use Retry", because smart runs have "Run again" rather than Retry.
+A resumed run's log does not contain the word "interrupted" because the CLI's synthetic tool_result stays in the transcript, so the real-claude test checks the shared Claude session id instead.
+Deleting a transcript requires Claude's session id (Sessions claudeSessionId), not the ADE session row id.
+Workflow YAML prompt: values containing an unquoted ": " cause a parse error and must be quoted.
+Workflow YAML allowed_tools: ["Bash(sh:*)"] works, and the resumed run keeps the Claude session id.
+In real-claude test rows with haiku, prompts must say the call is safe to rerun and to inspect nothing first, because haiku inspected state with ps, was denied, and stopped as blocked.
+In ade-v2-resume.spec.ts, the Needs tab hides cards so the Plan tab must be opened first, and a refused Resume error renders in the step block (ade-stage-block-error), not the task panel.
+
+### v2.5 P280 Presentation page (Astro). Decisions final: Astro plus Tailwind. Declined: Jekyll (Ruby toolchain, no components); Vi... (Done.)
+The presentation page uses Astro plus Tailwind; this decision is final.
+Jekyll was declined for the presentation page because of its Ruby toolchain and lack of components; VitePress was declined because its docs-centric theme fights a landing page. Both reasons go in the CLAUDE.md library rule.
+The page structure stays compatible with a later Starlight docs install (P284).
+The page is hosted on GitHub Pages at https://vlad-cirstean.github.io/kira-studio/ with Astro base '/kira-studio' and no custom domain.
+A GitHub Action builds and deploys the page using actions/configure-pages, actions/upload-pages-artifact and actions/deploy-pages.
+Workflows under .github/workflows/ cannot be pushed from the agent session, so the Pages workflow ships under docs/pending-workflows/ (per docs/DEV_ENVIRONMENT.md). The user copies it and sets repo Settings > Pages > Source = GitHub Actions.
+The page is mobile-first and verified with Playwright at phone and desktop widths.
+Screenshots are generated once with Playwright (not per Action run) from the real apps at a deliberately small window size so content stays readable on mobile, and saved in the repo's screenshots/ folder, used by the page and the root README.md.
+macOS window buttons (traffic lights) are not in the screenshots; they are overlaid from a static svg or png asset.
+The screenshot generation script is a documented dev command with deterministic fixtures and no credential reads.
+Page content follows CLAUDE.md "Communication style", not README.md.
+The site is an Astro 7.3.8 workspace in site/ with Tailwind 4 via @tailwindcss/vite and zero client JavaScript; bun run site:check runs 12 tests at phone 375 px and desktop 1280 px.
+Six screenshots are produced by bun run screenshots, byte-identical across three reruns, 2.8 MB total with each PNG under 260 KB.
+Space screenshot shots need fixtures for adeTaskRepos, codeWorkspaceRepoHeads, memoryImportJobs, memorySemanticStatus, memoryHistory and memoryContext, because each unmocked call causes an HTTP 422 console error.
+The studio-api shot varied between runs because Monaco tokenizes JSON asynchronously and fades scrollbars on a JS timer; the shot now waits for coloured tokens and capture hides scrollbars.
+captureShot framing uses a fresh context at scale 2, because browser.newPage pages own their context.
+On the page, the hero shot is not repeated in the Studio section, and the header brand text is hidden below 640 px.
+Dependency licences: astro, @astrojs/check and @tailwindcss/vite are MIT; sharp is Apache-2.0 (prebuilt libvips LGPL-3.0); both Fontsource packages are OFL-1.1.
+The README references six framed images in screenshots/framed/*.png, each 2048 x 1280 with transparent corners.
+
+### v2.5 P281 Code review round 1. One Opus reviewer over everything changed since the last review session, covering architecture a... (Done.)
+Code review round 1 (P281) uses one Opus reviewer over everything changed since the last review session, covering architecture and security, functional correctness, and performance, per CLAUDE.md "Code review".
+The P281 review base is the P270 docs update commit cbc60ea4a, which closed the P268/P269 review rounds; the planner states the exact base found in git.
+Review findings go to plans/P281-findings.md and are committed before a fixer starts; the findings file is deleted once fixed.
+In the review process, one Sonnet fixer commits per logical group of findings, followed by serial test-and-fix.
+P281 resulted in six fixes (A1, A2, B1, C1, D1, E1) plus an A1 idle-claim guard test.
+After P281, suites are green except two known frame-time specs that fail only under load.
+
+### v2.5 P282 Code review round 2. Same cycle over the full diff since the same base, round-1 fixer commits treated as unreviewed.... (Done.)
+P282 code review round 2 fixed three minor findings: the memdoc gate now holds when scope or project differs, chunk normalisation runs once per verify load, and the registry missing label is reset.
+P282 code review round 2 reviews the full diff since the same base as round 1, treating round-1 fixer commits as unreviewed; findings go in plans/P282-findings.md.
+A code review round with nothing real to report must say so in its findings.
+
+### v2.5 P283 Docs update. Sonnet agent updates `docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md` and SPEC results; prunes stale li... (Done.)
+The P283 docs update covers docs/ARCHITECTURE.md, docs/DEV_ENVIRONMENT.md and SPEC results, pruning stale lines and resolved "Known open items" (including P277-owned items that P277 resolved).
+P283 deletes the findings files after the docs are updated.
+
+### v2.5 P284 Documentation site in the Astro page. End-user and developer docs inside the P280 Astro site; planner decides Starlig... (Done.)
+Every docs page in the P284 Astro docs site must follow CLAUDE.md "Communication style": terse, substance only, no filler, about 20 words per sentence, imperative instructions, one term per concept.
+A check script in bun run lint enforces mechanical docs rules: sentence length, banned filler words, invented abbreviations, arrows, emoji, decorative tables. A manual review pass is also documented.
+The docs site lives inside the P280 Astro site under src/content; Starlight (MIT) is preferred over hand-rolled, and the planner decides.
+Docs content derives from the real app: docs/ARCHITECTURE.md facts, Settings, MCP tools, P273 memory formats, P274 ingestion, P271 prompts. Screenshots reuse P280's folder.
+Data-grid cell formats are text, json, xml, csv, sql, iso8601, epochSeconds, epochMillis, base64, hex; UUID and URL were removed in P42. Beautify applies only to JSON and XML.
+Foreign-key navigation in the data grid works on PostgreSQL, MySQL, MariaDB and SQLite; the popover opens a new tab, and editing goes through the cell menu.
+Generate data excludes read-only connections.
+SQL console explain applies to SELECT/WITH on PostgreSQL, MySQL, MariaDB, SQLite and ClickHouse; auto-explain skips above 10 statements.
+API client supports gRPC unary and server-streaming only; Postman export skips gRPC.
+In git, Skip is offered for rebase, cherry-pick and revert, but not merge.
+Agent no-report string is "no report: Claude ended without calling finish_step"; the stop option applies only to a non-ok result; the script stage has no steps.
+Automation params are text, select or multi-select, each optionally secret.
+Memory-format write-back is per job, skips doc sources, overwrites only a valid same-group doc, and leaves out facts with other provenance.
+Per-engine capabilities: Redis edits string keys and deletes any type; ClickHouse insert only; Kafka produce; SQS send and delete; S3 file transfer with a key browser (PageKindKeyValue). Explain supports five SQL kinds, there are six mask kinds, and the pre-connect limit is 2000.
+The database MCP server listens on loopback 127.0.0.1:8766 with no fallback on bind failure, uses a bearer token with 7 day TTL, and denies exposure by default.
+Database MCP defaults: read allowed, write prompts, DDL denied; unclassified statements get the strictest mode. It has six tools, and masking is applied in render.go.
+Git review hazard list is illustrative in code (worktree conflict, staged changes, untracked collisions, non-fast-forward, protected push). Snapshots use compressed blobs, text only (gitreview/store.go).
+Git AI comments are added with the gutter +, listed grouped by file, support delete and clear all, and offer "Copy as prompt".
+The third branch kind is parked: kept out of merge order and shown as Not merging.
+The Studio Settings footer shows kira.sqlite, but the real file is kira.db.
+
+### v2.5 P285 Part 1 Memory ingest quality evaluation. Autonomous experiment on the real memory-ingest pipeline (P274 ingest by path: chun...
+P285 evaluates memory ingest quality as an autonomous experiment on the real ingest pipeline (P274 ingest by path): chunker, extraction and cross-check prompts in internal/llmprompts, importer in internal/memory/importer.
+P285 goal: ingest output holds only atomic facts, loses nothing important, and is meaningfully shorter than the input.
+The P285 corpus mixes phase plans (docs/v*/plans), spec files (Playwright/Go tests), other docs (ARCHITECTURE/DEV_ENVIRONMENT sections) and code comment blocks, covering prose, tables, code-heavy and JSON/JSONL input.
+The P285 rubric, defined by an Opus planner, measures compression ratio (chars and tokens), fact recall against a hand-extracted gold list per sample (each gold fact marked essential or minor), atomicity, precision, duplicate rate and reason quality.
+P285 atomicity requires one claim per fact, standalone, with no pronoun without a referent; precision requires no invented or unsupported fact.
+The fixed P285 corpus manifest is committed under docs/v2.5/plans/P285-corpus/ so runs repeat.
+P285 ingest runs go through the real claude CLI, which is opt-in, costs tokens, and must not read credentials.
+Each P285 run is scored in a separate judge pass, which may use an Opus-class model through real claude, scripted under apps/kira-space/tests/claude or a scratch harness.
+P285 iterates on prompts, chunk sizes and boundaries, the cross-check rule and dedupe until the planner's rubric thresholds are met or no further gain is found.
+Every P285 iteration is committed with its scores so the history shows progression.
+Prompt and chunker changes from P285 land in the registry and importer, with golden and unit test updates as needed.
+The P285 final deliverable is docs/v2.5/plans/P285-report.md plus a published Artifact page, with a before/after table per sample, compression, recall, atomicity, example input/output pairs, what changed and why, and remaining weaknesses; real-claude rows are rerun at the end.
+
+### v2.5 P285 Part 2 Terse memory prompts and distill tool. Decisions final. (a) Rewrite the memory-pipeline prompts in the registry (extr...
+Memory-pipeline prompts in the registry (extract, finalize, verify, gate, reconcile) and the memory MCP instructions and tool and arg descriptions are rewritten as terse atomic instructions, one rule per line, same meaning, following CLAUDE.md Communication style, because every call pays the prompt tokens.
+When rewriting prompts, keep template variables, schema and field names, tool names, negations, numbers, error strings and safety clauses (data hygiene, secrets) verbatim.
+New memory MCP tool distill takes text or a file path and outputs only terse atomic facts or instructions, one per line in source order, with no ids, evidence, keywords, origin or scope; it writes nothing to the store.
+The distill tool name is final unless the planner finds a clash.
+distill keeps the source-stated rationale inline (X, because Y) for facts and prompt rules only when it is not obvious from the fact itself, and drops it when self-explanatory.
+distill has a prompt mode that keeps rules as short imperatives with negations and numbers verbatim, because a plain fact extractor loses imperative force.
+distill has a per-call size limit and a spend cap, is read-only, and is not subject to the write gate.
+distill exists so any agent can condense long docs and prompts without the memory structure; P289 later uses it to rewrite the other registry prompts.
+Memory import and distill are unified into one pipeline: distill is the base (text or chunk in, terse atomic lines out), and memory import is distill per chunk plus a memory layer on top.
+The memory layer on top of distill covers chunk splitting, section from the heading path, provenance, source locator (path plus section), ids, gate, verify, dedupe, store and write-back.
+There is no separate extract prompt or mode: the registry extract prompt is replaced by the distill prompt, and instruction-versus-fact handling stays an option of the same prompt, not a second pipeline.
+The memory MCP exposes distill as a read-only tool over the same core as memory import.
+The evidence quote is dropped unless it adds information, and the source locator is added by code.
+Risks to measure for the unified pipeline: verify without the evidence quote (verifying against chunk text); the unresolved flag stays optional.
+Fall back to the old split extract/memory pipeline only if measurements regress beyond the Part 1 noise bands.
+The P285 eval is redone with the rewritten prompts: scores must equal Part 1 final within the Part 1 noise bands (R_ess, R_all, P, unsupported and duplicate rates, with C_fact not worse).
+Acceptance for the rewrite: the real claude rows for memory import, ingest and MCP stay green and TestMemoryMcpFollowsDocs passes.
+The total experiment cap for the P285 Part 2 eval is 30 USD.
+A rewritten prompt that regresses is reverted and listed; before/after prompt sizes are recorded in chars and runes/3 tokens.
+P285 Part 2 process: Opus plans, Sonnet implements, serial test-and-fix, close-out; the Memory Ingest Eval Artifact page and the site docs (memory and mcp-tools pages) are updated; the plan lives at plans/P285-part2-terse-memory-prompts.md.
+
+### v2.5 P285 Part 3 Compact memory output. Decisions final. (a) Merge very closely related facts into one denser fact in the store step a...
+Memory extraction (store step and prompt) must merge very closely related facts into one denser fact, because fewer facts shrink C_fact at little recall cost.
+Memory output must drop the evidence quote unless it adds information, because the source locator is added by code.
+Keep a rationale inline only when the source states one and it is not obvious from the fact itself; drop it when self-explanatory.
+Part 3 compacts memory output because evidence and keywords grew the stored record past the source size (C_rec 1.06).
+A new compact text format is required for code-comment blocks and .memory.md doc files: fact id once, no fact:, reason:, keywords: prefixes, a nicer layout; it must stay grep-first. The planner designs it.
+Keep parse/format round-trip tests for the memory format. The planner decides migration or compatibility for existing P273-format files and stored data.
+The new format change must update the memfmt parser and formatter, importer write-back, MCP tool descriptions and instructions, prompts, the site memory-formats docs page and ARCHITECTURE.
+Part 3 experiments reuse the P285 harness with a TOTAL spend cap of 20 USD.
+Part 3 targets: C_fact and the whole stored footprint (fact, reason and keywords as written to .memory.md; the C_doc measurement is to be fixed) clearly below Part 1, with R_ess not below Part 2's result beyond the noise band.
+Part 3 process: Opus plan, one Sonnet implementer, serial test-and-fix with the real claude rows, close-out; the Artifact page is updated with Part 3 results. The plan is plans/P285-part3-compact-memory-output.md.
+
+### v2.5 P285 Part 4 Distill in the UI. Decisions final. The Part 2 `distill` tool is also available in the Kira Space UI: paste text or p...
+The Part 2 distill tool is also available in the Kira Space UI: paste text or pick a file or selection, get terse atomic lines back, copy them, and optionally send them to import or store through the normal memory path.
+Distill in the UI is read-only by itself and is cancellable.
+The Distill UI shows cost and size before and after (chars, runes/3 tokens). Cost is displayed via formatCurrency and the tokens share via formatPercent.
+The Distill UI uses the same core as the MCP distill tool through a bridge service.
+The Distill UI is built with shadcn-vue, Tailwind and TanStack Query per CLAUDE.md, and is placed with the memory panel.
+Distill UI tests are split at the IPC boundary: a Go flow test, a UI spec and a visual baseline, plus one real-claude row.
+The distill contract keys written to memory-distill.json are MemoryDistillService.Distill#done, MemoryDistillService.Limits, MemoryDistillService.ToImport#job and kira:memory:distill#progress.
+Distill progress text reads "Parts done: {done} of {total} · {cost}" rather than "Part 1 of 1", because the total is known after chunking and done counts finished parts.
+The busy E_CONFLICT test lives in TestBridgeDistillCancel because it shares the lock-release setup.
+The Distill result is hidden while a run is in flight, to avoid a stale result beside new progress.
+The selection UI test uses the Monaco palette (F1) rather than the context menu, because right-click collapses the selection in Monaco under WebKit.
+A separate DistillProgress.vue component exists because rule U92 forbids a Spinner inside a Button.
+
+### v2.5 P286 Review step in workflows. Add a review step type to the Space ADE workflow (smart workflow graph). When a run reaches... (Done.)
+The Space ADE workflow (smart workflow graph) has a review step type that opens the existing git-ui review window for the branch of the run/card the user clicked, and the run waits for the user.
+In the review window the user adds AI comments with a kind: change request or question; review comments use review.comment.* keyed by (repoId, branch).
+Review step routing is configurable per review step and overridable per run: comments go either to a dedicated new agent session created for the review, or to a previous implementation agent session of the same task/run, resumed via its Claude session id using the P279 resume path.
+The user chooses when review comments are sent via an explicit Send to agent action; the existing copy-for-AI action stays.
+Agent replies, follow-up commits and answers to questions flow back into the review, with answers shown against the comment and comment states open/addressed.
+The prompt distinguishing questions from change requests is a registry entry in internal/llmprompts, editable in Settings.
+If the target session of a review is gone, the P279 EndResumeLost fallback to a dedicated agent applies.
+The review step feature depends on P279.
+The timeout field stays required on review steps.
+A taken-over review round has no reply or finish tools.
+P286 is covered by Go flow tests (7, fakeagent), UI tests, visual tests (2 new, 2 re-recorded) and real-claude tests TestAdeReviewStep and TestAdeReviewLost.
+
+### v2.5 P287 Workflow agent sandbox (macOS Seatbelt). Workflow steps run agents under per-step filesystem restrictions via macOS `... (Done (Mac enforcement unverified).)
+Workflow steps run agents under per-step filesystem restrictions via macOS sandbox-exec / Seatbelt profiles that Kira generates.
+A read-only workflow step gets read access to one or more configured folders and no write access anywhere except its own scratch.
+An implementation step gets full rights (read, write, create, delete) only inside its delegated worktree and nothing outside it.
+Ad hoc headless agents (merge/rebase/conflict agents, smart-script agents) get write access only to their one worktree.
+Sandboxed agents cannot create or remove branches or worktrees; git operations touching refs or worktrees outside the delegated worktree are denied, and there is no write to the main repo .git common dir beyond what the worktree needs.
+Branch and worktree creation happen only through Kira MCP tools (e.g. create_worktree, create_branch) that run in the app, unsandboxed, and validate requests.
+On Linux and Windows there is no Seatbelt: the sandbox policy is declared but not enforced, a clear notice is shown, and enforcement must never be pretended.
+claude built-in permission flags serve as a second layer alongside the Seatbelt sandbox.
+Keychain access is denied by default in the agent sandbox.
+Because Seatbelt runs only on macOS, Go tests build and golden-snapshot generated SBPL profiles on every platform; the enforcement test is macOS-only (build tag) and proves denied writes/branch creation and allowed writes.
+The macOS enforcement test is listed in the Mac checklist in docs/DEV_ENVIRONMENT.md.
+P287 depends on P279 and the workflow step model.
+P287 implemented the agent sandbox in new package internal/agentsandbox (policy, SBPL generator with golden files, darwin enforcer, deny watcher, goproxy allowlist).
+Each workflow step has a sandbox block with access, read, allow and network settings; P287 also added fetch_remote and push_branch tools, a run badge and popover, a step inspector section, the ade.sandboxKeychain setting and migration 0037.
+
+### v2.5 P288 Workflow step returns and single-surface step editing. A failed workflow step can return to a previous step. Planner... (Done (met as scoped by the plan).)
+Workflow steps have a per-step max_returns setting; agent steps default to 3 (range 1..10), the review step defaults to 0 meaning no limit (range 0..10). It replaces the per-result max; legacy retry N and result max values fold into it, with no migration.
+The workflow return counter is derived from back rows, so it survives app restart and Resume, and the run view shows it as a ↩ n/N chip.
+When a step reaches its return limit, the run stops in a failed state with a message naming the step and the limit, using i18n key backend.space.ade.returnLimit.body.
+The workflow editor has no strip row above the flow graph; add, remove, move, skip and Max returns are on the canvas and inspector, so one surface owns all step editing (less chrome).
+The 'interactive step = 0 returns' default applies to the review step, because user stages have no steps.
+Return-limit behavior is tested by Go flow test TestReturnLimit and UI spec ade-v2-return-limit, split at the IPC boundary.
+P288 depends on P279 (Resume) and shares workflow files with P286/P287, so it runs after them.
+
+### v2.5 P289 Terse LLM prompts. Rewrite every prompt in the llmprompts registry (`internal/llmprompts/registry.go` and fragments;... (Done (partly met: size target -3.5 % vs 25 % missed).)
+P289 rewrites every default prompt in the llmprompts registry (internal/llmprompts/registry.go and fragments, including MCP instructions and tool descriptions) in the CLAUDE.md Communication style: fragments, no filler, imperative, one idea per sentence, same meaning.
+Prompts are made terse because every call pays the prompt tokens and the user asked for caveman-short prompts.
+When tersening prompts, keep template variables, schema names/fields, error strings, negations, numbers, and tool and field names untouched.
+A prompt rewrite must not regress real claude rows (memory import/ingest/MCP, ADE, smart scripts) or the P285 memory eval harness subset beyond the P285 noise bands; revert a regressing prompt to its prior text and list it.
+Prompt size is measured as a token estimate of runes/3, before and after, per prompt.
+The prompt rewrite must keep the guards green: checkprompts, catalog rules, fakeagent keys and the prompt-count assertion. Only defaults change; user overrides stay untouched.
+P289 depends on P285; the eval's extract prompt result from P285 is the starting text, and P285 Part 2's distill tool is used to condense the remaining registry prompts.
+P289 shipped tooling: promptsizes -snapshot/-compare, promptdistill, and checkprompts style and size-budget rules backed by testdata/budget.tsv.
+P289 rewrote 52 of 126 default prompts, cutting 30567 to 29507 chars (-3.5 %, -6.0 % over changed entries); it missed the 25 % size target because memory and workflow texts were already terse.
+A bolder extract prompt edit (01c/01d) in the P289 eval exceeded the P floor and was reverted before shipping.
+The P286-P288 prompts (14 new entries) were already terse and each has a budget.tsv line, so P289 changed none of them.
+
+### v2.5 P290 Presentation page redesign. Decisions final. (a) Split the public docs presentation/landing page into two subtabs: St... (Done.)
+The public docs presentation/landing page is split into two subtabs: Studio and Space.
+The presentation page redesign keeps the theme (colours, fonts) but redesigns every element (hero, cards, sections, feature lists, screenshot frames), because the old look was too bland.
+Studio screenshots use English for UI language and data names.
+The Develop section is dropped from public docs entirely: nav entry, pages, links to it, docs-lint rules and sources frontmatter referencing it. bun run lint and site:check must stay green.
+Docs follow the CLAUDE.md Communication style (P284 rule).
+Space screenshot fixtures drop the Romanian identity too and were re-recorded, by user decision.
+The hero Shot component takes a glow prop, and the hero gradient lives on main in Landing.astro rather than in AppHero, so no hard edge shows under the tab bar.
+The intro band shows SITE.tagline; the availability line is the hero eyebrow.
+The keyboard focus-ring test skips on the phone project.
+The visual spec capture scrolls with behavior: 'instant' and uses test.slow(), because smooth-scroll caused instability.
+Visual test baselines are Linux-only.
+
+### v2.5 P291 Memory retrieval and unified import investigation. Decisions final. (a) Goal ranking from user: finding the right mem...
+Memory goal priority: finding the right memory when needed first; extracting as many facts as possible second; storage size third, but stored text must stay smaller than source.
+The old rule 'C_fact not worse' is replaced by 'stored text below source size, retrieval not worse'.
+Unified pipeline makes distill the core of import (distill per chunk, code-built source reason, no evidence quote), with memory (reconcile add/update, verify, scope, origin, store) built on top: one versatile system, not two.
+The unified pipeline in P285 Part 2 round p2-02 (commit 5866fd5e1) was reverted only because of the C_fact rule, not a technical failure. It measured R_ess 0.924, R_all 0.836, P 0.865, C_fact 0.549 vs ceiling 0.526.
+Memory stores fact, reason, origin, scope and source locator; 'subject' and 'aspect' exist only as prompt wording (finalize merges same subject and aspect facts up to 300 chars; reconcile uses 'same subject').
+Retrieval eval uses questions with known answer facts per corpus source (docs/v2.5/plans/P285-corpus) and measures hit@k and MRR on the real search path with the embedder ON, for keyword and vector search; the P285 harness had the embedder off.
+Memory and distill output become telegraphic: only meaning-carrying words survive; negations, numbers, units, names and exact technical terms stay. Scope is the memory module prompts only; other prompts and MCP texts are out of scope.
+No backward compatibility is required for the memory module because nobody uses it yet; destructive DB migration, memfmt format changes, re-importing memories and read-time grouping are allowed if they give better results (plan decision D32).
+P291 adopted no pipeline or prompt change because all gates failed. The storage half target was not reachable at this recall: fact text was 0.43-0.50 of source and rendered doc 0.73-0.84.
+Unified import (92e6cf609), V1T (5f987d0bb) and XT (35734574d) can be re-applied by reverting their reverts (608a3d1b4, 331452da6, 9c1f00a2b) if the user accepts the size trade.
+P291 kept the retrieval, keys, telegraph and compare harness, internal/textloss, and docs. Variants A1 V1T, A2, A3, A4 (V1T and XT) and A5 were not adopted; prompts are back at the pre-P291 text.
+The V1T and XT ports stay in git as commits 9b96da41f (V1T) and a487cbc18 (XT).
+
+### v2.5 P292 Code review, 2 rounds. Decisions final. Per `CLAUDE.md` "Code review": one Opus reviewer covering (1) architecture/st... (Done.)
+Per CLAUDE.md 'Code review', each review round uses one Opus reviewer covering (1) architecture/structure/maintainability/security, (2) functional correctness and business logic, (3) performance and resource efficiency.
+The code reviewer only reports: it writes findings to plans/P292-review-round1.md and commits them before any fixer starts.
+After the reviewer commits, one sequential Sonnet fixer commits per logical group of fixes.
+Review round 2 repeats over the full diff since the same base, treats round 1 fixer commits as unreviewed code, and writes findings to plans/P292-review-round2.md.
+A review round that finds nothing real must say so.
+Review findings files are deleted once fixed; only still-open items are carried to docs/ARCHITECTURE.md 'Known open items'.
+The review base is the last review session's final commit, found in git and stated in the findings file; scope is everything changed since.
+P292 review scope includes P271-P291; P285 Parts 2-4 and P286-P291 had no prior code review.
+P292 runs after P291 in table order.
+P292 completed two review rounds with fixes landed; round 2 open items are recorded in ARCHITECTURE Known open items.
+
+### v2.5 P293 Flat workflow steps and friendlier step panel. Decisions final. Today a workflow holds stages, a stage holds steps (a... (Done.)
+The ADE workflow is a flat list of steps because the user found the stage-and-step model too complex; the word "stage" is no longer used in UI, docs, workflow files or code names.
+P293 has no backwards compatibility (user decision, no users): old workflow files with `stages` are refused with a clear error, ADE task data is reset by one migration, and SQL columns are renamed to step naming.
+The step configuration panel (inspector) has grouped sections, plain labels, sensible defaults first and advanced options collapsed, following shadcn-vue/Tailwind rules.
+P293 tests are split at the IPC boundary: a Go flow test plus a UI spec asserting the same result.
+P293 depends on P286-P288 and runs last, after P292; P292 code review rounds do not cover P293.
+In the flat model, `since` in snapshots holds only the target step and later steps; TargetErr is lenient; a not-started task follows the live workflow file's first step; `snapshotStartedTasks` was removed.
+The wire format dropped `Session.StageID`, `ReviewCandidate.Stage` and `RunOutcomeEntry.Stage`.
+Engine `queueRun` was fixed so the attempt number bumps past history.
+The `task_info` default text now says "step".
+In the frontend, `canMove` blocks only explicit id routes, and Remove is disabled for a one-step workflow.
+Step kind labels read "Agent step" etc., because of the catalog duplicate rule.
+`AdeStepBlock` `reviewRows` still checks `step.id === 'review'`.
+The UI spec `ade-v2-flat-steps` uses the contract for shape checks and fixture boards for UI state; `openWorkflows` lives in `support/adeV2.ts`.
+Remaining uses of the word "stage" in the code are git/grid/update staging, the rejection message for old workflow files, and its docs mention.
+<!-- /chapter v2.5 -->
