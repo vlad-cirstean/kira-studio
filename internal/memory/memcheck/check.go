@@ -1,5 +1,5 @@
-// Package memcheck is the `memory-check` subcommand: a validator for kira-memory comments and doc
-// files, usable as a git pre-commit hook in any repository.
+// Package memcheck is the `memory-check` subcommand: a validator for kira-memory doc files that
+// also flags retired comment blocks, usable as a git pre-commit hook in any repository.
 package memcheck
 
 import (
@@ -45,11 +45,7 @@ func Check(files []Source) (problems []Problem, facts int) {
 			d, _, ps = memfmt.ParseDoc(f.Data)
 			fs = d.Facts
 		} else {
-			var blocks []memfmt.Block
-			blocks, ps = memfmt.ParseComments(f.Path, f.Data)
-			for _, b := range blocks {
-				fs = append(fs, b.Facts...)
-			}
+			ps = memfmt.RetiredComments(f.Data)
 		}
 		for _, p := range ps {
 			problems = append(problems, Problem{f.Path, p.Line, p.Msg})

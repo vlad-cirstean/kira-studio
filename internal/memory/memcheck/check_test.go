@@ -13,10 +13,10 @@ const (
 	idC = "km_9c2d4e6f8g1h"
 )
 
-func block(id, fact, reason string) string {
-	b := "// kira-memory origin=user scope=company\n// " + id + " " + fact + "\n"
+func doc(id, fact, reason string) string {
+	b := "---\nkira-memory: 2\ngroup: kg_4m9xq2c7v8ab\ntitle: T\norigin: user\nscope: company\n---\n\n- " + id + " " + fact + "\n"
 	if reason != "" {
-		b += "//   " + reason + "\n"
+		b += "  " + reason + "\n"
 	}
 	return b
 }
@@ -25,33 +25,41 @@ type fake []Source
 
 func (f fake) Files(context.Context) ([]Source, error) { return f, nil }
 
-// TestCrossFileDrift: one id must carry the same text in every scanned file, including the staged
-// set the hook reads from blobs.
+// TestCrossFileDrift: one id must carry the same text in every scanned doc, including the staged
+// set the hook reads from blobs. A code file only reports a retired block header.
 func TestCrossFileDrift(t *testing.T) {
 	files := fake{
-		{"b.go", []byte(block(idA, "Port is 9090.", "Manifest."))},
-		{"a.go", []byte("package a\n// legacy comment\n" + block(idA, "Port is 9090.", "Manifest."))},
-		{"c.py", []byte("# kira-memory origin=user scope=company\n# " + idA + " Port is 8080.\n#   Manifest.\n")},
-		{"d.go", []byte(block(idB, "Other.", "Why."))},
+		{"b.memory.md", []byte(doc(idA, "Port is 9090.", "Manifest."))},
+		{"a.memory.md", []byte(doc(idA, "Port is 9090.", "Manifest."))},
+		{"c.memory.md", []byte(doc(idA, "Port is 8080.", "Manifest."))},
+		{"d.memory.md", []byte(doc(idB, "Other.", "Why."))},
 		{"README.md", []byte("# legacy doc\n\nno header here\n")},
-		{"e.go", []byte(block(idC, "Other.", ""))},
-		{"f.go", []byte(block(idC, "Other.", "Later reason."))},
-		{"g.go", []byte(block(idC, "Other.", "Different reason."))},
+		{"e.memory.md", []byte(doc(idC, "Other.", ""))},
+		{"f.memory.md", []byte(doc(idC, "Other.", "Later reason."))},
+		{"g.memory.md", []byte(doc(idC, "Other.", "Different reason."))},
+		{"old.go", []byte("package a\n\n// " + "kira-memory origin=user scope=company\n// " + idA + " Port is 9090.\n")},
+		{"plain.go", []byte("package a\n\n// Ports are fixed by the manifest (" + idA + ").\n")},
 	}
 	var out, errOut bytes.Buffer
 	if code := runCheck(context.Background(), files, &out, &errOut); code != 1 {
 		t.Fatalf("code = %d, out=%q err=%q", code, out.String(), errOut.String())
 	}
-	// A reason-less copy never conflicts; two stated reasons that differ do (g.go against f.go).
-	want := "c.py:2: " + idA + " differs from a.go:4"
-	if !strings.Contains(errOut.String(), want) || !strings.Contains(errOut.String(), "g.go:2: "+idC+" differs from e.go:2") || !strings.Contains(errOut.String(), "memory-check: 2 problem(s)") {
-		t.Errorf("stderr = %q, want %q", errOut.String(), want)
+	// A reason-less copy never conflicts; two stated reasons that differ do (g against f).
+	for _, want := range []string{
+		"c.memory.md:9: " + idA + " differs from a.memory.md:9",
+		"g.memory.md:9: " + idC + " differs from e.memory.md:9",
+		"old.go:3: kira-memory comment blocks are retired (P296)",
+		"memory-check: 3 problem(s)",
+	} {
+		if !strings.Contains(errOut.String(), want) {
+			t.Errorf("stderr = %q, want %q", errOut.String(), want)
+		}
 	}
 
-	clean := fake{files[0], files[1], files[3], files[5], files[6]}
+	clean := fake{files[0], files[1], files[3], files[5], files[6], files[9]}
 	out.Reset()
 	errOut.Reset()
-	if code := runCheck(context.Background(), clean, &out, &errOut); code != 0 || out.String() != "memory-check: 5 file(s), 5 fact(s) ok\n" {
+	if code := runCheck(context.Background(), clean, &out, &errOut); code != 0 || out.String() != "memory-check: 6 file(s), 5 fact(s) ok\n" {
 		t.Errorf("clean run: code=%d out=%q err=%q", code, out.String(), errOut.String())
 	}
 }

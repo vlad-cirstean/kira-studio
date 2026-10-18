@@ -9,11 +9,12 @@ import (
 
 var (
 	sourceTag   = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
-	factLine    = regexp.MustCompile(`^(` + FactID + `) (.*)$`)
 	retiredLine = regexp.MustCompile(`^` + FactID + ` (fact|reason|keywords): `)
-	docFactLine = regexp.MustCompile(`^- (` + FactID + `) (.*)$`)
-	headingLine = regexp.MustCompile(`^#{1,6} (\S.*)$`)
-	dateLine    = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	// retiredHeader is the first line of a retired comment block, in any of its comment markers.
+	retiredHeader = regexp.MustCompile(`^[ \t]*(//|#|--|;|%|<!--|/\*) kira-memory [a-z]+=`)
+	docFactLine   = regexp.MustCompile(`^- (` + FactID + `) (.*)$`)
+	headingLine   = regexp.MustCompile(`^#{1,6} (\S.*)$`)
+	dateLine      = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 )
 
 func splitLines(src []byte) []string {
@@ -27,202 +28,24 @@ func splitLines(src []byte) []string {
 func validOrigin(o string) bool { return o == "user" || o == "agent" || o == "external" }
 func validScope(s string) bool  { return s == "company" || s == "project" || s == "personal" }
 
-// commentText strips the marker of one line. ok is false when the line is not a comment of m;
-// closed is false for a wrapped marker missing its closer.
-func commentText(line string, m Marker) (indent, text string, closed, ok bool) {
-	trim := strings.TrimLeft(line, " \t")
-	indent = line[:len(line)-len(trim)]
-	if !strings.HasPrefix(trim, m.Open+" ") {
-		return "", "", false, false
-	}
-	text = trim[len(m.Open)+1:]
-	if m.Close == "" {
-		return indent, text, true, true
-	}
-	if strings.HasSuffix(text, " "+m.Close) {
-		return indent, strings.TrimSuffix(text, " "+m.Close), true, true
-	}
-	return indent, text, false, true
-}
-
-func inScopeText(t string) bool {
-	return strings.HasPrefix(t, "kira-memory ") || strings.HasPrefix(t, "km_")
-}
-
 // isReasonText reports whether t is a reason line: exactly two spaces, then text.
 func isReasonText(t string) bool {
 	return len(t) > 2 && strings.HasPrefix(t, "  ") && t[2] != ' ' && t[2] != '\t'
 }
 
-const retiredCommentMsg = "'<id> fact:' and '<id> reason:' lines are the retired P273 format; write '<id> <fact>' and an indented reason line"
+const retiredLineMsg = "'<id> fact:' and '<id> reason:' lines are the retired P273 format; write '<id> <fact>' and an indented reason line"
 
-type blockState struct {
-	block  Block
-	marker Marker
-	indent string
-	// afterFact: the previous line of this block was a fact line, so an indented line is its reason.
-	afterFact bool
-}
+const retiredBlockMsg = "kira-memory comment blocks are retired (P296); store the facts with store_memory and cite the returned km_ id in a plain comment"
 
-type commentParser struct {
-	markers  []Marker
-	blocks   []Block
-	problems []Problem
-	cur      *blockState
-	seen     map[string]int
-}
-
-func (p *commentParser) add(line int, f string, a ...any) {
-	p.problems = append(p.problems, Problem{line, fmt.Sprintf(f, a...)})
-}
-
-func (p *commentParser) finish() {
-	c := p.cur
-	if c == nil {
-		return
-	}
-	if len(c.block.Facts) == 0 {
-		p.add(c.block.Line, "empty kira-memory block")
-	}
-	p.blocks = append(p.blocks, c.block)
-	p.cur = nil
-}
-
-// ParseComments parses the kira-memory blocks of a source file. Only in-scope lines (text after
-// the marker starting "kira-memory " or "km_", or an indented reason line directly after a fact
-// line) are read or flagged; other comments are legacy and end the block. An unsupported path
-// yields nothing.
-func ParseComments(path string, src []byte) ([]Block, []Problem) {
-	markers, ok := MarkersFor(path)
-	if !ok {
-		return nil, nil
-	}
-	p := &commentParser{markers: markers, seen: map[string]int{}}
+// RetiredComments reports one problem per retired comment block header in a source file.
+func RetiredComments(src []byte) []Problem {
+	var out []Problem
 	for i, line := range splitLines(src) {
-		p.line(i+1, line)
-	}
-	p.finish()
-	return p.blocks, p.problems
-}
-
-func (p *commentParser) line(n int, line string) {
-	for _, m := range p.markers {
-		indent, text, closed, ok := commentText(line, m)
-		if !ok {
-			continue
-		}
-		if !inScopeText(text) && !(p.cur != nil && p.cur.afterFact && isReasonText(text)) {
-			break
-		}
-		p.scoped(n, m, indent, text, closed)
-		return
-	}
-	p.finish()
-}
-
-func (p *commentParser) scoped(n int, m Marker, indent, text string, closed bool) {
-	if m.Close != "" {
-		if !closed {
-			p.add(n, "comment is not closed with %s", m.Close)
-		}
-		if strings.Contains(text, m.Close) {
-			p.add(n, "text contains %s", m.Close)
+		if retiredHeader.MatchString(line) {
+			out = append(out, Problem{i + 1, retiredBlockMsg})
 		}
 	}
-	if m.NoDashes && strings.Contains(text, "--") {
-		p.add(n, "text contains -- (not allowed in XML comments)")
-	}
-	if strings.HasPrefix(text, "kira-memory ") {
-		p.finish()
-		prov, msg := parseHeader(text)
-		if msg != "" {
-			p.add(n, "%s", msg)
-		}
-		p.cur = &blockState{block: Block{Provenance: prov, Line: n}, marker: m, indent: indent}
-		return
-	}
-	c := p.cur
-	if retiredLine.MatchString(text) {
-		p.add(n, "%s", retiredCommentMsg)
-		if c != nil {
-			c.afterFact = false
-		}
-		return
-	}
-	reason := isReasonText(text)
-	sm := factLine.FindStringSubmatch(text)
-	if !reason && sm == nil {
-		p.add(n, "line must be '<id> <fact>' or an indented reason line")
-		if c != nil {
-			c.afterFact = false
-		}
-		return
-	}
-	if c == nil {
-		p.add(n, "fact line without kira-memory header")
-		return
-	}
-	if m != c.marker || indent != c.indent {
-		p.add(n, "marker or indentation differs from the block header")
-	}
-	if reason {
-		p.reason(n, text[2:])
-		return
-	}
-	p.fact(n, sm[1], sm[2])
-}
-
-func (p *commentParser) fact(n int, id, body string) {
-	c := p.cur
-	if msg := CheckText(body); msg != "" {
-		p.add(n, "%s fact: %s", id, msg)
-	}
-	if first, dup := p.seen[id]; dup {
-		p.add(n, "%s already a fact at line %d", id, first)
-	}
-	p.seen[id] = n
-	c.block.Facts = append(c.block.Facts, Fact{ID: id, Fact: body, Line: n})
-	c.afterFact = true
-}
-
-func (p *commentParser) reason(n int, body string) {
-	c := p.cur
-	last := &c.block.Facts[len(c.block.Facts)-1]
-	if msg := CheckText(body); msg != "" {
-		p.add(n, "%s reason: %s", last.ID, msg)
-	}
-	last.Reason = body
-	c.afterFact = false
-}
-
-// parseHeader reads "kira-memory origin=<o> [source=<tag>] scope=<s>".
-func parseHeader(text string) (Provenance, string) {
-	var p Provenance
-	toks := strings.Fields(text)[1:]
-	val := func(key string) (string, bool) {
-		if len(toks) == 0 || !strings.HasPrefix(toks[0], key+"=") {
-			return "", false
-		}
-		v := strings.TrimPrefix(toks[0], key+"=")
-		toks = toks[1:]
-		return v, true
-	}
-	const form = "header must be 'kira-memory origin=<user|agent|external> [source=<tag>] scope=<company|project|personal>'"
-	var ok bool
-	if p.Origin, ok = val("origin"); !ok || !validOrigin(p.Origin) {
-		return p, form
-	}
-	if p.Origin == "external" {
-		if p.Source, ok = val("source"); !ok || !sourceTag.MatchString(p.Source) {
-			return p, "origin external needs source=<tag> of 1 to 32 characters from a-z, 0-9 and -"
-		}
-	} else if len(toks) > 0 && strings.HasPrefix(toks[0], "source=") {
-		return p, "source is only for origin external"
-	}
-	if p.Scope, ok = val("scope"); !ok || !validScope(p.Scope) || len(toks) > 0 || strings.Count(text, "  ") > 0 {
-		return p, form
-	}
-	return p, ""
+	return out
 }
 
 var docKeys = []string{"group", "title", "from", "origin", "source", "scope", "project", "session", "keywords", "updated"}
@@ -402,7 +225,7 @@ func (p *docParser) body(n int, line string) {
 			return
 		}
 		if retiredLine.MatchString(line) {
-			p.add(n, "%s", retiredCommentMsg)
+			p.add(n, "%s", retiredLineMsg)
 			return
 		}
 		sm := docFactLine.FindStringSubmatch(line)

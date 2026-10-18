@@ -63,26 +63,17 @@ func TestCommentCheckHook(t *testing.T) {
 		t.Fatalf("hook = %q, %v, want the marked pre-commit script", hook, err)
 	}
 
-	writeFile(t, repo, "bad.go", "package bad\n// km_7h3kq9x2mfa4 orphan line\n")
+	writeFile(t, repo, "bad.go", "package bad\n// kira-memory origin=user scope=company\n// km_7h3kq9x2mfa4 Port is 9090.\n")
 	mustGit(t, repo, "add", "bad.go")
 	out, err := gitIn(repo, "commit", "-q", "-m", "bad")
-	if err == nil || !strings.Contains(out, "bad.go:2: fact line without kira-memory header") {
-		t.Fatalf("commit of an orphan km_ line = %v\n%s, want it blocked with path:line", err, out)
+	if err == nil || !strings.Contains(out, "bad.go:2: ") || !strings.Contains(out, "retired (P296)") {
+		t.Fatalf("commit of a retired block = %v\n%s, want it blocked with path:line", err, out)
 	}
 
-	// The retired P273 lines are flagged, not read.
-	writeFile(t, repo, "bad.go", "package bad\n// kira-memory origin=user scope=company\n// km_7h3kq9x2mfa4 fact: Port is 9090.\n// km_7h3kq9x2mfa4 reason: Manifest says so.\n")
-	mustGit(t, repo, "add", "bad.go")
-	out, err = gitIn(repo, "commit", "-q", "-m", "v1")
-	if err == nil || !strings.Contains(out, "bad.go:3: ") || !strings.Contains(out, "retired P273 format") {
-		t.Fatalf("commit of P273 lines = %v\n%s, want it blocked as retired", err, out)
-	}
-
-	writeFile(t, repo, "bad.go", "package bad\n// legacy comment mentioning km_7h3kq9x2mfa4 mid-sentence\n"+
-		"// kira-memory origin=user scope=company\n// km_7h3kq9x2mfa4 Port is 9090.\n//   Manifest says so.\n")
+	writeFile(t, repo, "bad.go", "package bad\n// Ports are fixed by the manifest (km_7h3kq9x2mfa4).\n")
 	mustGit(t, repo, "add", "bad.go")
 	if out, err := gitIn(repo, "commit", "-q", "-m", "good"); err != nil {
-		t.Fatalf("commit of a valid block: %v\n%s", err, out)
+		t.Fatalf("commit of a plain comment citing a fact id: %v\n%s", err, out)
 	}
 
 	foreign := t.TempDir()

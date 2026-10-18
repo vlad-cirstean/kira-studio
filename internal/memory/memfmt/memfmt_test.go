@@ -13,129 +13,12 @@ const (
 	grp = "kg_4m9xq2c7v8ab"
 )
 
-// wrap renders lines with a marker: "// x", "<!-- x -->", "/* x */".
-func wrap(open, closer string, lines ...string) string {
-	var b strings.Builder
-	for _, l := range lines {
-		b.WriteString(open + " " + l)
-		if closer != "" {
-			b.WriteString(" " + closer)
-		}
-		b.WriteString("\n")
-	}
-	return b.String()
-}
-
-var blockLines = []string{
-	"kira-memory origin=user scope=project",
-	idA + " Billing API listens on port 9090 in production.",
-	"  Deploy manifest changed in March release.",
-	"kira-memory origin=external source=slack scope=company",
-	idB + " Staging deploys at 09:00 UTC.",
-	"  Release calendar fixes it; see " + idA + ".",
-	idC + " Deploys run on weekdays.",
-}
-
 func problemLines(ps []Problem) []int {
 	var out []int
 	for _, p := range ps {
 		out = append(out, p.Line)
 	}
 	return out
-}
-
-func TestParseCommentsValid(t *testing.T) {
-	cases := []struct{ path, open, closer string }{
-		{"a.go", "//", ""}, {"a.py", "#", ""}, {"a.sql", "--", ""}, {"a.ini", ";", ""}, {"a.tex", "%", ""},
-		{"a.html", "<!--", "-->"}, {"a.css", "/*", "*/"}, {"a.vue", "//", ""}, {"a.vue", "<!--", "-->"},
-		{"Dockerfile", "#", ""}, {"go", "//", ""},
-	}
-	for _, c := range cases {
-		src := "legacy := 1 // not ours\n" + wrap(c.open, c.closer, blockLines...) + wrap(c.open, c.closer, "just prose mentioning "+idA+" mid-sentence")
-		blocks, ps := ParseComments(c.path, []byte(src))
-		if len(ps) != 0 || len(blocks) != 2 {
-			t.Fatalf("%s %s: blocks=%d problems=%v", c.path, c.open, len(blocks), ps)
-		}
-		if blocks[0].Origin != "user" || blocks[0].Scope != "project" || len(blocks[0].Facts) != 1 || blocks[0].Facts[0].ID != idA {
-			t.Errorf("%s: block 0 = %+v", c.path, blocks[0])
-		}
-		if blocks[1].Source != "slack" || blocks[1].Facts[0].Reason != "Release calendar fixes it; see "+idA+"." || len(blocks[1].Facts) != 2 || blocks[1].Facts[1].Reason != "" {
-			t.Errorf("%s: block 1 = %+v", c.path, blocks[1])
-		}
-	}
-	if blocks, ps := ParseComments("a.txt", []byte("// "+idA+" fact: x")); blocks != nil || ps != nil {
-		t.Error("unsupported path must scan nothing")
-	}
-}
-
-func TestParseCommentsRules(t *testing.T) {
-	head := "// kira-memory origin=user scope=company\n"
-	fact := "// " + idA + " A fact.\n"
-	reason := "//   A reason.\n"
-	cases := []struct {
-		name, path, src string
-		line            int
-		msg             string
-	}{
-		{"1 bad key order", "a.go", "// kira-memory scope=company origin=user\n" + fact + reason, 1, "header must be"},
-		{"1 source on user", "a.go", "// kira-memory origin=user source=x scope=company\n" + fact + reason, 1, "source is only"},
-		{"1 external without source", "a.go", "// kira-memory origin=external scope=company\n" + fact + reason, 1, "needs source"},
-		{"1 bad scope", "a.go", "// kira-memory origin=user scope=team\n" + fact + reason, 1, "header must be"},
-		{"3 outside block", "a.go", fact + reason, 1, "without kira-memory header"},
-		{"3 after blank line", "a.go", head + fact + reason + "\n" + "// " + idB + " B.\n", 5, "without kira-memory header"},
-		{"4 empty block", "a.go", head + "x := 1\n", 1, "empty kira-memory block"},
-		{"4 reason without fact", "a.go", head + reason, 1, "empty kira-memory block"},
-		{"5 marker differs", "a.vue", head + fact + "<!--   R. -->\n", 3, "marker or indentation"},
-		{"5 indent differs", "a.go", head + "\t" + fact, 2, "marker or indentation"},
-		{"5 not closed", "a.html", "<!-- kira-memory origin=user scope=company -->\n<!-- " + idA + " A fact.\n", 2, "not closed"},
-		{"6 closer in text", "a.css", "/* kira-memory origin=user scope=company */\n/* " + idA + " has */ inside */\n", 2, "contains */"},
-		{"6 dashes in xml", "a.xml", "<!-- kira-memory origin=user scope=company -->\n<!-- " + idA + " a -- b -->\n", 2, "XML"},
-		{"7 markup in fact", "a.go", head + "// " + idA + " Use **bold** text.\n", 2, "Markdown"},
-		{"7 markup in reason", "a.go", head + fact + "//   Use `code` here.\n", 3, "Markdown"},
-		{"7 malformed id", "a.go", head + "// " + idA + " See km_short.\n", 2, "malformed id"},
-		{"7 empty text", "a.go", head + "// " + idA + " \n", 2, "empty"},
-		{"7 bare id", "a.go", head + "// " + idA + "\n", 2, "must be"},
-		{"8 duplicate id", "a.go", head + fact + head + fact, 4, "already a fact"},
-		{"9 retired fact line", "a.go", head + "// " + idA + " fact: A fact.\n", 2, "retired P273"},
-		{"9 retired reason line", "a.go", head + fact + "// " + idA + " reason: R.\n", 3, "retired P273"},
-	}
-	for _, c := range cases {
-		_, ps := ParseComments(c.path, []byte(c.src))
-		found := false
-		for _, p := range ps {
-			if p.Line == c.line && strings.Contains(p.Msg, c.msg) {
-				found = true
-			}
-		}
-		if !found {
-			t.Errorf("%s: want line %d %q, got %v", c.name, c.line, c.msg, ps)
-		}
-	}
-
-	// An indented line that is not the one reason after a fact is legacy: it ends the block unflagged.
-	for name, src := range map[string]string{
-		"second indented line":  head + fact + reason + "//   Another.\n",
-		"indented after header": head + "//   Stray.\n",
-		"three spaces":          head + fact + "//    Over-indented.\n",
-		"after another comment": head + fact + "// prose\n" + reason,
-	} {
-		blocks, ps := ParseComments("a.go", []byte(src))
-		if name == "indented after header" {
-			if len(ps) != 1 || ps[0].Msg != "empty kira-memory block" {
-				t.Errorf("%s: %v", name, ps)
-			}
-			continue
-		}
-		if len(ps) != 0 || len(blocks) != 1 || len(blocks[0].Facts) != 1 {
-			t.Errorf("%s: blocks=%+v problems=%v", name, blocks, ps)
-		}
-	}
-	if blocks, _ := ParseComments("a.go", []byte(head+fact+"//    Over-indented.\n")); blocks[0].Facts[0].Reason != "" {
-		t.Error("three-space line must not be a reason")
-	}
-	if blocks, _ := ParseComments("a.go", []byte(head+fact+reason+"//   Another.\n")); blocks[0].Facts[0].Reason != "A reason." {
-		t.Error("only the first indented line is the reason")
-	}
 }
 
 func validDocText() string {
@@ -228,57 +111,8 @@ func TestCheckText(t *testing.T) {
 	}
 }
 
-func clearLines(blocks []Block) {
-	for i := range blocks {
-		blocks[i].Line = 0
-		for j := range blocks[i].Facts {
-			blocks[i].Facts[j].Line = 0
-		}
-	}
-}
-
 func TestFormatRoundTrip(t *testing.T) {
-	blocks := []Block{
-		{Provenance: Provenance{Origin: "user", Scope: "project"}, Facts: []Fact{{ID: idA, Fact: "Port is 9090.", Reason: "Manifest."}, {ID: idC, Fact: "Jobs run nightly."}}},
-		{Provenance: Provenance{Origin: "external", Source: "slack", Scope: "company"}, Facts: []Fact{{ID: idB, Fact: "Deploys at 09:00.", Reason: "Calendar."}}},
-	}
-	for _, path := range []string{"a.go", "a.py", "a.html", "a.css", "a.sql", "a.xml", "a.tex"} {
-		ms, _ := MarkersFor(path)
-		out, err := FormatComment(ms[0], blocks)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, l := range strings.Split(strings.TrimSuffix(out, "\n"), "\n") {
-			if !CommentLine.MatchString(l) {
-				t.Errorf("%s: line %q does not match CommentLine", path, l)
-			}
-		}
-		got, ps := ParseComments(path, []byte(out))
-		if len(ps) != 0 || len(got) != 2 {
-			t.Fatalf("%s: %v", path, ps)
-		}
-		clearLines(got)
-		if !reflect.DeepEqual(got, blocks) {
-			t.Errorf("%s: round trip = %+v", path, got)
-		}
-	}
-	css, _ := MarkersFor("a.css")
-	out, _ := FormatComment(css[0], blocks[1:])
-	if !strings.Contains(out, "/*   Calendar. */\n") || !strings.Contains(out, "/* "+idB+" Deploys at 09:00. */\n") {
-		t.Errorf("css layout = %q", out)
-	}
-	html, _ := MarkersFor("a.html")
-	if _, err := FormatComment(html[0], []Block{{Provenance: blocks[0].Provenance, Facts: []Fact{{ID: idA, Fact: "a --> b"}}}}); err == nil {
-		t.Error("closer in text must be refused")
-	}
-	svg, _ := MarkersFor("a.svg")
-	if _, err := FormatComment(svg[0], []Block{{Provenance: blocks[0].Provenance, Facts: []Fact{{ID: idA, Fact: "a -- b"}}}}); err == nil {
-		t.Error("double dash in svg must be refused")
-	}
 	for _, f := range []string{"fact: x", "reason: x", "keywords: x"} {
-		if _, err := FormatComment(css[0], []Block{{Provenance: blocks[0].Provenance, Facts: []Fact{{ID: idA, Fact: f}}}}); err == nil {
-			t.Errorf("fact text %q reads as a retired line and must be refused", f)
-		}
 		if _, err := FormatDoc(Doc{Group: grp, Title: "T", Provenance: Provenance{Origin: "user", Scope: "company"}, Facts: []Fact{{ID: idA, Fact: f}}}); err == nil {
 			t.Errorf("doc fact text %q must be refused", f)
 		}
@@ -322,7 +156,7 @@ func TestFormatRoundTrip(t *testing.T) {
 			t.Errorf("%s: doc round trip = %+v", variant, got)
 		}
 	}
-	out, _ = FormatDoc(doc)
+	out, _ := FormatDoc(doc)
 	if !strings.Contains(out, "\n## Ports\n\n- "+idA+" Port is 9090.\n  Manifest.\n- "+idB+" Deploys at 09:00.\n\n## Jobs\n\n- "+idC) {
 		t.Errorf("doc layout = %q", out)
 	}
@@ -376,33 +210,9 @@ func TestLocator(t *testing.T) {
 	}
 }
 
-// TestRegexMatchesParser keeps the published regexes aligned with the parsers: every line a valid
+// TestRegexMatchesParser keeps the published regex aligned with the parser: every line a valid
 // fixture holds matches, and every in-scope line the regex rejects in an invalid fixture is a problem.
 func TestRegexMatchesParser(t *testing.T) {
-	for _, tc := range []struct{ path, open, closer string }{{"a.go", "//", ""}, {"a.html", "<!--", "-->"}, {"a.css", "/*", "*/"}, {"a.sql", "--", ""}} {
-		valid := wrap(tc.open, tc.closer, blockLines...)
-		if _, ps := ParseComments(tc.path, []byte(valid)); len(ps) != 0 {
-			t.Fatalf("%s: %v", tc.path, ps)
-		}
-		for _, l := range strings.Split(strings.TrimSuffix(valid, "\n"), "\n") {
-			if !CommentLine.MatchString(l) {
-				t.Errorf("valid line rejected by regex: %q", l)
-			}
-		}
-		invalid := wrap(tc.open, tc.closer,
-			"kira-memory origin=team scope=company", idA, "km_short x", "kira-memory scope=company origin=user", idA+" ok text")
-		_, ps := ParseComments(tc.path, []byte(invalid))
-		flagged := map[int]bool{}
-		for _, l := range problemLines(ps) {
-			flagged[l] = true
-		}
-		for i, l := range strings.Split(strings.TrimSuffix(invalid, "\n"), "\n") {
-			if !CommentLine.MatchString(l) && !flagged[i+1] {
-				t.Errorf("%s: regex rejects line %d (%q) but parser accepts it", tc.path, i+1, l)
-			}
-		}
-	}
-
 	if _, _, ps := ParseDoc([]byte(validDocText())); len(ps) != 0 {
 		t.Fatal(ps)
 	}

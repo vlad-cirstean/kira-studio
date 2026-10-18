@@ -14,8 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
 const (
@@ -23,15 +21,6 @@ const (
 	nulProbe    = 8 << 10
 	gitTimeout  = 30 * time.Second
 )
-
-// scannable reports whether a path is a kind of file memory-check reads.
-func scannable(path string) bool {
-	if memfmt.IsDocPath(path) {
-		return true
-	}
-	_, ok := memfmt.MarkersFor(path)
-	return ok
-}
 
 // usable drops files over the size cap and binary files.
 func usable(data []byte) bool {
@@ -74,13 +63,10 @@ func splitNUL(b []byte) []string {
 	return out
 }
 
-// readDisk reads each scannable path from the work tree.
+// readDisk reads each path from the work tree.
 func readDisk(paths []string) []Source {
 	var out []Source
 	for _, p := range paths {
-		if !scannable(p) {
-			continue
-		}
 		data, err := os.ReadFile(p)
 		if err != nil || !usable(data) {
 			continue
@@ -139,7 +125,7 @@ func (staged) Files(ctx context.Context) ([]Source, error) {
 	}
 	var paths []string
 	for _, p := range splitNUL(out) {
-		if scannable(p) && !strings.Contains(p, "\n") {
+		if !strings.Contains(p, "\n") {
 			paths = append(paths, p)
 		}
 	}

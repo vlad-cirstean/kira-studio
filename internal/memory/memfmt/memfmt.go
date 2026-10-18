@@ -1,10 +1,13 @@
-// Package memfmt defines the two grep-first text formats for memory facts, a code comment block
-// and a doc file, with one parser, one formatter and one regex per format. Pure: no I/O.
+// Package memfmt defines the grep-first doc format for memory facts, with one parser, one
+// formatter and one regex, plus the shared id and text rules. A code comment cites a memory by
+// fact id only. Pure: no I/O.
 package memfmt
 
 import (
 	"fmt"
+	"path"
 	"regexp"
+	"strings"
 )
 
 const (
@@ -12,19 +15,23 @@ const (
 	FactID  = `km_[0-9a-hjkmnp-tv-z]{12}`
 	GroupID = `kg_[0-9a-hjkmnp-tv-z]{12}`
 
-	// CommentLineSource and DocLineSource match every line of a valid block or doc. They use the
-	// ERE subset shared by Go RE2 and grep -E. Block and doc rules need the parser.
-	CommentLineSource = `^[[:space:]]*(//|#|--|;|%|<!--|/\*) (kira-memory origin=(user|agent|external source=[a-z0-9-]{1,32}) scope=(company|project|personal)( -->| \*/)?|` + FactID + ` [^[:space:]].*|  [^[:space:]].*)$`
-	DocLineSource     = `^(---|kira-memory: 2|(group|title|from|origin|source|scope|project|session|keywords|updated): [^[:space:]].*|- ` + FactID + ` [^[:space:]].*|  [^[:space:]].*|#{1,6} [^[:space:]].*|)$`
+	// DocLineSource matches every line of a valid doc. It uses the ERE subset shared by Go RE2 and
+	// grep -E. Doc rules need the parser.
+	DocLineSource = `^(---|kira-memory: 2|(group|title|from|origin|source|scope|project|session|keywords|updated): [^[:space:]].*|- ` + FactID + ` [^[:space:]].*|  [^[:space:]].*|#{1,6} [^[:space:]].*|)$`
 )
 
-var (
-	CommentLine = regexp.MustCompile(CommentLineSource)
-	DocLine     = regexp.MustCompile(DocLineSource)
-)
+var DocLine = regexp.MustCompile(DocLineSource)
 
-// Provenance is who decided the facts and where they apply. Comments carry origin, source and
-// scope only; docs carry all five.
+// IsDocPath reports whether a path is a doc file candidate (.md or .txt).
+func IsDocPath(p string) bool {
+	switch strings.ToLower(path.Ext(p)) {
+	case ".md", ".txt":
+		return true
+	}
+	return false
+}
+
+// Provenance is who decided the facts and where they apply.
 type Provenance struct {
 	Origin  string
 	Source  string
@@ -40,13 +47,6 @@ type Fact struct {
 	Reason  string
 	Line    int
 	Section string
-}
-
-// Block is one comment block: a header and its facts.
-type Block struct {
-	Provenance
-	Facts []Fact
-	Line  int
 }
 
 // Doc is one doc file. From is the job-relative path of the source its facts were stated in. Version
