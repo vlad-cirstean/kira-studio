@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import { scriptRunSchema } from '@shared/domain/scriptRuns';
 import { customScriptSchema } from '@shared/domain/scripts';
 import { expect, test } from './fixtures';
-import { adeBoard, adeFixture, openPlan, PLAIN, SCRIPTS, SMART } from './support/adeV2';
+import { adeBoard, adeFixture, openPlan, SCRIPTS, SMART } from './support/adeV2';
 import { contract } from './support/contract';
 import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
