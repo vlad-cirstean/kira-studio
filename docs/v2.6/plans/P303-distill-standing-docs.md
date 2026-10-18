@@ -196,7 +196,39 @@ per-char rate, because ARCHITECTURE is denser (output/input 0.68, P299 0.22 to 0
    `git diff --exit-code` clean. `HUMAN_CODE_REVIEW.md` is untouched.
 6. `docs: repoint ARCHITECTURE references (P303)`: the 2 line refs plus every V5-unresolved ref, per D3.
    Comment-only edits; the hook runs biome, `lint:rules` and the affected typecheck.
-7. `docs(v2.6): P303 result`: fill `## Result
+7. `docs(v2.6): P303 result`: fill `## Result` with §6's table. Do not edit `SPEC.md`: P302's row is adjacent,
+   so the orchestrator flips P303's status at landing.
+
+Hooks pass normally on every commit; never `--no-verify`. No push.
+
+Stream rules:
+- Work only in `/home/user/kira-p303`; never touch `/home/user/kira-studio`.
+- P303 owns: `scripts/docshistory/**`, `docs/ARCHITECTURE.md`, `docs/PACKAGING.md`,
+  `docs/v2.6/plans/P303*`, and the comment lines group 6 touches (none under ADE paths).
+- No overlap with P302's ADE test and component files.
+- Landing: `git rebase v2.6`. If v2.6 changed `ARCHITECTURE.md` or `PACKAGING.md` since `83e59846b`, the
+  render commit conflicts. Resolve it by taking v2.6's version of the source and continuing. Then rerun
+  `doc distill` (only units whose input sha changed run again), `doc verify` and `doc render`, and commit as a
+  follow-up. Changed Known open items text is carried verbatim automatically.
+
+## 6. Final report table (implementer fills, in `## Result`)
+
+| Item | Value |
+|---|---|
+| Commits | hash and subject per group |
+| Units per doc: total / ok / verbatim-kept / redone | ARCHITECTURE, PACKAGING |
+| Spend | ok `costUsd` sum; charged sum; cap; projection 12 (worst 21) |
+| Bytes, lines before / after | ARCHITECTURE 600,492, 6,069; PACKAGING 42,785; HUMAN_CODE_REVIEW 2,184 (unchanged) |
+| V1 structure | headings n/n per doc; verbatim segments n/n identical; Known open items 70/70 identical |
+| V2 loss | hard lost/total and % per doc; units flagged; `E_*` kept n/35; PACKAGING commands kept n/n |
+| V3 flagged outcome | per flagged slug: accepted (reason), redone, kept |
+| V4 hand-read | units read; decisions lost; negation flips; invented facts |
+| Refs | 64 lines: resolved as-is n; repointed to heading n; `git show` pointers n; listed for orchestrator (ADE) n |
+| Render | idempotent (second render diff clean) |
+| Checks | `go test ./scripts/docshistory`, `go vet ./scripts/...`, `bun run lint:go`, hooks per commit |
+| Deviations | anything not as planned, with reason |
+
+## Result
 
 Done. Verify report: `docs/v2.6/plans/P303-verify.md`. Records: `docs/v2.6/plans/P303-runs/`.
 
