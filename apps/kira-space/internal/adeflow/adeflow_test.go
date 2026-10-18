@@ -108,7 +108,7 @@ func TestParse_rules(t *testing.T) {
 		{"results reserved id", head + step("s", resultsBlock("needs_input", "true", "")), 0, "needs_input is reserved"},
 		{"results ok required", head + step("s", "    results:\n      - id: a\n"), 0, "ok is required"},
 		{"results later step", head + step("s", resultsBlock("a", "true", "t")) + step("t", ""), 0, ""},
-		{"results back to earlier kind", head + manual("m", "") + step("s", resultsBlock("a", "true", "")+resultsBlock("b", "false", "m")), 0, ""},
+		{"results back to manual step", head + manual("m", "") + step("s", resultsBlock("a", "true", "")+resultsBlock("b", "false", "m")), 0, "cannot return to a manual or skipped step"},
 		{"timeout zero", head + strings.Replace(step("s", ""), "1h", "0s", 1), 0, "timeout must be"},
 		{"timeout over 24h", head + strings.Replace(step("s", ""), "1h", "25h", 1), 0, "timeout must be"},
 		{"timeout garbage", head + strings.Replace(step("s", ""), "1h", "soon", 1), 0, "timeout must be"},
