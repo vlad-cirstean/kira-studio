@@ -168,4 +168,9 @@ placeholder line only, then confirm `wc -l` grew (D1's truncation came from a wh
 
 ## Result
 
-(placeholder)
+Done. Restored P299 and P300 plan bodies (283 and 227 lines; `units` P299 3,096 chars, P300 5,498).
+`docshistory`: `v2.6` guard removed from `checkChapter`; `planResultChapter` rule (v2.0, v2.5 and later) replaces
+the map; `doc` default `--runs` is `docs/history-runs`. `units v2.6`: 12 phases, 47,160 bytes, no notes unit.
+CLAUDE.md: highest-P rule reads open chapter `SPEC.md` only, start list gains v2.5 and v2.6, rollover rule now
+"Closing a chapter folds it". Fold, repoint and measured numbers follow after the pin, see the
+`DEV_ENVIRONMENT.md` docshistory bullet.
