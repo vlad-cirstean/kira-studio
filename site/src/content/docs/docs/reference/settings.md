@@ -81,7 +81,7 @@ Keep-awake (off by default), notifications per event, and the usage display. All
 
 ### Memory
 
-Connect Claude Code, download the semantic model, and install the comment check hook. See [Memory](../../space/memory/).
+Connect Claude Code, download the semantic model, and install the memory check hook. See [Memory](../../space/memory/).
 
 ### Advanced
 

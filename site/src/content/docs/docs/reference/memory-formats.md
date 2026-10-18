@@ -1,6 +1,6 @@
 ---
 title: Memory formats
-description: The two plain-text formats for memory facts in code comments and doc files.
+description: The plain-text doc format for memory facts, and how a code comment cites a memory.
 sources:
   - internal/memory/memfmt/memfmt.go
   - internal/memory/memfmt/parse.go
@@ -14,7 +14,7 @@ sidebar:
   order: 4
 ---
 
-Both formats are grep-first. Every fact line starts with the fact id and holds the fact text. A reason is optional and sits on the next line, indented by two spaces. There are no field names and no per-fact keywords.
+The doc format is grep-first. Every fact line starts with the fact id and holds the fact text. A reason is optional and sits on the next line, indented by two spaces. There are no field names and no per-fact keywords.
 
 ## Ids
 
@@ -29,34 +29,18 @@ A fact id is `km_` plus 12 lowercase Crockford base32 characters, such as `km_7h
 
 ## Code comments
 
-A block starts with a header line, then facts. The header names the origin, an optional source and the scope.
+A code comment is a plain comment. It cites a memory by its fact id only. It holds no header, no copy of the fact, no reason, origin or scope.
 
 ```go
-// kira-memory origin=user scope=project
-// km_7h3kq9x2mfa4 Billing amounts are stored in cents, because the ledger rejects fractional values.
-// km_2b8c4d6f8g0h Staging deploys at 09:00 UTC.
-//   Release calendar fixes it.
+// Amounts are integer cents; the ledger rejects fractions (km_7h3kq9x2mfa4).
 ```
 
-- Origin: `user`, `agent` or `external`.
-- An external origin needs `source=<tag>`: 1 to 32 characters from a-z, 0-9 and `-`. Other origins forbid it.
-- Scope: `company`, `project` or `personal`.
-- A comment has no project, session or keywords.
-- A reason is the next comment line, indented by exactly two spaces after the marker and its space.
+- Write the fact id anywhere in the comment, never a version id. The id always resolves to the current version.
+- Store the memory first, then cite the id that `store_memory` returns.
+- `grep -rn km_7h3kq9x2mfa4` finds every comment that cites it. `grep -rnoE 'km_[0-9a-hjkmnp-tv-z]{12}'` lists all references.
+- `memory-check` does not resolve ids. The memory store is per user, so a reference valid for its author could not be checked for a teammate or in CI.
 
-The comment marker depends on the file extension:
-
-- `//`: go, ts, js, java, kt, swift, rs, c, cpp, cs, php, proto.
-- `#`: py, sh, rb, yaml, toml, tf.
-- `--`: sql, lua, hs.
-- `;`: clj, el, lisp, ini.
-- `%`: erl, tex.
-- `<!-- -->`: html, xml, svg.
-- `/* */`: css.
-
-An extension outside the list is unsupported. The Vue and Svelte extensions take `//` or `<!-- -->`. The full list lives in `markers.go`.
-
-Only comment lines that start with `kira-memory ` or a fact id are in scope, plus an indented reason right after a fact. Other comments are never flagged.
+Earlier versions wrote a `kira-memory` header and fact lines into a comment. That block is retired. `memory-check` reports each retired header as a problem. To migrate, store each fact with `store_memory`, then replace the block with a plain comment that cites the returned ids, or delete it. Never reuse the ids in the block: its new facts were never stored.
 
 ## Doc files
 
@@ -103,6 +87,6 @@ A fact without a reason line was stated in the source under its heading. Importi
 
 One doc has one provenance. Importing a doc needs no Claude call: the parser reads it directly. The header wins over the job's origin and scope. An agent's import waits for your confirmation when a header claims a higher origin, or another scope or project, than the job.
 
-A `kira-memory: 1` doc, or a comment line written as `<id> fact:` or `<id> reason:`, is the retired earlier format. It is reported as one problem. Rewrite it in this format.
+A `kira-memory: 1` doc, or a doc line written as `<id> fact:` or `<id> reason:`, is the retired earlier format. It is reported as one problem. Rewrite it in this format.
 
 An import job can write each source's stored facts to `<name>.memory.md` beside it. Doc sources are skipped. An existing target is overwritten only when it is a doc with the same group. Facts with another provenance than the job are left out. A fact whose reason is only the source and its heading becomes an item under that heading with no reason line. Any other reason is written in full. The writer adjusts a title (`: ` becomes ` - `) and strips inline Markdown from facts. A fact that stays invalid is left out. Per-fact keywords are not written, so an imported doc indexes its facts with the doc keywords only.

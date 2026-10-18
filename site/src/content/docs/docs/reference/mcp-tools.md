@@ -25,7 +25,8 @@ Store facts. The store splits independent claims into separate facts. A list abo
 - `clarifications`: question and answer pairs for an earlier challenge.
 - `session`: a Claude Code session id. Defaults to the current session.
 - `groups`: up to 5 groups of kind task, document or thread, each with `key` and optional `title`.
-- `asComment`: a path or extension. Stores nothing and returns the facts as a code comment.
+
+To cite a memory in a code comment, write its fact id.
 
 ### search_memories
 

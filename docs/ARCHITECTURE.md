@@ -4852,8 +4852,7 @@ replies and full terminal attach for Claude Code sessions.
   `ErrClaudeOutdated` ("update Claude Code").
 - MCP server: `<Kira Space executable> memory-mcp`, stdio, spawned per session by Claude Code, so it works
   with the app closed or open. `main.go` calls `appwire.RunArgvShim` (`internal/appwire/wire.go`) before `startupfail` and
-  `acquireSingleInstance`. Tools `store_memory` (progress `checking`, `reconciling`, `saving`;
-  `asComment`), `search_memories` (`includeHistory`, `scopes`, `origins`, `project`, `limit`), `memory_history`,
+  `acquireSingleInstance`. Tools `store_memory` (progress `checking`, `reconciling`, `saving`), `search_memories` (`includeHistory`, `scopes`, `origins`, `project`, `limit`), `memory_history`,
   `memory_context`, plus `ingest_files` and `ingest_status` when `Options.Ingest` is set and `distill` when `Options.Distill` is set (neither in import mode);
   prompt `remember` (`/mcp__kira-memory__remember`). Registered as `kira-memory` with `claude mcp add-json --scope user`
   from Settings > Memory (repo-root `internal/mcpinstall`, shared; the Database MCP header-helper
@@ -4861,7 +4860,8 @@ replies and full terminal attach for Claude Code sessions.
 - Agent docs (P276): texts live in `internal/llmprompts/registry.go` (`memory.mcp.*`), read once per session.
   Contract: the store splits and rewords facts; the agent sends each with reason, origin and scope, never
   inventing a reason; files go by path. Numbers in descriptions come from Go constants (`memory.MaxItems`,
-  `MaxGroups`, search and context limits, `maxIngestPaths`), never literals.
+  `MaxGroups`, search and context limits, `maxIngestPaths`), never literals. A code comment cites a memory by
+  fact id only (P296); the tool never writes or returns comment text.
 - Space: `bridge.MemoryService` (`apps/kira-space/internal/bridge/memory.go`; teardown is the
   package-level `bridge.CloseMemory`) emits `kira:memory:changed` after its own writes and, via a 2 s
   `PRAGMA data_version` watcher, after the MCP subprocess writes. `memory` is the last mode in
@@ -4906,16 +4906,17 @@ replies and full terminal attach for Claude Code sessions.
   first, `total` and up to `limit` (default 20, max 100) other current facts. IPC: `MemoryService.Context`
   and `MemoryService.Projects` (distinct project keys of current facts). UI: detail shows fact id, grade, scope,
   session and a context section per group (`MemoryContext.vue`).
-- Text formats (P273), pure Go in `internal/memory/memfmt` (parse, format, `CheckText`, `MarkersFor`; no I/O,
-  `internal/memory` imports it, `ids.go` builds the id patterns from it). Both formats are grep-first: id leads
+- Text formats (P273), pure Go in `internal/memory/memfmt` (parse, format, `CheckText`; no I/O,
+  `internal/memory` imports it, `ids.go` builds the id patterns from it). The doc format is grep-first: id leads
   every line, `<id> <fact>` (P285 Part 3, format v2), the reason an optional line indented by two spaces, no field
   names, no per-fact keywords, no version, no inline Markdown pairs (`**x**`, `` `x` ``, links, tags; lone `*` and `_` in identifiers stay legal),
   `km_`/`kg_` tokens in text must be full ids, other memories cited by id only.
-- Comment format: header `<marker> kira-memory origin=<o> [source=<tag>] scope=<s>` once per block, then
-  `<id> <fact>` lines, each with an optional reason line (text indented by exactly two spaces; a second indented line ends the block unflagged). No project, session or keywords. In scope: comment line whose text starts
-  `kira-memory ` or `km_`; any other comment is legacy, never flagged. Markers by extension (`//`, `#`, `--`,
-  `;`, `%`, `<!-- -->`, `/* */`); unlisted extension unsupported. Regex: `memory-check --print-regex`.
-  Retired v1 lines (`<id> fact:`, `<id> reason:`, `<id> keywords:`) yield one problem naming the P273 format; the formatter refuses a fact text starting `fact: `, `reason: ` or `keywords: `.
+- Code comments (P296): a plain comment cites a memory by fact id, one token `km_` plus 12 base32 chars, anywhere in
+  the text (`memfmt.FactID`); never a version id. No header, fact copy, reason, origin or scope. `memory-check` never
+  resolves an id (the store is per user, so teammates and CI could not), and flags only retired block headers
+  (`<marker> kira-memory <key>=`, `memfmt.RetiredComments`). Migration is manual: store each fact, cite the returned
+  id, never reuse an id from the block (its `add` ids were never stored). Retired v1 lines (`<id> fact:`, `<id> reason:`,
+  `<id> keywords:`) yield one problem naming the P273 format; the formatter refuses a fact text starting `fact: `, `reason: ` or `keywords: `.
 - Doc format over `.md`/`.txt`: front matter (`---`, `kira-memory: 2`, `group: kg_...`, `title`, optional `from`
   (job-relative source path), `origin`, `source`, `scope`, `project`, optional `session`, doc-level `keywords`,
   `updated`), body only `## section` headings and `- <id> <fact>` items, each with an optional two-space-indented
@@ -4927,21 +4928,16 @@ replies and full terminal attach for Claude Code sessions.
 - Style rule: `memory.gate.system` rewrites each fact and reason to `CLAUDE.md` style (one claim, about 20 words,
   keeps negations, numbers, names, ids); `memory.reconcile.system` asks the same for update/add text. Go
   collapses whitespace runs to one space in both (`validateGate`, `checkDecision`).
-- `store_memory` `asComment` (path or extension, such as `internal/x.go` or `go`): `Service.Prepare` shares
-  `decide` with `Store` (validate, gate, prepare, reconcile), stops before commit, persists nothing, emits no
-  event. Ids: noop and update reuse the stored fact id, add mints a fresh unreserved one. Result status
-  `prepared` with `comment` and `prepared` facts; text is the `memory.mcp.store.prepared` line plus the
-  comment. Refused with `groups`, import mode, `md`/`txt` or an unsupported extension.
 - MCP text output (`search_memories`, `memory_history`, `memory_context`): same grammar, `<id> <fact>`, then
   `  <reason>`, then `  vN origin=... [source=...] scope=... [project=...] [match=...] [score parts] [historical] [ctx=N]`.
   Ranking "Output" lists the score parts; neutral parts are omitted. `ctx=N`: `memory_context` has N facts stored with it.
 - Validator: `<Kira Space executable> memory-check` (`internal/memory/memcheck`, `appwire.RunArgvShim` case).
-  `[paths]` scans git-tracked files (or walks outside git); `--staged` checks staged blobs and runs the
+  Checks docs and flags retired comment blocks. `[paths]` scans git-tracked files (or walks outside git); `--staged` checks staged blobs and runs the
   cross-file check (one id, one text); `--install-hook` writes `pre-commit` (honours `core.hooksPath`) with a
   `# kira-memory-check` marker, refuses a foreign hook and prints the line to add; the hook skips with a
-  warning when the executable is missing; `--print-regex` prints both regexes. Exit 0 clean, 1 problems, 2
+  warning when the executable is missing; `--print-regex` prints the doc and reference regexes. Exit 0 clean, 1 problems, 2
   usage or git error. No `memory.db` check, so hooks and CI run anywhere. Install commands show in Settings >
-  Memory (`CommentCheckSection.vue`, bridge `MemoryService.CommentCheck`).
+  Memory (`CheckHookSection.vue`, bridge `MemoryService.CheckHook`).
 - Failure modes: no `claude` on `PATH` or not logged in surfaces a typed message in the dialog and as an
   MCP tool error; the gate can over-challenge; model latency is 5 to 20 s per store.
 
