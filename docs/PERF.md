@@ -1405,193 +1405,44 @@ cost.
 
 ### 2.9 P5: the renderer's own memory
 
-**Status: measured, on the finished tree (all of C1-C7 landed, C8's two gates resolved).** §2.1-2.8
-measure interaction latency and the data-plane wire/decode/encode path; nothing before this section
-measures what the renderer's own JS heap retains once a page has arrived. Full findings (F1-F10),
-the decisions (D1-D11) and the implementation order are
-`docs/HISTORY.md (v1.1 P5)` — this section is that plan's own §6.3/§6.4 re-run on the tree
-that plan's own implementation produced, not a copy of its numbers (every figure below was
-re-measured this session; none is carried over from the plan doc).
+Method: production bundle booted in **Chromium** (V8, a proxy for the shipped JavaScriptCore)
+against `tests/ui` mock fixtures; heap via `HeapProfiler.collectGarbage` x2 then
+`Runtime.getHeapUsage`; `window.__kiraRetention` counts structures directly. Full findings are
+`docs/HISTORY.md (v1.1 P5)`. Conclusions:
 
-**Method — same as F1's, restated because it matters every time this number is quoted.** No macOS
-hardware here (§2.3/§2.4 already established WebKitGTK isn't a stand-in for WKWebView), and
-`tests/ui`'s own WebKit tier has no `performance.memory`/CDP heap domain. Every megabyte figure
-below is the real production bundle (`bun run build:studio`), booted in **Chromium** against `tests/ui`'s
-own mock fixtures (browser-agnostic — a temporary Playwright config, `browserName: 'chromium'`,
-deleted after each run, nothing measurement-only committed), heap read via `HeapProfiler.enable` →
-`HeapProfiler.collectGarbage` x2 → `Runtime.getHeapUsage`. **This is V8, not the JavaScriptCore the
-app ships on** — a proxy for the app's own allocations against the app's own real code, not a claim
-of equivalence with a packaged build. The renderer-retention probe (`window.__kiraRetention`, C1)
-is the deterministic, engine-independent cross-check for the same claims — it counts structures
-directly (Map sizes), not bytes an engine chooses to report, so it's quoted alongside the heap
-number wherever the two measure the same thing.
-
-**F2's own baseline, re-run** (same fixtures, same method; the boot-heap absolute isn't
-comparable session-to-session — a different Chromium build/host each run, F1's own caveat — the
-deltas are what matters and are compared to F2 directly):
-
-| Scenario | Heap delta (Chromium/V8) | F2's original delta |
-|---|---|---|
-| + connect, expand two tree levels | +1.14 MB | +0.50 MB |
-| + a 10 000 x 12 tabular console result | **+2.49 MB** | +2.51 MB |
-| + that grid scrolled end to end | **-0.03 MB** (noise — flat) | +0.35 MB |
-| Mongo document tab, 100 docs | **+1.29 MB** (49.2x wire) | +1.64 MB (40.7x wire) |
-| Mongo document tab, 1 000 docs | **+3.19 MB** (12.0x wire) | +4.23 MB (10.4x wire) |
-| Mongo document tab, 5 000 docs | **+10.62 MB** (8.0x wire) | +15.56 MB (7.6x wire) |
-
-The grid/console row is the control this whole phase was measured against, and it lands within
-noise of F2's own number both ways — expected, since C1-C7 touch none of its code path. The
-document-tab row is the headline: **-21% at 100 docs, -25% at 1 000, -32% at 5 000** — the gap
-widens with page size because C3's pruning caps retained rows at the rendered window regardless of
-how many more rows the page holds, so the fixed cost (the window) becomes a shrinking fraction of a
-bigger page while the eliminated cost (the rest of the page) grows with it.
-
-**The probe, on the same scenario, showing what the heap number can't.** A synthetic 100-document
-page, no scroll: `parseCacheRows`/`decodeCacheRows` sit at **100** (the whole page) immediately
-after load — VirtualList's own exact-height math needs every *expanded* row's line count to build
-its offset table, and every document defaults to expanded (P27 D2), so the first pass is a genuine,
-unavoidable O(rowCount) walk (C2's own reasoning for why `fieldNamesOnPage` still walks the whole
-page too, just without retaining a parse tree while doing it). The very next `visible-range` event
-(VirtualList's own `immediate: true` watch — fires on mount, no scroll needed) prunes both back to
-**18** (the rendered window plus overscan) via C3's `setVisibleWindow`/`pruneRows`, and scrolling to
-the bottom of the page leaves them at 18 again, never re-growing. This is the number F4 said the
-app's own accounting is blind to (`__kiraRetainedBytes()` sums `page.byteSize` only) — it now has
-an answer.
-
-**C4 (find cap):** unchanged from F6's own per-match figure (~101 B/match) — the fix is the cap
-itself, not a different cost per match. 50 000 matches is ~5 MB by that figure, a fixed ceiling
-instead of the 38.8 MB (400 000 matches) / 96.2 MB (a million) F6 measured with none.
-
-**C5 (schema tree-shaking), bundle size, real A/B on this tree:** the production JS chunk went
-from **1,052,840 B / 334.51 KB gzip** (C1-C4 landed, before the `/*#__PURE__*/` pass) to
-**1,050,930 B / 333.97 KB gzip** after — **-1,910 B (-0.18%)**. Smaller than F7's own zod-aliased-
-to-a-stub A/B estimate (70,103 B): that measurement removed the whole zod runtime plus every schema
-wholesale, which a pure annotation on unused declarations alone can't recover once Rollup traces
-the real dependency graph — several of the 135 schemas turn out reachable from something real, not
-only the two `safeParse` call sites F7 audited by hand. The `decodePath`/`pathTail` Set lookup
-(replacing `nodeKindSchema.safeParse` on a render path) isn't separately measured in bundle bytes
-— it's a CPU-time fix (F7's own 1 443 ns/call figure), not a retention one.
-
-**C7 (multi-page frame sharing), the exact P11 OQ-1 shape, before and after, this session:** a
-two-statement `Run all` (two 3 000-row pages, one frame) followed by "Close other results".
-*Before* this fix: `__kiraRetention().frameBuffers` = `{count: 1, bytes: 31,256}` (the whole frame)
-both immediately after `Run all` and after closing one of the two results — **closing a result
-freed nothing**, confirming OQ-1's prediction exactly. *After*: `{count: 2, bytes: 6,000}` right
-after `Run all` (each page already owns its buffer) falling to `{count: 1, bytes: 3,000}` once the
-other result is closed — freeing exactly that page's own share.
-
-**C8's two gated measurements, and the verdicts.**
-
-1. **D8 (CodeMirror async chunk): declined — no split landed.** *(P60a/v1.6 note: this measurement's
-   own premise — `AutocompleteField.vue` mounting a live `CodeMirrorHost` unconditionally on the
-   WHERE/ORDER BY boxes — is gone; P60a replaced that overlay with Monaco span-painting
-   (`editor/paintSpans.ts`), loaded lazily like every other editor surface, not eagerly on first
-   data-tab open. Kept as the historical record of the P5-era decision it documents, not a
-   currently-true fact about the bundle.)* CodeMirror + Lezer is 407,469 bytes
-   (38.9%) of the single JS chunk (F3), but `AutocompleteField.vue` — the permanent filter-row
-   AutocompleteField every data-tab kind (grid/documents/keyvalue/stream) mounts unconditionally —
-   confirmed to mount a live `CodeMirrorHost` the instant the *first* data tab opens: booting to
-   nothing-open costs 4.74 MB, expanding the tree costs +1.13 MB more (5.87 MB, still nothing that
-   uses CodeMirror), and opening one ordinary grid tab — the single most common first action in any
-   real session — costs +1.02 MB more (6.89 MB), with two live `.cm-editor` instances confirmed
-   present in the DOM at that point (the WHERE and ORDER BY boxes). Splitting the chunk would move
-   that ~1 MB (not 407 KB — bundle size and parsed/retained heap aren't 1:1) from before first
-   paint to the first tab open, which happens within seconds of launch in essentially every real
-   session. This phase measures *retained* memory (§0.1), not boot latency — a code the user is
-   about to load anyway staying loaded isn't a retention win, and P6 (Vapor mode) is explicitly
-   this repo's owner for boot-time/parse-time concerns, not P5.
-2. **D9 (`sessionQueueBytes`/`sessionMaxInFlightOps`): declined — no change.** Instrumented
-   `Session.queuedBytes`' peak directly (a temporary, uncommitted `go test` inside
-   `internal/adapterhost`, not `tests/e2e-real` — the package's own unit-level mechanics are the
-   real code path `handleDataOp`/`enqueueResponse` run, and reaching it this way avoided the
-   `-tags server` binary + real WebSocket round trip for a number the package test already answers
-   directly) under the worst case the system's own other constants allow: `sessionMaxInFlightOps`
-   (64) concurrent responses, each a real 10 000-row page's own measured wire size
-   (3,715,570 B, F4), against a writer whose `conn.Send` is deliberately slower than production so
-   frames genuinely pile up. **Peak: 35.4 MiB**, against the 32 MiB `sessionQueueBytes` budget —
-   reached and briefly exceeded (`enqueueResponse`'s own "a single frame must still get through"
-   rule lets one more frame in past the ceiling), not a ceiling nothing approaches. That's the
-   budget working as designed, not evidence it should move either direction — D9's own bar
-   ("change the constant only if the peak justifies it") isn't cleared by a peak that confirms the
-   existing number rather than contradicting it.
+- Grid/console control (10 000 x 12 result): **+2.49 MB**, flat when scrolled; C1-C7 do not touch it.
+- Mongo document tab after C3 pruning: **-21% at 100 docs, -25% at 1 000, -32% at 5 000** versus
+  baseline. Retained parse/decode rows drop from the whole page to the rendered window plus
+  overscan (100 → 18).
+- C4 find cap: ~101 B/match, so 50 000 matches ≈ 5 MB versus 38.8 MB at 400 000 uncapped.
+- C5 schema tree-shaking: −1,910 B (−0.18%) of the JS chunk.
+- C7 multi-page frame sharing: closing one of two `Run all` results now frees its own share
+  (frame buffers `{1, 31,256 B}` → per-page `{2, 6,000 B}` → `{1, 3,000 B}`).
+- Declined, no change: D8 (CodeMirror async chunk; premise gone since P60a moved to Monaco) and D9
+  (`sessionQueueBytes`: peak 35.4 MiB against the 32 MiB budget, so the budget works as designed).
 
 ### 2.10 P12 round 1 — bundle size re-measured, P18's own "unchanged in size" claim now stale
 
-P18's own plan doc (`docs/HISTORY.md (v1.1 P18)` §7.5) asserted
-`dist/assets/index-*.js` and the `sql-formatter` chunk were both unchanged in size. True at the
-time, but P18 did land real, eagerly-bundled app code for the EXPLAIN feature itself
-(`ExplainResultView.vue` + five plan parsers + supporting modules) — P12 round 1's own performance
-review caught the claim going stale and this re-measures it (`bun run build:studio`, current HEAD, after
-every fix that review's findings needed):
-
-- `index-*.js`: **1,117,138 B raw / 356,081 B gzip** — up from P15's own recorded
-  **1,057,495 B / 334,906 B gzip** baseline (`docs/HISTORY.md (v1.1 P15)`), a
-  **+59,643 B (+5.6%) raw / +21,175 B (+6.3%) gzip** growth entirely accounted for by P18's own new
-  code. Correctly *not* lazy-loaded: an order of magnitude below the size P13/P15 split their own
-  dependencies out at (both lazy chunks below are well over 140 KB raw on their own).
-- `sqlFormatterEntry-*.js`: **141,507 B** — unchanged, still a properly split lazy chunk.
-- `fakerEntry-*.js`: **416,026 B** — unchanged, still a properly split lazy chunk.
-
-No dependency leaked into the main chunk; the growth is real app code, not a regression.
+P18's EXPLAIN code (`ExplainResultView.vue` plus five plan parsers) grew `index-*.js` to
+**1,117,138 B raw / 356,081 B gzip**, +5.6% from P15's 1,057,495 B / 334,906 B. Correctly eager:
+well under the size P13/P15 split dependencies out at. `sqlFormatterEntry-*.js` 141,507 B and
+`fakerEntry-*.js` 416,026 B stayed separate lazy chunks. No dependency leaked into the main chunk.
 
 ### 2.11 P19 — bundle re-measured under Vite 8/Rolldown; a Green Tea GC caveat on every Go-side RSS/CPU figure above
 
-**Bundle (`bun run build:studio`, current HEAD, Vite 8.2.2/Rolldown):**
+Vite 8.2.2/Rolldown: `index-*.js` **1,115,370 B raw / 351.14 KB gzip**, `sqlFormatterEntry-*.js`
+130,746 B / 37.41 KB, `fakerEntry-*.js` 415,801 B / 155.46 KB. Both lazy splits survive Rolldown.
 
-- `index-*.js`: **1,115,370 B raw / 351.14 KB gzip** — down slightly from §2.10's Rollup+esbuild
-  figure (1,117,138 B / 356,081 B gzip), noise-level and not attributed to Rolldown specifically;
-  no dependency graph or chunking decision changed (P19 D4).
-- `sqlFormatterEntry-*.js`: **130,746 B raw / 37.41 KB gzip** — still a separate lazy chunk.
-- `fakerEntry-*.js`: **415,801 B raw / 155.46 KB gzip** — still a separate lazy chunk.
-
-Both dynamic-import splits survive Rolldown's own chunking (P19 §7.2's own acceptance bar for the
-Vite major) — neither collapsed into the main chunk.
-
-**The Green Tea GC caveat.** Go 1.26 (this repo moved to Go 1.27 in the same phase, P19 C4) turns
-Green Tea on by default — Go's own numbers put it at 10-40% less GC overhead than the prior
-collector. **Every Go-side RSS/CPU figure recorded above this line was measured under the
-pre-Green-Tea collector** — not just §2.3's Linux walking-skeleton RSS and §2.4's real-macOS-arm64
-gate G1 result, but also §2.5's transient-heap row, §2.6's before/after wall-clock and allocation
-table, §2.7's Go encode time/`TotalAlloc` table, and §2.8's fixed-regression table. §2.3/§2.4
-genuinely need the real macOS hardware §2.4's own methodology note requires, which this sandbox
-doesn't have; §2.5-§2.8 need no such hardware — they're pure in-module Go benchmarks (throwaway
-programs run in this sandbox, per each section's own "Method" note) — but this phase doesn't
-re-measure them either, since P19's own scope is a dependency and toolchain bump, not a re-run of
-P4's/P58a's/P11's own measurement procedures.
-
-**Which of §2.5-§2.8's numbers actually move under Green Tea, and which don't.** Every allocation
-figure in those four sections (`TotalAlloc` deltas, the "Alloc/wire ratio" and "Transient heap
-bytes" columns) counts bytes the allocator handed out, not GC pause time or scheduling overhead —
-Green Tea changes *how* those bytes are collected and *when* a collection pauses the program, not
-how many bytes a given code path allocates for a given input, so these figures are collector-
-independent and stand as measured. Every Go-side wall-clock figure (the encode "time" columns, and
-§2.6/§2.7's "speedup" columns derived from them) can move under a GC with materially less overhead,
-since wall-clock time includes whatever GC work ran concurrently with or was triggered by the
-measured call — these need re-measurement before being read as current, same as §2.3/§2.4. §2.7's
-frontend decode timings are a different case again: they run under Bun/JavaScriptCore, not Go, so
-there's no Go GC in that measured window at all — unaffected by this caveat either way. Read
-§2.5-§2.8's Go-side wall-clock numbers as historical baselines from before this GC change, and
-their allocation numbers (and the frontend decode timings) as still current, until whoever next
-re-runs these throwaway measurement programs (or the real-Mac procedure, §3, for §2.3/§2.4)
-confirms the wall-clock ones too.
+**Green Tea GC caveat.** Go 1.26+ enables Green Tea (10-40% less GC overhead). Every Go-side
+wall-clock figure in §2.3-§2.8 predates it and may move; allocation figures (`TotalAlloc`,
+"Alloc/wire ratio", "Transient heap") count bytes handed out and stand. Frontend decode timings run
+under Bun/JavaScriptCore and are unaffected. Re-run before reading wall-clock numbers as current.
 
 ### 2.12 P21 — bundle re-measured at the close of the v1.1 chapter; §2.11 confirmed still current
 
-**Bundle (`bun run build:studio`, `62c7e84`, Vite 8.2.2/Rolldown, 631 modules):**
-
-- `index-*.js`: **1,115,990 B raw / 351.31 KB gzip** — +620 B / +0.17 KB gzip against §2.11
-  (+0.06%), noise at this scale: P12 rounds 1-2's own frontend fixes landed between §2.11's capture
-  and this one, and no dependency graph or chunking decision changed.
-- `sqlFormatterEntry-*.js`: **130,746 B raw / 37.41 KB gzip** — byte-for-byte identical to §2.11.
-- `fakerEntry-*.js`: **415,801 B raw / 155.46 KB gzip** — byte-for-byte identical to §2.11.
-- `index-*.css`: **120,067 B raw / 21.77 KB gzip** — not recorded in §2.11; recorded here for the
-  first time.
-
-Both dynamic-import splits survive, exactly as §2.11 already established — nothing collapsed into
-the main chunk. **§2.11's figures are confirmed still current**, and its Green Tea GC caveat is
-**unchanged and still applies**: no Go-side wall-clock number was re-measured by this phase either
-— P21 is a docs-only sweep (§0.3 of `docs/HISTORY.md (v1.1 P21)`), not a new measurement
-program.
+`62c7e84`: `index-*.js` **1,115,990 B raw / 351.31 KB gzip** (+0.06% against §2.11, noise),
+`index-*.css` 120,067 B / 21.77 KB (first recorded here); both lazy chunks byte-identical to §2.11.
+The Green Tea caveat still applies; no Go-side wall-clock figure was re-measured.
 
 ### 2.13 G3/G8 — the git module's transport, re-measured rather than re-derived
 
@@ -1632,43 +1483,13 @@ sizing isn't a live constraint.
 **Not measured on real hardware.** These are container numbers, like every other figure in §2. The
 macOS equivalents belong in §3's manual procedures, which have still not been run.
 
+
 ### 2.14 G34 — the visual-parity phase's own CSS delta, measured after the fact
 
-`docs/HISTORY.md (v1.3 G34)` §7.1 item 9 made recording the built CSS
-asset's raw/gzip size, before and after the phase, an explicit Tier-1 exit criterion — "F3 predicts
-a delta inside ±3 KB raw; a materially larger one means something was duplicated rather than
-replaced and is worth investigating before merge." None of G34's four commits
-(`0bc989f`/`bfff105`/`e72afe1`/`bf0a1d8`) actually recorded it; G30 round 1's own performance
-review flagged the gap. This entry supplies the measurement the exit criterion asked for, run now
-rather than at the time.
-
-**Method.** `bun run build:vscode` (removed in P243 Part 2; `scripts/build-vscode.ts`, the same Vite production build G34's
-own exit criterion #4 already exercises) at the commit immediately before G34's first code change
-(`521fcba`, a docs-only plan commit — its parent has no G34 code at all) versus at G34's last commit
-(`bf0a1d8`). Nothing between `bf0a1d8` and the measurement date touches a `.vue` `<style>` block or
-a `packages/kira-ui` (deleted in P267)/`packages/git-ui` `.css` file (checked via `git log bf0a1d8..HEAD` over both
-extensions), so `bf0a1d8`'s own CSS is byte-identical to what a build at current `HEAD` produces —
-the container this ran in.
-
-| | Raw | Gzip |
-|---|---|---|
-| Before G34 (`521fcba`) | 65,409 B (63.9 KiB) | 9,867 B (9.6 KiB) |
-| After G34 (`bf0a1d8`) | 61,466 B (60.0 KiB) | 9,700 B (9.5 KiB) |
-| Δ | **−3,943 B (−3.85 KiB)** | −167 B (−0.16 KiB) |
-
-**This is a decrease, not an increase** — G34 replaced bespoke, duplicated `.kv-*` button/menu/row
-styling with shared `packages/kira-ui` (deleted in P267) component classes and a single token scale (D1/D13's own "one
-token scale, not two"), and removing the duplication outweighed whatever the newly-consumed
-`kira-ui` classes added. The raw delta's own magnitude (3.85 KiB) is about 1.3x the plan's ±3 KB
-tolerance band, which technically trips exit criterion #9's own "materially larger… worth
-investigating" clause by absolute size — but a *shrink* of this shape is exactly what removing
-duplicated CSS in favour of shared components predicts, not evidence that anything was duplicated
-rather than replaced (the failure mode #9 was actually watching for). No further investigation
-follows from this number; it's recorded here so the exit criterion is no longer an open item.
-
-**Not measured on real hardware**, like every other figure in this section — the macOS-packaged
-build's own CSS asset wasn't separately verified, on the standing assumption (§2.13's own note)
-that a container Vite build and a packaged one produce byte-identical CSS output.
+G34's exit criterion #9 asked for the built CSS asset size before and after (±3 KB raw expected);
+none of its commits recorded it. Measured later with the Vite production build at `521fcba` versus
+`bf0a1d8`: raw 65,409 B → 61,466 B (**−3,943 B**), gzip 9,867 B → 9,700 B (−167 B). A shrink: shared
+component classes replaced duplicated `.kv-*` styling. Container build, not a packaged one.
 
 ## 3. Manual procedures (macOS, packaged build)
 
@@ -1773,36 +1594,19 @@ gone while newer ones remain.
 
 ## 4. P13's nonfunctional sweep — the three items P12 handed forward
 
-The three items §4 handed to P13 are resolved as of P13; the two below whose coverage
-lived in `tests/e2e/leaks.spec.ts` moved to Go with the rest of the L2/L3 cache (P58a A21, per
-§2.1) and are now asserted directly against the real cache in
-`apps/kira-studio/internal/enginecache/lru_test.go`'s `TestByteLru_*` cases, not a browser-driven scenario.
+All three resolved in P13. Their cache coverage moved to Go with L2/L3 (P58a A21) and is asserted in
+`apps/kira-studio/internal/enginecache/lru_test.go`'s `TestByteLru_*` cases.
 
-1. **`src/engine/cache/counts.ts`'s `store` was a plain `Map<string, StoredCount>`** with no byte
-   budget or eviction policy — **fixed (F19, D19)**. It's now a `ByteLru` sharing L2's shape:
-   `L3_BUDGET_BYTES = 256 * 1024`, a nominal `COUNT_ENTRY_BYTES = 128` per entry, ≈ 2 048 entries
-   before eviction, ported unchanged into `apps/kira-studio/internal/enginecache`. The original browser-driven
-   proof (now retired) drove 2 500 distinct `{path, filter}` combinations through `data.count()` and
-   observed `cacheStats().l3Entries` plateau at exactly **2 048** — confirming both that the bound
-   is real and that it matches the constant's own arithmetic (256 KiB / 128 B), not just "some
-   number less than 2 500."
-2. **Renderer page retention for cold (inactive) tabs (lever L-B)** — **answered, not fixed
-   (D21)**. This was already a considered P12 decision (D20/L-B), not an oversight; P13 re-examined
-   it rather than treating "handed to P13" as "still open." §2.2 requires pages to be released when
-   a tab is **closed**, which P13's F4/F5 fix (renderer runtime + page-store cleanup, verified by
-   `tests/ui/leaks.spec.ts`'s tab open/close symmetry scenario) makes actually true across all five
-   page stores, not just the grid. It says nothing about inactive-but-open tabs. The P12 measurement
-   above puts the whole 10-tab retained-bytes delta at ≈ 18–43 MB — roughly 2–4 MB per tab — against
-   a real risk to the ≤ 50 ms cached-tab-switch budget (§2.1) if a cold tab's pages were evicted and
-   had to be re-fetched on re-activation. Trading a hard interaction budget for single-digit
-   megabytes is the wrong side of that trade. Not implemented, on purpose, for the second time.
-3. **`src/engine/cache/pages.ts`'s `hits`/`misses` counters were lifetime-cumulative** —
-   **fixed (F20, D20)**. `clearPages()` now resets both counters to 0, so a hit rate read after
-   clearing reflects "since last clear" rather than the engine process's entire lifetime — the only
-   interpretation that matches what the Clear caches button in Settings → Cache appears to do,
-   ported unchanged into `apps/kira-studio/internal/enginecache`. The original browser-driven proof (now
-   retired) warmed L2 to a real (non-"—") hit rate, clicked Clear, and asserted the Settings → Cache
-   hit rate field read `—` again.
+1. **L3 count store had no byte budget — fixed (F19, D19).** Now a `ByteLru` like L2:
+   `L3_BUDGET_BYTES = 256 * 1024`, `COUNT_ENTRY_BYTES = 128`, so 2 048 entries before eviction
+   (ported into `internal/enginecache`). Driving 2 500 distinct `{path, filter}` pairs plateaued
+   `l3Entries` at exactly 2 048.
+2. **Page retention for inactive tabs (lever L-B) — answered, not fixed (D21).** Tab close releases
+   pages (P13 F4/F5, `tests/ui/leaks.spec.ts`). Inactive-but-open tabs keep theirs: the 10-tab delta
+   is ≈ 18–43 MB (2–4 MB per tab, §2.2), and evicting would risk the ≤ 50 ms cached-tab-switch
+   budget (§2.1) for single-digit megabytes. Declined twice.
+3. **L2 `hits`/`misses` were lifetime-cumulative — fixed (F20, D20).** `clearPages()` resets both, so
+   the hit rate after Settings → Cache → Clear reads `—`.
 
 ## 5. Test-suite duration (P294, replaces the v1.4 P1 baseline)
 
