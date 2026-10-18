@@ -6,7 +6,7 @@ memory.import.extract.system	1950
 memory.distill.system	1763
 memory.import.finalize.system	2615
 memory.import.verify.system	1355
-memory.mcp.instructions	1874
+memory.mcp.instructions	1901
 memory.mcp.tool.store_memory	469
 memory.mcp.tool.store_memory.arg.items	66
 memory.mcp.tool.store_memory.arg.items.fact	77

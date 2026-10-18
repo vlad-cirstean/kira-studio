@@ -484,7 +484,7 @@ Origins rank user, external, agent. An agent fact never replaces a user fact.
 A challenge stores nothing. Ask the user the returned questions or fix the items, then call again with the answers in clarifications.
 
 Files (repo docs, Slack or Jira export): call ingest_files with absolute paths, then ingest_status. Never read, open or paste the content, not even to check it; Kira reads the files. Save external material to a .md, .txt or .json file first.
-Code comments are plain comments. Never write a kira-memory header, fact, reason, origin or scope into one. To tie a comment to a memory, store it first, then cite the returned fact id (km_...) in the comment.
+Code comments are plain comments. Never write a kira-memory header, fact, reason, origin or scope into one. A comment that records something you store cites the returned fact id (km_...) in its text: store first, then write the comment.
 Condense long text or a file into short lines without storing (for a comment too): call distill with text or an absolute path; do not Read the file first. Mode instructions for prompts. To store a file use ingest_files.
 
 Recall: search_memories matches words and meaning, best first, loosely related results included; drop what is unrelated. Each result is "<id> <fact>", an indented reason line, an indented meta line (version, origin, scope). Cite a memory by fact id (km_...). ctx=N in the meta line: memory_context has N facts stored with it. memory_history shows versions.`,
