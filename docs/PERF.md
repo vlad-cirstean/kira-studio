@@ -53,17 +53,13 @@ caveat below for exactly which of those numbers that affects and which it doesn'
 | Cold start, fresh | wall 589 ms / in-app uptime 537 ms | — | — | — | ≤ 2500 ms | pass |
 | Cold start, restored (5 conns, 10 tabs) | wall 640 ms / in-app uptime 522 ms | — | — | — | ≤ 3000 ms | pass |
 
-Re-measured 2026-08-26 on this environment (the macOS/Colima dev machine) as part of P47's checkpoint,
-alongside the assertion split below and the D13 table in the P47 note — the previous "not yet run" /
-"fails" entries this row replaces predate both. The cell to editor, tab switch, tree expand and
-keystroke rows were replaced in P139 Part 2 with the Linux sandbox's WebKit numbers (headless,
-4 vCPU, `ui-timing` project, ranges over 5 runs); the macOS figures they held predate
-`SlickGridHost.vue` and the Wails port.
+Scroll and cold-start rows: macOS/Colima dev machine, 2026-08-26 (P47 checkpoint). Cell to editor,
+tab switch, tree expand and keystroke rows: Linux sandbox WebKit (headless, 4 vCPU, `ui-timing`
+project, ranges over 5 runs), replaced in P139 Part 2.
 
-**Console keystroke → completion popup.** The `<= 1000` gate came from the P57 M5 port (`9ee240f0`);
-before it the spec asserted p50 <= 50 / max <= 200. The ~113 ms it then measured was Monaco's fixed
-100 ms `.visible` class timer, not the popup: the widget is on screen at 27-32 ms. P139 Part 2
-measures the on-screen state and restores p50 <= 50 / max <= 200.
+**Console keystroke → completion popup.** The `<= 1000` gate from the P57 M5 port (`9ee240f0`)
+measured ~113 ms, which was Monaco's fixed 100 ms `.visible` class timer, not the popup (on screen at
+27-32 ms). P139 Part 2 measures the on-screen state and restores p50 <= 50 / max <= 200.
 
 **Tab switch (P139 Part 2).** Every switch remounts `DataView` and SlickGrid (`MainView.vue` keys it
 by tab id); no tab caching. Before the fix, WebKit here measured p50 311-318 / p95 436-447 ms. Two
@@ -85,229 +81,80 @@ sheets excluded) and zero `.slickgrid_` rules across the 20 switches. Not measur
 Run on a Mac (§3): `CSS.supports('margin-trim: inline')` should be `true`, and the 20-switch p50/p95
 gives the true figure against the 50 ms product budget.
 
-**Console keystroke → completion popup.** Docker/Colima is available here (the macOS dev machine
-this file's numbers now come from), so the Postgres-backed `tests/ui/budgets.spec.ts` suite runs in
-full rather than self-skipping; the row above is a real measurement, not a carry-over.
+**Scroll-response methodology note.** A script-driven `el.scrollTop = x` dispatches its native
+`scroll` event on the next "update the rendering" step, the same cadence as `requestAnimationFrame`.
+On a headless, software-rendered display roughly half of every 20 steps pay an extra frame regardless
+of app work; a double-rAF wait made every sample jump to ~one frame period, confirming a
+frame-scheduling artifact. So p95 over a mix of "no wait" / "one frame wait" samples does not measure
+app work (nor can `perf.spec.ts`'s rAF tripwire demonstrate 8 ms). `budgets.spec.ts` asserts **p50**
+with a looser `max` sanity bound and logs p95. On macOS the compositor hit a full frame on all 20
+steps; `tests/e2e/support/measure.ts`'s work/e2e split (`61ba523`) gates on the work delta
+(`KiraSlickGrid.render()` entry to DOM committed, P139), which removes both hops.
 
-**P29 (scroll rendering gap) — resolved, numbers recorded.** `budgets.spec.ts`'s horizontal
-scroll-response measurement and wide-table (`app.scroll_grid`, 60 columns x 5000 rows) vertical
-measurement, the deterministic column/row overscan-coverage invariants, the DOM-cell bound, and the
-sub-row-scroll-mutates-nothing check (docs/HISTORY.md (v1 P29)) all pass here; the
-table above carries the horizontal and wide-table-vertical p50/p95 pairs L-A's row was outstanding
-for. `.grid-row { contain: layout }` (D8) stays in place; P47's own before/after measurement below
-(same instrumentation, same machine) shows no isolable regression from removing it, so no basis to
-revisit D8's call here.
+**P29 and P47.** The horizontal and wide-table-vertical measurements, overscan-coverage invariants,
+DOM-cell bound and sub-row zero-mutation check all pass (`.grid-row { contain: layout }` stays, D8).
+The `@tanstack/vue-virtual` migration (P47) was flat-to-improved on work p50 (D13): `big_rows` vertical
+2.4 → 2.2 ms, `scroll_grid` horizontal 6.3 → 6.2 ms, wide-table vertical 6.2 → 5.1 ms (~18%). No D14
+no-go criterion tripped. Verdict: go.
 
-**P47 (`@tanstack/vue-virtual` migration) — before/after, work p50 (D13).** Baseline captured this
-session before the migration (Step 0 of `docs/HISTORY.md (v1 P47)`), after
-captured post-migration, both via the same `measureScrollResponses` work-delta instrumentation on
-this machine:
+**P161 `ui-timing` re-measurement.** The scroll-response case failed 4 of 5 runs against p50 <= 12 /
+max <= 50 (p50 9-14 ms, max 51-68 ms), identical at P139's own commit `058623df`; no grid render code
+changed between. This host runs the render ~1.4x slower than P139's (p50 6-8 ms). Bounds became **p50
+<= 16 ms and max <= 80 ms**. The 8 ms product budget is unchanged and unverified here.
 
-| Metric | Baseline (work p50) | After (work p50) | Change |
-|---|---|---|---|
-| `big_rows`, vertical | 2.4 ms | 2.2 ms | improved |
-| `scroll_grid`, horizontal | 6.3 ms | 6.2 ms | improved |
-| `scroll_grid`, vertical (wide table) | 6.2 ms | 5.1 ms | improved ~18% |
+**P161 Documents list (WebKit sandbox, `perf:documents:studio`).** 5 000 documents, 160 px rows, fast
+flick: before frame p95 171 ms (80 of 82 over 50 ms), after 66 ms (41 of 80). Fixes: one shared
+tooltip instead of two reka `Tooltip`s per row (~51 ms of a 142 ms frame), overscan in px (320). The
+target (flick p95 <= 50 ms) was not met: mounting a full new row window per frame floors at 21 ms.
 
-All three are flat-to-improved — none regressed, let alone by D14's >15% no-go threshold — and the
-wide-table vertical axis clears D14's "measurable improvement" go bar on its own. Combined with
-`columns.ts` losing `visibleColumnRange`'s hand-rolled binary-search-plus-expansion-loop (43 lines)
-for TanStack's own windowing plus the much smaller `columnRangeExtractor` seam (D5), both go-clause
-conditions are satisfied. All five of D14's no-go criteria were checked and none tripped: the
-sub-row zero-mutation assertion passes (fixed by a custom `observeElementRect` — see
-`DataGrid.vue`'s `observeScrollElementRect`, added because TanStack's default measures
-border-box/scrollbar-inclusive size where the old code measured `clientWidth`/`clientHeight`), both
-overscan-coverage invariants pass, the DOM-cell bound passes, no D13 metric regressed, and
-`tests/e2e/data-view.spec.ts`'s filtered-grid scenario (gutter numbers under an active WHERE filter)
-passes. **Verdict: go.**
+**P163 large-input parse callers (WebKit sandbox, `perf:parse:studio`).** Moving parse and format to
+a worker cut the longest main-thread block: Console Format 64 KB 631 → 84 ms, 236 KB 1 848 → 187 ms,
+1 MB 6 913 → 683 ms; Console Copy all 198-411 → 83-85 ms (10 000 x 0.4 KB). Beautify keeps a ~1 s
+block at 5 MB because Monaco applies the result as one undoable edit. Documents field-name
+memoization saves ~20 ms, inside noise. Worker cold start 7-14 ms, warm round trip 0-1 ms, 12 MB
+`postMessage` 15-18 ms. Every other caller timed in-page (find, compare, `detectFormat`,
+`parseDocument`, row menu, Mongo lint, EXPLAIN, Copy as JSON) stayed <= 51 ms and was left alone. The
+HTTP response viewer showed no regression within run noise.
 
-**Scroll-response methodology note (contradicts plan D6's assumption).** The plan expected scroll
-response gated on p95, like the other three interaction budgets. In practice, a script-driven
-`el.scrollTop = x` assignment's native `scroll` event dispatch is deferred by Chromium to the next
-"update the rendering" frame step — the same per-frame cadence `requestAnimationFrame` uses. On
-this headless, software-rendered display (no real 120 Hz cadence, closer to 60 Hz), roughly half of
-every 20 steps land right after that boundary and pay a full extra frame regardless of how fast the
-app's own work is; forcing every step to start right after a frame (a double-rAF wait) makes every
-sample jump to ~one frame period, confirming this is a frame-scheduling artifact, not app work. So
-p95 over a mix of "no wait" / "one frame wait" samples doesn't measure app work at all here (the
-same reason `perf.spec.ts`'s existing rAF tripwire can't demonstrate 8 ms either). So
-`budgets.spec.ts` asserts **p50** (unaffected by whether a step straddled a frame boundary) and
-keeps a looser `max ≤ 50 ms` sanity bound instead of gating on p95; the p95 number above is logged,
-not gated. Re-check this against a real macOS display before relying on p95 anywhere in this
-environment's history.
-
-**P161 re-measurement, `ui-timing` scroll response.** On this container with no other browser
-running (`ps` shows no WPE web process, `load1 <= 1.0` at start), the `interaction budgets` case
-failed 4 of 5 runs against p50 <= 12 / max <= 50: p50 9-14 ms, max 51-68 ms. The same case at
-`058623df` (P139's own commit) failed 3 of 3 (p50 9-11, max 51-68); `git log 058623df..HEAD`
-touches no grid render code. Sharing the machine with another session's browsers pushed p50 to 18
-ms and max to 43 ms. The code did not regress; this host runs the render about 1.4x slower than
-the one P139 measured (p50 6-8 ms). The bounds became p50 <= 16 ms and max <= 80 ms. The 8 ms
-product budget is unchanged and stays unverified here.
-
-**P161 Documents list, fastest wheel flick (WebKit sandbox, `perf:documents:studio`).** 5 000
-documents, 160 px rows, 800 000 px list, 3 runs per case, run `load1` 1.1-1.5 (start gate <= 0.95),
-before and after back to back on the same host. Profile named two causes: two reka `Tooltip`
-instances per row (~51 ms of a 142 ms flick frame) and a fixed 8-row overscan (16 of 22 rendered rows
-off screen at 160 px). Fixes: one shared tooltip, overscan sized in px (320).
-
-| Case | fps | frame p50 ms | frame p95 ms | frame max ms | over 50 ms |
-|---|---|---|---|---|---|
-| ladder before | 23 | 41 | 68 | 77 | 12 of 52 |
-| ladder after | 38 | 25 | 39 | 41 | 0 of 52 |
-| flick before | 8 | 122 | 171 | 192 | 80 of 82 |
-| flick after | 19 | 52 | 66 | 85 | 41 of 80 |
-| flick-up before | 8 | 118 | 163 | 187 | 80 of 82 |
-| flick-up after | 20 | 47 | 63 | 74 | 26 of 80 |
-
-Target (flick p95 <= 50 ms, <= 10 % of frames over) not met: remaining cost is mounting a full new
-window of rows per frame (bare divs floor 21 ms). No uncovered viewport in any run.
-
-**P163 large-input parse callers (WebKit sandbox, `perf:parse:studio`).** Medians of 3 runs, one discarded
-warm-up. Before: tree at `260ee0a1` (worker and chunker present, callers not moved), probe files
-from the final probe commit. After: P163 head. Per-run `load1` (includes the probe's browser) 1.4-3.2
-before, 1.7-8.3 after: this host's load swings with nothing of ours running, so only large deltas
-count. `longestBlockMs` = longest main-thread gap click to result + 1 s.
-
-| Caller | Size | Before block ms | After block ms | After actionMs (before) |
-|---|---|---|---|---|
-| Console Format | 64 KB | 631 | 84 | 990 (686) |
-| Console Format | 236 KB | 1 848 | 187 | 2 775 (1 863) |
-| Console Format | 1 MB | 6 913 | 683 | 8 928 (6 957) |
-| Request Beautify JSON | 0.5 MB | 184 | 134 | 187 (187) |
-| Request Beautify JSON | 5 MB | 1 420 | 1 021 | 1 301 (1 422) |
-| Request Beautify XML | 0.5 MB | 343 | 224 | 295 (343) |
-| Request Beautify XML | 5 MB | 1 787 | 1 596 | 2 105 (1 787) |
-| gRPC Beautify JSON | 0.5 MB | 153 | 145 | 196 (155) |
-| gRPC Beautify JSON | 5 MB | 1 176 | 1 057 | 1 356 (1 178) |
-| Console Copy all, JSON | 10 000 x 0.4 KB | 198 | 85 | 288 (167) |
-| Console Copy all, shell | 10 000 x 0.4 KB | 411 | 83 | 558 (365) |
-| Console Copy all, JSON | 2 000 x 8.6 KB | 158 | 98 | 471 (125) |
-| Console Copy all, shell | 2 000 x 8.6 KB | 264 | 102 | 508 (231) |
-
-The Beautify rows keep a ~1 s block at 5 MB: the parse is off-thread, the remaining block is
-Monaco applying the 5 MB result as one editable `pushEditOperations` (undo boundary). Chunking it
-would split undo into many entries, so it stays; the worker removed the parse and format share
-(~25 % at 5 MB JSON). Residual 83-100 ms on Copy all is the click and menu close, not the encode.
-
-Documents field names (10 000 x 0.4 KB page load): `fieldNamesOnPage` ran in four computeds plus
-the projection menu, now memoized per page object. One pass costs 6-8 ms (10 000 x 0.4 KB) and
-13-23 ms (2 000 x 8 KB) in WebKit, so a worker is not warranted. The load block is 340-460 ms before
-and after (435 before; 366, 461, 339 after, loads 1.4-2.0): the memoization saves about three passes
-(~20 ms), inside run noise; the rest is page decode and row rendering, outside P163.
-
-No change (function timed in-page in WebKit, median of 5 x 3 runs, 1 ms timer):
-
-| Row | Input | ms |
-|---|---|---|
-| Response find `findRanges` | 5 MB / 12 MB | 1 / 35-51 |
-| Response compare `detectAndBeautify` x2 | 256 KB JSON / XML | 7-12 / 11-16 |
-| Cell editor `detectFormat`, `validateFormat`, `beautifyFor` | 64 KB | <= 7 |
-| `byteLabel` `TextEncoder` | 64 KB | < 1 |
-| Documents `parseDocument` | 64 KB; 60 x 0.4 KB | < 1; <= 1 |
-| Row menu `toPlainJson`/`toRelaxedText`/`toShellText`/pretty | 64 KB | < 1 |
-| Mongo lint `tryParseShellText` | 64 KB / 1 MB | 1-2 / 10-20 |
-| `beautifyShellText` | 1 MB | 25-44 |
-| EXPLAIN `JSON.parse` | 1 MB | 4-7 |
-| Grid Copy as JSON `rowsToJson` | 10 000 x 20 | 19-33 |
-
-gRPC response messages have no frontend parse (Go `protojson`); the fill is `MonacoHost`'s
-chunked path, already covered by the P160 http probe. The diff editor fill (<= 256 KiB per side)
-was not driven through the UI; the compare functions above are 7-16 ms.
-
-Worker costs (3 runs): cold start 7-14 ms, warm round trip 0-1 ms, respawn 5-12 ms, `postMessage`
-of a 12 MB string 15-18 ms, 200 000-object JSON beautify round trip 360-415 ms. Transfer stays
-structured clone (under the 50 ms bar).
-
-HTTP response viewer no-regression (`perf:http:studio`, json and text-80col, before `b14bb1ed`,
-after P163 head, 3 runs each): medians within run noise. json 5 MB firstText/shown 633/968 before,
-719/1 057 after on the first pass (loads 2.7 vs 1.1); two back-to-back reruns: 624/941 vs 615/930
-and 580/903 vs 613/916 ms. json 12 MB shown 1 754 vs 1 732, text-80col 12 MB shown 765 vs 807.
-
-**macOS re-run (2026-08-24), scroll response — resolved.** The finding recorded here at the time —
-macOS's compositor saturating the e2e delta with a full frame period on every one of 20 steps,
-where the Xvfb container above hit it on only about half — motivated
-`tests/e2e/support/measure.ts`'s work/e2e split (`61ba523`): gating on the work delta — the
-scroll-work mark (now `KiraSlickGrid.render()` entry, P139) to DOM-committed, which excludes both frame-scheduling hops described above —
-removes exactly the compositor-cadence noise this paragraph diagnosed. The table above reflects
-that gate; scroll response now passes on this same macOS machine (work p50=2.2 ms, e2e p50 still
-logged at 4.8 ms for comparison).
-
-**P57 M5 (Wails/Go migration) — re-measured on the webkit/mocked tier, `tests/ui/budgets.spec.ts` and
-`tests/ui/perf.spec.ts`.** `tests/e2e/budgets.spec.ts` and `tests/e2e/perf.spec.ts` both ported —
-against real-captured Postgres fixtures, no Electron, no live backend, `page.evaluate()` timing
-hooks unchanged — rather than needing to be "re-created against renderer-owned instrumentation" as
-P57-cutover.md §5.6 originally guessed: every wall-clock measurement in both files times a
-click/scroll/keystroke against data the app already holds in memory, never a live round trip during
-the measured window, so a mocked backend changes nothing about what the numbers mean. See both
-files' own header comments for the full reasoning. Measured on this repo's sandboxed Linux
-container (headless, software-rendered real WebKit under Playwright automation — a different browser
-engine and a different, more virtualized host than either environment this section's numbers above
-came from):
+**P57 M5 (Wails/Go migration) — `tests/ui/budgets.spec.ts` and `tests/ui/perf.spec.ts`.** Both specs
+ported against real-captured Postgres fixtures, no Electron, no live backend: every timing is a
+click/scroll/keystroke against data already in memory, so a mocked backend changes nothing about what
+the numbers mean. Measured on the sandboxed Linux container (headless, software-rendered real WebKit,
+a different engine and a more virtualized host than the figures above):
 
 | Metric | p50 (work) | p95 (work) | Budget | Result |
 |---|---|---|---|---|
 | Scroll response (`big_rows`) | 7-10 ms | 12-17 ms | ≤ 12 ms (p50; see note) | pass |
-| Scroll response, horizontal (`scroll_grid`, mocked to one pageSize=100 page) | 19-21 ms | 27-43 ms | ≤ 1000 ms (sanity bound only, not a budget — see note) | pass |
+| Scroll response, horizontal (`scroll_grid`, mocked to one pageSize=100 page) | 19-21 ms | 27-43 ms | ≤ 1000 ms (sanity bound only) | pass |
 | Scroll response, vertical, wide table (`scroll_grid`) | 14-16 ms | 29-48 ms | ≤ 1000 ms (sanity bound only) | pass |
 | Cell → editor | ~6 ms | ~15 ms | ≤ 50 ms (p95) | pass |
-| Cached tab switch | ~48 ms | ~85 ms | ≤ 50 ms (p95, tight) — measured `DataGrid.vue`, before `SlickGridHost.vue` (`d01b082e`); superseded by the P139 Part 2 row above | pass |
 | Cached tree expand | ~4 ms | ~10 ms | ≤ 50 ms (p95) | pass |
 | Console keystroke → completion popup | ~13 ms | ~20 ms | ≤ 50 ms (p50) | pass |
-| `perf.spec.ts` rAF scroll frame time | 34-47 ms | 37-54 ms | < 80 ms (secondary tripwire; see note) | pass |
+| `perf.spec.ts` rAF scroll frame time | 34-47 ms | 37-54 ms | < 80 ms (secondary tripwire) | pass |
 
-P139: the scroll-work mark moved from the host scroll listener to `KiraSlickGrid.render()` entry.
-SlickGrid's `scrollRenderThrottling` defers a far-jump render past that listener, so the old mark
-timed the throttle wait. Scroll response (`big_rows`) work p50 is now 6-8 ms, p95 9-22 ms, quiet and
-under load.
+P139: the scroll-work mark moved from the host scroll listener to `KiraSlickGrid.render()` entry,
+because SlickGrid's `scrollRenderThrottling` defers a far-jump render past that listener. `big_rows`
+work p50 is now 6-8 ms, p95 9-22 ms.
 
-**Two budgets needed a documented adjustment for this tier, neither for app-work reasons:**
+Two budgets needed a documented adjustment for this tier, neither for app-work reasons:
 
-- **`perf.spec.ts`'s rAF-cadence tripwire, 24 ms → 80 ms.** Raw rAF-to-rAF deltas carry this
-  environment's own frame-pump cadence, not just app work — confirmed non-flaky (idle load average
-  0.1-0.3, no other containers) at a consistent ~35 ms/frame baseline even doing nothing, the same
-  "frame-scheduling artifact, not app work" category the scroll-response methodology note above
-  already established for this repo's p95 axis specifically. `budgets.spec.ts`'s own work-isolated
-  scroll measurement (via `__kiraGridScrollWorkStart`, unaffected by frame cadence) stayed in the
-  7-10 ms range throughout, confirming the raw-rAF number's inflation is cadence, not a real
-  regression. Raised to 80 ms: still far below what an actual unvirtualized-render regression would
-  produce, comfortably above this environment's own baseline.
-- **`budgets.spec.ts`'s primary scroll-response budget, 8 ms → 12 ms.** This tier's `ui` project runs
-  `fullyParallel: true` (§4.9's own documented tradeoff — no Electron process or Docker container to
-  contend over, unlike `tests/e2e/`'s `workers: 1`), so this measurement now shares CPU with whichever
-  other `tests/ui/*.spec.ts` files a worker happens to be running concurrently. Confirmed real and
-  reproducible, not a one-off flake: 7-8 ms alone, 9-10 ms under full-suite contention, across
-  repeated runs of each. 12 ms keeps meaningful headroom below a 60fps-safe 16.7 ms frame budget
-  while tolerating this tier's own inherent cross-file contention.
-- The horizontal and wide-table-vertical scroll-response rows were already gated at a loose 1000 ms
-  sanity bound rather than the strict 8 ms budget in this port (unlike the macOS/Colima measurement
-  above, which held all three to 8 ms) — the P29 overscan-coverage invariants these two scenarios
-  primarily exist to prove are unaffected by that choice; only the exact-timing budget claim differs.
+- **`perf.spec.ts` rAF tripwire, 24 ms → 80 ms.** Raw rAF deltas carry this environment's frame-pump
+  cadence (~35 ms/frame idle, load 0.1-0.3), the same artifact as the methodology note. The
+  work-isolated scroll measurement stayed at 7-10 ms. 80 ms is far below what an unvirtualized
+  render would produce.
+- **`budgets.spec.ts` primary scroll response, 8 ms → 12 ms** (later 16 ms, P161 above). The `ui`
+  project runs `fullyParallel: true`, so it shares CPU with other spec files: 7-8 ms alone, 9-10 ms
+  under full-suite contention, reproducible. The horizontal and wide-table-vertical rows are gated at
+  a 1000 ms sanity bound here; the P29 coverage invariants they exist to prove are unaffected.
 
-**One check doesn't port: `perf.spec.ts`'s "L2 budget: never exceeded after loading twenty distinct
-pages."** `window.__kiraCacheStats` looks like a pure-renderer hook but isn't — it wraps a real
-`DATA_OP.cacheStats` request answered by the `engine` child process's own `src/engine/cache/pages.ts`
-`ByteLru`, which doesn't run at all in this tier. A mock could only echo a hand-picked
-`{bytes, budgetBytes}` pair, making "usage ≤ budget" true by fixture construction rather than by the
-real eviction algorithm. Replaced by `tests/unit/engine-cache.spec.ts` (new, P57 M5): a direct,
-dependency-free unit test of `ByteLru`/`pages.ts`/`counts.ts` (no browser, no mock, no engine
-process, `bun test tests/unit`) asserting the exact budget-respecting behaviour rather than "≤ some
-number after 20 real page loads." (That TypeScript test itself didn't survive the P58 port: P58a A21
-deleted `tests/unit/engine-cache.spec.ts` along with the `src/engine/` it tested, and the same
-budget-respecting behaviour is now asserted directly in Go, against the real cache the app ships —
-`apps/kira-studio/internal/enginecache/lru_test.go`'s `TestByteLru_*` cases — with no port-side gap left to
-name.) The identical reasoning drops two `tests/e2e/leaks.spec.ts`
-sub-scenarios ("L3 is bounded", "clearing the cache resets the hit rate") for the same
-`src/engine/cache/counts.ts` `ByteLru`, and one `tests/e2e/leaks.spec.ts` sub-scenario ("deleting a
-connection closes its tabs") doesn't port for an unrelated reason: `state/tabs.ts`'s stale-tab-close
-and `project/state/tree.ts`'s `knownConnectionIds` pruning are both deliberately wired to the
-`connectionsChanged` *event*, and `tests/ui/support/mockRuntime.ts` has no `Events.On` analogue at
-all — a structural gap this session's `tests/ui/interaction.spec.ts` port already named for its own
-dropped Operations-panel scenario, confirmed again here. `tests/e2e-real/` (the real `-tags server`
-Go process, real embedded adapters — P58f M10 removed the separate engine process this sentence
-originally described) is the only tier that could recover the L2/event-driven checks this port
-drops, if ever wanted on top of `lru_test.go`'s unit coverage — named as a possible follow-up, not
-built.
+Not ported: `perf.spec.ts`'s "L2 budget never exceeded after twenty pages", because
+`window.__kiraCacheStats` wraps a real engine request and a mock could only make "usage ≤ budget"
+true by construction. The budget-respecting behaviour is asserted in Go against the real cache,
+`apps/kira-studio/internal/enginecache/lru_test.go`'s `TestByteLru_*`. The `leaks.spec.ts`
+sub-scenarios "L3 is bounded" and "clearing the cache resets the hit rate" drop for the same reason;
+"deleting a connection closes its tabs" drops because `tests/ui/support/mockRuntime.ts` has no
+`Events.On` analogue for `connectionsChanged`. `tests/e2e-real/` is the only tier that could recover
+them.
 
 ### 2.1a P22 — the fast-scroll rendering lag: pass 1's fix was a no-op, corrected in a second pass
 
@@ -393,42 +240,17 @@ Full detail, including what to do if neither mechanism moves the needle, is
 
 ### 2.1b P22 D6 — the first-launch window default, and what it is and is not worth
 
-**Implemented, and framed deliberately: this is a UX fix, not the fix for §2.1a's memory doc.**
-`internal/shell/window.go`'s unconditional `Width: 1280, Height: 800` — edge-to-edge and overlapping
-the menu bar/Dock on a same-size laptop panel, a real bug on its own — is now `DefaultBounds`, a pure
-function (unit-tested, `window_test.go`'s `TestDefaultBounds`) that clamps the default to the primary
-screen's work area, minus a small margin, when a screen can be resolved. It can only ever *shrink*
-1280×800, never grow it, and falls back to exactly 1280×800 (today's behaviour) when no work area is
-given. `MinWidth`/`MinHeight` are unchanged at 1024×640 — P22 D6(b) declines lowering them to
-Electron's old 900×600, judging the current minimum a considered floor for this app's UI against a
-first-launch-only, unmeasured memory win not worth the usability cost.
+A UX fix, not the fix for §2.1a's memory doc. `internal/shell/window.go`'s unconditional 1280×800
+(edge-to-edge on a same-size laptop panel) is now `DefaultBounds`, which clamps to the primary
+screen's work area minus a margin, never grows it, and falls back to 1280×800 with no work area
+(`TestDefaultBounds`). `MinWidth`/`MinHeight` stay 1024×640 (D6(b) declined Electron's 900×600). It
+applies to first launch only: stored window bounds override it.
 
-**F12 — first-launch-only.** `Options()` already overrides `Width`/`Height`/`X`/`Y` from a window's
-stored rectangle whenever it has one, and `Attach()` persists bounds on every resize/move. A user who
-has ever resized a window never sees this default again, on this clamp or the unclamped one it
-replaces.
-
-**F13 — the Electron comparison, recovered and quantified.** `18fe7bb^:src/main/window.ts` (deleted
-by the Electron-to-Wails cutover) passed no explicit `width`/`height`, only `minWidth: 900, minHeight:
-600` — so Electron's own 800×600 default, clamped up to 900×600 at first launch. Against Wails'
-1280×800: a first-launch-only **1.90×** (540 000 px² vs 1 024 000 px²), and a floor ratio of only
-**1.21×** (900×600 vs 1024×640). `git show 7d8a72ab4a5e:docs/WEBVIEW-SCROLL-MEMORY.md` §7's old "min 900×600" parenthetical
-undersold the first-launch number and omitted the floor one; both are recorded in that document.
-
-**F14 — the area premise is a projection, not a measurement, and this pass doesn't change that.**
-`git show 7d8a72ab4a5e:docs/WEBVIEW-SCROLL-MEMORY.md` never varied window size — every figure in it came from one 1440×960
-harness — so "cost scales with viewport area" is a mechanism-level inference from that document's own
-tile-coverage-rect explanation, not something either document has measured. No macOS hardware was
-available to this implementing pass either, so the area ladder that would settle it (that document's
-§7/§9) remains unrun. **Nothing in this section should be read as a memory-cost number for the new
-default** — only F13's ratios are measured; the megabytes they might translate to aren't.
-
-**Real Mac verification pending, same as everywhere else in this chapter.** This sandbox has no live
-screen backend to test the clamp against for real (Wails v3.0.0-beta.16's `*application.App` has no
-resolvable primary screen before `Run()` — a property of Wails' own Go startup ordering, verified
-here without needing macOS hardware, not a platform-specific gap), so `DefaultBounds`' arithmetic is
-unit-tested but its effect on an actual first launch is unverified on any platform in this sandbox.
-`internal/shell/window.go`'s own doc comment on `Options` records this in full.
+Measured: Electron's 900×600 first-launch area against Wails' 1280×800 is **1.90×** (540 000 px² vs
+1 024 000 px²), and the floor ratio is **1.21×**. "Cost scales with viewport area" is a projection
+from one 1440×960 harness (`git show 7d8a72ab4a5e:docs/WEBVIEW-SCROLL-MEMORY.md`), not a measurement;
+no megabyte figure exists for the new default. The clamp's effect on a real first launch is unverified
+on any platform here (Wails v3.0.0-beta.16 resolves no primary screen before `Run()`).
 
 ### 2.1c P22 spike — the SlickGrid A/B, and how to run it on real hardware
 
