@@ -1,6 +1,6 @@
-# P298 plan: docs history
+# P299 plan: docs history
 
-SPEC row P298 (`docs/v2.6/SPEC.md`) plus three user amendments relayed 2026-10-18: distill is real (MCP
+SPEC row P299 (`docs/v2.6/SPEC.md`) plus three user amendments relayed 2026-10-18: distill is real (MCP
 `ingest_files` distill), a CLAUDE.md chapter-rollover rule, and cost measured by a planner pilot with no hard
 cap. Base: `08394d55` (v2.6). Planner: Opus. Implementer: one sequential Sonnet subagent, after the user accepts
 the Cost section. No split: the tool's parser feeds distill, render, verify and repoint, and deletion waits on
@@ -9,11 +9,11 @@ all of them. Nothing below is started except the pilot.
 Discovery: `codegraph_explore` over `evalPlansDir memory eval corpus runs`, `check-docs.ts check-conventions.ts`,
 `memorycli Run addIngestTools ingestInput ingestOutput Distiller Distill`, `memorycli/run.go NewCLIRunner`,
 `DefaultBudget ChunkMarkdown tooManyFacts verifyBatch`. Docs are not indexed: SPEC headings and table first
-cells surveyed by grep only; no old SPEC read whole. Pilot: `P298-pilot/pilot.md`.
+cells surveyed by grep only; no old SPEC read whole. Pilot: `P299-pilot/pilot.md`.
 
 ## Cost
 
-From the pilot (10 units, real pipeline; `P298-pilot/`). Units: 457 phases plus 13 chapter-notes units.
+From the pilot (10 units, real pipeline; `P299-pilot/`). Units: 457 phases plus 13 chapter-notes units.
 
 - Per unit: mean 0.068 USD, spread 0.018 (146 chars) to 0.249 (25,179 chars). Fixed part dominates small
   units (0.13 USD per 1,000 chars at 146 chars, 0.010 at 25,000). Wall 7 to 40 s per unit.
@@ -137,7 +137,7 @@ renumbered (word-bounded, case-insensitive).
 - Resume: results append one JSON line per finished unit to `<runs>/<chapter>.jsonl` (`{slug, id, title, status,
   inputSha256, inChars, state, reason, lines, unresolved, costUsd, wallMs, sourceCommit}`); a torn last line is
   ignored on load. Rerun skips a slug whose last record is `ok` with the same `inputSha256`; `fallback` is
-  retried only with `--retry-fallback`. Default runs dir for P298: `docs/v2.6/plans/P298-runs/`; for a
+  retried only with `--retry-fallback`. Default runs dir for P299: `docs/v2.6/plans/P299-runs/`; for a
   rollover: `docs/history-runs/`.
 
 ### D5. Output format (`render.go`)
@@ -166,7 +166,7 @@ alternative, a render constant only, no re-distill). The tool prints total and p
 `verify --sample 12 <ch...>`: 12 phases chosen by `sha1(chapter+" "+id)` order across the given chapters, plus
 every `fallback`/`pending` unit listed by count. For each sample: the HISTORY block, the source marker
 sentences of its unit (from `git show <sourceCommit>:...`, so it works after deletion too) and its other
-marker hits in the SPEC. Output at most about 300 lines, written to `docs/v2.6/plans/P298-verify.md` (rollover:
+marker hits in the SPEC. Output at most about 300 lines, written to `docs/v2.6/plans/P299-verify.md` (rollover:
 stdout). Pass: every sample has its title/status block and lines (or a fallback), and the implementer, reading
 only this report, finds every sampled marker decision carried. A miss: fix the unit rule, rerun those units,
 redraw 12 new samples. Deletion (group 6) only after a pass.
@@ -203,7 +203,7 @@ v2.6, `docs/design/`, `docs/pending-changes/` untouched. Git keeps the files.
 
 ### D10. Lint and hooks
 
-- `biome.json`: add `!docs/v2.6/plans/P298-runs` and `!docs/history-runs` beside the v2.5 excludes (precedent;
+- `biome.json`: add `!docs/v2.6/plans/P299-runs` and `!docs/history-runs` beside the v2.5 excludes (precedent;
   `.jsonl` is not linted today, the exclude guards future JSON there).
 - `scripts/` change means a full pre-commit run; `go vet`, `bun run lint:go` cover the new package; knip ignores
   Go. `check-docs.ts` does not see `docs/`. No hook greps `docs/v*/`.
@@ -221,23 +221,23 @@ v2.6, `docs/design/`, `docs/pending-changes/` untouched. Git keeps the files.
   script reads at runtime (move them first, own phase). Never hand-edit `docs/HISTORY.md`.
 - Prune any text implying old chapters stay on disk; keep the C/M lettering note (still true in HISTORY).
 `DEV_ENVIRONMENT.md`: 4 lines under the real `claude` section: tool needs the logged-in `claude` CLI, builds the
-server binary itself, temp memory homes, cost scale (P298 pilot: 0.02 to 0.25 USD per phase).
+server binary itself, temp memory homes, cost scale (P299 pilot: 0.02 to 0.25 USD per phase).
 
 ## 3. Commit groups (in order; start only after the user accepts the Cost section)
 
 1. `feat(scripts): docshistory parser, units, render, verify, repoint` (zero-token parts, `parse_test.go`,
    `biome.json` excludes). Check: `units` totals match section 1 (457 phase units, 1.82 MB).
 2. `feat(scripts): docshistory distill over ingest_files` (D4) and `fold`. Smoke: `distill v2.2 --only
-   v2.2-p212-part-1` (one unit, about 0.04 USD); compare with `P298-pilot/units.jsonl`.
-3. `chore(v2.6): P298 distill <chapter>`, one commit per chapter, newest first, runs files only. Background
+   v2.2-p212-part-1` (one unit, about 0.04 USD); compare with `P299-pilot/units.jsonl`.
+3. `chore(v2.6): P299 distill <chapter>`, one commit per chapter, newest first, runs files only. Background
    run; on restart rerun the same command (finished units skip).
 4. `docs: build docs/HISTORY.md from v1 to v2.2` (render output only), then `verify`, commit
-   `P298-verify.md` in the same group. Fix rounds, if any, as follow-up commits before group 5.
+   `P299-verify.md` in the same group. Fix rounds, if any, as follow-up commits before group 5.
 5. `docs: move WEBVIEW-SCROLL-MEMORY.md out of v1.1` (`git mv`) and `refactor: repoint docs/v* references to
    HISTORY.md` (D7, pending patch hunk, README).
 6. `docs: remove v1 to v2.2 chapter folders` (D9).
 7. `docs: chapter rollover rule in CLAUDE.md` plus the DEV_ENVIRONMENT lines (D11).
-8. `docs(v2.6): P298 result`.
+8. `docs(v2.6): P299 result`.
 
 ## 4. Verification
 

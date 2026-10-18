@@ -1,9 +1,9 @@
-# P298 pilot: distill 10 SPEC units
+# P299 pilot: distill 10 SPEC units
 
 Planner run, 2026-10-18, tree `08394d55`. Real pipeline: `go build -tags server ./apps/kira-space`, one
 `kira-space memory-mcp` process per unit (temp `KIRA_MEMORY_HOME` and `KIRA_SPACE_HOME`, default prompts), MCP
 `tools/call` `ingest_files` with `{distill: true, text}`. Claude CLI 2.1.302. Driver was a throwaway Bun script
-in the planner's scratchpad (newline JSON-RPC over stdio), not committed; the P298 tool replaces it.
+in the planner's scratchpad (newline JSON-RPC over stdio), not committed; the P299 tool replaces it.
 
 Unit = one phase: `# <chapter> <id>`, the row title, `Status:` when the table has a Status column, the other row
 cells as paragraphs, then `## Result` with the phase's `## P<n> result` section(s). Picked by size percentile,
@@ -47,4 +47,4 @@ lines (decision, declined, rather than, instead of, supersed...) vs output for `
 - Reasons kept with decisions ("because primitives already live in the shared theme layer").
 - Not compressed for small units: a 466-char row became 5 lines, 495 chars. Lines restate the phase id.
 - Large units keep operational trivia: sandbox limits, fixture gaps, a refused push, flaky specs. True, but low
-  value for a history. The pipeline has no knob for that; prompt changes are out of P298 scope.
+  value for a history. The pipeline has no knob for that; prompt changes are out of P299 scope.
