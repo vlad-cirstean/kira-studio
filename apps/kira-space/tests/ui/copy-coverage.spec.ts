@@ -199,8 +199,8 @@ test('settings dialog, every pane', async ({ relaunch }) => {
     control: [
       { channel: IPC.memoryMcpStatus, response: status },
       {
-        channel: IPC.memoryCommentCheck,
-        response: contract('memory-settings', 'MemoryService.CommentCheck'),
+        channel: IPC.memoryCheckHook,
+        response: contract('memory-settings', 'MemoryService.CheckHook'),
       },
     ],
   });

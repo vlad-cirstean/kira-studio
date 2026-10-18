@@ -105,12 +105,12 @@ export function useMemoryMcpStatus() {
   );
 }
 
-export function useMemoryCommentCheck() {
+export function useMemoryCheckHook() {
   const { control } = useMemoryModule();
   return useQuery(
     {
-      queryKey: [...MEMORY_KEY, 'commentCheck'] as const,
-      queryFn: () => control.memoryCommentCheck(),
+      queryKey: [...MEMORY_KEY, 'checkHook'] as const,
+      queryFn: () => control.memoryCheckHook(),
       staleTime: 0,
     },
     queryClient,

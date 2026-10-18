@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import CheckHookSection from '@workbench/memory/settings/CheckHookSection.vue';
 import ClaudeCodeMcpSection from '@workbench/memory/settings/ClaudeCodeMcpSection.vue';
-import CommentCheckSection from '@workbench/memory/settings/CommentCheckSection.vue';
 import SemanticModelSection from '@workbench/memory/settings/SemanticModelSection.vue';
 import type { SettingsPaneProps } from './types';
 
@@ -12,7 +12,7 @@ defineProps<SettingsPaneProps>();
 <template>
   <div class="contents" v-show="active">
     <ClaudeCodeMcpSection />
-    <CommentCheckSection />
+    <CheckHookSection />
     <SemanticModelSection />
   </div>
 </template>

@@ -210,7 +210,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   memoryContext: 'MemoryService.Context',
   memoryProjects: 'MemoryService.Projects',
   memoryMcpStatus: 'MemoryService.McpStatus',
-  memoryCommentCheck: 'MemoryService.CommentCheck',
+  memoryCheckHook: 'MemoryService.CheckHook',
   memoryMcpInstall: 'MemoryService.InstallClaudeCode',
   memorySemanticStatus: 'MemoryService.SemanticStatus',
   memorySemanticInstall: 'MemoryService.InstallSemanticModel',
@@ -345,7 +345,7 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // P272: no project keys by default.
   [IPC.memoryProjects]: '[]',
   // P273: no check commands by default.
-  [IPC.memoryCommentCheck]: JSON.stringify({ executable: '', installCommand: '', hookLine: '' }),
+  [IPC.memoryCheckHook]: JSON.stringify({ executable: '', installCommand: '', hookLine: '' }),
   // P211: no imports by default.
   [IPC.memoryImportJobs]: '[]',
   // P210: no embedder by default, so the semantic row stays hidden.

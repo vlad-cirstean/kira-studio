@@ -2,7 +2,7 @@ import * as MemoryDistillService from '@bindings/memorydistillservice.js';
 import * as MemoryImportService from '@bindings/memoryimportservice.js';
 import * as MemoryService from '@bindings/memoryservice.js';
 import {
-  memoryCommentCheckSchema,
+  memoryCheckHookSchema,
   memoryContextSchema,
   memoryHistorySchema,
   memoryInstallResultSchema,
@@ -61,8 +61,7 @@ export const memoryControl: MemoryControl = {
       .array()
       .parse((await unwrap(MemoryService.Projects())) ?? []),
   memoryMcpStatus: async () => memoryMcpStatusSchema.parse(await unwrap(MemoryService.McpStatus())),
-  memoryCommentCheck: async () =>
-    memoryCommentCheckSchema.parse(await unwrap(MemoryService.CommentCheck())),
+  memoryCheckHook: async () => memoryCheckHookSchema.parse(await unwrap(MemoryService.CheckHook())),
   memoryMcpInstall: async () =>
     memoryInstallResultSchema.parse(await unwrap(MemoryService.InstallClaudeCode())),
   onMemoryChanged: (cb) => on(CHANNEL.memoryChanged, cb),

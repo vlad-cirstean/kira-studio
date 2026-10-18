@@ -7,10 +7,10 @@ import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import { useCopy } from '../../behaviour/clipboard';
 import QueryState from '../../components/QueryState.vue';
-import { useMemoryCommentCheck } from '../queries';
+import { useMemoryCheckHook } from '../queries';
 
-// P273: the commands that install the kira-memory commit check in another repository.
-const check = useMemoryCommentCheck();
+// P273, P296: the commands that install the memory commit check in another repository.
+const check = useMemoryCheckHook();
 const install = computed(() => check.data.value?.installCommand ?? '');
 const hook = computed(() => check.data.value?.hookLine ?? '');
 const installCopy = useCopy();
@@ -19,8 +19,8 @@ const hookCopy = useCopy();
 
 <template>
   <FieldSet data-testid="memory-check-section">
-    <FieldLegend>{{ t('memory.commentCheck.title') }}</FieldLegend>
-    <FieldDescription>{{ t('memory.commentCheck.description') }}</FieldDescription>
+    <FieldLegend>{{ t('memory.checkHook.title') }}</FieldLegend>
+    <FieldDescription>{{ t('memory.checkHook.description') }}</FieldDescription>
     <QueryState :query="check" variant="inline" :is-empty="() => false">
       <template #error="{ message }">
         <Alert variant="error">
@@ -28,7 +28,7 @@ const hookCopy = useCopy();
         </Alert>
       </template>
       <template v-if="install">
-        <FieldDescription>{{ t('memory.commentCheck.install.hint') }}</FieldDescription>
+        <FieldDescription>{{ t('memory.checkHook.install.hint') }}</FieldDescription>
         <Card
           class="font-data whitespace-pre-wrap break-all select-all text-kira-sm leading-normal"
           data-testid="memory-check-install"
@@ -50,7 +50,7 @@ const hookCopy = useCopy();
             }}
           </Button>
         </div>
-        <FieldDescription>{{ t('memory.commentCheck.hook.hint') }}</FieldDescription>
+        <FieldDescription>{{ t('memory.checkHook.hook.hint') }}</FieldDescription>
         <Card
           class="font-data whitespace-pre-wrap break-all select-all text-kira-sm leading-normal"
           data-testid="memory-check-hook"

@@ -152,12 +152,12 @@ export const memoryMcpStatusSchema = /*#__PURE__*/ z.object({
 });
 export type MemoryMcpStatus = z.infer<typeof memoryMcpStatusSchema>;
 
-export const memoryCommentCheckSchema = /*#__PURE__*/ z.object({
+export const memoryCheckHookSchema = /*#__PURE__*/ z.object({
   executable: z.string(),
   installCommand: z.string(),
   hookLine: z.string(),
 });
-export type MemoryCommentCheck = z.infer<typeof memoryCommentCheckSchema>;
+export type MemoryCheckHook = z.infer<typeof memoryCheckHookSchema>;
 
 // "installed" | "notFound" | "installFailed" — mcpinstall's outcome vocabulary.
 export const memoryInstallResultSchema = /*#__PURE__*/ z.object({

@@ -5,7 +5,7 @@ sources:
   - internal/memory/memfmt/memfmt.go
   - internal/memory/memfmt/parse.go
   - internal/memory/memfmt/format.go
-  - internal/memory/memfmt/markers.go
+  - internal/memory/memcheck/check.go
   - internal/memory/importer/writedoc.go
   - internal/memory/memfmt/locator.go
   - docs/v2.5/plans/P273-memory-text-formats.md

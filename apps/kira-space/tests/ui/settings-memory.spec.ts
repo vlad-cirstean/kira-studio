@@ -43,16 +43,16 @@ test('contract: Connect Claude Code shows the registration command', async ({ re
   );
 });
 
-// Contract memory-settings. Backend half: memoryflow TestCommentCheckHook.
-test('contract: comment check shows the install commands and copies each', async ({ relaunch }) => {
+// Contract memory-settings. Backend half: memoryflow TestCheckHook.
+test('contract: check hook shows the install commands and copies each', async ({ relaunch }) => {
   const check = contract<{ installCommand: string; hookLine: string }>(
     'memory-settings',
-    'MemoryService.CommentCheck',
+    'MemoryService.CheckHook',
   );
   expect(check.installCommand).toContain('memory-check --install-hook');
   expect(check.hookLine).toContain('memory-check --staged');
   const { window: page } = await relaunch({
-    control: [{ channel: IPC.memoryCommentCheck, response: check }],
+    control: [{ channel: IPC.memoryCheckHook, response: check }],
   });
   await openMemorySettings(page);
   await expect(page.locator('[data-testid="memory-check-section"]')).toBeVisible();

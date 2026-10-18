@@ -39,16 +39,16 @@ func writeFile(t *testing.T, dir, name, body string) {
 	}
 }
 
-// Contract memory-settings. UI half: settings-memory.spec.ts "contract: comment check shows the
+// Contract memory-settings. UI half: settings-memory.spec.ts "contract: check hook shows the
 // install commands".
-func TestCommentCheckHook(t *testing.T) {
+func TestCheckHook(t *testing.T) {
 	app := flowharness.New(t)
-	cc := app.W.Memory.CommentCheck()
+	cc := app.W.Memory.CheckHook()
 	exe := flowharness.Replace(cc.Executable, "<bin>/kira-space")
-	app.Contract(t, "memory-settings", "MemoryService.CommentCheck", cc, exe)
+	app.Contract(t, "memory-settings", "MemoryService.CheckHook", cc, exe)
 	if !filepath.IsAbs(cc.Executable) || !strings.Contains(cc.InstallCommand, "memory-check --install-hook") ||
 		!strings.Contains(cc.HookLine, "memory-check --staged") || !strings.Contains(cc.InstallCommand, cc.Executable) {
-		t.Fatalf("CommentCheck = %+v, want an absolute executable in both commands", cc)
+		t.Fatalf("CheckHook = %+v, want an absolute executable in both commands", cc)
 	}
 
 	repo := t.TempDir()
