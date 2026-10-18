@@ -57,6 +57,6 @@ Several targets overshot the plan's trim (2.1 119 vs 60): kept tables the specs 
 Headings unchanged. Repointed: `measure.ts` stale `PERF.md:98-102` -> `§2.1 methodology note` (section kept, no `git show` needed).
 Resolve check: every cited id exists (§1, 2.1, 2.1a, 2.1c, 2.2, 2.3, 2.5, 2.6, 2.7, 2.8, 2.13, 3, 5).
 Open: §1 says 12 ms for the `tests/ui/` scroll tier, `budgets.spec.ts` asserts p50 <= 16 / max <= 80
-(P161, recorded in §2.1). §1 left verbatim per the phase rule; fix in a follow-up.
+(P161, recorded in §2.1). Follow-up: §1 row 1 now reads "p50 ≤ 16 ms and max ≤ 80 ms on the `tests/ui/` tier". Other §1 bounds (50/300 ms, keystroke 50/200, rAF 80 ms, cells < 1500) checked against the specs: agree. P163 sentence now names the slowest caller (find, 12 MB, 35-51 ms).
 Worktree hook needed symlinked `node_modules`, `site/node_modules`, `packages/*/node_modules`,
 `frontend/bindings` from the main checkout (git-ignored).

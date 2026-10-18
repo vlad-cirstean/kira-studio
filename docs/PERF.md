@@ -20,7 +20,7 @@ caveat below for exactly which of those numbers that affects and which it doesn'
 
 | §2 budget | Metric actually measured | Where | Automated? |
 |---|---|---|---|
-| Grid scroll frame ≤ 8 ms (12 ms on the `tests/ui/` tier, see §2.1) | app-work delta (`KiraSlickGrid.render()` entry's scroll-work mark → DOM committed), **p50** over 20 steps on a 10 000-row page (see methodology note below) | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
+| Grid scroll frame ≤ 8 ms (p50 ≤ 16 ms and max ≤ 80 ms on the `tests/ui/` tier, see §2.1) | app-work delta (`KiraSlickGrid.render()` entry's scroll-work mark → DOM committed), **p50** over 20 steps on a 10 000-row page (see methodology note below) | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
 | Grid scroll frame, horizontal axis (P29) ≤ 8 ms | same work-delta measurement, **p50** over 20 steps, on `app.scroll_grid` (60 cols x 5000 rows) | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
 | Grid scroll frame, vertical axis, wide table (P29) ≤ 8 ms | same work-delta measurement, **p50** over 20 steps, on `app.scroll_grid` | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
 | Row window stays coalesced to <= 1 re-render/frame during sustained fast scroll (P22 D1) | `notifiesPerFrame` <= 1 at 40/100/200/456 px/frame; `uncoveredPx` === 0 at 40-100 px/frame | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1a** |
@@ -113,7 +113,7 @@ a worker cut the longest main-thread block: Console Format 64 KB 631 → 84 ms, 
 block at 5 MB because Monaco applies the result as one undoable edit. Documents field-name
 memoization saves ~20 ms, inside noise. Worker cold start 7-14 ms, warm round trip 0-1 ms, 12 MB
 `postMessage` 15-18 ms. Every other caller timed in-page (find, compare, `detectFormat`,
-`parseDocument`, row menu, Mongo lint, EXPLAIN, Copy as JSON) stayed <= 51 ms and was left alone. The
+`parseDocument`, row menu, Mongo lint, EXPLAIN, Copy as JSON) stayed <= 51 ms (slowest: response find `findRanges` on 12 MB, 35-51 ms) and was left alone. The
 HTTP response viewer showed no regression within run noise.
 
 **P57 M5 (Wails/Go migration) — `tests/ui/budgets.spec.ts` and `tests/ui/perf.spec.ts`.** Both specs
