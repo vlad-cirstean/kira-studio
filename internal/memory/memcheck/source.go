@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
 const (
@@ -28,6 +30,15 @@ func usable(data []byte) bool {
 		return false
 	}
 	return !bytes.Contains(data[:min(len(data), nulProbe)], []byte{0})
+}
+
+// slim drops the content of a file that cannot hold a finding, so a large tree is not held in
+// memory: only doc files and files naming kira-memory keep their bytes. The file still counts.
+func slim(path string, data []byte) []byte {
+	if memfmt.IsDocPath(path) || bytes.Contains(data, []byte("kira-memory")) {
+		return data
+	}
+	return nil
 }
 
 // lister yields the files to check.
@@ -71,7 +82,7 @@ func readDisk(paths []string) []Source {
 		if err != nil || !usable(data) {
 			continue
 		}
-		out = append(out, Source{p, data})
+		out = append(out, Source{p, slim(p, data)})
 	}
 	return out
 }
@@ -178,7 +189,7 @@ func parseBatch(paths []string, r io.Reader) ([]Source, error) {
 				return nil, err
 			}
 			if usable(data) {
-				out = append(out, Source{p, data})
+				out = append(out, Source{p, slim(p, data)})
 			}
 			continue
 		}

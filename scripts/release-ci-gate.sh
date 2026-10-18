@@ -32,7 +32,18 @@ fi
 command -v gh >/dev/null 2>&1 || { echo "release-ci-gate: gh not found" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "release-ci-gate: jq not found" >&2; exit 1; }
 
-FULL_SHA="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA" --jq .sha)"
+# retry <command...>: runs it up to 4 times, 5s apart, so one 5xx or network blip is not a red gate.
+retry() {
+  _n=1
+  until "$@"; do
+    [ "$_n" -lt 4 ] || return 1
+    echo "release-ci-gate: '$1' failed, retrying ($_n/3)" >&2
+    _n=$((_n + 1))
+    sleep 5
+  done
+}
+
+FULL_SHA="$(retry gh api "repos/$GITHUB_REPOSITORY/commits/$SHA" --jq .sha)"
 
 # Prints "<id> <event> <status> <conclusion> <url>" per run, newest first.
 list_runs() {
@@ -43,7 +54,7 @@ list_runs() {
 START="$(date +%s)"
 DISPATCHED=0
 while :; do
-  RUNS="$(list_runs)"
+  RUNS="$(retry list_runs)"
   GREEN="$(printf '%s\n' "$RUNS" | awk '$3 == "completed" && $4 == "success" {print $5; exit}')"
   if [ -n "$GREEN" ]; then
     echo "release-ci-gate: PR CI green on $FULL_SHA: $GREEN"
