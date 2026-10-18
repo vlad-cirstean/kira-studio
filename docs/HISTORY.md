@@ -6472,3 +6472,170 @@ Step kind labels read "Agent step" etc., because of the catalog duplicate rule.
 The UI spec `ade-v2-flat-steps` uses the contract for shape checks and fixture boards for UI state; `openWorkflows` lives in `support/adeV2.ts`.
 Remaining uses of the word "stage" in the code are git/grid/update staging, the rejection message for old workflow files, and its docs mention.
 <!-- /chapter v2.5 -->
+
+<!-- chapter v2.6 -->
+## v2.6
+Source: docs/v2.6/ at ca2fa17c172b. 12 phases.
+
+### v2.6 P294 Test and CI speed. Goal: cut PR CI wall time and local test time sharply; planner decides every deferred point. Evide... (Done (CI half pending the pr.yml patch))
+Workflow edits go through docs/pending-workflows/ (see docs/DEV_ENVIRONMENT.md); the pr.yml change is a pending patch at docs/pending-changes/.github__workflows__pr.yml.patch, to be applied from a Mac session.
+The ui CI job is sharded into 4 shards by user decision, after first shipping with 2 shards.
+The Docker image tar cache stays in CI: go-containers restores it and loads it in the background beside setup; the parallel pull script runs only on a cache miss, after which the tar is saved as before.
+setup-go's go.sum-keyed cache is replaced by gomod-* (module cache) plus per-job gobuild-* cache entries; existing cache keys and paths are kept.
+CI runs the full suite on every PR, with no path filters and no skipped jobs.
+Git hooks scope to changed files; pre-commit is 0.5s for docs-only, 0.1s for Go-only and 56s for studio frontend commits, and pre-push for a Go-only range runs tests of the changed package.
+Frontend commits get no hook speedup because the lint rules take 17s and the changed projects must typecheck.
+The Ryuk image is not pulled because the go-containers job sets TESTCONTAINERS_RYUK_DISABLED=true.
+scripts/pull-test-images.sh (run via bun run test:images) pulls alpine:3.20 and bash:5.2 under the mirror name only, and no longer creates a plain alpine:3.20 tag.
+TestImageRegistryURL failed because a plain alpine:3.20 tag (from a manual pull/tag recipe) made the registry-link logic pick the implied Hub name; with that tag removed the test passes unchanged. It was not a containerd-store issue.
+Running the app via nohup leaves SIGHUP ignored and shells inherited it, so terminal Close never hung them up; internal/terminal/session.go now installs a handler when SIGHUP is ignored at start so the exec resets it to default.
+The Go 'under 30s cached' target is not met because the ade and i18n tests are never cached by go test.
+CI estimates, not measured: run wall time drops from 15m47s to about 6 min warm (about 60% less), while billed Linux runner-minutes stay about equal (24.9 before, 23.8 after); cold-cache runs add about 1.5 min per job.
+
+### v2.6 P295 Release flow speed; publish, not draft. Goal: cut tag-to-release wall time and publish the release directly. Evidence... (Done (pending the release.yml patch))
+The release workflow .github/workflows/release.yml triggers on push of tags v*.*.*, runs jobs test-matrix and db-compat (ubuntu, timeouts 30 and 60 min) first, then the release job (macos-15, needs both, timeout 60 min) which builds, signs and packages.
+P295 goal: cut tag-to-release wall time and publish the release directly (not as a draft), only after tests pass and assets are uploaded and verified.
+Failure safety requirement: a failed gate must not leave a published release, and the handling of a bad tag must be stated.
+Workflow edits must go through docs/pending-changes/ (see docs/DEV_ENVIRONMENT.md), so the release.yml change is delivered as a pending patch to apply.
+P295 added a release gate script, scripts/release-ci-gate.sh, which supports --dry-run and has a dispatch path (exit 3 means it would dispatch, exit 1 means a failed run).
+The setup action (.github/actions/setup) gained a cache-save option; the cache-save: true branch equals the old steps plus one && clause.
+The new publish job fetches the DMGs with gh run download (needs actions: read) instead of actions/download-artifact, because no verified pin for that action was reachable.
+release.yml has no dry run, so after-change release timings can only be measured on a real tag.
+
+### v2.6 P296 Memory: code comments are plain comments. Decisions final (user, 2026-10-18). The memory tool never touches files and... (Done)
+Code comments are plain comments, not memories: they carry no kira-memory header, no km_ fact lines, no tags, ids, keywords or provenance of their own.
+A code comment may only reference a memory by its id; the id always resolves because the memory is stored the normal way.
+The memory tool never touches files and never adds comment markers; the store_memory asComment flag was removed, so it no longer returns a marker-wrapped kira-memory block.
+To condense text for a comment the agent uses distill (P297 merges it into memory).
+The .memory.md doc format and import write-back stay unchanged in P296; P297 changes them.
+Service.Prepare and the asComment flag were dropped, and memfmt no longer has the comment format.
+memory-check flags retired comment blocks (exit 1 with the D3 message at the file and line); a plain comment citing a memory id like (km_7h3kq9x2mfa4) passes with exit 0.
+The comment check was renamed to the check hook; the flow TestCheckHook contract is unchanged.
+The memory MCP instructions must tell agents to cite the stored memory id in the code comment, because a real claude agent stored a memory but left no id in the comment before the reword.
+The --print-regex flag help text was reworded because the old text named the comment regex.
+Re-run the real claude rows of docs/DEV_ENVIRONMENT.md after prompt changes, because agent behavior depends on the prompt wording.
+
+### v2.6 P297 Memory: distill collapses into memory; rules. Decisions final (user, 2026-10-18). (1) A memory can be a rule: a stand... (Done)
+A memory can be a rule: a standing, general imperative with a reason, as durable as a fact.
+The memories table gains a kind column (fact or rule); versions are immutable, so kind is fixed per version, and no other new metadata is added.
+The gate (memory.gate.system), the import extract and finalize prompts and the no-challenge mode no longer treat an imperative as non-durable, but still refuse one-off tasks and questions and still require a reason.
+Distill is collapsed into memory: ingest_files gains a no-store flag that runs the same pipeline (chunk, extract, verify, finalize merge) and returns the merged lines instead of storing; it also accepts text, not only paths.
+The old distill chunked and distilled each part in an isolated call and only concatenated the lines, so duplicates across parts survived; the merge pass of import's finalize step 1 is now shared, not rewritten.
+With no store, the merge covers the input only, and the call never reads the store.
+The UI Distill view and Import as document keep working on the same backend after distill is merged into ingest_files.
+The instructions mode is removed; the single prompt keeps rules as short imperatives and facts as claims, with negations, numbers, units, names, paths and template variables verbatim.
+An example is never a memory by itself; it stays inside a rule or fact only when the rule is hard to state without it (an exact command, format or error string), fits on one plain-text line with no backticks, and is stated in the source. Longer ones become a pointer to their path.
+Doc format kira-memory: 3 has top-level ## Facts and ## Rules sections with the source section as ### under each; fact items stay - <id> <text> with an optional indented reason.
+In kira-memory: 3 the Stated in <from>, <heading> locator uses the source heading, never the category.
+The kira-memory: 3 format change required updates to the memfmt parser, formatter and validator, writedoc.go, memcheck and the site memory-formats page.
+The pipeline has three outputs: stored memories, merged lines (no store), and a .memory.md doc.
+The distill MCP tool was removed; ingest_files schema required no longer lists paths, origin or scope, and a no-store call creates no job and emits no kira:memory:changed.
+A kira-memory: 2 doc is retired: the memory-check reports the v2 message and exits 1, while a staged v3 doc with both categories exits 0.
+A tail chunk under MinTail merges back into the first chunk, so a short second part yields only one chunk.
+In the importer tests, unchanged fixture sentences such as "Never call billing-api directly..." are rules too, so the import test asserts the restore rule is stored with kind rule rather than exactly one rule (4 stored rules).
+The eval harness reserves 2 USD per phase, so a phase cap of 2 skips every source; the P297 eval subset used KIRA_EVAL_PHASE_CAP_USD=4.
+The P297 eval subset showed no R_ess drop (0.899 vs 0.871 baseline mean), so the extract wording stays; precision P was 0.521 vs 0.635, inside baseline noise but under the P289 pass line, and unconfirmed.
+
+### v2.6 P298 Memory: drop operational trivia from distill and import output. Decisions final (user, 2026-10-18). The extract and m... (Done)
+The extract and merge prompts (shared by import and distill) must not output facts about how a run was executed: refused or conflicting pushes, branch handling, sandbox or environment limits, flaky test runs or timeouts, fixture or harness gaps noted to explain a skipped check, what was left for the user to verify, or commit mechanics.
+Decisions with their reasons, constraints, design choices and their consequences stay in memory output; the trivia exclusion applies to both import and distill, with no exception.
+Trivia removal is done through the prompts (memory.merge.system and the extract prompt), not by a filter after the fact.
+In the P298 pilot over 10 units, trivia lines fell from 11 to 4 with the reworded prompts. The model still keeps harness and fixture facts as test knowledge even when the Drop list names them. The user accepted this on 2026-10-18, relaxing the trivia pass line from at most 1.
+The reworded prompts removed the push, flake, live-check, baseline, real-phone and install trivia lines from output.
+A stronger Drop wording risks losing the pathspec guard, which the reworded prompt lost once in the pilot (P131 Part 2) before it came back on rerun.
+With the reworded prompts, eval round p298-01 had R_ess 0.903, R_all 0.769, P 0.562 and unsupported 0.000. P is up 0.041 versus p297-01 and 0.008 under the P289 floor of 0.570.
+The holdout doc-devenv-claude lost no environment fact under the reworded prompts, with R_ess 0.958 in both rounds.
+The P298 change added the prompt memory.runTrivia and grew memory.import.extract.system from 2852 to 4020 chars, memory.merge.system from 2605 to 3824, and memory.import.finalize.system from 3622 to 4841.
+
+### v2.6 P299 Docs history. Decisions final (user, 2026-10-18). Replace every `docs/v*/` chapter except v2.6 (and v2.5 until the ev... (Done)
+Decision (final, user, 2026-10-18): every docs/v*/ chapter except v2.6 (and v2.5 until the eval harness is confirmed not to read P285-runs) is replaced by one docs/HISTORY.md; those chapters' SPEC.md and plans/ are deleted.
+A script builds HISTORY.md with zero model tokens, because no model reads the old prose.
+Per phase, HISTORY.md keeps the P-number, title, status and first sentence of its SPEC row, plus the opening paragraph of the phase's P<n> result section and every line matching decision markers, with a size cap per phase.
+Decision markers used to select lines are: decision, decided, user override, declined, rejected, instead of, rather than, supersedes, reverted, renumbered.
+Prose outside any P<n> section is scanned with the same decision markers and filed under its chapter.
+The planner measures output size and checks a sample of phases against their source, so a decision found only elsewhere in a SPEC is caught.
+Code comments and docs pointing at docs/v*/plans/... are repointed at HISTORY.md or lose the reference; git history keeps the deleted files.
+P299 folded v1 to v2.2 into docs/HISTORY.md; v2.5 and v2.6 chapters stay.
+The history tool waits with backoff on a rate-limit error, charges 0 and does not consume a try.
+The tool charges failed claude calls in the spend ledger because cost is not returned on error, so ledgered spend exceeds real spend (sum of costUsd on ok calls).
+The generated docs/HISTORY.md has no per-phase line cap; rerunning render gives a clean git diff.
+WEBVIEW-SCROLL-MEMORY.md was moved to docs/ when the chapter folders were deleted.
+The CLAUDE.md rule passes --runs docs/history-runs; the history tool's default runs dir is the P299 dir.
+The repoint command also rewrites the tool's own test fixtures (scripts/docshistory), which must be reverted by hand.
+After P299, references to docs/v(1|1.x|2.0-2.2)/ remain only in the tool's own fixtures (scripts/docshistory), docs/pending-changes/ and .github/workflows/.
+
+### v2.6 P300 Docs history, v2.5 and the tool fix. Decisions final (user, 2026-10-18). v2.5 is done and folds into `docs/HISTORY.md... (Done.)
+The repoint command in scripts/docshistory must skip its own files (scripts/docshistory/), so a fold does not rewrite the tool's test fixtures.
+What the memory eval harness reads at runtime (P285 and P291 corpora, run folders, the promptsizes default path) was moved out of docs/v2.5/plans/ to a non-docs location, keeping the harness green and baselines comparable.
+The v2.5 docs were folded into docs/HISTORY.md using the CLAUDE.md rollover command: distill via ingest_files, sequential with --jobs 1, rate-limit backoff, then verify sample, repoint, and git rm of the v2.5 folder except moved data.
+docs/WEBVIEW-SCROLL-MEMORY.md was dropped as stale (user decision); its special-case in repoint.go was removed. It stays reachable through git show 7d8a72ab4a5e: pointers in wkhost.swift, ARCHITECTURE.md and PERF.md.
+The orchestrator must confirm with the user if the projected phase cost passes 10 USD; the projection uses the P299 mean of 0.068 USD per phase times the v2.5 unit count.
+docs/v2.6 stays after the fold (it is not removed).
+The verify step failed because verifyBaseTurns was 3: a 2-fact batch hit terminal_reason max_turns in 7 of 8 replays at 3 turns, 0 of 14 at 5 or 6. Batch size was not the cause.
+In internal/memory/importer/verify.go the verify base turn count is now 6, scaling with +facts/4 and keeping the cap of 20.
+The Claude CLI error error_max_turns maps to memory.ErrClaudeMaxTurns ("Claude Code call hit its turn limit."), which is retryable and passed through memoryErr, instead of the generic "Claude Code failed: exit 1".
+In the ledger, failed tries charge a 0.25 USD estimate against the cap while the real cost is recorded as 0.
+Under the fix-on-the-spot rule, commit a fix (such as fix(memory)) inside the current phase when a bug is found.
+P285-report.md is no longer in the tree and stays reachable via git show b811de651f56:docs/v2.5/plans/P285-report.md; HISTORY.md P285 Part 1 now reads "docs/HISTORY.md (v2.5 P285)" as repoint's output.
+
+### v2.6 P301 Code review (one Opus round, all three dimensions) of code changes only. Decisions final (user, 2026-10-18). Scope: e... (Done.)
+The P301 code review is a single Opus round covering all three dimensions, and it reviews code changes only.
+P301 review scope is everything changed since the last review session; the reviewer finds the base in git per CLAUDE.md and states it.
+P301 review scope excludes all documentation: nothing under docs/, no *.md, no plan, spec, HISTORY.md or pending-changes files.
+P301 review scope includes code, tests, scripts, prompts, configs and workflows-as-patches.
+In P301 the findings file plans/P301-findings.md must be committed before any fixer starts; then one sequential Sonnet fixer commits per group of related findings.
+A review round that finds nothing real must say so.
+P301 fixed 7 findings (1.1, 1.2, 2.1, 2.2, 3.1, 4.1, 4.2) and skipped none.
+The fix for finding 3.1 ships as the unapplied pending patch docs/pending-changes/.github__workflows__pr.yml.patch, to be applied from an environment with workflow scope.
+
+### v2.6 P302 E2E coverage for the P301 editor fixes. Decisions final (user, 2026-10-18). Two end-to-end tests, each split at the I... (Done)
+P302 adds two end-to-end tests for the P301 editor fixes, each split at the IPC boundary per CLAUDE.md: a backend flow test asserts the result and a frontend UI spec asserts the same result.
+A workflow YAML or step-editor route that sends back to a manual or skipped step is refused with a parser error, and the editor hides those steps in the route options while keeping the current pick visible.
+Removing, moving, changing the kind of, or toggling the smart script of a step clears a stale review.implementer, and the next save succeeds.
+The P302 tests reuse the existing adeflow flow-test harness and the ADE UI spec fixtures, with no new mechanism.
+The backend already refused a stale implementer; the P301 fix is the editor clearing it, so Go TestWorkflowEditorClearsStaleImplementer passes even without the fix.
+Backend refuses a stale review implementer with the error 'implementer must be an earlier agent step'; an empty implementer saves and re-reads as cleared.
+Go TestWorkflowReturnToStepThatNeverRuns covers a YAML return to a manual step giving a parser error at line 19, and a graph SaveWorkflow return to a skipped step giving bad-request with the file hash unchanged.
+The UI YAML-error test is mock-driven and passes without the fix; the parser guard itself is covered by the Go contract test.
+The new Go flow tests write the contract file ade-workflow-editor.json, and shared smart script fixtures live in tests/ui/support/adeV2.ts.
+
+### v2.6 P303 Distill the standing docs: `docs/ARCHITECTURE.md` (600 KB), `docs/PACKAGING.md` (43 KB), `docs/HUMAN_CODE_REVIEW.md`... (Done)
+P303 distills the standing docs docs/ARCHITECTURE.md, docs/PACKAGING.md and docs/HUMAN_CODE_REVIEW.md with the P299 pipeline (ingest_files distill on plain text, sequential, P298 prompts), split by section because the input cap is 120,000 characters per call.
+P303 touches only docs and the docs tool, so it has zero file overlap with P302 (ADE tests and components); it runs as Stream B in its own git worktree in parallel with P302, by user override of one-phase-at-a-time.
+The original text of the distilled docs stays in git and is referenced by git show <commit>:<path> where a pointer needs it.
+The P303 plan must keep a pointer scheme so code comments and docs citing ARCHITECTURE.md §n still resolve.
+Distill rules keep tables only as one headline figure, and keep ARCHITECTURE's Known open items entry text verbatim.
+The P303 ARCHITECTURE.md distill shrank the file from 600,492 to 459,256 bytes (-23.5%), less than the projected 29%, because 2 large units were kept verbatim.
+PACKAGING.md ended fully verbatim because the plan's gates failed: the command gate failed in sections 2 and 7, and sections 5 and 8 lost open-state text, so those were kept verbatim.
+HUMAN_CODE_REVIEW.md was left unchanged by P303.
+Distill verification uses a doc-level loss gate of 45% hard-lost details; ARCHITECTURE held at 24.4% whole-doc loss (1,798 of 7,377).
+P303 verification confirmed all 70 Known open items in ARCHITECTURE.md are byte-identical (29,202 bytes) and all E_* error identifiers were kept (35/35).
+The docshistory tool counts loss on the unit body only, not the '# file: heading' header; it has a doc show subcommand; render writes the note line only when a unit is distilled and is idempotent.
+P303 reference repoint: of 60 lines in 41 files citing ARCHITECTURE.md outside the tool, 50 resolved as-is and 10 were repointed to headings.
+The docshistory tool lives in scripts/docshistory and is checked by go test ./scripts/docshistory, go vet ./scripts/... and bun run lint:go.
+The P303 verify report is at docs/v2.6/plans/P303-verify.md and run records are in docs/v2.6/plans/P303-runs/.
+
+### v2.6 P304 Clean up `docs/PERF.md` by hand (no distill pipeline). Decisions final (user, 2026-10-18). Runs as Stream C in its ow... (Done)
+docs/PERF.md was cleaned up by hand (no distill pipeline): stale historical result tables of §2 were cut, what is cited or live was kept; size went from 1826 lines / 143,668 B to 1085 / 85,924 B.
+In docs/PERF.md, the header, §1 budget table, §2.1a, §2.1c (real-Mac scroll A/B protocol), §2.13, §3 manual procedures and §5 are kept verbatim.
+Never renumber or remove a PERF.md section cited from other files, and keep headings unchanged, because docs/ARCHITECTURE.md (owned by P303) cites §1, §2.2, §2.5, §2.6, §2.7, §2.13, §3 and §5.
+PERF.md section ids cited and existing after cleanup: §1, 2.1, 2.1a, 2.1c, 2.2, 2.3, 2.5, 2.6, 2.7, 2.8, 2.13, 3, 5.
+Point a citation of a removed PERF.md subsection to git show <commit>:docs/PERF.md; if the section is kept, cite the section instead (measure.ts PERF.md:98-102 was repointed to §2.1 methodology note).
+PERF.md §1 row 1 reads "p50 ≤ 16 ms and max ≤ 80 ms on the tests/ui/ tier", matching the budgets.spec.ts assertion (p50 <= 16 / max <= 80, P161, recorded in §2.1). It had said 12 ms.
+The other PERF.md §1 bounds agree with the specs: 50/300 ms, keystroke 50/200, rAF 80 ms, cells < 1500.
+The P163 sentence in PERF.md names the slowest caller: find, 12 MB, 35-51 ms.
+The worktree hook needs git-ignored node_modules, site/node_modules, packages/*/node_modules and frontend/bindings symlinked from the main checkout.
+
+### v2.6 P305 Close chapter v2.6. Decisions final (user, 2026-10-18). Runs after P303 and P304 have landed and everything else is d... (Done.)
+Phase P305 closes chapter v2.6 by folding phases P294 to P304 (including P305's own row as a closed entry) into docs/HISTORY.md, then deleting the chapter's md files (docs/v2.6/SPEC.md, docs/v2.6/plans/*.md and docs/history-runs/).
+P305 runs only after P303 and P304 have landed and everything else is done.
+The chapter fold uses the CLAUDE.md rollover command: go run ./scripts/docshistory fold --runs docs/history-runs --out - --jobs 1 --max-usd <cap> v2.6, which is sequential, backs off on rate limits and is resume-safe.
+The P305 verify pass requires every phase row P294 to P304 to be present in HISTORY.md with its decisions and cost.
+The P305 planner must decide which non-md data under docs/v2.6/ is read at runtime or in tests (P298-pilot, P299-pilot, P299-runs, P303-pilot, runs ledgers), and either move it to a testdata home or delete it with the folder.
+References to v2.6 plans and docs/v2.6 in code comments, docs, tests and CLAUDE.md are repointed to a HISTORY.md entry or to git show <commit>:path.
+Once the chapter folder is gone, the next phase number is found by the HISTORY.md highest-P rule.
+In the docshistory tool, the v2.6 guard was removed from checkChapter, and a planResultChapter rule (v2.0, v2.5 and later) replaces the map.
+The docshistory doc command's default --runs is docs/history-runs.
+CLAUDE.md's highest-P rule now reads only the open chapter's SPEC.md, the start list gains v2.5 and v2.6, and the rollover rule now reads "Closing a chapter folds it".
+The P299 and P300 plan bodies were restored (283 and 227 lines), and units v2.6 shows 12 phases, 47,160 bytes, and no notes unit.
+<!-- /chapter v2.6 -->
