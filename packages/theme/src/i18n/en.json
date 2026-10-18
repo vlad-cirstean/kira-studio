@@ -5858,21 +5858,12 @@
           "hint": "No file chosen."
         }
       },
+      "hint": "Facts come back as short claims and rules as short imperatives. Negations and numbers stay.",
       "import": {
         "label": "Import as document…"
       },
       "input": {
         "placeholder": "Paste text to condense"
-      },
-      "mode": {
-        "facts": {
-          "hint": "Short statements of what the text says.",
-          "label": "Facts"
-        },
-        "instructions": {
-          "hint": "Short imperatives. Negations and numbers stay.",
-          "label": "Instructions"
-        }
       },
       "open": {
         "label": "Distill text"
@@ -5884,7 +5875,15 @@
         "error": "Over the limit of {max} characters."
       },
       "progress": {
-        "status": "Parts done: {done} of {total} · {cost}"
+        "extract": {
+          "status": "Reading parts: {done} of {total} · {cost}"
+        },
+        "merge": {
+          "status": "Merging lines: {done} of {total} · {cost}"
+        },
+        "verify": {
+          "status": "Checking against the source: {done} of {total} · {cost}"
+        }
       },
       "result": {
         "line": {
@@ -5917,6 +5916,9 @@
         "limit": {
           "hint": "Select at most {max} lines to store."
         }
+      },
+      "unresolved": {
+        "title": "Unclear, left out"
       }
     },
     "import": {

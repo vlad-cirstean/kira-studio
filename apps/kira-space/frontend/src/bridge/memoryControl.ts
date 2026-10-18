@@ -103,12 +103,11 @@ export const memoryControl: MemoryControl = {
     await unwrap(MemoryImportService.RetryFile({ fileId }));
   },
   onMemoryImport: (cb) => on(CHANNEL.memoryImport, cb),
-  memoryDistill: async ({ requestId, text, path, mode }, signal) => {
+  memoryDistill: async ({ requestId, text, path }, signal) => {
     const call = MemoryDistillService.Distill({
       requestId,
       text: text ?? '',
       path: path ?? '',
-      mode,
     });
     signal?.addEventListener('abort', () => call.cancel(), { once: true });
     return distillResultSchema.parse(await unwrap(call));

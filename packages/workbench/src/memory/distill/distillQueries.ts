@@ -75,7 +75,7 @@ export function useDistillProgress(): void {
   const ui = useDistillUiStore();
   const off = control.onMemoryDistill((p: DistillProgress) => {
     if (p.requestId !== ui.requestId) return;
-    ui.progress = { done: p.done, total: p.total, costUsd: p.costUsd };
+    ui.progress = { stage: p.stage, done: p.done, total: p.total, costUsd: p.costUsd };
   });
   tryOnScopeDispose(off);
 }
