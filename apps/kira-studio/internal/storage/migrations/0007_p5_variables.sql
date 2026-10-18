@@ -1,5 +1,5 @@
 -- P5 D2/D4: variables are rows in this app's own database, owned by either a collection or an
--- environment — never both, never neither. Environments are top-level (docs/v1.2/SPEC.md's P5 row
+-- environment — never both, never neither. Environments are top-level (docs/HISTORY.md (v1.2)'s P5 row
 -- calls them "separate", and a scratch request tab belongs to no collection at all), so they carry
 -- no collection foreign key.
 CREATE TABLE http_environments (

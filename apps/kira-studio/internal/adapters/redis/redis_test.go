@@ -1,6 +1,6 @@
 // Ported from packages/db-fixtures/redis.spec.ts (§9.4), case by case where practical — the spec's own
 // numbering is kept in each test's name so the two can be diffed. §5.4 of
-// docs/v1/plans/P58c-mongo-redis.md names the cases that carry the most weight: hash/set/zset
+// docs/HISTORY.md (v1 P58c) names the cases that carry the most weight: hash/set/zset
 // paging asserting "some rows, more to come" rather than an exact count where overshoot is
 // possible, the offset-cursor-restarts-the-scan contract, a vanished key being E_QUERY not
 // E_NOT_FOUND, truncated only when the round cap actually cut a scan short, children() of a key

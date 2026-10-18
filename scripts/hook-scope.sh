@@ -19,6 +19,11 @@ any() {
 # typecheck_targets <file list>: prints the `typecheck:*` script names the list touches, or the
 # word `full` when a changed TS/Vue file maps to no single project (shared package).
 typecheck_targets() {
+  # MessageKey derives from the catalog, so a catalog change can break any project.
+  if printf '%s\n' "$1" | grep -q '^packages/theme/src/i18n/'; then
+    echo full
+    return 0
+  fi
   _ts="$(printf '%s\n' "$1" | grep -E '\.(ts|mts|vue|js|d\.ts)$' || true)"
   [ -n "$_ts" ] || return 0
   printf '%s\n' "$_ts" | while IFS= read -r _f; do
@@ -35,7 +40,27 @@ typecheck_targets() {
   done | tr ' ' '\n' | sort -u
 }
 
-# go_dirs <file list>: package dirs (./path) of changed Go files.
+# go_mod_dir <dir>: prints the dir holding the nearest go.mod at or above <dir> (`.` = root module).
+go_mod_dir() {
+  _d="$1"
+  while [ "$_d" != "." ] && [ "$_d" != "/" ] && [ ! -f "$_d/go.mod" ]; do
+    _d="$(dirname "$_d")"
+  done
+  echo "$_d"
+}
+
+# go_dirs <file list>: package dirs (./path) of changed Go files inside the root module.
+# Nested modules (apps/*/tests/claude) are excluded: the root `golangci-lint`/`go test` reject them.
 go_dirs() {
-  printf '%s\n' "$1" | grep -E '\.go$' | xargs -r -n1 dirname | sort -u | sed 's|^|./|'
+  printf '%s\n' "$1" | grep -E '\.go$' | xargs -r -n1 dirname | sort -u | while IFS= read -r _g; do
+    [ "$(go_mod_dir "$_g")" = "." ] && echo "./$_g"
+  done
+}
+
+# nested_go_mods <file list>: dirs of nested Go modules holding a changed Go file.
+nested_go_mods() {
+  printf '%s\n' "$1" | grep -E '\.go$' | xargs -r -n1 dirname | sort -u | while IFS= read -r _g; do
+    _m="$(go_mod_dir "$_g")"
+    [ "$_m" = "." ] || echo "$_m"
+  done | sort -u
 }

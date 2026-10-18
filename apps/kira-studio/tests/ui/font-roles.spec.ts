@@ -10,7 +10,7 @@ import {
 } from './support/mariadbFixture';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
-// docs/v1.2/plans/P26-interface-font-split.md §4.3 cases 1-2: the two guarantees this phase
+// docs/HISTORY.md (v1.2 P26) cases 1-2: the two guarantees this phase
 // exists to make true — every genuinely-data surface (F6's 36 sites) resolves --kira-font-data,
 // every chrome surface (F7's "no declaration of its own" majority, riding `body`) resolves
 // --kira-font-ui, and the two tokens are not secretly aliased back together.

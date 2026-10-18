@@ -1,6 +1,7 @@
 package memoryflow_test
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -299,7 +300,7 @@ func writesDoc(t *testing.T, itemReason, wantReason string, heading bool) {
 	t.Helper()
 	app := ingestAppReason(t, itemReason, "",
 		fakeagent.PromptRule{System: extractSystem, Doc: "billing.md", Emit: testdata(t, "extract-billing.md.json")},
-		fakeagent.PromptRule{System: gateSystem, Doc: "billing.md", Emit: testdata(t, "gate-billing.md.json")},
+		fakeagent.PromptRule{System: gateSystem, Doc: "billing.md", Emit: testdata(t, "gate-billing-rule.md.json")},
 		fakeagent.PromptRule{System: reconcileSystem, Emit: testdata(t, "reconcile.json")})
 	dir := copyTestdata(t, app, "docs", "import/billing.md")
 	awaiting := createJob(t, app, dir)
@@ -327,10 +328,14 @@ func writesDoc(t *testing.T, itemReason, wantReason string, heading bool) {
 	if doc.Origin != memory.OriginUser || doc.Scope != memory.ScopeProject || doc.Project != billingKey || doc.Group != f.GroupID {
 		t.Fatalf("doc header = %+v, want user/project %s in group %s", doc.Provenance, billingKey, f.GroupID)
 	}
-	if doc.Version != 2 || doc.From != "billing.md" || strings.Contains(string(raw), " fact: ") || strings.Contains(string(raw), "\n  ") {
-		t.Fatalf("written doc is not format v2 with from billing.md and no reason lines:\n%s", raw)
+	if doc.Version != 3 || doc.From != "billing.md" || strings.Contains(string(raw), " fact: ") || strings.Contains(string(raw), "\n  ") {
+		t.Fatalf("written doc is not format v3 with from billing.md and no reason lines:\n%s", raw)
 	}
-	if got := strings.Contains(string(raw), "\n## Billing\n"); got != heading {
+	if !strings.Contains(string(raw), "\n## Facts\n") || !strings.Contains(string(raw), "\n## Rules\n") ||
+		len(doc.Facts) != 2 || doc.Facts[0].Kind != memory.KindFact || doc.Facts[1].Kind != memory.KindRule {
+		t.Fatalf("written doc has a fact under ## Facts and a rule under ## Rules:\n%s", raw)
+	}
+	if got := strings.Contains(string(raw), "\n### Billing\n"); got != heading {
 		t.Fatalf("heading present = %v, want %v:\n%s", got, heading, raw)
 	}
 	recent, err := app.W.Memory.Recent(ctx)
@@ -384,8 +389,8 @@ func TestImportFormattedDocParsesOnly(t *testing.T) {
 	}
 	first := run()
 	f := fileNamed(t, first, "billing.memory.md")
-	if first.Job.State != importer.JobDone || first.Job.Calls != 0 || f.Kind != importer.KindMemdoc || f.GroupID != "kg_aaaaaaaaaaaa" || f.Added != 2 {
-		t.Fatalf("job = %+v file %+v, want a parsed doc: two added, no model call, the header's group", first.Job, f)
+	if first.Job.State != importer.JobDone || first.Job.Calls != 0 || f.Kind != importer.KindMemdoc || f.GroupID != "kg_aaaaaaaaaaaa" || f.Added != 3 {
+		t.Fatalf("job = %+v file %+v, want a parsed doc: three added, no model call, the header's group", first.Job, f)
 	}
 	app.Contract(t, "memory-import", "MemoryImportService.Job#memdoc", first, importMask)
 	ids := func() []string {
@@ -400,11 +405,14 @@ func TestImportFormattedDocParsesOnly(t *testing.T) {
 		slices.Sort(out)
 		return out
 	}
-	if got := ids(); !slices.Equal(got, []string{"km_aaaaaaaaaaaa", "km_bbbbbbbbbbbb"}) {
+	if got := ids(); !slices.Equal(got, []string{"km_aaaaaaaaaaaa", "km_bbbbbbbbbbbb", "km_cccccccccccc"}) {
 		t.Fatalf("stored ids = %v, want the doc's", got)
 	}
 	recent, _ := app.W.Memory.Recent(ctx)
 	for _, m := range recent {
+		if wantKind := map[string]string{"km_cccccccccccc": memory.KindRule}[m.LineageID]; m.Kind != cmp.Or(wantKind, memory.KindFact) {
+			t.Fatalf("memory %s kind = %q, want the doc category's", m.LineageID, m.Kind)
+		}
 		if m.Origin != memory.OriginUser || m.Scope != memory.ScopeProject || m.Project == nil || *m.Project != billingKey {
 			t.Fatalf("memory = %+v, want the header's user/project provenance", m)
 		}
@@ -423,11 +431,11 @@ func TestImportFormattedDocParsesOnly(t *testing.T) {
 	}
 	second := run()
 	f = fileNamed(t, second, "billing.memory.md")
-	if second.Job.State != importer.JobDone || second.Job.Calls != 0 || f.Updated != 1 || f.Noop != 1 || f.Added != 0 {
-		t.Fatalf("second job = %+v file %+v, want one update and one noop", second.Job, f)
+	if second.Job.State != importer.JobDone || second.Job.Calls != 0 || f.Updated != 1 || f.Noop != 2 || f.Added != 0 {
+		t.Fatalf("second job = %+v file %+v, want one update and two noops", second.Job, f)
 	}
-	if got := ids(); !slices.Equal(got, []string{"km_aaaaaaaaaaaa", "km_bbbbbbbbbbbb"}) {
-		t.Fatalf("stored ids after re-ingest = %v, want the same two", got)
+	if got := ids(); !slices.Equal(got, []string{"km_aaaaaaaaaaaa", "km_bbbbbbbbbbbb", "km_cccccccccccc"}) {
+		t.Fatalf("stored ids after re-ingest = %v, want the same three", got)
 	}
 	// The reason-less fact took the locator of its heading, the written one stayed.
 	reasons := map[string]string{}
@@ -435,7 +443,7 @@ func TestImportFormattedDocParsesOnly(t *testing.T) {
 	for _, m := range recent {
 		reasons[m.LineageID] = m.Reason
 	}
-	if reasons["km_aaaaaaaaaaaa"] != "Confirmed by the platform team." || reasons["km_bbbbbbbbbbbb"] != "Stated in billing.memory.md, Storage" {
+	if reasons["km_aaaaaaaaaaaa"] != "Confirmed by the platform team." || reasons["km_bbbbbbbbbbbb"] != "Stated in billing.memory.md, Storage" || reasons["km_cccccccccccc"] != "Stated in billing.memory.md, Storage" {
 		t.Fatalf("reasons = %v", reasons)
 	}
 }
@@ -456,8 +464,31 @@ func TestImportRetiredDocFails(t *testing.T) {
 	}
 	done := waitJob(t, app, awaiting.Job.ID, importer.JobDone, importer.JobFailed)
 	f := fileNamed(t, done, "billing.memory.md")
-	if f.State != importer.FileFailed || !strings.Contains(f.Reason, "kira-memory: 1 is the retired P273 format; rewrite it as kira-memory: 2") {
+	if f.State != importer.FileFailed || !strings.Contains(f.Reason, "kira-memory: 1 is the retired P273 format; rewrite it as kira-memory: 3") {
 		t.Fatalf("file = %+v, want failed with the retired message", f)
+	}
+	if recent, _ := app.W.Memory.Recent(ctx); len(recent) != 0 {
+		t.Fatalf("stored %d facts from a retired doc", len(recent))
+	}
+}
+
+// TestImportRetiredV2DocFails: a kira-memory: 2 doc fails the file with the v2 message and stores nothing.
+func TestImportRetiredV2DocFails(t *testing.T) {
+	app := ingestApp(t, "")
+	dir := filepath.Join(app.Work, "retired2")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, dir, "billing.memory.md", "---\nkira-memory: 2\ngroup: kg_aaaaaaaaaaaa\ntitle: Billing\norigin: user\nscope: personal\n---\n\n## Storage\n\n"+
+		"- km_aaaaaaaaaaaa Invoices are monthly.\n")
+	awaiting := createJob(t, app, dir)
+	if err := app.W.MemoryImport.Start(bridge.MemoryImportStartArgs{ID: awaiting.Job.ID}); err != nil {
+		t.Fatal(err)
+	}
+	done := waitJob(t, app, awaiting.Job.ID, importer.JobDone, importer.JobFailed)
+	f := fileNamed(t, done, "billing.memory.md")
+	if f.State != importer.FileFailed || !strings.Contains(f.Reason, "kira-memory: 2 is retired (P297)") {
+		t.Fatalf("file = %+v, want failed with the v2 message", f)
 	}
 	if recent, _ := app.W.Memory.Recent(ctx); len(recent) != 0 {
 		t.Fatalf("stored %d facts from a retired doc", len(recent))

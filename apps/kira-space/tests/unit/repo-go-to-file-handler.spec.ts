@@ -3,7 +3,7 @@
 // of them applies, and an id-space translation (gitRepoId -> codeRepoId) that throws on a miss
 // rather than guessing — worth a direct test at the handler itself rather than through the whole
 // transport/UI stack this repo has no mock for yet (gitStreamMock.ts answers only app.init/
-// repo.list/refs.list, and has no streaming support at all — see docs/v1.8/SPEC.md's P74 result).
+// repo.list/refs.list, and has no streaming support at all — see docs/HISTORY.md (v1.8)'s P74 result).
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';

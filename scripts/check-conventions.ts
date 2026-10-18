@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
- * P266 code convention guard N1-N7 (docs/v2.2/plans/P266-consistency-audit.md section 2.10 and
- * 4.2) and N8-N12 (docs/v2.2/plans/P267-ui-leftovers.md section 3).
+ * P266 code convention guard N1-N7 (git show bd0c224688d9:docs/v2.2/plans/P266-consistency-audit.md section 2.10 and
+ * 4.2) and N8-N12 (git show bd0c224688d9:docs/v2.2/plans/P267-ui-leftovers.md section 3).
  *
  * N1 file names (.ts camelCase, .vue PascalCase), N2 no `.test.ts`, N3 no util/utils/helpers
  * folder, N4 Pinia id = export name without `use`/`create` and `Store`, N5 event names
@@ -483,7 +483,7 @@ function main(): number {
   for (const h of hits) console.error(`check-conventions: ${h.path}: ${h.rule} ${h.message}`);
   if (hits.length > 0) {
     console.error(
-      `check-conventions: ${hits.length} hit(s); see docs/v2.2/plans/P266-consistency-audit.md section 2.10 and P267-ui-leftovers.md section 3`,
+      `check-conventions: ${hits.length} hit(s); see git show bd0c224688d9:docs/v2.2/plans/P266-consistency-audit.md section 2.10 and P267-ui-leftovers.md section 3`,
     );
     return 1;
   }

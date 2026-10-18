@@ -1,5 +1,5 @@
 // Package gitclient is the Go rewrite of the source project's Node `child_process`-based git
-// driver (docs/v1.3/SPEC.md, "A Node → Go port of the process-spawning half"). It spawns the
+// driver (docs/HISTORY.md (v1.3), "A Node → Go port of the process-spawning half"). It spawns the
 // user's own `git` binary through os/exec — no bundled git, no native bindings — and owns every
 // process this app runs against a repository. Zero I/O beyond os/exec and the filesystem, zero
 // Wails dependency: bridge/git.go is the thin adapter that turns this package's plain Go types

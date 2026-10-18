@@ -1,4 +1,4 @@
--- P4 D2: collections live in this app's own database (docs/v1.2/SPEC.md's P4 row), not as Postman
+-- P4 D2: collections live in this app's own database (docs/HISTORY.md (v1.2)'s P4 row), not as Postman
 -- files on disk. A collection is a *normalized* folder/request tree — Postman's `item` is an
 -- ordered array, so `sort_order` is data, not presentation — plus one opaque `origin_json` column
 -- per row holding the original Postman object verbatim, which is what makes an export re-emit

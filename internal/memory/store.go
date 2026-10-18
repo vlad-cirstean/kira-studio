@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -124,7 +125,7 @@ func (k *scopeKey) args() (scope, project any) {
 	return k.scope, k.project
 }
 
-const memoryColumns = `m.id, m.lineage_id, m.version, m.fact, m.reason, m.keywords, m.origin, m.source_tag, m.scope,
+const memoryColumns = `m.id, m.lineage_id, m.version, m.fact, m.kind, m.reason, m.keywords, m.origin, m.source_tag, m.scope,
 	m.project, m.session_id, m.status, m.supersedes_id, m.superseded_by_id, m.created_at, m.superseded_at,
 	(SELECT count(*) FROM memories x WHERE x.lineage_id = m.lineage_id) AS versions, m.seq`
 
@@ -133,7 +134,7 @@ type rowScanner interface{ Scan(dest ...any) error }
 func scanMemory(r rowScanner, extra ...any) (Memory, error) {
 	var m Memory
 	var kw string
-	dest := append([]any{&m.ID, &m.LineageID, &m.Version, &m.Fact, &m.Reason, &kw, &m.Origin, &m.SourceTag, &m.Scope,
+	dest := append([]any{&m.ID, &m.LineageID, &m.Version, &m.Fact, &m.Kind, &m.Reason, &kw, &m.Origin, &m.SourceTag, &m.Scope,
 		&m.Project, &m.SessionID, &m.Status, &m.SupersedesID, &m.SupersededBy, &m.CreatedAt, &m.SupersededAt, &m.Versions, &m.seq}, extra...)
 	if err := r.Scan(dest...); err != nil {
 		return Memory{}, err
@@ -562,6 +563,7 @@ type commitInput struct {
 	TargetID  string // update/noop: version id of the current version
 	FactID    string // add: the fact id to use (a doc's); empty generates one
 	Fact      string
+	Kind      string // empty means fact
 	Reason    string
 	Keywords  []string
 	Origin    string
@@ -754,10 +756,10 @@ func joinGroup(ctx context.Context, tx *sql.Tx, g GroupRef, lineage string, ms i
 
 func insertMemory(ctx context.Context, tx *sql.Tx, r commitResult, in commitInput, supersedes, now string) error {
 	res, err := tx.ExecContext(ctx, `INSERT INTO memories
-		(id, lineage_id, version, fact, reason, keywords, origin, source_tag, scope, project, session_id, status,
+		(id, lineage_id, version, fact, kind, reason, keywords, origin, source_tag, scope, project, session_id, status,
 		 supersedes_id, fact_hash, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'current', ?, ?, ?)`,
-		r.ID, r.LineageID, r.Version, in.Fact, in.Reason, joinKeywords(in.Keywords), in.Origin, nullable(in.SourceTag),
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'current', ?, ?, ?)`,
+		r.ID, r.LineageID, r.Version, in.Fact, cmp.Or(in.Kind, KindFact), in.Reason, joinKeywords(in.Keywords), in.Origin, nullable(in.SourceTag),
 		in.Scope, nullable(in.Project), nullable(in.SessionID), nullable(supersedes), factHash(in.Fact), now)
 	if err != nil {
 		return fmt.Errorf("memory: insert: %w", err)

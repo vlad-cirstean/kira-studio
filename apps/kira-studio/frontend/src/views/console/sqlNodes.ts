@@ -2,7 +2,7 @@
 // both share (sqlRefs.ts) walk the same shallow token tree `@shared/domain/sqlTokens.ts` builds.
 // This file was `lezerNodes.ts` through P60a — its own tree came from `@codemirror/lang-sql`'s
 // Lezer parser; P60b's `sql-tokens.ts` produces the identical `LNode` shape from this app's own
-// in-house tokenizer instead (docs/v1.6/plans/P60b-sql-language-service-monaco.md §2's library
+// in-house tokenizer instead (docs/HISTORY.md (v1.6 P60b)'s library
 // survey), so every helper below — and every consumer's own `LNode`-typed code — is unchanged.
 import { keywordsFor } from '@shared/domain/sqlKeywords';
 import { type LNode, tokenizeSql } from '@shared/domain/sqlTokens';

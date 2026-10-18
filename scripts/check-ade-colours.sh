@@ -4,7 +4,7 @@
 # palette. Any other colour literal under `ade/`, comments
 # included, fails. So does an allowlist entry with no hit left, keeping the list exactly the kept
 # set. A kept value reused as chrome (selection, link, error text) is not visible here; review it.
-# Docs: docs/v2.0/plans/P138-ade-theme-tokens.md §4.
+# Docs: git show bd0c224688d9:docs/v2.0/plans/P138-ade-theme-tokens.md §4.
 set -e
 
 cd "$(dirname "$0")/.."

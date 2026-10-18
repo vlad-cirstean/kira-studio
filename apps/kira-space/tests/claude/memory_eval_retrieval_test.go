@@ -338,7 +338,7 @@ func seedStore(ctx context.Context, dir string, facts []seedFact) (*seededStore,
 		id := crockfordID("km_", i+1)
 		ss.byKM[id] = i
 		ss.km[f.key] = id
-		doc := memfmt.Doc{Group: groups[gk], Title: f.key.Source, From: f.src.fileName(), Version: 2, Keywords: f.keywords, Updated: evalDocDate,
+		doc := memfmt.Doc{Group: groups[gk], Title: f.key.Source, From: f.src.fileName(), Version: 3, Keywords: f.keywords, Updated: evalDocDate,
 			Provenance: memfmt.Provenance{Origin: memory.OriginAgent, Scope: memory.ScopeProject, Project: evalProject},
 			Facts:      []memfmt.Fact{{ID: id, Fact: f.fact, Reason: f.reason, Section: f.section}}}
 		res, err := ss.kw.ApplyDoc(ctx, memory.ApplyDocRequest{Doc: doc, FileID: "eval-" + f.key.Round + "-" + f.key.Source, Path: f.src.fileName()})

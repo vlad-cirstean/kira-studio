@@ -1,4 +1,4 @@
-// The console tokenizer, unit-level, no container (C12, per docs/v1/plans/P58c-mongo-redis.md
+// The console tokenizer, unit-level, no container (C12, per docs/HISTORY.md (v1 P58c)
 // §5.5): three interacting rules and one error, and it is the console's entire input path.
 package redis
 

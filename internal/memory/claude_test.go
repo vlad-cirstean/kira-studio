@@ -72,6 +72,7 @@ func TestCLIRunnerErrorMapping(t *testing.T) {
 		want error
 	}{
 		{"budget", `{"is_error":true,"subtype":"error_max_budget_usd"}`, 1, ErrClaudeBudget},
+		{"max turns", `{"is_error":true,"subtype":"error_max_turns"}`, 1, ErrClaudeMaxTurns},
 		{"auth from stderr", `{"is_error":true,"result":""}`, 1, ErrClaudeAuth},
 		{"is_error with exit 0", `{"is_error":true,"result":"please log in"}`, 0, ErrClaudeAuth},
 		{"missing structured output", `{"is_error":false,"result":"text"}`, 0, ErrClaudeOutput},

@@ -25,11 +25,11 @@ import {
 import { useDistillUiStore } from './distillStore';
 import { countChars, estimateTokens } from './size';
 
-// P285 Part 4: the main area's distill view. Same core as the MCP `distill` tool; read-only until
-// the user stores or imports the result.
+// P285 Part 4: the main area's distill view. Same pipeline as `ingest_files` with distill true;
+// read-only until the user stores or imports the result.
 const memoryUi = useMemoryUiStore();
 const ui = useDistillUiStore();
-const { source, text, path, origin, mode, progress, cancelled } = storeToRefs(ui);
+const { source, text, path, origin, progress, cancelled } = storeToRefs(ui);
 const limits = useDistillLimits();
 const distill = useDistill();
 const choose = useChooseDistillFile();
@@ -40,15 +40,6 @@ const SOURCES = computed(() => [
   { value: 'text', label: t('common.field.text.label'), testid: 'distill-source-text' },
   { value: 'file', label: t('common.field.file.label'), testid: 'distill-source-file' },
 ]);
-const MODES = computed(() => [
-  { value: 'facts', label: t('memory.distill.mode.facts.label'), testid: 'distill-mode-facts' },
-  {
-    value: 'instructions',
-    label: t('memory.distill.mode.instructions.label'),
-    testid: 'distill-mode-instructions',
-  },
-]);
-
 const chars = computed(() => countChars(text.value));
 const maxChars = computed(() => limits.data.value?.maxChars ?? Number.POSITIVE_INFINITY);
 const overLimit = computed(() => source.value === 'text' && chars.value > maxChars.value);
@@ -95,7 +86,6 @@ async function run(): Promise<void> {
     await distill.mutateAsync({
       args: {
         requestId: ui.requestId,
-        mode: mode.value,
         ...(fromText ? { text: text.value } : { path: path.value }),
       },
       signal,
@@ -122,12 +112,9 @@ async function run(): Promise<void> {
         }}</Button
       >
       <SecondaryTabs v-model="source" variant="segmented" :items="SOURCES" />
-      <SecondaryTabs v-model="mode" variant="segmented" :items="MODES" />
     </PanelBar>
     <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-      <FieldDescription data-testid="distill-mode-hint">{{
-        t(mode === 'facts' ? 'memory.distill.mode.facts.hint' : 'memory.distill.mode.instructions.hint')
-      }}</FieldDescription>
+      <FieldDescription data-testid="distill-hint">{{ t('memory.distill.hint') }}</FieldDescription>
       <template v-if="source === 'text'">
         <Badge v-if="origin" class="self-start" data-testid="distill-origin">{{
           originLabel

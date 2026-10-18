@@ -6,16 +6,13 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/importer"
-	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
@@ -153,69 +150,6 @@ func TestStoreSearchHistoryOverMCP(t *testing.T) {
 	}
 }
 
-func TestAsCommentPersistsNothingAndTextIsGrepFirst(t *testing.T) {
-	store := memory.NewStore(filepath.Join(t.TempDir(), "memory.db"))
-	defer store.Close()
-	svc := memory.NewService(store, acceptRunner{}, memory.ServiceOptions{})
-	ctx := context.Background()
-	ct, st := mcp.NewInMemoryTransports()
-	if _, err := Build(svc, Options{}).Connect(ctx, st, nil); err != nil {
-		t.Fatal(err)
-	}
-	cs, err := mcp.NewClient(&mcp.Implementation{Name: "t", Version: "1"}, nil).Connect(ctx, ct, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cs.Close()
-	item := map[string]any{"fact": "the cache is redis", "reason": "ops runbook", "origin": "agent", "scope": "personal"}
-
-	res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "store_memory", Arguments: map[string]any{"items": []map[string]any{item}, "asComment": "internal/billing/api.go"}})
-	if err != nil || res.IsError {
-		t.Fatalf("err=%v res=%+v", err, res)
-	}
-	var out storeOutput
-	b, _ := json.Marshal(res.StructuredContent)
-	_ = json.Unmarshal(b, &out)
-	blocks, ps := memfmt.ParseComments("x.go", []byte(out.Comment))
-	if out.Status != "prepared" || len(ps) != 0 || len(blocks) != 1 || len(blocks[0].Facts) != 1 {
-		t.Fatalf("out=%+v problems=%v", out, ps)
-	}
-	if text := res.Content[0].(*mcp.TextContent).Text; !strings.HasSuffix(text, "\n\n"+out.Comment) || !strings.HasPrefix(text, llmprompts.MemoryStorePrepared.Text(llmprompts.Defaults(), llmprompts.NoVars{})) {
-		t.Errorf("text = %q", text)
-	}
-	if rows, _ := svc.Recent(ctx, 10); len(rows) != 0 {
-		t.Fatalf("asComment stored %d rows", len(rows))
-	}
-
-	for name, args := range map[string]map[string]any{
-		"doc file":    {"items": []map[string]any{item}, "asComment": "notes.md"},
-		"unsupported": {"items": []map[string]any{item}, "asComment": "data.bin"},
-		"groups":      {"items": []map[string]any{item}, "asComment": "go", "groups": []map[string]any{{"kind": "task", "key": "X-1"}}},
-	} {
-		if r, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "store_memory", Arguments: args}); err == nil && !r.IsError {
-			t.Errorf("%s accepted", name)
-		}
-	}
-
-	if _, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "store_memory", Arguments: map[string]any{"items": []map[string]any{item}}}); err != nil {
-		t.Fatal(err)
-	}
-	res, err = cs.CallTool(ctx, &mcp.CallToolParams{Name: "search_memories", Arguments: map[string]any{"query": "cache"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var lines []string
-	for _, l := range strings.Split(res.Content[0].(*mcp.TextContent).Text, "\n") {
-		if l != "" {
-			lines = append(lines, l)
-		}
-	}
-	if len(lines) != 3 || !regexp.MustCompile(`^`+memfmt.FactID+` \S`).MatchString(lines[0]) || !regexp.MustCompile(`^  \S`).MatchString(lines[1]) ||
-		!regexp.MustCompile(`^  v\d+ origin=`).MatchString(lines[2]) {
-		t.Errorf("want '<id> <fact>', an indented reason and an indented meta line, got %q", lines)
-	}
-}
-
 func TestSearchFiltersProjectDefaultAndScoreMeta(t *testing.T) {
 	store := memory.NewStore(filepath.Join(t.TempDir(), "memory.db"))
 	defer store.Close()
@@ -347,63 +281,5 @@ func TestIngestToolsOverMCP(t *testing.T) {
 	if len(lines) != 2 || !strings.HasPrefix(lines[0], "job job-1 done files 0/0") ||
 		lines[1] != "slack.json done json group kg_0123456789ab added 2 updated 0 noop 0 verified 0 dropped 0 unresolved 0" {
 		t.Errorf("status = %q", lines)
-	}
-}
-
-type fakeDistill struct{ got importer.DistillRequest }
-
-func (f *fakeDistill) Distill(_ context.Context, r importer.DistillRequest) (importer.DistillResult, error) {
-	f.got = r
-	return importer.DistillResult{Lines: []string{"a", "b"}}, nil
-}
-
-func TestDistillToolOffer(t *testing.T) {
-	store := memory.NewStore(filepath.Join(t.TempDir(), "memory.db"))
-	defer store.Close()
-	svc := memory.NewService(store, acceptRunner{}, memory.ServiceOptions{})
-	ctx := context.Background()
-	connect := func(opts Options) *mcp.ClientSession {
-		t.Helper()
-		ct, st := mcp.NewInMemoryTransports()
-		if _, err := Build(svc, opts).Connect(ctx, st, nil); err != nil {
-			t.Fatal(err)
-		}
-		cs, err := mcp.NewClient(&mcp.Implementation{Name: "t", Version: "1"}, nil).Connect(ctx, ct, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { _ = cs.Close() })
-		return cs
-	}
-	offered := func(cs *mcp.ClientSession) *mcp.Tool {
-		tools, err := cs.ListTools(ctx, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, tl := range tools.Tools {
-			if tl.Name == "distill" {
-				return tl
-			}
-		}
-		return nil
-	}
-	if offered(connect(Options{})) != nil || offered(connect(Options{ImportRef: "f"})) != nil {
-		t.Fatal("distill offered without a distiller")
-	}
-	fd := &fakeDistill{}
-	cs := connect(Options{Distill: fd})
-	tl := offered(cs)
-	if tl == nil || tl.Annotations == nil || !tl.Annotations.ReadOnlyHint {
-		t.Fatalf("distill tool = %+v", tl)
-	}
-	res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "distill", Arguments: map[string]any{"path": "/x/a.md", "mode": "instructions"}})
-	if err != nil || res.IsError {
-		t.Fatalf("err=%v res=%+v", err, res)
-	}
-	if got := res.Content[0].(*mcp.TextContent).Text; got != "a\nb" || fd.got.Path != "/x/a.md" || fd.got.Mode != "instructions" {
-		t.Errorf("text=%q req=%+v", got, fd.got)
-	}
-	if r, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "distill", Arguments: map[string]any{"path": "/x/a.md", "mode": "nope"}}); err == nil && !r.IsError {
-		t.Error("bad mode accepted")
 	}
 }

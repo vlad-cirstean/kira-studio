@@ -41,7 +41,7 @@ describe('setiIconFor — Go tooling filenames route to the .go icon', () => {
 // P7 (item 3): `seti-icons@0.0.4`'s own bundled definitions.json is stale for the TypeScript/TSX
 // test-file pair (still yellow) — VS Code's own real vs-seti-icon-theme.json renders every test/spec
 // file orange (#e37933), same glyph as the language's plain file. Confirmed against the real theme
-// JSON during P7's own research pass (docs/v1.4/plans/P7-git-graph-polish.md §3.1).
+// JSON during P7's own research pass (docs/HISTORY.md (v1.4 P7)).
 describe('setiIconFor — test/spec files render orange, matching VS Code exactly', () => {
   const ORANGE = '#e37933';
 

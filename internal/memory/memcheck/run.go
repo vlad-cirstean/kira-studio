@@ -41,14 +41,14 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	stagedFlag := fs.Bool("staged", false, "check the staged blobs instead of the work tree")
 	install := fs.Bool("install-hook", false, "write the git pre-commit hook")
-	printRegex := fs.Bool("print-regex", false, "print the comment and doc line regexes")
+	printRegex := fs.Bool("print-regex", false, "print the doc line regex and the fact id reference regex")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	ctx := context.Background()
 	switch {
 	case *printRegex:
-		fmt.Fprintf(stdout, "comment: %s\ndoc: %s\n", memfmt.CommentLineSource, memfmt.DocLineSource)
+		fmt.Fprintf(stdout, "doc: %s\nreference: %s\n", memfmt.DocLineSource, memfmt.FactID)
 		return 0
 	case *install:
 		return installHook(ctx, stdout, stderr)

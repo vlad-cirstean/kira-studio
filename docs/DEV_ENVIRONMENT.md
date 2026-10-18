@@ -230,7 +230,7 @@ historical prose.
   a Linux run exercises the `fsnotify` companion instead. Both satisfy the same seam and both are
   covered by `watcher_test.go`; only the darwin backend's own behaviour needs real hardware.
 - **The scoped Go race run** for a git-chapter phase is the git packages in play plus
-  `internal` itself for the layering test, not the whole tree — `docs/v1.3/SPEC.md`'s own "Full
+  `internal` itself for the layering test, not the whole tree — `git show bd0c224688d9:docs/v1.3/SPEC.md`'s own "Full
   verification scope" note fixes the list and the reason. The unscoped tree stays worth running
   occasionally as a backstop, not per phase.
 - **A fresh worktree fails `bun run typecheck`/the pre-commit hook on any change**, even after
@@ -458,7 +458,8 @@ popup never shows there. Call `openMainWindow(kira)` (`@workbench/testing/e2eRea
 Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-commit or pre-push.
 
 - Own Go module per app: `apps/kira-space/tests/claude/`, `apps/kira-studio/tests/claude/`. Opt-in by absence:
-  `go test ./...`, `lint:go`, CI and hooks stop at the nested `go.mod`. No build tag, no env flag. Never add
+  `go test ./...`, `lint:go`, CI and hooks stop at the nested `go.mod`; pre-push lints a changed nested module
+  by `cd`-ing into it (`nested_go_mods` in `scripts/hook-scope.sh`), never tests it. No build tag, no env flag. Never add
   a root `go.work`: workspace mode pulls the modules into `./...`. After a Wails or Go bump run
   `go mod tidy` in both modules.
 - Run: `bun run test:claude` (both), `test:claude:space`, `test:claude:studio`. Narrow with `go test` flags
@@ -469,7 +470,14 @@ Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-c
   skips, not fails, when `claude` is missing or `claude -p` cannot run under the temp `HOME`.
 - Rule: after changing code in an area below, run that row before calling the change done. Append `-count=1`: `go test` caches a passing run and prints the old spend.
 - Resume rows (P279, CLI 2.1.296): a held `hold.sh` Bash call, app restart, Resume. Prompts say the call is safe to rerun and to inspect nothing first; haiku otherwise runs `ps`/`ls`, gets denied (no approval surface) and stops as blocked. The CLI's "interrupted" `tool_result` is not in the run log; the check is the shared Claude session id. Hand probe recipe: temp `HOME` with an onboarding-done `.claude.json`, parent `CLAUDE_CODE_SESSION_ID`, `CLAUDE_CODE_REMOTE_SESSION_ID`, `CLAUDECODE` unset, SIGKILL the child's process group mid tool call, then `claude -p --resume <id>`.
-- Spend, measured on 2026-10-09 (CLI 2.1.295, haiku): `claude -p` results of the Space suite 0.014 USD, TUI sessions (about 4 at 1 to 2 haiku prompts) an estimated 0.02 USD, Studio suite under 0.01 USD, memory gate smoke a few cents, import smoke 0.14 USD (P211), memory docs test 0.01 USD (P276). Space suite about 75 s, Studio about 12 s. The Space run prints its measured `claude -p` spend. P279 (CLI 2.1.296): resume rows 0.0067 USD per run of the three (about 55 s), whole Space ADE and smart set 0.020 USD (about 156 s).
+- Spend, measured on 2026-10-09 (CLI 2.1.295, haiku): `claude -p` results of the Space suite 0.014 USD, TUI sessions (about 4 at 1 to 2 haiku prompts) an estimated 0.02 USD, Studio suite under 0.01 USD, memory gate smoke a few cents, import smoke 0.14 USD (P211), memory docs test 0.01 USD (P276). Space suite about 75 s, Studio about 12 s. The Space run prints its measured `claude -p` spend. P279 (CLI 2.1.296): resume rows 0.0067 USD per run of the three (about 55 s), whole Space ADE and smart set 0.020 USD (about 156 s). P296: `comment` subtest of the memory docs test 0.006 USD (about 16 s), prompt-registry row of the Space suite 0.083 USD (about 427 s). P297 (CLI 2.1.302): `TestMemoryDistill` 0.03 USD (about 21 s), `TestMemoryDistillBridge` 0.03 USD (about 13 s), `TestMemoryMcpFollowsDocs` 0.022 USD (about 85 s), prompt-registry row 0.082 USD (about 444 s); `TestMemoryGate` now also checks rule kind (about 32 s). Eval subset round `round-p297-01` 1.50 USD (ledger `spend-p297.jsonl`, needs `KIRA_EVAL_PHASE_CAP_USD` above the run cap plus 2); a shallow clone must first `git fetch --depth=1 origin <corpus commit>`.
+- `scripts/docshistory` (docs chapter fold, P299): needs the logged-in `claude` CLI, builds `kira-space` itself
+  (or `--binary`), gives each unit temp `KIRA_MEMORY_HOME`/`KIRA_SPACE_HOME` and never touches your memory DB.
+  Defaults (also `doc`): `--runs docs/history-runs`, `--out -`, `--jobs 1`. Cost per phase 0.02 to 0.25 USD (P299 pilot, mean 0.07);
+  v2.5 (P300): 27 units, 1.45 USD real, 3.20 USD charged (failed tries charge a 0.25 USD estimate).
+  v2.6 (P305): 12 units (13 tries), 0.78 USD real, 0.78 charged. `--max-usd` stops new
+  units, resume reruns the command. `repoint` skips `scripts/docshistory/` and both `testdata/` roots (eval data lives in
+  `apps/kira-space/tests/claude/testdata/memory-eval/`, `internal/llmprompts/testdata/`).
 
 | Changed area (paths) | Command |
 |---|---|
@@ -478,13 +486,12 @@ Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-c
 | ADE runs and sessions: `apps/kira-space/internal/{ade,adeflow}/**, internal/claudeheadless/**` | `bun run test:claude:space -run 'TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeManualSession\|TestAdeRebaseRun\|TestAdeResumeRun\|TestAdeResumeLost\|TestAdeReviewStep\|TestAdeReviewLost\|TestAdeSandbox\|TestAdeSandboxReadOnly'` |
 | Agent sandbox: `internal/agentsandbox/**`, `apps/kira-space/internal/ade/sandbox.go` | `bun run test:claude:space -run 'TestAdeSandbox\|TestAdeSandboxReadOnly' -count=1`. Linux checks the second layer (flags, note, `enforced 0`); the macOS half is in the Mac checklist below. |
 | Smart scripts: `internal/{claudeheadless,scriptruns,scripts}/**` (incl. `scheduler.go`, `confirm.go`), `apps/kira-space/internal/ade/automation.go` | `bun run test:claude:space -run 'TestSmartScriptRun\|TestSmartScriptResume'` and `bun run test:claude:studio -run TestSmartScriptRun` |
-| Memory MCP and install: `internal/memory/memorycli/**`, `internal/memory/mcpserver/**`, `internal/memory/memfmt/**`, `internal/mcpinstall/**`, `apps/kira-space/internal/bridge/memory.go`, `apps/kira-space/internal/bridge/memorydistill.go` | `bun run test:claude:space -run 'TestMemoryMcpThroughClaude\|TestMemoryMcpFollowsDocs\|TestMemoryInstallRegisters\|TestMemoryDistill\|TestMemoryDistillBridge'` (`TestMemoryDistill` covers the `distill` tool, P285 Part 2; `TestMemoryDistillBridge` covers the UI bridge call, P285 Part 4, about 0.005 USD) |
+| Memory MCP and install: `internal/memory/memorycli/**`, `internal/memory/mcpserver/**`, `internal/memory/memfmt/**`, `internal/mcpinstall/**`, `apps/kira-space/internal/bridge/memory.go`, `apps/kira-space/internal/bridge/memorydistill.go` | `bun run test:claude:space -run 'TestMemoryMcpThroughClaude\|TestMemoryMcpFollowsDocs\|TestMemoryInstallRegisters\|TestMemoryDistill\|TestMemoryDistillBridge'` (`TestMemoryDistill` covers `ingest_files` with `distill` true, P297; `TestMemoryDistillBridge` covers the UI bridge call, P285 Part 4, P297) |
 | Memory gate: `internal/memory/{claude.go,gate*.go,service.go}` | `bun run test:claude:space -run TestMemoryGate` |
-| Memory import and ingest: `internal/memory/importer/**`, `internal/memory/claude.go` | `bun run test:claude:space -run 'TestMemoryImport\|TestMemoryIngest\|TestMemoryDistill\|TestMemoryDistillBridge'` (import about 50 s, 0.14 USD, P211; ingest P274) |
+| Memory import and ingest: `internal/memory/importer/**`, `internal/memory/claude.go` | `bun run test:claude:space -run 'TestMemoryImport\|TestMemoryIngest\|TestMemoryDistill\|TestMemoryDistillBridge\|TestMemoryDistillTrivia'` (import about 50 s, 0.14 USD, P211; ingest P274) |
 | Memory ingest eval (P285): `internal/llmprompts` memory.import.* prompts, `internal/memory/importer/{chunk,extract,finalize}*.go` quality | `bun run eval:memory` with `KIRA_EVAL_MODE=run KIRA_EVAL_ROUND=<name>` (see ARCHITECTURE "Memory ingest eval"). Opt-in, never in hooks or CI. Costs about 4 to 5 USD per tuning run (8 to 10 min), judge included; P285 spent 57.9 USD in all; Part 2 spent 28.5 USD (ledger `spend-p2.jsonl`). Part 3 spent about 5.4 USD on the eval (ledger `spend-p3.jsonl`). P289 spent about 8.9 USD on the 5-source subset (ledger `spend-p289.jsonl`; `KIRA_EVAL_ONLY=plan-p257,spec-chunk-go,doc-arch-prompts,cmt-runner-go,json-ade-errors`, about 1.5 USD per round); run the test binary from `apps/kira-space/tests/claude` (`go test -c`) to keep a tree edit from changing a round midway. `KIRA_EVAL_MODE=footprint` with `KIRA_EVAL_ROUNDS=<r1,r2>` re-renders stored facts of past rounds and costs nothing. P291 (retrieval and telegraph eval) spent 14.04 USD of 20 (ledger `P291-runs/spend-p291.jsonl`, set `KIRA_EVAL_RUNS_DIR=P291-runs KIRA_EVAL_LEDGER=spend-p291.jsonl`); modes `questions`, `keys`, `telegraph`, `score` (with `KIRA_EVAL_STYLE=tele`) are paid, `retrieval` and `compare` are free and need `KIRA_ORT_LIB` (`sh scripts/fetch-onnxruntime.sh linux-x64`). Not a pass/fail row: it scores quality. |
 | DB MCP: `apps/kira-studio/internal/dbmcp/**`, `apps/kira-studio/internal/bridge/dbmcp.go` | `bun run test:claude:studio` |
-| Prompt registry, store, templates: `internal/llmprompts/**` (after a default rewrite run the whole row; regenerate goldens with `go test ./internal/llmprompts -run TestGolden -update` and contracts with `KIRA_CONTRACT=write`) | memory gate, memory MCP, memory import, ADE, smart scripts and DB MCP rows above: `test:claude:space -run 'TestMemoryGate\|TestMemoryMcpThroughClaude\|TestMemoryMcpFollowsDocs\|TestMemoryInstallRegisters\|TestMemoryImport\|TestMemoryIngest\|TestMemoryDistill\|TestMemoryDistillBridge\|TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeManualSession\|TestAdeRebaseRun\|TestAdeResumeRun\|TestAdeResumeLost\|TestAdeSandbox\|TestSmartScriptRun\|TestSmartScriptResume'` and `bun run test:claude:studio` |
-| Drafting a terse prompt (P289): `internal/llmprompts/cmd/promptdistill` | `go run ./internal/llmprompts/cmd/promptdistill -ids <id,..> -out <jsonl> -cap 1.5`. Opt-in, spends about 0.01 USD per prompt (0.275 USD for 31 ids), never in hooks or CI. Resumable: ids already in `-out` are skipped. |
+| Prompt registry, store, templates: `internal/llmprompts/**` (after a default rewrite run the whole row; regenerate goldens with `go test ./internal/llmprompts -run TestGolden -update` and contracts with `KIRA_CONTRACT=write`) | memory gate, memory MCP, memory import, ADE, smart scripts and DB MCP rows above: `test:claude:space -run 'TestMemoryGate\|TestMemoryMcpThroughClaude\|TestMemoryMcpFollowsDocs\|TestMemoryInstallRegisters\|TestMemoryImport\|TestMemoryIngest\|TestMemoryDistill\|TestMemoryDistillBridge\|TestMemoryDistillTrivia\|TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeManualSession\|TestAdeRebaseRun\|TestAdeResumeRun\|TestAdeResumeLost\|TestAdeSandbox\|TestSmartScriptRun\|TestSmartScriptResume'` and `bun run test:claude:studio` |
 | Claude CLI upgrade | `bun run test:claude` |
 
 Sandbox notes:
@@ -653,7 +660,7 @@ environment: it corrupts the baseline. Baselines re-recorded in this container (
 
 ## `golangci-lint` / `knip` — code-quality tooling in this environment (P94)
 
-See `docs/v1.8/plans/P94-code-quality-tooling.md` for what these tools check and why
+See `git show bd0c224688d9:docs/v1.8/plans/P94-code-quality-tooling.md` for what these tools check and why
 the pass split. Here: the container quirk that blocked two prior attempts, and the pre-commit/
 pre-push design.
 
@@ -760,7 +767,7 @@ per-message regardless of how the index got built. If a worktree was never provi
 ## CodeGraph duplicate finder — `scripts/codegraph-duplicates.ts`
 
 Runnable form of the ad-hoc sweeps P107/P113/P115 ran against `.codegraph/codegraph.db` (they were
-never committed as a script; method text lives in `docs/v1.9/plans/P107-duplication-findings*.md`
+never committed as a script; method text lives in `git show bd0c224688d9:docs/v1.9/plans/P107-duplication-findings*.md`
 §0 and `P113-duplication-sweep.md` §0). Opens the index read-only via `bun:sqlite`, reads each
 function/method body from disk by `nodes.file_path` + line span, never writes. Needs an index
 (`scripts/codegraph-setup.sh`); with none it prints how to build one and exits 0. In a linked
@@ -860,14 +867,14 @@ flick). Add a view by copying a probe and calling `measureFlick` over `FLICK_LAD
 - Engine is Playwright WebKit. Linux runs the WPE port: software rendering, no GPU process.
 - fps = 1000 / frame ms. Compare views to each other, not to 16 ms.
 - RSS comes from `ps`. On macOS it omits CoreAnimation/IOSurface graphics memory, the dominant
-  scroll cost there. Read real footprint with `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` Appendix A.
+  scroll cost there. Read real footprint with `apps/kira-studio/frontend/proto/grid/mac/wkhost.swift`.
 - Env knobs: `NDOCS` (documents), `NROWS`/`NCOLS` (console grid), `BODYKIND`/`NITEMS` (HTTP
   response), `NTABLES` (tree), `GRAPH_N` (git graph).
 
 ## Grid prototype (P165) — `proto/grid/`
 
 Dev-only Cheetah Grid prototype beside SlickGrid baselines. Not in the shipped bundle; Go embeds only
-`frontend/dist`. Plan and verdict: `docs/v2.0/plans/P165-cheetah-grid-prototype.md`.
+`frontend/dist`. Plan and verdict: `git show bd0c224688d9:docs/v2.0/plans/P165-cheetah-grid-prototype.md`.
 
 - Pages: `cheetah.html`, `slick.html?variant=kira|stock`, `empty.html` (bare scroller control).
   Query: `fixture=features` (NULL, empty, truncated, masked, FK rows), `w`/`h`, `rowHeight`, `zebra=1`,
@@ -934,7 +941,7 @@ Every name read or set in Go. "Set by" says who supplies it; "you" means set it 
 | `KIRA_COMPAT_IMAGE_<KIND>` | Overrides the adapter compat container image per kind | you |
 | `KIRA_FAKE_SCEN`, `KIRA_FAKE_DIR`, `KIRA_DOC` | Fake agent: scenario JSON or path, call-log dir, doc basename | flow tests |
 | `KIRA_FAKE_CLAUDE` | Re-executes the ADE test binary as a fake `claude` | `ade` tests |
-| `KIRA_MEMORY_EVAL`, `KIRA_EVAL_MODE`, `KIRA_EVAL_ROUND`, `KIRA_EVAL_SET`, `KIRA_EVAL_ONLY`, `KIRA_EVAL_ROUNDS`, `KIRA_EVAL_PROMPTS`, `KIRA_EVAL_BUDGET`, `KIRA_EVAL_PARALLEL`, `KIRA_EVAL_CAP_USD`, `KIRA_EVAL_PHASE_CAP_USD`, `KIRA_EVAL_LEDGER`, `KIRA_EVAL_RUNS_DIR`, `KIRA_EVAL_MODEL_HOME`, `KIRA_EVAL_RECIPES`, `KIRA_EVAL_STYLES`, `KIRA_EVAL_STYLE`, `KIRA_EVAL_VARIANTS`, `KIRA_EVAL_EMBED_WORKER` | Memory ingest eval; `KIRA_MEMORY_EVAL=1` opts in (costs real money); `KIRA_EVAL_LEDGER` names the spend file per part (default `spend.jsonl`); `KIRA_EVAL_RUNS_DIR` picks the runs dir under `docs/v2.5/plans` (P291: `P291-runs`); `KIRA_EVAL_EMBED_WORKER=1` is internal (the test binary re-executed as the embedding worker) | `bun run eval:memory`, you |
+| `KIRA_MEMORY_EVAL`, `KIRA_EVAL_MODE`, `KIRA_EVAL_ROUND`, `KIRA_EVAL_SET`, `KIRA_EVAL_ONLY`, `KIRA_EVAL_ROUNDS`, `KIRA_EVAL_PROMPTS`, `KIRA_EVAL_BUDGET`, `KIRA_EVAL_PARALLEL`, `KIRA_EVAL_CAP_USD`, `KIRA_EVAL_PHASE_CAP_USD`, `KIRA_EVAL_LEDGER`, `KIRA_EVAL_RUNS_DIR`, `KIRA_EVAL_MODEL_HOME`, `KIRA_EVAL_RECIPES`, `KIRA_EVAL_STYLES`, `KIRA_EVAL_STYLE`, `KIRA_EVAL_VARIANTS`, `KIRA_EVAL_EMBED_WORKER` | Memory ingest eval; `KIRA_MEMORY_EVAL=1` opts in (costs real money); `KIRA_EVAL_LEDGER` names the spend file per part (default `spend.jsonl`); `KIRA_EVAL_RUNS_DIR` picks the runs dir under `apps/kira-space/tests/claude/testdata/memory-eval` (P291: `P291-runs`); `KIRA_EVAL_EMBED_WORKER=1` is internal (the test binary re-executed as the embedding worker) | `bun run eval:memory`, you |
 | `KIRA_TEST_MEMORY_MCP` | Real `claude` tests: run the binary as the memory MCP server | `apps/kira-space/tests/claude` |
 | `KIRA_GIT_DIFFERENTIAL`, `KIRA_GIT_PERF` | `1` runs the git search differential test, the git perf probe | you |
 | `KIRA_DATAGRIP_REAL_PROJECT` | Path of a real DataGrip project for the opt-in import test | you |

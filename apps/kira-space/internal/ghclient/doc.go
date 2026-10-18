@@ -1,4 +1,4 @@
-// Package ghclient is G24's whole GitHub surface (docs/v1.3/SPEC.md §3.5, `:70`'s own package
+// Package ghclient is G24's whole GitHub surface (docs/HISTORY.md (v1.3), `:70`'s own package
 // row): a Go wrapper around the user's own `gh` CLI, spawned exactly like internal/gitclient spawns
 // `git` — argv only, no shell, ever — but through its own Runner/Discovery/Client, never gitclient's
 // (F5: gitclient.Runner hard-prepends git-only `-c` overrides and always appends `--no-pager`, both

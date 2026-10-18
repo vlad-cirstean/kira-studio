@@ -7,7 +7,7 @@
    media query and index.html hardcodes class="dark", so a second copy would be two names for one
    palette.
 
-   P110 I2-37/I2-38: one name per value, repo-wide, kira names win (docs/v1.9/plans/
+   P110 I2-37/I2-38: one name per value, repo-wide, kira names win (docs/HISTORY.md (v1.9)
    P110-css-tailwind-migration-iter2.md §3.11.3) -- every shadcn colour AND radius alias that
    duplicated a kira name was renamed away in PT/components/ui and deleted from here (I2-38 also
    dropped --radius and its shadcn-scale @theme inline radius-step twins: every former shadcn-scale

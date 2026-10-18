@@ -55,7 +55,7 @@ func TestRepo_WriteSerialises(t *testing.T) {
 
 // TestRepo_WriteQueuesWithoutLossOrOverlap: N concurrent Writes queued behind one already in
 // flight all eventually run, exactly once each, never overlapping — the "write queue" half of
-// docs/v1.3/SPEC.md's P1 row. Strict FIFO order is deliberately not asserted (Repo's own doc
+// docs/HISTORY.md (v1.3)'s P1 row. Strict FIFO order is deliberately not asserted (Repo's own doc
 // comment on why: a broadcast-and-recheck gate, not a single ordered channel, is what avoids the
 // N-token deadlock a naive "Write grabs every Read slot" design would have).
 func TestRepo_WriteQueuesWithoutLossOrOverlap(t *testing.T) {

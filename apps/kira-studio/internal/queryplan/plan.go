@@ -1,6 +1,6 @@
 // Package queryplan is the Go port of the console's EXPLAIN plan normalizer
 // (frontend/src/views/console/plan.ts, planModel.ts, planIssues.ts, planParsers/*.ts) —
-// docs/v1.7/plans/M3-explain-path.md §2. It is a port, not a bridge (§2.1): every function
+// docs/HISTORY.md (v1.7 M3) It is a port, not a bridge (§2.1): every function
 // involved is pure data transformation over the page each dialect's EXPLAIN returns, so this
 // package imports internal/page and stdlib only — never internal/dbmcp, never internal/adapters.
 //

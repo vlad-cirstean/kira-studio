@@ -7,7 +7,7 @@
 // Api-scoped Go, beside internal/httpclient, internal/grpcclient and internal/postman (D19) —
 // imports internal/storage/repos, internal/secrets and internal/localauth, and deliberately not
 // internal/connections (D8: importing Studio's connections package from here would be exactly the
-// Studio<->Api coupling docs/v1.2/SPEC.md's module-boundary section exists to prevent) and not
+// Studio<->Api coupling docs/HISTORY.md (v1.2)'s module-boundary section exists to prevent) and not
 // Wails.
 package apivars
 

@@ -1,7 +1,7 @@
 #!/bin/sh
-# Kira Studio pre-commit — see docs/v1/plans/P15-gh-tooling.md §3, scoped by P294.
+# Kira Studio pre-commit — see git show bd0c224688d9:docs/v1/plans/P15-gh-tooling.md §3, scoped by P294.
 # Installed by `bun install` (package.json "prepare" sets core.hooksPath).
-# Checks only what the commit stages (biome --staged, the affected typecheck projects); falls back
+# Checks only what the commit stages or deletes (biome --staged, the affected typecheck projects); falls back
 # to the full lint + typecheck when config, a lockfile, scripts or a shared package changed.
 # Bypass for a work-in-progress commit with: git commit --no-verify
 set -e
@@ -12,7 +12,7 @@ if [ ! -d node_modules ]; then
 fi
 
 . scripts/hook-scope.sh
-FILES="$(git diff --cached --name-only --diff-filter=ACMR)"
+FILES="$(git diff --cached --name-only --diff-filter=ACMRD)"
 [ -n "$FILES" ] || exit 0
 
 TARGETS="$(typecheck_targets "$FILES")"
@@ -24,7 +24,7 @@ if is_full "$FILES" || printf '%s\n' "$TARGETS" | grep -qx full; then
 fi
 
 bunx biome check --staged --no-errors-on-unmatched
-if any "$FILES" '\.(ts|mts|vue|css|astro|js)$|^internal/llmprompts/'; then
+if any "$FILES" '\.(ts|mts|vue|css|astro|js|go)$|^internal/llmprompts/|^packages/theme/src/i18n/'; then
   bun run lint:rules
 elif any "$FILES" '\.(md|mdx)$'; then
   bun site/scripts/check-docs.ts

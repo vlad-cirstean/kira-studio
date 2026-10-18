@@ -1,5 +1,5 @@
 // Package mcpserver is the kira-memory MCP server: store_memory, search_memories, memory_history
-// and memory_context tools, the ingest and distill tools when wired, plus the `remember` prompt, over a memory.Service.
+// and memory_context tools, the ingest tools when wired, plus the `remember` prompt, over a memory.Service.
 package mcpserver
 
 import (
@@ -15,7 +15,6 @@ import (
 
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
-	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
 const serverVersion = "1"
@@ -25,18 +24,13 @@ type storeInput struct {
 	Clarifications []memory.Clarification `json:"clarifications,omitempty"`
 	Session        string                 `json:"session,omitempty"`
 	Groups         []memory.GroupRef      `json:"groups,omitempty"`
-	// AsComment is the path or extension of the file a comment goes in; set means store nothing.
-	AsComment string `json:"asComment,omitempty"`
 }
 
-// storeOutput is store_memory's structured result: the stored outcomes, or with asComment the
-// prepared facts and their comment.
+// storeOutput is store_memory's structured result.
 type storeOutput struct {
-	Status     string                 `json:"status"` // "stored" | "challenged" | "prepared"
+	Status     string                 `json:"status"` // "stored" | "challenged"
 	Challenges []memory.ItemChallenge `json:"challenges"`
 	Outcomes   []memory.FactOutcome   `json:"outcomes"`
-	Comment    string                 `json:"comment,omitempty"`
-	Prepared   []memory.PreparedFact  `json:"prepared,omitempty"`
 }
 
 type searchInput struct {
@@ -78,7 +72,7 @@ type Options struct {
 	Project string
 	// Ingest, when set, adds the ingest_files and ingest_status tools. Import mode leaves it nil.
 	Ingest Ingestor
-	// Distill, when set, adds the read-only distill tool. Import mode leaves it nil.
+	// Distill runs ingest_files with distill true; nil refuses it. Import mode leaves it nil.
 	Distill Distiller
 	// Prompts resolves the texts the server shows; nil means the registry defaults. Instructions,
 	// tool and argument descriptions are read once here, so an edit reaches the next session.
@@ -155,9 +149,6 @@ func Build(svc *memory.Service, opts Options) *mcp.Server {
 
 	if opts.Ingest != nil {
 		addIngestTools(srv, opts)
-	}
-	if opts.Distill != nil {
-		addDistillTool(srv, opts)
 	}
 
 	srv.AddPrompt(&mcp.Prompt{
@@ -256,10 +247,6 @@ func requestFor(ctx context.Context, svc *memory.Service, opts Options, in store
 }
 
 func storeMemory(ctx context.Context, svc *memory.Service, opts Options, req *mcp.CallToolRequest, in storeInput) (*mcp.CallToolResult, storeOutput, error) {
-	marker, err := commentMarker(opts, in)
-	if err != nil {
-		return nil, storeOutput{}, err
-	}
 	sr, err := requestFor(ctx, svc, opts, in)
 	if err != nil {
 		return nil, storeOutput{}, err
@@ -273,51 +260,12 @@ func storeMemory(ctx context.Context, svc *memory.Service, opts Options, req *mc
 			})
 		}
 	}
-	if marker != nil {
-		return prepareMemory(ctx, svc, opts, sr, *marker)
-	}
 	res, err := svc.Store(ctx, sr)
 	if err != nil {
 		return nil, storeOutput{}, err
 	}
 	out := storeOutput{Status: res.Status, Challenges: res.Challenges, Outcomes: res.Outcomes}
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: renderStore(opts.Prompts, res)}}}, out, nil
-}
-
-// commentMarker resolves asComment to a comment syntax; nil when the call stores normally.
-func commentMarker(opts Options, in storeInput) (*memfmt.Marker, error) {
-	if in.AsComment == "" {
-		return nil, nil
-	}
-	bad := func(format string, a ...any) error {
-		return fmt.Errorf("%w: %s", memory.ErrInvalid, fmt.Sprintf(format, a...))
-	}
-	switch {
-	case opts.ImportRef != "":
-		return nil, bad("asComment is not available in import mode")
-	case len(in.Groups) > 0:
-		return nil, bad("asComment stores nothing, so groups are not allowed")
-	case memfmt.IsDocPath(in.AsComment):
-		return nil, bad("asComment writes code comments, not %s docs", in.AsComment)
-	}
-	markers, ok := memfmt.MarkersFor(in.AsComment)
-	if !ok {
-		return nil, bad("asComment %q has no known comment syntax; supported: %s", in.AsComment, strings.Join(memfmt.Supported(), ", "))
-	}
-	return &markers[0], nil
-}
-
-func prepareMemory(ctx context.Context, svc *memory.Service, opts Options, sr memory.StoreRequest, m memfmt.Marker) (*mcp.CallToolResult, storeOutput, error) {
-	res, err := svc.Prepare(ctx, sr, m)
-	if err != nil {
-		return nil, storeOutput{}, err
-	}
-	out := storeOutput{Status: res.Status, Challenges: res.Challenges, Outcomes: []memory.FactOutcome{}, Comment: res.Comment, Prepared: res.Facts}
-	text := llmprompts.MemoryStorePrepared.Text(opts.Prompts, llmprompts.NoVars{}) + "\n\n" + res.Comment
-	if res.Status == "challenged" {
-		text = renderStore(opts.Prompts, memory.StoreResult{Status: res.Status, Challenges: res.Challenges})
-	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}, out, nil
 }
 
 func renderStore(src llmprompts.Source, res memory.StoreResult) string {
@@ -336,11 +284,11 @@ func renderStore(src llmprompts.Source, res memory.StoreResult) string {
 	for _, o := range res.Outcomes {
 		switch o.Action {
 		case memory.ActionAdd:
-			fmt.Fprintf(&b, "Added %s v%d: %s\n", o.LineageID, o.Version, o.Fact)
+			fmt.Fprintf(&b, "Added %s v%d %s: %s\n", o.LineageID, o.Version, o.Kind, o.Fact)
 		case memory.ActionUpdate:
-			fmt.Fprintf(&b, "Updated %s to v%d: %s (previous version kept as history)\n", o.LineageID, o.Version, o.Fact)
+			fmt.Fprintf(&b, "Updated %s to v%d %s: %s (previous version kept as history)\n", o.LineageID, o.Version, o.Kind, o.Fact)
 		case memory.ActionNoop:
-			fmt.Fprintf(&b, "Already known %s v%d: %s\n", o.LineageID, o.Version, o.Fact)
+			fmt.Fprintf(&b, "Already known %s v%d %s: %s\n", o.LineageID, o.Version, o.Kind, o.Fact)
 		default:
 			fmt.Fprintf(&b, "Failed: %s: %s\n", o.Fact, o.Error)
 		}
@@ -368,7 +316,7 @@ func renderMemories(ms []memory.Memory) string {
 // writeMemory prints the grep-first layout shared with the comment and doc formats: "<id> <fact>",
 // the reason indented by two spaces, then an indented meta line with the per-result provenance.
 func writeMemory(b *strings.Builder, m memory.Memory) {
-	meta := []string{fmt.Sprintf("v%d", m.Version), "origin=" + m.Origin}
+	meta := []string{fmt.Sprintf("v%d", m.Version), m.Kind, "origin=" + m.Origin}
 	if m.SourceTag != nil {
 		meta = append(meta, "source="+*m.SourceTag)
 	}

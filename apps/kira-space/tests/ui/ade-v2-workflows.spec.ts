@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { previewText } from './adePromptPreview';
 import { expect, test } from './fixtures';
-import { adeFixture, openWorkflows } from './support/adeV2';
+import { adeFixture, openWorkflows, SCRIPTS } from './support/adeV2';
 import { contract } from './support/contract';
 import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
@@ -574,3 +574,107 @@ test('contract: the step inspector shows the finish instruction rendered by the 
   await node(page, 'plan').click();
   await expect(page.locator(t('ade-wf-finish-note'))).toContainText(previewText('finish'));
 });
+
+test('contract: the route select hides manual and skipped steps up to this one, keeping the current pick', async ({
+  relaunch,
+}) => {
+  const refused = JSON.parse(
+    contract<string>('ade-workflow-editor', 'AdeTaskService.SaveWorkflow#return-to-skipped'),
+  ) as { code: string; message: string };
+  const { window: page } = await openWorkflows(relaunch, [
+    { channel: IPC.adeTaskSaveWorkflow, error: refused },
+  ]);
+  await menuItem(page, 'impl', 'ade-wf-step-skip');
+  await menuItem(page, 'plan', 'ade-wf-step-skip');
+  await node(page, 'tests').click();
+  const route = page
+    .locator(`${t('ade-wf-result')}[data-result="failed"]`)
+    .locator(t('ade-wf-result-route'));
+  const option = (value: string) => route.locator(`option[value="${value}"]`);
+  await expect(route).toHaveValue('impl');
+  await expect(option('impl')).toHaveCount(1);
+  await expect(option('spec')).toHaveCount(0);
+  await expect(option('plan')).toHaveCount(0);
+  await expect(option('tests')).toHaveCount(1);
+  await expect(option('review')).toHaveCount(1);
+  await page.locator(t('ade-wf-save')).click();
+  await expect(page.locator(t('ade-wf-save-error'))).toContainText(refused.message);
+});
+
+test('contract: a YAML return to a manual step shows the parser error', async ({ relaunch }) => {
+  const refused = contract<{ workflow: null; error: { line: number; message: string } }>(
+    'ade-workflow-editor',
+    'AdeTaskService.ValidateWorkflowYaml#return-to-manual',
+  );
+  expect(refused.workflow).toBeNull();
+  expect(refused.error.message).toContain('cannot return to a manual or skipped step');
+  const { window: page } = await openWorkflows(relaunch, [
+    { channel: IPC.adeTaskValidateWorkflowYaml, response: refused },
+  ]);
+  await openYaml(page);
+  await page.locator(t('ade-wf-yaml')).fill('id: x\n');
+  await expect(page.locator(t('ade-wf-yaml-msg'))).toHaveText(
+    `✕ Line ${refused.error.line}: ${refused.error.message} (the last valid version stays in use).`,
+  );
+});
+
+// Each edit leaves `review.implementer` naming a step that is gone, later, manual or smart; the
+// editor sends '' and the backend accepts it (TestWorkflowEditorClearsStaleImplementer).
+const STALE_IMPLEMENTER_EDITS: {
+  name: string;
+  apply: (page: Page) => Promise<void>;
+}[] = [
+  {
+    name: 'removing the implementer',
+    apply: async (page) => {
+      await menuItem(page, 'impl', 'ade-wf-step-remove');
+      await page.locator(t('confirm-dialog-confirm')).click();
+    },
+  },
+  {
+    name: 'moving the review above the implementer',
+    apply: (page) => menuItem(page, 'review', 'ade-wf-step-up'),
+  },
+  {
+    name: 'making the implementer manual',
+    apply: async (page) => {
+      await node(page, 'impl').click();
+      await page.locator(t('ade-wf-step-kind-manual')).click();
+      await page.locator(t('confirm-dialog-confirm')).click();
+    },
+  },
+  {
+    name: 'giving the implementer a smart script',
+    apply: async (page) => {
+      await node(page, 'impl').click();
+      await page.locator(t('ade-wf-step-mode-smart')).click();
+    },
+  },
+];
+
+for (const edit of STALE_IMPLEMENTER_EDITS) {
+  test(`contract: ${edit.name} clears the review implementer and the save goes through`, async ({
+    relaunch,
+  }) => {
+    const { window: page, control } = await openWorkflows(relaunch, [
+      {
+        channel: IPC.adeTaskWorkflows,
+        response: contract('ade-workflow-editor', 'AdeTaskService.Workflows'),
+      },
+      {
+        channel: IPC.adeTaskSaveWorkflow,
+        response: contract('ade-workflow-editor', 'AdeTaskService.SaveWorkflow#cleared'),
+      },
+      SCRIPTS,
+    ]);
+    const implementer = page.locator(t('ade-wf-step-review-implementer'));
+    await node(page, 'review').click();
+    await expect(implementer).toHaveValue('impl');
+    await edit.apply(page);
+    await node(page, 'review').click();
+    await expect(implementer).toHaveValue('');
+    const out = await saved(page, control, 1);
+    expect(stepOf(out, 'review')?.review).toEqual({ sendTo: 'implementer', implementer: '' });
+    await expect(page.locator(t('ade-wf-save-error'))).toHaveCount(0);
+  });
+}

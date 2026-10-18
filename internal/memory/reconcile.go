@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,7 +15,7 @@ const reconcileCandidateLimit = 10
 
 // work is one accepted fact moving through reconcile and commit.
 type work struct {
-	Fact, Reason string
+	Fact, Reason, Kind string
 	// pinned, when set, is the reason an add or update commits (import mode).
 	pinned   string
 	Keywords []string
@@ -31,6 +32,9 @@ type work struct {
 }
 
 // within is the scope and project the fact may merge with: an update never crosses scopes.
+// kind is the work's kind; empty means fact.
+func (w *work) kind() string { return cmp.Or(w.Kind, KindFact) }
+
 func (w *work) within() *scopeKey { return &scopeKey{scope: w.Scope, project: w.Project} }
 
 type decision struct {
@@ -45,6 +49,7 @@ type decision struct {
 type reconcileInputFact struct {
 	Index      int                  `json:"index"`
 	Fact       string               `json:"fact"`
+	Kind       string               `json:"kind"`
 	Reason     string               `json:"reason"`
 	Origin     string               `json:"origin"`
 	Candidates []reconcileCandidate `json:"candidates"`
@@ -53,6 +58,7 @@ type reconcileInputFact struct {
 type reconcileCandidate struct {
 	ID        string `json:"id"`
 	Fact      string `json:"fact"`
+	Kind      string `json:"kind"`
 	Reason    string `json:"reason"`
 	Origin    string `json:"origin"`
 	CreatedAt string `json:"createdAt"`
@@ -75,7 +81,7 @@ func (s *Service) prepare(ctx context.Context, w *work) (needsLLM bool, err erro
 		return false, err
 	}
 	for _, m := range same {
-		if normalize(m.Reason) == normalize(w.Reason) {
+		if m.Kind == w.kind() && normalize(m.Reason) == normalize(w.Reason) {
 			w.dec = decision{Action: ActionNoop, Target: m.ID, Why: "Identical fact and reason already stored."}
 			return false, nil
 		}
@@ -142,13 +148,13 @@ func (s *Service) reconcile(ctx context.Context, works []*work) error {
 	tempIDs := make([]map[string]Memory, len(works))
 	next := 1
 	for i, w := range works {
-		f := reconcileInputFact{Index: i, Fact: w.Fact, Reason: w.Reason, Origin: w.Origin, Candidates: []reconcileCandidate{}}
+		f := reconcileInputFact{Index: i, Fact: w.Fact, Kind: w.kind(), Reason: w.Reason, Origin: w.Origin, Candidates: []reconcileCandidate{}}
 		tempIDs[i] = map[string]Memory{}
 		for _, m := range w.cands {
 			id := "c" + strconv.Itoa(next)
 			next++
 			tempIDs[i][id] = m
-			f.Candidates = append(f.Candidates, reconcileCandidate{ID: id, Fact: m.Fact, Reason: m.Reason, Origin: m.Origin, CreatedAt: m.CreatedAt})
+			f.Candidates = append(f.Candidates, reconcileCandidate{ID: id, Fact: m.Fact, Kind: m.Kind, Reason: m.Reason, Origin: m.Origin, CreatedAt: m.CreatedAt})
 		}
 		in.Facts = append(in.Facts, f)
 	}
@@ -185,6 +191,9 @@ func (s *Service) reconcile(ctx context.Context, works []*work) error {
 // keptBesideWhy explains a grade-guard downgrade of update to add.
 const keptBesideWhy = "Kept beside a higher-graded fact."
 
+// keptApartWhy explains a kind-guard downgrade of noop or update to add.
+const keptApartWhy = "A rule and a fact stay separate memories."
+
 func checkDecision(d reconcileDecision, w *work, cands map[string]Memory) decision {
 	fail := func(format string, a ...any) decision {
 		return decision{Err: fmt.Errorf("%w: reconcile: %s", ErrClaudeOutput, fmt.Sprintf(format, a...))}
@@ -200,6 +209,9 @@ func checkDecision(d reconcileDecision, w *work, cands map[string]Memory) decisi
 		cand, ok := cands[d.Target]
 		if !ok {
 			return fail("target %q is not a candidate of this fact", d.Target)
+		}
+		if cand.Kind != w.kind() {
+			return decision{Action: ActionAdd, Fact: w.Fact, Reason: w.Reason, Why: keptApartWhy}
 		}
 		target := cand.ID
 		if d.Action == ActionNoop {

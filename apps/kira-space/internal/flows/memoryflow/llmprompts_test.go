@@ -12,7 +12,7 @@ import (
 
 const (
 	gateMarker   = "EDITED-GATE-MARKER"
-	gateOverride = gateMarker + ` keeps at most {{.MaxKeywords}} keywords. {{template "memory.dataHygiene"}}`
+	gateOverride = gateMarker + ` keeps at most {{.MaxKeywords}} keywords. {{template "memory.dataHygiene"}} {{template "memory.kinds"}}`
 )
 
 func overrideGate(t *testing.T, app *flowharness.App) {

@@ -15,6 +15,14 @@ import type { WorkflowStep } from '../../wire';
 const props = defineProps<{ step: WorkflowStep; steps: WorkflowStep[]; fixed?: boolean }>();
 const draft = useAdeWorkflowDraftStore();
 const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.id}-${rid}`;
+// A return needs a step that runs: manual and skipped steps up to this one are not offered, the
+// current pick excepted so the select keeps showing it.
+const targets = (next: string): WorkflowStep[] => {
+  const at = props.steps.findIndex((s) => s.id === props.step.id);
+  return props.steps.filter(
+    (s, i) => s.id === next || !(i <= at && (s.kind === 'manual' || s.skip)),
+  );
+};
 </script>
 
 <template>
@@ -90,7 +98,7 @@ const id = (k: string, rid: string): string => `ade-wf-result-${k}-${props.step.
           @update:model-value="(v) => draft.route(step.id, r.id, String(v))"
         >
           <option value="next">{{ t('space.ade.stepMover.next.tooltip') }}</option>
-          <option v-for="s in steps" :key="s.id" :value="s.id">{{
+          <option v-for="s in targets(r.next)" :key="s.id" :value="s.id">{{
             s.id === step.id ? t('space.ade.workflows.route.thisStep.option') : s.name
           }}</option>
           <option value="end">{{ t('space.ade.workflows.route.end.option') }}</option>

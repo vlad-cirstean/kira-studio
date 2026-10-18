@@ -18,7 +18,7 @@ func (a *Adapter) ClassifyStatement(_ context.Context, statement string) (adapte
 
 // classifyClickHouseSQL corrects ClassifySQL's own default for a bare (non-ANALYZE) EXPLAIN (M7
 // finding #10): on Postgres/MySQL/MariaDB/SQLite an EXPLAIN without ANALYZE never executes its
-// target, so ClassifySQL classifies it ClassRead unconditionally — docs/v1.7/plans/M3's own §8.1
+// target, so ClassifySQL classifies it ClassRead unconditionally — docs/HISTORY.md (v1.7 M3)'s own §8.1
 // records that ClickHouse is "the one it does not clear", the reason queryplan.Explainable already
 // refuses to ever compose a ClickHouse EXPLAIN over anything but SELECT/WITH. That restriction only
 // covers explain_query's own composed statements, not run_query, which accepts raw SQL text a

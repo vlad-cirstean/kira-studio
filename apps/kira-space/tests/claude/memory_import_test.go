@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -112,8 +113,11 @@ func TestMemoryImport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	imported := 0
+	imported, restoreRule := 0, false
 	for _, m := range mems {
+		if m.Kind == memory.KindRule && strings.Contains(m.Fact, "backup") && strings.Contains(m.Fact, "production") {
+			restoreRule = true
+		}
 		h, err := svc.History(context.Background(), m.ID)
 		if err != nil {
 			t.Fatal(err)
@@ -134,5 +138,8 @@ func TestMemoryImport(t *testing.T) {
 	}
 	if imported == 0 {
 		t.Error("no add event with source import")
+	}
+	if !restoreRule {
+		t.Error("the restore rule of billing.md is not stored with kind rule")
 	}
 }

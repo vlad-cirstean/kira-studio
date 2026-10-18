@@ -9,7 +9,7 @@
 // `{{$randomemail}}` is not `{{$randomEmail}}` and is reported as an unknown dynamic value (D13) —
 // a case-insensitive lookup would make `{{$RANDOMEMAIL}}` work here and fail in Postman.
 //
-// What is deliberately excluded, and why, is enumerated in the plan (docs/v1.2/plans/
+// What is deliberately excluded, and why, is enumerated in the plan (docs/HISTORY.md (v1.2)
 // P6-faker-dynamic-values.md, D4) rather than repeated here: the ~17-name image family (faker only
 // has two image calls), the `$randomBs*`/word-fragment families (faker 10 removed `company.bs*`),
 // `$randomArrayElement`/`$randomObjectElement` (meaningless without argument syntax, D10), names

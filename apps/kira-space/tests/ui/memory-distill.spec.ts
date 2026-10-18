@@ -12,7 +12,8 @@ import type { ControlSnapshot } from './support/types';
 // TestBridgeDistill*; fixtures from contract memory-distill.
 
 interface Distilled {
-  lines: string[];
+  lines: { text: string; kind: 'fact' | 'rule' }[];
+  unresolved: { fact: string; questions: string[] }[];
   costUsd: number;
   chunks: number;
   inChars: number;
@@ -29,10 +30,13 @@ interface Limits {
 
 const done = contract<Distilled>('memory-distill', 'MemoryDistillService.Distill#done');
 const limits = contract<Limits>('memory-distill', 'MemoryDistillService.Limits');
-const progress = contract<{ requestId: string; done: number; total: number; costUsd: number }>(
-  'memory-distill',
-  'kira:memory:distill#progress',
-);
+const progress = contract<{
+  requestId: string;
+  stage: string;
+  done: number;
+  total: number;
+  costUsd: number;
+}>('memory-distill', 'kira:memory:distill#progress');
 const stored = contract<{ status: string; outcomes: { action: string }[] }>(
   'memory',
   'MemoryService.Store#stored',
@@ -76,16 +80,32 @@ test('contract: distill: paste, size line, progress push, result summary and Cop
   await expect(page.locator('[data-testid="distill-size"]')).toContainText(
     `${TEXT.length} characters, about ${Math.floor((TEXT.length + 2) / 3)} tokens`,
   );
-  await page.locator('[data-testid="distill-mode-instructions"]').click();
+  // One mode: no mode tabs, one static hint.
+  await expect(page.locator('[data-testid="distill-mode-facts"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="distill-mode-instructions"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="distill-hint"]')).toContainText(
+    'rules as short imperatives',
+  );
   await run.click();
 
   await expect.poll(() => runCalls(control)).toHaveLength(1);
-  const sent = runCalls(control)[0]?.args as { requestId: string; text: string; mode: string };
-  expect(sent).toMatchObject({ text: TEXT, mode: 'instructions' });
-  await emitWailsEvent(page, IPC.memoryDistill, { ...progress, requestId: sent.requestId });
+  const sent = runCalls(control)[0]?.args as { requestId: string; text: string };
+  expect(sent).toMatchObject({ text: TEXT });
+  expect(sent).not.toHaveProperty('mode');
+  await emitWailsEvent(page, IPC.memoryDistill, {
+    ...progress,
+    stage: 'extract',
+    requestId: sent.requestId,
+  });
   await expect(page.locator('[data-testid="distill-progress"]')).toContainText(
-    `Parts done: ${progress.done} of ${progress.total}`,
+    `Reading parts: ${progress.done} of ${progress.total}`,
   );
+  await emitWailsEvent(page, IPC.memoryDistill, {
+    ...progress,
+    stage: 'merge',
+    requestId: sent.requestId,
+  });
+  await expect(page.locator('[data-testid="distill-progress"]')).toContainText('Merging lines');
   // Another request's push changes nothing.
   await emitWailsEvent(page, IPC.memoryDistill, { ...progress, requestId: 'other', done: 9 });
   await expect(page.locator('[data-testid="distill-progress"]')).not.toContainText('9 of');
@@ -100,7 +120,19 @@ test('contract: distill: paste, size line, progress push, result summary and Cop
     `${done.inTokens} to ${done.outTokens} tokens`,
   );
   for (const [i, line] of done.lines.entries()) {
-    await expect(result.locator(`[data-testid="distill-text-${i}"]`)).toHaveText(line);
+    await expect(result.locator(`[data-testid="distill-text-${i}"]`)).toHaveText(line.text);
+    // Only a rule is badged.
+    await expect(result.locator(`[data-testid="distill-kind-${i}"]`)).toHaveCount(
+      line.kind === 'rule' ? 1 : 0,
+    );
+  }
+  // What the input leaves open is listed apart from the lines.
+  const unclear = result.locator('[data-testid="distill-unresolved"]');
+  await expect(unclear).toContainText('Unclear, left out');
+  for (const [i, item] of done.unresolved.entries()) {
+    const row = unclear.locator(`[data-testid="distill-unresolved-${i}"]`);
+    await expect(row).toContainText(item.fact);
+    await expect(row).toContainText(item.questions.join(' '));
   }
 
   await result.locator('[data-testid="distill-line-0"]').click();
@@ -109,7 +141,12 @@ test('contract: distill: paste, size line, progress push, result summary and Cop
     .poll(() =>
       page.evaluate(() => (window as unknown as { __clipboard: string[] }).__clipboard[0]),
     )
-    .toBe(done.lines.slice(1).join('\n'));
+    .toBe(
+      done.lines
+        .slice(1)
+        .map((l) => l.text)
+        .join('\n'),
+    );
 });
 
 test('contract: distill: Cancel cancels the call and shows the cancelled status', async ({
@@ -187,7 +224,7 @@ test('contract: distill: Store sends the picked lines with the distilled reason'
   const sent = control.log().find((e) => e.channel === IPC.memoryStore)?.args as {
     items: { fact: string; reason: string }[];
   };
-  expect(sent.items.map((i) => i.fact)).toEqual(done.lines);
+  expect(sent.items.map((i) => i.fact)).toEqual(done.lines.map((l) => l.text));
   expect(sent.items.every((i) => i.reason.startsWith('Distilled by the user from'))).toBe(true);
 });
 
@@ -212,7 +249,7 @@ test('contract: distill: Import as document sends the lines and opens the import
   await page.locator('[data-testid="distill-import"]').click();
   await expect(page.locator('[data-testid="import-confirm-dialog"]')).toBeVisible();
   const sent = control.log().find((e) => e.channel === IPC.memoryDistillToImport)?.args;
-  expect(sent).toEqual({ lines: done.lines, source: '' });
+  expect(sent).toEqual({ lines: done.lines.map((l) => l.text), source: '' });
 });
 
 test('contract: distill: a chosen file is sent by path', async ({ relaunch }) => {
@@ -231,10 +268,10 @@ test('contract: distill: a chosen file is sent by path', async ({ relaunch }) =>
   await expect(page.locator('[data-testid="distill-path"]')).toContainText('notes.md');
   await page.locator('[data-testid="distill-run"]').click();
   await expect(page.locator('[data-testid="distill-result"]')).toBeVisible();
-  expect(runCalls(control)[0]?.args).toMatchObject({ path, text: '', mode: 'facts' });
+  expect(runCalls(control)[0]?.args).toMatchObject({ path, text: '' });
 });
 
-test('distill: Back returns to the memory view and the draft survives a mode switch', async ({
+test('distill: Back returns to the memory view and the draft survives a module switch', async ({
   relaunch,
 }) => {
   const { window: page } = await relaunch({ control: BASE });

@@ -31,7 +31,7 @@ type RepoSummary struct {
 	Head             HeadState `json:"head"`
 }
 
-// maxConcurrentReads bounds a repo's own read pool (docs/v1.3/SPEC.md's P1 row: "a per-repository
+// maxConcurrentReads bounds a repo's own read pool (docs/HISTORY.md (v1.3)'s P1 row: "a per-repository
 // write queue with a bounded concurrent read pool"). Small on purpose: every real read this app
 // runs against one repository is a single `git` process, and git itself already serialises on its
 // own index/ref locks — this bound exists to cap how many such processes pile up concurrently

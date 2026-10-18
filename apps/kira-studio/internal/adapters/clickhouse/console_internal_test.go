@@ -1,7 +1,7 @@
 // console_internal_test.go guards M7 finding #10: run_query classified any bare (non-ANALYZE)
 // EXPLAIN as ClassRead via the shared, dialect-agnostic adapters.ClassifySQL — safe on
 // Postgres/MySQL/MariaDB/SQLite, whose plain EXPLAIN never executes its target, but not confirmed
-// safe on ClickHouse (docs/v1.7/plans/M3 §8.1's own "the one it does not clear"). A connection with
+// safe on ClickHouse (docs/HISTORY.md (v1.7 M3) §8.1's own "the one it does not clear"). A connection with
 // write:deny could otherwise run a write through `EXPLAIN <DELETE ...>` typed straight into
 // run_query's raw SQL argument.
 package clickhouse

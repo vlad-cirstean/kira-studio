@@ -2,7 +2,7 @@
 // and hands it over as `/?window=<key>`, since it must be readable synchronously at module load —
 // before hydrateTabs() ever runs — and an async round trip (Window.Name() from
 // `@wailsio/runtime`) can't give that guarantee (it isn't even reliable across build modes; see
-// docs/v1.1/plans/P8-multi-window-correctness.md D2).
+// docs/HISTORY.md (v1.1 P8)).
 //
 // Absent or unrecognised falls back to "main": tests/ui (a plain static file server, no
 // `?window=`) and tests/e2e-real's plain Chromium tab both see this fallback and keep working

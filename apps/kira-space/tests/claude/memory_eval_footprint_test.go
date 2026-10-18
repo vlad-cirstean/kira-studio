@@ -248,8 +248,8 @@ func evalFootprint(t *testing.T, man evalManifest) {
 					}
 				}
 			}
-			if doc, _ := renderedDoc(rec, titleOf(text, s), s.ID+"."+s.Kind, evalDocDate); strings.Contains(doc, "\nkira-memory: 2\n") {
-				format = "v2"
+			if doc, _ := renderedDoc(rec, titleOf(text, s), s.ID+"."+s.Kind, evalDocDate); strings.Contains(doc, "\nkira-memory: 3\n") {
+				format = "v3"
 			}
 			rows = append(rows, row)
 			all.add(row)

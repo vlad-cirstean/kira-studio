@@ -184,7 +184,7 @@ func memoryErr(err error) error {
 	case err == nil:
 		return nil
 	case errors.Is(err, memory.ErrInvalid), errors.Is(err, memory.ErrClaudeNotFound), errors.Is(err, memory.ErrClaudeAuth),
-		errors.Is(err, memory.ErrClaudeBudget), errors.Is(err, memory.ErrClaudeTimeout), errors.Is(err, memory.ErrClaudeOutput),
+		errors.Is(err, memory.ErrClaudeBudget), errors.Is(err, memory.ErrClaudeMaxTurns), errors.Is(err, memory.ErrClaudeTimeout), errors.Is(err, memory.ErrClaudeOutput),
 		errors.Is(err, memory.ErrClaudeOutdated), errors.Is(err, memory.ErrClaudeRateLimited), errors.Is(err, memory.ErrClaudeUsageLimit):
 		return ipcerr.BadRequest(err.Error())
 	case errors.Is(err, embed.ErrChecksum):
@@ -352,9 +352,9 @@ type MemoryMcpStatus struct {
 	Probed          []string `json:"probed"`
 }
 
-// MemoryCommentCheck is what Settings > Memory shows to install the kira-memory commit check in
+// MemoryCheckHook is what Settings > Memory shows to install the kira-memory commit check in
 // another repository.
-type MemoryCommentCheck struct {
+type MemoryCheckHook struct {
 	Executable     string `json:"executable"`
 	InstallCommand string `json:"installCommand"`
 	HookLine       string `json:"hookLine"`
@@ -391,13 +391,13 @@ func (s *MemoryService) McpStatus() MemoryMcpStatus {
 	return st
 }
 
-// CommentCheck returns the commands that install the memory-check pre-commit hook for this binary.
-func (s *MemoryService) CommentCheck() MemoryCommentCheck {
+// CheckHook returns the commands that install the memory-check pre-commit hook for this binary.
+func (s *MemoryService) CheckHook() MemoryCheckHook {
 	exe, err := memoryExecutable()
 	if err != nil {
-		return MemoryCommentCheck{}
+		return MemoryCheckHook{}
 	}
-	return MemoryCommentCheck{Executable: exe, InstallCommand: memcheck.InstallCommand(exe), HookLine: memcheck.HookLine(exe)}
+	return MemoryCheckHook{Executable: exe, InstallCommand: memcheck.InstallCommand(exe), HookLine: memcheck.HookLine(exe)}
 }
 
 // InstallClaudeCode registers the kira-memory stdio server with Claude Code. It never returns a

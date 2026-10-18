@@ -17,7 +17,7 @@ import StreamTabView from '../views/stream/StreamView.vue';
 // P1 D4: the component half of the tab-kind registry — split from state/tabKinds.ts because
 // state/ -> workbench/ is a lint-forbidden edge (F19), while workbench/ -> views/ is not. STATIC
 // imports, deliberately: this is a registry lookup, not a lazy-load boundary, so the bundle keeps
-// exactly the two dynamic chunks docs/ARCHITECTURE.md:28 records (sql-formatter, @faker-js/faker).
+// exactly the two dynamic chunks docs/ARCHITECTURE.md's Stack section records (sql-formatter, @faker-js/faker).
 // P103 Part 2 (§5.1): `StudioTabKind` covers this app's own real vocabulary only, so this is a
 // total function over it with no unreachable member to keep total against a wider union.
 export const TAB_VIEWS: TabViewMap<StudioTabKind> = {

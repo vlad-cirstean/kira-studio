@@ -15,7 +15,7 @@ import (
 // permanently lost when the UI suite moved to the isolated webkit tier) — one of the few things
 // this migration makes strictly better (P52 §11). It exercises the real macOS Keychain under a
 // test-only service/account, never the user's real key, and cannot be compiled or run outside
-// darwin (see docs/v1/plans/P55-go-application-services.md §5.1/§8 — this Linux sandbox excludes
+// darwin (see docs/HISTORY.md (v1 P55)/§8 — this Linux sandbox excludes
 // this file by build tag rather than skipping it at runtime, which is the honest form P52 §13
 // requires).
 func TestRealKeychainRoundTrip(t *testing.T) {

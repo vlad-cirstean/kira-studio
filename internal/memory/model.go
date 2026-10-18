@@ -1,6 +1,10 @@
 package memory
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
+)
 
 const (
 	// Origin: who decided a fact. Grade order: user > external > agent.
@@ -22,6 +26,10 @@ const (
 	SourceMCP    = "mcp"
 	SourceUI     = "ui"
 	SourceImport = "import"
+
+	// Kind: a fact is a durable claim; a rule is a standing imperative with a reason.
+	KindFact = memfmt.KindFact
+	KindRule = memfmt.KindRule
 
 	StatusCurrent    = "current"
 	StatusSuperseded = "superseded"
@@ -56,6 +64,7 @@ type Memory struct {
 	LineageID    string   `json:"lineageId"`
 	Version      int      `json:"version"`
 	Fact         string   `json:"fact"`
+	Kind         string   `json:"kind"`
 	Reason       string   `json:"reason"`
 	Keywords     []string `json:"keywords"`
 	Origin       string   `json:"origin"`

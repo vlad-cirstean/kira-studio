@@ -1,7 +1,7 @@
 /* P16 design system (docs/design/kira-design-system), ported 1:1 from parts/_style.css's P1-P12
    and its named LAWs at P71-P104 into reusable classes on the real token set (tokens.css). P110
    converted every primitive here to a Tailwind utility string or a component variant — see
-   docs/v1.9/plans/P110-css-tailwind-migration.md §5.11 (commits B14-B30) and
+   docs/HISTORY.md (v1.9 P110) (commits B14-B30) and
    scripts/check-theme-classes.sh for the retired-name-to-replacement list. Only the P4 input law's
    `.p-input.is-grow` remains (B31): no Tailwind utility captures its auto-grow math, and it must
    stay unlayered CSS to keep beating a layered utility by construction — see its own comment

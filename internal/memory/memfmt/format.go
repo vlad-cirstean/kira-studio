@@ -1,13 +1,14 @@
 package memfmt
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 )
 
-func checkProvenance(p Provenance, doc bool) error {
+func checkProvenance(p Provenance) error {
 	if !validOrigin(p.Origin) {
 		return fmt.Errorf("origin %q must be user, agent or external", p.Origin)
 	}
@@ -20,10 +21,10 @@ func checkProvenance(p Provenance, doc bool) error {
 	if !validScope(p.Scope) {
 		return fmt.Errorf("scope %q must be company, project or personal", p.Scope)
 	}
-	if doc && (p.Scope == "project") != (p.Project != "") {
+	if (p.Scope == "project") != (p.Project != "") {
 		return errors.New("project is required for scope project and forbidden otherwise")
 	}
-	if doc && p.Session != "" && p.Origin == "external" {
+	if p.Session != "" && p.Origin == "external" {
 		return errors.New("session is only for origin user or agent")
 	}
 	return nil
@@ -50,78 +51,10 @@ func checkFact(f Fact) error {
 			return fmt.Errorf("%s reason: %s", f.ID, msg)
 		}
 	}
-	return nil
-}
-
-type commentWriter struct {
-	m Marker
-	b strings.Builder
-}
-
-func (w *commentWriter) line(text string) error {
-	if w.m.Close != "" && strings.Contains(text, w.m.Close) {
-		return fmt.Errorf("text contains %s, which would end the comment", w.m.Close)
-	}
-	if w.m.NoDashes && strings.Contains(text, "--") {
-		return errors.New("text contains --, which XML comments forbid")
-	}
-	w.b.WriteString(w.m.Open + " " + text)
-	if w.m.Close != "" {
-		w.b.WriteString(" " + w.m.Close)
-	}
-	w.b.WriteString("\n")
-	return nil
-}
-
-func (w *commentWriter) block(bl Block, seen map[string]bool) error {
-	if err := checkProvenance(Provenance{Origin: bl.Origin, Source: bl.Source, Scope: bl.Scope}, false); err != nil {
-		return err
-	}
-	if len(bl.Facts) == 0 {
-		return errors.New("block has no facts")
-	}
-	head := "kira-memory origin=" + bl.Origin
-	if bl.Source != "" {
-		head += " source=" + bl.Source
-	}
-	if err := w.line(head + " scope=" + bl.Scope); err != nil {
-		return err
-	}
-	for _, f := range bl.Facts {
-		if err := checkFact(f); err != nil {
-			return err
-		}
-		if seen[f.ID] {
-			return fmt.Errorf("%s appears twice", f.ID)
-		}
-		seen[f.ID] = true
-		if err := w.line(f.ID + " " + f.Fact); err != nil {
-			return err
-		}
-		if f.Reason == "" {
-			continue
-		}
-		if err := w.line("  " + f.Reason); err != nil {
-			return err
-		}
+	if f.Kind != "" && f.Kind != KindFact && f.Kind != KindRule {
+		return fmt.Errorf("%s kind %q must be fact or rule", f.ID, f.Kind)
 	}
 	return nil
-}
-
-// FormatComment renders blocks as comment lines in marker m, one trailing newline. It errors on
-// anything the parser would flag, so a formatted comment always validates.
-func FormatComment(m Marker, blocks []Block) (string, error) {
-	if len(blocks) == 0 {
-		return "", errors.New("no blocks")
-	}
-	w := &commentWriter{m: m}
-	seen := map[string]bool{}
-	for _, bl := range blocks {
-		if err := w.block(bl, seen); err != nil {
-			return "", err
-		}
-	}
-	return w.b.String(), nil
 }
 
 type docWriter struct{ b strings.Builder }
@@ -141,7 +74,7 @@ func (w *docWriter) front(d Doc) error {
 	if !IsGroupID(d.Group) {
 		return errors.New("group must be a kg_ id")
 	}
-	if err := checkProvenance(d.Provenance, true); err != nil {
+	if err := checkProvenance(d.Provenance); err != nil {
 		return err
 	}
 	if d.From != "" {
@@ -154,7 +87,7 @@ func (w *docWriter) front(d Doc) error {
 			return errors.New("updated must be YYYY-MM-DD")
 		}
 	}
-	w.b.WriteString("---\nkira-memory: 2\n")
+	w.b.WriteString("---\nkira-memory: 3\n")
 	for _, f := range []struct {
 		key, val string
 		optional bool
@@ -182,32 +115,57 @@ func (w *docWriter) fact(f Fact) error {
 	return nil
 }
 
-// FormatDoc renders a doc file. Facts print in order as list items; a heading appears wherever
-// Section changes.
+// FormatDoc renders a doc file. Facts print under ## Facts, rules under ## Rules, each in input
+// order; a category without entries is left out. A ### heading appears wherever Section changes
+// inside a category.
 func FormatDoc(d Doc) (string, error) {
 	w := &docWriter{}
 	if err := w.front(d); err != nil {
 		return "", err
 	}
-	section, seen, started := "", map[string]bool{}, false
+	seen := map[string]bool{}
 	for _, f := range d.Facts {
 		if seen[f.ID] {
 			return "", fmt.Errorf("%s appears twice", f.ID)
 		}
 		seen[f.ID] = true
-		if f.Section != section {
-			if f.Section == "" || strings.TrimSpace(f.Section) != f.Section || strings.ContainsAny(f.Section, "\r\n") {
-				return "", fmt.Errorf("%s: section %q must be one trimmed line, and sections cannot end", f.ID, f.Section)
-			}
-			section = f.Section
-			w.b.WriteString("\n## " + section + "\n\n")
-		} else if !started {
-			w.b.WriteString("\n")
+		if err := checkFact(f); err != nil {
+			return "", err
 		}
-		started = true
-		if err := w.fact(f); err != nil {
+	}
+	for _, c := range []struct{ kind, heading string }{{KindFact, "## Facts"}, {KindRule, "## Rules"}} {
+		if err := w.category(d.Facts, c.kind, c.heading); err != nil {
 			return "", err
 		}
 	}
 	return w.b.String(), nil
+}
+
+func (w *docWriter) category(facts []Fact, kind, heading string) error {
+	section, started, afterHeading := "", false, false
+	for _, f := range facts {
+		if cmp.Or(f.Kind, KindFact) != kind {
+			continue
+		}
+		if !started {
+			w.b.WriteString("\n" + heading + "\n")
+			started, afterHeading = true, true
+		}
+		if f.Section != section {
+			if f.Section == "" || strings.TrimSpace(f.Section) != f.Section || strings.ContainsAny(f.Section, "\r\n") {
+				return fmt.Errorf("%s: section %q must be one trimmed line, and sections cannot end", f.ID, f.Section)
+			}
+			section = f.Section
+			w.b.WriteString("\n### " + section + "\n")
+			afterHeading = true
+		}
+		if afterHeading {
+			w.b.WriteString("\n")
+			afterHeading = false
+		}
+		if err := w.fact(f); err != nil {
+			return err
+		}
+	}
+	return nil
 }

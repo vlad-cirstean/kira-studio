@@ -24,7 +24,7 @@ import (
 // kira:v2: blob would fail to authenticate under the new AAD regardless, so the prefix bump exists
 // to turn that failure into a clear "re-enter it" message instead of a generic tag mismatch. There
 // is no dual-read path: every kira:v2: (and kira:v1:) value is refused, by design — see
-// docs/v1.2/plans/P29-secret-cipher-aad-scope.md §2 D3.
+// docs/HISTORY.md (v1.2 P29).
 const envelopePrefix = "kira:v3:"
 
 // insecureKeyMaterial is a hardcoded compile-time constant, deliberately (P52 §6.5): the Linux
@@ -96,7 +96,7 @@ func (c *Cipher) Status() Status { return c.status }
 // genuinely cross-kind.
 //
 // kira:v2: (and kira:v1:) values are refused with no migration, by explicit decision — see
-// docs/v1.2/plans/P29-secret-cipher-aad-scope.md §2 D3.
+// docs/HISTORY.md (v1.2 P29).
 func (c *Cipher) Encrypt(scope Scope, plain string) (string, error) {
 	if !scope.valid() {
 		return "", ipcerr.Contract("%q is not a known secret scope", scope)

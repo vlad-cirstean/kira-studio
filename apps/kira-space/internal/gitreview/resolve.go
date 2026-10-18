@@ -1,5 +1,5 @@
-// Package gitreview holds branch review's base-resolution policy (docs/v1.3/plans/G6-branch-
-// review-base-resolver-and-the-ranged-walk.md, D7a): a pure classifier over a for-each-ref
+// Package gitreview holds branch review's base-resolution policy (docs/HISTORY.md (v1.3 G6),
+// D7a): a pure classifier over a for-each-ref
 // snapshot, with no I/O — the caller (gitsession.RepoEntry.ResolveReviewBase) has already fetched
 // the ref snapshot (cached) and the origin/HEAD answer (one spawn, only when needed) before
 // calling ResolveBase. Imports gitclient/porcelain (for RefRow) and stdlib only, the same

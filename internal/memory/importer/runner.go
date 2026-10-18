@@ -729,15 +729,7 @@ func (r *Runner) verifyBatches(ctx context.Context, it finalItem, u *usage) erro
 		if err != nil {
 			return err
 		}
-		verdicts := map[string]Verdict{}
-		for _, f := range batch {
-			v, ok := out.Verdicts[f.ID]
-			if !ok {
-				v = Verdict{Verdict: VerdictAmbiguous, Why: "No verdict returned."}
-			}
-			verdicts[f.ID] = v
-		}
-		if err := r.st.saveVerdicts(it, verdicts, *u); err != nil {
+		if err := r.st.saveVerdicts(it, batchVerdicts(batch, out), *u); err != nil {
 			return err
 		}
 		*u = usage{}

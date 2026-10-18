@@ -280,6 +280,7 @@ function memoryRecord(id: string, fact: string): Record<string, unknown> {
     lineageId: id,
     version: 1,
     fact,
+    kind: 'fact',
     reason: 'Because.',
     keywords: [],
     origin: 'user',

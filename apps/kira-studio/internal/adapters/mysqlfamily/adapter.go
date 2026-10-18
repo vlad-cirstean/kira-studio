@@ -77,7 +77,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	// P24: DATABASE() is SQL NULL, not "", whenever the connection was opened with no default
 	// schema (client.go's BuildConfig only sets mc.DBName when cfg.Database is non-empty) — a
 	// completely ordinary case for a connection meant to browse every database on the server
-	// (docs/ARCHITECTURE.md's MariaDB/MySQL tree, database -> tables), and one Validate (input.go)
+	// (docs/ARCHITECTURE.md's PostgreSQL / MariaDB / MySQL section, database -> tables), and one Validate (input.go)
 	// deliberately allows. Scanning that NULL into a plain string panics-the-query with "converting
 	// NULL to string is unsupported", failing Connect outright for every such connection — a
 	// sql.NullString is what actually tolerates it.

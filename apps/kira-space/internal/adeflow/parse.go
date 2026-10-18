@@ -724,6 +724,10 @@ func (v *validator) resolveStepRoutes(steps []adewire.WorkflowStep, index map[st
 				return false
 			}
 			loop = target <= si
+			if loop && (steps[target].Kind == adewire.KindManual || steps[target].Skip) {
+				v.fail(node, rp, "next cannot return to a manual or skipped step, which never runs")
+				return false
+			}
 		}
 		forward = forward || !loop
 		r.Loop = loop

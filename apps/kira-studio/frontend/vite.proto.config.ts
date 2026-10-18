@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig, mergeConfig } from 'vite';
 import { defineAppViteConfig } from '../../../packages/workbench/src/viteAppConfig.ts';
 
-// P165 dev-only prototype build (docs/v2.0/plans/P165-cheetah-grid-prototype.md §2). Same aliases,
+// P165 dev-only prototype build (docs/HISTORY.md (v2.0 P165)). Same aliases,
 // plugins and debug-hook define as the app, different entries and outDir. The shipped build
 // (`vite build`, index.html only) never reaches `proto/`, and Go embeds only `dist`.
 const app = defineAppViteConfig({

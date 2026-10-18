@@ -1239,7 +1239,7 @@ export interface BaseResolution {
 }
 
 // ---------------------------------------------------------------------------------------
-// G11 — incremental review (`docs/v1.3/plans/G11-incremental-review-state-and-review-db.md`).
+// G11 — incremental review (`docs/HISTORY.md (v1.3 G11)`).
 // review.db's own per-file "last reviewed" state, the three-tier delta selection, and partial
 // review ranges — all new to v1.3, no upstream equivalent.
 // ---------------------------------------------------------------------------------------
@@ -1283,7 +1283,7 @@ export type ReviewDeltaSource =
 export type ReviewDiffMode = 'range' | 'sinceReview';
 
 // ---------------------------------------------------------------------------------------
-// G13 — inline AI review comments (`docs/v1.3/plans/G13-inline-ai-review-comments.md`). A flat,
+// G13 — inline AI review comments (`docs/HISTORY.md (v1.3 G13)`). A flat,
 // non-threaded annotation table anchored to the revision the reviewer was reading and projected
 // forward on read (D6/D7) — no upstream equivalent, same as G11.
 // ---------------------------------------------------------------------------------------

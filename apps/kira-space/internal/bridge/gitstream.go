@@ -13,13 +13,13 @@ import (
 	"github.com/kirathecat/kira-studio/internal/rpcstream"
 )
 
-// GitStreamName is the second named stream (docs/v1.5/plans/C10-git-graph-native.md §3.2) —
+// GitStreamName is the second named stream (docs/HISTORY.md (v1.5 C10)) —
 // StreamName's peer, carrying gitrpc's own wire protocol instead of adapterhost's.
 const GitStreamName = "git"
 
 // nativeClientID/nativeLabel identify the native graph's own gitsession.Conn (ClientID/
 // ClientLabel) — used only for attribution (e.g. the undo slot's "made in this window" label),
-// never for trust: there is no pairing here to trust (docs/v1.5/plans/C10-git-graph-native.md
+// never for trust: there is no pairing here to trust (docs/HISTORY.md (v1.5 C10)
 // §3.2).
 const (
 	nativeClientID = "kira-native"
@@ -75,7 +75,7 @@ type CredentialAsker interface {
 
 // ServeGitStream runs for the life of one renderer connection, mirroring ServeEngineStream
 // (stream.go). There is no handshake: the peer is this process's own
-// webview, not an external client the trust store exists to gate (docs/v1.5/plans/
+// webview, not an external client the trust store exists to gate (docs/HISTORY.md (v1.5)
 // C10-git-graph-native.md §3.2). gconn still does its real job — per-connection repo holds, so
 // repo.close only ever releases this connection's own hold (gitrpc/handlers.go), and Emit for
 // repo.changed. Its credential prompts go to the relay, tagged with windowKey (P246).
@@ -86,7 +86,7 @@ func ServeGitStream(router *gitrpc.Router, conn StreamSession, windowKey string,
 	})
 	// P67e/D5: still opted out, but no longer because writes were refused here — a periodic
 	// background `git fetch --prune` is a network write the user never pressed a button for, and
-	// every fetch this phase admits is one they did (P67e's own plan doc §9 OQ-2, docs/v1.6/plans/).
+	// every fetch this phase admits is one they did (P67e's own plan doc §9 OQ-2, docs/HISTORY.md (v1.6)).
 	// One deleted line whenever someone actually wants automatic background fetching for this Conn.
 	gconn.DisableAutoFetch()
 	defer gconn.Close()

@@ -11,7 +11,6 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/internal/memory"
-	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
 const memoryServer = "kira-memory"
@@ -51,7 +50,6 @@ func TestMemoryMcpThroughClaude(t *testing.T) {
 	}
 	storeThroughClaude(t, app, cfg)
 	searchScoredThroughClaude(t, app, cfg)
-	asCommentThroughClaude(t, app, cfg)
 }
 
 // searchScoredThroughClaude has claude search from the billing repo: every meta line carries the
@@ -101,38 +99,6 @@ func searchScoredThroughClaude(t *testing.T, app *realApp, cfg string) {
 	}
 	if metas == 0 {
 		t.Fatalf("search_memories result = %q, want the stored fact with a meta line", text)
-	}
-}
-
-// asCommentThroughClaude has claude call store_memory with asComment: the comment comes back,
-// parses clean, and the store keeps the one fact the previous step wrote.
-func asCommentThroughClaude(t *testing.T, app *realApp, cfg string) {
-	t.Helper()
-	out, _ := app.claudeP(t, app.Work, nil,
-		"Call store_memory once with one item: fact \"The billing-api service listens on port 8080 in production.\", "+
-			"reason \"Stated in the deployment manifest.\", origin agent, scope personal, and asComment \"go\". Reply with the word done.",
-		"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", "mcp__"+memoryServer+"__store_memory",
-		"--output-format", "stream-json", "--verbose")
-	msgs := parseStream(out)
-	uses := toolUses(msgs, "mcp__"+memoryServer+"__store_memory")
-	if len(uses) == 0 {
-		t.Fatalf("no store_memory tool use in the stream:\n%s", tail(out, 1500))
-	}
-	text, isErr, ok := toolResult(msgs, uses[0].ID)
-	var res struct {
-		Status  string `json:"status"`
-		Comment string `json:"comment"`
-	}
-	if !ok || isErr || json.Unmarshal([]byte(text), &res) != nil || res.Status != "prepared" || res.Comment == "" {
-		t.Fatalf("store_memory asComment result = %q (ok=%v, err=%v), want status prepared and a comment", text, ok, isErr)
-	}
-	comment := res.Comment
-	blocks, problems := memfmt.ParseComments("x.go", []byte(comment))
-	if len(problems) != 0 || len(blocks) != 1 || len(blocks[0].Facts) != 1 {
-		t.Fatalf("comment %q: blocks %+v, problems %v, want one clean block of one fact", comment, blocks, problems)
-	}
-	if recent, err := app.W.Memory.Recent(ctx); err != nil || len(recent) != 1 {
-		t.Fatalf("Recent = %+v, %v, want the store untouched", recent, err)
 	}
 }
 
@@ -208,9 +174,9 @@ func TestMemoryInstallRegisters(t *testing.T) {
 	t.Logf("claude mcp list:\n%s", out)
 }
 
-// TestMemoryDistill has the real claude call the read-only distill tool on a file path
-// through the memory-mcp server: the tool runs its own nested claude call and returns terse lines;
-// nothing is stored.
+// TestMemoryDistill has the real claude call ingest_files with distill true on a file path through
+// the memory-mcp server: the tool runs its own nested claude calls and returns short lines; nothing
+// is stored.
 func TestMemoryDistill(t *testing.T) {
 	app := newRealApp(t)
 	exe, err := os.Executable()
@@ -227,13 +193,20 @@ func TestMemoryDistill(t *testing.T) {
 	writeFile(t, doc, "# Deploy\n\nThe billing-api service is deployed with Helm charts. Ops standardised on Helm in 2025, so there is no raw kubectl apply in production. Deploys never run on Friday.\n")
 
 	out, _ := app.claudeP(t, app.Work, nil,
-		"Call the distill tool once with path "+doc+" and no other argument, then reply with the word done.",
-		"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", "mcp__"+memoryServer+"__distill",
+		"Call the ingest_files tool once with distill true and paths [\""+doc+"\"] and no other argument, then reply with the word done.",
+		"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", "mcp__"+memoryServer+"__ingest_files",
 		"--output-format", "stream-json", "--verbose")
 	msgs := parseStream(out)
-	uses := toolUses(msgs, "mcp__"+memoryServer+"__distill")
+	uses := toolUses(msgs, "mcp__"+memoryServer+"__ingest_files")
 	if len(uses) == 0 {
-		t.Fatalf("no distill tool use in the stream:\n%s", tail(out, 1500))
+		t.Fatalf("no ingest_files tool use in the stream:\n%s", tail(out, 1500))
+	}
+	var in struct {
+		Distill bool     `json:"distill"`
+		Paths   []string `json:"paths"`
+	}
+	if err := json.Unmarshal(uses[0].Input, &in); err != nil || !in.Distill || len(in.Paths) != 1 || in.Paths[0] != doc {
+		t.Fatalf("ingest_files input = %s (%v), want distill true and path %s", uses[0].Input, err, doc)
 	}
 	text, isErr, ok := toolResult(msgs, uses[0].ID)
 	if !ok || isErr || strings.TrimSpace(text) == "" {
@@ -245,35 +218,108 @@ func TestMemoryDistill(t *testing.T) {
 	if recent, err := app.W.Memory.Recent(ctx); err != nil || len(recent) != 0 {
 		t.Errorf("Recent = %+v, %v, want nothing stored", recent, err)
 	}
+	if jobs, err := app.W.MemoryImport.Jobs(); err != nil || len(jobs) != 0 {
+		t.Errorf("Jobs = %+v, %v, want no import job", jobs, err)
+	}
 }
 
 // TestMemoryDistillBridge calls the Memory module's bridge distill (the UI path) with the real
-// claude: terse lines come back with sizes and cost, and nothing is stored.
+// claude on a text of two parts that state one claim each and one rule: the merge joins the repeated
+// claim into one line, a rule comes back as a rule, and nothing is stored.
 func TestMemoryDistillBridge(t *testing.T) {
 	app := newRealApp(t)
 	mark := app.Events.Mark()
-	text := "# Deploy\n\nThe billing-api service is deployed with Helm charts. Ops standardised on Helm in 2025, so there is no raw kubectl apply in production. Deploys never run on Friday.\n"
+	// Each part holds more than the chunk minimum fill and tail, so each becomes one chunk.
+	filler := strings.Repeat("This paragraph holds no decision, name or number.\n\n", 90)
+	text := "# Ports\n\n## Part one\n\nThe billing-api service listens on port 8080 in production.\n\n" + filler +
+		"## Part two\n\nThe billing-api service listens on port 8080 in production. Never expose it directly to customer apps, because the gateway applies the rate limits.\n\n" + filler
 
 	res, err := app.W.MemoryDistill.Distill(ctx, bridge.MemoryDistillArgs{RequestID: "claude-row", Text: text})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Lines) == 0 || res.Chunks != 1 || res.InChars != len([]rune(text)) || res.OutChars == 0 {
+	if len(res.Lines) == 0 || res.Chunks < 2 || res.InChars != len([]rune(text)) || res.OutChars == 0 {
 		t.Fatalf("result = %+v", res)
 	}
+	var withPort, rules int
 	for _, l := range res.Lines {
-		if strings.TrimSpace(l) == "" {
-			t.Errorf("empty line in %q", res.Lines)
+		if strings.TrimSpace(l.Text) == "" {
+			t.Errorf("empty line in %+v", res.Lines)
+		}
+		if strings.Contains(l.Text, "8080") {
+			withPort++
+		}
+		if l.Kind == memory.KindRule {
+			rules++
 		}
 	}
-	if res.CostUSD <= 0 || res.CostUSD > 0.50 {
-		t.Errorf("cost = %v USD, want above 0 and at most 0.50", res.CostUSD)
+	if withPort != 1 {
+		t.Errorf("%d lines mention port 8080, want the repeated claim merged into one: %+v", withPort, res.Lines)
 	}
-	t.Logf("distill bridge: %d lines, %d to %d chars, %.4f USD", len(res.Lines), res.InChars, res.OutChars, res.CostUSD)
+	if rules < 1 {
+		t.Errorf("no rule line in %+v", res.Lines)
+	}
+	if res.CostUSD <= 0 || res.CostUSD > 1.00 {
+		t.Errorf("cost = %v USD, want above 0 and at most 1.00", res.CostUSD)
+	}
+	t.Logf("distill bridge: %d lines (%d rules), %d parts, %d to %d chars, %.4f USD, lines %+v unresolved %+v", len(res.Lines), rules, res.Chunks, res.InChars, res.OutChars, res.CostUSD, res.Lines, res.Unresolved)
 	if recent, err := app.W.Memory.Recent(ctx); err != nil || len(recent) != 0 {
 		t.Errorf("Recent = %+v, %v, want nothing stored", recent, err)
 	}
 	if ev := app.Events.Since(mark, bridge.ChannelMemoryChanged); len(ev) != 0 {
 		t.Errorf("distill emitted %d memory changed events, want none", len(ev))
+	}
+}
+
+// TestMemoryDistillTrivia checks that distill drops run trivia from a phase result and keeps the
+// decision and the incident lesson, and that an environment document keeps its limits.
+func TestMemoryDistillTrivia(t *testing.T) {
+	app := newRealApp(t)
+	distill := func(id, text string) []string {
+		res, err := app.W.MemoryDistill.Distill(ctx, bridge.MemoryDistillArgs{RequestID: id, Text: text})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var lines []string
+		for _, l := range res.Lines {
+			lines = append(lines, l.Text)
+		}
+		t.Logf("%s: %d lines, %.4f USD: %q", id, len(lines), res.CostUSD, lines)
+		return lines
+	}
+	has := func(lines []string, sub string) bool {
+		for _, l := range lines {
+			if strings.Contains(l, sub) {
+				return true
+			}
+		}
+		return false
+	}
+
+	run := distill("trivia-run", "# P900 result\n\n## Outcome\n\n"+
+		"The retry queue uses exponential backoff capped at 30 seconds, because the upstream rate limiter bans clients that retry faster. "+
+		"The cap lives in config key retryQueue.maxDelaySeconds, not in code, so ops can change it without a release.\n\n"+
+		"## Run notes\n\n"+
+		"My first push of branch p900-retry was refused as non-fast-forward; I rebased and pushed to a new branch.\n"+
+		"The retry-queue.spec.ts run was flaky once and passed on rerun.\n"+
+		"The macOS dock check is left to the user.\n"+
+		"Commit with an explicit pathspec in a shared checkout, because another session's staged files land in a bare commit.\n")
+	noise := regexp.MustCompile(`(?i)non-fast-forward|flak|left (to|for) the user`)
+	for _, l := range run {
+		if noise.MatchString(l) {
+			t.Errorf("run trivia kept: %q", l)
+		}
+	}
+	if !has(run, "pathspec") {
+		t.Errorf("incident lesson (pathspec) dropped: %q", run)
+	}
+	if !has(run, "retryQueue.maxDelaySeconds") {
+		t.Errorf("decision (retryQueue.maxDelaySeconds) dropped: %q", run)
+	}
+
+	env := distill("trivia-env", "# Sandbox setup\n\nThe sandbox has no display, so run GUI checks through the Playwright ui project.\n"+
+		"The sandbox allows outbound traffic only through the package proxy, so install dependencies with bun install.\n")
+	if !has(env, "display") {
+		t.Errorf("environment limit (display) dropped: %q", env)
 	}
 }

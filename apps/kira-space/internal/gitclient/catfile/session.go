@@ -1,5 +1,5 @@
-// Package catfile is the paged history pipeline's blob/metadata reader (docs/v1.3/plans/G3-
-// history-pipeline-and-wire-format.md, D11): two persistent `git cat-file` processes
+// Package catfile is the paged history pipeline's blob/metadata reader (docs/HISTORY.md (v1.3 G3),
+// D11): two persistent `git cat-file` processes
 // (`--batch-check` for metadata-only lookups, `--batch` for content), each driven one request at
 // a time by writing a revision per line and reading its two-phase response. Built in this phase;
 // its first production caller is G4's commit.detail/commit.fileDiff/blob-read work — RepoEntry

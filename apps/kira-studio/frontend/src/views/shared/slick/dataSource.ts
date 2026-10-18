@@ -3,7 +3,7 @@ import type { ItemMetadata } from 'slickgrid';
 // P22 spike, §6 D1 — the load-bearing decision the grid's SlickGrid migration lives or dies on:
 // SlickGrid's own `CustomDataView` seam over the app's EXISTING frozen-page/decode-cache/staged-
 // edit pipeline, never a materialised row array (that is `SlickDataView`'s job, declined — F9/§4).
-// Nothing here is Vue-reactive; `docs/ARCHITECTURE.md`'s "no Vue reactivity on row data" invariant
+// Nothing here is Vue-reactive; `docs/ARCHITECTURE.md`'s Invariants section (no Vue reactivity on row data)
 // holds by construction because `RowHandle` is a plain frozen object and `GridDataSourceState` is
 // a plain object the host swaps by reassignment, never a `ref`/`reactive`.
 //

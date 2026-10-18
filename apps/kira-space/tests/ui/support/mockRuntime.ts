@@ -210,7 +210,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   memoryContext: 'MemoryService.Context',
   memoryProjects: 'MemoryService.Projects',
   memoryMcpStatus: 'MemoryService.McpStatus',
-  memoryCommentCheck: 'MemoryService.CommentCheck',
+  memoryCheckHook: 'MemoryService.CheckHook',
   memoryMcpInstall: 'MemoryService.InstallClaudeCode',
   memorySemanticStatus: 'MemoryService.SemanticStatus',
   memorySemanticInstall: 'MemoryService.InstallSemanticModel',
@@ -297,7 +297,7 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.codeWorkspaceCancelSearch]: 'null',
   // P116 G5: main.ts's bootstrap() joins keepAwakeStore.initKeepAwake() into the optional
   // Promise.allSettled group, same reasoning as the rest of this table's every-boot calls. The
-  // plan (docs/v1.9/plans/P116-window-chrome-parity.md §2) names `supported: false` here, but this
+  // plan (docs/HISTORY.md (v1.9 P116)) names `supported: false` here, but this
   // deliberately follows Kira Studio's own WILDCARD_DEFAULTS value instead (`supported: true`) —
   // Studio's own comment explains why: the UI suite runs against a static server, not a real Go
   // build, and a spec that never cares about keep-awake should still see the titlebar button it
@@ -345,7 +345,7 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // P272: no project keys by default.
   [IPC.memoryProjects]: '[]',
   // P273: no check commands by default.
-  [IPC.memoryCommentCheck]: JSON.stringify({ executable: '', installCommand: '', hookLine: '' }),
+  [IPC.memoryCheckHook]: JSON.stringify({ executable: '', installCommand: '', hookLine: '' }),
   // P211: no imports by default.
   [IPC.memoryImportJobs]: '[]',
   // P210: no embedder by default, so the semantic row stays hidden.

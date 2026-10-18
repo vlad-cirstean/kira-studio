@@ -20,7 +20,7 @@ for (const section of sections) {
           },
         },
         {
-          channel: IPC.memoryCommentCheck,
+          channel: IPC.memoryCheckHook,
           response: {
             executable: '/Applications/Kira Space',
             installCommand: "'/Applications/Kira Space' memory-check --install-hook",

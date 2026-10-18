@@ -1,15 +1,29 @@
 {
   "MemoryDistillService.Distill#done": {
     "chunks": 1,
-    "costUsd": 0.01,
+    "costUsd": 0.03,
     "inChars": 71,
     "inTokens": 24,
     "lines": [
-      "Worker keeps port 8000 open.",
-      "Queue never retries."
+      {
+        "kind": "fact",
+        "text": "Worker keeps port 8000 open."
+      },
+      {
+        "kind": "rule",
+        "text": "Never retry the queue, because duplicates corrupt totals."
+      }
     ],
-    "outChars": 49,
-    "outTokens": 17
+    "outChars": 86,
+    "outTokens": 29,
+    "unresolved": [
+      {
+        "fact": "It restarts.",
+        "questions": [
+          "Which service restarts?"
+        ]
+      }
+    ]
   },
   "MemoryDistillService.Limits": {
     "maxChars": 120000,
@@ -63,9 +77,10 @@
     "writeDoc": false
   },
   "kira:memory:distill#progress": {
-    "costUsd": 0.01,
+    "costUsd": 0.03,
     "done": 1,
     "requestId": "req-1",
+    "stage": "merge",
     "total": 1
   }
 }

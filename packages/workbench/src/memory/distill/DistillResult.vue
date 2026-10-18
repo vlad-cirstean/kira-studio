@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { FieldDescription } from '@theme/components/ui/field';
@@ -14,6 +15,7 @@ import { formatCurrency, formatPercent } from '../../behaviour/format';
 import { errorText } from '../../bridge/codedError';
 import AddMemoryDialog from '../AddMemoryDialog.vue';
 import { useImportUiStore } from '../import/importStore';
+import { KIND_LABEL } from '../labels';
 import { useDistillLimits, useDistillToImport } from './distillQueries';
 import { useDistillUiStore } from './distillStore';
 
@@ -27,7 +29,10 @@ const toImport = useDistillToImport();
 const storeOpen = ref(false);
 
 const lines = computed(() => result.value?.lines ?? []);
-const picked = computed(() => lines.value.filter((_, i) => selected.value.has(i)));
+const unresolved = computed(() => result.value?.unresolved ?? []);
+const picked = computed(() =>
+  lines.value.filter((_, i) => selected.value.has(i)).map((line) => line.text),
+);
 const allPicked = computed(
   () => lines.value.length > 0 && picked.value.length === lines.value.length,
 );
@@ -117,9 +122,12 @@ function importDocument(): void {
             class="text-kira-md font-normal whitespace-pre-wrap"
             :data-testid="`distill-text-${i}`"
             >{{
-              line
+              line.text
             }}</Label
           >
+          <Badge v-if="line.kind === 'rule'" class="shrink-0" :data-testid="`distill-kind-${i}`">{{
+            t(KIND_LABEL.rule)
+          }}</Badge>
         </li>
       </ul>
       <div class="flex flex-wrap items-center gap-1.5">
@@ -162,6 +170,24 @@ function importDocument(): void {
         <AlertDescription>{{ importError }}</AlertDescription>
       </Alert>
     </template>
+    <section
+      v-if="unresolved.length > 0"
+      class="flex flex-col gap-1"
+      data-testid="distill-unresolved"
+    >
+      <h3 class="m-0 text-kira-lg font-medium">{{ t('memory.distill.unresolved.title') }}</h3>
+      <ul class="m-0 flex list-none flex-col gap-1 p-0">
+        <li
+          v-for="(item, i) in unresolved"
+          :key="i"
+          class="flex flex-col"
+          :data-testid="`distill-unresolved-${i}`"
+        >
+          <span class="text-kira-md">{{ item.fact }}</span>
+          <span class="text-kira-sm text-muted-foreground">{{ item.questions.join(' ') }}</span>
+        </li>
+      </ul>
+    </section>
     <AddMemoryDialog
       v-if="storeOpen"
       :lines="picked"

@@ -1,4 +1,4 @@
-// Package maskrules is M5's own rule-management service (docs/v1.7/plans/M5-anonymization-masking.md
+// Package maskrules is M5's own rule-management service (docs/HISTORY.md (v1.7 M5)
 // §4.6): the layer between storage (repos.MaskRulesRepo/MaskKeysRepo) and this rule set's two
 // consumers — internal/dbmcp's render path (through the MaskSetFor seam it consumer-declares) and
 // internal/bridge's IPC surface for the connection dialog's Privacy tab and the grid's header menu.

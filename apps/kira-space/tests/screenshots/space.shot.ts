@@ -288,6 +288,7 @@ const MEMORIES = FACTS.map((f, i) => ({
   fact: f.fact,
   historical: false,
   keywords: f.keywords,
+  kind: 'fact',
   origin: f.origin,
   project: f.scope === 'project' ? PROJECT : null,
   reason: f.reason,

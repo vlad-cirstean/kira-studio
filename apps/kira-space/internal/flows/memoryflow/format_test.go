@@ -11,10 +11,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
-	"github.com/kirathecat/kira-studio/internal/llmprompts"
-	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
@@ -42,16 +39,16 @@ func writeFile(t *testing.T, dir, name, body string) {
 	}
 }
 
-// Contract memory-settings. UI half: settings-memory.spec.ts "contract: comment check shows the
+// Contract memory-settings. UI half: settings-memory.spec.ts "contract: check hook shows the
 // install commands".
-func TestCommentCheckHook(t *testing.T) {
+func TestCheckHook(t *testing.T) {
 	app := flowharness.New(t)
-	cc := app.W.Memory.CommentCheck()
+	cc := app.W.Memory.CheckHook()
 	exe := flowharness.Replace(cc.Executable, "<bin>/kira-space")
-	app.Contract(t, "memory-settings", "MemoryService.CommentCheck", cc, exe)
+	app.Contract(t, "memory-settings", "MemoryService.CheckHook", cc, exe)
 	if !filepath.IsAbs(cc.Executable) || !strings.Contains(cc.InstallCommand, "memory-check --install-hook") ||
 		!strings.Contains(cc.HookLine, "memory-check --staged") || !strings.Contains(cc.InstallCommand, cc.Executable) {
-		t.Fatalf("CommentCheck = %+v, want an absolute executable in both commands", cc)
+		t.Fatalf("CheckHook = %+v, want an absolute executable in both commands", cc)
 	}
 
 	repo := t.TempDir()
@@ -66,26 +63,17 @@ func TestCommentCheckHook(t *testing.T) {
 		t.Fatalf("hook = %q, %v, want the marked pre-commit script", hook, err)
 	}
 
-	writeFile(t, repo, "bad.go", "package bad\n// km_7h3kq9x2mfa4 orphan line\n")
+	writeFile(t, repo, "bad.go", "package bad\n// kira-memory origin=user scope=company\n// km_7h3kq9x2mfa4 Port is 9090.\n")
 	mustGit(t, repo, "add", "bad.go")
 	out, err := gitIn(repo, "commit", "-q", "-m", "bad")
-	if err == nil || !strings.Contains(out, "bad.go:2: fact line without kira-memory header") {
-		t.Fatalf("commit of an orphan km_ line = %v\n%s, want it blocked with path:line", err, out)
+	if err == nil || !strings.Contains(out, "bad.go:2: ") || !strings.Contains(out, "retired (P296)") {
+		t.Fatalf("commit of a retired block = %v\n%s, want it blocked with path:line", err, out)
 	}
 
-	// The retired P273 lines are flagged, not read.
-	writeFile(t, repo, "bad.go", "package bad\n// kira-memory origin=user scope=company\n// km_7h3kq9x2mfa4 fact: Port is 9090.\n// km_7h3kq9x2mfa4 reason: Manifest says so.\n")
-	mustGit(t, repo, "add", "bad.go")
-	out, err = gitIn(repo, "commit", "-q", "-m", "v1")
-	if err == nil || !strings.Contains(out, "bad.go:3: ") || !strings.Contains(out, "retired P273 format") {
-		t.Fatalf("commit of P273 lines = %v\n%s, want it blocked as retired", err, out)
-	}
-
-	writeFile(t, repo, "bad.go", "package bad\n// legacy comment mentioning km_7h3kq9x2mfa4 mid-sentence\n"+
-		"// kira-memory origin=user scope=company\n// km_7h3kq9x2mfa4 Port is 9090.\n//   Manifest says so.\n")
+	writeFile(t, repo, "bad.go", "package bad\n// Ports are fixed by the manifest (km_7h3kq9x2mfa4).\n")
 	mustGit(t, repo, "add", "bad.go")
 	if out, err := gitIn(repo, "commit", "-q", "-m", "good"); err != nil {
-		t.Fatalf("commit of a valid block: %v\n%s", err, out)
+		t.Fatalf("commit of a plain comment citing a fact id: %v\n%s", err, out)
 	}
 
 	foreign := t.TempDir()
@@ -119,11 +107,7 @@ func memoryMCP(t *testing.T, app *flowharness.App) *mcp.ClientSession {
 	return cs
 }
 
-type storeOut struct {
-	Status   string
-	Comment  string
-	Prepared []struct{ ID, Action string }
-}
+type storeOut struct{ Status string }
 
 func callStore(t *testing.T, cs *mcp.ClientSession, args map[string]any) (storeOut, string) {
 	t.Helper()
@@ -139,61 +123,8 @@ func callStore(t *testing.T, cs *mcp.ClientSession, args map[string]any) (storeO
 	return out, res.Content[0].(*mcp.TextContent).Text
 }
 
-func TestMcpPrepareComment(t *testing.T) {
-	app := flowharness.New(t)
-	gate(t, app, "gate-accept.json")
-	cs := memoryMCP(t, app)
-	items := []map[string]string{
-		{"fact": "billing runs postgres", "reason": "migration notes", "origin": "user", "scope": "personal"},
-		{"fact": "staging deploys at 09:00", "reason": "release calendar", "origin": "user", "scope": "personal"},
-	}
-	args := map[string]any{"items": items, "asComment": "internal/billing/api.go"}
-
-	mark := app.Events.Mark()
-	out, text := callStore(t, cs, args)
-	blocks, problems := memfmt.ParseComments("internal/billing/api.go", []byte(out.Comment))
-	if out.Status != "prepared" || len(problems) != 0 || len(blocks) != 1 || len(blocks[0].Facts) != 2 {
-		t.Fatalf("prepared = %+v, problems %v, blocks %+v, want one block of two facts", out, problems, blocks)
-	}
-	for _, f := range blocks[0].Facts {
-		if !factID(f.ID) {
-			t.Fatalf("fact id %q is not a km_ id", f.ID)
-		}
-	}
-	if !strings.HasPrefix(text, llmprompts.MemoryStorePrepared.Text(llmprompts.Defaults(), llmprompts.NoVars{})) || !strings.HasSuffix(text, "\n\n"+out.Comment) {
-		t.Fatalf("text = %q, want the prepared line, a blank line and the comment", text)
-	}
-	if recent, err := app.W.Memory.Recent(ctx); err != nil || len(recent) != 0 {
-		t.Fatalf("Recent = %+v, %v, want nothing stored", recent, err)
-	}
-	if ev := app.Events.Since(mark, bridge.ChannelMemoryChanged); len(ev) != 0 {
-		t.Fatalf("prepare emitted %d memory changed events, want none", len(ev))
-	}
-
-	if res, err := app.W.Memory.Store(ctx, twoItemsArgs()); err != nil || res.Status != "stored" {
-		t.Fatalf("Store = %+v, %v", res, err)
-	}
-	stored, err := app.W.Memory.Recent(ctx)
-	if err != nil || len(stored) != 2 {
-		t.Fatalf("Recent = %+v, %v", stored, err)
-	}
-	again, _ := callStore(t, cs, args)
-	ids := map[string]bool{}
-	for _, p := range again.Prepared {
-		ids[p.ID] = p.Action == memory.ActionNoop
-	}
-	for _, m := range stored {
-		if !ids[m.LineageID] {
-			t.Fatalf("prepared = %+v, want a noop carrying stored fact id %s", again.Prepared, m.LineageID)
-		}
-		if !strings.Contains(again.Comment, m.LineageID+" ") {
-			t.Fatalf("comment lacks stored id %s:\n%s", m.LineageID, again.Comment)
-		}
-	}
-}
-
-// metaLine is a result's indented meta line; it starts with the version and origin.
-var metaLine = regexp.MustCompile(`^  v\d+ origin=`)
+// metaLine is a result's indented meta line; it starts with the version, kind and origin.
+var metaLine = regexp.MustCompile(`^  v\d+ (fact|rule) origin=`)
 
 func TestMcpSearchTextFormat(t *testing.T) {
 	app := flowharness.New(t)

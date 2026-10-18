@@ -243,7 +243,7 @@ export const IPC = {
   memoryContext: 'kira:memory:context',
   memoryProjects: 'kira:memory:projects',
   memoryMcpStatus: 'kira:memory:mcpStatus',
-  memoryCommentCheck: 'kira:memory:commentCheck',
+  memoryCheckHook: 'kira:memory:checkHook',
   memoryMcpInstall: 'kira:memory:mcpInstall',
   memoryChanged: 'kira:memory:changed',
   // P210: semantic-search status; memorySemantic is a push channel, no FQN entry.

@@ -495,6 +495,25 @@ export function removeStep(wf: Workflow, stepId: string): Workflow {
   });
 }
 
+/** Clears a review step's `implementer` once it no longer names an earlier agent prompt step (the
+ *  save would refuse it); '' means the nearest one. */
+export function clearStaleImplementers(wf: Workflow): Workflow {
+  const stale = (steps: readonly WorkflowStep[], i: number): boolean => {
+    const id = steps[i]?.review?.implementer;
+    if (!id) return false;
+    const t = steps.findIndex((x) => x.id === id);
+    const target = steps[t];
+    return !target || t >= i || target.kind !== 'agent' || target.smartScript !== '';
+  };
+  if (!wf.steps.some((_, i) => stale(wf.steps, i))) return wf;
+  return mapSteps(wf, (steps) => {
+    steps.forEach((s, i) => {
+      if (s.review && stale(steps, i)) s.review.implementer = '';
+    });
+    return steps;
+  });
+}
+
 /** Makes a step the first one, the workflow's start. */
 export function setStart(wf: Workflow, stepId: string): Workflow {
   return mapSteps(wf, (steps) => {

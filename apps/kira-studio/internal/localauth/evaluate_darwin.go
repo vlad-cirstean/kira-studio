@@ -5,7 +5,7 @@
 // plain `go test` on Linux already covers (D8) — and it cannot be compiled or exercised outside a
 // real macOS toolchain (the same wall P7 §1.4 hit: CGO_ENABLED=1 GOOS=darwin go build fails here
 // with "clang: error: unsupported option '-arch'"). Read it for structure, not for a compiler's
-// blessing here; §6.3 of docs/v1.1/plans/P14-credential-reveal-confirmation.md is what a human
+// blessing here; §6.3 of docs/HISTORY.md (v1.1 P14) is what a human
 // must still run on a real Mac to confirm it.
 package localauth
 

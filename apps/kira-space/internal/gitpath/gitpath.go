@@ -1,4 +1,4 @@
-// Package gitpath is the git module's single Unicode-canonicalisation point (docs/v1.3/plans/
+// Package gitpath is the git module's single Unicode-canonicalisation point (docs/HISTORY.md (v1.3)
 // G27-unicode-path-normalization.md D2/D4). It exists because five otherwise-unrelated packages
 // (gitclient, gitclient/porcelain, gitrpc, gitreview, and any future one) each need the same
 // one-line normalization and share no existing common import without inverting the layering:

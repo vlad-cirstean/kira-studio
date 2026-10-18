@@ -115,7 +115,7 @@
         "prov": null,
         "reason": "",
         "relPath": "billing.memory.md",
-        "size": 328,
+        "size": 411,
         "state": "pending",
         "title": "",
         "unresolved": [],
@@ -447,7 +447,7 @@
   "MemoryImportService.Job#memdoc": {
     "files": [
       {
-        "added": 2,
+        "added": 3,
         "chunkCount": 0,
         "chunksDone": 0,
         "costUsd": 0,
@@ -469,7 +469,7 @@
         },
         "reason": "",
         "relPath": "billing.memory.md",
-        "size": 328,
+        "size": 411,
         "state": "done",
         "title": "Billing",
         "unresolved": [],
@@ -511,7 +511,7 @@
       "startedAt": "<masked>",
       "state": "done",
       "totals": {
-        "added": 2,
+        "added": 3,
         "dropped": 0,
         "failedFiles": 0,
         "noop": 0,

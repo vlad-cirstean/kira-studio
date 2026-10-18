@@ -5,7 +5,7 @@ import { IPC } from './support/ipcChannels';
 import { openSettings } from './support/settings';
 
 // P17: the settings dialog stages every control into a local draft and only reaches
-// SettingsService.Set on Save — see docs/v1.1/plans/P17-settings-apply-on-save.md §6.1 for the
+// SettingsService.Set on Save — see docs/HISTORY.md (v1.1 P17) for the
 // five scenarios below. A settings change is observable without opening a grid via the CSS
 // custom property applyAppearance() writes (state/settings.ts): --kira-row-height reads 28px at
 // the comfortable default and 22px for compact.

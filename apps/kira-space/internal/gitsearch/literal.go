@@ -59,7 +59,7 @@ func boundaryOK(s string, start, end int) bool {
 // pattern matches s" is equivalent to "SOME occurrence of needle in s has a non-word character
 // (or nothing) on each side". Enumerating occurrences and post-checking their two edge bytes
 // computes that directly, with no dialect to reconcile — SPEC's own "a byte-boundary post-check
-// implementation in gitsearch rather than a direct pattern port" (docs/v1.3/SPEC.md:449).
+// implementation in gitsearch rather than a direct pattern port" (docs/HISTORY.md (v1.3)).
 type literalMatcher struct {
 	// text is the raw needle, used directly for the case-sensitive path (strings.Contains/
 	// strings.Index).

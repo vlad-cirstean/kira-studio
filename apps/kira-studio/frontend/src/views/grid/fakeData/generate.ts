@@ -37,7 +37,7 @@ function getFaker(): Promise<Faker> {
 }
 
 // D6: 500 rows/batch — ~0.12 MiB of request JSON and ~35ms to generate (F8), comfortably inside
-// the ~150ms-per-step budget (docs/ARCHITECTURE.md:69), two orders of magnitude under the 8 MiB
+// the ~150ms-per-step budget (docs/ARCHITECTURE.md's Invariants section), two orders of magnitude under the 8 MiB
 // inbound-queue admission ceiling (F9.2), and a 500-statement (not 100 000-statement) op_log.command
 // row (F9.1) — none of which anything else here truncates.
 export const BATCH_SIZE = 500;

@@ -67,7 +67,7 @@ type Conn struct {
 	// noAutoFetch is C13-10's own opt-out: the native git-graph mount's own Conn (bridge/
 	// gitstream.go's ServeGitStream) sets this before serving any request, so its own repo.open
 	// never arms a RepoEntry's background auto-fetch timer (autofetch.go) — restoring
-	// docs/ARCHITECTURE.md's "provably read-only" claim for that surface specifically. Set once,
+	// the read-only claim of docs/ARCHITECTURE.md's "Git graph in the native workspace (C10)" section for that surface specifically. Set once,
 	// before this Conn is handed to anything that could call Open concurrently (a plain field, not
 	// mutex-guarded, on that basis) — see DisableAutoFetch's own doc comment. Every other Conn
 	// leaves this false and keeps today's behaviour unchanged: RepoEntry is shared per-repository across every connection regardless, so any

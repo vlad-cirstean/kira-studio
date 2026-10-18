@@ -69,7 +69,7 @@ func (r *Runner) writeDocFile(ctx context.Context, it finalItem, w writeInfo) (p
 	target := strings.TrimSuffix(it.Path, filepath.Ext(it.Path)) + docSuffix
 	if existing, err := os.ReadFile(target); err == nil {
 		doc, ok, problems := memfmt.ParseDoc(existing)
-		if !ok || doc.Group != w.GroupID || (len(problems) > 0 && doc.Version != 1) {
+		if !ok || doc.Group != w.GroupID || (len(problems) > 0 && doc.Version >= 3) {
 			return "", "exists and is not this file's kira-memory doc"
 		}
 	} else if !os.IsNotExist(err) {
@@ -114,7 +114,7 @@ var errNoDocFacts = errors.New("no stored fact to write")
 
 // RenderDoc renders the kira-memory doc of a file's stored facts. A fact whose reason is the source
 // locator of its section takes that section as its heading and no reason line; any other reason is
-// written in full under the running section. left counts facts with another provenance, bad facts
+// written in full under the running section of its kind. left counts facts with another provenance, bad facts
 // whose text the format rejects; both are left out. Pure: the write-back and the eval harness share it.
 func RenderDoc(in DocInput, mems []memory.Memory) (text string, left, bad int, err error) {
 	doc := memfmt.Doc{Group: in.GroupID, Title: docTitle(in.Title, in.FileName), Updated: in.Updated, Provenance: memfmt.Provenance{
@@ -125,7 +125,7 @@ func RenderDoc(in DocInput, mems []memory.Memory) (text string, left, bad int, e
 	if in.Prov.Origin != memory.OriginExternal {
 		doc.Session = in.Prov.Session
 	}
-	running := ""
+	running := map[string]string{}
 	for _, m := range mems {
 		if !sameProvenance(m, in.Prov) {
 			left++
@@ -136,15 +136,15 @@ func RenderDoc(in DocInput, mems []memory.Memory) (text string, left, bad int, e
 			bad++
 			continue
 		}
-		f := memfmt.Fact{ID: m.LineageID, Fact: fact, Section: running}
+		f := memfmt.Fact{ID: m.LineageID, Fact: fact, Kind: m.Kind, Section: running[m.Kind]}
 		section, isLocator := "", false
 		if doc.From != "" {
 			section, isLocator = memfmt.ParseLocator(m.Reason, doc.From)
 		}
 		switch {
 		case isLocator && section != "":
-			running, f.Section = section, section
-		case isLocator && running == "":
+			running[m.Kind], f.Section = section, section
+		case isLocator && running[m.Kind] == "":
 		default:
 			if f.Reason = docText(m.Reason); f.Reason == "" {
 				bad++

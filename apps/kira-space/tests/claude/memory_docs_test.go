@@ -5,16 +5,19 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
+	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
 // TestMemoryMcpFollowsDocs has the real claude use the kira-memory server from goal-only prompts,
 // so the server instructions and tool docs alone must steer it: each stored item carries a reason,
 // origin and scope, a docs folder goes by path with no read of its content, and a request to
-// condense a file goes to distill by path, again with no read of the file.
+// condense a file goes to ingest_files with distill true and the path, again with no read of the file. A code comment stays a
+// plain comment that cites the stored fact by id, with no asComment call.
 func TestMemoryMcpFollowsDocs(t *testing.T) {
 	app := newRealApp(t)
 	exe, err := os.Executable()
@@ -37,7 +40,7 @@ func TestMemoryMcpFollowsDocs(t *testing.T) {
 		}},
 	}})))
 	var memTools []string
-	for _, n := range []string{"store_memory", "search_memories", "memory_history", "memory_context", "ingest_files", "ingest_status", "distill"} {
+	for _, n := range []string{"store_memory", "search_memories", "memory_history", "memory_context", "ingest_files", "ingest_status"} {
 		memTools = append(memTools, "mcp__"+memoryServer+"__"+n)
 	}
 
@@ -162,19 +165,20 @@ func TestMemoryMcpFollowsDocs(t *testing.T) {
 			"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", tools,
 			"--output-format", "stream-json", "--verbose")
 		msgs := parseStream(out)
-		uses := toolUses(msgs, "mcp__"+memoryServer+"__distill")
+		uses := toolUses(msgs, "mcp__"+memoryServer+"__ingest_files")
 		if len(uses) == 0 {
-			t.Fatalf("no distill tool use in the stream:\n%s", tail(out, 1500))
+			t.Fatalf("no ingest_files tool use in the stream:\n%s", tail(out, 1500))
 		}
 		var in struct {
-			Path string `json:"path"`
-			Text string `json:"text"`
+			Distill bool     `json:"distill"`
+			Paths   []string `json:"paths"`
+			Text    string   `json:"text"`
 		}
 		if err := json.Unmarshal(uses[0].Input, &in); err != nil {
 			t.Fatal(err)
 		}
-		if in.Path != notes || in.Text != "" {
-			t.Errorf("distill input = %s, want path %s and no text", uses[0].Input, notes)
+		if !in.Distill || len(in.Paths) != 1 || in.Paths[0] != notes || in.Text != "" {
+			t.Errorf("ingest_files input = %s, want distill true, path %s and no text", uses[0].Input, notes)
 		}
 		if got := toolUses(msgs, "mcp__"+memoryServer+"__store_memory"); len(got) != 0 {
 			t.Errorf("claude stored memory in a distill request: %s", got[0].Input)
@@ -185,6 +189,47 @@ func TestMemoryMcpFollowsDocs(t *testing.T) {
 					t.Errorf("claude used %s on the file itself: %s", tool, u.Input)
 				}
 			}
+		}
+	})
+
+	t.Run("comment", func(t *testing.T) {
+		file := filepath.Join(repo, "billing.go")
+		writeFile(t, file, "package billing\n\nfunc Charge(amount int) {}\n")
+		tools := strings.Join(append(append([]string{}, memTools...), "Read", "Edit"), ",")
+		out, _ := app.claudeP(t, repo, nil,
+			"Add a comment above func Charge in billing.go saying amounts are integer cents because the ledger rejects fractions, and remember that for the team with the kira-memory server.",
+			"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", tools,
+			"--output-format", "stream-json", "--verbose")
+		uses := toolUses(parseStream(out), "mcp__"+memoryServer+"__store_memory")
+		if len(uses) == 0 {
+			t.Fatalf("no store_memory tool use in the stream:\n%s", tail(out, 1500))
+		}
+		for _, u := range uses {
+			if strings.Contains(string(u.Input), "asComment") {
+				t.Errorf("store_memory input has asComment: %s", u.Input)
+			}
+		}
+		src, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids := regexp.MustCompile(memfmt.FactID).FindAllString(string(src), -1)
+		if len(ids) == 0 {
+			t.Fatalf("billing.go cites no fact id:\n%s", src)
+		}
+		stored, err := app.W.Memory.Recent(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var found bool
+		for _, m := range stored {
+			found = found || m.LineageID == ids[0]
+		}
+		if !found {
+			t.Errorf("billing.go cites %s, which no stored memory carries", ids[0])
+		}
+		if ps := memfmt.RetiredComments(src); len(ps) != 0 {
+			t.Errorf("billing.go holds a retired kira-memory block: %v\n%s", ps, src)
 		}
 	})
 }

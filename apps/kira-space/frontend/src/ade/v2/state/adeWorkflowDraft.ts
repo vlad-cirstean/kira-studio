@@ -5,6 +5,7 @@ import {
   addResult,
   addStep,
   clearRoute,
+  clearStaleImplementers,
   moveStep,
   patchResult,
   removeResult,
@@ -60,10 +61,11 @@ export const useAdeWorkflowDraftStore = defineStore('adeWorkflowDraft', () => {
     error.value = '';
   }
   function edit(next: Workflow): void {
-    draft.value = next;
+    const wf = clearStaleImplementers(next);
+    draft.value = wf;
     dirty.value = true;
     const sel = selection.value;
-    if (sel && !next.steps.some((s) => s.id === sel.stepId)) selection.value = null;
+    if (sel && !wf.steps.some((s) => s.id === sel.stepId)) selection.value = null;
   }
   /** After a save: clean only when nothing changed while it was in flight. */
   function saved(sent: string, hash: string): void {

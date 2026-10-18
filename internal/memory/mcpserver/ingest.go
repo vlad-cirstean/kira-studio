@@ -16,6 +16,11 @@ import (
 	"github.com/kirathecat/kira-studio/internal/memory/importer"
 )
 
+// Distiller is the no-store core of ingest_files with distill true: importer.Distiller.
+type Distiller interface {
+	Distill(context.Context, importer.DistillRequest) (importer.DistillResult, error)
+}
+
 // Ingestor is the control side of the import runner: the importer.Engine.
 type Ingestor interface {
 	Create(importer.CreateArgs) (importer.Job, error)
@@ -24,21 +29,30 @@ type Ingestor interface {
 
 const maxIngestPaths = 100
 
+// ingestInput holds no required property: storing needs paths, origin and scope, distilling needs
+// text or one path, and Go checks which applies.
 type ingestInput struct {
-	Paths     []string          `json:"paths"`
-	Origin    string            `json:"origin"`
+	Paths     []string          `json:"paths,omitempty"`
+	Text      string            `json:"text,omitempty"`
+	Distill   bool              `json:"distill,omitempty"`
+	Origin    string            `json:"origin,omitempty"`
 	SourceTag string            `json:"sourceTag,omitempty"`
-	Scope     string            `json:"scope"`
+	Scope     string            `json:"scope,omitempty"`
 	Project   string            `json:"project,omitempty"`
 	Groups    []memory.GroupRef `json:"groups,omitempty"`
 	WriteDoc  bool              `json:"writeDoc,omitempty"`
 	Session   string            `json:"session,omitempty"`
 }
 
+// ingestOutput is a job (jobId, state, reason) when storing, or the merged lines (lines, unresolved,
+// costUsd) when distilling.
 type ingestOutput struct {
-	JobID  string `json:"jobId"`
-	State  string `json:"state"`
-	Reason string `json:"reason"`
+	JobID      string                    `json:"jobId,omitempty"`
+	State      string                    `json:"state,omitempty"`
+	Reason     string                    `json:"reason,omitempty"`
+	Lines      []importer.Line           `json:"lines,omitempty"`
+	Unresolved []importer.UnresolvedFact `json:"unresolved,omitempty"`
+	CostUSD    float64                   `json:"costUsd,omitempty"`
 }
 
 type ingestStatusInput struct {
@@ -48,6 +62,7 @@ type ingestStatusInput struct {
 func ingestSchema(src llmprompts.Source) *jsonschema.Schema {
 	sch := llmprompts.InputSchema[ingestInput](src, llmprompts.MemoryToolIngestFiles.ID(), map[string]any{
 		"paths":  llmprompts.MaxVars{Max: maxIngestPaths},
+		"text":   llmprompts.MaxVars{Max: importer.MaxDistillRunes},
 		"groups": llmprompts.MaxVars{Max: memory.MaxGroups - 1},
 	})
 	enum := func(prop *jsonschema.Schema, values ...string) {
@@ -91,6 +106,15 @@ func badIngest(format string, a ...any) error {
 }
 
 func ingestFiles(ctx context.Context, opts Options, in ingestInput) (*mcp.CallToolResult, ingestOutput, error) {
+	if in.Distill {
+		return distillInput(ctx, opts, in)
+	}
+	switch {
+	case in.Text != "":
+		return nil, ingestOutput{}, badIngest("to store text call store_memory, or save it to a file and ingest that")
+	case in.Origin == "" || in.Scope == "":
+		return nil, ingestOutput{}, badIngest("origin and scope are required")
+	}
 	if n := len(in.Paths); n < 1 || n > maxIngestPaths {
 		return nil, ingestOutput{}, badIngest("send 1 to %d paths", maxIngestPaths)
 	}
@@ -131,6 +155,64 @@ func ingestFiles(ctx context.Context, opts Options, in ingestInput) (*mcp.CallTo
 		text += llmprompts.MemoryIngestStarted.Text(opts.Prompts, llmprompts.NoVars{})
 	}
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}, ingestOutput{JobID: job.ID, State: job.State, Reason: job.Reason}, nil
+}
+
+// distillInput runs ingest_files with distill true: text or one file in, merged lines out, nothing
+// stored and no job created.
+func distillInput(ctx context.Context, opts Options, in ingestInput) (*mcp.CallToolResult, ingestOutput, error) {
+	if opts.Distill == nil {
+		return nil, ingestOutput{}, badIngest("distill is not available in this server")
+	}
+	if in.Origin != "" || in.SourceTag != "" || in.Scope != "" || in.Project != "" || len(in.Groups) > 0 || in.WriteDoc || in.Session != "" {
+		return nil, ingestOutput{}, badIngest("distill takes text or one file path only; it stores nothing")
+	}
+	req := importer.DistillRequest{Text: in.Text}
+	switch {
+	case (in.Text != "") == (len(in.Paths) > 0):
+		return nil, ingestOutput{}, badIngest("distill takes exactly one of text and one file path")
+	case len(in.Paths) > 1:
+		return nil, ingestOutput{}, badIngest("distill takes one file path, got %d", len(in.Paths))
+	case len(in.Paths) == 1:
+		p := in.Paths[0]
+		if !filepath.IsAbs(p) {
+			return nil, ingestOutput{}, badIngest("path must be absolute: %s", p)
+		}
+		info, err := os.Stat(p)
+		switch {
+		case err != nil:
+			return nil, ingestOutput{}, badIngest("path not found or unreadable: %s", p)
+		case info.IsDir():
+			return nil, ingestOutput{}, badIngest("distill takes a file, not a folder: %s", p)
+		}
+		req.Path = p
+	}
+	res, err := opts.Distill.Distill(ctx, req)
+	if err != nil {
+		return nil, ingestOutput{}, err
+	}
+	out := ingestOutput{Lines: res.Lines, Unresolved: res.Unresolved, CostUSD: res.CostUSD}
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: renderDistill(res)}}}, out, nil
+}
+
+// renderDistill is the lines in source order, one per line with no kind prefix, then a blank line and
+// one "unresolved: <fact> | <questions>" line per fact the input leaves open.
+func renderDistill(res importer.DistillResult) string {
+	lines := make([]string, len(res.Lines))
+	for i, l := range res.Lines {
+		lines[i] = l.Text
+	}
+	text := strings.Join(lines, "\n")
+	if len(res.Unresolved) == 0 {
+		return text
+	}
+	notes := make([]string, len(res.Unresolved))
+	for i, u := range res.Unresolved {
+		notes[i] = fmt.Sprintf("unresolved: %s | %s", oneLine(u.Fact), oneLine(strings.Join(u.Questions, " ")))
+	}
+	if text == "" {
+		return strings.Join(notes, "\n")
+	}
+	return text + "\n\n" + strings.Join(notes, "\n")
 }
 
 // projectOf is the project key of the first path's directory. Outside a git repository it falls

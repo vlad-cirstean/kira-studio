@@ -38,6 +38,7 @@ type gateRelated struct {
 
 type gateFact struct {
 	Fact     string   `json:"fact"`
+	Kind     string   `json:"kind"`
 	Reason   string   `json:"reason"`
 	Keywords []string `json:"keywords"`
 }
@@ -94,7 +95,7 @@ func (s *Service) runGate(ctx context.Context, req StoreRequest) ([]gateVerdict,
 }
 
 // validateGate enforces the contract in Go rather than trusting the model: every index answered
-// exactly once, challenges carry questions, accepts carry in-limit facts.
+// exactly once, challenges carry questions, accepts carry in-limit facts. An empty kind means fact.
 func validateGate(n int, items []gateVerdict) ([]gateVerdict, error) {
 	bad := func(format string, a ...any) error {
 		return fmt.Errorf("%w: gate: %s", ErrClaudeOutput, fmt.Sprintf(format, a...))
@@ -120,6 +121,13 @@ func validateGate(n int, items []gateVerdict) ([]gateVerdict, error) {
 				f := &v.Facts[j]
 				f.Fact, f.Reason = collapse(f.Fact), collapse(f.Reason)
 				f.Keywords = cleanKeywords(f.Keywords)
+				switch f.Kind {
+				case "":
+					f.Kind = KindFact
+				case KindFact, KindRule:
+				default:
+					return nil, bad("unknown kind %q for item %d", f.Kind, v.Index)
+				}
 				if f.Fact == "" || len([]rune(f.Fact)) > MaxFactLen || f.Reason == "" || len([]rune(f.Reason)) > MaxReasonLen {
 					return nil, bad("fact or reason of item %d is empty or too long", v.Index)
 				}

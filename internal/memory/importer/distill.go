@@ -2,13 +2,12 @@ package importer
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 	"unicode/utf8"
 
 	"golang.org/x/sync/errgroup"
@@ -17,104 +16,39 @@ import (
 	"github.com/kirathecat/kira-studio/internal/memory"
 )
 
-// Distill modes.
 const (
-	ModeFacts        = "facts"
-	ModeInstructions = "instructions"
-)
-
-const (
-	maxLinesPerChunk = 40
-	distillTimeout   = 180 * time.Second
-	distillBudget    = "0.50"
-
 	// MaxDistillRunes bounds one distill call's input (about 40 000 estimated tokens).
 	MaxDistillRunes = 120_000
 	// MaxDistillChunks bounds the parts one distill call splits into.
 	MaxDistillChunks = 16
-	// DistillSpendCapUSD stops a call from starting new chunks once the reported spend reaches it.
+	// DistillSpendCapUSD stops a call from starting new work once the reported spend reaches it.
 	DistillSpendCapUSD = 2.00
 	distillWorkers     = 3
+
+	// distillText is the source name of pasted text.
+	distillText = "text.md"
 )
-
-// DistillInput is one distill call: a chunk of text.
-type DistillInput struct {
-	Source, Section, Context, Text string
-	Instructions                   bool
-}
-
-// DistillLine is one distilled line. Unresolved names what the text leaves open; empty when none.
-type DistillLine struct {
-	Text       string `json:"text"`
-	Unresolved string `json:"unresolved"`
-}
-
-// DistillOutput.CostUSD is valid even alongside an error.
-type DistillOutput struct {
-	Lines   []DistillLine
-	CostUSD float64
-}
-
-type distillWire struct {
-	Source  string `json:"source,omitempty"`
-	Section string `json:"section,omitempty"`
-	Context string `json:"context,omitempty"`
-	Text    string `json:"text"`
-}
-
-// distillCall runs the distill prompt over one chunk. It is the one core import and the MCP tool share.
-func distillCall(ctx context.Context, runner *memory.CLIRunner, prompts llmprompts.Source, in DistillInput) (DistillOutput, error) {
-	input, err := json.Marshal(distillWire{Source: in.Source, Section: in.Section, Context: in.Context, Text: in.Text})
-	if err != nil {
-		return DistillOutput{}, err
-	}
-	res, err := runner.RunResult(ctx, memory.Call{
-		System: llmprompts.MemoryDistillSystem.Text(prompts, llmprompts.DistillVars{MaxLines: maxLinesPerChunk, Instructions: in.Instructions}),
-		Input:  string(input), Schema: llmprompts.MemoryDistillSystem.Schema(),
-		Timeout: distillTimeout, Budget: distillBudget,
-	})
-	out := DistillOutput{CostUSD: res.CostUSD}
-	if err != nil {
-		return out, err
-	}
-	var parsed struct{ Lines []DistillLine }
-	if err := json.Unmarshal(res.Output, &parsed); err != nil {
-		return out, memory.ErrClaudeOutput
-	}
-	out.Lines = cleanLines(parsed.Lines)
-	return out, nil
-}
-
-// cleanLines trims, folds line breaks, drops empty and over-long lines and caps the count.
-func cleanLines(in []DistillLine) []DistillLine {
-	out := make([]DistillLine, 0, len(in))
-	for _, l := range in {
-		l.Text = strings.TrimSpace(strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(l.Text))
-		if n := utf8.RuneCountInString(l.Text); n == 0 || n > memory.MaxFactLen {
-			continue
-		}
-		l.Unresolved = strings.TrimSpace(l.Unresolved)
-		out = append(out, l)
-		if len(out) == maxLinesPerChunk {
-			break
-		}
-	}
-	return out
-}
 
 // DistillRequest is text or one absolute file path, never both.
 type DistillRequest struct {
 	Text string
 	Path string
-	// Mode is ModeFacts (default) or ModeInstructions.
-	Mode string
-	// Progress, when set, is called with Done 0 after chunking and once per finished chunk. It runs
-	// under the call's lock and must return quickly.
+	// Progress, when set, is called when a stage starts (Done 0) and after each finished step of it. It
+	// runs under the call's lock and must return quickly.
 	Progress func(DistillProgress)
 }
 
-// DistillProgress is the parts finished so far and the spend they reported.
+// Distill stages, in order.
+const (
+	StageExtract = "extract"
+	StageVerify  = "verify"
+	StageMerge   = "merge"
+)
+
+// DistillProgress is the steps finished so far in a stage (parts, cross-check batches, the one merge)
+// and the spend reported so far.
 type DistillProgress struct {
+	Stage       string
 	Done, Total int
 	CostUSD     float64
 }
@@ -123,6 +57,7 @@ type DistillProgress struct {
 const (
 	ReasonTooLong      = "tooLong"
 	ReasonTooManyParts = "tooManyParts"
+	ReasonTooManyFacts = "tooManyFacts"
 	ReasonUnreadable   = "unreadable"
 	ReasonSpendCap     = "spendCap"
 )
@@ -139,16 +74,19 @@ type DistillError struct {
 func (e *DistillError) Error() string { return e.msg }
 func (e *DistillError) Unwrap() error { return e.wrap }
 
-// DistillResult is the distilled lines in source order plus what the call cost and shrank.
+// DistillResult is the merged lines in source order plus what the call cost and shrank. Unresolved
+// lists facts the input leaves open; dropped facts are not returned.
 type DistillResult struct {
-	Lines    []string
-	CostUSD  float64
-	Chunks   int
-	InRunes  int
-	OutRunes int
+	Lines      []Line
+	Unresolved []UnresolvedFact
+	CostUSD    float64
+	Chunks     int
+	InRunes    int
+	OutRunes   int
 }
 
-// Distiller condenses text or a file into terse atomic lines without touching the store.
+// Distiller condenses text or a file into short lines without touching the store. It runs the import
+// pipeline (chunk, extract, cross-check, merge) and stops where import would store.
 type Distiller struct {
 	Runner  *memory.CLIRunner
 	Prompts llmprompts.Source
@@ -162,14 +100,52 @@ func invalidReason(reason string, vars map[string]string, format string, a ...an
 	return &DistillError{Reason: reason, Vars: vars, msg: invalid(format, a...).Error(), wrap: memory.ErrInvalid}
 }
 
-// Distill chunks the input like an import, distills each chunk (three at once) and joins the lines in
-// source order. It starts no chunk once the spend reaches the per-call cap; the error then names the
-// amount spent.
-func (d Distiller) Distill(ctx context.Context, req DistillRequest) (DistillResult, error) {
-	instructions, err := distillMode(req.Mode)
-	if err != nil {
-		return DistillResult{}, err
+// distillRun is the state of one Distill call shared by its stages.
+type distillRun struct {
+	agent    Agent
+	progress func(DistillProgress)
+
+	mu    sync.Mutex
+	spent float64
+}
+
+func (r *distillRun) charge(cost float64) {
+	r.mu.Lock()
+	r.spent += cost
+	r.mu.Unlock()
+}
+
+// capped reports whether the spend has reached the cap.
+func (r *distillRun) capped() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.spent >= DistillSpendCapUSD
+}
+
+func (r *distillRun) capError() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return &DistillError{
+		Reason: ReasonSpendCap,
+		Vars:   map[string]string{"spent": fmt.Sprintf("%.2f", r.spent), "cap": fmt.Sprintf("%.2f", DistillSpendCapUSD)},
+		msg:    fmt.Sprintf("distill stopped at its spend cap: %.2f USD spent, %.2f USD allowed", r.spent, DistillSpendCapUSD),
 	}
+}
+
+func (r *distillRun) report(stage string, done, total int) {
+	if r.progress == nil {
+		return
+	}
+	r.mu.Lock()
+	r.progress(DistillProgress{Stage: stage, Done: done, Total: total, CostUSD: r.spent})
+	r.mu.Unlock()
+}
+
+// Distill chunks the input like an import and extracts facts from each part (three at once). Facts
+// the extractor doubted go through the cross-check against the source, then one merge call joins
+// duplicates across parts and returns the lines in source order. No stage starts once the spend
+// reaches the per-call cap; the error then names the amount spent. A failed call is not retried.
+func (d Distiller) Distill(ctx context.Context, req DistillRequest) (DistillResult, error) {
 	text, kind, rel, err := distillSource(req)
 	if err != nil {
 		return DistillResult{}, err
@@ -179,7 +155,7 @@ func (d Distiller) Distill(ctx context.Context, req DistillRequest) (DistillResu
 		return DistillResult{}, invalidReason(ReasonTooLong, map[string]string{"count": strconv.Itoa(in), "max": strconv.Itoa(MaxDistillRunes)},
 			"input is %d characters, the limit is %d", in, MaxDistillRunes)
 	}
-	chunks, _, err := chunkFile(kind, text, rel, DefaultBudget)
+	chunks, title, err := chunkFile(kind, text, rel, DefaultBudget)
 	if err != nil {
 		return DistillResult{}, invalidReason(ReasonUnreadable, map[string]string{"path": req.Path, "reason": err.Error()},
 			"cannot read the input as %s: %v", kind, err)
@@ -188,78 +164,129 @@ func (d Distiller) Distill(ctx context.Context, req DistillRequest) (DistillResu
 		return DistillResult{}, invalidReason(ReasonTooManyParts, map[string]string{"count": strconv.Itoa(len(chunks)), "max": strconv.Itoa(MaxDistillChunks)},
 			"input splits into %d parts, the limit is %d", len(chunks), MaxDistillChunks)
 	}
-	prompts := d.Prompts
-	if prompts == nil {
-		prompts = llmprompts.Defaults()
+	run := &distillRun{agent: ClaudeAgent{Runner: d.Runner, Prompts: d.Prompts}, progress: req.Progress}
+	res := DistillResult{Chunks: len(chunks), InRunes: in}
+	finish := func(err error) (DistillResult, error) {
+		res.CostUSD = run.spent
+		return res, err
 	}
 
-	var mu sync.Mutex
-	var spent float64
-	done := 0
-	capped := false
-	if req.Progress != nil {
-		req.Progress(DistillProgress{Total: len(chunks)})
+	facts, verify, err := run.extract(ctx, rel, title, chunks)
+	if err != nil {
+		return finish(err)
 	}
-	results := make([][]DistillLine, len(chunks))
+	if len(facts) == 0 {
+		return finish(nil)
+	}
+	if tooManyFacts(facts) {
+		return finish(invalidReason(ReasonTooManyFacts, nil, "the input yields too many facts for one merge; split it"))
+	}
+	verdicts, err := run.verify(ctx, rel, title, path.Ext(rel), text, verify)
+	if err != nil {
+		return finish(err)
+	}
+	kept, _ := applyVerdicts(facts, verdicts)
+	if len(kept) == 0 {
+		return finish(nil)
+	}
+	merged, err := run.merge(ctx, MergeInput{Path: rel, Title: title, ChunkCount: len(chunks), Facts: kept})
+	if err != nil {
+		return finish(err)
+	}
+	res.Lines, res.Unresolved = merged.Lines, merged.Unresolved
+	for _, l := range res.Lines {
+		res.OutRunes += utf8.RuneCountInString(l.Text)
+	}
+	return finish(nil)
+}
+
+// extract runs the extract prompt over every part, three at once, and returns the facts in document
+// order plus the questionable ones for the cross-check.
+func (r *distillRun) extract(ctx context.Context, rel, title string, chunks []Chunk) ([]FinalFact, []VerifyFact, error) {
+	r.report(StageExtract, 0, len(chunks))
+	results := make([][]Fact, len(chunks))
+	var done int
+	capped := false
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(distillWorkers)
 	for i, c := range chunks {
 		g.Go(func() error {
-			mu.Lock()
-			stop := spent >= DistillSpendCapUSD
-			if stop {
+			if r.capped() {
+				r.mu.Lock()
 				capped = true
-			}
-			mu.Unlock()
-			if stop {
+				r.mu.Unlock()
 				return nil
 			}
-			out, err := distillCall(gctx, d.Runner, prompts, DistillInput{Source: rel, Section: c.HeadingPath, Context: c.Context, Text: c.Text, Instructions: instructions})
-			mu.Lock()
-			spent += out.CostUSD
-			mu.Unlock()
+			out, err := r.agent.Extract(gctx, ExtractInput{Path: rel, Title: title, Index: i, Count: len(chunks),
+				HeadingPath: c.HeadingPath, Context: c.Context, Text: c.Text})
+			r.charge(out.CostUSD)
 			if err != nil {
 				return err
 			}
-			results[i] = out.Lines
-			if req.Progress != nil {
-				mu.Lock()
-				done++
-				req.Progress(DistillProgress{Done: done, Total: len(chunks), CostUSD: spent})
-				mu.Unlock()
-			}
+			results[i] = out.Facts
+			r.mu.Lock()
+			done++
+			n := done
+			r.mu.Unlock()
+			r.report(StageExtract, n, len(chunks))
 			return nil
 		})
 	}
-	err = g.Wait()
-	res := DistillResult{CostUSD: spent, Chunks: len(chunks), InRunes: in}
-	switch {
-	case err != nil:
-		return res, err
-	case capped:
-		return res, &DistillError{
-			Reason: ReasonSpendCap,
-			Vars:   map[string]string{"spent": fmt.Sprintf("%.2f", spent), "cap": fmt.Sprintf("%.2f", DistillSpendCapUSD)},
-			msg:    fmt.Sprintf("distill stopped at its spend cap: %.2f USD spent, %.2f USD allowed", spent, DistillSpendCapUSD),
-		}
+	if err := g.Wait(); err != nil {
+		return nil, nil, err
 	}
-	for _, lines := range results {
-		for _, l := range lines {
-			res.Lines = append(res.Lines, l.Text)
-			res.OutRunes += utf8.RuneCountInString(l.Text)
-		}
+	if capped {
+		return nil, nil, r.capError()
 	}
-	return res, nil
+	var facts []FinalFact
+	var verify []VerifyFact
+	for i, c := range chunks {
+		ffs, vs := chunkFinalFacts(rel, i, c.HeadingPath, c.Text, results[i])
+		facts, verify = append(facts, ffs...), append(verify, vs...)
+	}
+	return facts, verify, nil
 }
 
-func distillMode(mode string) (instructions bool, err error) {
-	switch mode {
-	case "", ModeFacts:
-		return false, nil
-	case ModeInstructions:
-		return true, nil
+// verify cross-checks the questionable facts against the source, one batch at a time, and returns a
+// verdict per fact (ambiguous when the cross-check returned none).
+func (r *distillRun) verify(ctx context.Context, rel, title, ext, text string, facts []VerifyFact) (map[string]Verdict, error) {
+	verdicts := map[string]Verdict{}
+	if len(facts) == 0 {
+		return verdicts, nil
 	}
-	return false, invalid("mode must be %s or %s", ModeFacts, ModeInstructions)
+	batches := (len(facts) + verifyBatch - 1) / verifyBatch
+	r.report(StageVerify, 0, batches)
+	for n := range batches {
+		if r.capped() {
+			return nil, r.capError()
+		}
+		batch := facts[n*verifyBatch : min((n+1)*verifyBatch, len(facts))]
+		out, err := r.agent.Verify(ctx, VerifyInput{Path: rel, Title: title, Source: []byte(text), Ext: ext, Facts: batch})
+		r.charge(out.CostUSD)
+		if err != nil {
+			return nil, err
+		}
+		for id, v := range batchVerdicts(batch, out) {
+			verdicts[id] = v
+		}
+		r.report(StageVerify, n+1, batches)
+	}
+	return verdicts, nil
+}
+
+// merge runs the one merge call.
+func (r *distillRun) merge(ctx context.Context, in MergeInput) (MergeOutput, error) {
+	if r.capped() {
+		return MergeOutput{}, r.capError()
+	}
+	r.report(StageMerge, 0, 1)
+	out, err := r.agent.Merge(ctx, in)
+	r.charge(out.CostUSD)
+	if err != nil {
+		return MergeOutput{}, err
+	}
+	r.report(StageMerge, 1, 1)
+	return out, nil
 }
 
 // distillSource is the text to chunk, its chunking kind and the name shown to the model as source.
@@ -269,7 +296,7 @@ func distillSource(req DistillRequest) (text, kind, rel string, err error) {
 	case hasText == hasPath:
 		return "", "", "", invalid("give exactly one of text and path")
 	case hasText:
-		return req.Text, KindMarkdown, "", nil
+		return req.Text, KindMarkdown, distillText, nil
 	case !filepath.IsAbs(req.Path):
 		return "", "", "", invalid("path must be absolute")
 	}

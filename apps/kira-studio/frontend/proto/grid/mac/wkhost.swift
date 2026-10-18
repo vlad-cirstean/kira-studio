@@ -1,6 +1,6 @@
 // wkhost.swift: swiftc -O -o /tmp/wkhost wkhost.swift
 // usage: /tmp/wkhost <url> <hold-seconds> <driver.js> 2> run.log
-// docs/v1.1/WEBVIEW-SCROLL-MEMORY.md Appendix A's harness plus an in-process 4 Hz footprint poll.
+// Appendix A harness of `git show 7d8a72ab4a5e:docs/WEBVIEW-SCROLL-MEMORY.md` plus an in-process 4 Hz footprint poll.
 // stderr: WEBPID, LOADED, TITLE <mark>, FOOTPRINT <seconds> <mark> <MB>.
 import Cocoa
 import Darwin
@@ -13,7 +13,7 @@ let jsPath = args.count > 3 ? args[3] : ""
 
 func log(_ s: String) { FileHandle.standardError.write((s + "\n").data(using: .utf8)!) }
 
-/// ri_phys_footprint of one process, in MB. Never vmmap: it suspends the target (the doc's §2.1).
+/// ri_phys_footprint of one process, in MB. Never vmmap: it suspends the target.
 func footprintMB(_ pid: Int32) -> Double? {
     var info = rusage_info_v2()
     let status = withUnsafeMutablePointer(to: &info) { pointer in

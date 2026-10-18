@@ -1,5 +1,5 @@
 // Frozen at P143 (ADE v2 wire contract). Mirrors apps/kira-space/internal/bridge/adewire.
-// Changing a key, type or value set is a contract change (docs/v2.0/plans/P143-ade-v2-preplan.md rule 1).
+// Changing a key, type or value set is a contract change (docs/HISTORY.md (v2.0 P143) rule 1).
 
 import type { RunOutcome } from '@shared/domain/runOutcome';
 

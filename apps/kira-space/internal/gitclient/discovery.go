@@ -15,7 +15,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
-// RequiredVersion is the hard floor (docs/v1.3/SPEC.md, "The user's own Git, at 2.38 or newer") —
+// RequiredVersion is the hard floor (docs/HISTORY.md (v1.3), "The user's own Git, at 2.38 or newer") —
 // `git merge-tree --write-tree` (2.38) is what a later phase's conflict prediction needs to be
 // exact rather than heuristic.
 const RequiredVersion = "2.38.0"
@@ -128,7 +128,7 @@ func (u unsupportedLocator) Locate(string) (string, []string, bool) {
 }
 
 // NewPlatformLocator selects D3's named per-platform strategy on runtime.GOOS — only darwin is
-// implemented (docs/v1.3/SPEC.md, "macOS only").
+// implemented (docs/HISTORY.md (v1.3), "macOS only").
 func NewPlatformLocator() Locator {
 	if runtime.GOOS == "darwin" {
 		return NewDarwinLocator()

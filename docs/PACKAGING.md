@@ -182,7 +182,7 @@ prompt at all has not been confirmed on real hardware. If it turns out not to be
 correct — it falls back to the existing in-app confirmation dialog (`confirmDialog()`) exactly as
 it does on Linux — but "macOS Touch ID confirmation" would then be a Developer-ID-signing-only
 capability until this app is properly signed. §6.3 of
-`docs/v1.1/plans/P14-credential-reveal-confirmation.md` is where the answer, once observed on a
+`docs/HISTORY.md (v1.1 P14)` is where the answer, once observed on a
 real Mac, gets recorded.
 
 ## 3. Verification checklist — results from this environment
@@ -209,7 +209,7 @@ RSS, and the `.app` size.
 
 ## 4. Human checklist (run on macOS 14+ arm64)
 
-Every item is a pass/fail a human should record here after running it for real. Items 1–3, 10 and 11
+Every item is a pass/fail a human should record here after running it for real. Since P295 these run after the release is published (§7), against its published assets, not before it. Items 1–3, 10 and 11
 are also checked automatically on macOS by `release.yml`'s own "Assert packaged bundle and disk
 image" step (§7) — but this list is
 only updated from an *observed* run, never from expectation. The items marked **pass (P10)** were
@@ -256,7 +256,7 @@ human to launch the packaged app and use it.
 
 **P119's curl installer and in-app update, items 13-20 — none of these can run in this Linux
 sandbox.** They need a published release with both DMGs, which only the first real run of the
-patched `release.yml` produces; §11.3 in `docs/v1.9/plans/P119-space-release-notifier.md` has the
+patched `release.yml` produces; §11.3 in `docs/HISTORY.md (v1.9 P119)` has the
 full step-by-step. All *not yet run*.
 
 13. Fresh machine, no app installed: the Studio curl command installs and opens the app with **no**
@@ -308,7 +308,7 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
   native module was never vendored into the packaged bundle" (P57 M7): `build:engine` marked
   `@confluentinc/kafka-javascript` `--external` and no build step vendored it, so a packaged build's
   Kafka connections would fail at `require()` time. P58e M9 made the gap moot without closing it:
-  Kafka went native in Go (`docs/v1/plans/P58e-kafka.md`) and stopped reaching the Node engine child
+  Kafka went native in Go (`docs/HISTORY.md (v1 P58e)`) and stopped reaching the Node engine child
   at all, so the dead `require()` path was never exercised — `sign-bundle.sh` and
   `verify-packaging.sh` kept probing for the native module and printing a harmless "not present" note.
   P58f M10 closed it for real: the Node engine, `build:engine`, and every check that probed for that
@@ -356,8 +356,8 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
 **Status:** applied. `.github/workflows/` holds the two workflows described below (`pr.yml`,
 `release.yml` — `db-compat.yml` and `test-matrix.yml` existed at one point but were folded into
 `release.yml`'s own jobs, see `docs/ARCHITECTURE.md`). Each of the original workflows spent time in
-a staging directory — `docs/v1/plans/p58-pending-ci-workflows/`, then
-`docs/v1.1/plans/p1{6,9}-pending-ci-workflow/` — waiting for a session whose GitHub token carried
+a staging directory — a `p58-pending-ci-workflows/` plan folder (v1 P58), then
+`p1{6,9}-pending-ci-workflow/` plan folders (v1.1; both in `docs/HISTORY.md`) — waiting for a session whose GitHub token carried
 the `workflow` OAuth scope; all of those directories are gone.
 
 **`pr.yml`** (named `CI` until it was renamed to match what it actually gates — push/PR to `main`,
@@ -383,21 +383,33 @@ the ones needing Docker-on-Linux (Electron-hosted macOS runners have neither Doc
 virtualization); P58f D1 moved that coverage into `apps/kira-studio/internal/adapters/*/*_test.go`
 (`docs/ARCHITECTURE.md`'s Testing section) without changing which runner exercises it.
 
-**Cutting a release** (`release.yml`, on tags matching `v*.*.*`, P119: one job, both apps):
+**Cutting a release** (`release.yml`, on tags matching `v*.*.*`, P119 one tag for both apps, P295 direct publish):
 
-1. `git tag vX.Y.Z && git push origin vX.Y.Z`. The workflow writes the tag (minus its `v`) into
-   both apps' `build/config.yml`'s `info.version` in its own checkout — no pre-tag version-bump
-   commit is needed — and from there each reaches its own binary, About dialog and bundle
-   `Info.plist` (see "Where the version comes from"); it asserts both writes landed before building.
-2. It generates bindings for both apps, runs `lint`/`typecheck`, then `bun run package:studio` and
-   `bun run package:space` in turn.
-3. It copies each app's already-signed `.dmg` to its own platform-qualified asset name
-   (`kira-studio-macos-arm64.dmg`, `kira-space-macos-arm64.dmg` — each image itself built and signed
-   by step 2's `package:*`, not here), re-runs `verify:packaging` (both bundles present, so every
-   artifact check runs), and opens one **draft** GitHub Release carrying both disk images plus an
-   artifact upload per app.
-4. A human runs §4 against the draft's artifacts on real hardware, fills in the rows, then
-   publishes. The workflow never publishes automatically.
+1. `git tag vX.Y.Z && git push origin vX.Y.Z`. Pushing the tag is manual; nothing creates or pushes
+   tags. The `build` job writes the tag (minus its `v`) into both apps' `build/config.yml`
+   `info.version` in its own checkout — no pre-tag version-bump commit is needed — and from there
+   each reaches its own binary, About dialog and bundle `Info.plist` (see "Where the version comes
+   from"); it asserts both writes landed before building.
+2. Five jobs start together, none `needs` another: `ci-gate` (waits for a green `pr.yml` run on the
+   tagged sha, or dispatches one if none exists; `scripts/release-ci-gate.sh`), `build (macOS)`,
+   `test-matrix (Linux)` and `db-compat (Linux, min|max)`. `build` restores the setup action's caches
+   from `main` and saves none (tag-scoped caches are never restored by a later tag). It runs
+   `bun run package:studio` and `bun run package:space`, names each `.dmg`
+   (`kira-studio-macos-arm64.dmg`, `kira-space-macos-arm64.dmg`), runs `verify:packaging` and the
+   bundle and disk image assert, hashes both images and uploads them as artifact `release-dmgs`.
+   `lint` and `typecheck` do not rerun here; `ci-gate` proves PR CI ran them on this sha.
+3. `publish` (ubuntu) runs only when every job above passed. It re-checks the artifact hashes, refuses
+   a tag that already has a published release, creates a draft with both images, verifies each
+   asset (`state`, `size`, `sha256` digest), then publishes with one API call. A failed gate leaves
+   no release and no draft; a failure after the draft exists deletes it.
+4. The release is public at once and `/releases/latest` serves it. The §4 real-hardware checks run
+   after publish against the published assets. A failure found there means a fixed next patch tag
+   (the updater offers only strictly newer versions); optionally delete the bad release so
+   `/releases/latest` falls back to the previous one. Installed copies are not downgraded.
+
+Failed gate: flaky, use "Re-run failed jobs" (artifacts of the first attempt stay available). Real
+failure: delete the tag (`git push --delete origin vX.Y.Z`), fix, tag again. PR CI red on the sha:
+rerun or fix PR CI first, then rerun the release's failed jobs.
 
 **No *silent* auto-update — P119 adds a real one, gated on an explicit click.** SPEC.md defers
 *silent* auto-update past v1 (§1's deferred list, §3's app-identity line); a user-initiated
@@ -461,9 +473,10 @@ over an fd once the disk image is staged, the app quits, and the script swaps th
 above are what keep the app-code half of that true; `scripts/install.sh` itself is the one
 sanctioned exception, run by the user's own action. A dev/test build (`buildinfo.Version` one of
 `0.0.0`/`0.0.0-dev`/`0.0.0-unknown`) makes no request and refuses `InstallUpdate` outright. And
-because `release.yml`'s own release is created as a **draft** (step 3 above) that a human publishes
-by hand (step 4), **a draft release is invisible to the check** — `/releases/latest` excludes drafts
-and prereleases by construction, so nothing shows up until a human actually publishes.
+because `release.yml` publishes the release only after every gate and asset check passed (step 3
+above), a release is visible to this check from the moment it is published. It goes through a draft
+first, and `/releases/latest` excludes drafts and prereleases by construction, so a failed run
+never shows up.
 
 **What a future *silent* auto-update (no click at all) would require, in order:** code signing and
 notarization (SPEC.md §1/§3), then a SPEC.md scope change reversing "no silent auto-update", then an
@@ -479,8 +492,8 @@ against each kind's oldest and newest supported server image, sixteen (kind, min
 deliberately outside `bun run test:go` and outside `pr.yml`, since it's too expensive to run on
 every push. It used to also have its own standalone `workflow_dispatch`-only workflow,
 `.github/workflows/db-compat.yml`; that file is gone — `release.yml`'s own `db-compat` job now runs
-it directly, as a `needs:`-gated step every release tag must pass before the `release` job builds
-and drafts the release, and a one-off single-kind/extreme run during adapter work uses `bun run
+it directly, as a job (min and max in parallel) every release tag must pass before `publish` creates
+the release, and a one-off single-kind/extreme run during adapter work uses `bun run
 test:compat -- --only <kind> --min|--max` locally instead. `scripts/test-matrix.sh` (P25's complete
 auth/config tier) is the same shape and made the same move, for the same reason — see
 `docs/ARCHITECTURE.md`'s own note on it.
@@ -488,7 +501,7 @@ auth/config tier) is the same shape and made the same move, for the same reason 
 **P19's `actions/{checkout,setup-go,upload-artifact}` bumps to `@v7` across `pr.yml` and
 `release.yml`, together with P20's rerouting of all three inline binding-generation blocks through
 `sh scripts/setup.sh`, spent several phases staged under
-`docs/v1.1/plans/p1{6,9}-pending-ci-workflow/`** because the sessions that wrote them had GitHub
+`p1{6,9}-pending-ci-workflow/`** plan folders (v1.1, `docs/HISTORY.md`) because the sessions that wrote them had GitHub
 push access without the `workflow` OAuth scope, which GitHub requires for any commit touching
 `.github/workflows/*.yml`. A session with that scope applied them; both staging directories are
 gone.
@@ -510,7 +523,7 @@ apps/kira-space && wails3 task darwin:package:dmg`, then `sh scripts/sign-bundle
 of P100 Part 2, so this one script signs both apps' bundles rather than a near-identical copy per
 app. Expected artifacts: `apps/kira-space/bin/Kira Space.dmg`/`.app`/`Kira Space` (the DMG, the
 bundle, and the bare binary). **As of P119, `Kira Space.dmg` ships as `kira-space-macos-arm64.dmg` on the
-same draft release as Kira Studio's own disk image** — one `release.yml` job, one tag, one release
+same release as Kira Studio's own disk image** — one `release.yml` build job, one tag, one release
 (§7) — rather than a separate release or a separate `release-space` job.
 
 **ONNX Runtime (P210).** `darwin:package` and `darwin:package:universal` depend on `fetch:onnxruntime`

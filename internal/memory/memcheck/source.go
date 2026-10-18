@@ -24,21 +24,21 @@ const (
 	gitTimeout  = 30 * time.Second
 )
 
-// scannable reports whether a path is a kind of file memory-check reads.
-func scannable(path string) bool {
-	if memfmt.IsDocPath(path) {
-		return true
-	}
-	_, ok := memfmt.MarkersFor(path)
-	return ok
-}
-
 // usable drops files over the size cap and binary files.
 func usable(data []byte) bool {
 	if len(data) > maxFileSize {
 		return false
 	}
 	return !bytes.Contains(data[:min(len(data), nulProbe)], []byte{0})
+}
+
+// slim drops the content of a file that cannot hold a finding, so a large tree is not held in
+// memory: only doc files and files naming kira-memory keep their bytes. The file still counts.
+func slim(path string, data []byte) []byte {
+	if memfmt.IsDocPath(path) || bytes.Contains(data, []byte("kira-memory")) {
+		return data
+	}
+	return nil
 }
 
 // lister yields the files to check.
@@ -74,18 +74,15 @@ func splitNUL(b []byte) []string {
 	return out
 }
 
-// readDisk reads each scannable path from the work tree.
+// readDisk reads each path from the work tree.
 func readDisk(paths []string) []Source {
 	var out []Source
 	for _, p := range paths {
-		if !scannable(p) {
-			continue
-		}
 		data, err := os.ReadFile(p)
 		if err != nil || !usable(data) {
 			continue
 		}
-		out = append(out, Source{p, data})
+		out = append(out, Source{p, slim(p, data)})
 	}
 	return out
 }
@@ -139,7 +136,7 @@ func (staged) Files(ctx context.Context) ([]Source, error) {
 	}
 	var paths []string
 	for _, p := range splitNUL(out) {
-		if scannable(p) && !strings.Contains(p, "\n") {
+		if !strings.Contains(p, "\n") {
 			paths = append(paths, p)
 		}
 	}
@@ -192,7 +189,7 @@ func parseBatch(paths []string, r io.Reader) ([]Source, error) {
 				return nil, err
 			}
 			if usable(data) {
-				out = append(out, Source{p, data})
+				out = append(out, Source{p, slim(p, data)})
 			}
 			continue
 		}

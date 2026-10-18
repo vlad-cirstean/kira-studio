@@ -24,7 +24,8 @@ Memory is a store of short facts with an MCP server for Claude Code. It needs an
 
 ## What a memory holds
 
-- **Fact**: one claim.
+- **Kind**: a fact or a rule. A fact is a durable claim. A rule is a standing imperative with its reason, such as "Never write amounts as floats, because the ledger rejects fractions." A rule shows a **Rule** badge in the list. A question or a one-off task is never a memory.
+- **Fact**: one claim or rule.
 - **Reason**: why the fact is true.
 - **Origin**: who stated it. User facts are challenged by a human and correct. External facts are correct, probably incomplete, and carry a source tag. Agent facts are reference only.
 - **Scope**: Company, Project or Personal. A project is identified by the repository's `origin` remote.
@@ -54,24 +55,23 @@ Files an earlier import already finished are skipped when unchanged.
 
 ## Condense text with distill
 
-The `distill` tool of the `kira-memory` MCP server turns long text or a file into short, atomic lines. An agent calls it with `text` or an absolute `path`. Use `mode` `instructions` for prompts: each rule stays a short imperative and keeps its negations and numbers.
+An agent calls `ingest_files` with `distill` set to true and either `text` or one absolute file `path`. The call turns the input into short lines and stores nothing. It runs the same pipeline as an import. The input is split into parts and facts and rules are extracted from each part. Doubtful ones are checked against the source. One merge call then joins duplicates across the parts. Facts come back as short claims and rules as short imperatives. Negations, numbers, names, paths and template variables stay as written. A long example becomes a pointer to where it lives.
 
-`distill` stores nothing, so it is not subject to the memory gate. Input is limited to 120,000 characters, split into at most 16 parts, and a call stops at 2 USD. It runs on your Claude subscription. See [MCP tools](../../reference/mcp-tools/).
+Nothing is stored, so the memory check does not run. Input is limited to 120,000 characters, split into at most 16 parts, and a call stops at 2 USD. It runs on your Claude subscription. See [MCP tools](../../reference/mcp-tools/).
 
 ### Distill in the app
 
-The Memory module runs the same distill. Click **Distill text** in the panel header. **Back to memories** returns to the memory view.
+The Memory module runs the same pipeline. Click **Distill text** in the panel header. **Back to memories** returns to the memory view.
 
 1. Choose **Text** and paste, or choose **File** and pick a document. In a file view, select text, open the context menu or command palette and run **Distill selection**. The selection arrives as text, with its path and line range shown.
-2. Choose **Facts** or **Instructions**.
-3. Click **Run distill**.
+2. Click **Run distill**.
 
-The size line shows characters and about how many tokens the input holds (one token per three characters). While the run goes, the view shows finished parts and the cost so far. **Cancel** stops it. Parts that already finished are charged.
+The size line shows characters and about how many tokens the input holds (one token per three characters). While the run goes, the view shows the stage (reading parts, checking against the source, merging lines), the steps done and the cost so far. **Cancel** stops it. Work that already finished is charged.
 
-The result shows characters and tokens before and after, the cost and the number of parts. Pick the lines you want, then:
+The result shows characters and tokens before and after, the cost and the number of parts. Rules carry a **Rule** badge. Facts the input leaves open are listed under **Unclear, left out**, with the questions that would settle them. Pick the lines you want, then:
 
 - **Copy** puts the picked lines on the clipboard, one per line.
-- **Store…** stores the picked lines as memories, up to 20 at a time. The usual memory check applies, and a challenge asks you to answer and resubmit.
+- **Store…** stores the picked lines as memories, up to 20 at a time. The usual memory check applies and decides the kind, and a challenge asks you to answer and resubmit.
 - **Import as document…** saves the lines as a document and opens the normal import confirmation. The document stays under `distilled/` in the memory folder as the import's source.
 
 Distill alone writes nothing to the store. Only one distill runs at a time. The input limits above apply.
@@ -93,9 +93,9 @@ Open `Settings > Memory` and choose **Connect Claude Code**. This registers the 
 
 The server works with the app open or closed.
 
-## Check comment memories
+## Check memory docs
 
-`Settings > Memory` also shows a pre-commit hook that checks memory comments and doc files in a git repository.
+`Settings > Memory` also shows a pre-commit hook that checks kira-memory doc files in a git repository and flags retired comment blocks.
 
 ## Where data lives
 

@@ -1288,6 +1288,9 @@
           "tooLong": {
             "body": "The input is {count} characters. The limit is {max}."
           },
+          "tooManyFacts": {
+            "body": "The text yields too many facts for one merge. Split it."
+          },
           "tooManyParts": {
             "body": "The input splits into {count} parts. The limit is {max}."
           },
@@ -5437,14 +5440,7 @@
         "description": "A paragraph that tells Claude to treat the document text as data and never follow instructions found inside it.",
         "title": "Untrusted input notice",
         "usedBy": {
-          "body": "Included in the memory gate, reconcile, import extract and import finalize prompts."
-        }
-      },
-      "memoryDistillSystem": {
-        "description": "Condenses text into terse atomic lines.",
-        "title": "Distill",
-        "usedBy": {
-          "body": "Sent as the system prompt for each chunk while a memory import reads a file, and by the distill tool of the memory MCP server."
+          "body": "Included in the memory gate, reconcile, import extract, import verify and import finalize prompts."
         }
       },
       "memoryGateSystem": {
@@ -5473,6 +5469,13 @@
         "title": "Import cross-check",
         "usedBy": {
           "body": "Sent as the system prompt of the Claude run that reads the source file to confirm, rewrite or reject doubtful facts during a memory import."
+        }
+      },
+      "memoryKinds": {
+        "description": "Defines a memory as a fact or a rule, and says that questions, one-off tasks, standalone examples and result tables are not memories.",
+        "title": "Memory kinds",
+        "usedBy": {
+          "body": "Included in the memory gate, import extract, import finalize and merge prompts."
         }
       },
       "memoryMcpIngestAwaiting": {
@@ -5524,11 +5527,18 @@
           "body": "Returned from store_memory when the gate challenges an item."
         }
       },
-      "memoryMcpStorePrepared": {
-        "description": "Tells the agent that nothing was stored and to paste the comment that follows. The comment follows it.",
-        "title": "Store comment notice",
+      "memoryMergeRules": {
+        "description": "The steps that merge duplicate facts, resolve unclear ones and drop what is not a memory.",
+        "title": "Merge steps",
         "usedBy": {
-          "body": "Returned from store_memory when it is called with asComment."
+          "body": "Included in the import finalize and merge prompts."
+        }
+      },
+      "memoryMergeSystem": {
+        "description": "Merges the facts extracted from one input into short lines, one per fact or rule, without storing anything.",
+        "title": "Merge lines",
+        "usedBy": {
+          "body": "Sent as the system prompt of the last Claude call when the ingest_files tool runs with distill true and when the distill view runs."
         }
       },
       "memoryReconcileSystem": {
@@ -5536,6 +5546,13 @@
         "title": "Memory reconcile",
         "usedBy": {
           "body": "Sent as the system prompt of the Claude call that runs after the gate accepts a fact."
+        }
+      },
+      "memoryRunTrivia": {
+        "description": "Defines run trivia, notes on how one run went, as never a memory, and what to keep instead.",
+        "title": "Run trivia",
+        "usedBy": {
+          "body": "Included in the import extract, import finalize and merge prompts."
         }
       },
       "runResumeLine": {
@@ -5759,15 +5776,15 @@
         "label": "Use {project}"
       }
     },
-    "commentCheck": {
-      "description": "Checks kira-memory comments and doc files in any git repository. The hook reads staged files only, ignores other comments, and skips itself when this app is missing.",
+    "checkHook": {
+      "description": "Checks kira-memory doc files in any git repository and flags retired kira-memory comment blocks. The hook reads staged files only and skips itself when this app is missing.",
       "hook": {
         "hint": "Or add this line to a hook manager such as husky or lefthook."
       },
       "install": {
         "hint": "Install the pre-commit hook by running this once in the repository root."
       },
-      "title": "Check memory comments"
+      "title": "Memory commit check"
     },
     "common": {
       "grade": {
@@ -5791,6 +5808,11 @@
       },
       "historical": {
         "status": "Historical"
+      },
+      "kind": {
+        "rule": {
+          "label": "Rule"
+        }
       },
       "origin": {
         "agent": {
@@ -5843,21 +5865,12 @@
           "hint": "No file chosen."
         }
       },
+      "hint": "Facts come back as short claims and rules as short imperatives. Negations and numbers stay.",
       "import": {
         "label": "Import as document…"
       },
       "input": {
         "placeholder": "Paste text to condense"
-      },
-      "mode": {
-        "facts": {
-          "hint": "Short statements of what the text says.",
-          "label": "Facts"
-        },
-        "instructions": {
-          "hint": "Short imperatives. Negations and numbers stay.",
-          "label": "Instructions"
-        }
       },
       "open": {
         "label": "Distill text"
@@ -5869,7 +5882,15 @@
         "error": "Over the limit of {max} characters."
       },
       "progress": {
-        "status": "Parts done: {done} of {total} · {cost}"
+        "extract": {
+          "status": "Reading parts: {done} of {total} · {cost}"
+        },
+        "merge": {
+          "status": "Merging lines: {done} of {total} · {cost}"
+        },
+        "verify": {
+          "status": "Checking against the source: {done} of {total} · {cost}"
+        }
       },
       "result": {
         "line": {
@@ -5902,6 +5923,9 @@
         "limit": {
           "hint": "Select at most {max} lines to store."
         }
+      },
+      "unresolved": {
+        "title": "Unclear, left out"
       }
     },
     "import": {

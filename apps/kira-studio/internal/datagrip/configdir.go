@@ -143,7 +143,7 @@ func ReadSecurityXML(configDir string) SecurityConfig {
 	return cfg
 }
 
-// LookupOrder is D4, reduced by this follow-up (see docs/v1.2/plans/P25-datagrip-connection-import.md's
+// LookupOrder is D4, reduced by this follow-up (see docs/HISTORY.md (v1.2 P25)'s
 // correction note): the file-based PasswordSafe store (KEEPASS) was removed per explicit user
 // correction, so "keychain" is the only backend this package ever tries. A KEEPASS-configured
 // project is handled separately by its callers (apply.go's lookupPassword, scan.go's outlookFor),

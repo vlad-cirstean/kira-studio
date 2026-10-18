@@ -1,4 +1,4 @@
-import type { DistillMode, DistillResult } from '@shared/domain/memoryDistill';
+import type { DistillResult, DistillStage } from '@shared/domain/memoryDistill';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
@@ -10,19 +10,19 @@ export interface DistillOrigin {
 }
 
 export interface DistillRun {
+  stage: DistillStage;
   done: number;
   total: number;
   costUsd: number;
 }
 
-// P285 Part 4: distill draft, run and result. Survives a mode switch (the Memory module unmounts);
+// P285 Part 4: distill draft, run and result. Survives a module switch (the Memory module unmounts);
 // the abort handle lives here so a remounted view can still cancel, like useModelDownloadsStore.
 export const useDistillUiStore = defineStore('distillUi', () => {
   const source = ref<'text' | 'file'>('text');
   const text = ref('');
   const path = ref('');
   const origin = ref<DistillOrigin | null>(null);
-  const mode = ref<DistillMode>('facts');
   const requestId = ref('');
   const progress = ref<DistillRun | null>(null);
   const result = ref<DistillResult | null>(null);
@@ -67,7 +67,6 @@ export const useDistillUiStore = defineStore('distillUi', () => {
     text,
     path,
     origin,
-    mode,
     requestId,
     progress,
     result,

@@ -235,3 +235,34 @@ export async function openWorkflows(
   await app.window.locator('[data-testid="ade-workflows"]').waitFor();
   return app;
 }
+
+/** A custom script record as `customScriptsList` returns it. */
+function script(id: string, name: string, kind: 'script' | 'smart', command: string) {
+  return {
+    id,
+    kind,
+    name,
+    command,
+    params: [],
+    smart:
+      kind === 'smart'
+        ? { model: 'sonnet', maxBudgetUsd: 1, timeout: '15m', tools: [], bashPatterns: [], mcp: [] }
+        : null,
+    workingDir: '',
+    dirMode: 'kira',
+    useAdeDir: true,
+    color: 'none',
+    collectionId: null,
+    sortOrder: 0,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+export const SMART = script('smart-1', 'Review diff', 'smart', 'Review {branch} of {task}.');
+export const PLAIN = script('plain-1', 'Lint', 'script', 'bun run lint');
+
+export const SCRIPTS: ControlSnapshot = {
+  channel: IPC.customScriptsList,
+  response: { collections: [], scripts: [PLAIN, SMART] },
+};

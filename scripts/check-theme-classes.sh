@@ -340,7 +340,7 @@ check_font_scale() {
   fi
   host_class='(?<![-\w])text-(?:xs|sm|base|lg|[2-9]?xl|kira-xs|\[(?!#|rgb|hsl|color:|var\()[^\]\s]+\]|\(length:[^)\s]+\))(?![-\w])'
   host_css='(?<![-\w])font-size\s*:(?!\s*var\(--kira-t-(?:sm|md|lg|xl)\)\s*[;}])'
-  hint='text-kira-sm/md/lg/xl (data surfaces: text-graph-sm/md/lg) per docs/v1.9/plans/P123-font-size-normalization.md §1.2'
+  hint='text-kira-sm/md/lg/xl (data surfaces: text-graph-sm/md/lg) per git show bd0c224688d9:docs/v1.9/plans/P123-font-size-normalization.md §1.2'
   slick_theme="${FRONTEND_SRC}/views/shared/slick/slickTheme.css"
 
   host_hits=$(grep -rnP --include='*.vue' --include='*.ts' --include='*.css' \
@@ -799,7 +799,7 @@ if [ -s "$GREP_ERRORS" ]; then
 fi
 
 if [ "$STATUS" -ne 0 ]; then
-  echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
+  echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (git show bd0c224688d9:docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
 else
   echo "check-theme-classes: no retired class names found."
 fi

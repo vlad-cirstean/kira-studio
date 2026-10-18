@@ -3,7 +3,7 @@ version: '3'
 vars:
   APP_NAME: "Kira Space"
   BIN_DIR: "bin"
-  # This repository has exactly one package manager (docs/ARCHITECTURE.md's Stack table).
+  # This repository has exactly one package manager (docs/ARCHITECTURE.md's Stack section).
   PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "bun"}}'
   # 9246, not Kira Studio's 9245 — the two dev servers must be able to run side by side.
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9246}}'

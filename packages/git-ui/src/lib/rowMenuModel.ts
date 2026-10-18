@@ -118,7 +118,7 @@ export function buildRowMenu(ctx: CommitMenuContext): MenuSection[] {
  * copy message *only* (§6.8's
  * "Read-only" — no checkout/branch/tag/revert, never gated on `canRunOp`, since none of these
  * items are operations git could refuse mid-op; C10 hides the mutating items rather than
- * disabling them, `docs/v1.5/plans/C10-git-graph-native.md` §4.2 layer 3). Kept
+ * disabling them, `docs/HISTORY.md (v1.5 C10)` §4.2 layer 3). Kept
  * separate from `buildRowMenu` rather than that function gated down to nothing by a flag, so a
  * reader never has to check "which of these does the review row actually get" against a table of
  * conditions — there is no table, there is a second, smaller function.

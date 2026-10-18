@@ -1,5 +1,5 @@
 /**
- * P265 F3: catalog rules C1-C11 over the flattened message catalog (docs/v2.2/plans/P265-text-catalog-i18n.md
+ * P265 F3: catalog rules C1-C11 over the flattened message catalog (git show bd0c224688d9:docs/v2.2/plans/P265-text-catalog-i18n.md
  * section 3.2). Pure functions; `check-catalog.ts` is the CLI.
  */
 import { baseCompile } from '@intlify/message-compiler';

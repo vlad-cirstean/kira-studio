@@ -1,5 +1,5 @@
 // P22 iter2 D2: a real-fling scroll trace, driven by a human on real hardware — see
-// docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md §5 D2/§7.3. Every scroll
+// docs/HISTORY.md (v1.1 P22)/§7.3. Every scroll
 // measurement anywhere else in this repo (tests/ui/support/measure.ts included) drives `scrollTop`
 // from the main thread, so the DOM's scroll offset and the main thread's knowledge of it are
 // necessarily the same value — the condition that produces the user's real symptom (the compositor

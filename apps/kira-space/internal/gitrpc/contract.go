@@ -57,7 +57,7 @@ package gitrpc
 // G23 D6/D13 (2026-09-09): 25 -> 26, for one new SearchRunResult member, unsupportedPattern — a
 // `regex`-mode pattern using lookahead/lookbehind/a backreference, syntax the Go tail scan's RE2
 // engine cannot run at all (SPEC's own "a hit's presence must not depend on which page happens to
-// be loaded", docs/v1.3/SPEC.md:446-450). Unlike most of this constant's history, this bump also
+// be loaded", docs/HISTORY.md (v1.3)). Unlike most of this constant's history, this bump also
 // lands the first real Go implementation of the method it accompanies (search.run) rather than
 // only the wire shape for an extension-answered method.
 // G24 D14 (2026-09-09): 26 -> 27, for two new Go-served requests (commit.resolvePr,

@@ -9,7 +9,7 @@ import (
 // ImageFor returns the container image for kind. An on-demand compatibility run (P16,
 // scripts/db-compat.sh) overrides the pinned default through KIRA_COMPAT_IMAGE_<KIND>; with the
 // variable unset every caller gets exactly the image it pinned before P16, so `bun run test:go`
-// and CI are unchanged. See docs/v1.1/plans/P16-db-compat-suite.md §4 D2.
+// and CI are unchanged. See docs/HISTORY.md (v1.1 P16).
 func ImageFor(kind, pinned string) string {
 	v := strings.TrimSpace(os.Getenv("KIRA_COMPAT_IMAGE_" + strings.ToUpper(kind)))
 	if v == "" {
@@ -23,7 +23,7 @@ func ImageFor(kind, pinned string) string {
 // leading number (":latest", a digest pin). Conformance suites build their own ServerVersion
 // assertion from it, so running against a different image still asserts the version that was
 // actually asked for instead of asserting nothing. See
-// docs/v1.1/plans/P16-db-compat-suite.md §4 D4 for the parsing rule.
+// docs/HISTORY.md (v1.1 P16) for the parsing rule.
 func ServerMajor(kind, pinned string) string {
 	image := ImageFor(kind, pinned)
 	// A "@sha256:…" digest suffix is never the tag — strip it before hunting for a ":tag", so a

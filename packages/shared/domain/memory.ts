@@ -7,6 +7,10 @@ import { z } from 'zod';
 export const memoryOriginSchema = /*#__PURE__*/ z.enum(['user', 'agent', 'external']);
 export type MemoryOrigin = z.infer<typeof memoryOriginSchema>;
 
+// A fact is a durable claim; a rule is a standing imperative with a reason.
+export const memoryKindSchema = /*#__PURE__*/ z.enum(['fact', 'rule']);
+export type MemoryKind = z.infer<typeof memoryKindSchema>;
+
 export const memoryScopeSchema = /*#__PURE__*/ z.enum(['company', 'project', 'personal']);
 export type MemoryScope = z.infer<typeof memoryScopeSchema>;
 
@@ -43,6 +47,7 @@ export const memorySchema = /*#__PURE__*/ z.object({
   lineageId: z.string(),
   version: z.number().int(),
   fact: z.string(),
+  kind: memoryKindSchema,
   reason: z.string(),
   keywords: z.array(z.string()),
   origin: memoryOriginSchema,
@@ -131,6 +136,7 @@ export const memoryStoreResultSchema = /*#__PURE__*/ z.object({
   outcomes: z.array(
     z.object({
       fact: z.string(),
+      kind: memoryKindSchema,
       reason: z.string(),
       action: /*#__PURE__*/ z.enum(['add', 'update', 'noop', 'failed']),
       id: z.string(),
@@ -152,12 +158,12 @@ export const memoryMcpStatusSchema = /*#__PURE__*/ z.object({
 });
 export type MemoryMcpStatus = z.infer<typeof memoryMcpStatusSchema>;
 
-export const memoryCommentCheckSchema = /*#__PURE__*/ z.object({
+export const memoryCheckHookSchema = /*#__PURE__*/ z.object({
   executable: z.string(),
   installCommand: z.string(),
   hookLine: z.string(),
 });
-export type MemoryCommentCheck = z.infer<typeof memoryCommentCheckSchema>;
+export type MemoryCheckHook = z.infer<typeof memoryCheckHookSchema>;
 
 // "installed" | "notFound" | "installFailed" — mcpinstall's outcome vocabulary.
 export const memoryInstallResultSchema = /*#__PURE__*/ z.object({
