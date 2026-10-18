@@ -204,4 +204,12 @@ One table plus deviations:
 
 ## Result
 
-Pending.
+Stopped at group 4 (plan: unit still fallback after one `--retry-fallback` means stop and report). P300 stays Todo.
+
+- Landed: group 1 `bc147350`, group 2 `b811de65`, group 3 `1cff86ba`. Hooks passed, no `--no-verify`.
+- `units v2.5` bytes: 49,147 before, 80,165 after D5 (plan est. 55.7 KB). Cause: 17 v2.5 plans carry numbered `## N. Result` headings, not 3. No stray `P285` unit.
+- Group 3 free checks, before vs after move: `promptsizes` output and exit (10 losses, 11 with `-allowed /dev/null`) `cmp` identical; `checkprompts` 0; footprint (`round-p297-01`, `round-p298-01`) and compare (`P285-runs/round-p2-01` vs `round-p2-01b`) outputs `cmp` identical; 493 renames, all 100%; nested `go vet` ok.
+- Fold: 27 units, 26 ok, 1 fallback (`v2.5-p271`), 0 pending. Ledger: 33 try rows, 7 failed; ok `costUsd` sum 1.399 USD; charged sum 3.149 USD (failed tries charge 0.25 USD estimate each; real cost of failed tries 0). Cap 10 USD not reached.
+- Cause of `v2.5-p271` failure (2 tries, then 1 retry, same each time): the verify call (`--max-turns 3`, tools Read,Grep) ends `terminal_reason: max_turns`, exit 1, empty stderr, so the error reads `Claude Code failed: exit 1`. P271 has many facts. Fix needs a tool change (turn limit or fact batching) outside this plan.
+- Not committed: `docs/HISTORY.md` (+359 lines, 913,049 to 961,702 bytes, 6,106 to 6,465 lines, includes P271 fallback text) and untracked `docs/history-runs/`. Resume: decide the P271 fix, rerun `fold ... --retry-fallback v2.5` with same flags, then groups 4 to 9.
+- Verify sample: 12 of 26 phases, 12 `[CHECK]` lines, not yet hand-judged.
