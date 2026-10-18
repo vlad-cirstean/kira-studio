@@ -1,7 +1,7 @@
 #!/bin/sh
 # Kira Studio pre-push — P94 §5, scoped by P294. The heavier checks, run where a cold
 # multi-minute wait is acceptable and a per-commit one is not. Scoped to the pushed range: Go lint
-# and tests only for changed Go packages, knip only when frontend code or package config changed;
+# and tests only for changed Go packages (nested modules lint in their own dir, no tests), knip only when frontend code or package config changed;
 # `go build ./...` always runs (a link error can sit in an unchanged dependent). Config, lockfile or
 # script changes fall back to the full run.
 # Bypass mid-investigation only: git push --no-verify
@@ -51,6 +51,14 @@ if [ -n "$DIRS" ]; then
   TESTDIRS="$(echo $DIRS | tr ' ' '\n' | grep -Ev '/internal/adapters/|/internal/ipcfixture|/flows/dockerflow|/flows/dbflow' || true)"
   # shellcheck disable=SC2086
   [ -z "$TESTDIRS" ] || go test $TESTDIRS
+fi
+# Nested modules (apps/*/tests/claude) lint on their own; their tests are opt-in and cost tokens.
+NESTED="$(nested_go_mods "$FILES" | while read -r m; do [ -d "$m" ] && echo "$m"; done)"
+if [ -n "$NESTED" ]; then
+  sh scripts/install-golangci-lint.sh
+  for m in $NESTED; do
+    (cd "$m" && "$(go env GOPATH)/bin/golangci-lint" run)
+  done
 fi
 if any "$FILES" '\.(ts|mts|vue)$'; then
   bun run lint:dead

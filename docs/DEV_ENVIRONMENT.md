@@ -458,7 +458,8 @@ popup never shows there. Call `openMainWindow(kira)` (`@workbench/testing/e2eRea
 Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-commit or pre-push.
 
 - Own Go module per app: `apps/kira-space/tests/claude/`, `apps/kira-studio/tests/claude/`. Opt-in by absence:
-  `go test ./...`, `lint:go`, CI and hooks stop at the nested `go.mod`. No build tag, no env flag. Never add
+  `go test ./...`, `lint:go`, CI and hooks stop at the nested `go.mod`; pre-push lints a changed nested module
+  by `cd`-ing into it (`nested_go_mods` in `scripts/hook-scope.sh`), never tests it. No build tag, no env flag. Never add
   a root `go.work`: workspace mode pulls the modules into `./...`. After a Wails or Go bump run
   `go mod tidy` in both modules.
 - Run: `bun run test:claude` (both), `test:claude:space`, `test:claude:studio`. Narrow with `go test` flags
