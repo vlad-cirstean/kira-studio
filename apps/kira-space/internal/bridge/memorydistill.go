@@ -32,7 +32,7 @@ const (
 	distilledDir          = "distilled"
 )
 
-// MemoryDistillService is the Memory module's distill: the MCP tool's core behind the UI. A separate
+// MemoryDistillService is the Memory module's distill: ingest_files with distill true behind the UI. A separate
 // bound service from MemoryService and MemoryImportService; it shares their prompts and engine.
 type MemoryDistillService struct {
 	mem     *MemoryService
@@ -48,29 +48,32 @@ func NewMemoryDistillService(mem *MemoryService, dialogs Dialogs, events appcore
 }
 
 // MemoryDistillArgs is Distill's argument shape: exactly one of Text and Path. RequestID tags the
-// progress events. Mode is "facts" (default) or "instructions".
+// progress events.
 type MemoryDistillArgs struct {
 	RequestID string `json:"requestId"`
 	Text      string `json:"text"`
 	Path      string `json:"path"`
-	Mode      string `json:"mode"`
 }
 
 // MemoryDistillResult sizes count characters (runes) and tokens (runes/3) of the input and of the
-// output as Copy puts it on the clipboard (lines joined by newlines).
+// output as Copy puts it on the clipboard (line texts joined by newlines). Unresolved lists facts the
+// input leaves open.
 type MemoryDistillResult struct {
-	Lines     []string `json:"lines"`
-	CostUSD   float64  `json:"costUsd"`
-	Chunks    int      `json:"chunks"`
-	InChars   int      `json:"inChars"`
-	OutChars  int      `json:"outChars"`
-	InTokens  int      `json:"inTokens"`
-	OutTokens int      `json:"outTokens"`
+	Lines      []importer.Line           `json:"lines"`
+	Unresolved []importer.UnresolvedFact `json:"unresolved"`
+	CostUSD    float64                   `json:"costUsd"`
+	Chunks     int                       `json:"chunks"`
+	InChars    int                       `json:"inChars"`
+	OutChars   int                       `json:"outChars"`
+	InTokens   int                       `json:"inTokens"`
+	OutTokens  int                       `json:"outTokens"`
 }
 
-// MemoryDistillProgress is the ChannelMemoryDistill payload.
+// MemoryDistillProgress is the ChannelMemoryDistill payload. Stage is extract, verify or merge; Done
+// and Total count the parts, cross-check batches or the one merge of that stage.
 type MemoryDistillProgress struct {
 	RequestID string  `json:"requestId"`
+	Stage     string  `json:"stage"`
 	Done      int     `json:"done"`
 	Total     int     `json:"total"`
 	CostUSD   float64 `json:"costUsd"`
@@ -139,22 +142,28 @@ func (s *MemoryDistillService) Distill(ctx context.Context, args MemoryDistillAr
 
 	d := importer.Distiller{Runner: memory.NewCLIRunner(), Prompts: s.mem.prompts}
 	res, err := d.Distill(ctx, importer.DistillRequest{
-		Text: args.Text, Path: args.Path, Mode: args.Mode,
+		Text: args.Text, Path: args.Path,
 		Progress: func(p importer.DistillProgress) {
-			s.events.Emit(ChannelMemoryDistill, MemoryDistillProgress{RequestID: args.RequestID, Done: p.Done, Total: p.Total, CostUSD: p.CostUSD})
+			s.events.Emit(ChannelMemoryDistill, MemoryDistillProgress{RequestID: args.RequestID, Stage: p.Stage, Done: p.Done, Total: p.Total, CostUSD: p.CostUSD})
 		},
 	})
 	if err != nil {
 		return MemoryDistillResult{}, distillErr(ctx, err)
 	}
-	lines := res.Lines
+	lines, unresolved := res.Lines, res.Unresolved
 	if lines == nil {
-		lines = []string{}
+		lines = []importer.Line{}
 	}
-	joined := strings.Join(lines, "\n")
-	out := utf8.RuneCountInString(joined)
+	if unresolved == nil {
+		unresolved = []importer.UnresolvedFact{}
+	}
+	texts := make([]string, len(lines))
+	for i, l := range lines {
+		texts[i] = l.Text
+	}
+	out := utf8.RuneCountInString(strings.Join(texts, "\n"))
 	return MemoryDistillResult{
-		Lines: lines, CostUSD: res.CostUSD, Chunks: res.Chunks,
+		Lines: lines, Unresolved: unresolved, CostUSD: res.CostUSD, Chunks: res.Chunks,
 		InChars: res.InRunes, OutChars: out,
 		InTokens: tokensOf(res.InRunes), OutTokens: tokensOf(out),
 	}, nil
@@ -167,6 +176,7 @@ func tokensOf(runes int) int { return (runes + 2) / 3 }
 var distillReasonKeys = map[string]string{
 	importer.ReasonTooLong:      "backend.space.memory.distill.tooLong.body",
 	importer.ReasonTooManyParts: "backend.space.memory.distill.tooManyParts.body",
+	importer.ReasonTooManyFacts: "backend.space.memory.distill.tooManyFacts.body",
 	importer.ReasonUnreadable:   "backend.space.memory.distill.unreadable.body",
 	importer.ReasonSpendCap:     "backend.space.memory.distill.spendCap.body",
 }

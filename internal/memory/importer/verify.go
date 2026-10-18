@@ -83,6 +83,20 @@ func normalizeQuote(s string) string {
 	return strings.ToLower(strings.Join(strings.Fields(s), " "))
 }
 
+// batchVerdicts is one verdict per fact of the batch: the cross-check's, or ambiguous when it
+// returned none for that fact.
+func batchVerdicts(batch []VerifyFact, out VerifyOutput) map[string]Verdict {
+	verdicts := make(map[string]Verdict, len(batch))
+	for _, f := range batch {
+		v, ok := out.Verdicts[f.ID]
+		if !ok {
+			v = Verdict{Verdict: VerdictAmbiguous, Why: "No verdict returned."}
+		}
+		verdicts[f.ID] = v
+	}
+	return verdicts
+}
+
 func verifyLimits(facts int) (time.Duration, string, int) {
 	timeout := min(verifyBaseTimeout+time.Duration(facts)*verifyFactTime, verifyMaxTimeout)
 	budget := min(verifyBaseBudget+verifyFactBudget*float64(facts), verifyMaxBudget)

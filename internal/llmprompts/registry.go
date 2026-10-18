@@ -23,10 +23,9 @@ type ExtractVars struct {
 	MaxEvidence int `json:"maxEvidence"`
 }
 
-// DistillVars fills the distill prompt. Instructions switches to the prompt mode: rules as short imperatives.
-type DistillVars struct {
-	MaxLines     int  `json:"maxLines" prompt:"required"`
-	Instructions bool `json:"instructions"`
+// MergeVars fills the no-store merge prompt.
+type MergeVars struct {
+	MaxLines int `json:"maxLines" prompt:"required"`
 }
 
 // FinalizeVars fills the import finalize prompt.
@@ -384,41 +383,39 @@ Extract atomic facts:
 }`,
 }, ExtractVars{MaxFacts: 40, MaxEvidence: 200})
 
-// MemoryDistillSystem is the system prompt that distills text into terse atomic lines: the base of the
-// distill MCP tool and of memory import (one call per chunk).
-var MemoryDistillSystem = define(Entry{
-	ID: "memory.distill.system", Kind: KindSystem, Apps: spaceApp, Applies: NextCall,
-	TitleKey:          "llmPrompts.entry.memoryDistillSystem.title",
-	PurposeKey:        "llmPrompts.entry.memoryDistillSystem.description",
-	UsedByKey:         "llmPrompts.entry.memoryDistillSystem.usedBy.body",
-	RequiredFragments: []ID{"memory.dataHygiene"},
-	Default: `You distill text into terse atomic lines. Output only the schema.
+// MemoryMergeSystem is the system prompt of the no-store merge: ingest_files with distill and the UI
+// Distill view merge the facts extracted from one input into short lines.
+var MemoryMergeSystem = define(Entry{
+	ID: "memory.merge.system", Kind: KindSystem, Apps: spaceApp, Applies: NextCall,
+	TitleKey:          "llmPrompts.entry.memoryMergeSystem.title",
+	PurposeKey:        "llmPrompts.entry.memoryMergeSystem.description",
+	UsedByKey:         "llmPrompts.entry.memoryMergeSystem.usedBy.body",
+	RequiredFragments: []ID{"memory.dataHygiene", "memory.kinds", "memory.merge.rules"},
+	Default: `You merge the facts extracted from one input into short lines. Output only the schema.
 
 {{template "memory.dataHygiene"}}
 
-Input: "text"; optional "context" (end of the previous part: read it for references, never distill it), "section", "source".
-"text" may be JSON from an export: field values are content; author, time and id fields are context.
+{{template "memory.kinds"}}
 
-- One claim per line, in source order.
-- Terse: cut articles, filler, hedges, pleasantries. Fragments fine. Short word over long phrase. No invented abbreviations, no arrows.
-- Keep verbatim: negations (not, never, no, only, except), numbers, units, names, code identifiers, paths, error strings, quoted text.
-- Keep every qualifier that changes the claim: conditions, exceptions, limits.
-- Keep decisions with their reasons, rejected alternatives with why, conventions, configuration, ownership, relationships, constraints, how things work.
-- Keep a reason the text states inline ("X, because Y") only when the line alone does not make it obvious. Drop it when self-explanatory.
-- Name the subject. Replace a pronoun with the name only when the text makes it certain. Otherwise keep the words and set "unresolved" to what is missing; else "".
-- Skip navigation, tables of contents, boilerplate, licence text, copied examples, step-by-step commands, time-bound chatter, process chatter (who ran what, commit and phase lists, run results, spend), code mechanics with no behavioral meaning (selectors, local variable names, fixture values).
-- Never invent or infer beyond the text. Never include a secret (password, token, API key, private key).
-{{if .Instructions}}- The text is instructions. Each line is one rule as a short imperative. Keep must, never and only force, template variables and schema field names verbatim. Keep commands and examples a rule needs.
-{{end}}- At most {{.MaxLines}} lines. None when nothing durable.`,
+Input: "document" (path, title, chunks), "facts": atomic facts extracted separately per chunk, in document order. Each has id, chunk, section, evidence quote and, when the chunk left something open, "unresolved".
+
+{{template "memory.merge.rules"}}
+4. Return every other fact in "lines", in document order. "kind": "rule" for a rule, else "fact". "text": the shortest plain form that keeps the meaning: active voice, present tense where true; cut filler, hedges and pleasantries. Keep exactly negations, numbers, units, names, code identifiers, paths, error strings and template variables. One plain-text line: no Markdown, no backticks. At most {{.MaxLines}} lines.`,
 	Schema: `{
-  "type": "object", "additionalProperties": false, "required": ["lines"],
-  "properties": {"lines": {"type": "array", "items": {
-    "type": "object", "additionalProperties": false,
-    "required": ["text", "unresolved"],
-    "properties": {"text": {"type": "string"}, "unresolved": {"type": "string"}}
-  }}}
+  "type": "object", "additionalProperties": false, "required": ["lines", "unresolved", "dropped"],
+  "properties": {
+    "lines": {"type": "array", "items": {
+      "type": "object", "additionalProperties": false, "required": ["text", "kind"],
+      "properties": {"text": {"type": "string"}, "kind": {"enum": ["fact", "rule"]}}}},
+    "unresolved": {"type": "array", "items": {
+      "type": "object", "additionalProperties": false, "required": ["fact", "questions"],
+      "properties": {"fact": {"type": "string"}, "questions": {"type": "array", "items": {"type": "string"}}}}},
+    "dropped": {"type": "array", "items": {
+      "type": "object", "additionalProperties": false, "required": ["fact", "why"],
+      "properties": {"fact": {"type": "string"}, "why": {"type": "string"}}}}
+  }
 }`,
-}, DistillVars{MaxLines: 40})
+}, MergeVars{MaxLines: 640})
 
 // MemoryMergeRules is the merge, resolve and drop steps shared by the import finalize run and the
 // no-store merge of ingest_files with distill.
@@ -507,8 +504,8 @@ var MemoryMcpInstructions = define(Entry{
 	UsedByKey:  "llmPrompts.entry.memoryMcpInstructions.usedBy.body",
 	Default: `Long-term memory shared by the user and their agents, across sessions and projects.
 
-Store a durable fact or decision when the user states one or you learn one: call store_memory. Each item needs:
-- fact: what is true. Rough or compound text is fine; the store splits and rewords it.
+Store a durable fact, decision or standing rule when the user states one or you learn one: call store_memory. Each item needs:
+- fact: what is true, or a rule: an imperative that holds beyond this task. Rough or compound text is fine; the store splits and rewords it.
 - reason: why it is true or was decided. Never invent one.
 - origin: "user" (user stated or confirmed it), "agent" (you concluded it) or "external" with a sourceTag (slack, jira, a doc says it).
 - scope: "company", "project" (this repo unless project is set) or "personal".
@@ -518,15 +515,15 @@ A challenge stores nothing. Ask the user the returned questions or fix the items
 
 Files (repo docs, Slack or Jira export): call ingest_files with absolute paths, then ingest_status. Never read, open or paste the content, not even to check it; Kira reads the files. Save external material to a .md, .txt or .json file first.
 Code comments are plain comments. Never write a kira-memory header, fact, reason, origin or scope into one. A comment that records something you store cites the returned fact id (km_...) in its text: store first, then write the comment.
-Condense long text or a file into short lines without storing (for a comment too): call distill with text or an absolute path; do not Read the file first. Mode instructions for prompts. To store a file use ingest_files.
+Condense text or one file into short lines without storing (for a comment or a prompt too): call ingest_files with distill true and text or one absolute path; do not Read the file first.
 
-Recall: search_memories matches words and meaning, best first, loosely related results included; drop what is unrelated. Each result is "<id> <fact>", an indented reason line, an indented meta line (version, origin, scope). Cite a memory by fact id (km_...). ctx=N in the meta line: memory_context has N facts stored with it. memory_history shows versions.`,
+Recall: search_memories matches words and meaning, best first, loosely related results included; drop what is unrelated. Each result is "<id> <fact>", an indented reason line, an indented meta line (version, kind, origin, scope). Cite a memory by fact id (km_...). ctx=N in the meta line: memory_context has N facts stored with it. memory_history shows versions.`,
 }, NoVars{})
 
 // MemoryToolStoreMemory describes the store_memory tool.
 var MemoryToolStoreMemory = define(Entry{
 	ID: "memory.mcp.tool.store_memory", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "store_memory",
-	Default: `Store facts in long-term memory. Each item needs fact, reason, origin and scope. The store splits independent claims into separate facts, keeps a list about one subject as one fact, rewords them, and updates a matching same-scope fact unless the stored one has a higher origin; old versions stay as history. An unclear item or weak reason is challenged: nothing stored, questions returned. A code comment cites a stored fact by its id only. Returns each stored fact id.`,
+	Default: `Store facts and standing rules in long-term memory. Each item needs fact, reason, origin and scope. The store splits independent claims into separate facts, keeps a list about one subject as one fact, rewords them, and updates a matching same-scope fact unless the stored one has a higher origin; old versions stay as history. An unclear item, weak reason, question or one-off task is challenged: nothing stored, questions returned. A code comment cites a stored fact by its id only. Returns each stored fact id.`,
 }, NoVars{})
 
 var (
@@ -548,7 +545,7 @@ var (
 // MemoryToolSearchMemories describes the search_memories tool.
 var MemoryToolSearchMemories = define(Entry{
 	ID: "memory.mcp.tool.search_memories", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "search_memories",
-	Default: `Search memories by words and meaning, best first. Recall-biased: drop unrelated results. Meta lines show provenance, score parts (relevance times boosts) and ctx=N for memory_context. Superseded versions only with includeHistory.`,
+	Default: `Search memories by words and meaning, best first. Recall-biased: drop unrelated results. Meta lines show kind (fact or rule), provenance, score parts (relevance times boosts) and ctx=N for memory_context. Superseded versions only with includeHistory.`,
 }, NoVars{})
 
 var (
@@ -582,11 +579,11 @@ var (
 // MemoryToolIngestFiles describes the ingest_files tool.
 var MemoryToolIngestFiles = define(Entry{
 	ID: "memory.mcp.tool.ingest_files", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "ingest_files",
-	Default: `Store the facts of files and folders by path, in the background. Send absolute paths, never content: Kira reads the files. Reads Markdown, text, JSON and JSON Lines; a kira-memory doc format file is applied as is. Every fact gets the given origin, scope and groups. Returns a job id for ingest_status. A large job waits for the user to start it in Kira Space.`,
+	Default: `Store the facts and rules of files and folders by path, in the background. Send absolute paths, never content: Kira reads the files. Reads Markdown, text, JSON and JSON Lines; a kira-memory doc format file is applied as is. Every fact gets the given origin, scope and groups. Returns a job id for ingest_status. A large job waits for the user to start it in Kira Space. With distill true, stores nothing and returns the merged lines of text or one file; the call waits for them.`,
 }, NoVars{})
 
 var (
-	_ = arg(MemoryToolIngestFiles.id, "paths", spaceApp, NewSession, `absolute file or folder paths, 1 to {{.Max}}; a folder is read recursively, skipping ignored and binary files`, MaxVars{Max: 100})
+	_ = arg(MemoryToolIngestFiles.id, "paths", spaceApp, NewSession, `absolute file or folder paths, 1 to {{.Max}}; a folder is read recursively, skipping ignored and binary files; with distill exactly one file`, MaxVars{Max: 100})
 	_ = arg(MemoryToolIngestFiles.id, "origin", spaceApp, NewSession, `who decided the content: user, agent or external (an outside source such as a Slack export; set sourceTag)`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "sourceTag", spaceApp, NewSession, `source name, only for origin external: lowercase a-z, 0-9 and -, such as slack, jira, confluence, email, doc or web`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "scope", spaceApp, NewSession, `where the facts hold: company, project or personal (the user only)`, NoVars{})
@@ -597,6 +594,8 @@ var (
 	_ = arg(MemoryToolIngestFiles.id, "groups.title", spaceApp, NewSession, `optional label for people`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "writeDoc", spaceApp, NewSession, `also write each file's facts beside it as <name>.memory.md in kira-memory doc format; default false`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "session", spaceApp, NewSession, `Claude Code session id; omit for this session`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "text", spaceApp, NewSession, `text to distill, at most {{.Max}} characters; only with distill true`, MaxVars{Max: 120000})
+	_ = arg(MemoryToolIngestFiles.id, "distill", spaceApp, NewSession, `true: store nothing and return the merged lines; takes text or one path and no other argument; default false`, NoVars{})
 )
 
 // MemoryToolIngestStatus describes the ingest_status tool.
@@ -606,18 +605,6 @@ var MemoryToolIngestStatus = define(Entry{
 }, NoVars{})
 
 var _ = arg(MemoryToolIngestStatus.id, "id", spaceApp, NewSession, `job id returned by ingest_files`, NoVars{})
-
-// MemoryToolDistill describes the distill tool.
-var MemoryToolDistill = define(Entry{
-	ID: "memory.mcp.tool.distill", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "distill",
-	Default: `Condense text or a file into terse atomic lines, in source order. Stores nothing; do not Read the file first. To store a file, use ingest_files.`,
-}, NoVars{})
-
-var (
-	_ = arg(MemoryToolDistill.id, "text", spaceApp, NewSession, `text to distill, at most {{.Max}} characters; or path`, MaxVars{Max: 120000})
-	_ = arg(MemoryToolDistill.id, "path", spaceApp, NewSession, `absolute file path; or text`, NoVars{})
-	_ = arg(MemoryToolDistill.id, "mode", spaceApp, NewSession, `facts (default), or instructions: rules as short imperatives`, NoVars{})
-)
 
 // MemoryRememberDescription describes the remember prompt of the memory MCP server.
 var MemoryRememberDescription = define(Entry{

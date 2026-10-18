@@ -713,24 +713,35 @@ func (s *store) loadExtracted(tx *sql.Tx, fileID string) (extractedFile, error) 
 		if err := rows.Scan(&idx, &headingPath, &text, &raw); err != nil {
 			return f, err
 		}
-		norm := normalizeQuote(text)
 		var facts []Fact
 		if err := json.Unmarshal([]byte(raw), &facts); err != nil {
 			return f, fmt.Errorf("import: chunk facts: %w", err)
 		}
-		reason := sourceLocator(f.Rel, headingPath)
-		for n, fact := range facts {
-			fact.Section = headingPath
-			ff := FinalFact{ID: fmt.Sprintf("%d.%d", idx+1, n+1), Chunk: idx + 1, Reason: reason, Fact: fact}
-			if questionableIn(norm, fact) {
-				if _, judged := f.verdicts[ff.ID]; !judged {
-					f.Verify = append(f.Verify, VerifyFact{ID: ff.ID, Fact: fact.Fact, Evidence: fact.Evidence, Section: fact.Section, Unresolved: fact.Unresolved})
-				}
+		ffs, verify := chunkFinalFacts(f.Rel, idx, headingPath, text, facts)
+		for _, v := range verify {
+			if _, judged := f.verdicts[v.ID]; !judged {
+				f.Verify = append(f.Verify, v)
 			}
-			f.Facts = append(f.Facts, ff)
 		}
+		f.Facts = append(f.Facts, ffs...)
 	}
 	return f, rows.Err()
+}
+
+// chunkFinalFacts tags one chunk's extracted facts with their ids, chunk number and source locator, in
+// order, and lists the questionable ones for the cross-check. idx is the zero-based chunk index.
+func chunkFinalFacts(rel string, idx int, headingPath, text string, facts []Fact) (ffs []FinalFact, verify []VerifyFact) {
+	norm := normalizeQuote(text)
+	reason := sourceLocator(rel, headingPath)
+	for n, fact := range facts {
+		fact.Section = headingPath
+		ff := FinalFact{ID: fmt.Sprintf("%d.%d", idx+1, n+1), Chunk: idx + 1, Reason: reason, Fact: fact}
+		if questionableIn(norm, fact) {
+			verify = append(verify, VerifyFact{ID: ff.ID, Fact: fact.Fact, Evidence: fact.Evidence, Section: fact.Section, Unresolved: fact.Unresolved})
+		}
+		ffs = append(ffs, ff)
+	}
+	return ffs, verify
 }
 
 // sourceLocator is the stored reason of a fact stated under a heading path: memfmt.Locator, with the
@@ -749,10 +760,9 @@ func sourceLocator(rel, headingPath string) string {
 
 // applyVerdicts folds the cross-check verdicts into the facts: confirmed and rewritten facts are
 // resolved, unsupported ones leave for the dropped list, ambiguous ones stay unresolved.
-func (f *extractedFile) applyVerdicts() {
-	kept := f.Facts[:0:0]
-	for _, ff := range f.Facts {
-		v, judged := f.verdicts[ff.ID]
+func applyVerdicts(facts []FinalFact, verdicts map[string]Verdict) (kept []FinalFact, dropped []DroppedFact) {
+	for _, ff := range facts {
+		v, judged := verdicts[ff.ID]
 		switch {
 		case !judged:
 		case v.Verdict == VerdictConfirmed:
@@ -766,12 +776,18 @@ func (f *extractedFile) applyVerdicts() {
 			}
 			ff.Unresolved = ""
 		case v.Verdict == VerdictUnsupported:
-			f.PreDropped = append(f.PreDropped, DroppedFact{Fact: ff.Fact.Fact, Why: "Not supported by the source: " + v.Why})
+			dropped = append(dropped, DroppedFact{Fact: ff.Fact.Fact, Why: "Not supported by the source: " + v.Why})
 			continue
 		}
 		kept = append(kept, ff)
 	}
+	return kept, dropped
+}
+
+func (f *extractedFile) applyVerdicts() {
+	kept, dropped := applyVerdicts(f.Facts, f.verdicts)
 	f.Facts = kept
+	f.PreDropped = append(f.PreDropped, dropped...)
 }
 
 // settleVerifyPending computes verify_pending for extracted files that lack it, once per file.

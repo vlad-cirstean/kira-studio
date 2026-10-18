@@ -1,5 +1,5 @@
 // Package mcpserver is the kira-memory MCP server: store_memory, search_memories, memory_history
-// and memory_context tools, the ingest and distill tools when wired, plus the `remember` prompt, over a memory.Service.
+// and memory_context tools, the ingest tools when wired, plus the `remember` prompt, over a memory.Service.
 package mcpserver
 
 import (
@@ -72,7 +72,7 @@ type Options struct {
 	Project string
 	// Ingest, when set, adds the ingest_files and ingest_status tools. Import mode leaves it nil.
 	Ingest Ingestor
-	// Distill, when set, adds the read-only distill tool. Import mode leaves it nil.
+	// Distill runs ingest_files with distill true; nil refuses it. Import mode leaves it nil.
 	Distill Distiller
 	// Prompts resolves the texts the server shows; nil means the registry defaults. Instructions,
 	// tool and argument descriptions are read once here, so an edit reaches the next session.
@@ -149,9 +149,6 @@ func Build(svc *memory.Service, opts Options) *mcp.Server {
 
 	if opts.Ingest != nil {
 		addIngestTools(srv, opts)
-	}
-	if opts.Distill != nil {
-		addDistillTool(srv, opts)
 	}
 
 	srv.AddPrompt(&mcp.Prompt{

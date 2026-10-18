@@ -10,6 +10,7 @@ type Agent interface {
 	Extract(ctx context.Context, in ExtractInput) (ExtractOutput, error)
 	Verify(ctx context.Context, in VerifyInput) (VerifyOutput, error)
 	Finalize(ctx context.Context, in FinalizeInput) (FinalizeOutput, error)
+	Merge(ctx context.Context, in MergeInput) (MergeOutput, error)
 }
 
 type ExtractInput struct {

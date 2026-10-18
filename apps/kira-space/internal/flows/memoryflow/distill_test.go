@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -24,25 +25,48 @@ import (
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
-const distillSystem = "distill text into terse atomic lines"
+const mergeSystem = "merge the facts extracted from one input"
 
-// distillAnswer writes a canned distill result that reports cost USD.
-func distillAnswer(t *testing.T, cost float64, lines ...string) string {
+// costAnswer writes a canned result that reports cost USD.
+func costAnswer(t *testing.T, cost float64, structured any) string {
 	t.Helper()
-	out := []map[string]string{}
-	for _, l := range lines {
-		out = append(out, map[string]string{"text": l, "unresolved": ""})
-	}
 	raw, err := json.Marshal(map[string]any{"type": "result", "subtype": "success", "is_error": false,
-		"total_cost_usd": cost, "structured_output": map[string]any{"lines": out}})
+		"total_cost_usd": cost, "structured_output": structured})
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := filepath.Join(t.TempDir(), "distill.json")
+	p := filepath.Join(t.TempDir(), "answer.json")
 	if err := os.WriteFile(p, raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return p
+}
+
+// evidence is a phrase every sections() part contains, so no extracted fact is questionable.
+const evidence = "the worker keeps port"
+
+// extractRule answers every extract call with the same two facts at cost USD.
+func extractRule(t *testing.T, cost float64) fakeagent.PromptRule {
+	t.Helper()
+	return fakeagent.PromptRule{System: extractSystem, Emit: costAnswer(t, cost, map[string]any{"facts": []map[string]string{
+		{"fact": "Worker keeps port 8000 open.", "evidence": evidence, "section": "", "unresolved": ""},
+		{"fact": "Queue never retries.", "evidence": evidence, "section": "", "unresolved": ""},
+	}})}
+}
+
+var mergedLines = []importer.Line{
+	{Text: "Worker keeps port 8000 open.", Kind: memory.KindFact},
+	{Text: "Never retry the queue, because duplicates corrupt totals.", Kind: memory.KindRule},
+}
+
+// mergeRule answers the merge call with mergedLines and one unresolved fact.
+func mergeRule(t *testing.T, cost float64) fakeagent.PromptRule {
+	t.Helper()
+	return fakeagent.PromptRule{System: mergeSystem, Emit: costAnswer(t, cost, map[string]any{
+		"lines":      mergedLines,
+		"unresolved": []map[string]any{{"fact": "It restarts.", "questions": []string{"Which service restarts?"}}},
+		"dropped":    []map[string]string{},
+	})}
 }
 
 // sections returns n Markdown sections of about size characters each; above the chunk minimum fill, so each becomes one chunk.
@@ -66,71 +90,136 @@ func distillFiles(t *testing.T, app *flowharness.App) []string {
 	return files
 }
 
-func TestMcpDistill(t *testing.T) {
+// callsWith counts the claude calls whose system prompt holds marker.
+func callsWith(t *testing.T, app *flowharness.App, marker string) int {
+	t.Helper()
+	n := 0
+	for _, f := range distillFiles(t, app) {
+		if raw, _ := os.ReadFile(f); strings.Contains(string(raw), marker) {
+			n++
+		}
+	}
+	return n
+}
+
+// mergePrompt is the input of the latest merge call.
+func mergePrompt(t *testing.T, app *flowharness.App) string {
+	t.Helper()
+	var latest string
+	var at time.Time
+	for _, f := range distillFiles(t, app) {
+		raw, _ := os.ReadFile(f)
+		info, err := os.Stat(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(raw), mergeSystem) && !info.ModTime().Before(at) {
+			latest, at = f, info.ModTime()
+		}
+	}
+	if latest == "" {
+		t.Fatal("no merge call")
+	}
+	prompt, err := os.ReadFile(strings.TrimSuffix(latest, ".args") + ".prompt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(prompt)
+}
+
+func TestMcpIngestDistill(t *testing.T) {
 	app := flowharness.New(t)
-	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{
-		{System: distillSystem, Emit: distillAnswer(t, 0.01, "Worker keeps port 8000 open.", "Queue never retries.")},
-	}})
+	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{extractRule(t, 0.01), mergeRule(t, 0.02)}})
 	cs := memoryMCP(t, app)
 	mark := app.Events.Mark()
 
-	res := callMCP(t, cs, "distill", map[string]any{"text": "## Worker\n\nThe worker keeps port 8000 open and the queue never retries."})
-	if got := res.Content[0].(*mcp.TextContent).Text; got != "Worker keeps port 8000 open.\nQueue never retries." {
-		t.Fatalf("text = %q", got)
+	tools, err := cs.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if out := structuredAs[struct{ Lines []string }](t, res); len(out.Lines) != 2 || out.Lines[1] != "Queue never retries." {
-		t.Fatalf("structured = %+v", out)
-	}
-	if n := len(distillFiles(t, app)); n != 1 {
-		t.Fatalf("%d claude calls, want 1", n)
+	for _, tl := range tools.Tools {
+		if tl.Name == "distill" {
+			t.Fatal("the distill tool is gone: ingest_files distill true replaces it")
+		}
+		if tl.Name == "ingest_files" {
+			var sch struct{ Required []string }
+			raw, _ := json.Marshal(tl.InputSchema)
+			if err := json.Unmarshal(raw, &sch); err != nil {
+				t.Fatal(err)
+			}
+			for _, r := range []string{"paths", "origin", "scope"} {
+				if slices.Contains(sch.Required, r) {
+					t.Errorf("ingest_files schema requires %q, want none", r)
+				}
+			}
+		}
 	}
 
-	// A path of two chunks: lines come back in source order across both calls.
+	res := callMCP(t, cs, "ingest_files", map[string]any{"distill": true,
+		"text": "## Worker\n\nThe worker keeps port 8000 open and the queue never retries."})
+	want := "Worker keeps port 8000 open.\nNever retry the queue, because duplicates corrupt totals.\n\nunresolved: It restarts. | Which service restarts?"
+	if got := res.Content[0].(*mcp.TextContent).Text; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+	out := structuredAs[struct {
+		Lines      []importer.Line
+		Unresolved []importer.UnresolvedFact
+		CostUSD    float64
+		JobID      string
+	}](t, res)
+	if !slices.Equal(out.Lines, mergedLines) || len(out.Unresolved) != 1 || out.Unresolved[0].Fact != "It restarts." ||
+		out.CostUSD < 0.029 || out.CostUSD > 0.031 || out.JobID != "" {
+		t.Fatalf("structured = %+v", out)
+	}
+	if n := len(distillFiles(t, app)); n != 2 {
+		t.Fatalf("%d claude calls, want an extract and a merge", n)
+	}
+
+	// A file of two parts: both parts are extracted, then one merge sees every fact, duplicates included.
 	path := filepath.Join(t.TempDir(), "notes.md")
 	if err := os.WriteFile(path, []byte(sections(2, 6000)), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	res = callMCP(t, cs, "distill", map[string]any{"path": path})
-	want := "Worker keeps port 8000 open.\nQueue never retries.\nWorker keeps port 8000 open.\nQueue never retries."
-	if got := res.Content[0].(*mcp.TextContent).Text; got != want {
-		t.Fatalf("two-chunk text = %q", got)
+	callMCP(t, cs, "ingest_files", map[string]any{"distill": true, "paths": []string{path}})
+	if got, want := callsWith(t, app, extractSystem), 3; got != want {
+		t.Fatalf("%d extract calls, want %d", got, want)
 	}
-	if n := len(distillFiles(t, app)); n != 3 {
-		t.Fatalf("%d claude calls, want 3", n)
+	if got := callsWith(t, app, mergeSystem); got != 2 {
+		t.Fatalf("%d merge calls, want 2", got)
 	}
-
-	// Mode instructions reaches the prompt; facts mode does not carry it.
-	callMCP(t, cs, "distill", map[string]any{"text": "Always run the tests.", "mode": "instructions"})
-	var withMode, without int
-	for _, f := range distillFiles(t, app) {
-		raw, _ := os.ReadFile(f)
-		if strings.Contains(string(raw), "The text is instructions.") {
-			withMode++
-		} else {
-			without++
-		}
-	}
-	if withMode != 1 || without != 3 {
-		t.Fatalf("instructions prompts = %d, facts prompts = %d, want 1 and 3", withMode, without)
+	if p := mergePrompt(t, app); !strings.Contains(p, `"id":"1.1"`) || !strings.Contains(p, `"id":"2.2"`) || strings.Contains(p, "reason") {
+		t.Fatalf("merge input = %s, want the facts of both parts and no reason", p)
 	}
 
-	// Read-only: nothing stored, no change event.
+	// Nothing stored, no job, no change event.
 	if recent, err := app.W.Memory.Recent(ctx); err != nil || len(recent) != 0 {
 		t.Fatalf("Recent = %+v, %v, want nothing stored", recent, err)
+	}
+	if jobs, err := app.W.MemoryImport.Jobs(); err != nil || len(jobs) != 0 {
+		t.Fatalf("Jobs = %+v, %v, want none", jobs, err)
 	}
 	if ev := app.Events.Since(mark, bridge.ChannelMemoryChanged); len(ev) != 0 {
 		t.Fatalf("distill emitted %d memory changed events, want none", len(ev))
 	}
 
 	callsBefore := len(distillFiles(t, app))
+	dir := t.TempDir()
 	for name, args := range map[string]map[string]any{
-		"neither":       {},
-		"both":          {"text": "x", "path": path},
-		"relative path": {"path": "notes.md"},
-		"missing file":  {"path": filepath.Join(t.TempDir(), "nope.md")},
-		"over limit":    {"text": strings.Repeat("a", 120_001)},
+		"neither":           {"distill": true},
+		"text and path":     {"distill": true, "text": "x", "paths": []string{path}},
+		"two paths":         {"distill": true, "paths": []string{path, path}},
+		"folder":            {"distill": true, "paths": []string{dir}},
+		"relative path":     {"distill": true, "paths": []string{"notes.md"}},
+		"missing file":      {"distill": true, "paths": []string{filepath.Join(dir, "nope.md")}},
+		"over limit":        {"distill": true, "text": strings.Repeat("a", 120_001)},
+		"with origin":       {"distill": true, "text": "x", "origin": "user"},
+		"with scope":        {"distill": true, "text": "x", "scope": "personal"},
+		"with groups":       {"distill": true, "text": "x", "groups": []map[string]any{{"kind": "task", "key": "T-1"}}},
+		"with writeDoc":     {"distill": true, "text": "x", "writeDoc": true},
+		"text without flag": {"text": "x", "origin": "user", "scope": "personal"},
+		"store no origin":   {"paths": []string{path}, "scope": "personal"},
 	} {
-		if r, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "distill", Arguments: args}); err == nil && !r.IsError {
+		if r, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "ingest_files", Arguments: args}); err == nil && !r.IsError {
 			t.Errorf("%s accepted", name)
 		}
 	}
@@ -139,20 +228,47 @@ func TestMcpDistill(t *testing.T) {
 	}
 }
 
-func TestMcpDistillSpendCap(t *testing.T) {
+// TestMcpIngestDistillCrossChecks: a doubtful fact goes through the cross-check and an unsupported
+// one never reaches the merge.
+func TestMcpIngestDistillCrossChecks(t *testing.T) {
 	app := flowharness.New(t)
-	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{{System: distillSystem, Emit: distillAnswer(t, 2.50, "Line.")}}})
+	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{
+		{System: extractSystem, Emit: costAnswer(t, 0.01, map[string]any{"facts": []map[string]string{
+			{"fact": "Worker keeps port 8000 open.", "evidence": evidence, "section": "", "unresolved": ""},
+			{"fact": "Pagers rotate every Monday.", "evidence": "a quote the text never contains", "section": "", "unresolved": ""},
+		}})},
+		{System: verifySystem, Emit: costAnswer(t, 0.01, map[string]any{"verdicts": []map[string]string{
+			{"id": "1.2", "verdict": "unsupported", "fact": "", "evidence": "", "why": "No pager rotation in the text."},
+		}})},
+		mergeRule(t, 0.02),
+	}})
+	cs := memoryMCP(t, app)
+	callMCP(t, cs, "ingest_files", map[string]any{"distill": true, "text": "## Worker\n\nThe worker keeps port 8000 open."})
+	if n := callsWith(t, app, verifySystem); n != 1 {
+		t.Fatalf("%d cross-check calls, want 1", n)
+	}
+	if p := mergePrompt(t, app); !strings.Contains(p, `"id":"1.1"`) || strings.Contains(p, "Pagers rotate") {
+		t.Fatalf("merge input = %s, want only the supported fact", p)
+	}
+}
+
+func TestMcpIngestDistillSpendCap(t *testing.T) {
+	app := flowharness.New(t)
+	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{extractRule(t, 2.50), mergeRule(t, 0.02)}})
 	cs := memoryMCP(t, app)
 	path := filepath.Join(t.TempDir(), "big.md")
 	if err := os.WriteFile(path, []byte(sections(8, 6000)), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	r, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "distill", Arguments: map[string]any{"path": path}})
+	r, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "ingest_files", Arguments: map[string]any{"distill": true, "paths": []string{path}}})
 	if err != nil || !r.IsError || !strings.Contains(r.Content[0].(*mcp.TextContent).Text, "spend cap") {
 		t.Fatalf("err=%v res=%+v, want a spend cap tool error", err, r)
 	}
 	if n := len(distillFiles(t, app)); n < 3 || n >= 8 {
-		t.Fatalf("%d claude calls, want 3 to 7 (the cap stops new chunks)", n)
+		t.Fatalf("%d claude calls, want 3 to 7 (the cap stops new parts)", n)
+	}
+	if callsWith(t, app, mergeSystem) != 0 {
+		t.Fatal("the merge ran past the spend cap")
 	}
 }
 
@@ -174,9 +290,7 @@ func wantCode(t *testing.T, err error, code ipcerr.Code, message string) {
 
 func TestBridgeDistill(t *testing.T) {
 	app := flowharness.New(t)
-	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{
-		{System: distillSystem, Emit: distillAnswer(t, 0.01, "Worker keeps port 8000 open.", "Queue never retries.")},
-	}})
+	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{extractRule(t, 0.01), mergeRule(t, 0.02)}})
 	mark := app.Events.Mark()
 
 	text := "## Worker\n\nThe worker keeps port 8000 open and the queue never retries."
@@ -184,8 +298,9 @@ func TestBridgeDistill(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	joined := "Worker keeps port 8000 open.\nQueue never retries."
-	if got := strings.Join(res.Lines, "\n"); got != joined || res.Chunks != 1 || res.CostUSD != 0.01 {
+	joined := mergedLines[0].Text + "\n" + mergedLines[1].Text
+	if !slices.Equal(res.Lines, mergedLines) || res.Chunks != 1 || res.CostUSD < 0.029 || res.CostUSD > 0.031 ||
+		len(res.Unresolved) != 1 || res.Unresolved[0].Questions[0] != "Which service restarts?" {
 		t.Fatalf("result = %+v", res)
 	}
 	if res.InChars != utf8.RuneCountInString(text) || res.OutChars != utf8.RuneCountInString(joined) ||
@@ -195,16 +310,20 @@ func TestBridgeDistill(t *testing.T) {
 	app.Contract(t, "memory-distill", "MemoryDistillService.Distill#done", res)
 
 	progress := app.Events.Since(mark, bridge.ChannelMemoryDistill)
-	if len(progress) != 2 {
-		t.Fatalf("%d progress events, want 2", len(progress))
+	steps := []struct {
+		stage string
+		done  int
+	}{{"extract", 0}, {"extract", 1}, {"merge", 0}, {"merge", 1}}
+	if len(progress) != len(steps) {
+		t.Fatalf("%d progress events, want %d", len(progress), len(steps))
 	}
 	for i, ev := range progress {
 		p, ok := ev.Data.(bridge.MemoryDistillProgress)
-		if !ok || p.RequestID != "req-1" || p.Done != i || p.Total != 1 {
+		if !ok || p.RequestID != "req-1" || p.Stage != steps[i].stage || p.Done != steps[i].done || p.Total != 1 {
 			t.Fatalf("progress[%d] = %#v", i, ev.Data)
 		}
 	}
-	app.Contract(t, "memory-distill", "kira:memory:distill#progress", progress[1].Data)
+	app.Contract(t, "memory-distill", "kira:memory:distill#progress", progress[3].Data)
 
 	// Read-only: nothing stored, no change event.
 	if recent, err := app.W.Memory.Recent(ctx); err != nil || len(recent) != 0 {
@@ -231,9 +350,11 @@ func TestBridgeDistill(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "Worker keeps port 8000 open.\nQueue never retries.\nWorker keeps port 8000 open.\nQueue never retries."
-	if strings.Join(res.Lines, "\n") != want || res.Chunks != 2 {
+	if !slices.Equal(res.Lines, mergedLines) || res.Chunks != 2 {
 		t.Fatalf("two-chunk result = %+v", res)
+	}
+	if p := mergePrompt(t, app); !strings.Contains(p, `"id":"1.1"`) || !strings.Contains(p, `"id":"2.2"`) {
+		t.Fatalf("merge input = %s, want the facts of both parts", p)
 	}
 
 	limits := app.W.MemoryDistill.Limits()
@@ -266,9 +387,9 @@ func TestBridgeDistill(t *testing.T) {
 func TestBridgeDistillCancel(t *testing.T) {
 	app := flowharness.New(t)
 	hold := filepath.Join(t.TempDir(), "release")
-	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{
-		{System: distillSystem, WaitFile: hold, Emit: distillAnswer(t, 0.01, "Line.")},
-	}})
+	held := extractRule(t, 0.01)
+	held.WaitFile = hold
+	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{held, mergeRule(t, 0.02)}})
 	path := filepath.Join(t.TempDir(), "big.md")
 	if err := os.WriteFile(path, []byte(sections(8, 6000)), 0o600); err != nil {
 		t.Fatal(err)
@@ -305,14 +426,14 @@ func TestBridgeDistillCancel(t *testing.T) {
 	if err := os.WriteFile(hold, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := app.W.MemoryDistill.Distill(ctx, distillArgs("after", "Always run the tests.")); err != nil {
+	if _, err := app.W.MemoryDistill.Distill(ctx, distillArgs("after", "The worker keeps port 8000 open.")); err != nil {
 		t.Fatalf("call after cancel: %v", err)
 	}
 }
 
 func TestBridgeDistillSpendCap(t *testing.T) {
 	app := flowharness.New(t)
-	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{{System: distillSystem, Emit: distillAnswer(t, 2.50, "Line.")}}})
+	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{extractRule(t, 2.50), mergeRule(t, 0.02)}})
 	path := filepath.Join(t.TempDir(), "big.md")
 	if err := os.WriteFile(path, []byte(sections(8, 6000)), 0o600); err != nil {
 		t.Fatal(err)
@@ -325,6 +446,9 @@ func TestBridgeDistillSpendCap(t *testing.T) {
 	}
 	if n := len(distillFiles(t, app)); n < 3 || n >= 8 {
 		t.Fatalf("%d claude calls, want 3 to 7 (the cap stops new chunks)", n)
+	}
+	if callsWith(t, app, mergeSystem) != 0 {
+		t.Fatal("the merge ran past the spend cap")
 	}
 }
 

@@ -118,6 +118,11 @@ func (a *fakeAgent) Verify(ctx context.Context, in VerifyInput) (VerifyOutput, e
 	return out, nil
 }
 
+// Merge is unused by the runner; the fake satisfies Agent.
+func (a *fakeAgent) Merge(context.Context, MergeInput) (MergeOutput, error) {
+	return MergeOutput{}, nil
+}
+
 func (a *fakeAgent) Finalize(ctx context.Context, in FinalizeInput) (FinalizeOutput, error) {
 	a.mu.Lock()
 	a.curFinal++

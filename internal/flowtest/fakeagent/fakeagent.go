@@ -323,18 +323,12 @@ func finishAction(action Action, args []string, headless bool) int {
 	return 0 // "nofinish"
 }
 
-var (
-	promptPath   = regexp.MustCompile(`"path":"([^"]*)"`)
-	promptSource = regexp.MustCompile(`"source":"([^"]*)"`)
-)
+var promptPath = regexp.MustCompile(`"path":"([^"]*)"`)
 
-// promptDoc is the basename of the first "path" the prompt names (else its "source", the distill
-// input's file name), or KIRA_DOC when it names none.
+// promptDoc is the basename of the first "path" the prompt names, or KIRA_DOC when it names none.
 func promptDoc(prompt []byte) string {
-	for _, re := range []*regexp.Regexp{promptPath, promptSource} {
-		if m := re.FindSubmatch(prompt); m != nil {
-			return filepath.Base(string(m[1]))
-		}
+	if m := promptPath.FindSubmatch(prompt); m != nil {
+		return filepath.Base(string(m[1]))
 	}
 	return os.Getenv("KIRA_DOC")
 }
