@@ -34,24 +34,26 @@ func evalRepoRoot() string {
 }
 
 func evalCorpusDir() string {
-	return filepath.Join(evalRepoRoot(), "docs", "v2.5", "plans", "P285-corpus")
+	return filepath.Join(evalDataDir(), "P285-corpus")
 }
 
 // evalCorpus291Dir holds the P291 prompts, schemas and questions.
-func evalCorpus291Dir() string { return filepath.Join(evalPlansDir(), "P291-corpus") }
+func evalCorpus291Dir() string { return filepath.Join(evalDataDir(), "P291-corpus") }
 
-// evalPlansDir is docs/v2.5/plans, where corpus, runs and rounds live.
-func evalPlansDir() string { return filepath.Join(evalRepoRoot(), "docs", "v2.5", "plans") }
-
-// evalRunsDir is the runs dir of this process: P285-runs, or KIRA_EVAL_RUNS_DIR (a name under plans).
-func evalRunsDir() string {
-	return filepath.Join(evalPlansDir(), filepath.Base(envOr("KIRA_EVAL_RUNS_DIR", "P285-runs")))
+// evalDataDir is where corpus, runs and rounds live.
+func evalDataDir() string {
+	return filepath.Join(evalRepoRoot(), "apps", "kira-space", "tests", "claude", "testdata", "memory-eval")
 }
 
-// roundDirOf resolves a round reference: a bare name lives under the runs dir, "<dir>/<round>" under plans.
+// evalRunsDir is the runs dir of this process: P285-runs, or KIRA_EVAL_RUNS_DIR (a name under the eval data dir).
+func evalRunsDir() string {
+	return filepath.Join(evalDataDir(), filepath.Base(envOr("KIRA_EVAL_RUNS_DIR", "P285-runs")))
+}
+
+// roundDirOf resolves a round reference: a bare name lives under the runs dir, "<dir>/<round>" under the eval data dir.
 func roundDirOf(ref string) string {
 	if strings.Contains(ref, "/") {
-		return filepath.Join(evalPlansDir(), ref)
+		return filepath.Join(evalDataDir(), ref)
 	}
 	return filepath.Join(evalRunsDir(), ref)
 }

@@ -36,7 +36,7 @@ func main() {
 	prefix := flag.String("prefix", "", "only entries whose id starts with this")
 	snapshot := flag.String("snapshot", "", "write a JSON snapshot of every selected entry to this file")
 	compare := flag.String("compare", "", "compare against this snapshot")
-	allowed := flag.String("allowed", "docs/v2.5/plans/P289-runs/allowed-losses.tsv", "allowed protected-token losses (id, token, why)")
+	allowed := flag.String("allowed", "internal/llmprompts/testdata/P289-runs/allowed-losses.tsv", "allowed protected-token losses (id, token, why)")
 	flag.Parse()
 
 	cur := map[string]snap{}

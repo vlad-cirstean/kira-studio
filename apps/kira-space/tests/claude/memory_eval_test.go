@@ -27,8 +27,8 @@ import (
 //	KIRA_EVAL_MODE     prepare | golden | run | footprint (free: re-renders finished rounds, no claude)
 //	                   P291: questions | keys | telegraph | score (paid); retrieval | compare (free)
 //	KIRA_EVAL_ROUNDS   footprint, keys, telegraph, score, retrieval, compare: comma-separated round names
-//	                   (a bare name lives in the runs dir; "<dir>/<round>" under docs/v2.5/plans)
-//	KIRA_EVAL_RUNS_DIR runs dir name under docs/v2.5/plans (default P285-runs; P291 uses P291-runs)
+//	                   (a bare name lives in the runs dir; "<dir>/<round>" under the eval data dir)
+//	KIRA_EVAL_RUNS_DIR runs dir name under the eval data dir (default P285-runs; P291 uses P291-runs)
 //	KIRA_EVAL_MODEL_HOME  home of the embedding model files (retrieval; default <user cache>/kira-eval)
 //	KIRA_EVAL_RECIPES  retrieval: embedding recipes (fact, fact-kw, sec-fact, sec-fact-kw, sa-fact, sa-fact-kw)
 //	KIRA_EVAL_STYLES   retrieval: full, tele, tele-guard, mixed, mixed-swap (default full)
@@ -36,7 +36,7 @@ import (
 //	KIRA_EVAL_VARIANTS compare: two variant keys, one per side
 //	KIRA_EVAL_EMBED_WORKER  internal: the test binary re-executed as the embedding worker
 //	KIRA_EVAL_SET      tuning | holdout | all (run default tuning; prepare and golden default all)
-//	KIRA_EVAL_ROUND    round name, the output dir under docs/v2.5/plans/P285-runs
+//	KIRA_EVAL_ROUND    round name, the output dir under the eval data dir P285-runs
 //	KIRA_EVAL_PROMPTS  JSON map {prompt id: text} overriding registry prompts for the run
 //	KIRA_EVAL_BUDGET   chunk budget "Target,Max,MinFill,MinTail,Context"
 //	KIRA_EVAL_ONLY     comma-separated source ids to run (smoke test); default all of the set
