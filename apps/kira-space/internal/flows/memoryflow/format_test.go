@@ -11,10 +11,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
-	"github.com/kirathecat/kira-studio/internal/llmprompts"
-	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
@@ -119,11 +116,7 @@ func memoryMCP(t *testing.T, app *flowharness.App) *mcp.ClientSession {
 	return cs
 }
 
-type storeOut struct {
-	Status   string
-	Comment  string
-	Prepared []struct{ ID, Action string }
-}
+type storeOut struct{ Status string }
 
 func callStore(t *testing.T, cs *mcp.ClientSession, args map[string]any) (storeOut, string) {
 	t.Helper()
@@ -137,59 +130,6 @@ func callStore(t *testing.T, cs *mcp.ClientSession, args map[string]any) (storeO
 		t.Fatal(err)
 	}
 	return out, res.Content[0].(*mcp.TextContent).Text
-}
-
-func TestMcpPrepareComment(t *testing.T) {
-	app := flowharness.New(t)
-	gate(t, app, "gate-accept.json")
-	cs := memoryMCP(t, app)
-	items := []map[string]string{
-		{"fact": "billing runs postgres", "reason": "migration notes", "origin": "user", "scope": "personal"},
-		{"fact": "staging deploys at 09:00", "reason": "release calendar", "origin": "user", "scope": "personal"},
-	}
-	args := map[string]any{"items": items, "asComment": "internal/billing/api.go"}
-
-	mark := app.Events.Mark()
-	out, text := callStore(t, cs, args)
-	blocks, problems := memfmt.ParseComments("internal/billing/api.go", []byte(out.Comment))
-	if out.Status != "prepared" || len(problems) != 0 || len(blocks) != 1 || len(blocks[0].Facts) != 2 {
-		t.Fatalf("prepared = %+v, problems %v, blocks %+v, want one block of two facts", out, problems, blocks)
-	}
-	for _, f := range blocks[0].Facts {
-		if !factID(f.ID) {
-			t.Fatalf("fact id %q is not a km_ id", f.ID)
-		}
-	}
-	if !strings.HasPrefix(text, llmprompts.MemoryStorePrepared.Text(llmprompts.Defaults(), llmprompts.NoVars{})) || !strings.HasSuffix(text, "\n\n"+out.Comment) {
-		t.Fatalf("text = %q, want the prepared line, a blank line and the comment", text)
-	}
-	if recent, err := app.W.Memory.Recent(ctx); err != nil || len(recent) != 0 {
-		t.Fatalf("Recent = %+v, %v, want nothing stored", recent, err)
-	}
-	if ev := app.Events.Since(mark, bridge.ChannelMemoryChanged); len(ev) != 0 {
-		t.Fatalf("prepare emitted %d memory changed events, want none", len(ev))
-	}
-
-	if res, err := app.W.Memory.Store(ctx, twoItemsArgs()); err != nil || res.Status != "stored" {
-		t.Fatalf("Store = %+v, %v", res, err)
-	}
-	stored, err := app.W.Memory.Recent(ctx)
-	if err != nil || len(stored) != 2 {
-		t.Fatalf("Recent = %+v, %v", stored, err)
-	}
-	again, _ := callStore(t, cs, args)
-	ids := map[string]bool{}
-	for _, p := range again.Prepared {
-		ids[p.ID] = p.Action == memory.ActionNoop
-	}
-	for _, m := range stored {
-		if !ids[m.LineageID] {
-			t.Fatalf("prepared = %+v, want a noop carrying stored fact id %s", again.Prepared, m.LineageID)
-		}
-		if !strings.Contains(again.Comment, m.LineageID+" ") {
-			t.Fatalf("comment lacks stored id %s:\n%s", m.LineageID, again.Comment)
-		}
-	}
 }
 
 // metaLine is a result's indented meta line; it starts with the version and origin.

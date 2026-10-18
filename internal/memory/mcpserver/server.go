@@ -15,7 +15,6 @@ import (
 
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
-	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
 const serverVersion = "1"
@@ -25,18 +24,13 @@ type storeInput struct {
 	Clarifications []memory.Clarification `json:"clarifications,omitempty"`
 	Session        string                 `json:"session,omitempty"`
 	Groups         []memory.GroupRef      `json:"groups,omitempty"`
-	// AsComment is the path or extension of the file a comment goes in; set means store nothing.
-	AsComment string `json:"asComment,omitempty"`
 }
 
-// storeOutput is store_memory's structured result: the stored outcomes, or with asComment the
-// prepared facts and their comment.
+// storeOutput is store_memory's structured result.
 type storeOutput struct {
-	Status     string                 `json:"status"` // "stored" | "challenged" | "prepared"
+	Status     string                 `json:"status"` // "stored" | "challenged"
 	Challenges []memory.ItemChallenge `json:"challenges"`
 	Outcomes   []memory.FactOutcome   `json:"outcomes"`
-	Comment    string                 `json:"comment,omitempty"`
-	Prepared   []memory.PreparedFact  `json:"prepared,omitempty"`
 }
 
 type searchInput struct {
@@ -256,10 +250,6 @@ func requestFor(ctx context.Context, svc *memory.Service, opts Options, in store
 }
 
 func storeMemory(ctx context.Context, svc *memory.Service, opts Options, req *mcp.CallToolRequest, in storeInput) (*mcp.CallToolResult, storeOutput, error) {
-	marker, err := commentMarker(opts, in)
-	if err != nil {
-		return nil, storeOutput{}, err
-	}
 	sr, err := requestFor(ctx, svc, opts, in)
 	if err != nil {
 		return nil, storeOutput{}, err
@@ -273,51 +263,12 @@ func storeMemory(ctx context.Context, svc *memory.Service, opts Options, req *mc
 			})
 		}
 	}
-	if marker != nil {
-		return prepareMemory(ctx, svc, opts, sr, *marker)
-	}
 	res, err := svc.Store(ctx, sr)
 	if err != nil {
 		return nil, storeOutput{}, err
 	}
 	out := storeOutput{Status: res.Status, Challenges: res.Challenges, Outcomes: res.Outcomes}
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: renderStore(opts.Prompts, res)}}}, out, nil
-}
-
-// commentMarker resolves asComment to a comment syntax; nil when the call stores normally.
-func commentMarker(opts Options, in storeInput) (*memfmt.Marker, error) {
-	if in.AsComment == "" {
-		return nil, nil
-	}
-	bad := func(format string, a ...any) error {
-		return fmt.Errorf("%w: %s", memory.ErrInvalid, fmt.Sprintf(format, a...))
-	}
-	switch {
-	case opts.ImportRef != "":
-		return nil, bad("asComment is not available in import mode")
-	case len(in.Groups) > 0:
-		return nil, bad("asComment stores nothing, so groups are not allowed")
-	case memfmt.IsDocPath(in.AsComment):
-		return nil, bad("asComment writes code comments, not %s docs", in.AsComment)
-	}
-	markers, ok := memfmt.MarkersFor(in.AsComment)
-	if !ok {
-		return nil, bad("asComment %q has no known comment syntax; supported: %s", in.AsComment, strings.Join(memfmt.Supported(), ", "))
-	}
-	return &markers[0], nil
-}
-
-func prepareMemory(ctx context.Context, svc *memory.Service, opts Options, sr memory.StoreRequest, m memfmt.Marker) (*mcp.CallToolResult, storeOutput, error) {
-	res, err := svc.Prepare(ctx, sr, m)
-	if err != nil {
-		return nil, storeOutput{}, err
-	}
-	out := storeOutput{Status: res.Status, Challenges: res.Challenges, Outcomes: []memory.FactOutcome{}, Comment: res.Comment, Prepared: res.Facts}
-	text := llmprompts.MemoryStorePrepared.Text(opts.Prompts, llmprompts.NoVars{}) + "\n\n" + res.Comment
-	if res.Status == "challenged" {
-		text = renderStore(opts.Prompts, memory.StoreResult{Status: res.Status, Challenges: res.Challenges})
-	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}, out, nil
 }
 
 func renderStore(src llmprompts.Source, res memory.StoreResult) string {

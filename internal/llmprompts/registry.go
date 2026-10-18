@@ -492,7 +492,7 @@ Recall: search_memories matches words and meaning, best first, loosely related r
 // MemoryToolStoreMemory describes the store_memory tool.
 var MemoryToolStoreMemory = define(Entry{
 	ID: "memory.mcp.tool.store_memory", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "store_memory",
-	Default: `Store facts in long-term memory. Each item needs fact, reason, origin and scope. The store splits independent claims into separate facts, keeps a list about one subject as one fact, rewords them, and updates a matching same-scope fact unless the stored one has a higher origin; old versions stay as history. An unclear item or weak reason is challenged: nothing stored, questions returned. Returns each stored fact id. With asComment, stores nothing and returns the facts as a code comment.`,
+	Default: `Store facts in long-term memory. Each item needs fact, reason, origin and scope. The store splits independent claims into separate facts, keeps a list about one subject as one fact, rewords them, and updates a matching same-scope fact unless the stored one has a higher origin; old versions stay as history. An unclear item or weak reason is challenged: nothing stored, questions returned. Returns each stored fact id.`,
 }, NoVars{})
 
 var (
@@ -508,7 +508,6 @@ var (
 	_ = arg(MemoryToolStoreMemory.id, "groups", spaceApp, NewSession, `up to {{.Max}} groups every item joins, besides its session and request; memory_context reads a group's facts`, MaxVars{Max: 5})
 	_ = arg(MemoryToolStoreMemory.id, "groups.kind", spaceApp, NewSession, `task, document or thread`, NoVars{})
 	_ = arg(MemoryToolStoreMemory.id, "groups.key", spaceApp, NewSession, `stable id: a task id such as PROJ-123, an absolute document path or a thread URL`, NoVars{})
-	_ = arg(MemoryToolStoreMemory.id, "asComment", spaceApp, NewSession, `path or extension of the target file, such as internal/billing/api.go or py; stores nothing and returns a code comment; no groups`, NoVars{})
 	_ = arg(MemoryToolStoreMemory.id, "groups.title", spaceApp, NewSession, `optional label for people`, NoVars{})
 )
 
@@ -612,15 +611,6 @@ var MemoryStoreChallenged = define(Entry{
 	PurposeKey: "llmPrompts.entry.memoryMcpStoreChallenged.description",
 	UsedByKey:  "llmPrompts.entry.memoryMcpStoreChallenged.usedBy.body",
 	Default:    `Nothing stored. Ask the user these or fix the items, then call store_memory again with clarifications:`,
-}, NoVars{})
-
-// MemoryStorePrepared heads the comment store_memory returns when called with asComment.
-var MemoryStorePrepared = define(Entry{
-	ID: "memory.mcp.store.prepared", Kind: KindToolResult, Apps: spaceApp, Applies: NextCall,
-	TitleKey:   "llmPrompts.entry.memoryMcpStorePrepared.title",
-	PurposeKey: "llmPrompts.entry.memoryMcpStorePrepared.description",
-	UsedByKey:  "llmPrompts.entry.memoryMcpStorePrepared.usedBy.body",
-	Default:    `Nothing stored. Paste this comment above the code it explains; keep every id unchanged:`,
 }, NoVars{})
 
 // MemoryIngestStarted tells the agent an ingest job runs on its own.

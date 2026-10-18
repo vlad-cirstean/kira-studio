@@ -11,7 +11,6 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/internal/memory"
-	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
 const memoryServer = "kira-memory"
@@ -51,7 +50,6 @@ func TestMemoryMcpThroughClaude(t *testing.T) {
 	}
 	storeThroughClaude(t, app, cfg)
 	searchScoredThroughClaude(t, app, cfg)
-	asCommentThroughClaude(t, app, cfg)
 }
 
 // searchScoredThroughClaude has claude search from the billing repo: every meta line carries the
@@ -101,38 +99,6 @@ func searchScoredThroughClaude(t *testing.T, app *realApp, cfg string) {
 	}
 	if metas == 0 {
 		t.Fatalf("search_memories result = %q, want the stored fact with a meta line", text)
-	}
-}
-
-// asCommentThroughClaude has claude call store_memory with asComment: the comment comes back,
-// parses clean, and the store keeps the one fact the previous step wrote.
-func asCommentThroughClaude(t *testing.T, app *realApp, cfg string) {
-	t.Helper()
-	out, _ := app.claudeP(t, app.Work, nil,
-		"Call store_memory once with one item: fact \"The billing-api service listens on port 8080 in production.\", "+
-			"reason \"Stated in the deployment manifest.\", origin agent, scope personal, and asComment \"go\". Reply with the word done.",
-		"--strict-mcp-config", "--mcp-config", cfg, "--allowedTools", "mcp__"+memoryServer+"__store_memory",
-		"--output-format", "stream-json", "--verbose")
-	msgs := parseStream(out)
-	uses := toolUses(msgs, "mcp__"+memoryServer+"__store_memory")
-	if len(uses) == 0 {
-		t.Fatalf("no store_memory tool use in the stream:\n%s", tail(out, 1500))
-	}
-	text, isErr, ok := toolResult(msgs, uses[0].ID)
-	var res struct {
-		Status  string `json:"status"`
-		Comment string `json:"comment"`
-	}
-	if !ok || isErr || json.Unmarshal([]byte(text), &res) != nil || res.Status != "prepared" || res.Comment == "" {
-		t.Fatalf("store_memory asComment result = %q (ok=%v, err=%v), want status prepared and a comment", text, ok, isErr)
-	}
-	comment := res.Comment
-	blocks, problems := memfmt.ParseComments("x.go", []byte(comment))
-	if len(problems) != 0 || len(blocks) != 1 || len(blocks[0].Facts) != 1 {
-		t.Fatalf("comment %q: blocks %+v, problems %v, want one clean block of one fact", comment, blocks, problems)
-	}
-	if recent, err := app.W.Memory.Recent(ctx); err != nil || len(recent) != 1 {
-		t.Fatalf("Recent = %+v, %v, want the store untouched", recent, err)
 	}
 }
 
