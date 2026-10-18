@@ -270,3 +270,56 @@ func TestMemoryDistillBridge(t *testing.T) {
 		t.Errorf("distill emitted %d memory changed events, want none", len(ev))
 	}
 }
+
+// TestMemoryDistillTrivia checks that distill drops run trivia from a phase result and keeps the
+// decision and the incident lesson, and that an environment document keeps its limits.
+func TestMemoryDistillTrivia(t *testing.T) {
+	app := newRealApp(t)
+	distill := func(id, text string) []string {
+		res, err := app.W.MemoryDistill.Distill(ctx, bridge.MemoryDistillArgs{RequestID: id, Text: text})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var lines []string
+		for _, l := range res.Lines {
+			lines = append(lines, l.Text)
+		}
+		t.Logf("%s: %d lines, %.4f USD: %q", id, len(lines), res.CostUSD, lines)
+		return lines
+	}
+	has := func(lines []string, sub string) bool {
+		for _, l := range lines {
+			if strings.Contains(l, sub) {
+				return true
+			}
+		}
+		return false
+	}
+
+	run := distill("trivia-run", "# P900 result\n\n## Outcome\n\n"+
+		"The retry queue uses exponential backoff capped at 30 seconds, because the upstream rate limiter bans clients that retry faster. "+
+		"The cap lives in config key retryQueue.maxDelaySeconds, not in code, so ops can change it without a release.\n\n"+
+		"## Run notes\n\n"+
+		"My first push of branch p900-retry was refused as non-fast-forward; I rebased and pushed to a new branch.\n"+
+		"The retry-queue.spec.ts run was flaky once and passed on rerun.\n"+
+		"The macOS dock check is left to the user.\n"+
+		"Commit with an explicit pathspec in a shared checkout, because another session's staged files land in a bare commit.\n")
+	noise := regexp.MustCompile(`(?i)non-fast-forward|flak|left (to|for) the user`)
+	for _, l := range run {
+		if noise.MatchString(l) {
+			t.Errorf("run trivia kept: %q", l)
+		}
+	}
+	if !has(run, "pathspec") {
+		t.Errorf("incident lesson (pathspec) dropped: %q", run)
+	}
+	if !has(run, "retryQueue.maxDelaySeconds") {
+		t.Errorf("decision (retryQueue.maxDelaySeconds) dropped: %q", run)
+	}
+
+	env := distill("trivia-env", "# Sandbox setup\n\nThe sandbox has no display, so run GUI checks through the Playwright ui project.\n"+
+		"The sandbox allows outbound traffic only through the package proxy, so install dependencies with bun install.\n")
+	if !has(env, "display") {
+		t.Errorf("environment limit (display) dropped: %q", env)
+	}
+}
