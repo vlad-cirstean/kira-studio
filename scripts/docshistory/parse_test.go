@@ -146,14 +146,23 @@ func TestBlocksIdempotent(t *testing.T) {
 
 func TestRepointText(t *testing.T) {
 	commits := map[string]string{"v1": "aaaaaaaaaaaa", "v1.1": "bbbbbbbbbbbb"}
-	in := "see docs/v1.1/plans/P22-slickgrid-plan.md §4.2 and docs/v1/SPEC.md:10-12, docs/v1.1/WEBVIEW-SCROLL-MEMORY.md. Glob docs/v1.1/plans/P1*.md"
+	in := "see docs/v1.1/plans/P22-slickgrid-plan.md §4.2 and docs/v1/SPEC.md:10-12. Glob docs/v1.1/plans/P1*.md"
 	got, n, um := repointText("src/x.go", in, commits)
-	want := "see docs/HISTORY.md (v1.1 P22) and docs/HISTORY.md (v1), docs/WEBVIEW-SCROLL-MEMORY.md. Glob docs/v1.1/plans/P1*.md"
-	if got != want || n != 3 || len(um) != 1 {
+	want := "see docs/HISTORY.md (v1.1 P22) and docs/HISTORY.md (v1). Glob docs/v1.1/plans/P1*.md"
+	if got != want || n != 2 || len(um) != 1 {
 		t.Errorf("got %q n=%d unmatched=%v", got, n, um)
 	}
 	got, _, _ = repointText("scripts/a.sh", "# docs/v1/plans/P1-x.md", commits)
 	if got != "# git show aaaaaaaaaaaa:docs/v1/plans/P1-x.md" {
 		t.Errorf("operative = %q", got)
+	}
+	for p, want := range map[string]bool{
+		"scripts/docshistory/parse_test.go":                                           true,
+		"apps/kira-space/tests/claude/testdata/memory-eval/P285-corpus/manifest.json": true,
+		"src/x.go": false,
+	} {
+		if skipRepoint(p) != want {
+			t.Errorf("skipRepoint(%q) != %v", p, want)
+		}
 	}
 }

@@ -108,7 +108,7 @@ func sortedKeys(m map[string]string) []string {
 }
 
 // planResultChapters are the chapters whose plan files carry Result sections that belong to SPEC phases.
-var planResultChapters = map[string]bool{"v2.0": true}
+var planResultChapters = map[string]bool{"v2.0": true, "v2.5": true}
 
 // loadChapter reads docs/<ch> from commit and parses it.
 func loadChapter(ch, commit string) (*Parsed, error) {

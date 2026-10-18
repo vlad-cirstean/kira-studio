@@ -39,15 +39,15 @@ func run(cmd string, args []string) error {
 		return err
 	}
 	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
-	runs := fs.String("runs", "docs/v2.6/plans/P299-runs", "runs directory")
+	runs := fs.String("runs", "docs/history-runs", "runs directory")
 	history := fs.String("history", "docs/HISTORY.md", "history file")
 	only := fs.String("only", "", "comma-separated unit slugs")
 	binary := fs.String("binary", "", "prebuilt kira-space binary (default: build one)")
-	jobs := fs.Int("jobs", 3, "concurrent units")
+	jobs := fs.Int("jobs", 1, "concurrent units")
 	maxUSD := fs.Float64("max-usd", 0, "stop starting units when charged plus in-flight estimates would pass this (0 = no cap)")
 	retryFall := fs.Bool("retry-fallback", false, "rerun fallback units")
 	sampleN := fs.Int("sample", 12, "verify sample size")
-	out := fs.String("out", "docs/v2.6/plans/P299-verify.md", "verify report path, - for stdout")
+	out := fs.String("out", "-", "verify report path, - for stdout")
 	dry := fs.Bool("dry-run", false, "repoint: report without writing")
 	if err := fs.Parse(args); err != nil {
 		return err

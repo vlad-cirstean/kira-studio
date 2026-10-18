@@ -22,8 +22,6 @@ func refPattern(commits map[string]string) *regexp.Regexp {
 	return regexp.MustCompile(`docs/(` + strings.Join(alt, "|") + `)/([A-Za-z0-9_.\-/]*)`)
 }
 
-const webviewOld, webviewNew = "docs/v1.1/WEBVIEW-SCROLL-MEMORY.md", "docs/WEBVIEW-SCROLL-MEMORY.md"
-
 func operative(path string) bool {
 	return strings.HasPrefix(path, "scripts/") || strings.HasPrefix(path, ".githooks/") ||
 		path == "docs/DEV_ENVIRONMENT.md" || path == "CLAUDE.md"
@@ -35,8 +33,6 @@ type repointStats struct{ refs, files int }
 // whether trailing locators (section, decision, line numbers) belong to the reference and are dropped.
 func refTarget(ch, tail string) (rep string, loc bool) {
 	switch {
-	case "docs/"+ch+"/"+tail == webviewOld:
-		return webviewNew, false
 	case tail == "SPEC.md" || tail == "README.md":
 		return "docs/HISTORY.md (" + ch + ")", true
 	case strings.HasPrefix(tail, "plans/") && strings.HasSuffix(tail, ".md") && !strings.Contains(tail[6:], "/"):
@@ -67,7 +63,7 @@ func repointText(path, text string, commits map[string]string) (string, int, []s
 			unmatched = append(unmatched, "docs/"+ch+"/"+tail)
 			continue
 		}
-		if op && rep != webviewNew {
+		if op {
 			if !strings.HasSuffix(tail, ".md") {
 				unmatched = append(unmatched, "docs/"+ch+"/"+tail)
 				continue
@@ -90,7 +86,9 @@ func repointText(path, text string, commits map[string]string) (string, int, []s
 
 func skipRepoint(path string) bool {
 	return strings.HasPrefix(path, "docs/v") || path == "docs/HISTORY.md" ||
-		strings.HasPrefix(path, ".github/workflows/") || strings.HasPrefix(path, "docs/pending-changes/")
+		strings.HasPrefix(path, ".github/workflows/") || strings.HasPrefix(path, "docs/pending-changes/") ||
+		strings.HasPrefix(path, "scripts/docshistory/") || strings.HasPrefix(path, "apps/kira-space/tests/claude/testdata/") ||
+		strings.HasPrefix(path, "internal/llmprompts/testdata/")
 }
 
 func cmdRepoint(runs string, dry bool, chapters []string) error {
