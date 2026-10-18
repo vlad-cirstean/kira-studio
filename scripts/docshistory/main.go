@@ -1,6 +1,7 @@
 // Command docshistory folds finished docs chapters into docs/HISTORY.md.
 //
 //	go run ./scripts/docshistory units|distill|render|verify|repoint|fold [flags] <chapter...>
+//	go run ./scripts/docshistory doc units|distill|keep|render|verify|show [flags] <standing doc>
 package main
 
 import (
@@ -17,12 +18,20 @@ const usage = `usage: docshistory <units|distill|render|verify|repoint|fold> [fl
   render   write the chapters' blocks into the history file
   verify   write a sample report to check decisions survived
   repoint  rewrite docs/<chapter>/ references in the rest of the repo
-  fold     distill, render and verify`
+  fold     distill, render and verify
+  doc      the same for a standing doc: docshistory doc <units|distill|keep|render|verify|show> [flags] <docs/ARCHITECTURE.md|docs/PACKAGING.md>`
 
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, usage)
 		os.Exit(2)
+	}
+	if os.Args[1] == "doc" {
+		if err := standingMain(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, "docshistory:", err)
+			os.Exit(1)
+		}
+		return
 	}
 	if err := run(os.Args[1], os.Args[2:]); err != nil {
 		fmt.Fprintln(os.Stderr, "docshistory:", err)
