@@ -123,8 +123,8 @@ func callStore(t *testing.T, cs *mcp.ClientSession, args map[string]any) (storeO
 	return out, res.Content[0].(*mcp.TextContent).Text
 }
 
-// metaLine is a result's indented meta line; it starts with the version and origin.
-var metaLine = regexp.MustCompile(`^  v\d+ origin=`)
+// metaLine is a result's indented meta line; it starts with the version, kind and origin.
+var metaLine = regexp.MustCompile(`^  v\d+ (fact|rule) origin=`)
 
 func TestMcpSearchTextFormat(t *testing.T) {
 	app := flowharness.New(t)

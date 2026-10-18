@@ -5475,6 +5475,13 @@
           "body": "Sent as the system prompt of the Claude run that reads the source file to confirm, rewrite or reject doubtful facts during a memory import."
         }
       },
+      "memoryKinds": {
+        "description": "Defines a memory as a fact or a rule, and says that questions, one-off tasks, standalone examples and result tables are not memories.",
+        "title": "Memory kinds",
+        "usedBy": {
+          "body": "Included in the memory gate prompt."
+        }
+      },
       "memoryMcpIngestAwaiting": {
         "description": "Tells the agent an ingest job is waiting for the user to start it, and why.",
         "title": "Ingest waits for the user",

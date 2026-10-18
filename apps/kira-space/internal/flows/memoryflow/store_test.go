@@ -83,6 +83,28 @@ func TestStoreThroughGate(t *testing.T) {
 	}
 }
 
+func TestStoreRule(t *testing.T) {
+	app := flowharness.New(t)
+	gate(t, app, "gate-rule.json")
+	args := bridge.MemoryStoreArgs{
+		Items: []bridge.MemoryStoreItem{{Fact: "Never write amounts as floats.", Reason: "The ledger rejects fractions."}},
+		Scope: memory.ScopePersonal,
+	}
+	res, err := app.W.Memory.Store(ctx, args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Status != "stored" || len(res.Outcomes) != 1 || res.Outcomes[0].Kind != memory.KindRule {
+		t.Fatalf("Store = %+v, want one stored rule", res)
+	}
+	app.Contract(t, "memory", "MemoryService.Store#rule", res)
+	recent, err := app.W.Memory.Recent(ctx)
+	if err != nil || len(recent) != 1 || recent[0].Kind != memory.KindRule {
+		t.Fatalf("Recent = %+v, %v, want one rule", recent, err)
+	}
+	app.Contract(t, "memory", "MemoryService.Recent#rule", recent, flowharness.Mask("createdAt"))
+}
+
 func TestGateRejectsOrFails(t *testing.T) {
 	app := flowharness.New(t)
 	empty := func(why string) {

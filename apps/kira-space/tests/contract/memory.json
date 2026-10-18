@@ -15,6 +15,7 @@
               "release",
               "weekday"
             ],
+            "kind": "fact",
             "lineageId": "<id:1>",
             "origin": "agent",
             "project": null,
@@ -50,6 +51,7 @@
               "release",
               "weekday"
             ],
+            "kind": "fact",
             "lineageId": "<id:1>",
             "origin": "agent",
             "project": null,
@@ -85,6 +87,7 @@
               "release",
               "weekday"
             ],
+            "kind": "fact",
             "lineageId": "<id:1>",
             "origin": "agent",
             "project": null,
@@ -119,6 +122,7 @@
         "database",
         "db"
       ],
+      "kind": "fact",
       "lineageId": "<id:2>",
       "origin": "external",
       "project": null,
@@ -150,6 +154,7 @@
               "release",
               "weekday"
             ],
+            "kind": "fact",
             "lineageId": "<id:1>",
             "origin": "user",
             "project": null,
@@ -184,6 +189,7 @@
         "database",
         "db"
       ],
+      "kind": "fact",
       "lineageId": "<id:4>",
       "origin": "user",
       "project": null,
@@ -215,6 +221,7 @@
         "release",
         "weekday"
       ],
+      "kind": "fact",
       "lineageId": "<id:2>",
       "origin": "user",
       "project": null,
@@ -241,6 +248,7 @@
         "database",
         "db"
       ],
+      "kind": "fact",
       "lineageId": "<id:1>",
       "origin": "user",
       "project": null,
@@ -269,6 +277,7 @@
         "release",
         "weekday"
       ],
+      "kind": "fact",
       "lineageId": "<id:1>",
       "origin": "agent",
       "project": null,
@@ -295,6 +304,7 @@
         "database",
         "db"
       ],
+      "kind": "fact",
       "lineageId": "<id:2>",
       "origin": "external",
       "project": null,
@@ -302,6 +312,35 @@
       "scope": "company",
       "sessionId": "flow-session",
       "sourceTag": "slack",
+      "status": "current",
+      "supersededAt": null,
+      "supersededById": null,
+      "supersedesId": null,
+      "version": 1,
+      "versions": 1
+    }
+  ],
+  "MemoryService.Recent#rule": [
+    {
+      "createdAt": "<masked>",
+      "fact": "Never write amounts as floats.",
+      "historical": false,
+      "id": "<id:1>.1",
+      "keywords": [
+        "amounts",
+        "float",
+        "money",
+        "ledger",
+        "integer"
+      ],
+      "kind": "rule",
+      "lineageId": "<id:1>",
+      "origin": "user",
+      "project": null,
+      "reason": "The ledger rejects fractions.",
+      "scope": "personal",
+      "sessionId": null,
+      "sourceTag": null,
       "status": "current",
       "supersededAt": null,
       "supersededById": null,
@@ -323,6 +362,7 @@
         "release",
         "weekday"
       ],
+      "kind": "fact",
       "lineageId": "<id:1>",
       "origin": "user",
       "project": "github.com/acme/billing",
@@ -349,6 +389,7 @@
         "database",
         "db"
       ],
+      "kind": "fact",
       "lineageId": "<id:2>",
       "origin": "user",
       "project": "github.com/acme/billing",
@@ -378,6 +419,7 @@
         "database",
         "db"
       ],
+      "kind": "fact",
       "lineageId": "<id:1>",
       "match": "keyword",
       "origin": "user",
@@ -415,6 +457,7 @@
       "keywords": [
         "invoice"
       ],
+      "kind": "fact",
       "lineageId": "<id:1>",
       "match": "keyword",
       "origin": "user",
@@ -451,6 +494,7 @@
       "keywords": [
         "invoice"
       ],
+      "kind": "fact",
       "lineageId": "<id:2>",
       "match": "keyword",
       "origin": "agent",
@@ -487,6 +531,7 @@
       "keywords": [
         "invoice"
       ],
+      "kind": "fact",
       "lineageId": "<id:3>",
       "match": "keyword",
       "origin": "external",
@@ -523,6 +568,7 @@
       "keywords": [
         "invoice"
       ],
+      "kind": "fact",
       "lineageId": "<id:4>",
       "match": "keyword",
       "origin": "user",
@@ -561,6 +607,7 @@
       "keywords": [
         "invoice"
       ],
+      "kind": "fact",
       "lineageId": "<id:1>",
       "match": "keyword",
       "origin": "user",
@@ -597,6 +644,7 @@
       "keywords": [
         "invoice"
       ],
+      "kind": "fact",
       "lineageId": "<id:2>",
       "match": "keyword",
       "origin": "user",
@@ -633,6 +681,7 @@
       "keywords": [
         "invoice"
       ],
+      "kind": "fact",
       "lineageId": "<id:3>",
       "match": "keyword",
       "origin": "user",
@@ -681,6 +730,24 @@
     "outcomes": [],
     "status": "challenged"
   },
+  "MemoryService.Store#rule": {
+    "challenges": [],
+    "outcomes": [
+      {
+        "action": "add",
+        "error": "",
+        "fact": "Never write amounts as floats.",
+        "id": "<id:1>.1",
+        "kind": "rule",
+        "lineageId": "<id:1>",
+        "previousId": "",
+        "reason": "The ledger rejects fractions.",
+        "version": 1,
+        "why": "No related memory."
+      }
+    ],
+    "status": "stored"
+  },
   "MemoryService.Store#stored": {
     "challenges": [],
     "outcomes": [
@@ -689,6 +756,7 @@
         "error": "",
         "fact": "The billing service uses PostgreSQL 16.",
         "id": "<id:1>.1",
+        "kind": "fact",
         "lineageId": "<id:1>",
         "previousId": "",
         "reason": "Stated by the maintainer in the migration notes.",
@@ -700,6 +768,7 @@
         "error": "",
         "fact": "Deploys to staging run every weekday at 09:00 UTC.",
         "id": "<id:2>.1",
+        "kind": "fact",
         "lineageId": "<id:2>",
         "previousId": "",
         "reason": "The release calendar says so.",

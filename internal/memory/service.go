@@ -96,6 +96,7 @@ type ItemChallenge struct {
 
 type FactOutcome struct {
 	Fact   string `json:"fact"`
+	Kind   string `json:"kind"`
 	Reason string `json:"reason"`
 	Action string `json:"action"` // add | update | noop | failed
 	// ID is the version id; LineageID is the fact id agents cite.
@@ -318,7 +319,7 @@ func (s *Service) decide(ctx context.Context, req StoreRequest) (works []*work, 
 		it := req.Items[v.Index]
 		pinned := importReason(req, it)
 		for _, f := range v.Facts {
-			works = append(works, &work{Fact: f.Fact, Reason: cmp.Or(pinned, f.Reason), pinned: pinned, Keywords: f.Keywords,
+			works = append(works, &work{Fact: f.Fact, Kind: f.Kind, Reason: cmp.Or(pinned, f.Reason), pinned: pinned, Keywords: f.Keywords,
 				Origin: it.Origin, SourceTag: it.SourceTag, Scope: it.Scope, Project: it.Project})
 		}
 	}
@@ -405,7 +406,7 @@ func requestGroups(req StoreRequest, requestID string) []GroupRef {
 func (s *Service) commit(ctx context.Context, req StoreRequest, requestID string, groups []GroupRef, rest []*work, rev *int64) FactOutcome {
 	w := rest[0]
 	fail := func(err error) FactOutcome {
-		return FactOutcome{Fact: w.Fact, Reason: w.Reason, Action: ActionFailed, Error: err.Error()}
+		return FactOutcome{Fact: w.Fact, Kind: w.kind(), Reason: w.Reason, Action: ActionFailed, Error: err.Error()}
 	}
 	for attempt := 0; ; attempt++ {
 		if w.dec.Err != nil {
@@ -416,14 +417,14 @@ func (s *Service) commit(ctx context.Context, req StoreRequest, requestID string
 			w.dec.Reason = w.pinned
 		}
 		r, err := s.store.commitFact(ctx, commitInput{
-			Revision: *rev, Action: w.dec.Action, TargetID: w.dec.Target, Fact: w.dec.Fact, Reason: w.dec.Reason,
+			Revision: *rev, Action: w.dec.Action, TargetID: w.dec.Target, Fact: w.dec.Fact, Kind: w.kind(), Reason: w.dec.Reason,
 			Keywords: w.Keywords, Origin: w.Origin, SourceTag: w.SourceTag, Scope: w.Scope, Project: w.Project,
 			SessionID: req.Session, Source: req.Source, SourceRef: req.SourceRef, RequestID: requestID, Why: w.dec.Why,
 			Groups: groups, Vec: vec, Model: model,
 		})
 		if err == nil {
 			*rev = r.Revision
-			return FactOutcome{Fact: w.dec.factOr(w.Fact), Reason: w.dec.reasonOr(w.Reason), Action: w.dec.Action,
+			return FactOutcome{Fact: w.dec.factOr(w.Fact), Kind: w.kind(), Reason: w.dec.reasonOr(w.Reason), Action: w.dec.Action,
 				ID: r.ID, LineageID: r.LineageID, Version: r.Version, PreviousID: r.PreviousID, Why: w.dec.Why}
 		}
 		if !errors.Is(err, errStale) {

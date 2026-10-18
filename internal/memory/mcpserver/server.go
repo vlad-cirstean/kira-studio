@@ -287,11 +287,11 @@ func renderStore(src llmprompts.Source, res memory.StoreResult) string {
 	for _, o := range res.Outcomes {
 		switch o.Action {
 		case memory.ActionAdd:
-			fmt.Fprintf(&b, "Added %s v%d: %s\n", o.LineageID, o.Version, o.Fact)
+			fmt.Fprintf(&b, "Added %s v%d %s: %s\n", o.LineageID, o.Version, o.Kind, o.Fact)
 		case memory.ActionUpdate:
-			fmt.Fprintf(&b, "Updated %s to v%d: %s (previous version kept as history)\n", o.LineageID, o.Version, o.Fact)
+			fmt.Fprintf(&b, "Updated %s to v%d %s: %s (previous version kept as history)\n", o.LineageID, o.Version, o.Kind, o.Fact)
 		case memory.ActionNoop:
-			fmt.Fprintf(&b, "Already known %s v%d: %s\n", o.LineageID, o.Version, o.Fact)
+			fmt.Fprintf(&b, "Already known %s v%d %s: %s\n", o.LineageID, o.Version, o.Kind, o.Fact)
 		default:
 			fmt.Fprintf(&b, "Failed: %s: %s\n", o.Fact, o.Error)
 		}
@@ -319,7 +319,7 @@ func renderMemories(ms []memory.Memory) string {
 // writeMemory prints the grep-first layout shared with the comment and doc formats: "<id> <fact>",
 // the reason indented by two spaces, then an indented meta line with the per-result provenance.
 func writeMemory(b *strings.Builder, m memory.Memory) {
-	meta := []string{fmt.Sprintf("v%d", m.Version), "origin=" + m.Origin}
+	meta := []string{fmt.Sprintf("v%d", m.Version), m.Kind, "origin=" + m.Origin}
 	if m.SourceTag != nil {
 		meta = append(meta, "source="+*m.SourceTag)
 	}

@@ -23,6 +23,10 @@ const (
 	SourceUI     = "ui"
 	SourceImport = "import"
 
+	// Kind: a fact is a durable claim; a rule is a standing imperative with a reason.
+	KindFact = "fact"
+	KindRule = "rule"
+
 	StatusCurrent    = "current"
 	StatusSuperseded = "superseded"
 
@@ -56,6 +60,7 @@ type Memory struct {
 	LineageID    string   `json:"lineageId"`
 	Version      int      `json:"version"`
 	Fact         string   `json:"fact"`
+	Kind         string   `json:"kind"`
 	Reason       string   `json:"reason"`
 	Keywords     []string `json:"keywords"`
 	Origin       string   `json:"origin"`
