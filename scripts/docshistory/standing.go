@@ -492,11 +492,15 @@ func proseSegs(segs []segment) []segment {
 func renderDoc(file, commit string, segs []segment, recs map[string]Record) (string, error) {
 	var b strings.Builder
 	var missing []string
+	distilled := false
+	for _, s := range segs {
+		distilled = distilled || (s.Kind == segProse && recs[s.Slug].State == stateOK)
+	}
 	for i, s := range segs {
 		switch s.Kind {
 		case segHeading, segVerbatim:
 			b.WriteString(s.Raw)
-			if i == 0 && s.Kind == segHeading && s.Level == 1 {
+			if i == 0 && distilled && s.Kind == segHeading && s.Level == 1 {
 				fmt.Fprintf(&b, "\nDistilled in P303, one fact per line. Full earlier text: git show %s:docs/%s.\n", commit[:12], file)
 			}
 		case segProse:

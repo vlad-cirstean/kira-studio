@@ -96,3 +96,7 @@
 {"slug":"packaging/7-ci-releases-install-and-update/01","try":1,"ok":true,"costUsd":0.0327104,"charged":0.0327104,"wallMs":18375}
 {"slug":"packaging/7-ci-releases-install-and-update/02","try":1,"ok":true,"costUsd":0.1449633,"charged":0.1449633,"wallMs":47435}
 {"slug":"packaging/8-kira-space-packaging/01","try":1,"ok":true,"costUsd":0.0665725,"charged":0.0665725,"wallMs":28062}
+{"slug":"architecture/process-model/01","try":1,"ok":true,"costUsd":0.1514801,"charged":0.1514801,"wallMs":48235}
+{"slug":"architecture/renderer-security-surface/01","try":1,"ok":true,"costUsd":0.1320062,"charged":0.1320062,"wallMs":50883}
+{"slug":"packaging/5-off-macos-what-this-environment-could-actually-check/01","try":1,"ok":true,"costUsd":0.0424124,"charged":0.0424124,"wallMs":19542}
+{"slug":"packaging/8-kira-space-packaging/01","try":1,"ok":true,"costUsd":0.0600107,"charged":0.0600107,"wallMs":23925}
