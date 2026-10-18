@@ -251,6 +251,20 @@ var MemoryKinds = define(Entry{
 - A table or a list of run results is not a memory. Keep one headline figure only when it is the evidence for a conclusion the text states; drop the rest.`,
 }, NoVars{})
 
+// MemoryRunTrivia defines run trivia: notes on how one run went, which no memory carries.
+var MemoryRunTrivia = define(Entry{
+	ID: "memory.runTrivia", Kind: KindFragment, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.memoryRunTrivia.title",
+	PurposeKey: "llmPrompts.entry.memoryRunTrivia.description",
+	UsedByKey:  "llmPrompts.entry.memoryRunTrivia.usedBy.body",
+	Default: `Run trivia is never a memory: a note on how one run of the work went, not on what the system is or what was decided.
+- Drop: who ran what; commit, push and branch mechanics, a refused or conflicting push included; a sandbox or container limit met during the run; a flaky, timed-out or rerun test; a fixture or harness gap named only to explain a skipped check; a check left for the user; spend.
+- Keep: what the work built or changed, tests and fixtures included; a decision with its reason; a constraint; a design choice and its consequence; how the system works.
+- Test: still true and useful once this run is forgotten? Keep. True only of this run? Drop.
+- A lesson from an incident that holds for later work is a rule: "Commit with an explicit pathspec in a shared checkout, because another session's staged files land in a bare commit."
+- When the document's subject is the environment, tooling or a process (a runbook, a setup or test guide), its limits and procedures are the content: keep them.`,
+}, NoVars{})
+
 // MemoryGateSystem is the system prompt of the memory gate call.
 var MemoryGateSystem = define(Entry{
 	ID: "memory.gate.system", Kind: KindSystem, Apps: spaceApp, Applies: NextCall,
@@ -352,12 +366,14 @@ var MemoryImportExtractSystem = define(Entry{
 	TitleKey:          "llmPrompts.entry.memoryImportExtractSystem.title",
 	PurposeKey:        "llmPrompts.entry.memoryImportExtractSystem.description",
 	UsedByKey:         "llmPrompts.entry.memoryImportExtractSystem.usedBy.body",
-	RequiredFragments: []ID{"memory.dataHygiene", "memory.kinds"},
+	RequiredFragments: []ID{"memory.dataHygiene", "memory.kinds", "memory.runTrivia"},
 	Default: `You extract facts and rules from one chunk of a document for a developer's long-term memory. Output only the schema.
 
 {{template "memory.dataHygiene"}}
 
 {{template "memory.kinds"}}
+
+{{template "memory.runTrivia"}}
 
 Input: "document" (path, title), "chunk" (index, count, headingPath), "context", "text".
 "text" is the only source of facts. "context" is the end of the previous chunk: read it for references, never extract a fact from it.
@@ -366,7 +382,7 @@ Input: "document" (path, title), "chunk" (index, count, headingPath), "context",
 Extract atomic facts:
 - One claim or rule per fact, one complete sentence of at most 300 characters. Keep every qualifier that changes the claim in that fact: numbers, units, names, negations, conditions, exceptions, limits, template variables.
 - Keep facts and rules only (see above).
-- Skip navigation, tables of contents, boilerplate, licence text, standalone examples, step-by-step procedures (keep a rule they state), tables and run results (see above), time-bound chatter, process chatter (who ran what, commit and phase lists, run results, spend) and code mechanics with no behavioral meaning (selectors, local variable names, fixture values).
+- Skip navigation, tables of contents, boilerplate, licence text, standalone examples, step-by-step procedures (keep a rule they state), tables and run results (see above), time-bound chatter, run trivia (see above), commit and phase lists and code mechanics with no behavioral meaning (selectors, local variable names, fixture values).
 - Make a fact standalone only where the text makes its subject certain: name the service instead of "it" when the text names it. When the text leaves a subject or reference open, keep the original wording and say what is missing in "unresolved" (for example: which service "it" means). Else leave "unresolved" empty.
 - Never invent or infer beyond the text. Never include a secret (password, token, API key, private key).
 - "evidence" quotes the supporting words from "text", at most {{.MaxEvidence}} characters. "section" is the chunk's heading path.
@@ -390,12 +406,14 @@ var MemoryMergeSystem = define(Entry{
 	TitleKey:          "llmPrompts.entry.memoryMergeSystem.title",
 	PurposeKey:        "llmPrompts.entry.memoryMergeSystem.description",
 	UsedByKey:         "llmPrompts.entry.memoryMergeSystem.usedBy.body",
-	RequiredFragments: []ID{"memory.dataHygiene", "memory.kinds", "memory.merge.rules"},
+	RequiredFragments: []ID{"memory.dataHygiene", "memory.kinds", "memory.runTrivia", "memory.merge.rules"},
 	Default: `You merge the facts extracted from one input into short lines. Output only the schema.
 
 {{template "memory.dataHygiene"}}
 
 {{template "memory.kinds"}}
+
+{{template "memory.runTrivia"}}
 
 Input: "document" (path, title, chunks), "facts": atomic facts extracted separately per chunk, in document order. Each has id, chunk, section, evidence quote and, when the chunk left something open, "unresolved".
 
@@ -426,7 +444,7 @@ var MemoryMergeRules = define(Entry{
 	UsedByKey:  "llmPrompts.entry.memoryMergeRules.usedBy.body",
 	Default: `1. Chunks were read independently. Merge duplicates and near-duplicates into one fact. Also merge facts about the same subject and the same aspect (fields of one type, values or limits of one setting, cases of one rule) into one fact that keeps every qualifier of each, at most 300 characters. Never merge facts about different subjects. Never merge a rule with a fact.
 2. Resolve each unresolved fact from the other facts of this document, then rewrite it standalone. A fact that stays ambiguous is not kept: list it in "unresolved" with the open question.
-3. Drop a fact that is not a memory (see above), trivia, time-bound or navigation: list it in "dropped" with why. Drop any secret (password, token, API key, private key); never keep it.`,
+3. Drop a fact that is not a memory or is run trivia (see above), other trivia, time-bound or navigation: list it in "dropped" with why. Drop any secret (password, token, API key, private key); never keep it.`,
 }, NoVars{})
 
 // MemoryImportFinalizeSystem is the system prompt of the run that stores one imported file's facts.
@@ -435,12 +453,14 @@ var MemoryImportFinalizeSystem = define(Entry{
 	TitleKey:          "llmPrompts.entry.memoryImportFinalizeSystem.title",
 	PurposeKey:        "llmPrompts.entry.memoryImportFinalizeSystem.description",
 	UsedByKey:         "llmPrompts.entry.memoryImportFinalizeSystem.usedBy.body",
-	RequiredFragments: []ID{"memory.dataHygiene", "memory.kinds", "memory.merge.rules"},
+	RequiredFragments: []ID{"memory.dataHygiene", "memory.kinds", "memory.runTrivia", "memory.merge.rules"},
 	Default: `You store the facts extracted from one document into long-term memory through the kira-memory tools, then report the facts you did not store. Output only the schema when done.
 
 {{template "memory.dataHygiene"}}
 
 {{template "memory.kinds"}}
+
+{{template "memory.runTrivia"}}
 
 Input: "document" (path, title, chunks), "provenance" (origin, sourceTag, scope, project), "challenge", "facts": atomic facts extracted separately per chunk, in document order. Each has id, chunk, section, evidence quote, reason (source locator) and, when the chunk left something open, "unresolved".
 

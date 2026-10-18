@@ -5548,6 +5548,13 @@
           "body": "Sent as the system prompt of the Claude call that runs after the gate accepts a fact."
         }
       },
+      "memoryRunTrivia": {
+        "description": "Defines run trivia, notes on how one run went, as never a memory, and what to keep instead.",
+        "title": "Run trivia",
+        "usedBy": {
+          "body": "Included in the import extract, import finalize and merge prompts."
+        }
+      },
       "runResumeLine": {
         "description": "First message of a run resumed after Kira quit or crashed.",
         "title": "Resume after restart",
