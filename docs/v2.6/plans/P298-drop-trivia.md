@@ -205,6 +205,8 @@ pass or fail per test. Spend: pilot, eval, rows, total against 6.00. Prompt size
 
 ## Result
 
+Accepted by the user 2026-10-18 with 4 harness/fixture lines left in the pilot (trivia pass line relaxed by the user); numbers below unchanged.
+
 Status: not Done. Pass line "trivia in `after` at most 1" fails after the one reword. SPEC row stays Todo. Groups 8 (docs) skipped: they describe a shipped feature.
 
 Commits: `14c4a7e2` holdout baseline, `77a52c86` feat (first wording), `1b9cf695` real claude test, pilot run 1, `2714f51d` reword, pilot run 2, `be0e8d6c` eval rounds. Wording in tree is the reworded fragment.
