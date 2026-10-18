@@ -323,7 +323,7 @@ func TestConn_MarkWalksStaleRacesSafelyWithWalkRebuild(t *testing.T) {
 // TestConn_DisableAutoFetch_OptsThisConnOutOfArming is C13-10: the native git-graph mount's own
 // Conn (bridge/gitstream.go's ServeGitStream) calls DisableAutoFetch before serving any request,
 // so its own repo.open must never be what arms a RepoEntry's background auto-fetch timer —
-// docs/ARCHITECTURE.md documents that surface as provably read-only, and a real `git fetch
+// docs/ARCHITECTURE.md's "Git graph in the native workspace (C10)" section documents that surface as read-only, and a real `git fetch
 // --prune` is a write. An ordinary Conn (no DisableAutoFetch call) opening the identical scenario
 // DOES arm it, proving this test's own assertion actually distinguishes the two rather than being
 // vacuously true regardless of the fix.

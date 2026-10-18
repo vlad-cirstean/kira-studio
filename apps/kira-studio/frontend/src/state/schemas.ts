@@ -12,7 +12,7 @@ import { sqlKeywordCompletionSource } from '../views/console/sqlKeywordCompletio
 import { type SqlDialect, sqlDialectFor } from '../views/shared/sqlIdent';
 
 // P18 (v1.1) D2/D4: each connection's own pasted DDL document — app-wide like
-// connections/settings/layout (docs/ARCHITECTURE.md's Multi-window section), keyed by
+// connections/settings/layout (docs/ARCHITECTURE.md's UI architecture section), keyed by
 // connectionId. A connection with no saved document simply has no entry, matching D2's "absent
 // until the user writes one" (never an error, never a placeholder row).
 //

@@ -79,7 +79,7 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 		// any real least-privilege role whose name doesn't happen to match an existing database.
 		// "postgres" is the maintenance database every real server ships with, and the sane
 		// bootstrap target anyway: this connection's whole point is to enumerate every database
-		// on the server (docs/ARCHITECTURE.md's Postgres tree, database -> schema -> table), not
+		// on the server (docs/ARCHITECTURE.md's PostgreSQL / MariaDB / MySQL section, database -> schema -> table), not
 		// to land in one particular one.
 		connConfig.Database = "postgres"
 	}
