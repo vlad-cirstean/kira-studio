@@ -1066,7 +1066,7 @@ All three resolved in P13. Their cache coverage moved to Go with L2/L3 (P58a A21
 ## 5. Test-suite duration (P294, replaces the v1.4 P1 baseline)
 
 Measured on this box (4 cores, 15 GB, Docker 29, real WebKit). Plan and method:
-`docs/v2.6/plans/P294-test-ci-speed.md`. CI numbers are pending the pending-changes patch.
+`git show ca2fa17c172b:docs/v2.6/plans/P294-test-ci-speed.md`. CI numbers are pending the pending-changes patch.
 
 | Item | Before | After |
 |---|---|---|

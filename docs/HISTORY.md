@@ -6613,7 +6613,7 @@ P303 verification confirmed all 70 Known open items in ARCHITECTURE.md are byte-
 The docshistory tool counts loss on the unit body only, not the '# file: heading' header; it has a doc show subcommand; render writes the note line only when a unit is distilled and is idempotent.
 P303 reference repoint: of 60 lines in 41 files citing ARCHITECTURE.md outside the tool, 50 resolved as-is and 10 were repointed to headings.
 The docshistory tool lives in scripts/docshistory and is checked by go test ./scripts/docshistory, go vet ./scripts/... and bun run lint:go.
-The P303 verify report is at docs/v2.6/plans/P303-verify.md and run records are in docs/v2.6/plans/P303-runs/.
+The P303 verify report is at docs/HISTORY.md (v2.6 P303) and run records are in docs/v2.6/plans/P303-runs/.
 
 ### v2.6 P304 Clean up `docs/PERF.md` by hand (no distill pipeline). Decisions final (user, 2026-10-18). Runs as Stream C in its ow... (Done)
 docs/PERF.md was cleaned up by hand (no distill pipeline): stale historical result tables of §2 were cut, what is cited or live was kept; size went from 1826 lines / 143,668 B to 1085 / 85,924 B.
@@ -6627,11 +6627,11 @@ The P163 sentence in PERF.md names the slowest caller: find, 12 MB, 35-51 ms.
 The worktree hook needs git-ignored node_modules, site/node_modules, packages/*/node_modules and frontend/bindings symlinked from the main checkout.
 
 ### v2.6 P305 Close chapter v2.6. Decisions final (user, 2026-10-18). Runs after P303 and P304 have landed and everything else is d... (Done.)
-Phase P305 closes chapter v2.6 by folding phases P294 to P304 (including P305's own row as a closed entry) into docs/HISTORY.md, then deleting the chapter's md files (docs/v2.6/SPEC.md, docs/v2.6/plans/*.md and docs/history-runs/).
+Phase P305 closes chapter v2.6 by folding phases P294 to P304 (including P305's own row as a closed entry) into docs/HISTORY.md, then deleting the chapter's md files (docs/HISTORY.md (v2.6), docs/v2.6/plans/*.md and docs/history-runs/).
 P305 runs only after P303 and P304 have landed and everything else is done.
 The chapter fold uses the CLAUDE.md rollover command: go run ./scripts/docshistory fold --runs docs/history-runs --out - --jobs 1 --max-usd <cap> v2.6, which is sequential, backs off on rate limits and is resume-safe.
 The P305 verify pass requires every phase row P294 to P304 to be present in HISTORY.md with its decisions and cost.
-The P305 planner must decide which non-md data under docs/v2.6/ is read at runtime or in tests (P298-pilot, P299-pilot, P299-runs, P303-pilot, runs ledgers), and either move it to a testdata home or delete it with the folder.
+The P305 planner must decide which non-md data under docs/HISTORY.md (v2.6) is read at runtime or in tests (P298-pilot, P299-pilot, P299-runs, P303-pilot, runs ledgers), and either move it to a testdata home or delete it with the folder.
 References to v2.6 plans and docs/v2.6 in code comments, docs, tests and CLAUDE.md are repointed to a HISTORY.md entry or to git show <commit>:path.
 Once the chapter folder is gone, the next phase number is found by the HISTORY.md highest-P rule.
 In the docshistory tool, the v2.6 guard was removed from checkChapter, and a planResultChapter rule (v2.0, v2.5 and later) replaces the map.

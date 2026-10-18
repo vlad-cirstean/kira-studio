@@ -9,7 +9,6 @@ sources:
   - internal/memory/importer/writedoc.go
   - internal/memory/memfmt/locator.go
   - docs/HISTORY.md
-  - docs/v2.6/plans/P297-distill-into-memory.md
 sidebar:
   order: 4
 ---
