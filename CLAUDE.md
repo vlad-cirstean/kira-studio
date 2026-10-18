@@ -149,13 +149,17 @@ duplicated here; this file only points at them.
 - No per-phase PRs. One feature branch per chapter.
 - **Every chapter uses `P` phase numbers, one running sequence across the whole repo, not
   per-chapter.** v1.1/v1.2/v1.4/v1.6/v1.8/v1.9 continue one counter (v1.6 topped out at `P70`; v1.8
-  starts at `P71`, v1.9 at `P96`, v2.0 at `P126`, v2.1 at `P185`, v2.2 at `P210`). Before opening a
-  new chapter, read the highest `P` in `docs/HISTORY.md` and in every `docs/v*/SPEC.md` still on
-  disk, and continue from there. v1.5's `C` lettering and v1.7's `M` lettering predate this rule and
+  starts at `P71`, v1.9 at `P96`, v2.0 at `P126`, v2.1 at `P185`, v2.2 at `P210`, v2.5 at `P271`, v2.6 at
+  `P294`). Before opening a new chapter, read the highest `P` in `docs/HISTORY.md` and in an open
+  chapter's `SPEC.md`, if one exists, and continue from there. v1.5's `C` lettering and v1.7's `M` lettering predate this rule and
   stay as shipped, never renumbered; every chapter from here on uses `P`.
-- **Opening a chapter folds the previous one.** Run `go run ./scripts/docshistory fold --runs docs/history-runs --out - --jobs 1 --max-usd <cap> <prev>`
-  (distills each phase through `ingest_files`, costs tokens, resumable), read its verify report,
-  run `repoint --runs docs/history-runs`, commit, then `git rm -r docs/<prev>/ docs/history-runs/` and create `docs/<new>/`.
+- **Closing a chapter folds it.** The chapter's last phase runs
+  `go run ./scripts/docshistory fold --runs docs/history-runs --out - --jobs 1 --max-usd <cap> <ch>`
+  (distills each phase through `ingest_files`, costs tokens, resumable), reads the verify report,
+  runs `repoint --runs docs/history-runs`, commits, then `git rm -r docs/<ch>/ docs/history-runs/`.
+  That phase marks its own row Done and writes its Result in the commit before the fold, so its
+  entry folds closed. Between chapters no `docs/v*/` exists. Open the next with `docs/v<new>/SPEC.md`
+  (intro: first `P` is highest plus one, branch name) and `plans/`.
   Data a test or script reads at runtime never lives under `docs/v*/`; it goes in its reader's `testdata/`.
   Move any found first, own phase. Never hand-edit `docs/HISTORY.md`.
 - **Splitting a phase keeps its number — it doesn't consume a new one, when an agent is the one
