@@ -130,3 +130,8 @@ Runs: contract write, then `-count=2` re-run, pass (6 subtests each run, no mach
 `bun run build:test:space` ok. Playwright `ade-v2-workflows` + `ade-v2-automations`: 50 pass, 1 test-side fix
 (trailing `.` in the YAML message), then the 8 `contract:` tests pass. Full `internal/flows/adeflow` and
 `internal/adeflow` pass.
+
+Follow-up:
+- Biome warning: unused `PLAIN` import in `ade-v2-automations.spec.ts`, from commit 2; removed in `66b93e432`. Biome on `tests/ui` clean.
+- Fix reverted (parse.go, `workflowGraph.ts`, `adeWorkflowDraft.ts`, `AdeStepResults.vue` from `afb63dde9`, tree restored, nothing committed). Fail without fix: both Go `TestWorkflowReturnToStepThatNeverRuns` subtests; UI route-select test and all 4 stale-implementer UI tests. Pass without fix: Go `TestWorkflowEditorClearsStaleImplementer` (backend already refused stale implementer; the fix is the editor clearing it) and the UI YAML-error test (mock-driven; the parser guard is the Go contract).
+- Full rerun of `ade-v2-workflows` + `ade-v2-automations` after restore and rebuild: 51 passed, 0 failed.
