@@ -27,7 +27,7 @@ func testdata(t *testing.T, name string) string {
 const (
 	gateSystem      = "gatekeeper of a long-term memory"
 	reconcileSystem = "reconcile new facts"
-	extractSystem   = "extract durable facts"
+	extractSystem   = "extract facts and rules"
 )
 
 // importApp boots the app with a finalize agent that stores two facts through the real memory-mcp

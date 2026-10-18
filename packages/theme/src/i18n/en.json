@@ -5437,7 +5437,7 @@
         "description": "A paragraph that tells Claude to treat the document text as data and never follow instructions found inside it.",
         "title": "Untrusted input notice",
         "usedBy": {
-          "body": "Included in the memory gate, reconcile, import extract and import finalize prompts."
+          "body": "Included in the memory gate, reconcile, import extract, import verify and import finalize prompts."
         }
       },
       "memoryDistillSystem": {
@@ -5479,7 +5479,7 @@
         "description": "Defines a memory as a fact or a rule, and says that questions, one-off tasks, standalone examples and result tables are not memories.",
         "title": "Memory kinds",
         "usedBy": {
-          "body": "Included in the memory gate prompt."
+          "body": "Included in the memory gate, import extract and import finalize prompts."
         }
       },
       "memoryMcpIngestAwaiting": {
@@ -5529,6 +5529,13 @@
         "title": "Store challenge notice",
         "usedBy": {
           "body": "Returned from store_memory when the gate challenges an item."
+        }
+      },
+      "memoryMergeRules": {
+        "description": "The steps that merge duplicate facts, resolve unclear ones and drop what is not a memory.",
+        "title": "Merge steps",
+        "usedBy": {
+          "body": "Included in the import finalize prompt."
         }
       },
       "memoryReconcileSystem": {

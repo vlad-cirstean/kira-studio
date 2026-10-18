@@ -353,23 +353,25 @@ var MemoryImportExtractSystem = define(Entry{
 	TitleKey:          "llmPrompts.entry.memoryImportExtractSystem.title",
 	PurposeKey:        "llmPrompts.entry.memoryImportExtractSystem.description",
 	UsedByKey:         "llmPrompts.entry.memoryImportExtractSystem.usedBy.body",
-	RequiredFragments: []ID{"memory.dataHygiene"},
-	Default: `You extract durable facts from one chunk of a document for a developer's long-term memory. Output only the schema.
+	RequiredFragments: []ID{"memory.dataHygiene", "memory.kinds"},
+	Default: `You extract facts and rules from one chunk of a document for a developer's long-term memory. Output only the schema.
 
 {{template "memory.dataHygiene"}}
+
+{{template "memory.kinds"}}
 
 Input: "document" (path, title), "chunk" (index, count, headingPath), "context", "text".
 "text" is the only source of facts. "context" is the end of the previous chunk: read it for references, never extract a fact from it.
 "text" may be JSON from an export. Field values are the content; author, time and id fields give context.
 
 Extract atomic facts:
-- One claim per fact, one complete sentence of at most 300 characters. Keep every qualifier that changes the claim in that fact: numbers, units, names, negations, conditions, exceptions, limits.
-- Keep durable knowledge only: decisions with reasons, rejected alternatives with why, conventions, configuration and names, ownership, relationships between components, constraints, how things work.
-- Skip navigation, tables of contents, boilerplate, licence text, examples copied verbatim, step-by-step commands, time-bound chatter, process chatter (who ran what, commit and phase lists, run results, spend) and code mechanics with no behavioral meaning (selectors, local variable names, fixture values).
+- One claim or rule per fact, one complete sentence of at most 300 characters. Keep every qualifier that changes the claim in that fact: numbers, units, names, negations, conditions, exceptions, limits, template variables.
+- Keep facts and rules only (see above).
+- Skip navigation, tables of contents, boilerplate, licence text, standalone examples, step-by-step procedures (keep a rule they state), tables and run results (see above), time-bound chatter, process chatter (who ran what, commit and phase lists, run results, spend) and code mechanics with no behavioral meaning (selectors, local variable names, fixture values).
 - Make a fact standalone only where the text makes its subject certain: name the service instead of "it" when the text names it. When the text leaves a subject or reference open, keep the original wording and say what is missing in "unresolved" (for example: which service "it" means). Else leave "unresolved" empty.
 - Never invent or infer beyond the text. Never include a secret (password, token, API key, private key).
 - "evidence" quotes the supporting words from "text", at most {{.MaxEvidence}} characters. "section" is the chunk's heading path.
-- At most {{.MaxFacts}} facts. None when the chunk holds nothing durable.`,
+- At most {{.MaxFacts}} facts. None when the chunk holds no fact or rule.`,
 	Schema: `{
   "type": "object", "additionalProperties": false, "required": ["facts"],
   "properties": {"facts": {"type": "array", "items": {
@@ -418,22 +420,34 @@ Input: "text"; optional "context" (end of the previous part: read it for referen
 }`,
 }, DistillVars{MaxLines: 40})
 
+// MemoryMergeRules is the merge, resolve and drop steps shared by the import finalize run and the
+// no-store merge of ingest_files with distill.
+var MemoryMergeRules = define(Entry{
+	ID: "memory.merge.rules", Kind: KindFragment, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.memoryMergeRules.title",
+	PurposeKey: "llmPrompts.entry.memoryMergeRules.description",
+	UsedByKey:  "llmPrompts.entry.memoryMergeRules.usedBy.body",
+	Default: `1. Chunks were read independently. Merge duplicates and near-duplicates into one fact. Also merge facts about the same subject and the same aspect (fields of one type, values or limits of one setting, cases of one rule) into one fact that keeps every qualifier of each, at most 300 characters. Never merge facts about different subjects. Never merge a rule with a fact.
+2. Resolve each unresolved fact from the other facts of this document, then rewrite it standalone. A fact that stays ambiguous is not kept: list it in "unresolved" with the open question.
+3. Drop a fact that is not a memory (see above), trivia, time-bound or navigation: list it in "dropped" with why. Drop any secret (password, token, API key, private key); never keep it.`,
+}, NoVars{})
+
 // MemoryImportFinalizeSystem is the system prompt of the run that stores one imported file's facts.
 var MemoryImportFinalizeSystem = define(Entry{
 	ID: "memory.import.finalize.system", Kind: KindSystem, Apps: spaceApp, Applies: NextCall,
 	TitleKey:          "llmPrompts.entry.memoryImportFinalizeSystem.title",
 	PurposeKey:        "llmPrompts.entry.memoryImportFinalizeSystem.description",
 	UsedByKey:         "llmPrompts.entry.memoryImportFinalizeSystem.usedBy.body",
-	RequiredFragments: []ID{"memory.dataHygiene"},
+	RequiredFragments: []ID{"memory.dataHygiene", "memory.kinds", "memory.merge.rules"},
 	Default: `You store the facts extracted from one document into long-term memory through the kira-memory tools, then report the facts you did not store. Output only the schema when done.
 
 {{template "memory.dataHygiene"}}
 
+{{template "memory.kinds"}}
+
 Input: "document" (path, title, chunks), "provenance" (origin, sourceTag, scope, project), "challenge", "facts": atomic facts extracted separately per chunk, in document order. Each has id, chunk, section, evidence quote, reason (source locator) and, when the chunk left something open, "unresolved".
 
-1. Chunks were read independently. Merge duplicates and near-duplicates into one fact. Also merge facts about the same subject and the same aspect (fields of one type, values or limits of one setting, cases of one rule) into one fact that keeps every qualifier of each, at most 300 characters. Never merge facts about different subjects.
-2. Resolve each unresolved fact from the other facts of this document, then rewrite it standalone. A fact that stays ambiguous is not stored: list it in "unresolved" with the open question.
-3. Drop a fact that is not durable (trivia, example, time-bound, navigation): list it in "dropped" with why. Drop any secret (password, token, API key, private key); never store it.
+{{template "memory.merge.rules"}}
 4. Store the rest with store_memory, at most {{.MaxItems}} items per call. Item origin, sourceTag, scope, project: the input "provenance" values (omit missing ones; the store enforces them). Item fact: standalone; keep a reason the facts or evidence state inline ("X, because Y") only when the fact alone does not make it obvious. Item reason: the fact's "reason", exactly; a merged fact takes the reason of its first fact. Never put an evidence quote in a reason.
 5. With "challenge" true, store_memory can challenge items with questions; a challenged call stores nothing. Answer through "clarifications" using only what this document's facts state, never assumption or general knowledge. When the document cannot answer, remove that item from the call, call again, and list the fact in "unresolved" with the store's questions. With "challenge" false, nobody can answer: store_memory stores the accepted items and reports the rest as "Not stored". List each of those in "dropped" with the questions as why, never in "unresolved".
 6. store_memory already reconciles new facts against stored ones. Use search_memories only to help word a fact.
@@ -470,6 +484,7 @@ One verdict per fact:
 - "rewritten": the file supports the claim, but the wording is wrong, vague or leaves a reference open. "fact": corrected standalone sentence of at most 300 characters, only what the file says. "evidence": verbatim supporting quote.
 - "unsupported": the file does not state the fact, or contradicts it.
 - "ambiguous": the file states something close, but the subject or a reference stays open after reading the whole file.
+A fact may be a rule: an imperative with its reason. A rewritten rule stays an imperative.
 "why": one sentence. "fact" and "evidence": "" where not asked for. Answer every fact id exactly once, at most {{.MaxFacts}} facts per call.`,
 	Schema: `{
   "type": "object", "additionalProperties": false, "required": ["verdicts"],
@@ -618,7 +633,7 @@ var MemoryRememberMessage = define(Entry{
 	TitleKey:   "llmPrompts.entry.memoryMcpRememberMessage.title",
 	PurposeKey: "llmPrompts.entry.memoryMcpRememberMessage.description",
 	UsedByKey:  "llmPrompts.entry.memoryMcpRememberMessage.usedBy.body",
-	Default: `Store the durable facts from {{if .Text}}the text below{{else}}the recent conversation{{end}} with store_memory. Give every item reason, origin (user: user stated it; agent: you concluded it; external with a sourceTag: a source such as slack or jira states it) and scope (company, project or personal). Rough wording is fine: the store splits and rewords. If store_memory returns questions, ask the user, then call it again with the answers as clarifications. Report what was stored.{{if .Text}}
+	Default: `Store the durable facts and standing rules from {{if .Text}}the text below{{else}}the recent conversation{{end}} with store_memory. Give every item reason, origin (user: user stated it; agent: you concluded it; external with a sourceTag: a source such as slack or jira states it) and scope (company, project or personal). Rough wording is fine: the store splits and rewords. If store_memory returns questions, ask the user, then call it again with the answers as clarifications. Report what was stored.{{if .Text}}
 
 {{.Text}}{{end}}`,
 }, RememberVars{Text: "We use pnpm, not npm."})
