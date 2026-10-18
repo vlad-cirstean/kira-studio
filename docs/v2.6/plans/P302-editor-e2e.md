@@ -113,4 +113,20 @@ skipped target and the graph path it lacks.
 
 ## Result
 
-_Pending._
+Done. Commits: `4185dcd86` (flow tests + contract `ade-workflow-editor.json`), `ca2f7d385` (shared smart script
+fixtures in `tests/ui/support/adeV2.ts`), `492132a64` (UI specs). No product bug found, no Vue change, no follow-up fix.
+
+Tests added:
+- Go `TestWorkflowReturnToStepThatNeverRuns` (2 subtests): YAML return to manual -> parser error with line 19;
+  graph `SaveWorkflow` return to skipped step -> bad-request, file hash unchanged.
+- Go `TestWorkflowEditorClearsStaleImplementer` (4 subtests: remove, move above, kind manual, smart script): stale
+  `Implementer: "impl"` refused with `implementer must be an earlier agent step`; `""` saves and re-reads cleared.
+  Manual-kind step built like the frontend `withKind` (agent fields dropped); assumption held.
+- UI, 6 tests in `ade-v2-workflows.spec.ts`: route select hides manual/skipped steps up to the step, keeps
+  current pick, refused save shows contract message; YAML error line/message shown; 4 edits clear the review
+  implementer to `''` and the save goes through (same values as backend).
+
+Runs: contract write, then `-count=2` re-run, pass (6 subtests each run, no machine paths in JSON).
+`bun run build:test:space` ok. Playwright `ade-v2-workflows` + `ade-v2-automations`: 50 pass, 1 test-side fix
+(trailing `.` in the YAML message), then the 8 `contract:` tests pass. Full `internal/flows/adeflow` and
+`internal/adeflow` pass.
