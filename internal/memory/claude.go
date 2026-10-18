@@ -22,6 +22,7 @@ var (
 	ErrClaudeNotFound = errors.New("Claude Code CLI not found. Install it, then retry.")
 	ErrClaudeAuth     = errors.New("Claude Code is not logged in. Run `claude` once to log in.")
 	ErrClaudeBudget   = errors.New("Claude Code call exceeded its cost budget.")
+	ErrClaudeMaxTurns = errors.New("Claude Code call hit its turn limit.")
 	ErrClaudeTimeout  = errors.New("Claude Code call timed out.")
 	ErrClaudeOutput   = errors.New("Claude Code returned output the memory store could not use.")
 	ErrClaudeOutdated = errors.New("Claude Code CLI is too old for the memory store. Update Claude Code, then retry.")
@@ -173,6 +174,9 @@ func parseClaudeResult(out []byte, runErr error) (Result, error) {
 	spent := Result{CostUSD: res.TotalCostUSD, Turns: res.NumTurns}
 	if parsed && res.Subtype == "error_max_budget_usd" {
 		return spent, ErrClaudeBudget
+	}
+	if parsed && res.Subtype == "error_max_turns" {
+		return spent, ErrClaudeMaxTurns
 	}
 	if runErr != nil || (parsed && res.IsError) {
 		detail := res.Result

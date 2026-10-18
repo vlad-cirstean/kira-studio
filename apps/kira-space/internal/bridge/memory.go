@@ -184,7 +184,7 @@ func memoryErr(err error) error {
 	case err == nil:
 		return nil
 	case errors.Is(err, memory.ErrInvalid), errors.Is(err, memory.ErrClaudeNotFound), errors.Is(err, memory.ErrClaudeAuth),
-		errors.Is(err, memory.ErrClaudeBudget), errors.Is(err, memory.ErrClaudeTimeout), errors.Is(err, memory.ErrClaudeOutput),
+		errors.Is(err, memory.ErrClaudeBudget), errors.Is(err, memory.ErrClaudeMaxTurns), errors.Is(err, memory.ErrClaudeTimeout), errors.Is(err, memory.ErrClaudeOutput),
 		errors.Is(err, memory.ErrClaudeOutdated), errors.Is(err, memory.ErrClaudeRateLimited), errors.Is(err, memory.ErrClaudeUsageLimit):
 		return ipcerr.BadRequest(err.Error())
 	case errors.Is(err, embed.ErrChecksum):

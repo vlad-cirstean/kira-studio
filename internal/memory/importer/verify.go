@@ -20,6 +20,7 @@ const (
 	VerdictAmbiguous   = "ambiguous"
 )
 
+// verifyBaseTurns: a 2-fact call at 3 turns hit max_turns in 7 of 8 replays, none of 14 at 5 or 6.
 const (
 	verifyBatch       = 40
 	verifyBaseTimeout = 120 * time.Second
@@ -28,7 +29,7 @@ const (
 	verifyBaseBudget  = 0.30
 	verifyFactBudget  = 0.03
 	verifyMaxBudget   = 2.00
-	verifyBaseTurns   = 3
+	verifyBaseTurns   = 6
 	verifyMaxTurns    = 20
 )
 
