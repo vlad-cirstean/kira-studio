@@ -8,8 +8,7 @@ sources:
   - internal/memory/memcheck/check.go
   - internal/memory/importer/writedoc.go
   - internal/memory/memfmt/locator.go
-  - docs/v2.5/plans/P273-memory-text-formats.md
-  - docs/v2.5/plans/P285-part3-compact-memory-output.md
+  - docs/HISTORY.md
   - docs/v2.6/plans/P297-distill-into-memory.md
 sidebar:
   order: 4

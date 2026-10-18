@@ -6316,7 +6316,7 @@ Each P285 run is scored in a separate judge pass, which may use an Opus-class mo
 P285 iterates on prompts, chunk sizes and boundaries, the cross-check rule and dedupe until the planner's rubric thresholds are met or no further gain is found.
 Every P285 iteration is committed with its scores so the history shows progression.
 Prompt and chunker changes from P285 land in the registry and importer, with golden and unit test updates as needed.
-The P285 final deliverable is docs/v2.5/plans/P285-report.md plus a published Artifact page, with a before/after table per sample, compression, recall, atomicity, example input/output pairs, what changed and why, and remaining weaknesses; real-claude rows are rerun at the end.
+The P285 final deliverable is docs/HISTORY.md (v2.5 P285) plus a published Artifact page, with a before/after table per sample, compression, recall, atomicity, example input/output pairs, what changed and why, and remaining weaknesses; real-claude rows are rerun at the end.
 
 ### v2.5 P285 Part 2 Terse memory prompts and distill tool. Decisions final. (a) Rewrite the memory-pipeline prompts in the registry (extr...
 Memory-pipeline prompts in the registry (extract, finalize, verify, gate, reconcile) and the memory MCP instructions and tool and arg descriptions are rewritten as terse atomic instructions, one rule per line, same meaning, following CLAUDE.md Communication style, because every call pays the prompt tokens.

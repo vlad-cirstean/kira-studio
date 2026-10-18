@@ -260,7 +260,7 @@ docs                  architecture, packaging, performance and the per-chapter r
 - [`docs/PACKAGING.md`](docs/PACKAGING.md) — building, releasing, install and update.
 - [`docs/DEV_ENVIRONMENT.md`](docs/DEV_ENVIRONMENT.md) — building and testing in a given sandbox.
 - [`docs/v2.6/`](docs/v2.6/) — the current development chapter's spec and phase plans.
-  [`docs/HISTORY.md`](docs/HISTORY.md) distills the earlier chapters (v1 to v2.2); v2.5 stays in `docs/`.
+  [`docs/HISTORY.md`](docs/HISTORY.md) distills the earlier chapters (v1 to v2.5).
 - [`CLAUDE.md`](CLAUDE.md) — the working agreement for changes to this repo.
 
 ## Not shipped
