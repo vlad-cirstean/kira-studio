@@ -200,7 +200,7 @@ export interface SustainedScrollResult {
  * docs/HISTORY.md (v1.1 P22)/F1/F4). That instrument
  * manufactured its own "many scroll events per frame" burst via `SUB_STEPS_PER_FRAME = 8` synthetic
  * `dispatchEvent(new Event('scroll'))` calls — a burst real browsers never produce (`scroll`
- * dispatches at most once per rendering update; docs/PERF.md:98-102, f28b25a's own commit message)
+ * dispatches at most once per rendering update; docs/PERF.md §2.1 methodology note, f28b25a's own commit message)
  * — so its "before: up to 8/frame" numbers measured the harness's own constant, not the app.
  *
  * This drives one *real* `scroll` event per rAF (`el.scrollTop = next`, no synthetic dispatch) and

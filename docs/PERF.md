@@ -939,7 +939,6 @@ sizing isn't a live constraint.
 **Not measured on real hardware.** These are container numbers, like every other figure in §2. The
 macOS equivalents belong in §3's manual procedures, which have still not been run.
 
-
 ### 2.14 G34 — the visual-parity phase's own CSS delta, measured after the fact
 
 G34's exit criterion #9 asked for the built CSS asset size before and after (±3 KB raw expected);
