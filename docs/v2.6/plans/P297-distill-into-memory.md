@@ -438,4 +438,60 @@ and 6; groups 6 and 7 share the distill wire shapes. Each depends on the one bef
 
 ## 7. Result
 
-(Filled by the implementer.)
+Done. 10 commit groups on `v2.6`, in plan order; no push, no tag.
+
+Commits: `4671aba6` kind; `3e3d9772` list marks rules; `9a02ec85` doc format 3; `a25d6ac9` chunker table header;
+`fc31e42d` import prompts keep rules; `4a75376b` ingest_files distill, distill tool removed; `cc9fc3be` distill view;
+`c64994b9` agent docs; `3318f389` docs; `d771ed81` real `claude` row asserts; this result commit.
+
+Deviations from the plan:
+
+- D10 texts (instructions, tool and arg descriptions, remember message) landed in group 6 with the tool removal, not
+  group 8: the removed `distill` tool left no valid instruction text. Group 8 holds the real `claude` row changes.
+- `chunkFinalFacts` takes no `judged` filter; `loadExtracted` filters verdicts itself.
+- `fakeAgent` in `importer/engine_test.go` was the only fake needing `Merge` (no `recAgent` in the importer tests);
+  `recAgent` in `tests/claude/memory_eval_test.go` got a pass-through `Merge`.
+- `TestMemoryDistillBridge` text needs filler in both parts: a tail chunk under `MinTail` merges back into the
+  first, so a short second part gives one chunk.
+- `TestMemoryImport` asserts the restore rule is stored with kind `rule`, not "exactly one rule": the unchanged
+  fixture sentences "Never call billing-api directly...", hotfix write-up and "only fixes linked to a defect" are rules too (4 stored rules).
+- `spend-p297.jsonl` and `round-p297-01` sit in `docs/v2.5/plans/P285-runs/` (harness-fixed dir).
+
+Verification (all run after the last code commit, tree at `d771ed81` plus docs):
+
+- `go build ./...`, `go vet`, `bun run lint` (biome, rules, checkprompts, check-docs), `bun run lint:go` (0 issues),
+  `bun run lint:claude` (0 issues in both modules), `bun run lint:dead` (knip clean), `bun run typecheck`: clean.
+- `go test ./internal/... ./apps/kira-space/...` with `CGO_ENABLED=1`: all packages ok (memory, importer incl. table
+  header test, memfmt v3 parser and regex-vs-parser, memcheck kind drift, llmprompts goldens, memoryflow).
+- Flow: `TestStoreRule`, `TestMcpIngestDistill` (no `distill` tool, `ingest_files` schema `required` lacks
+  `paths`, `origin`, `scope`; 13 refused argument shapes; no job, no `kira:memory:changed`; merge input holds both parts),
+  `TestMcpIngestDistillCrossChecks`, `TestMcpIngestDistillSpendCap`, `TestBridgeDistill*` (stage progress), v3
+  doc cases (`TestImportFormattedDocParsesOnly`, write-back with `## Facts` and `## Rules`, `TestImportRetiredV2DocFails`).
+  Contracts rewritten with `KIRA_CONTRACT=write`: `memory`, `memory-distill`, `memory-import`, `restart`.
+- UI: `memory-distill`, `memory-module`, `copy-coverage`, `settings-llm-prompts`, `list-keyboard`,
+  `memory-import`, `memory-provenance`, `settings-memory` all pass. Visual `memory` baseline re-recorded after
+  `fc-match sans-serif` printed Inter.
+- Greps: `ModeInstructions`, `ModeFacts`, `DistillMode`, `memory.distill.system`, `MemoryDistillSystem`,
+  `MemoryToolDistill`, `distillCall`, `memory.distill.mode`, `__distill` return nothing outside excluded dirs;
+  `promptdistill` only in the ARCHITECTURE history sentences; `kira-memory: 2` only in retired-format texts and tests.
+- Built `kira-space` (`-tags server`): `memory-check` at repo root exit 0; temp repo with a staged v2 doc exit 1 with
+  the v2 message; staged v3 doc with both categories exit 0.
+- Real `claude` rows (CLI 2.1.302): gate (`assertGateKinds`: rule stored as `rule`; one-off task and `Always run the
+  linter.` with reason `because` challenged), `TestMemoryDistill`, `TestMemoryDistillBridge` (2 parts, one 8080 line, one
+  rule line), `TestMemoryMcpFollowsDocs`, `TestMemoryMcpThroughClaude`, `TestMemoryInstallRegisters`, `TestMemoryImport`,
+  `TestMemoryIngestThroughClaude`, ADE and smart script rows, `test:claude:studio`: pass. In the first full
+  run `TestMemoryMcpFollowsDocs` failed and `TestMemoryImport` failed (my "exactly one rule" assert); the Docs test passed
+  twice on rerun, cause of the one failure not captured (the run's output was filtered); likely model variance with the Go suite running at the same time.
+- Eval subset (`round-p297-01`, 5-source subset, cap 2 USD, `KIRA_EVAL_PHASE_CAP_USD=4`: the harness reserves 2 USD,
+  so a phase cap of 2 skips every source). Against the mean of `round-p289-00a`/`00b`: `R_ess` 0.899 (0.871, up),
+  `R_all` 0.721 (0.712), `P` 0.521 (0.635; the two baselines differ by 0.106 on `P`, 00a alone 0.582), unsupported 0.014 (0.006;
+  one fact in 73), `C_fact` 0.444 (0.443), `C_store` 0.654 (0.658 / 0.702). No `R_ess` drop, so the extract wording stays.
+  The `P` figure sits under the P289 pass line (reference minus 0.065 = 0.570 on the mean) and inside the baseline
+  noise; one confirmation round was not run (cap).
+
+Costs (USD): eval round 1.503 (ledger `spend-p297.jsonl`); real `claude` rows about 0.30 in all: gate 0.005 to 0.03,
+distill bridge 0.030, distill tool 0.03, docs row 0.022 per run (3 runs), import 0.114 per run (2 runs), prompt-registry
+row 0.082 (`claude -p` meter), studio under 0.01.
+
+Not verified: the macOS-only paths; a rerun of the eval round; why the first `TestMemoryMcpFollowsDocs` run failed.
+`git fetch --depth=1 origin 9ed83ae8...` was needed for the eval corpus commit (shallow clone), repo state otherwise unchanged.
