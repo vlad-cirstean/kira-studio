@@ -113,6 +113,10 @@ func distillOne(ctx context.Context, bin, text string) (distilled, error) {
 var refusalRe = regexp.MustCompile(`the limit is|splits into|too many facts|spend cap|invalid`)
 var capSpentRe = regexp.MustCompile(`([0-9.]+) USD spent`)
 
+var rateLimitRe = regexp.MustCompile(`(?i)rate.?limit|usage limit|\b429\b|overloaded|too many requests|limit reached`)
+
+func isRateLimit(err error) bool { return rateLimitRe.MatchString(err.Error()) }
+
 func isRefusal(err error) bool { return refusalRe.MatchString(err.Error()) }
 
 func failedCharge(err error) float64 {
@@ -263,11 +267,26 @@ func distillUnit(ctx context.Context, bin string, u Unit, commit string, led *le
 	rec := Record{Slug: u.Slug, ID: u.ID, Title: u.Title, Status: u.Status, InputSha256: u.Sha, InChars: len([]rune(u.Text)), SourceCommit: commit}
 	var total time.Duration
 	var lastErr error
+	backoff := time.Minute
 	for try := 1; try <= 2; try++ {
 		start := time.Now()
 		d, err := distillOne(ctx, bin, u.Text)
 		wall := time.Since(start)
 		total += wall
+		if err != nil && isRateLimit(err) && ctx.Err() == nil {
+			// rate limit is not a unit failure: wait, retry same try, charge nothing
+			led.mu.Lock()
+			_ = appendLine(led.path, spendLine{Slug: u.Slug, Try: try, WallMs: wall.Milliseconds()})
+			led.mu.Unlock()
+			fmt.Fprintf(os.Stderr, "  %s rate limited, waiting %s\n", u.Slug, backoff)
+			select {
+			case <-time.After(backoff):
+			case <-ctx.Done():
+			}
+			backoff = min(backoff*2, 15*time.Minute)
+			try--
+			continue
+		}
 		s := spendLine{Slug: u.Slug, Try: try, OK: err == nil, WallMs: wall.Milliseconds()}
 		if err == nil {
 			s.CostUSD, s.Charged = d.CostUSD, d.CostUSD
