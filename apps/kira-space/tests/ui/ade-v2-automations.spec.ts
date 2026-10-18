@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import { scriptRunSchema } from '@shared/domain/scriptRuns';
 import { customScriptSchema } from '@shared/domain/scripts';
 import { expect, test } from './fixtures';
-import { adeBoard, adeFixture, openPlan } from './support/adeV2';
+import { adeBoard, adeFixture, openPlan, PLAIN, SCRIPTS, SMART } from './support/adeV2';
 import { contract } from './support/contract';
 import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
@@ -13,36 +13,6 @@ import type { ControlSnapshot } from './support/types';
 
 const t = (id: string) => `[data-testid="${id}"]`;
 const card = (id: string) => `[data-testid="ade-card"][data-task-id="${id}"]`;
-
-function script(id: string, name: string, kind: 'script' | 'smart', command: string) {
-  return {
-    id,
-    kind,
-    name,
-    command,
-    params: [],
-    smart:
-      kind === 'smart'
-        ? { model: 'sonnet', maxBudgetUsd: 1, timeout: '15m', tools: [], bashPatterns: [], mcp: [] }
-        : null,
-    workingDir: '',
-    dirMode: 'kira',
-    useAdeDir: true,
-    color: 'none',
-    collectionId: null,
-    sortOrder: 0,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-  };
-}
-
-const SMART = script('smart-1', 'Review diff', 'smart', 'Review {branch} of {task}.');
-const PLAIN = script('plain-1', 'Lint', 'script', 'bun run lint');
-
-const SCRIPTS: ControlSnapshot = {
-  channel: IPC.customScriptsList,
-  response: { collections: [], scripts: [PLAIN, SMART] },
-};
 
 const BRANCHES = [
   { id: 'd_alerts_api', label: 'acme-platform-core-api-service', disabled: false, why: '' },
