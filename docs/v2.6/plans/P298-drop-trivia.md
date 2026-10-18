@@ -205,4 +205,63 @@ pass or fail per test. Spend: pilot, eval, rows, total against 6.00. Prompt size
 
 ## Result
 
-Pending.
+Status: not Done. Pass line "trivia in `after` at most 1" fails after the one reword. SPEC row stays Todo. Groups 8 (docs) skipped: they describe a shipped feature.
+
+Commits: `14c4a7e2` holdout baseline, `77a52c86` feat (first wording), `1b9cf695` real claude test, pilot run 1, `2714f51d` reword, pilot run 2, `be0e8d6c` eval rounds. Wording in tree is the reworded fragment.
+
+Deviation: eval rounds ran once, on the reworded prompts only. Reason: first pilot already failed; rerunning eval for both wordings would pass the 6.00 USD cap. `llmpromptsflow` `TestList` count was stale (113 real, test said 115, pre-existing); set to 114.
+
+### Pilot (`P298-pilot/lines.tsv`, `runs.jsonl`). Runs: `after`/`after2` first wording, `rw-after`/`rw-after2` reworded.
+
+Trivia lines over 10 units: before 11, after 7, rw-after 4. Over the 3 rerun units: after2 7, rw-after2 6.
+
+| unit | trivia before / after / after2 / rw-after / rw-after2 | marker+guard before | lines before / after / rw-after | USD after / rw-after |
+|---|---|---|---|---|
+| v1-p16 | 0 / 0 / - / 0 / - | 1 | 5 / 5 / 7 | 0.021 / 0.037 |
+| v1.1-p16 | 0 / 0 / - / 0 / - | 0 | 3 / 4 / 4 | 0.020 / 0.029 |
+| v1.2-p15 | 0 / 0 / - / 0 / - | 2 | 12 / 12 / 13 | 0.062 / 0.066 |
+| v1.3-g5 | 0 / 0 / - / 0 / - | 0 | 1 / 1 / 1 | 0.012 / 0.012 |
+| v1.7-m1 | 0 / 0 / - / 0 / - | 0 | 11 / 9 / 11 | 0.052 / 0.058 |
+| v1.8-p90 | 1 / 1 / 2 / 1 / 1 | 1 | 13 / 12 / 14 | 0.057 / 0.071 |
+| v1.9-p98 | 1 / 1 / 2 / 0 / 1 | 3 | 17 / 18 / 16 | 0.118 / 0.080 |
+| v2.0-p131-part-2 | 8 / 3 / 3 / 3 / 4 | 3 | 32 / 28 / 27 | 0.188 / 0.207 |
+| v2.0-p181 | 0 / 0 / - / 0 / - | 1 | 6 / 7 / 8 | 0.053 / 0.045 |
+| v2.2-p212-part-1 | 1 / 2 / - / 0 / - | 0 | 10 / 10 / 8 | 0.055 / 0.044 |
+
+Markers and guards (11 before rows): lost in `after` 0 (one partial: P181 line 5 lost its ARCHITECTURE.md pointer, kept the plan pointer). Lost in `rw-after` 2: P131 Part 2 pathspec guard, and the P98 "instead of" reason (partial at line 3); both back in `rw-after2`. Variance by the plan's rule, but the strict pass line (0 lost in `after`) fails for the reword.
+
+Trivia still left, reworded run: P90 "container has no display" (1); P131 Part 2 `fakeGraphHost.ts` token, `capabilities.write` and `graphStreamFixture.ts` fixture gaps (3). The model keeps harness and fixture facts as test knowledge even with "what a fixture, mock or harness does not cover" in Drop; the planner classes them trivia, unsure counts trivia. The reword removed the push, flake, live-check, baseline, real-phone and install lines.
+
+### Eval (ledger `spend-p298.jsonl`, reworded prompts)
+
+| round | R_ess | R_all | P | unsupported | C_fact | C_store |
+|---|---|---|---|---|---|---|
+| P289 mean (00a, 00b) | 0.871 | 0.712 | 0.635 | 0.006 | 0.443 | 0.658 / 0.702 |
+| p297-01 | 0.899 | 0.721 | 0.521 | 0.014 | 0.444 | 0.654 |
+| p298-01 | 0.903 | 0.769 | 0.562 | 0.000 | 0.446 | 0.651 |
+
+Bands: R_ess pass (0.903 >= 0.879), R_all pass (0.769 >= 0.701), unsupported pass, P pass (0.562 >= 0.456). P vs p297: up 0.041. P vs P289 mean: down 0.073; under the P289 floor 0.570 by 0.008. `plan-p257` g53 (contract fixtures regenerated) not covered in both p297-01 and p298-01 (extracted, lost at finalize): not a new loss. Stage misses p298-01: MissEssExtract 3, MissEssFinalize 4 (p297-01: 4, 2). No confirmation round.
+
+Holdout `doc-devenv-claude`: 00h R_ess 0.958 (P 0.769, 26 stored), 01h R_ess 0.958 (P 0.778, 27 stored). Guard holds, no environment fact lost.
+
+### Real `claude` rows
+
+Prompt-registry row with `TestMemoryDistillTrivia` (`-count=1`): all pass (gate, MCP, import, ingest, distill, bridge, trivia, ADE, smart scripts, sandbox). `test:claude:studio`: pass. Meter 0.0775 USD (`claude -p` only).
+
+### Prompt sizes (chars, rendered)
+
+| id | before | after |
+|---|---|---|
+| memory.runTrivia | - | 1194 |
+| memory.import.extract.system | 2852 | 4020 |
+| memory.merge.system | 2605 | 3824 |
+| memory.import.finalize.system | 3622 | 4841 |
+| memory.merge.rules | 743 | 766 |
+
+### Spend (cap 6.00 USD)
+
+Eval ledger 2.649 (00h 0.532, 01 1.592, 01h 0.525); pilot 1.937 (first 0.936, reword 1.000); `TestMemoryDistillTrivia` first run 0.036; real rows about 0.15 (meter 0.0775 plus nested calls, estimated). Total about 4.8 USD.
+
+### Open for the orchestrator
+
+Pass line fails on trivia (4 over 10 units after one reword, target at most 1). All 4 are test-harness or sandbox-limit lines. Options, user's call: accept harness/fixture facts as keepable and re-class them; a stronger Drop wording (risks the pathspec guard, lost once already); a post-filter (out of scope here).
