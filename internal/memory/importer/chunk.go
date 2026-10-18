@@ -8,6 +8,8 @@ import (
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/extension"
+	extast "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/text"
 )
 
@@ -44,13 +46,21 @@ type heading struct {
 	text  string
 }
 
+// table is a GFM table: header is its header and delimiter rows, repeated on a piece that starts
+// inside the body (body is the offset just past the delimiter row, end the offset past the last row).
+type table struct {
+	header    string
+	body, end int
+}
+
 // ChunkMarkdown splits Markdown at paragraph and heading boundaries without cutting fenced or
 // indented code or HTML blocks. title is the first level-1 heading, empty when there is none.
 func ChunkMarkdown(src string, b Budget) (chunks []Chunk, title string) {
 	lines := newLineIndex(src)
-	doc := goldmark.New().Parser().Parse(text.NewReader([]byte(src)))
+	doc := goldmark.New(goldmark.WithExtensions(extension.Table)).Parser().Parse(text.NewReader([]byte(src)))
 	headings := map[int]heading{} // byte offset of the heading's line start
 	var forbidden []span
+	var tables []table
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
@@ -59,6 +69,10 @@ func ChunkMarkdown(src string, b Budget) (chunks []Chunk, title string) {
 		case *ast.Heading:
 			if v.Parent() == doc && v.Lines().Len() > 0 {
 				headings[lines.lineStart(v.Lines().At(0).Start)] = heading{level: v.Level, text: headingText(v, src)}
+			}
+		case *extast.Table:
+			if t, ok := tableOf(v, lines); ok {
+				tables = append(tables, t)
 			}
 		case *ast.FencedCodeBlock:
 			if v.Lines().Len() > 0 {
@@ -88,12 +102,12 @@ func ChunkMarkdown(src string, b Budget) (chunks []Chunk, title string) {
 			break
 		}
 	}
-	return pack(buildUnits(src, lines, headings, forbidden, b), b), title
+	return pack(buildUnits(src, lines, headings, forbidden, tables, b), b), title
 }
 
 // ChunkText splits plain text at blank lines.
 func ChunkText(src string, b Budget) []Chunk {
-	return pack(buildUnits(src, newLineIndex(src), nil, nil, b), b)
+	return pack(buildUnits(src, newLineIndex(src), nil, nil, nil, b), b)
 }
 
 func sortedKeys(m map[int]heading) []int {
@@ -114,6 +128,30 @@ func headingText(h *ast.Heading, src string) string {
 		return ast.WalkContinue, nil
 	})
 	return strings.TrimSpace(strings.Join(parts, " "))
+}
+
+// tableOf locates a table by the text of its cells: the header row is the line of the first cell
+// text, the delimiter row the line after it, and the table ends with the line of the last cell text.
+func tableOf(n *extast.Table, lines lineIndex) (table, bool) {
+	first, last := -1, -1
+	_ = ast.Walk(n, func(c ast.Node, entering bool) (ast.WalkStatus, error) {
+		if t, ok := c.(*ast.Text); ok && entering && t.Segment.Stop > t.Segment.Start {
+			if first < 0 || t.Segment.Start < first {
+				first = t.Segment.Start
+			}
+			last = max(last, t.Segment.Stop-1)
+		}
+		return ast.WalkContinue, nil
+	})
+	if first < 0 {
+		return table{}, false
+	}
+	head := lines.lineStart(first)
+	body := lines.lineEnd(lines.lineEnd(first))
+	if body > lines.lineEnd(last) {
+		return table{}, false
+	}
+	return table{header: lines.src[head:body], body: body, end: lines.lineEnd(last)}, true
 }
 
 // lineIndex maps byte offsets to line boundaries.
@@ -188,7 +226,7 @@ func cutPoints(src string, lines lineIndex, headings map[int]heading, forbidden 
 }
 
 // buildUnits cuts src at cutPoints, tracks the heading path, then splits any unit larger than Max.
-func buildUnits(src string, lines lineIndex, headings map[int]heading, forbidden []span, b Budget) []unit {
+func buildUnits(src string, lines lineIndex, headings map[int]heading, forbidden []span, tables []table, b Budget) []unit {
 	if strings.TrimSpace(src) == "" {
 		return nil
 	}
@@ -219,25 +257,42 @@ func buildUnits(src string, lines lineIndex, headings map[int]heading, forbidden
 			names[j] = h.text
 		}
 		u.path = strings.Join(names, " > ")
-		units = append(units, sizeUnits(u, raw, b)...)
+		units = append(units, sizeUnits(u, raw, cuts[i], tables, b)...)
 	}
 	return units
 }
 
-// sizeUnits fills u with raw, or with Target-sized pieces of it when raw exceeds Max. Only the
-// first piece keeps the heading flags.
-func sizeUnits(u unit, raw string, b Budget) []unit {
+// sizeUnits fills u with raw (starting at byte offset at), or with Target-sized pieces of it when
+// raw exceeds Max. Only the first piece keeps the heading flags. A piece that starts in the body of
+// a table gets the table's header and delimiter rows back, and the piece size leaves room for them.
+func sizeUnits(u unit, raw string, at int, tables []table, b Budget) []unit {
 	if tokens := EstimateTokens(raw); tokens <= b.Max {
 		u.text, u.tokens = raw, tokens
 		return []unit{u}
 	}
+	var inside []table
+	room := 0
+	for _, t := range tables {
+		if t.end > at && t.body < at+len(raw) {
+			inside = append(inside, t)
+			room = max(room, utf8.RuneCountInString(t.header))
+		}
+	}
+	limit := b.Target * 3
+	limit -= min(room, limit/2)
 	var out []unit
-	for j, piece := range splitOversize(raw, b.Target*3) {
+	off := at
+	for j, piece := range splitOversize(raw, limit) {
 		p := u
 		if j > 0 {
 			p.level, p.heading = 0, false
 		}
-		p.text, p.tokens = piece, EstimateTokens(piece)
+		p.text = piece
+		if i := slices.IndexFunc(inside, func(t table) bool { return off >= t.body && off < t.end }); i >= 0 {
+			p.text = inside[i].header + piece
+		}
+		p.tokens = EstimateTokens(p.text)
+		off += len(piece)
 		out = append(out, p)
 	}
 	return out

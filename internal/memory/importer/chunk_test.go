@@ -164,3 +164,40 @@ func TestChunking(t *testing.T) {
 		})
 	}
 }
+
+// A table larger than Max is cut at row ends; every piece after the first gets the header and
+// delimiter rows back, and no row is lost or repeated.
+func TestChunkTableRepeatsHeader(t *testing.T) {
+	const head = "| Name | Port | Owner |\n| --- | --- | --- |\n"
+	var rows []string
+	var sb strings.Builder
+	sb.WriteString("# Services\n\n" + head)
+	for i := 0; sb.Len() < 15000; i++ {
+		row := "| svc-" + strings.Repeat("x", 40) + string(rune('a'+i%26)) + strings.Repeat("y", i%7) + " | " + strings.Repeat("9", 4) + " | team-" + strings.Repeat("o", 20) + " |\n"
+		rows = append(rows, row)
+		sb.WriteString(row)
+	}
+	cs, _ := ChunkMarkdown(sb.String(), DefaultBudget)
+	if len(cs) < 2 {
+		t.Fatalf("chunks = %d, want the table cut into at least two", len(cs))
+	}
+	var got []string
+	for i, c := range cs {
+		body := c.Text
+		if i == 0 {
+			body = strings.TrimPrefix(body, "# Services\n\n")
+		}
+		if !strings.HasPrefix(body, strings.TrimSuffix(head, "\n")) {
+			t.Errorf("chunk %d starts %q, want the table header and delimiter rows", i, body[:min(len(body), 60)])
+		}
+		for _, l := range strings.SplitAfter(body, "\n") {
+			if l != "" && !strings.Contains(head, l) {
+				got = append(got, strings.TrimSuffix(l, "\n")+"\n")
+			}
+		}
+	}
+	// The final row of the source carries a newline; the chunk text is trimmed, so compare trimmed.
+	if strings.TrimSpace(strings.Join(got, "")) != strings.TrimSpace(strings.Join(rows, "")) {
+		t.Errorf("table rows lost or repeated across chunks (%d chunks): got %d rows, want %d", len(cs), len(got), len(rows))
+	}
+}
