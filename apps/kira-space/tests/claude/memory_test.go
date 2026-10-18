@@ -229,9 +229,10 @@ func TestMemoryDistill(t *testing.T) {
 func TestMemoryDistillBridge(t *testing.T) {
 	app := newRealApp(t)
 	mark := app.Events.Mark()
+	// Each part holds more than the chunk minimum fill and tail, so each becomes one chunk.
 	filler := strings.Repeat("This paragraph holds no decision, name or number.\n\n", 90)
 	text := "# Ports\n\n## Part one\n\nThe billing-api service listens on port 8080 in production.\n\n" + filler +
-		"## Part two\n\nThe billing-api service listens on port 8080 in production. Never expose it directly to customer apps, because the gateway applies the rate limits.\n"
+		"## Part two\n\nThe billing-api service listens on port 8080 in production. Never expose it directly to customer apps, because the gateway applies the rate limits.\n\n" + filler
 
 	res, err := app.W.MemoryDistill.Distill(ctx, bridge.MemoryDistillArgs{RequestID: "claude-row", Text: text})
 	if err != nil {
