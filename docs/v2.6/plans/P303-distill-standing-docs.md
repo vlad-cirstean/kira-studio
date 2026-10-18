@@ -196,38 +196,21 @@ per-char rate, because ARCHITECTURE is denser (output/input 0.68, P299 0.22 to 0
    `git diff --exit-code` clean. `HUMAN_CODE_REVIEW.md` is untouched.
 6. `docs: repoint ARCHITECTURE references (P303)`: the 2 line refs plus every V5-unresolved ref, per D3.
    Comment-only edits; the hook runs biome, `lint:rules` and the affected typecheck.
-7. `docs(v2.6): P303 result`: fill `## Result` with §6's table. Do not edit `SPEC.md`: P302's row is adjacent,
-   so the orchestrator flips P303's status at landing.
+7. `docs(v2.6): P303 result`: fill `## Result
 
-Hooks pass normally on every commit; never `--no-verify`. No push.
-
-Stream rules:
-- Work only in `/home/user/kira-p303`; never touch `/home/user/kira-studio`.
-- P303 owns: `scripts/docshistory/**`, `docs/ARCHITECTURE.md`, `docs/PACKAGING.md`,
-  `docs/v2.6/plans/P303*`, and the comment lines group 6 touches (none under ADE paths).
-- No overlap with P302's ADE test and component files.
-- Landing: `git rebase v2.6`. If v2.6 changed `ARCHITECTURE.md` or `PACKAGING.md` since `83e59846b`, the
-  render commit conflicts. Resolve it by taking v2.6's version of the source and continuing. Then rerun
-  `doc distill` (only units whose input sha changed run again), `doc verify` and `doc render`, and commit as a
-  follow-up. Changed Known open items text is carried verbatim automatically.
-
-## 6. Final report table (implementer fills, in `## Result`)
+Done. Verify report: `docs/v2.6/plans/P303-verify.md`. Records: `docs/v2.6/plans/P303-runs/`.
 
 | Item | Value |
 |---|---|
-| Commits | hash and subject per group |
-| Units per doc: total / ok / verbatim-kept / redone | ARCHITECTURE, PACKAGING |
-| Spend | ok `costUsd` sum; charged sum; cap; projection 12 (worst 21) |
-| Bytes, lines before / after | ARCHITECTURE 600,492, 6,069; PACKAGING 42,785; HUMAN_CODE_REVIEW 2,184 (unchanged) |
-| V1 structure | headings n/n per doc; verbatim segments n/n identical; Known open items 70/70 identical |
-| V2 loss | hard lost/total and % per doc; units flagged; `E_*` kept n/35; PACKAGING commands kept n/n |
-| V3 flagged outcome | per flagged slug: accepted (reason), redone, kept |
-| V4 hand-read | units read; decisions lost; negation flips; invented facts |
-| Refs | 64 lines: resolved as-is n; repointed to heading n; `git show` pointers n; listed for orchestrator (ADE) n |
-| Render | idempotent (second render diff clean) |
-| Checks | `go test ./scripts/docshistory`, `go vet ./scripts/...`, `bun run lint:go`, hooks per commit |
-| Deviations | anything not as planned, with reason |
-
-## Result
-
-Not started.
+| Commits | `f5df2c0d8` feat(docshistory): doc subcommand for standing docs; `46da2ac4f`, `eb503b25e`, `8a1d05ed7` ARCHITECTURE distill runs (3 steps); `e2352a566` PACKAGING distill runs; `c03e80972` verify report; `d853e7eb8` distill ARCHITECTURE.md; `13af63618` repoint ARCHITECTURE references; result commit after this table |
+| Units per doc: total / ok / verbatim-kept / redone | ARCHITECTURE 91 / 89 / 2 / 2. PACKAGING 7 / 0 / 7 / 2 |
+| Spend | 10.6789 USD charged on the shared ledger = sum of every call's `costUsd` (102 calls, 0 failures, 0 rate limits). Final ok records: ARCHITECTURE 9.5545. Cap 22; projection 12 (worst 21) |
+| Bytes, lines before / after | ARCHITECTURE 600,492 / 6,069 to 459,256 / 3,127 (-23.5% bytes). PACKAGING 42,785 / 544 unchanged. HUMAN_CODE_REVIEW 2,184 / 44 unchanged (`git diff --exit-code 83e59846b` empty) |
+| V1 structure | Headings 66/66 and 10/10. Verbatim segments 94/94 (ARCHITECTURE), 24/24 (PACKAGING). Known open items 70/70 byte-identical (29,202 bytes). PACKAGING sections 1, 3, 4, 6 identical |
+| V2 loss | ARCHITECTURE distilled units: hard lost 1,798 of 6,407 (28.1%): numbers 457/1,531, identifiers 540/2,881, paths 635/1,726, quoted 166/269. Whole doc 24.4% (1,798/7,377). Doc gate 45%: held. Flagged 9 on pass 1, 7 after keeps. `E_*` kept 35/35. PACKAGING: command gate failed in sections 2 and 7, both reverted to verbatim |
+| V3 flagged outcome | process-model/01 redone, still missing `E_ENGINE_DOWN`: kept. renderer-security-surface/01 redone, still lost pending SPI grep: kept. invariants/01, sslmode/01, storage/02, ui-architecture/02, ui-architecture/10, git-module/01, testing/02: accepted, trivia only (reasons in verify report). PACKAGING sections 5 and 8 redone, still lost open-state text: kept |
+| V4 hand-read | 12 ARCHITECTURE units plus all 7 PACKAGING units read. Decisions lost 0. Negation flips 0. Invented facts 0. One ambiguous attribution (git-module/01, "before P116 Cmd+W closed the window") |
+| Refs | 60 lines in 41 files outside the tool: resolved as-is 50; repointed to heading 10; `git show` pointers 0; ADE listed 0. "WebKit's clipboard gesture heuristics" resolves (verbatim section, line-wrapped) |
+| Render | Idempotent (second render byte-identical). PACKAGING render equals source, no note line |
+| Checks | `go test ./scripts/docshistory`, `go vet ./scripts/...`, `bun run lint:go` (0 issues), hooks passed on every commit |
+| Deviations | Spend cap stepped 4, 8, 12 for ARCHITECTURE (3 commits, not 1). Loss counts use the unit body only, not the `# file: heading` header, so small differences from the pilot (hcr 5/26 vs 7/28). Added `doc show`. `render` writes the note line only when a unit is distilled. PACKAGING ends fully verbatim by the plan's own gates; ARCHITECTURE shrank 23.5%, not the projected 29%, because 2 large units were kept. Untracked placeholders `frontend/dist{,-mobile}/index.html` created for build only (gitignored) |
