@@ -337,3 +337,12 @@
 {"slug":"v1.5-c10","try":2,"ok":true,"costUsd":0.050011299999999995,"charged":0.050011299999999995,"wallMs":21844}
 {"slug":"v1.5-c13","try":1,"ok":true,"costUsd":0.02745,"charged":0.02745,"wallMs":15691}
 {"slug":"v1.5-notes","try":1,"ok":true,"costUsd":0.0552029,"charged":0.0552029,"wallMs":22930}
+{"slug":"v1.4-p3","try":1,"ok":true,"costUsd":0.0390693,"charged":0.0390693,"wallMs":16459}
+{"slug":"v1.4-p1","try":1,"ok":false,"costUsd":0,"charged":0.25,"wallMs":20578}
+{"slug":"v1.4-p2","try":1,"ok":true,"costUsd":0.0500313,"charged":0.0500313,"wallMs":22114}
+{"slug":"v1.4-p4","try":1,"ok":true,"costUsd":0.0641789,"charged":0.0641789,"wallMs":26624}
+{"slug":"v1.4-p5","try":1,"ok":true,"costUsd":0.0570857,"charged":0.0570857,"wallMs":24070}
+{"slug":"v1.4-p6","try":1,"ok":true,"costUsd":0.06310879999999999,"charged":0.06310879999999999,"wallMs":25923}
+{"slug":"v1.4-p1","try":2,"ok":true,"costUsd":0.054976,"charged":0.054976,"wallMs":22362}
+{"slug":"v1.4-p7","try":1,"ok":true,"costUsd":0.076703,"charged":0.076703,"wallMs":28639}
+{"slug":"v1.4-notes","try":1,"ok":true,"costUsd":0.019585699999999998,"charged":0.019585699999999998,"wallMs":10088}
