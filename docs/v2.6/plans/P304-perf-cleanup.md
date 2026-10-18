@@ -49,4 +49,14 @@ One-off grep: every `PERF.md §n` resolves to a heading. budgets.spec bounds vs 
 
 ## Result
 
-(filled at end)
+Done. 1826 lines / 143,668 B -> 1085 / 85,924 B (-41% lines, -40% bytes).
+Verbatim, byte-identical to base (diff checked): header, §1, §2.1a, §2.1c, §2.13, §3, §5.
+Trimmed (lines): 2.1 272->119, 2.1b 39->14, 2.2 109->40, 2.3 83->19, 2.4 81->22, 2.5 49->17 (+L2 note 9->7),
+2.6 61->26, 2.7 122->39, 2.8 46->24, 2.9 112->18, 2.10-2.12 78->23, 2.14 38->7, §4 33->16.
+Several targets overshot the plan's trim (2.1 119 vs 60): kept tables the specs cite.
+Headings unchanged. Repointed: `measure.ts` stale `PERF.md:98-102` -> `§2.1 methodology note` (section kept, no `git show` needed).
+Resolve check: every cited id exists (§1, 2.1, 2.1a, 2.1c, 2.2, 2.3, 2.5, 2.6, 2.7, 2.8, 2.13, 3, 5).
+Open: §1 says 12 ms for the `tests/ui/` scroll tier, `budgets.spec.ts` asserts p50 <= 16 / max <= 80
+(P161, recorded in §2.1). §1 left verbatim per the phase rule; fix in a follow-up.
+Worktree hook needed symlinked `node_modules`, `site/node_modules`, `packages/*/node_modules`,
+`frontend/bindings` from the main checkout (git-ignored).
