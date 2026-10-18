@@ -1,4 +1,4 @@
--- P8 D3: one row per response actually received (docs/v1.2/SPEC.md's P8 row). The request half is
+-- P8 D3: one row per response actually received (docs/HISTORY.md (v1.2)'s P8 row). The request half is
 -- stored in its STAGE-1 form -- {{$dynamic}} and non-secret {{name}} substituted, a secret still
 -- spelled {{name}} -- which is the same line op_log.command already draws (bridge/http.go, P5
 -- D6/F3): a secret's plaintext lives in http_variables.secret_value and nowhere else.

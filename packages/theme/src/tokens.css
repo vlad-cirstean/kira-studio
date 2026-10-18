@@ -116,7 +116,7 @@
      value, an identifier, a query, a duration — anything that came out of a database) takes the
      font-data role; anything the app itself wrote takes the font-ui role.
      --kira-font-data is user-customizable (it is --kira-font-family); --kira-font-ui is FIXED and
-     has no Settings control by design — see docs/v1.2/plans/P26-interface-font-split.md D3. */
+     has no Settings control by design — see docs/HISTORY.md (v1.2 P26). */
   --kira-font-data: var(--kira-font-family);
   --kira-font-ui:
     -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", system-ui, "Ubuntu", "Droid Sans",

@@ -1,5 +1,5 @@
 // Package gitsearch is G23's port of upstream's server-side half of §7.8 search
-// (docs/v1.3/plans/G23-search.md): compiling a wire SearchQueryParams into a matcher and running
+// (docs/HISTORY.md (v1.3 G23)): compiling a wire SearchQueryParams into a matcher and running
 // it over a streaming, cancellable, time-boxed `git log` tail scan.
 //
 // # What runs here vs. packages/git-core/src/search/
@@ -31,7 +31,7 @@
 //  3. What RE2 genuinely cannot express — lookahead, lookbehind, a numbered or named
 //     backreference — is REJECTED with ErrUnsupportedPattern, never silently dropped: the server
 //     answers `{kind: "unsupportedPattern"}` as data (D6), so a hit's presence never depends on
-//     which page happened to be loaded (docs/v1.3/SPEC.md:446-450).
+//     which page happened to be loaded (docs/HISTORY.md (v1.3)).
 //
 // One knowingly-accepted divergence survives in regex mode: case folding is RE2's own `(?i)`, not
 // literal.go's ECMA-262 Canonicalize (foldRune) — so the Kelvin-sign class of difference (`/k/i`

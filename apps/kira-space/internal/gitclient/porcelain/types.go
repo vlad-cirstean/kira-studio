@@ -1,5 +1,5 @@
-// Package porcelain is the log walk's own porcelain layer (docs/v1.3/plans/G3-history-pipeline-
-// and-wire-format.md, D8): the -z/%x1f record splitter, the log record format and its argv
+// Package porcelain is the log walk's own porcelain layer (docs/HISTORY.md (v1.3 G3),
+// D8): the -z/%x1f record splitter, the log record format and its argv
 // builders, decoration classification, and the ref snapshot the paged walk's --skip resume guards
 // itself with. Nothing else — status/diff/stash/refs.list's own parser each land with the RPC
 // that reads them (G4/G5/G8).

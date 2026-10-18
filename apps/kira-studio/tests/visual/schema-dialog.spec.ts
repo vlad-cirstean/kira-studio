@@ -7,7 +7,7 @@ import { orderItemsFixture, postgresConnectionSummary } from '../ui/support/post
 import { connectionRow, openRowMenu } from '../ui/support/tree';
 import { settleFonts } from './support/settle';
 
-// v1.4 P6 (docs/v1.4/plans/P6-visual-regression.md §3.5): the Schema (DDL) editor at rest — P3/P4
+// v1.4 P6 (docs/HISTORY.md (v1.4 P6)): the Schema (DDL) editor at rest — P3/P4
 // this chapter both touched this surface's own formatting/completion; a pixel baseline is cheap
 // insurance against a future edit silently regressing its layout. Mirrors sql-schema.spec.ts's own
 // connectAndExpandPostgres + "menu-item-schema" opening sequence.

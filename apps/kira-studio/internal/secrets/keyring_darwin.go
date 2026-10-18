@@ -10,7 +10,7 @@ import (
 )
 
 // This is the only file in the repo importing github.com/keybase/go-keychain (P52 §6.3's chosen
-// library, confirmed against its real source for P55 — see docs/v1/plans/
+// library, confirmed against its real source for P55 — see docs/HISTORY.md (v1)
 // P55-go-application-services.md §1.1 for the six gotchas handled below).
 const (
 	// "Safe Storage" is Chromium/Electron's own naming convention for this kind of Keychain item

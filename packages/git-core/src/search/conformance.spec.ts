@@ -9,7 +9,7 @@ import { compileQuery } from './query.ts';
  * `docs/plans/G23-search.md` D9: the shared conformance corpus, read from BOTH languages —
  * `apps/kira-space/internal/gitsearch/conformance_test.go` reads the exact same JSON and runs
  * `Compile`/`MatchFields`. A row failing here and passing there (or vice versa) is exactly the
- * silent divergence SPEC's own open item (`docs/v1.3/SPEC.md:446-450`) forbids.
+ * silent divergence SPEC's own open item (`docs/HISTORY.md (v1.3)`) forbids.
  */
 
 interface ConformanceQuery {

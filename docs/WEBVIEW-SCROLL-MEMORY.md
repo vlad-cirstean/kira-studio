@@ -292,7 +292,7 @@ hard budget and evicts aggressively; WebKit's pools retired tiles and frees them
 is the remaining explanation.
 
 > **Update (P22, 2026-09-02).** This section's caveat and its three-item avenue list were written
-> before either avenue had actually been tried. `docs/v1.1/plans/P22-webview-scroll-performance.md`
+> before either avenue had actually been tried. `docs/HISTORY.md (v1.1 P22)`
 > picked both up; its own §3 (F8–F14) and §5 (D5, D6) are now the fuller record, cited below rather
 > than reproduced whole.
 
@@ -335,7 +335,7 @@ hardware in the P22 implementing sandbox either. §9 carries this forward as sti
    above) — nobody should cite it as the fix for the reported symptom. `MinWidth`/`MinHeight` were
    left unchanged (D6(b)): the 1.21× floor ratio isn't worth the usability cost of a smaller floor.
 
-Full findings and citations: `docs/v1.1/plans/P22-webview-scroll-performance.md` §3 (F8–F14) and §5
+Full findings and citations: `docs/HISTORY.md (v1.1 P22)` §3 (F8–F14) and §5
 (D5–D8).
 
 ### 7.1 `internal/metrics` — no change needed
@@ -381,7 +381,7 @@ than trying to synthesize the gesture from outside the process. That route wasn'
 document's own harness (a separate process posting synthetic `CGEvent`s), which is exactly why it
 never worked; a probe living inside the WKWebView itself doesn't need TCC for anything. See
 `docs/PERF.md` §2.1a and
-`docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md` §7.3 for the protocol. This does
+`docs/HISTORY.md (v1.1 P22)` §7.3 for the protocol. This does
 not reopen this document's own memory conclusions — a rendering-latency measurement is a different
 question than `ri_phys_footprint`, asked here only because the same real-fling gap applied to both.
 

@@ -122,7 +122,7 @@ func DefaultMobileSettings() MobileSettings {
 	return MobileSettings{Enabled: false, Port: 7790, AgentInput: false}
 }
 
-// DefaultGitSettings mirrors docs/v1.3/plans/G7 D16's own default: the same three-pattern default
+// DefaultGitSettings mirrors docs/HISTORY.md (v1.3 G7) D16's own default: the same three-pattern default
 // upstream's own kiraVersion.protectedBranches carried, before that phase moved it server-side.
 func DefaultGitSettings() GitSettings {
 	return GitSettings{

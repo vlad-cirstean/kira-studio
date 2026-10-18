@@ -1431,7 +1431,7 @@ func TestPostgres_MutateBinaryColumnRoundTrips(t *testing.T) {
 	}
 }
 
-// P15 C5: the fake-data generator's own batch scale (docs/v1.1/plans/P15-fake-data-generator.md) —
+// P15 C5: the fake-data generator's own batch scale (docs/HISTORY.md (v1.1 P15)) —
 // this belongs under CLAUDE.md's conformance-suite exemption, not the general unit-test bar,
 // because nothing else exercises a multi-row insert plan at anything beyond
 // TestPostgres_MutateRowCountConflictRollsBack's two-op scale.

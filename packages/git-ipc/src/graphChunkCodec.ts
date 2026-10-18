@@ -1,5 +1,5 @@
 /**
- * G3 plan (docs/v1.3/plans/G3-history-pipeline-and-wire-format.md) D1/D2 — `toWire`/`fromWire` for
+ * G3 plan (docs/HISTORY.md (v1.3 G3)) D1/D2 — `toWire`/`fromWire` for
  * `graph.stream`'s `PackedCommitChunk`, retargeted at the `"KIG1"` `gitwire` schema's `Frame`/
  * `Payload` root (D1's wrapper, matching `packages/shared/protocol/wire.fbs`'s own shape) — the
  * chapter's own schema, not upstream's migrated `"KVGC"` `graphChunk.fbs`, which is deleted with

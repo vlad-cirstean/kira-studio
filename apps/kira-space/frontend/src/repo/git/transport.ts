@@ -9,7 +9,7 @@
  * No length prefix, no pairing, no trust store: `streamChannel.ts` (S2) is message-framed already,
  * and `internal/bridge/gitstream.go`'s own doc comment states why there is no handshake — the peer
  * is this process's own webview, not an external client a trust store exists to gate
- * (`docs/v1.5/plans/C10-git-graph-native.md` §3.2).
+ * (`docs/HISTORY.md (v1.5 C10)` §3.2).
  *
  * C11 §8.1 (S4) adds a small local event bus alongside the remote one: `review.target` and
  * `ui.action` are composed host-side (`review.open`'s handler, and the repaint choreography below)

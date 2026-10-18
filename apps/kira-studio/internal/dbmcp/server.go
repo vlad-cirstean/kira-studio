@@ -1,4 +1,4 @@
-// Package dbmcp is the local DB MCP server (docs/v1.7/plans/M1-db-mcp-server-core.md): a protocol
+// Package dbmcp is the local DB MCP server (docs/HISTORY.md (v1.7 M1)): a protocol
 // front end that lists this app's own connections, browses their metadata and runs a query —
 // through the existing adapter layer (internal/adapterhost, internal/tree, internal/connections),
 // never a parallel path. Transport is go-sdk/mcp over a loopback-only Streamable HTTP listener

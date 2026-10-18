@@ -11,7 +11,7 @@ import (
 )
 
 // conformanceRow mirrors conformance.spec.ts's own ConformanceRow shape exactly — one JSON file,
-// two readers (docs/v1.3/plans/G23-search.md D9).
+// two readers (docs/HISTORY.md (v1.3 G23)).
 type conformanceRow struct {
 	Name           string          `json:"name"`
 	Query          conformanceQry  `json:"query"`

@@ -177,7 +177,7 @@ declare global {
      * P22 iter2 D2: a real-fling scroll trace a human drives from DevTools on real hardware (a dev
      * build — View → Open DevTools, internal/shell/menutemplate.go) — NOT a Playwright hook, and
      * not gated in CI. See views/shared/slick/scrollTrace.ts's own header comment and
-     * docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md §7.3 for the protocol.
+     * docs/HISTORY.md (v1.1 P22) for the protocol.
      */
     __kiraScrollTrace?: { start: () => void; stop: () => ScrollTraceResult | null };
     /**

@@ -48,7 +48,7 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // 'ui.action' at all.
 // G23 D6/D13: 25 -> 26, for one new 'SearchRunResult' member, 'unsupportedPattern' -- a
 // `regex`-mode pattern using lookahead/lookbehind/a backreference, syntax the Go tail scan's RE2
-// engine cannot express at all (docs/v1.3/SPEC.md:446-450's own "a hit's presence must not depend
+// engine cannot express at all (docs/HISTORY.md (v1.3)'s own "a hit's presence must not depend
 // on which page happens to be loaded"). Unlike every earlier bump in this history, the Go server
 // now actually serves 'search.run' for the first time -- this is the phase that ports upstream's
 // P11 tail scan into internal/gitsearch, not merely a contract-shape change for a method the

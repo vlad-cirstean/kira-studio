@@ -1,6 +1,6 @@
 #!/bin/sh
 # test-matrix.sh — the on-demand complete auth/config permutation matrix runner (P25 §2.10,
-# docs/v1.1/plans/P25-connection-auth-test-matrix.md). Not run as part of `bun run test:go` or
+# git show bd0c224688d9:docs/v1.1/plans/P25-connection-auth-test-matrix.md). Not run as part of `bun run test:go` or
 # ci.yml — the same "not run as part of the regular CI/test run" posture db-compat.sh already
 # established for exactly this kind of real-container matrix (P16 D6).
 #

@@ -1,4 +1,4 @@
-// Package mask implements M5's PII masking scheme (docs/v1.7/plans/M5-anonymization-masking.md
+// Package mask implements M5's PII masking scheme (docs/HISTORY.md (v1.7 M5)
 // §2-§4): a partial redaction of one cell's text, plus an optional keyed correlation tag riding
 // alongside it. A leaf package — stdlib and github.com/rivo/uniseg only, no dependency on dbmcp,
 // page or storage/model — so packages/shared/domain/mask.ts's TypeScript port can mirror it

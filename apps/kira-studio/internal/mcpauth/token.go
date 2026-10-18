@@ -1,5 +1,5 @@
 // Package mcpauth mints, persists and verifies the DB MCP server's static bearer token
-// (docs/v1.7/plans/M1-db-mcp-server-core.md §2). 32 crypto/rand bytes, base64url on the wire,
+// (docs/HISTORY.md (v1.7 M1)). 32 crypto/rand bytes, base64url on the wire,
 // sha256(salt‖token) at rest, one token per server instance, persisted as one small JSON file
 // rather than a database table: the caller supplies the file's own identifying name (the DB
 // server's fixed name), so this package stays storage-shape-agnostic and importable from both

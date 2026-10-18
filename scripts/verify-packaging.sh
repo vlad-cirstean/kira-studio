@@ -1,6 +1,6 @@
 #!/bin/sh
 # verify-packaging.sh — the executable form of P15's "auto-update configuration verified"
-# deliverable (docs/v1/plans/P15-gh-tooling.md §2, §4). Runs on Linux and macOS, locally and in CI.
+# deliverable (git show bd0c224688d9:docs/v1/plans/P15-gh-tooling.md §2, §4). Runs on Linux and macOS, locally and in CI.
 #
 # Rewritten for the Wails/Go shell (P57 M7/§4.13): electron-builder.yml and every check that read
 # it are gone — there is no updater feed format, no Electron fuses, no asar to unpack a native

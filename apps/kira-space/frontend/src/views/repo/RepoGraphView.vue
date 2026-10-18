@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // C5 §6.2: the pinned first tab (a placeholder at C5). C10 §8 replaces this file's content
-// wholesale with the real @kira/git-ui graph mount, read-only (docs/v1.5/plans/
+// wholesale with the real @kira/git-ui graph mount, read-only (docs/HISTORY.md (v1.5)
 // C10-git-graph-native.md) — modelled on RepoDiffView.vue's own mount lifecycle: mount() on
 // onMounted, unmount() on onUnmounted (a mere tab switch away, not a workspace close — the
 // transport itself outlives that, cached per repo workspace by gitTransportFor, S17 disposes it;

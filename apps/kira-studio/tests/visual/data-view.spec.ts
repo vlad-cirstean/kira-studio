@@ -11,7 +11,7 @@ import {
 import { connectionRow, expandRow, findRow, openRowMenu } from '../ui/support/tree';
 import { settleFonts } from './support/settle';
 
-// v1.4 P6 (docs/v1.4/plans/P6-visual-regression.md §3.2): the data grid at rest on a small,
+// v1.4 P6 (docs/HISTORY.md (v1.4 P6)): the data grid at rest on a small,
 // representative table — mixed column types, no scroll/edit in progress. Same boot shape
 // font-roles.spec.ts's own connectAndOpenGrid already established (a handful of rows, not the
 // heavier 1M-row postgres fixture data-view.spec.ts's own interaction tests use — this spec only

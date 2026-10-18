@@ -17,7 +17,7 @@
 // changed is how the already-extracted, already-trimmed text between the delimiters is read:
 // `parseReference` below splits it into a bare name and an optional transform pipeline, and the
 // three value-producing branches in `resolve` apply the pipeline to the value they would otherwise
-// have emitted unchanged. See docs/v1.2/plans/P17-variable-environment-overhaul.md §0.3/§5.
+// have emitted unchanged. See docs/HISTORY.md (v1.2 P17)/§5.
 import { applyPipeline, isTransformName, type TransformName } from './transforms';
 
 export type ReferenceKind = 'resolved' | 'deferred' | 'dynamic' | 'unknown';

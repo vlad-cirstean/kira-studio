@@ -1,7 +1,7 @@
 import { expect, test } from './fixtures';
 
 // P130: guards the shared focus ring (packages/theme/src/base.css) against animating on focus —
-// see docs/v2.0/plans/P130-focus-ring-no-animate.md §4.1. Before the fix, `outline-color` (and, on
+// see docs/HISTORY.md (v2.0 P130) Before the fix, `outline-color` (and, on
 // `transition-all` elements, `outline-width`/`outline-offset`) interpolated from `currentcolor`/
 // `medium`/`0px` over Tailwind's default 150ms transition, so a freshly-focused element showed a
 // white-to-blue (or thick-to-thin) flash instead of the ring's resting state on the first frame.

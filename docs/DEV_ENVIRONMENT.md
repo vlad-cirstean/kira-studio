@@ -230,7 +230,7 @@ historical prose.
   a Linux run exercises the `fsnotify` companion instead. Both satisfy the same seam and both are
   covered by `watcher_test.go`; only the darwin backend's own behaviour needs real hardware.
 - **The scoped Go race run** for a git-chapter phase is the git packages in play plus
-  `internal` itself for the layering test, not the whole tree — `docs/v1.3/SPEC.md`'s own "Full
+  `internal` itself for the layering test, not the whole tree — `git show bd0c224688d9:docs/v1.3/SPEC.md`'s own "Full
   verification scope" note fixes the list and the reason. The unscoped tree stays worth running
   occasionally as a backstop, not per phase.
 - **A fresh worktree fails `bun run typecheck`/the pre-commit hook on any change**, even after
@@ -656,7 +656,7 @@ environment: it corrupts the baseline. Baselines re-recorded in this container (
 
 ## `golangci-lint` / `knip` — code-quality tooling in this environment (P94)
 
-See `docs/v1.8/plans/P94-code-quality-tooling.md` for what these tools check and why
+See `git show bd0c224688d9:docs/v1.8/plans/P94-code-quality-tooling.md` for what these tools check and why
 the pass split. Here: the container quirk that blocked two prior attempts, and the pre-commit/
 pre-push design.
 
@@ -763,7 +763,7 @@ per-message regardless of how the index got built. If a worktree was never provi
 ## CodeGraph duplicate finder — `scripts/codegraph-duplicates.ts`
 
 Runnable form of the ad-hoc sweeps P107/P113/P115 ran against `.codegraph/codegraph.db` (they were
-never committed as a script; method text lives in `docs/v1.9/plans/P107-duplication-findings*.md`
+never committed as a script; method text lives in `git show bd0c224688d9:docs/v1.9/plans/P107-duplication-findings*.md`
 §0 and `P113-duplication-sweep.md` §0). Opens the index read-only via `bun:sqlite`, reads each
 function/method body from disk by `nodes.file_path` + line span, never writes. Needs an index
 (`scripts/codegraph-setup.sh`); with none it prints how to build one and exits 0. In a linked
@@ -863,14 +863,14 @@ flick). Add a view by copying a probe and calling `measureFlick` over `FLICK_LAD
 - Engine is Playwright WebKit. Linux runs the WPE port: software rendering, no GPU process.
 - fps = 1000 / frame ms. Compare views to each other, not to 16 ms.
 - RSS comes from `ps`. On macOS it omits CoreAnimation/IOSurface graphics memory, the dominant
-  scroll cost there. Read real footprint with `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` Appendix A.
+  scroll cost there. Read real footprint with `docs/WEBVIEW-SCROLL-MEMORY.md` Appendix A.
 - Env knobs: `NDOCS` (documents), `NROWS`/`NCOLS` (console grid), `BODYKIND`/`NITEMS` (HTTP
   response), `NTABLES` (tree), `GRAPH_N` (git graph).
 
 ## Grid prototype (P165) — `proto/grid/`
 
 Dev-only Cheetah Grid prototype beside SlickGrid baselines. Not in the shipped bundle; Go embeds only
-`frontend/dist`. Plan and verdict: `docs/v2.0/plans/P165-cheetah-grid-prototype.md`.
+`frontend/dist`. Plan and verdict: `git show bd0c224688d9:docs/v2.0/plans/P165-cheetah-grid-prototype.md`.
 
 - Pages: `cheetah.html`, `slick.html?variant=kira|stock`, `empty.html` (bare scroller control).
   Query: `fixture=features` (NULL, empty, truncated, masked, FK rows), `w`/`h`, `rowHeight`, `zebra=1`,

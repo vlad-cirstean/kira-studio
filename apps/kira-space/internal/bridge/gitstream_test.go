@@ -13,7 +13,7 @@ import (
 
 // spyRequest wraps a requestFn, recording every method it was actually called with — the
 // mechanism that pins "never calls the inner handler" for a refused write, not merely "returns the
-// right error" (docs/v1.5/plans/C10-git-graph-native.md §11's own requirement).
+// right error" (docs/HISTORY.md (v1.5 C10)'s own requirement).
 type spyRequest struct {
 	called []string
 }
@@ -136,7 +136,7 @@ func TestRepoSettingsSetTouchesRestrictedField_CoversEveryPatchField(t *testing.
 	// Mirrors gitstream.go's own repoSettingsSetTouchesRestrictedField doc comment: the two `true`
 	// entries are write-only surface a compromised graph mount could otherwise stage (a prepare
 	// script/base path; gitrpc refuses the script on every connection since P172, this guard is
-	// defence in depth). PullStrategy/CheckoutAutoStash flipped to `false` in P67e (docs/v1.6/plans/
+	// defence in depth). PullStrategy/CheckoutAutoStash flipped to `false` in P67e (docs/HISTORY.md (v1.6)
 	// P67e-git-relax-read-only.md D4) — they configure operations this stream now admits, not
 	// write-only surface. Every `false` entry is a per-repo graph/UI preference.
 	knownFields := map[string]bool{

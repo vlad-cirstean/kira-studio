@@ -9,7 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// MaskRulesService is M5's Privacy-tab/header-menu surface (docs/v1.7/plans/
+// MaskRulesService is M5's Privacy-tab/header-menu surface (docs/HISTORY.md (v1.7)
 // M5-anonymization-masking.md §4.6) — connections.go's own per-method-args-struct shape (:22-31),
 // each argument validated with ipcerr.BadRequest here; the actual domain validation (a valid kind,
 // a non-empty column name, forcing correlate=false for `number`) lives in maskrules.Service.Upsert.

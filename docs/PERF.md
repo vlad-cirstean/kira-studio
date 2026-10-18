@@ -5,7 +5,7 @@ See the [README](../README.md) for what the app is and how to run it.
 This doc is the P12 deliverable named by SPEC.md §2's two hard requirements (§2.1 "Silky UI",
 §2.2 "Small RAM footprint"): where each budget is measured, whether measurement is automated or
 manual, and the numbers from a real run. Re-measure it; don't rewrite it from scratch —
-`docs/v1/plans/P12-hardening.md` is the frozen design record, this file is the living one.
+`docs/HISTORY.md (v1 P12)` is the frozen design record, this file is the living one.
 
 §2.1's numbers were first captured on this repo's Linux/Xvfb dev container (headless,
 software-rendered Chromium), 2026-08-23, and re-measured 2026-08-26 on the macOS/Colima dev machine
@@ -92,14 +92,14 @@ full rather than self-skipping; the row above is a real measurement, not a carry
 **P29 (scroll rendering gap) — resolved, numbers recorded.** `budgets.spec.ts`'s horizontal
 scroll-response measurement and wide-table (`app.scroll_grid`, 60 columns x 5000 rows) vertical
 measurement, the deterministic column/row overscan-coverage invariants, the DOM-cell bound, and the
-sub-row-scroll-mutates-nothing check (docs/v1/plans/P29-scroll-render-gap.md §5) all pass here; the
+sub-row-scroll-mutates-nothing check (docs/HISTORY.md (v1 P29)) all pass here; the
 table above carries the horizontal and wide-table-vertical p50/p95 pairs L-A's row was outstanding
 for. `.grid-row { contain: layout }` (D8) stays in place; P47's own before/after measurement below
 (same instrumentation, same machine) shows no isolable regression from removing it, so no basis to
 revisit D8's call here.
 
 **P47 (`@tanstack/vue-virtual` migration) — before/after, work p50 (D13).** Baseline captured this
-session before the migration (Step 0 of `docs/v1/plans/P47-tanstack-virtual-spike.md`), after
+session before the migration (Step 0 of `docs/HISTORY.md (v1 P47)`), after
 captured post-migration, both via the same `measureScrollResponses` work-delta instrumentation on
 this machine:
 
@@ -316,7 +316,7 @@ notify) as a solved problem with a measured root cause. It wasn't — the premis
 instrument that certified it was unfalsifiable by construction, and the "fix" changed nothing a user
 could see.** Kept below in full, not deleted, because the corrected understanding is only legible
 against what it corrects. See
-`docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md` for the complete evidence (§2)
+`docs/HISTORY.md (v1.1 P22)` for the complete evidence (§2)
 and decisions (§5); this is the short version.
 
 **What pass 1 assumed, and why it's false.** Pass 1's F1 asserted *"a fling can fire many native
@@ -365,13 +365,13 @@ real-hardware question this environment can't answer — see the protocol below.
 different things, and pass 1 additionally paired a refuted mechanism with an instrument that could
 not have disproven it either way. The general shape — an instrument that can't observe the
 phenomenon produces a confident, wrong conclusion — is the same failure
-`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` §2.1 hit and fixed first, for the memory half.
+`docs/WEBVIEW-SCROLL-MEMORY.md` §2.1 hit and fixed first, for the memory half.
 
 **What a real measurement needs, and how to take it.** `window.__kiraScrollTrace`
 (`views/grid/scrollTrace.ts`) is an in-page probe, not a `tests/ui/` instrument: it records, per
 animation frame, the real native `scroll` events observed, a measured px/frame velocity, live
 `uncoveredPx`, and Vue's own update duration — all read from a *real* fling on *real* hardware, which
-this environment has never been able to produce (`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` §9's own
+this environment has never been able to produce (`docs/WEBVIEW-SCROLL-MEMORY.md` §9's own
 `CGEventPost` injector never got a TCC grant, but that gap was for driving momentum from *outside*
 the process; this probe lives inside the page and lets the human supply the momentum instead). It's
 reachable from a dev build's View → Open DevTools (`internal/shell/menutemplate.go`). Protocol:
@@ -389,7 +389,7 @@ reachable from a dev build's View → Open DevTools (`internal/shell/menutemplat
    `uncoveredPx` moves accordingly, that's the constraint; if not, compare `renderMs` instead.
 
 Full detail, including what to do if neither mechanism moves the needle, is
-`docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md` §7.3.
+`docs/HISTORY.md (v1.1 P22)` §7.3.
 
 ### 2.1b P22 D6 — the first-launch window default, and what it is and is not worth
 
@@ -412,11 +412,11 @@ replaces.
 by the Electron-to-Wails cutover) passed no explicit `width`/`height`, only `minWidth: 900, minHeight:
 600` — so Electron's own 800×600 default, clamped up to 900×600 at first launch. Against Wails'
 1280×800: a first-launch-only **1.90×** (540 000 px² vs 1 024 000 px²), and a floor ratio of only
-**1.21×** (900×600 vs 1024×640). `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` §7's old "min 900×600" parenthetical
+**1.21×** (900×600 vs 1024×640). `docs/WEBVIEW-SCROLL-MEMORY.md` §7's old "min 900×600" parenthetical
 undersold the first-launch number and omitted the floor one; both are now recorded there directly.
 
 **F14 — the area premise is a projection, not a measurement, and this pass doesn't change that.**
-`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` never varied window size — every figure in it came from one 1440×960
+`docs/WEBVIEW-SCROLL-MEMORY.md` never varied window size — every figure in it came from one 1440×960
 harness — so "cost scales with viewport area" is a mechanism-level inference from that document's own
 tile-coverage-rect explanation, not something either document has measured. No macOS hardware was
 available to this implementing pass either, so the area ladder that would settle it (that document's
@@ -445,7 +445,7 @@ build where the hooks are actually compiled in** (P29 F1 gates `window.__kira*` 
 `build:dev`/`build:test` — **never** a packaged `.dmg`, where they're gone by design.
 
 **What this section isn't: it doesn't say the fast-scroll lag is fixed.** Pass A
-(`docs/v1.1/plans/P22-slickgrid-migration-plan.md`) built a second, additive grid —
+(`docs/HISTORY.md (v1.1 P22)`) built a second, additive grid —
 `views/grid/SlickGridHost.vue`, wrapping `6pac/SlickGrid`'s core engine — behind
 `window.__kiraGridEngine === 'slick'`, mounted by `views/grid/DataView.vue` instead of the
 incumbent `DataGrid.vue`/`@tanstack/vue-virtual` grid. The incumbent stays the default and every
@@ -530,7 +530,7 @@ never-before-mounted territory has no `rowsCache` overlap either way — doublin
 doubles the size of the batch that was already too large.
 
 Traced against SlickGrid 5.20.0's own source
-(`docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-scroll-gaps.md` §1-§3, cited by line number) to
+(`docs/HISTORY.md (v1.1 P22)` §1-§3, cited by line number) to
 `render()`'s own unconditional cost: every row entering `rowsCache` for the first time pays a
 synchronous decode (`page.ts`/`store.ts`, real and un-batched, but memoised after the first access)
 **and** unconditional per-cell DOM construction (`Utils32.createDomElement`, class-list joins,
@@ -541,7 +541,7 @@ independent contributor: SlickGrid's own `_handleScroll` defers to a 10 ms-windo
 fling's high end reaches routinely — deferring the render rather than speeding it up, on a macrotask
 boundary unrelated to the display's own frame cadence.
 
-**The fix** (landed as four commits, `docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-scroll-gaps.md`
+**The fix** (landed as four commits, `docs/HISTORY.md (v1.1 P22)`
 §5-§6): `KiraSlickGrid.getRenderedRange` now always returns the strictly-visible range in full — nothing
 on screen is ever deferred — and caps the *extra* runway per call at `MAX_NEW_CELLS_PER_RENDER = 600`
 cells (`columns.ts`, provisional like `LEAD_FRAMES`/`MAX_LEAD_PX`, overridable live via
@@ -602,7 +602,7 @@ runs the full A/B above should update this section with the real numbers and ver
 
 **Found chasing the above with a real Safari Web Inspector Timeline recording: `slickTheme.css`'s port
 of `GridRow.vue` had dropped `contain: layout` from `.slick-row`, fragmenting every paint into
-one-per-cell** (`docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-scroll-gaps.md` §10 — mechanism,
+one-per-cell** (`docs/HISTORY.md (v1.1 P22)` §10 — mechanism,
 proof, and fix). SlickGrid's own `slick.grid.css` gives `.slick-cell` a non-`auto` `z-index`, making
 every cell its own stacking context; without `.slick-row` itself being one, each cell's stacking
 context escaped to the far-away scroller ancestor instead of nesting in its row. Proven reversibly, on
@@ -624,7 +624,7 @@ same fling, and the share of frame time unattributable to a WebContent-process t
 **88%**. The one actionable finding in that recording: frames in which the self-scheduled catch-up
 ("chase") render fires average **49.8 ms against 33.3 ms** for frames without one — a mechanism this
 app owns outright, root-caused and fixed in
-`docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-pacing.md`. Read that document for the full
+`docs/HISTORY.md (v1.1 P22)`. Read that document for the full
 evidence (a real WebKit reproduction — two render() passes in 131 of 140 wheel-driven frames — and
 the source citations behind it); this entry is the real-Mac protocol it specifies, folded into this
 section per that plan's own instruction, not a new one.
@@ -720,7 +720,7 @@ different. The perceptual sentence is what answers the report; the numbers keep 
    independent of the app's own instrumentation, worth having because refuting reading (a) is a real
    possibility and the app's own trace isn't a neutral witness to it.
 7. Update this section with the real numbers and verdict, and update
-   `docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-pacing.md` §7/§10 to match. **This entry is
+   `docs/HISTORY.md (v1.1 P22)` §7/§10 to match. **This entry is
    not that update** — it's the protocol, written before anyone has run it on real hardware, exactly
    like `forceSyncScrolling`'s own history two sections above should be a reminder to keep it that
    way until a real trace actually reports back.
@@ -829,7 +829,7 @@ whether the onset artifact is still there.
    iter2-scroll-gaps pass existed to bound**, so a win there's a re-opened trade-off, not a free
    fix.
 6. Fold the result into this section and update
-   `docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-pacing.md` §11. **This entry isn't that
+   `docs/HISTORY.md (v1.1 P22)` §11. **This entry isn't that
    update** — it's the protocol, written before anyone has run it on real hardware.
 
 **The ceiling, restated so nobody re-derives it** (the plan's own §7.4): even the calmest frames in
@@ -1183,7 +1183,7 @@ spent getting there — `encoding/json` calling each page's `MarshalJSON` and `U
 `MarshalJSON`, then re-scanning (`compact`) the bytes each one returned into the outer buffer — and
 what removing those two round trips bought, byte-for-byte identically. Full findings, the off-the-
 shelf alternatives weighed against these numbers, and the recommendation are
-`docs/v1.1/plans/P4-fe-be-data-transfer-protocol.md`'s F10-F21 and §4; this section is that plan's
+`docs/HISTORY.md (v1.1 P4)`'s F10-F21 and §4; this section is that plan's
 §8.4 re-run, not a copy of its own measurements.
 
 **Method.** Four fixtures — the two configurable page sizes, the maximum page size, and a wide
@@ -1246,7 +1246,7 @@ real, current `packages/shared/protocol/frame.ts`'s `decodeFrame`, against the s
 encoded and decoded through the pre-change JSON+base64 pipeline at the tip of C2 (commit
 `f1efaab`, immediately before the format switch). Full findings, the off-the-shelf alternatives
 weighed against these numbers, and the decision are
-`docs/v1.1/plans/P11-flatbuffers-data-plane.md`'s §2/§3/§4; this section is that plan's §8.4
+`docs/HISTORY.md (v1.1 P11)`'s §2/§3/§4; this section is that plan's §8.4
 re-run, not a copy of its own back-of-envelope measurements.
 
 **Method.** Four fixtures — `100 × 12`, `1,000 × 12`, `10,000 × 12`, `10,000 × 40` — built through
@@ -1409,7 +1409,7 @@ cost.
 measure interaction latency and the data-plane wire/decode/encode path; nothing before this section
 measures what the renderer's own JS heap retains once a page has arrived. Full findings (F1-F10),
 the decisions (D1-D11) and the implementation order are
-`docs/v1.1/plans/P5-ram-usage.md` — this section is that plan's own §6.3/§6.4 re-run on the tree
+`docs/HISTORY.md (v1.1 P5)` — this section is that plan's own §6.3/§6.4 re-run on the tree
 that plan's own implementation produced, not a copy of its numbers (every figure below was
 re-measured this session; none is carried over from the plan doc).
 
@@ -1517,7 +1517,7 @@ other result is closed — freeing exactly that page's own share.
 
 ### 2.10 P12 round 1 — bundle size re-measured, P18's own "unchanged in size" claim now stale
 
-P18's own plan doc (`docs/v1.1/plans/P18-sql-language-server-explain.md` §7.5) asserted
+P18's own plan doc (`docs/HISTORY.md (v1.1 P18)` §7.5) asserted
 `dist/assets/index-*.js` and the `sql-formatter` chunk were both unchanged in size. True at the
 time, but P18 did land real, eagerly-bundled app code for the EXPLAIN feature itself
 (`ExplainResultView.vue` + five plan parsers + supporting modules) — P12 round 1's own performance
@@ -1525,7 +1525,7 @@ review caught the claim going stale and this re-measures it (`bun run build:stud
 every fix that review's findings needed):
 
 - `index-*.js`: **1,117,138 B raw / 356,081 B gzip** — up from P15's own recorded
-  **1,057,495 B / 334,906 B gzip** baseline (`docs/v1.1/plans/P15-fake-data-generator.md`), a
+  **1,057,495 B / 334,906 B gzip** baseline (`docs/HISTORY.md (v1.1 P15)`), a
   **+59,643 B (+5.6%) raw / +21,175 B (+6.3%) gzip** growth entirely accounted for by P18's own new
   code. Correctly *not* lazy-loaded: an order of magnitude below the size P13/P15 split their own
   dependencies out at (both lazy chunks below are well over 140 KB raw on their own).
@@ -1590,13 +1590,13 @@ confirms the wall-clock ones too.
 Both dynamic-import splits survive, exactly as §2.11 already established — nothing collapsed into
 the main chunk. **§2.11's figures are confirmed still current**, and its Green Tea GC caveat is
 **unchanged and still applies**: no Go-side wall-clock number was re-measured by this phase either
-— P21 is a docs-only sweep (§0.3 of `docs/v1.1/plans/P21-docs-refresh.md`), not a new measurement
+— P21 is a docs-only sweep (§0.3 of `docs/HISTORY.md (v1.1 P21)`), not a new measurement
 program.
 
 ### 2.13 G3/G8 — the git module's transport, re-measured rather than re-derived
 
 Upstream's ≤300 ms first-paint budget was measured over in-process `postMessage`. v1.3 replaced
-that with a Unix socket plus FlatBuffers framing, so `docs/v1.3/SPEC.md` carried a standing note
+that with a Unix socket plus FlatBuffers framing, so `docs/HISTORY.md (v1.3)` carried a standing note
 asking for re-measurement, not re-derivation. G3 built the probe (`TestGraphStreamPerf`) and G8
 extended it to nine (`TestG8PerfBaseline`), both in `internal/gitsock/` at the time (the
 suites now live in `apps/kira-space/internal/flows/gitflow/`, P243; `gitsock` is gone). Both are
@@ -1634,7 +1634,7 @@ macOS equivalents belong in §3's manual procedures, which have still not been r
 
 ### 2.14 G34 — the visual-parity phase's own CSS delta, measured after the fact
 
-`docs/v1.3/plans/G34-kira-studio-visual-parity.md` §7.1 item 9 made recording the built CSS
+`docs/HISTORY.md (v1.3 G34)` §7.1 item 9 made recording the built CSS
 asset's raw/gzip size, before and after the phase, an explicit Tier-1 exit criterion — "F3 predicts
 a delta inside ±3 KB raw; a materially larger one means something was duplicated rather than
 replaced and is worth investigating before merge." None of G34's four commits

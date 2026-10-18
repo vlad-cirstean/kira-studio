@@ -244,7 +244,7 @@ export const MAX_NEW_LEAD_CELLS_PER_RENDER = 600;
 // MAX_NEW_CELLS_PER_RENDER: how long the viewport must go without a native scroll event before a
 // self-scheduled catch-up render is allowed to run. A catch-up that fires while a fling is still
 // delivering scroll events lands in the same animation frame as that frame's scroll-driven
-// render, doubling the frame's work (docs/v1.1/plans/P22-slickgrid-migration-plan-iter2-pacing.md
+// render, doubling the frame's work (docs/HISTORY.md (v1.1 P22)
 // §1.2: 131 of 140 frames in a WebKit repro). ~1.5 frames at 60 Hz, ~3 at 120 Hz. 0 restores the
 // pre-fix "fire on the very next rAF, unconditionally" behaviour exactly — which is what makes the
 // real-Mac A/B a console line (docs/PERF.md §2.1c). Re-set from that A/B, not from here.

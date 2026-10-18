@@ -2,7 +2,7 @@
 // project directory: parsing .idea/dataSources.xml and dataSources.local.xml, locating the
 // IntelliJ Platform PasswordSafe credential store, and reading a data source's password from the
 // macOS Keychain — the only backend this package supports, per an explicit user correction after
-// P25 shipped (docs/v1.2/plans/P25-datagrip-connection-import.md's correction note). See that plan
+// P25 shipped (docs/HISTORY.md (v1.2 P25)'s correction note). See that plan
 // for the research and decisions this package implements — every format claim below is cited
 // there, not re-derived here.
 package datagrip

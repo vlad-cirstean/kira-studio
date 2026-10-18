@@ -1,7 +1,7 @@
 // Package mysqlfamily_test is the Go analogue of packages/db-fixtures/{mariadb,mysql}.spec.ts: the two specs
 // are ~90% the same file, so this is one shared suite function (runFamilySuite) plus two thin
 // drivers (TestMariaDB/TestMySQL), in one package so one TestMain stops both containers
-// (docs/v1/plans/P58b-mysql-sqlite-clickhouse.md §5.3). Not every one of the two specs' ~30
+// (docs/HISTORY.md (v1 P58b)). Not every one of the two specs' ~30
 // scenarios has a Go twin — the ones ported are the load-bearing behaviours P58 D12's own
 // "adapter-first-test-first" rule exists to protect, matching P58a's own postgres_test.go
 // precedent.

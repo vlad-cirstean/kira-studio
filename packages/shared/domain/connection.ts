@@ -33,7 +33,7 @@ export const DEFAULT_PORT: Partial<Record<ConnectionKind, number>> = {
 
 // P16: the minimum server version each adapter's client library (and this app's own catalog SQL)
 // actually supports — the verified floor of the on-demand compatibility suite
-// (docs/v1.1/plans/P16-db-compat-suite.md §3), not a marketing claim. SQS/S3 have no server
+// (docs/HISTORY.md (v1.1 P16)), not a marketing claim. SQS/S3 have no server
 // version at all (AWS's APIs are versionless), so they have no entry.
 // Getters, not values: the text resolves through the catalog when read, never at module load.
 export const MIN_SERVER_VERSION: Partial<Record<ConnectionKind, string>> = {

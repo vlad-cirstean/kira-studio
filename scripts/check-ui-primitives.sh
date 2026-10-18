@@ -1,7 +1,7 @@
 #!/bin/sh
-# P262/P263/P264: one UI language. Guards the element rules of docs/v2.2/plans/P262-ui-unification.md §2
+# P262/P263/P264: one UI language. Guards the element rules of git show bd0c224688d9:docs/v2.2/plans/P262-ui-unification.md §2
 # (U1-U21: dialog structure, secondary tabs, buttons, form controls, weights, icon sizes, bars,
-# popovers) and docs/v2.2/plans/P263-ui-unification-2.md §2 (U22-U38: titles, spinners, alerts, tones,
+# popovers) and git show bd0c224688d9:docs/v2.2/plans/P263-ui-unification-2.md §2 (U22-U38: titles, spinners, alerts, tones,
 # dots, toggles, tooltips, menus, resize handles, scrollbars, kbd, colours, focus, cards, tables, scale).
 # Scans app/package sources and packages/theme/src, never packages/theme/src/components/ui (the primitives themselves).
 #
@@ -10,7 +10,7 @@
 #
 # U39-U63 never scan `/behaviour/` (the owning modules) or `/testing/`.
 #
-# Guards U72-U82: docs/v2.2/plans/P266-consistency-audit.md section 4.4.
+# Guards U72-U82: git show bd0c224688d9:docs/v2.2/plans/P266-consistency-audit.md section 4.4.
 #
 # Needs GNU grep -P like check-theme-classes.sh.
 set -e
@@ -342,7 +342,7 @@ while IFS= read -r line; do
 done <"$TMP/guards"
 
 if [ "$STATUS" -ne 0 ]; then
-  echo "check-ui-primitives: see docs/v2.2/plans/P262-ui-unification.md, P263-ui-unification-2.md §2 and P264-behaviour-unification.md §3.3 and P266-consistency-audit.md §4.4." >&2
+  echo "check-ui-primitives: see git show bd0c224688d9:docs/v2.2/plans/P262-ui-unification.md, P263-ui-unification-2.md §2 and P264-behaviour-unification.md §3.3 and P266-consistency-audit.md §4.4." >&2
 else
   echo "check-ui-primitives: every guarded element follows the P262-P266 rules."
 fi

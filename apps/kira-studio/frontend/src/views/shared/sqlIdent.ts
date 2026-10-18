@@ -137,7 +137,7 @@ export function quoteLiteral(dialect: SqlDialect | undefined, value: string): st
 // A short, curated set of the reserved words most likely to collide with a real column name —
 // not exhaustive (a full per-dialect reserved-word list runs to hundreds of entries and shifts
 // with engine version); the same "curated, not exhaustive" call P18's own WHERE/ORDER BY
-// vocabularies make (docs/v1/plans/P18-autocomplete.md D8).
+// vocabularies make (docs/HISTORY.md (v1 P18)).
 const COMMON_RESERVED = new Set([
   'select',
   'from',

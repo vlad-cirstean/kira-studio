@@ -19,7 +19,7 @@ import { expandRow, findRow, openRowMenu } from './support/tree';
 // symptom. What this file *can* prove, sandboxed: the probe exists, is inert until start(), and
 // start()/stop() produce the documented shape when driven by ordinary (main-thread) scrolling —
 // the mechanism working as designed, not the real-hardware fix being proven (that's §7.3 of
-// docs/v1.1/plans/P22-webview-scroll-performance-iter2-rendering.md, run by a human on a Mac).
+// docs/HISTORY.md (v1.1 P22), run by a human on a Mac).
 
 const CONNECTION_ID = 'conn-scroll-trace';
 const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Scroll Trace DB', 'grey');

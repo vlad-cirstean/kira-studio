@@ -10,7 +10,7 @@ import {
 } from './support/mariadb';
 import { installPassthrough } from './support/passthrough';
 
-// C1b (docs/v1/plans/P58b-mysql-sqlite-clickhouse.md §7) — the half of P58a's own C1 that could not
+// C1b (docs/HISTORY.md (v1 P58b)) — the half of P58a's own C1 that could not
 // run before a second adapter went native: MariaDB (native as of M6.2), proven end to end against a
 // real Go-native adapter in a running app, rather than only in adapterhost's own router unit tests.
 // This sandbox has no real X display (P58a §13), so — as with E2 — this is tests/e2e-real/'s own

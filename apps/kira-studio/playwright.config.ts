@@ -90,7 +90,7 @@ export default defineConfig({
     // screenshot comparison degrades under CPU contention, so this runs fully parallel like `ui`
     // itself. `animations: 'disabled'` is Playwright's own default already, stated explicitly here
     // so it's not accidentally lost to a future edit — freezes every CSS animation/transition to
-    // its terminal frame before capture (docs/v1.4/plans/P6-visual-regression.md §2(b)'s own
+    // its terminal frame before capture (docs/HISTORY.md (v1.4 P6)(b)'s own
     // inventory of this app's `infinite` animations). `stylePath` collapses --kira-font-ui/
     // --kira-font-data to their own trailing generic keyword only for this project — removing the
     // multi-hop fallback chain's own run-to-run fontconfig ambiguity on the CI image that is this

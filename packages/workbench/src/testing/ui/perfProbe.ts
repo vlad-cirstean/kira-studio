@@ -3,7 +3,7 @@ import type { Page, TestInfo } from '@playwright/test';
 
 // Shared by both apps' tests/perf probes. Probes report numbers and assert nothing: a hard bound
 // would be flaky across machines. On macOS `ps` RSS omits CoreAnimation/IOSurface graphics memory,
-// the dominant scroll cost there (docs/v1.1/WEBVIEW-SCROLL-MEMORY.md); read footprint with that
+// the dominant scroll cost there (docs/WEBVIEW-SCROLL-MEMORY.md); read footprint with that
 // document's Appendix A harness instead. Process RSS here is the DOM/JS/malloc side only.
 
 const WEBKIT_PROCESS =

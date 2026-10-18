@@ -13,7 +13,7 @@ import "context"
 // and often win before — the adapter's own explicit server-side kill, the one place a real
 // cancellation is meant to happen (P58a's own CLAUDE.md findings: pgx first, generalised here for
 // mysql-family/clickhouse/sqlite in P58b — three more reasons, one helper, §1.7 of
-// docs/v1/plans/P58b-mysql-sqlite-clickhouse.md).
+// docs/HISTORY.md (v1 P58b)).
 //
 // release is called exactly once, whenever issue actually settles — not merely when ctx fires — so
 // a caller's own Cancel(opID) still finds whatever it tracks (a backend pid, a thread id, a

@@ -1,5 +1,5 @@
 /**
- * P265 F3: source text guard rules U64-U71 (docs/v2.2/plans/P265-text-catalog-i18n.md section 3.2).
+ * P265 F3: source text guard rules U64-U71 (git show bd0c224688d9:docs/v2.2/plans/P265-text-catalog-i18n.md section 3.2).
  * AST-based: `.vue` through `@vue/compiler-sfc`, expressions and TypeScript through `@babel/parser`.
  * Pure: `scanSource` takes the file text and the catalog's placeholder table, returns hits.
  */

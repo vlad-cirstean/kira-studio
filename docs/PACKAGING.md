@@ -182,7 +182,7 @@ prompt at all has not been confirmed on real hardware. If it turns out not to be
 correct — it falls back to the existing in-app confirmation dialog (`confirmDialog()`) exactly as
 it does on Linux — but "macOS Touch ID confirmation" would then be a Developer-ID-signing-only
 capability until this app is properly signed. §6.3 of
-`docs/v1.1/plans/P14-credential-reveal-confirmation.md` is where the answer, once observed on a
+`docs/HISTORY.md (v1.1 P14)` is where the answer, once observed on a
 real Mac, gets recorded.
 
 ## 3. Verification checklist — results from this environment
@@ -256,7 +256,7 @@ human to launch the packaged app and use it.
 
 **P119's curl installer and in-app update, items 13-20 — none of these can run in this Linux
 sandbox.** They need a published release with both DMGs, which only the first real run of the
-patched `release.yml` produces; §11.3 in `docs/v1.9/plans/P119-space-release-notifier.md` has the
+patched `release.yml` produces; §11.3 in `docs/HISTORY.md (v1.9 P119)` has the
 full step-by-step. All *not yet run*.
 
 13. Fresh machine, no app installed: the Studio curl command installs and opens the app with **no**
@@ -308,7 +308,7 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
   native module was never vendored into the packaged bundle" (P57 M7): `build:engine` marked
   `@confluentinc/kafka-javascript` `--external` and no build step vendored it, so a packaged build's
   Kafka connections would fail at `require()` time. P58e M9 made the gap moot without closing it:
-  Kafka went native in Go (`docs/v1/plans/P58e-kafka.md`) and stopped reaching the Node engine child
+  Kafka went native in Go (`docs/HISTORY.md (v1 P58e)`) and stopped reaching the Node engine child
   at all, so the dead `require()` path was never exercised — `sign-bundle.sh` and
   `verify-packaging.sh` kept probing for the native module and printing a harmless "not present" note.
   P58f M10 closed it for real: the Node engine, `build:engine`, and every check that probed for that
@@ -356,8 +356,8 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
 **Status:** applied. `.github/workflows/` holds the two workflows described below (`pr.yml`,
 `release.yml` — `db-compat.yml` and `test-matrix.yml` existed at one point but were folded into
 `release.yml`'s own jobs, see `docs/ARCHITECTURE.md`). Each of the original workflows spent time in
-a staging directory — `docs/v1/plans/p58-pending-ci-workflows/`, then
-`docs/v1.1/plans/p1{6,9}-pending-ci-workflow/` — waiting for a session whose GitHub token carried
+a staging directory — a `p58-pending-ci-workflows/` plan folder (v1 P58), then
+`p1{6,9}-pending-ci-workflow/` plan folders (v1.1; both in `docs/HISTORY.md`) — waiting for a session whose GitHub token carried
 the `workflow` OAuth scope; all of those directories are gone.
 
 **`pr.yml`** (named `CI` until it was renamed to match what it actually gates — push/PR to `main`,
@@ -501,7 +501,7 @@ auth/config tier) is the same shape and made the same move, for the same reason 
 **P19's `actions/{checkout,setup-go,upload-artifact}` bumps to `@v7` across `pr.yml` and
 `release.yml`, together with P20's rerouting of all three inline binding-generation blocks through
 `sh scripts/setup.sh`, spent several phases staged under
-`docs/v1.1/plans/p1{6,9}-pending-ci-workflow/`** because the sessions that wrote them had GitHub
+`p1{6,9}-pending-ci-workflow/`** plan folders (v1.1, `docs/HISTORY.md`) because the sessions that wrote them had GitHub
 push access without the `workflow` OAuth scope, which GitHub requires for any commit touching
 `.github/workflows/*.yml`. A session with that scope applied them; both staging directories are
 gone.

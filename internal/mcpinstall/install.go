@@ -1,5 +1,5 @@
 // Package mcpinstall registers MCP servers with Claude Code's own CLI — the one client the apps
-// install for (docs/v1.7/plans/M1-db-mcp-server-core.md). Every real
+// install for (docs/HISTORY.md (v1.7 M1)). Every real
 // spawn Install makes is argv-only, never a shell, never writes another program's config file
 // directly. Command is the one exception: it renders shell syntax (`;`, redirection) purely as
 // copy-paste TEXT for the pane's fallback UI, never executed by this package itself.

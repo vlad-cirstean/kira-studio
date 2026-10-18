@@ -6,7 +6,7 @@ import { DB_PATH, mariadbConnectionSummary, orderItemsFixture } from '../ui/supp
 import { connectionRow, expandRow, openRowMenu } from '../ui/support/tree';
 import { settleFonts } from './support/settle';
 
-// v1.4 P6 (docs/v1.4/plans/P6-visual-regression.md §3.3): the SQL console at rest with
+// v1.4 P6 (docs/HISTORY.md (v1.4 P6)): the SQL console at rest with
 // syntax-highlighted content — CodeMirror's own decoration/theme layer has no existing pixel guard;
 // console.spec.ts/console-format.spec.ts/console-explain.spec.ts all assert *behaviour* only.
 

@@ -1,6 +1,6 @@
 // wkhost.swift: swiftc -O -o /tmp/wkhost wkhost.swift
 // usage: /tmp/wkhost <url> <hold-seconds> <driver.js> 2> run.log
-// docs/v1.1/WEBVIEW-SCROLL-MEMORY.md Appendix A's harness plus an in-process 4 Hz footprint poll.
+// docs/WEBVIEW-SCROLL-MEMORY.md Appendix A's harness plus an in-process 4 Hz footprint poll.
 // stderr: WEBPID, LOADED, TITLE <mark>, FOOTPRINT <seconds> <mark> <MB>.
 import Cocoa
 import Darwin

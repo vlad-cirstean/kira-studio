@@ -1,5 +1,5 @@
-// Package logsession is the paged history walk (docs/v1.3/plans/G3-history-pipeline-and-wire-
-// format.md, D10): a paused, resumable `git log` process. A page's own limit IS the pause — the
+// Package logsession is the paged history walk (docs/HISTORY.md (v1.3 G3),
+// D10): a paused, resumable `git log` process. A page's own limit IS the pause — the
 // read loop simply stops calling Read on the child's stdout once a page is full, and git's own
 // write() blocks against the now-unread OS pipe, holding the process (and its walk position)
 // exactly where the caller left it, with no explicit protocol needed to say "pause" or "resume".

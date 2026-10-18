@@ -1,5 +1,5 @@
 // Ported from packages/db-fixtures/kafka.spec.ts, case by case where practical — the spec's own numbering is
-// kept in each test's name so the two can be diffed. docs/v1/plans/P58e-kafka.md §5.3 names the
+// kept in each test's name so the two can be diffed. docs/HISTORY.md (v1 P58e) names the
 // six cases that carry the most weight: scenario 17 (a browse joins no consumer group) and 18 (a
 // browse commits no offsets) are rewritten to check the broker directly rather than trusting the
 // adapter; scenario 21 (a transaction's commit marker still terminates the browse) is the single

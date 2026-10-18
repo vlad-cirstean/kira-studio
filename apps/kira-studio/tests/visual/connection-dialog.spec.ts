@@ -1,7 +1,7 @@
 import { expect, test } from '../ui/fixtures';
 import { IPC } from '../ui/support/ipcChannels';
 
-// v1.4 P6 (docs/v1.4/plans/P6-visual-regression.md §3.4): the three-tab connection dialog at rest
+// v1.4 P6 (docs/HISTORY.md (v1.4 P6)): the three-tab connection dialog at rest
 // — the densest single "form" surface in the app, most token/spacing/icon-alignment area per
 // pixel. Mirrors connection-dialog-tabs.spec.ts's own opening sequence, which asserts tab-switch
 // behaviour only, never how any of the three tabs actually renders.

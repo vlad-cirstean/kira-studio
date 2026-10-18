@@ -1,6 +1,6 @@
 // Ported from packages/db-fixtures/mongo.spec.ts (§9.3), case by case where practical — the spec's own
 // numbering is kept in each test's name so the two can be diffed. §5.3 of
-// docs/v1/plans/P58c-mongo-redis.md names the four cases that carry the most weight: the _id
+// docs/HISTORY.md (v1 P58c) names the four cases that carry the most weight: the _id
 // text/parser closure round-trip (C3), byte-stable EJSON rendering (C2), field order surviving a
 // read (C2), and cancel asserted server-side via killOp — all four are here, none softened.
 package mongo_test

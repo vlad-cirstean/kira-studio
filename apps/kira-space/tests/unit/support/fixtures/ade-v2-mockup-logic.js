@@ -1,5 +1,5 @@
 // Logic-only extract of the frozen P143-149 ade-v2 design mockup's inline <script>
-// (formerly docs/v2.0/design/ade-v2/mockup.html, stripped of markup/CSS the parity
+// (formerly the v2.0 ADE mockup, see docs/HISTORY.md (v2.0), stripped of markup/CSS the parity
 // oracle never reads). Verbatim design code, not app style — not meant to pass this
 // repo's own lint rules (see biome.json's exclusion).
 

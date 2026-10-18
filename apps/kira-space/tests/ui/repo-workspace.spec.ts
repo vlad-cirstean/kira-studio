@@ -293,7 +293,7 @@ test('a repo workspace: search streams results out of order and opens a match', 
 
 // C11 §11/S16 — deliberately shallow (the plan's own words): the deep review behaviour (a real
 // branch comparison, marking, comments) needs a real repository and is the manual recipe's job
-// (docs/v1.5/plans/C11-code-review-native.md §15 step 7), not a UI spec. This asserts only that
+// (docs/HISTORY.md (v1.5 C11) step 7), not a UI spec. This asserts only that
 // switching the panel to Review actually mounts the real @kira/git-ui ReviewView.vue bundle over
 // the native git stream and renders something real (its own branch picker) rather than an empty
 // container — the one thing neither typecheck nor a Go test can reach for this phase, the same

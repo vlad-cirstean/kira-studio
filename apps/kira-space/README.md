@@ -255,7 +255,7 @@ packages/theme       shared design tokens/CSS both apps' frontends import, plus 
 ```
 
 See [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md)'s Git module section for the full
-current-state breakdown, and [`docs/v1.9/SPEC.md`](../../docs/v1.9/SPEC.md) for the phase (P100)
+current-state breakdown, and [`docs/HISTORY.md (v1.9)`](../../docs/HISTORY.md (v1.9)) for the phase (P100)
 that created this app.
 
 ## Not shipped

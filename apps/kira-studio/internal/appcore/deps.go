@@ -52,7 +52,7 @@ type Deps struct {
 	// wraps Repos.Variables instead, the same split CollectionsService already has between
 	// Repos.Collections and nothing else).
 	ApiVars *apivars.Service
-	// MaskRules is M5's rule-management service (docs/v1.7/plans/M5-anonymization-masking.md §4.6)
+	// MaskRules is M5's rule-management service (docs/HISTORY.md (v1.7 M5))
 	// — the bridge's own Privacy-tab/header-menu surface, and (via dbmcp.Config.MaskRules) the DB
 	// MCP server's masking seam.
 	MaskRules *maskrules.Service
