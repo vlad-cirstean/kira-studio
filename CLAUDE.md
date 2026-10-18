@@ -46,7 +46,7 @@ duplicated here; this file only points at them.
 - The **main session runs on Sonnet and orchestrates only** — it doesn't implement, edit code, or
   fix findings directly. Its job: spawn the right subagents in order, carry context between them,
   and track progress. The actual writing always happens in a subagent.
-- Each phase (the current chapter's `SPEC.md` phasing table — `docs/v2.2/` today) needs an
+- Each phase (the current chapter's `docs/v<chapter>/SPEC.md` phasing table) needs an
   Opus-authored plan committed under that chapter's `plans/` before implementation starts — spawn
   an **Opus subagent** (`Agent` tool, `model: "opus"`) whose only job is writing that plan. No plan
   there means no implementing straight from the spec; get the plan written and committed first.
@@ -149,12 +149,15 @@ duplicated here; this file only points at them.
 - No per-phase PRs. One feature branch per chapter.
 - **Every chapter uses `P` phase numbers, one running sequence across the whole repo, not
   per-chapter.** v1.1/v1.2/v1.4/v1.6/v1.8/v1.9 continue one counter (v1.6 topped out at `P70`; v1.8
-  starts at `P71`, v1.9 at `P96`, v2.0 at `P126`, v2.1 at `P185`, v2.2 at `P210`). Before opening a new chapter, scan every prior chapter's `SPEC.md` for the
-  highest `P` number used across all of them, not just the chapter immediately before it, and
-  continue from there — regardless of whether that chapter was shaped as independent misc phases or
-  one cohesive subsystem. v1.5's `C` lettering and v1.7's `M` lettering predate this rule and stay
-  as shipped, never renumbered after landing; every chapter from here on, cohesive-subsystem chapters
-  included, uses `P`.
+  starts at `P71`, v1.9 at `P96`, v2.0 at `P126`, v2.1 at `P185`, v2.2 at `P210`). Before opening a
+  new chapter, read the highest `P` in `docs/HISTORY.md` and in every `docs/v*/SPEC.md` still on
+  disk, and continue from there. v1.5's `C` lettering and v1.7's `M` lettering predate this rule and
+  stay as shipped, never renumbered; every chapter from here on uses `P`.
+- **Opening a chapter folds the previous one.** Run `go run ./scripts/docshistory fold <prev>`
+  (distills each phase through `ingest_files`, costs tokens, resumable), read its verify report,
+  run `repoint`, commit, then `git rm -r docs/<prev>/ docs/history-runs/` and create `docs/<new>/`.
+  Skip a chapter whose files a test or script reads at runtime (move them first, own phase). Never
+  hand-edit `docs/HISTORY.md`.
 - **Splitting a phase keeps its number — it doesn't consume a new one, when an agent is the one
   deciding to split it.** A subagent (an Opus planning pass finding the scope is really two
   pieces, or anyone else in the loop) that decides a `SPEC.md` row needs splitting renames it
