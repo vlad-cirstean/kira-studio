@@ -258,10 +258,10 @@ var MemoryRunTrivia = define(Entry{
 	PurposeKey: "llmPrompts.entry.memoryRunTrivia.description",
 	UsedByKey:  "llmPrompts.entry.memoryRunTrivia.usedBy.body",
 	Default: `Run trivia is never a memory: a note on how one run of the work went, not on what the system is or what was decided.
-- Drop: who ran what; commit, push and branch mechanics, a refused or conflicting push included; a sandbox or container limit met during the run; a flaky, timed-out or rerun test; a fixture or harness gap named only to explain a skipped check; a check left for the user; spend.
+- Drop: who ran what; commit, push and branch mechanics, a refused or conflicting push included; a sandbox, container or tool limit met during the run (no display, a failed install or fetch, a warning, a failure that predates the work); a flaky, timed-out or rerun test; what a test fixture, mock or harness does not cover or reach; a check not run, not verified or left for the user; a baseline or snapshot still to regenerate; spend.
 - Keep: what the work built or changed, tests and fixtures included; a decision with its reason; a constraint; a design choice and its consequence; how the system works.
 - Test: still true and useful once this run is forgotten? Keep. True only of this run? Drop.
-- A lesson from an incident that holds for later work is a rule: "Commit with an explicit pathspec in a shared checkout, because another session's staged files land in a bare commit."
+- A lesson from an incident, or a rule about the environment, that holds for later work is a rule: "Commit with an explicit pathspec in a shared checkout, because another session's staged files land in a bare commit."
 - When the document's subject is the environment, tooling or a process (a runbook, a setup or test guide), its limits and procedures are the content: keep them.`,
 }, NoVars{})
 
