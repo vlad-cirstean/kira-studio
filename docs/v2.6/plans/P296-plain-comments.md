@@ -286,4 +286,23 @@ distill tool shape and modes, `kind` column, gate durability rules.
 
 ## 7. Result
 
-(Implementer fills: commits, check outputs (one decisive line each), real `claude` spend.)
+Commits (v2.6, in order): `91b01d21` drop asComment and Service.Prepare; `76810e62` memfmt drops comment format,
+memory-check flags retired blocks; `8ce1a57c` rename comment check to check hook; `16acb7b0` agent docs and
+`comment` subtest; `672a28ca` fix: instructions tell agents to cite the stored id; `04d68bac` docs.
+
+Checks:
+- `go test ./internal/memory/... ./internal/llmprompts/...`: all ok. Flow `TestCheckHook` (contract unchanged
+  after rename) and whole memoryflow package: ok.
+- `bun run typecheck`, `bun run lint` (incl. lint:rules), `lint:dead`, `lint:go`, `lint:claude`: clean.
+- UI `settings-memory`, `copy-coverage`: 34 passed. Visual `settings` Memory pane re-recorded with Inter.
+- Grep for removed names outside `docs/v2.5/` and plans: only the real `claude` test asserting `asComment` absent.
+- Built `kira-space`: `memory-check` at repo root exit 0; temp repo with staged retired block exit 1 with the
+  D3 message at `bad.go:2`; plain `// ... (km_7h3kq9x2mfa4)` comment exit 0.
+- Real `claude` prompt-registry row (Space, one run) 0.083 USD, 427 s: the new `comment` subtest failed first
+  (agent stored, no id in comment). Instructions reworded (`672a28ca`); `TestMemoryMcpFollowsDocs` (all 5
+  subtests) and `TestMemoryMcpThroughClaude` then passed, 0.032 USD. All other rows passed in the first run.
+  Studio suite passed.
+
+Deviations: `--print-regex` flag help text reworded (old text named the comment regex). `memory.mcp.instructions`
+wording differs slightly from D6 (see fix commit); budget lines set to the rendered sizes (1901, 469).
+Not verified: the other Space rows were not rerun after the one-sentence reword in `672a28ca`.
