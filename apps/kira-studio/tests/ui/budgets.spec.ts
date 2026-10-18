@@ -312,7 +312,7 @@ function logStats(label: string, values: number[]): void {
 const P95_SAMPLES = 40;
 
 // P22 iter2 D7's own velocity ladder: the original plan's realistic 40-100 px/frame band, a fling
-// peak, and WEBVIEW-SCROLL-MEMORY.md §5.4's own top rung, so the two documents' axes line up.
+// peak, and the v1.1 P22 memory study's top rung (456).
 const SCROLL_COVERAGE_LADDER = [40, 100, 200, 456];
 
 // P22 iter2 D7: logged, never gated — see measureSustainedScroll's own header comment for why a

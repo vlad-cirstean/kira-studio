@@ -200,7 +200,7 @@ export function initialWidthsByIndex(page: TabularPage): number[] {
 // LEAD_FRAMES/MAX_LEAD_PX are provisional: nobody in this repo has measured a real macOS momentum
 // scroll's velocity (the plan's F5) — these are a defensible first guess, to be re-set once
 // window.__kiraScrollTrace (D2) reports one from real hardware. Extra runway costs compositing
-// memory while flinging only (WEBVIEW-SCROLL-MEMORY.md §6) — accepted (F7) as a trade, not free.
+// memory while flinging only — accepted (F7) as a trade, not free.
 // Row-axis runway, tuned independently of OVERSCAN_PX (column-axis clamp); defaulted equal.
 export const BASE_LEAD_PX = 560;
 export const BASE_TRAIL_PX = 560;

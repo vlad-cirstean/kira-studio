@@ -863,7 +863,7 @@ flick). Add a view by copying a probe and calling `measureFlick` over `FLICK_LAD
 - Engine is Playwright WebKit. Linux runs the WPE port: software rendering, no GPU process.
 - fps = 1000 / frame ms. Compare views to each other, not to 16 ms.
 - RSS comes from `ps`. On macOS it omits CoreAnimation/IOSurface graphics memory, the dominant
-  scroll cost there. Read real footprint with `docs/WEBVIEW-SCROLL-MEMORY.md` Appendix A.
+  scroll cost there. Read real footprint with `apps/kira-studio/frontend/proto/grid/mac/wkhost.swift`.
 - Env knobs: `NDOCS` (documents), `NROWS`/`NCOLS` (console grid), `BODYKIND`/`NITEMS` (HTTP
   response), `NTABLES` (tree), `GRAPH_N` (git graph).
 
