@@ -1,6 +1,7 @@
 package memfmt
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"strings"
@@ -50,6 +51,9 @@ func checkFact(f Fact) error {
 			return fmt.Errorf("%s reason: %s", f.ID, msg)
 		}
 	}
+	if f.Kind != "" && f.Kind != KindFact && f.Kind != KindRule {
+		return fmt.Errorf("%s kind %q must be fact or rule", f.ID, f.Kind)
+	}
 	return nil
 }
 
@@ -83,7 +87,7 @@ func (w *docWriter) front(d Doc) error {
 			return errors.New("updated must be YYYY-MM-DD")
 		}
 	}
-	w.b.WriteString("---\nkira-memory: 2\n")
+	w.b.WriteString("---\nkira-memory: 3\n")
 	for _, f := range []struct {
 		key, val string
 		optional bool
@@ -111,32 +115,57 @@ func (w *docWriter) fact(f Fact) error {
 	return nil
 }
 
-// FormatDoc renders a doc file. Facts print in order as list items; a heading appears wherever
-// Section changes.
+// FormatDoc renders a doc file. Facts print under ## Facts, rules under ## Rules, each in input
+// order; a category without entries is left out. A ### heading appears wherever Section changes
+// inside a category.
 func FormatDoc(d Doc) (string, error) {
 	w := &docWriter{}
 	if err := w.front(d); err != nil {
 		return "", err
 	}
-	section, seen, started := "", map[string]bool{}, false
+	seen := map[string]bool{}
 	for _, f := range d.Facts {
 		if seen[f.ID] {
 			return "", fmt.Errorf("%s appears twice", f.ID)
 		}
 		seen[f.ID] = true
-		if f.Section != section {
-			if f.Section == "" || strings.TrimSpace(f.Section) != f.Section || strings.ContainsAny(f.Section, "\r\n") {
-				return "", fmt.Errorf("%s: section %q must be one trimmed line, and sections cannot end", f.ID, f.Section)
-			}
-			section = f.Section
-			w.b.WriteString("\n## " + section + "\n\n")
-		} else if !started {
-			w.b.WriteString("\n")
+		if err := checkFact(f); err != nil {
+			return "", err
 		}
-		started = true
-		if err := w.fact(f); err != nil {
+	}
+	for _, c := range []struct{ kind, heading string }{{KindFact, "## Facts"}, {KindRule, "## Rules"}} {
+		if err := w.category(d.Facts, c.kind, c.heading); err != nil {
 			return "", err
 		}
 	}
 	return w.b.String(), nil
+}
+
+func (w *docWriter) category(facts []Fact, kind, heading string) error {
+	section, started, afterHeading := "", false, false
+	for _, f := range facts {
+		if cmp.Or(f.Kind, KindFact) != kind {
+			continue
+		}
+		if !started {
+			w.b.WriteString("\n" + heading + "\n")
+			started, afterHeading = true, true
+		}
+		if f.Section != section {
+			if f.Section == "" || strings.TrimSpace(f.Section) != f.Section || strings.ContainsAny(f.Section, "\r\n") {
+				return fmt.Errorf("%s: section %q must be one trimmed line, and sections cannot end", f.ID, f.Section)
+			}
+			section = f.Section
+			w.b.WriteString("\n### " + section + "\n")
+			afterHeading = true
+		}
+		if afterHeading {
+			w.b.WriteString("\n")
+			afterHeading = false
+		}
+		if err := w.fact(f); err != nil {
+			return err
+		}
+	}
+	return nil
 }

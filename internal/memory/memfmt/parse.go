@@ -1,6 +1,7 @@
 package memfmt
 
 import (
+	"cmp"
 	"fmt"
 	"regexp"
 	"strings"
@@ -14,6 +15,7 @@ var (
 	retiredHeader = regexp.MustCompile(`^[ \t]*(//|#|--|;|%|<!--|/\*) kira-memory [a-z]+=`)
 	docFactLine   = regexp.MustCompile(`^- (` + FactID + `) (.*)$`)
 	headingLine   = regexp.MustCompile(`^#{1,6} (\S.*)$`)
+	sectionLine   = regexp.MustCompile(`^### (\S.*)$`)
 	dateLine      = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 )
 
@@ -83,7 +85,10 @@ type docParser struct {
 	problems []Problem
 	vals     map[string]string
 
-	section string
+	// category is "" before the first ## Facts or ## Rules; section is the ### heading under it.
+	category string
+	section  string
+	cats     map[string]int
 	// last: the previous line was a fact line, so an indented line is its reason.
 	last bool
 	seen map[string]int
@@ -93,15 +98,20 @@ func (p *docParser) add(line int, f string, a ...any) {
 	p.problems = append(p.problems, Problem{line, fmt.Sprintf(f, a...)})
 }
 
+const (
+	retiredV1Msg = "kira-memory: 1 is the retired P273 format; rewrite it as kira-memory: 3"
+	retiredV2Msg = "kira-memory: 2 is retired (P297); rewrite it as kira-memory: 3 with facts under ## Facts, rules under ## Rules and source headings as ###"
+)
+
 // ParseDoc parses a doc file. inScope is false when line 1 is not "---" followed by
-// "kira-memory: 2" (or "kira-memory: 1", the retired format, which yields one problem and its front
-// matter); such a file is legacy and yields no problems.
+// "kira-memory: 3" (or "kira-memory: 2" or "1", the retired formats, which yield one problem and
+// their front matter); such a file is legacy and yields no problems.
 func ParseDoc(src []byte) (Doc, bool, []Problem) {
 	lines := splitLines(src)
-	if len(lines) < 2 || lines[0] != "---" || (lines[1] != "kira-memory: 2" && lines[1] != "kira-memory: 1") {
+	if len(lines) < 2 || lines[0] != "---" || (lines[1] != "kira-memory: 3" && lines[1] != "kira-memory: 2" && lines[1] != "kira-memory: 1") {
 		return Doc{}, false, nil
 	}
-	p := &docParser{vals: map[string]string{}, seen: map[string]int{}}
+	p := &docParser{vals: map[string]string{}, seen: map[string]int{}, cats: map[string]int{}}
 	p.doc.Version = int(lines[1][len(lines[1])-1] - '0')
 	closeAt := p.front(lines)
 	if closeAt < 0 {
@@ -109,8 +119,12 @@ func ParseDoc(src []byte) (Doc, bool, []Problem) {
 		return p.doc, true, p.problems
 	}
 	p.checkFront()
-	if p.doc.Version == 1 {
-		p.add(2, "kira-memory: 1 is the retired P273 format; rewrite it as kira-memory: 2")
+	switch p.doc.Version {
+	case 1:
+		p.add(2, retiredV1Msg)
+		return p.doc, true, p.problems
+	case 2:
+		p.add(2, retiredV2Msg)
 		return p.doc, true, p.problems
 	}
 	for i := closeAt + 1; i < len(lines); i++ {
@@ -220,8 +234,7 @@ func (p *docParser) body(n int, line string) {
 		}
 		last.Reason = line[2:]
 	default:
-		if hm := headingLine.FindStringSubmatch(line); hm != nil {
-			p.section = strings.TrimSpace(hm[1])
+		if p.heading(n, line) {
 			return
 		}
 		if retiredLine.MatchString(line) {
@@ -230,14 +243,52 @@ func (p *docParser) body(n int, line string) {
 		}
 		sm := docFactLine.FindStringSubmatch(line)
 		if sm == nil {
-			p.add(n, "body allows only blank lines, headings, '- <id> <fact>' lines and an indented reason line")
+			p.add(n, "body allows only blank lines, headings (## Facts, ## Rules, ### <source section>), '- <id> <fact>' lines and an indented reason line")
 			return
 		}
 		p.fact(n, sm[1], sm[2])
 	}
 }
 
+// heading handles a heading line and reports whether line was one. ## Facts and ## Rules set the
+// category once each; ### sets the source section inside it.
+func (p *docParser) heading(n int, line string) bool {
+	if headingLine.FindStringSubmatch(line) == nil {
+		return false
+	}
+	switch kind := categoryKind(line); {
+	case kind != "":
+		if first, dup := p.cats[kind]; dup {
+			p.add(n, "%s appears twice (first at line %d)", line, first)
+		}
+		p.cats[kind] = n
+		p.category, p.section = kind, ""
+	case sectionLine.MatchString(line):
+		if p.category == "" {
+			p.add(n, "source heading before ## Facts or ## Rules")
+		}
+		p.section = strings.TrimSpace(sectionLine.FindStringSubmatch(line)[1])
+	default:
+		p.add(n, "headings are ## Facts, ## Rules and ### <source section>")
+	}
+	return true
+}
+
+// categoryKind maps a category heading line to its kind, or "".
+func categoryKind(line string) string {
+	switch line {
+	case "## Facts":
+		return KindFact
+	case "## Rules":
+		return KindRule
+	}
+	return ""
+}
+
 func (p *docParser) fact(n int, id, text string) {
+	if p.category == "" {
+		p.add(n, "fact before ## Facts or ## Rules")
+	}
 	if msg := CheckText(text); msg != "" {
 		p.add(n, "%s fact: %s", id, msg)
 	}
@@ -245,7 +296,7 @@ func (p *docParser) fact(n int, id, text string) {
 		p.add(n, "%s already a fact at line %d", id, first)
 	}
 	p.seen[id] = n
-	p.doc.Facts = append(p.doc.Facts, Fact{ID: id, Fact: text, Line: n, Section: p.section})
+	p.doc.Facts = append(p.doc.Facts, Fact{ID: id, Fact: text, Kind: cmp.Or(p.category, KindFact), Line: n, Section: p.section})
 	p.last = true
 }
 

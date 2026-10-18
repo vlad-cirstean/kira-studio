@@ -1,6 +1,10 @@
 package memory
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
+)
 
 const (
 	// Origin: who decided a fact. Grade order: user > external > agent.
@@ -24,8 +28,8 @@ const (
 	SourceImport = "import"
 
 	// Kind: a fact is a durable claim; a rule is a standing imperative with a reason.
-	KindFact = "fact"
-	KindRule = "rule"
+	KindFact = memfmt.KindFact
+	KindRule = memfmt.KindRule
 
 	StatusCurrent    = "current"
 	StatusSuperseded = "superseded"

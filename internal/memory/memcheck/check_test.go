@@ -13,8 +13,10 @@ const (
 	idC = "km_9c2d4e6f8g1h"
 )
 
-func doc(id, fact, reason string) string {
-	b := "---\nkira-memory: 2\ngroup: kg_4m9xq2c7v8ab\ntitle: T\norigin: user\nscope: company\n---\n\n- " + id + " " + fact + "\n"
+func doc(id, fact, reason string) string { return docKind(id, fact, reason, "Facts") }
+
+func docKind(id, fact, reason, category string) string {
+	b := "---\nkira-memory: 3\ngroup: kg_4m9xq2c7v8ab\ntitle: T\norigin: user\nscope: company\n---\n\n## " + category + "\n\n- " + id + " " + fact + "\n"
 	if reason != "" {
 		b += "  " + reason + "\n"
 	}
@@ -26,7 +28,7 @@ type fake []Source
 func (f fake) Files(context.Context) ([]Source, error) { return f, nil }
 
 // TestCrossFileDrift: one id must carry the same text in every scanned doc, including the staged
-// set the hook reads from blobs. A code file only reports a retired block header.
+// set the hook reads from blobs. A rule and a fact sharing an id drift too. A code file only reports a retired block header.
 func TestCrossFileDrift(t *testing.T) {
 	files := fake{
 		{"b.memory.md", []byte(doc(idA, "Port is 9090.", "Manifest."))},
@@ -37,6 +39,7 @@ func TestCrossFileDrift(t *testing.T) {
 		{"e.memory.md", []byte(doc(idC, "Other.", ""))},
 		{"f.memory.md", []byte(doc(idC, "Other.", "Later reason."))},
 		{"g.memory.md", []byte(doc(idC, "Other.", "Different reason."))},
+		{"h.memory.md", []byte(docKind(idB, "Other.", "Why.", "Rules"))},
 		{"old.go", []byte("package a\n\n// " + "kira-memory origin=user scope=company\n// " + idA + " Port is 9090.\n")},
 		{"plain.go", []byte("package a\n\n// Ports are fixed by the manifest (" + idA + ").\n")},
 	}
@@ -46,17 +49,18 @@ func TestCrossFileDrift(t *testing.T) {
 	}
 	// A reason-less copy never conflicts; two stated reasons that differ do (g against f).
 	for _, want := range []string{
-		"c.memory.md:9: " + idA + " differs from a.memory.md:9",
-		"g.memory.md:9: " + idC + " differs from e.memory.md:9",
+		"c.memory.md:11: " + idA + " differs from a.memory.md:11",
+		"g.memory.md:11: " + idC + " differs from e.memory.md:11",
+		"h.memory.md:11: " + idB + " differs from d.memory.md:11",
 		"old.go:3: kira-memory comment blocks are retired (P296)",
-		"memory-check: 3 problem(s)",
+		"memory-check: 4 problem(s)",
 	} {
 		if !strings.Contains(errOut.String(), want) {
 			t.Errorf("stderr = %q, want %q", errOut.String(), want)
 		}
 	}
 
-	clean := fake{files[0], files[1], files[3], files[5], files[6], files[9]}
+	clean := fake{files[0], files[1], files[3], files[5], files[6], files[10]}
 	out.Reset()
 	errOut.Reset()
 	if code := runCheck(context.Background(), clean, &out, &errOut); code != 0 || out.String() != "memory-check: 6 file(s), 5 fact(s) ok\n" {

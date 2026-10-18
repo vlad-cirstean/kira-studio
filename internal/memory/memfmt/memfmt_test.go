@@ -1,6 +1,7 @@
 package memfmt
 
 import (
+	"cmp"
 	"reflect"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ const (
 	idA = "km_7h3kq9x2mfa4"
 	idB = "km_2b8c4d6f8g0h"
 	idC = "km_9c2d4e6f8g1h"
+	idD = "km_5d3e5g7h9j2k"
 	grp = "kg_4m9xq2c7v8ab"
 )
 
@@ -22,8 +24,8 @@ func problemLines(ps []Problem) []int {
 }
 
 func validDocText() string {
-	return "---\nkira-memory: 2\ngroup: " + grp + "\ntitle: Billing deploys\nfrom: docs/billing.md\norigin: external\nsource: confluence\nscope: project\nproject: github.com/acme/billing\nkeywords: billing, deploy, release\nupdated: 2026-10-12\n---\n\n## Ports\n\n" +
-		"- " + idA + " Billing API listens on port 9090 in production.\n  Deploy manifest changed in March release.\n- " + idB + " Staging deploys at 09:00 UTC.\n\n## Jobs\n\n- " + idC + " Jobs run nightly.\n"
+	return "---\nkira-memory: 3\ngroup: " + grp + "\ntitle: Billing deploys\nfrom: docs/billing.md\norigin: external\nsource: confluence\nscope: project\nproject: github.com/acme/billing\nkeywords: billing, deploy, release\nupdated: 2026-10-12\n---\n\n## Facts\n\n### Ports\n\n" +
+		"- " + idA + " Billing API listens on port 9090 in production.\n  Deploy manifest changed in March release.\n- " + idB + " Staging deploys at 09:00 UTC.\n\n### Jobs\n\n- " + idC + " Jobs run nightly.\n\n## Rules\n\n### Ports\n\n- " + idD + " Never expose port 9090 outside the VPC.\n  Staging has no firewall.\n"
 }
 
 func TestParseDoc(t *testing.T) {
@@ -31,24 +33,32 @@ func TestParseDoc(t *testing.T) {
 	if !in || len(ps) != 0 {
 		t.Fatalf("in=%v problems=%v", in, ps)
 	}
-	if d.Group != grp || d.Version != 2 || d.From != "docs/billing.md" || d.Origin != "external" || d.Source != "confluence" || d.Project != "github.com/acme/billing" || len(d.Keywords) != 3 || d.Updated != "2026-10-12" {
+	if d.Group != grp || d.Version != 3 || d.From != "docs/billing.md" || d.Origin != "external" || d.Source != "confluence" || d.Project != "github.com/acme/billing" || len(d.Keywords) != 3 || d.Updated != "2026-10-12" {
 		t.Errorf("doc = %+v", d)
 	}
-	if len(d.Facts) != 3 || d.Facts[0].Section != "Ports" || d.Facts[0].Reason != "Deploy manifest changed in March release." || d.Facts[1].Reason != "" || d.Facts[2].Section != "Jobs" {
+	if len(d.Facts) != 4 || d.Facts[0].Section != "Ports" || d.Facts[0].Kind != KindFact || d.Facts[0].Reason != "Deploy manifest changed in March release." || d.Facts[1].Reason != "" || d.Facts[2].Section != "Jobs" ||
+		d.Facts[3].Kind != KindRule || d.Facts[3].Section != "Ports" || d.Facts[3].Reason != "Staging has no firewall." {
 		t.Errorf("facts = %+v", d.Facts)
 	}
 	if _, in, ps := ParseDoc([]byte("# Notes\n\nfree prose km_bad\n")); in || ps != nil {
 		t.Error("legacy md must be out of scope")
 	}
 	if _, in, _ := ParseDoc([]byte("---\ntitle: x\n---\n")); in {
-		t.Error("front matter without kira-memory: 2 must be out of scope")
+		t.Error("front matter without kira-memory: 3 must be out of scope")
 	}
 
 	// A kira-memory: 1 doc is the retired format: its group parses, nothing else is read.
 	v1 := "---\nkira-memory: 1\ngroup: " + grp + "\ntitle: Old\norigin: user\nscope: company\n---\n\n" + idA + " fact: A.\n" + idA + " reason: B.\n"
 	d, in, ps = ParseDoc([]byte(v1))
-	if !in || d.Version != 1 || d.Group != grp || len(d.Facts) != 0 || len(ps) != 1 || !strings.Contains(ps[0].Msg, "retired P273 format; rewrite it as kira-memory: 2") {
+	if !in || d.Version != 1 || d.Group != grp || len(d.Facts) != 0 || len(ps) != 1 || !strings.Contains(ps[0].Msg, "retired P273 format; rewrite it as kira-memory: 3") {
 		t.Errorf("v1: in=%v doc=%+v problems=%v", in, d, ps)
+	}
+
+	// A kira-memory: 2 doc is retired too: one problem naming the v3 layout, no facts.
+	v2 := strings.Replace(strings.Replace(validDocText(), "kira-memory: 3", "kira-memory: 2", 1), "## Facts", "## Ports", 1)
+	d, in, ps = ParseDoc([]byte(v2))
+	if !in || d.Version != 2 || d.Group != grp || len(d.Facts) != 0 || len(ps) != 1 || !strings.Contains(ps[0].Msg, "kira-memory: 2 is retired (P297)") {
+		t.Errorf("v2: in=%v doc=%+v problems=%v", in, d, ps)
 	}
 
 	v := validDocText()
@@ -66,14 +76,21 @@ func TestParseDoc(t *testing.T) {
 		{"9 hash in value", strings.Replace(v, "title: Billing deploys", "title: Billing #1", 1), "' #'"},
 		{"9 yaml indicator", strings.Replace(v, "title: Billing deploys", "title: [Billing]", 1), "YAML indicator"},
 		{"9 bad date", strings.Replace(v, "2026-10-12", "2026-13-40", 1), "YYYY-MM-DD"},
-		{"9 not closed", strings.Replace(v, "---\n\n## Ports", "\n## Ports", 1), "not closed"},
+		{"9 not closed", strings.Replace(v, "---\n\n## Facts", "\n## Facts", 1), "not closed"},
 		{"10 prose", v + "\nfree prose\n", "body allows only"},
 		{"10 old list bullet", v + "\n* " + idB[:3] + "2b8c4d6f8g1k Another.\n", "body allows only"},
 		{"11 reason after blank", strings.Replace(v, "  Deploy manifest", "\n  Deploy manifest", 1), "directly follow a fact"},
-		{"11 reason after heading", strings.Replace(v, "## Jobs\n\n", "## Jobs\n  Stray.\n\n", 1), "directly follow a fact"},
-		{"11 reason first in doc", strings.Replace(v, "## Ports\n\n", "## Ports\n\n  Stray.\n", 1), "directly follow a fact"},
+		{"11 reason after heading", strings.Replace(v, "### Jobs\n\n", "### Jobs\n  Stray.\n\n", 1), "directly follow a fact"},
+		{"11 reason first in doc", strings.Replace(v, "## Facts\n\n", "## Facts\n\n  Stray.\n", 1), "directly follow a fact"},
 		{"12 markup in fact", strings.Replace(v, "port 9090", "port `9090`", 1), "Markdown"},
 		{"12 markup in reason", strings.Replace(v, "March release", "**March** release", 1), "Markdown"},
+		{"17 facts twice", v + "\n## Facts\n", "## Facts appears twice"},
+		{"17 rules twice", v + "\n## Rules\n", "## Rules appears twice"},
+		{"17 fact before category", strings.Replace(v, "## Facts\n\n### Ports\n\n", "- "+idD[:0]+"km_8a2b4c6d8e0f Early.\n\n## Facts\n\n### Ports\n\n", 1), "fact before ## Facts or ## Rules"},
+		{"17 source heading before category", strings.Replace(v, "## Facts\n\n", "### Early\n\n## Facts\n\n", 1), "source heading before"},
+		{"17 other heading", v + "\n## Notes\n", "headings are ## Facts"},
+		{"17 retired heading", v + "\n# Title\n", "headings are ## Facts"},
+		{"17 deep heading", v + "\n#### Deep\n", "headings are ## Facts"},
 		{"13 duplicate", v + "- " + idA + " Again.\n", "already a fact"},
 		{"14 group", strings.Replace(v, grp, "km_4m9xq2c7v8ab", 1), "kg_ id"},
 		{"15 retired line", v + idA[:0] + idC + " fact: Old.\n", "retired P273"},
@@ -118,14 +135,15 @@ func TestFormatRoundTrip(t *testing.T) {
 		}
 	}
 
-	doc := Doc{Group: grp, Title: "Billing deploys", From: "docs/billing.md", Version: 2, Keywords: []string{"billing", "deploy"}, Updated: "2026-10-12",
+	doc := Doc{Group: grp, Title: "Billing deploys", From: "docs/billing.md", Version: 3, Keywords: []string{"billing", "deploy"}, Updated: "2026-10-12",
 		Provenance: Provenance{Origin: "external", Source: "confluence", Scope: "project", Project: "github.com/acme/billing"},
 		Facts: []Fact{
 			{ID: idA, Fact: "Port is 9090.", Reason: "Manifest.", Section: "Ports"},
 			{ID: idB, Fact: "Deploys at 09:00.", Section: "Ports"},
 			{ID: idC, Fact: "Jobs run nightly.", Reason: "Cron.", Section: "Jobs"},
+			{ID: idD, Fact: "Never run jobs by hand.", Kind: KindRule, Section: "Jobs"},
 		}}
-	for _, variant := range []string{"full", "no sections", "minimal front matter"} {
+	for _, variant := range []string{"full", "no sections", "rules only", "minimal front matter"} {
 		d := doc
 		d.Facts = append([]Fact(nil), doc.Facts...)
 		switch variant {
@@ -133,6 +151,8 @@ func TestFormatRoundTrip(t *testing.T) {
 			for i := range d.Facts {
 				d.Facts[i].Section = ""
 			}
+		case "rules only":
+			d.Facts = []Fact{{ID: idD, Fact: "Never run jobs by hand.", Kind: KindRule}}
 		case "minimal front matter":
 			d.From, d.Keywords, d.Updated = "", nil, ""
 		}
@@ -152,18 +172,31 @@ func TestFormatRoundTrip(t *testing.T) {
 		for i := range got.Facts {
 			got.Facts[i].Line = 0
 		}
+		for i := range d.Facts {
+			d.Facts[i].Kind = cmp.Or(d.Facts[i].Kind, KindFact)
+		}
 		if !reflect.DeepEqual(got, d) {
 			t.Errorf("%s: doc round trip = %+v", variant, got)
 		}
 	}
 	out, _ := FormatDoc(doc)
-	if !strings.Contains(out, "\n## Ports\n\n- "+idA+" Port is 9090.\n  Manifest.\n- "+idB+" Deploys at 09:00.\n\n## Jobs\n\n- "+idC) {
+	if !strings.Contains(out, "\n## Facts\n\n### Ports\n\n- "+idA+" Port is 9090.\n  Manifest.\n- "+idB+" Deploys at 09:00.\n\n### Jobs\n\n- "+idC+" Jobs run nightly.\n  Cron.\n\n## Rules\n\n### Jobs\n\n- "+idD) {
 		t.Errorf("doc layout = %q", out)
 	}
 	bad := doc
 	bad.Facts = []Fact{{ID: idA, Fact: "x", Section: "A"}, {ID: idB, Fact: "y"}}
 	if _, err := FormatDoc(bad); err == nil {
 		t.Error("a section cannot end")
+	}
+	// The section rule holds per category: a rule with no section is fine after a sectioned fact.
+	mixed := doc
+	mixed.Facts = []Fact{{ID: idA, Fact: "x", Section: "A"}, {ID: idB, Fact: "y", Kind: KindRule}}
+	if _, err := FormatDoc(mixed); err != nil {
+		t.Errorf("a rule outside any section after a sectioned fact: %v", err)
+	}
+	bad.Facts = []Fact{{ID: idA, Fact: "x", Kind: "law"}}
+	if _, err := FormatDoc(bad); err == nil {
+		t.Error("an unknown kind must be refused")
 	}
 }
 

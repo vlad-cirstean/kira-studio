@@ -579,7 +579,7 @@ func TestAutoStartWaitsOnMemdocHeaderClaims(t *testing.T) {
 		if project != "" {
 			project = "project: " + project + "\n"
 		}
-		return "---\nkira-memory: 2\ngroup: kg_4m9xq2c7v8ab\ntitle: Billing deploys\norigin: " + origin + "\nscope: " + scope + "\n" + project + "updated: 2026-10-12\n---\n\n## Ports\n\n" +
+		return "---\nkira-memory: 3\ngroup: kg_4m9xq2c7v8ab\ntitle: Billing deploys\norigin: " + origin + "\nscope: " + scope + "\n" + project + "updated: 2026-10-12\n---\n\n## Facts\n\n### Ports\n\n" +
 			"- km_7h3kq9x2mfa4 Billing API listens on port 9090 in production.\n  Deploy manifest changed in March release.\n"
 	}
 	cases := []struct {

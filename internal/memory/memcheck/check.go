@@ -25,12 +25,12 @@ type Problem struct {
 func (p Problem) String() string { return fmt.Sprintf("%s:%d: %s", p.Path, p.Line, p.Msg) }
 
 type seenFact struct {
-	fact, reason string
-	at           string
+	fact, reason, kind string
+	at                 string
 }
 
-// Check validates every file and the facts across them: one id must carry the same fact text
-// everywhere, and the same reason wherever two files both state one. Problems come sorted; facts counts the valid facts read.
+// Check validates every file and the facts across them: one id must carry the same fact text and
+// kind everywhere, and the same reason wherever two files both state one. Problems come sorted; facts counts the valid facts read.
 func Check(files []Source) (problems []Problem, facts int) {
 	sorted := append([]Source(nil), files...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Path < sorted[j].Path })
@@ -56,8 +56,8 @@ func Check(files []Source) (problems []Problem, facts int) {
 			prev, ok := seen[x.ID]
 			switch {
 			case !ok:
-				seen[x.ID] = seenFact{x.Fact, x.Reason, at}
-			case prev.fact != x.Fact || (prev.reason != "" && x.Reason != "" && prev.reason != x.Reason):
+				seen[x.ID] = seenFact{x.Fact, x.Reason, x.Kind, at}
+			case prev.fact != x.Fact || prev.kind != x.Kind || (prev.reason != "" && x.Reason != "" && prev.reason != x.Reason):
 				problems = append(problems, Problem{f.Path, x.Line, fmt.Sprintf("%s differs from %s", x.ID, prev.at)})
 			case prev.reason == "" && x.Reason != "":
 				prev.reason = x.Reason

@@ -92,7 +92,7 @@ func (s *Service) applyDocFact(ctx context.Context, req ApplyDocRequest, request
 		return out, nil
 	}
 	in := commitInput{
-		Fact: f.Fact, Reason: f.Reason, Origin: d.Origin, SourceTag: d.Source, Scope: d.Scope, Project: d.Project,
+		Fact: f.Fact, Kind: f.Kind, Reason: f.Reason, Origin: d.Origin, SourceTag: d.Source, Scope: d.Scope, Project: d.Project,
 		SessionID: d.Session, Source: SourceImport, SourceRef: req.FileID, RequestID: requestID, Groups: groups,
 	}
 	for attempt := 0; ; attempt++ {
@@ -131,5 +131,5 @@ func (s *Service) applyDocFact(ctx context.Context, req ApplyDocRequest, request
 }
 
 func sameDocFact(cur Memory, f memfmt.Fact) bool {
-	return normalize(cur.Fact) == normalize(f.Fact) && collapse(cur.Reason) == collapse(f.Reason)
+	return cur.Kind == cmp.Or(f.Kind, KindFact) && normalize(cur.Fact) == normalize(f.Fact) && collapse(cur.Reason) == collapse(f.Reason)
 }
