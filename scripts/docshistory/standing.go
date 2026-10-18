@@ -540,7 +540,7 @@ func standingMain(args []string) error {
 	}
 	cmd := args[0]
 	fs := flag.NewFlagSet("doc "+cmd, flag.ContinueOnError)
-	runs := fs.String("runs", "docs/v2.6/plans/P303-runs", "runs directory")
+	runs := fs.String("runs", "docs/history-runs", "runs directory")
 	binary := fs.String("binary", "", "prebuilt kira-space binary (default: build one)")
 	maxUSD := fs.Float64("max-usd", 0, "stop starting units when charged plus in-flight estimates would pass this (0 = no cap)")
 	only := fs.String("only", "", "comma-separated unit slugs")

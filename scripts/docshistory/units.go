@@ -60,9 +60,6 @@ func checkChapter(ch string) error {
 	if !chapterRe.MatchString(ch) {
 		return fmt.Errorf("bad chapter %q", ch)
 	}
-	if ch == "v2.6" {
-		return fmt.Errorf("v2.6 is the current chapter and is never folded")
-	}
 	return nil
 }
 
@@ -107,8 +104,9 @@ func sortedKeys(m map[string]string) []string {
 	return ks
 }
 
-// planResultChapters are the chapters whose plan files carry Result sections that belong to SPEC phases.
-var planResultChapters = map[string]bool{"v2.0": true, "v2.5": true}
+// planResultChapter reports whether a chapter's plan files carry Result sections that belong to SPEC phases:
+// v2.0 and every chapter from v2.5 on.
+func planResultChapter(ch string) bool { return ch == "v2.0" || !chapterLess(ch, "v2.5") }
 
 // loadChapter reads docs/<ch> from commit and parses it.
 func loadChapter(ch, commit string) (*Parsed, error) {
@@ -132,7 +130,7 @@ func loadChapter(ch, commit string) (*Parsed, error) {
 			readme, err = show(f)
 		case !strings.Contains(rel, "/"):
 			extras[rel], err = show(f)
-		case planResultChapters[ch] && strings.HasPrefix(rel, "plans/") && strings.Count(rel, "/") == 1:
+		case planResultChapter(ch) && strings.HasPrefix(rel, "plans/") && strings.Count(rel, "/") == 1:
 			plans[strings.TrimPrefix(rel, "plans/")], err = show(f)
 		}
 		if err != nil {
