@@ -19,7 +19,7 @@ Registered in your Claude Code user scope from `Settings > Memory`. Claude Code 
 
 ### store_memory
 
-Store facts. The store splits independent claims into separate facts. A list about one subject stays one fact. It rewords each fact and updates a matching fact in the same scope, unless the stored one has a higher origin. An unclear item or weak reason is challenged: nothing is stored and questions come back.
+Store facts and standing rules. A rule is an imperative that holds beyond one task, with its reason. The store splits independent claims into separate facts. A list about one subject stays one fact. It rewords each fact and updates a matching fact in the same scope, unless the stored one has a higher origin. An unclear item, a weak reason, a question or a one-off task is challenged: nothing is stored and questions come back. A rule and a fact stay separate memories. The result and every search result show the kind, `fact` or `rule`, after the version.
 
 - `items`: 1 to 20 items. Each has `fact`, `reason`, `origin` (user, agent or external), `scope` (company, project or personal), plus `sourceTag` for external and `project` for project scope.
 - `clarifications`: question and answer pairs for an earlier challenge.
@@ -30,7 +30,7 @@ To cite a memory in a code comment, write its fact id.
 
 ### search_memories
 
-Search by words and meaning, best first.
+Search by words and meaning, best first. The meta line of a result shows its kind, `fact` or `rule`.
 
 - `query`: free text.
 - `includeHistory`: also return older versions.
@@ -48,29 +48,29 @@ The facts stored with one fact, per group, newest first. Arguments: `id`, `limit
 
 ### ingest_files
 
-Store the facts of files and folders by path, in the background. Send absolute paths, never content.
+Store the facts and rules of files and folders by path, in the background. Send absolute paths, never content.
 
 - `paths`: 1 to 100 paths.
-- `origin`, `sourceTag`, `scope`, `project`: as in `store_memory`.
+- `origin`, `sourceTag`, `scope`, `project`: as in `store_memory`. Storing needs `paths`, `origin` and `scope`.
 - `groups`: up to 4 groups of kind task or thread.
 - `writeDoc`: also write `<name>.memory.md` beside each file. Default false.
 - `session`: a Claude Code session id.
+- `text`: text to distill, up to 120,000 characters. Only with `distill`.
+- `distill`: `true` stores nothing and returns the merged lines instead. Default false.
 
 A large job waits for you to start it in Kira Space. So does a job holding a kira-memory doc whose header claims a higher origin, or another scope or project, than the job. A doc's header provenance wins on import, so you confirm it first.
+
+#### Distill
+
+With `distill` true, the call condenses text or one file into short lines and stores nothing. No gate runs and no import job is created. Give `text` or one absolute file path in `paths`, never both. Any other argument is refused: `origin`, `sourceTag`, `scope`, `project`, `groups`, `writeDoc` and `session`. A folder is refused. Do not read the file first.
+
+It runs the import pipeline up to the point where import would store. The input is split into parts, and Claude extracts the facts and rules of each part. Doubtful facts are checked against the source. One merge call then joins duplicates across the parts, resolves unclear references, drops what is not a memory and returns the lines in source order. The merge covers only the input and never reads your memories. Examples are never lines by themselves, and a table is kept only as the headline figure of a stated conclusion.
+
+The call waits for the result. The text holds the lines, one per line with no prefix. A blank line and one `unresolved: <fact> | <questions>` line per fact the input leaves open follow. The structured result has `lines` (each with `text` and `kind`), `unresolved` and `costUsd`. A call costs Claude tokens: large input is split into at most 16 parts, and the call stops at 2 USD. It is not available to the agent an import runs.
 
 ### ingest_status
 
 State of an ingest job. Argument: `id`, the job id from `ingest_files`.
-
-### distill
-
-Condense text or a file into short, atomic lines, in source order. Stores nothing and never touches the memory store, so no gate runs. To store a file, use `ingest_files`.
-
-- `text`: the text, up to 120,000 characters. Give `text` or `path`, not both.
-- `path`: an absolute file path.
-- `mode`: `facts` (default) or `instructions`. `instructions` keeps each rule as a short imperative and keeps negations and numbers verbatim, for condensing prompts.
-
-The result is the lines only, one per line. A call costs Claude tokens: large input is split into at most 16 parts, and the call stops at 2 USD. `distill` is not available to the agent an import runs.
 
 ### remember (prompt)
 

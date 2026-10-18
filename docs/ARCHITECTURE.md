@@ -4853,7 +4853,7 @@ replies and full terminal attach for Claude Code sessions.
 - MCP server: `<Kira Space executable> memory-mcp`, stdio, spawned per session by Claude Code, so it works
   with the app closed or open. `main.go` calls `appwire.RunArgvShim` (`internal/appwire/wire.go`) before `startupfail` and
   `acquireSingleInstance`. Tools `store_memory` (progress `checking`, `reconciling`, `saving`), `search_memories` (`includeHistory`, `scopes`, `origins`, `project`, `limit`), `memory_history`,
-  `memory_context`, plus `ingest_files` and `ingest_status` when `Options.Ingest` is set and `distill` when `Options.Distill` is set (neither in import mode);
+  `memory_context`, plus `ingest_files` and `ingest_status` when `Options.Ingest` is set (not in import mode); `ingest_files` with `distill` true needs `Options.Distill`, else refused;
   prompt `remember` (`/mcp__kira-memory__remember`). Registered as `kira-memory` with `claude mcp add-json --scope user`
   from Settings > Memory (repo-root `internal/mcpinstall`, shared; the Database MCP header-helper
   script lives in Studio's `mcpauth`).
@@ -4917,19 +4917,34 @@ replies and full terminal attach for Claude Code sessions.
   (`<marker> kira-memory <key>=`, `memfmt.RetiredComments`). Migration is manual: store each fact, cite the returned
   id, never reuse an id from the block (its `add` ids were never stored). Retired v1 lines (`<id> fact:`, `<id> reason:`,
   `<id> keywords:`) yield one problem naming the P273 format; the formatter refuses a fact text starting `fact: `, `reason: ` or `keywords: `.
-- Doc format over `.md`/`.txt`: front matter (`---`, `kira-memory: 2`, `group: kg_...`, `title`, optional `from`
+- Doc format over `.md`/`.txt` (`kira-memory: 3`, P297): front matter (`---`, `kira-memory: 3`, `group: kg_...`, `title`, optional `from`
   (job-relative source path), `origin`, `source`, `scope`, `project`, optional `session`, doc-level `keywords`,
-  `updated`), body only `## section` headings and `- <id> <fact>` items, each with an optional two-space-indented
-  reason line. In scope only when line 1 is `---` and line 2 `kira-memory: 1` or `2`; version 1 yields one
-  problem (`kira-memory: 1 is the retired P273 format; rewrite it as kira-memory: 2`) and no reader. One
-  provenance per doc. P274 writes and re-ingests it by parse alone.
+  `updated`), body only `## Facts` and `## Rules` (each at most once, any order; set `memfmt.Fact.Kind`, reset the
+  section), `### <source section>` under a category, and `- <id> <text>` items with an optional two-space-indented
+  reason line. A fact line before a category, a `###` before one, and any other heading are problems. In scope only
+  when line 1 is `---` and line 2 `kira-memory: 1`, `2` or `3`; versions 1 and 2 yield one problem each
+  (`kira-memory: 2 is retired (P297); rewrite it as kira-memory: 3 ...`) and no reader. `DocLineSource` matches
+  `## (Facts|Rules)` and `### ...`. The `Stated in <from>, <heading>` locator uses the `###` heading, never the
+  category. `FormatDoc` writes `## Facts` then `## Rules`, drops an empty category, and applies the section rule per
+  category. `RenderDoc` tracks the running section per kind; `writeDocFile` migrates a v2 doc of its own group in
+  place. `ApplyDoc` takes the kind from the category; `sameDocFact` compares kind (a kind change is a new version);
+  `memcheck` reports one id with two kinds as drift. One provenance per doc. P274 writes and re-ingests it by parse alone.
+- Memory kind (P297): `memories.kind` is `fact` or `rule` (migration 8, default `fact`, in the immutable trigger).
+  A fact is a durable claim; a rule is a standing imperative with its reason; a question, a one-off task or a
+  procedure step is neither. The gate sets it (`kind` in each output fact; empty means `fact`, any other value is
+  `ErrClaudeOutput`), a merge line carries it, a v3 doc takes it from the category. Never caller-set. Reconcile keeps
+  kinds apart: input facts and candidates carry `kind`, and `checkDecision` turns a noop or update across kinds into
+  an add. MCP text prints the kind after the version (`v3 rule origin=...`, `Added km_... v1 rule: ...`); the
+  UI badges a rule only. Prompt fragment `memory.kinds` defines both kinds and the example and table rules (an example
+  is never a memory by itself; a table keeps one headline figure only as evidence for a stated conclusion); gate,
+  extract, finalize and merge include it. Existing rows are facts; there is no reclassification.
 - Source locator: `memfmt.Locator(path, section)` returns `Stated in <path>[, <section>]`; `ParseLocator(reason, path)`
   is its exact inverse. Import, store pin and write-back share both.
 - Style rule: `memory.gate.system` rewrites each fact and reason to `CLAUDE.md` style (one claim, about 20 words,
   keeps negations, numbers, names, ids); `memory.reconcile.system` asks the same for update/add text. Go
   collapses whitespace runs to one space in both (`validateGate`, `checkDecision`).
 - MCP text output (`search_memories`, `memory_history`, `memory_context`): same grammar, `<id> <fact>`, then
-  `  <reason>`, then `  vN origin=... [source=...] scope=... [project=...] [match=...] [score parts] [historical] [ctx=N]`.
+  `  <reason>`, then `  vN kind origin=... [source=...] scope=... [project=...] [match=...] [score parts] [historical] [ctx=N]`.
   Ranking "Output" lists the score parts; neutral parts are omitted. `ctx=N`: `memory_context` has N facts stored with it.
 - Validator: `<Kira Space executable> memory-check` (`internal/memory/memcheck`, `appwire.RunArgvShim` case).
   Checks docs and flags retired comment blocks. `[paths]` scans git-tracked files (or walks outside git); `--staged` checks staged blobs and runs the
@@ -4985,8 +5000,20 @@ replies and full terminal attach for Claude Code sessions.
   user or external. Facts carry the requesting session for MCP jobs, plus the file's `document` group
   and the job's `task`/`thread` groups (job groups cap at 4). Scope `project` without `project` uses
   `DetectProject` of the first path, then the server's project.
-- Distill (P285 Part 2). MCP tool `distill` on `kira-memory`: text or one absolute file path in, terse atomic lines out (source order, one per line; structured output `{"lines": [string]}`), `mode` `facts` (default) or `instructions` (rules as short imperatives, negations and numbers verbatim). Read-only (`ReadOnlyHint`): never calls the gate, never writes `memory.db`; not registered in import mode. Prompt `memory.distill.system` (schema `{"lines": [{"text", "unresolved"}]}`, no evidence quote); core `importer.Distiller` (`Distill(ctx, DistillRequest) (DistillResult, error)`: lines, cost, chunk count, in and out runes). Limits: input at most 120 000 characters (text, or a file read with the 1 MiB import cap), at most 16 chunks under `DefaultBudget`, three chunks at once, per chunk 0.50 USD and 180 s, per call 2.00 USD (no chunk starts once reported spend reaches it; the call then fails naming the amount). Bad input is a tool error (`memory.ErrInvalid`). The import pipeline still runs the extract prompt (below): a unified import (distill per chunk, section and `Stated in` reason built by code, no evidence quote, salient-token check instead of the quote check) was built, measured and reverted; see Known open items.
-  Part 4 (UI): `bridge.MemoryDistillService` (own bound service; shares prompts and engine with `MemoryService`) runs the same `importer.Distiller` per call. Methods: `Distill(ctx, {requestId, text|path, mode})` returns `{lines, costUsd, chunks, inChars, outChars, inTokens, outTokens}` (`outChars` counts lines joined by newline, as Copy copies; tokens are runes/3); `Limits()`; `Choose()` (native single-file picker, import filter); `ToImport({lines, source})` writes `<memory home>/distilled/distilled-<UTC>-<4 hex>.md` (dir 0700, file 0600, heading plus one bullet per line, 1 to 640 lines) and creates an import job (channel ui) through the normal engine. Progress: `Emit` on `kira:memory:distill`, payload `{requestId, done, total, costUsd}`, first event `done` 0 after chunking, then one per finished part (core `DistillRequest.Progress`). One call at a time app-wide (`TryLock`; second call `E_CONFLICT`). Cancelling the bound call cancels ctx (`E_CANCELLED`); finished parts stay charged. Errors: core `importer.DistillError` (`tooLong`, `tooManyParts`, `unreadable`, `spendCap`; `Error()` text unchanged for MCP) maps to catalog keys `backend.space.memory.distill.<reason>.body` with `E_BAD_REQUEST`; other errors go through `memoryErr`. Read-only: no `memory.db` write, no `kira:memory:changed`. UI: `DistillView` in the Memory main area (`useMemoryUiStore().view` is `memory`, `imports` or `distill`); draft, run and result live in `useDistillUiStore` (Pinia, survives a mode switch, holds the `AbortController`); bridge calls go through TanStack Query (`distillQueries.ts`; the progress push writes the store). Entry points: header button, and `Distill selection` in the Space file view (Monaco action). Copy copies picked lines; `Store…` opens `AddMemoryDialog` in lines mode (one item per line, gate and challenge unchanged, 20 lines at most); `Import as document…` calls `ToImport`, then the normal import confirm.
+- Distill (P285 Part 2, P297): no `distill` tool and no job rows. `ingest_files` with `distill` true runs the import
+  pipeline synchronously in process and stores nothing: `importer.Distiller.Distill` chunks (`chunkFile`), runs
+  `ClaudeAgent.Extract` per chunk (three at once), builds facts with `chunkFinalFacts` (shared with `loadExtracted`),
+  cross-checks questionable ones with `ClaudeAgent.Verify` in batches (`batchVerdicts`, `applyVerdicts` shared with the
+  runner), then one `ClaudeAgent.Merge` call (`memory.merge.system`, no tools, no MCP; shares fragment
+  `memory.merge.rules` with import finalize steps 1 to 3) returns `lines` (`text`, `kind`), `unresolved` and `dropped`.
+  The merge covers the input only and never reads the store. One mode (the `instructions` mode and `promptdistill` are
+  gone). Input is `text` (at most 120 000 characters, source name `text.md`) or one absolute file; every store-only
+  argument is refused with `distill`, `text` without it is refused, `paths`, `origin` and `scope` are not in the schema
+  `required` list (Go checks them when storing). Limits: 120 000 characters, 16 chunks, `tooManyFacts` guard (as finalize),
+  per call 2.00 USD across all stages (no extract chunk, verify batch or merge starts once reported spend reaches it; the
+  error names the amount). No retry. MCP output: text is the lines, one per line with no kind prefix, then a blank
+  line and `unresolved: <fact> | <questions>` per fact; structured `lines`, `unresolved`, `costUsd`. Not registered in import mode.
+  Part 4 (UI): `bridge.MemoryDistillService` (own bound service; shares prompts and engine with `MemoryService`) runs the same `importer.Distiller` per call. Methods: `Distill(ctx, {requestId, text|path})` returns `{lines: [{text, kind}], unresolved: [{fact, questions}], costUsd, chunks, inChars, outChars, inTokens, outTokens}` (`outChars` counts line texts joined by newline, as Copy copies; tokens are runes/3); `Limits()`; `Choose()` (native single-file picker, import filter); `ToImport({lines, source})` writes `<memory home>/distilled/distilled-<UTC>-<4 hex>.md` (dir 0700, file 0600, heading plus one bullet per line, 1 to 640 lines) and creates an import job (channel ui) through the normal engine. Progress: `Emit` on `kira:memory:distill`, payload `{requestId, stage, done, total, costUsd}`, `stage` `extract` (total = chunks), `verify` (batches) or `merge` (1); first event `extract` 0 after chunking. One call at a time app-wide (`TryLock`; second call `E_CONFLICT`). Cancelling the bound call cancels ctx (`E_CANCELLED`); finished stages stay charged. Errors: core `importer.DistillError` (`tooLong`, `tooManyParts`, `tooManyFacts`, `unreadable`, `spendCap`; `Error()` text unchanged for MCP) maps to catalog keys `backend.space.memory.distill.<reason>.body` with `E_BAD_REQUEST`; other errors go through `memoryErr`. Read-only: no `memory.db` write, no `kira:memory:changed`. UI: `DistillView` in the Memory main area (`useMemoryUiStore().view` is `memory`, `imports` or `distill`); draft, run and result live in `useDistillUiStore` (Pinia, survives a module switch, holds the `AbortController`); bridge calls go through TanStack Query (`distillQueries.ts`; the progress push writes the store). The result marks rules with a `Rule` badge and lists `unresolved` apart. Entry points: header button, and `Distill selection` in the Space file view (Monaco action). Copy copies picked line texts; `Store…` opens `AddMemoryDialog` in lines mode (one item per line, gate decides the kind, challenge unchanged, 20 lines at most); `Import as document…` calls `ToImport`, then the normal import confirm.
 - Runner: the scheduler is one detached `kira-space memory-ingest` process per `memory.db`
   (`RunArgvShim` case, `memorycli.RunIngest`; `Setsid`, stderr appended to
   `<memory home>/import-runner.log`, restarted over 1 MiB). Exclusive `flock` on
@@ -5019,7 +5046,7 @@ replies and full terminal attach for Claude Code sessions.
   committed reason of every import add or update to the item's reason when `ParseLocator` accepts it, else the bare
   locator. Finalize merges facts of one subject and aspect (at most 300 characters); the gate keeps a list about one
   subject as one fact and keeps a locator reason verbatim.
-- Formatted docs: a `.md`/`.txt` whose first two lines are `---` and `kira-memory: 2` (or `1`, which fails) is kind `memdoc`.
+- Formatted docs: a `.md`/`.txt` whose first two lines are `---` and `kira-memory: 3` (or `2` or `1`, which fail) is kind `memdoc`.
   It parses with `memfmt.ParseDoc` (first 5 problems fail the file), no chunk, no claude call.
   Provenance and group come from the doc header. `Service.ApplyDoc` per fact id: no lineage adds with the
   doc's id, equal fact and reason noop, an edit updates when the doc grade is at least the stored grade, else
@@ -5263,7 +5290,7 @@ PII` submenu (`views/grid/menu.ts`'s `headerMenu`) and the toolbar preview toggl
   against an older default.
 - **Validation (server side).** Template parses, every `prompt:"required"` variable referenced, every
   required fragment included (`memory.dataHygiene` in the memory system prompts: injection defence),
-  executes against example vars. Schema-bound prompts (gate, reconcile, distill, import extract, verify and finalize)
+  executes against example vars. Schema-bound prompts (gate, reconcile, merge, import extract, verify and finalize)
   keep their JSON schema fixed; it shows read-only in Settings.
 - **Source injection.** No global. Consumers get a `llmprompts.Source` (`Resolve`, `Revision`) through
   their options: `memory.ServiceOptions`, `mcpserver.Options`, `claudeheadless`, `scriptruns`, ADE,
@@ -5296,8 +5323,8 @@ PII` submenu (`views/grid/menu.ts`'s `headerMenu`) and the toolbar preview toggl
   keys. Tooling (`go run ./internal/llmprompts/cmd/...`): `promptsizes` prints sizes, `-snapshot f.json`
   writes defaults and sizes, `-compare f.json` prints before and after per id and fails on a lost
   protected token (actions, numbers, quoted spans, identifiers, tool argument names, negations; allowed
-  losses in `docs/v2.5/plans/P289-runs/allowed-losses.tsv`); `promptdistill` drafts a terse version through the
-  memory `distill` core (opt-in, spends tokens). Result: 126 entries, 30567 to 29507 characters (-3.5 %),
+  losses in `docs/v2.5/plans/P289-runs/allowed-losses.tsv`); `promptdistill` (deleted in P297) drafted a terse version through the
+  memory `distill` core. Result: 126 entries, 30567 to 29507 characters (-3.5 %),
   -6.0 % over the 52 rewritten entries; the memory texts were already at the P285 Part 2 floor.
 
 ## Renderer security surface
@@ -5791,8 +5818,6 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **The sandbox is unverified on a real Mac (P287).** Linux checks the generator and flows only. Delete once
   the Mac checklist in `docs/DEV_ENVIRONMENT.md` passes.
 - **A written memory doc holds no per-fact keywords (P285 Part 3).** Importing it into another store indexes its facts with the doc-level keywords only; the store regenerates per-fact keywords only for facts the gate sees.
-- **Memory import is not unified with `distill` (P285 Part 2, P291).** Import runs the extract prompt with an evidence quote; `distill` is a separate prompt. P291 rebuilt the unified pipeline (V1T): `R_ess` 0.977 against 0.885, hybrid MRR 0.905 against 0.886 (band 0.026), but `C_store` 0.908 against 0.661 and `C_doc` 1.017 (source size). Reverted for size. The port is commit `9b96da41f`; adopting it is a user decision on recall against size.
-
 - **Memory ingest compression target not met (P285, P291).** `round-p3-01`: `C_fact` 0.434, `C_store` 0.661, `C_doc` 0.734, `R_ess` 0.885. Golden essential facts alone are 0.47 of source chars. The telegraph style cuts fact chars 7% and `C_store` 4.5% on identical facts; run on the pipeline it raised recall and stored 18% more facts (XT, commit `a487cbc18`, `C_store` 0.753), so it is not adopted. Residual token loss of the style: 14 of 209 facts fail the preservation check.
 
 - **No detached runner for agent runs and PTYs (P279).** Quit or crash stops every agent and PTY. The memory ingest runner is separate and does detach (P274). Resume restores the Claude conversation; the turn in flight is lost and its tool effects may be half-applied. The `kira-db` MCP stops with Studio. Resume needs the saved transcript under `~/.claude`; without it the run fails with "could not resume".

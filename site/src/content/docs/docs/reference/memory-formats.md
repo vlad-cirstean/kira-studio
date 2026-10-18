@@ -10,11 +10,12 @@ sources:
   - internal/memory/memfmt/locator.go
   - docs/v2.5/plans/P273-memory-text-formats.md
   - docs/v2.5/plans/P285-part3-compact-memory-output.md
+  - docs/v2.6/plans/P297-distill-into-memory.md
 sidebar:
   order: 4
 ---
 
-The doc format is grep-first. Every fact line starts with the fact id and holds the fact text. A reason is optional and sits on the next line, indented by two spaces. There are no field names and no per-fact keywords.
+The doc format is grep-first. Every fact line starts with the fact id and holds the fact or rule text. A reason is optional and sits on the next line, indented by two spaces. There are no field names and no per-fact keywords.
 
 ## Ids
 
@@ -44,7 +45,7 @@ Earlier versions wrote a `kira-memory` header and fact lines into a comment. Tha
 
 ## Doc files
 
-A `.md` or `.txt` file is a doc when line 1 is `---` and line 2 is `kira-memory: 2`.
+A `.md` or `.txt` file is a doc when line 1 is `---` and line 2 is `kira-memory: 3`.
 
 The front matter keys, in order:
 
@@ -59,11 +60,11 @@ The front matter keys, in order:
 - `keywords`: optional, comma separated, for the whole doc.
 - `updated`: optional, `YYYY-MM-DD`.
 
-The body holds only `##` headings and fact items: `- <id> <fact>`, then an optional indented reason line.
+The body holds two categories and the source headings under them. `## Facts` holds facts, `## Rules` holds rules, and each appears at most once, in any order. Under a category, `### <source section>` names the heading of the source the items were stated under. An item is `- <id> <text>`, then an optional indented reason line. An item before the first category is a problem, and so is any other heading.
 
 ```md
 ---
-kira-memory: 2
+kira-memory: 3
 group: kg_4m2x8q1b7c3d
 title: Billing runbook
 from: docs/billing-runbook.md
@@ -73,20 +74,29 @@ project: github.com/acme/billing
 updated: 2026-10-14
 ---
 
-## Amounts
+## Facts
+
+### Amounts
 
 - km_7h3kq9x2mfa4 Billing amounts are stored in cents, because the ledger rejects fractional values.
 
-## Deploys
+### Deploys
 
 - km_9c2d4e6f8g1h Staging deploys at 09:00 UTC.
   Release calendar, confirmed by ops in March.
+
+## Rules
+
+### Amounts
+
+- km_5d3e5g7h9j2k Never write amounts as floats.
+  The ledger rejects fractions.
 ```
 
-A fact without a reason line was stated in the source under its heading. Importing the doc gives it the reason `Stated in <from>, <heading>`, or `Stated in <from>` before any heading. Kira builds that text itself.
+The category sets the memory's kind: a fact or a rule. A rule is a standing imperative that holds beyond one task. A fact without a reason line was stated in the source under its `###` heading, never under its category. Importing the doc gives it the reason `Stated in <from>, <heading>`, or `Stated in <from>` before any heading. Kira builds that text itself.
 
 One doc has one provenance. Importing a doc needs no Claude call: the parser reads it directly. The header wins over the job's origin and scope. An agent's import waits for your confirmation when a header claims a higher origin, or another scope or project, than the job.
 
-A `kira-memory: 1` doc, or a doc line written as `<id> fact:` or `<id> reason:`, is the retired earlier format. It is reported as one problem. Rewrite it in this format.
+A `kira-memory: 1` doc, or a doc line written as `<id> fact:` or `<id> reason:`, is a retired earlier format. A `kira-memory: 2` doc is retired too. Each is reported as one problem and yields no facts. To migrate a version 2 doc, set line 2 to `kira-memory: 3` and put its facts under `## Facts`. Demote its `##` source headings to `###`. Move any rule under `## Rules`. Or import the source again with the doc option. An import that writes a doc beside its source also migrates a version 2 doc of the same group in place.
 
-An import job can write each source's stored facts to `<name>.memory.md` beside it. Doc sources are skipped. An existing target is overwritten only when it is a doc with the same group. Facts with another provenance than the job are left out. A fact whose reason is only the source and its heading becomes an item under that heading with no reason line. Any other reason is written in full. The writer adjusts a title (`: ` becomes ` - `) and strips inline Markdown from facts. A fact that stays invalid is left out. Per-fact keywords are not written, so an imported doc indexes its facts with the doc keywords only.
+An import job can write each source's stored facts to `<name>.memory.md` beside it. Doc sources are skipped. An existing target is overwritten only when it is a doc with the same group. Facts with another provenance than the job are left out. A fact whose reason is only the source and its heading becomes an item under that heading with no reason line. Facts go under `## Facts` and rules under `## Rules`. Any other reason is written in full. The writer adjusts a title (`: ` becomes ` - `) and strips inline Markdown from facts. A fact that stays invalid is left out. Per-fact keywords are not written, so an imported doc indexes its facts with the doc keywords only.
