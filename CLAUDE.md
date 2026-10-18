@@ -153,11 +153,11 @@ duplicated here; this file only points at them.
   new chapter, read the highest `P` in `docs/HISTORY.md` and in every `docs/v*/SPEC.md` still on
   disk, and continue from there. v1.5's `C` lettering and v1.7's `M` lettering predate this rule and
   stay as shipped, never renumbered; every chapter from here on uses `P`.
-- **Opening a chapter folds the previous one.** Run `go run ./scripts/docshistory fold --runs docs/history-runs --out - <prev>`
+- **Opening a chapter folds the previous one.** Run `go run ./scripts/docshistory fold --runs docs/history-runs --out - --jobs 1 --max-usd <cap> <prev>`
   (distills each phase through `ingest_files`, costs tokens, resumable), read its verify report,
   run `repoint --runs docs/history-runs`, commit, then `git rm -r docs/<prev>/ docs/history-runs/` and create `docs/<new>/`.
-  Skip a chapter whose files a test or script reads at runtime (move them first, own phase). Never
-  hand-edit `docs/HISTORY.md`.
+  Data a test or script reads at runtime never lives under `docs/v*/`; it goes in its reader's `testdata/`.
+  Move any found first, own phase. Never hand-edit `docs/HISTORY.md`.
 - **Splitting a phase keeps its number — it doesn't consume a new one, when an agent is the one
   deciding to split it.** A subagent (an Opus planning pass finding the scope is really two
   pieces, or anyone else in the loop) that decides a `SPEC.md` row needs splitting renames it
