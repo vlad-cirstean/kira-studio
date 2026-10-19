@@ -123,7 +123,7 @@ U82 apps/kira-space/frontend/mobile/state/useAdeWrites.ts # slices a UUID into i
 # C (rest)
 U91 packages/git-ui/src/components/UncommittedChangesStrip.vue # tooltip text differs from the visible label
 U11 packages/docker-ui/src/components/LogsView.vue # ANSI bold is log data, not UI chrome
-U34 packages/docker-ui/src/components/OriginIcon.vue # compose brand mark colour
+U34 packages/docker-ui/src/components/OriginGlyph.vue # compose brand mark colour
 U41 packages/git-ui/src/App.vue # git engine host reads modifier keys
 U62 packages/git-ui/src/components/CommitGrid.vue # SlickGrid engine host owns row focus
 U47 packages/git-ui/src/components/SearchResults.vue # listbox of the SearchBox combobox; keys live in SearchBox
