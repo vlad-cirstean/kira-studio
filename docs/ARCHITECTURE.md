@@ -490,7 +490,7 @@ custom_script_collections(id, name, sort_order, created_at, updated_at)
                                                        -- P219; one row per script collection, name
                                                        -- trimmed, 64 runes max, order is sort_order,
                                                        -- name (creation order). Empty ones may exist.
-ui_layout(key, value)                                   -- panel sizes, visibility (app-wide)
+ui_layout(key, value)                                   -- panel visibility (app-wide), panel sizes per module (modes.<mode>.*)
 windows(key, order, bounds_json)                        -- one row per workbench (P8)
 tabs(id, connection_id, path, kind, state_json, order, active, window_key, workspace_id)
                                                        -- session restore, window_key ON DELETE
@@ -816,6 +816,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - TerminalTabView.vue/TerminalHostView.vue read neither workspaceId nor codeRepoId; the tab prop is typed against TerminalHostView's own prop shape, not either app's tab-record type.
 - The Operations dock is a full-width flex sibling below the shell's project/main row, outside any split, because nesting it as a vertical group hung the render process on a tree-row click (never root-caused).
 - WorkbenchShell.vue renders the project panel and the dock through ResizeHandle (px, clamped to [180, 480] and [100, 500]), previewing locally and emitting resize-project/resize-ops on release; project and main share one row so their heights match.
+- Project width and dock height are keyed by active module (`modes.<mode>.project.width`, `modes.<mode>.operations.height`); each shell passes `layoutStore.sizesFor(modeStore.active)`. Visibility and cell editor height stay app-wide.
 - The Operations panel is shared: OpLogPanel.vue (generic over R extends OpLogRecord) in packages/workbench is the panel shell, and createOpLogStore<R>({ control, searchText? }) is the Pinia store factory.
 - opLogRecordSchema/OpLogRecord in packages/shared/domain/ops.ts (id, startedAt, durationMs, kind as plain z.string(), status, command, error) is the base contract that consumers' own op records extend.
 - Kira Studio's OpRecord extends opLogRecordSchema with connectionId, tabId, kind: opKindSchema, rows, commandTruncated and path; it is the first consumer, and Kira Space's SpaceOpRecord is the second (P132 Part 2).
