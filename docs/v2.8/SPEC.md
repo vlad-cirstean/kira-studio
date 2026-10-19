@@ -7,7 +7,7 @@ First phase `P306` (highest in `docs/HISTORY.md` is `P305`). Branch `v2.8`. Phas
 | P306 | Fix failing Release workflow. Run 39153063833 (tag v0.2.7): `db-compat (Linux, min)` fails `TestRedis_Console_SlowCommandTimesOutWithoutResend` (`err = <nil>, want E_TIMEOUT`, redis:7.0); `db-compat (Linux, max)` fails `TestKafka_Read_MidBrowseCancellation` (`want an error`, cp-kafka:8.3.0); `ci-gate` fails because PR CI failed. Root-cause both tests, fix in code. No `.github/workflows` push from here; see `docs/DEV_ENVIRONMENT.md`. | Done |
 | P307 | Operations panel shows a DB's preconnect scripts. Preconnect script run has a visible timer. Fix the race between "connecting" and the script itself. | Todo |
 | P308 | Drag-and-drop reorder of DBs, scripts, repos in the left panel. Colored bars in the panel get thicker. | Todo |
-| P309 | SQL cell editor: date editor has a large min height and scrolls out of view. Footer controls stay fixed; only the text editor scrolls. | Todo |
+| P309 | SQL cell editor: date editor has a large min height and scrolls out of view. Footer controls stay fixed; only the text editor scrolls. | Done |
 | P310 | SQL column tooltip: explanation and comment read as one run. Rearrange and format them. | Todo |
 | P311 | Docker container list in the left panel scrolls sluggishly. Find the cause, fix (likely virtualization or per-row cost). | Todo |
 | P312 | Panel sizes are shared across modules today; they must be per module (resize in studio, api stays unchanged). Re-key per module, migrate current values. | Todo |
@@ -20,6 +20,8 @@ First phase `P306` (highest in `docs/HISTORY.md` is `P305`). Branch `v2.8`. Phas
 Filled per phase.
 
 **P306.** Both tests used workload speed as a clock; production code was correct. Redis: fixed 250M-iteration Lua loop finished under the 1s read timeout on a fast CPU. Now calibrated at runtime to a 3s target. Kafka: 20 000-record browse finished before the 50ms cancel; the producer compressed the repetitive pad into one fetch. Now incompressible pads plus a 64 KiB/s consumer quota on client-id `kira-studio` (removed in cleanup) and a 500ms cancel delay; elapsed to error ~501ms. Verified: default images `-count=5`, redis 7.0/8.10, cp-kafka 8.3.0/7.4.0 via `db-compat.sh`, full redis+kafka packages. `ci-gate` goes green once PR CI is green on the new commit; not provable here.
+
+**P309.** Timestamp pane now `shrink-0` at natural height; only the encoded Monaco flexes (`basis-0`). Editor body clips with `overflow-hidden`; decoded-empty alert scrolls. UI test `timestamp controls stay in view at small dock height` fails on the old classes, passes now. At the 120px drag minimum with find open, 34 + 34 + 20 + 72 exceeds the dock, so the find-open check runs at default height.
 
 ## Notes
 
