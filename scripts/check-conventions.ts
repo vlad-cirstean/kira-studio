@@ -333,11 +333,13 @@ export function menuShortcutHits(
 ): Hit[] {
   const ids = new Set([...menuSource.matchAll(/\bshortcut:\s*'([^']+)'/g)].map((m) => m[1] ?? ''));
   const binders = featureSources.filter((src) => /\b(?:useShortcut|shortcutFor)\(/.test(src));
-  const treeBound = featureSources.some((src) => /\buseTreeShortcuts\(/.test(src));
+  const treeBinders = featureSources.filter((src) => /\buseTreeShortcuts\(/.test(src));
+  const treeBound = treeBinders.length > 0;
   const hits: Hit[] = [];
   for (const id of ids) {
     if (scopes.get(id) === 'global' || ENGINE_BOUND_SHORTCUTS.has(id)) continue;
     if (id.startsWith('tree.') && treeBound) continue;
+    if (treeBinders.some((src) => src.includes(`'${id}'`))) continue;
     if (binders.some((src) => src.includes(`'${id}'`))) continue;
     hits.push({
       rule: 'N11',

@@ -45,6 +45,7 @@ export const IPC = {
   connectionsUpdate: 'kira:connections:update',
   connectionsDuplicate: 'kira:connections:duplicate',
   connectionsDelete: 'kira:connections:delete',
+  connectionsReorder: 'kira:connections:reorder',
   connectionsReveal: 'kira:connections:reveal',
   connectionsSecretsStatus: 'kira:connections:secretsStatus',
   connectionsTest: 'kira:connections:test',

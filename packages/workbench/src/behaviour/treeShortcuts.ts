@@ -10,6 +10,8 @@ const TREE_IDS = [
   'tree.rename',
   'tree.duplicate',
   'tree.delete',
+  'list.moveUp',
+  'list.moveDown',
 ] as const satisfies readonly ShortcutId[];
 
 export type TreeShortcutId = (typeof TREE_IDS)[number];

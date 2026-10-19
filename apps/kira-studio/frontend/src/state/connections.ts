@@ -87,6 +87,29 @@ export const useConnectionsStore = defineStore('connections', () => {
     return created;
   }
 
+  // Optimistic like the tab strip; a rejection (an id deleted in another window) restores the
+  // persisted order before rethrowing.
+  async function reorderConnections(ids: string[]): Promise<void> {
+    const byId = new Map(state.records.map((r) => [r.id, r]));
+    const listed = ids.flatMap((id) => byId.get(id) ?? []);
+    state.records = [...listed, ...state.records.filter((r) => !ids.includes(r.id))];
+    try {
+      state.records = await control.connectionsReorder(ids);
+    } catch (err) {
+      state.records = await control.connectionsList();
+      throw err;
+    }
+  }
+
+  async function moveConnection(id: string, step: -1 | 1): Promise<void> {
+    const ids = state.records.map((r) => r.id);
+    const from = ids.indexOf(id);
+    const to = from + step;
+    if (from < 0 || to < 0 || to >= ids.length) return;
+    [ids[from], ids[to]] = [ids[to], ids[from]];
+    await reorderConnections(ids);
+  }
+
   async function deleteConnection(id: string): Promise<void> {
     await control.connectionsDelete(id);
     state.records = state.records.filter((r) => r.id !== id);
@@ -187,6 +210,8 @@ export const useConnectionsStore = defineStore('connections', () => {
     hydrateConnections,
     upsertRecord,
     duplicateConnection,
+    reorderConnections,
+    moveConnection,
     deleteConnection,
     connectConnection,
     disconnectConnection,

@@ -9,6 +9,7 @@ import { colorMarkClass } from '@theme/connColor';
 import { rowIndent, rowMeta, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { splitMatches } from '@workbench/behaviour/match';
+import { SORTABLE_GHOST_CLASS } from '@workbench/behaviour/sortableReorder';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, type HTMLAttributes } from 'vue';
 import { useConnectionsStore } from '../state/connections';
@@ -26,9 +27,13 @@ const props = withDefaults(
     row: TreeRowVm;
     selected: boolean;
     sticky?: boolean;
+    /** This connection row is the one being dragged. */
+    dragging?: boolean;
+    /** A connection drag would drop on this row's top or bottom edge. */
+    dropEdge?: 'top' | 'bottom' | null;
     class?: HTMLAttributes['class'];
   }>(),
-  { sticky: false },
+  { sticky: false, dragging: false, dropEdge: null },
 );
 
 // A pinned band row needs an opaque background; selected still wins (rowVariants selected).
@@ -117,12 +122,13 @@ function onKeydown(e: KeyboardEvent): void {
 <template>
   <div
     :class="
-      cn(rowVariants({ layout: 'tree', selected }), 'h-row', stickyClass, props.class)
+      cn(rowVariants({ layout: 'tree', selected }), 'h-row', stickyClass, dragging && SORTABLE_GHOST_CLASS, props.class)
     "
     :style="rowIndent(row.depth)"
     :data-testid="sticky ? 'tree-sticky-row' : 'tree-row'"
     :data-path="row.path"
     :data-kind="row.kind"
+    :data-connection-id="row.kind === 'connection' ? row.connectionId : undefined"
     :data-status="row.kind === 'connection' ? row.status : undefined"
     :data-depth="sticky ? row.depth : undefined"
     role="treeitem"
@@ -137,6 +143,12 @@ function onKeydown(e: KeyboardEvent): void {
     @contextmenu.prevent.stop="onContextMenu"
   >
     <div :class="colorMarkClass('rail', railColor)" data-testid="tree-rail" />
+    <div
+      v-if="dropEdge"
+      aria-hidden="true"
+      data-testid="tree-drop-indicator"
+      :class="cn('pointer-events-none absolute inset-x-0 h-0.5 bg-focus', dropEdge === 'top' ? 'top-0' : 'bottom-0')"
+    />
 
     <!-- P31 D25/F25: the twisty is the one control in the app whose entire meaning is already
          drawn by the chevron direction, and it fires on the single most-hovered control in the

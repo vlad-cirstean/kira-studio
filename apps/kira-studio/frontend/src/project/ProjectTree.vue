@@ -7,12 +7,14 @@ import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useTreeShortcuts } from '@workbench/behaviour/treeShortcuts';
 import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
+import { logError } from '@workbench/bridge/log';
 import { useRowHeight } from '@workbench/lib/rowHeight';
 import { type MenuItem, runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useTabsStore } from '../state/tabs';
 import { reloadTab } from '../state/viewCommands';
+import { useConnectionReorder } from './connectionReorder';
 import { emptyBackgroundMenu, menuForRow } from './menu';
 import { type TreeRowVm, useTreeStore } from './state/tree';
 import TreeRow from './TreeRow.vue';
@@ -54,6 +56,26 @@ const { virtualItems, totalSize, band, onScroll, revealKey } = useTreeVirtualRow
   rowHeight: () => rowHeight.value,
   scrollElement: scrollEl,
 });
+
+// Raw `search` (not the debounced query) so typing pauses drag at once.
+const { draggingId, drop } = useConnectionReorder({
+  container: scrollEl,
+  ids: () => connectionsStore.records.map((r) => r.id),
+  disabled: () => treeStore.search.trim() !== '' || connectionsStore.records.length < 2,
+  rowHeight: () => rowHeight.value,
+  onReorder: (ids) =>
+    void connectionsStore
+      .reorderConnections(ids)
+      .catch((err) => logError('projectTree', 'reorder failed', err)),
+});
+
+function dragProps(row: TreeRowVm) {
+  if (row.kind !== 'connection') return {};
+  return {
+    dragging: draggingId.value === row.connectionId,
+    dropEdge: drop.value?.id === row.connectionId ? drop.value.edge : null,
+  };
+}
 
 // F3 (P108 Part 12): initTreeSync/initSchemaSync/initSchemaColumnsSync used to be wired from here,
 // on mount — moved to main.ts's bootstrap() so they're live whether or not this panel ever
@@ -198,12 +220,23 @@ function viaMenu(id: ShortcutId): (key: string) => void {
     if (row) runMenuShortcut(menuForRow(row), id);
   };
 }
+// Rows are index-keyed, so after a move the focused element would show another row: scroll to the
+// moved row and focus it again.
+function moveViaMenu(id: ShortcutId): (key: string) => void {
+  const run = viaMenu(id);
+  return (key) => {
+    run(key);
+    void revealKey(key).then(() => nav.focusKey(key));
+  };
+}
 useTreeShortcuts(nav, {
   'tree.copyName': viaMenu('tree.copyName'),
   'tree.copyUri': viaMenu('tree.copyUri'),
   'tree.rename': viaMenu('tree.rename'),
   'tree.duplicate': viaMenu('tree.duplicate'),
   'tree.delete': viaMenu('tree.delete'),
+  'list.moveUp': moveViaMenu('list.moveUp'),
+  'list.moveDown': moveViaMenu('list.moveDown'),
 });
 
 // The tree background has no interactive role of its own: bind its listener via VueUse.
@@ -216,7 +249,7 @@ useEventListener(treeBodyEl, 'contextmenu', onBackgroundContextMenu);
     <div ref="treeBodyEl" class="flex-1 min-h-0" data-testid="tree-background">
       <div
         ref="scrollEl"
-        class="virtual-list h-full overflow-auto"
+        :class="['virtual-list h-full overflow-auto', draggingId && 'select-none']"
         data-testid="virtual-list"
         role="tree"
         :aria-label="t('studio.project.tree.aria')"
@@ -230,6 +263,7 @@ useEventListener(treeBodyEl, 'contextmenu', onBackgroundContextMenu);
               :row="slot.row"
               :selected="treeStore.selected === slot.row.key"
               :sticky="true"
+              v-bind="dragProps(slot.row)"
               @select="onSelect"
               @toggle="onToggle"
               @open="onOpen"
@@ -245,6 +279,7 @@ useEventListener(treeBodyEl, 'contextmenu', onBackgroundContextMenu);
               :row="treeStore.visibleRows[item.index]"
               :selected="treeStore.selected === treeStore.visibleRows[item.index].key"
               :sticky="false"
+              v-bind="dragProps(treeStore.visibleRows[item.index])"
               @select="onSelect"
               @toggle="onToggle"
               @open="onOpen"

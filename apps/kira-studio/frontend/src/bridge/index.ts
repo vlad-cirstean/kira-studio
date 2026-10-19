@@ -102,6 +102,8 @@ const studioControl = {
 
   connectionsList: (): Promise<ConnectionSummary[]> =>
     unwrap(ConnectionsService.List()).then((r) => trust<ConnectionSummary[]>(r ?? [])),
+  connectionsReorder: (ids: string[]): Promise<ConnectionSummary[]> =>
+    unwrap(ConnectionsService.Reorder({ ids })).then((r) => trust<ConnectionSummary[]>(r ?? [])),
   connectionsCreate: (input: ConnectionInput): Promise<ConnectionSummary> =>
     unwrap(ConnectionsService.Create(input)).then((r) => trust<ConnectionSummary>(r)),
   connectionsUpdate: (id: string, input: ConnectionInput): Promise<ConnectionSummary> =>
