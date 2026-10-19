@@ -108,7 +108,7 @@ watch(calendarOpen, (open) => {
 </script>
 
 <template>
-  <div class="flex flex-col h-full min-h-0" data-testid="cell-editor-timestamp-pane">
+  <div class="flex flex-col" data-testid="cell-editor-timestamp-pane">
     <Alert class="shrink-0" variant="info" icon="clock" data-testid="cell-editor-timestamp">
       <AlertDescription>
         <div class="flex items-center gap-1">
@@ -136,7 +136,7 @@ watch(calendarOpen, (open) => {
       </AlertDescription>
     </Alert>
 
-    <div class="flex-1 min-h-0 flex items-start gap-1 py-1.5 px-2">
+    <div class="flex items-center gap-1 py-1.5 px-2">
       <SecondaryTabs
         variant="segmented"
         :model-value="zone"

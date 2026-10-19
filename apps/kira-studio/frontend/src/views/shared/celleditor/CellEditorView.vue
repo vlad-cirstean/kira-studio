@@ -179,7 +179,11 @@ const isTimestampFormat = computed(
 const showDecodedPane = computed(
   () => effectiveFormat.value === 'hex' || effectiveFormat.value === 'base64',
 );
-const showTranslatePane = computed(() => showDecodedPane.value || isTimestampFormat.value);
+const encodedClass = computed(() => {
+  if (showDecodedPane.value) return 'flex-1 basis-7/12 min-h-0 border-b border-border';
+  if (isTimestampFormat.value) return 'flex-1 basis-0 min-h-0 border-b border-border';
+  return 'flex-auto min-h-0';
+});
 const decodedDoc = ref<string | null>('');
 let skipNextDecode = false;
 
@@ -501,11 +505,8 @@ const statusLine = computed(() => {
       </span>
     </ViewToolbar>
 
-    <div ref="editorBodyEl" class="flex-1 min-h-0 flex flex-col">
-      <div
-        :class="showTranslatePane ? 'flex-1 basis-7/12 border-b border-border min-h-0' : 'flex-auto min-h-0'"
-        data-testid="cell-editor-encoded"
-      >
+    <div ref="editorBodyEl" class="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div :class="encodedClass" data-testid="cell-editor-encoded">
         <MonacoHost
           ref="encodedHostRef"
           :doc="doc"
@@ -542,7 +543,7 @@ const statusLine = computed(() => {
         <Alert
           v-else
           variant="info"
-          class="flex-1 basis-5/12 items-center text-subtle"
+          class="flex-1 basis-5/12 min-h-0 overflow-auto items-center text-subtle"
           data-testid="cell-editor-decoded-empty"
         >
           <AlertDescription>
@@ -563,7 +564,7 @@ const statusLine = computed(() => {
           <span>{{ t('studio.cellEditor.timestamp.title') }}</span>
         </div>
         <TimestampPane
-          class="flex-1 basis-5/12 min-h-0"
+          class="shrink-0"
           :doc="doc"
           :format="effectiveFormat"
           :readonly="!isEditable"
