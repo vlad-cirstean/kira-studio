@@ -1170,6 +1170,72 @@ const PORT_3: PortSnapshot[] = [
   },
 ];
 
+test('cell editor — timestamp controls stay in view at small dock height', async ({ relaunch }) => {
+  test.setTimeout(120_000);
+  const { window: page } = await relaunch({ control: CONTROL_2, stream: PORT_2 });
+  await connectAndExpand(page, { name: 'Format Actions DB', color: 'blue' });
+  await (await findRow(page, FORMATS_PATH)).dblclick();
+  await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
+
+  const dock = page.locator('[data-testid="cell-editor"]');
+  const controls = ['field', 'calendar', 'zone'].map((id) =>
+    page.locator(`[data-testid="cell-editor-timestamp-${id}"]`),
+  );
+  const height = async (testId: string) =>
+    (await page.locator(`[data-testid="${testId}"]`).boundingBox())?.height ?? Number.NaN;
+  const expectControlsInside = async () => {
+    const dockBox = await dock.boundingBox();
+    expect(dockBox).not.toBeNull();
+    for (const control of controls) {
+      await expect(control).toBeInViewport();
+      const box = await control.boundingBox();
+      expect(box).not.toBeNull();
+      expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(
+        (dockBox?.y ?? 0) + (dockBox?.height ?? 0) + 0.5,
+      );
+    }
+  };
+
+  await selectCell(page, 5, 'sample'); // epochSeconds row
+  await expect(controls[0]).toBeVisible();
+  await expectControlsInside();
+  const paneHeight = await height('cell-editor-timestamp-pane');
+  const encodedHeight = await height('cell-editor-encoded');
+
+  // Find bar sits above the pane; 34 + 34 + 20 + 72 fits the default dock, not the 120 minimum.
+  await page.click('[data-testid="cell-editor-search-toggle"]');
+  await expect(page.locator('[data-testid="http-find-input"]')).toBeVisible();
+  await expectControlsInside();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-testid="http-find-bar"]')).toHaveCount(0);
+
+  await page.locator('.cell-splitter').focus();
+  await page.keyboard.press('Home');
+  await expect
+    .poll(async () => (await dock.boundingBox())?.height ?? Number.NaN)
+    .toBeCloseTo(120, 0);
+  await expectControlsInside();
+  expect(Math.abs((await height('cell-editor-timestamp-pane')) - paneHeight)).toBeLessThanOrEqual(
+    1,
+  );
+  expect(await height('cell-editor-encoded')).toBeLessThan(encodedHeight);
+
+  const insideDock = async (testId: string) => {
+    const dockBox = await dock.boundingBox();
+    const box = await page.locator(`[data-testid="${testId}"]`).boundingBox();
+    expect(box?.height ?? -1).toBeGreaterThanOrEqual(0);
+    expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(
+      (dockBox?.y ?? 0) + (dockBox?.height ?? 0) + 0.5,
+    );
+  };
+  await selectCell(page, 3, 'sample'); // base64 row
+  await expect(page.locator('[data-testid="cell-editor-decoded"]')).toBeVisible();
+  await insideDock('cell-editor-decoded');
+  await selectCell(page, 4, 'sample'); // undecodable row
+  await expect(page.locator('[data-testid="cell-editor-decoded-empty"]')).toBeVisible();
+  await insideDock('cell-editor-decoded-empty');
+});
+
 test("cell editor — owned by the view, never shows another tab's cell", async ({
   relaunch,
   consoleErrors,
