@@ -9,7 +9,7 @@ First phase `P306` (highest in `docs/HISTORY.md` is `P305`). Branch `v2.8`. Phas
 | P307 Part 2 | Per-connection preconnect delay setting (seconds, between starting the preconnect script and the first connect attempt). Covers non-loopback targets that the Part 1 readiness probe skips. Runs after P312 lands (migration number and generated bindings overlap). | Todo |
 | P308 | Drag-and-drop reorder of DBs, scripts, repos in the left panel. Colored bars in the panel get thicker. | Todo |
 | P309 | SQL cell editor: date editor has a large min height and scrolls out of view. Footer controls stay fixed; only the text editor scrolls. | Done |
-| P310 | SQL column tooltip: explanation and comment read as one run. Rearrange and format them. | Todo |
+| P310 | SQL column tooltip: explanation and comment read as one run. Rearrange and format them. | Done |
 | P311 | Docker container list in the left panel scrolls sluggishly. Find the cause, fix (likely virtualization or per-row cost). | Todo |
 | P312 | Panel sizes are shared across modules today; they must be per module (resize in studio, api stays unchanged). Re-key per module, migrate current values. | Todo |
 | P313 | Code review per `CLAUDE.md` (one Opus round, three dimensions), then fixer. Base: P305 close-out. | Todo |
@@ -25,6 +25,8 @@ Filled per phase.
 **P307 Part 1.** Preconnect script is an operation (kind `preconnect`, cancellable, no re-run) with a live elapsed timer in `OpLogPanel`. Race fixed: for a loopback host:port target, `Supervisor.Start` dials every 100ms while the script runs and connects only once the port accepts (60s timeout); other targets keep the 2s settle window (Known open item in `docs/ARCHITECTURE.md`, per-DB delay setting is the follow-up). Backend flow test `TestSQLitePreconnectOp` and a matching `contract:` UI spec. Full `test:ui:studio` not run; Studio `operations.spec.ts` and Space `operations`/`list-keyboard` specs pass.
 
 **P309.** Timestamp pane now `shrink-0` at natural height; only the encoded Monaco flexes (`basis-0`). Editor body clips with `overflow-hidden`; decoded-empty alert scrolls. UI test `timestamp controls stay in view at small dock height` fails on the old classes, passes now. At the 120px drag minimum with find open, 34 + 34 + 20 + 72 exceeds the dock, so the find-open check runs at default height.
+
+**P310.** Column tooltip stacks sections: header (name, type), `PK`/`NOT NULL` chips, explanation, divider, labeled comment. `AttributeTooltip.vue` gains `tags`/`note` parts; plain `data-kira-tip` path unchanged. Lint rules U29/U21 forbid classes on `TooltipContent` and `uppercase`, so layout sits on a wrapper div and width cap stays at primitive `max-w-xs`. UI spec `tooltips.spec.ts` covers structure.
 
 ## Notes
 
