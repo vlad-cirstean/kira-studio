@@ -12,7 +12,7 @@ First phase `P306` (highest in `docs/HISTORY.md` is `P305`). Branch `v2.8`. Phas
 | P310 | SQL column tooltip: explanation and comment read as one run. Rearrange and format them. | Done |
 | P311 | Docker container list in the left panel scrolls sluggishly. Find the cause, fix (likely virtualization or per-row cost). | Done |
 | P312 | Panel sizes are shared across modules today; they must be per module (resize in studio, api stays unchanged). Re-key per module, migrate current values. | Done |
-| P313 | Code review per `CLAUDE.md` (one Opus round, three dimensions), then fixer. Base: P305 close-out. | Todo |
+| P313 | Code review per `CLAUDE.md` (one Opus round, three dimensions), then fixer. Base: P305 close-out. | Done |
 | P314 | Comment cleanup across Go/TS/Vue. Build a comment-extraction tool (see Notes), rewrite via distill plumbing to shorter atomic comments in one consistent format per the `CLAUDE.md` comment rule. Must prove the rewrite is better: drop trivia and restated-code comments, keep every non-obvious why/constraint/workaround, never touch directives. Needs a quality gate: rule-based checks plus a sampled before/after report reviewed by an Opus judge; failures redo. Opus plan decides the format and gate. | Todo |
 | P315 | Close chapter v2.8 (fold per `CLAUDE.md`). Hold until user says to close. | Todo |
 
@@ -35,6 +35,8 @@ Filled per phase.
 **P308.** Rail `w-0.5` to `w-1` (4px). Drag reorder: scripts and collections (shared `internal/scripts` `Reorder`/`ReorderCollections`, `SortableList.vue`), Studio connections (`connectionReorder.ts` pointer drag, drop line, edge auto-scroll), Space repos (`useSortableReorder`). Alt+Up/Down and Move up/down menu items are the keyboard path. Scripts reorder within their own set; cross-collection stays in "Move to collection". No migration. Flow tests `TestScriptOrder`, `TestConnectionOrder` and UI specs `connection-order`, `script-order`, `repo-order`. Full UI suites not run.
 
 **P311.** Cause: virtual rows re-created on range change plus per-row tooltip and nav-handler cost. `VirtualList.vue` keyed by row key with cached handlers; rows split into `ContainerRow.vue`/`ContainerGroupRow.vue` with one shared `AttributeTooltip`. Probe `docker-scroll` (400 containers, WebKit sandbox, load1 <= 1.0): frame p95 median 40-46 ms to 20 ms (50-57% drop). Spec `row tooltips come from one shared tooltip`. Full `test:ui:studio` 551 passed on the implementer branch; not re-run after rebase.
+
+**P313.** One review round over `a74ece9..e05b483` (base: v2.6 squash, P305 close-out). 4 findings, all fixed: duplicate-connection INSERT misaligned placeholders put the throttle into `mcp_enabled` (High, test guards it); dialog Test preconnect script survived app quit (`Shutdown` now cancels and waits); panel-cancelled preconnect ends `disconnected`; `widthUserSet` persisted in both layout models. Performance pass found nothing. Raw English supervisor messages in the dialog Test result remain unlocalized (separate scope).
 
 ## Notes
 
