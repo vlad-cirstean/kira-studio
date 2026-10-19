@@ -67,6 +67,9 @@ export const MIN_SERVER_VERSION: Partial<Record<ConnectionKind, string>> = {
 // interval, so a user reacting to "keep it under N/s" types the same number the server told them.
 export const CONNECTION_THROTTLE_RANGE = { min: 0.01, max: 1000 } as const;
 
+// P307 Part 2: whole seconds; 0 = off. 300 covers a browser-login tunnel; longer means run it by hand.
+export const PRECONNECT_DELAY_RANGE = { min: 0, max: 300 } as const;
+
 // P18 D18: promoted to domain/color.ts as paletteColorSchema/PaletteColor/PALETTE_COLOR_CHOICES —
 // one palette *by construction* now that an environment's colour (this phase) draws from the same
 // set. These three names stay as aliases so nothing in Studio (or its call sites' comments) has to
@@ -123,6 +126,9 @@ const connectionFieldsSchema = /*#__PURE__*/ z.object({
   // arm() once the adapter connects, regardless of what the settle-window race resolved to (a
   // no-op if the script already exited, since there's nothing left to monitor).
   preconnectSidecar: z.boolean().default(false),
+  // P307 Part 2: seconds between starting the script and the first connect; 0 = off. `.default(0)`
+  // is load-bearing for an older stored row, like throttlePerSec's.
+  preconnectDelaySec: z.number().int().min(0).max(PRECONNECT_DELAY_RANGE.max).default(0),
   // P18 (v1.1) D18: runs the connection's own EXPLAIN before every SELECT a console run issues on
   // it, warning (never blocking) when the threshold or a structural issue fires. A first-class
   // column rather than an options_json key — the same reason preconnect above is one: `options`

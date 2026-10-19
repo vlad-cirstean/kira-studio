@@ -20,6 +20,8 @@ type ConnectionFields struct {
 	Options           map[string]any `json:"options"`
 	Preconnect        *string        `json:"preconnect"`
 	PreconnectSidecar bool           `json:"preconnectSidecar"`
+	// P307 Part 2: seconds to wait after the script starts before the first connect attempt; 0 = off.
+	PreconnectDelaySec int `json:"preconnectDelaySec"`
 	// P18 (v1.1) D18: runs the connection's own EXPLAIN before every SELECT a console run issues
 	// on it, and warns when the threshold or a structural issue fires (never blocks). A first-class
 	// column, not an options_json key — see the migration's own comment for why.

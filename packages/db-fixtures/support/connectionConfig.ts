@@ -4,11 +4,11 @@ import type { ConnectionSummary } from '@shared/domain/connection';
 // to be packages/shared/protocol/engine-ops.ts's `ResolvedConnectionConfig`, the old main→engine-child
 // wire type from the pre-P58 Node-engine-sidecar architecture — nothing under apps/kira-studio/frontend/src or the
 // Go adapters package needs this shape today, only these fixtures constructing one to pass
-// in-process). `preconnect`/`preconnectSidecar` are omitted the same way the original type did:
+// in-process). `preconnect`/`preconnectSidecar`/`preconnectDelaySec` are omitted the same way the original type did:
 // they govern main's own arm()/monitor decision, not anything the adapter itself reads.
 export type ResolvedConnectionConfig = Omit<
   ConnectionSummary,
-  'preconnect' | 'preconnectSidecar'
+  'preconnect' | 'preconnectSidecar' | 'preconnectDelaySec'
 > & {
   password: string | null;
 };

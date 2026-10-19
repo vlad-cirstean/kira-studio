@@ -12,7 +12,8 @@ import (
 
 const connectionSelectColumns = `
 	id, name, kind, color, mode, read_only, host, port, database, username,
-	options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
+	options_json, preconnect, preconnect_sidecar, preconnect_delay_sec, auto_explain, throttle_per_sec,
+	mcp_enabled,
 	mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode, mcp_auto_explain,
 	sort_order, created_at, updated_at
 `
@@ -21,32 +22,34 @@ type ConnectionsRepo struct {
 	DB *sql.DB
 }
 
-// connectionColumns is the connections table's 20 config columns, shared by every write below
+// connectionColumns is the connections table's 21 config columns, shared by every write below
 // (P107 I2-9) — id/created_at/updated_at/sort_order/password/uri sit outside it since which of those a
 // statement needs (and how) is exactly what differs between Insert/InsertWithSecret/
 // InsertDuplicateWithSecret and Update/UpdateWithSecret; connectionSetColumns is the same list as
 // an UPDATE "col = ?" clause.
 const connectionColumns = `name, kind, color, mode, read_only, host, port, database, username,
-	options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
+	options_json, preconnect, preconnect_sidecar, preconnect_delay_sec, auto_explain, throttle_per_sec,
+	mcp_enabled,
 	mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode, mcp_auto_explain`
 
 const connectionSetColumns = `name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
 	database = ?, username = ?, options_json = ?, preconnect = ?,
-	preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, mcp_enabled = ?,
+	preconnect_sidecar = ?, preconnect_delay_sec = ?, auto_explain = ?, throttle_per_sec = ?,
+	mcp_enabled = ?,
 	mcp_description = ?, mcp_read_mode = ?, mcp_write_mode = ?, mcp_ddl_mode = ?,
 	mcp_auto_explain = ?`
 
-// connectionArgs is connectionColumns's own 20 values off f, in the same order — every write that
+// connectionArgs is connectionColumns's own 21 values off f, in the same order — every write that
 // binds the full column set (Insert, InsertWithSecret, Update, UpdateWithSecret) uses this. It
 // never binds f.URI: the column is ciphertext the caller seals (SecretWrite / uriEnc).
 // InsertDuplicateWithSecret does not use it: it forces mcp_enabled to a SQL literal 0 regardless
-// of f.McpEnabled (see its own doc comment), so one of these 20 values would never actually be
+// of f.McpEnabled (see its own doc comment), so one of these 21 values would never actually be
 // bound there — it builds its own arg list by hand instead of trimming this one.
 func connectionArgs(f model.ConnectionFields, optionsJSON string) []any {
 	return []any{
 		f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 		f.Username, optionsJSON, f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
+		f.PreconnectDelaySec, boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
 		f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
 	}
 }
@@ -72,7 +75,7 @@ func scanConnectionRow(row rowScanner) (*model.ConnectionSummary, error) {
 	)
 	if err := row.Scan(
 		&c.ID, &c.Name, &c.Kind, &c.Color, &c.Mode, &readOnly, &host, &port, &database,
-		&username, &options, &preconnect, &sidecar, &autoExplain, &c.ThrottlePerSec,
+		&username, &options, &preconnect, &sidecar, &c.PreconnectDelaySec, &autoExplain, &c.ThrottlePerSec,
 		&mcpEnabled, &c.McpDescription, &c.McpReadMode, &c.McpWriteMode, &c.McpDdlMode, &mcpAutoExplain,
 		&c.SortOrder, &c.CreatedAt, &c.UpdatedAt,
 	); err != nil {
@@ -272,7 +275,7 @@ func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFiel
 		if _, err := tx.Exec(`
 			INSERT INTO connections (
 				id, `+connectionColumns+`, created_at, updated_at, sort_order, password, uri
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`,
 			append(append([]any{connID}, connectionArgs(f, string(optionsJSON))...), createdAt, createdAt, sortOrder, secretEnc, uriEnc)...,
 		); err != nil {
@@ -313,13 +316,13 @@ func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnecti
 		if _, err := tx.Exec(`
 			INSERT INTO connections (
 				id, `+connectionColumns+`, created_at, updated_at, sort_order, password, uri
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 				(SELECT password FROM connections WHERE id = ?),
 				(SELECT uri FROM connections WHERE id = ?))
 		`,
 			toConnectionID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 			f.Username, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-			boolToInt(f.AutoExplain), f.ThrottlePerSec,
+			f.PreconnectDelaySec, boolToInt(f.AutoExplain), f.ThrottlePerSec,
 			f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
 			createdAt, createdAt, sortOrder, fromConnectionID, fromConnectionID,
 		); err != nil {

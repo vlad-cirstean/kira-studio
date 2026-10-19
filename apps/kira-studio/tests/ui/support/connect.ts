@@ -39,6 +39,7 @@ export function connectionCreateArgs(
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    preconnectDelaySec: 0,
     autoExplain,
     throttlePerSec: 0,
     ...(mcp

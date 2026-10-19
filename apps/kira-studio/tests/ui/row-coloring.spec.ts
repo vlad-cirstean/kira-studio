@@ -40,6 +40,7 @@ const CONNECTION_CREATE_SNAPSHOT: ControlSnapshot = {
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    preconnectDelaySec: 0,
     autoExplain: false,
     throttlePerSec: 0,
   },

@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { PRECONNECT_DELAY_RANGE } from '@shared/domain/connection';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@theme/components/ui/field';
 import { TabsContent } from '@theme/components/ui/tabs';
 import { Textarea } from '@theme/components/ui/textarea';
 import { t } from '@theme/i18n';
+import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { computed } from 'vue';
 import { useConnectionDialogStore } from '../../state/connections';
@@ -20,6 +22,13 @@ const preconnectText = computed({
     if (draft.value) draft.value.preconnect = value.trim() === '' ? null : value;
   },
 });
+
+function setDelaySec(value: string): void {
+  const d = draft.value;
+  if (!d) return;
+  const n = Number.parseInt(value, 10);
+  d.preconnectDelaySec = Number.isNaN(n) ? 0 : n;
+}
 </script>
 
 <template>
@@ -57,5 +66,30 @@ const preconnectText = computed({
       :description="t('studio.project.connectionDialog.sidecar.description')"
       testid="connection-preconnect-sidecar"
     />
+
+    <Field v-if="preconnectText" class="flex-1">
+      <FieldLabel>{{ t('studio.project.connectionDialog.preconnectDelay.label') }}</FieldLabel>
+      <div class="w-24">
+        <NumberStepperInput
+          :min="0"
+          :max="PRECONNECT_DELAY_RANGE.max"
+          step="1"
+          v-bind="invalidAttrs('preconnectDelaySec')"
+          data-testid="connection-preconnect-delay"
+          :model-value="String(draft.preconnectDelaySec)"
+          @update:model-value="(v: string | number) => setDelaySec(String(v))"
+        />
+      </div>
+      <FieldError
+        v-if="errorFor('preconnectDelaySec')"
+        :id="errorId('preconnectDelaySec')"
+        data-testid="connection-preconnect-delay-error"
+      >
+        {{ errorFor('preconnectDelaySec') }}
+      </FieldError>
+      <FieldDescription v-else class="w-full">
+        {{ t('studio.project.connectionDialog.preconnectDelay.description') }}
+      </FieldDescription>
+    </Field>
   </TabsContent>
 </template>

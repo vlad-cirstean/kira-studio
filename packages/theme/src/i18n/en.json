@@ -1655,6 +1655,9 @@
         "portRequired": {
           "body": "Port is required."
         },
+        "preconnectDelayRange": {
+          "body": "Pre-connect delay must be a whole number of seconds from 0 to 300."
+        },
         "preconnectExit": {
           "error": "Pre-connect script exited {detail}{tail}. Connection dropped."
         },
@@ -11795,6 +11798,13 @@
           "label": "Pre-connect command",
           "warning": {
             "body": "This command runs on your machine with your permissions every time this connection connects."
+          }
+        },
+        "preconnectDelay": {
+          "description": "Seconds to wait after the command starts before the first connect attempt. 0 (default) connects as soon as the command is ready. Cancel it while it runs from the operations list.",
+          "label": "Wait before connecting (seconds)",
+          "range": {
+            "status": "Whole seconds, {min}–{max}"
           }
         },
         "privacy": {

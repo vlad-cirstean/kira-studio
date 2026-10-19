@@ -1,4 +1,8 @@
-import { CONNECTION_THROTTLE_RANGE, connectionInputSchema } from '@shared/domain/connection';
+import {
+  CONNECTION_THROTTLE_RANGE,
+  connectionInputSchema,
+  PRECONNECT_DELAY_RANGE,
+} from '@shared/domain/connection';
 import { t } from '@theme/i18n';
 import { useFormErrors } from '@workbench/behaviour/formErrors';
 import { computed, type InjectionKey, inject } from 'vue';
@@ -13,10 +17,11 @@ type FieldName =
   | 'database'
   | 'uri'
   | 'preconnect'
+  | 'preconnectDelaySec'
   | 'throttlePerSec'
   | 'mcpDescription';
 
-/** Field errors for the connection draft: schema issues plus the throttle range. */
+/** Field errors for the connection draft: schema issues plus the throttle and delay ranges. */
 export function useConnectionForm(openTab: (tab: DetailTab) => void) {
   const store = useConnectionDialogStore();
 
@@ -45,6 +50,17 @@ export function useConnectionForm(openTab: (tab: DetailTab) => void) {
     return null;
   });
 
+  const delayError = computed<string | null>(() => {
+    const v = store.draft?.preconnectDelaySec ?? 0;
+    if (!Number.isInteger(v) || v < PRECONNECT_DELAY_RANGE.min || v > PRECONNECT_DELAY_RANGE.max) {
+      return t('studio.project.connectionDialog.preconnectDelay.range.status', {
+        min: PRECONNECT_DELAY_RANGE.min,
+        max: PRECONNECT_DELAY_RANGE.max,
+      });
+    }
+    return null;
+  });
+
   function schemaRule(field: FieldName, tab: DetailTab) {
     return {
       value: () => (store.draft as Record<string, unknown> | null)?.[field],
@@ -61,6 +77,11 @@ export function useConnectionForm(openTab: (tab: DetailTab) => void) {
       database: schemaRule('database', 'General'),
       uri: schemaRule('uri', 'General'),
       preconnect: schemaRule('preconnect', 'Pre-connect'),
+      preconnectDelaySec: {
+        value: () => store.draft?.preconnectDelaySec,
+        error: () => delayError.value,
+        tab: 'Pre-connect',
+      },
       mcpDescription: schemaRule('mcpDescription', 'MCP'),
       throttlePerSec: {
         value: () => store.draft?.throttlePerSec,

@@ -21,6 +21,9 @@ const (
 	throttlePerSecMax = 1000
 )
 
+// preconnectDelaySecMax mirrors PRECONNECT_DELAY_RANGE.max.
+const preconnectDelaySecMax = 300
+
 // fileKinds mirrors connection.ts's FILE_KINDS: fields mode repurposes `database` for an absolute
 // local file path.
 var fileKinds = map[string]bool{"sqlite": true}
@@ -85,6 +88,9 @@ func (in Input) validateLimits() error {
 	if in.ThrottlePerSec != 0 &&
 		(in.ThrottlePerSec < throttlePerSecMin || in.ThrottlePerSec > throttlePerSecMax) {
 		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.throttleRange.body", nil)
+	}
+	if in.PreconnectDelaySec < 0 || in.PreconnectDelaySec > preconnectDelaySecMax {
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.connection.preconnectDelayRange.body", nil)
 	}
 	return nil
 }

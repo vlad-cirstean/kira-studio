@@ -83,6 +83,7 @@ function mariadbCreateArgs(name: string) {
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    preconnectDelaySec: 0,
     autoExplain: false,
     throttlePerSec: 0,
   };

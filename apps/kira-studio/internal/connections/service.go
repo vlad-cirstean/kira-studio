@@ -624,13 +624,15 @@ func (s *Service) destinationUnchangedFor(id string, in Input, stored *model.Con
 // gates whether this connection is exposed to the DB MCP server, never what it connects to. M2:
 // McpDescription is free-text metadata, never interpreted; McpReadMode/McpWriteMode/McpDdlMode gate
 // DB-MCP-path permissions, not the destination. M3: McpAutoExplain gates DB-MCP-path plan-first
-// behaviour, the same non-destination footing as AutoExplain.
+// behaviour, the same non-destination footing as AutoExplain. PreconnectDelaySec is timing only,
+// never the destination.
 func zeroExemptFields(f *model.ConnectionFields) {
 	f.Name = ""
 	f.Color = ""
 	f.ReadOnly = false
 	f.AutoExplain = false
 	f.ThrottlePerSec = 0
+	f.PreconnectDelaySec = 0
 	f.McpEnabled = false
 	f.McpDescription = ""
 	f.McpReadMode = ""
