@@ -62,6 +62,8 @@ type inFlightOp struct {
 	// Append for it, handleOpEnd skips Finish, and finishInFlight skips it on shutdown. The live
 	// Operations-panel update (updates.Emit) still fires in all three cases.
 	incognito bool
+	// delayMs is P307 Part 2: a preconnect op's configured wait (0 = none), carried onto its records.
+	delayMs int
 }
 
 // Wiring is the Go analogue of oplog.ts's wireOplog, split into New/Start/Stop (P54 D14): New
@@ -169,6 +171,7 @@ func (w *Wiring) handleOpStart(payload json.RawMessage, inFlight map[string]inFl
 		Kind         string  `json:"kind"`
 		StartedAt    string  `json:"startedAt"`
 		Incognito    bool    `json:"incognito"`
+		DelayMs      int     `json:"delayMs"`
 	}
 	if err := json.Unmarshal(payload, &evt); err != nil || !model.ValidOpKind(evt.Kind) {
 		return
@@ -176,7 +179,7 @@ func (w *Wiring) handleOpStart(payload json.RawMessage, inFlight map[string]inFl
 
 	rec := inFlightOp{
 		connectionID: evt.ConnectionID, tabID: evt.TabID, kind: evt.Kind, startedAt: evt.StartedAt,
-		incognito: evt.Incognito,
+		incognito: evt.Incognito, delayMs: evt.DelayMs,
 	}
 	inFlight[evt.OpID] = rec
 
@@ -195,7 +198,15 @@ func (w *Wiring) handleOpStart(payload json.RawMessage, inFlight map[string]inFl
 	w.updates.Emit(model.OpRecord{
 		ID: evt.OpID, ConnectionID: rec.connectionID, TabID: rec.tabID, StartedAt: rec.startedAt,
 		DurationMs: nil, Kind: rec.kind, Status: "running", Rows: nil, Command: nil, Error: nil,
+		DelayMs: delayPtr(rec.delayMs),
 	})
+}
+
+func delayPtr(ms int) *int {
+	if ms <= 0 {
+		return nil
+	}
+	return &ms
 }
 
 func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlightOp, completedSincePrune int) int {
@@ -248,6 +259,7 @@ func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlig
 	}
 	if ok {
 		record.ConnectionID, record.TabID, record.StartedAt, record.Kind = started.connectionID, started.tabID, started.startedAt, started.kind
+		record.DelayMs = delayPtr(started.delayMs)
 	} else {
 		record.StartedAt, record.Kind = kiratime.NowISO(), "test"
 	}

@@ -51,8 +51,8 @@ type Backend interface {
 	SetThrottle(connectionID string, perSec float64)
 	// RunPreconnect runs the pre-connect startup wait (run) as a `preconnect` op so the
 	// Operations panel shows the script and a timer. command is the script text; connectionID is
-	// nil for a dialog Test.
-	RunPreconnect(ctx context.Context, connectionID *string, command string, run func(context.Context) error) error
+	// nil for a dialog Test. delay is the connection's configured wait, shown as a countdown.
+	RunPreconnect(ctx context.Context, connectionID *string, command string, delay time.Duration, run func(context.Context) error) error
 }
 
 // ConnectResult is engine-ops.ts's adapter:connect success payload, the part attemptConnect
@@ -685,8 +685,8 @@ func (s *Service) Test(in Input, existingID string) TestResult {
 	if r.preconnect != nil {
 		// Test has no in-flight-attempt tracking of its own to race against (F4 is Connect's own
 		// dedupe/abort machinery) — context.Background() here is unchanged from before.
-		err := s.deps.Backend.RunPreconnect(context.Background(), nil, *r.preconnect, func(opCtx context.Context) error {
-			_, err := s.deps.Preconnect.Start(opCtx, r.config.ID, *r.preconnect, readyCheck(r.readyAddr))
+		err := s.deps.Backend.RunPreconnect(context.Background(), nil, *r.preconnect, r.preconnectDelay, func(opCtx context.Context) error {
+			_, err := s.deps.Preconnect.Start(opCtx, r.config.ID, *r.preconnect, readyCheck(r.readyAddr), r.preconnectDelay)
 			return err
 		})
 		if err != nil {
@@ -867,8 +867,8 @@ func (s *Service) attemptConnect(id string, ctx context.Context) (model.Connecti
 
 	started := false
 	if r.preconnect != nil {
-		err := s.deps.Backend.RunPreconnect(ctx, &id, *r.preconnect, func(opCtx context.Context) error {
-			_, err := s.deps.Preconnect.Start(opCtx, id, *r.preconnect, readyCheck(r.readyAddr))
+		err := s.deps.Backend.RunPreconnect(ctx, &id, *r.preconnect, r.preconnectDelay, func(opCtx context.Context) error {
+			_, err := s.deps.Preconnect.Start(opCtx, id, *r.preconnect, readyCheck(r.readyAddr), r.preconnectDelay)
 			return err
 		})
 		if err != nil {

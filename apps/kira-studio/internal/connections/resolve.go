@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
@@ -19,6 +20,7 @@ type resolved struct {
 	config            model.ResolvedConnectionConfig
 	preconnect        *string
 	preconnectSidecar bool
+	preconnectDelay   time.Duration
 	// readyAddr is the loopback host:port the pre-connect script is expected to open ("" when the
 	// target is not a loopback address with an explicit port).
 	readyAddr string
@@ -70,6 +72,7 @@ func resolve(conns *repos.ConnectionsRepo, secrets *repos.SecretsRepo, id string
 		readyAddr:         readyAddr(cfg),
 		preconnect:        summary.Preconnect,
 		preconnectSidecar: summary.PreconnectSidecar,
+		preconnectDelay:   time.Duration(summary.PreconnectDelaySec) * time.Second,
 		throttlePerSec:    summary.ThrottlePerSec,
 	}, nil
 }
@@ -121,6 +124,7 @@ func resolveFromInput(in Input) resolved {
 		readyAddr:         readyAddr(cfg),
 		preconnect:        in.Preconnect,
 		preconnectSidecar: in.PreconnectSidecar,
+		preconnectDelay:   time.Duration(in.PreconnectDelaySec) * time.Second,
 	}
 }
 

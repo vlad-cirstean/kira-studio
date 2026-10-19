@@ -275,8 +275,8 @@ func (r *Router) Test(ctx context.Context, cfg model.ResolvedConnectionConfig) (
 // RunPreconnect is connections.Backend's pre-connect hook: run (the script's startup wait) executes
 // as a `preconnect` op whose command is the script text, so the Operations panel lists it with a
 // timer and can cancel it.
-func (r *Router) RunPreconnect(ctx context.Context, connectionID *string, command string, run func(context.Context) error) error {
-	_, _, err := r.host.RunOp(ctx, OpSpec{ConnectionID: connectionID, Kind: "preconnect"},
+func (r *Router) RunPreconnect(ctx context.Context, connectionID *string, command string, delay time.Duration, run func(context.Context) error) error {
+	_, _, err := r.host.RunOp(ctx, OpSpec{ConnectionID: connectionID, Kind: "preconnect", DelayMs: int(delay.Milliseconds())},
 		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
 			op.SetCommand(command)
 			return nil, run(ctx)

@@ -163,7 +163,10 @@ func (s *Supervisor) OnExit(fn func(Exit)) (unsubscribe func()) {
 //
 // ready, when non-nil, replaces the settle window: the script counts as a sidecar once ready.Check
 // succeeds while it is alive, and fails after readyTimeout. A nil ready keeps the settle-window rule.
-func (s *Supervisor) Start(ctx context.Context, connectionID, command string, ready *ReadyCheck) (Start, error) {
+//
+// delay is a floor: Start returns no earlier than delay after spawn, even for a script that exits 0
+// or is ready sooner. A failing script or ctx cancel still ends it at once.
+func (s *Supervisor) Start(ctx context.Context, connectionID, command string, ready *ReadyCheck, delay time.Duration) (Start, error) {
 	s.mu.Lock()
 	existing := s.entries[connectionID]
 	s.mu.Unlock()
@@ -171,9 +174,140 @@ func (s *Supervisor) Start(ctx context.Context, connectionID, command string, re
 		s.killEntry(connectionID, existing)
 	}
 
+	e, outcomeCh, err := spawn(connectionID, command)
+	if err != nil {
+		return Start{}, err
+	}
+
+	w := &startWait{delayDone: delay <= 0}
+	defer w.stop()
+	var settleC <-chan time.Time
+	var readyCh chan struct{}
+	if !w.delayDone {
+		w.delayTimer = time.NewTimer(delay)
+	}
+	if ready == nil {
+		w.settleTimer = time.NewTimer(settleWindow)
+		settleC = w.settleTimer.C
+	} else {
+		readyCh = make(chan struct{}, 1)
+		probeCtx, stopProbe := context.WithCancel(ctx)
+		defer stopProbe()
+		go probeLoop(probeCtx, ready, readyCh)
+		if w.delayDone {
+			w.armTimeout()
+		}
+	}
+	var delayC <-chan time.Time
+	if w.delayTimer != nil {
+		delayC = w.delayTimer.C
+	}
+
+	sidecar := func() (Start, error) {
+		s.mu.Lock()
+		s.entries[connectionID] = e
+		s.mu.Unlock()
+		go s.awaitExit(connectionID, e, outcomeCh)
+		return Start{Kind: KindSidecar}, nil
+	}
+	// readyNow runs once the script counts as ready and the delay is over. A script that exited just
+	// as readiness hit is classified by its exit, not as a sidecar.
+	readyNow := func() (Start, error) {
+		select {
+		case out := <-outcomeCh:
+			return s.finishExit(connectionID, e, out)
+		default:
+		}
+		return sidecar()
+	}
+
+	outC := (<-chan outcome)(outcomeCh)
+	for {
+		select {
+		case <-ctx.Done():
+			// Not yet tracked in s.entries (only the sidecar branches add it) — killEntry operates on
+			// e directly regardless, and F1's own bound on it means this returns promptly rather than
+			// blocking for however long the script would otherwise have run.
+			s.killEntry(connectionID, e)
+			return Start{}, fmt.Errorf("Pre-connect script cancelled: %w", ctx.Err())
+
+		case out := <-outC:
+			if w.delayDone || out.signal != "" || out.code == nil || *out.code != 0 {
+				return s.finishExit(connectionID, e, out)
+			}
+			// Exit 0 inside the delay: the script may have backgrounded a tunnel still starting, so
+			// wait the delay out, then classify it.
+			w.held = &out
+			outC = nil
+
+		case <-delayC:
+			w.delayDone = true
+			switch {
+			case w.held != nil:
+				return s.finishExit(connectionID, e, *w.held)
+			case ready == nil && w.settled:
+				return sidecar()
+			case ready != nil && w.probed:
+				return readyNow()
+			case ready != nil:
+				w.armTimeout()
+			}
+
+		case <-settleC:
+			w.settled = true
+			if w.delayDone {
+				return sidecar()
+			}
+
+		case <-readyCh:
+			w.probed = true
+			if w.delayDone {
+				return readyNow()
+			}
+
+		case <-w.timeoutC():
+			e.drainStderr()
+			s.killEntry(connectionID, e)
+			return Start{}, fmt.Errorf("Pre-connect script not ready after %s: nothing accepting connections on %s%s",
+				readyTimeout, ready.Addr, stderrSuffix(e.lastStderr()))
+		}
+	}
+}
+
+// startWait is Start's wait state: which of the delay floor, settle window and readiness probe
+// have fired, plus an exit-0 outcome held until the delay ends.
+type startWait struct {
+	delayDone, settled, probed bool
+	held                       *outcome
+	delayTimer, settleTimer    *time.Timer
+	timeoutTimer               *time.Timer
+}
+
+// armTimeout starts the readiness timeout; it counts from delay end so a long delay never trips it.
+func (w *startWait) armTimeout() { w.timeoutTimer = time.NewTimer(readyTimeout) }
+
+// timeoutC is nil (blocks forever in a select) until armTimeout runs.
+func (w *startWait) timeoutC() <-chan time.Time {
+	if w.timeoutTimer == nil {
+		return nil
+	}
+	return w.timeoutTimer.C
+}
+
+func (w *startWait) stop() {
+	for _, t := range []*time.Timer{w.delayTimer, w.settleTimer, w.timeoutTimer} {
+		if t != nil {
+			t.Stop()
+		}
+	}
+}
+
+// spawn starts command in its own process group and returns its entry plus the channel that
+// delivers its exit outcome.
+func spawn(connectionID, command string) (*entry, chan outcome, error) {
 	dir, err := os.UserHomeDir()
 	if err != nil {
-		return Start{}, fmt.Errorf("Pre-connect script could not start: %w", err)
+		return nil, nil, fmt.Errorf("Pre-connect script could not start: %w", err)
 	}
 
 	e := &entry{exited: make(chan struct{}), groupGone: make(chan struct{}), readerDone: make(chan struct{})}
@@ -183,7 +317,7 @@ func (s *Supervisor) Start(ctx context.Context, connectionID, command string, re
 	// background child that inherited the pipe).
 	stderrR, stderrW, err := os.Pipe()
 	if err != nil {
-		return Start{}, fmt.Errorf("Pre-connect script could not start: %w", err)
+		return nil, nil, fmt.Errorf("Pre-connect script could not start: %w", err)
 	}
 
 	cmd := exec.Command("/bin/sh", "-c", command)
@@ -197,7 +331,7 @@ func (s *Supervisor) Start(ctx context.Context, connectionID, command string, re
 		_ = stderrW.Close()
 		_ = stderrR.Close()
 		slog.Error("preconnect failed to spawn", "scope", "preconnect", "connectionId", connectionID, "err", err)
-		return Start{}, fmt.Errorf("Pre-connect script could not start: %s", err)
+		return nil, nil, fmt.Errorf("Pre-connect script could not start: %s", err)
 	}
 	_ = stderrW.Close()
 	e.pid = cmd.Process.Pid
@@ -220,60 +354,7 @@ func (s *Supervisor) Start(ctx context.Context, connectionID, command string, re
 		outcomeCh <- out
 		close(e.exited)
 	}()
-
-	var settleC, timeoutC <-chan time.Time
-	var readyCh chan struct{}
-	if ready == nil {
-		timer := time.NewTimer(settleWindow)
-		defer timer.Stop()
-		settleC = timer.C
-	} else {
-		timer := time.NewTimer(readyTimeout)
-		defer timer.Stop()
-		timeoutC = timer.C
-		readyCh = make(chan struct{}, 1)
-		probeCtx, stopProbe := context.WithCancel(ctx)
-		defer stopProbe()
-		go probeLoop(probeCtx, ready, readyCh)
-	}
-
-	sidecar := func() (Start, error) {
-		s.mu.Lock()
-		s.entries[connectionID] = e
-		s.mu.Unlock()
-		go s.awaitExit(connectionID, e, outcomeCh)
-		return Start{Kind: KindSidecar}, nil
-	}
-
-	select {
-	case <-ctx.Done():
-		// Not yet tracked in s.entries (only the sidecar branches add it) — killEntry operates on
-		// e directly regardless, and F1's own bound on it means this returns promptly rather than
-		// blocking for however long the script would otherwise have run.
-		s.killEntry(connectionID, e)
-		return Start{}, fmt.Errorf("Pre-connect script cancelled: %w", ctx.Err())
-
-	case <-settleC:
-		return sidecar()
-
-	case <-readyCh:
-		// A script that exited just as the probe succeeded is classified by its exit, not as a sidecar.
-		select {
-		case out := <-outcomeCh:
-			return s.finishExit(connectionID, e, out)
-		default:
-		}
-		return sidecar()
-
-	case <-timeoutC:
-		e.drainStderr()
-		s.killEntry(connectionID, e)
-		return Start{}, fmt.Errorf("Pre-connect script not ready after %s: nothing accepting connections on %s%s",
-			readyTimeout, ready.Addr, stderrSuffix(e.lastStderr()))
-
-	case out := <-outcomeCh:
-		return s.finishExit(connectionID, e, out)
-	}
+	return e, outcomeCh, nil
 }
 
 // finishExit classifies a script that exited before it was judged ready.

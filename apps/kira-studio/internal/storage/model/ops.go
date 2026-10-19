@@ -19,6 +19,9 @@ type OpRecord struct {
 	// for every op kind that isn't a console execute() batch, and for a pre-P108-Part-11 row. Set
 	// by adapterhost.Dispatcher.Execute (op.SetPath), the one op kind that has a path at all.
 	Path *string `json:"path"`
+	// DelayMs (P307 Part 2): a preconnect op's configured wait, so the panel can count it down. Live
+	// only, never stored in op_log.
+	DelayMs *int `json:"delayMs,omitempty"`
 }
 
 // OpAppend is ops.ts's AppendOpInput.

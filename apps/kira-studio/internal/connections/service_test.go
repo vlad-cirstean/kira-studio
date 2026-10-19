@@ -100,7 +100,7 @@ func (b *fakeBackend) Disconnect(ctx context.Context, connectionID string) error
 	return nil
 }
 
-func (b *fakeBackend) RunPreconnect(ctx context.Context, _ *string, _ string, run func(context.Context) error) error {
+func (b *fakeBackend) RunPreconnect(ctx context.Context, _ *string, _ string, _ time.Duration, run func(context.Context) error) error {
 	return run(ctx)
 }
 

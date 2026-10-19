@@ -64,5 +64,7 @@ export const opRecordSchema = /*#__PURE__*/ opLogRecordSchema.extend({
   // (Go's *string always marshals the key) and optional (a hand-written test fixture predating this
   // field has no opinion) — OperationsPanel.vue's re-run treats either as "no recorded path".
   path: z.string().nullable().optional(),
+  // P307 Part 2: a preconnect op's configured wait in ms (live only, absent otherwise).
+  delayMs: z.number().optional(),
 });
 export type OpRecord = z.infer<typeof opRecordSchema>;

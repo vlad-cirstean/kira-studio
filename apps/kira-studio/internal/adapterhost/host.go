@@ -32,6 +32,8 @@ type OpSpec struct {
 	// persisting this op at all (Append/Finish) while still emitting the live Operations-panel
 	// update — false for every caller but HttpService.Send/GrpcService.Call.
 	Incognito bool
+	// DelayMs is preconnect only: the configured wait, so the panel can count it down.
+	DelayMs int
 }
 
 type runningOp struct {
@@ -184,6 +186,7 @@ type opStartPayload struct {
 	Kind         string  `json:"kind"`
 	StartedAt    string  `json:"startedAt"`
 	Incognito    bool    `json:"incognito"`
+	DelayMs      int     `json:"delayMs,omitempty"`
 }
 
 type opEndPayload struct {
@@ -255,7 +258,7 @@ func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, 
 	startedAt := kiratime.NowISO()
 	h.emitJSON(oplog.EventOpStart, opStartPayload{
 		OpID: opID, ConnectionID: spec.ConnectionID, TabID: spec.TabID, Kind: spec.Kind, StartedAt: startedAt,
-		Incognito: spec.Incognito,
+		Incognito: spec.Incognito, DelayMs: spec.DelayMs,
 	})
 
 	op := adapters.NewOpCtx(opID)
