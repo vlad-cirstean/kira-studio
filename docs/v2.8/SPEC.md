@@ -10,7 +10,7 @@ First phase `P306` (highest in `docs/HISTORY.md` is `P305`). Branch `v2.8`. Phas
 | P309 | SQL cell editor: date editor has a large min height and scrolls out of view. Footer controls stay fixed; only the text editor scrolls. | Todo |
 | P310 | SQL column tooltip: explanation and comment read as one run. Rearrange and format them. | Todo |
 | P311 | Docker container list in the left panel scrolls sluggishly. Find the cause, fix (likely virtualization or per-row cost). | Todo |
-| P312 | Panel sizes are per module (resize in studio, api stays unchanged). Share one panel size across modules. | Todo |
+| P312 | Panel sizes are shared across modules today; they must be per module (resize in studio, api stays unchanged). Re-key per module, migrate current values. | Todo |
 | P313 | Code review per `CLAUDE.md` (one Opus round, three dimensions), then fixer. Base: P305 close-out. | Todo |
 | P314 | Comment cleanup across Go/TS/Vue. Build a comment-extraction tool (see Notes), rewrite via distill plumbing to shorter atomic comments in one consistent format per the `CLAUDE.md` comment rule. Must prove the rewrite is better: drop trivia and restated-code comments, keep every non-obvious why/constraint/workaround, never touch directives. Needs a quality gate: rule-based checks plus a sampled before/after report reviewed by an Opus judge; failures redo. Opus plan decides the format and gate. | Todo |
 | P315 | Close chapter v2.8 (fold per `CLAUDE.md`). Hold until user says to close. | Todo |
