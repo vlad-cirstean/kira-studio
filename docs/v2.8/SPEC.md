@@ -9,8 +9,16 @@ First phase `P306` (highest in `docs/HISTORY.md` is `P305`). Branch `v2.8`. Phas
 | P308 | Drag-and-drop reorder of DBs, scripts, repos in the left panel. Colored bars in the panel get thicker. | Todo |
 | P309 | SQL cell editor: date editor has a large min height and scrolls out of view. Footer controls stay fixed; only the text editor scrolls. | Todo |
 | P310 | SQL column tooltip: explanation and comment read as one run. Rearrange and format them. | Todo |
-| P311 | Close chapter v2.8 (fold per `CLAUDE.md`). | Todo |
+| P311 | Docker container list in the left panel scrolls sluggishly. Find the cause, fix (likely virtualization or per-row cost). | Todo |
+| P312 | Panel sizes are per module (resize in studio, api stays unchanged). Share one panel size across modules. | Todo |
+| P313 | Code review per `CLAUDE.md` (one Opus round, three dimensions), then fixer. Base: P305 close-out. | Todo |
+| P314 | Comment cleanup: shorter atomic comments, aligned to the `CLAUDE.md` comment rule, across Go/TS/Vue. Needs a new comment-aware tool (see Notes); Opus plan decides scope and approach. | Todo |
+| P315 | Close chapter v2.8 (fold per `CLAUDE.md`). | Todo |
 
 ## Results
 
 Filled per phase.
+
+## Notes
+
+P314 feasibility: `scripts/docshistory` distills markdown chapters and standing docs only (units are doc sections, output rewrites `docs/HISTORY.md` and the two standing docs). It cannot read or write source comments. Reusable: the `ingest_files` distill call, resumable run ledger, `--max-usd` cap. New: comment extraction (go/ast for Go; a TS/Vue parser for the rest), a rewrite prompt, safe write-back.
