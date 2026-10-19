@@ -41,9 +41,9 @@ func TestLayoutAdePanelWidth(t *testing.T) {
 // P312: panel sizes are per module; a patch to one module leaves the others at their own values.
 func TestLayoutPanelSizesPerModule(t *testing.T) {
 	app := flowharness.New(t)
-	width, height := 410.0, 310.0
+	width, height, userSet := 410.0, 310.0, true
 	patch := model.LayoutPatch{Modes: map[string]model.PanelSizesPatch{
-		"git": {Project: &model.ProjectSizePatch{Width: &width}, Operations: &model.OperationsSizePatch{Height: &height}},
+		"git": {Project: &model.ProjectSizePatch{Width: &width, WidthUserSet: &userSet}, Operations: &model.OperationsSizePatch{Height: &height}},
 	}}
 	merged, err := app.W.Layout.Set(bridge.LayoutSetArgs{Patch: patch})
 	if err != nil || merged.Modes["git"].Project.Width != width || merged.Modes["git"].Operations.Height != height {
@@ -55,7 +55,7 @@ func TestLayoutPanelSizesPerModule(t *testing.T) {
 
 	app.Restart()
 	got, err := app.W.Layout.GetAll()
-	if err != nil || got.Modes["git"].Project.Width != width || got.Modes["automations"] != model.DefaultPanelSizes() {
+	if err != nil || got.Modes["git"].Project.Width != width || !got.Modes["git"].Project.WidthUserSet || got.Modes["automations"] != model.DefaultPanelSizes() {
 		t.Fatalf("Layout.GetAll after restart = %+v, %v", got.Modes, err)
 	}
 

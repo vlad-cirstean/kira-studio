@@ -210,3 +210,19 @@ func TestDockerStatsEndWithTheirWindow(t *testing.T) {
 		t.Fatalf("closed window A still gets %d stats samples", n)
 	}
 }
+
+// widthUserSet must survive the bridge and a relaunch (the Git review widen reads it).
+func TestLayoutWidthUserSetSurvivesRestart(t *testing.T) {
+	app := flowharness.New(t)
+	width, userSet := 300.0, true
+	if _, err := app.W.Layout.Set(bridge.LayoutSetArgs{Patch: model.LayoutPatch{Modes: map[string]model.PanelSizesPatch{
+		"studio": {Project: &model.ProjectSizePatch{Width: &width, WidthUserSet: &userSet}},
+	}}}); err != nil {
+		t.Fatalf("Layout.Set: %v", err)
+	}
+	app.Restart(t)
+	got, err := app.W.Layout.GetAll()
+	if err != nil || !got.Modes["studio"].Project.WidthUserSet || got.Modes["api"].Project.WidthUserSet {
+		t.Fatalf("Layout.GetAll after restart = %+v, %v, want studio widthUserSet only", got.Modes, err)
+	}
+}

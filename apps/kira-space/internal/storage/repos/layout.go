@@ -19,7 +19,10 @@ type LayoutRepo struct {
 	selectAll *sql.Stmt
 }
 
-func modeWidthKey(mode string) string  { return "modes." + mode + ".project.width" }
+func modeWidthKey(mode string) string { return "modes." + mode + ".project.width" }
+func modeWidthUserSetKey(mode string) string {
+	return "modes." + mode + ".project.widthUserSet"
+}
 func modeHeightKey(mode string) string { return "modes." + mode + ".operations.height" }
 
 // decodeLayout builds model.Layout from an already-scanned leaf map — the part of GetAll's read
@@ -30,6 +33,7 @@ func decodeLayout(stored map[string]json.RawMessage) model.Layout {
 	appsettings.Leaf(stored, "panel.project.visible", &result.Panel.Project.Visible)
 	for mode, sizes := range result.Modes {
 		appsettings.Leaf(stored, modeWidthKey(mode), &sizes.Project.Width)
+		appsettings.Leaf(stored, modeWidthUserSetKey(mode), &sizes.Project.WidthUserSet)
 		appsettings.Leaf(stored, modeHeightKey(mode), &sizes.Operations.Height)
 		result.Modes[mode] = sizes
 	}
@@ -46,6 +50,9 @@ func applyModesPatch(merged *model.Layout, modes map[string]model.PanelSizesPatc
 		}
 		if patch.Project != nil && patch.Project.Width != nil {
 			sizes.Project.Width = *patch.Project.Width
+		}
+		if patch.Project != nil && patch.Project.WidthUserSet != nil {
+			sizes.Project.WidthUserSet = *patch.Project.WidthUserSet
 		}
 		if patch.Operations != nil && patch.Operations.Height != nil {
 			sizes.Operations.Height = *patch.Operations.Height
@@ -87,6 +94,7 @@ func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
 		for mode, sizes := range merged.Modes {
 			leaves = append(leaves,
 				appstorage.Leaf{Key: modeWidthKey(mode), Value: sizes.Project.Width},
+				appstorage.Leaf{Key: modeWidthUserSetKey(mode), Value: sizes.Project.WidthUserSet},
 				appstorage.Leaf{Key: modeHeightKey(mode), Value: sizes.Operations.Height},
 			)
 		}

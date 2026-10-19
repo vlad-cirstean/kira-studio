@@ -55,3 +55,38 @@ func TestLayoutRepoSetSurvivesConcurrentDisjointPatches(t *testing.T) {
 		t.Fatalf("%d/%d rounds lost one of two disjoint concurrent patches, want 0", lost, rounds)
 	}
 }
+
+// TestLayoutRepoWidthUserSetRoundTrips guards the flag staying a stored leaf: an absent patch field
+// leaves it alone, and an explicit false clears it.
+func TestLayoutRepoWidthUserSetRoundTrips(t *testing.T) {
+	r := newLayoutRepo(t)
+	set := func(v *bool, w *float64) {
+		t.Helper()
+		if _, err := r.Set(model.LayoutPatch{Modes: map[string]model.PanelSizesPatch{
+			"studio": {Project: &model.ProjectSizePatch{Width: w, WidthUserSet: v}},
+		}}); err != nil {
+			t.Fatalf("Set: %v", err)
+		}
+	}
+	flag := func() bool {
+		t.Helper()
+		got, err := r.GetAll()
+		if err != nil {
+			t.Fatalf("GetAll: %v", err)
+		}
+		return got.Modes["studio"].Project.WidthUserSet
+	}
+	yes, no := true, false
+	set(&yes, floatPtr(300))
+	if !flag() {
+		t.Fatal("widthUserSet lost after Set(true)")
+	}
+	set(nil, floatPtr(310))
+	if !flag() {
+		t.Fatal("widthUserSet cleared by a patch that omits it")
+	}
+	set(&no, nil)
+	if flag() {
+		t.Fatal("widthUserSet still true after Set(false)")
+	}
+}

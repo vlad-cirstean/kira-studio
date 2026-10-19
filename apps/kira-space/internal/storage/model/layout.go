@@ -16,6 +16,8 @@ type PanelSizes struct {
 
 type ProjectSize struct {
 	Width float64 `json:"width"`
+	// WidthUserSet marks a width the user dragged; the Git review widen leaves those alone.
+	WidthUserSet bool `json:"widthUserSet"`
 }
 
 type OperationsSize struct {
@@ -62,7 +64,8 @@ type PanelProjectPatch struct {
 }
 
 type ProjectSizePatch struct {
-	Width *float64 `json:"width,omitempty"`
+	Width        *float64 `json:"width,omitempty"`
+	WidthUserSet *bool    `json:"widthUserSet,omitempty"`
 }
 
 type OperationsSizePatch struct {
