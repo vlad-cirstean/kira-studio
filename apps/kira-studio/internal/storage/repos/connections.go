@@ -408,6 +408,27 @@ func (r *ConnectionsRepo) Delete(connID string) error {
 	return nil
 }
 
+// Reorder applies a user's drag order and rewrites sort_order dense. updated_at stays: order is
+// not content.
+func (r *ConnectionsRepo) Reorder(ids []string) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos/connections: reorder: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := sqlitex.ReorderSortOrder(tx,
+		`SELECT id FROM connections ORDER BY sort_order ASC, name ASC`,
+		`UPDATE connections SET sort_order = ? WHERE id = ?`,
+		ids,
+	); err != nil {
+		return fmt.Errorf("repos/connections: reorder: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos/connections: reorder: commit: %w", err)
+	}
+	return nil
+}
+
 func boolToInt(b bool) int {
 	if b {
 		return 1

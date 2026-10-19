@@ -536,6 +536,26 @@ func (s *Service) Remove(id string) error {
 	return nil
 }
 
+// Reorder persists the sidebar's drag order. An id deleted in another window fails the call; the
+// renderer resyncs from List.
+func (s *Service) Reorder(ids []string) ([]model.ConnectionSummary, error) {
+	if len(ids) == 0 {
+		return nil, ipcerr.Required("ids")
+	}
+	seen := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		if seen[id] {
+			return nil, ipcerr.Contract("ids must be unique")
+		}
+		seen[id] = true
+	}
+	if err := s.deps.Conns.Reorder(ids); err != nil {
+		return nil, ipcerr.Wrap(err)
+	}
+	s.emitListChanged()
+	return s.List()
+}
+
 // Reveal never errors (P25 D9): the renderer's edit dialog has no error handling around this
 // call, so an undecryptable stored secret — or a failed/declined authentication — must not become
 // an unhandled failure, only a RevealResult whose Outcome names what happened.
