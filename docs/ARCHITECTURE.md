@@ -48,7 +48,7 @@ whatever sandbox a session happens to be in),
 - Styling uses Tailwind v4 with CSS-first config; tokens mirror VS Code Dark Modern.
 - Dynamic colours must be Record<Enum,string> class maps of full literals, never template-built class names, because Tailwind emits only scanned literals.
 - ADE tones are @theme tokens in ade/v2/tones.css.
-- Every palette colour mark must go through colorMarkClass(mark, color) in packages/theme/src/connColor.ts: rail on left-panel rows, bar on tabs, dot inline, band under view toolbars; no colour leaves the slot empty, and a dot shows a ring.
+- Every palette colour mark must go through colorMarkClass(mark, color) in packages/theme/src/connColor.ts: rail on left-panel rows, bar on tabs, dot inline, band under view toolbars; no colour leaves the slot empty, and a dot shows a ring. The rail is 4px (`w-1`).
 - When converting off plain CSS, stop at the first fitting rung: (1) Tailwind default-scale utility; (2) existing @theme token utility backed by a --kira-* property; (3) a new @theme token only when the value recurs 3+ times or is a deliberate design seam; (4) an arbitrary value only for a one-off or genuinely runtime/viewport/calc value, with a stated reason.
 - Define each @theme name once, because Tailwind v4 resolves a duplicated name to the last-loaded definition (base.css and shadcn-bridge.css declare @theme on the same root); never re-declare a name shadcn's bridge already owns.
 - The duplicate --color-muted, --color-input and --color-border declarations were deleted from base.css and now live only in shadcn-bridge.css; legacy meanings moved to bg-field and text-muted-foreground.
@@ -471,7 +471,10 @@ custom_scripts(id, name, command, working_dir, dir_mode, kind, params_json, smar
                                                        -- 0036 / 0029), schedule_json (Part 4, 0037 /
                                                        -- 0030; '' = not recurring):
                                                        -- NULL = ungrouped, FK to
-                                                       -- custom_script_collections ON DELETE CASCADE
+                                                       -- custom_script_collections ON DELETE CASCADE;
+                                                       -- sort_order is dense per collection (NULL =
+                                                       -- ungrouped set); Move appends to the end of
+                                                       -- the target set
 script_runs(id, script_id, script_name, color, kind, trigger_kind, state, terminal_id, cwd, command,
             outcome_json, created_at, started_at, finished_at, model, session_id, prompt, params_json,
             tools_json, task_id, task_title, branch_id, branch_label)
@@ -489,8 +492,8 @@ script_run_logs(run_id, seq, stream, text)              -- P242 Part 2; smart-ru
                                                        -- stdout|stderr|event
 custom_script_collections(id, name, sort_order, created_at, updated_at)
                                                        -- P219; one row per script collection, name
-                                                       -- trimmed, 64 runes max, order is sort_order,
-                                                       -- name (creation order). Empty ones may exist.
+                                                       -- trimmed, 64 runes max, order is sort_order
+                                                       -- (user drag order), name. Empty ones may exist.
 ui_layout(key, value)                                   -- panel visibility (app-wide), panel sizes per module (modes.<mode>.*)
 windows(key, order, bounds_json)                        -- one row per workbench (P8)
 tabs(id, connection_id, path, kind, state_json, order, active, window_key, workspace_id)
@@ -867,7 +870,8 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - TabStrip reads the narrow TabStripHost seam (host.ts): an optional host prop, falling back to the injected WorkbenchHost, which extends it. Optional capabilities (close*, duplicate, promote, preview, moveTab) hide their affordance when absent.
 - TabStrip has a #tab-leading slot that renders before the title, and the kind flag pinnedTitle makes a pinned chip labelled rather than icon-only.
 - Tab reorder uses vue-draggable-plus useDraggable in forceFallback mode on the scrolling row only (pinned chips sit outside it), bound to an id mirror so the library reverts its own DOM move; onUpdate commits once per drop via moveTab.
-- The reorder binding is util/useSortableReorder.ts, shared with Studio's column, environment and variable lists.
+- The reorder binding is useSortableReorder (packages/workbench/src/behaviour/sortableReorder.ts), shared with Studio's column, environment and variable lists, the Automations panel (SortableList.vue) and Space's Git panel repo list. Its keyboardHandle option limits Alt+Arrow moves to an item's own row.
+- Studio's project tree is virtualized, so connection drag uses project/connectionReorder.ts (VueUse pointer hit-testing, drop line, edge auto-scroll). Alt+Up/Down go through the connection menu's Move up/down items.
 - Adding a tab kind takes one registry entry each in state/tabKinds.ts and workbench/tabViews.ts, not editing a dispatch chain in three files.
 - 'http-request' is the first Api-mode tab kind: TAB_KIND_MODE['http-request'] is 'api' and every other entry is 'studio'.
 - Tab kinds are a vocabulary that Go's model.RenderableTabKinds must also carry; no compiler catches a miss, and tests/unit/go-ts-vocabulary-parity.spec.ts checks it.
