@@ -110,12 +110,18 @@ func TestStudioWindows(t *testing.T) {
 
 	// Layout and settings are app-wide: one write, every window hears it.
 	mark := app.Events.Mark()
-	wide := 320.0
-	merged, err := app.W.Layout.Set(bridge.LayoutSetArgs{Patch: model.LayoutPatch{Panel: &model.PanelsPatch{Project: &model.PanelProjectPatch{Width: &wide}}}})
-	if err != nil || merged.Panel.Project.Width != wide {
+	wide, tall := 400.0, 300.0
+	merged, err := app.W.Layout.Set(bridge.LayoutSetArgs{Patch: model.LayoutPatch{Modes: map[string]model.PanelSizesPatch{
+		"studio": {Project: &model.ProjectSizePatch{Width: &wide}, Operations: &model.OperationsSizePatch{Height: &tall}},
+	}}})
+	if err != nil || merged.Modes["studio"].Project.Width != wide || merged.Modes["studio"].Operations.Height != tall {
 		t.Fatalf("Layout.Set = %+v (%v)", merged, err)
 	}
-	if got, err := app.W.Layout.GetAll(); err != nil || got != merged {
+	// P312: sizes are per module, so another module keeps its defaults.
+	if got := merged.Modes["api"]; got != model.DefaultPanelSizes() {
+		t.Fatalf("api sizes = %+v, want the defaults untouched", got)
+	}
+	if got, err := app.W.Layout.GetAll(); err != nil || !reflect.DeepEqual(got, merged) {
 		t.Fatalf("Layout.GetAll = %+v (%v), want %+v", got, err, merged)
 	}
 	if ev := app.Events.WaitAfter(t, mark, appevent.ChannelLayoutChanged, nil, wait); ev.Window != "" {
@@ -151,8 +157,13 @@ func TestStudioWindows(t *testing.T) {
 	if a, _ := app.W.WindowsSvc.Ensure(windowsvc.EnsureArgs{WindowKey: "A"}); a.Mode != "automations" {
 		t.Fatalf("window A mode after a relaunch = %q", a.Mode)
 	}
-	if got, _ := app.W.Layout.GetAll(); got.Panel.Project.Width != wide {
+	if got, _ := app.W.Layout.GetAll(); got.Modes["studio"].Project.Width != wide || got.Modes["api"] != model.DefaultPanelSizes() {
 		t.Fatalf("layout after a relaunch = %+v", got)
+	}
+	_, err = app.W.Layout.Set(bridge.LayoutSetArgs{Patch: model.LayoutPatch{Modes: map[string]model.PanelSizesPatch{"bogus": {}}}})
+	var coded *ipcerr.Error
+	if !errors.As(err, &coded) || coded.Code != string(ipcerr.CodeContract) {
+		t.Fatalf("Layout.Set(unknown mode) = %v, want %s", err, ipcerr.CodeContract)
 	}
 }
 

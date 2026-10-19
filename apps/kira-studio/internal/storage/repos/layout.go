@@ -20,22 +20,29 @@ type LayoutRepo struct {
 	selectAll *sql.Stmt
 }
 
+func modeWidthKey(mode string) string  { return "modes." + mode + ".project.width" }
+func modeHeightKey(mode string) string { return "modes." + mode + ".operations.height" }
+
 // decodeLayout builds model.Layout from an already-scanned leaf map — the part of GetAll's read
 // path that Set's own apply callback needs too, reading the same leaves inside its own
 // transaction (P107 I2-1).
 func decodeLayout(stored map[string]json.RawMessage) model.Layout {
 	result := model.DefaultLayout()
 	appsettings.Leaf(stored, "panel.project.visible", &result.Panel.Project.Visible)
-	appsettings.Leaf(stored, "panel.project.width", &result.Panel.Project.Width)
 	appsettings.Leaf(stored, "panel.operations.visible", &result.Panel.Operations.Visible)
-	appsettings.Leaf(stored, "panel.operations.height", &result.Panel.Operations.Height)
 	appsettings.Leaf(stored, "panel.cellEditor.height", &result.Panel.CellEditor.Height)
+	for mode, sizes := range result.Modes {
+		appsettings.Leaf(stored, modeWidthKey(mode), &sizes.Project.Width)
+		appsettings.Leaf(stored, modeHeightKey(mode), &sizes.Operations.Height)
+		result.Modes[mode] = sizes
+	}
 	return result
 }
 
 // applyLayoutPatch merges patch's set leaves onto merged — split out of Set's own closure to keep
 // its cognitive complexity within this repo's linted bound (gocognit).
 func applyLayoutPatch(merged *model.Layout, patch model.LayoutPatch) {
+	applyModesPatch(merged, patch.Modes)
 	p := patch.Panel
 	if p == nil {
 		return
@@ -44,20 +51,31 @@ func applyLayoutPatch(merged *model.Layout, patch model.LayoutPatch) {
 		if p.Project.Visible != nil {
 			merged.Panel.Project.Visible = *p.Project.Visible
 		}
-		if p.Project.Width != nil {
-			merged.Panel.Project.Width = *p.Project.Width
-		}
 	}
 	if p.Operations != nil {
 		if p.Operations.Visible != nil {
 			merged.Panel.Operations.Visible = *p.Operations.Visible
 		}
-		if p.Operations.Height != nil {
-			merged.Panel.Operations.Height = *p.Operations.Height
-		}
 	}
 	if p.CellEditor != nil && p.CellEditor.Height != nil {
 		merged.Panel.CellEditor.Height = *p.CellEditor.Height
+	}
+}
+
+// applyModesPatch skips a mode outside the app's vocabulary; the bridge rejects those up front.
+func applyModesPatch(merged *model.Layout, modes map[string]model.PanelSizesPatch) {
+	for mode, patch := range modes {
+		sizes, ok := merged.Modes[mode]
+		if !ok {
+			continue
+		}
+		if patch.Project != nil && patch.Project.Width != nil {
+			sizes.Project.Width = *patch.Project.Width
+		}
+		if patch.Operations != nil && patch.Operations.Height != nil {
+			sizes.Operations.Height = *patch.Operations.Height
+		}
+		merged.Modes[mode] = sizes
 	}
 }
 
@@ -69,7 +87,7 @@ func (r *LayoutRepo) GetAll() (model.Layout, error) {
 	return decodeLayout(stored), nil
 }
 
-// Set writes all six leaves every time (unlike SettingsRepo.Set's patched-leaves-only write —
+// Set writes every leaf every time (unlike SettingsRepo.Set's patched-leaves-only write —
 // P53 §4.5 deliberately keeps the two repos different), mirroring layout.ts's flatten(merged).
 //
 // The read that feeds the merge runs inside this same transaction (P8 C7/F7's fix), not before
@@ -85,13 +103,18 @@ func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
 		merged = decodeLayout(stored)
 		applyLayoutPatch(&merged, patch)
 
-		return appstorage.UpsertLeafList(tx, "ui_layout", []appstorage.Leaf{
+		leaves := []appstorage.Leaf{
 			{Key: "panel.project.visible", Value: merged.Panel.Project.Visible},
-			{Key: "panel.project.width", Value: merged.Panel.Project.Width},
 			{Key: "panel.operations.visible", Value: merged.Panel.Operations.Visible},
-			{Key: "panel.operations.height", Value: merged.Panel.Operations.Height},
 			{Key: "panel.cellEditor.height", Value: merged.Panel.CellEditor.Height},
-		})
+		}
+		for mode, sizes := range merged.Modes {
+			leaves = append(leaves,
+				appstorage.Leaf{Key: modeWidthKey(mode), Value: sizes.Project.Width},
+				appstorage.Leaf{Key: modeHeightKey(mode), Value: sizes.Operations.Height},
+			)
+		}
+		return appstorage.UpsertLeafList(tx, "ui_layout", leaves)
 	})
 	if err != nil {
 		return model.Layout{}, err

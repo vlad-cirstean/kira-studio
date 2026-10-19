@@ -12,7 +12,6 @@ func newLayoutRepo(t *testing.T) *repos.LayoutRepo {
 	return &repos.LayoutRepo{DB: newRepos(t).DB}
 }
 
-func boolPtr(b bool) *bool        { return &b }
 func floatPtr(f float64) *float64 { return &f }
 
 // TestLayoutRepoSetSurvivesConcurrentDisjointPatches is P8 D13.1's rule: LayoutRepo.Set rewrites
@@ -31,14 +30,14 @@ func TestLayoutRepoSetSurvivesConcurrentDisjointPatches(t *testing.T) {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			_, _ = r.Set(model.LayoutPatch{Panel: &model.PanelsPatch{
-				Project: &model.PanelProjectPatch{Visible: boolPtr(false)},
+			_, _ = r.Set(model.LayoutPatch{Modes: map[string]model.PanelSizesPatch{
+				"studio": {Project: &model.ProjectSizePatch{Width: floatPtr(333)}},
 			}})
 		}()
 		go func() {
 			defer wg.Done()
-			_, _ = r.Set(model.LayoutPatch{Panel: &model.PanelsPatch{
-				CellEditor: &model.PanelCellEditorPatch{Height: floatPtr(321)},
+			_, _ = r.Set(model.LayoutPatch{Modes: map[string]model.PanelSizesPatch{
+				"api": {Operations: &model.OperationsSizePatch{Height: floatPtr(321)}},
 			}})
 		}()
 		wg.Wait()
@@ -47,7 +46,7 @@ func TestLayoutRepoSetSurvivesConcurrentDisjointPatches(t *testing.T) {
 		if err != nil {
 			t.Fatalf("round %d: GetAll: %v", round, err)
 		}
-		if got.Panel.Project.Visible != false || got.Panel.CellEditor.Height != 321 {
+		if got.Modes["studio"].Project.Width != 333 || got.Modes["api"].Operations.Height != 321 {
 			lost++
 		}
 	}
