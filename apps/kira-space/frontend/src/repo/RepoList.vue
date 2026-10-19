@@ -14,7 +14,9 @@ import { cn } from '@theme/lib/utils';
 import { copyAndAnnounce } from '@workbench/behaviour/clipboard';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { matchesQuery } from '@workbench/behaviour/match';
+import { useSortableReorder } from '@workbench/behaviour/sortableReorder';
 import { useTreeShortcuts } from '@workbench/behaviour/treeShortcuts';
+import { logError } from '@workbench/bridge/log';
 import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
@@ -25,6 +27,7 @@ import { useCodeReposStore } from '../state/coderepos';
 import { openRepoTerminalTab } from '../state/repoTabs';
 import { useTerminalsStore } from '../state/terminals';
 import { repoWorkspaceKey, useWorkspaceStore } from '../state/workspace';
+import RepoWorktreeRow from './RepoWorktreeRow.vue';
 import { useRepoHeadsStore } from './state/repoHeads';
 import { useRepoLinksStore } from './state/repoLinks';
 import { useReposDialogStore } from './state/reposDialog';
@@ -357,6 +360,23 @@ const nav = useListNavigation<NavRow>({
     }),
 });
 
+// Drag and Alt+arrows reorder top-level repos; a search shows a subset, so it pauses both.
+useSortableReorder(
+  listEl,
+  () => filteredRepos.value.map((r) => r.id),
+  (from, to) =>
+    void codeReposStore
+      .reorderCodeRepos(from, to)
+      .catch((err) => logError('repoList', 'reorder failed', err)),
+  {
+    draggable: '.repo-entry',
+    handle: '[data-testid="repo-row"]',
+    keyboardHandle: '[data-testid="repo-row"]',
+    keyboard: true,
+    disabled: () => props.search.trim() !== '' || filteredRepos.value.length < 2,
+  },
+);
+
 // F2 renames, Delete removes, Ctrl/Cmd+C copies the name of the focused row.
 const rowRecord = (row: NavRow): { id: string; name: string } | undefined =>
   row.kind === 'repo' ? row.repo : codeReposStore.codeRepoRecordForPath(row.wt.path);
@@ -490,70 +510,19 @@ useTreeShortcuts(nav, {
         data-testid="repo-worktrees"
         :aria-label="t('common.module.worktrees.label')"
       >
-        <!-- Children of a twisty row sit one indent level in (`rowIndent(1)`). -->
-        <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
-        <div
+        <RepoWorktreeRow
           v-for="wt in worktreesStore.worktreeEntries(repo.id)"
           :key="wt.path"
-          :class="[
-          cn(
-            rowVariants({
-              layout: 'tree',
-              selected: isActive(worktreeRecordId(wt.path)),
-              muted: !(wt.isCurrent || isOpen(worktreeRecordId(wt.path))),
-            }),
-            'h-row',
-          ),
-          { active: isActive(worktreeRecordId(wt.path)) },
-        ]"
-          :style="rowIndent(1)"
-          data-testid="repo-worktree-row"
-          :data-worktree-path="wt.path"
-          role="option"
-          :data-nav-key="wtKey(wt)"
+          :wt="wt"
+          :color="repo.color"
+          :active="isActive(worktreeRecordId(wt.path))"
+          :dimmed="!(wt.isCurrent || isOpen(worktreeRecordId(wt.path)))"
+          :nav-key="wtKey(wt)"
           :tabindex="nav.tabindexFor(wtKey(wt))"
-          :aria-selected="isActive(worktreeRecordId(wt.path))"
           @focus="activeNavKey = wtKey(wt)"
-          @click.stop="worktreesStore.switchToWorktree(repo.id, wt)"
-          @contextmenu.prevent.stop="onRowContextMenu($event, { key: wtKey(wt), kind: 'worktree', repo, wt })"
-        >
-          <span
-            :class="colorMarkClass('rail', repo.color)"
-            data-testid="repo-worktree-rail"
-            aria-hidden="true"
-          />
-          <CodiconIcon name="git-branch" :size="13" class="shrink-0" />
-          <span class="min-w-0 flex-1"
-            ><TruncatedText :text="wt.path">{{ worktreeLabel(wt) }}</TruncatedText></span
-          >
-          <Tooltip v-if="wt.isMain">
-            <TooltipTrigger as-child>
-              <span class="worktree-badge shrink-0 text-kira-sm text-subtle">{{
-                t('space.ade.basePicker.main.label')
-              }}</span>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('common.mainWorktree.tooltip') }}</TooltipContent>
-          </Tooltip>
-          <Tooltip v-if="terminalsStore.terminalCountAtPath(wt.path) > 0">
-            <TooltipTrigger as-child>
-              <CodiconIcon
-                name="terminal-bash"
-                :size="12"
-                class="shrink-0 text-subtle"
-                data-testid="repo-terminal-indicator"
-              />
-            </TooltipTrigger>
-            <TooltipContent>{{
-              terminalTooltip(terminalsStore.terminalCountAtPath(wt.path))
-            }}</TooltipContent>
-          </Tooltip>
-          <Tooltip v-if="wt.locked">
-            <TooltipTrigger as-child>
-              <CodiconIcon name="lock" :size="12" class="shrink-0 text-subtle" />
-            </TooltipTrigger>
-            <TooltipContent>{{ wt.locked?.reason }}</TooltipContent>
-          </Tooltip>
-        </div>
+          @click="worktreesStore.switchToWorktree(repo.id, wt)"
+          @menu="onRowContextMenu($event, { key: wtKey(wt), kind: 'worktree', repo, wt })"
+        />
         <!-- Same indent as the worktree row above. -->
         <InlineState
           v-if="worktreesStore.worktreesError(repo.id)"
