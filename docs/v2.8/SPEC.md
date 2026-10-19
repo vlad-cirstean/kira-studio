@@ -12,7 +12,7 @@ First phase `P306` (highest in `docs/HISTORY.md` is `P305`). Branch `v2.8`. Phas
 | P311 | Docker container list in the left panel scrolls sluggishly. Find the cause, fix (likely virtualization or per-row cost). | Todo |
 | P312 | Panel sizes are per module (resize in studio, api stays unchanged). Share one panel size across modules. | Todo |
 | P313 | Code review per `CLAUDE.md` (one Opus round, three dimensions), then fixer. Base: P305 close-out. | Todo |
-| P314 | Comment cleanup: shorter atomic comments, aligned to the `CLAUDE.md` comment rule, across Go/TS/Vue. Needs a new comment-aware tool (see Notes); Opus plan decides scope and approach. | Todo |
+| P314 | Comment cleanup across Go/TS/Vue. Build a comment-extraction tool (see Notes), rewrite via distill plumbing to shorter atomic comments in one consistent format per the `CLAUDE.md` comment rule. Must prove the rewrite is better: drop trivia and restated-code comments, keep every non-obvious why/constraint/workaround, never touch directives. Needs a quality gate: rule-based checks plus a sampled before/after report reviewed by an Opus judge; failures redo. Opus plan decides the format and gate. | Todo |
 | P315 | Close chapter v2.8 (fold per `CLAUDE.md`). Hold until user says to close. | Todo |
 
 ## Results
