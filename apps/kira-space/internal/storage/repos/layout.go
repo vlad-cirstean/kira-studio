@@ -10,7 +10,7 @@ import (
 )
 
 // LayoutRepo reads and writes the `ui_layout` table — Kira Studio's own LayoutRepo, trimmed to
-// this app's own one-panel model.Layout (P100 Part 2).
+// this app's own model.Layout (P100 Part 2).
 type LayoutRepo struct {
 	DB *sql.DB
 
@@ -19,15 +19,39 @@ type LayoutRepo struct {
 	selectAll *sql.Stmt
 }
 
+func modeWidthKey(mode string) string  { return "modes." + mode + ".project.width" }
+func modeHeightKey(mode string) string { return "modes." + mode + ".operations.height" }
+
 // decodeLayout builds model.Layout from an already-scanned leaf map — the part of GetAll's read
 // path that Set's own apply callback needs too, reading the same leaves inside its own
 // transaction (P107 I2-1).
 func decodeLayout(stored map[string]json.RawMessage) model.Layout {
 	result := model.DefaultLayout()
 	appsettings.Leaf(stored, "panel.project.visible", &result.Panel.Project.Visible)
-	appsettings.Leaf(stored, "panel.project.width", &result.Panel.Project.Width)
+	for mode, sizes := range result.Modes {
+		appsettings.Leaf(stored, modeWidthKey(mode), &sizes.Project.Width)
+		appsettings.Leaf(stored, modeHeightKey(mode), &sizes.Operations.Height)
+		result.Modes[mode] = sizes
+	}
 	appsettings.LeafValid(stored, "panel.ade.width", &result.Panel.Ade.Width, model.ValidAdePanelWidth)
 	return result
+}
+
+// applyModesPatch skips a mode outside the app's vocabulary; the bridge rejects those up front.
+func applyModesPatch(merged *model.Layout, modes map[string]model.PanelSizesPatch) {
+	for mode, patch := range modes {
+		sizes, ok := merged.Modes[mode]
+		if !ok {
+			continue
+		}
+		if patch.Project != nil && patch.Project.Width != nil {
+			sizes.Project.Width = *patch.Project.Width
+		}
+		if patch.Operations != nil && patch.Operations.Height != nil {
+			sizes.Operations.Height = *patch.Operations.Height
+		}
+		merged.Modes[mode] = sizes
+	}
 }
 
 func (r *LayoutRepo) GetAll() (model.Layout, error) {
@@ -46,23 +70,27 @@ func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
 	var merged model.Layout
 	err := appstorage.UpdateLeaves(r.DB, r.selectAll, appstorage.LayoutSelectAllSQL, func(tx *sql.Tx, stored map[string]json.RawMessage) error {
 		merged = decodeLayout(stored)
+		applyModesPatch(&merged, patch.Modes)
 		if p := patch.Panel; p != nil {
 			if p.Project != nil && p.Project.Visible != nil {
 				merged.Panel.Project.Visible = *p.Project.Visible
-			}
-			if p.Project != nil && p.Project.Width != nil {
-				merged.Panel.Project.Width = *p.Project.Width
 			}
 			if p.Ade != nil && p.Ade.Width != nil {
 				merged.Panel.Ade.Width = *p.Ade.Width
 			}
 		}
 
-		return appstorage.UpsertLeafList(tx, "ui_layout", []appstorage.Leaf{
+		leaves := []appstorage.Leaf{
 			{Key: "panel.project.visible", Value: merged.Panel.Project.Visible},
-			{Key: "panel.project.width", Value: merged.Panel.Project.Width},
 			{Key: "panel.ade.width", Value: merged.Panel.Ade.Width},
-		})
+		}
+		for mode, sizes := range merged.Modes {
+			leaves = append(leaves,
+				appstorage.Leaf{Key: modeWidthKey(mode), Value: sizes.Project.Width},
+				appstorage.Leaf{Key: modeHeightKey(mode), Value: sizes.Operations.Height},
+			)
+		}
+		return appstorage.UpsertLeafList(tx, "ui_layout", leaves)
 	})
 	if err != nil {
 		return model.Layout{}, err

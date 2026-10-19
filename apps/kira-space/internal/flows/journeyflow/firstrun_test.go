@@ -141,7 +141,7 @@ func TestFirstRunJourney(t *testing.T) {
 		t.Fatal(err)
 	}
 	width, on := 321.0, true
-	if _, err := app.W.Layout.Set(bridge.LayoutSetArgs{Patch: model.LayoutPatch{Panel: &model.PanelsPatch{Project: &model.PanelProjectPatch{Width: &width}}}}); err != nil {
+	if _, err := app.W.Layout.Set(bridge.LayoutSetArgs{Patch: model.LayoutPatch{Modes: map[string]model.PanelSizesPatch{"ade": {Project: &model.ProjectSizePatch{Width: &width}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{ClaudeCode: &model.ClaudeCodePatch{KeepAwakeWithAgents: &on}}}); err != nil {
@@ -186,7 +186,7 @@ func TestFirstRunJourney(t *testing.T) {
 	if !reflect.DeepEqual(b1.Tasks, b2.Tasks) || !reflect.DeepEqual(b1.History, b2.History) || !reflect.DeepEqual(b1.Branches, b2.Branches) {
 		t.Fatalf("board changed across restart\n before: %+v\n after:  %+v", b1, b2)
 	}
-	if !reflect.DeepEqual(lay1, lay2) || lay2.Panel.Project.Width != 321 {
+	if !reflect.DeepEqual(lay1, lay2) || lay2.Modes["ade"].Project.Width != 321 {
 		t.Fatalf("layout = %+v, want %+v", lay2, lay1)
 	}
 	if !reflect.DeepEqual(set1, set2) || !set2.ClaudeCode.KeepAwakeWithAgents {
