@@ -146,6 +146,9 @@ type Service struct {
 	inFlight map[string]*attempt
 	// tearing holds one entry per id while Disconnect/Remove is aborting and tearing it down.
 	tearing map[string]*teardown
+	// tests holds the dialog Test runs in progress; Shutdown cancels and waits them out because
+	// their pre-connect script is not tracked by Preconnect.StopAll until it has started.
+	tests map[*attempt]struct{}
 	// closed is set once by Shutdown (F13, P108 Part 7): every Connect arriving after refuses
 	// outright rather than racing a StopAll that has already taken its own snapshot of what to kill.
 	closed bool
@@ -164,6 +167,7 @@ func New(d Deps) *Service {
 		states:   make(map[string]model.ConnectionState),
 		inFlight: make(map[string]*attempt),
 		tearing:  make(map[string]*teardown),
+		tests:    make(map[*attempt]struct{}),
 	}
 }
 
@@ -190,8 +194,11 @@ func (s *Service) Start() {
 func (s *Service) Shutdown() {
 	s.mu.Lock()
 	s.closed = true
-	attempts := make([]*attempt, 0, len(s.inFlight))
+	attempts := make([]*attempt, 0, len(s.inFlight)+len(s.tests))
 	for _, a := range s.inFlight {
+		attempts = append(attempts, a)
+	}
+	for a := range s.tests {
 		attempts = append(attempts, a)
 	}
 	s.mu.Unlock()
@@ -700,12 +707,29 @@ func (s *Service) Test(in Input, existingID string) TestResult {
 		return TestResult{OK: false, Error: &msg}
 	}
 	r := resolveFromInput(in)
-	defer s.deps.Preconnect.Stop(r.config.ID)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	run := &attempt{done: make(chan struct{}), cancel: cancel}
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		cancel()
+		msg := errorMessage(ipcerr.T(ipcerr.CodeUnavailable, "backend.studio.connection.shuttingDown.body", nil))
+		return TestResult{OK: false, Error: &msg}
+	}
+	s.tests[run] = struct{}{}
+	s.mu.Unlock()
+	defer func() {
+		s.deps.Preconnect.Stop(r.config.ID)
+		cancel()
+		s.mu.Lock()
+		delete(s.tests, run)
+		s.mu.Unlock()
+		close(run.done)
+	}()
 
 	if r.preconnect != nil {
-		// Test has no in-flight-attempt tracking of its own to race against (F4 is Connect's own
-		// dedupe/abort machinery) — context.Background() here is unchanged from before.
-		err := s.deps.Backend.RunPreconnect(context.Background(), nil, *r.preconnect, r.preconnectDelay, func(opCtx context.Context) error {
+		err := s.deps.Backend.RunPreconnect(ctx, nil, *r.preconnect, r.preconnectDelay, func(opCtx context.Context) error {
 			_, err := s.deps.Preconnect.Start(opCtx, r.config.ID, *r.preconnect, readyCheck(r.readyAddr), r.preconnectDelay)
 			return err
 		})
@@ -714,7 +738,7 @@ func (s *Service) Test(in Input, existingID string) TestResult {
 			return TestResult{OK: false, Error: &msg}
 		}
 	}
-	serverVersion, err := s.deps.Backend.Test(context.Background(), r.config)
+	serverVersion, err := s.deps.Backend.Test(ctx, r.config)
 	if err != nil {
 		msg := errorMessage(err)
 		return TestResult{OK: false, Error: &msg}

@@ -1,11 +1,16 @@
 package dbflow
 
 import (
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
@@ -181,4 +186,48 @@ func TestSQLitePreconnectDelay(t *testing.T) {
 			}
 		}
 	})
+}
+
+// Quit mid-delay of a dialog Test must kill its script: the process is not tracked by StopAll yet.
+func TestSQLiteTestPreconnectKilledOnQuit(t *testing.T) {
+	app := flowharness.New(t)
+	pidFile := filepath.Join(t.TempDir(), "pid")
+	in := sqliteInput("dialog-test", newSQLiteFile(t))
+	in.Preconnect = ptr("echo $$ > " + pidFile + "; exec sleep 30")
+	in.PreconnectDelaySec = 30
+
+	mark := app.Events.Mark()
+	done := make(chan connections.TestResult, 1)
+	go func() { done <- app.W.Connections.Test(bridge.ConnectionsTestArgs{Input: in}) }()
+	waitOp(t, app, mark, "preconnect", "running")
+
+	var pid int
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) && pid == 0 {
+		if b, err := os.ReadFile(pidFile); err == nil {
+			pid, _ = strconv.Atoi(strings.TrimSpace(string(b)))
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if pid == 0 {
+		t.Fatal("script never wrote its pid")
+	}
+
+	app.Quit(t)
+
+	select {
+	case r := <-done:
+		if r.OK {
+			t.Errorf("Test = %+v, want failure after quit", r)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Test still waiting 5s after quit")
+	}
+	for i := 0; i < 50 && syscall.Kill(pid, 0) == nil; i++ {
+		time.Sleep(100 * time.Millisecond)
+	}
+	if syscall.Kill(pid, 0) == nil {
+		syscall.Kill(pid, syscall.SIGKILL)
+		t.Fatalf("pre-connect script pid %d survived quit", pid)
+	}
 }
