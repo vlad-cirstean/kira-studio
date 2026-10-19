@@ -16,12 +16,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"regexp"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kgo"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -767,19 +769,47 @@ func TestKafka_Read_BinaryPayloadsAreMarkedBase64(t *testing.T) {
 // Fetches, not an error, and injects a fake fetch carrying ctx.Err() on cancellation — a literal
 // port that inspects only returned errors would keep polling against a dead context.
 //
-// M9.2 re-derivation: M9.1's own version of this test browsed ORDERS_TOPIC's 6 seed messages and
-// slept 50ms before cancelling, on the assumption (KF-2(a)'s cancellation-latency measurement,
-// which answered a different question) that a browse would still be in flight by then. Measured
-// against the real adapter, a 6-message browse completes end to end in ~40ms regardless of
-// implementation quality — ephemeral-client construction and one Fetch round trip dominate, not
-// the tiny payload — leaving a 3-8ms window in which cancellation lands "mid-flight" at all,
-// against a 50ms sleep that is reliably too late. This is the same false-pass shape KF-2's own
-// first probe attempt hit (§12: "produced 50 records and cancelled at 300ms, but PollRecords
-// drained all 50 in ~49ms — before the cancel fired"), fixed the same way: give the browse enough
-// genuine work that a fixed, generous delay has a wide, environment-tolerant margin. A dedicated,
-// 20 000-record topic (P58e E27 — never orders/empty-topic) pushes an uncancelled full read to
-// comfortably three-digit milliseconds, confirmed empirically to make a 50ms cancel land
-// mid-flight reliably across repeated runs.
+// A record count alone is a speed race: a faster broker or runner finishes before the cancel. A
+// broker-side consumer quota on the adapter's client id makes the browse last seconds, so the
+// cancel always lands mid-flight.
+// adapterClientID mirrors kgo.ClientID in client.go; a mismatch stops the quota applying and the
+// cancellation test fails with "want an error".
+const adapterClientID = "kira-studio"
+
+func throttleAdapterFetches(t *testing.T, f *testsupport.KafkaFixture, bytesPerSec float64) {
+	t.Helper()
+	name := adapterClientID
+	entity := kadm.ClientQuotaEntity{{Type: "client-id", Name: &name}}
+	alter := func(op kadm.AlterClientQuotaOp) {
+		res, err := f.Admin.AlterClientQuotas(context.Background(), []kadm.AlterClientQuotaEntry{{Entity: entity, Ops: []kadm.AlterClientQuotaOp{op}}})
+		if err != nil {
+			t.Fatalf("AlterClientQuotas: %v", err)
+		}
+		for _, r := range res {
+			if r.Err != nil {
+				t.Fatalf("AlterClientQuotas %v: %v (%s)", r.Entity, r.Err, r.ErrMessage)
+			}
+		}
+	}
+	waitQuota := func(want bool) {
+		deadline := time.Now().Add(10 * time.Second)
+		for time.Now().Before(deadline) {
+			got, err := f.Admin.DescribeClientQuotas(context.Background(), true, []kadm.DescribeClientQuotaComponent{{Type: "client-id", MatchName: &name}})
+			if err == nil && (len(got) > 0) == want {
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		t.Fatalf("client-id quota for %s did not reach present=%v within 10s", name, want)
+	}
+	alter(kadm.AlterClientQuotaOp{Key: "consumer_byte_rate", Value: bytesPerSec})
+	t.Cleanup(func() {
+		alter(kadm.AlterClientQuotaOp{Key: "consumer_byte_rate", Remove: true})
+		waitQuota(false)
+	})
+	waitQuota(true)
+}
+
 func TestKafka_Read_MidBrowseCancellation(t *testing.T) {
 	f := testsupport.StartKafka(t)
 	a := connectedAdapter(t, f)
@@ -787,13 +817,19 @@ func TestKafka_Read_MidBrowseCancellation(t *testing.T) {
 	const topic = "browse-cancel-topic"
 	testsupport.CreateTopic(t, f, topic)
 	const n = 20000
+	// Random pad: the producer compresses batches, so a repetitive pad would fit one fetch.
+	rng := rand.New(rand.NewSource(1))
+	pad := make([]byte, 150)
 	records := make([]*kgo.Record, n)
 	for i := 0; i < n; i++ {
-		records[i] = &kgo.Record{Topic: topic, Value: []byte(fmt.Sprintf(`{"seq":%d,"pad":"0123456789012345678901234567890123456789"}`, i))}
+		rng.Read(pad)
+		records[i] = &kgo.Record{Topic: topic, Value: []byte(fmt.Sprintf(`{"seq":%d,"pad":"%x"}`, i, pad))}
 	}
 	if err := f.Client.ProduceSync(context.Background(), records...).FirstErr(); err != nil {
 		t.Fatalf("seed %s: %v", topic, err)
 	}
+
+	throttleAdapterFetches(t, f, 64*1024)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -803,7 +839,7 @@ func TestKafka_Read_MidBrowseCancellation(t *testing.T) {
 		_, err := a.Read(ctx, offsetRead(topicPath(f, topic), n), adapters.NewOpCtx("op-15b"))
 		errCh <- err
 	}()
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 	cancel()
 
 	select {
