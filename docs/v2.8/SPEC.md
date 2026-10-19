@@ -6,7 +6,7 @@ First phase `P306` (highest in `docs/HISTORY.md` is `P305`). Branch `v2.8`. Phas
 |---|-------|--------|
 | P306 | Fix failing Release workflow. Run 39153063833 (tag v0.2.7): `db-compat (Linux, min)` fails `TestRedis_Console_SlowCommandTimesOutWithoutResend` (`err = <nil>, want E_TIMEOUT`, redis:7.0); `db-compat (Linux, max)` fails `TestKafka_Read_MidBrowseCancellation` (`want an error`, cp-kafka:8.3.0); `ci-gate` fails because PR CI failed. Root-cause both tests, fix in code. No `.github/workflows` push from here; see `docs/DEV_ENVIRONMENT.md`. | Done |
 | P307 Part 1 | Operations panel shows a DB's preconnect scripts. Preconnect script run has a visible timer. Fix the race between "connecting" and the script itself. | Done |
-| P307 Part 2 | Per-connection preconnect delay setting (seconds, between starting the preconnect script and the first connect attempt). Covers non-loopback targets that the Part 1 readiness probe skips. Runs after P312 lands (migration number and generated bindings overlap). | Todo |
+| P307 Part 2 | Per-connection preconnect delay setting (seconds, between starting the preconnect script and the first connect attempt). Covers non-loopback targets that the Part 1 readiness probe skips. Runs after P312 lands (migration number and generated bindings overlap). | Done |
 | P308 | Drag-and-drop reorder of DBs, scripts, repos in the left panel. Colored bars in the panel get thicker. | Todo |
 | P309 | SQL cell editor: date editor has a large min height and scrolls out of view. Footer controls stay fixed; only the text editor scrolls. | Done |
 | P310 | SQL column tooltip: explanation and comment read as one run. Rearrange and format them. | Done |
@@ -29,6 +29,8 @@ Filled per phase.
 **P310.** Column tooltip stacks sections: header (name, type), `PK`/`NOT NULL` chips, explanation, divider, labeled comment. `AttributeTooltip.vue` gains `tags`/`note` parts; plain `data-kira-tip` path unchanged. Lint rules U29/U21 forbid classes on `TooltipContent` and `uppercase`, so layout sits on a wrapper div and width cap stays at primitive `max-w-xs`. UI spec `tooltips.spec.ts` covers structure.
 
 **P312.** Layout keys `modes.<mode>.project.width` and `modes.<mode>.operations.height`, in both apps; store `sizesFor(mode)`. Migration 0039 copies the old shared value into every module and drops legacy keys. Bridge `Layout.Set` rejects an unknown mode with `E_CONTRACT`. Visibility and cell editor height stay app-wide. Space now persists dock height per module. Flow test (windowflow, Space appflow) and UI specs cover isolation. Studio `budgets.spec.ts` fails on this sandbox (known open item); Space `copy-coverage` flaked once under load, passes alone.
+
+**P307 Part 2.** `preconnectDelaySec` per connection (0-300 whole seconds, 0 = off), migration 0040. Connect waits max(delay, readiness); both count from script start. Failing script or cancel ends the wait at once; the 60s `readyTimeout` starts after the delay. Operations panel shows "Connecting in m:ss". Known open item for non-loopback targets deleted from ARCHITECTURE. Flow test `TestSQLitePreconnectDelay`, `TestStartDelay`, UI specs in `operations.spec.ts` and `preconnect.spec.ts`. Full `test:ui:studio` not run.
 
 ## Notes
 
