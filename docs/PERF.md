@@ -107,6 +107,14 @@ flick: before frame p95 171 ms (80 of 82 over 50 ms), after 66 ms (41 of 80). Fi
 tooltip instead of two reka `Tooltip`s per row (~51 ms of a 142 ms frame), overscan in px (320). The
 target (flick p95 <= 50 ms) was not met: mounting a full new row window per frame floors at 21 ms.
 
+**P311 Docker container list (WebKit sandbox, `docker-scroll` probe).** 400 containers, 28 rows
+mounted, 5-step flick ladder, 3 runs each at `load1 <= 1.0`. Frame p95 medians before 44 / 40 / 46 /
+42 / 43 ms, after 20 / 20 / 20 / 20 / 20 ms (-50 to -57%). Frames over 50 ms before 13 / 5 / 17 / 10 /
+13, after 0-1. One baseline run (p95 58-68 ms, 92-157 frames over 50 ms) was an outlier and is in the
+medians. Fixes: row-key `v-for` keys plus per-key cached nav handlers in `VirtualList` so mounted rows
+skip re-render on range change, row components with primitive props, one `AttributeTooltip` instead
+of a reka `Tooltip` per row button and origin icon.
+
 **P163 large-input parse callers (WebKit sandbox, `perf:parse:studio`).** Moving parse and format to
 a worker cut the longest main-thread block: Console Format 64 KB 631 → 84 ms, 236 KB 1 848 → 187 ms,
 1 MB 6 913 → 683 ms; Console Copy all 198-411 → 83-85 ms (10 000 x 0.4 KB). Beautify keeps a ~1 s
