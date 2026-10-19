@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Badge } from '@theme/components/ui/badge';
+import { Separator } from '@theme/components/ui/separator';
 import {
   Tooltip,
   TooltipContent,
@@ -30,7 +32,11 @@ interface TooltipContentShape {
    *  `meta` today is a column-type hint, and the badge is what carries the colour visibly rather
    *  than the plain a11y text these get joined into, so this never affects it. */
   metaColor?: string;
+  /** Short fact chips, already translated. */
+  tags?: string[];
   body?: string;
+  /** A labelled block below a separator, e.g. a DB comment. Label already translated. */
+  note?: { label: string; text: string };
 }
 
 const TIP_ATTR = 'data-kira-tip';
@@ -121,11 +127,14 @@ useEventListener(containerRef, 'focusout', onFocusOut);
       </TooltipTrigger>
       <TooltipAnchorBridge ref="bridge" />
       <TooltipContent>
-        <template v-if="parts">
-          <div class="flex items-baseline gap-1.5">
-            <span class="font-medium" data-testid="tooltip-title">{{ parts.title }}</span>
+        <div v-if="parts" class="flex flex-col items-stretch gap-1.5 py-1">
+          <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5" data-testid="tooltip-header">
+            <span class="font-data font-medium wrap-anywhere" data-testid="tooltip-title">{{
+              parts.title
+            }}</span>
             <span
               v-if="parts.meta"
+              class="font-data text-kira-sm"
               data-testid="tooltip-meta"
               :style="parts.metaColor ? { color: parts.metaColor } : undefined"
               >{{
@@ -133,8 +142,34 @@ useEventListener(containerRef, 'focusout', onFocusOut);
               }}</span
             >
           </div>
-          <div v-if="parts.body" data-testid="tooltip-body">{{ parts.body }}</div>
-        </template>
+          <div v-if="parts.tags?.length" class="flex flex-wrap gap-1" data-testid="tooltip-tags">
+            <Badge
+              v-for="tag in parts.tags"
+              :key="tag"
+              variant="chip"
+              data
+              class="h-auto border border-bg/30 text-kira-sm"
+              data-testid="tooltip-tag"
+              >{{
+                tag
+              }}</Badge
+            >
+          </div>
+          <p v-if="parts.body" class="text-kira-sm text-bg/75" data-testid="tooltip-body">
+            {{ parts.body }}
+          </p>
+          <template v-if="parts.note">
+            <Separator class="bg-bg/20" />
+            <div class="flex flex-col gap-0.5" data-testid="tooltip-note">
+              <span class="text-kira-sm font-medium text-bg/60" data-testid="tooltip-note-label">{{
+                parts.note.label
+              }}</span>
+              <p class="text-kira-sm wrap-anywhere" data-testid="tooltip-note-text">{{
+                parts.note.text
+              }}</p>
+            </div>
+          </template>
+        </div>
         <template v-else>{{ plainText }}</template>
       </TooltipContent>
     </Tooltip>
