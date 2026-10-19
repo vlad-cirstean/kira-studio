@@ -289,7 +289,9 @@ function elapsedText(record: R): string {
                   v-else-if="column.id === 'duration' && listItems[vi.index].record.status === 'running'"
                   class="font-data"
                   data-testid="op-elapsed"
-                  >{{ elapsedText(listItems[vi.index].record) }}</span
+                  >{{
+                    elapsedText(listItems[vi.index].record)
+                  }}</span
                 >
                 <span v-else-if="column.id === 'duration'">{{
                   displayValue(durationText(listItems[vi.index].record.durationMs))
