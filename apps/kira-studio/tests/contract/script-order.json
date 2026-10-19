@@ -1,0 +1,23 @@
+{
+  "args:CustomScriptsService.Reorder#collection": {
+    "collectionId": "<id:4>",
+    "ids": [
+      "<id:5>",
+      "<id:6>"
+    ]
+  },
+  "args:CustomScriptsService.Reorder#ungrouped": {
+    "collectionId": null,
+    "ids": [
+      "<id:1>",
+      "<id:2>",
+      "<id:3>"
+    ]
+  },
+  "args:CustomScriptsService.ReorderCollections": {
+    "ids": [
+      "<id:7>",
+      "<id:4>"
+    ]
+  }
+}

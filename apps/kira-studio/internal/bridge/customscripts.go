@@ -15,13 +15,15 @@ type CustomScriptsService struct {
 }
 
 type (
-	CustomScriptsCreateArgs           = scripts.CreateArgs
-	CustomScriptsUpdateArgs           = scripts.UpdateArgs
-	CustomScriptsDeleteArgs           = scripts.DeleteArgs
-	CustomScriptsCreateCollectionArgs = scripts.CreateCollectionArgs
-	CustomScriptsRenameCollectionArgs = scripts.RenameCollectionArgs
-	CustomScriptsDeleteCollectionArgs = scripts.DeleteCollectionArgs
-	CustomScriptsMoveArgs             = scripts.MoveArgs
+	CustomScriptsCreateArgs             = scripts.CreateArgs
+	CustomScriptsUpdateArgs             = scripts.UpdateArgs
+	CustomScriptsDeleteArgs             = scripts.DeleteArgs
+	CustomScriptsCreateCollectionArgs   = scripts.CreateCollectionArgs
+	CustomScriptsRenameCollectionArgs   = scripts.RenameCollectionArgs
+	CustomScriptsDeleteCollectionArgs   = scripts.DeleteCollectionArgs
+	CustomScriptsMoveArgs               = scripts.MoveArgs
+	CustomScriptsReorderArgs            = scripts.ReorderArgs
+	CustomScriptsReorderCollectionsArgs = scripts.ReorderCollectionsArgs
 )
 
 func (s *CustomScriptsService) shared() *scripts.Service {
@@ -64,4 +66,12 @@ func (s *CustomScriptsService) DeleteCollection(args CustomScriptsDeleteCollecti
 
 func (s *CustomScriptsService) Move(args CustomScriptsMoveArgs) error {
 	return s.shared().Move(args)
+}
+
+func (s *CustomScriptsService) Reorder(args CustomScriptsReorderArgs) error {
+	return s.shared().Reorder(args)
+}
+
+func (s *CustomScriptsService) ReorderCollections(args CustomScriptsReorderCollectionsArgs) error {
+	return s.shared().ReorderCollections(args)
 }

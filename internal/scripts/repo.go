@@ -238,20 +238,58 @@ func (r *Repo) requireCollection(id *string) error {
 	return nil
 }
 
-// Move sets (nil clears) one command's collection. Returns a wrapped sql.ErrNoRows for an unknown
+// Move sets (nil clears) one command's collection and appends it at the end of the target set
+// (sort_order is dense per set once reordered). Returns a wrapped sql.ErrNoRows for an unknown
 // command id.
 func (r *Repo) Move(id string, collectionID *string) error {
 	if err := r.requireCollection(collectionID); err != nil {
 		return err
 	}
 	res, err := r.DB.Exec(
-		`UPDATE custom_scripts SET collection_id = ?, updated_at = ? WHERE id = ?`,
-		collectionID, kiratime.NowISO(), id,
+		`UPDATE custom_scripts SET collection_id = ?, updated_at = ?,
+		 sort_order = (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM custom_scripts WHERE collection_id IS ? AND id <> ?)
+		 WHERE id = ?`,
+		collectionID, kiratime.NowISO(), collectionID, id, id,
 	)
 	if err != nil {
 		return fmt.Errorf("scripts: move %s: %w", id, err)
 	}
 	return requireRow(res, "move", id)
+}
+
+// Reorder applies a user's drag order to one set: the ungrouped scripts (nil) or one collection's.
+// sort_order becomes dense per set; updated_at stays, so a script's content hash does not move.
+func (r *Repo) Reorder(collectionID *string, ids []string) error {
+	if err := r.requireCollection(collectionID); err != nil {
+		return err
+	}
+	return r.reorderTx("custom_scripts",
+		`SELECT id FROM custom_scripts WHERE collection_id IS ? ORDER BY sort_order ASC, name ASC`,
+		`UPDATE custom_scripts SET sort_order = ? WHERE id = ?`,
+		ids, collectionID)
+}
+
+// ReorderCollections applies a user's drag order to the collections.
+func (r *Repo) ReorderCollections(ids []string) error {
+	return r.reorderTx("custom_script_collections",
+		`SELECT id FROM custom_script_collections ORDER BY sort_order ASC, name ASC`,
+		`UPDATE custom_script_collections SET sort_order = ? WHERE id = ?`,
+		ids)
+}
+
+func (r *Repo) reorderTx(table, selectSQL, updateSQL string, ids []string, args ...any) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("scripts: reorder %s: begin: %w", table, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := sqlitex.ReorderSortOrder(tx, selectSQL, updateSQL, ids, args...); err != nil {
+		return fmt.Errorf("scripts: reorder %s: %w", table, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("scripts: reorder %s: commit: %w", table, err)
+	}
+	return nil
 }
 
 const collectionColumns = `id, name, sort_order, created_at, updated_at`
@@ -262,7 +300,7 @@ func scanCollection(row rowScanner) (Collection, error) {
 	return c, err
 }
 
-// ListCollections orders by sort_order, name (creation order, name as the tiebreak).
+// ListCollections orders by sort_order (user drag order), name as the tiebreak.
 func (r *Repo) ListCollections() ([]Collection, error) {
 	rows, err := r.DB.Query(`SELECT ` + collectionColumns + ` FROM custom_script_collections ORDER BY sort_order ASC, name ASC`)
 	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (Collection, bool, error) {

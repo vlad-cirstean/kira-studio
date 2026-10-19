@@ -257,6 +257,35 @@ func TestScriptFolders(t *testing.T) {
 	}
 }
 
+func TestScriptOrder(t *testing.T) {
+	app := flowharness.New(t)
+	cs := app.W.CustomScripts
+	x, err := cs.CreateCollection(bridge.CustomScriptsCreateCollectionArgs{Name: "X"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	y, err := cs.CreateCollection(bridge.CustomScriptsCreateCollectionArgs{Name: "Y"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := newScript(t, app, scripts.CustomScriptFields{Name: "a", Command: "echo a"})
+	b := newScript(t, app, scripts.CustomScriptFields{Name: "b", Command: "echo b"})
+	if err := cs.Reorder(bridge.CustomScriptsReorderArgs{IDs: []string{b.ID, a.ID}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cs.ReorderCollections(bridge.CustomScriptsReorderCollectionsArgs{IDs: []string{y.ID, x.ID}}); err != nil {
+		t.Fatal(err)
+	}
+	app.Restart()
+	snap, err := app.W.CustomScripts.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snap.Scripts) != 2 || snap.Scripts[0].ID != b.ID || len(snap.Collections) != 2 || snap.Collections[0].ID != y.ID {
+		t.Fatalf("after Restart = %+v, want b before a and Y before X", snap)
+	}
+}
+
 func TestScriptLaunchIgnoresForgedCommand(t *testing.T) {
 	app := flowharness.New(t)
 	rec := newScript(t, app, scripts.CustomScriptFields{Command: "echo stored-command"})
