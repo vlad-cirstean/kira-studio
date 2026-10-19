@@ -316,7 +316,7 @@ func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnecti
 		if _, err := tx.Exec(`
 			INSERT INTO connections (
 				id, `+connectionColumns+`, created_at, updated_at, sort_order, password, uri
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?,
 				(SELECT password FROM connections WHERE id = ?),
 				(SELECT uri FROM connections WHERE id = ?))
 		`,
