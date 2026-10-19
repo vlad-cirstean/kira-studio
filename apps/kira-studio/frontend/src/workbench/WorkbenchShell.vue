@@ -20,6 +20,7 @@ import StatusBar from './StatusBar.vue';
 // here at all.
 const modeStore = useModeStore();
 const layoutStore = useLayoutStore();
+const sizes = computed(() => layoutStore.sizesFor(modeStore.active));
 
 // P1 D6/C6: the left panel mounts whichever mode is active's own self-contained panel component.
 const activeModePanel = computed(() => MODES[modeStore.active].panel);
@@ -32,12 +33,12 @@ const modeNewTab = computed(() => MODES[modeStore.active].newTab);
 <template>
   <WorkbenchShellBase
     :project-visible="layoutStore.panel.project.visible"
-    :project-width="layoutStore.panel.project.width"
+    :project-width="sizes.project.width"
     :tab-strip-visible="MODES[modeStore.active].tabStrip !== false"
     :ops-visible="layoutStore.panel.operations.visible"
-    :ops-height="layoutStore.panel.operations.height"
-    @resize-project="layoutStore.setProjectWidth"
-    @resize-ops="layoutStore.setOperationsHeight"
+    :ops-height="sizes.operations.height"
+    @resize-project="(width: number) => layoutStore.setProjectWidth(modeStore.active, width)"
+    @resize-ops="(height: number) => layoutStore.setOperationsHeight(modeStore.active, height)"
   >
     <template #panel>
       <component :is="activeModePanel" />

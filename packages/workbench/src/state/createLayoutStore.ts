@@ -1,4 +1,10 @@
-import { defaultLayout, type Layout, type LayoutPatch } from '@shared/domain/layout';
+import {
+  defaultLayout,
+  defaultPanelSizes,
+  type Layout,
+  type LayoutPatch,
+  type PanelSizes,
+} from '@shared/domain/layout';
 import { useDebounceFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
@@ -56,6 +62,11 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
       Object.assign(state.panel.project, layout.panel.project);
       Object.assign(state.panel.operations, layout.panel.operations);
       Object.assign(state.panel.cellEditor, layout.panel.cellEditor);
+      for (const [mode, sizes] of Object.entries(layout.modes ?? {})) {
+        const entry = modeEntry(mode);
+        Object.assign(entry.project, sizes.project);
+        Object.assign(entry.operations, sizes.operations);
+      }
       // F10: Go's `LayoutService.Set` broadcasts `layoutChanged` to every window, sender included.
       // A pause of TIMING.persist or more mid-resize lets that echo land here while a newer
       // local edit still sits unflushed in `pendingPatch` -- without reapplying it, the remote
@@ -76,8 +87,30 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
       });
     }
 
+    function modeEntry(mode: string): PanelSizes {
+      state.modes[mode] ??= structuredClone(defaultPanelSizes);
+      return state.modes[mode];
+    }
+
+    // P312: panel sizes are per module; a size read for a mode never saved falls back to defaults.
+    function sizesFor(mode: string): PanelSizes {
+      return state.modes[mode] ?? defaultPanelSizes;
+    }
+
+    function mergeModes(a: LayoutPatch['modes'], b: LayoutPatch['modes']): LayoutPatch['modes'] {
+      const merged: NonNullable<LayoutPatch['modes']> = {};
+      for (const mode of new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])) {
+        merged[mode] = {
+          project: { ...a?.[mode]?.project, ...b?.[mode]?.project },
+          operations: { ...a?.[mode]?.operations, ...b?.[mode]?.operations },
+        };
+      }
+      return merged;
+    }
+
     function mergePatch(a: LayoutPatch, b: LayoutPatch): LayoutPatch {
       return {
+        modes: mergeModes(a.modes, b.modes),
         panel: {
           project: { ...a.panel?.project, ...b.panel?.project },
           operations: { ...a.panel?.operations, ...b.panel?.operations },
@@ -90,6 +123,11 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
       Object.assign(state.panel.project, patch.panel?.project);
       Object.assign(state.panel.operations, patch.panel?.operations);
       Object.assign(state.panel.cellEditor, patch.panel?.cellEditor);
+      for (const [mode, sizes] of Object.entries(patch.modes ?? {})) {
+        const entry = modeEntry(mode);
+        Object.assign(entry.project, sizes.project);
+        Object.assign(entry.operations, sizes.operations);
+      }
     }
 
     function patchLayout(patch: LayoutPatch): void {
@@ -106,8 +144,8 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
     // only call site — so a call here is always a real user drag. Sets widthUserSet alongside
     // width so ensureReviewPanelWidth below never widens a panel the user has already sized for
     // themselves.
-    function setProjectWidth(width: number): void {
-      patchLayout({ panel: { project: { width, widthUserSet: true } } });
+    function setProjectWidth(mode: string, width: number): void {
+      patchLayout({ modes: { [mode]: { project: { width, widthUserSet: true } } } });
     }
 
     /** C11 §14 OQ2 (S14): the review segment's first-activation widen — only when the user has
@@ -115,10 +153,10 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
      *  widthUserSet), and only when the current width is already narrower than `minWidth`. Never
      *  touches widthUserSet itself: this is Kira widening its own default, not the user resizing
      *  it, so a later genuine drag is still the first one recorded. */
-    function ensureReviewPanelWidth(minWidth: number): void {
-      const project = state.panel.project;
+    function ensureReviewPanelWidth(mode: string, minWidth: number): void {
+      const { project } = sizesFor(mode);
       if (project.widthUserSet || project.width >= minWidth) return;
-      patchLayout({ panel: { project: { width: minWidth } } });
+      patchLayout({ modes: { [mode]: { project: { width: minWidth } } } });
     }
 
     // P132 Part 1 (§2.5): hoisted from Studio's own state/layout.ts — the Operations panel's
@@ -126,8 +164,8 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
     function toggleOperationsPanel(): void {
       patchLayout({ panel: { operations: { visible: !state.panel.operations.visible } } });
     }
-    function setOperationsHeight(height: number): void {
-      patchLayout({ panel: { operations: { height } } });
+    function setOperationsHeight(mode: string, height: number): void {
+      patchLayout({ modes: { [mode]: { operations: { height } } } });
     }
 
     const extra = extend({ state, patchLayout });
@@ -135,6 +173,7 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
     return {
       ...toRefs(state),
       hydrateLayout,
+      sizesFor,
       toggleProjectPanel,
       setProjectWidth,
       ensureReviewPanelWidth,

@@ -97,7 +97,7 @@ watch(
     // §14 OQ2: widen once, only if the user has never manually resized the panel — checked inside
     // ensureReviewPanelWidth itself (state/layout.ts's own widthUserSet). 320px: VS Code's ~300px
     // sidebar default, raised a little for the review panes' own extra density.
-    layoutStore.ensureReviewPanelWidth(320);
+    layoutStore.ensureReviewPanelWidth('git', 320);
   },
   { immediate: true },
 );

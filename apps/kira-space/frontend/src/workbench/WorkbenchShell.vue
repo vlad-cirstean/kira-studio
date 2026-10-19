@@ -21,6 +21,7 @@ import StatusBar from './StatusBar.vue';
 // lookup.
 const layoutStore = useLayoutStore();
 const modeStore = useModeStore();
+const sizes = computed(() => layoutStore.sizesFor(modeStore.active));
 
 // P129 Part 3 §0.12/§0.13/§2.1: a `layout: 'full'` module (`ade`) has no panel/start/newTab at all
 // — `def`'s own `layout` discriminant is what every computed below narrows on, so a `FullModeDef`
@@ -42,13 +43,13 @@ const fullView = computed(() => (def.value.layout === 'full' ? def.value.view : 
 <template>
   <WorkbenchShellBase
     :project-visible="!isFull && layoutStore.panel.project.visible"
-    :project-width="layoutStore.panel.project.width"
+    :project-width="sizes.project.width"
     :tab-strip-visible="hasTabStrip"
     :main-framed="!isFull"
     :ops-visible="layoutStore.panel.operations.visible"
-    :ops-height="layoutStore.panel.operations.height"
-    @resize-project="layoutStore.setProjectWidth"
-    @resize-ops="layoutStore.setOperationsHeight"
+    :ops-height="sizes.operations.height"
+    @resize-project="(width: number) => layoutStore.setProjectWidth(modeStore.active, width)"
+    @resize-ops="(height: number) => layoutStore.setOperationsHeight(modeStore.active, height)"
   >
     <template #panel>
       <component :is="activeModePanel" />
