@@ -4,7 +4,7 @@ import { splitSqlStatements } from '@shared/domain/sqlSplit';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
-import { displayValue } from '@workbench/behaviour/format';
+import { displayValue, formatElapsed } from '@workbench/behaviour/format';
 import { logError } from '@workbench/bridge/log';
 import OpLogPanel from '@workbench/components/OpLogPanel.vue';
 import { type OpLogColumn, opLogMenuItems } from '@workbench/lib/opLog';
@@ -147,6 +147,16 @@ function menuFor(record: OpRecord): MenuItem[] {
     cancel,
   ];
 }
+
+// Counts the preconnect delay down in the command cell; falls back to the command once it elapses.
+function preconnectNote(record: OpRecord, now: number): string | null {
+  if (record.kind !== 'preconnect' || !record.delayMs) return null;
+  const left = Date.parse(record.startedAt) + record.delayMs - now;
+  if (left <= 0) return null;
+  return t('studio.operations.preconnectDelay.status', {
+    remaining: formatElapsed(Math.ceil(left / 1000) * 1000),
+  });
+}
 </script>
 
 <template>
@@ -158,6 +168,7 @@ function menuFor(record: OpRecord): MenuItem[] {
     :columns="columns"
     :clear-hint="t('studio.operations.clear.hint')"
     :menu-for="menuFor"
+    :running-note="preconnectNote"
     @clear="opsStore.clearOps"
     @cancel="(record) => opsStore.cancelOp(record.id)"
   >

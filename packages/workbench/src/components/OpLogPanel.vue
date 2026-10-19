@@ -39,6 +39,8 @@ interface Props {
   clearHint: string;
   canCancel?: (record: R) => boolean;
   menuFor?: (record: R) => MenuItem[];
+  /** Replaces the command cell of a running row while non-null; `now` is the shared clock. */
+  runningNote?: (record: R, now: number) => string | null;
 }
 const props = defineProps<Props>();
 
@@ -188,6 +190,9 @@ watch(
   },
   { immediate: true },
 );
+function runningNoteFor(record: R): string | null {
+  return record.status === 'running' ? (props.runningNote?.(record, now.value) ?? null) : null;
+}
 function elapsedText(record: R): string {
   return formatElapsed(Math.max(0, now.value - Date.parse(record.startedAt)));
 }
@@ -298,7 +303,15 @@ function elapsedText(record: R): string {
                 }}</span>
                 <template v-else-if="column.id === 'command'">
                   <span
-                    v-if="listItems[vi.index].record.status === 'error'"
+                    v-if="runningNoteFor(listItems[vi.index].record)"
+                    class="block min-w-0 text-muted-foreground"
+                    data-testid="op-running-note"
+                    >{{
+                      runningNoteFor(listItems[vi.index].record)
+                    }}</span
+                  >
+                  <span
+                    v-else-if="listItems[vi.index].record.status === 'error'"
                     class="block min-w-0 font-data text-error"
                     ><TruncatedText :text="listItems[vi.index].record.error ?? ''" /></span
                   >

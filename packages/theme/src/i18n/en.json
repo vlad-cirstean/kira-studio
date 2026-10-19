@@ -11626,6 +11626,9 @@
         "revealTab": {
           "label": "Reveal originating tab"
         }
+      },
+      "preconnectDelay": {
+        "status": "Connecting in {remaining}"
       }
     },
     "pager": {
