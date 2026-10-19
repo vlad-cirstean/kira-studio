@@ -173,13 +173,22 @@ func TestSQLitePreconnectDelay(t *testing.T) {
 
 		select {
 		case r := <-done:
-			if r.st.Status != "error" || r.st.Error == nil || !strings.Contains(*r.st.Error, "cancelled") {
-				t.Errorf("Connect = %+v (%v), want error state mentioning cancelled", r.st, r.err)
+			if r.st.Status != "disconnected" || r.st.Error != nil {
+				t.Errorf("Connect = %+v (%v), want disconnected without an error", r.st, r.err)
 			}
 		case <-time.After(5 * time.Second):
 			t.Fatal("Connect still waiting 5s after cancelling the delayed preconnect op")
 		}
 		waitOp(t, app, mark, "preconnect", "cancelled")
+		states, err := app.W.Connections.States()
+		if err != nil {
+			t.Fatalf("States: %v", err)
+		}
+		for _, st := range states {
+			if st.ConnectionID == conn.ID && st.Status != "disconnected" {
+				t.Errorf("state after cancel = %+v, want disconnected", st)
+			}
+		}
 		for _, r := range opUpdates(app, mark) {
 			if r.Kind == "connect" {
 				t.Errorf("connect op %+v ran after the preconnect was cancelled", r)

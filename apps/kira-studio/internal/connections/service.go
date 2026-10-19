@@ -916,7 +916,9 @@ func (s *Service) attemptConnect(id string, ctx context.Context) (model.Connecti
 			return err
 		})
 		if err != nil {
-			if ctx.Err() != nil {
+			// A cancelled script with ctx alive is the Operations panel's Cancel: a user choice, not
+			// a failure, so it ends disconnected like a Disconnect-aborted wait.
+			if ctx.Err() != nil || errors.Is(err, context.Canceled) {
 				return s.finalizeAbortedAttempt(id)
 			}
 			return model.ConnectionState{}, err
