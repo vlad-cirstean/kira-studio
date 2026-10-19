@@ -49,6 +49,8 @@ export const IPC = {
   customScriptsRenameCollection: 'kira:customScripts:renameCollection',
   customScriptsDeleteCollection: 'kira:customScripts:deleteCollection',
   customScriptsMove: 'kira:customScripts:move',
+  customScriptsReorder: 'kira:customScripts:reorder',
+  customScriptsReorderCollections: 'kira:customScripts:reorderCollections',
   customScriptsChanged: 'kira:customScripts:changed',
   scriptRunsChanged: 'kira:scriptRuns:changed',
   scriptRunLog: 'kira:scriptRunLog:appended',

@@ -8,6 +8,9 @@ export const SORTABLE_GHOST_CLASS = 'opacity-50';
 /** The one class on the item being dragged, for a drag that needs more than the ghost. */
 export const SORTABLE_CHOSEN_CLASS = 'ring-2';
 
+/** Pointer travel before a press becomes a drag; shared by Sortable and the virtualized tree. */
+export const DRAG_TOLERANCE_PX = 4;
+
 /** Moves fromId to toId's pre-splice index — createTabsStore.moveTab's own rule, so a drop onto a
  *  later item lands after it and onto an earlier one lands before it. */
 export function moveId(ids: readonly string[], fromId: string, toId: string): string[] {
@@ -35,6 +38,9 @@ interface SortableReorderOptions {
   disabled?: () => boolean;
   /** Alt+arrow moves the focused item one place (`list.move*`); items must be focusable. */
   keyboard?: boolean;
+  /** With `keyboard`: a move fires only when focus sits in this selector's element inside the
+   *  item. For items that nest other focusable rows (a collection holds script rows). */
+  keyboardHandle?: string;
 }
 
 /** P137's TabStrip pattern, shared: vue-draggable-plus in forceFallback mode bound to an id mirror
@@ -71,7 +77,7 @@ export function useSortableReorder(
       group: { name: 'sortable-reorder', pull: false, put: false },
       forceFallback: true,
       fallbackOnBody: options.fallbackOnBody ?? true,
-      fallbackTolerance: 4,
+      fallbackTolerance: DRAG_TOLERANCE_PX,
       ghostClass: SORTABLE_GHOST_CLASS,
       onStart: () => {
         dragging.value = true;
@@ -105,6 +111,10 @@ export function useSortableReorder(
       const id = shortcutFor(e, axisIds);
       const el = (e.target as HTMLElement | null)?.closest<HTMLElement>(options.draggable);
       if (id === null || !el || !container.value?.contains(el)) return;
+      if (options.keyboardHandle) {
+        const handle = (e.target as HTMLElement).closest(options.keyboardHandle);
+        if (!handle || !el.contains(handle)) return;
+      }
       const items = [...container.value.querySelectorAll<HTMLElement>(options.draggable)];
       const current = ids();
       const from = current[items.indexOf(el)];

@@ -59,7 +59,9 @@ func TestImportViaFolderPicker(t *testing.T) {
 		if _, err := app.W.CodeWorkspace.SetRepoColor(bridge.CodeWorkspaceSetColorArgs{ID: rec.ID, Color: "not-a-colour"}); errCode(err) != "E_CONTRACT" {
 			t.Fatalf("bad colour err = %v, want E_CONTRACT", err)
 		}
-		order, err := app.W.CodeWorkspace.ReorderRepos(bridge.CodeWorkspaceReorderArgs{IDs: []string{rec2.ID, rec.ID}})
+		reorder := bridge.CodeWorkspaceReorderArgs{IDs: []string{rec2.ID, rec.ID}}
+		app.Contract(t, "repos", "args:CodeWorkspaceService.ReorderRepos", reorder)
+		order, err := app.W.CodeWorkspace.ReorderRepos(reorder)
 		if err != nil || len(order) != 2 || order[0].ID != rec2.ID {
 			t.Fatalf("ReorderRepos = %+v, %v", order, err)
 		}

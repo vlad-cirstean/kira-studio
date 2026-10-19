@@ -20,6 +20,9 @@ export interface CustomScriptsControl {
   customScriptsRenameCollection(id: string, name: string): Promise<void>;
   customScriptsDeleteCollection(id: string): Promise<void>;
   customScriptsMove(id: string, collectionId: string | null): Promise<void>;
+  /** collectionId null is the ungrouped set. */
+  customScriptsReorder(collectionId: string | null, ids: string[]): Promise<void>;
+  customScriptsReorderCollections(ids: string[]): Promise<void>;
   onCustomScriptsChanged(cb: (snapshot: ScriptsSnapshot) => void): () => void;
 }
 
@@ -27,6 +30,15 @@ export interface CustomScriptsControl {
 export function scriptsSnapshotOf(raw: unknown): ScriptsSnapshot {
   const r = (raw ?? {}) as Partial<ScriptsSnapshot>;
   return { collections: r.collections ?? [], scripts: r.scripts ?? [] };
+}
+
+/** Puts the listed items in `ids` order at the positions the listed items already hold. */
+function placeOrdered<T extends { id: string }>(list: readonly T[], ids: readonly string[]): T[] {
+  const byId = new Map(list.map((x) => [x.id, x]));
+  const queue = ids.map((id) => byId.get(id)).filter((x): x is T => x !== undefined);
+  const listed = new Set(queue.map((x) => x.id));
+  let next = 0;
+  return list.map((x) => (listed.has(x.id) ? queue[next++] : x));
 }
 
 export function createCustomScriptsStore(control: CustomScriptsControl) {
@@ -79,6 +91,32 @@ export function createCustomScriptsStore(control: CustomScriptsControl) {
       await control.customScriptsMove(id, collectionId);
     }
 
+    async function resync(): Promise<void> {
+      const snapshot = await control.customScriptsList();
+      state.collections = snapshot.collections;
+      state.records = snapshot.scripts;
+    }
+
+    async function reorderScripts(collectionId: string | null, ids: string[]): Promise<void> {
+      state.records = placeOrdered(state.records, ids);
+      try {
+        await control.customScriptsReorder(collectionId, ids);
+      } catch (err) {
+        await resync();
+        throw err;
+      }
+    }
+
+    async function reorderCollections(ids: string[]): Promise<void> {
+      state.collections = placeOrdered(state.collections, ids);
+      try {
+        await control.customScriptsReorderCollections(ids);
+      } catch (err) {
+        await resync();
+        throw err;
+      }
+    }
+
     return {
       ...toRefs(state),
       hydrateCustomScripts,
@@ -89,6 +127,8 @@ export function createCustomScriptsStore(control: CustomScriptsControl) {
       renameCollection,
       removeCollection,
       moveScript,
+      reorderScripts,
+      reorderCollections,
     };
   });
 }

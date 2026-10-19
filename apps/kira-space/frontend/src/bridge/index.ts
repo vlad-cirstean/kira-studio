@@ -97,6 +97,10 @@ const spaceControl = {
     unwrap(CustomScriptsService.DeleteCollection({ id })),
   customScriptsMove: (id: string, collectionId: string | null): Promise<void> =>
     unwrap(CustomScriptsService.Move({ id, collectionId })),
+  customScriptsReorder: (collectionId: string | null, ids: string[]): Promise<void> =>
+    unwrap(CustomScriptsService.Reorder({ collectionId, ids })),
+  customScriptsReorderCollections: (ids: string[]): Promise<void> =>
+    unwrap(CustomScriptsService.ReorderCollections({ ids })),
   onCustomScriptsChanged: (cb: (snapshot: ScriptsSnapshot) => void): (() => void) =>
     on(CHANNEL.customScriptsChanged, (r) => cb(scriptsSnapshotOf(r))),
 
