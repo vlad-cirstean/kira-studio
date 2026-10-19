@@ -11,7 +11,7 @@ First phase `P306` (highest in `docs/HISTORY.md` is `P305`). Branch `v2.8`. Phas
 | P309 | SQL cell editor: date editor has a large min height and scrolls out of view. Footer controls stay fixed; only the text editor scrolls. | Done |
 | P310 | SQL column tooltip: explanation and comment read as one run. Rearrange and format them. | Done |
 | P311 | Docker container list in the left panel scrolls sluggishly. Find the cause, fix (likely virtualization or per-row cost). | Todo |
-| P312 | Panel sizes are shared across modules today; they must be per module (resize in studio, api stays unchanged). Re-key per module, migrate current values. | Todo |
+| P312 | Panel sizes are shared across modules today; they must be per module (resize in studio, api stays unchanged). Re-key per module, migrate current values. | Done |
 | P313 | Code review per `CLAUDE.md` (one Opus round, three dimensions), then fixer. Base: P305 close-out. | Todo |
 | P314 | Comment cleanup across Go/TS/Vue. Build a comment-extraction tool (see Notes), rewrite via distill plumbing to shorter atomic comments in one consistent format per the `CLAUDE.md` comment rule. Must prove the rewrite is better: drop trivia and restated-code comments, keep every non-obvious why/constraint/workaround, never touch directives. Needs a quality gate: rule-based checks plus a sampled before/after report reviewed by an Opus judge; failures redo. Opus plan decides the format and gate. | Todo |
 | P315 | Close chapter v2.8 (fold per `CLAUDE.md`). Hold until user says to close. | Todo |
@@ -27,6 +27,8 @@ Filled per phase.
 **P309.** Timestamp pane now `shrink-0` at natural height; only the encoded Monaco flexes (`basis-0`). Editor body clips with `overflow-hidden`; decoded-empty alert scrolls. UI test `timestamp controls stay in view at small dock height` fails on the old classes, passes now. At the 120px drag minimum with find open, 34 + 34 + 20 + 72 exceeds the dock, so the find-open check runs at default height.
 
 **P310.** Column tooltip stacks sections: header (name, type), `PK`/`NOT NULL` chips, explanation, divider, labeled comment. `AttributeTooltip.vue` gains `tags`/`note` parts; plain `data-kira-tip` path unchanged. Lint rules U29/U21 forbid classes on `TooltipContent` and `uppercase`, so layout sits on a wrapper div and width cap stays at primitive `max-w-xs`. UI spec `tooltips.spec.ts` covers structure.
+
+**P312.** Layout keys `modes.<mode>.project.width` and `modes.<mode>.operations.height`, in both apps; store `sizesFor(mode)`. Migration 0039 copies the old shared value into every module and drops legacy keys. Bridge `Layout.Set` rejects an unknown mode with `E_CONTRACT`. Visibility and cell editor height stay app-wide. Space now persists dock height per module. Flow test (windowflow, Space appflow) and UI specs cover isolation. Studio `budgets.spec.ts` fails on this sandbox (known open item); Space `copy-coverage` flaked once under load, passes alone.
 
 ## Notes
 
