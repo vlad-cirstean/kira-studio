@@ -12,6 +12,7 @@ export const IPC = {
   settingsSet: 'kira:settings:set',
   layoutGetAll: 'kira:layout:getAll',
   layoutSet: 'kira:layout:set',
+  layoutChanged: 'kira:layout:changed',
   openSettings: 'kira:menu:openSettings',
   newConnection: 'kira:menu:newConnection',
   toggleProjectPanel: 'kira:menu:toggleProjectPanel',

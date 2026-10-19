@@ -148,7 +148,7 @@ test('mode switch — four mode tabs, an empty Http mode, and Studio state that 
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   await expect(page.locator('[data-testid="page-size-1000"]')).toHaveAttribute('data-state', 'on');
 
-  // 4. the left panel's width is preserved across the switch (D8: both modes share one width).
+  // 4. the left panel's width is preserved across the switch (P312: each mode keeps its own width).
   const panelWidthAfter = (await page.locator('[data-testid="project-panel"]').boundingBox())
     ?.width;
   expect(panelWidthAfter).toBe(panelWidthBefore);
