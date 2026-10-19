@@ -26,6 +26,8 @@ export const opKindSchema = /*#__PURE__*/ z.enum([
   // kinds well before this schema recognized them.
   'schemaColumns',
   'keyTypes',
+  // P307: the pre-connect script's startup wait, shown so its progress and timer are visible.
+  'preconnect',
 ]);
 export type OpKind = z.infer<typeof opKindSchema>;
 

@@ -12,10 +12,12 @@ import { tableHeadClass, tableHeadRowClass, tableRowClass } from '@theme/compone
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
-import { computed, ref } from 'vue';
+import { useIntervalFn } from '@vueuse/core';
+import { computed, ref, watch } from 'vue';
 import { useCopy } from '../behaviour/clipboard';
-import { displayValue, formatClockTime, formatDuration } from '../behaviour/format';
+import { displayValue, formatClockTime, formatDuration, formatElapsed } from '../behaviour/format';
 import { useListNavigation } from '../behaviour/listNavigation';
+import { TIMING } from '../behaviour/timing';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '../behaviour/virtualRows';
 import { type OpLogColumn, type OpLogStatusFilter, opLogMenuItems } from '../lib/opLog';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
@@ -166,6 +168,29 @@ defineSlots<{
 function durationText(ms: number | null): string | null {
   return ms === null ? null : formatDuration(ms);
 }
+
+// One shared clock for every running row (rows are virtualized, so a per-row timer would churn).
+const now = ref(Date.now());
+const { pause, resume } = useIntervalFn(
+  () => {
+    now.value = Date.now();
+  },
+  TIMING.clockTick,
+  { immediate: false },
+);
+watch(
+  () => props.runningCount,
+  (count) => {
+    if (count > 0) {
+      now.value = Date.now();
+      resume();
+    } else pause();
+  },
+  { immediate: true },
+);
+function elapsedText(record: R): string {
+  return formatElapsed(Math.max(0, now.value - Date.parse(record.startedAt)));
+}
 </script>
 
 <template>
@@ -260,6 +285,12 @@ function durationText(ms: number | null): string | null {
                     <CodiconIcon name="debug-stop" :size="13" />
                   </Button>
                 </span>
+                <span
+                  v-else-if="column.id === 'duration' && listItems[vi.index].record.status === 'running'"
+                  class="font-data"
+                  data-testid="op-elapsed"
+                  >{{ elapsedText(listItems[vi.index].record) }}</span
+                >
                 <span v-else-if="column.id === 'duration'">{{
                   displayValue(durationText(listItems[vi.index].record.durationMs))
                 }}</span>

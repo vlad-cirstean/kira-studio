@@ -140,7 +140,8 @@ function menuFor(record: OpRecord): MenuItem[] {
       icon: ICON.run,
       // P23 D1(c): a truncated command is only a 64 KiB prefix of what actually ran — Copy
       // command stays enabled (copying a prefix is honest and useful), but Re-run must not.
-      disabled: !record.command || !canSql || record.commandTruncated,
+      disabled:
+        !record.command || !canSql || record.commandTruncated || record.kind === 'preconnect',
       run: () => void onRerun(record),
     },
     cancel,
@@ -182,7 +183,7 @@ function menuFor(record: OpRecord): MenuItem[] {
               ? t('studio.operations.commandTruncated.status', { command: record.command ?? '' })
               : t('common.command.label', { value: record.command ?? '' })
           "
-          :language="record.kind === 'http' ? 'plain' : 'sql'"
+          :language="record.kind === 'http' || record.kind === 'preconnect' ? 'plain' : 'sql'"
           :sql-dialect="opSqlDialect(record)"
           readonly
           :single-line="true"
