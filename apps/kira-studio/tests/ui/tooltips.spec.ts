@@ -9,6 +9,7 @@ import {
 } from './support/clock';
 import { IPC } from './support/ipcChannels';
 import {
+  COMPOSITE_PK_META,
   COMPOSITE_PK_PATH,
   compositePkConnectAndOpen,
   postgresConnectionSummary,
@@ -285,11 +286,12 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   const body = (
     await tooltipContent(page).locator('[data-testid="tooltip-body"]').innerText()
   ).trim();
-  await expect(tenantIdHeader).toHaveAttribute(
-    'data-kira-tip',
-    ['tenant_id', meta, body].join('\n'),
-  );
-  await expect(tenantIdHeader).toHaveAttribute('aria-label', ['tenant_id', meta, body].join('\n'));
+  const tags = await tooltipContent(page).locator('[data-testid="tooltip-tag"]').allInnerTexts();
+  expect(tags).toEqual(['PK', 'NOT NULL']);
+  await expect(tooltipContent(page).locator('[data-testid="tooltip-note"]')).toHaveCount(0);
+  const plain = ['tenant_id', meta, ...tags, body].join('\n');
+  await expect(tenantIdHeader).toHaveAttribute('data-kira-tip', plain);
+  await expect(tenantIdHeader).toHaveAttribute('aria-label', plain);
 
   // A hover elsewhere closes it — AttributeTooltip's own `leave()`, same rearm-window behaviour as
   // every other tooltip in this app (TooltipProvider's own skipDelayDuration).
@@ -445,6 +447,76 @@ test('tooltips — shifts back on-screen near a horizontal viewport edge', async
       { message: 'shift: the tooltip stays on-screen (both edges)' },
     )
     .toBe(true);
+
+  expect(consoleErrors).toEqual([]);
+});
+
+const TENANT_COMMENT =
+  'Owning tenant; never reused after a tenant is deleted. Set by the provisioning service.\nSee the tenants table for the full lifecycle.';
+
+test('tooltips — column header separates explanation from comment', async ({
+  relaunch,
+  consoleErrors,
+}) => {
+  const meta = {
+    ...COMPOSITE_PK_META,
+    columns: COMPOSITE_PK_META.columns.map((c) =>
+      c.name === 'tenant_id' ? { ...c, comment: TENANT_COMMENT } : c,
+    ),
+  };
+  const control = RW_CONTROL.map((c) =>
+    c.channel === IPC.treeDescribe ? { ...c, response: { meta, source: 'server' } } : c,
+  );
+  const { window: page } = await relaunch({ control, stream: RW_PORT });
+  await openConnectionAndGrid(page);
+
+  const tip = tooltipContent(page);
+  const part = (id: string): Locator => tip.locator(`[data-testid="${id}"]`);
+  const tenantIdHeader = page.locator('[data-testid="grid-header-cell"][data-column="tenant_id"]');
+  await tenantIdHeader.hover();
+  await expect(tip).toBeVisible({ timeout: 3_000 });
+
+  await expect(part('tooltip-title')).toHaveText('tenant_id');
+  await expect(part('tooltip-meta')).toHaveText('integer');
+  expect(await part('tooltip-tag').allInnerTexts()).toEqual(['PK', 'NOT NULL']);
+  const body = (await part('tooltip-body').innerText()).trim();
+  expect(body).not.toBe('');
+  expect(body).not.toContain('Owning tenant');
+  await expect(part('tooltip-note-label')).toHaveText('Comment');
+  expect(await part('tooltip-note-text').innerText()).toBe(TENANT_COMMENT);
+
+  const box = async (id: string) => {
+    const b = await part(id).boundingBox();
+    if (!b) throw new Error(`${id} has no box`);
+    return b;
+  };
+  const [header, tagsBox, bodyBox, noteBox, tipBox] = [
+    await box('tooltip-header'),
+    await box('tooltip-tags'),
+    await box('tooltip-body'),
+    await box('tooltip-note'),
+    await tip.boundingBox(),
+  ];
+  if (!tipBox) throw new Error('tooltip has no box');
+  expect(header.y + header.height).toBeLessThanOrEqual(tagsBox.y + 1);
+  expect(tagsBox.y + tagsBox.height).toBeLessThanOrEqual(bodyBox.y + 1);
+  expect(bodyBox.y + bodyBox.height).toBeLessThanOrEqual(noteBox.y + 1);
+  expect(tipBox.width).toBeLessThanOrEqual(385);
+
+  const plain = ['tenant_id', 'integer', 'PK', 'NOT NULL', body, 'Comment', TENANT_COMMENT].join(
+    '\n',
+  );
+  await expect(tenantIdHeader).toHaveAttribute('data-kira-tip', plain);
+  await expect(tenantIdHeader).toHaveAttribute('aria-label', plain);
+
+  await page.mouse.move(4, 4);
+  await expect(tip).toHaveCount(0);
+
+  await page.locator('[data-testid="grid-header-cell"][data-column="name"]').hover();
+  await expect(tip).toBeVisible({ timeout: 3_000 });
+  await expect(part('tooltip-title')).toHaveText('name');
+  expect(await part('tooltip-tag').allInnerTexts()).toEqual(['Nullable']);
+  await expect(part('tooltip-note')).toHaveCount(0);
 
   expect(consoleErrors).toEqual([]);
 });
