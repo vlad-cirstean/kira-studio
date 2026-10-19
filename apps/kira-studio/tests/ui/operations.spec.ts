@@ -1,6 +1,8 @@
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 import {
   POSTGRES_CAPS,
   postgresConnectionSummary,
@@ -247,4 +249,66 @@ test('Operations panel — arrows, Home/End, Enter and Space toggle detail, Shif
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
   await expect(rows.first()).toBeFocused();
+});
+
+// P307: a pre-connect script is an op of its own. The Go flow test (TestSQLitePreconnectOp) stores
+// its running/ok updates; this spec pushes them and checks the live timer and the Re-run gate.
+test('contract: a pre-connect script row ticks a live timer and cannot be re-run', async ({
+  relaunch,
+}) => {
+  const CONN = postgresConnectionSummary('conn-pre-1', 'Tunnel DB', 'blue');
+  const running = contract<Record<string, unknown>>('preconnect-op', 'event:preconnect-running');
+  const ok = contract<Record<string, unknown>>('preconnect-op', 'event:preconnect-ok');
+  const base = { id: 'op-pre', connectionId: 'conn-pre-1', command: 'sleep 0.3' };
+
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.connectionsList, response: [CONN] },
+      {
+        channel: IPC.connectionsStates,
+        response: [
+          {
+            connectionId: 'conn-pre-1',
+            status: 'connected',
+            serverVersion: SERVER_VERSION,
+            error: null,
+            since: 1735689600000,
+            caps: POSTGRES_CAPS,
+          },
+        ],
+      },
+      { channel: IPC.opsRecent, response: [] },
+    ],
+  });
+  const t0 = Date.now();
+  await page.clock.install({ time: t0 });
+  await page.clock.pauseAt(t0 + 1000);
+  await page.click('[data-testid="toggle-operations-panel"]');
+
+  await emitWailsEvent(page, IPC.opUpdate, {
+    ...running,
+    ...base,
+    startedAt: new Date(t0 + 1000).toISOString(),
+  });
+  const row = page.locator('[data-testid="op-row"]');
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText('preconnect');
+  await expect(row).toContainText('Tunnel DB');
+  const elapsed = row.locator('[data-testid="op-elapsed"]');
+  await expect(elapsed).toHaveText('0:00');
+  await page.clock.runFor(2000);
+  await expect(elapsed).toHaveText('0:02');
+
+  await emitWailsEvent(page, IPC.opUpdate, { ...ok, ...base, durationMs: 2300 });
+  await expect(elapsed).toHaveCount(0);
+  await expect(row).toContainText('2.3');
+
+  await row.click({ button: 'right' });
+  await expect(page.locator('[data-testid="menu-item-re-run"]')).toHaveAttribute(
+    'data-disabled',
+    '',
+  );
+  await expect(page.locator('[data-testid="menu-item-copy-command"]')).not.toHaveAttribute(
+    'data-disabled',
+  );
 });

@@ -1,0 +1,30 @@
+{
+  "event:preconnect-ok": {
+    "command": "sleep 0.3",
+    "commandTruncated": false,
+    "connectionId": "<id:1>",
+    "durationMs": 0,
+    "error": null,
+    "id": "<masked>",
+    "kind": "preconnect",
+    "path": null,
+    "rows": null,
+    "startedAt": "<time>",
+    "status": "ok",
+    "tabId": null
+  },
+  "event:preconnect-running": {
+    "command": null,
+    "commandTruncated": false,
+    "connectionId": "<id:1>",
+    "durationMs": null,
+    "error": null,
+    "id": "<masked>",
+    "kind": "preconnect",
+    "path": null,
+    "rows": null,
+    "startedAt": "<time>",
+    "status": "running",
+    "tabId": null
+  }
+}
