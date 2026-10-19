@@ -406,7 +406,8 @@ whatever sandbox a session happens to be in),
 schema_version(version)
 settings(key, value)                                   -- fonts, sizes, budgets, toggles
 connections(id, name, kind, color, mode, read_only, host, port, database, username, password,
-            uri, options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec,
+            uri, options_json, preconnect, preconnect_sidecar, preconnect_delay_sec, auto_explain,
+            throttle_per_sec,
             created_at, updated_at, sort_order, mcp_enabled, mcp_description, mcp_read_mode,
             mcp_write_mode, mcp_ddl_mode, mcp_auto_explain, mask_correlation_key)
                                                        -- v1.7: mcp_enabled (0/1, default 0, 0020);
@@ -1489,7 +1490,8 @@ packaged app does not), where the identical application code runs unchanged over
 - Kira Space's WindowsService gained Ensure/SetMode in P128 §2.2; it previously bound only OpenNew.
 - Behind Kira Studio's services: internal/storage (repos plus forward-only SQL migrations), internal/tree/service.go (children/describe/definition cache-aside), internal/preconnect (pre-connect script supervisor state machine), internal/secrets (keychain), internal/adapterhost, internal/adapters, internal/oplog.
 - Pre-connect readiness: Supervisor.Start takes a ReadyCheck. When the connection's target is loopback with an explicit port (connections.readyAddr), Start probes a TCP dial every 100 ms while the script lives and returns once it connects (60 s timeout kills the script); every other target keeps the 2 s settle window. A fixed window raced slow tunnels (kubectl port-forward, ssh -L): Connect dialed before the port listened.
-- The script's startup wait runs as the op kind 'preconnect' (Backend.RunPreconnect, command = script text, nil connection id for a dialog Test). It ends before the 'connect' op starts, Cancel in the Operations panel aborts it, and Re-run is disabled for it.
+- Per-connection `preconnectDelaySec` (0-300, 0 = off) is a floor: connect waits until both the delay and the readiness rule hold. An exit-0 script still waits out the delay; a failing script or Cancel ends it at once; the 60 s timeout starts at delay end. It sizes the wait for non-loopback tunnels and floors a port that already listens before the script runs.
+- The script's startup wait runs as the op kind 'preconnect' (Backend.RunPreconnect, command = script text, nil connection id for a dialog Test). It ends before the 'connect' op starts, Cancel in the Operations panel aborts it, and Re-run is disabled for it. `op:start` carries `delayMs` for a delayed preconnect (live only, not in `op_log`); the Operations panel counts it down in the command cell.
 - internal/oplog holds the op-log event type and its two topics, relocated from the deleted internal/enginehost (P58f D9); repo-root internal/metrics is shared with Kira Space since v1.9 P116.
 - Multi-window (P8): the tab set and active tab (tabs.window_key) and the window's rectangle (windows.bounds_json) are per-window; a second window is reachable via Window → New Window (⇧⌘N).
 - App-wide state shared by all windows: connections and live state, settings, op log, all three cache tiers, metrics readout, keychain, pre-connect supervision, panel layout, because they belong to the one process and database.
@@ -3129,4 +3131,3 @@ Performance:
 - **Visual baselines are recorded in the dev sandbox (P227, P229, P242, P245, P247, P264, P266).** Accepted by the user. 13 Studio, 4 Space Settings, 3 git-module and 1 ADE workflow graph PNGs; the suites pass there. CI render may drift (0.6-1% on 13 specs before the P264 re-record); if the CI job disagrees, regenerate there and check each diff is the expected change only.
 - **The phone sees desktop worktree paths (P231 B-4).** Board `branches[].worktree` is a local path served to paired phones. Open user decision; delete once decided.
 - **Space repo-graph specs time out on first paint under heavy load (P230, P231, P243, P277).** Under 8 busy loops with `--repeat-each=40 --workers=8` (recipe in `docs/DEV_ENVIRONMENT.md`) app boot to graph row 0 takes 5-11 s against a 5 s default wait, 1.3 s idle. Failures: `repo-graph-refresh` scroll test 8+ of 40, `repo-graph-paging` 9 of 48 (`graph-svg` wait in `openRepo`), `repo-graph-columns` 3 of 400, `repo-workspace` 4 of 252. All pass idle (`test:ui:space`: 576 passed). Cause: CPU starvation of the whole app boot, not a test step. Delete once the boot is cheaper or the machine faster.
-- **A pre-connect script whose target is not loopback (or has no explicit port) is judged ready by the 2 s settle window (P307).** A slow tunnel to a non-loopback address can still race the connect. Follow-up if it bites: a per-connection start delay. A port already listening before the script starts also probes ready at once.
