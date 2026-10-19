@@ -100,6 +100,10 @@ func (b *fakeBackend) Disconnect(ctx context.Context, connectionID string) error
 	return nil
 }
 
+func (b *fakeBackend) RunPreconnect(ctx context.Context, _ *string, _ string, run func(context.Context) error) error {
+	return run(ctx)
+}
+
 func (b *fakeBackend) SetThrottle(connectionID string, perSec float64) {
 	b.mu.Lock()
 	defer b.mu.Unlock()

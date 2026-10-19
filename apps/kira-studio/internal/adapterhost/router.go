@@ -272,6 +272,18 @@ func (r *Router) Test(ctx context.Context, cfg model.ResolvedConnectionConfig) (
 	return value.(adapters.ConnectInfo).ServerVersion, nil
 }
 
+// RunPreconnect is connections.Backend's pre-connect hook: run (the script's startup wait) executes
+// as a `preconnect` op whose command is the script text, so the Operations panel lists it with a
+// timer and can cancel it.
+func (r *Router) RunPreconnect(ctx context.Context, connectionID *string, command string, run func(context.Context) error) error {
+	_, _, err := r.host.RunOp(ctx, OpSpec{ConnectionID: connectionID, Kind: "preconnect"},
+		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+			op.SetCommand(command)
+			return nil, run(ctx)
+		})
+	return err
+}
+
 // Disconnect covers all three fire-and-forget call sites (onPreconnectExit, Remove, Disconnect —
 // A11's own count settled on three connections.Backend methods, not four). Every one of them
 // passes context.Background() by contract (connections/service.go), so disconnectAdapter's own

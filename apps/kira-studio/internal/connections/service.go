@@ -49,6 +49,10 @@ type Backend interface {
 	// currently connected, after a successful Update — so tuning the limit while hitting it
 	// applies live, with no disconnect/reconnect round trip.
 	SetThrottle(connectionID string, perSec float64)
+	// RunPreconnect runs the pre-connect startup wait (run) as a `preconnect` op so the
+	// Operations panel shows the script and a timer. command is the script text; connectionID is
+	// nil for a dialog Test.
+	RunPreconnect(ctx context.Context, connectionID *string, command string, run func(context.Context) error) error
 }
 
 // ConnectResult is engine-ops.ts's adapter:connect success payload, the part attemptConnect
@@ -679,7 +683,11 @@ func (s *Service) Test(in Input, existingID string) TestResult {
 	if r.preconnect != nil {
 		// Test has no in-flight-attempt tracking of its own to race against (F4 is Connect's own
 		// dedupe/abort machinery) — context.Background() here is unchanged from before.
-		if _, err := s.deps.Preconnect.Start(context.Background(), r.config.ID, *r.preconnect); err != nil {
+		err := s.deps.Backend.RunPreconnect(context.Background(), nil, *r.preconnect, func(opCtx context.Context) error {
+			_, err := s.deps.Preconnect.Start(opCtx, r.config.ID, *r.preconnect, readyCheck(r.readyAddr))
+			return err
+		})
+		if err != nil {
 			msg := errorMessage(err)
 			return TestResult{OK: false, Error: &msg}
 		}
@@ -857,7 +865,11 @@ func (s *Service) attemptConnect(id string, ctx context.Context) (model.Connecti
 
 	started := false
 	if r.preconnect != nil {
-		if _, err := s.deps.Preconnect.Start(ctx, id, *r.preconnect); err != nil {
+		err := s.deps.Backend.RunPreconnect(ctx, &id, *r.preconnect, func(opCtx context.Context) error {
+			_, err := s.deps.Preconnect.Start(opCtx, id, *r.preconnect, readyCheck(r.readyAddr))
+			return err
+		})
+		if err != nil {
 			if ctx.Err() != nil {
 				return s.finalizeAbortedAttempt(id)
 			}

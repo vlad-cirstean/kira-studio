@@ -57,6 +57,8 @@ var opKinds = map[string]bool{
 	// connectionId, which state/ops.ts then prepended as a bogus new row on every SQL-completion
 	// schema fetch and every Redis browse scroll window.
 	"schemaColumns": true, "keyTypes": true,
+	// P307: the pre-connect script's startup wait (Router.RunPreconnect).
+	"preconnect": true,
 }
 
 var opStatuses = map[string]bool{

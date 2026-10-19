@@ -2,8 +2,13 @@ package connections
 
 import (
 	"fmt"
+	"net"
+	"net/url"
+	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )
@@ -14,6 +19,9 @@ type resolved struct {
 	config            model.ResolvedConnectionConfig
 	preconnect        *string
 	preconnectSidecar bool
+	// readyAddr is the loopback host:port the pre-connect script is expected to open ("" when the
+	// target is not a loopback address with an explicit port).
+	readyAddr string
 	// P28 §5.5: not a ResolvedConnectionConfig field (that shape carries a password and exists for
 	// adapters; a UI pacing knob doesn't belong in it) — carried alongside it purely so attemptConnect
 	// can hand it to Backend.SetThrottle from the summary it already read.
@@ -50,14 +58,16 @@ func resolve(conns *repos.ConnectionsRepo, secrets *repos.SecretsRepo, id string
 		}
 	}
 
+	cfg := model.ResolvedConnectionConfig{
+		ID: summary.ID, Name: summary.Name, Kind: summary.Kind, Color: summary.Color,
+		Mode: summary.Mode, ReadOnly: summary.ReadOnly, Host: summary.Host, Port: summary.Port,
+		Database: summary.Database, Username: summary.Username, URI: uri, Options: options,
+		SortOrder: summary.SortOrder, CreatedAt: summary.CreatedAt, UpdatedAt: summary.UpdatedAt,
+		Password: password,
+	}
 	return resolved{
-		config: model.ResolvedConnectionConfig{
-			ID: summary.ID, Name: summary.Name, Kind: summary.Kind, Color: summary.Color,
-			Mode: summary.Mode, ReadOnly: summary.ReadOnly, Host: summary.Host, Port: summary.Port,
-			Database: summary.Database, Username: summary.Username, URI: uri, Options: options,
-			SortOrder: summary.SortOrder, CreatedAt: summary.CreatedAt, UpdatedAt: summary.UpdatedAt,
-			Password: password,
-		},
+		config:            cfg,
+		readyAddr:         readyAddr(cfg),
 		preconnect:        summary.Preconnect,
 		preconnectSidecar: summary.PreconnectSidecar,
 		throttlePerSec:    summary.ThrottlePerSec,
@@ -99,15 +109,61 @@ func resolveFromInput(in Input) resolved {
 	} else {
 		password = in.Password
 	}
+	cfg := model.ResolvedConnectionConfig{
+		ID: "test:" + uuid.NewString(), Name: in.Name, Kind: in.Kind, Color: in.Color, Mode: in.Mode,
+		ReadOnly: in.ReadOnly, Host: in.Host, Port: in.Port, Database: in.Database,
+		Username: in.Username, URI: uri, Options: options,
+		SortOrder: 0, CreatedAt: "", UpdatedAt: "",
+		Password: password,
+	}
 	return resolved{
-		config: model.ResolvedConnectionConfig{
-			ID: "test:" + uuid.NewString(), Name: in.Name, Kind: in.Kind, Color: in.Color, Mode: in.Mode,
-			ReadOnly: in.ReadOnly, Host: in.Host, Port: in.Port, Database: in.Database,
-			Username: in.Username, URI: uri, Options: options,
-			SortOrder: 0, CreatedAt: "", UpdatedAt: "",
-			Password: password,
-		},
+		config:            cfg,
+		readyAddr:         readyAddr(cfg),
 		preconnect:        in.Preconnect,
 		preconnectSidecar: in.PreconnectSidecar,
 	}
+}
+
+// readyCheck is the TCP-dial readiness probe for addr, or nil (settle-window fallback) when addr is "".
+func readyCheck(addr string) *preconnect.ReadyCheck {
+	if addr == "" {
+		return nil
+	}
+	return preconnect.DialReady(addr)
+}
+
+// readyAddr derives the loopback host:port a pre-connect tunnel script is expected to listen on.
+// A non-loopback target says nothing about the script (it is reachable regardless), so it yields "".
+func readyAddr(cfg model.ResolvedConnectionConfig) string {
+	if fileKinds[cfg.Kind] {
+		return ""
+	}
+	var host, port string
+	if cfg.Mode == "uri" {
+		if cfg.URI == nil {
+			return ""
+		}
+		u, err := url.Parse(*cfg.URI)
+		if err != nil || strings.Contains(u.Host, ",") {
+			return ""
+		}
+		host, port = u.Hostname(), u.Port()
+	} else {
+		if cfg.Host == nil || cfg.Port == nil {
+			return ""
+		}
+		host, port = *cfg.Host, strconv.Itoa(*cfg.Port)
+	}
+	if host == "" || port == "" || !isLoopback(host) {
+		return ""
+	}
+	return net.JoinHostPort(host, port)
+}
+
+func isLoopback(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
