@@ -85,7 +85,7 @@ test('tree and script rails share one class, geometry and paint', async ({ relau
     [treeBox, treeRowBox],
     [box, rowBox],
   ] as const) {
-    expect(b?.width).toBe(2);
+    expect(b?.width).toBe(4);
     expect(b?.x).toBe(r?.x);
     expect(b?.height).toBe(r?.height);
   }

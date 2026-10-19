@@ -63,7 +63,7 @@ async function expectRail(rail: Locator, row: Locator): Promise<void> {
   await expect(rail).toHaveAttribute('class', RAIL_CLASS);
   const box = await rail.boundingBox();
   const rowBox = await row.boundingBox();
-  expect(box?.width).toBe(2);
+  expect(box?.width).toBe(4);
   expect(box?.x).toBe(rowBox?.x);
   expect(box?.height).toBe(rowBox?.height);
 }
@@ -114,7 +114,7 @@ test('repo, worktree, quick-command and dialog rails share one class, geometry a
   const navRail = navRow.locator('[data-testid="repos-dialog-repo-rail"]');
   await expect(navRail).toHaveAttribute('class', RAIL_CLASS);
   const navBox = await navRail.boundingBox();
-  expect(navBox?.width).toBe(2);
+  expect(navBox?.width).toBe(4);
   expect(navBox?.x).toBe((await navRow.boundingBox())?.x);
   expect(await paintOf(navRail)).toBe(paint);
   await page.keyboard.press('Escape');
