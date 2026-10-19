@@ -58,7 +58,7 @@ export type ColorMark = 'rail' | 'bar' | 'dot' | 'band' | 'swatch';
 
 // Tailwind emits only scanned literals, so each shape is spelled in full.
 const MARK_SHAPE: Record<ColorMark, string> = {
-  rail: 'absolute inset-y-0 left-0 w-0.5',
+  rail: 'absolute inset-y-0 left-0 w-1',
   bar: 'w-0.5 h-3.5 rounded-xs shrink-0',
   dot: 'size-1.25 rounded-full shrink-0',
   band: 'h-0.5 shrink-0',

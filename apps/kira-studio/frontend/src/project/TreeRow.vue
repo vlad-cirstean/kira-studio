@@ -61,7 +61,7 @@ const statusTitle = computed(() => {
   return props.row.statusDetail ?? undefined;
 });
 
-// P16 design system LAW: the connection colour is a 2px rail running the length
+// P16 design system LAW: the connection colour is a 4px rail running the length
 // of the connection's whole group in the tree, not a badge on one row — so it
 // is looked up per-row from the connection record (row.color is only ever set
 // on the connection row itself) and drawn at every depth.

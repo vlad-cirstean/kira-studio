@@ -208,7 +208,7 @@ const canOpenConsole = computed(
   () => connectionsStore.states[props.tab.connectionId ?? '']?.caps?.sql === true,
 );
 
-// P16 design system LAW: connection colour reaches a view as a 2px rail (tree, tab, toolbar
+// P16 design system LAW: connection colour reaches a view as a rail (tree, tab, toolbar
 // cap) or a dot (view header) — the same per-tab lookup Toolbar.vue and TreeRow.vue already
 // use for the rail elsewhere, just aimed at the dot instead.
 const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));

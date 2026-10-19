@@ -6,7 +6,7 @@ import { IPC } from './support/ipcChannels';
 // P226: one colour mark across modules. Pins the same literal as
 // apps/kira-studio/tests/ui/color-rails.spec.ts, so Studio and Space rails match by construction.
 
-const RAIL_CLASS = 'absolute inset-y-0 left-0 w-0.5 bg-conn-cyan';
+const RAIL_CLASS = 'absolute inset-y-0 left-0 w-1 bg-conn-cyan';
 
 const REPO = {
   id: 'repo-rail-1',
