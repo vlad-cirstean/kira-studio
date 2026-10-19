@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { foldRulesByColumn, type MaskingRule } from '@shared/domain/mask';
-import type { ForeignKeyMeta, ObjectMeta } from '@shared/domain/tree';
+import type { ColumnMeta, ForeignKeyMeta, ObjectMeta } from '@shared/domain/tree';
 import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { useQuery } from '@tanstack/vue-query';
@@ -478,7 +478,7 @@ function keyLabelFor(
 function dataTypeFor(
   name: string,
   descriptor: ColumnDescriptor | undefined,
-  metaByName: Map<string, { dataType: string; comment: string | null }>,
+  metaByName: Map<string, ColumnMeta>,
 ): string {
   return metaByName.get(name)?.dataType ?? descriptor?.dataType ?? '';
 }
@@ -518,10 +518,17 @@ function buildColumns(
     const descriptor = byName.get(name);
     const classes = [`tc-${descriptor ? categoryForTypeClass(descriptor.typeClass) : 'other'}`];
     if (descriptor && alignmentFor(descriptor) === 'right') classes.push('kira-align-right');
+    const keyLabel = keyLabelFor(descriptor, name, fkNames);
+    const m = metaByName.get(name);
     const tooltip = columnHeaderTooltip(
       descriptor ?? { name, typeClass: 'other' },
       dataTypeFor(name, descriptor, metaByName),
-      metaByName.get(name)?.comment,
+      {
+        comment: m?.comment,
+        key: keyLabel,
+        nullable: m?.nullable ?? null,
+        generated: descriptor?.generated ?? false,
+      },
     );
     // P16 D4: a per-column floor that knows what the header actually renders — padding, the sort
     // indicator (every column here is sortable, below) and the PK/FK badge (keyLabelFor is the
@@ -531,7 +538,7 @@ function buildColumns(
     const floor = headerAwareMinWidth(name, {
       padding: 16,
       sortControl: 16, // P28 D4 — was 22; see HeaderChrome.sortControl's own comment.
-      keyBadge: keyLabelFor(descriptor, name, fkNames) ? 20 : 0,
+      keyBadge: keyLabel ? 20 : 0,
     });
     cols.push({
       id: name,

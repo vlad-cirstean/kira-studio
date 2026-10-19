@@ -1,5 +1,6 @@
 import type { ColumnDescriptor, TabularPage, TypeClass } from '@shared/protocol/page';
 import { cellText, isNull } from '@shared/protocol/page';
+import { t } from '@theme/i18n';
 import { typeClassColor } from '../../../theme/icons';
 import { typeDescription } from '../typeGlossary';
 
@@ -378,32 +379,59 @@ export function pageColumnIndexFor(page: TabularPage, order: string[], displayCo
   return nameIndexFor(page).get(name) ?? -1;
 }
 
-// P48 F7: the column-header tooltip object the deleted DataGrid.vue and ConsoleResultGrid.vue's
-// own (now also deleted) tabular branch each built — deliberately the same shape (P42 D19/D20's
-// own comment), differing only in whether a DB comment line is available to fold into `body`.
-// `dataType` is passed in rather than read off `col` directly: DataGrid.vue overlaid a
-// DESCRIBE-derived dataType where the console has none.
+// P48 F7 / P310: the column-header tooltip content the data tab and console grids share. The
+// generated type explanation (`body`) and the DB comment (`note`) stay separate so the tooltip
+// stacks them; `tags` carry the key/nullability facts DESCRIBE knows. `dataType` is passed in
+// rather than read off `col`: the data tab overlays a DESCRIBE-derived type the console lacks.
+export interface ColumnTipFacts {
+  comment?: string | null;
+  key?: 'PK' | 'FK' | null;
+  /** From DESCRIBE only; null/undefined when unknown (console results). */
+  nullable?: boolean | null;
+  generated?: boolean;
+}
+export interface ColumnTooltipParts {
+  title: string;
+  meta?: string;
+  metaColor?: string;
+  tags?: string[];
+  body?: string;
+  note?: { label: string; text: string };
+}
 export function columnHeaderTooltip(
   col: { name: string; typeClass: TypeClass },
   dataType: string,
-  comment?: string | null,
-): { title: string; meta?: string; metaColor?: string; body?: string } {
-  const description = dataType ? typeDescription(dataType) : null;
+  facts: ColumnTipFacts = {},
+): ColumnTooltipParts {
+  const tags: string[] = [];
+  if (facts.key === 'PK') tags.push(t('studio.definition.primaryKey.label'));
+  else if (facts.key === 'FK') tags.push(t('studio.definition.foreignKey.label'));
+  if (facts.nullable === false) tags.push(t('studio.definition.notNull.label'));
+  else if (facts.nullable === true) tags.push(t('studio.definition.nullable.label'));
+  if (facts.generated) tags.push(t('studio.cellEditor.readOnly.generated.label'));
+  const comment = facts.comment?.trim();
   return {
     title: col.name,
     meta: dataType || undefined,
     metaColor: typeClassColor(col.typeClass) || undefined,
-    body: [description, comment].filter((line): line is string => !!line).join('\n') || undefined,
+    tags: tags.length > 0 ? tags : undefined,
+    body: (dataType ? typeDescription(dataType) : null) || undefined,
+    note: comment ? { label: t('common.comment.label'), text: comment } : undefined,
   };
 }
 
 // P107 T2-17: byte-identical across SlickGridHost.vue/ConsoleSlickGrid.vue — the DOM attributes a
 // header cell's tooltip formatter spreads onto its element, next to columnHeaderTooltip's own
 // content it reads.
-export function tooltipAttrs(
-  content: ReturnType<typeof columnHeaderTooltip>,
-): Record<string, string> {
-  const plain = [content.title, content.meta, content.body]
+export function tooltipAttrs(content: ColumnTooltipParts): Record<string, string> {
+  const plain = [
+    content.title,
+    content.meta,
+    ...(content.tags ?? []),
+    content.body,
+    content.note?.label,
+    content.note?.text,
+  ]
     .filter((v): v is string => !!v)
     .join('\n');
   return {
