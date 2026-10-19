@@ -10,7 +10,7 @@ First phase `P306` (highest in `docs/HISTORY.md` is `P305`). Branch `v2.8`. Phas
 | P308 | Drag-and-drop reorder of DBs, scripts, repos in the left panel. Colored bars in the panel get thicker. | Done |
 | P309 | SQL cell editor: date editor has a large min height and scrolls out of view. Footer controls stay fixed; only the text editor scrolls. | Done |
 | P310 | SQL column tooltip: explanation and comment read as one run. Rearrange and format them. | Done |
-| P311 | Docker container list in the left panel scrolls sluggishly. Find the cause, fix (likely virtualization or per-row cost). | Todo |
+| P311 | Docker container list in the left panel scrolls sluggishly. Find the cause, fix (likely virtualization or per-row cost). | Done |
 | P312 | Panel sizes are shared across modules today; they must be per module (resize in studio, api stays unchanged). Re-key per module, migrate current values. | Done |
 | P313 | Code review per `CLAUDE.md` (one Opus round, three dimensions), then fixer. Base: P305 close-out. | Todo |
 | P314 | Comment cleanup across Go/TS/Vue. Build a comment-extraction tool (see Notes), rewrite via distill plumbing to shorter atomic comments in one consistent format per the `CLAUDE.md` comment rule. Must prove the rewrite is better: drop trivia and restated-code comments, keep every non-obvious why/constraint/workaround, never touch directives. Needs a quality gate: rule-based checks plus a sampled before/after report reviewed by an Opus judge; failures redo. Opus plan decides the format and gate. | Todo |
@@ -33,6 +33,8 @@ Filled per phase.
 **P307 Part 2.** `preconnectDelaySec` per connection (0-300 whole seconds, 0 = off), migration 0040. Connect waits max(delay, readiness); both count from script start. Failing script or cancel ends the wait at once; the 60s `readyTimeout` starts after the delay. Operations panel shows "Connecting in m:ss". Known open item for non-loopback targets deleted from ARCHITECTURE. Flow test `TestSQLitePreconnectDelay`, `TestStartDelay`, UI specs in `operations.spec.ts` and `preconnect.spec.ts`. Full `test:ui:studio` not run.
 
 **P308.** Rail `w-0.5` to `w-1` (4px). Drag reorder: scripts and collections (shared `internal/scripts` `Reorder`/`ReorderCollections`, `SortableList.vue`), Studio connections (`connectionReorder.ts` pointer drag, drop line, edge auto-scroll), Space repos (`useSortableReorder`). Alt+Up/Down and Move up/down menu items are the keyboard path. Scripts reorder within their own set; cross-collection stays in "Move to collection". No migration. Flow tests `TestScriptOrder`, `TestConnectionOrder` and UI specs `connection-order`, `script-order`, `repo-order`. Full UI suites not run.
+
+**P311.** Cause: virtual rows re-created on range change plus per-row tooltip and nav-handler cost. `VirtualList.vue` keyed by row key with cached handlers; rows split into `ContainerRow.vue`/`ContainerGroupRow.vue` with one shared `AttributeTooltip`. Probe `docker-scroll` (400 containers, WebKit sandbox, load1 <= 1.0): frame p95 median 40-46 ms to 20 ms (50-57% drop). Spec `row tooltips come from one shared tooltip`. Full `test:ui:studio` 551 passed on the implementer branch; not re-run after rebase.
 
 ## Notes
 
