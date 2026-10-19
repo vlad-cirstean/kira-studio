@@ -851,6 +851,17 @@ func consoleRun(a adapters.Adapter, fixture *testsupport.RedisFixture, ctx conte
 	return a.Execute(ctx, model.ConsoleRequest{Path: nodePath(fixture, seg("database", "db0")), Statements: statements}, adapters.NewOpCtx(opID))
 }
 
+func calibratedLoopIterations(t *testing.T, root *goredis.Client, target time.Duration) int64 {
+	t.Helper()
+	const calib = 50_000_000
+	start := time.Now()
+	if err := root.Eval(context.Background(), `local x = 0; for i = 1, tonumber(ARGV[1]) do x = x + i end; return 0`, nil, calib).Err(); err != nil {
+		t.Fatalf("calibration EVAL: %v", err)
+	}
+	elapsed := max(time.Since(start), time.Millisecond)
+	return int64(float64(calib) * target.Seconds() / elapsed.Seconds())
+}
+
 // F9: a reply slower than the read timeout is reported as E_TIMEOUT and never re-sent (a retried
 // script would INCR twice).
 func TestRedis_Console_SlowCommandTimesOutWithoutResend(t *testing.T) {
@@ -862,9 +873,11 @@ func TestRedis_Console_SlowCommandTimesOutWithoutResend(t *testing.T) {
 	const key = "slow:resend:probe"
 	root.Del(context.Background(), key)
 
-	// ~2.5s of Lua busy work (TIME is frozen inside a script, so it cannot be the clock).
-	script := `local x = 0; for i = 1, 250000000 do x = x + i end; return redis.call('INCR', KEYS[1])`
-	_, err := consoleRun(a, fixture, context.Background(), "op-slow", fmt.Sprintf("EVAL %q 1 %s", script, key))
+	// Loop length is calibrated to this server's speed; TIME is frozen inside a script.
+	const target = 3 * time.Second
+	iters := calibratedLoopIterations(t, root, target)
+	script := `local x = 0; for i = 1, tonumber(ARGV[1]) do x = x + i end; return redis.call('INCR', KEYS[1])`
+	_, err := consoleRun(a, fixture, context.Background(), "op-slow", fmt.Sprintf("EVAL %q 1 %s %d", script, key, iters))
 	if code, _ := adapters.CodeOf(err); code != adapters.CodeTimeout {
 		t.Fatalf("err = %v, want E_TIMEOUT", err)
 	}
@@ -873,7 +886,7 @@ func TestRedis_Console_SlowCommandTimesOutWithoutResend(t *testing.T) {
 			break
 		}
 	}
-	time.Sleep(3 * time.Second) // a re-sent script would land a second INCR
+	time.Sleep(target + time.Second) // a re-sent script would land a second INCR
 	if n, err := root.Get(context.Background(), key).Int(); err != nil || n != 1 {
 		t.Fatalf("script ran %d times (err %v), want exactly once", n, err)
 	}
