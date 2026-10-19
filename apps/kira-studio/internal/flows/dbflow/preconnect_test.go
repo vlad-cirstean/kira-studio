@@ -102,3 +102,83 @@ func TestSQLitePreconnectOp(t *testing.T) {
 		}
 	})
 }
+
+func TestSQLitePreconnectDelay(t *testing.T) {
+	t.Run("delay holds connect and is counted in the op", func(t *testing.T) {
+		app := flowharness.New(t)
+		in := sqliteInput("slow-tunnel", newSQLiteFile(t))
+		in.Preconnect = ptr("true")
+		in.PreconnectDelaySec = 1
+		conn := createConn(t, app, in)
+
+		list, err := app.W.Connections.List()
+		if err != nil || len(list) != 1 || list[0].PreconnectDelaySec != 1 {
+			t.Fatalf("List = %+v (%v), want one connection with preconnectDelaySec 1", list, err)
+		}
+		dup, err := app.W.Connections.Duplicate(bridge.ConnectionsIDArgs{ID: conn.ID})
+		if err != nil || dup.PreconnectDelaySec != 1 {
+			t.Fatalf("Duplicate = %+v (%v), want preconnectDelaySec 1", dup, err)
+		}
+
+		mark := app.Events.Mark()
+		if st := connect(t, app, conn.ID); st.Status != "connected" {
+			t.Fatalf("Connect = %+v, want connected", st)
+		}
+
+		waitOp(t, app, mark, "preconnect", "ok")
+		waitOp(t, app, mark, "connect", "running")
+		recs := opUpdates(app, mark)
+		running, done, connectRunning := indexOf(recs, "preconnect", "running"), indexOf(recs, "preconnect", "ok"), indexOf(recs, "connect", "running")
+		if running < 0 || done < 0 || connectRunning < 0 || done > connectRunning {
+			t.Fatalf("op updates = %+v, want preconnect running, preconnect ok, then connect running", recs)
+		}
+		if d := recs[running].DelayMs; d == nil || *d != 1000 {
+			t.Errorf("running preconnect delayMs = %v, want 1000", d)
+		}
+		if d := recs[done].DurationMs; d == nil || *d < 1000 {
+			t.Errorf("preconnect durationMs = %v, want >= 1000", d)
+		}
+		app.Contract(t, "preconnect-delay", "event:preconnect-delay-running", recs[running], flowharness.Mask("id", "durationMs"))
+	})
+
+	t.Run("cancel during the delay", func(t *testing.T) {
+		app := flowharness.New(t)
+		in := sqliteInput("cancelled-tunnel", newSQLiteFile(t))
+		in.Preconnect = ptr("exec sleep 30")
+		in.PreconnectDelaySec = 30
+		conn := createConn(t, app, in)
+
+		mark := app.Events.Mark()
+		type result struct {
+			st  model.ConnectionState
+			err error
+		}
+		done := make(chan result, 1)
+		go func() {
+			st, err := app.W.Connections.Connect(bridge.ConnectionsIDArgs{ID: conn.ID})
+			done <- result{st, err}
+		}()
+
+		waitOp(t, app, mark, "preconnect", "running")
+		recs := opUpdates(app, mark)
+		opID := recs[indexOf(recs, "preconnect", "running")].ID
+		if err := app.W.Ops.Cancel(bridge.OpsCancelArgs{OpID: opID}); err != nil {
+			t.Fatalf("Ops.Cancel: %v", err)
+		}
+
+		select {
+		case r := <-done:
+			if r.st.Status != "error" || r.st.Error == nil || !strings.Contains(*r.st.Error, "cancelled") {
+				t.Errorf("Connect = %+v (%v), want error state mentioning cancelled", r.st, r.err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("Connect still waiting 5s after cancelling the delayed preconnect op")
+		}
+		waitOp(t, app, mark, "preconnect", "cancelled")
+		for _, r := range opUpdates(app, mark) {
+			if r.Kind == "connect" {
+				t.Errorf("connect op %+v ran after the preconnect was cancelled", r)
+			}
+		}
+	})
+}

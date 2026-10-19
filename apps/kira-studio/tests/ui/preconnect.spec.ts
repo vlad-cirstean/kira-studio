@@ -228,3 +228,59 @@ test('preconnect — dialog field, and failure before connect', async ({ relaunc
   await expect(statusTooltip).toContainText(/exit 3/);
   await expect(statusTooltip).toContainText(/nope/);
 });
+
+test('preconnect delay — field shows with a script, range-checks, and is sent on save', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.connectionsList, response: [] },
+      {
+        channel: IPC.connectionsCreate,
+        args: {
+          name: 'Preconnect Test',
+          kind: 'postgres',
+          color: 'none',
+          mode: 'fields',
+          readOnly: false,
+          host: '127.0.0.1',
+          port: 5432,
+          database: 'testdb',
+          username: 'testuser',
+          password: null,
+          uri: null,
+          options: {},
+          preconnect: 'echo hi',
+          preconnectSidecar: false,
+          preconnectDelaySec: 5,
+          autoExplain: false,
+          throttlePerSec: 0,
+        },
+        response: { ...CREATED, preconnectDelaySec: 5 },
+      },
+    ],
+  });
+
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-name"]', 'Preconnect Test');
+  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await page.fill('[data-testid="connection-port"]', '5432');
+  await page.fill('[data-testid="connection-database"]', 'testdb');
+  await page.fill('[data-testid="connection-username"]', 'testuser');
+  await page.click('[data-testid="connection-tab-preconnect"]');
+  const delay = page.locator('[data-testid="connection-preconnect-delay"]');
+  await expect(delay).toHaveCount(0);
+  await page.fill('[data-testid="connection-preconnect"]', 'echo hi');
+  await expect(delay).toBeVisible();
+
+  await delay.fill('301');
+  await expect(page.locator('[data-testid="connection-preconnect-delay-error"]')).toBeVisible();
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
+
+  await delay.fill('5');
+  await expect(page.locator('[data-testid="connection-preconnect-delay-error"]')).toHaveCount(0);
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
+});

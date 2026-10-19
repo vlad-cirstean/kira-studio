@@ -312,3 +312,41 @@ test('contract: a pre-connect script row ticks a live timer and cannot be re-run
     'data-disabled',
   );
 });
+
+// P307 Part 2: a delayed pre-connect counts the wait down in the command cell. Backend half:
+// TestSQLitePreconnectDelay.
+test('contract: a delayed pre-connect row counts down before the connect', async ({ relaunch }) => {
+  const CONN = postgresConnectionSummary('conn-pre-2', 'Slow Tunnel DB', 'blue');
+  const running = contract<Record<string, unknown>>(
+    'preconnect-delay',
+    'event:preconnect-delay-running',
+  );
+
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.connectionsList, response: [CONN] },
+      { channel: IPC.opsRecent, response: [] },
+    ],
+  });
+  const t0 = Date.now();
+  await page.clock.install({ time: t0 });
+  await page.clock.pauseAt(t0 + 1000);
+  await page.click('[data-testid="toggle-operations-panel"]');
+
+  await emitWailsEvent(page, IPC.opUpdate, {
+    ...running,
+    id: 'op-pre-delay',
+    connectionId: 'conn-pre-2',
+    startedAt: new Date(t0 + 1000).toISOString(),
+  });
+  const row = page.locator('[data-testid="op-row"]');
+  await expect(row).toHaveCount(1);
+  const note = row.locator('[data-testid="op-running-note"]');
+  const elapsed = row.locator('[data-testid="op-elapsed"]');
+  await expect(note).toHaveText('Connecting in 0:01');
+  await expect(elapsed).toHaveText('0:00');
+
+  await page.clock.runFor(1000);
+  await expect(note).toHaveCount(0);
+  await expect(elapsed).toHaveText('0:01');
+});
