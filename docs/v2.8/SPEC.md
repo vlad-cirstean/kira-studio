@@ -13,7 +13,7 @@ First phase `P306` (highest in `docs/HISTORY.md` is `P305`). Branch `v2.8`. Phas
 | P312 | Panel sizes are per module (resize in studio, api stays unchanged). Share one panel size across modules. | Todo |
 | P313 | Code review per `CLAUDE.md` (one Opus round, three dimensions), then fixer. Base: P305 close-out. | Todo |
 | P314 | Comment cleanup: shorter atomic comments, aligned to the `CLAUDE.md` comment rule, across Go/TS/Vue. Needs a new comment-aware tool (see Notes); Opus plan decides scope and approach. | Todo |
-| P315 | Close chapter v2.8 (fold per `CLAUDE.md`). | Todo |
+| P315 | Close chapter v2.8 (fold per `CLAUDE.md`). Hold until user says to close. | Todo |
 
 ## Results
 
