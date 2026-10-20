@@ -822,6 +822,24 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 	if b.ctx.Err() != nil {
 		return // app quit: rows stay running (R18)
 	}
+	b.endAgentRun(ctx, run, l, runEnd{exit: exit, err: runErr, res: res, sink: sink, sbx: sbx, complete: complete})
+}
+
+// runEnd is what a headless agent run left behind.
+type runEnd struct {
+	exit     harness.Exit
+	err      error
+	res      *harness.Result
+	sink     *logSink
+	sbx      *sandboxRun
+	complete func(outcome)
+}
+
+// endAgentRun maps how an agent process ended to the run's outcome and completes the run.
+func (b *TaskBoard) endAgentRun(ctx context.Context, run model.AdeRun, l agentLaunch, e runEnd) {
+	def, sessionID, agent := l.def, l.sessionID, l.agent
+	exit, runErr, res, sink, sbx, complete := e.exit, e.err, e.res, e.sink, e.sbx, e.complete
+	rebase := run.Purpose == model.AdeRunPurposeRebase
 	if out, ok := stopOutcome(ctx); ok {
 		b.takeFinish(run.ID)
 		code := exit.Code

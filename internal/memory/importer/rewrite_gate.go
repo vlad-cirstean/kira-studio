@@ -290,18 +290,34 @@ func tokenKept(tok string, present func(string) bool) bool {
 // quotedSpansKept checks every double-quoted span of input, ignoring backticks in the draft forms.
 func quotedSpansKept(input string, forms []string, present func(string) bool) bool {
 	for _, tok := range quotesOutsideBackticks(input) {
-		found := false
-		for _, f := range forms {
-			if strings.Contains(strings.ReplaceAll(f, "`", ""), tok) {
-				found = true
-				break
-			}
-		}
-		if !found && !present(tok) {
+		if !quoteKept(tok, forms, present) {
 			return false
 		}
 	}
 	return true
+}
+
+// tokenKept checks one protected token; a path token is checked per component.
+func tokenKept(tok string, present func(string) bool) bool {
+	if !strings.Contains(tok, "/") || strings.HasPrefix(tok, "`") {
+		return present(tok)
+	}
+	for _, part := range strings.Split(tok, "/") {
+		if part != "" && !present(part) {
+			return false
+		}
+	}
+	return true
+}
+
+// quoteKept checks one quoted span, which may survive with its backticks removed.
+func quoteKept(tok string, forms []string, present func(string) bool) bool {
+	for _, f := range forms {
+		if strings.Contains(strings.ReplaceAll(f, "`", ""), tok) {
+			return true
+		}
+	}
+	return present(tok)
 }
 
 // isCommentText tells a code comment from prose: its first line opens with a comment marker, or every

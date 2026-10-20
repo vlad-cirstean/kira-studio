@@ -128,7 +128,7 @@ func Profile(p Policy, rt Runtime) string {
 
 // agentConfig is the agent's config dirs, then its config files.
 func agentConfig(n harness.SandboxNeeds) []string {
-	var out []string
+	out := make([]string, 0, len(n.ConfigDirs)+len(n.ConfigFiles))
 	for _, d := range n.ConfigDirs {
 		out = append(out, sub(d))
 	}
