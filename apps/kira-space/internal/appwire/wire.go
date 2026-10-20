@@ -30,7 +30,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/internal/appevent"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	memembed "github.com/kirathecat/kira-studio/internal/memory/embed"
@@ -222,7 +221,7 @@ func wireAdeTask(
 		},
 		OnLog:    func(ev adewire.LogEvent) { bridge.AdeTaskLogAppended(events, ev) },
 		OnReview: func(ev adewire.ReviewEvent) { bridge.AdeTaskReviewChanged(events, ev) },
-		OnRateLimits: func(rl claudeheadless.RateLimits) {
+		OnRateLimits: func(rl harness.RateLimits) {
 			var five, seven *claudeusage.Window
 			if rl.FiveHour != nil {
 				five = claudeusage.FromRun(rl.FiveHour.Utilization, rl.FiveHour.ResetsAt)

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/renameio/v2"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
@@ -40,7 +40,7 @@ func (s *system) prepare(p Policy, rt Runtime) (Prepared, error) {
 	if !enforced {
 		return pr, nil
 	}
-	if _, err := os.Stat(claudeheadless.DefaultSandboxBin); err != nil {
+	if _, err := os.Stat(harness.DefaultSandboxBin); err != nil {
 		return Prepared{}, ipcerr.T(ipcerr.CodeInternal, "backend.space.ade.sandbox.noSandboxExec.body", nil)
 	}
 	path := filepath.Join(p.Scratch, "profile.sb")
@@ -49,10 +49,10 @@ func (s *system) prepare(p Policy, rt Runtime) (Prepared, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if out, err := exec.CommandContext(ctx, claudeheadless.DefaultSandboxBin, "-f", path, "/usr/bin/true").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(ctx, harness.DefaultSandboxBin, "-f", path, "/usr/bin/true").CombinedOutput(); err != nil {
 		return Prepared{}, ipcerr.T(ipcerr.CodeInternal, "backend.space.ade.sandbox.profileInvalid.body", map[string]string{"detail": toolexec.FirstLineBounded(string(out), 300)})
 	}
 	pr.ProfilePath = path
-	pr.Exec = &claudeheadless.SandboxExec{Profile: path, Env: pr.Env, Unset: []string{"SSH_AUTH_SOCK"}}
+	pr.Exec = &harness.SandboxExec{Profile: path, Env: pr.Env, Unset: []string{"SSH_AUTH_SOCK"}}
 	return pr, nil
 }

@@ -184,7 +184,7 @@ func (sr *sandboxRun) on() bool { return sr != nil && sr.access != agentsandbox.
 
 // apply adds the sandbox to the process spec: launch wrap, environment, permission flags, the tool
 // names and the prompt note.
-func (b *TaskBoard) applySandbox(spec claudeheadless.Spec, sr *sandboxRun, l agentLaunch) claudeheadless.Spec {
+func (b *TaskBoard) applySandbox(spec harness.HeadlessSpec, sr *sandboxRun, l agentLaunch) harness.HeadlessSpec {
 	if !sr.on() {
 		return spec
 	}

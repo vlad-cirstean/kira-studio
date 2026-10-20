@@ -61,7 +61,7 @@ func (sb *smartSandbox) cleanup() {
 }
 
 // applySandbox adds the sandbox to the process spec.
-func (s *Service) applySandbox(spec claudeheadless.Spec, sb *smartSandbox) claudeheadless.Spec {
+func (s *Service) applySandbox(spec harness.HeadlessSpec, sb *smartSandbox) harness.HeadlessSpec {
 	if sb == nil {
 		return spec
 	}

@@ -66,7 +66,7 @@ type TaskBoardDeps struct {
 	Sessions   *repos.AdeSessionsRepo
 	OnSessions func()
 	// OnRateLimits receives the rate-limit windows a headless run's stream reports (nil = ignored).
-	OnRateLimits func(claudeheadless.RateLimits)
+	OnRateLimits func(harness.RateLimits)
 	// OnRuns pushes changed runs on kira:adetask:runs.
 	OnRuns func(adewire.RunsChangedEvent)
 	// OnReview pushes a review step's change on kira:adetask:review.

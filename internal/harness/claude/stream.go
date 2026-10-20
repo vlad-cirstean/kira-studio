@@ -1,23 +1,12 @@
-package claudeheadless
+package claude
 
 import (
 	"encoding/json"
 	"fmt"
 	"strings"
-)
 
-// Log streams, matching the ade_log_chunks stream values.
-const (
-	StreamStdout = "stdout"
-	StreamStderr = "stderr"
-	StreamEvent  = "event"
+	"github.com/kirathecat/kira-studio/internal/harness"
 )
-
-// Line is one log line.
-type Line struct {
-	Stream string
-	Text   string
-}
 
 type streamMsg struct {
 	Type    string `json:"type"`
@@ -41,14 +30,14 @@ type contentBlock struct {
 }
 
 // parseLine turns one `claude -p --output-format stream-json` line into log lines.
-func parseLine(raw string) []Line {
+func parseLine(raw string) []harness.Line {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return nil
 	}
 	var msg streamMsg
 	if err := json.Unmarshal([]byte(raw), &msg); err != nil || msg.Type == "" {
-		return []Line{{StreamStdout, raw}}
+		return []harness.Line{{Stream: harness.StreamStdout, Text: raw}}
 	}
 	switch msg.Type {
 	case "system":
@@ -58,51 +47,51 @@ func parseLine(raw string) []Line {
 		if json.Unmarshal(msg.Message.Content, &blocks) != nil {
 			return nil // a plain-string user message carries nothing to show
 		}
-		var lines []Line
+		var lines []harness.Line
 		for _, b := range blocks {
 			lines = append(lines, block(b)...)
 		}
 		return lines
 	case "result":
-		return []Line{{StreamEvent, fmt.Sprintf("result: %s · %d turns", msg.Subtype, msg.NumTurns)}}
+		return []harness.Line{{Stream: harness.StreamEvent, Text: fmt.Sprintf("result: %s · %d turns", msg.Subtype, msg.NumTurns)}}
 	}
 	return nil
 }
 
-func system(msg streamMsg) []Line {
+func system(msg streamMsg) []harness.Line {
 	switch msg.Subtype {
 	case "init":
-		return []Line{{StreamEvent, "session " + msg.SessionID}}
+		return []harness.Line{{Stream: harness.StreamEvent, Text: "session " + msg.SessionID}}
 	case "permission_denied":
 		name := msg.ToolName
 		if name == "" {
 			name = msg.Tool
 		}
-		return []Line{{StreamStderr, "denied: " + name}}
+		return []harness.Line{{Stream: harness.StreamStderr, Text: "denied: " + name}}
 	}
 	return nil
 }
 
-func block(b contentBlock) []Line {
+func block(b contentBlock) []harness.Line {
 	switch b.Type {
 	case "text":
-		return splitLines(StreamStdout, b.Text)
+		return splitLines(harness.StreamStdout, b.Text)
 	case "tool_use":
-		return []Line{{StreamStdout, "▸ " + b.Name + shortInput(b.Name, b.Input)}}
+		return []harness.Line{{Stream: harness.StreamStdout, Text: "▸ " + b.Name + shortInput(b.Name, b.Input)}}
 	case "tool_result":
 		if b.IsError {
 			first, _, _ := strings.Cut(strings.TrimSpace(resultText(b.Content)), "\n")
-			return []Line{{StreamStderr, "✕ " + first}}
+			return []harness.Line{{Stream: harness.StreamStderr, Text: "✕ " + first}}
 		}
 	}
 	return nil
 }
 
-func splitLines(stream, text string) []Line {
+func splitLines(stream, text string) []harness.Line {
 	parts := strings.Split(strings.TrimRight(text, "\n"), "\n")
-	out := make([]Line, 0, len(parts))
+	out := make([]harness.Line, 0, len(parts))
 	for _, l := range parts {
-		out = append(out, Line{stream, l})
+		out = append(out, harness.Line{Stream: stream, Text: l})
 	}
 	return out
 }
@@ -151,61 +140,50 @@ func shortInput(name string, raw json.RawMessage) string {
 	return " " + arg
 }
 
-// RateWindow is one rate-limit window of a rate_limit_event; Utilization is a 0..1 fraction and
-// ResetsAt Unix seconds.
-type RateWindow struct {
-	Utilization float64 `json:"utilization"`
-	ResetsAt    int64   `json:"resetsAt"`
-}
-
-// RateLimits holds the windows a rate_limit_event carried; either may be nil.
-type RateLimits struct {
-	FiveHour *RateWindow
-	SevenDay *RateWindow
-}
-
 // parseRateLimits reads a `rate_limit_event` stream line; ok is false for any other line or one
 // without a five_hour or seven_day window.
-func parseRateLimits(raw string) (RateLimits, bool) {
+func parseRateLimits(raw string) (harness.RateLimits, bool) {
 	if !strings.Contains(raw, `"rate_limit_event"`) {
-		return RateLimits{}, false
+		return harness.RateLimits{}, false
 	}
 	var msg struct {
 		Type          string `json:"type"`
 		RateLimitInfo struct {
 			UnifiedWindows struct {
-				FiveHour *RateWindow `json:"five_hour"`
-				SevenDay *RateWindow `json:"seven_day"`
+				FiveHour *harness.RateWindow `json:"five_hour"`
+				SevenDay *harness.RateWindow `json:"seven_day"`
 			} `json:"unifiedWindows"`
 		} `json:"rate_limit_info"`
 	}
 	if json.Unmarshal([]byte(raw), &msg) != nil || msg.Type != "rate_limit_event" {
-		return RateLimits{}, false
+		return harness.RateLimits{}, false
 	}
 	w := msg.RateLimitInfo.UnifiedWindows
 	if w.FiveHour == nil && w.SevenDay == nil {
-		return RateLimits{}, false
+		return harness.RateLimits{}, false
 	}
-	return RateLimits{FiveHour: w.FiveHour, SevenDay: w.SevenDay}, true
-}
-
-// Result is what the closing `result` line reports.
-type Result struct {
-	Subtype string
-	IsError bool
-	// CostUSD is nil when the line carried no total_cost_usd.
-	CostUSD *float64
-	Denials []string
-	// Text is the final message, cut at maxResultText.
-	Text string
+	return harness.RateLimits{FiveHour: w.FiveHour, SevenDay: w.SevenDay}, true
 }
 
 const maxResultText = 1 << 10
 
+// resultEnd maps the closing line's subtype and is_error flag to how the run ended.
+func resultEnd(subtype string, isError bool) harness.ResultEnd {
+	switch {
+	case subtype == "error_max_budget_usd":
+		return harness.EndBudget
+	case subtype == "error_max_turns":
+		return harness.EndMaxTurns
+	case isError:
+		return harness.EndError
+	}
+	return harness.EndDone
+}
+
 // parseResult reads a `result` stream line; ok is false for any other line.
-func parseResult(raw string) (Result, bool) {
+func parseResult(raw string) (harness.Result, bool) {
 	if !strings.Contains(raw, `"result"`) {
-		return Result{}, false
+		return harness.Result{}, false
 	}
 	var msg struct {
 		Type    string   `json:"type"`
@@ -218,9 +196,9 @@ func parseResult(raw string) (Result, bool) {
 		} `json:"permission_denials"`
 	}
 	if json.Unmarshal([]byte(strings.TrimSpace(raw)), &msg) != nil || msg.Type != "result" {
-		return Result{}, false
+		return harness.Result{}, false
 	}
-	r := Result{Subtype: msg.Subtype, IsError: msg.IsError, CostUSD: msg.Cost, Text: msg.Result}
+	r := harness.Result{End: resultEnd(msg.Subtype, msg.IsError), CostUSD: msg.Cost, Text: msg.Result}
 	if len(r.Text) > maxResultText {
 		r.Text = strings.ToValidUTF8(r.Text[:maxResultText], "") + "…"
 	}
@@ -236,7 +214,7 @@ func parseResult(raw string) (Result, bool) {
 
 const noConversationPrefix = "No conversation found with session ID:"
 
-// IsNoConversation reports whether a stderr line is the CLI's answer to --resume of an unknown session.
-func IsNoConversation(line string) bool {
+// ResumeLost reports whether a stderr line is the CLI's answer to --resume of an unknown session.
+func (*Provider) ResumeLost(line string) bool {
 	return strings.HasPrefix(strings.TrimSpace(line), noConversationPrefix)
 }

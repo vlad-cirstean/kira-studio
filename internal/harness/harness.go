@@ -25,6 +25,7 @@ type Provider interface {
 	Models() Catalog
 	Locator
 	Structured
+	Headless
 	MCPHost
 }
 

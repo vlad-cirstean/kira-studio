@@ -642,7 +642,7 @@ func fromOutcome(state string, o runoutcome.Outcome) outcome {
 }
 
 // agentEnd is how an agent process ended, for the no-report outcomes.
-func agentEnd(exit claudeheadless.Exit, runErr error, timeout string) runoutcome.Process {
+func agentEnd(exit harness.Exit, runErr error, timeout string) runoutcome.Process {
 	p := runoutcome.Process{Kind: runoutcome.KindAgent, ExitCode: exit.Code, Timeout: timeout}
 	switch {
 	case runErr != nil:
@@ -653,11 +653,11 @@ func agentEnd(exit claudeheadless.Exit, runErr error, timeout string) runoutcome
 	return p
 }
 
-func (b *TaskBoard) settingSources() string {
+func (b *TaskBoard) configScope() harness.ConfigScope {
 	if b.deps.HeadlessSettingSources != nil && b.deps.HeadlessSettingSources() == "user" {
-		return settingSourcesUser
+		return harness.ConfigUser
 	}
-	return settingSourcesAll
+	return harness.ConfigAll
 }
 
 func allowedTools(p harness.MCPHost, step []string, space bool) []string {
@@ -740,9 +740,9 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		return
 	}
 	agent := b.deps.Agent.Active()
-	spec := claudeheadless.Spec{
-		ClaudeBin: cmpNonEmpty(b.deps.AgentBin, "claude"), Dir: l.path, Prompt: l.prompt, SessionID: b.sessionClaudeID(sessionID),
-		Resume: l.resume, MCPConfigPath: cfg, SettingSources: b.settingSources(), AllowedTools: roundTools(agent, allowedTools(agent, def.AllowedTools, space), round), DisallowedTools: def.DisallowedTools,
+	spec := harness.HeadlessSpec{
+		Bin: b.deps.AgentBin, Dir: l.path, Prompt: l.prompt, SessionID: b.sessionClaudeID(sessionID),
+		Resume: l.resume, MCPConfigs: []string{cfg}, Config: b.configScope(), AllowedTools: roundTools(agent, allowedTools(agent, def.AllowedTools, space), round), DisallowedTools: def.DisallowedTools,
 		Timeout: l.timeout,
 	}
 	spec.Env = gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: l.path})
@@ -762,17 +762,17 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 				return
 			}
 			defer relUser()
-			spec.MCPConfigPaths = []string{path}
+			spec.MCPConfigs = append(spec.MCPConfigs, path)
 		}
 	}
 	spec = b.applySandbox(spec, sbx, l)
 	b.noticeSandbox(sink, sbx)
-	var res *claudeheadless.Result
+	var res *harness.Result
 	var stopWatch func()
-	exit, runErr := claudeheadless.Run(ctx, spec, claudeheadless.Handler{
-		OnLine:       func(l claudeheadless.Line) { sink.add(l.Stream, l.Text) },
+	exit, runErr := agent.RunHeadless(ctx, spec, harness.Handler{
+		OnLine:       func(l harness.Line) { sink.add(l.Stream, l.Text) },
 		OnRateLimits: b.deps.OnRateLimits,
-		OnResult:     func(r claudeheadless.Result) { res = &r },
+		OnResult:     func(r harness.Result) { res = &r },
 		OnStart: func(pid int) {
 			if sbx.on() {
 				stopWatch = b.watchSandbox(run, sbx, sink, pid)
@@ -811,11 +811,12 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		b.completeRebase(run, sessionID, report, end)
 		return
 	}
+	resumeLost := l.resume != "" && agent.ResumeLost(sink.lastStderr())
 	if l.smart != nil {
-		b.completeRun(run, sessionID, sbx.sandboxOutcome(b.smartOutcome(run.ID, exit, runErr, res, l.smart, def.Results, sink.lastStderr(), l.resume != ""), sink.lastStderr()))
+		b.completeRun(run, sessionID, sbx.sandboxOutcome(b.smartOutcome(run.ID, exit, runErr, res, l.smart, def.Results, sink.lastStderr(), resumeLost), sink.lastStderr()))
 		return
 	}
-	complete(sbx.sandboxOutcome(b.agentOutcome(run.ID, exit, runErr, def, sink.lastStderr(), l.resume != ""), sink.lastStderr()))
+	complete(sbx.sandboxOutcome(b.agentOutcome(run.ID, exit, runErr, def, sink.lastStderr(), resumeLost), sink.lastStderr()))
 }
 
 // roundTools adds the reply tool to a review round's allowed tools.
@@ -837,8 +838,8 @@ func (b *TaskBoard) sessionClaudeID(sessionID string) string {
 }
 
 // lostOutcome is the outcome of a resume whose Claude conversation is gone.
-func lostOutcome(resumed bool, lastErr string) (outcome, bool) {
-	if !resumed || !claudeheadless.IsNoConversation(lastErr) {
+func lostOutcome(lost bool, lastErr string) (outcome, bool) {
+	if !lost {
 		return outcome{}, false
 	}
 	o := runoutcome.ForProcess(runoutcome.Process{Kind: runoutcome.KindAgent, End: runoutcome.EndResumeLost}).WithLastError(lastErr)
@@ -847,11 +848,11 @@ func lostOutcome(resumed bool, lastErr string) (outcome, bool) {
 	return out, true
 }
 
-func (b *TaskBoard) agentOutcome(runID string, exit claudeheadless.Exit, runErr error, def stepDef, lastErr string, resumed bool) outcome {
+func (b *TaskBoard) agentOutcome(runID string, exit harness.Exit, runErr error, def stepDef, lastErr string, resumeLost bool) outcome {
 	code := exit.Code
 	f, finished := b.takeFinish(runID)
 	if !finished {
-		if out, ok := lostOutcome(resumed, lastErr); ok {
+		if out, ok := lostOutcome(resumeLost, lastErr); ok {
 			return out
 		}
 		o := runoutcome.ForProcess(agentEnd(exit, runErr, def.Timeout)).WithLastError(lastErr)

@@ -1,13 +1,15 @@
-package claudeheadless
+package claude
 
 import (
 	"bufio"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
-func feedFile(t *testing.T, name string) (lines []Line) {
+func feedFile(t *testing.T, name string) (lines []harness.Line) {
 	t.Helper()
 	f, err := os.Open("testdata/" + name)
 	if err != nil {
@@ -44,12 +46,12 @@ func TestParserDenialAndOversize(t *testing.T) {
 		t.Errorf("only the first line of a command / error belongs in the log:\n%s", text)
 	}
 	got := parseLine(`{"type":"assistant","message":{"content":[{"type":"tex…`)
-	if len(got) != 1 || got[0].Stream != StreamStdout {
+	if len(got) != 1 || got[0].Stream != harness.StreamStdout {
 		t.Fatalf("unparseable line = %v, want one raw stdout line", got)
 	}
 }
 
-func joinLines(lines []Line) string {
+func joinLines(lines []harness.Line) string {
 	var sb strings.Builder
 	for _, l := range lines {
 		sb.WriteString(l.Text)

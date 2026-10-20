@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/renameio/v2"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
 // Fake implements agentsandbox.Enforcer.
@@ -59,7 +59,7 @@ func (f *Fake) Prepare(p agentsandbox.Policy, rt agentsandbox.Runtime) (agentsan
 		return agentsandbox.Prepared{}, err
 	}
 	pr.ProfilePath = path
-	pr.Exec = &claudeheadless.SandboxExec{Bin: shim, Profile: path, Env: pr.Env, Unset: []string{"SSH_AUTH_SOCK"}}
+	pr.Exec = &harness.SandboxExec{Bin: shim, Profile: path, Env: pr.Env, Unset: []string{"SSH_AUTH_SOCK"}}
 	return pr, nil
 }
 

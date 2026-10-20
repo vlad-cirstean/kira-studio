@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
 
@@ -12,19 +13,19 @@ const maxDenials = 50
 
 // ResultOutcome maps a `result` event that ended the run in failure (budget, turn limit, error) to
 // an outcome. ok is false when the event says nothing about the end.
-func ResultOutcome(res *Result, exit int, budgetUSD float64) (runoutcome.Outcome, bool) {
+func ResultOutcome(res *harness.Result, exit int, budgetUSD float64) (runoutcome.Outcome, bool) {
 	if res == nil {
 		return runoutcome.Outcome{}, false
 	}
 	code := exit
 	switch {
-	case res.Subtype == "error_max_budget_usd":
+	case res.End == harness.EndBudget:
 		return runoutcome.Outcome{Status: runoutcome.StatusFailed, Source: runoutcome.SourceBudget, ExitCode: &code,
 			Reason: fmt.Sprintf("stopped at the budget of %g USD", budgetUSD)}, true
-	case res.Subtype == "error_max_turns":
+	case res.End == harness.EndMaxTurns:
 		return runoutcome.Outcome{Status: runoutcome.StatusFailed, Source: runoutcome.SourceAgent, ExitCode: &code,
 			Reason: "stopped at the turn limit"}, true
-	case res.IsError:
+	case res.End == harness.EndError:
 		return runoutcome.Outcome{Status: runoutcome.StatusFailed, Source: runoutcome.SourceAgent, ExitCode: &code,
 			Reason: FirstNonEmpty(res.Text, "Claude reported an error")}, true
 	}
@@ -32,7 +33,7 @@ func ResultOutcome(res *Result, exit int, budgetUSD float64) (runoutcome.Outcome
 }
 
 // ApplyResult adds the cost and the permission denials of a `result` event to an outcome.
-func ApplyResult(out runoutcome.Outcome, res *Result) runoutcome.Outcome {
+func ApplyResult(out runoutcome.Outcome, res *harness.Result) runoutcome.Outcome {
 	if res == nil {
 		return out
 	}

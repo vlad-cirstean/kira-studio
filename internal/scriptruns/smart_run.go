@@ -10,7 +10,6 @@ import (
 
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/harness"
-	"github.com/kirathecat/kira-studio/internal/harness/claude"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
@@ -171,11 +170,12 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 	if s.SmartTimeout > 0 {
 		timeout, timeoutText = s.SmartTimeout, s.SmartTimeout.String()
 	}
-	env := claude.ScrubSessionEnv(loginshell.ScrubGitEnv(os.Environ()))
+	agent := s.Agent.Active()
+	env := agent.ScrubEnv(loginshell.ScrubGitEnv(os.Environ()))
 	env = append(env, "GIT_TERMINAL_PROMPT=0")
 	env = append(env, p.envList...)
-	spec := claudeheadless.Spec{
-		Dir: p.dir.Path, Prompt: p.sent, SessionID: sessionID, Resume: p.resume, MCPConfigPath: cfg, MCPConfigPaths: extra,
+	spec := harness.HeadlessSpec{
+		Dir: p.dir.Path, Prompt: p.sent, SessionID: sessionID, Resume: p.resume, MCPConfigs: append([]string{cfg}, extra...),
 		Model: p.smart.Model, MaxBudgetUSD: p.smart.MaxBudgetUSD, Tools: pv.Tools, AllowedTools: pv.Allowed,
 		Isolated: true, Timeout: timeout, Env: env,
 	}
@@ -184,11 +184,11 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 		defer s.smartWait.Done()
 		sink := newLogSink(s, runID)
 		s.noticeSandbox(sink, sbx)
-		var res *claudeheadless.Result
+		var res *harness.Result
 		var stopWatch func()
-		exit, runErr := claudeheadless.Run(ctx, spec, claudeheadless.Handler{
-			OnLine:   func(l claudeheadless.Line) { sink.add(l.Stream, l.Text) },
-			OnResult: func(r claudeheadless.Result) { res = &r },
+		exit, runErr := agent.RunHeadless(ctx, spec, harness.Handler{
+			OnLine:   func(l harness.Line) { sink.add(l.Stream, l.Text) },
+			OnResult: func(r harness.Result) { res = &r },
 			OnStart:  func(pid int) { stopWatch = s.watchSandbox(sbx, runID, sink, pid) },
 		})
 		if stopWatch != nil {
@@ -201,7 +201,7 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 		sbx.cleanup()
 		out := decide(decision{
 			finish: s.takeFinishPtr(runID), res: res, exit: exit, runErr: runErr, end: sr.endedBy(),
-			timeout: timeoutText, budget: p.smart.MaxBudgetUSD, app: s.App, lastErr: sink.lastStderr(), resumed: p.resume != "",
+			timeout: timeoutText, budget: p.smart.MaxBudgetUSD, app: s.App, lastErr: sink.lastStderr(), resumeLost: p.resume != "" && agent.ResumeLost(sink.lastStderr()),
 		})
 		out = sbx.outcome(out)
 		cancel()
@@ -277,16 +277,16 @@ func (s *Service) Close() {
 
 type decision struct {
 	finish  *claudeheadless.Finish
-	res     *claudeheadless.Result
-	exit    claudeheadless.Exit
+	res     *harness.Result
+	exit    harness.Exit
 	runErr  error
 	end     int
 	timeout string
 	budget  float64
 	app     string
 	lastErr string
-	// resumed says the run continued an earlier Claude session.
-	resumed bool
+	// resumeLost says the run resumed an earlier agent session that no longer exists.
+	resumeLost bool
 }
 
 // decide maps how a smart run ended to its outcome: the first matching row wins.
@@ -309,7 +309,7 @@ func decide(d decision) runoutcome.Outcome {
 			out.Status = runoutcome.StatusFailed
 			out.Reason = firstNonEmpty(d.finish.Reason, d.finish.Summary, "the agent reported failure without a reason")
 		}
-	case d.resumed && claudeheadless.IsNoConversation(d.lastErr):
+	case d.resumeLost:
 		out = runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndResumeLost})
 	case resultEnds(d):
 		out, _ = claudeheadless.ResultOutcome(d.res, code, d.budget)

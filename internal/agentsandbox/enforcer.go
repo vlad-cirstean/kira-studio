@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
@@ -23,11 +23,11 @@ type Support struct {
 	Reason string
 }
 
-// Prepared is a run's sandbox, ready to apply to a claudeheadless.Spec.
+// Prepared is a run's sandbox, ready to apply to a harness.HeadlessSpec.
 type Prepared struct {
 	Profile, ProfilePath string
 	// Exec is nil when the OS does not enforce the profile.
-	Exec *claudeheadless.SandboxExec
+	Exec *harness.SandboxExec
 	// Env are overrides for the child environment, on every OS.
 	Env []string
 	// AddDirs and Disallowed are the claude permission flags (second layer).

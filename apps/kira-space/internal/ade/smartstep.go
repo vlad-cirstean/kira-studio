@@ -98,14 +98,14 @@ func (s *smartStep) mcpNames() []string {
 }
 
 // spec is the process spec of a smart step run; the caller adds the MCP config paths.
-func (s *smartStep) spec(agent harness.Provider, base claudeheadless.Spec, space bool) claudeheadless.Spec {
+func (s *smartStep) spec(agent harness.Provider, base harness.HeadlessSpec, space bool) harness.HeadlessSpec {
 	extra := harness.ToolNames(agent, claudeheadless.FinishStep, claudeheadless.RunOutcome)
 	if space {
 		extra = append(extra, harness.ToolNames(agent, claudeheadless.SpaceToolIDs...)...)
 	}
 	base.Dir, base.Model, base.MaxBudgetUSD, base.Isolated = s.dir, s.script.Smart.Model, s.script.Smart.MaxBudgetUSD, true
 	base.Tools, base.AllowedTools = agent.ToolArgs(s.script.Smart.ToolPolicy(extra))
-	base.SettingSources = ""
+	base.Config = harness.ConfigNone
 	base.Env = append(base.Env, s.env...)
 	base.Timeout = s.timeout
 	return base
@@ -113,12 +113,12 @@ func (s *smartStep) spec(agent harness.Provider, base claudeheadless.Spec, space
 
 // smartOutcome is a smart step's outcome: a finish_step call wins, then the result event (budget,
 // turn limit, error), then how the process ended. The cost and denials of the result event are added.
-func (b *TaskBoard) smartOutcome(runID string, exit claudeheadless.Exit, runErr error, res *claudeheadless.Result, step *smartStep, results []adewire.StepResult, lastErr string, resumed bool) outcome {
+func (b *TaskBoard) smartOutcome(runID string, exit harness.Exit, runErr error, res *harness.Result, step *smartStep, results []adewire.StepResult, lastErr string, resumeLost bool) outcome {
 	var out outcome
 	if f, finished := b.takeFinish(runID); finished {
 		code := exit.Code
 		out = fromFinish(f, &code, results)
-	} else if lost, ok := lostOutcome(resumed, lastErr); ok {
+	} else if lost, ok := lostOutcome(resumeLost, lastErr); ok {
 		out = lost
 	} else if o, ok := claudeheadless.ResultOutcome(res, exit.Code, step.script.Smart.MaxBudgetUSD); ok {
 		out = fromOutcome(model.AdeRunFailed, o.WithLastError(lastErr))
