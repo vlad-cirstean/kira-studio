@@ -52,7 +52,7 @@ async function continueInTerminal(): Promise<void> {
       command,
       label: t('common.product.claudeCode.label'),
       color: 'none',
-      kind: 'claude-code',
+      kind: 'agent',
     },
   });
 }

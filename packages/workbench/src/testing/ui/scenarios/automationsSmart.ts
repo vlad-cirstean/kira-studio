@@ -402,7 +402,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     await view.locator('[data-testid="run-continue"]').click();
     await expect
       .poll(() => control.log().find((e) => e.channel === IPC.terminalOpen)?.args)
-      .toMatchObject({ command: "claude --resume 'sess-1'", launchKind: 'claude-code' });
+      .toMatchObject({ command: "claude --resume 'sess-1'", launchKind: 'agent' });
   });
 
   test('a normal script with params starts through a launch token', async ({ relaunch }) => {

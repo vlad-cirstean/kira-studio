@@ -172,7 +172,7 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
      *  race the subscription (§3.2/§5.2). cwd is canonicalized once here, so every other read in this
      *  module (terminalCountAtPath, the tab's own cwd) compares like with like. P86 §4: launchKind is
      *  forwarded to TerminalOpenArgs.LaunchKind as-is — Go, not this module, decides what a
-     *  'claude-code' launch gets (hooks, the agent count). */
+     *  'agent' launch gets (hooks, the agent count). */
     async function openTerminalSession(
       tabId: string,
       codeRepoId: string,

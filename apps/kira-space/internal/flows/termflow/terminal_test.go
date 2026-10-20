@@ -188,7 +188,7 @@ func TestAgentTabCountsForKeepAwake(t *testing.T) {
 	const id = "agent-1"
 	if _, err := app.W.Terminal.Open(terminal.OpenArgs{
 		TerminalID: id, WindowKey: window, Cwd: app.Home, Cols: 100, Rows: 30,
-		Command: "claude", LaunchKind: terminal.LaunchKindClaudeCode,
+		Command: "claude", LaunchKind: terminal.LaunchKindAgent,
 	}); err != nil {
 		t.Fatal(err)
 	}

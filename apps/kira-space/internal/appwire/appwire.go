@@ -239,7 +239,7 @@ func Build(opts Options) *Wired {
 
 	// P128 §2.1: the bound terminal methods live once in internal/terminal.BoundService; this
 	// app's own TerminalService only embeds it. ComposeAgent (P129 Part 1 §4.1) rewrites every
-	// claude-code launch through adeTracker.Compose.
+	// agent launch through adeTracker.Compose.
 	termBroker := wireTermBroker(adeTracker, terminalRegistry, emitter)
 	w.TermBroker = termBroker
 	runs := &scriptruns.Service{

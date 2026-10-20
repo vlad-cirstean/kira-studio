@@ -41,7 +41,7 @@ export async function openLaunch(
     80,
     24,
     launch.command,
-    'claude-code',
+    'agent',
   );
   const entry = deps.terminalSession(launch.terminalId);
   if (entry?.status === 'failed')

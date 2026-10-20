@@ -36,7 +36,7 @@ const tab = computed(() => ({
     codeRepoId: '',
     cwd: props.view.session.cwd,
     command: '',
-    launchKind: 'claude-code' as const,
+    launchKind: 'agent' as const,
   },
 }));
 

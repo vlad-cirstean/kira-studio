@@ -82,7 +82,7 @@ export const useDbMcpStore = defineStore('dbMcp', () => {
     state.status = await control.dbMcpRegenerate();
   }
 
-  async function installDbMcpClaudeCode(): Promise<void> {
+  async function installDbMcpAgent(): Promise<void> {
     state.installResult = await control.dbMcpInstallAgent();
   }
 
@@ -94,6 +94,6 @@ export const useDbMcpStore = defineStore('dbMcp', () => {
     denyQuery,
     setDbMcpEnabled,
     regenerateDbMcpToken,
-    installDbMcpClaudeCode,
+    installDbMcpAgent,
   };
 });

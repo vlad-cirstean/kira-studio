@@ -129,7 +129,7 @@ func (f *fixture) openLaunch(t *testing.T, l adewire.Launch) {
 	t.Helper()
 	_, err := f.app.W.Terminal.Open(terminal.OpenArgs{
 		TerminalID: l.TerminalID, Cwd: l.Cwd, Cols: 100, Rows: 30, WindowKey: desktopWindow,
-		Command: l.Command, LaunchKind: terminal.LaunchKindClaudeCode,
+		Command: l.Command, LaunchKind: terminal.LaunchKindAgent,
 	})
 	if err != nil {
 		t.Fatalf("Terminal.Open: %v", err)

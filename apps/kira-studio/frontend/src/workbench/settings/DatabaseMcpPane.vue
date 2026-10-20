@@ -41,7 +41,7 @@ function tokenExpired(expiresAt: string): boolean {
 // snaps back is not the only trace of the failure. One error line serves all three actions.
 const toggle = useAsyncAction((enabled: boolean) => dbMcpStore.setDbMcpEnabled(enabled));
 const regenerate = useAsyncAction(() => dbMcpStore.regenerateDbMcpToken());
-const install = useAsyncAction(() => dbMcpStore.installDbMcpClaudeCode());
+const install = useAsyncAction(() => dbMcpStore.installDbMcpAgent());
 const connectionToggle = useAsyncAction((id: string, enabled: boolean) =>
   connectionsStore.setConnectionMcpEnabled(id, enabled),
 );
@@ -69,7 +69,7 @@ async function onRegenerateDbMcpToken(): Promise<void> {
   clearActionErrors();
   await regenerate.run();
 }
-async function onInstallDbMcpClaudeCode(): Promise<void> {
+async function onInstallDbMcpAgent(): Promise<void> {
   clearActionErrors();
   await install.run();
 }
@@ -150,7 +150,7 @@ const dbMcpEnabledId = useId();
             class="self-start"
             :pending="dbMcpInstalling"
             data-testid="db-mcp-install-button"
-            @click="onInstallDbMcpClaudeCode"
+            @click="onInstallDbMcpAgent"
             >{{
               dbMcpStore.status.agentAvailable
                 ? t('common.registerWithClaudeCode.label')

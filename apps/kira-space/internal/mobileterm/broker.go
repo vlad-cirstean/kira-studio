@@ -34,7 +34,7 @@ type Timer interface{ Stop() bool }
 
 type Deps struct {
 	Registry Registry
-	// Sessions resolves an ADE session id to its live claude-code terminal.
+	// Sessions resolves an ADE session id to its live agent terminal.
 	Sessions  func(sessionID string) (terminalID string, ok bool)
 	Now       func() time.Time
 	AfterFunc func(d time.Duration, f func()) Timer

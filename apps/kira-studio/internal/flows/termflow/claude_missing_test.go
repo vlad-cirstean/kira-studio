@@ -29,7 +29,7 @@ func TestClaudeCodeLaunchWithoutClaude(t *testing.T) {
 
 	_, err := app.W.Terminal.Open(terminal.OpenArgs{
 		TerminalID: "cc1", WindowKey: "w1", Cwd: app.Home, Cols: 80, Rows: 24,
-		Command: "claude", LaunchKind: terminal.LaunchKindClaudeCode,
+		Command: "claude", LaunchKind: terminal.LaunchKindAgent,
 	})
 	var ie *ipcerr.Error
 	if !errors.As(err, &ie) || ie.Code != string(ipcerr.CodeNotFound) || !strings.HasPrefix(ie.Message, "Claude Code CLI not found") {

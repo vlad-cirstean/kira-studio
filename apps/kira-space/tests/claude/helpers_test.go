@@ -416,12 +416,12 @@ func (a *realApp) waitAgentEvent(t *testing.T, mark int, terminalID, name string
 	return agentEvent{}
 }
 
-// openAgent opens a claude-code terminal the way the renderer does.
+// openAgent opens a agent terminal the way the renderer does.
 func (a *realApp) openAgent(t *testing.T, id, cwd, command string) {
 	t.Helper()
 	if _, err := a.W.Terminal.Open(terminal.OpenArgs{
 		TerminalID: id, WindowKey: window, Cwd: cwd, Cols: 120, Rows: 40,
-		Command: command, LaunchKind: terminal.LaunchKindClaudeCode,
+		Command: command, LaunchKind: terminal.LaunchKindAgent,
 	}); err != nil {
 		t.Fatalf("Terminal.Open %s: %v", id, err)
 	}

@@ -365,7 +365,7 @@ func (t *Tracker) hasPending(match func(pendingIntent) bool) bool {
 }
 
 // Compose is BoundService.ComposeAgent's own target (wired in main.go) — internal/terminal.Open
-// calls it for every claude-code launch, composed or not. No intent for terminalID (a claude-code
+// calls it for every agent launch, composed or not. No intent for terminalID (an agent
 // launch not started through Prepare; this app has none today) means hooks-only composition, no
 // record — §4.4's own explicit fallback.
 func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, error) {

@@ -170,7 +170,7 @@ func TestFocusSessionAcrossWindows(t *testing.T) {
 	})
 	if _, err := app.W.Terminal.Open(terminal.OpenArgs{
 		TerminalID: launch.TerminalID, Cwd: launch.Cwd, Cols: 100, Rows: 30, WindowKey: "w-a",
-		Command: launch.Command, LaunchKind: terminal.LaunchKindClaudeCode,
+		Command: launch.Command, LaunchKind: terminal.LaunchKindAgent,
 	}); err != nil {
 		t.Fatal(err)
 	}

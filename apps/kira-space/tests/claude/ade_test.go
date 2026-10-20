@@ -206,7 +206,7 @@ func TestAdeManualSession(t *testing.T) {
 	mark := f.Events.Mark()
 	if _, err := f.W.Terminal.Open(terminal.OpenArgs{
 		TerminalID: launch.TerminalID, WindowKey: window, Cwd: launch.Cwd, Cols: 120, Rows: 40,
-		Command: launch.Command, LaunchKind: terminal.LaunchKindClaudeCode,
+		Command: launch.Command, LaunchKind: terminal.LaunchKindAgent,
 	}); err != nil {
 		t.Fatal(err)
 	}

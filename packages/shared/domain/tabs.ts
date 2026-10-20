@@ -43,10 +43,10 @@ export const tabRecordBase = {
   workspaceId: z.string().nullable().default(null),
 };
 
-// P86 §4: which kind of launch a terminal tab is — 'claude-code' is the only kind that gets hooks
+// P86 §4: which kind of launch a terminal tab is — 'agent' is the only kind that gets hooks
 // (a session reporting its own activity) and the only kind the status-bar widget counts. Decided
 // once at launch time by the caller (TabStrip.vue's producers), never inferred from `command`.
-export const terminalLaunchKindSchema = /*#__PURE__*/ z.enum(['shell', 'claude-code', 'script']);
+export const terminalLaunchKindSchema = /*#__PURE__*/ z.enum(['shell', 'agent', 'script']);
 export type TerminalLaunchKind = z.infer<typeof terminalLaunchKindSchema>;
 
 // P83 §7.1: minimal on purpose — a terminal tab's whole content is a live process (never

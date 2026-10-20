@@ -10,20 +10,20 @@ import (
 )
 
 // P86 §4: the three wire values a LaunchKind arg accepts (packages/shared/domain/tabs.ts's
-// terminalLaunchKindSchema, field for field). Only LaunchKindClaudeCode counts toward
+// terminalLaunchKindSchema, field for field). Only LaunchKindAgent counts toward
 // OpenParams.Agent; a custom script that happens to run `claude` counts as a script, deliberately
 // (§4: "so the implementation does not 'fix' it into a heuristic").
 const (
-	LaunchKindShell      = "shell"
-	LaunchKindClaudeCode = "claude-code"
-	LaunchKindScript     = "script"
+	LaunchKindShell  = "shell"
+	LaunchKindAgent  = "agent"
+	LaunchKindScript = "script"
 )
 
 // ValidLaunchKind reports whether v is "" (treated as LaunchKindShell, so an older caller keeps
 // working) or one of the three named kinds above.
 func ValidLaunchKind(v string) bool {
 	switch v {
-	case "", LaunchKindShell, LaunchKindClaudeCode, LaunchKindScript:
+	case "", LaunchKindShell, LaunchKindAgent, LaunchKindScript:
 		return true
 	default:
 		return false

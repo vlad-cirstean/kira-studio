@@ -18,7 +18,7 @@ import (
 type BoundService struct {
 	Emit     appevent.Emitter
 	Registry *Registry
-	// ComposeAgent, when set, rewrites a claude-code launch's command and supplies extra env before
+	// ComposeAgent, when set, rewrites a agent launch's command and supplies extra env before
 	// spawn. Kira Space sets it (P129, its own session tracker's Compose method); Kira Studio leaves
 	// it nil, so its own Open is byte-identical to before this field existed. A func field, not a
 	// method: Wails' binding generator only ever sees exported *methods* on the registered type
@@ -137,9 +137,9 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 	// P127: agent-activity monitoring (the `--settings` flag, the hook env vars) left Kira Studio;
 	// Agent stays — it is P87's own keep-awake input (§2.5), read from this registry's own live-
 	// session count, no dependency on the hooks. P129: Kira Space sets ComposeAgent below, so its
-	// own claude-code launches are composed and tracked; Kira Studio leaves it nil, so its Open is
+	// own agent launches are composed and tracked; Kira Studio leaves it nil, so its Open is
 	// unchanged.
-	agent := args.LaunchKind == LaunchKindClaudeCode
+	agent := args.LaunchKind == LaunchKindAgent
 	if err := b.requireAgent(agent); err != nil {
 		return OpenResult{}, err
 	}

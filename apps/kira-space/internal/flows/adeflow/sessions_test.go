@@ -22,7 +22,7 @@ func openLaunch(t *testing.T, app *flowharness.App, l adewire.Launch) {
 	t.Helper()
 	_, err := app.W.Terminal.Open(terminal.OpenArgs{
 		TerminalID: l.TerminalID, Cwd: l.Cwd, Cols: 100, Rows: 30, WindowKey: sessionWindow,
-		Command: l.Command, LaunchKind: terminal.LaunchKindClaudeCode,
+		Command: l.Command, LaunchKind: terminal.LaunchKindAgent,
 	})
 	if err != nil {
 		t.Fatalf("Terminal.Open %s: %v", l.Command, err)

@@ -106,7 +106,7 @@ func openAgent(t *testing.T, app *flowharness.App, id, cwd string) {
 	t.Helper()
 	if _, err := app.W.Terminal.Open(terminal.OpenArgs{
 		TerminalID: id, WindowKey: window, Cwd: cwd, Cols: 100, Rows: 30,
-		Command: "claude", LaunchKind: terminal.LaunchKindClaudeCode,
+		Command: "claude", LaunchKind: terminal.LaunchKindAgent,
 	}); err != nil {
 		t.Fatalf("Terminal.Open %s: %v", id, err)
 	}
@@ -240,7 +240,7 @@ func openAgent2(t *testing.T, app *flowharness.App, l adewire.Launch) {
 	t.Helper()
 	if _, err := app.W.Terminal.Open(terminal.OpenArgs{
 		TerminalID: l.TerminalID, WindowKey: window, Cwd: l.Cwd, Cols: 100, Rows: 30,
-		Command: l.Command, LaunchKind: terminal.LaunchKindClaudeCode,
+		Command: l.Command, LaunchKind: terminal.LaunchKindAgent,
 	}); err != nil {
 		t.Fatalf("Terminal.Open %s: %v", l.Command, err)
 	}
