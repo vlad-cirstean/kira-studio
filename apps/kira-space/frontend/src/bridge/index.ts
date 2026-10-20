@@ -1,6 +1,6 @@
 import * as AdeTaskService from '@bindings/adetaskservice.js';
 import * as AgentNotifyService from '@bindings/agentnotifyservice.js';
-import * as ClaudeUsageService from '@bindings/claudeusageservice.js';
+import * as AgentUsageService from '@bindings/agentusageservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as CustomScriptsService from '@bindings/customscriptsservice.js';
 import * as FilesService from '@bindings/filesservice.js';
@@ -453,27 +453,26 @@ const spaceControl = {
   onAgentRevealScriptRun: (cb: (event: { runId: string; label: string }) => void): (() => void) =>
     on('kira:agent:revealScriptRun', cb),
   // P239: Claude Code usage limits for the ADE status bar.
-  claudeUsageGet: (): Promise<ClaudeUsageSnapshot> => unwrap(ClaudeUsageService.Get()),
-  onClaudeUsage: (cb: (snapshot: ClaudeUsageSnapshot) => void): (() => void) =>
-    on('kira:claude:usage', cb),
+  agentUsageGet: (): Promise<AgentUsageSnapshot> => unwrap(AgentUsageService.Get()),
+  onAgentUsage: (cb: (snapshot: AgentUsageSnapshot) => void): (() => void) =>
+    on('kira:agent:usage', cb),
 };
 
-export interface ClaudeUsageWindow {
+export interface AgentUsageWindow {
   usedPercent: number;
   /** Unix milliseconds. */
   resetsAt: number;
 }
 
-export interface ClaudeUsageSnapshot {
+export interface AgentUsageSnapshot {
   /** ok, waiting or off. */
   state: string;
   /** session or run; empty until a reading arrives. */
   source: string;
-  fiveHour: ClaudeUsageWindow | null;
-  sevenDay: ClaudeUsageWindow | null;
+  fiveHour: AgentUsageWindow | null;
+  sevenDay: AgentUsageWindow | null;
   /** Unix milliseconds. */
   updatedAt: number;
-  detail: string;
 }
 
 interface AgentNotifyFocus {

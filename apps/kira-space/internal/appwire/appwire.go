@@ -16,10 +16,10 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/agentnotify"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/agentusage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/claudeusage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
@@ -149,8 +149,8 @@ type Wired struct {
 	Update         *bridge.UpdateService
 	CodeWorkspace  *bridge.CodeWorkspaceService
 	AgentNotifySvc *bridge.AgentNotifyService
-	ClaudeUsage    *claudeusage.Service
-	ClaudeUsageSvc *bridge.ClaudeUsageService
+	AgentUsage     *agentusage.Service
+	AgentUsageSvc  *bridge.AgentUsageService
 	// Agents resolves the active agent provider per call.
 	Agents harness.Selector
 
@@ -229,12 +229,12 @@ func Build(opts Options) *Wired {
 		Alive: func(key string) bool { return slices.Contains(w.Windows.Keys(), key) },
 	})
 	w.AgentNotifySvc = &bridge.AgentNotifyService{N: w.AgentNotify}
-	w.ClaudeUsage = claudeusage.New(claudeusage.Deps{
-		Enabled: usageEnabled(repositories), Path: filepath.Join(config.KiraSpaceHome(), "claude-usage.json"),
-		OnChange: func() { bridge.ClaudeUsageChanged(emitter, w.ClaudeUsage.Get()) },
+	w.AgentUsage = agentusage.New(agentusage.Deps{
+		Enabled: usageEnabled(repositories), Path: filepath.Join(config.KiraSpaceHome(), "agent-usage.json"),
+		OnChange: func() { bridge.AgentUsageChanged(emitter, w.AgentUsage.Get()) },
 	})
-	w.ClaudeUsageSvc = &bridge.ClaudeUsageService{U: w.ClaudeUsage}
-	adeTracker, agentHooks := wireTracker(repositories, terminalRegistry, emitter, events, opts.TrackerGrace, w.AgentNotify, w.ClaudeUsage, w.Agents)
+	w.AgentUsageSvc = &bridge.AgentUsageService{U: w.AgentUsage}
+	adeTracker, agentHooks := wireTracker(repositories, terminalRegistry, emitter, events, opts.TrackerGrace, w.AgentNotify, w.AgentUsage, w.Agents)
 	w.Tracker, w.AgentHooks = adeTracker, agentHooks
 
 	// P128 §2.1: the bound terminal methods live once in internal/terminal.BoundService; this
@@ -294,7 +294,7 @@ func Build(opts Options) *Wired {
 				return w.AdeTask.CloseWindow(key)
 			}
 			return w.Windows.Close(key)
-		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.ClaudeUsage, opts.RebaseTimeout, runs, w.Agents)
+		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.AgentUsage, opts.RebaseTimeout, runs, w.Agents)
 	runs.ADE = w.AdeBoard
 	w.sched = &scriptruns.Scheduler{Svc: runs, Clock: opts.Clock}
 	w.sched.Start()
@@ -393,7 +393,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.AdeTask), application.NewService(w.Ops), application.NewService(w.Lifecycle),
 		application.NewService(w.KeepAwake), application.NewService(w.Mobile), application.NewService(w.Memory),
 		application.NewService(w.MemoryImport), application.NewService(w.MemoryDistill), application.NewService(w.WindowsSvc), application.NewService(w.Update),
-		application.NewService(w.AgentNotifySvc), application.NewService(w.ClaudeUsageSvc),
+		application.NewService(w.AgentNotifySvc), application.NewService(w.AgentUsageSvc),
 		application.NewService(w.PromptsSvc), application.NewService(w.LlmPromptsSvc),
 	}
 }

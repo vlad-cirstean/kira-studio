@@ -17,7 +17,6 @@ function snapshot(five: number | null, seven: number | null, extra: Record<strin
     fiveHour: five === null ? null : { usedPercent: five, resetsAt: FIXED_NOW + 2 * HOUR },
     sevenDay: seven === null ? null : { usedPercent: seven, resetsAt: FIXED_NOW + 50 * HOUR },
     updatedAt: FIXED_NOW - 5 * 60_000,
-    detail: '',
     ...extra,
   };
 }
@@ -35,7 +34,7 @@ function fromContract(key: string) {
     sevenDay: UsageWindow | null;
     source: string;
     state: string;
-  }>('claude-usage', key);
+  }>('agent-usage', key);
   return {
     ...snap,
     fiveHour: snap.fiveHour && { ...snap.fiveHour, resetsAt: FIXED_NOW + 2 * HOUR },
@@ -46,7 +45,7 @@ function fromContract(key: string) {
 
 const pct = (w: UsageWindow | null) => Math.round(w?.usedPercent ?? 0);
 
-const usageControl = (snap: unknown) => [{ channel: IPC.claudeUsageGet, response: snap }];
+const usageControl = (snap: unknown) => [{ channel: IPC.agentUsageGet, response: snap }];
 const item = (page: Page) => page.locator('[data-testid="claude-usage-status"]');
 const text = (page: Page) => page.locator('[data-testid="claude-usage-text"]');
 
@@ -70,7 +69,7 @@ test('shows both windows, and the tooltip lists the reset times and the source',
 });
 
 test('contract: a session snapshot shows both windows and its source', async ({ relaunch }) => {
-  const snap = fromContract('ClaudeUsageService.Get#session');
+  const snap = fromContract('AgentUsageService.Get#session');
   const { window: page } = await openPlan(relaunch, usageControl(snap));
   await expect(text(page)).toHaveText(
     `Session ${pct(snap.fiveHour)}% · Weekly ${pct(snap.sevenDay)}%`,
@@ -82,7 +81,7 @@ test('contract: a session snapshot shows both windows and its source', async ({ 
 });
 
 test('contract: a run snapshot names the run source', async ({ relaunch }) => {
-  const snap = fromContract('ClaudeUsageService.Get#run');
+  const snap = fromContract('AgentUsageService.Get#run');
   const { window: page } = await openPlan(relaunch, usageControl(snap));
   await expect(text(page)).toHaveText(
     `Session ${pct(snap.fiveHour)}% · Weekly ${pct(snap.sevenDay)}%`,
@@ -94,7 +93,7 @@ test('contract: a run snapshot names the run source', async ({ relaunch }) => {
 });
 
 test('contract: one window only shows only that window', async ({ relaunch }) => {
-  const snap = fromContract('ClaudeUsageService.Get#expired');
+  const snap = fromContract('AgentUsageService.Get#expired');
   expect(snap.sevenDay).toBeNull();
   const { window: page } = await openPlan(relaunch, usageControl(snap));
   await expect(text(page)).toHaveText(`Session ${pct(snap.fiveHour)}%`);
@@ -113,7 +112,7 @@ test('the usage item sits in the left group with the dashboard icon', async ({ r
 test('warns at 80 percent and errors at 95 percent', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch, usageControl(snapshot(85, 10)));
   await expect(item(page)).toHaveClass(/text-warn-text/);
-  await emitWailsEvent(page, IPC.claudeUsage, snapshot(85, 97));
+  await emitWailsEvent(page, IPC.agentUsage, snapshot(85, 97));
   await expect(text(page)).toHaveText('Session 85% · Weekly 97%');
   await expect(item(page)).toHaveClass(/text-error/);
 });
@@ -127,7 +126,6 @@ test('shows a dash and the hint before any session reported', async ({ relaunch 
       fiveHour: null,
       sevenDay: null,
       updatedAt: 0,
-      detail: 'Start a Claude Code session to see usage',
     }),
   );
   await expect(text(page)).toHaveText('Usage: –');
@@ -139,7 +137,7 @@ test('shows a dash and the hint before any session reported', async ({ relaunch 
 
 test('shows unavailable when the read fails', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch, [
-    { channel: IPC.claudeUsageGet, error: { code: 'internal', message: 'boom' } },
+    { channel: IPC.agentUsageGet, error: { code: 'internal', message: 'boom' } },
   ]);
   await expect(text(page)).toHaveText('Usage unavailable');
 });
@@ -147,7 +145,7 @@ test('shows unavailable when the read fails', async ({ relaunch }) => {
 test('a pushed snapshot replaces the shown values', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch, usageControl(snapshot(10, 20)));
   await expect(text(page)).toHaveText('Session 10% · Weekly 20%');
-  await emitWailsEvent(page, IPC.claudeUsage, snapshot(30, 40));
+  await emitWailsEvent(page, IPC.agentUsage, snapshot(30, 40));
   await expect(text(page)).toHaveText('Session 30% · Weekly 40%');
 });
 

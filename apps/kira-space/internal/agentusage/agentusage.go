@@ -1,8 +1,8 @@
-// Package claudeusage keeps the latest Claude Code rate-limit windows (5-hour and weekly) that
-// Kira-started sessions report. Two feeds, no credential and no network call: an interactive
-// session's statusline payload and a headless run's stream-json rate_limit_event. The newest
-// reading wins per window. Only the numbers are persisted, never a payload.
-package claudeusage
+// Package agentusage keeps the latest agent rate-limit windows (5-hour and weekly) that
+// Kira-started sessions report, for providers that implement harness.UsageReporter. Two feeds, no
+// credential and no network call: an interactive session's report and a headless run's. The
+// newest reading wins per window. Only the numbers are persisted, never a payload.
+package agentusage
 
 import (
 	"encoding/json"
@@ -26,9 +26,6 @@ const (
 	SourceRun     = "run"
 )
 
-// WaitingDetail is the hint shown while no session has reported yet.
-const WaitingDetail = "Start a Claude Code session to see usage"
-
 // emitInterval bounds OnChange to one call per interval.
 const emitInterval = 10 * time.Second
 
@@ -45,7 +42,6 @@ type Snapshot struct {
 	FiveHour  *Window `json:"fiveHour"`
 	SevenDay  *Window `json:"sevenDay"`
 	UpdatedAt int64   `json:"updatedAt"`
-	Detail    string  `json:"detail"`
 }
 
 // FromSession converts a reported window: percent 0-100, reset in epoch seconds.
@@ -59,7 +55,7 @@ func clamp(p float64) float64 {
 
 // Deps wires the Service.
 type Deps struct {
-	// Enabled reads claudeCode.usageEnabled fresh on every call.
+	// Enabled reads the usage setting fresh on every call.
 	Enabled func() bool
 	// Path is the persisted snapshot file ("" disables persistence).
 	Path string
@@ -141,7 +137,7 @@ func (s *Service) Get() Snapshot {
 		snap.SevenDay = &w
 	}
 	if snap.FiveHour == nil && snap.SevenDay == nil {
-		return Snapshot{State: StateWaiting, Detail: WaitingDetail}
+		return Snapshot{State: StateWaiting}
 	}
 	snap.State = StateOK
 	return snap
@@ -179,12 +175,12 @@ func (s *Service) persistLocked() {
 		return
 	}
 	if err := writeAtomic(s.deps.Path, raw); err != nil {
-		slog.Warn("claude usage: persist", "scope", "usage", "err", err)
+		slog.Warn("agent usage: persist", "scope", "usage", "err", err)
 	}
 }
 
 func writeAtomic(path string, data []byte) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".claude-usage-*")
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".agent-usage-*")
 	if err != nil {
 		return err
 	}

@@ -9124,6 +9124,9 @@
         "unknown": {
           "status": "Usage: –"
         },
+        "waiting": {
+          "hint": "Start a Claude Code session to see usage."
+        },
         "weeklyLong": {
           "label": "Weekly"
         }

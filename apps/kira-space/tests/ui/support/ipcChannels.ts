@@ -159,8 +159,8 @@ export const IPC = {
   agentRevealTerminal: 'kira:agent:revealTerminal',
   agentRevealTask: 'kira:agent:revealTask',
   agentRevealScriptRun: 'kira:agent:revealScriptRun',
-  claudeUsageGet: 'kira:claudeusage:get',
-  claudeUsage: 'kira:claude:usage',
+  agentUsageGet: 'kira:agentusage:get',
+  agentUsage: 'kira:agent:usage',
   // P145: the ade v2 board surface. `adeTaskBoard` names the bound call; its push counterpart is
   // `adeTaskBoardChanged`.
   adeTaskBoard: 'kira:adetask:board:call',

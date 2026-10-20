@@ -769,9 +769,13 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 	b.noticeSandbox(sink, sbx)
 	var res *harness.Result
 	var stopWatch func()
+	onLimits := b.deps.OnRateLimits
+	if !harness.ReportsUsage(agent) {
+		onLimits = nil
+	}
 	exit, runErr := agent.RunHeadless(ctx, spec, harness.Handler{
 		OnLine:       func(l harness.Line) { sink.add(l.Stream, l.Text) },
-		OnRateLimits: b.deps.OnRateLimits,
+		OnRateLimits: onLimits,
 		OnResult:     func(r harness.Result) { res = &r },
 		OnStart: func(pid int) {
 			if sbx.on() {

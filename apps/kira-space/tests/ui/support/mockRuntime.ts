@@ -121,7 +121,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   keepAwakeSetManual: 'KeepAwakeService.SetManual',
   agentNotifyReportFocus: 'AgentNotifyService.ReportFocus',
   agentNotifySendTest: 'AgentNotifyService.SendTest',
-  claudeUsageGet: 'ClaudeUsageService.Get',
+  agentUsageGet: 'AgentUsageService.Get',
 
   // P128 §2.2/§2.6: this app now persists a per-window module mode too, via the same shared
   // internal/windowsvc.Service Kira Studio's own WindowsService embeds.
@@ -310,13 +310,12 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.agentNotifyReportFocus]: 'null',
   [IPC.agentNotifySendTest]: 'null',
   // P239: nothing reported yet.
-  [IPC.claudeUsageGet]: JSON.stringify({
+  [IPC.agentUsageGet]: JSON.stringify({
     state: 'waiting',
     source: '',
     fiveHour: null,
     sevenDay: null,
     updatedAt: 0,
-    detail: 'Start a Claude Code session to see usage',
   }),
   [IPC.keepAwakeStatus]: JSON.stringify({ manual: false, supported: true, error: '' }),
   // P119: no update available by default — same shape as Kira Studio's own WILDCARD_DEFAULTS

@@ -1,6 +1,5 @@
 {
-  "ClaudeUsageService.Get#expired": {
-    "detail": "",
+  "AgentUsageService.Get#expired": {
     "fiveHour": {
       "resetsAt": 0,
       "usedPercent": 30
@@ -10,8 +9,7 @@
     "state": "ok",
     "updatedAt": 0
   },
-  "ClaudeUsageService.Get#run": {
-    "detail": "",
+  "AgentUsageService.Get#run": {
     "fiveHour": {
       "resetsAt": 0,
       "usedPercent": 24
@@ -24,8 +22,7 @@
     "state": "ok",
     "updatedAt": 0
   },
-  "ClaudeUsageService.Get#session": {
-    "detail": "",
+  "AgentUsageService.Get#session": {
     "fiveHour": {
       "resetsAt": 0,
       "usedPercent": 23.5
@@ -38,8 +35,7 @@
     "state": "ok",
     "updatedAt": 0
   },
-  "event:kira:claude:usage": {
-    "detail": "",
+  "event:kira:agent:usage": {
     "fiveHour": {
       "resetsAt": 0,
       "usedPercent": 23.5

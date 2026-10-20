@@ -83,7 +83,11 @@ func (h *Hooks) Start() error {
 		if !ok || h.listeners[id] != nil {
 			continue
 		}
-		l, err := host.StartHooks(h.opts)
+		opts := h.opts
+		if !ReportsUsage(p) {
+			opts.OnStatusLine = nil
+		}
+		l, err := host.StartHooks(opts)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", id, err))
 			continue
@@ -127,4 +131,15 @@ func (h *Hooks) Status(provider string) HookStatus {
 		return HookStatus{}
 	}
 	return l.Status()
+}
+
+// UsageReporter is a provider whose runs and sessions report account rate-limit windows.
+type UsageReporter interface {
+	UsageWindows() bool
+}
+
+// ReportsUsage reports whether p feeds usage limits.
+func ReportsUsage(p Provider) bool {
+	u, ok := p.(UsageReporter)
+	return ok && u.UsageWindows()
 }

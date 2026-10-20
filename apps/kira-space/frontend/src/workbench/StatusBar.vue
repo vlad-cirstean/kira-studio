@@ -18,7 +18,7 @@ import { useBlameStatusStore } from '../state/blameStatus';
 import { useModeStore } from '../state/mode';
 import { useSettingsStore } from '../state/settings';
 import { blameLineText, blameLineTooltip } from '../views/repo/blameLine';
-import ClaudeUsageItem from './ClaudeUsageItem.vue';
+import AgentUsageItem from './AgentUsageItem.vue';
 
 // P103 Part 2 (§5.4): Kira Studio's own workbench/StatusBar.vue, trimmed to the blame item (P76
 // §5.2) on the left. Now a thin composition over the shared bar chrome
@@ -68,7 +68,7 @@ function onRevealBlameCommit(): void {
         <TooltipContent>{{ blameTooltip }}</TooltipContent>
       </Tooltip>
       <!-- P239: Claude Code usage limits, ADE module only. -->
-      <ClaudeUsageItem v-if="modeStore.active === 'ade' && settingsStore.claudeCode.usageEnabled" />
+      <AgentUsageItem v-if="modeStore.active === 'ade' && settingsStore.claudeCode.usageEnabled" />
     </template>
     <template #right>
       <RunsStatusItem />

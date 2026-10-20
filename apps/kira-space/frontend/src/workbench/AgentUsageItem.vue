@@ -7,14 +7,14 @@ import { useIntervalFn, useNow } from '@vueuse/core';
 import { formatCompactDuration, formatDateTime, formatRelative } from '@workbench/behaviour/format';
 import { TIMING } from '@workbench/behaviour/timing';
 import { computed } from 'vue';
-import type { ClaudeUsageWindow } from '../bridge/index';
-import { useClaudeUsage } from '../state/claudeUsage';
+import type { AgentUsageWindow } from '../bridge/index';
+import { useAgentUsage } from '../state/agentUsage';
 
-// P239: ADE status-bar readout of the Claude Code 5-hour and weekly limits.
+// P239: ADE status-bar readout of the agent 5-hour and weekly limits.
 const WARN_AT = 80;
 const ERROR_AT = 95;
 
-const { data, isError } = useClaudeUsage();
+const { data, isError } = useAgentUsage();
 const now = useNow({ scheduler: (cb) => useIntervalFn(cb, TIMING.clockTickSlow) });
 
 const windows = computed(() => {
@@ -32,7 +32,7 @@ const windows = computed(() => {
       window: d.sevenDay,
     },
   ].filter(
-    (w): w is { label: string; long: string; window: ClaudeUsageWindow } => w.window !== null,
+    (w): w is { label: string; long: string; window: AgentUsageWindow } => w.window !== null,
   );
 });
 
@@ -87,7 +87,7 @@ const sourceLine = computed(() => {
 const detail = computed(() => {
   if (isError.value && windows.value.length === 0)
     return t('space.settings.claudeUsage.readFailed.error');
-  return data.value?.state === 'ok' ? '' : (data.value?.detail ?? '');
+  return data.value?.state === 'waiting' ? t('space.settings.claudeUsage.waiting.hint') : '';
 });
 </script>
 

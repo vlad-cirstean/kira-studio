@@ -13,10 +13,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeflow"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/agentnotify"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/agentusage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/claudeusage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
@@ -97,7 +97,7 @@ type gitWired struct {
 // Rows a previous process life left running are stopped by the task board's Recover.
 func wireTracker(
 	repositories *repos.Repos, registry *terminal.Registry, emitter appevent.Emitter, events *bridge.Events,
-	grace time.Duration, notifier *agentnotify.Notifier, usage *claudeusage.Service, agents harness.Selector,
+	grace time.Duration, notifier *agentnotify.Notifier, usage *agentusage.Service, agents harness.Selector,
 ) (*ade.Tracker, *harness.Hooks) {
 	tracker := ade.NewTracker(ade.TrackerDeps{
 		Agent: agents, Store: repositories.AdeSessions, LiveAgents: registry.AgentSessions,
@@ -115,14 +115,14 @@ func wireTracker(
 		},
 		StatusLine: usageEnabled(repositories),
 		OnStatusLine: func(_ string, rl harness.RateLimits) {
-			var five, seven *claudeusage.Window
+			var five, seven *agentusage.Window
 			if rl.FiveHour != nil {
-				five = claudeusage.FromSession(rl.FiveHour.UsedPercent, rl.FiveHour.ResetsAt)
+				five = agentusage.FromSession(rl.FiveHour.UsedPercent, rl.FiveHour.ResetsAt)
 			}
 			if rl.SevenDay != nil {
-				seven = claudeusage.FromSession(rl.SevenDay.UsedPercent, rl.SevenDay.ResetsAt)
+				seven = agentusage.FromSession(rl.SevenDay.UsedPercent, rl.SevenDay.ResetsAt)
 			}
-			usage.Ingest(claudeusage.SourceSession, five, seven)
+			usage.Ingest(agentusage.SourceSession, five, seven)
 		},
 	})
 	if err := hooks.Start(); err != nil {
@@ -181,7 +181,7 @@ func closeTaskReviewWindows(repositories *repos.Repos, closeWindow func(key stri
 func wireAdeTask(
 	repositories *repos.Repos, events *bridge.Events, git gitWired, tracker *ade.Tracker, closeTerminal func(string) error,
 	closeReviewWindows func(taskID string), credentials *gitcred.Relay, keepAwake *bridge.KeepAwakeService,
-	notifier *agentnotify.Notifier, usage *claudeusage.Service, rebaseTimeout time.Duration, runs *scriptruns.Service,
+	notifier *agentnotify.Notifier, usage *agentusage.Service, rebaseTimeout time.Duration, runs *scriptruns.Service,
 	agents harness.Selector,
 ) *ade.TaskBoard {
 	userHome, err := os.UserHomeDir()
@@ -221,14 +221,14 @@ func wireAdeTask(
 		OnLog:    func(ev adewire.LogEvent) { bridge.AdeTaskLogAppended(events, ev) },
 		OnReview: func(ev adewire.ReviewEvent) { bridge.AdeTaskReviewChanged(events, ev) },
 		OnRateLimits: func(rl harness.RateLimits) {
-			var five, seven *claudeusage.Window
+			var five, seven *agentusage.Window
 			if rl.FiveHour != nil {
-				five = claudeusage.FromSession(rl.FiveHour.UsedPercent, rl.FiveHour.ResetsAt)
+				five = agentusage.FromSession(rl.FiveHour.UsedPercent, rl.FiveHour.ResetsAt)
 			}
 			if rl.SevenDay != nil {
-				seven = claudeusage.FromSession(rl.SevenDay.UsedPercent, rl.SevenDay.ResetsAt)
+				seven = agentusage.FromSession(rl.SevenDay.UsedPercent, rl.SevenDay.ResetsAt)
 			}
-			usage.Ingest(claudeusage.SourceRun, five, seven)
+			usage.Ingest(agentusage.SourceRun, five, seven)
 		},
 		OnSessions: func() {
 			bridge.AdeTaskSessionsChanged(events)
