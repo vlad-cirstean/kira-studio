@@ -5899,11 +5899,17 @@
         "error": "Over the limit of {max} characters."
       },
       "progress": {
+        "check": {
+          "status": "Checking the rewrite · {cost}"
+        },
         "extract": {
           "status": "Reading parts: {done} of {total} · {cost}"
         },
         "merge": {
           "status": "Merging lines: {done} of {total} · {cost}"
+        },
+        "rewrite": {
+          "status": "Rewriting · {cost}"
         },
         "verify": {
           "status": "Checking against the source: {done} of {total} · {cost}"
