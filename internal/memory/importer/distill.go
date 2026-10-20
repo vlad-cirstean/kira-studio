@@ -27,12 +27,31 @@ const (
 
 	// distillText is the source name of pasted text.
 	distillText = "text.md"
+
+	// RewriteMaxRunes bounds the text of one rewrite call.
+	RewriteMaxRunes = 2000
+	// RewriteMaxContextRunes bounds the read-only code around the text.
+	RewriteMaxContextRunes = 6000
+	// RewriteWidth is the column limit the rewrite prompt and the width gate share.
+	RewriteWidth = 100
+)
+
+// Distill modes: facts merges lines, rewrite cleans one short text in its own form.
+const (
+	ModeFacts   = "facts"
+	ModeRewrite = "rewrite"
 )
 
 // DistillRequest is text or one absolute file path, never both.
 type DistillRequest struct {
 	Text string
 	Path string
+	// Mode is ModeFacts (or empty) or ModeRewrite. Rewrite takes text only.
+	Mode string
+	// Context is read-only code around the text; rewrite only.
+	Context string
+	// Check adds a second call that checks the rewrite kept every fact; rewrite only.
+	Check bool
 	// Progress, when set, is called when a stage starts (Done 0) and after each finished step of it. It
 	// runs under the call's lock and must return quickly.
 	Progress func(DistillProgress)
@@ -43,6 +62,8 @@ const (
 	StageExtract = "extract"
 	StageVerify  = "verify"
 	StageMerge   = "merge"
+	StageRewrite = "rewrite"
+	StageCheck   = "check"
 )
 
 // DistillProgress is the steps finished so far in a stage (parts, cross-check batches, the one merge)
@@ -75,8 +96,11 @@ func (e *DistillError) Error() string { return e.msg }
 func (e *DistillError) Unwrap() error { return e.wrap }
 
 // DistillResult is the merged lines in source order plus what the call cost and shrank. Unresolved
-// lists facts the input leaves open; dropped facts are not returned.
+// lists facts the input leaves open; dropped facts are not returned. In rewrite mode Rewrite holds
+// the outcome and Lines and Unresolved stay empty.
 type DistillResult struct {
+	Mode       string
+	Rewrite    *RewriteResult
 	Lines      []Line
 	Unresolved []UnresolvedFact
 	CostUSD    float64
@@ -146,6 +170,16 @@ func (r *distillRun) report(stage string, done, total int) {
 // duplicates across parts and returns the lines in source order. No stage starts once the spend
 // reaches the per-call cap; the error then names the amount spent. A failed call is not retried.
 func (d Distiller) Distill(ctx context.Context, req DistillRequest) (DistillResult, error) {
+	switch req.Mode {
+	case "", ModeFacts:
+		if req.Context != "" || req.Check {
+			return DistillResult{}, invalid("context and check need mode %s", ModeRewrite)
+		}
+	case ModeRewrite:
+		return d.checkedRewrite(ctx, req)
+	default:
+		return DistillResult{}, invalid("unknown mode %q", req.Mode)
+	}
 	text, kind, rel, err := distillSource(req)
 	if err != nil {
 		return DistillResult{}, err
@@ -165,7 +199,7 @@ func (d Distiller) Distill(ctx context.Context, req DistillRequest) (DistillResu
 			"input splits into %d parts, the limit is %d", len(chunks), MaxDistillChunks)
 	}
 	run := &distillRun{agent: ClaudeAgent{Runner: d.Runner, Prompts: d.Prompts}, progress: req.Progress}
-	res := DistillResult{Chunks: len(chunks), InRunes: in}
+	res := DistillResult{Mode: ModeFacts, Chunks: len(chunks), InRunes: in}
 	finish := func(err error) (DistillResult, error) {
 		res.CostUSD = run.spent
 		return res, err
@@ -198,6 +232,24 @@ func (d Distiller) Distill(ctx context.Context, req DistillRequest) (DistillResu
 		res.OutRunes += utf8.RuneCountInString(l.Text)
 	}
 	return finish(nil)
+}
+
+// checkedRewrite validates a rewrite request, then runs it.
+func (d Distiller) checkedRewrite(ctx context.Context, req DistillRequest) (DistillResult, error) {
+	if req.Path != "" {
+		return DistillResult{}, invalid("mode %s takes text, not a path", ModeRewrite)
+	}
+	if strings.TrimSpace(req.Text) == "" {
+		return DistillResult{}, invalid("give text to rewrite")
+	}
+	if n := utf8.RuneCountInString(req.Text); n > RewriteMaxRunes {
+		return DistillResult{}, invalidReason(ReasonTooLong, map[string]string{"count": strconv.Itoa(n), "max": strconv.Itoa(RewriteMaxRunes)},
+			"input is %d characters, the limit is %d", n, RewriteMaxRunes)
+	}
+	if n := utf8.RuneCountInString(req.Context); n > RewriteMaxContextRunes {
+		return DistillResult{}, invalid("context is %d characters, the limit is %d", n, RewriteMaxContextRunes)
+	}
+	return d.rewrite(ctx, req)
 }
 
 // extract runs the extract prompt over every part, three at once, and returns the facts in document
