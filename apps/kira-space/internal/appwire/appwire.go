@@ -271,7 +271,7 @@ func Build(opts Options) *Wired {
 	if opts.EmbedSpec != nil {
 		embedSpec = *opts.EmbedSpec
 	}
-	w.Memory = bridge.NewMemoryService(emitter, mcpinstall.New(mcpinstall.Deps{}), promptStore, embedSpec)
+	w.Memory = bridge.NewMemoryService(emitter, mcpinstall.New(mcpinstall.Deps{}), promptStore, embedSpec, memoryModelFrom(repositories.Settings))
 	removeLegacyGitSocket()
 	go removeRetiredModels()
 

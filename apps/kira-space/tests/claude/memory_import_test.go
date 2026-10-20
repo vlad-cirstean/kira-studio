@@ -42,9 +42,9 @@ func TestMemoryImport(t *testing.T) {
 	}
 	ms := memory.OpenDefault()
 	defer ms.Close()
-	svc := memory.NewService(ms, memory.NewCLIRunner(), memory.ServiceOptions{})
+	svc := memory.NewService(ms, memory.NewCLIRunner(nil), memory.ServiceOptions{})
 	defer svc.Close()
-	agent := importer.ClaudeAgent{Runner: memory.NewCLIRunner(), Executable: exe, Home: memory.Home(),
+	agent := importer.ClaudeAgent{Runner: memory.NewCLIRunner(nil), Executable: exe, Home: memory.Home(),
 		Env: map[string]string{"KIRA_TEST_MEMORY_MCP": "1"}}
 	// A small budget forces billing.md's second section into its own chunk, so "It restarts..."
 	// reaches step 1 without the service name; releases.md's last sentence leaves its references open,

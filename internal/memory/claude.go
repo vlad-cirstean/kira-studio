@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"github.com/google/renameio/v2"
 
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/claudemodel"
 	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
@@ -32,7 +34,6 @@ var (
 )
 
 const (
-	claudeModel      = "sonnet"
 	claudeCallBudget = "0.50"
 	claudeTimeout    = 120 * time.Second
 )
@@ -72,20 +73,41 @@ type Result struct {
 type CLIRunner struct {
 	lookPath func(string) (string, error)
 	stat     func(string) (os.FileInfo, error)
+	models   ModelSource
 }
 
-func NewCLIRunner() *CLIRunner {
-	return &CLIRunner{lookPath: exec.LookPath, stat: os.Stat}
+// ModelSource returns the model alias for the next call; nil means claudemodel.Default.
+type ModelSource func() (string, error)
+
+func NewCLIRunner(models ModelSource) *CLIRunner {
+	return &CLIRunner{lookPath: exec.LookPath, stat: os.Stat, models: models}
+}
+
+// model resolves per call, so a settings change applies to the next call in a running process.
+func (r *CLIRunner) model() string {
+	if r.models == nil {
+		return claudemodel.Default
+	}
+	m, err := r.models()
+	if err != nil {
+		slog.Warn("memory: read claude model, using default", "err", err)
+		return claudemodel.Default
+	}
+	if !claudemodel.Valid(m) {
+		slog.Warn("memory: invalid claude model, using default", "model", m)
+		return claudemodel.Default
+	}
+	return m
 }
 
 // claudeArgs is the isolation contract. Not --bare: it forces ANTHROPIC_API_KEY auth and never
 // reads OAuth/keychain, which breaks a subscription login.
-func claudeArgs(c Call) []string {
+func claudeArgs(model string, c Call) []string {
 	budget := c.Budget
 	if budget == "" {
 		budget = claudeCallBudget
 	}
-	args := []string{"-p", "--model", claudeModel}
+	args := []string{"-p", "--model", model}
 	if c.MCPConfig == "" && len(c.Tools) == 0 {
 		args = append(args, "--safe-mode")
 	}
@@ -135,6 +157,9 @@ func (r *CLIRunner) Available() error {
 	return nil
 }
 
+// ClaudeAvailable is the Available probe without a runner.
+func ClaudeAvailable() error { return NewCLIRunner(nil).Available() }
+
 // RunResult is Run plus the cost and turn count Claude Code reports.
 func (r *CLIRunner) RunResult(ctx context.Context, c Call) (Result, error) {
 	path, _, found := toolexec.Locate(r.lookPath, r.stat, "claude", toolexec.ClaudeCandidates())
@@ -158,7 +183,7 @@ func (r *CLIRunner) RunResult(ctx context.Context, c Call) (Result, error) {
 	}
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	out, runErr := toolexec.RunIO(runCtx, path, claudeArgs(c), dir, claudeheadless.ScrubSessionEnv(os.Environ()), []byte(c.Input))
+	out, runErr := toolexec.RunIO(runCtx, path, claudeArgs(r.model(), c), dir, claudeheadless.ScrubSessionEnv(os.Environ()), []byte(c.Input))
 	if runErr != nil && runCtx.Err() != nil {
 		if ctx.Err() != nil {
 			return Result{}, ctx.Err()

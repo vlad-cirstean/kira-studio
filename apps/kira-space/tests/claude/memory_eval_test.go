@@ -463,9 +463,9 @@ func runPipeline(t *testing.T, cfg evalCfg, s evalSource, text string) (runRecor
 	if cfg.promptsFile != "" {
 		prompts = llmprompts.NewStore(cfg.promptsFile)
 	}
-	svc := memory.NewService(ms, memory.NewCLIRunner(), memory.ServiceOptions{Prompts: prompts})
+	svc := memory.NewService(ms, memory.NewCLIRunner(nil), memory.ServiceOptions{Prompts: prompts})
 	defer svc.Close()
-	inner := importer.ClaudeAgent{Runner: memory.NewCLIRunner(), Executable: cfg.exe, Home: home, Prompts: prompts,
+	inner := importer.ClaudeAgent{Runner: memory.NewCLIRunner(nil), Executable: cfg.exe, Home: home, Prompts: prompts,
 		Env: map[string]string{"KIRA_TEST_MEMORY_MCP": "1", "KIRA_TEST_PROMPTS": cfg.promptsFile, "KIRA_EVAL_COSTLOG": costDir}}
 	ra := &recAgent{inner: inner, raw: map[int][]importer.Fact{}, verdicts: map[string]int{}}
 	runner, err := importer.NewRunner(ms, importer.RunnerOptions{Agent: ra, Docs: svc, Budget: cfg.budget})

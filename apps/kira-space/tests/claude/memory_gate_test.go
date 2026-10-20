@@ -30,7 +30,7 @@ func TestMemoryGate(t *testing.T) {
 	}
 	store := memory.NewStore(filepath.Join(t.TempDir(), "memory.db"))
 	defer store.Close()
-	svc := memory.NewService(store, memory.NewCLIRunner(), memory.ServiceOptions{})
+	svc := memory.NewService(store, memory.NewCLIRunner(nil), memory.ServiceOptions{})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	do := func(r memory.StoreRequest) memory.StoreResult {
@@ -76,7 +76,7 @@ func assertGateKinds(ctx context.Context, t *testing.T) {
 	t.Helper()
 	store := memory.NewStore(filepath.Join(t.TempDir(), "memory.db"))
 	defer store.Close()
-	svc := memory.NewService(store, memory.NewCLIRunner(), memory.ServiceOptions{})
+	svc := memory.NewService(store, memory.NewCLIRunner(nil), memory.ServiceOptions{})
 	store1 := func(it memory.Item) memory.StoreResult {
 		t.Helper()
 		res, err := svc.Store(ctx, memory.StoreRequest{Source: memory.SourceUI, Items: []memory.Item{it}})
@@ -104,7 +104,7 @@ func assertGateRewritesWordyItem(ctx context.Context, t *testing.T) {
 	t.Helper()
 	store := memory.NewStore(filepath.Join(t.TempDir(), "memory.db"))
 	defer store.Close()
-	svc := memory.NewService(store, memory.NewCLIRunner(), memory.ServiceOptions{})
+	svc := memory.NewService(store, memory.NewCLIRunner(nil), memory.ServiceOptions{})
 	res, err := svc.Store(ctx, memory.StoreRequest{Source: memory.SourceUI, Items: []memory.Item{item(
 		"Basically, the billing-api service is actually really listening on port 8080 in production, I think, because the manifest says so.",
 		"Honestly, I just looked at the deployment manifest and it simply says so.",

@@ -50,6 +50,7 @@ type MemoryService struct {
 	events    appcore.Emitter
 	installer MemoryMcpInstaller
 	prompts   llmprompts.Source
+	claude    *memory.CLIRunner
 
 	mu        sync.Mutex
 	svc       *memory.Service
@@ -72,8 +73,8 @@ type MemoryService struct {
 }
 
 // NewMemoryService wires the module; spec is the embedding model it installs and runs.
-func NewMemoryService(events appcore.Emitter, installer MemoryMcpInstaller, prompts llmprompts.Source, spec embed.Spec) *MemoryService {
-	s := &MemoryService{events: events, installer: installer, prompts: prompts, spec: spec}
+func NewMemoryService(events appcore.Emitter, installer MemoryMcpInstaller, prompts llmprompts.Source, spec embed.Spec, models memory.ModelSource) *MemoryService {
+	s := &MemoryService{events: events, installer: installer, prompts: prompts, spec: spec, claude: memory.NewCLIRunner(models)}
 	s.semanticEvents = newCoalescer(emitGap, func() { events.Emit(ChannelMemorySemantic, struct{}{}) })
 	s.importEvents = newCoalescer(emitGap, func() { events.Emit(ChannelMemoryImport, struct{}{}) })
 	return s
@@ -87,7 +88,7 @@ func (s *MemoryService) service() *memory.Service {
 	}
 	s.store = memory.OpenDefault()
 	s.embedder = embed.NewClient(embed.ClientOptions{Spec: s.spec, Home: memory.Home(), OnState: s.emitSemantic})
-	s.svc = memory.NewService(s.store, memory.NewCLIRunner(), memory.ServiceOptions{
+	s.svc = memory.NewService(s.store, s.claude, memory.ServiceOptions{
 		Embedder: s.embedder, OnChange: s.emitChanged, OnSemantic: s.emitSemantic, Prompts: s.prompts,
 	})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -118,7 +119,7 @@ func (s *MemoryService) importer() (*importer.Engine, error) {
 	}
 	s.engine, err = importer.Open(s.store, importer.Options{
 		Launcher:  importer.SpawnLauncher{Executable: exe, LogPath: importer.DefaultLogPath(s.store)},
-		Available: memory.NewCLIRunner().Available,
+		Available: memory.ClaudeAvailable,
 		OnChange:  s.emitImport,
 	})
 	return s.engine, err
