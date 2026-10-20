@@ -365,17 +365,15 @@ func proseKept(input, draft string) bool {
 
 var hedgeWord = regexp.MustCompile(`(?i)\b(?:really|basically|actually|simply)\b`)
 
-var quotedSpan = regexp.MustCompile(`"[^"\n]{1,80}"`)
+// quotedSpan matches a double-quoted span of up to 80 runes per line, wrapped across at most one line break.
+var quotedSpan = regexp.MustCompile(`"(?:[^"\n]{1,80}|[^"\n]{0,80}\n[^"\n]{0,80})"`)
 
 // hedgeLeft reports whether text still holds an unambiguous hedge word outside backtick code and
 // double-quoted spans; the prompt requires every such word gone.
 func hedgeLeft(text string) bool {
-	for _, l := range splitLines(text) {
-		l = backtickSpan.ReplaceAllString(l, " ")
-		l = quotedSpan.ReplaceAllString(l, " ")
-		if hedgeWord.MatchString(l) {
-			return true
-		}
+	lines := splitLines(text)
+	for i, l := range lines {
+		lines[i] = backtickSpan.ReplaceAllString(l, " ")
 	}
-	return false
+	return hedgeWord.MatchString(quotedSpan.ReplaceAllString(strings.Join(lines, "\n"), " "))
 }
