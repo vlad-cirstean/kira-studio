@@ -2437,9 +2437,16 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 - Distill input is text (at most 120 000 characters, source name text.md) or one absolute file; store-only arguments are refused with distill, and text without distill is refused.
 - Distill limits: 120 000 characters, 16 chunks, a tooManyFacts guard, and a 2.00 USD spend cap per call across all stages; no stage starts once reported spend reaches it. No retry.
 - Distill is not registered in import mode.
+- Distill mode `facts` (default) runs the pipeline above. Mode `rewrite` cleans one short text in its own form: text only (path refused), at most 2000 characters (`tooLong`), optional read-only `context` (6000 characters) and `check`; both refused without rewrite.
+- Rewrite is one structured `ClaudeAgent.Rewrite` call (system prompt `memory.rewrite.system`, no tools, 90 s, 0.25 USD budget). Unusable output (`ErrClaudeOutput`, empty text) retries once, then keeps the input with gate `output`. Other errors return as errors.
+- Rewrite returns the full text: the input verbatim when already clean. Outcomes: rewritten (`changed` true), unchanged (`changed` false, gate empty, an accepted no-op), kept (a gate rejected the draft; input returned, `draft` and `gate` set). No shrink rule; `grew` (draft longer than input) is the only length guard.
+- Rewrite gates accept or reject, never edit text, run in order and stop at the first failure: `grew`, `form` (comment markers), `indent`, `width` (100 columns, tab 4, never wider than the input), `directive` (lines stay byte for byte), `tokens` (backtick spans, quoted spans, numbers, identifiers must survive unless listed in `dropped`), then `check`.
+- `check` true adds a second call (`memory.rewrite.check.system`) on a changed draft; `ok` false or unusable output keeps the input with gate `check`. Default off. The result carries `draft`, `check` and `dropped` for audit; the UI schema omits `draft` and `check`.
+- Rewrite result: `Chunks` 0, `Lines` and `Unresolved` empty, `CostUSD` sums every call. MCP renders the final text, then `kept: <gate>` or `unchanged`, then `dropped: <text> | <why>` lines for a changed text.
+- Distill UI: Facts and Rewrite tabs under source Text. Rewrite shows the text, why a gate kept the original, the dropped list and Copy; no Store or Import.
 - bridge.MemoryDistillService runs the same importer.Distiller per call, sharing prompts and engine with MemoryService; only one distill call runs at a time app-wide (TryLock), a second gets E_CONFLICT.
 - MemoryDistillService.ToImport writes <memory home>/distilled/distilled-<UTC>-<4 hex>.md (dir 0700, file 0600, heading plus one bullet per line, 1 to 640 lines) and creates an import job on channel ui.
-- Distill progress is emitted on kira:memory:distill with payload {requestId, stage, done, total, costUsd}; stage is extract, verify or merge.
+- Distill progress is emitted on kira:memory:distill with payload {requestId, stage, done, total, costUsd}; stage is extract, verify, merge, rewrite or check.
 - Cancelling a bound distill call cancels ctx (E_CANCELLED); stages already finished stay charged.
 - importer.DistillError reasons (tooLong, tooManyParts, tooManyFacts, unreadable, spendCap) map to catalog keys backend.space.memory.distill.<reason>.body with E_BAD_REQUEST; other errors go through memoryErr.
 - Distill is read-only: no memory.db write and no kira:memory:changed event.
@@ -2615,7 +2622,7 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 - If the store file is corrupt or an override no longer validates, the default is used, a warning is logged, and it is flagged in Settings (storeError, invalid); defaultChanged flags an override made against an older default.
 - Server-side validation requires that the template parses, every prompt:"required" variable is referenced, every required fragment is included, and it executes against example vars.
 - The memory system prompts must include the memory.dataHygiene fragment, which is the injection defence.
-- Schema-bound prompts (gate, reconcile, merge, import extract, verify and finalize) keep their JSON schema fixed, shown read-only in Settings.
+- Schema-bound prompts (gate, reconcile, merge, rewrite, rewrite check, import extract, verify and finalize) keep their JSON schema fixed, shown read-only in Settings.
 - There is no global prompt source; consumers get a llmprompts.Source (Resolve, Revision) through their options (memory.ServiceOptions, mcpserver.Options, claudeheadless, scriptruns, ADE, dbmcp).
 - Defaults() is the registry-only source, and Store.Resolve stats the file per call and re-reads on mtime or size change.
 - Gate, reconcile, import, headless suffixes and ADE messages resolve per call, so an edit applies on the next call.
