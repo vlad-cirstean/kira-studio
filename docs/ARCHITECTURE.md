@@ -901,7 +901,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - ConnectionsService.SecretsStatus is the Api module's only call into a Studio service (used by api/VariableSetView.vue's OS-keychain check). It reports a process-wide platform fact and lives on ConnectionsService only historically; the proper fix is a separate SecretsService, a new bound method out of scope for P12.
 - No Go domain package may import internal/bridge. Repo-root internal/ipcerr (the error type every bound method returns) was moved out of internal/bridge/ipcerr so connections, secrets and tree no longer depend on the IPC transport layer.
 - apps/kira-studio/internal/layering_test.go's TestDomainPackagesDoNotImportBridge runs go list -deps against the named domain packages so imports into internal/bridge/... fail a test. Kira Space has its own apps/kira-space/internal/layering_test.go, and both use the shared helper internal/layeringtest.
-- The layering tests do not cover repo-root internal/ packages (e.g. internal/agenthooks, internal/terminal), because Go's internal/ visibility rule already stops them from importing either app's internal/bridge.
+- The layering tests do not cover repo-root internal/ packages (e.g. internal/harness, internal/terminal), because Go's internal/ visibility rule already stops them from importing either app's internal/bridge.
 - api/reveal.ts's runReveal is the single four-outcome switch (revealed | cancelled | confirmation-required | error) with a recurse-once-on-confirmation shape, shared by revealVariable, revealHistoryEntry and the Copy as curl reveal loop. The Copy as curl loop calls revealVariable rather than hand-rolling its own copy.
 - project/ConnectionDialog.vue keeps its own copy of the gated-reveal loop on purpose, because sharing it would need a home both project/** and api/** may import, i.e. a new Studio↔Api shared module, created by the phase whose job is removing couplings between them.
 - packages/api-core/src/http/escape.ts is the one exported goQueryEscape, imported by both curl/generate.ts and raw/generate.ts, which now live in one package's src/http/ tree.
@@ -1354,7 +1354,7 @@ keepawake` (repo-root as of v1.9 P116, shared by both apps rather than Kira Stud
 independent, level-shaped reasons onto one `Controller`, a set of held reasons rather than a
 refcount (a refcount double-acquires the moment either source re-asserts a level it already holds).
 The titlebar toggle is the manual reason in both apps. The agent reason is Kira Space only (P188):
-Settings leaf `claudeCode.keepAwakeWithAgents` (Claude Code pane), applied by the package-level
+Settings leaf `agent.keepAwakeWithAgents` (Agent pane), applied by the package-level
 `bridge.KeepAwakeRecompute` against the live count of terminal-registry agent sessions plus `ade`
 sessions running headless. It emits `ChannelKeepAwake` only when the agent reason flips. Triggers:
 terminal `Registry.OnChange`, ade board `OnSessions`, `SettingsService.OnChanged`, boot. Kira Studio
@@ -1373,24 +1373,24 @@ no-op while nothing is held. Every non-darwin build gets a documented no-op driv
 titlebar hides its button outright rather than offering a control that does nothing, and Kira
 Studio's titlebar toggle is its only reason.
 
-**Claude Code hook monitoring is a shared, host-wired package (P127).** What was Kira Studio's own
+**Hook monitoring is a shared, host-wired package (P127), now the Claude provider's optional hook role (P316).** What was Kira Studio's own
 `internal/agenthooks` (P86-P126: the local HTTP listener a Claude Code hook shells out to, plus the
 bridge glue that started it, composed a tab's launch and projected running sessions to the
-renderer) moved to repo-root `internal/agenthooks` — `Manager` (start/stop/status, plus
-`ComposeLaunch(terminalID, cwd, command)` for the `--settings` flag and hook env a launcher adds to a terminal command), the
+renderer) moved to repo-root `internal/agenthooks`, then (P316) to `internal/harness/claude/hooks` — `Server` (start/stop/status, plus
+`Compose(terminalID, cwd, command)` for the `--settings` flag and hook env a launcher adds to a terminal command), the
 socket protocol and its documented bounds (one connection at a time, bounded event size). The
 renderer-side reducer and store hoisted the same way, to
 `packages/workbench/src/state/{agentActivity,createAgentSessionsStore}.ts`; the wire types both
 sides share stayed at `packages/shared/domain/agent.ts` (unmoved — already shared, P86); the two
 event-channel strings hoisted to `internal/appevent`. What a host app still supplies itself: the
 on/off setting (if any), the bound service surface a hook's own launch reaches, and wiring
-`Manager.ComposeLaunch`'s result into its own `TerminalService.Open` — never `ComposeLaunch`'s env
+`harness.Hooks.Compose`'s result into its own `TerminalService.Open` — never `Compose`'s env
 map directly, since `KIRA_AGENT_HOOK_TOKEN` must stay inside Go. **Kira Space is the first, and so
 far only, consumer (P129 Part 1)** — Kira Studio dropped its own bridge/UI/settings leaves at P127
-and wires none of this; the agent keep-awake reason is Kira Space-only (above, P188). Kira Space's `internal/appwire/wire.go` (`wireTracker`) starts `agenthooks.Manager`
+and wires none of this; the agent keep-awake reason is Kira Space-only (above, P188). Kira Space's `internal/appwire/wire.go` (`wireTracker`) starts the `harness.Hooks` hub, which starts each provider's `harness.HookHost`,
 unconditionally, with no on/off setting of its own (P129 Part 1's own posture: a start failure —
 `curl` missing, a bind conflict — is logged, never fatal, and sessions still spawn and track with
-activity icons simply absent). `hookEvents` (`internal/agenthooks/config.go`) now also asks Claude
+activity icons simply absent). `hookEvents` (`internal/harness/claude/hooks/config.go`) now also asks Claude
 Code to fire `UserPromptSubmit`, the one hook event P127's own set left out — `reduceAgentActivity`
 (below) is its first consumer. `AgentEvent` gains `lastAssistantMessage` (P238; Stop's reply text, bounded to 200 bytes on a rune
 boundary like `message`; `packages/shared/domain/agent.ts`).
@@ -1886,6 +1886,54 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - appearance.inlineBlame is a settings toggle, defaulted on, that gates only the inline renderer and is watched live by RepoFileView.vue so toggling affects open tabs immediately.
 - Settings are Go-persisted, one row per leaf, typed via AppearanceSettings/AppearancePatch in internal/storage/model/settings.go; a leaf without a Go counterpart is silently discarded on Set and reverts to its zod default on read.
 
+## Agent harness (P316)
+
+The agent CLI sits behind one interface, so a second provider needs no caller change.
+
+- `internal/harness` holds the neutral contract. `Provider` is one value with these roles: `Locator`
+  (find the CLI), `Structured` (one isolated JSON call, memory), `Headless` (a streamed run with an MCP
+  report, ADE steps and smart scripts), `Interactive` (the PTY command, resume, first prompt), `Sandboxed`
+  (what the OS sandbox opens and denies) and `MCPHost` (MCP config, tool names, user servers, installing
+  Kira's servers). Names (`Label`, `ProductLabel`, `HeadlessLabel`, `Command`), `Models` (aliases and a
+  default) and `ModelLabel` are plain methods.
+- Optional roles are found by type assertion, so a provider compiles without stubs: `HookHost` (hook
+  events for interactive sessions; `harness.Hooks` starts every host and composes launches by provider id)
+  and `UsageReporter` (feeds `agentusage`). A provider without them has no activity icons, no
+  finished/needs-input notes and no usage item.
+- `internal/harness/claude` is the only provider. `internal/harness/providers.New` is the single
+  registration point (Claude first, then any extra). Everything Claude-specific lives under it: argv,
+  stream-json parsing, MCP config shape, sandbox profile needs, hooks (`hooks`), the CLI installer
+  (`mcpinstall`) and error texts.
+- `harness.Selector` resolves `Active()` from the `agent.provider` setting per use; an unset, unreadable or
+  unregistered id falls back to `claude` with a warning, never an error. `For(id)` serves a stored
+  conversation and returns `ErrProviderGone` for an unregistered id, mapped to the
+  `backend.core.agent.providerGone.body` conflict. Settings validation accepts any well-formed id, so a
+  provider can be removed without bricking the setting. There is no UI to pick the provider.
+- Run binding: `ade_sessions` and `script_runs` store `provider`. New work uses `Active()`; resume,
+  take over and Continue in terminal use the stored provider, even after the setting changes.
+- Models: `memory.models` maps provider id to alias; smart scripts store an alias in their own `model`
+  field, validated against the union of registered catalogs.
+- UI derivation: the bound `AgentService` (`internal/harness/agentsvc`, both apps) answers `Info()` for the
+  active provider and `InfoFor(id)` for a stored one: `AgentInfo{id, label, productLabel, command,
+  headlessLabel, models, defaultModel, hooks, usage}`. The frontend reads it through
+  `packages/workbench/src/agent/agentInfo.ts` (TanStack Query, keys `['agent','info']`,
+  `['agent','infoFor',id]`; a settings save that changes `agent.provider` invalidates `['agent']`) and
+  feeds `{agent}`, `{product}`, `{headless}` and `{command}` to every catalog message as ambient defaults
+  (`setMessageDefaults`), so templates need no per-call param. The phone reads `GET /api/agent/info`.
+  Settings hide the hook-only notification switches and the usage switch when `hooks`/`usage` are false.
+  Provider labels are plain Go strings, not catalog keys.
+- Outcome and sandbox texts name the provider (`runoutcome.Agent`, `agentsandbox.Namer`).
+- Still Claude-specific by nature: `internal/flowtest/fakeagent` keeps its `claude` persona (the Claude
+  CLI double); real-claude tests (`apps/*/tests/claude`) test the Claude provider; the built-in tool
+  vocabulary of scripts and the `--allowedTools` argv use Claude's tool names, which a new provider maps in
+  `MCPHost.ToolArgs`; the `--color-agent` CSS token keeps Claude's colour value.
+- Add a provider: implement `harness.Provider` and any optional roles in `internal/harness/<id>`, add it to
+  `providers.New`, and keep its CLI strings and error texts inside its package. No caller changes.
+- Test: `flows/harnessflow` `TestSecondProviderRegistered` registers `internal/flowtest/fakeprovider`
+  (id `fake`, models `fast`/`deep`, no hooks, no usage; interactive sessions run the `kira-fake-agent`
+  persona) and drives distill, a smart script, an ADE headless step, an interactive session, resume after
+  a switch, unknown-id fallback and provider-gone. UI half: `tests/ui/agent-provider.spec.ts`.
+
 ## ADE: Kira Space task planner (v2.0)
 
 Kira Space's `ade` module plans tasks across repositories and runs Claude Code on them. It is a
@@ -2029,11 +2077,11 @@ and `docs/HISTORY.md (v2.0)`.
 - When a session is resumed after a kill, the turn in flight is lost and its tool effects may be half-applied.
 - Resuming an unknown session id makes the Claude CLI exit 1 with No conversation found with session ID: <id>.
 - The Claude CLI treats --resume together with --session-id as an error, so a resumed launch drops --session-id.
-- AdeTaskRepo.RecoverRunning writes launch_resume_id from ade_sessions.claude_session_id in the same UPDATE that marks the run stuck, only for agent and smart-step runs (purpose = '' with a session).
+- AdeTaskRepo.RecoverRunning writes launch_resume_id from ade_sessions.agent_session_id in the same UPDATE that marks the run stuck, only for agent and smart-step runs (purpose = '' with a session).
 - Rebase and script-step runs, user stops and needs_input runs get no launch_resume_id; adewire.Run.resumable is stuck plus that id.
 - TaskBoard.ResumeRun clears the old spec first, so a second click refuses, then queues attempt+1 with Launch{ResumeID, Prompt: RunResumeLine, Note: "resumed after restart"}.
-- On resume, startRun reuses the Claude session id and composeResumePrompt appends the finish instruction; RunResumeLine (run.resume.line) is one shared prompt for ADE and smart scripts.
-- When agentmcp.IsNoConversation matches the last stderr line, the outcome becomes runoutcome.EndResumeLost (failed, source start) with no automatic fresh run; Retry or Run again starts anew.
+- On resume, startRun reuses the agent session id and composeResumePrompt appends the finish instruction; RunResumeLine (run.resume.line) is one shared prompt for ADE and smart scripts.
+- When the run's provider reports ResumeLost for the last stderr line (Claude: No conversation found), the outcome becomes runoutcome.EndResumeLost (failed, source start) with no automatic fresh run; Retry or Run again starts anew.
 - Smart scripts in both apps store script_runs.resume_id and resumed_from (Studio migration 0038, Space 0035).
 - Repo.FailRunning and finish set resume_id = session_id for a smart run ended with source restart (crash and graceful quit).
 - Smart script resume: Service.Resume re-plans from the current script, TakeResume compare-and-swaps the id, and the new run row carries resumedFrom and the same session id.
@@ -2070,7 +2118,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 ### Interactive sessions
 
-- A single ade.Tracker instance is shared by terminal.BoundService.ComposeAgent (Compose), terminal.Registry.OnChange (Reconcile), agenthooks.Manager OnEvent (HandleEvent) and the board (Send, Get).
+- A single ade.Tracker instance is shared by terminal.BoundService.ComposeAgent (Compose), terminal.Registry.OnChange (Reconcile), harness.Hooks OnEvent (HandleEvent) and the board (Send, Get).
 - Tracker.Prepare records a pending launch intent with a 2 min TTL; the renderer opens the terminal through the ordinary TerminalService.Open; ComposeAgent then consumes the intent, inserts the ade_sessions row as running and appends hooks env, --settings and the initial prompt.
 - Reconcile stops a session record only when its terminal is gone and a 30s grace window has passed.
 - The user message follows ' -- ' in argv so it cannot parse as a flag.
@@ -2111,12 +2159,12 @@ and `docs/HISTORY.md (v2.0)`.
 - push_branch pushes the run's branch to the same-named remote branch (RemoteOpParams.RemoteBranch), refuses protected branches, and is refused for read steps.
 - request_branch remains the way to create a branch and its worktree.
 
-### Claude launch check and folder-scan hiding (P277)
+### Agent launch check and folder-scan hiding (P277)
 
-- toolexec.ResolveClaude finds the claude CLI before any launch by checking PATH, then well-known install paths (ClaudeCandidates), then the user's login shell, because a GUI app's PATH can differ.
-- Tests replace the system well-known claude install paths with SetSystemClaudePaths.
-- When ResolveClaude finds no claude CLI it returns ErrClaudeMissing, which lists every probed place.
-- ade.Tracker.Prepare, the terminal claude-code path and agentmcp call RequireClaude, so a missing CLI shows a Kira error instead of the shell's text.
+- The provider's Locate finds its CLI before any launch (Claude: PATH, then well-known install paths, then the user's login shell, because a GUI app's PATH can differ; internal/harness/claude/locate.go).
+- Tests replace the system well-known claude install paths with claude.SetSystemPaths.
+- When Locate finds no CLI it returns a harness.ErrNotFound error that lists every probed place.
+- ade.Tracker.Prepare, the terminal agent-launch path and the headless runners call Locate, so a missing CLI shows a Kira error instead of the shell's text.
 - code_repos.hidden_rev (migration 0034) counts writes of the hidden flag.
 - A folder scan applies its stored hidden flag (ApplyFolderHidden) only to repos whose hidden_rev still equals the one stored at import, in one transaction, so a repo unhidden or toggled meanwhile is never re-hidden.
 
@@ -2124,7 +2172,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 Desktop notification when a Kira Space agent finishes or needs input. Package `internal/agentnotify`,
 built in `appwire.Build` and fed by two existing callbacks: the hooks `OnEvent` (every Kira-launched
-claude-code PTY) and the board's `OnRuns` (headless runs, which have no hooks).
+agent PTY) and the board's `OnRuns` (headless runs, which have no hooks).
 
 | Source | Note |
 |---|---|
@@ -2140,7 +2188,7 @@ claude-code PTY) and the board's `OnRuns` (headless runs, which have no hooks).
 - Each window reports focus through AgentNotifyService.ReportFocus, debounced 150 ms (state/agentNotify.ts).
 - Agent notifications have a cooldown of 10 s per (terminal or run, kind).
 - A note id is <kind>:<id> so a newer note replaces the older one.
-- Settings claudeCode.notifyEnabled (master), notifyOnFinished, notifyOnNeedsInput, notifyOnRunEnded and notifyIncludeMessage all default to on.
+- Settings agent.notifyEnabled (master), notifyOnFinished, notifyOnNeedsInput, notifyOnRunEnded and notifyIncludeMessage all default to on.
 - SendTest ignores focus suppression and cooldown.
 - Notifier.Click focuses the window and pushes kira:agent:revealTerminal or kira:agent:revealTask (EmitTo, Space only); an ADE record goes through FocusSession.
 - notify_darwin.go (darwin && !server) registers the Wails v3 notifications service; its sink WailsSink lives in internal/desknotify, shared with prompt notifications (P246).
@@ -2177,12 +2225,15 @@ answers. Bound as `PromptsService` (`List`, `MainWindow`, `Claim`, `Raise`, `Dis
 - The stream no longer carries credential.request or credential.provide (contract 47); the relay snapshot kira:git:credential plus GitCredentialService.Provide is the only path for Git credentials.
 - Prompt routing is tested by flows/promptflow in both apps, dbmcpflow TestDbMcpApprovalRoutes, Space gitflow TestCredentialRoutes, mobileflow TestMobilePairingRoutes, tests/ui/prompts.spec.ts and tests/e2e-real/prompts-two-windows-real.spec.ts; the recording sink is internal/flowtest/notifysink.
 
-### Claude Code usage limits (P239)
+### Agent usage limits (P239, P316)
 
 ADE status-bar item `5h 23% · wk 41%` with reset times in a tooltip. No credential read, no network
-call: Kira only listens to what Claude Code already computes. Package `internal/claudeusage`
-(`Service.Ingest`, `Get`), bound as `ClaudeUsageService` (Kira Space only), push
-`kira:claude:usage` (Space only, at most one per 10 s on a changed value).
+call: Kira only listens to what the agent already computes. Package `apps/kira-space/internal/agentusage`
+(`Service.Ingest`, `Get`), bound as `AgentUsageService` (Kira Space only), push
+`kira:agent:usage` (Space only, at most one per 10 s on a changed value). Usage is an optional provider
+role (`harness.UsageReporter`): only a provider that reports it feeds the service (Claude does), and
+`AgentService.Info.usage` hides the item for a provider that does not. Windows are `harness.RateWindow`
+(`UsedPercent` 0..100).
 
 | Feed | Source | Units |
 |---|---|---|
@@ -2191,16 +2242,16 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 
 - claude -p never invokes a statusLine (checked on claude 2.1.295), so headless runs feed usage limits through their output instead, via agentmcp.Handler.OnRateLimits chained from ade/runs.go.
 - For usage readings, the newest reading wins per window; the tooltip shows the source and its age.
-- Manager.ComposeLaunch(terminalID, cwd, command) writes <server dir>/settings-<12 hex>.json (0600; hooks plus a statusLine pointing at the shim in statusline mode) and passes it to --settings.
+- hooks.Server.Compose(terminalID, cwd, command) writes <server dir>/settings-<12 hex>.json (0600; hooks plus a statusLine pointing at the shim in statusline mode) and passes it to --settings.
 - Claude Code replaces the user's own statusline for the session, so the shim runs the user's statusline command and prints its output; lookup is read-only: project .claude/settings.local.json, .claude/settings.json, then $CLAUDE_CONFIG_DIR or ~/.claude settings.json, passed as KIRA_USER_STATUSLINE. The user's files are never written.
 - The shim forwards a payload containing rate_limits at most once per 30 s per terminal, in the background, to POST /statusline (same token and terminal checks as /hook, 64 KiB cap).
 - The /statusline listener decodes rate_limits only; nothing else of the payload is kept.
 - Usage states are ok, waiting (nothing yet: Usage: –, hint "Start a Claude Code session to see usage") and off.
 - A usage window whose reset time has passed is dropped on read.
-- The last usage numbers persist atomically to <KIRA_SPACE_HOME>/claude-usage.json (0600) and reload at start.
-- Setting claudeCode.usageEnabled (default on): when off, no statusLine is injected into new launches, the usage item is hidden, and Get returns off; it applies only to launches after the change.
-- Frontend usage display: state/claudeUsage.ts (TanStack Query, 60 s poll, push replaces the cache) and workbench/ClaudeUsageItem.vue (tones at 80 and 95 percent), shown in ADE mode only.
-- Usage limit tests: flows/usageflow (statusline through the real shim and socket, run stream through the board) and tests/ui/claude-usage.spec.ts.
+- The last usage numbers persist atomically to <KIRA_SPACE_HOME>/agent-usage.json (0600) and reload at start.
+- Setting agent.usageEnabled (default on): when off, no statusLine is injected into new launches, the usage item is hidden, and Get returns off; it applies only to launches after the change.
+- Frontend usage display: state/agentUsage.ts (TanStack Query, 60 s poll, push replaces the cache) and workbench/AgentUsageItem.vue (tones at 80 and 95 percent), shown in ADE mode only.
+- Usage limit tests: flows/usageflow (statusline through the real shim and socket, run stream through the board) and tests/ui/agent-usage.spec.ts.
 
 ### Worktree setup
 
@@ -2306,7 +2357,7 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 - Write rate per device is 1/s burst 10; terminal attach is 1 per 2 s burst 3.
 - Stale guard: FromStepID on SetTaskStepArgs, StartRunArgs and LaunchStepArgs is checked inside taskMu; a mismatch is ade.ErrStale (bridge E_STALE, HTTP 409). Desktop leaves it empty.
 - PTYs stay window-owned: a phone launch or take-over makes the server EmitTo kira:mobile:openLaunch to one real (non-ephemeral) window, which runs the desktop openLaunch and acks via MobileAccessService.LaunchOpened. The request waits 20 s (504 E_LAUNCH_TIMEOUT); no window gives 409 E_NO_WINDOW; the phone gets only the ADE session id, never a terminal id.
-- internal/terminal.Arbiter (nil in Kira Studio) hooks BoundService for claude-code terminals, sees output from spawn and gates window Write and Resize; mobileterm.Broker implements it. Each terminal has a 1 MiB ring with absolute byte offsets, so attach replays history; a slow phone gets {type:"reset"} plus the oldest byte held and never blocks the PTY reader.
+- internal/terminal.Arbiter (nil in Kira Studio) hooks BoundService for agent terminals, sees output from spawn and gates window Write and Resize; mobileterm.Broker implements it. Each terminal has a 1 MiB ring with absolute byte offsets, so attach replays history; a slow phone gets {type:"reset"} plus the oldest byte held and never blocks the PTY reader.
 - Takeover has one controller per terminal: desktop (default), or phone (connected: phone input and size apply, window Write dropped, window Resize only recorded; offline: 60 s grace). It returns to desktop on desktop Reconnect, phone Release or leaving the screen, grace expiry, 15 min without phone input, device revoked or agent input off, server stop, or PTY exit.
 - On return to desktop the PTY is resized to the recorded desktop size. A second device gets 409 E_TERMINAL_BUSY; the same device replaces its old socket. Attach resolves the session via Tracker.TerminalOf and accepts only a running TUI task session.
 - The terminal uses WebSocket via github.com/coder/websocket (ISC) because SSE plus POST cannot keep keystrokes ordered on HTTP/1.1. Binary frames carry terminal bytes; text frames are JSON (hello, reset, throttled out; resize, release in). ?cols&rows are required and ?from=<offset> resumes.
@@ -2352,20 +2403,20 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 - Service.SemanticStatus is off (no embedder), notInstalled, unavailable (with worker message), indexing (done/total) or ready; the bridge overlays downloading (bytes). kira:memory:semantic, coalesced to one per 250 ms, tells the UI to refetch. MCP search_memories output carries semantic and a note when results are keyword-only.
 - Service.Store pipeline: validation, gate (one Claude call that splits atomic facts, challenges ambiguity, weak reasons and secrets, adds keywords), reconcile (one call for facts with candidates; hash short-circuit and no-candidate add skip it), then per-fact commit in one BEGIN IMMEDIATE transaction with optimistic revision check (2 retries).
 - A gate challenge stores nothing and is stateless: the caller resubmits with clarifications. At most 2 store pipelines run at once.
-- memory.CLIRunner runs claude -p with --model from Kira Space setting memory.claudeModel (default sonnet), resolved per call, --safe-mode, empty --setting-sources, --strict-mcp-config, no tools, --disable-slash-commands, --no-session-persistence, --permission-prompts none, JSON output with schema, --max-budget-usd 0.50; input on stdin, empty temp cwd, session env variables stripped, auth variables kept, 120 s timeout.
-- CLIRunner does not use --bare because it forces API-key auth.
-- memory.claudeModel (P314) is a Kira Space settings leaf in kira.db, one of haiku, sonnet or opus (internal/claudemodel; aliases, so the CLI picks the current model of that family). CLIRunner takes a ModelSource: the app reads it through SettingsRepo, and memory-mcp and memory-ingest open kira.db per call (appwire.memoryModelAt; a missing file means sonnet and is never created). An invalid or unreadable value falls back to sonnet with a warning. A change applies from the next Claude call in every process, with no restart. scripts/docshistory always runs the default.
-- toolexec.RunIO returns stdout alongside an *ExecError because claude -p prints its structured error to stdout; unknown-flag stderr maps to ErrClaudeOutdated ('update Claude Code').
+- memory.AgentRunner runs the active provider's Structured role with the model from Kira Space setting memory.models[provider id] (default: the provider's catalog default), resolved per call. The Claude provider (internal/harness/claude/structured.go) runs claude -p with --model, --safe-mode, empty --setting-sources, --strict-mcp-config, no tools, --disable-slash-commands, --no-session-persistence, --permission-prompts none, JSON output with schema, --max-budget-usd 0.50; input on stdin, empty temp cwd, session env variables stripped, auth variables kept, 120 s timeout.
+- The Claude provider does not use --bare because it forces API-key auth.
+- memory.models (P314, P316) is a Kira Space settings leaf in kira.db: a map from provider id to a model alias of that provider's catalog (Claude: haiku, sonnet or opus; aliases, so the CLI picks the current model of that family). AgentRunner takes a ModelSource: the app reads it through SettingsRepo, and memory-mcp and memory-ingest open kira.db per call (appwire.memoryModelAt; a missing file means the provider default and is never created). An invalid or unreadable value falls back to the provider default with a warning. A change applies from the next agent call in every process, with no restart. scripts/docshistory always runs the default.
+- toolexec.RunIO returns stdout alongside an *ExecError because claude -p prints its structured error to stdout; unknown-flag stderr maps to harness.ErrOutdated ('update Claude Code').
 - The MCP server is '<Kira Space executable> memory-mcp' over stdio, spawned per session by Claude Code, working with the app closed or open; main.go calls appwire.RunArgvShim before startupfail and acquireSingleInstance.
 - MCP tools are store_memory (progress checking, reconciling, saving), search_memories (includeHistory, scopes, origins, project, limit), memory_history, memory_context, plus ingest_files and ingest_status when Options.Ingest is set (not in import mode); ingest_files with distill true needs Options.Distill, else refused.
-- The memory MCP server registers as kira-memory with claude mcp add-json --scope user from Kira Space Settings > Memory, using the shared repo-root internal/mcpinstall.
+- The memory MCP server registers as kira-memory with claude mcp add-json --scope user from Kira Space Settings > Memory, through the active provider's MCPInstaller (Claude: internal/harness/claude/mcpinstall).
 - Memory MCP agent doc texts live in internal/llmprompts/registry.go (memory.mcp.*) and are read once per session.
 - Memory store contract: the store splits and rewords facts; the agent sends each with reason, origin and scope and never invents a reason; files go by path.
 - Take numbers in memory MCP tool descriptions from Go constants (memory.MaxItems, MaxGroups, search and context limits, maxIngestPaths), never literals.
 - A code comment cites a memory by fact id (one token km_ plus 12 base32 chars, memfmt.FactID; P296), never a version id, and carries no header, fact copy, reason, origin or scope; the tool never writes or returns comment text.
 - bridge.MemoryService emits kira:memory:changed after its own writes and, via a 2 s PRAGMA data_version watcher, after the MCP subprocess writes.
 - memory is the last mode in MODE_ORDER (windows.mode vocabulary, no migration); the memory UI lives in shared packages/workbench/src/memory/ and Kira Studio hosts none of it.
-- Memory setup lives only in Kira Space Settings > Memory (MemoryPane.vue), which also holds the memory.claudeModel select, saved with the dialog; the module hosts no setup action, and MemorySetupHint only links there through MemoryModuleContext.openSettings.
+- Memory setup lives only in Kira Space Settings > Memory (MemoryPane.vue), which also holds the memory model select, saved with the dialog; the module hosts no setup action, and MemorySetupHint only links there through MemoryModuleContext.openSettings.
 - useModelDownloadsStore holds the download AbortController, so Cancel survives closing Settings.
 - settings/SemanticModelSection.vue adds a semantic badge on rows found by meaning only.
 - There is no detection of whether the memory MCP is registered with Claude Code (open item).
@@ -2395,7 +2446,7 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 - The 'Stated in <from>, <heading>' locator uses the ### heading, never the category.
 - FormatDoc writes ## Facts then ## Rules and drops an empty category; writeDocFile migrates a v2 doc of its own group in place; ApplyDoc takes the kind from the category; sameDocFact compares kind, so a kind change is a new version.
 - memcheck reports one id with two kinds as drift. A doc has one provenance.
-- memories.kind is fact or rule (migration 8, default fact, in the immutable trigger); the gate sets it and it is never caller-set; empty means fact, any other value is ErrClaudeOutput.
+- memories.kind is fact or rule (migration 8, default fact, in the immutable trigger); the gate sets it and it is never caller-set; empty means fact, any other value is harness.ErrOutput.
 - Reconcile keeps kinds apart: checkDecision turns a noop or update across kinds into an add. Existing rows are facts and there is no reclassification.
 
 - Bulk import (P211) lives in internal/memory/importer and is bound as MemoryImportService, which shares the engine MemoryService opens lazily; the scheduler runs in a detached runner.
@@ -2432,14 +2483,14 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 - Ingest scope project without a project argument uses DetectProject of the first path, then the server's project.
 - MCP import limits: a job over 300 chunks stops at awaiting for UI confirmation; at most 5 active MCP jobs; same roots and provenance as an active job returns that job's id; a relative or missing path is refused.
 - ingest_files with distill true runs the import pipeline synchronously in process and stores nothing; there is no distill tool and no job rows.
-- Distill pipeline: chunk, ClaudeAgent.Extract per chunk (three at once), build facts, cross-check questionable ones with ClaudeAgent.Verify in batches, then one ClaudeAgent.Merge call (no tools, no MCP) returning lines, unresolved and dropped.
+- Distill pipeline: chunk, ModelAgent.Extract per chunk (three at once), build facts, cross-check questionable ones with ModelAgent.Verify in batches, then one ModelAgent.Merge call (no tools, no MCP) returning lines, unresolved and dropped.
 - The distill merge covers the input only and never reads the store.
 - Distill input is text (at most 120 000 characters, source name text.md) or one absolute file; store-only arguments are refused with distill, and text without distill is refused.
 - Distill limits: 120 000 characters, 16 chunks, a tooManyFacts guard, and a 2.00 USD spend cap per call across all stages; no stage starts once reported spend reaches it. No retry.
 - Distill is not registered in import mode.
 - Distill mode `facts` (default) runs the pipeline above. Mode `rewrite` cleans one short text in its own form: text only (path refused), at most 2000 characters (`tooLong`), optional read-only `context` (6000 characters) and `check`; both refused without rewrite.
 - A deterministic pre-check (`needsRewrite`) runs first. It calls the model only for a text with an ID-like token (`AB12`, `JIRA-12`, `#123`, `§`, `v1.2`), a `.md` reference, tracking vocabulary (phase, round, iteration, milestone, finding, ticket, plan, spec, tracker), unambiguous history narration (previously, formerly, originally, no longer, used to, renamed, moved from, replaced), a listed hedge, or a code comment line over 100 columns. Otherwise it returns the input unchanged with no call and zero cost. It never edits text and holds no repo-specific pattern; it is broad because a false positive costs one call.
-- Rewrite is one structured `ClaudeAgent.Rewrite` call (system prompt `memory.rewrite.system`, no tools, 90 s, 0.25 USD budget). Unusable output (`ErrClaudeOutput`, empty text) retries once, then keeps the input with gate `output`. Other errors return as errors.
+- Rewrite is one structured `ModelAgent.Rewrite` call (system prompt `memory.rewrite.system`, no tools, 90 s, 0.25 USD budget). Unusable output (`harness.ErrOutput`, empty text) retries once, then keeps the input with gate `output`. Other errors return as errors.
 - Rewrite returns the full text: the input verbatim when already clean. Outcomes: rewritten (`changed` true), unchanged (`changed` false, gate empty, an accepted no-op), kept (a gate rejected the draft; input returned, `draft` and `gate` set). No shrink rule; `grew` (draft longer than input, plus a reflow allowance when the draft fixes an over-width input) is the only length guard.
 - Text that does not open with a comment marker is prose: only `grew`, `form` and `tokens` apply, with no width rule and no reflow. Rewrite gates accept or reject, never edit text, run in order and stop at the first failure: `grew`, `form` (comment markers, trailing newline; for prose, the draft must be the input minus listed hedge words, same line structure), `indent`, `width` (100 columns, tab 4; a changed draft keeps no line over 100, inherited lines included), `directive` (lines stay byte for byte), `tokens` (backtick spans, quoted spans outside backticks (backticks inside a span are stripped before comparing), numbers, identifiers must survive unless listed in `dropped`; path tokens checked per component; line breaks joined), then `check`.
 - `check` true adds a second call (`memory.rewrite.check.system`) on a changed draft; `ok` false or unusable output keeps the input with gate `check`. Default off. The result carries `draft`, `check` and `dropped` for audit; the UI schema omits `draft` and `check`.

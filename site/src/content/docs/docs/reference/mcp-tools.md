@@ -6,7 +6,7 @@ sources:
   - internal/memory/mcpserver
   - apps/kira-studio/internal/dbmcp/server.go
   - internal/agentmcp
-  - internal/mcpinstall
+  - internal/harness/claude/mcpinstall
 sidebar:
   order: 3
 ---
