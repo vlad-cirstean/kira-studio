@@ -46,6 +46,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	result.Ade = readAde(stored)
 	result.Mobile = readMobile(stored)
 	readClaudeCode(stored, &result.ClaudeCode)
+	appsettings.LeafValid(stored, "memory.claudeModel", &result.Memory.ClaudeModel, model.ValidClaudeModel)
 	appsettings.LeafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
 	appsettings.Leaf(stored, "advanced.notifyPrompts", &result.Advanced.NotifyPrompts)
 	return result, nil
@@ -97,6 +98,13 @@ func readMobile(stored map[string]json.RawMessage) model.MobileSettings {
 	appsettings.LeafValid(stored, "mobile.port", &result.Port, model.ValidMobilePort)
 	appsettings.Leaf(stored, "mobile.agentInput", &result.AgentInput)
 	return result
+}
+
+func upsertMemory(tx *sql.Tx, m *model.MemoryPatch) error {
+	if m == nil {
+		return nil
+	}
+	return appsettings.UpsertOptional(tx, "memory.claudeModel", m.ClaudeModel)
 }
 
 func upsertMobile(tx *sql.Tx, m *model.MobilePatch) error {
@@ -208,6 +216,9 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 			return err
 		}
 		if err := upsertMobile(tx, patch.Mobile); err != nil {
+			return err
+		}
+		if err := upsertMemory(tx, patch.Memory); err != nil {
 			return err
 		}
 		return upsertClaudeCode(tx, patch.ClaudeCode)

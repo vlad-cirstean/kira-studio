@@ -5,6 +5,7 @@ import (
 	"regexp"
 
 	"github.com/kirathecat/kira-studio/internal/appsettings"
+	"github.com/kirathecat/kira-studio/internal/claudemodel"
 )
 
 // Kira Space's own trimmed Settings model (P100 Part 1). Data/Cache/Api/DbMcp are dropped
@@ -108,6 +109,12 @@ type MobileSettings struct {
 	AgentInput bool `json:"agentInput"`
 }
 
+// MemorySettings is P314's memory-feature leaf: ClaudeModel is the claude alias every memory Claude
+// call uses (gate, reconcile, import, distill).
+type MemorySettings struct {
+	ClaudeModel string `json:"claudeModel"`
+}
+
 type Settings struct {
 	Appearance Appearance         `json:"appearance"`
 	Advanced   AdvancedSettings   `json:"advanced"`
@@ -115,6 +122,7 @@ type Settings struct {
 	Ade        AdeSettings        `json:"ade"`
 	ClaudeCode ClaudeCodeSettings `json:"claudeCode"`
 	Mobile     MobileSettings     `json:"mobile"`
+	Memory     MemorySettings     `json:"memory"`
 }
 
 // DefaultMobileSettings mirrors settingsDomain.ts's mobileSettingsSchema defaults.
@@ -162,6 +170,7 @@ func DefaultSettings() Settings {
 		Ade:        DefaultAdeSettings(),
 		ClaudeCode: DefaultClaudeCodeSettings(),
 		Mobile:     DefaultMobileSettings(),
+		Memory:     MemorySettings{ClaudeModel: claudemodel.Default},
 	}
 }
 
@@ -225,6 +234,11 @@ type MobilePatch struct {
 	AgentInput *bool `json:"agentInput,omitempty"`
 }
 
+// MemoryPatch mirrors MemorySettings' own `.partial()` shape.
+type MemoryPatch struct {
+	ClaudeModel *string `json:"claudeModel,omitempty"`
+}
+
 type SettingsPatch struct {
 	Appearance *AppearancePatch `json:"appearance,omitempty"`
 	Advanced   *AdvancedPatch   `json:"advanced,omitempty"`
@@ -232,6 +246,7 @@ type SettingsPatch struct {
 	Ade        *AdePatch        `json:"ade,omitempty"`
 	ClaudeCode *ClaudeCodePatch `json:"claudeCode,omitempty"`
 	Mobile     *MobilePatch     `json:"mobile,omitempty"`
+	Memory     *MemoryPatch     `json:"memory,omitempty"`
 }
 
 // validateAppearanceSection mirrors upsertAppearance's own leaf list (repos/settings.go).
@@ -360,6 +375,19 @@ func validateMobileSection(m *MobilePatch) error {
 	return nil
 }
 
+// ValidClaudeModel is memory.claudeModel's allowed set.
+var ValidClaudeModel = claudemodel.Valid
+
+func validateMemorySection(m *MemoryPatch) error {
+	if m == nil {
+		return nil
+	}
+	if m.ClaudeModel != nil && !ValidClaudeModel(*m.ClaudeModel) {
+		return fmt.Errorf("model: memory.claudeModel: invalid value %q", *m.ClaudeModel)
+	}
+	return nil
+}
+
 // Validate checks every leaf the caller actually patched against settings.ts's bounds, naming the
 // offending leaf in the error — fontFamily and fontSize have no bounds in the TS schema either, so
 // they are accepted as-is.
@@ -376,5 +404,8 @@ func (p SettingsPatch) Validate() error {
 	if err := validateAdeSection(p.Ade); err != nil {
 		return err
 	}
-	return validateMobileSection(p.Mobile)
+	if err := validateMobileSection(p.Mobile); err != nil {
+		return err
+	}
+	return validateMemorySection(p.Memory)
 }
