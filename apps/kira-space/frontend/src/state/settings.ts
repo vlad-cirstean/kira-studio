@@ -11,7 +11,7 @@ export const sections = [
   'Appearance',
   'Git',
   'Mobile access',
-  'Claude Code',
+  'Agent',
   'Memory',
   'Prompts',
   'Advanced',

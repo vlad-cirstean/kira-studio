@@ -98,10 +98,14 @@ const draft = reactive(cloneSections(props.current)) as T;
 
 // G7 D16: an array-valued leaf (Kira Space's git.protectedBranches) gets its own array object from
 // cloneSections even when unedited, so a bare `!==`/`===` would report it changed/non-default on
-// every open. Compared by value instead; every primitive leaf still takes the cheap `===` path.
+// every open; a record leaf (memory.models) likewise. Compared by value instead; every primitive
+// leaf still takes the cheap `===` path.
 function valuesEqual(a: unknown, b: unknown): boolean {
   if (Array.isArray(a) && Array.isArray(b)) {
     return a.length === b.length && a.every((v, i) => v === b[i]);
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    return JSON.stringify(a) === JSON.stringify(b);
   }
   return a === b;
 }

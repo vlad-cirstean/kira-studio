@@ -35,6 +35,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/agentsvc"
 	"github.com/kirathecat/kira-studio/internal/harness/providers"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
@@ -152,7 +153,8 @@ type Wired struct {
 	AgentUsage     *agentusage.Service
 	AgentUsageSvc  *bridge.AgentUsageService
 	// Agents resolves the active agent provider per call.
-	Agents harness.Selector
+	Agents   harness.Selector
+	AgentSvc *bridge.AgentService
 
 	reopen          func()
 	detachMetrics   func()
@@ -172,6 +174,7 @@ func Build(opts Options) *Wired {
 		registry = providers.New()
 	}
 	w.Agents = agentSelector(registry, repositories.Settings)
+	w.AgentSvc = &bridge.AgentService{Service: &agentsvc.Service{Agents: w.Agents}}
 	repositories.CustomScripts.Agents = registry
 
 	credentialRelay := gitcred.New()
@@ -226,7 +229,8 @@ func Build(opts Options) *Wired {
 	w.TermRegistry = terminalRegistry
 	w.AgentNotify = agentnotify.New(agentnotify.Deps{
 		Prefs: notifyPrefs(repositories), Describe: w.describeAgent, TaskTitle: w.taskTitle, Reveal: w.revealNote,
-		Alive: func(key string) bool { return slices.Contains(w.Windows.Keys(), key) },
+		AgentLabel: func() string { return w.Agents.Active().Label() },
+		Alive:      func(key string) bool { return slices.Contains(w.Windows.Keys(), key) },
 	})
 	w.AgentNotifySvc = &bridge.AgentNotifyService{N: w.AgentNotify}
 	w.AgentUsage = agentusage.New(agentusage.Deps{
@@ -324,10 +328,14 @@ func Build(opts Options) *Wired {
 	w.Mobile = bridge.NewMobileAccessService(&bridge.MobileAccessService{
 		Deps: deps, Reader: w.AdeTask, Hub: mobileHub, Broker: mobileweb.NewBroker(time.Now, w.Prompts), Assets: opts.MobileAssets,
 		AgentSessions: func() any { return w.Terminal.AgentSessions() },
-		Writer:        &bridge.MobileWriter{Svc: w.AdeTask, Launches: mobileLaunches},
-		Launches:      mobileLaunches,
-		Terminals:     termBroker,
-		Detect:        opts.MobileDetect, Find: opts.MobileFind, Poll: opts.MobilePoll,
+		AgentInfo: func() any {
+			info, _ := w.AgentSvc.Info()
+			return info
+		},
+		Writer:    &bridge.MobileWriter{Svc: w.AdeTask, Launches: mobileLaunches},
+		Launches:  mobileLaunches,
+		Terminals: termBroker,
+		Detect:    opts.MobileDetect, Find: opts.MobileFind, Poll: opts.MobilePoll,
 		IsLAN: opts.MobileIsLAN,
 	})
 	w.detachMobile = bridge.AttachMobilePush(w.Mobile)
@@ -383,7 +391,7 @@ func (w *Wired) reopenWindow() {
 // StartMobile starts the phone server when settings enable it; call after the shell is up.
 func (w *Wired) StartMobile() { bridge.StartMobileIfEnabled(w.Mobile) }
 
-// Bound returns the 24 bound services in registration order.
+// Bound returns the 26 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.GitCredential),
@@ -394,7 +402,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.KeepAwake), application.NewService(w.Mobile), application.NewService(w.Memory),
 		application.NewService(w.MemoryImport), application.NewService(w.MemoryDistill), application.NewService(w.WindowsSvc), application.NewService(w.Update),
 		application.NewService(w.AgentNotifySvc), application.NewService(w.AgentUsageSvc),
-		application.NewService(w.PromptsSvc), application.NewService(w.LlmPromptsSvc),
+		application.NewService(w.PromptsSvc), application.NewService(w.LlmPromptsSvc), application.NewService(w.AgentSvc),
 	}
 }
 

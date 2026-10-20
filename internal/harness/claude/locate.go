@@ -82,7 +82,7 @@ func Resolve(ctx context.Context, deps Deps) (path string, probed []string, err 
 
 // Missing is the user-facing error for a failed Resolve.
 func Missing(probed []string) *ipcerr.Error {
-	return ipcerr.T(ipcerr.CodeNotFound, "backend.core.claude.missing.body", map[string]string{"probed": strings.Join(probed, ", ")})
+	return ipcerr.T(ipcerr.CodeNotFound, "backend.core.agent.missing.body", map[string]string{"product": "Claude Code", "probed": strings.Join(probed, ", ")})
 }
 
 // Require resolves the CLI and returns the Kira error when it is missing.

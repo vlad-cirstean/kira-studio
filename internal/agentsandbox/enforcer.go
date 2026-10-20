@@ -14,7 +14,16 @@ import (
 const NotEnforcedKey = "backend.space.ade.sandbox.notEnforced.body"
 
 // NotEnforcedText is the not-enforced notice in the user's language.
-func NotEnforcedText() string { return i18n.T("backend.space.ade.sandbox.notEnforced.body", nil) }
+func NotEnforcedText(a Namer) string {
+	return i18n.T("backend.space.ade.sandbox.notEnforced.body", map[string]string{"agent": a.Label()})
+}
+
+// Namer names the agent in sandbox texts; a harness provider satisfies it.
+type Namer interface {
+	Label() string
+	ProductLabel() string
+	Command() string
+}
 
 // Support says whether profiles are enforced on this OS.
 type Support struct {

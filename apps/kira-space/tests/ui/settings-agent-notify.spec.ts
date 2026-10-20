@@ -11,11 +11,11 @@ const LEAVES = ['finished', 'needs-input', 'run-ended', 'include-message'] as co
 
 async function openClaudeCodePane(page: Page): Promise<void> {
   await emitWailsEvent(page, IPC.openSettings, undefined);
-  await page.locator('[data-testid="settings-section-Claude Code"]').click();
+  await page.locator('[data-testid="settings-section-Agent"]').click();
 }
 
 const sw = (page: Page, suffix = '') =>
-  page.locator(`[data-testid="settings-claude-code-notify${suffix}"]`);
+  page.locator(`[data-testid="settings-agent-notify${suffix}"]`);
 
 test('every notification switch starts on and the master switch gates the four others', async ({
   relaunch,

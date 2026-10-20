@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'bun:test';
+import { beforeAll, describe, expect, test } from 'bun:test';
+import { useClaudeAgentText } from '@workbench/testing/unit/claudeAgentText';
 import { buildBranchGraph } from '../../frontend/src/ade/v2/board/branchGraph';
 import {
   archiveSpec,
@@ -19,6 +20,8 @@ import { runMockupV2 } from './support/mockupV2Oracle';
 // review branch, merge), then the rules the mockup has no oracle for: busy and headless blocks,
 // target resolution, archive lines and the session and start mirrors of the server defaults. The turn
 // watcher's submit / stop / ended / live-seen rules close the file.
+
+beforeAll(useClaudeAgentText);
 
 const board = loadFixture<Board>('board');
 const repos = loadFixture<ReposResult>('repos').repos;

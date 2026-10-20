@@ -106,6 +106,7 @@ test('contract: Continue in terminal without the claude CLI shows the install me
       { channel: IPC.scriptRunsPreview, response: PREVIEW },
       { channel: IPC.scriptRunsStart, response: { runId: 'run-9', terminal: null } },
       { channel: IPC.scriptRunsReadLog, response: { chunks: [], truncated: false } },
+      { channel: IPC.scriptRunsResumeCommand, response: 'claude --resume sess-1' },
       { channel: IPC.terminalOpen, error: failure },
     ],
   });

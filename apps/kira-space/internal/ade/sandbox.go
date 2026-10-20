@@ -34,6 +34,7 @@ type sandboxRun struct {
 	tracker    agentsandbox.Tracker
 	keychain   bool
 	authFailed func(string) bool
+	agent      agentsandbox.Namer
 	grant      *agentmcp.SandboxGrant
 	scratch    string
 	notes      []string
@@ -108,7 +109,7 @@ func (b *TaskBoard) prepareSandbox(ctx context.Context, run model.AdeRun, l agen
 		sd = adewire.DefaultSandbox()
 	}
 	agent := l.agent
-	sr := &sandboxRun{access: agentsandbox.Access(sd.Access), authFailed: agent.IsAuthFailure}
+	sr := &sandboxRun{access: agentsandbox.Access(sd.Access), authFailed: agent.IsAuthFailure, agent: agent}
 	if sr.access == agentsandbox.AccessOff {
 		return sr, b.storeSandbox(run.ID, sr, false, "")
 	}
@@ -286,7 +287,7 @@ func (sr *sandboxRun) sandboxOutcome(out outcome, lastErr string) outcome {
 	}
 	reason := out.out.Reason
 	if !out.out.Reported && !sr.keychain && sr.authFailed(lastErr+" "+out.out.LastError) {
-		reason = agentsandbox.AuthReason()
+		reason = agentsandbox.AuthReason(sr.agent)
 	} else {
 		reason = sr.tracker.BlockedReason(reason)
 	}
@@ -410,7 +411,7 @@ func (b *TaskBoard) noticeSandbox(sink *logSink, sr *sandboxRun) {
 		return
 	}
 	if sup := b.deps.Sandbox.Support(); !sup.Enforced {
-		sink.add(logStdout, agentsandbox.NotEnforcedText())
+		sink.add(logStdout, agentsandbox.NotEnforcedText(sr.agent))
 	}
 	for _, n := range sr.notes {
 		sink.add(logStdout, n)
@@ -425,10 +426,10 @@ func (b *TaskBoard) sandboxSupport() adewire.SandboxSupport {
 		if sup := b.deps.Sandbox.Support(); sup.Enforced {
 			return adewire.SandboxSupport{Enforced: true}
 		} else {
-			return adewire.SandboxSupport{Reason: agentsandbox.NotEnforcedText()}
+			return adewire.SandboxSupport{Reason: agentsandbox.NotEnforcedText(b.deps.Agent.Active())}
 		}
 	}
-	return adewire.SandboxSupport{Reason: agentsandbox.NotEnforcedText()}
+	return adewire.SandboxSupport{Reason: agentsandbox.NotEnforcedText(b.deps.Agent.Active())}
 }
 
 func badgeOf(s repos.AdeRunSandbox) *adewire.RunSandboxBadge {
@@ -483,7 +484,7 @@ func (b *TaskBoard) RunSandbox(_ context.Context, runID string) (adewire.RunSand
 		Write: []string{}, Read: []string{}, Allow: []string{}, Denials: []adewire.SandboxDenial{},
 	}
 	if row.Reason != "" {
-		out.Reason = agentsandbox.NotEnforcedText()
+		out.Reason = agentsandbox.NotEnforcedText(b.deps.Agent.Active())
 	}
 	var pol agentsandbox.Policy
 	if err := json.Unmarshal([]byte(row.PolicyJSON), &pol); err == nil {

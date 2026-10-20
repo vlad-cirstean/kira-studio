@@ -11,7 +11,7 @@ import type { Branch, Run } from '../wire';
 export type HeaderAction =
   | { kind: 'rebase'; label: string; tone: Tone; act: RebaseAct }
   | { kind: 'remerge'; label: string; tone: Tone; target: string }
-  | { kind: 'start'; label: string; tone: 'claude' }
+  | { kind: 'start'; label: string; tone: 'agent' }
   | { kind: 'automation'; label: string; tone: 'grey' }
   | { kind: 'review'; label: string; tone: 'grey' }
   | { kind: 'created'; label: string; tone: 'grey' };
@@ -65,7 +65,7 @@ export function headerActions(i: HeaderInput): HeaderAction[] {
     if (g.status === 'stale') {
       out.push({
         kind: 'remerge',
-        label: t('space.ade.claudeDialog.reMerge.title', { target: g.target }),
+        label: t('space.ade.agentDialog.reMerge.title', { target: g.target }),
         tone: 'amber',
         target: g.target,
       });
@@ -73,7 +73,7 @@ export function headerActions(i: HeaderInput): HeaderAction[] {
   }
   const setupOk = b.setup === null || b.setup.state === 'ready';
   if (!i.hadSession && setupOk)
-    out.push({ kind: 'start', label: t('space.ade.header.startAgent.label'), tone: 'claude' });
+    out.push({ kind: 'start', label: t('space.ade.header.startAgent.label'), tone: 'agent' });
   out.push(
     { kind: 'automation', label: t('space.ade.board.taskMenu.runAutomation.label'), tone: 'grey' },
     review,

@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
+import { useClaudeAgentText } from '@workbench/testing/unit/claudeAgentText';
 import { branchTag, taskCell } from '../../frontend/src/ade/v2/board/actions';
 import { baseMarker } from '../../frontend/src/ade/v2/board/baseMarker';
 import { buildBranchGraph } from '../../frontend/src/ade/v2/board/branchGraph';
@@ -94,6 +95,7 @@ function normalizeBoard(raw: Board, sess: SessionsResult): Board {
 }
 
 beforeAll(() => {
+  useClaudeAgentText();
   const rawSessions = loadFixture<SessionsResult>('sessions');
   sessions = { sessions: rawSessions.sessions.filter((s) => s.id !== 'tk01') };
   board = normalizeBoard(loadFixture<Board>('board'), sessions);

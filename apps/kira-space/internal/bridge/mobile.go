@@ -113,6 +113,8 @@ type MobileAccessService struct {
 	// Reader is the read-only ADE slice the phone sees; AgentSessions the live session list.
 	Reader        mobileweb.Reader
 	AgentSessions func() any
+	// AgentInfo is the agent provider's display facts for the phone.
+	AgentInfo func() any
 	// Assets is the embedded mobile build.
 	Assets fs.FS
 	Hub    *mobileweb.Hub
@@ -152,7 +154,7 @@ func NewMobileAccessService(s *MobileAccessService) *MobileAccessService {
 				return nil, err
 			}
 			srv := mobileweb.New(mobileweb.Config{
-				Reader: s.Reader, AgentSessions: s.AgentSessions, Devices: s.Deps.Repos.MobileDevices,
+				Reader: s.Reader, AgentSessions: s.AgentSessions, AgentInfo: s.AgentInfo, Devices: s.Deps.Repos.MobileDevices,
 				Writer: s.Writer, Terminals: s.Terminals, AgentInputEnabled: s.agentInputEnabled,
 				Hub: s.Hub, Broker: s.Broker, Assets: s.Assets,
 				Port: cfg.Mobile.Port, Network: s.sup.network(), IsLAN: s.IsLAN,

@@ -1,3 +1,4 @@
+import * as AgentService from '@bindings/agentservice.js';
 import * as AppService from '@bindings/appservice.js';
 import * as ConnectionsService from '@bindings/connectionsservice.js';
 import * as CustomScriptsService from '@bindings/customscriptsservice.js';
@@ -471,6 +472,7 @@ export const control = {
     update: UpdateService,
     prompts: PromptsService,
     llmPrompts: LlmPromptsService,
+    agent: AgentService,
   }),
   ...apiControl,
   ...studioControl,

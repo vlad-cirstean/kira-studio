@@ -28,7 +28,7 @@ import { useMemoryUiStore } from '../store';
 import { useImportAction, useImportJob, useStartImport } from './importQueries';
 import { useImportUiStore } from './importStore';
 
-// P211: the scan result and its cost estimate, confirmed before any Claude call is made.
+// P211: the scan result and its cost estimate, confirmed before any agent call is made.
 const emit = defineEmits<{ close: [] }>();
 const ui = useImportUiStore();
 const memoryUi = useMemoryUiStore();

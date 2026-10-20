@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { FieldDescription } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
+import { useAgentInfo } from '@workbench/agent/agentInfo';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { useTerminalsStore } from '../../../state/terminals';
@@ -50,13 +51,15 @@ const here = computed(
   () => running.value && terminals.terminalSession(session.value?.terminalId ?? '') !== undefined,
 );
 
-const NO_LOOKUP: SessionLookup = {
+const { info: agentInfo } = useAgentInfo();
+const lookup = computed<SessionLookup>(() => ({
   task: () => undefined,
   branch: () => undefined,
   repoLabel: () => '',
   workflow: () => undefined,
-};
-const view = computed(() => (session.value ? sessionView(session.value, NO_LOOKUP) : null));
+  headlessLabel: agentInfo.value.headlessLabel,
+}));
+const view = computed(() => (session.value ? sessionView(session.value, lookup.value) : null));
 
 async function start(): Promise<void> {
   error.value = '';
@@ -133,7 +136,7 @@ async function focus(): Promise<void> {
         @click="start"
       >
         {{
-          waitingSetup ? t('space.ade.claudeDialog.startsWhenReady.loading') : session ? t('space.ade.review.agent.resume.label') : t('space.ade.review.agent.start.label')
+          waitingSetup ? t('space.ade.agentDialog.startsWhenReady.loading') : session ? t('space.ade.review.agent.resume.label') : t('space.ade.review.agent.start.label')
         }}
       </Button>
     </div>

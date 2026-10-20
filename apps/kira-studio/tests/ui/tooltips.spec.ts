@@ -301,7 +301,7 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   await expect(tooltipContent(page)).toHaveCount(0);
 
   // A plain-string tooltip elsewhere is unaffected — still one text node, no parts.
-  await page.clock.pauseAt(Date.now() + 10_000);
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 10_000);
   await settleTooltipSkipDelay(page);
   await refreshButton.hover();
   await runToJustBeforeTooltipDelay(page);

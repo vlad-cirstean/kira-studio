@@ -186,8 +186,8 @@ test('contract: memory model saves memory.models with the dialog', async ({ rela
     control: [{ channel: IPC.settingsGetAll, response: { ...defaultSettings, memory } }],
   });
   await openMemorySettings(page);
-  const select = page.locator('[data-testid="settings-memory-claude-model"]');
-  const reset = page.locator('[data-testid="settings-reset-memory-models"]');
+  const select = page.locator('[data-testid="settings-memory-agent-model"]');
+  const reset = page.locator('[data-testid="settings-reset-memory-agentModel"]');
   await expect(select).toHaveValue('sonnet');
   await expect(reset).toBeDisabled();
 

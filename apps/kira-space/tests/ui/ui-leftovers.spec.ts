@@ -91,7 +91,7 @@ test('the Claude usage status item is one control-sm row high', async ({ relaunc
   const { window: page } = await openPlan(relaunch, [
     { channel: IPC.agentUsageGet, response: snap },
   ]);
-  const box = await page.locator(t('claude-usage-status')).boundingBox();
+  const box = await page.locator(t('agent-usage-status')).boundingBox();
   expect(Math.round(box?.height ?? 0)).toBe(18);
 });
 

@@ -9,8 +9,8 @@ test('the Claude Code switch saves agent.keepAwakeWithAgents with the dialog', a
 }) => {
   const { window: page, control } = await relaunch();
   await emitWailsEvent(page, IPC.openSettings, undefined);
-  await page.locator('[data-testid="settings-section-Claude Code"]').click();
-  const sw = page.locator('[data-testid="settings-claude-code-keep-awake"]');
+  await page.locator('[data-testid="settings-section-Agent"]').click();
+  const sw = page.locator('[data-testid="settings-agent-keep-awake"]');
   await expect(sw).toHaveAttribute('aria-checked', 'false');
   await sw.click();
   await expect(sw).toHaveAttribute('aria-checked', 'true');

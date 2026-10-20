@@ -27,6 +27,7 @@ type smartSandbox struct {
 	release func()
 	// authFailed reads a sign-in failure in the agent's output.
 	authFailed func(string) bool
+	agent      agentsandbox.Namer
 }
 
 // prepareSandbox returns nil when the run is not confined.
@@ -53,7 +54,7 @@ func (s *Service) prepareSandbox(ctx context.Context, p *planned, runID string, 
 		_ = os.RemoveAll(pol.Scratch)
 		return nil, err
 	}
-	return &smartSandbox{policy: pol, prep: prep, tools: p.preview.ADE != nil, authFailed: agent.IsAuthFailure, release: func() { s.Sandbox.Release(runID) }}, nil
+	return &smartSandbox{policy: pol, prep: prep, tools: p.preview.ADE != nil, authFailed: agent.IsAuthFailure, agent: agent, release: func() { s.Sandbox.Release(runID) }}, nil
 }
 
 func (sb *smartSandbox) cleanup() {
@@ -93,7 +94,7 @@ func (s *Service) noticeSandbox(sink *logSink, sb *smartSandbox) {
 		return
 	}
 	if sup := s.Sandbox.Support(); !sup.Enforced {
-		sink.add("stdout", agentsandbox.NotEnforcedText())
+		sink.add("stdout", agentsandbox.NotEnforcedText(sb.agent))
 	}
 }
 
@@ -115,7 +116,7 @@ func (sb *smartSandbox) outcome(out runoutcome.Outcome) runoutcome.Outcome {
 		return out
 	}
 	if !out.Reported && !sb.policy.Keychain && sb.authFailed(out.LastError) {
-		out.Reason = agentsandbox.AuthReason()
+		out.Reason = agentsandbox.AuthReason(sb.agent)
 		return out
 	}
 	out.Reason = sb.tracker.BlockedReason(out.Reason)

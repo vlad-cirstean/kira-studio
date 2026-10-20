@@ -1,3 +1,4 @@
+import { type AgentInfo, agentInfoSchema } from '@shared/domain/agent';
 import type { LayoutPatch } from '@shared/domain/layout';
 import {
   type LlmPromptChange,
@@ -89,6 +90,10 @@ export interface CoreBindings {
   };
   files: {
     ChooseFolder(a: { title: string }): Promise<unknown>;
+  };
+  agent: {
+    Info(): Promise<unknown>;
+    InfoFor(id: string): Promise<unknown>;
   };
   windows: {
     OpenNew(): Promise<void>;
@@ -205,6 +210,8 @@ export interface CoreControl<S, L, T, P, M> {
   // P22 D12/P128 §2.2: this window's own persisted module mode — the boot-time seam each app's own
   // state/mode.ts hydrateMode reads without a second round trip, and the debounced writer
   // state/mode.ts's setMode schedules.
+  agentInfo: () => Promise<AgentInfo>;
+  agentInfoFor: (id: string) => Promise<AgentInfo>;
   windowsEnsure: () => Promise<M>;
   windowsSetMode: (mode: M) => Promise<void>;
 
@@ -309,6 +316,10 @@ export function createCoreControl<S, L, T, P, M>(b: CoreBindings): CoreControl<S
 
     windowsOpenNew: (): Promise<void> => unwrap(b.windows.OpenNew()),
 
+    agentInfo: (): Promise<AgentInfo> =>
+      unwrap(b.agent.Info()).then((r) => agentInfoSchema.parse(r)),
+    agentInfoFor: (id: string): Promise<AgentInfo> =>
+      unwrap(b.agent.InfoFor(id)).then((r) => agentInfoSchema.parse(r)),
     windowsEnsure: (): Promise<M> =>
       unwrap(b.windows.Ensure({ windowKey })).then((r) =>
         trust<M>(trust<{ mode: string }>(r).mode),

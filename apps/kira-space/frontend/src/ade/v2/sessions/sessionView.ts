@@ -1,6 +1,6 @@
 import { t } from '@theme/i18n';
 import { compareNatural } from '@workbench/behaviour/match';
-import { type ActivityKind, activityKind, shortId } from '../activity';
+import { type ActivityKind, activityKind, agentSessionName, shortId } from '../activity';
 import type { Branch, Run, Session, Task, Workflow } from '../wire';
 
 // A session as the Sessions tab and All sessions list show it (mockup `termFor` / `agents`). Pure:
@@ -12,6 +12,8 @@ export interface SessionLookup {
   branch: (id: string) => Branch | undefined;
   repoLabel: (codeRepoId: string) => string;
   workflow: (id: string) => Workflow | undefined;
+  /** The background run's command line as the provider shows it (`claude -p`). */
+  headlessLabel: string;
 }
 
 export interface SessionView {
@@ -27,10 +29,10 @@ export interface SessionView {
   run: Run | null;
   /** Strip tab: `Implement · repo` / `Implement · Create PR · repo`; `Review agent` for the review agent. */
   tabName: string;
-  badge: 'TUI' | 'claude -p';
+  badge: string;
   /** Finished / stopped row: `run · Create PR · repo · branch · c81a` / `TUI · spec · 3c3c`. */
   stoppedLabel: string;
-  /** All sessions kind column: `claude -p · <step>` / `TUI · interactive` / `TUI · spec session`. */
+  /** All sessions kind column: `<headless label> · <step>` / `TUI · interactive` / `TUI · spec session`. */
   allLabel: string;
 }
 
@@ -63,9 +65,7 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
     ? reviewAgent
     : headless
       ? named(step, repo)
-      : resumed(
-          named(stepName || t('space.common.claudeSession.label', { id }), repo || specLabel),
-        );
+      : resumed(named(stepName || agentSessionName(id), repo || specLabel));
   return {
     session: s,
     kind: activityKind(s),
@@ -76,14 +76,14 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
     step,
     run,
     tabName,
-    badge: headless ? 'claude -p' : 'TUI',
+    badge: headless ? look.headlessLabel : 'TUI',
     stoppedLabel: review
       ? `TUI · ${reviewAgent} · ${id}`
       : `${headless ? named(step) : named('TUI', stepName)} · ${scope} · ${id}`,
     allLabel: review
       ? `TUI · ${reviewAgent}`
       : headless
-        ? named('claude -p', step)
+        ? named(look.headlessLabel, step)
         : s.branchId
           ? named('TUI', stepName, t('space.ade.sessionList.interactive.label'))
           : named('TUI', stepName, t('space.ade.sessionList.specSession.label')),

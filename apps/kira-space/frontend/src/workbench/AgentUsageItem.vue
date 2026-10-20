@@ -22,13 +22,13 @@ const windows = computed(() => {
   if (d?.state !== 'ok') return [];
   return [
     {
-      label: t('space.settings.claudeUsage.session.label'),
-      long: t('space.settings.claudeUsage.fiveHourLong.label'),
+      label: t('space.settings.agentUsage.session.label'),
+      long: t('space.settings.agentUsage.fiveHourLong.label'),
       window: d.fiveHour,
     },
     {
-      label: t('space.settings.claudeUsage.weeklyLong.label'),
-      long: t('space.settings.claudeUsage.weeklyLong.label'),
+      label: t('space.settings.agentUsage.weeklyLong.label'),
+      long: t('space.settings.agentUsage.weeklyLong.label'),
       window: d.sevenDay,
     },
   ].filter(
@@ -38,8 +38,8 @@ const windows = computed(() => {
 
 const text = computed(() => {
   if (isError.value && windows.value.length === 0)
-    return t('space.settings.claudeUsage.unavailable.status');
-  if (windows.value.length === 0) return t('space.settings.claudeUsage.unknown.status');
+    return t('space.settings.agentUsage.unavailable.status');
+  if (windows.value.length === 0) return t('space.settings.agentUsage.unknown.status');
   return windows.value
     .map((w) =>
       t('common.progressPercent.label', {
@@ -63,7 +63,7 @@ const lines = computed(() =>
     const left = formatCompactDuration(
       Math.max(0, Math.round((w.window.resetsAt - now.value.getTime()) / 60_000)) * 60_000,
     );
-    return t('space.settings.claudeUsage.line.status', {
+    return t('space.settings.agentUsage.line.status', {
       window: w.long,
       percent: Math.round(w.window.usedPercent),
       when,
@@ -78,29 +78,29 @@ const sourceLine = computed(() => {
   const when = formatRelative(d.updatedAt, now.value.getTime());
   return t(
     d.source === 'run'
-      ? 'space.settings.claudeUsage.sourceRun.status'
-      : 'space.settings.claudeUsage.sourceSession.status',
+      ? 'space.settings.agentUsage.sourceRun.status'
+      : 'space.settings.agentUsage.sourceSession.status',
     { when },
   );
 });
 
 const detail = computed(() => {
   if (isError.value && windows.value.length === 0)
-    return t('space.settings.claudeUsage.readFailed.error');
-  return data.value?.state === 'waiting' ? t('space.settings.claudeUsage.waiting.hint') : '';
+    return t('space.settings.agentUsage.readFailed.error');
+  return data.value?.state === 'waiting' ? t('space.settings.agentUsage.waiting.hint') : '';
 });
 </script>
 
 <template>
   <Tooltip>
     <TooltipTrigger as-child>
-      <Button variant="toolbar" size="status" :class="tone" data-testid="claude-usage-status">
+      <Button variant="toolbar" size="status" :class="tone" data-testid="agent-usage-status">
         <CodiconIcon name="dashboard" :size="13" />
-        <span class="font-data" data-testid="claude-usage-text">{{ text }}</span>
+        <span class="font-data" data-testid="agent-usage-text">{{ text }}</span>
       </Button>
     </TooltipTrigger>
     <TooltipContent>
-      <div class="flex flex-col gap-0.5" data-testid="claude-usage-tooltip">
+      <div class="flex flex-col gap-0.5" data-testid="agent-usage-tooltip">
         <span v-for="line in lines" :key="line">{{ line }}</span>
         <span v-if="sourceLine" class="text-subtle">{{ sourceLine }}</span>
         <span v-if="detail">{{ detail }}</span>

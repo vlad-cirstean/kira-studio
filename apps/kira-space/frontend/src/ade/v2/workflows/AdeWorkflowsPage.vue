@@ -9,6 +9,7 @@ import CatalogText from '@theme/i18n/CatalogText.vue';
 import { paneFrame } from '@theme/lib/frames';
 import { rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
+import { useAgentInfo } from '@workbench/agent/agentInfo';
 import { errorText } from '@workbench/bridge/codedError';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref, watch } from 'vue';
@@ -19,7 +20,7 @@ import type { WorkflowEntry } from '../wire';
 import AdeWorkflowEditor from './AdeWorkflowEditor.vue';
 
 // Workflows page (SPEC2 section 5.1): the list of workflow files beside the editor for the picked one.
-const CLAUDE_CMD = 'claude -p';
+const { info } = useAgentInfo();
 const wfUi = useAdeWorkflowsUiStore();
 const workflows = useWorkflows();
 const importWf = useImportWorkflow();
@@ -182,7 +183,7 @@ async function createNew(): Promise<void> {
         </button>
         <div class="px-1 pt-3 text-kira-sm leading-normal text-subtle">
           <CatalogText k="space.ade.workflows.page.intro.body">
-            <template #command><span class="font-data">{{ CLAUDE_CMD }}</span></template>
+            <template #headless><span class="font-data">{{ info.headlessLabel }}</span></template>
           </CatalogText>
         </div>
       </div>

@@ -57,4 +57,8 @@ func (t *Tracker) BlockedReason(reason string) string {
 }
 
 // AuthReason is the outcome reason of a sign-in failure in a keychain-denied run.
-func AuthReason() string { return i18n.T("backend.space.ade.sandbox.auth.body", nil) }
+func AuthReason(a Namer) string {
+	return i18n.T("backend.space.ade.sandbox.auth.body", map[string]string{
+		"agent": a.Label(), "product": a.ProductLabel(), "command": a.Command(),
+	})
+}

@@ -207,10 +207,7 @@ async function onArchiveTurns(
   const key = `archive:${taskId}`;
   try {
     if (outcomes.includes('ended')) {
-      deps.setActionError(
-        taskId,
-        "Claude's session ended before archiving; archive again when ready",
-      );
+      deps.setActionError(taskId, 'The session ended before archiving; archive again when ready');
       return;
     }
     await archiveIfClear(deps, taskId);

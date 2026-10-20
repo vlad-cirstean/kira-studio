@@ -1,5 +1,6 @@
 import * as AdeTaskService from '@bindings/adetaskservice.js';
 import * as AgentNotifyService from '@bindings/agentnotifyservice.js';
+import * as AgentService from '@bindings/agentservice.js';
 import * as AgentUsageService from '@bindings/agentusageservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as CustomScriptsService from '@bindings/customscriptsservice.js';
@@ -500,6 +501,7 @@ export const control = {
     update: UpdateService,
     prompts: PromptsService,
     llmPrompts: LlmPromptsService,
+    agent: AgentService,
   }),
   ...memoryControl,
   ...spaceControl,

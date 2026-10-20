@@ -19,6 +19,10 @@ const MIME: Readonly<Record<string, string>> = {
   '.ttf': 'font/ttf',
 };
 
+const AGENT_INFO = JSON.parse(
+  readFileSync(resolve(__dirname, '../../contract/agent.json'), 'utf8'),
+) as Record<string, unknown>;
+
 const fixture = (name: string): unknown =>
   JSON.parse(readFileSync(join(FIXTURES, `${name}.json`), 'utf8'));
 
@@ -227,6 +231,8 @@ export async function startMobileServer(): Promise<MobileServer> {
             : writeReply(path, body),
         );
       }
+    } else if (path === '/api/agent/info' && method === 'GET') {
+      json(res, 200, AGENT_INFO['AgentService.Info']);
     } else if (path === '/api/agent/sessions' && method === 'GET') {
       json(res, 200, { sessions: state.agentSessions });
     } else if (path === '/api/ade/backlog' && method === 'GET') {

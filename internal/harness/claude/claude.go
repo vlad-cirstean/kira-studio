@@ -4,6 +4,7 @@ package claude
 
 import (
 	"os"
+	"strings"
 
 	"github.com/kirathecat/kira-studio/internal/harness"
 )
@@ -31,5 +32,14 @@ func (*Provider) Label() string { return "Claude" }
 func (*Provider) Command() string { return "claude" }
 
 func (*Provider) ProductLabel() string { return "Claude Code" }
+
+func (*Provider) HeadlessLabel() string { return "claude -p" }
+
+func (*Provider) ModelLabel(alias string) string {
+	if alias == "" {
+		return alias
+	}
+	return strings.ToUpper(alias[:1]) + alias[1:]
+}
 
 func (*Provider) Models() harness.Catalog { return Catalog }

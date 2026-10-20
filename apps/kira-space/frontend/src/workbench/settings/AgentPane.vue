@@ -5,6 +5,7 @@ import { Field, FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
+import { useAgentInfo } from '@workbench/agent/agentInfo';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { computed, useId } from 'vue';
 import { control } from '../../bridge/control';
@@ -15,6 +16,7 @@ import type { SettingsPaneProps } from './types';
 // assertion. Edited through the dialog's draft/Save flow like every other leaf here.
 const props = defineProps<SettingsPaneProps>();
 const switchId = useId();
+const { info } = useAgentInfo();
 
 type NotifyLeaf = Exclude<
   keyof Settings['agent'],
@@ -25,30 +27,37 @@ type NotifyLeaf = Exclude<
 const notifyLeaves = computed<{ leaf: NotifyLeaf; testid: string; label: string }[]>(() => [
   {
     leaf: 'notifyEnabled',
-    testid: 'settings-claude-code-notify',
+    testid: 'settings-agent-notify',
     label: t('space.settings.agent.notify.label'),
   },
   {
     leaf: 'notifyOnFinished',
-    testid: 'settings-claude-code-notify-finished',
+    testid: 'settings-agent-notify-finished',
     label: t('space.settings.agent.notifyFinished.label'),
   },
   {
     leaf: 'notifyOnNeedsInput',
-    testid: 'settings-claude-code-notify-needs-input',
+    testid: 'settings-agent-notify-needs-input',
     label: t('space.settings.agent.notifyNeedsInput.label'),
   },
   {
     leaf: 'notifyOnRunEnded',
-    testid: 'settings-claude-code-notify-run-ended',
+    testid: 'settings-agent-notify-run-ended',
     label: t('space.settings.agent.notifyRunEnded.label'),
   },
   {
     leaf: 'notifyIncludeMessage',
-    testid: 'settings-claude-code-notify-include-message',
+    testid: 'settings-agent-notify-include-message',
     label: t('space.settings.agent.notifyIncludeMessage.label'),
   },
 ]);
+
+// Finished and needs-input notes come from interactive session events.
+const shownNotifyLeaves = computed(() =>
+  notifyLeaves.value.filter(
+    (n) => info.value.hooks || (n.leaf !== 'notifyOnFinished' && n.leaf !== 'notifyOnNeedsInput'),
+  ),
+);
 
 function setNotify(leaf: NotifyLeaf, on: boolean): void {
   props.draft.agent[leaf] = on;
@@ -88,7 +97,7 @@ function setKeepAwake(on: boolean): void {
       <Switch
         :id="switchId"
         :model-value="draft.agent.keepAwakeWithAgents"
-        data-testid="settings-claude-code-keep-awake"
+        data-testid="settings-agent-keep-awake"
         @update:model-value="(v) => setKeepAwake(v === true)"
       />
       <FieldDescription>
@@ -113,7 +122,7 @@ function setKeepAwake(on: boolean): void {
       <Switch
         :id="`${switchId}-sandboxKeychain`"
         :model-value="draft.ade.sandboxKeychain"
-        data-testid="settings-claude-code-sandbox-keychain"
+        data-testid="settings-agent-sandbox-keychain"
         @update:model-value="(v) => setSandboxKeychain(v === true)"
       />
       <FieldDescription>
@@ -121,7 +130,7 @@ function setKeepAwake(on: boolean): void {
       </FieldDescription>
     </Field>
 
-    <Field v-for="n in notifyLeaves" :key="n.leaf">
+    <Field v-for="n in shownNotifyLeaves" :key="n.leaf">
       <div class="flex items-center justify-between gap-1">
         <Label :for="`${switchId}-${n.leaf}`" :class="n.leaf === 'notifyEnabled' ? '' : 'pl-4'">{{
           n.label
@@ -152,14 +161,14 @@ function setKeepAwake(on: boolean): void {
         size="kira-lg"
         class="self-start"
         :disabled="!draft.agent.notifyEnabled"
-        data-testid="settings-claude-code-notify-test"
+        data-testid="settings-agent-notify-test"
         @click="sendTest"
       >
         {{ t('common.sendTest.label') }}
       </Button>
     </Field>
 
-    <Field>
+    <Field v-if="info.usage">
       <div class="flex items-center justify-between gap-1">
         <Label :for="`${switchId}-usage`">{{ t('space.settings.agent.usage.label') }}</Label>
         <TooltipIconButton
@@ -174,7 +183,7 @@ function setKeepAwake(on: boolean): void {
       <Switch
         :id="`${switchId}-usage`"
         :model-value="draft.agent.usageEnabled"
-        data-testid="settings-claude-code-usage"
+        data-testid="settings-agent-usage"
         @update:model-value="(v) => setUsage(v === true)"
       />
       <FieldDescription>

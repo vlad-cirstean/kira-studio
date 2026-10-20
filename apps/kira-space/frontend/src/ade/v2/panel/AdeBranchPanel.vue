@@ -453,7 +453,7 @@ function deployNote(d: Deployment): string {
             v-if="canMerge && i.status !== 'merged'"
             size="kira"
             class="shrink-0 "
-            :class="ACTION_CLASS[i.status === 'stale' ? 'amber' : 'claude']"
+            :class="ACTION_CLASS[i.status === 'stale' ? 'amber' : 'agent']"
             :pending="dialogs.pending.has(`merge:${branch.id}:${i.target}`)"
             data-testid="ade-branch-merge"
             @click="dialogs.merge(branch.id, i.target)"

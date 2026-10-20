@@ -37,7 +37,7 @@ export interface TaskAction {
   kind: TaskActionKind;
   label: string;
   tip: string;
-  tone: 'claude' | 'red' | 'amber' | 'green' | 'purple';
+  tone: 'agent' | 'red' | 'amber' | 'green' | 'purple';
   /** Step the action applies to (`approve`, `retry`, `takeOver`). */
   stepId?: string;
   /** Session to open for `takeOver`. */
@@ -109,7 +109,7 @@ function manualAction(i: TaskCellInput): TaskAction {
       kind: 'session',
       label: t('space.ade.board.taskAction.session.label', { step: step.name }),
       tip: t('space.ade.board.taskAction.session.tooltip', { step: step.name }),
-      tone: 'claude',
+      tone: 'agent',
     };
   }
   return doneAction(p);
@@ -164,7 +164,7 @@ function automaticAction(p: TaskProgress): TaskAction | null {
           : s.kind === 'review'
             ? t('space.ade.board.taskAction.runReview.tooltip', { step: s.name })
             : t('space.ade.board.taskAction.runAgents.tooltip', { step: s.name }),
-      tone: 'claude',
+      tone: 'agent',
       stepId: s.id,
     };
   }

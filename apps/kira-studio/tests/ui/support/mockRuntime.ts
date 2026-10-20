@@ -10,6 +10,7 @@ import {
 } from '@workbench/testing/ui/mockRuntime';
 import { defaultSettings } from '../../../frontend/src/state/settingsDomain';
 import { STUDIO_TAB_KIND_MODE, type StudioTabKind } from '../../../frontend/src/state/tabDomain';
+import { contract } from './contract';
 import { IPC } from './ipcChannels';
 
 export type { ControlLogEntry, ControlMockHandle } from '@workbench/testing/ui/mockRuntime';
@@ -184,6 +185,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   promptsRaise: 'PromptsService.Raise',
   promptsDismiss: 'PromptsService.Dismiss',
   promptsSendTest: 'PromptsService.SendTest',
+  agentInfo: 'AgentService.Info',
+  agentInfoFor: 'AgentService.InfoFor',
   llmPromptsList: 'LlmPromptsService.List',
   llmPromptsSave: 'LlmPromptsService.Save',
   llmPromptsPreview: 'LlmPromptsService.Preview',
@@ -315,6 +318,9 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.promptsDismiss]: 'null',
   [IPC.promptsSendTest]: 'null',
   // The prompt editor's calls; a spec answers List/Save from tests/contract/llm-prompts.json.
+  // The active agent provider's names: the claude provider, as the Go flow test writes it.
+  [IPC.agentInfo]: JSON.stringify(contract('agent', 'AgentService.Info')),
+  [IPC.agentInfoFor]: JSON.stringify(contract('agent', 'AgentService.Info')),
   [IPC.llmPromptsList]: '{"prompts":[],"storeError":"","revision":0}',
   [IPC.llmPromptsSave]: '{"prompts":[],"storeError":"","revision":0}',
   [IPC.llmPromptsPreview]: '{"errors":[],"parts":[]}',

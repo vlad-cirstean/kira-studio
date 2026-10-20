@@ -1,3 +1,4 @@
+import { useAgentInfo } from '@workbench/agent/agentInfo';
 import { computed } from 'vue';
 import { usePlanModel } from '../plan/usePlanModel';
 import { type SessionLookup, type SessionView, sessionView } from './sessionView';
@@ -5,6 +6,7 @@ import { type SessionLookup, type SessionView, sessionView } from './sessionView
 /** `view(session)` for any session, resolved against the live board, workflows and repo names. */
 export function useSessionViews() {
   const { model, sessions, repoLabel } = usePlanModel();
+  const { info } = useAgentInfo();
 
   const lookup = computed<SessionLookup>(() => {
     const m = model.value;
@@ -15,6 +17,7 @@ export function useSessionViews() {
       branch: (id) => branches?.get(id),
       repoLabel,
       workflow: (id) => m?.workflows.get(id),
+      headlessLabel: info.value.headlessLabel,
     };
   });
 

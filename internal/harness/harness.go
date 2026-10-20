@@ -24,6 +24,10 @@ type Provider interface {
 	Command() string
 	// ProductLabel is the product's full name ("Claude Code").
 	ProductLabel() string
+	// HeadlessLabel is the command line of a background run as a user reads it ("claude -p").
+	HeadlessLabel() string
+	// ModelLabel is a model alias as the UI shows it.
+	ModelLabel(alias string) string
 	// Models is the provider's model aliases.
 	Models() Catalog
 	Locator

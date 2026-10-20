@@ -207,15 +207,16 @@ test('settings dialog, every pane', async ({ relaunch }) => {
   await emitWailsEvent(page, IPC.openSettings, undefined);
   await page.locator(t('settings-dialog')).waitFor();
   await setPseudoLocale(page);
-  const allow = fixtureData();
-  for (const section of [
-    'Appearance',
-    'Git',
-    'Mobile access',
-    'Claude Code',
-    'Memory',
-    'Advanced',
-  ]) {
+  // Provider names (the section label, model options) come from the provider, not the catalog.
+  const agent = contract<{ productLabel: string; models: { label: string }[] }>(
+    'agent',
+    'AgentService.Info',
+  );
+  const allow = [
+    ...fixtureData(),
+    ...[agent.productLabel, ...agent.models.map((m) => m.label)].map((v) => new RegExp(`^${v}$`)),
+  ];
+  for (const section of ['Appearance', 'Git', 'Mobile access', 'Agent', 'Memory', 'Advanced']) {
     await page.locator(t(`settings-section-${section}`)).click();
     await expectCatalogText(page.locator(t('settings-dialog')), { allow });
   }

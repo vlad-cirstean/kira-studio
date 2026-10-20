@@ -22,6 +22,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/docker"
 	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/agentsvc"
 	"github.com/kirathecat/kira-studio/internal/harness/providers"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
@@ -110,7 +111,8 @@ type Wired struct {
 	PromptsSvc      *bridge.PromptsService
 	LlmPromptsSvc   *bridge.LlmPromptsService
 	// Agents resolves the active agent provider per call.
-	Agents harness.Selector
+	Agents   harness.Selector
+	AgentSvc *bridge.AgentService
 
 	reopen          func()
 	beforeFlushOnce func()
@@ -248,7 +250,8 @@ func Build(opts Options) (*Wired, error) {
 		},
 		Lifecycle: &bridge.LifecycleService{Flusher: lifecycle.quitter, WindowFlusher: lifecycle.closeFlush, Quit: lifecycle.quitter, Live: live},
 
-		Agents: agents,
+		Agents:   agents,
+		AgentSvc: &bridge.AgentService{Service: &agentsvc.Service{Agents: agents}},
 
 		beforeFlushOnce: lifecycle.beforeFlush,
 		teardownOnce:    lifecycle.teardown,
@@ -265,7 +268,7 @@ func (w *Wired) reopenWindow() {
 	}
 }
 
-// Bound returns the 31 bound services in registration order.
+// Bound returns the 32 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.App), application.NewService(w.Settings), application.NewService(w.Layout),
@@ -277,7 +280,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.ResponseHistory), application.NewService(w.GrpcHistory),
 		application.NewService(w.DataGrip), application.NewService(w.DbMcp), application.NewService(w.KeepAwake),
 		application.NewService(w.Terminal), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Docker), application.NewService(w.Link),
-		application.NewService(w.Update), application.NewService(w.Lifecycle), application.NewService(w.PromptsSvc), application.NewService(w.LlmPromptsSvc),
+		application.NewService(w.Update), application.NewService(w.Lifecycle), application.NewService(w.PromptsSvc), application.NewService(w.LlmPromptsSvc), application.NewService(w.AgentSvc),
 	}
 }
 

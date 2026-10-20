@@ -97,6 +97,13 @@ func (s *Server) routes() []route {
 			}
 			writeJSON(w, http.StatusOK, v)
 		}),
+		read("/api/agent/info", func(w http.ResponseWriter, _ *http.Request, _ repos.MobileDeviceRow) {
+			if s.cfg.AgentInfo == nil {
+				writeJSON(w, http.StatusOK, map[string]any{})
+				return
+			}
+			writeJSON(w, http.StatusOK, s.cfg.AgentInfo())
+		}),
 		write("/api/ade/backlog/items", "backlog.add", permWrite, s.handleBacklogAdd),
 		write("/api/ade/backlog/move", "backlog.move", permWrite, s.handleBacklogMove),
 		write("/api/ade/tasks/step", "task.step", permWrite, s.handleTaskStep),

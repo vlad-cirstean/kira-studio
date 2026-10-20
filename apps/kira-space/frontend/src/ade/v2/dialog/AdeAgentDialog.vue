@@ -129,7 +129,7 @@ async function discard(): Promise<void> {
             stroke-linecap="round"
             stroke-linejoin="round"
             aria-hidden="true"
-            class="stroke-claude"
+            class="stroke-agent"
           >
             <rect x="3" y="4" width="18" height="16" rx="3" />
             <path d="M7 10l3 2-3 2M12 15h5" />
@@ -207,10 +207,10 @@ async function discard(): Promise<void> {
             v-model="dialogs.autostash"
             data-testid="ade-dialog-autostash"
           />
-          <span>{{ t('space.ade.claudeDialog.autostash.label') }}</span>
+          <span>{{ t('space.ade.agentDialog.autostash.label') }}</span>
         </Label>
         <FieldDescription v-if="view.noOp" data-testid="ade-dialog-noop">
-          {{ t('space.ade.claudeDialog.noOp.hint') }}
+          {{ t('space.ade.agentDialog.noOp.hint') }}
         </FieldDescription>
 
         <div
@@ -218,7 +218,7 @@ async function discard(): Promise<void> {
           class="text-kira-md text-tone-amber"
           data-testid="ade-dialog-risk"
         >
-          {{ t('space.ade.claudeDialog.risk.body', { risk: view.riskText }) }}
+          {{ t('space.ade.agentDialog.risk.body', { risk: view.riskText }) }}
         </div>
 
         <div
@@ -246,7 +246,7 @@ async function discard(): Promise<void> {
           <span>
             <span data-testid="ade-dialog-push-label">{{ view.pushLabel }}</span>
             <span v-if="!dialogs.push" class="text-subtle">
-              {{ t('space.ade.claudeDialog.pushOff.hint') }}</span
+              {{ t('space.ade.agentDialog.pushOff.hint') }}</span
             >
           </span>
         </Label>
@@ -254,7 +254,7 @@ async function discard(): Promise<void> {
         <div v-if="view.showMessage" class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
             <FieldLabel for="ade-dialog-message" class="flex-1">{{
-              t('space.ade.claudeDialog.message.label')
+              t('space.ade.agentDialog.message.label')
             }}</FieldLabel>
             <Button
               v-if="view.edited"
@@ -303,7 +303,7 @@ async function discard(): Promise<void> {
             t('common.action.cancel.label')
           }}</Button
         >
-        <AdeTip v-if="view.isArchive" :text="t('space.ade.claudeDialog.deleteAnyway.tooltip')">
+        <AdeTip v-if="view.isArchive" :text="t('space.ade.agentDialog.deleteAnyway.tooltip')">
           <Button
             variant="dialog"
             size="kira-lg"
@@ -312,20 +312,20 @@ async function discard(): Promise<void> {
             data-testid="ade-dialog-delete"
             @click="discard"
           >
-            {{ t('space.ade.claudeDialog.deleteAnyway.label') }}
+            {{ t('space.ade.agentDialog.deleteAnyway.label') }}
           </Button>
         </AdeTip>
         <Button
           variant="dialog-primary"
           size="kira-lg"
-          :class="ACTION_CLASS[view.overridden ? 'red' : 'claude']"
+          :class="ACTION_CLASS[view.overridden ? 'red' : 'agent']"
           :pending="sending"
           :disabled="view.blocked || view.sendDisabled || dialogs.waitingSetup"
           data-testid="ade-dialog-send"
           @click="send"
         >
           {{
-            dialogs.waitingSetup ? t('space.ade.claudeDialog.startsWhenReady.loading') : view.sendLabel
+            dialogs.waitingSetup ? t('space.ade.agentDialog.startsWhenReady.loading') : view.sendLabel
           }}
         </Button>
       </DialogFooter>

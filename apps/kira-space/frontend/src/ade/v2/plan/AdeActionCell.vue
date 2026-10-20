@@ -27,7 +27,7 @@ const ACTION_BTN_CLASS: Record<BranchAction['kind'], string> = {
   seeLog: TONE_SOLID_CLASS.amber,
   takeOver: TONE_SOLID_CLASS.red,
   seeError: TONE_SOLID_CLASS.red,
-  start: ACTION_CLASS.claude,
+  start: ACTION_CLASS.agent,
 };
 const TESTID: Record<BranchAction['kind'], string> = {
   forcePush: 'ade-force-push',

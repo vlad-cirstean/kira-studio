@@ -46,8 +46,8 @@ function fromContract(key: string) {
 const pct = (w: UsageWindow | null) => Math.round(w?.usedPercent ?? 0);
 
 const usageControl = (snap: unknown) => [{ channel: IPC.agentUsageGet, response: snap }];
-const item = (page: Page) => page.locator('[data-testid="claude-usage-status"]');
-const text = (page: Page) => page.locator('[data-testid="claude-usage-text"]');
+const item = (page: Page) => page.locator('[data-testid="agent-usage-status"]');
+const text = (page: Page) => page.locator('[data-testid="agent-usage-text"]');
 
 test('hidden outside the ADE module', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: usageControl(snapshot(23, 41)) });
@@ -61,7 +61,7 @@ test('shows both windows, and the tooltip lists the reset times and the source',
   await expect(text(page)).toHaveText('Session 23% · Weekly 41%');
   await expect(item(page)).toHaveClass(/text-fg/);
   await item(page).hover();
-  const tip = page.locator('[data-testid="claude-usage-tooltip"]');
+  const tip = page.locator('[data-testid="agent-usage-tooltip"]');
   await expect(tip).toContainText('Five-hour: 23% used');
   await expect(tip).toContainText('in 2h');
   await expect(tip).toContainText('Weekly: 41% used');
@@ -75,7 +75,7 @@ test('contract: a session snapshot shows both windows and its source', async ({ 
     `Session ${pct(snap.fiveHour)}% · Weekly ${pct(snap.sevenDay)}%`,
   );
   await item(page).hover();
-  await expect(page.locator('[data-testid="claude-usage-tooltip"]')).toContainText(
+  await expect(page.locator('[data-testid="agent-usage-tooltip"]')).toContainText(
     'From a Claude Code session',
   );
 });
@@ -87,7 +87,7 @@ test('contract: a run snapshot names the run source', async ({ relaunch }) => {
     `Session ${pct(snap.fiveHour)}% · Weekly ${pct(snap.sevenDay)}%`,
   );
   await item(page).hover();
-  await expect(page.locator('[data-testid="claude-usage-tooltip"]')).toContainText(
+  await expect(page.locator('[data-testid="agent-usage-tooltip"]')).toContainText(
     'From a background ADE run',
   );
 });
@@ -130,7 +130,7 @@ test('shows a dash and the hint before any session reported', async ({ relaunch 
   );
   await expect(text(page)).toHaveText('Usage: –');
   await item(page).hover();
-  await expect(page.locator('[data-testid="claude-usage-tooltip"]')).toContainText(
+  await expect(page.locator('[data-testid="agent-usage-tooltip"]')).toContainText(
     'Start a Claude Code session to see usage',
   );
 });
@@ -167,8 +167,8 @@ test('hidden while the setting is off', async ({ relaunch }) => {
 test('the Settings switch saves agent.usageEnabled', async ({ relaunch }) => {
   const { window: page, control } = await relaunch();
   await emitWailsEvent(page, IPC.openSettings, undefined);
-  await page.locator('[data-testid="settings-section-Claude Code"]').click();
-  const sw = page.locator('[data-testid="settings-claude-code-usage"]');
+  await page.locator('[data-testid="settings-section-Agent"]').click();
+  const sw = page.locator('[data-testid="settings-agent-usage"]');
   await expect(sw).toHaveAttribute('aria-checked', 'true');
   await sw.click();
   await page.locator('[data-testid="settings-save"]').click();

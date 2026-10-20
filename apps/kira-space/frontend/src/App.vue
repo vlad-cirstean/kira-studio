@@ -3,6 +3,7 @@
 // this one provider.
 import { TooltipProvider } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { agentControlKey, useAgentMessageDefaults } from '@workbench/agent/agentInfo';
 import { automationsModuleKey } from '@workbench/automations/module';
 import ScheduleConfirmPrompt from '@workbench/automations/schedule/ScheduleConfirmPrompt.vue';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
@@ -22,7 +23,7 @@ import CommandPalette from '@workbench/shortcuts/CommandPalette.vue';
 import { runCommand } from '@workbench/shortcuts/commands';
 import { providePaletteCommands, usePaletteStore } from '@workbench/shortcuts/palette';
 import { appUpdateStoreKey } from '@workbench/state/createAppUpdateStore';
-import { markRaw, onMounted, onUnmounted, provide } from 'vue';
+import { getCurrentInstance, markRaw, onMounted, onUnmounted, provide } from 'vue';
 import AdeReviewWindow from './ade/v2/review/AdeReviewWindow.vue';
 import { useAdeReviewWindowStore } from './ade/v2/state/adeReviewWindow';
 import { useAdeWorkflowsUiStore } from './ade/v2/state/adeWorkflowsUi';
@@ -51,11 +52,14 @@ provide(automationsModuleKey, createAutomationsModule());
 provide(memoryModuleKey, createMemoryModule());
 provide(promptsControlKey, control);
 provide(llmPromptsControlKey, control);
+// App level, not component level: Pinia stores and composables outside the tree inject it too.
+getCurrentInstance()?.appContext.app.provide(agentControlKey, control);
 
 // Always-mounted root dialogs (ConfirmDialog, GitCredentialDialog: a credential prompt must be able
 // to appear with nothing else open) and the Go menu's channel subscriptions.
 const layoutStore = useLayoutStore();
 const settingsStore = useSettingsStore();
+useAgentMessageDefaults(() => settingsStore.agent.provider, control);
 const tabsStore = useTabsStore();
 const modeStore = useModeStore();
 const keepAwakeStore = useKeepAwakeStore();

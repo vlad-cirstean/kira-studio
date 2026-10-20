@@ -167,7 +167,7 @@ const send = sending.run;
             stroke-linecap="round"
             stroke-linejoin="round"
             aria-hidden="true"
-            class="stroke-claude"
+            class="stroke-agent"
           >
             <rect x="3" y="4" width="18" height="16" rx="3" />
             <path d="M7 10l3 2-3 2M12 15h5" />
@@ -222,7 +222,7 @@ const send = sending.run;
         <div v-else class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
             <Label for="ade-run-message" class="flex-1 text-muted-foreground">{{
-              t('space.ade.claudeDialog.message.label')
+              t('space.ade.agentDialog.message.label')
             }}</Label>
             <Button
               v-if="edited"
@@ -257,12 +257,12 @@ const send = sending.run;
         <Button
           variant="dialog-primary"
           size="kira-lg"
-          :class="ACTION_CLASS.claude"
+          :class="ACTION_CLASS.agent"
           :pending="busy"
           data-testid="ade-run-send"
           @click="send"
         >
-          {{ t('space.ade.claudeDialog.runInBackground.label') }}
+          {{ t('space.ade.agentDialog.runInBackground.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

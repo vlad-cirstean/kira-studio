@@ -31,8 +31,10 @@ type Config struct {
 	Terminals         TerminalBroker
 	AgentInputEnabled func() bool
 	AgentSessions     func() any
-	Devices           DeviceStore
-	Hub               *Hub
+	// AgentInfo is the active agent provider's display facts; the phone names the agent from it.
+	AgentInfo func() any
+	Devices   DeviceStore
+	Hub       *Hub
 	// Broker outlives the server: the desktop approval dialog stays subscribed across restarts.
 	Broker *Broker
 	// Assets is the mobile build (index.html, assets/).

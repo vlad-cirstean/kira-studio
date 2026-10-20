@@ -9,6 +9,7 @@ import {
   installControlMocks as sharedInstallControlMocks,
 } from '@workbench/testing/ui/mockRuntime';
 import { defaultSettings } from '../../../frontend/src/state/settingsDomain';
+import { contract } from './contract';
 import { IPC } from './ipcChannels';
 import type { ControlSnapshot } from './types';
 
@@ -104,6 +105,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   promptsRaise: 'PromptsService.Raise',
   promptsDismiss: 'PromptsService.Dismiss',
   promptsSendTest: 'PromptsService.SendTest',
+  agentInfo: 'AgentService.Info',
+  agentInfoFor: 'AgentService.InfoFor',
   llmPromptsList: 'LlmPromptsService.List',
   llmPromptsSave: 'LlmPromptsService.Save',
   llmPromptsPreview: 'LlmPromptsService.Preview',
@@ -264,6 +267,9 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.promptsRaise]: 'null',
   [IPC.promptsDismiss]: 'null',
   [IPC.promptsSendTest]: 'null',
+  // The active agent provider's names: the claude provider, as the Go flow test writes it.
+  [IPC.agentInfo]: JSON.stringify(contract('agent', 'AgentService.Info')),
+  [IPC.agentInfoFor]: JSON.stringify(contract('agent', 'AgentService.Info')),
   // The prompt editor's calls; a spec answers List/Save from tests/contract/llm-prompts.json.
   [IPC.llmPromptsList]: '{"prompts":[],"storeError":"","revision":0}',
   [IPC.llmPromptsSave]: '{"prompts":[],"storeError":"","revision":0}',

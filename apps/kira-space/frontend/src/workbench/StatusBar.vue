@@ -7,6 +7,7 @@ import {
   TooltipDisabledTrigger,
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
+import { useAgentInfo } from '@workbench/agent/agentInfo';
 import RunsStatusItem from '@workbench/automations/runs/RunsStatusItem.vue';
 import AppMetricsItem from '@workbench/components/AppMetricsItem.vue';
 import StatusBarBase from '@workbench/components/StatusBar.vue';
@@ -31,6 +32,7 @@ const appMetricsStore = useAppMetricsStore();
 const appUpdateStore = useAppUpdateStore();
 const modeStore = useModeStore();
 const settingsStore = useSettingsStore();
+const { info: agentInfo } = useAgentInfo();
 
 // P76 §5.2: 'none' and 'uncommitted' both render nothing — an always-present "Uncommitted" readout
 // is the extension's own choice; this bar hides items with nothing to say instead.
@@ -67,8 +69,10 @@ function onRevealBlameCommit(): void {
         </TooltipTrigger>
         <TooltipContent>{{ blameTooltip }}</TooltipContent>
       </Tooltip>
-      <!-- P239: Claude Code usage limits, ADE module only. -->
-      <AgentUsageItem v-if="modeStore.active === 'ade' && settingsStore.agent.usageEnabled" />
+      <!-- P239: agent usage limits, ADE module only, for a provider that reports them. -->
+      <AgentUsageItem
+        v-if="modeStore.active === 'ade' && settingsStore.agent.usageEnabled && agentInfo.usage"
+      />
     </template>
     <template #right>
       <RunsStatusItem />

@@ -152,8 +152,8 @@ const historyToggleId = useId();
           >
             <MemorySetupHint
               v-if="query.trim() === ''"
-              :message="t('memory.panel.connectClaude.hint')"
-              data-testid="memory-setup-hint-claude"
+              :message="t('memory.panel.connectAgent.hint')"
+              data-testid="memory-setup-hint-agent"
             />
           </EmptyState>
         </template>

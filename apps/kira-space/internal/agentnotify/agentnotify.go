@@ -86,6 +86,8 @@ type Deps struct {
 	Focus  func(windowKey string) bool
 	Reveal func(n Note)
 	Now    func() time.Time
+	// AgentLabel names the active agent in titles; nil reads "Agent".
+	AgentLabel func() string
 }
 
 // Cooldown is the minimum gap between two notes of one kind for one terminal or run. A var so a
@@ -118,6 +120,9 @@ type Notifier struct {
 func New(d Deps) *Notifier {
 	if d.Now == nil {
 		d.Now = time.Now
+	}
+	if d.AgentLabel == nil {
+		d.AgentLabel = func() string { return "Agent" }
 	}
 	return &Notifier{
 		d: d, focus: map[string]FocusState{}, wake: map[string]bool{},
@@ -194,10 +199,11 @@ func (n *Notifier) notifyTerminal(kind Kind, ev harness.AgentEvent, message stri
 	}
 	t := n.d.Describe(ev.TerminalID, ev.Cwd)
 	fallback := i18n.T("backend.notify.agent.finished.body", nil)
-	title := i18n.T("backend.notify.agent.finished.title", map[string]string{"name": t.Name})
+	agent := n.d.AgentLabel()
+	title := i18n.T("backend.notify.agent.finished.title", map[string]string{"agent": agent, "name": t.Name})
 	if kind == KindNeedsInput {
 		fallback = i18n.T("backend.notify.agent.needsInput.body", nil)
-		title = i18n.T("backend.notify.agent.needsInput.title", map[string]string{"name": t.Name})
+		title = i18n.T("backend.notify.agent.needsInput.title", map[string]string{"agent": agent, "name": t.Name})
 	}
 	note := Note{
 		ID: string(kind) + ":" + ev.TerminalID, Kind: kind, Title: title,

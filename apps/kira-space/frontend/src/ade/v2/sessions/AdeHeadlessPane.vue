@@ -58,7 +58,7 @@ async function onStop(): Promise<void> {
         variant="dialog"
         size="kira"
         class="shrink-0 rounded-kira-sm px-2"
-        :class="ACTION_CLASS.claude"
+        :class="ACTION_CLASS.agent"
         :pending="takeOver.pending.has(view.session.id)"
         :title="t('space.ade.headless.takeOver.tooltip')"
         data-testid="ade-session-takeover"

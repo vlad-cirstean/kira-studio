@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Translation } from 'vue-i18n';
+import { messageDefaults } from './index';
 import { formatCount } from './number';
 import type { MessageKey, MessageParams } from './types';
 
@@ -17,7 +18,7 @@ const count = computed(() =>
 
 // Translation interpolates through slots only; plain params render as text slots.
 const textParams = computed(() =>
-  Object.entries(props.params ?? {})
+  Object.entries({ ...messageDefaults(), ...props.params })
     .filter(([name]) => !(name in slots))
     .map(
       ([name, value]) =>

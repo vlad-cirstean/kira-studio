@@ -240,6 +240,8 @@ export const IPC = {
   promptsDismiss: 'kira:prompts:dismiss',
   promptsSendTest: 'kira:prompts:sendTest',
   llmPromptsChanged: 'kira:llmPrompts:changed',
+  agentInfo: 'kira:agent:info',
+  agentInfoFor: 'kira:agent:infoFor',
   llmPromptsList: 'kira:llmPrompts:list',
   llmPromptsSave: 'kira:llmPrompts:save',
   llmPromptsPreview: 'kira:llmPrompts:preview',

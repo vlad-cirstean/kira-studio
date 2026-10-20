@@ -17,18 +17,16 @@ const install = useInstallMemoryMcp();
 const command = computed(() => status.data.value?.command ?? '');
 const { copy, copied } = useCopy();
 
-const agent = 'Claude Code';
-
 const message = computed(() => {
   const r = install.data.value;
   if (!r) return null;
   switch (r.outcome) {
     case 'installed':
-      return t('common.agentRegistered.description', { agent });
+      return t('common.agentRegistered.description');
     case 'notFound':
-      return t('common.agentCliNotFound.error', { agent });
+      return t('common.agentCliNotFound.error');
     default:
-      return t('common.agentRegistrationRefused.error', { agent, detail: r.detail });
+      return t('common.agentRegistrationRefused.error', { detail: r.detail });
   }
 });
 </script>
@@ -78,7 +76,7 @@ const message = computed(() => {
         data-testid="memory-mcp-install"
         @click="install.mutate()"
       >
-        <CodiconIcon name="plug" :size="12" /> {{ t('common.registerWithClaudeCode.label') }}
+        <CodiconIcon name="plug" :size="12" /> {{ t('common.registerWithAgent.label') }}
       </Button>
     </div>
   </FieldSet>

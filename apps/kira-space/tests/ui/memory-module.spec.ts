@@ -253,7 +253,7 @@ test('module hosts no setup; hints open Settings > Memory', async ({ relaunch })
 
   await expect(page.locator('[data-testid="memory-connect"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="memory-setup-hint-semantic"]')).toBeVisible();
-  await expect(page.locator('[data-testid="memory-setup-hint-claude"]')).toBeVisible();
+  await expect(page.locator('[data-testid="memory-setup-hint-agent"]')).toBeVisible();
   await page.locator('[data-testid="memory-open-settings"]').first().click();
   await expect(page.locator('[data-testid="memory-semantic"]')).toBeVisible();
 });

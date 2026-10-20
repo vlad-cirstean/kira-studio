@@ -45,7 +45,7 @@ export async function openLaunch(
   );
   const entry = deps.terminalSession(launch.terminalId);
   if (entry?.status === 'failed')
-    throw new Error(entry.error || t('space.ade.claudeDialog.launchFailed.error'));
+    throw new Error(entry.error || t('space.ade.agentDialog.launchFailed.error'));
 }
 
 /** Delivers one message; returns the launch for a new session, `null` for a `Send`. */
