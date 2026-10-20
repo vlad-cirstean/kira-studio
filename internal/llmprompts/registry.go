@@ -474,8 +474,8 @@ Keep, exactly:
 - What the declaration below holds, when the text defines it.
 
 Drop:
-- Phase, plan and review tags (P107, M2, D7, F3, C5 §3.1, v1.8, iter2, "Part 2", "round 2"). Keep the fact a tag labels. A name or number for a part of this code or this text (phase 2, step 1, stage 2, rule 1/3, level 2) is not a tag. A path to a plan doc ("docs/plans/P9.md") and a leftover reference to a dropped tag ("the plan's own", "every G24 surface") are tags.
-- History narration ("was X, now Y", "previously", "no longer", "until now", "used to", "stayed", "the old X"). Narration of a removed bug or an old design is not a current fact: drop it whole or keep it in past tense; never restate it in present tense. An equivalence or guarantee (provably unchanged, byte-identical, same as X) is a fact, not history.
+- Phase, plan and review tags (P107, M2, D7, F3, C5 §3.1, v1.8, iter2, "Part 2", "round 2"). Keep the fact a tag labels. If removing a tag leaves a claim false or dangling ("empty at P8"), keep the clause's truth: drop the whole clause or say what holds now. A name or number for a part of this code or this text (phase 2, step 1, stage 2, rule 1/3, level 2) is not a tag. A path to a plan doc ("docs/plans/P9.md") and a leftover reference to a dropped tag ("the plan's own", "every G24 surface") are tags.
+- History narration ("was X, now Y", "previously", "no longer", "until now", "used to", "stayed", "the old X"). Past-tense text that explains current code (a rejected alternative, the bug a guard prevents, a verification, a consequence chain) is a current why: keep it as written. Drop only narration that explains nothing about current code: who or which phase changed it, moved-from notes, "used to" with no consequence. An equivalence or guarantee (provably unchanged, byte-identical, same as X) is a fact, not history. Equivalence, safety and cost comparisons (as safe as X, O(1) instead of O(n), not a binding change) are facts.
 - A sentence that restates what the context code shows.
 - Filler, only these: "really", "basically", "actually", "simply", and "just" as a hedge. Keep every other word, intensifiers and intent words included ("own", "already", "deliberately", "exactly", "purely", "currently"). "just" meaning "only" or "recently" stays.
 
@@ -519,8 +519,8 @@ var MemoryRewriteCheckSystem = define(Entry{
 {{template "memory.dataHygiene"}}
 
 Input: "original", "rewrite", optional "context" (code around it; read it, never judge it).
-The rewrite may drop phase, plan and review tags (P107, M2, D7, C5 §3.1, v1.8, iter2), history narration (extraction and motivation history included), sentences that restate the context code, and the filler words "really", "basically", "actually", "simply", "just" as a hedge, plus intensifiers ("purely", "always", "today", "silently", "correctly").
-"wrong" also takes past-tense narration of a removed bug or an old design restated in present tense.
+The rewrite may drop phase, plan and review tags (P107, M2, D7, C5 §3.1, v1.8, iter2), history narration that explains nothing about current code (who changed it, moved-from notes), sentences that restate the context code, and the filler words "really", "basically", "actually", "simply", "just" as a hedge, plus intensifiers ("purely", "always", "today", "silently", "correctly").
+Past-tense text that explains current code (a rejected alternative, the bug a guard prevents, a consequence chain) is a why: dropping it is "lost". "wrong" also takes past-tense narration restated in present tense, and a claim a dropped tag left false.
 Find every other fact of the original: literals, numbers, negations, qualifiers of scope and place, what the declaration below holds, cause links (because, so, otherwise), examples, cross-references to other files or settings.
 "lost": each such fact missing from the rewrite or weakened; a dropped cause link or qualifier counts.
 "wrong": each claim of the rewrite the original does not state, or states differently.

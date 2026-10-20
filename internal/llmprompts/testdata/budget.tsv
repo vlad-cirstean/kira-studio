@@ -4,8 +4,8 @@ memory.kinds	971
 memory.runTrivia	1194
 memory.merge.rules	766
 memory.merge.system	3824
-memory.rewrite.system	3488
-memory.rewrite.check.system	1305
+memory.rewrite.system	3906
+memory.rewrite.check.system	1488
 memory.gate.system	4354
 memory.reconcile.system	1444
 memory.import.extract.system	4020
