@@ -163,9 +163,9 @@ func widest(s string) int {
 	return w
 }
 
-// widthKept never widens past the input's own widest line.
-func widthKept(input, draft string) bool {
-	return widest(draft) <= max(RewriteWidth, widest(input))
+// widthKept rejects a changed draft that keeps any line over the width, an inherited over-width line included.
+func widthKept(_, draft string) bool {
+	return widest(draft) <= RewriteWidth
 }
 
 func directivesKept(input, draft string) bool {
@@ -203,10 +203,11 @@ func reflowAllowance(input, draft string) int {
 }
 
 // quotesOutsideBackticks returns the double-quoted spans of s, paired in order per line, ignoring
-// backtick spans.
+// quote characters inside backtick spans. A span holding backticks is returned without them.
 func quotesOutsideBackticks(s string) []string {
 	var spans []string
 	for _, l := range splitLines(s) {
+		raw := l
 		l = backtickSpan.ReplaceAllStringFunc(l, func(m string) string { return strings.Repeat(" ", len(m)) })
 		var at []int
 		for i := 0; i < len(l); i++ {
@@ -216,7 +217,7 @@ func quotesOutsideBackticks(s string) []string {
 		}
 		for k := 0; k+1 < len(at); k += 2 {
 			if n := at[k+1] - at[k] - 1; n >= 1 && n <= 80 {
-				spans = append(spans, l[at[k]:at[k+1]+1])
+				spans = append(spans, strings.ReplaceAll(raw[at[k]:at[k+1]+1], "`", ""))
 			}
 		}
 	}
@@ -259,7 +260,14 @@ func tokensKept(input, draft string, dropped []DroppedSpan) bool {
 		}
 	}
 	for _, tok := range quotesOutsideBackticks(input) {
-		if !present(tok) {
+		found := false
+		for _, f := range forms {
+			if strings.Contains(strings.ReplaceAll(f, "`", ""), tok) {
+				found = true
+				break
+			}
+		}
+		if !found && !present(tok) {
 			return false
 		}
 	}
