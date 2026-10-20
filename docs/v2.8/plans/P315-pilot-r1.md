@@ -75,7 +75,7 @@ unit with check against an estimated 0.014 to 0.016 without.
 Check on or off: neither arm passes. Check on buys 3 caught errors in 120 for 11 lost cleanups
 (missed-trivia 9 to 23) and about +0.010 USD per unit, and still misses #100. Keep the default off
 (plan default; UI has a human reader). All 4 default-arm errors share the two prompt causes above,
-fixable in the rewrite prompt. Re-measure both arms in round 2 with the check prompt fixed; P317
+fixable in the rewrite prompt. Re-measure both arms in round 2 with the check prompt fixed; P318
 picks `check` from round 2 numbers, not these.
 
 ## Idempotence

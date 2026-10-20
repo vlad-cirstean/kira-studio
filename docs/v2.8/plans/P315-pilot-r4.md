@@ -125,7 +125,7 @@ version are the subject. Only the width gate stopped two destructive drafts, by 
 
 1. Rerun and resume: never re-feed a unit already rewritten. Skip by ledger (input hash to output
    hash), so second-pass risk is zero by construction. This one change clears both failing bars
-   for P317.
+   for P318.
 2. Pre-check `historyWord`: drop the common words `was|were|now|before|instead|old|earlier`; keep
    unambiguous narration (`previously`, `formerly`, `originally`, `no longer`, `used to`,
    `renamed`, `moved from`, `replaced`). A miss costs only trivia; a hit on clean text costs risk.

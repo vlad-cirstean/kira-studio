@@ -98,18 +98,18 @@ Main 1.5606 USD: 0.0130 per unit over 120, 0.0159 per model-called unit (98). Ro
 Idempotence 0.1812 (0.0020 per fed-back unit). Round 3 total 1.7418. Pilot spend about 11.95 of
 21.00. Mean wall 8.5 s per main call.
 
-## Shipping risk for P317 (about 5k long comments)
+## Shipping risk for P318 (about 5k long comments)
 
 - Meaning-level bad: 1/120 = 0.8% (95% upper bound about 4.6%). Expect about 40 damaged comments
   of 5k; plausible range 10 to 100, worst case near 230. Damage is minor so far (a lost secondary
   why), not false claims: bad-wrong 0 this round.
 - Every meaning-level bad in rounds 2-3 (r2 #112, r2 #61, r3 #92) and the r3 #90 near-miss came from
   a `history` or tag-adjacent drop. A cheap review filter: flag rewrites whose `dropped` list holds a
-  `history` item. In round 3 that is 28 of 92 rewrites and covers the one bad. Recommend P317
+  `history` item. In round 3 that is 28 of 92 rewrites and covers the one bad. Recommend P318
   lands as a reviewable diff with that subset skimmed.
 - Missed-trivia 7.5%: about 375 comments keep some trivia. Harmless; extend pre-check patterns to
   cut it.
-- Re-run risk: a second P317 pass is safe (0 harmful, 1% churn), so resume or rerun is fine.
+- Re-run risk: a second P318 pass is safe (0 harmful, 1% churn), so resume or rerun is fine.
 - Safe defaults: `check` off (round 2: +27% cost, false alarms, missed-trivia fail), pre-check on,
   tokens gate on, width gate on (reject changed draft with any line over 100, tabs as 4), round-3
   rewrite prompt. Optional, not gating: extra pre-check patterns, tab-width note in the prompt.
