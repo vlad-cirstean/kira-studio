@@ -699,6 +699,9 @@
         "promptTooLong": {
           "body": "The prompt is longer than {max} characters."
         },
+        "resumeCommandNone": {
+          "body": "Only a smart run with a saved conversation can continue in a terminal."
+        },
         "resumeMissing": {
           "body": "Resume needs values for: {names}. Run it again instead."
         },

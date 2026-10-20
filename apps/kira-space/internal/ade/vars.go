@@ -6,6 +6,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
+	"github.com/kirathecat/kira-studio/internal/loginshell"
 )
 
 // runVars are the prompt and command variables of one run (SPEC2 section 5.1.1).
@@ -19,7 +20,7 @@ type runVars struct {
 func substitute(text string, v runVars, quote bool) string {
 	val := func(s string) string {
 		if quote {
-			return quotePOSIX(s)
+			return loginshell.Quote(s)
 		}
 		return s
 	}

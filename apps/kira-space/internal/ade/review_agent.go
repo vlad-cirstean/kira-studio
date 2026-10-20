@@ -28,14 +28,10 @@ func (b *TaskBoard) launchReviewAgent(ctx context.Context, tc *taskCtx, tr *Trac
 	if err != nil {
 		return adewire.Launch{}, false, "", err
 	}
-	var addDirs []string
-	if len(extra) > 0 {
-		addDirs = append([]string{"--add-dir"}, extra...)
-	}
 	note := ""
 	if row != nil {
 		if info, serr := os.Stat(row.Cwd); serr == nil && info.IsDir() {
-			res, err := tr.Prepare(PrepareArgs{TaskID: tc.task.ID, Resume: row.ID, Message: message, ExtraArgs: addDirs})
+			res, err := tr.Prepare(PrepareArgs{TaskID: tc.task.ID, Resume: row.ID, Message: message, AddDirs: extra})
 			if err != nil {
 				return adewire.Launch{}, false, "", err
 			}
@@ -54,7 +50,7 @@ func (b *TaskBoard) launchReviewAgent(ctx context.Context, tc *taskCtx, tr *Trac
 		}
 	}
 	res, err := tr.Prepare(PrepareArgs{
-		TaskID: tc.task.ID, Cwd: cwd, Message: message, ExtraArgs: addDirs, Purpose: model.AdeSessionPurposeReview,
+		TaskID: tc.task.ID, Cwd: cwd, Message: message, AddDirs: extra, Purpose: model.AdeSessionPurposeReview,
 	})
 	if err != nil {
 		return adewire.Launch{}, false, "", err

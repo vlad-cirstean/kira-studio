@@ -14,6 +14,7 @@ type Env = ScenarioEnv<
   | 'scriptRunsMcpTools'
   | 'scriptRunsPreview'
   | 'scriptRunsReadLog'
+  | 'scriptRunsResumeCommand'
   | 'scriptRunsStart'
   | 'terminalOpen'
 >;
@@ -367,7 +368,15 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
   test('a failed run shows its reason and Continue in terminal resumes the session', async ({
     relaunch,
   }) => {
-    const { window: page, control } = await relaunch({ control: BASE });
+    const { window: page, control } = await relaunch({
+      control: [
+        ...BASE,
+        {
+          channel: IPC.scriptRunsResumeCommand,
+          response: contract('smart', 'ScriptRunsService.ResumeCommand'),
+        },
+      ],
+    });
     await openPanel(page);
     await page.locator(`[data-testid="script-${SMART.id}"]`).click();
     await page.locator('[data-testid="run-start"]').click();

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/scripts"
@@ -93,4 +94,16 @@ func resumeArgs(run Run, rec scripts.CustomScript) (RunArgs, []string) {
 		}
 	}
 	return args, secrets
+}
+
+// ResumeCommand is the terminal command that continues a smart run's saved conversation.
+func (s *Service) ResumeCommand(id string) (string, error) {
+	run, err := s.Runs.Get(id)
+	if err != nil {
+		return "", err
+	}
+	if run.Kind != KindSmart || run.SessionID == "" {
+		return "", ipcerr.T(ipcerr.CodeBadRequest, "backend.core.scriptRun.resumeCommandNone.body", nil)
+	}
+	return s.Agent.Active().InteractiveCommand(harness.InteractiveSpec{SessionID: run.SessionID, Resume: true}), nil
 }

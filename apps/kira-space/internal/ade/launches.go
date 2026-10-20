@@ -302,8 +302,7 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 			ids = append(ids, agentmcp.SpaceToolIDs...)
 		}
 		tools := harness.ToolNames(b.deps.Agent.Active(), ids...)
-		pa.ExtraArgs = append(pa.ExtraArgs, "--mcp-config", cfg, "--allowedTools")
-		pa.ExtraArgs = append(pa.ExtraArgs, tools...)
+		pa.MCPConfig, pa.AllowedTools = cfg, tools
 	}
 	res, err := tr.Prepare(pa)
 	if err != nil {
@@ -475,7 +474,7 @@ func (b *TaskBoard) LaunchStep(ctx context.Context, args adewire.LaunchStepArgs)
 	}
 	pa := PrepareArgs{TaskID: tc.task.ID, StepID: step.ID, Cwd: cwd, Message: message}
 	if len(extra) > 0 {
-		pa.ExtraArgs = append([]string{"--add-dir"}, extra...)
+		pa.AddDirs = extra
 	}
 	return b.prepareWithGrant(tr, tc, pa, "")
 }

@@ -417,7 +417,7 @@ func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
 
 	res, err := tr.Prepare(PrepareArgs{
 		TaskID: "t1", BranchID: "b1", StepID: "s1", Cwd: cwd, Resumes: "claude-9",
-		ExtraArgs: []string{"--add-dir", "/x y"}, Message: "go on",
+		AddDirs: []string{"/x y"}, Message: "go on",
 	})
 	if err != nil {
 		t.Fatal(err)

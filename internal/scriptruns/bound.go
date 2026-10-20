@@ -111,6 +111,26 @@ func (b *Bound) Resume(args IDArgs) (Started, error) {
 	return started, nil
 }
 
+// ResumeCommandArgs names the smart run to continue in a terminal.
+type ResumeCommandArgs struct {
+	RunID string `json:"runId"`
+}
+
+// ResumeCommand is the shell command that continues a smart run's conversation in the agent's TUI.
+func (b *Bound) ResumeCommand(args ResumeCommandArgs) (string, error) {
+	if args.RunID == "" {
+		return "", ipcerr.Required("runId")
+	}
+	cmd, err := b.Svc.ResumeCommand(args.RunID)
+	if IsCallerError(err) {
+		return "", ipcerr.T(ipcerr.CodeNotFound, "backend.core.scriptRun.runNotFound.body", nil)
+	}
+	if err != nil {
+		return "", ipcerr.Wrap(err)
+	}
+	return cmd, nil
+}
+
 type ReadLogArgs struct {
 	ID       string `json:"id"`
 	AfterSeq int    `json:"afterSeq"`

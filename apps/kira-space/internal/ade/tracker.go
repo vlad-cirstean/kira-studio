@@ -95,10 +95,12 @@ type PrepareArgs struct {
 	// Resume is "" for a new session, or an existing ade_sessions.id to resume.
 	Resume  string
 	Message string
-	// Resumes is the Claude session id a new record continues (`claude --resume`), ExtraArgs are
-	// added to the base command, quoted.
+	// Resumes is the agent session id a new record continues. AddDirs, MCPConfig and AllowedTools
+	// extend the base command.
 	TaskID, BranchID, StepID, Resumes string
-	ExtraArgs                         []string
+	AddDirs                           []string
+	MCPConfig                         string
+	AllowedTools                      []string
 	// Purpose is "" or model.AdeSessionPurposeReview for the task's review agent.
 	Purpose string
 }
@@ -281,13 +283,10 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	}
 
 	claudeBin := cmpNonEmpty(t.deps.AgentBin, agent.Command())
-	command := newCommand(claudeBin, claudeSessionID)
-	if args.Resume != "" || args.Resumes != "" {
-		command = resumeCommand(claudeBin, claudeSessionID)
-	}
-	for _, a := range args.ExtraArgs {
-		command += " " + quotePOSIX(a)
-	}
+	command := agent.InteractiveCommand(harness.InteractiveSpec{
+		Bin: claudeBin, SessionID: claudeSessionID, Resume: args.Resume != "" || args.Resumes != "",
+		AddDirs: args.AddDirs, MCPConfig: args.MCPConfig, AllowedTools: args.AllowedTools,
+	})
 
 	terminalID := uuid.NewString()
 	intent := pendingIntent{
@@ -385,7 +384,7 @@ func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, er
 	}
 	if intent.Message != "" {
 		// The command can end in a variadic flag (--add-dir a b), which would swallow the prompt.
-		composed += " -- " + quotePOSIX(normalizeMessage(intent.Message))
+		composed = t.deps.Agent.Active().WithPrompt(composed, normalizeMessage(intent.Message))
 	}
 	if len(composed) > terminal.MaxCommandBytes {
 		return "", nil, fmt.Errorf("%w: command is too long", ErrInvalidInput)

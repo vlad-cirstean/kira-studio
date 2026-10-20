@@ -54,6 +54,8 @@ export interface ScriptRunsSeam {
   start(args: ScriptRunArgs, hash: string): Promise<ScriptRunStarted>;
   /** Continues the Claude session of a smart run a restart ended, as a new run. */
   resume(id: string): Promise<ScriptRunStarted>;
+  /** The terminal command that continues a smart run's conversation. */
+  resumeCommand(runId: string): Promise<string>;
   readLog(id: string, afterSeq: number): Promise<ScriptRunLogPage>;
   onLog(cb: (push: { runId: string; chunks: ScriptRunLogChunk[] }) => void): () => void;
   /** Next fire instants (unix ms) of a cron in a timezone; rejects with the Go validation text. */

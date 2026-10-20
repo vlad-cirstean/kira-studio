@@ -246,6 +246,7 @@ export const IPC = {
   scriptRunsGet: 'kira:scriptRuns:get',
   scriptRunsStop: 'kira:scriptRuns:stop',
   scriptRunsResume: 'kira:scriptRuns:resume',
+  scriptRunsResumeCommand: 'kira:scriptRuns:resumeCommand',
   scriptRunsResolveDir: 'kira:scriptRuns:resolveDir',
   scriptRunsPreview: 'kira:scriptRuns:preview',
   scriptRunsStart: 'kira:scriptRuns:start',

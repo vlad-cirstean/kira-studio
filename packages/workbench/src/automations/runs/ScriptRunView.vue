@@ -42,17 +42,14 @@ const canContinue = computed(
     (run.value.state === 'blocked' || run.value.state === 'failed'),
 );
 
-function shellQuote(s: string): string {
-  return `'${s.replaceAll("'", `'\\''`)}'`;
-}
-
-function continueInTerminal(): void {
+async function continueInTerminal(): Promise<void> {
   const r = run.value;
   if (!r) return;
+  const command = await ctx.runs.resumeCommand(r.id);
   ctx.openTerminalTab({
     cwd: r.cwd,
     launch: {
-      command: `claude --resume ${shellQuote(r.sessionId)}`,
+      command,
       label: t('common.product.claudeCode.label'),
       color: 'none',
       kind: 'claude-code',

@@ -26,6 +26,7 @@ type Provider interface {
 	Locator
 	Structured
 	Headless
+	Interactive
 	MCPHost
 }
 
