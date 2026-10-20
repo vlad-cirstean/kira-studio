@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
 	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
@@ -91,7 +92,7 @@ const (
 // locateClaude checks PATH first, then every absolute candidate in order, every path considered
 // recorded in probed regardless of outcome.
 func (i *Installer) locateClaude() (path string, probed []string, found bool) {
-	return toolexec.Locate(i.lookPath, i.stat, "claude", toolexec.ClaudeCandidates())
+	return toolexec.Locate(i.lookPath, i.stat, "claude", claude.Candidates())
 }
 
 // Status is the pane's own pre-click read.

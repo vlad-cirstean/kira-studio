@@ -185,7 +185,7 @@ func Build(opts Options) (*Wired, error) {
 	promptRouter := newPromptRouter(windows, repositories, opts.Emitter, w.reopenWindow)
 	windows.OnChange = promptRouter.Reroute
 
-	embedded := wireEmbeddedServices(deps, opts.McpInstaller, opts.KeepAwakeDriver, connectionsSvc, oplogWiring, metricsTicker, promptRouter, opts)
+	embedded := wireEmbeddedServices(deps, opts.McpInstaller, opts.KeepAwakeDriver, connectionsSvc, oplogWiring, metricsTicker, promptRouter, agents, opts)
 	lifecycle := wireLifecycle(windows, embedded.events, embedded.eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
 		embedded.dbMcpSvc, embedded.keepAwakeSvc, embedded.terminalSvc, updateInstaller, embedded.runs, embedded.sched, repositories, db)
 	embedded.sched.Start()

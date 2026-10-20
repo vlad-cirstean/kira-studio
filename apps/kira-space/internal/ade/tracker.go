@@ -18,8 +18,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/agenthooks"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/terminal"
-	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
 // defaultGrace/defaultPendingTTL are TrackerDeps' own zero-value defaults, applied by NewTracker.
@@ -29,7 +29,6 @@ const (
 	// launchGuardWindow bounds how long an uncomposed intent blocks a repeat launch: it covers the
 	// double-click and the terminal mount round trip, not an abandoned launch.
 	launchGuardWindow = 10 * time.Second
-	defaultClaudeBin  = "claude"
 )
 
 // Sentinel errors Prepare/Compose/Send return — bridge/adetask.go maps each to an invalid-input
@@ -65,12 +64,14 @@ type TrackerDeps struct {
 	// seconds.
 	Grace      time.Duration
 	PendingTTL time.Duration
-	// ClaudeBin defaults to "claude" when empty. Exists only so ade_test.go's integration test can
-	// point it at an absolute path to a fake script — this container's own login-shell PATH always
-	// resolves a bare "claude" to the real installed CLI ahead of anything a test could prepend
-	// (every /etc/profile.d/*.sh script re-prepends its own bin dir), which would make a hermetic
-	// fake-CLI test impossible without this seam. Production never sets it.
-	ClaudeBin string
+	// Agent resolves the provider of a new launch.
+	Agent harness.Selector
+	// AgentBin defaults to the provider's CLI name when empty. Exists only so ade_test.go's
+	// integration test can point it at an absolute path to a fake script — this container's own
+	// login-shell PATH always resolves a bare "claude" to the real installed CLI ahead of anything
+	// a test could prepend (every /etc/profile.d/*.sh script re-prepends its own bin dir), which
+	// would make a hermetic fake-CLI test impossible without this seam. Production never sets it.
+	AgentBin string
 }
 
 // pendingIntent is one PrepareLaunch call's own record, keyed by the terminalId Prepare mints —
@@ -162,9 +163,6 @@ func NewTracker(deps TrackerDeps) *Tracker {
 	if deps.PendingTTL <= 0 {
 		deps.PendingTTL = defaultPendingTTL
 	}
-	if deps.ClaudeBin == "" {
-		deps.ClaudeBin = defaultClaudeBin
-	}
 	return &Tracker{
 		deps:            deps,
 		pending:         map[string]pendingIntent{},
@@ -239,7 +237,8 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	if args.TaskID == "" {
 		return PrepareResult{}, fmt.Errorf("%w: taskId is required", ErrInvalidInput)
 	}
-	if _, err := toolexec.RequireClaude(context.Background(), toolexec.ClaudeDeps{Bin: t.deps.ClaudeBin}); err != nil {
+	agent := t.deps.Agent.Active()
+	if _, err := agent.Locate(context.Background(), t.deps.AgentBin); err != nil {
 		return PrepareResult{}, err
 	}
 	now := t.deps.Now()
@@ -281,7 +280,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 		cwd = existing.Cwd
 	}
 
-	claudeBin := t.deps.ClaudeBin
+	claudeBin := cmpNonEmpty(t.deps.AgentBin, agent.Command())
 	command := newCommand(claudeBin, claudeSessionID)
 	if args.Resume != "" || args.Resumes != "" {
 		command = resumeCommand(claudeBin, claudeSessionID)

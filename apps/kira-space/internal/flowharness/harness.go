@@ -38,10 +38,10 @@ import (
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox/sandboxtest"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/testx"
-	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
 type options struct {
@@ -140,7 +140,7 @@ func New(t *testing.T, opts ...Opt) *App {
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(root) })
 	if o.noClaude {
-		t.Cleanup(toolexec.SetSystemClaudePaths())
+		t.Cleanup(claude.SetSystemPaths())
 	}
 	a := &App{
 		t: t, Root: root,

@@ -39,7 +39,7 @@ func (s *Service) prepareSandbox(ctx context.Context, p *planned, runID string, 
 	if s.SandboxKeychain != nil {
 		in.Keychain = s.SandboxKeychain()
 	}
-	rt := agentsandbox.DiscoverRuntime(ctx, "claude")
+	rt := agentsandbox.DiscoverRuntime(ctx, s.Agent.Active(), "")
 	pol, _, err := agentsandbox.ResolvePolicy(in, rt)
 	if err != nil {
 		return nil, err

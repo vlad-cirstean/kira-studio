@@ -370,7 +370,7 @@ func TestRunEngine_takeOver(t *testing.T) {
 		t.Fatalf("cwd = %s, want the run's worktree %s", l.Cwd, head.Cwd)
 	}
 	composed := e.spawn(l)
-	if !strings.HasPrefix(composed, e.tracker.deps.ClaudeBin+" --resume '"+head.ClaudeSessionID+"' ") ||
+	if !strings.HasPrefix(composed, e.tracker.deps.AgentBin+" --resume '"+head.ClaudeSessionID+"' ") ||
 		!strings.Contains(composed, "'--allowedTools' '"+claudeheadless.FinishStepTool+"'") {
 		t.Fatalf("command = %s", composed)
 	}

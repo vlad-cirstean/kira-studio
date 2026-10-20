@@ -24,6 +24,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/scripts"
@@ -74,8 +75,9 @@ type TaskBoardDeps struct {
 	AgentDir string
 	// Prompts resolves the editable LLM prompt texts; nil means the registry defaults.
 	Prompts llmprompts.Source
-	// ClaudeBin defaults to "claude" (a test points it at a fake).
-	ClaudeBin string
+	// Agent resolves the provider of a new run. AgentBin overrides its CLI (a test points it at a fake).
+	Agent    harness.Selector
+	AgentBin string
 	// Tracker records and launches interactive (TUI) task sessions.
 	Tracker *Tracker
 	// CloseTerminal closes a running terminal by id (Archive).

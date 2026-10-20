@@ -31,6 +31,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	memembed "github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/memcheck"
@@ -98,10 +99,10 @@ type gitWired struct {
 // Rows a previous process life left running are stopped by the task board's Recover.
 func wireTracker(
 	repositories *repos.Repos, registry *terminal.Registry, emitter appevent.Emitter, events *bridge.Events,
-	grace time.Duration, notifier *agentnotify.Notifier, usage *claudeusage.Service,
+	grace time.Duration, notifier *agentnotify.Notifier, usage *claudeusage.Service, agents harness.Selector,
 ) (*ade.Tracker, *agenthooks.Manager) {
 	tracker := ade.NewTracker(ade.TrackerDeps{
-		Store: repositories.AdeSessions, LiveAgents: registry.AgentSessions,
+		Agent: agents, Store: repositories.AdeSessions, LiveAgents: registry.AgentSessions,
 		WriteTerminal: registry.Write, Now: time.Now, Grace: grace,
 		OnChange: func() { bridge.AdeTaskSessionsChanged(events) },
 	})
@@ -183,6 +184,7 @@ func wireAdeTask(
 	repositories *repos.Repos, events *bridge.Events, git gitWired, tracker *ade.Tracker, closeTerminal func(string) error,
 	closeReviewWindows func(taskID string), credentials *gitcred.Relay, keepAwake *bridge.KeepAwakeService,
 	notifier *agentnotify.Notifier, usage *claudeusage.Service, rebaseTimeout time.Duration, runs *scriptruns.Service,
+	agents harness.Selector,
 ) *ade.TaskBoard {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
@@ -191,6 +193,7 @@ func wireAdeTask(
 	gitPath := adeGitPathSetting(repositories)
 	runs.SandboxKeychain = sandboxKeychain(repositories)
 	board := ade.NewTaskBoard(ade.TaskBoardDeps{
+		Agent:   agents,
 		Prompts: runs.LlmPrompts,
 		Tasks:   repositories.AdeTasks, Backlog: repositories.AdeBacklog, RepoConfig: repositories.AdeRepoConfig,
 		CodeRepos: repositories.CodeRepos, GitRepoSettings: repositories.GitRepoSettings.Get,

@@ -89,16 +89,17 @@ func newTestTracker(t *testing.T) (*Tracker, *repos.AdeSessionsRepo, *fakeLive, 
 
 	live := newFakeLive()
 	clock := newFakeClock()
-	// ClaudeBin points Prepare's own CLI preflight check at this test binary (always present and
+	// AgentBin points Prepare's own CLI preflight check at this test binary (always present and
 	// executable) rather than the real "claude" — these tests mock the launch itself via live/
-	// WriteTerminal, so what ClaudeBin resolves to past the preflight check never runs.
+	// WriteTerminal, so what AgentBin resolves to past the preflight check never runs.
 	self, err := os.Executable()
 	if err != nil {
 		t.Fatalf("os.Executable: %v", err)
 	}
 	tr := NewTracker(TrackerDeps{
+		Agent: testAgents,
 		Store: repositories.AdeSessions, LiveAgents: live.AgentSessions, WriteTerminal: live.Write,
-		Now: clock.Now, Grace: 20 * time.Millisecond, PendingTTL: time.Minute, ClaudeBin: self,
+		Now: clock.Now, Grace: 20 * time.Millisecond, PendingTTL: time.Minute, AgentBin: self,
 	})
 	return tr, repositories.AdeSessions, live, clock
 }
@@ -425,7 +426,7 @@ func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := tr.deps.ClaudeBin + " --resume 'claude-9' '--add-dir' '/x y' -- 'go on'"; composed != want {
+	if want := tr.deps.AgentBin + " --resume 'claude-9' '--add-dir' '/x y' -- 'go on'"; composed != want {
 		t.Fatalf("composed = %q, want %q", composed, want)
 	}
 	rec, err := store.Get(res.RecordID)
@@ -455,7 +456,7 @@ func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if again.RecordID != res.RecordID || again.Command != tr.deps.ClaudeBin+" --resume 'claude-9'" {
+	if again.RecordID != res.RecordID || again.Command != tr.deps.AgentBin+" --resume 'claude-9'" {
 		t.Fatalf("resume = %+v", again)
 	}
 	if _, _, err := tr.Compose(again.TerminalID, "", again.Command); err != nil {

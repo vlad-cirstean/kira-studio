@@ -46,6 +46,7 @@ func TestWorkflows_writesAndExternalEdits(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "workflows")
 	var emitted atomic.Int32
 	b := NewTaskBoard(TaskBoardDeps{
+		Agent:       testAgents,
 		Credentials: gitcred.New(),
 		Tasks:       r.AdeTasks, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
 		Logs:   r.AdeLogs,

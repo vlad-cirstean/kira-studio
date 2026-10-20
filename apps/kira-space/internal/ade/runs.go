@@ -739,7 +739,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		return
 	}
 	spec := claudeheadless.Spec{
-		ClaudeBin: cmpNonEmpty(b.deps.ClaudeBin, "claude"), Dir: l.path, Prompt: l.prompt, SessionID: b.sessionClaudeID(sessionID),
+		ClaudeBin: cmpNonEmpty(b.deps.AgentBin, "claude"), Dir: l.path, Prompt: l.prompt, SessionID: b.sessionClaudeID(sessionID),
 		Resume: l.resume, MCPConfigPath: cfg, SettingSources: b.settingSources(), AllowedTools: roundTools(allowedTools(def.AllowedTools, space), round), DisallowedTools: def.DisallowedTools,
 		Timeout: l.timeout,
 	}

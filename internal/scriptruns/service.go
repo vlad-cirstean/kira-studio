@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/prompts"
@@ -35,6 +36,8 @@ type Service struct {
 
 	// EmitLog pushes the log lines a smart run just stored.
 	EmitLog func(LogPush)
+	// Agent resolves the provider of a new run.
+	Agent harness.Selector
 	// Getenv reads the user's environment for their Claude config; nil means os.Getenv.
 	Getenv func(string) string
 	// SmartTimeout, when positive, replaces every smart run's own timeout (a flow test).

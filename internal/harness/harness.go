@@ -5,6 +5,7 @@
 package harness
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"slices"
@@ -16,8 +17,20 @@ const DefaultProvider = "claude"
 // Provider is one agent harness. ID is the agent.provider setting value.
 type Provider interface {
 	ID() string
+	// Command is the agent CLI's name as a user types it ("claude").
+	Command() string
 	// Models is the provider's model aliases.
 	Models() Catalog
+	Locator
+}
+
+// Locator finds the provider's CLI.
+type Locator interface {
+	// Locate resolves the agent CLI the way a launch does (PATH, install paths, login shell). An
+	// absolute bin is the only path tried (a test seam). A miss is the Kira not-found ipcerr.
+	Locate(ctx context.Context, bin string) (string, error)
+	// Available is the quick probe without the login-shell fallback.
+	Available() error
 }
 
 // Catalog is a provider's model aliases; Default is used when none is chosen.

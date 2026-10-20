@@ -214,10 +214,12 @@ func newEngine(t *testing.T, scen map[string][]string) *engine {
 	e.workdir = wfDir
 	e.live = newFakeLive()
 	e.tracker = NewTracker(TrackerDeps{
+		Agent: testAgents,
 		Store: r.AdeSessions, LiveAgents: e.live.AgentSessions, WriteTerminal: e.live.Write, Now: time.Now,
-		Grace: 20 * time.Millisecond, PendingTTL: time.Minute, ClaudeBin: self,
+		Grace: 20 * time.Millisecond, PendingTTL: time.Minute, AgentBin: self,
 	})
 	e.board = NewTaskBoard(TaskBoardDeps{
+		Agent:       testAgents,
 		Credentials: gitcred.New(),
 		Tracker:     e.tracker,
 		CloseTerminal: func(id string) error {
@@ -231,7 +233,7 @@ func newEngine(t *testing.T, scen map[string][]string) *engine {
 		GitRepoSettings: r.GitRepoSettings.Get, Runner: gitclient.NewExecRunner(), Registry: registry,
 		GitStatus: func(context.Context) gitclient.GitStatus { return gitclient.GitStatus{Kind: "ok", Path: "git"} },
 		Workflows: &adeflow.Reader{Dir: wfDir, Store: r.AdeTasks},
-		Logs:      r.AdeLogs, Sessions: r.AdeSessions, AgentDir: filepath.Join(t.TempDir(), "agent"), ClaudeBin: self,
+		Logs:      r.AdeLogs, Sessions: r.AdeSessions, AgentDir: filepath.Join(t.TempDir(), "agent"), AgentBin: self,
 		OnLog:            func(ev adewire.LogEvent) { e.mu.Lock(); e.logs = append(e.logs, ev); e.mu.Unlock() },
 		AutofetchMinutes: func() int { return 0 }, HomeDir: e.home,
 	})

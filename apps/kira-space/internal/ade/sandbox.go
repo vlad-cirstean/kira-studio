@@ -113,7 +113,7 @@ func (b *TaskBoard) prepareSandbox(ctx context.Context, run model.AdeRun, l agen
 	if err != nil {
 		return nil, err
 	}
-	rt := agentsandbox.DiscoverRuntime(ctx, cmpNonEmpty(b.deps.ClaudeBin, "claude"))
+	rt := agentsandbox.DiscoverRuntime(ctx, b.deps.Agent.Active(), b.deps.AgentBin)
 	pol, notes, err := agentsandbox.ResolvePolicy(in, rt)
 	if err != nil {
 		return nil, err

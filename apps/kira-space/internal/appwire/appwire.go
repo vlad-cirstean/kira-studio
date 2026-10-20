@@ -236,7 +236,7 @@ func Build(opts Options) *Wired {
 		OnChange: func() { bridge.ClaudeUsageChanged(emitter, w.ClaudeUsage.Get()) },
 	})
 	w.ClaudeUsageSvc = &bridge.ClaudeUsageService{U: w.ClaudeUsage}
-	adeTracker, agentHooks := wireTracker(repositories, terminalRegistry, emitter, events, opts.TrackerGrace, w.AgentNotify, w.ClaudeUsage)
+	adeTracker, agentHooks := wireTracker(repositories, terminalRegistry, emitter, events, opts.TrackerGrace, w.AgentNotify, w.ClaudeUsage, w.Agents)
 	w.Tracker, w.AgentHooks = adeTracker, agentHooks
 
 	// P128 §2.1: the bound terminal methods live once in internal/terminal.BoundService; this
@@ -252,6 +252,7 @@ func Build(opts Options) *Wired {
 		},
 		EmitLog:      func(p scriptruns.LogPush) { emitter.Emit(bridge.ChannelScriptRunLog, p) },
 		SmartTimeout: opts.SmartTimeout, ScheduleTimeout: opts.ScheduleTimeout, Prompts: w.Prompts, LlmPrompts: promptStore,
+		Agent: w.Agents,
 	}
 	if opts.Clock != nil {
 		runs.Now = opts.Clock.Now
@@ -267,7 +268,7 @@ func Build(opts Options) *Wired {
 	w.ScriptRuns = &bridge.ScriptRunsService{Bound: &scriptruns.Bound{Svc: runs}}
 	w.Terminal = &bridge.TerminalService{BoundService: &terminal.BoundService{
 		Emit: emitter, Registry: terminalRegistry, ComposeAgent: adeTracker.Compose, AbortAgent: adeTracker.Abort,
-		Arbiter: termBroker, Scripts: runs,
+		Arbiter: termBroker, Scripts: runs, Agent: w.Agents,
 	}}
 	// P116 G5 keep-awake toggle plus P188's agent reason: the live Claude Code session count —
 	// terminal agent tabs and running headless ade sessions — against claudeCode.keepAwakeWithAgents.
@@ -295,7 +296,7 @@ func Build(opts Options) *Wired {
 				return w.AdeTask.CloseWindow(key)
 			}
 			return w.Windows.Close(key)
-		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.ClaudeUsage, opts.RebaseTimeout, runs)
+		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.ClaudeUsage, opts.RebaseTimeout, runs, w.Agents)
 	runs.ADE = w.AdeBoard
 	w.sched = &scriptruns.Scheduler{Svc: runs, Clock: opts.Clock}
 	w.sched.Start()

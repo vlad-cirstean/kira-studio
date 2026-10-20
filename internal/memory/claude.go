@@ -151,7 +151,7 @@ func (r *CLIRunner) Run(ctx context.Context, c Call) (json.RawMessage, error) {
 
 // Available reports whether the claude CLI can be found.
 func (r *CLIRunner) Available() error {
-	if _, _, found := toolexec.Locate(r.lookPath, r.stat, "claude", toolexec.ClaudeCandidates()); !found {
+	if _, _, found := toolexec.Locate(r.lookPath, r.stat, "claude", claude.Candidates()); !found {
 		return ErrClaudeNotFound
 	}
 	return nil
@@ -162,7 +162,7 @@ func ClaudeAvailable() error { return NewCLIRunner(nil).Available() }
 
 // RunResult is Run plus the cost and turn count Claude Code reports.
 func (r *CLIRunner) RunResult(ctx context.Context, c Call) (Result, error) {
-	path, _, found := toolexec.Locate(r.lookPath, r.stat, "claude", toolexec.ClaudeCandidates())
+	path, _, found := toolexec.Locate(r.lookPath, r.stat, "claude", claude.Candidates())
 	if !found {
 		return Result{}, ErrClaudeNotFound
 	}
