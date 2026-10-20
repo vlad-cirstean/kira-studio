@@ -29,7 +29,7 @@ import { countChars, estimateTokens } from './size';
 // read-only until the user stores or imports the result.
 const memoryUi = useMemoryUiStore();
 const ui = useDistillUiStore();
-const { source, text, path, origin, progress, cancelled } = storeToRefs(ui);
+const { source, text, mode, path, origin, progress, cancelled } = storeToRefs(ui);
 const limits = useDistillLimits();
 const distill = useDistill();
 const choose = useChooseDistillFile();
@@ -40,8 +40,21 @@ const SOURCES = computed(() => [
   { value: 'text', label: t('common.field.text.label'), testid: 'distill-source-text' },
   { value: 'file', label: t('common.field.file.label'), testid: 'distill-source-file' },
 ]);
+const MODES = computed(() => [
+  { value: 'facts', label: t('memory.distill.mode.facts.label'), testid: 'distill-mode-facts' },
+  {
+    value: 'rewrite',
+    label: t('memory.distill.mode.rewrite.label'),
+    testid: 'distill-mode-rewrite',
+  },
+]);
+const rewriting = computed(() => source.value === 'text' && mode.value === 'rewrite');
 const chars = computed(() => countChars(text.value));
-const maxChars = computed(() => limits.data.value?.maxChars ?? Number.POSITIVE_INFINITY);
+const maxChars = computed(
+  () =>
+    (rewriting.value ? limits.data.value?.rewriteMaxChars : limits.data.value?.maxChars) ??
+    Number.POSITIVE_INFINITY,
+);
 const overLimit = computed(() => source.value === 'text' && chars.value > maxChars.value);
 const canRun = computed(
   () =>
@@ -86,7 +99,7 @@ async function run(): Promise<void> {
     await distill.mutateAsync({
       args: {
         requestId: ui.requestId,
-        ...(fromText ? { text: text.value } : { path: path.value }),
+        ...(fromText ? { text: text.value, mode: mode.value } : { path: path.value }),
       },
       signal,
       source: from,
@@ -112,9 +125,12 @@ async function run(): Promise<void> {
         }}</Button
       >
       <SecondaryTabs v-model="source" variant="segmented" :items="SOURCES" />
+      <SecondaryTabs v-if="source === 'text'" v-model="mode" variant="segmented" :items="MODES" />
     </PanelBar>
     <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-      <FieldDescription data-testid="distill-hint">{{ t('memory.distill.hint') }}</FieldDescription>
+      <FieldDescription data-testid="distill-hint">{{
+        t(rewriting ? 'memory.distill.rewrite.hint' : 'memory.distill.hint')
+      }}</FieldDescription>
       <template v-if="source === 'text'">
         <Badge v-if="origin" class="self-start" data-testid="distill-origin">{{
           originLabel

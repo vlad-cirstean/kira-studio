@@ -1,4 +1,4 @@
-import type { DistillResult, DistillStage } from '@shared/domain/memoryDistill';
+import type { DistillMode, DistillResult, DistillStage } from '@shared/domain/memoryDistill';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
@@ -21,6 +21,7 @@ export interface DistillRun {
 export const useDistillUiStore = defineStore('distillUi', () => {
   const source = ref<'text' | 'file'>('text');
   const text = ref('');
+  const mode = ref<DistillMode>('facts');
   const path = ref('');
   const origin = ref<DistillOrigin | null>(null);
   const requestId = ref('');
@@ -65,6 +66,7 @@ export const useDistillUiStore = defineStore('distillUi', () => {
   return {
     source,
     text,
+    mode,
     path,
     origin,
     requestId,

@@ -16,6 +16,7 @@ import { errorText } from '../../bridge/codedError';
 import AddMemoryDialog from '../AddMemoryDialog.vue';
 import { useImportUiStore } from '../import/importStore';
 import { KIND_LABEL } from '../labels';
+import DistillRewriteResult from './DistillRewriteResult.vue';
 import { useDistillLimits, useDistillToImport } from './distillQueries';
 import { useDistillUiStore } from './distillStore';
 
@@ -83,7 +84,8 @@ function importDocument(): void {
 </script>
 
 <template>
-  <div v-if="result" class="flex flex-col gap-2" data-testid="distill-result">
+  <DistillRewriteResult v-if="result?.mode === 'rewrite'" />
+  <div v-else-if="result" class="flex flex-col gap-2" data-testid="distill-result">
     <FieldDescription data-testid="distill-summary">{{ summary }}</FieldDescription>
     <EmptyState
       v-if="lines.length === 0"

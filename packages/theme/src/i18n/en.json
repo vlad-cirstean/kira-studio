@@ -5889,6 +5889,14 @@
       "input": {
         "placeholder": "Paste text to condense"
       },
+      "mode": {
+        "facts": {
+          "label": "Facts"
+        },
+        "rewrite": {
+          "label": "Rewrite"
+        }
+      },
       "open": {
         "label": "Distill text"
       },
@@ -5924,6 +5932,55 @@
         },
         "summary": {
           "status": "{inChars} to {outChars} characters ({percent}) · {inTokens} to {outTokens} tokens · {cost}"
+        }
+      },
+      "rewrite": {
+        "copy": {
+          "announce": "Copied the rewrite"
+        },
+        "dropped": {
+          "title": "Left out"
+        },
+        "hint": "The text comes back in its own form with trivia dropped. Facts, negations and numbers stay.",
+        "kept": {
+          "check": {
+            "body": "Kept the original. The check found a fact lost or changed."
+          },
+          "directive": {
+            "body": "Kept the original. The rewrite changed a directive."
+          },
+          "form": {
+            "body": "Kept the original. The rewrite changed the comment markers."
+          },
+          "grew": {
+            "body": "Kept the original. The rewrite was longer."
+          },
+          "indent": {
+            "body": "Kept the original. The rewrite changed the indentation."
+          },
+          "output": {
+            "body": "Kept the original. Claude returned no usable rewrite."
+          },
+          "tokens": {
+            "body": "Kept the original. The rewrite lost a name, number or quoted text."
+          },
+          "width": {
+            "body": "Kept the original. The rewrite had a line wider than 100 columns."
+          }
+        },
+        "unchanged": {
+          "body": "Already concise. Nothing to drop."
+        },
+        "why": {
+          "restatesCode": {
+            "label": "Restates the code"
+          },
+          "tag": {
+            "label": "Phase or plan tag"
+          },
+          "trivia": {
+            "label": "Trivia"
+          }
         }
       },
       "run": {
