@@ -126,6 +126,11 @@ func (d Distiller) rewrite(ctx context.Context, req DistillRequest) (DistillResu
 		return &RewriteResult{Text: req.Text, Gate: gate, Reason: draft.Reason, Draft: draft.Text, Dropped: nonNilDropped(draft.Dropped)}
 	}
 
+	if !needsRewrite(req.Text) {
+		res.Rewrite = &RewriteResult{Text: req.Text, Dropped: []DroppedSpan{}}
+		return finish(nil)
+	}
+
 	run.report(StageRewrite, 0, 1)
 	var draft rewriteDraft
 	usable := false

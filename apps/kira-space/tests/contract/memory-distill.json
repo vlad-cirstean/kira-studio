@@ -30,12 +30,12 @@
   "MemoryDistillService.Distill#rewrite": {
     "chunks": 0,
     "costUsd": 0.01,
-    "inChars": 106,
-    "inTokens": 36,
+    "inChars": 99,
+    "inTokens": 33,
     "lines": [],
     "mode": "rewrite",
-    "outChars": 99,
-    "outTokens": 33,
+    "outChars": 92,
+    "outTokens": 31,
     "rewrite": {
       "changed": true,
       "check": null,
@@ -48,31 +48,11 @@
       ],
       "gate": "",
       "reason": "Dropped the phase tag.",
-      "text": "\t// Retry caps at 30 s, because the upstream bans faster clients; see `retryQueue.maxDelaySeconds`."
+      "text": "\t// Retry caps at 30 s, because the upstream bans clients; see `retryQueue.maxDelaySeconds`."
     },
     "unresolved": []
   },
   "MemoryDistillService.Distill#rewriteKept": {
-    "chunks": 0,
-    "costUsd": 0.01,
-    "inChars": 106,
-    "inTokens": 36,
-    "lines": [],
-    "mode": "rewrite",
-    "outChars": 106,
-    "outTokens": 36,
-    "rewrite": {
-      "changed": false,
-      "check": null,
-      "draft": "\t// Retry caps at 30 s (P900), because the upstream bans faster clients; see `retryQueue.maxDelaySeconds`. Extra words.",
-      "dropped": [],
-      "gate": "grew",
-      "reason": "Dropped the phase tag.",
-      "text": "\t// Retry caps at 30 s (P900), because the upstream bans faster clients; see `retryQueue.maxDelaySeconds`."
-    },
-    "unresolved": []
-  },
-  "MemoryDistillService.Distill#rewriteUnchanged": {
     "chunks": 0,
     "costUsd": 0.01,
     "inChars": 99,
@@ -84,11 +64,31 @@
     "rewrite": {
       "changed": false,
       "check": null,
+      "draft": "\t// Retry caps at 30 s (P900), because the upstream bans clients; see `retryQueue.maxDelaySeconds`. Extra words.",
+      "dropped": [],
+      "gate": "grew",
+      "reason": "Dropped the phase tag.",
+      "text": "\t// Retry caps at 30 s (P900), because the upstream bans clients; see `retryQueue.maxDelaySeconds`."
+    },
+    "unresolved": []
+  },
+  "MemoryDistillService.Distill#rewriteUnchanged": {
+    "chunks": 0,
+    "costUsd": 0,
+    "inChars": 92,
+    "inTokens": 31,
+    "lines": [],
+    "mode": "rewrite",
+    "outChars": 92,
+    "outTokens": 31,
+    "rewrite": {
+      "changed": false,
+      "check": null,
       "draft": "",
       "dropped": [],
       "gate": "",
-      "reason": "Dropped the phase tag.",
-      "text": "\t// Retry caps at 30 s, because the upstream bans faster clients; see `retryQueue.maxDelaySeconds`."
+      "reason": "",
+      "text": "\t// Retry caps at 30 s, because the upstream bans clients; see `retryQueue.maxDelaySeconds`."
     },
     "unresolved": []
   },

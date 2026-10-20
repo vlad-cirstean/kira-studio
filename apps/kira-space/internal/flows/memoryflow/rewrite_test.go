@@ -18,8 +18,8 @@ const (
 	rewriteSystem      = "clean one short text"
 	rewriteCheckSystem = "check a rewrite of one short text"
 
-	rewriteIn    = "\t// Retry caps at 30 s (P900), because the upstream bans faster clients; see `retryQueue.maxDelaySeconds`."
-	rewriteOut   = "\t// Retry caps at 30 s, because the upstream bans faster clients; see `retryQueue.maxDelaySeconds`."
+	rewriteIn    = "\t// Retry caps at 30 s (P900), because the upstream bans clients; see `retryQueue.maxDelaySeconds`."
+	rewriteOut   = "\t// Retry caps at 30 s, because the upstream bans clients; see `retryQueue.maxDelaySeconds`."
 	rewriteCost  = 0.01
 	rewriteCheck = 0.008
 )
@@ -82,8 +82,18 @@ func TestMcpIngestDistillRewrite(t *testing.T) {
 		t.Fatalf("%d claude calls, want one rewrite and no extract, verify or merge", n)
 	}
 
+	// A clean text skips the model: unchanged, no call, no cost.
+	app, res, out = rewriteVia(t, rewriteOut, true, rewriteRule(t, rewriteIn, tagDropped))
+	if out.Rewrite.Changed || out.Rewrite.Gate != "" || out.Rewrite.Text != rewriteOut || out.CostUSD != 0 {
+		t.Fatalf("clean = %+v", out)
+	}
+	if n := len(distillFiles(t, app)); n != 0 {
+		t.Fatalf("%d claude calls, want none", n)
+	}
+
 	// An unchanged draft is an accepted no-op, with no check call even when asked.
-	app, res, out = rewriteVia(t, rewriteOut, true, rewriteRule(t, rewriteOut, nil), checkRule(t, false, []string{"x"}))
+	const filler = "// Retry caps at 30 s, actually."
+	app, res, out = rewriteVia(t, filler, true, rewriteRule(t, filler, nil), checkRule(t, false, []string{"x"}))
 	if got := res.Content[0].(*mcp.TextContent).Text; !strings.HasSuffix(got, "\n\nunchanged") {
 		t.Fatalf("text = %q, want it to end with unchanged", got)
 	}
@@ -98,14 +108,14 @@ func TestMcpIngestDistillRewrite(t *testing.T) {
 // Each gate rejects its draft and keeps the input.
 func TestMcpIngestDistillRewriteGates(t *testing.T) {
 	var wide []string
-	for _, p := range []string{"Retry caps at 30 s because the upstream", "bans faster clients and sends 429 after", "ten requests per second in a window"} {
+	for _, p := range []string{"Retry caps at 30 s (P900) because the upstream", "bans faster clients and sends 429 after", "ten requests per second in a window"} {
 		wide = append(wide, "\t// "+p)
 	}
 	for _, tc := range []struct {
 		name, gate, in, draft string
 	}{
 		{"indent", "indent", rewriteIn, strings.TrimPrefix(rewriteOut, "\t")},
-		{"tokens", "tokens", rewriteIn, "\t// Retry caps at 30 s, because the upstream bans faster clients."},
+		{"tokens", "tokens", rewriteIn, "\t// Retry caps at 30 s, because the upstream bans clients."},
 		{"grew", "grew", rewriteIn, rewriteIn + " Extra words."},
 		{"width", "width", strings.Join(wide, "\n"), "\t// " + strings.Join([]string{"Retry caps at 30 s because the upstream", "bans faster clients and sends 429 after", "ten requests per second in a window"}, " ")},
 		{"form", "form", "/**\n * Retry caps at 30 s (P900), because the upstream bans faster clients.\n */",
@@ -130,7 +140,7 @@ func TestMcpIngestDistillRewriteGates(t *testing.T) {
 	}
 
 	t.Run("equal length passes grew", func(t *testing.T) {
-		_, _, out := rewriteVia(t, "// Retry caps at 30 s because x.", false, rewriteRule(t, "// Retry caps at 30 s because y.", nil))
+		_, _, out := rewriteVia(t, "// Retry caps at 30 s because x, simply.", false, rewriteRule(t, "// Retry caps at 30 s because x, y.", nil))
 		if !out.Rewrite.Changed || out.Rewrite.Gate != "" {
 			t.Fatalf("rewrite = %+v, want accepted", out.Rewrite)
 		}
@@ -221,7 +231,7 @@ func TestBridgeDistillRewrite(t *testing.T) {
 		}
 	}
 
-	// A clean text comes back unchanged.
+	// A clean text comes back unchanged without a model call.
 	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{rewriteRule(t, rewriteOut, nil)}})
 	res, err = app.W.MemoryDistill.Distill(ctx, bridge.MemoryDistillArgs{RequestID: "rw-2", Text: rewriteOut, Mode: "rewrite"})
 	if err != nil {

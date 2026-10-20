@@ -328,7 +328,7 @@ func TestMemoryDistillTrivia(t *testing.T) {
 // nothing stored. A changed result keeps the identifier and the number; an unchanged one is valid.
 func TestMemoryDistillRewrite(t *testing.T) {
 	app := newRealApp(t)
-	text := "\t// Retry caps at 30 s (P900), because the upstream bans faster clients; see `retryQueue.maxDelaySeconds`."
+	text := "\t// Retry caps at 30 s (P900), because the upstream bans clients; see `retryQueue.maxDelaySeconds`."
 	res, err := app.W.MemoryDistill.Distill(ctx, bridge.MemoryDistillArgs{RequestID: "rewrite", Text: text, Mode: "rewrite"})
 	if err != nil {
 		t.Fatal(err)
