@@ -1,5 +1,11 @@
 import { CLAUDE_MODELS, DEFAULT_CLAUDE_MODEL } from '@shared/domain/claudeModels';
-import { appearanceSettingsSchema, FONT_SIZE_RANGE, logLevelSchema } from '@shared/domain/settings';
+import {
+  agentSettingsSchema,
+  appearanceSettingsSchema,
+  DEFAULT_AGENT_PROVIDER,
+  FONT_SIZE_RANGE,
+  logLevelSchema,
+} from '@shared/domain/settings';
 import { z } from 'zod';
 
 // P103 Part 4 (§7.3): this app's own three-section settingsSchema/settingsPatchSchema/
@@ -184,6 +190,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
     agentInput: false,
   }),
   memory: memorySettingsSchema.default({ claudeModel: DEFAULT_CLAUDE_MODEL }),
+  agent: agentSettingsSchema.default({ provider: DEFAULT_AGENT_PROVIDER }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -195,6 +202,7 @@ const settingsPatchSchema = /*#__PURE__*/ z.object({
   claudeCode: claudeCodeSettingsSchema.partial().optional(),
   mobile: mobileSettingsSchema.partial().optional(),
   memory: memorySettingsSchema.partial().optional(),
+  agent: agentSettingsSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -245,5 +253,8 @@ export const defaultSettings: Settings = {
   },
   memory: {
     claudeModel: DEFAULT_CLAUDE_MODEL,
+  },
+  agent: {
+    provider: DEFAULT_AGENT_PROVIDER,
   },
 };

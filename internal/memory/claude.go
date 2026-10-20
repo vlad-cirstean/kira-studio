@@ -16,7 +16,7 @@ import (
 	"github.com/google/renameio/v2"
 
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
-	"github.com/kirathecat/kira-studio/internal/claudemodel"
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
 	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
@@ -76,7 +76,7 @@ type CLIRunner struct {
 	models   ModelSource
 }
 
-// ModelSource returns the model alias for the next call; nil means claudemodel.Default.
+// ModelSource returns the model alias for the next call; nil means claude.Catalog.Default.
 type ModelSource func() (string, error)
 
 func NewCLIRunner(models ModelSource) *CLIRunner {
@@ -86,16 +86,16 @@ func NewCLIRunner(models ModelSource) *CLIRunner {
 // model resolves per call, so a settings change applies to the next call in a running process.
 func (r *CLIRunner) model() string {
 	if r.models == nil {
-		return claudemodel.Default
+		return claude.Catalog.Default
 	}
 	m, err := r.models()
 	if err != nil {
 		slog.Warn("memory: read claude model, using default", "err", err)
-		return claudemodel.Default
+		return claude.Catalog.Default
 	}
-	if !claudemodel.Valid(m) {
+	if !claude.Catalog.Valid(m) {
 		slog.Warn("memory: invalid claude model, using default", "model", m)
-		return claudemodel.Default
+		return claude.Catalog.Default
 	}
 	return m
 }

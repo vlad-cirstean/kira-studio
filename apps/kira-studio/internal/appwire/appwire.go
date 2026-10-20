@@ -21,6 +21,8 @@ import (
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/docker"
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/providers"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/logging"
@@ -57,6 +59,8 @@ type Options struct {
 	Clock           scriptruns.Clock
 	// DockerHubAPI replaces the Docker Hub base URL the image registry check calls (flow-test seam); empty keeps the default.
 	DockerHubAPI string
+	// Providers is the agent harness registry; nil means providers.New() (a flow-test seam).
+	Providers *harness.Registry
 }
 
 // Wired is the built object graph.
@@ -105,6 +109,8 @@ type Wired struct {
 	Lifecycle       *bridge.LifecycleService
 	PromptsSvc      *bridge.PromptsService
 	LlmPromptsSvc   *bridge.LlmPromptsService
+	// Agents resolves the active agent provider per call.
+	Agents harness.Selector
 
 	reopen          func()
 	beforeFlushOnce func()
@@ -120,6 +126,15 @@ func Build(opts Options) (*Wired, error) {
 
 	startedAt := time.Now()
 	repositories, db := opts.Repos, opts.DB
+	registry := opts.Providers
+	if registry == nil {
+		registry = providers.New()
+	}
+	repositories.CustomScripts.Agents = registry
+	agents := harness.Selector{Registry: registry, ID: func() (string, error) {
+		s, err := repositories.Settings.GetAll()
+		return s.Agent.Provider, err
+	}}
 
 	secretsRepo := repos.NewSecrets(db.DB, opts.Cipher)
 	// P5: the same "needs a Cipher, constructed separately from repos.New's aggregate" shape as
@@ -228,6 +243,8 @@ func Build(opts Options) (*Wired, error) {
 			Checker: updateChecker, Installer: updateInstaller, Quit: lifecycle.quitter.RequestQuit,
 		},
 		Lifecycle: &bridge.LifecycleService{Flusher: lifecycle.quitter, WindowFlusher: lifecycle.closeFlush, Quit: lifecycle.quitter, Live: live},
+
+		Agents: agents,
 
 		beforeFlushOnce: lifecycle.beforeFlush,
 		teardownOnce:    lifecycle.teardown,

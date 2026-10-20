@@ -7,6 +7,8 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/providers"
 	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
@@ -20,6 +22,15 @@ const selectColumns = `id, name, command, working_dir, dir_mode, color, collecti
 // Repo reads and writes the `custom_scripts` table, List ordered deterministically.
 type Repo struct {
 	DB *sql.DB
+	// Agents supplies the model aliases a smart script may name; nil means the built-in providers.
+	Agents *harness.Registry
+}
+
+func (r *Repo) models() harness.Catalog {
+	if r.Agents == nil {
+		return providers.New().Models()
+	}
+	return r.Agents.Models()
 }
 
 func scanRow(row rowScanner) (CustomScript, error) {
@@ -109,7 +120,7 @@ func (r *Repo) Get(id string) (*CustomScript, error) {
 // own append-at-the-end convention. fields is validated (and its name/command trimmed in place)
 // before the insert.
 func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
-	if err := fields.Validate(); err != nil {
+	if err := fields.Validate(r.models()); err != nil {
 		return CustomScript{}, fmt.Errorf("scripts: %w", err)
 	}
 	if fields.DirMode == DirModeHome {
@@ -159,7 +170,7 @@ func (r *Repo) Create(fields CustomScriptFields) (CustomScript, error) {
 // created_at are untouched. Returns a wrapped sql.ErrNoRows for an unknown id
 // (ConnectionsRepo.SetMcpEnabled's own recorded fix, applied here from the start).
 func (r *Repo) Update(id string, fields CustomScriptFields) (CustomScript, error) {
-	if err := fields.Validate(); err != nil {
+	if err := fields.Validate(r.models()); err != nil {
 		return CustomScript{}, fmt.Errorf("scripts: %w", err)
 	}
 	if err := r.requireCollection(fields.CollectionID); err != nil {

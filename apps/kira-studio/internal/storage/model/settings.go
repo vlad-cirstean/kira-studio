@@ -57,6 +57,7 @@ type Settings struct {
 	Advanced   AdvancedSettings       `json:"advanced"`
 	Api        ApiSettings            `json:"api"`
 	DbMcp      DbMcpSettings          `json:"dbMcp"`
+	Agent      appsettings.Agent      `json:"agent"`
 }
 
 // DefaultSettings mirrors packages/shared/domain/settings.ts's defaultSettings verbatim.
@@ -84,6 +85,7 @@ func DefaultSettings() Settings {
 			DisableCookieJar: true,
 		},
 		DbMcp: DbMcpSettings{ServerEnabled: false},
+		Agent: appsettings.DefaultAgent(),
 	}
 }
 
@@ -130,6 +132,7 @@ type SettingsPatch struct {
 	Advanced   *AdvancedPatch               `json:"advanced,omitempty"`
 	Api        *ApiPatch                    `json:"api,omitempty"`
 	DbMcp      *DbMcpPatch                  `json:"dbMcp,omitempty"`
+	Agent      *appsettings.AgentPatch      `json:"agent,omitempty"`
 }
 
 // ValidHTTPVersion mirrors settings.ts's HTTP_VERSIONS — Go's HTTP/1 *is* 1.1, so "1" is never a
@@ -231,5 +234,5 @@ func (p SettingsPatch) Validate() error {
 	if err := validateApiSection(p.Api); err != nil {
 		return err
 	}
-	return nil
+	return appsettings.ValidateAgent(p.Agent)
 }

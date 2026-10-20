@@ -46,6 +46,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	result.Ade = readAde(stored)
 	result.Mobile = readMobile(stored)
 	readClaudeCode(stored, &result.ClaudeCode)
+	result.Agent = appsettings.ReadAgent(stored)
 	appsettings.LeafValid(stored, "memory.claudeModel", &result.Memory.ClaudeModel, model.ValidClaudeModel)
 	appsettings.LeafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
 	appsettings.Leaf(stored, "advanced.notifyPrompts", &result.Advanced.NotifyPrompts)
@@ -221,7 +222,10 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		if err := upsertMemory(tx, patch.Memory); err != nil {
 			return err
 		}
-		return upsertClaudeCode(tx, patch.ClaudeCode)
+		if err := upsertClaudeCode(tx, patch.ClaudeCode); err != nil {
+			return err
+		}
+		return appsettings.UpsertAgent(tx, patch.Agent)
 	})
 	if err != nil {
 		return model.Settings{}, err

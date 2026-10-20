@@ -1,5 +1,7 @@
 import {
+  agentSettingsSchema,
   appearanceSettingsSchema,
+  DEFAULT_AGENT_PROVIDER,
   HTTP_VERSIONS,
   httpVersionSchema,
   logLevelSchema,
@@ -150,6 +152,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
     disableCookieJar: true,
   }),
   dbMcp: dbMcpSettingsSchema.default({ serverEnabled: false }),
+  agent: agentSettingsSchema.default({ provider: DEFAULT_AGENT_PROVIDER }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -160,6 +163,7 @@ const settingsPatchSchema = /*#__PURE__*/ z.object({
   advanced: advancedSettingsSchema.partial().optional(),
   api: apiSettingsSchema.partial().optional(),
   dbMcp: dbMcpSettingsSchema.partial().optional(),
+  agent: agentSettingsSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -194,5 +198,8 @@ export const defaultSettings: Settings = {
   },
   dbMcp: {
     serverEnabled: false,
+  },
+  agent: {
+    provider: DEFAULT_AGENT_PROVIDER,
   },
 };

@@ -35,6 +35,8 @@ import (
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/appupdate"
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/providers"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
@@ -86,6 +88,8 @@ type Options struct {
 	Clock           scriptruns.Clock
 	// EmbedSpec is the semantic-search model; nil means embed.Default (a flow-test seam).
 	EmbedSpec *embed.Spec
+	// Providers is the agent harness registry; nil means providers.New() (a flow-test seam).
+	Providers *harness.Registry
 }
 
 // ShellHooks completes the window-manager seams once the shell exists. CloseWindow, FocusWindow and
@@ -149,6 +153,8 @@ type Wired struct {
 	AgentNotifySvc *bridge.AgentNotifyService
 	ClaudeUsage    *claudeusage.Service
 	ClaudeUsageSvc *bridge.ClaudeUsageService
+	// Agents resolves the active agent provider per call.
+	Agents harness.Selector
 
 	reopen          func()
 	detachMetrics   func()
@@ -163,6 +169,12 @@ type Wired struct {
 func Build(opts Options) *Wired {
 	repositories := opts.Repos
 	w := &Wired{Repos: repositories}
+	registry := opts.Providers
+	if registry == nil {
+		registry = providers.New()
+	}
+	w.Agents = agentSelector(registry, repositories.Settings)
+	repositories.CustomScripts.Agents = registry
 
 	credentialRelay := gitcred.New()
 	w.Windows = shell.NewWindowRegistry()

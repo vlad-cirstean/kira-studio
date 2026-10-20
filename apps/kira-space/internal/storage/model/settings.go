@@ -5,7 +5,7 @@ import (
 	"regexp"
 
 	"github.com/kirathecat/kira-studio/internal/appsettings"
-	"github.com/kirathecat/kira-studio/internal/claudemodel"
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
 )
 
 // Kira Space's own trimmed Settings model (P100 Part 1). Data/Cache/Api/DbMcp are dropped
@@ -123,6 +123,7 @@ type Settings struct {
 	ClaudeCode ClaudeCodeSettings `json:"claudeCode"`
 	Mobile     MobileSettings     `json:"mobile"`
 	Memory     MemorySettings     `json:"memory"`
+	Agent      appsettings.Agent  `json:"agent"`
 }
 
 // DefaultMobileSettings mirrors settingsDomain.ts's mobileSettingsSchema defaults.
@@ -170,7 +171,8 @@ func DefaultSettings() Settings {
 		Ade:        DefaultAdeSettings(),
 		ClaudeCode: DefaultClaudeCodeSettings(),
 		Mobile:     DefaultMobileSettings(),
-		Memory:     MemorySettings{ClaudeModel: claudemodel.Default},
+		Memory:     MemorySettings{ClaudeModel: claude.Catalog.Default},
+		Agent:      appsettings.DefaultAgent(),
 	}
 }
 
@@ -240,13 +242,14 @@ type MemoryPatch struct {
 }
 
 type SettingsPatch struct {
-	Appearance *AppearancePatch `json:"appearance,omitempty"`
-	Advanced   *AdvancedPatch   `json:"advanced,omitempty"`
-	Git        *GitPatch        `json:"git,omitempty"`
-	Ade        *AdePatch        `json:"ade,omitempty"`
-	ClaudeCode *ClaudeCodePatch `json:"claudeCode,omitempty"`
-	Mobile     *MobilePatch     `json:"mobile,omitempty"`
-	Memory     *MemoryPatch     `json:"memory,omitempty"`
+	Appearance *AppearancePatch        `json:"appearance,omitempty"`
+	Advanced   *AdvancedPatch          `json:"advanced,omitempty"`
+	Git        *GitPatch               `json:"git,omitempty"`
+	Ade        *AdePatch               `json:"ade,omitempty"`
+	ClaudeCode *ClaudeCodePatch        `json:"claudeCode,omitempty"`
+	Mobile     *MobilePatch            `json:"mobile,omitempty"`
+	Memory     *MemoryPatch            `json:"memory,omitempty"`
+	Agent      *appsettings.AgentPatch `json:"agent,omitempty"`
 }
 
 // validateAppearanceSection mirrors upsertAppearance's own leaf list (repos/settings.go).
@@ -376,7 +379,7 @@ func validateMobileSection(m *MobilePatch) error {
 }
 
 // ValidClaudeModel is memory.claudeModel's allowed set.
-var ValidClaudeModel = claudemodel.Valid
+var ValidClaudeModel = claude.Catalog.Valid
 
 func validateMemorySection(m *MemoryPatch) error {
 	if m == nil {
@@ -407,5 +410,8 @@ func (p SettingsPatch) Validate() error {
 	if err := validateMobileSection(p.Mobile); err != nil {
 		return err
 	}
-	return validateMemorySection(p.Memory)
+	if err := validateMemorySection(p.Memory); err != nil {
+		return err
+	}
+	return appsettings.ValidateAgent(p.Agent)
 }

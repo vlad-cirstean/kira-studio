@@ -51,3 +51,11 @@ export type AppearanceSettings = z.infer<typeof appearanceSettingsSchema>;
 // appsettings.ValidLogLevel mirrors this same enum.
 export const logLevelSchema = /*#__PURE__*/ z.enum(['off', 'error', 'warn', 'info', 'debug']);
 export type LogLevel = z.infer<typeof logLevelSchema>;
+
+// P316: the agent harness every new agent run, launch and structured call uses. A string id, not an
+// enum: the registered providers live in Go, and an unknown id falls back to the default there.
+export const DEFAULT_AGENT_PROVIDER = 'claude';
+export const agentSettingsSchema = /*#__PURE__*/ z.object({
+  provider: z.string().default(DEFAULT_AGENT_PROVIDER),
+});
+export type AgentSettings = z.infer<typeof agentSettingsSchema>;

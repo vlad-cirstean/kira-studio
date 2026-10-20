@@ -56,6 +56,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	appsettings.LeafValid(stored, "api.maxRedirects", &result.Api.MaxRedirects, appsettings.InRange(0, 100))
 	appsettings.Leaf(stored, "api.disableCookieJar", &result.Api.DisableCookieJar)
 	appsettings.Leaf(stored, "dbMcp.serverEnabled", &result.DbMcp.ServerEnabled)
+	result.Agent = appsettings.ReadAgent(stored)
 	return result, nil
 }
 
@@ -144,7 +145,10 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		if err := upsertApiSection(tx, patch.Api); err != nil {
 			return err
 		}
-		return upsertDbMcpSection(tx, patch.DbMcp)
+		if err := upsertDbMcpSection(tx, patch.DbMcp); err != nil {
+			return err
+		}
+		return appsettings.UpsertAgent(tx, patch.Agent)
 	})
 	if err != nil {
 		return model.Settings{}, err
