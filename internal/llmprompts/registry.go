@@ -475,8 +475,8 @@ Keep, exactly:
 - Cross-references: "ports X", "mirrors X", "X's twin", and "see issue, PR or URL". A doc comment's opening clause that names the documented symbol stays.
 
 Drop:
-- Internal tracking labels whose meaning lives outside the text: ticket, phase, milestone, review-finding, iteration or version identifiers, section-sign references, and references to a plan or tracker document. Keep the fact a label tags. If removing a label leaves a claim false or dangling, keep the clause's truth: drop the whole clause or say what holds now. After removing a leading label, capitalise the sentence that now starts there. A number that names a part of the code or of the text itself (step 2, level 3, rule 1/3) is not a label.
-- History narration: who changed it, when, in which version, moved-from notes, and a "now" or "used to" that only marks a change (drop the word or clause, keep the current fact). Keep past-tense or "no longer" text that states what the current code gains, prevents or must keep doing (a rejected alternative, the bug a guard prevents, a verification, a consequence chain): it is a current reason, as written. An equivalence, safety or cost comparison (as safe as X, O(1) instead of O(n), provably unchanged) is a fact, not history.
+- Internal tracking labels whose meaning lives outside the text: ticket, phase, milestone, review-finding, iteration or version identifiers, section-sign references, and references to a plan or tracker document. Keep the fact a label tags. If removing a label leaves a claim false or dangling, keep the clause's truth: drop the whole clause or say what holds now. After removing a leading label, capitalise the word that now starts the sentence, unless it is code (identifier, path, type, literal): code stays as written. Drop words that only pointed at the label, such as a possessive "own"; never leave a phrase whose referent was dropped. A number that names a part of the code or of the text itself (step 2, level 3, rule 1/3) is not a label.
+- History narration: who changed it, when, in which version, moved-from notes, and a "now" or "used to" that only marks a change (drop the word or clause, keep the current fact). A "previously" or "used to" whose clause is false without it is not a change marker: keep it. Keep past-tense or "no longer" text that states what the current code gains, prevents or must keep doing (a rejected alternative, the bug a guard prevents, a verification, a consequence chain): it is a current reason, as written. An equivalence, safety or cost comparison (as safe as X, O(1) instead of O(n), provably unchanged) is a fact, not history.
 - A sentence that restates what the context code shows and states nothing more. A stated invariant, contract or guarantee stays.
 - Filler, only these hedges: "really", "basically", "actually", "simply", and "just" as a hedge. Remove every occurrence, also inside a longer clause ("actually did" becomes "did"). Keep every other word, intensifiers and intent words included. "just" meaning "only" or "recently" stays.
 - Prose notes (text that is not a code comment): history, dates, versions and old values are content. Drop only the listed hedges, never reflow, keep the line structure.
@@ -489,7 +489,8 @@ Form:
 - Keep the input's trailing newline, or its absence.
 - Never add a fact, example or claim the text does not state. Never reword an identifier, literal or error string.
 - A tool directive (//go:build, //nolint, eslint-disable, @ts-ignore and the like) or a licence header stays byte for byte.
-- Never longer than the input.
+- Every sentence you keep stays complete; a drop never leaves a fragment.
+- Never longer than the input, except markers and indentation a reflow of an over-width line adds.
 
 Already clean: no label, no history narration, no restated code, no listed hedge, every code comment line within width. A clean text is returned verbatim, byte for byte. Style is never a reason to change text. A text you cleaned before comes back unchanged.
 
