@@ -460,7 +460,7 @@ var MemoryRewriteSystem = define(Entry{
 	PurposeKey:        "llmPrompts.entry.memoryRewriteSystem.description",
 	UsedByKey:         "llmPrompts.entry.memoryRewriteSystem.usedBy.body",
 	RequiredFragments: []ID{"memory.dataHygiene"},
-	Default: `You clean one short text, usually a code comment: drop its trivia, keep every fact and its form. Output only the schema.
+			Default: `You clean one short text, usually a code comment: drop its trivia, keep every fact and its form. Output only the schema.
 
 {{template "memory.dataHygiene"}}
 
@@ -470,29 +470,29 @@ Keep, exactly:
 - Every non-obvious why, constraint, workaround, limit, consequence and cross-reference to another file, function or setting.
 - Cause links (because, so, since, otherwise, unless). Splitting a sentence keeps its link.
 - Negations (not, never, no, only, except), numbers, units, identifiers, paths, error strings, quoted literals and backticked spans, verbatim, backticks included.
-- Qualifiers of scope and place ("here", "itself", "in templates", "per call").
+- Qualifiers of scope and place ("here", "itself", "per call", "on the server").
 - What the declaration below holds, when the text defines it.
 
 Drop:
-- Phase, plan and review tags (P107, M2, D7, F3, C5 §3.1, v1.8, iter2, "Part 2", "round 2"). Keep the fact a tag labels. If removing a tag leaves a claim false or dangling ("empty at P8"), keep the clause's truth: drop the whole clause or say what holds now. A name or number for a part of this code or this text (phase 2, step 1, stage 2, rule 1/3, level 2) is not a tag. A path to a plan doc ("docs/plans/P9.md") and a leftover reference to a dropped tag ("the plan's own", "every G24 surface") are tags.
-- History narration ("was X, now Y", "previously", "no longer", "until now", "used to", "stayed", "the old X"). Past-tense text that explains current code (a rejected alternative, the bug a guard prevents, a verification, a consequence chain) is a current why: keep it as written. Drop only narration that explains nothing about current code: who or which phase changed it, moved-from notes, "used to" with no consequence. An equivalence or guarantee (provably unchanged, byte-identical, same as X) is a fact, not history. Equivalence, safety and cost comparisons (as safe as X, O(1) instead of O(n), not a binding change) are facts.
+- Internal tracking labels whose meaning lives outside the text: ticket, phase, milestone, review-finding, iteration or version identifiers, and references to a plan or tracker document. Keep the fact a label tags. If removing a label leaves a claim false or dangling, keep the clause's truth: drop the whole clause or say what holds now. A number that names a part of the code or of the text itself (step 2, level 3, rule 1/3) is not a label.
+- History narration: who changed it, when, in which version, moved-from notes, "used to" with no consequence. Past-tense text that explains why current code is as it is (a rejected alternative, the bug a guard prevents, a verification, a consequence chain) is a current reason: keep it as written. An equivalence, safety or cost comparison (as safe as X, O(1) instead of O(n), provably unchanged) is a fact, not history.
 - A sentence that restates what the context code shows.
-- Filler, only these: "really", "basically", "actually", "simply", and "just" as a hedge. Keep every other word, intensifiers and intent words included ("own", "already", "deliberately", "exactly", "purely", "currently"). "just" meaning "only" or "recently" stays.
+- Filler, only these hedges: "really", "basically", "actually", "simply", and "just" as a hedge. Keep every other word, intensifiers and intent words included. "just" meaning "only" or "recently" stays.
 
 Form:
-- Same form as the input: same comment markers (//, /** */, /* */, <!-- -->, #). JSDoc stays JSDoc; a Go doc comment starts with the symbol name; Markdown stays Markdown.
-- Each line starts with the leading whitespace of the input line it replaces; JSDoc lines keep their " * " prefix.
+- Same form as the input: same comment markers, same kind of comment (a doc comment stays one and keeps the language's doc convention; Markdown stays Markdown).
+- Each line starts with the leading whitespace of the input line it replaces; block comment lines keep their prefix.
 - Lines at most {{.MaxWidth}} columns, indentation and markers included; a tab counts 4.
 - Words you keep stay as written: no rewording, no sentence split or merge, no punctuation change. Reflow only lines a drop touched, or lines over the width.
 - Keep the input's trailing newline, or its absence.
 - Never add a fact, example or claim the text does not state. Never reword an identifier, literal or error string.
-- A directive (//go:build, //go:generate, //go:embed, //nolint, eslint-disable, biome-ignore, @ts-expect-error, @ts-ignore, /// <reference, a licence header) stays byte for byte.
+- A tool directive (//go:build, //nolint, eslint-disable, @ts-ignore and the like) or a licence header stays byte for byte.
 - Never longer than the input.
 
-Already clean: no tag, no history narration, no restated code, no word from the filler list, every line within width. A clean text is returned verbatim, byte for byte. Style is never a reason to change text. A text you cleaned before comes back unchanged.
+Already clean: no label, no history narration, no restated code, no listed hedge, every line within width. A clean text is returned verbatim, byte for byte. Style is never a reason to change text. A text you cleaned before comes back unchanged.
 
 "text": the full result, markers and indentation included; the input verbatim when already clean.
-"dropped": each word, tag or clause of the input missing from "text", with "why": "tag", "history", "restatesCode" or "trivia". Empty when "text" is the input.
+"dropped": each word, label or clause of the input missing from "text", with "why": "tag", "history", "restatesCode" or "trivia". Empty when "text" is the input.
 "reason": one short sentence.`,
 	Schema: `{
   "type": "object", "additionalProperties": false, "required": ["text", "dropped", "reason"],
@@ -519,8 +519,8 @@ var MemoryRewriteCheckSystem = define(Entry{
 {{template "memory.dataHygiene"}}
 
 Input: "original", "rewrite", optional "context" (code around it; read it, never judge it).
-The rewrite may drop phase, plan and review tags (P107, M2, D7, C5 §3.1, v1.8, iter2), history narration that explains nothing about current code (who changed it, moved-from notes), sentences that restate the context code, and the filler words "really", "basically", "actually", "simply", "just" as a hedge, plus intensifiers ("purely", "always", "today", "silently", "correctly").
-Past-tense text that explains current code (a rejected alternative, the bug a guard prevents, a consequence chain) is a why: dropping it is "lost". "wrong" also takes past-tense narration restated in present tense, and a claim a dropped tag left false.
+The rewrite may drop internal tracking labels (ticket, phase, milestone, review-finding, iteration or version identifiers, plan or tracker references), history narration that explains nothing about current code (who changed it, moved-from notes), sentences that restate the context code, and the hedges "really", "basically", "actually", "simply", "just" as a hedge, plus intensifiers.
+Past-tense text that explains why current code is as it is (a rejected alternative, the bug a guard prevents, a consequence chain) is a reason: dropping it is "lost". "wrong" also takes past-tense narration restated in present tense, and a claim a dropped label left false.
 Find every other fact of the original: literals, numbers, negations, qualifiers of scope and place, what the declaration below holds, cause links (because, so, otherwise), examples, cross-references to other files or settings.
 "lost": each such fact missing from the rewrite or weakened; a dropped cause link or qualifier counts.
 "wrong": each claim of the rewrite the original does not state, or states differently.
