@@ -28,6 +28,11 @@ type MergeVars struct {
 	MaxLines int `json:"maxLines" prompt:"required"`
 }
 
+// RewriteVars fills the short-text rewrite prompt.
+type RewriteVars struct {
+	MaxWidth int `json:"maxWidth" prompt:"required"`
+}
+
 // FinalizeVars fills the import finalize prompt.
 type FinalizeVars struct {
 	MaxItems int `json:"maxItems"`
@@ -445,6 +450,87 @@ var MemoryMergeRules = define(Entry{
 	Default: `1. Chunks were read independently. Merge duplicates and near-duplicates into one fact. Also merge facts about the same subject and the same aspect (fields of one type, values or limits of one setting, cases of one rule) into one fact that keeps every qualifier of each, at most 300 characters. Never merge facts about different subjects. Never merge a rule with a fact.
 2. Resolve each unresolved fact from the other facts of this document, then rewrite it standalone. A fact that stays ambiguous is not kept: list it in "unresolved" with the open question.
 3. Drop a fact that is not a memory or is run trivia (see above), other trivia, time-bound or navigation: list it in "dropped" with why. Drop any secret (password, token, API key, private key); never keep it.`,
+}, NoVars{})
+
+// MemoryRewriteSystem is the system prompt of the short-text rewrite: ingest_files with distill and
+// mode rewrite, and the UI Distill view's Rewrite tab, clean one text in its own form.
+var MemoryRewriteSystem = define(Entry{
+	ID: "memory.rewrite.system", Kind: KindSystem, Apps: spaceApp, Applies: NextCall,
+	TitleKey:          "llmPrompts.entry.memoryRewriteSystem.title",
+	PurposeKey:        "llmPrompts.entry.memoryRewriteSystem.description",
+	UsedByKey:         "llmPrompts.entry.memoryRewriteSystem.usedBy.body",
+	RequiredFragments: []ID{"memory.dataHygiene"},
+	Default: `You clean one short text, usually a code comment: drop its trivia, keep every fact and its form. Output only the schema.
+
+{{template "memory.dataHygiene"}}
+
+Input: "text" (verbatim, with its comment markers and indentation) and optional "context" (code around it; read it, never rewrite or quote it).
+
+Keep, exactly:
+- Every non-obvious why, constraint, workaround, limit, consequence and cross-reference to another file, function or setting.
+- Cause links (because, so, since, otherwise, unless). Splitting a sentence keeps its link.
+- Negations (not, never, no, only, except), numbers, units, identifiers, paths, error strings, quoted literals and backticked spans, verbatim, backticks included.
+- Qualifiers of scope and place ("here", "itself", "in templates", "per call").
+- What the declaration below holds, when the text defines it.
+
+Drop:
+- Phase, plan and review tags (P107, M2, D7, F3, C5 §3.1, v1.8, iter2, "Part 2", "round 2"). Keep the fact a tag labels; when a tag is the only name of a referenced thing, drop its clause only if the rest stays true.
+- History narration ("was X, now Y", "previously", "no longer", "until now", "used to"): keep the current fact.
+- A sentence that restates what the context code shows.
+- Filler, hedges ("just", "really", "basically", "actually", "simply"), pleasantries, and articles where meaning stays clear.
+
+Form:
+- Same form as the input: same comment markers (//, /** */, /* */, <!-- -->, #). JSDoc stays JSDoc; a Go doc comment starts with the symbol name; Markdown stays Markdown.
+- Each line starts with the leading whitespace of the input line it replaces; JSDoc lines keep their " * " prefix.
+- Lines at most {{.MaxWidth}} columns, indentation and markers included; a tab counts 4. Wrap and reflow; sentences may share a line.
+- Terse: fragments fine, active voice, present tense, short word over long phrase. No invented abbreviations, no arrow connectors.
+- Never add a fact, example or claim the text does not state. Never reword an identifier, literal or error string.
+- A directive (//go:build, //go:generate, //go:embed, //nolint, eslint-disable, biome-ignore, @ts-expect-error, @ts-ignore, /// <reference, a licence header) stays byte for byte.
+- Never longer than the input.
+
+Already clean: a text with nothing from the Drop list, within the width, is returned verbatim, byte for byte. Never pad it, reword it or shorten it to look different. A text you cleaned before comes back unchanged.
+
+"text": the full result, markers and indentation included; the input verbatim when already clean.
+"dropped": each word, tag or clause of the input missing from "text", with "why": "tag", "history", "restatesCode" or "trivia". Empty when "text" is the input.
+"reason": one short sentence.`,
+	Schema: `{
+  "type": "object", "additionalProperties": false, "required": ["text", "dropped", "reason"],
+  "properties": {
+    "text": {"type": "string"},
+    "dropped": {"type": "array", "items": {
+      "type": "object", "additionalProperties": false, "required": ["text", "why"],
+      "properties": {"text": {"type": "string"}, "why": {"enum": ["tag", "history", "restatesCode", "trivia"]}}}},
+    "reason": {"type": "string"}
+  }
+}`,
+}, RewriteVars{MaxWidth: 100})
+
+// MemoryRewriteCheckSystem is the system prompt of the optional second call that checks a rewrite
+// kept every fact of the original.
+var MemoryRewriteCheckSystem = define(Entry{
+	ID: "memory.rewrite.check.system", Kind: KindSystem, Apps: spaceApp, Applies: NextCall,
+	TitleKey:          "llmPrompts.entry.memoryRewriteCheckSystem.title",
+	PurposeKey:        "llmPrompts.entry.memoryRewriteCheckSystem.description",
+	UsedByKey:         "llmPrompts.entry.memoryRewriteCheckSystem.usedBy.body",
+	RequiredFragments: []ID{"memory.dataHygiene"},
+	Default: `You check a rewrite of one short text, usually a code comment, against the original. Output only the schema.
+
+{{template "memory.dataHygiene"}}
+
+Input: "original", "rewrite", optional "context" (code around it; read it, never judge it).
+The rewrite may drop phase, plan and review tags (P107, M2, D7, C5 §3.1, v1.8, iter2), history narration and sentences that restate the context code.
+Find every other fact of the original: literals, numbers, negations, qualifiers of scope and place, what the declaration below holds, cause links (because, so, otherwise), examples, cross-references to other files or settings.
+"lost": each such fact missing from the rewrite or weakened; a dropped cause link or qualifier counts.
+"wrong": each claim of the rewrite the original does not state, or states differently.
+"ok": true only when "lost" and "wrong" are both empty.`,
+	Schema: `{
+  "type": "object", "additionalProperties": false, "required": ["ok", "lost", "wrong"],
+  "properties": {
+    "ok": {"type": "boolean"},
+    "lost": {"type": "array", "items": {"type": "string"}},
+    "wrong": {"type": "array", "items": {"type": "string"}}
+  }
+}`,
 }, NoVars{})
 
 // MemoryImportFinalizeSystem is the system prompt of the run that stores one imported file's facts.

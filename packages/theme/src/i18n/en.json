@@ -5551,6 +5551,20 @@
           "body": "Sent as the system prompt of the Claude call that runs after the gate accepts a fact."
         }
       },
+      "memoryRewriteCheckSystem": {
+        "description": "Checks that a rewrite of one short text kept every fact of the original.",
+        "title": "Rewrite check",
+        "usedBy": {
+          "body": "Sent as the system prompt of the second Claude call when the ingest_files tool runs with distill true, mode rewrite and check true."
+        }
+      },
+      "memoryRewriteSystem": {
+        "description": "Rewrites one short text, such as a code comment, in its own form. Drops trivia and keeps every fact.",
+        "title": "Rewrite text",
+        "usedBy": {
+          "body": "Sent as the system prompt of the Claude call when the distill view runs in rewrite mode and when the ingest_files tool runs with distill true and mode rewrite."
+        }
+      },
       "memoryRunTrivia": {
         "description": "Defines run trivia, notes on how one run went, as never a memory, and what to keep instead.",
         "title": "Run trivia",
