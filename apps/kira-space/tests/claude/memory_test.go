@@ -323,3 +323,27 @@ func TestMemoryDistillTrivia(t *testing.T) {
 		t.Errorf("environment limit (display) dropped: %q", env)
 	}
 }
+
+// TestMemoryDistillRewrite runs the short-text rewrite through the bridge: one call, text only,
+// nothing stored. A changed result keeps the identifier and the number; an unchanged one is valid.
+func TestMemoryDistillRewrite(t *testing.T) {
+	app := newRealApp(t)
+	text := "\t// Retry caps at 30 s (P900), because the upstream bans faster clients; see `retryQueue.maxDelaySeconds`."
+	res, err := app.W.MemoryDistill.Distill(ctx, bridge.MemoryDistillArgs{RequestID: "rewrite", Text: text, Mode: "rewrite"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Rewrite == nil || res.Mode != "rewrite" {
+		t.Fatalf("result = %+v, want a rewrite", res)
+	}
+	if res.CostUSD <= 0 || res.CostUSD > 0.25 {
+		t.Errorf("cost = %v USD, want above 0 and at most 0.25", res.CostUSD)
+	}
+	if res.Rewrite.Changed && (!strings.Contains(res.Rewrite.Text, "`retryQueue.maxDelaySeconds`") || !strings.Contains(res.Rewrite.Text, "30")) {
+		t.Errorf("rewrite lost a fact: %q", res.Rewrite.Text)
+	}
+	t.Logf("rewrite: changed %v gate %q %.4f USD: %q dropped %+v", res.Rewrite.Changed, res.Rewrite.Gate, res.CostUSD, res.Rewrite.Text, res.Rewrite.Dropped)
+	if recent, err := app.W.Memory.Recent(ctx); err != nil || len(recent) != 0 {
+		t.Errorf("Recent = %+v, %v, want nothing stored", recent, err)
+	}
+}
