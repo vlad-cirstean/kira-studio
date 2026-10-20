@@ -474,21 +474,22 @@ Keep, exactly:
 - What the declaration below holds, when the text defines it.
 
 Drop:
-- Phase, plan and review tags (P107, M2, D7, F3, C5 §3.1, v1.8, iter2, "Part 2", "round 2"). Keep the fact a tag labels; when a tag is the only name of a referenced thing, drop its clause only if the rest stays true.
-- History narration ("was X, now Y", "previously", "no longer", "until now", "used to"): keep the current fact.
+- Phase, plan and review tags (P107, M2, D7, F3, C5 §3.1, v1.8, iter2, "Part 2", "round 2"). Keep the fact a tag labels. A name or number for a part of this code or this text (phase 2, step 1, stage 2, rule 1/3, level 2) is not a tag. A path to a plan doc ("docs/plans/P9.md") and a leftover reference to a dropped tag ("the plan's own", "every G24 surface") are tags.
+- History narration ("was X, now Y", "previously", "no longer", "until now", "used to", "stayed", "the old X"). Narration of a removed bug or an old design is not a current fact: drop it whole or keep it in past tense; never restate it in present tense. An equivalence or guarantee (provably unchanged, byte-identical, same as X) is a fact, not history.
 - A sentence that restates what the context code shows.
-- Filler, hedges ("just", "really", "basically", "actually", "simply"), pleasantries, and articles where meaning stays clear.
+- Filler, only these: "really", "basically", "actually", "simply", and "just" as a hedge. Keep every other word, intensifiers and intent words included ("own", "already", "deliberately", "exactly", "purely", "currently"). "just" meaning "only" or "recently" stays.
 
 Form:
 - Same form as the input: same comment markers (//, /** */, /* */, <!-- -->, #). JSDoc stays JSDoc; a Go doc comment starts with the symbol name; Markdown stays Markdown.
 - Each line starts with the leading whitespace of the input line it replaces; JSDoc lines keep their " * " prefix.
-- Lines at most {{.MaxWidth}} columns, indentation and markers included; a tab counts 4. Wrap and reflow; sentences may share a line.
-- Terse: fragments fine, active voice, present tense, short word over long phrase. No invented abbreviations, no arrow connectors.
+- Lines at most {{.MaxWidth}} columns, indentation and markers included; a tab counts 4.
+- Words you keep stay as written: no rewording, no sentence split or merge, no punctuation change. Reflow only lines a drop touched, or lines over the width.
+- Keep the input's trailing newline, or its absence.
 - Never add a fact, example or claim the text does not state. Never reword an identifier, literal or error string.
 - A directive (//go:build, //go:generate, //go:embed, //nolint, eslint-disable, biome-ignore, @ts-expect-error, @ts-ignore, /// <reference, a licence header) stays byte for byte.
 - Never longer than the input.
 
-Already clean: a text with nothing from the Drop list, within the width, is returned verbatim, byte for byte. Never pad it, reword it or shorten it to look different. A text you cleaned before comes back unchanged.
+Already clean: no tag, no history narration, no restated code, no word from the filler list, every line within width. A clean text is returned verbatim, byte for byte. Style is never a reason to change text. A text you cleaned before comes back unchanged.
 
 "text": the full result, markers and indentation included; the input verbatim when already clean.
 "dropped": each word, tag or clause of the input missing from "text", with "why": "tag", "history", "restatesCode" or "trivia". Empty when "text" is the input.
@@ -518,7 +519,8 @@ var MemoryRewriteCheckSystem = define(Entry{
 {{template "memory.dataHygiene"}}
 
 Input: "original", "rewrite", optional "context" (code around it; read it, never judge it).
-The rewrite may drop phase, plan and review tags (P107, M2, D7, C5 §3.1, v1.8, iter2), history narration and sentences that restate the context code.
+The rewrite may drop phase, plan and review tags (P107, M2, D7, C5 §3.1, v1.8, iter2), history narration (extraction and motivation history included), sentences that restate the context code, and the filler words "really", "basically", "actually", "simply", "just" as a hedge, plus intensifiers ("purely", "always", "today", "silently", "correctly").
+"wrong" also takes past-tense narration of a removed bug or an old design restated in present tense.
 Find every other fact of the original: literals, numbers, negations, qualifiers of scope and place, what the declaration below holds, cause links (because, so, otherwise), examples, cross-references to other files or settings.
 "lost": each such fact missing from the rewrite or weakened; a dropped cause link or qualifier counts.
 "wrong": each claim of the rewrite the original does not state, or states differently.
