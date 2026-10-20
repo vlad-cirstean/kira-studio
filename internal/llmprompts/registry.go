@@ -685,7 +685,7 @@ var (
 // MemoryToolIngestFiles describes the ingest_files tool.
 var MemoryToolIngestFiles = define(Entry{
 	ID: "memory.mcp.tool.ingest_files", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "ingest_files",
-	Default: `Store the facts and rules of files and folders by path, in the background. Send absolute paths, never content: Kira reads the files. Reads Markdown, text, JSON and JSON Lines; a kira-memory doc format file is applied as is. Every fact gets the given origin, scope and groups. Returns a job id for ingest_status. A large job waits for the user to start it in Kira Space. With distill true, stores nothing and returns the merged lines of text or one file; the call waits for them.`,
+	Default: `Store the facts and rules of files and folders by path, in the background. Send absolute paths, never content: Kira reads the files. Reads Markdown, text, JSON and JSON Lines; a kira-memory doc format file is applied as is. Every fact gets the given origin, scope and groups. Returns a job id for ingest_status. A large job waits for the user to start it in Kira Space. With distill true, stores nothing and returns the merged lines of text or one file; the call waits for them. With distill true and mode rewrite, returns the text rewritten in its own form with trivia dropped and every fact kept, or unchanged when already clean; text only, at most 2000 characters.`,
 }, NoVars{})
 
 var (
@@ -701,7 +701,10 @@ var (
 	_ = arg(MemoryToolIngestFiles.id, "writeDoc", spaceApp, NewSession, `also write each file's facts beside it as <name>.memory.md in kira-memory doc format; default false`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "session", spaceApp, NewSession, `Claude Code session id; omit for this session`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "text", spaceApp, NewSession, `text to distill, at most {{.Max}} characters; only with distill true`, MaxVars{Max: 120000})
-	_ = arg(MemoryToolIngestFiles.id, "distill", spaceApp, NewSession, `true: store nothing and return the merged lines; takes text or one path and no other argument; default false`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "distill", spaceApp, NewSession, `true: store nothing and return the merged lines; takes text or one path, plus mode, context and check; no store argument; default false`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "mode", spaceApp, NewSession, `facts: merged lines (default); rewrite: one same-form rewrite of short text such as a code comment`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "context", spaceApp, NewSession, `code around the text, read only, at most {{.Max}} characters; only with mode rewrite`, MaxVars{Max: 6000})
+	_ = arg(MemoryToolIngestFiles.id, "check", spaceApp, NewSession, `run a second call that checks the rewrite kept every fact; a failed check keeps the original; only with mode rewrite; default false`, NoVars{})
 )
 
 // MemoryToolIngestStatus describes the ingest_status tool.

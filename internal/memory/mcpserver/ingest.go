@@ -42,10 +42,13 @@ type ingestInput struct {
 	Groups    []memory.GroupRef `json:"groups,omitempty"`
 	WriteDoc  bool              `json:"writeDoc,omitempty"`
 	Session   string            `json:"session,omitempty"`
+	Mode      string            `json:"mode,omitempty"`
+	Context   string            `json:"context,omitempty"`
+	Check     bool              `json:"check,omitempty"`
 }
 
-// ingestOutput is a job (jobId, state, reason) when storing, or the merged lines (lines, unresolved,
-// costUsd) when distilling.
+// ingestOutput is a job (jobId, state, reason) when storing, the merged lines (lines, unresolved,
+// costUsd) when distilling, or the rewrite (mode, rewrite, costUsd) when distilling in rewrite mode.
 type ingestOutput struct {
 	JobID      string                    `json:"jobId,omitempty"`
 	State      string                    `json:"state,omitempty"`
@@ -53,6 +56,8 @@ type ingestOutput struct {
 	Lines      []importer.Line           `json:"lines,omitempty"`
 	Unresolved []importer.UnresolvedFact `json:"unresolved,omitempty"`
 	CostUSD    float64                   `json:"costUsd,omitempty"`
+	Mode       string                    `json:"mode,omitempty"`
+	Rewrite    *importer.RewriteResult   `json:"rewrite,omitempty"`
 }
 
 type ingestStatusInput struct {
@@ -61,9 +66,10 @@ type ingestStatusInput struct {
 
 func ingestSchema(src llmprompts.Source) *jsonschema.Schema {
 	sch := llmprompts.InputSchema[ingestInput](src, llmprompts.MemoryToolIngestFiles.ID(), map[string]any{
-		"paths":  llmprompts.MaxVars{Max: maxIngestPaths},
-		"text":   llmprompts.MaxVars{Max: importer.MaxDistillRunes},
-		"groups": llmprompts.MaxVars{Max: memory.MaxGroups - 1},
+		"paths":   llmprompts.MaxVars{Max: maxIngestPaths},
+		"text":    llmprompts.MaxVars{Max: importer.MaxDistillRunes},
+		"context": llmprompts.MaxVars{Max: importer.RewriteMaxContextRunes},
+		"groups":  llmprompts.MaxVars{Max: memory.MaxGroups - 1},
 	})
 	enum := func(prop *jsonschema.Schema, values ...string) {
 		for _, v := range values {
@@ -71,6 +77,7 @@ func ingestSchema(src llmprompts.Source) *jsonschema.Schema {
 		}
 	}
 	enum(sch.Properties["origin"], memory.OriginUser, memory.OriginAgent, memory.OriginExternal)
+	enum(sch.Properties["mode"], importer.ModeFacts, importer.ModeRewrite)
 	enum(sch.Properties["scope"], memory.ScopeCompany, memory.ScopeProject, memory.ScopePersonal)
 	enum(sch.Properties["groups"].Items.Properties["kind"], memory.GroupTask, memory.GroupThread)
 	return sch
@@ -110,6 +117,8 @@ func ingestFiles(ctx context.Context, opts Options, in ingestInput) (*mcp.CallTo
 		return distillInput(ctx, opts, in)
 	}
 	switch {
+	case in.Mode != "" || in.Context != "" || in.Check:
+		return nil, ingestOutput{}, badIngest("mode, context and check need distill true")
 	case in.Text != "":
 		return nil, ingestOutput{}, badIngest("to store text call store_memory, or save it to a file and ingest that")
 	case in.Origin == "" || in.Scope == "":
@@ -166,8 +175,10 @@ func distillInput(ctx context.Context, opts Options, in ingestInput) (*mcp.CallT
 	if in.Origin != "" || in.SourceTag != "" || in.Scope != "" || in.Project != "" || len(in.Groups) > 0 || in.WriteDoc || in.Session != "" {
 		return nil, ingestOutput{}, badIngest("distill takes text or one file path only; it stores nothing")
 	}
-	req := importer.DistillRequest{Text: in.Text}
+	req := importer.DistillRequest{Text: in.Text, Mode: in.Mode, Context: in.Context, Check: in.Check}
 	switch {
+	case in.Mode == importer.ModeRewrite && len(in.Paths) > 0:
+		return nil, ingestOutput{}, badIngest("mode %s takes text, not paths", importer.ModeRewrite)
 	case (in.Text != "") == (len(in.Paths) > 0):
 		return nil, ingestOutput{}, badIngest("distill takes exactly one of text and one file path")
 	case len(in.Paths) > 1:
@@ -191,12 +202,18 @@ func distillInput(ctx context.Context, opts Options, in ingestInput) (*mcp.CallT
 		return nil, ingestOutput{}, err
 	}
 	out := ingestOutput{Lines: res.Lines, Unresolved: res.Unresolved, CostUSD: res.CostUSD}
+	if res.Mode == importer.ModeRewrite {
+		out.Mode, out.Rewrite = res.Mode, res.Rewrite
+	}
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: renderDistill(res)}}}, out, nil
 }
 
 // renderDistill is the lines in source order, one per line with no kind prefix, then a blank line and
 // one "unresolved: <fact> | <questions>" line per fact the input leaves open.
 func renderDistill(res importer.DistillResult) string {
+	if res.Mode == importer.ModeRewrite && res.Rewrite != nil {
+		return renderRewrite(*res.Rewrite)
+	}
 	lines := make([]string, len(res.Lines))
 	for i, l := range res.Lines {
 		lines[i] = l.Text
@@ -213,6 +230,28 @@ func renderDistill(res importer.DistillResult) string {
 		return strings.Join(notes, "\n")
 	}
 	return text + "\n\n" + strings.Join(notes, "\n")
+}
+
+// renderRewrite is the final text, then a blank line and "kept: <gate>" when a gate rejected the draft
+// or "unchanged" when the input was already clean, then one "dropped: <text> | <why>" line per span the
+// accepted rewrite left out.
+func renderRewrite(r importer.RewriteResult) string {
+	var notes []string
+	switch {
+	case r.Gate != "":
+		notes = append(notes, "kept: "+r.Gate)
+	case !r.Changed:
+		notes = append(notes, "unchanged")
+	}
+	if r.Changed {
+		for _, d := range r.Dropped {
+			notes = append(notes, fmt.Sprintf("dropped: %s | %s", oneLine(d.Text), d.Why))
+		}
+	}
+	if len(notes) == 0 {
+		return r.Text
+	}
+	return r.Text + "\n\n" + strings.Join(notes, "\n")
 }
 
 // projectOf is the project key of the first path's directory. Outside a git repository it falls
