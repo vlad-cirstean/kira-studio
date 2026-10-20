@@ -124,8 +124,7 @@ func TestRealClaudeSettingsUntouched(t *testing.T) {
 		}}); err != nil {
 			t.Fatal(err)
 		}
-		f.saveWorkflow(t, "smartflow", "  - id: build\n    name: build\n    kind: agent\n    status: In progress\n    steps:\n"+
-			"      - id: one\n        name: one\n        runs_on: each repo\n        timeout: 2m\n        smart_script: settings-lint\n")
+		f.saveWorkflow(t, "smartflow", "  - id: one\n    name: one\n    kind: agent\n    runs_on: each repo\n    timeout: 2m\n    smart_script: settings-lint\n"+manualStepYAML)
 		if r := f.startRun(t, f.createTask(t, "smartflow"), "feat/settings-smart"); r.State != "done" {
 			t.Fatalf("smart step run = %s, want done", r.State)
 		}
