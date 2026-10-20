@@ -9080,7 +9080,16 @@
       "memory": {
         "claudeModel": {
           "description": "Model for memory store checks, import and distill. Sonnet is the default.",
-          "label": "Claude model"
+          "haiku": {
+            "option": "Haiku"
+          },
+          "label": "Claude model",
+          "opus": {
+            "option": "Opus"
+          },
+          "sonnet": {
+            "option": "Sonnet"
+          }
         }
       },
       "mobileAccess": {

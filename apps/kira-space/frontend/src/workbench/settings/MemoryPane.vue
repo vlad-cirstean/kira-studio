@@ -21,6 +21,16 @@ function onModelChange(value: unknown): void {
 }
 
 const modelId = useId();
+function modelLabel(m: ClaudeModel): string {
+  switch (m) {
+    case 'haiku':
+      return t('space.settings.memory.claudeModel.haiku.option');
+    case 'sonnet':
+      return t('space.settings.memory.claudeModel.sonnet.option');
+    case 'opus':
+      return t('space.settings.memory.claudeModel.opus.option');
+  }
+}
 </script>
 
 <template>
@@ -45,7 +55,7 @@ const modelId = useId();
         :model-value="draft.memory.claudeModel"
         @update:model-value="onModelChange"
       >
-        <option v-for="m in CLAUDE_MODELS" :key="m" :value="m">{{ m }}</option>
+        <option v-for="m in CLAUDE_MODELS" :key="m" :value="m">{{ modelLabel(m) }}</option>
       </NativeSelect>
       <FieldDescription>{{ t('space.settings.memory.claudeModel.description') }}</FieldDescription>
     </Field>
