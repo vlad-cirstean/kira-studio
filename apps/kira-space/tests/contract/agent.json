@@ -22,5 +22,25 @@
     ],
     "productLabel": "Claude Code",
     "usage": true
+  },
+  "AgentService.Info#fake": {
+    "command": "kira-fake-agent",
+    "defaultModel": "fast",
+    "headlessLabel": "kira-fake-agent headless",
+    "hooks": false,
+    "id": "fake",
+    "label": "Fake agent",
+    "models": [
+      {
+        "id": "fast",
+        "label": "fast"
+      },
+      {
+        "id": "deep",
+        "label": "deep"
+      }
+    ],
+    "productLabel": "Fake agent",
+    "usage": false
   }
 }

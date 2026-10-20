@@ -125,7 +125,11 @@ type GhRule struct {
 	Exit   int    `json:"exit,omitempty"`
 }
 
-// Run plays the named tool ("claude" or "gh") for one invocation and returns its exit code.
+// Persona is the name of the generic agent CLI that interactive sessions of a test-only provider
+// run (internal/flowtest/fakeprovider): it records its argv and idles until stdin closes.
+const Persona = "kira-fake-agent"
+
+// Run plays the named tool ("claude", "gh", "fake-mcp" or Persona) for one invocation and returns its exit code.
 func Run(name string, args []string) int {
 	var scen Scenario
 	raw := []byte(os.Getenv(EnvScenario))
@@ -141,6 +145,8 @@ func Run(name string, args []string) int {
 		return runGh(scen, dir, args)
 	case "fake-mcp":
 		return runFakeMCP()
+	case Persona:
+		return runPersona(dir, args)
 	}
 	fmt.Fprintln(os.Stderr, "fakeagent: unknown tool", name)
 	return 127
@@ -384,6 +390,21 @@ func startHeadless(scen Scenario, dir, stem string, args []string) (code int, do
 	return 0, false
 }
 
+// runPersona writes the call's argv to <dir>/kira-fake-agent-<n>.args and what the app types into
+// the PTY to .prompt, then idles until stdin closes.
+func runPersona(dir string, args []string) int {
+	stem := filepath.Join(dir, fmt.Sprintf("%s-%d", Persona, nextCount(dir, Persona)))
+	writeFile(stem+".args", []byte(strings.Join(args, "\n")))
+	f, err := os.OpenFile(stem+".prompt", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "fakeagent:", err)
+		return 1
+	}
+	defer f.Close()
+	_, _ = io.Copy(f, os.Stdin)
+	return 0
+}
+
 // recordTUIInput keeps what the app types into an interactive TUI session, whose stdin is a PTY.
 func recordTUIInput(stem string) {
 	go func() {
@@ -516,6 +537,13 @@ func callTool(cfgPaths []string, server, tool string, args map[string]any) (*mcp
 		return res, fmt.Errorf("tool error: %s", toolText(res))
 	}
 	return res, nil
+}
+
+// CallTool calls one tool on a server named in the MCP config files (paths or inline JSON), as the
+// fake claude does for finish_step; a test provider's headless role uses it with HeadlessSpec.MCPConfigs.
+func CallTool(cfgPaths []string, server, tool string, args map[string]any) error {
+	_, err := callTool(cfgPaths, server, tool, args)
+	return err
 }
 
 func toolText(res *mcp.CallToolResult) string {

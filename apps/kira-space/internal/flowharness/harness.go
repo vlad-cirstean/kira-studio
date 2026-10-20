@@ -38,7 +38,9 @@ import (
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox/sandboxtest"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/harness/claude"
+	"github.com/kirathecat/kira-studio/internal/harness/providers"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/testx"
@@ -56,6 +58,7 @@ type options struct {
 	mobilePoll      time.Duration
 	seed            func(*App)
 	embedSpec       *embed.Spec
+	provider        harness.Provider
 }
 
 // Opt tweaks New.
@@ -91,6 +94,9 @@ func WithRebaseTimeout(d time.Duration) Opt { return func(o *options) { o.rebase
 
 // WithEmbedSpec replaces the semantic-search model, so a test serves its files from a fake host.
 func WithEmbedSpec(s embed.Spec) Opt { return func(o *options) { o.embedSpec = &s } }
+
+// WithProvider registers a test-only agent provider next to claude.
+func WithProvider(p harness.Provider) Opt { return func(o *options) { o.provider = p } }
 
 // WithSeed runs seed on the isolated homes before the first boot. Startup work that runs in the
 // background (sweeps) would race a seed written after New.
@@ -199,7 +205,7 @@ func (a *App) writeBin(o options) {
 	if err != nil {
 		a.t.Fatal(err)
 	}
-	tools := []string{"fake-mcp"}
+	tools := []string{"fake-mcp", fakeagent.Persona}
 	if !o.noClaude {
 		tools = append(tools, "claude")
 	}
@@ -279,7 +285,12 @@ func (a *App) build() {
 	if a.opts.noGh {
 		ghLocator = noGhLocator{}
 	}
+	var registry *harness.Registry
+	if a.opts.provider != nil {
+		registry = providers.New(a.opts.provider)
+	}
 	a.W = appwire.Build(appwire.Options{
+		Providers: registry,
 		GhLocator: ghLocator, TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, Sandbox: a.opts.sandbox, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll,
 		Repos: r, DB: db, Emitter: a.Events, Browser: a.Browser, Dialogs: a.Dialogs,
 		Locator: gitclient.NewHostLocator(), KeepAwakeDriver: a.KeepAwake,
@@ -318,6 +329,9 @@ func (a *App) Restart() {
 	a.stop()
 	a.build()
 }
+
+// Unregister drops the test provider from the next boot (Restart), as an uninstalled provider is.
+func (a *App) Unregister() { a.opts.provider = nil }
 
 // DB is the live database, for tests that plant or inspect rows no bound call reaches.
 func (a *App) DB() *sql.DB { return a.db.DB }
