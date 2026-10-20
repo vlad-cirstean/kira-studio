@@ -7,7 +7,9 @@ import "regexp"
 // and no over-width comment line has nothing the rewrite prompt drops, so the model would return it
 // verbatim. Prose has no width rule.
 func needsRewrite(text string) bool {
-	return labelShape.MatchString(text) || historyWord.MatchString(text) || hedgeWord.MatchString(text) ||
+	// Phrases match across a line break and its comment marker ("used\n// to"); the copy is read, never kept.
+	flat := lineBreak.ReplaceAllString(text, " ")
+	return labelShape.MatchString(flat) || historyWord.MatchString(flat) || hedgeWord.MatchString(flat) ||
 		(isCommentText(text) && widest(text) > RewriteWidth)
 }
 
