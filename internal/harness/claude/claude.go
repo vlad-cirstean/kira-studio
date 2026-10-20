@@ -30,4 +30,6 @@ func (*Provider) Label() string { return "Claude" }
 
 func (*Provider) Command() string { return "claude" }
 
+func (*Provider) ProductLabel() string { return "Claude Code" }
+
 func (*Provider) Models() harness.Catalog { return Catalog }

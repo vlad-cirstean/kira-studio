@@ -647,8 +647,8 @@ func fromOutcome(state string, o runoutcome.Outcome) outcome {
 }
 
 // agentEnd is how an agent process ended, for the no-report outcomes.
-func agentEnd(exit harness.Exit, runErr error, timeout string) runoutcome.Process {
-	p := runoutcome.Process{Kind: runoutcome.KindAgent, ExitCode: exit.Code, Timeout: timeout}
+func agentEnd(agent runoutcome.Agent, exit harness.Exit, runErr error, timeout string) runoutcome.Process {
+	p := runoutcome.Process{Agent: agent, Kind: runoutcome.KindAgent, ExitCode: exit.Code, Timeout: timeout}
 	switch {
 	case runErr != nil:
 		p.End, p.Err = runoutcome.EndStartErr, runErr
@@ -834,8 +834,9 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		return
 	}
 	if rebase {
+		an := runoutcome.AgentOf(agent)
 		code := exit.Code
-		o := runoutcome.ForProcess(agentEnd(exit, runErr, def.Timeout)).WithLastError(sink.lastStderr())
+		o := runoutcome.ForProcess(agentEnd(an, exit, runErr, def.Timeout)).WithLastError(sink.lastStderr())
 		end := sbx.sandboxOutcome(fromOutcome(model.AdeRunFailed, o), sink.lastStderr())
 		end.out.ExitCode = &code
 		f, ok := b.takeFinish(run.ID)
@@ -847,11 +848,12 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		return
 	}
 	resumeLost := l.resume != "" && agent.ResumeLost(sink.lastStderr())
+	an := runoutcome.AgentOf(agent)
 	if l.smart != nil {
-		b.completeRun(run, sessionID, sbx.sandboxOutcome(b.smartOutcome(run.ID, exit, runErr, res, l.smart, def.Results, sink.lastStderr(), resumeLost), sink.lastStderr()))
+		b.completeRun(run, sessionID, sbx.sandboxOutcome(b.smartOutcome(an, run.ID, exit, runErr, res, l.smart, def.Results, sink.lastStderr(), resumeLost), sink.lastStderr()))
 		return
 	}
-	complete(sbx.sandboxOutcome(b.agentOutcome(run.ID, exit, runErr, def, sink.lastStderr(), resumeLost), sink.lastStderr()))
+	complete(sbx.sandboxOutcome(b.agentOutcome(an, run.ID, exit, runErr, def, sink.lastStderr(), resumeLost), sink.lastStderr()))
 }
 
 // roundTools adds the reply tool to a review round's allowed tools.
@@ -873,24 +875,24 @@ func (b *TaskBoard) sessionClaudeID(sessionID string) string {
 }
 
 // lostOutcome is the outcome of a resume whose Claude conversation is gone.
-func lostOutcome(lost bool, lastErr string) (outcome, bool) {
+func lostOutcome(agent runoutcome.Agent, lost bool, lastErr string) (outcome, bool) {
 	if !lost {
 		return outcome{}, false
 	}
-	o := runoutcome.ForProcess(runoutcome.Process{Kind: runoutcome.KindAgent, End: runoutcome.EndResumeLost}).WithLastError(lastErr)
+	o := runoutcome.ForProcess(runoutcome.Process{Agent: agent, Kind: runoutcome.KindAgent, End: runoutcome.EndResumeLost}).WithLastError(lastErr)
 	out := fromOutcome(model.AdeRunFailed, o)
 	out.lost = true
 	return out, true
 }
 
-func (b *TaskBoard) agentOutcome(runID string, exit harness.Exit, runErr error, def stepDef, lastErr string, resumeLost bool) outcome {
+func (b *TaskBoard) agentOutcome(an runoutcome.Agent, runID string, exit harness.Exit, runErr error, def stepDef, lastErr string, resumeLost bool) outcome {
 	code := exit.Code
 	f, finished := b.takeFinish(runID)
 	if !finished {
-		if out, ok := lostOutcome(resumeLost, lastErr); ok {
+		if out, ok := lostOutcome(an, resumeLost, lastErr); ok {
 			return out
 		}
-		o := runoutcome.ForProcess(agentEnd(exit, runErr, def.Timeout)).WithLastError(lastErr)
+		o := runoutcome.ForProcess(agentEnd(an, exit, runErr, def.Timeout)).WithLastError(lastErr)
 		return fromOutcome(model.AdeRunFailed, o)
 	}
 	return fromFinish(f, &code, def.Results)

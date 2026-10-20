@@ -11,8 +11,8 @@ import (
 func TestDecideRebaseOutcome(t *testing.T) {
 	clean := rebaseCheck{facts: model.RebaseFacts{Verified: true}}
 	broken := rebaseCheck{facts: model.RebaseFacts{InProgress: true}, failure: "a rebase is still in progress in /wt/a"}
-	failedEnd := fromOutcome(model.AdeRunFailed, runoutcome.ForProcess(runoutcome.Process{Kind: runoutcome.KindAgent}))
-	crashEnd := fromOutcome(model.AdeRunFailed, runoutcome.ForProcess(runoutcome.Process{Kind: runoutcome.KindAgent, ExitCode: 1}))
+	failedEnd := fromOutcome(model.AdeRunFailed, runoutcome.ForProcess(runoutcome.Process{Agent: runoutcome.Agent{Label: "Claude", Command: "claude"}, Kind: runoutcome.KindAgent}))
+	crashEnd := fromOutcome(model.AdeRunFailed, runoutcome.ForProcess(runoutcome.Process{Agent: runoutcome.Agent{Label: "Claude", Command: "claude"}, Kind: runoutcome.KindAgent, ExitCode: 1}))
 	stoppedEnd := fromOutcome(model.AdeRunStuck, runoutcome.Outcome{Status: runoutcome.StatusCancelled, Source: runoutcome.SourceUser, Reason: "stopped by you"})
 	fin := func(status string) *agentmcp.Finish {
 		return &agentmcp.Finish{Status: status, Summary: "s", Reason: "because"}

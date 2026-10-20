@@ -204,7 +204,7 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 		sbx.cleanup()
 		out := decide(decision{
 			finish: s.takeFinishPtr(runID), res: res, exit: exit, runErr: runErr, end: sr.endedBy(),
-			timeout: timeoutText, budget: p.smart.MaxBudgetUSD, app: s.App, lastErr: sink.lastStderr(), resumeLost: p.resume != "" && agent.ResumeLost(sink.lastStderr()),
+			agent: runoutcome.AgentOf(agent), timeout: timeoutText, budget: p.smart.MaxBudgetUSD, app: s.App, lastErr: sink.lastStderr(), resumeLost: p.resume != "" && agent.ResumeLost(sink.lastStderr()),
 		})
 		out = sbx.outcome(out)
 		cancel()
@@ -287,6 +287,7 @@ type decision struct {
 	timeout string
 	budget  float64
 	app     string
+	agent   runoutcome.Agent
 	lastErr string
 	// resumeLost says the run resumed an earlier agent session that no longer exists.
 	resumeLost bool
@@ -313,11 +314,11 @@ func decide(d decision) runoutcome.Outcome {
 			out.Reason = firstNonEmpty(d.finish.Reason, d.finish.Summary, "the agent reported failure without a reason")
 		}
 	case d.resumeLost:
-		out = runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndResumeLost})
+		out = runoutcome.ForProcess(runoutcome.Process{Agent: d.agent, End: runoutcome.EndResumeLost})
 	case resultEnds(d):
-		out, _ = agentmcp.ResultOutcome(d.res, code, d.budget)
+		out, _ = agentmcp.ResultOutcome(d.agent, d.res, code, d.budget)
 	default:
-		p := runoutcome.Process{Kind: runoutcome.KindAgent, ExitCode: code, Timeout: d.timeout}
+		p := runoutcome.Process{Agent: d.agent, Kind: runoutcome.KindAgent, ExitCode: code, Timeout: d.timeout}
 		switch {
 		case d.runErr != nil:
 			p.End, p.Err = runoutcome.EndStartErr, d.runErr
@@ -331,7 +332,7 @@ func decide(d decision) runoutcome.Outcome {
 }
 
 func resultEnds(d decision) bool {
-	_, ok := agentmcp.ResultOutcome(d.res, d.exit.Code, d.budget)
+	_, ok := agentmcp.ResultOutcome(d.agent, d.res, d.exit.Code, d.budget)
 	return ok
 }
 

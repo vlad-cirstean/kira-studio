@@ -22,6 +22,8 @@ type Provider interface {
 	Label() string
 	// Command is the agent CLI's name as a user types it ("claude").
 	Command() string
+	// ProductLabel is the product's full name ("Claude Code").
+	ProductLabel() string
 	// Models is the provider's model aliases.
 	Models() Catalog
 	Locator

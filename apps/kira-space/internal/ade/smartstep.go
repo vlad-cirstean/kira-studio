@@ -113,17 +113,17 @@ func (s *smartStep) spec(agent harness.Provider, base harness.HeadlessSpec, spac
 
 // smartOutcome is a smart step's outcome: a finish_step call wins, then the result event (budget,
 // turn limit, error), then how the process ended. The cost and denials of the result event are added.
-func (b *TaskBoard) smartOutcome(runID string, exit harness.Exit, runErr error, res *harness.Result, step *smartStep, results []adewire.StepResult, lastErr string, resumeLost bool) outcome {
+func (b *TaskBoard) smartOutcome(an runoutcome.Agent, runID string, exit harness.Exit, runErr error, res *harness.Result, step *smartStep, results []adewire.StepResult, lastErr string, resumeLost bool) outcome {
 	var out outcome
 	if f, finished := b.takeFinish(runID); finished {
 		code := exit.Code
 		out = fromFinish(f, &code, results)
-	} else if lost, ok := lostOutcome(resumeLost, lastErr); ok {
+	} else if lost, ok := lostOutcome(an, resumeLost, lastErr); ok {
 		out = lost
-	} else if o, ok := agentmcp.ResultOutcome(res, exit.Code, step.script.Smart.MaxBudgetUSD); ok {
+	} else if o, ok := agentmcp.ResultOutcome(an, res, exit.Code, step.script.Smart.MaxBudgetUSD); ok {
 		out = fromOutcome(model.AdeRunFailed, o.WithLastError(lastErr))
 	} else {
-		o := runoutcome.ForProcess(agentEnd(exit, runErr, formatTimeout(step.timeout))).WithLastError(lastErr)
+		o := runoutcome.ForProcess(agentEnd(an, exit, runErr, formatTimeout(step.timeout))).WithLastError(lastErr)
 		out = fromOutcome(model.AdeRunFailed, o)
 	}
 	out.out.Outcome = agentmcp.ApplyResult(out.out.Outcome, res)

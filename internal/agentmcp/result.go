@@ -13,7 +13,7 @@ const maxDenials = 50
 
 // ResultOutcome maps a `result` event that ended the run in failure (budget, turn limit, error) to
 // an outcome. ok is false when the event says nothing about the end.
-func ResultOutcome(res *harness.Result, exit int, budgetUSD float64) (runoutcome.Outcome, bool) {
+func ResultOutcome(agent runoutcome.Agent, res *harness.Result, exit int, budgetUSD float64) (runoutcome.Outcome, bool) {
 	if res == nil {
 		return runoutcome.Outcome{}, false
 	}
@@ -27,7 +27,7 @@ func ResultOutcome(res *harness.Result, exit int, budgetUSD float64) (runoutcome
 			Reason: "stopped at the turn limit"}, true
 	case res.End == harness.EndError:
 		return runoutcome.Outcome{Status: runoutcome.StatusFailed, Source: runoutcome.SourceAgent, ExitCode: &code,
-			Reason: FirstNonEmpty(res.Text, "Claude reported an error")}, true
+			Reason: FirstNonEmpty(res.Text, agent.Name()+" reported an error")}, true
 	}
 	return runoutcome.Outcome{}, false
 }

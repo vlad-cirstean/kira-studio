@@ -246,7 +246,11 @@ func (b *TaskBoard) stopForTakeOver(rec *model.AdeSession, stop bool) error {
 	if !stop {
 		return invalid("the run is still running; stop it first")
 	}
-	done := b.cancelLive(b.live, run.ID, errTakenOver)
+	agent, err := b.agentFor(rec.Provider)
+	if err != nil {
+		return err
+	}
+	done := b.cancelLive(b.live, run.ID, takenOver{product: agent.ProductLabel()})
 	return b.awaitEnd(done)
 }
 

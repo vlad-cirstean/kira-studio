@@ -85,11 +85,41 @@ const (
 	EndWindow
 	EndQuit
 	EndRestart
-	// EndResumeLost is a resume whose Claude conversation is gone.
+	// EndResumeLost is a resume whose agent conversation is gone.
 	EndResumeLost
 )
 
+// Agent names the agent in outcome texts: Label as a name ("Claude"), Command as typed ("claude").
+type Agent struct{ Label, Command string }
+
+// Namer is what AgentOf reads; a harness provider satisfies it.
+type Namer interface {
+	Label() string
+	Command() string
+}
+
+// AgentOf names the agent of p.
+func AgentOf(p Namer) Agent { return Agent{Label: p.Label(), Command: p.Command()} }
+
+func (a Agent) label() string {
+	if a.Label == "" {
+		return "The agent"
+	}
+	return a.Label
+}
+
+func (a Agent) command() string {
+	if a.Command == "" {
+		return "agent"
+	}
+	return a.Command
+}
+
+// Name is the agent's name for outcome texts.
+func (a Agent) Name() string { return a.label() }
+
 type Process struct {
+	Agent    Agent
 	Kind     Kind
 	End      End
 	ExitCode int
@@ -113,7 +143,7 @@ func ForProcess(p Process) Outcome {
 	case EndStartErr:
 		return fail(SourceStart, fmt.Sprintf("could not start: %v", p.Err))
 	case EndResumeLost:
-		return fail(SourceStart, "could not resume: Claude has no saved conversation for this run; start it again")
+		return fail(SourceStart, "could not resume: "+p.Agent.label()+" has no saved conversation for this run; start it again")
 	case EndUser:
 		return Outcome{Status: StatusCancelled, Source: SourceUser, Reason: "stopped by you"}
 	case EndWindow:
@@ -127,9 +157,9 @@ func ForProcess(p Process) Outcome {
 	out := Outcome{Source: SourceExit, ExitCode: &code}
 	switch {
 	case p.Kind == KindAgent && code == 0:
-		out.Status, out.Reason = StatusFailed, "no report: Claude ended without calling finish_step"
+		out.Status, out.Reason = StatusFailed, "no report: "+p.Agent.label()+" ended without calling finish_step"
 	case p.Kind == KindAgent:
-		out.Status, out.Reason = StatusFailed, fmt.Sprintf("no report: claude exited with status %d", code)
+		out.Status, out.Reason = StatusFailed, fmt.Sprintf("no report: %s exited with status %d", p.Agent.command(), code)
 	case code == 0:
 		out.Status = StatusDone
 	case code < 0:
