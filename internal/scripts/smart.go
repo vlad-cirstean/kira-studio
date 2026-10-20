@@ -7,6 +7,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/kirathecat/kira-studio/internal/claudemodel"
 )
 
 // Script kinds.
@@ -57,7 +59,7 @@ var DefaultTools = []string{"Read", "Grep", "Glob"}
 var BuiltinVars = []string{"task", "jira", "repo", "branch", "base", "worktree"}
 
 // Models a smart script may use.
-var Models = []string{"haiku", "sonnet", "opus"}
+var Models = claudemodel.Aliases
 
 // SecretMask is what a run records in place of a secret value.
 const SecretMask = "••••"

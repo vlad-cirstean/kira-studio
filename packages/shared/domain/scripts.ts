@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CLAUDE_MODELS } from './claudeModels';
 import { paletteColorSchema } from './color';
 
 // P85 §9.2: zod schemas mirroring internal/scripts — mask.ts's own
@@ -23,7 +24,7 @@ export const BUILTIN_TOOLS = [
   'Bash',
 ] as const;
 export const DEFAULT_TOOLS: readonly string[] = ['Read', 'Grep', 'Glob'];
-export const SMART_MODELS = ['haiku', 'sonnet', 'opus'] as const;
+export const SMART_MODELS = CLAUDE_MODELS;
 // Variables a workflow run has; reserved as param names.
 export const BUILTIN_VARS = ['task', 'jira', 'repo', 'branch', 'base', 'worktree'] as const;
 export const DEFAULT_SMART = { model: 'sonnet', maxBudgetUsd: 1, timeout: '15m' } as const;
