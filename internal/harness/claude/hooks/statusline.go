@@ -1,4 +1,4 @@
-package agenthooks
+package hooks
 
 import (
 	"crypto/sha256"
@@ -13,27 +13,36 @@ import (
 	"strings"
 
 	"github.com/google/renameio/v2"
+
+	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
 // maxStatusLineBytes bounds one /statusline body; a statusline payload is a few KiB.
 const maxStatusLineBytes = 64 * 1024
 
-// RateWindow is one Claude Code rate-limit window as its statusline reports it.
-type RateWindow struct {
+// rateWindow is one Claude Code rate-limit window as its statusline reports it.
+type rateWindow struct {
 	UsedPercentage float64 `json:"used_percentage"`
 	// ResetsAt is Unix epoch seconds.
 	ResetsAt int64 `json:"resets_at"`
 }
 
-// RateLimits is the only part of a statusline payload this package decodes; either window may be
+// rateLimits is the only part of a statusline payload this package decodes; either window may be
 // absent (Claude Code omits a window it has no data for).
-type RateLimits struct {
-	FiveHour *RateWindow `json:"five_hour"`
-	SevenDay *RateWindow `json:"seven_day"`
+type rateLimits struct {
+	FiveHour *rateWindow `json:"five_hour"`
+	SevenDay *rateWindow `json:"seven_day"`
+}
+
+func (w *rateWindow) window() *harness.RateWindow {
+	if w == nil {
+		return nil
+	}
+	return &harness.RateWindow{UsedPercent: w.UsedPercentage, ResetsAt: w.ResetsAt}
 }
 
 type statusLineRequest struct {
-	RateLimits *RateLimits `json:"rate_limits"`
+	RateLimits *rateLimits `json:"rate_limits"`
 }
 
 // statusLineEntry is the settings `statusLine` object.
@@ -71,7 +80,7 @@ func (s *Server) handleStatusLine(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.onStatusLine != nil && req.RateLimits != nil && (req.RateLimits.FiveHour != nil || req.RateLimits.SevenDay != nil) {
-		s.onStatusLine(terminalID, *req.RateLimits)
+		s.onStatusLine(terminalID, harness.RateLimits{FiveHour: req.RateLimits.FiveHour.window(), SevenDay: req.RateLimits.SevenDay.window()})
 	}
 	w.WriteHeader(http.StatusOK)
 }
@@ -95,7 +104,7 @@ func (s *Server) composeStatusLine(terminalID, cwd string) (string, []string, er
 	sum := sha256.Sum256([]byte(terminalID))
 	path := filepath.Join(s.ln.Dir, "settings-"+hex.EncodeToString(sum[:])[:12]+".json")
 	if err := renameio.WriteFile(path, doc, 0o600); err != nil {
-		return "", nil, fmt.Errorf("agenthooks: write settings: %w", err)
+		return "", nil, fmt.Errorf("claude hooks: write settings: %w", err)
 	}
 	quoted, err := shellSingleQuote(path)
 	if err != nil {

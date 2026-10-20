@@ -1,4 +1,4 @@
-// Package localsock is the mkdtemp-then-unix-socket bootstrap agenthooks.New and gitaskpass.New
+// Package localsock is the mkdtemp-then-unix-socket bootstrap the Claude hooks listener and gitaskpass.New
 // each hand-rolled identically (P107 T2-9): a fresh 0700 temp directory, a unix socket inside it
 // named "s" (macOS caps sun_path at 104 bytes, so the filename has to stay short), chmod 0600, and
 // a random hex token. Both callers still build their own shim/hooks-document/http.Server on top —
@@ -24,12 +24,12 @@ type Options struct {
 	// per caller so a stray temp directory in a bug report is still traceable to which subsystem
 	// made it.
 	DirPrefix string
-	// TokenBytes is RandHex's own byte count (agenthooks and gitaskpass both use 32).
+	// TokenBytes is RandHex's own byte count (the Claude hooks listener and gitaskpass both use 32).
 	TokenBytes int
 }
 
 // Listener owns a temp directory and the unix socket inside it — Close removes both. It embeds
-// net.Listener so a caller that serves its own protocol on top (agenthooks' http.Server.Serve)
+// net.Listener so a caller that serves its own protocol on top (the hooks listener's http.Server.Serve)
 // can hand it over directly; Serve below is for a caller that wants a plain accept loop instead
 // (gitaskpass's own shape).
 type Listener struct {

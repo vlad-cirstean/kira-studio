@@ -76,7 +76,7 @@ export function reduceAgentActivity(
       // one signal this reducer has that the session is expecting an external event, not the user.
       const phase = base.wakeArmed ? 'waiting' : 'idle';
       // Clears everything else (P86 §13 rule 4), which is what heals a session that lost a
-      // PostToolUse to the listener's own bounds (internal/agenthooks/http.go §6.1).
+      // PostToolUse to the listener's own bounds (internal/harness/claude/hooks/http.go §6.1).
       return {
         ...base,
         phase,

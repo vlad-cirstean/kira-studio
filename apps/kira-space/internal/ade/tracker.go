@@ -1,5 +1,5 @@
 // Package ade is Kira Space's ADE engine: the task board, the run engine and the Claude Code session
-// tracker, over the shared internal/terminal and internal/agenthooks packages. No
+// tracker, over the shared internal/terminal and internal/harness packages. No
 // apps/kira-space/internal/bridge import (layering_test.go rule); bridge/adetask.go is the one
 // place that turns it into a Wails-bound surface.
 package ade
@@ -17,7 +17,6 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
@@ -86,6 +85,8 @@ type pendingIntent struct {
 	CreatedAt                         time.Time
 	TaskID, BranchID, StepID, Resumes string
 	Purpose                           string
+	// Provider is the id of the provider that composed Command; its listener hooks the launch.
+	Provider string
 }
 
 // PrepareArgs is Prepare's own argument shape. TaskID is required: the row is keyed to the task,
@@ -122,7 +123,7 @@ type PrepareResult struct {
 
 // Tracker is Kira Space's own agent session tracker (§4.4) — one instance, constructed in main.go
 // and shared by BoundService.ComposeAgent (via Compose), Registry.OnChange (via Reconcile),
-// agenthooks.Manager's OnEvent (via HandleEvent) and AdeTaskService (via Send/Get).
+// the hooks hub's OnEvent (via HandleEvent) and AdeTaskService (via Send/Get).
 type Tracker struct {
 	deps TrackerDeps
 
@@ -147,7 +148,7 @@ type Tracker struct {
 	// fresh marks records Compose inserted (not resumed), so Abort deletes rather than stops them.
 	fresh map[string]bool
 
-	hooks func(terminalID, cwd, command string) (string, []string)
+	hooks func(provider, terminalID, cwd, command string) (string, []string)
 
 	// graceTimers are Compose's pending Reconcile timers, stopped by Close; graceWG waits for a
 	// callback already running.
@@ -186,16 +187,16 @@ func (t *Tracker) SetStoppedHandler(fn func(recordID string)) {
 	t.deps.OnStopped = fn
 }
 
-// SetHooks installs the launch-composition callback (agenthooks.Manager.ComposeLaunch) — called
+// SetHooks installs the launch-composition callback (harness.Hooks.Compose) — called
 // once in main.go before any window exists, so Compose never races an unset hooks func with a
 // real launch.
-func (t *Tracker) SetHooks(fn func(terminalID, cwd, command string) (string, []string)) {
+func (t *Tracker) SetHooks(fn func(provider, terminalID, cwd, command string) (string, []string)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.hooks = fn
 }
 
-func (t *Tracker) hooksFn() func(string, string, string) (string, []string) {
+func (t *Tracker) hooksFn() func(string, string, string, string) (string, []string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.hooks
@@ -293,6 +294,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 		RecordID: recordID, ClaudeSessionID: claudeSessionID, Cwd: cwd, Command: command, Message: args.Message,
 		Resume: args.Resume != "", CreatedAt: now,
 		TaskID: args.TaskID, BranchID: args.BranchID, StepID: args.StepID, Resumes: args.Resumes, Purpose: args.Purpose,
+		Provider: agent.ID(),
 	}
 
 	t.mu.Lock()
@@ -368,7 +370,7 @@ func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, er
 		if hooks == nil {
 			return command, nil, nil
 		}
-		composed, env := hooks(terminalID, cwd, command)
+		composed, env := hooks(t.deps.Agent.Active().ID(), terminalID, cwd, command)
 		return composed, env, nil
 	}
 
@@ -380,7 +382,7 @@ func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, er
 	// leave a persisted row for a conversation that never ran.
 	composed, env := command, []string(nil)
 	if hooks := t.hooksFn(); hooks != nil {
-		composed, env = hooks(terminalID, cwd, command)
+		composed, env = hooks(intent.Provider, terminalID, cwd, command)
 	}
 	if intent.Message != "" {
 		// The command can end in a variadic flag (--add-dir a b), which would swallow the prompt.
@@ -574,10 +576,10 @@ func (t *Tracker) Reconcile() {
 	}
 }
 
-// HandleEvent is agenthooks.Options.OnEvent's own target — an event for a terminal this tracker
-// does not know (not live, or already reconciled away) is ignored, never an error: agenthooks has
+// HandleEvent is harness.HookOptions.OnEvent's own target — an event for a terminal this tracker
+// does not know (not live, or already reconciled away) is ignored, never an error: the hooks listener has
 // no notion of ade sessions, and a stray event racing a stop is expected, not a bug.
-func (t *Tracker) HandleEvent(ev agenthooks.Event) {
+func (t *Tracker) HandleEvent(ev harness.AgentEvent) {
 	t.mu.Lock()
 	recordID, ok := t.live[ev.TerminalID]
 	if !ok {

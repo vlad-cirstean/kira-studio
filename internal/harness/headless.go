@@ -109,10 +109,10 @@ type Exit struct {
 	Cancelled bool
 }
 
-// RateWindow is one rate-limit window; Utilization is a 0..1 fraction and ResetsAt Unix seconds.
+// RateWindow is one rate-limit window; UsedPercent is 0..100 and ResetsAt Unix seconds.
 type RateWindow struct {
-	Utilization float64 `json:"utilization"`
-	ResetsAt    int64   `json:"resetsAt"`
+	UsedPercent float64
+	ResetsAt    int64
 }
 
 // RateLimits holds the windows an event carried; either may be nil.

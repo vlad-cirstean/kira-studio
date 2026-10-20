@@ -11,7 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/agenthooks"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
@@ -270,7 +270,7 @@ func TestTracker_HandleEventUpdatesClaudeSessionIDOnClear(t *testing.T) {
 	recordID := sessions[0].ID
 
 	newClaudeID := "11111111-1111-1111-1111-111111111111"
-	tr.HandleEvent(agenthooks.Event{TerminalID: res.TerminalID, Event: "SessionStart", SessionID: newClaudeID})
+	tr.HandleEvent(harness.AgentEvent{TerminalID: res.TerminalID, Event: "SessionStart", SessionID: newClaudeID})
 
 	rec, err := store.Get(recordID)
 	if err != nil || rec == nil {
@@ -284,7 +284,7 @@ func TestTracker_HandleEventUpdatesClaudeSessionIDOnClear(t *testing.T) {
 func TestTracker_HandleEventUnknownTerminalIgnored(t *testing.T) {
 	tr, _, _, _ := newTestTracker(t)
 	// Must not panic or error for a terminal this tracker never Composed.
-	tr.HandleEvent(agenthooks.Event{TerminalID: "unknown", Event: "Stop"})
+	tr.HandleEvent(harness.AgentEvent{TerminalID: "unknown", Event: "Stop"})
 }
 
 func TestTracker_SendWritesBracketedPasteThenEnter(t *testing.T) {
@@ -313,7 +313,7 @@ func TestTracker_SendRefusedWhenNotRunning(t *testing.T) {
 
 // TestTracker_ConcurrentComposeReconcileHandleEvent is P129 Part 1 §6.1's own race guard: three
 // call sources (BoundService.Open's own goroutine via Compose, Registry.OnChange's own goroutine
-// via Reconcile, agenthooks' own request-handler goroutine via HandleEvent) genuinely run
+// via Reconcile, the hooks listener's request-handler goroutine via HandleEvent) genuinely run
 // concurrently in production. Run with -race.
 func TestTracker_ConcurrentComposeReconcileHandleEvent(t *testing.T) {
 	tr, _, live, _ := newTestTracker(t)
@@ -349,7 +349,7 @@ func TestTracker_ConcurrentComposeReconcileHandleEvent(t *testing.T) {
 		wg2.Add(1)
 		go func() {
 			defer wg2.Done()
-			tr.HandleEvent(agenthooks.Event{TerminalID: res.TerminalID, Event: "PreToolUse", ToolName: "Bash"})
+			tr.HandleEvent(harness.AgentEvent{TerminalID: res.TerminalID, Event: "PreToolUse", ToolName: "Bash"})
 			tr.Reconcile()
 		}()
 	}

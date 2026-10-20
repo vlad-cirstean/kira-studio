@@ -88,11 +88,11 @@ func TestStatusLineThrottle(t *testing.T) {
 func TestUsageOffNoInjection(t *testing.T) {
 	app := newApp(t)
 	setUsage(t, app, false)
-	command, env := app.W.AgentHooks.ComposeLaunch("tab-1", "", "claude")
-	if len(env) == 0 || !strings.Contains(command, app.W.AgentHooks.Status().SettingsPath) {
+	command, env := app.W.AgentHooks.Compose("claude", "tab-1", "", "claude")
+	if len(env) == 0 || !strings.Contains(command, app.W.AgentHooks.Status("claude").SettingsPath) {
 		t.Fatalf("command = %q, want the plain hooks file", command)
 	}
-	raw, err := os.ReadFile(app.W.AgentHooks.Status().SettingsPath)
+	raw, err := os.ReadFile(app.W.AgentHooks.Status("claude").SettingsPath)
 	if err != nil || strings.Contains(string(raw), "statusLine") {
 		t.Fatalf("hooks file has a statusLine (%v): %s", err, raw)
 	}

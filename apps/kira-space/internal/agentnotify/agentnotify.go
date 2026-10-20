@@ -10,8 +10,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
-	"github.com/kirathecat/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/internal/desknotify"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
@@ -140,7 +140,7 @@ func (n *Notifier) ReportFocus(f FocusState) {
 }
 
 // HandleEvent reacts to one hook event.
-func (n *Notifier) HandleEvent(ev agenthooks.Event) {
+func (n *Notifier) HandleEvent(ev harness.AgentEvent) {
 	n.mu.Lock()
 	armed := n.wake[ev.TerminalID]
 	switch ev.Event {
@@ -177,7 +177,7 @@ func (n *Notifier) HandleEvent(ev agenthooks.Event) {
 }
 
 // needsInput: a permission or elicitation prompt, or an untyped message from an older CLI.
-func needsInput(ev agenthooks.Event) bool {
+func needsInput(ev harness.AgentEvent) bool {
 	switch ev.NotificationType {
 	case "permission_prompt", "elicitation_dialog":
 		return true
@@ -187,7 +187,7 @@ func needsInput(ev agenthooks.Event) bool {
 	return false
 }
 
-func (n *Notifier) notifyTerminal(kind Kind, ev agenthooks.Event, message string) {
+func (n *Notifier) notifyTerminal(kind Kind, ev harness.AgentEvent, message string) {
 	p := n.d.Prefs()
 	if !p.Enabled || (kind == KindFinished && !p.OnFinished) || (kind == KindNeedsInput && !p.OnNeedsInput) {
 		return

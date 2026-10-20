@@ -1,4 +1,4 @@
-package agenthooks
+package hooks
 
 import (
 	"bytes"
@@ -14,14 +14,16 @@ import (
 	"testing"
 	"time"
 	"unicode/utf8"
+
+	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
 // newTestServer starts a real Server (a real mkdtemp dir, a real unix socket, a real http.Server)
 // and registers its own cleanup — every test in this file talks to it exactly as the shim would,
 // over the socket, never by calling Go methods that skip the wire.
-func newTestServer(t *testing.T, onEvent func(Event)) *Server {
+func newTestServer(t *testing.T, onEvent func(harness.AgentEvent)) *Server {
 	t.Helper()
-	s, err := New(Options{OnEvent: onEvent})
+	s, err := New(harness.HookOptions{OnEvent: onEvent})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -68,19 +70,19 @@ func postHook(t *testing.T, client *http.Client, token, terminalID, body string)
 // listener's own handler runs on net/http's per-request goroutine.
 type recordingEvents struct {
 	mu     sync.Mutex
-	events []Event
+	events []harness.AgentEvent
 }
 
-func (r *recordingEvents) record(e Event) {
+func (r *recordingEvents) record(e harness.AgentEvent) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.events = append(r.events, e)
 }
 
-func (r *recordingEvents) all() []Event {
+func (r *recordingEvents) all() []harness.AgentEvent {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	out := make([]Event, len(r.events))
+	out := make([]harness.AgentEvent, len(r.events))
 	copy(out, r.events)
 	return out
 }

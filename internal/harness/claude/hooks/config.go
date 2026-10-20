@@ -1,4 +1,4 @@
-package agenthooks
+package hooks
 
 import (
 	"encoding/json"
@@ -55,20 +55,20 @@ func buildHooksDocument(quotedShimCommand string, statusLine *statusLineEntry) (
 	}
 	encoded, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
-		return nil, fmt.Errorf("agenthooks: encode hooks.json: %w", err)
+		return nil, fmt.Errorf("claude hooks: encode hooks.json: %w", err)
 	}
 	return encoded, nil
 }
 
 // shellSingleQuote wraps s in single quotes for a POSIX shell argument — the command value
-// hooks.json stores (Claude Code runs it through a shell) and the settings path Manager.
+// hooks.json stores (Claude Code runs it through a shell) and the settings path Server.
 // ComposeLaunch appends after `--settings`. Refuses — a hard error, not a best-effort escape — a
 // string containing a single quote or a newline: an unquotable argv element. A mkdtemp-derived
 // path never contains either; the check exists so a future change here cannot silently produce a
 // broken command.
 func shellSingleQuote(s string) (string, error) {
 	if strings.ContainsAny(s, "'\n") {
-		return "", fmt.Errorf("agenthooks: path cannot be safely single-quoted: %q", s)
+		return "", fmt.Errorf("claude hooks: path cannot be safely single-quoted: %q", s)
 	}
 	return "'" + s + "'", nil
 }

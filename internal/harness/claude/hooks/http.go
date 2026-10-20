@@ -1,4 +1,4 @@
-package agenthooks
+package hooks
 
 import (
 	"crypto/subtle"
@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
 // maxHookPayloadBytes bounds one hook request's body (§6.1) — 4 MiB is generous for a real
@@ -17,13 +19,13 @@ import (
 const maxHookPayloadBytes = 4 * 1024 * 1024
 
 // maxHookMessageBytes truncates Notification's own message field (§6.1) — bounded before it ever
-// reaches Options.OnEvent, on a rune boundary so a multi-byte UTF-8 character is never split.
+// reaches HookOptions.OnEvent, on a rune boundary so a multi-byte UTF-8 character is never split.
 const maxHookMessageBytes = 200
 
 // hookRequest is the body this listener actually decodes — exactly the ten payload fields §6's
 // Event keeps, snake_case as the installed CLI's own hook payload names them. tool_input,
 // tool_response and transcript_path have no matching field here, so encoding/json silently skips
-// them on decode: nothing about them is ever retained, logged or reachable from Options.OnEvent.
+// them on decode: nothing about them is ever retained, logged or reachable from HookOptions.OnEvent.
 type hookRequest struct {
 	HookEventName    string `json:"hook_event_name"`
 	SessionID        string `json:"session_id"`
@@ -79,7 +81,7 @@ func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.onEvent != nil {
-		s.onEvent(Event{
+		s.onEvent(harness.AgentEvent{
 			TerminalID:           terminalID,
 			Event:                req.HookEventName,
 			SessionID:            req.SessionID,

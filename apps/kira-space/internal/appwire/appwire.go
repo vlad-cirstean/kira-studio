@@ -31,7 +31,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileweb"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/appupdate"
@@ -115,7 +114,7 @@ type Wired struct {
 
 	Git           gitWired
 	Tracker       *ade.Tracker
-	AgentHooks    *agenthooks.Manager
+	AgentHooks    *harness.Hooks
 	AgentNotify   *agentnotify.Notifier
 	TermBroker    *mobileterm.Broker
 	TermRegistry  *terminal.Registry

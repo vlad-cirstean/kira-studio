@@ -82,7 +82,7 @@ func New(opts Options) (*Broker, error) {
 		return nil, err
 	}
 
-	// localsock.Listen is agenthooks.New's own identical precedent (D8's whole security boundary,
+	// localsock.Listen is the Claude hooks listener's identical precedent (D8's whole security boundary,
 	// P107 T2-9): no other OS user can read the shim or reach the socket.
 	ln, err := localsock.Listen(localsock.Options{DirPrefix: "kira-askpass-", TokenBytes: 32})
 	if err != nil {

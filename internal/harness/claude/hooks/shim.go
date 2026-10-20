@@ -1,4 +1,4 @@
-package agenthooks
+package hooks
 
 import (
 	"fmt"
@@ -22,12 +22,12 @@ const statusLineThrottleSeconds = 30
 func buildShim(curlPath, sockPath string) (string, error) {
 	for _, arg := range []string{curlPath, sockPath} {
 		if strings.ContainsAny(arg, "\"\n") {
-			return "", fmt.Errorf("agenthooks: shim argument cannot be safely quoted: %q", arg)
+			return "", fmt.Errorf("claude hooks: shim argument cannot be safely quoted: %q", arg)
 		}
 	}
 	stampDir := filepath.Dir(sockPath)
 	if strings.ContainsAny(stampDir, "\"\n") {
-		return "", fmt.Errorf("agenthooks: shim argument cannot be safely quoted: %q", stampDir)
+		return "", fmt.Errorf("claude hooks: shim argument cannot be safely quoted: %q", stampDir)
 	}
 	return fmt.Sprintf(`#!/bin/sh
 # Kira agent hook. Always exits 0: a non-zero exit from a PreToolUse hook blocks the agent's own

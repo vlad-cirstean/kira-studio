@@ -150,8 +150,8 @@ func parseRateLimits(raw string) (harness.RateLimits, bool) {
 		Type          string `json:"type"`
 		RateLimitInfo struct {
 			UnifiedWindows struct {
-				FiveHour *harness.RateWindow `json:"five_hour"`
-				SevenDay *harness.RateWindow `json:"seven_day"`
+				FiveHour *streamWindow `json:"five_hour"`
+				SevenDay *streamWindow `json:"seven_day"`
 			} `json:"unifiedWindows"`
 		} `json:"rate_limit_info"`
 	}
@@ -162,7 +162,20 @@ func parseRateLimits(raw string) (harness.RateLimits, bool) {
 	if w.FiveHour == nil && w.SevenDay == nil {
 		return harness.RateLimits{}, false
 	}
-	return harness.RateLimits{FiveHour: w.FiveHour, SevenDay: w.SevenDay}, true
+	return harness.RateLimits{FiveHour: w.FiveHour.window(), SevenDay: w.SevenDay.window()}, true
+}
+
+// streamWindow is one window as the stream reports it: utilization is a 0..1 fraction.
+type streamWindow struct {
+	Utilization float64 `json:"utilization"`
+	ResetsAt    int64   `json:"resetsAt"`
+}
+
+func (w *streamWindow) window() *harness.RateWindow {
+	if w == nil {
+		return nil
+	}
+	return &harness.RateWindow{UsedPercent: w.Utilization * 100, ResetsAt: w.ResetsAt}
 }
 
 const maxResultText = 1 << 10

@@ -1,4 +1,4 @@
-// P86: the TypeScript mirrors of Go's terminal.AgentSession/agenthooks.Event wire shapes.
+// P86: the TypeScript mirrors of Go's terminal.AgentSession/harness.AgentEvent wire shapes.
 // grpc-history.ts's own precedent — types, not guards: neither crosses a storage boundary or gets
 // restored, so nothing here earns a Zod-parse boundary. control.ts `trust<T>()`s them like every
 // other bound result.
@@ -16,7 +16,7 @@ export interface AgentSessionsEvent {
   sessions: AgentSession[];
 }
 
-// agenthooks.Event's own wire projection, ChannelAgentEvent's payload (§6) — one hook firing for
+// harness.AgentEvent's own wire projection, ChannelAgentEvent's payload (§6) — one hook firing for
 // one tab. Every field the listener kept; everything else (tool_input, tool_response,
 // transcript_path, ...) was already dropped server-side and never reaches here.
 export interface AgentEvent {

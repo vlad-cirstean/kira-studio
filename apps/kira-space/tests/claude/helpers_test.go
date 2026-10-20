@@ -377,7 +377,7 @@ func (a *realApp) requireCostUnder(t *testing.T) {
 	}
 }
 
-// agentEvent is one ChannelAgentEvent payload (agenthooks.Event on the wire).
+// agentEvent is one ChannelAgentEvent payload (harness.AgentEvent on the wire).
 type agentEvent struct {
 	TerminalID string `json:"terminalId"`
 	Event      string `json:"event"`

@@ -7,12 +7,13 @@
 // this package's plain error into an ipcerr response. Manager (manager.go) is the host's own
 // entry point for lifecycle and launch composition; nothing here reads settings or knows which
 // app is hosting it.
-package agenthooks
+package hooks
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	"github.com/google/renameio/v2"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/localsock"
 )
 
@@ -28,52 +30,21 @@ import (
 // this is a generous backstop, not a value tuned against a known slow path.
 const closeHTTPGraceTimeout = 5 * time.Second
 
-// Event is what the listener hands to Options.OnEvent — the ten hook-payload fields this app
-// keeps (§6), plus TerminalID from the X-Kira-Terminal header (not the body). tool_input,
-// tool_response and transcript_path are never decoded into anything, so they can never reach
-// here — encoding/json silently skips a body field with no matching struct tag, which is the
-// actual mechanism behind "the listener keeps ten fields and drops the rest without logging".
-type Event struct {
-	TerminalID       string `json:"terminalId"`
-	Event            string `json:"event"`
-	SessionID        string `json:"sessionId"`
-	Cwd              string `json:"cwd"`
-	ToolName         string `json:"toolName"`
-	ToolUseID        string `json:"toolUseId"`
-	NotificationType string `json:"notificationType"`
-	Message          string `json:"message"`
-	Source           string `json:"source"`
-	Reason           string `json:"reason"`
-	// LastAssistantMessage is Stop's reply text, bounded like Message.
-	LastAssistantMessage string `json:"lastAssistantMessage"`
-}
-
-// Options configures a Server.
-type Options struct {
-	// OnEvent is called once per accepted hook request, from that request's own handler goroutine
-	// (net/http's usual one-goroutine-per-request model) — never after Close returns.
-	OnEvent func(Event)
-	// StatusLine reports whether a new launch gets the statusline wrapper (nil means no). Read at
-	// compose time, so a settings toggle applies to the next launch.
-	StatusLine func() bool
-	// OnStatusLine is called once per accepted POST /statusline carrying rate_limits.
-	OnStatusLine func(terminalID string, rl RateLimits)
-}
-
 // Server owns, for its own lifetime: a 0700 temp directory, the generated hooks.json (§2.4), the
 // shim script (§5.2), a 0600 unix socket and the http.Server serving POST /hook over it. One
 // instance per enable — internal/bridge/agenthooks.go's AgentHooksService constructs and closes
 // one each time the setting toggles on, mirroring internal/dbmcp.Server's own start/stop shape.
 type Server struct {
 	hooksPath string
-	// quotedHooksPath is hooksPath, single-quoted once here so Manager.ComposeLaunch has no error
+	// quotedHooksPath is hooksPath, single-quoted once here so Server.Compose has no error
 	// path of its own (§2.1's own design note): hooks.json shares ln.Dir with the shim, whose
 	// quoting New already succeeds on above, so quoting this path can never fail either.
 	quotedHooksPath string
 	shimPath        string
 	quotedShim      string
-	onEvent         func(Event)
-	onStatusLine    func(string, RateLimits)
+	onEvent         func(harness.AgentEvent)
+	onStatusLine    func(string, harness.RateLimits)
+	statusLine      func() bool
 
 	ln   *localsock.Listener
 	http *http.Server
@@ -83,7 +54,7 @@ type Server struct {
 // goroutine, and returns. A failure here is never fatal to the caller — AgentHooksService.
 // SetEnabled/startLocked surfaces it as AgentHooksStatus.Error (§5.2), the same "enabling fails
 // loudly, nothing silently degrades" posture DbMcpService already takes for a bind failure.
-func New(opts Options) (*Server, error) {
+func New(opts harness.HookOptions) (*Server, error) {
 	curlPath, err := exec.LookPath("curl")
 	if err != nil {
 		return nil, errors.New("curl not found; hooks cannot report")
@@ -93,7 +64,7 @@ func New(opts Options) (*Server, error) {
 	// token or reach the socket (P107 T2-9).
 	ln, err := localsock.Listen(localsock.Options{DirPrefix: "kira-agent-", TokenBytes: 32})
 	if err != nil {
-		return nil, fmt.Errorf("agenthooks: %w", err)
+		return nil, fmt.Errorf("claude hooks: %w", err)
 	}
 
 	shimBody, err := buildShim(curlPath, ln.SockPath)
@@ -104,7 +75,7 @@ func New(opts Options) (*Server, error) {
 	shimPath := filepath.Join(ln.Dir, "hook")
 	if err := renameio.WriteFile(shimPath, []byte(shimBody), 0o700); err != nil {
 		_ = ln.Close()
-		return nil, fmt.Errorf("agenthooks: write shim: %w", err)
+		return nil, fmt.Errorf("claude hooks: write shim: %w", err)
 	}
 
 	quotedShim, err := shellSingleQuote(shimPath)
@@ -120,7 +91,7 @@ func New(opts Options) (*Server, error) {
 	hooksPath := filepath.Join(ln.Dir, "hooks.json")
 	if err := renameio.WriteFile(hooksPath, hooksDoc, 0o600); err != nil {
 		_ = ln.Close()
-		return nil, fmt.Errorf("agenthooks: write hooks.json: %w", err)
+		return nil, fmt.Errorf("claude hooks: write hooks.json: %w", err)
 	}
 	quotedHooksPath, err := shellSingleQuote(hooksPath)
 	if err != nil {
@@ -130,7 +101,7 @@ func New(opts Options) (*Server, error) {
 
 	s := &Server{
 		hooksPath: hooksPath, quotedHooksPath: quotedHooksPath, shimPath: shimPath,
-		quotedShim: quotedShim, onEvent: opts.OnEvent, onStatusLine: opts.OnStatusLine,
+		quotedShim: quotedShim, onEvent: opts.OnEvent, onStatusLine: opts.OnStatusLine, statusLine: opts.StatusLine,
 		ln: ln,
 	}
 	s.http = &http.Server{
@@ -148,6 +119,28 @@ func New(opts Options) (*Server, error) {
 	}()
 
 	return s, nil
+}
+
+// Status reports the running listener.
+func (s *Server) Status() harness.HookStatus {
+	return harness.HookStatus{Running: true, SettingsPath: s.hooksPath}
+}
+
+// Compose returns command with " --settings '<hooks.json>'" appended and the three hook env vars a
+// launch's shell needs (Env). With the statusline option on, the settings file is per terminal
+// (cwd locates the project's own statusline setting). The env carries KIRA_AGENT_HOOK_TOKEN in
+// plain text: never return it from a bound method. Which launches get hooks at all (an agent
+// launch, never a plain shell or script) is the host's call, made before this is reached.
+func (s *Server) Compose(terminalID, cwd, command string) (string, []string) {
+	env := s.Env(terminalID)
+	if s.statusLine != nil && s.statusLine() {
+		quoted, extra, err := s.composeStatusLine(terminalID, cwd)
+		if err == nil {
+			return command + " --settings " + quoted, append(env, extra...)
+		}
+		slog.Warn("agent hooks: statusline settings", "scope", "ade", "err", err)
+	}
+	return command + " --settings " + s.quotedHooksPath, env
 }
 
 // SettingsPath is the generated hooks.json's own absolute path — internal/bridge/terminal.go's

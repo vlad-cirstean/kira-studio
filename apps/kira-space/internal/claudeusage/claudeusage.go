@@ -48,14 +48,9 @@ type Snapshot struct {
 	Detail    string  `json:"detail"`
 }
 
-// FromSession converts a statusline window: percent 0-100, reset in epoch seconds.
+// FromSession converts a reported window: percent 0-100, reset in epoch seconds.
 func FromSession(percent float64, resetsAtSeconds int64) *Window {
 	return &Window{UsedPercent: clamp(percent), ResetsAt: resetsAtSeconds * 1000}
-}
-
-// FromRun converts a stream-json window: utilization is a 0..1 fraction, reset in epoch seconds.
-func FromRun(utilization float64, resetsAtSeconds int64) *Window {
-	return &Window{UsedPercent: clamp(utilization * 100), ResetsAt: resetsAtSeconds * 1000}
 }
 
 func clamp(p float64) float64 {

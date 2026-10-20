@@ -28,7 +28,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/memory"
@@ -93,13 +92,13 @@ type gitWired struct {
 	opLog         *oplog.Log
 }
 
-// wireTracker constructs and starts the ade.Tracker and the agenthooks.Manager it drives, wired
+// wireTracker constructs and starts the ade.Tracker and the harness.Hooks hub it drives, wired
 // together before any window exists so Compose never races an unset hooks func with a real launch.
 // Rows a previous process life left running are stopped by the task board's Recover.
 func wireTracker(
 	repositories *repos.Repos, registry *terminal.Registry, emitter appevent.Emitter, events *bridge.Events,
 	grace time.Duration, notifier *agentnotify.Notifier, usage *claudeusage.Service, agents harness.Selector,
-) (*ade.Tracker, *agenthooks.Manager) {
+) (*ade.Tracker, *harness.Hooks) {
 	tracker := ade.NewTracker(ade.TrackerDeps{
 		Agent: agents, Store: repositories.AdeSessions, LiveAgents: registry.AgentSessions,
 		WriteTerminal: registry.Write, Now: time.Now, Grace: grace,
@@ -108,20 +107,20 @@ func wireTracker(
 
 	// Hooks are always on: a start failure (curl missing, a bind conflict) is logged, never fatal —
 	// sessions still spawn and track, activity icons stay absent.
-	hooks := agenthooks.NewManager(agenthooks.Options{
-		OnEvent: func(ev agenthooks.Event) {
+	hooks := harness.NewHooks(agents.Registry, harness.HookOptions{
+		OnEvent: func(ev harness.AgentEvent) {
 			tracker.HandleEvent(ev)
 			bridge.EmitAgentEvent(emitter, ev)
 			notifier.HandleEvent(ev)
 		},
 		StatusLine: usageEnabled(repositories),
-		OnStatusLine: func(_ string, rl agenthooks.RateLimits) {
+		OnStatusLine: func(_ string, rl harness.RateLimits) {
 			var five, seven *claudeusage.Window
 			if rl.FiveHour != nil {
-				five = claudeusage.FromSession(rl.FiveHour.UsedPercentage, rl.FiveHour.ResetsAt)
+				five = claudeusage.FromSession(rl.FiveHour.UsedPercent, rl.FiveHour.ResetsAt)
 			}
 			if rl.SevenDay != nil {
-				seven = claudeusage.FromSession(rl.SevenDay.UsedPercentage, rl.SevenDay.ResetsAt)
+				seven = claudeusage.FromSession(rl.SevenDay.UsedPercent, rl.SevenDay.ResetsAt)
 			}
 			usage.Ingest(claudeusage.SourceSession, five, seven)
 		},
@@ -129,7 +128,7 @@ func wireTracker(
 	if err := hooks.Start(); err != nil {
 		slog.Warn("agent hooks: start", "scope", "ade", "err", err)
 	}
-	tracker.SetHooks(hooks.ComposeLaunch)
+	tracker.SetHooks(hooks.Compose)
 	return tracker, hooks
 }
 
@@ -224,10 +223,10 @@ func wireAdeTask(
 		OnRateLimits: func(rl harness.RateLimits) {
 			var five, seven *claudeusage.Window
 			if rl.FiveHour != nil {
-				five = claudeusage.FromRun(rl.FiveHour.Utilization, rl.FiveHour.ResetsAt)
+				five = claudeusage.FromSession(rl.FiveHour.UsedPercent, rl.FiveHour.ResetsAt)
 			}
 			if rl.SevenDay != nil {
-				seven = claudeusage.FromRun(rl.SevenDay.Utilization, rl.SevenDay.ResetsAt)
+				seven = claudeusage.FromSession(rl.SevenDay.UsedPercent, rl.SevenDay.ResetsAt)
 			}
 			usage.Ingest(claudeusage.SourceRun, five, seven)
 		},
@@ -304,7 +303,7 @@ func adeCloseTerminal(registry *terminal.Registry) func(id string) error {
 
 // shutdownTracker is wireTracker's teardown half: flushes the tracker's still-in-memory lastActive
 // values, then stops the hooks listener.
-func shutdownTracker(tracker *ade.Tracker, hooks *agenthooks.Manager) {
+func shutdownTracker(tracker *ade.Tracker, hooks *harness.Hooks) {
 	if err := tracker.Close(); err != nil {
 		slog.Warn("ade: close", "scope", "ade", "err", err)
 	}
