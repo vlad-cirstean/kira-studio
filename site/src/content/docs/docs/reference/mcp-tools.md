@@ -59,7 +59,6 @@ Store the facts and rules of files and folders by path, in the background. Send 
 - `distill`: `true` stores nothing and returns the merged lines instead. Default false.
 - `mode`: with `distill`, `facts` (default) returns merged lines; `rewrite` returns one short text rewritten in its own form, or unchanged when already clean. Text only, up to 2,000 characters.
 - `context`: code around the text, read only, up to 6,000 characters. Only with `mode` rewrite.
-- `check`: run a second call that checks the rewrite kept every fact; a failed check keeps the original. Only with `mode` rewrite. Default false.
 
 A large job waits for you to start it in Kira Space. So does a job holding a kira-memory doc whose header claims a higher origin, or another scope or project, than the job. A doc's header provenance wins on import, so you confirm it first.
 

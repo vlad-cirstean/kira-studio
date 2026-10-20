@@ -5552,13 +5552,6 @@
           "body": "Sent as the system prompt of the {agent} call that runs after the gate accepts a fact."
         }
       },
-      "memoryRewriteCheckSystem": {
-        "description": "Checks that a rewrite of one short text kept every fact of the original.",
-        "title": "Rewrite check",
-        "usedBy": {
-          "body": "Sent as the system prompt of the second {agent} call when the ingest_files tool runs with distill true, mode rewrite and check true."
-        }
-      },
       "memoryRewriteSystem": {
         "description": "Rewrites one short text, such as a code comment, in its own form. Drops trivia and keeps every fact.",
         "title": "Rewrite text",
@@ -5908,9 +5901,6 @@
         "error": "Over the limit of {max} characters."
       },
       "progress": {
-        "check": {
-          "status": "Checking the rewrite · {cost}"
-        },
         "extract": {
           "status": "Reading parts: {done} of {total} · {cost}"
         },
@@ -5944,9 +5934,6 @@
         },
         "hint": "The text comes back in its own form with trivia dropped. Facts, negations and numbers stay.",
         "kept": {
-          "check": {
-            "body": "Kept the original. The check found a fact lost or changed."
-          },
           "directive": {
             "body": "Kept the original. The rewrite changed a directive."
           },

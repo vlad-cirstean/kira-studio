@@ -508,35 +508,6 @@ Already clean: no label, no history narration, no restated code, no listed hedge
 }`,
 }, RewriteVars{MaxWidth: 100})
 
-// MemoryRewriteCheckSystem is the system prompt of the optional second call that checks a rewrite
-// kept every fact of the original.
-var MemoryRewriteCheckSystem = define(Entry{
-	ID: "memory.rewrite.check.system", Kind: KindSystem, Apps: spaceApp, Applies: NextCall,
-	TitleKey:          "llmPrompts.entry.memoryRewriteCheckSystem.title",
-	PurposeKey:        "llmPrompts.entry.memoryRewriteCheckSystem.description",
-	UsedByKey:         "llmPrompts.entry.memoryRewriteCheckSystem.usedBy.body",
-	RequiredFragments: []ID{"memory.dataHygiene"},
-	Default: `You check a rewrite of one short text, usually a code comment, against the original. Output only the schema.
-
-{{template "memory.dataHygiene"}}
-
-Input: "original", "rewrite", optional "context" (code around it; read it, never judge it).
-The rewrite may drop internal tracking labels (ticket, phase, milestone, review-finding, iteration or version identifiers, plan or tracker references), history narration that explains nothing about current code (who changed it, moved-from notes), sentences that restate the context code, and the hedges "really", "basically", "actually", "simply", "just" as a hedge, plus intensifiers.
-Past-tense text that explains why current code is as it is (a rejected alternative, the bug a guard prevents, a consequence chain) is a reason: dropping it is "lost", as is a clause stating what the current code gains or prevents. So is dropping a cross-reference ("ports X", "mirrors X", "see issue N"), a doc comment's opening clause naming its symbol, a stated invariant or contract, or a current fact carried by a moved-from clause. For prose (not a code comment), history, dates, versions and old values are content: only the listed hedges may go. "wrong" also takes past-tense narration restated in present tense, and a claim a dropped label left false.
-Find every other fact of the original: literals, numbers, negations, qualifiers of scope and place, what the declaration below holds, cause links (because, so, otherwise), examples, cross-references to other files or settings.
-"lost": each such fact missing from the rewrite or weakened; a dropped cause link or qualifier counts.
-"wrong": each claim of the rewrite the original does not state, or states differently.
-"ok": true only when "lost" and "wrong" are both empty.`,
-	Schema: `{
-  "type": "object", "additionalProperties": false, "required": ["ok", "lost", "wrong"],
-  "properties": {
-    "ok": {"type": "boolean"},
-    "lost": {"type": "array", "items": {"type": "string"}},
-    "wrong": {"type": "array", "items": {"type": "string"}}
-  }
-}`,
-}, NoVars{})
-
 // MemoryImportFinalizeSystem is the system prompt of the run that stores one imported file's facts.
 var MemoryImportFinalizeSystem = define(Entry{
 	ID: "memory.import.finalize.system", Kind: KindSystem, Apps: spaceApp, Applies: NextCall,
@@ -705,10 +676,9 @@ var (
 	_ = arg(MemoryToolIngestFiles.id, "writeDoc", spaceApp, NewSession, `also write each file's facts beside it as <name>.memory.md in kira-memory doc format; default false`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "session", spaceApp, NewSession, `Claude Code session id; omit for this session`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "text", spaceApp, NewSession, `text to distill, at most {{.Max}} characters; only with distill true`, MaxVars{Max: 120000})
-	_ = arg(MemoryToolIngestFiles.id, "distill", spaceApp, NewSession, `true: store nothing and return the merged lines; takes text or one path, plus mode, context and check; no store argument; default false`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "distill", spaceApp, NewSession, `true: store nothing and return the merged lines; takes text or one path, plus mode and context; no store argument; default false`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "mode", spaceApp, NewSession, `facts: merged lines (default); rewrite: one same-form rewrite of short text such as a code comment`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "context", spaceApp, NewSession, `code around the text, read only, at most {{.Max}} characters; only with mode rewrite`, MaxVars{Max: 6000})
-	_ = arg(MemoryToolIngestFiles.id, "check", spaceApp, NewSession, `run a second call that checks the rewrite kept every fact; a failed check keeps the original; only with mode rewrite; default false`, NoVars{})
 )
 
 // MemoryToolIngestStatus describes the ingest_status tool.

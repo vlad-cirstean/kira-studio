@@ -15,13 +15,11 @@ import (
 )
 
 const (
-	rewriteSystem      = "clean one short text"
-	rewriteCheckSystem = "check a rewrite of one short text"
+	rewriteSystem = "clean one short text"
 
-	rewriteIn    = "\t// Retry caps at 30 s (P900), because the upstream bans clients; see `retryQueue.maxDelaySeconds`."
-	rewriteOut   = "\t// Retry caps at 30 s, because the upstream bans clients; see `retryQueue.maxDelaySeconds`."
-	rewriteCost  = 0.01
-	rewriteCheck = 0.008
+	rewriteIn   = "\t// Retry caps at 30 s (P900), because the upstream bans clients; see `retryQueue.maxDelaySeconds`."
+	rewriteOut  = "\t// Retry caps at 30 s, because the upstream bans clients; see `retryQueue.maxDelaySeconds`."
+	rewriteCost = 0.01
 )
 
 var tagDropped = []map[string]string{{"text": "(P900)", "why": "tag"}}
@@ -29,21 +27,16 @@ var tagDropped = []map[string]string{{"text": "(P900)", "why": "tag"}}
 // rewriteRule answers every rewrite call with text and the dropped spans.
 func rewriteRule(t *testing.T, text string, dropped []map[string]string) fakeagent.PromptRule {
 	t.Helper()
+	return rewriteRuleReason(t, text, dropped, "Dropped the phase tag.")
+}
+
+func rewriteRuleReason(t *testing.T, text string, dropped []map[string]string, reason string) fakeagent.PromptRule {
+	t.Helper()
 	if dropped == nil {
 		dropped = []map[string]string{}
 	}
 	return fakeagent.PromptRule{System: rewriteSystem, Emit: costAnswer(t, rewriteCost, map[string]any{
-		"text": text, "dropped": dropped, "reason": "Dropped the phase tag.",
-	})}
-}
-
-func checkRule(t *testing.T, ok bool, lost []string) fakeagent.PromptRule {
-	t.Helper()
-	if lost == nil {
-		lost = []string{}
-	}
-	return fakeagent.PromptRule{System: rewriteCheckSystem, Emit: costAnswer(t, rewriteCheck, map[string]any{
-		"ok": ok, "lost": lost, "wrong": []string{},
+		"text": text, "dropped": dropped, "reason": reason,
 	})}
 }
 
@@ -55,21 +48,18 @@ type rewriteOutput struct {
 }
 
 // rewriteVia runs ingest_files with distill and mode rewrite on a fresh app answering with rules.
-func rewriteVia(t *testing.T, input string, check bool, rules ...fakeagent.PromptRule) (*flowharness.App, *mcp.CallToolResult, rewriteOutput) {
+func rewriteVia(t *testing.T, input string, rules ...fakeagent.PromptRule) (*flowharness.App, *mcp.CallToolResult, rewriteOutput) {
 	t.Helper()
 	app := flowharness.New(t)
 	app.Scenario(fakeagent.Scenario{Prompts: rules})
 	cs := memoryMCP(t, app)
 	args := map[string]any{"distill": true, "mode": "rewrite", "text": input}
-	if check {
-		args["check"] = true
-	}
 	res := callMCP(t, cs, "ingest_files", args)
 	return app, res, structuredAs[rewriteOutput](t, res)
 }
 
 func TestMcpIngestDistillRewrite(t *testing.T) {
-	app, res, out := rewriteVia(t, rewriteIn, false, rewriteRule(t, rewriteOut, tagDropped))
+	app, res, out := rewriteVia(t, rewriteIn, rewriteRule(t, rewriteOut, tagDropped))
 	want := rewriteOut + "\n\ndropped: (P900) | tag"
 	if got := res.Content[0].(*mcp.TextContent).Text; got != want {
 		t.Fatalf("text = %q, want %q", got, want)
@@ -82,23 +72,15 @@ func TestMcpIngestDistillRewrite(t *testing.T) {
 		t.Fatalf("%d claude calls, want one rewrite and no extract, verify or merge", n)
 	}
 
-	// A clean text skips the model: unchanged, no call, no cost.
-	app, res, out = rewriteVia(t, rewriteOut, true, rewriteRule(t, rewriteIn, tagDropped))
-	if out.Rewrite.Changed || out.Rewrite.Gate != "" || out.Rewrite.Text != rewriteOut || out.CostUSD != 0 {
-		t.Fatalf("clean = %+v", out)
-	}
-	if n := len(distillFiles(t, app)); n != 0 {
-		t.Fatalf("%d claude calls, want none", n)
-	}
-
-	// An unchanged draft is an accepted no-op, with no check call even when asked.
-	const filler = "// Retry caps at 30 s, actually."
-	app, res, out = rewriteVia(t, filler, true, rewriteRule(t, filler, nil), checkRule(t, false, []string{"x"}))
+	// A clean text still gets the one call; the model returns it verbatim.
+	const clean = "Already clean."
+	app, res, out = rewriteVia(t, rewriteOut, rewriteRuleReason(t, rewriteOut, nil, clean))
 	if got := res.Content[0].(*mcp.TextContent).Text; !strings.HasSuffix(got, "\n\nunchanged") {
 		t.Fatalf("text = %q, want it to end with unchanged", got)
 	}
-	if out.Rewrite.Changed || out.Rewrite.Gate != "" || len(out.Rewrite.Dropped) != 0 || out.Rewrite.Check != nil {
-		t.Fatalf("unchanged = %+v", out.Rewrite)
+	if out.Rewrite.Changed || out.Rewrite.Gate != "" || out.Rewrite.Text != rewriteOut || len(out.Rewrite.Dropped) != 0 ||
+		out.Rewrite.Reason != clean || out.CostUSD < 0.009 || out.CostUSD > 0.011 {
+		t.Fatalf("clean = %+v", out)
 	}
 	if n := len(distillFiles(t, app)); n != 1 {
 		t.Fatalf("%d claude calls, want 1", n)
@@ -126,7 +108,7 @@ func TestMcpIngestDistillRewriteGates(t *testing.T) {
 			if tc.gate == "tokens" {
 				dropped = nil
 			}
-			app, res, out := rewriteVia(t, tc.in, false, rewriteRule(t, tc.draft, dropped))
+			app, res, out := rewriteVia(t, tc.in, rewriteRule(t, tc.draft, dropped))
 			if r := out.Rewrite; r.Changed || r.Gate != tc.gate || r.Text != tc.in || r.Draft != tc.draft {
 				t.Fatalf("rewrite = %+v, want gate %s with the input kept", r, tc.gate)
 			}
@@ -140,7 +122,7 @@ func TestMcpIngestDistillRewriteGates(t *testing.T) {
 	}
 
 	t.Run("equal length passes grew", func(t *testing.T) {
-		_, _, out := rewriteVia(t, "// Retry caps at 30 s because x, simply.", false, rewriteRule(t, "// Retry caps at 30 s because x, y.", nil))
+		_, _, out := rewriteVia(t, "// Retry caps at 30 s because x, simply.", rewriteRule(t, "// Retry caps at 30 s because x, y.", nil))
 		if !out.Rewrite.Changed || out.Rewrite.Gate != "" {
 			t.Fatalf("rewrite = %+v, want accepted", out.Rewrite)
 		}
@@ -150,12 +132,12 @@ func TestMcpIngestDistillRewriteGates(t *testing.T) {
 // Prose is accepted only as the input minus listed hedges: no reflow, no other word gone, no width rule.
 func TestMcpIngestDistillRewriteProse(t *testing.T) {
 	long := "The package is published on PyPI and it really only needs Python 3.9 or newer and has no compiled dependencies, so it works on Alpine images too."
-	_, _, out := rewriteVia(t, long, false, rewriteRule(t, strings.Replace(long, "really ", "", 1), nil))
+	_, _, out := rewriteVia(t, long, rewriteRule(t, strings.Replace(long, "really ", "", 1), nil))
 	if !out.Rewrite.Changed || out.Rewrite.Gate != "" {
 		t.Fatalf("hedge removal = %+v, want accepted", out.Rewrite)
 	}
 	note := "Changed: the page size is now 50 (was 25), actually."
-	_, _, out = rewriteVia(t, note, false, rewriteRule(t, "Changed: the page size is now 50.", nil))
+	_, _, out = rewriteVia(t, note, rewriteRule(t, "Changed: the page size is now 50.", nil))
 	if out.Rewrite.Changed || out.Rewrite.Gate != "form" {
 		t.Fatalf("dropped content = %+v, want gate form", out.Rewrite)
 	}
@@ -163,7 +145,7 @@ func TestMcpIngestDistillRewriteProse(t *testing.T) {
 
 func TestMcpIngestDistillRewriteOutput(t *testing.T) {
 	unusable := fakeagent.PromptRule{System: rewriteSystem, Emit: costAnswer(t, rewriteCost, nil)}
-	app, _, out := rewriteVia(t, rewriteIn, false, unusable)
+	app, _, out := rewriteVia(t, rewriteIn, unusable)
 	if r := out.Rewrite; r.Changed || r.Gate != "output" || r.Text != rewriteIn {
 		t.Fatalf("rewrite = %+v, want gate output", r)
 	}
@@ -175,25 +157,6 @@ func TestMcpIngestDistillRewriteOutput(t *testing.T) {
 	}
 }
 
-func TestMcpIngestDistillRewriteCheck(t *testing.T) {
-	app, _, out := rewriteVia(t, rewriteIn, true, rewriteRule(t, rewriteOut, tagDropped), checkRule(t, false, []string{"the cause link"}))
-	if r := out.Rewrite; r.Changed || r.Gate != "check" || r.Text != rewriteIn || r.Draft != rewriteOut ||
-		r.Check == nil || r.Check.OK || len(r.Check.Lost) != 1 {
-		t.Fatalf("rewrite = %+v, want gate check", r)
-	}
-	if n := len(distillFiles(t, app)); n != 2 {
-		t.Fatalf("%d claude calls, want a rewrite and a check", n)
-	}
-
-	app, _, out = rewriteVia(t, rewriteIn, true, rewriteRule(t, rewriteOut, tagDropped), checkRule(t, true, nil))
-	if r := out.Rewrite; !r.Changed || r.Gate != "" || r.Text != rewriteOut || r.Check == nil || !r.Check.OK {
-		t.Fatalf("rewrite = %+v, want accepted with an ok check", r)
-	}
-	if n := len(distillFiles(t, app)); n != 2 {
-		t.Fatalf("%d claude calls, want 2", n)
-	}
-}
-
 func TestMcpIngestDistillRewriteRefusals(t *testing.T) {
 	app := flowharness.New(t)
 	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{rewriteRule(t, rewriteOut, nil)}})
@@ -202,8 +165,8 @@ func TestMcpIngestDistillRewriteRefusals(t *testing.T) {
 	for name, args := range map[string]map[string]any{
 		"rewrite with paths":      {"distill": true, "mode": "rewrite", "paths": []string{path}},
 		"context without rewrite": {"distill": true, "text": "x", "context": "code"},
-		"check without rewrite":   {"distill": true, "text": "x", "check": true},
 		"unknown mode":            {"distill": true, "text": "x", "mode": "shrink"},
+		"check is unknown":        {"distill": true, "mode": "rewrite", "text": "x", "check": true},
 		"too long":                {"distill": true, "mode": "rewrite", "text": strings.Repeat("a", 2001)},
 		"mode without distill":    {"mode": "rewrite", "text": "x"},
 	} {
@@ -245,14 +208,18 @@ func TestBridgeDistillRewrite(t *testing.T) {
 		}
 	}
 
-	// A clean text comes back unchanged without a model call.
-	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{rewriteRule(t, rewriteOut, nil)}})
+	// A clean text still gets one call and comes back unchanged.
+	before := len(distillFiles(t, app))
+	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{rewriteRuleReason(t, rewriteOut, nil, "Already clean.")}})
 	res, err = app.W.MemoryDistill.Distill(ctx, bridge.MemoryDistillArgs{RequestID: "rw-2", Text: rewriteOut, Mode: "rewrite"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r := res.Rewrite; r == nil || r.Changed || r.Gate != "" || r.Text != rewriteOut {
+	if r := res.Rewrite; r == nil || r.Changed || r.Gate != "" || r.Text != rewriteOut || res.CostUSD < 0.009 || res.CostUSD > 0.011 {
 		t.Fatalf("unchanged = %+v", res)
+	}
+	if n := len(distillFiles(t, app)); n != before+1 {
+		t.Fatalf("%d claude calls, want 1 more", n-before)
 	}
 	app.Contract(t, "memory-distill", "MemoryDistillService.Distill#rewriteUnchanged", res)
 

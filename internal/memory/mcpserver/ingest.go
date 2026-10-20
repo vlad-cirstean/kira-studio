@@ -44,7 +44,6 @@ type ingestInput struct {
 	Session   string            `json:"session,omitempty"`
 	Mode      string            `json:"mode,omitempty"`
 	Context   string            `json:"context,omitempty"`
-	Check     bool              `json:"check,omitempty"`
 }
 
 // ingestOutput is a job (jobId, state, reason) when storing, the merged lines (lines, unresolved,
@@ -117,8 +116,8 @@ func ingestFiles(ctx context.Context, opts Options, in ingestInput) (*mcp.CallTo
 		return distillInput(ctx, opts, in)
 	}
 	switch {
-	case in.Mode != "" || in.Context != "" || in.Check:
-		return nil, ingestOutput{}, badIngest("mode, context and check need distill true")
+	case in.Mode != "" || in.Context != "":
+		return nil, ingestOutput{}, badIngest("mode and context need distill true")
 	case in.Text != "":
 		return nil, ingestOutput{}, badIngest("to store text call store_memory, or save it to a file and ingest that")
 	case in.Origin == "" || in.Scope == "":
@@ -175,7 +174,7 @@ func distillInput(ctx context.Context, opts Options, in ingestInput) (*mcp.CallT
 	if in.Origin != "" || in.SourceTag != "" || in.Scope != "" || in.Project != "" || len(in.Groups) > 0 || in.WriteDoc || in.Session != "" {
 		return nil, ingestOutput{}, badIngest("distill takes text or one file path only; it stores nothing")
 	}
-	req := importer.DistillRequest{Text: in.Text, Mode: in.Mode, Context: in.Context, Check: in.Check}
+	req := importer.DistillRequest{Text: in.Text, Mode: in.Mode, Context: in.Context}
 	switch {
 	case in.Mode == importer.ModeRewrite && len(in.Paths) > 0:
 		return nil, ingestOutput{}, badIngest("mode %s takes text, not paths", importer.ModeRewrite)

@@ -73,8 +73,8 @@ type MemoryDistillResult struct {
 	OutTokens  int                       `json:"outTokens"`
 }
 
-// MemoryDistillProgress is the ChannelMemoryDistill payload. Stage is extract, verify, merge, rewrite
-// or check; Done and Total count the parts, cross-check batches or the one call of that stage.
+// MemoryDistillProgress is the ChannelMemoryDistill payload. Stage is extract, verify, merge or rewrite; Done and Total count the
+// parts, cross-check batches or the one call of that stage.
 type MemoryDistillProgress struct {
 	RequestID string  `json:"requestId"`
 	Stage     string  `json:"stage"`

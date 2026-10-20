@@ -50,8 +50,6 @@ type DistillRequest struct {
 	Mode string
 	// Context is read-only code around the text; rewrite only.
 	Context string
-	// Check adds a second call that checks the rewrite kept every fact; rewrite only.
-	Check bool
 	// Progress, when set, is called when a stage starts (Done 0) and after each finished step of it. It
 	// runs under the call's lock and must return quickly.
 	Progress func(DistillProgress)
@@ -63,7 +61,6 @@ const (
 	StageVerify  = "verify"
 	StageMerge   = "merge"
 	StageRewrite = "rewrite"
-	StageCheck   = "check"
 )
 
 // DistillProgress is the steps finished so far in a stage (parts, cross-check batches, the one merge)
@@ -172,8 +169,8 @@ func (r *distillRun) report(stage string, done, total int) {
 func (d Distiller) Distill(ctx context.Context, req DistillRequest) (DistillResult, error) {
 	switch req.Mode {
 	case "", ModeFacts:
-		if req.Context != "" || req.Check {
-			return DistillResult{}, invalid("context and check need mode %s", ModeRewrite)
+		if req.Context != "" {
+			return DistillResult{}, invalid("context needs mode %s", ModeRewrite)
 		}
 	case ModeRewrite:
 		return d.checkedRewrite(ctx, req)

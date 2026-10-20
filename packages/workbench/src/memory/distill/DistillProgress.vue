@@ -13,7 +13,6 @@ const ui = useDistillUiStore();
 const { progress } = storeToRefs(ui);
 
 const STAGE_STATUS = {
-  check: 'memory.distill.progress.check.status',
   extract: 'memory.distill.progress.extract.status',
   verify: 'memory.distill.progress.verify.status',
   merge: 'memory.distill.progress.merge.status',

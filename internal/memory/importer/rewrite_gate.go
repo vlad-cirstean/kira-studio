@@ -15,7 +15,6 @@ const (
 	GateWidth     = "width"
 	GateDirective = "directive"
 	GateTokens    = "tokens"
-	GateCheck     = "check"
 	GateOutput    = "output"
 )
 

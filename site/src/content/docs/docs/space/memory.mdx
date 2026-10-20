@@ -61,7 +61,7 @@ Nothing is stored, so the memory check does not run. Input is limited to 120,000
 
 For one short text such as a code comment, add `mode` set to `rewrite`. One call returns the same text in its own form. Trivia is dropped: tracking labels, history, filler and sentences that restate the code. Every fact stays. Comment markers, indentation, backticked names, numbers and negations stay as written. A text that is already clean comes back unchanged.
 
-The text must be at most 2,000 characters and `text` only. Optional `context` is the code around it, read only, up to 6,000 characters. Optional `check` runs a second call that checks the rewrite kept every fact. A rewrite is rejected when it breaks a rule. Rules: not longer than the input, same markers and indentation, no line over 100 columns, no lost name or number. The original then returns with `kept: <reason>`.
+The text must be at most 2,000 characters and `text` only. Optional `context` is the code around it, read only, up to 6,000 characters. A rewrite is rejected when it breaks a rule. Rules: not longer than the input, same markers and indentation, no line over 100 columns, no lost name or number. The original then returns with `kept: <reason>`.
 
 ### Distill in the app
 

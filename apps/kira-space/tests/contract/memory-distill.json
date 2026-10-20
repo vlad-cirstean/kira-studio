@@ -38,7 +38,6 @@
     "outTokens": 31,
     "rewrite": {
       "changed": true,
-      "check": null,
       "draft": "",
       "dropped": [
         {
@@ -63,7 +62,6 @@
     "outTokens": 33,
     "rewrite": {
       "changed": false,
-      "check": null,
       "draft": "\t// Retry caps at 30 s (P900), because the upstream bans clients; see `retryQueue.maxDelaySeconds`. Extra words.",
       "dropped": [],
       "gate": "grew",
@@ -74,7 +72,7 @@
   },
   "MemoryDistillService.Distill#rewriteUnchanged": {
     "chunks": 0,
-    "costUsd": 0,
+    "costUsd": 0.01,
     "inChars": 92,
     "inTokens": 31,
     "lines": [],
@@ -83,11 +81,10 @@
     "outTokens": 31,
     "rewrite": {
       "changed": false,
-      "check": null,
       "draft": "",
       "dropped": [],
       "gate": "",
-      "reason": "",
+      "reason": "Already clean.",
       "text": "\t// Retry caps at 30 s, because the upstream bans clients; see `retryQueue.maxDelaySeconds`."
     },
     "unresolved": []

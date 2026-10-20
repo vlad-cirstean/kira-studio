@@ -22,7 +22,6 @@ const KEPT = {
   width: 'memory.distill.rewrite.kept.width.body',
   directive: 'memory.distill.rewrite.kept.directive.body',
   tokens: 'memory.distill.rewrite.kept.tokens.body',
-  check: 'memory.distill.rewrite.kept.check.body',
   output: 'memory.distill.rewrite.kept.output.body',
 } as const satisfies Record<Exclude<DistillRewrite['gate'], ''>, MessageKey>;
 

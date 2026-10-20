@@ -19,11 +19,11 @@ export const distillModeSchema = /*#__PURE__*/ z.enum(['facts', 'rewrite']);
 export type DistillMode = z.infer<typeof distillModeSchema>;
 
 // Rewrite mode: gate is the check that rejected the draft ('' when none did); unchanged is
-// changed false with gate ''. The wire also carries draft and check for audit; the UI never reads them.
+// changed false with gate ''. The wire also carries draft for audit; the UI never reads it.
 export const distillRewriteSchema = /*#__PURE__*/ z.object({
   text: z.string(),
   changed: z.boolean(),
-  gate: z.enum(['', 'grew', 'form', 'indent', 'width', 'directive', 'tokens', 'check', 'output']),
+  gate: z.enum(['', 'grew', 'form', 'indent', 'width', 'directive', 'tokens', 'output']),
   reason: z.string(),
   dropped: z.array(
     z.object({
@@ -64,14 +64,8 @@ export const distillChoiceSchema = /*#__PURE__*/ z.object({
 export type DistillChoice = z.infer<typeof distillChoiceSchema>;
 
 // Stage: extract counts parts, verify counts cross-check batches, merge is the one merge call;
-// rewrite and check are the one call each of rewrite mode.
-export const distillStageSchema = /*#__PURE__*/ z.enum([
-  'extract',
-  'verify',
-  'merge',
-  'rewrite',
-  'check',
-]);
+// rewrite is the one call of rewrite mode.
+export const distillStageSchema = /*#__PURE__*/ z.enum(['extract', 'verify', 'merge', 'rewrite']);
 export type DistillStage = z.infer<typeof distillStageSchema>;
 
 export const distillProgressSchema = /*#__PURE__*/ z.object({
