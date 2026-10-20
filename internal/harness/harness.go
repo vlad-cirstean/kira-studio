@@ -7,6 +7,7 @@ package harness
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
 )
@@ -124,6 +125,21 @@ func (s Selector) Active() Provider {
 		panic("harness: default provider " + DefaultProvider + " is not registered")
 	}
 	return p
+}
+
+// ErrProviderGone: the provider a stored conversation ran under is not registered any more.
+var ErrProviderGone = errors.New("harness: provider gone")
+
+// For resolves the provider a stored conversation ran under. "" means DefaultProvider, the id rows
+// written before providers existed carry.
+func (s Selector) For(id string) (Provider, error) {
+	if id == "" {
+		id = DefaultProvider
+	}
+	if p, ok := s.Registry.Get(id); ok {
+		return p, nil
+	}
+	return nil, fmt.Errorf("%w: %s", ErrProviderGone, id)
 }
 
 // Failure kinds a provider reports; match with errors.Is.

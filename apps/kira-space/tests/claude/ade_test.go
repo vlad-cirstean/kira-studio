@@ -227,8 +227,8 @@ func TestAdeManualSession(t *testing.T) {
 	}
 	start := f.waitAgentEvent(t, mark, launch.TerminalID, "SessionStart", 60*time.Second)
 	rec := session()
-	if rec.ClaudeSessionID == "" || rec.ClaudeSessionID != start.SessionID {
-		t.Fatalf("recorded claude session %q, SessionStart session %q, want equal", rec.ClaudeSessionID, start.SessionID)
+	if rec.AgentSessionID == "" || rec.AgentSessionID != start.SessionID {
+		t.Fatalf("recorded claude session %q, SessionStart session %q, want equal", rec.AgentSessionID, start.SessionID)
 	}
 
 	stops := func() int {

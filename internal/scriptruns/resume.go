@@ -1,6 +1,7 @@
 package scriptruns
 
 import (
+	"errors"
 	"log/slog"
 	"strings"
 
@@ -21,6 +22,10 @@ func (s *Service) Resume(id string) (Started, error) {
 	notResumable := ipcerr.T(ipcerr.CodeBadRequest, "backend.core.scriptRun.resumeNotResumable.body", map[string]string{"app": s.App})
 	if run.Kind != KindSmart || !run.Resumable {
 		return Started{}, notResumable
+	}
+	prov, err := s.Agent.For(run.Provider)
+	if err != nil {
+		return Started{}, providerGone(err)
 	}
 	rec, err := s.Scripts.Get(run.ScriptID)
 	if err != nil {
@@ -56,7 +61,7 @@ func (s *Service) Resume(id string) (Started, error) {
 		}
 		return Started{}, notResumable
 	}
-	p.resume, p.resumedFrom = sessionID, id
+	p.resume, p.resumedFrom, p.provider = sessionID, id, prov.ID()
 	p.sent = llmprompts.RunResumeLine.Text(s.llmPrompts(), llmprompts.ResumeVars{App: s.App}) + "\n\n" + p.preview.Suffix
 	started, err := s.startSmart(p)
 	if err != nil {
@@ -105,5 +110,17 @@ func (s *Service) ResumeCommand(id string) (string, error) {
 	if run.Kind != KindSmart || run.SessionID == "" {
 		return "", ipcerr.T(ipcerr.CodeBadRequest, "backend.core.scriptRun.resumeCommandNone.body", nil)
 	}
-	return s.Agent.Active().InteractiveCommand(harness.InteractiveSpec{SessionID: run.SessionID, Resume: true}), nil
+	prov, err := s.Agent.For(run.Provider)
+	if err != nil {
+		return "", providerGone(err)
+	}
+	return prov.InteractiveCommand(harness.InteractiveSpec{SessionID: run.SessionID, Resume: true}), nil
+}
+
+// providerGone maps an unregistered stored provider to its user-facing error.
+func providerGone(err error) error {
+	if errors.Is(err, harness.ErrProviderGone) {
+		return ipcerr.T(ipcerr.CodeConflict, "backend.core.agent.providerGone.body", nil)
+	}
+	return ipcerr.InternalErr(err)
 }

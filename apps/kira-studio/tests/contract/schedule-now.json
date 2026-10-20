@@ -39,6 +39,7 @@
     "outcome": null,
     "params": [],
     "prompt": "",
+    "provider": "",
     "resumable": false,
     "resumedFrom": "",
     "scriptId": "<id:1>",

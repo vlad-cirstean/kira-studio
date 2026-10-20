@@ -99,13 +99,13 @@ function copyItems(c: CardModel, sessions: readonly Session[]): TaskMenuItem[] {
     });
   }
   const latest = sessions
-    .filter((s) => s.claudeSessionId)
+    .filter((s) => s.agentSessionId)
     .sort((a, b) => b.lastActiveAt - a.lastActiveAt)[0];
   if (latest) {
     items.push({
       id: 'ade-task-copy-session',
       label: t('space.ade.board.taskMenu.latestSessionId.label'),
-      cmd: { kind: 'copy', text: latest.claudeSessionId },
+      cmd: { kind: 'copy', text: latest.agentSessionId },
     });
   }
   return items;

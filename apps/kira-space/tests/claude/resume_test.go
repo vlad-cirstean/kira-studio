@@ -68,7 +68,7 @@ func (f *adeFixture) claudeSession(t *testing.T, sessionID string) string {
 	}
 	for _, s := range res.Sessions {
 		if s.ID == sessionID {
-			return s.ClaudeSessionID
+			return s.AgentSessionID
 		}
 	}
 	t.Fatalf("no session %s in %+v", sessionID, res.Sessions)

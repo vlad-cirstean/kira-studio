@@ -44,7 +44,7 @@ func (e *engine) claudeID(r model.AdeRun) string {
 	if err != nil || rec == nil {
 		e.t.Fatalf("session of run %s: %v, %v", r.ID, rec, err)
 	}
-	return rec.ClaudeSessionID
+	return rec.AgentSessionID
 }
 
 func TestRunEngine_sendBack(t *testing.T) {
@@ -216,12 +216,12 @@ func TestRunEngine_recover(t *testing.T) {
 	}
 	if err := e.repos.AdeSessions.InsertHeadless(model.AdeSession{
 		ID: "s-head", Mode: model.AdeSessionModeHeadless, TaskID: id, BranchID: branch, StepID: "first",
-		RunID: "r-running", ClaudeSessionID: "c1", Cwd: "/x", State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
+		RunID: "r-running", AgentSessionID: "c1", Cwd: "/x", State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := e.repos.AdeSessions.InsertTUI(model.AdeSession{
-		ID: "s-tui", Mode: model.AdeSessionModeTUI, TaskID: id, BranchID: branch, ClaudeSessionID: "c2", Cwd: "/x",
+		ID: "s-tui", Mode: model.AdeSessionModeTUI, TaskID: id, BranchID: branch, AgentSessionID: "c2", Cwd: "/x",
 		State: model.AdeSessionStateRunning, TerminalID: "term-1", StartedAt: now, LastActiveAt: now,
 	}); err != nil {
 		t.Fatal(err)
@@ -370,12 +370,12 @@ func TestRunEngine_takeOver(t *testing.T) {
 		t.Fatalf("cwd = %s, want the run's worktree %s", l.Cwd, head.Cwd)
 	}
 	composed := e.spawn(l)
-	if !strings.HasPrefix(composed, e.tracker.deps.AgentBin+" --resume '"+head.ClaudeSessionID+"' ") ||
+	if !strings.HasPrefix(composed, e.tracker.deps.AgentBin+" --resume '"+head.AgentSessionID+"' ") ||
 		!strings.Contains(composed, "'--allowedTools' '"+toolName(agentmcp.FinishStep)+"'") {
 		t.Fatalf("command = %s", composed)
 	}
 	rec, _ := e.repos.AdeSessions.Get(l.SessionID)
-	if rec == nil || rec.Mode != model.AdeSessionModeTUI || rec.Resumes != head.ClaudeSessionID || rec.ClaudeSessionID != head.ClaudeSessionID ||
+	if rec == nil || rec.Mode != model.AdeSessionModeTUI || rec.Resumes != head.AgentSessionID || rec.AgentSessionID != head.AgentSessionID ||
 		rec.RunID != "" || rec.TaskID != id || rec.BranchID != head.BranchID || rec.StepID != "first" {
 		t.Fatalf("tui record = %+v", rec)
 	}

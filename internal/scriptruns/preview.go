@@ -107,6 +107,8 @@ type planned struct {
 	trigger Trigger
 	// resume is the Claude session a resumed smart run continues, resumedFrom the run it continues.
 	resume, resumedFrom string
+	// provider is the provider a resumed run continues under; empty means the active one.
+	provider string
 	// timeout and timeoutText bound a headless normal run.
 	timeout     time.Duration
 	timeoutText string

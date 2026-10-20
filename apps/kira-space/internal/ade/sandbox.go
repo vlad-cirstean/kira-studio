@@ -107,7 +107,7 @@ func (b *TaskBoard) prepareSandbox(ctx context.Context, run model.AdeRun, l agen
 	if rebase {
 		sd = adewire.DefaultSandbox()
 	}
-	agent := b.deps.Agent.Active()
+	agent := l.agent
 	sr := &sandboxRun{access: agentsandbox.Access(sd.Access), authFailed: agent.IsAuthFailure}
 	if sr.access == agentsandbox.AccessOff {
 		return sr, b.storeSandbox(run.ID, sr, false, "")
@@ -199,7 +199,7 @@ func (b *TaskBoard) applySandbox(spec harness.HeadlessSpec, sr *sandboxRun, l ag
 	}
 	spec.DisallowedTools = append(slices.Clone(spec.DisallowedTools), sr.prep.Disallowed...)
 	if sr.grant != nil {
-		spec.AllowedTools = append(slices.Clone(spec.AllowedTools), harness.ToolNames(b.deps.Agent.Active(), agentmcp.SandboxToolIDs...)...)
+		spec.AllowedTools = append(slices.Clone(spec.AllowedTools), harness.ToolNames(l.agent, agentmcp.SandboxToolIDs...)...)
 	}
 	sd := l.def.Sandbox.Normalized()
 	note := llmprompts.HeadlessSandboxNote.Text(b.prompts(), llmprompts.SandboxNoteVars{

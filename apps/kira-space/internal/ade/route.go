@@ -225,7 +225,7 @@ func (b *TaskBoard) claudeIDOfSession(sessionID string) string {
 	if err != nil || rec == nil {
 		return ""
 	}
-	return rec.ClaudeSessionID
+	return rec.AgentSessionID
 }
 
 // queue starts the loop's run; the task mutex is held.

@@ -525,9 +525,10 @@ func (b *TaskBoard) startRebase(run model.AdeRun, spec model.AdeRebaseSpec, prom
 	}()
 	now := b.deps.Now().UnixMilli()
 	sessionID, claudeID := b.newID(), b.newID()
+	agent := b.deps.Agent.Active()
 	if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
 		ID: sessionID, Mode: model.AdeSessionModeHeadless, TaskID: run.TaskID, BranchID: run.BranchID, StepID: rebaseStepID,
-		RunID: run.ID, ClaudeSessionID: claudeID, Cwd: root.Worktree, State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
+		RunID: run.ID, AgentSessionID: claudeID, Cwd: root.Worktree, Provider: agent.ID(), State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 	}); err != nil {
 		return run, err
 	}
@@ -544,7 +545,7 @@ func (b *TaskBoard) startRebase(run model.AdeRun, spec model.AdeRebaseSpec, prom
 		defer b.wg.Done()
 		defer endRun()
 		b.superviseAgent(runCtx, updated, agentLaunch{
-			def: b.rebaseDef(), sessionID: sessionID, path: root.Worktree, prompt: prompt, timeout: b.rebaseTimeout(),
+			def: b.rebaseDef(), agent: agent, sessionID: sessionID, path: root.Worktree, prompt: prompt, timeout: b.rebaseTimeout(),
 			git: &agentmcp.GitGrant{Worktrees: rebaseWorktrees(spec), Push: spec.Push},
 		})
 	}()

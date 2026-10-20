@@ -107,7 +107,8 @@ describe('merge path', () => {
 describe('busy and headless blocks', () => {
   const tui = (over: Partial<Session>): Session => ({
     id: 'aaaa1111',
-    claudeSessionId: 'c',
+    agentSessionId: 'c',
+    provider: 'claude',
     mode: 'tui',
     state: 'running',
     activity: 'working',
@@ -162,7 +163,8 @@ describe('busy and headless blocks', () => {
 describe('targets', () => {
   const running = (id: string, branchId: string): Session => ({
     id,
-    claudeSessionId: id,
+    agentSessionId: id,
+    provider: 'claude',
     mode: 'tui',
     state: 'running',
     activity: 'idle',

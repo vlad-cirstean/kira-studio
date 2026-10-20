@@ -166,7 +166,7 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 	if rec.Mode == model.AdeSessionModeTUI && !moved {
 		pa.Resume = rec.ID
 	} else {
-		pa.Resumes = rec.ClaudeSessionID
+		pa.Resumes, pa.Provider = rec.AgentSessionID, rec.Provider
 	}
 	runID := ""
 	if rec.Mode == model.AdeSessionModeHeadless {
@@ -181,14 +181,14 @@ func (b *TaskBoard) ensureNotOpen(tr *Tracker, rec *model.AdeSession) error {
 	if rec.Mode == model.AdeSessionModeTUI && rec.State == model.AdeSessionStateRunning {
 		return invalid("the session is already open")
 	}
-	open, err := b.runningTUI(func(s model.AdeSession) bool { return s.ClaudeSessionID == rec.ClaudeSessionID })
+	open, err := b.runningTUI(func(s model.AdeSession) bool { return s.AgentSessionID == rec.AgentSessionID })
 	if err != nil {
 		return err
 	}
 	if open != nil {
 		return invalid("the conversation is already open")
 	}
-	if tr.hasPending(func(p pendingIntent) bool { return p.ClaudeSessionID == rec.ClaudeSessionID }) {
+	if tr.hasPending(func(p pendingIntent) bool { return p.AgentSessionID == rec.AgentSessionID }) {
 		return invalid("a launch of the conversation is already starting")
 	}
 	return nil
@@ -301,7 +301,12 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 		if space {
 			ids = append(ids, agentmcp.SpaceToolIDs...)
 		}
-		tools := harness.ToolNames(b.deps.Agent.Active(), ids...)
+		agent, err := b.agentFor(pa.Provider)
+		if err != nil {
+			release()
+			return adewire.Launch{}, err
+		}
+		tools := harness.ToolNames(agent, ids...)
 		pa.MCPConfig, pa.AllowedTools = cfg, tools
 	}
 	res, err := tr.Prepare(pa)

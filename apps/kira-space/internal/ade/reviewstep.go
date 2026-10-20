@@ -536,7 +536,7 @@ func (b *TaskBoard) claudeBusy(claudeID string) (bool, error) {
 		return false, err
 	}
 	return slices.ContainsFunc(rows, func(s model.AdeSession) bool {
-		return s.ClaudeSessionID == claudeID && s.State == model.AdeSessionStateRunning
+		return s.AgentSessionID == claudeID && s.State == model.AdeSessionStateRunning
 	}), nil
 }
 
@@ -626,9 +626,13 @@ func (b *TaskBoard) startRound(_ context.Context, tc *taskCtx, run model.AdeRun,
 	now := b.deps.Now().UnixMilli()
 	launch := run.Launch
 	sessionID, claudeID := b.newID(), cmpNonEmpty(launch.ResumeID, b.newID())
+	agent, err := b.agentForResume(launch.ResumeID)
+	if err != nil {
+		return run, err
+	}
 	if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
 		ID: sessionID, Mode: model.AdeSessionModeHeadless, TaskID: tc.task.ID, BranchID: sb.ID,
-		StepID: run.StepID, RunID: run.ID, Resumes: launch.ResumeID, ClaudeSessionID: claudeID, Cwd: path,
+		StepID: run.StepID, RunID: run.ID, Resumes: launch.ResumeID, AgentSessionID: claudeID, Cwd: path, Provider: agent.ID(),
 		State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 	}); err != nil {
 		return run, err

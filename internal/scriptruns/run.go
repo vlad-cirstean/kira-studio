@@ -57,11 +57,13 @@ type Run struct {
 	StartedAt  *int64              `json:"startedAt"`
 	FinishedAt *int64              `json:"finishedAt"`
 	// Smart runs only; empty for a script run.
-	Model     string     `json:"model"`
-	SessionID string     `json:"sessionId"`
-	Prompt    string     `json:"prompt"`
-	Params    []RunParam `json:"params"`
-	Tools     RunTools   `json:"tools"`
+	Model     string `json:"model"`
+	SessionID string `json:"sessionId"`
+	// Provider is the harness provider id that ran the conversation.
+	Provider string     `json:"provider"`
+	Prompt   string     `json:"prompt"`
+	Params   []RunParam `json:"params"`
+	Tools    RunTools   `json:"tools"`
 	// ResumedFrom is the run this one continues; Resumable says a restart interrupted this run and
 	// its Claude session can continue.
 	ResumedFrom string `json:"resumedFrom"`

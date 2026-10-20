@@ -507,7 +507,8 @@ export interface LogPage {
 }
 export interface Session {
   id: string;
-  claudeSessionId: string;
+  agentSessionId: string;
+  provider: string;
   mode: 'tui' | 'headless';
   state: 'running' | 'stopped';
   activity:

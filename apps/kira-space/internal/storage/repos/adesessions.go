@@ -2,14 +2,15 @@ package repos
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
-const adeSessionsSelectColumns = `id, claude_session_id, cwd, state, terminal_id, started_at, last_active_at,
-	mode, task_id, branch_id, step_id, run_id, resumes, purpose`
+const adeSessionsSelectColumns = `id, agent_session_id, cwd, state, terminal_id, started_at, last_active_at,
+	mode, task_id, branch_id, step_id, run_id, resumes, purpose, provider`
 
 // AdeSessionsRepo reads and writes `ade_sessions` — the history of every task Claude Code session
 // (interactive or headless) the app has spawned or resumed.
@@ -21,9 +22,9 @@ func scanAdeSessionRow(row rowScanner) (model.AdeSession, error) {
 	var rec model.AdeSession
 	var terminalID sql.NullString
 	if err := row.Scan(
-		&rec.ID, &rec.ClaudeSessionID, &rec.Cwd,
+		&rec.ID, &rec.AgentSessionID, &rec.Cwd,
 		&rec.State, &terminalID, &rec.StartedAt, &rec.LastActiveAt,
-		&rec.Mode, &rec.TaskID, &rec.BranchID, &rec.StepID, &rec.RunID, &rec.Resumes, &rec.Purpose,
+		&rec.Mode, &rec.TaskID, &rec.BranchID, &rec.StepID, &rec.RunID, &rec.Resumes, &rec.Purpose, &rec.Provider,
 	); err != nil {
 		return model.AdeSession{}, err
 	}
@@ -88,10 +89,10 @@ func (r *AdeSessionsRepo) InsertHeadless(rec model.AdeSession) error {
 	}
 	if _, err := r.DB.Exec(
 		`INSERT INTO ade_sessions (id, mode, task_id, branch_id, step_id, run_id, resumes, purpose,
-			claude_session_id, cwd, state, terminal_id, started_at, last_active_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			agent_session_id, cwd, state, terminal_id, started_at, last_active_at, provider)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		rec.ID, rec.Mode, rec.TaskID, rec.BranchID, rec.StepID, rec.RunID, rec.Resumes, rec.Purpose,
-		rec.ClaudeSessionID, rec.Cwd, rec.State, nullableString(rec.TerminalID), rec.StartedAt, rec.LastActiveAt,
+		rec.AgentSessionID, rec.Cwd, rec.State, nullableString(rec.TerminalID), rec.StartedAt, rec.LastActiveAt, rec.Provider,
 	); err != nil {
 		return fmt.Errorf("repos: insert headless ade session %s: %w", rec.ID, err)
 	}
@@ -108,10 +109,10 @@ func (r *AdeSessionsRepo) InsertTUI(rec model.AdeSession) error {
 	}
 	if _, err := r.DB.Exec(
 		`INSERT INTO ade_sessions (id, mode, task_id, branch_id, step_id, run_id, resumes, purpose,
-			claude_session_id, cwd, state, terminal_id, started_at, last_active_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			agent_session_id, cwd, state, terminal_id, started_at, last_active_at, provider)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		rec.ID, rec.Mode, rec.TaskID, rec.BranchID, rec.StepID, rec.RunID, rec.Resumes, rec.Purpose,
-		rec.ClaudeSessionID, rec.Cwd, rec.State, nullableString(rec.TerminalID), rec.StartedAt, rec.LastActiveAt,
+		rec.AgentSessionID, rec.Cwd, rec.State, nullableString(rec.TerminalID), rec.StartedAt, rec.LastActiveAt, rec.Provider,
 	); err != nil {
 		return fmt.Errorf("repos: insert tui ade session %s: %w", rec.ID, err)
 	}
@@ -178,15 +179,27 @@ func (r *AdeSessionsRepo) Delete(id string) error {
 	return sqlitex.RequireOneRow(res, "ade session "+id)
 }
 
-// SetClaudeSessionID updates the tracked Claude session id — a session's own id can change across
+// SetAgentSessionID updates the tracked Claude session id — a session's own id can change across
 // a /clear (a fresh SessionStart with a different session_id, same terminal_id); this keeps the
 // row pointed at whichever id `--resume` must pass next.
-func (r *AdeSessionsRepo) SetClaudeSessionID(id, claudeSessionID string) error {
-	res, err := r.DB.Exec(`UPDATE ade_sessions SET claude_session_id = ? WHERE id = ?`, claudeSessionID, id)
+func (r *AdeSessionsRepo) SetAgentSessionID(id, claudeSessionID string) error {
+	res, err := r.DB.Exec(`UPDATE ade_sessions SET agent_session_id = ? WHERE id = ?`, claudeSessionID, id)
 	if err != nil {
-		return fmt.Errorf("repos: set ade session claude session id %s: %w", id, err)
+		return fmt.Errorf("repos: set ade session agent session id %s: %w", id, err)
 	}
 	return sqlitex.RequireOneRow(res, "ade session "+id)
+}
+
+// ProviderOfAgentSession is the provider id recorded with the newest row of an agent session, ""
+// when no row has it.
+func (r *AdeSessionsRepo) ProviderOfAgentSession(agentSessionID string) (string, error) {
+	var id string
+	err := r.DB.QueryRow(`SELECT provider FROM ade_sessions WHERE agent_session_id = ?
+		ORDER BY started_at DESC LIMIT 1`, agentSessionID).Scan(&id)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("repos: provider of agent session %s: %w", agentSessionID, err)
+	}
+	return id, nil
 }
 
 // SetLastActive bumps last_active_at alone — every hook event Tracker.HandleEvent sees for a

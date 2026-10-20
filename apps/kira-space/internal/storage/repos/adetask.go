@@ -1037,7 +1037,7 @@ func (r *AdeTaskRepo) RecoverRunning(now int64, out model.AdeRunOutcome) ([]mode
 	rows, err := r.DB.Query(`UPDATE ade_runs SET state = ?, note = ?, finished_at = ?, outcome_json = ?,
 		launch_note = '', launch_prompt = '', launch_extra = '',
 		launch_resume_id = CASE WHEN purpose IN ('', 'review') AND session_id <> '' THEN
-			COALESCE((SELECT claude_session_id FROM ade_sessions s WHERE s.id = ade_runs.session_id), '') ELSE '' END
+			COALESCE((SELECT agent_session_id FROM ade_sessions s WHERE s.id = ade_runs.session_id), '') ELSE '' END
 		WHERE state = 'running' RETURNING `+adeRunColumns,
 		model.AdeRunStuck, out.Reason, now, outcome)
 	runs, err := sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeRun, bool, error) {

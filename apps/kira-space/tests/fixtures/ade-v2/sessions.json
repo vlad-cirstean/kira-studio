@@ -2,7 +2,8 @@
   "sessions": [
     {
       "id": "c81a",
-      "claudeSessionId": "claude-c81a",
+      "agentSessionId": "claude-c81a",
+      "provider": "claude",
       "mode": "headless",
       "state": "stopped",
       "activity": "idle",
@@ -20,7 +21,8 @@
     },
     {
       "id": "b1c2",
-      "claudeSessionId": "claude-b1c2",
+      "agentSessionId": "claude-b1c2",
+      "provider": "claude",
       "mode": "headless",
       "state": "running",
       "activity": "working",
@@ -38,7 +40,8 @@
     },
     {
       "id": "9d10",
-      "claudeSessionId": "claude-9d10",
+      "agentSessionId": "claude-9d10",
+      "provider": "claude",
       "mode": "headless",
       "state": "running",
       "activity": "input",
@@ -56,7 +59,8 @@
     },
     {
       "id": "m111",
-      "claudeSessionId": "claude-m111",
+      "agentSessionId": "claude-m111",
+      "provider": "claude",
       "mode": "headless",
       "state": "running",
       "activity": "waiting",
@@ -74,7 +78,8 @@
     },
     {
       "id": "9ab0",
-      "claudeSessionId": "claude-9ab0",
+      "agentSessionId": "claude-9ab0",
+      "provider": "claude",
       "mode": "tui",
       "state": "running",
       "activity": "input",
@@ -92,7 +97,8 @@
     },
     {
       "id": "51cd",
-      "claudeSessionId": "claude-51cd",
+      "agentSessionId": "claude-51cd",
+      "provider": "claude",
       "mode": "headless",
       "state": "stopped",
       "activity": "idle",
@@ -110,7 +116,8 @@
     },
     {
       "id": "d4e7",
-      "claudeSessionId": "claude-d4e7",
+      "agentSessionId": "claude-d4e7",
+      "provider": "claude",
       "mode": "headless",
       "state": "stopped",
       "activity": "idle",
@@ -128,7 +135,8 @@
     },
     {
       "id": "a7a7",
-      "claudeSessionId": "claude-a7a7",
+      "agentSessionId": "claude-a7a7",
+      "provider": "claude",
       "mode": "headless",
       "state": "stopped",
       "activity": "idle",
@@ -146,7 +154,8 @@
     },
     {
       "id": "h001",
-      "claudeSessionId": "claude-h001",
+      "agentSessionId": "claude-h001",
+      "provider": "claude",
       "mode": "headless",
       "state": "running",
       "activity": "working",
@@ -164,7 +173,8 @@
     },
     {
       "id": "h002",
-      "claudeSessionId": "claude-h002",
+      "agentSessionId": "claude-h002",
+      "provider": "claude",
       "mode": "headless",
       "state": "running",
       "activity": "working",
@@ -182,7 +192,8 @@
     },
     {
       "id": "5e3a",
-      "claudeSessionId": "claude-5e3a",
+      "agentSessionId": "claude-5e3a",
+      "provider": "claude",
       "mode": "headless",
       "state": "running",
       "activity": "waiting",
@@ -200,7 +211,8 @@
     },
     {
       "id": "71b0",
-      "claudeSessionId": "claude-71b0",
+      "agentSessionId": "claude-71b0",
+      "provider": "claude",
       "mode": "headless",
       "state": "running",
       "activity": "working",
@@ -218,7 +230,8 @@
     },
     {
       "id": "aa12",
-      "claudeSessionId": "claude-aa12",
+      "agentSessionId": "claude-aa12",
+      "provider": "claude",
       "mode": "headless",
       "state": "running",
       "activity": "input",
@@ -236,7 +249,8 @@
     },
     {
       "id": "m7m7",
-      "claudeSessionId": "claude-m7m7",
+      "agentSessionId": "claude-m7m7",
+      "provider": "claude",
       "mode": "headless",
       "state": "running",
       "activity": "working",
@@ -254,7 +268,8 @@
     },
     {
       "id": "p0p0",
-      "claudeSessionId": "claude-p0p0",
+      "agentSessionId": "claude-p0p0",
+      "provider": "claude",
       "mode": "headless",
       "state": "running",
       "activity": "working",
@@ -272,7 +287,8 @@
     },
     {
       "id": "3c3c",
-      "claudeSessionId": "claude-3c3c",
+      "agentSessionId": "claude-3c3c",
+      "provider": "claude",
       "mode": "tui",
       "state": "stopped",
       "activity": "",
@@ -290,7 +306,8 @@
     },
     {
       "id": "sp11",
-      "claudeSessionId": "claude-sp11",
+      "agentSessionId": "claude-sp11",
+      "provider": "claude",
       "mode": "tui",
       "state": "stopped",
       "activity": "",
@@ -308,7 +325,8 @@
     },
     {
       "id": "sp22",
-      "claudeSessionId": "claude-sp22",
+      "agentSessionId": "claude-sp22",
+      "provider": "claude",
       "mode": "tui",
       "state": "running",
       "activity": "input",
@@ -326,7 +344,8 @@
     },
     {
       "id": "tk01",
-      "claudeSessionId": "claude-tk01",
+      "agentSessionId": "claude-tk01",
+      "provider": "claude",
       "mode": "tui",
       "state": "running",
       "activity": "working",
@@ -344,7 +363,8 @@
     },
     {
       "id": "rv01",
-      "claudeSessionId": "claude-rv01",
+      "agentSessionId": "claude-rv01",
+      "provider": "claude",
       "mode": "tui",
       "state": "stopped",
       "activity": "",

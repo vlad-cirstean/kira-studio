@@ -587,22 +587,23 @@ type LogPage struct {
 }
 
 type Session struct {
-	ID              string `json:"id"`
-	ClaudeSessionID string `json:"claudeSessionId"`
-	Mode            string `json:"mode"`     // 'tui' | 'headless'
-	State           string `json:"state"`    // 'running' | 'stopped'
-	Activity        string `json:"activity"` // '' | 'input' | 'working' | 'waiting' | 'idle'
-	TerminalID      string `json:"terminalId"`
-	TaskID          string `json:"taskId"`
-	BranchID        string `json:"branchId"`
-	StepID          string `json:"stepId"`
-	RunID           string `json:"runId"`
-	Resumes         string `json:"resumes"`
-	Purpose         string `json:"purpose"` // '' | 'review'
-	Cwd             string `json:"cwd"`
-	CwdMissing      bool   `json:"cwdMissing"`
-	StartedAt       int64  `json:"startedAt"`
-	LastActiveAt    int64  `json:"lastActiveAt"`
+	ID             string `json:"id"`
+	AgentSessionID string `json:"agentSessionId"`
+	Provider       string `json:"provider"`
+	Mode           string `json:"mode"`     // 'tui' | 'headless'
+	State          string `json:"state"`    // 'running' | 'stopped'
+	Activity       string `json:"activity"` // '' | 'input' | 'working' | 'waiting' | 'idle'
+	TerminalID     string `json:"terminalId"`
+	TaskID         string `json:"taskId"`
+	BranchID       string `json:"branchId"`
+	StepID         string `json:"stepId"`
+	RunID          string `json:"runId"`
+	Resumes        string `json:"resumes"`
+	Purpose        string `json:"purpose"` // '' | 'review'
+	Cwd            string `json:"cwd"`
+	CwdMissing     bool   `json:"cwdMissing"`
+	StartedAt      int64  `json:"startedAt"`
+	LastActiveAt   int64  `json:"lastActiveAt"`
 }
 
 type SessionsResult struct {

@@ -53,6 +53,7 @@ export const scriptRunSchema = /*#__PURE__*/ z.object({
   branchId: z.string(),
   branchLabel: z.string(),
   // The interrupted run this one continues, and whether a restart ended this one mid-session.
+  provider: z.string(),
   resumedFrom: z.string(),
   resumable: z.boolean(),
 });

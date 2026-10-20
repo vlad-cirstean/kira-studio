@@ -52,7 +52,7 @@ type TrackerDeps struct {
 	WriteTerminal func(terminalID string, data []byte) error
 	Now           func() time.Time
 	// OnChange is called whenever a persisted record's own state changes (a new or revived
-	// session, a stop, a claude_session_id update after /clear) — main.go wires it to
+	// session, a stop, a agent_session_id update after /clear) — main.go wires it to
 	// bridge.AdeTaskSessionsChanged, never called with the lock held.
 	OnChange func()
 	// OnStopped is called with a record id after Reconcile marked it stopped (its terminal is gone);
@@ -77,7 +77,7 @@ type TrackerDeps struct {
 // consumed exactly once, by the Compose call the renderer's own openTerminalSession triggers.
 type pendingIntent struct {
 	RecordID                          string
-	ClaudeSessionID                   string
+	AgentSessionID                    string
 	Cwd                               string
 	Command                           string // the exact base command Prepare returned; Compose refuses a mismatch
 	Message                           string
@@ -96,6 +96,8 @@ type PrepareArgs struct {
 	// Resume is "" for a new session, or an existing ade_sessions.id to resume.
 	Resume  string
 	Message string
+	// Provider is the provider of the conversation Resumes continues; empty means the active one.
+	Provider string
 	// Resumes is the agent session id a new record continues. AddDirs, MCPConfig and AllowedTools
 	// extend the base command.
 	TaskID, BranchID, StepID, Resumes string
@@ -241,9 +243,6 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 		return PrepareResult{}, fmt.Errorf("%w: taskId is required", ErrInvalidInput)
 	}
 	agent := t.deps.Agent.Active()
-	if _, err := agent.Locate(context.Background(), t.deps.AgentBin); err != nil {
-		return PrepareResult{}, err
-	}
 	now := t.deps.Now()
 
 	var recordID, claudeSessionID, cwd string
@@ -254,6 +253,12 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 			claudeSessionID = args.Resumes
 		}
 		cwd = args.Cwd
+		if args.Resumes != "" && args.Provider != "" {
+			var err error
+			if agent, err = t.deps.Agent.For(args.Provider); err != nil {
+				return PrepareResult{}, err
+			}
+		}
 	} else {
 		existing, err := t.deps.Store.Get(args.Resume)
 		if err != nil {
@@ -269,7 +274,10 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 			return PrepareResult{}, ErrSessionRunning
 		}
 		recordID = existing.ID
-		claudeSessionID = existing.ClaudeSessionID
+		claudeSessionID = existing.AgentSessionID
+		if agent, err = t.deps.Agent.For(existing.Provider); err != nil {
+			return PrepareResult{}, err
+		}
 		// Resume always uses the recorded cwd, never args.Cwd — a session must not appear to resume
 		// somewhere it never ran. A missing directory is an error.
 		if info, err := os.Stat(existing.Cwd); err != nil {
@@ -283,6 +291,9 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 		cwd = existing.Cwd
 	}
 
+	if _, err := agent.Locate(context.Background(), t.deps.AgentBin); err != nil {
+		return PrepareResult{}, err
+	}
 	claudeBin := cmpNonEmpty(t.deps.AgentBin, agent.Command())
 	command := agent.InteractiveCommand(harness.InteractiveSpec{
 		Bin: claudeBin, SessionID: claudeSessionID, Resume: args.Resume != "" || args.Resumes != "",
@@ -291,7 +302,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 
 	terminalID := uuid.NewString()
 	intent := pendingIntent{
-		RecordID: recordID, ClaudeSessionID: claudeSessionID, Cwd: cwd, Command: command, Message: args.Message,
+		RecordID: recordID, AgentSessionID: claudeSessionID, Cwd: cwd, Command: command, Message: args.Message,
 		Resume: args.Resume != "", CreatedAt: now,
 		TaskID: args.TaskID, BranchID: args.BranchID, StepID: args.StepID, Resumes: args.Resumes, Purpose: args.Purpose,
 		Provider: agent.ID(),
@@ -386,7 +397,11 @@ func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, er
 	}
 	if intent.Message != "" {
 		// The command can end in a variadic flag (--add-dir a b), which would swallow the prompt.
-		composed = t.deps.Agent.Active().WithPrompt(composed, normalizeMessage(intent.Message))
+		agent, err := t.deps.Agent.For(intent.Provider)
+		if err != nil {
+			return "", nil, err
+		}
+		composed = agent.WithPrompt(composed, normalizeMessage(intent.Message))
 	}
 	if len(composed) > terminal.MaxCommandBytes {
 		return "", nil, fmt.Errorf("%w: command is too long", ErrInvalidInput)
@@ -411,11 +426,11 @@ func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, er
 		}
 	} else {
 		rec := model.AdeSession{
-			ID: intent.RecordID, ClaudeSessionID: intent.ClaudeSessionID, Cwd: intent.Cwd,
+			ID: intent.RecordID, AgentSessionID: intent.AgentSessionID, Cwd: intent.Cwd,
 			State: model.AdeSessionStateRunning, TerminalID: terminalID,
 			StartedAt: now.UnixMilli(), LastActiveAt: now.UnixMilli(),
 			Mode: model.AdeSessionModeTUI, TaskID: intent.TaskID, BranchID: intent.BranchID,
-			StepID: intent.StepID, Resumes: intent.Resumes, Purpose: intent.Purpose,
+			StepID: intent.StepID, Resumes: intent.Resumes, Purpose: intent.Purpose, Provider: intent.Provider,
 		}
 		if err := t.deps.Store.InsertTUI(rec); err != nil {
 			return "", nil, fmt.Errorf("ade: compose: %w", err)
@@ -426,7 +441,7 @@ func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, er
 	t.live[terminalID] = intent.RecordID
 	t.byRecord[intent.RecordID] = terminalID
 	t.spawnedAt[intent.RecordID] = now
-	t.claudeSessionID[intent.RecordID] = intent.ClaudeSessionID
+	t.claudeSessionID[intent.RecordID] = intent.AgentSessionID
 	if !intent.Resume {
 		t.fresh[intent.RecordID] = true
 	}
@@ -600,8 +615,8 @@ func (t *Tracker) HandleEvent(ev harness.AgentEvent) {
 	t.mu.Unlock()
 
 	if sessionChanged {
-		if err := t.deps.Store.SetClaudeSessionID(recordID, ev.SessionID); err != nil {
-			slog.Warn("ade: handle event: set claude session id", "scope", "ade", "recordId", recordID, "err", err)
+		if err := t.deps.Store.SetAgentSessionID(recordID, ev.SessionID); err != nil {
+			slog.Warn("ade: handle event: set agent session id", "scope", "ade", "recordId", recordID, "err", err)
 		}
 	}
 	if flushNow {

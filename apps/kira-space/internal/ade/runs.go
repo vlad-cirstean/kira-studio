@@ -566,11 +566,16 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		runPath = smart.dir
 	}
 	var sessionID, prompt string
+	var agent harness.Provider
 	stepN, stepOf := stepNumber(plan, idx)
 	if def.Kind == adewire.KindAgent {
 		sessionID = b.newID()
 		patch.SessionID = &sessionID
 		claudeID := cmpNonEmpty(spec.ResumeID, b.newID())
+		agent, err = b.agentForResume(spec.ResumeID)
+		if err != nil {
+			return run, err
+		}
 		switch {
 		case spec.ResumeID != "":
 			prompt = composeResumePrompt(b.prompts(), spec.Prompt, def.Results)
@@ -585,7 +590,7 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		}
 		if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
 			ID: sessionID, Mode: model.AdeSessionModeHeadless, TaskID: tc.task.ID, BranchID: sb.ID,
-			StepID: def.ID, RunID: run.ID, Resumes: spec.ResumeID, ClaudeSessionID: claudeID, Cwd: runPath,
+			StepID: def.ID, RunID: run.ID, Resumes: spec.ResumeID, AgentSessionID: claudeID, Cwd: runPath, Provider: agent.ID(),
 			State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 		}); err != nil {
 			return run, err
@@ -608,7 +613,7 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		go func() {
 			defer b.wg.Done()
 			defer endRun()
-			b.superviseAgent(runCtx, updated, agentLaunch{def: def, sessionID: sessionID, resume: spec.ResumeID, path: runPath, worktree: path, prompt: prompt, timeout: timeout, smart: smart})
+			b.superviseAgent(runCtx, updated, agentLaunch{def: def, sessionID: sessionID, resume: spec.ResumeID, path: runPath, worktree: path, prompt: prompt, timeout: timeout, smart: smart, agent: agent})
 		}()
 	} else {
 		go func() {
@@ -688,6 +693,29 @@ type agentLaunch struct {
 	git *agentmcp.GitGrant
 	// review, when set, makes the run a review round: it may answer those comments.
 	review *agentmcp.ReviewGrant
+	// agent is the provider the conversation runs under.
+	agent harness.Provider
+}
+
+// agentFor is the provider a launch runs under: the one that ran the conversation it continues
+// (id), or the active one for a new conversation (id "").
+func (b *TaskBoard) agentFor(id string) (harness.Provider, error) {
+	if id == "" {
+		return b.deps.Agent.Active(), nil
+	}
+	return b.deps.Agent.For(id)
+}
+
+// agentForResume is agentFor over the provider recorded with the session a resume continues.
+func (b *TaskBoard) agentForResume(resumeID string) (harness.Provider, error) {
+	if resumeID == "" {
+		return b.deps.Agent.Active(), nil
+	}
+	id, err := b.deps.Sessions.ProviderOfAgentSession(resumeID)
+	if err != nil {
+		return nil, err
+	}
+	return b.agentFor(id)
 }
 
 // grantResults are the results finish_step takes for a run: a rebase run or review round keeps the implicit pair.
@@ -700,6 +728,9 @@ func grantResults(implicit bool, def stepDef) []agentmcp.ResultSpec {
 
 func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agentLaunch) {
 	def, sessionID := l.def, l.sessionID
+	if l.agent == nil {
+		l.agent = b.deps.Agent.Active()
+	}
 	sink := b.newLogSink(repos.AdeLogRun, run.ID, run.TaskID)
 	rebase := run.Purpose == model.AdeRunPurposeRebase
 	round := run.Purpose == model.AdeRunPurposeReview
@@ -739,7 +770,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		fail(err)
 		return
 	}
-	agent := b.deps.Agent.Active()
+	agent := l.agent
 	spec := harness.HeadlessSpec{
 		Bin: b.deps.AgentBin, Dir: l.path, Prompt: l.prompt, SessionID: b.sessionClaudeID(sessionID),
 		Resume: l.resume, MCPConfigs: []string{cfg}, Config: b.configScope(), AllowedTools: roundTools(agent, allowedTools(agent, def.AllowedTools, space), round), DisallowedTools: def.DisallowedTools,
@@ -838,7 +869,7 @@ func (b *TaskBoard) sessionClaudeID(sessionID string) string {
 	if err != nil || rec == nil {
 		return b.newID()
 	}
-	return rec.ClaudeSessionID
+	return rec.AgentSessionID
 }
 
 // lostOutcome is the outcome of a resume whose Claude conversation is gone.
@@ -1454,7 +1485,7 @@ func (b *TaskBoard) Sessions(_ context.Context) (adewire.SessionsResult, error) 
 
 func toWireSession(s model.AdeSession) adewire.Session {
 	w := adewire.Session{
-		ID: s.ID, ClaudeSessionID: s.ClaudeSessionID, Mode: s.Mode, State: s.State, TerminalID: s.TerminalID,
+		ID: s.ID, AgentSessionID: s.AgentSessionID, Provider: s.Provider, Mode: s.Mode, State: s.State, TerminalID: s.TerminalID,
 		TaskID: s.TaskID, BranchID: s.BranchID, StepID: s.StepID, RunID: s.RunID, Resumes: s.Resumes, Purpose: s.Purpose,
 		Cwd: s.Cwd, StartedAt: s.StartedAt, LastActiveAt: s.LastActiveAt,
 	}

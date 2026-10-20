@@ -171,6 +171,9 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 		timeout, timeoutText = s.SmartTimeout, s.SmartTimeout.String()
 	}
 	agent := s.Agent.Active()
+	if pv, err := s.Agent.For(p.provider); p.provider != "" && err == nil {
+		agent = pv
+	}
 	env := agent.ScrubEnv(loginshell.ScrubGitEnv(os.Environ()))
 	env = append(env, "GIT_TERMINAL_PROMPT=0")
 	env = append(env, p.envList...)
