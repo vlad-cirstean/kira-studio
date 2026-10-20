@@ -25,10 +25,7 @@ async function openMemorySettings(page: Page): Promise<void> {
 // and TestInstallSemanticModelCancelled.
 test('contract: Connect Claude Code shows the registration command', async ({ relaunch }) => {
   const status = contract<{ command: string }>('memory-settings', 'MemoryService.McpStatus');
-  const installed = contract<{ outcome: string }>(
-    'memory-settings',
-    'MemoryService.InstallClaudeCode',
-  );
+  const installed = contract<{ outcome: string }>('memory-settings', 'MemoryService.InstallAgent');
   expect(installed.outcome).toBe('installed');
   const { window: page } = await relaunch({
     control: [

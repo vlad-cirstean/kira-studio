@@ -153,7 +153,7 @@ export type MemoryStoreResult = z.infer<typeof memoryStoreResultSchema>;
 export const memoryMcpStatusSchema = /*#__PURE__*/ z.object({
   command: z.string(),
   executable: z.string(),
-  claudeAvailable: z.boolean(),
+  agentAvailable: z.boolean(),
   probed: z.array(z.string()),
 });
 export type MemoryMcpStatus = z.infer<typeof memoryMcpStatusSchema>;

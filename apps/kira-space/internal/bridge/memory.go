@@ -29,7 +29,7 @@ const ChannelMemorySemantic = "kira:memory:semantic"
 // payload is empty; the UI refetches the job list and the open job.
 const ChannelMemoryImport = "kira:memory:import"
 
-// memoryServerName is the name the kira-memory stdio server registers under in Claude Code.
+// memoryServerName is the name the kira-memory stdio server registers under in the agent.
 const memoryServerName = "kira-memory"
 
 const (
@@ -341,10 +341,10 @@ func (s *MemoryService) RetrySemantic() {
 
 // MemoryMcpStatus is the Connect dialog's pre-click read.
 type MemoryMcpStatus struct {
-	Command         string   `json:"command"`
-	Executable      string   `json:"executable"`
-	ClaudeAvailable bool     `json:"claudeAvailable"`
-	Probed          []string `json:"probed"`
+	Command        string   `json:"command"`
+	Executable     string   `json:"executable"`
+	AgentAvailable bool     `json:"agentAvailable"`
+	Probed         []string `json:"probed"`
 }
 
 // MemoryCheckHook is what Settings > Memory shows to install the kira-memory commit check in
@@ -375,10 +375,10 @@ func memoryExecutable() (string, error) {
 	return exe, nil
 }
 
-// McpStatus reports the registration command for this binary and whether `claude` is installed.
+// McpStatus reports the registration command for this binary and whether the agent CLI is installed.
 func (s *MemoryService) McpStatus() MemoryMcpStatus {
 	inst := s.installer.Status()
-	st := MemoryMcpStatus{ClaudeAvailable: inst.Path != "", Probed: inst.Probed}
+	st := MemoryMcpStatus{AgentAvailable: inst.Path != "", Probed: inst.Probed}
 	if exe, err := memoryExecutable(); err == nil {
 		st.Executable = exe
 		st.Command = s.installer.StdioCommand(memoryServerName, exe, []string{"memory-mcp"})
@@ -395,9 +395,9 @@ func (s *MemoryService) CheckHook() MemoryCheckHook {
 	return MemoryCheckHook{Executable: exe, InstallCommand: memcheck.InstallCommand(exe), HookLine: memcheck.HookLine(exe)}
 }
 
-// InstallClaudeCode registers the kira-memory stdio server with Claude Code. It never returns a
+// InstallAgent registers the kira-memory stdio server with the active agent. It never returns a
 // Go error: every outcome is a value the dialog renders.
-func (s *MemoryService) InstallClaudeCode(ctx context.Context) MemoryInstallResult {
+func (s *MemoryService) InstallAgent(ctx context.Context) MemoryInstallResult {
 	exe, err := memoryExecutable()
 	if err != nil {
 		return MemoryInstallResult{Outcome: harness.OutcomeInstallFailed, Detail: err.Error(), Probed: []string{}}

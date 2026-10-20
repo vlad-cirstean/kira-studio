@@ -15,7 +15,7 @@ for (const section of sections) {
           response: {
             command: "claude mcp add-json --scope user 'kira-memory' '{}'",
             executable: '/Applications/Kira Space',
-            claudeAvailable: true,
+            agentAvailable: true,
             probed: [],
           },
         },

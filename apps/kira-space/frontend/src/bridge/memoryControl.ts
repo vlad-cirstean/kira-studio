@@ -63,7 +63,7 @@ export const memoryControl: MemoryControl = {
   memoryMcpStatus: async () => memoryMcpStatusSchema.parse(await unwrap(MemoryService.McpStatus())),
   memoryCheckHook: async () => memoryCheckHookSchema.parse(await unwrap(MemoryService.CheckHook())),
   memoryMcpInstall: async () =>
-    memoryInstallResultSchema.parse(await unwrap(MemoryService.InstallClaudeCode())),
+    memoryInstallResultSchema.parse(await unwrap(MemoryService.InstallAgent())),
   onMemoryChanged: (cb) => on(CHANNEL.memoryChanged, cb),
   memorySemanticStatus: async () =>
     memorySemanticStatusSchema.parse(await unwrap(MemoryService.SemanticStatus())),

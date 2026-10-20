@@ -4,7 +4,7 @@
     "hookLine": "if [ -x '<bin>/kira-space' ]; then '<bin>/kira-space' memory-check --staged; fi",
     "installCommand": "'<bin>/kira-space' memory-check --install-hook"
   },
-  "MemoryService.InstallClaudeCode": {
+  "MemoryService.InstallAgent": {
     "detail": "",
     "outcome": "installed",
     "probed": [
@@ -16,7 +16,7 @@
     "message": "model: downloaded file failed its checksum: model.onnx"
   },
   "MemoryService.McpStatus": {
-    "claudeAvailable": true,
+    "agentAvailable": true,
     "command": "claude mcp remove --scope user 'kira-memory' 2>/dev/null; claude mcp add-json --scope user 'kira-memory' '{\"type\":\"stdio\",\"command\":\"<bin>/kira-space\",\"args\":[\"memory-mcp\"]}'",
     "executable": "<bin>/kira-space",
     "probed": [

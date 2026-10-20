@@ -74,16 +74,18 @@ async function onInstallDbMcpClaudeCode(): Promise<void> {
   await install.run();
 }
 
+const agent = 'Claude Code';
+
 const dbMcpInstallMessage = computed(() => {
   const result = dbMcpStore.installResult;
   if (!result) return null;
   switch (result.outcome) {
     case 'installed':
-      return t('common.claudeCodeRegistered.description');
+      return t('common.agentRegistered.description', { agent });
     case 'notFound':
-      return t('common.claudeCliNotFound.error');
+      return t('common.agentCliNotFound.error', { agent });
     case 'installFailed':
-      return t('common.claudeRegistrationRefused.error', { detail: result.detail });
+      return t('common.agentRegistrationRefused.error', { agent, detail: result.detail });
     default:
       return null;
   }
@@ -150,7 +152,7 @@ const dbMcpEnabledId = useId();
             data-testid="db-mcp-install-button"
             @click="onInstallDbMcpClaudeCode"
             >{{
-              dbMcpStore.status.claudeAvailable
+              dbMcpStore.status.agentAvailable
                 ? t('common.registerWithClaudeCode.label')
                 : t('studio.settings.dbMcp.copyCommandAbove.label')
             }}

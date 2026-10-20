@@ -141,7 +141,7 @@ export const IPC = {
   dbMcpStatus: 'kira:dbmcp:status',
   dbMcpSetEnabled: 'kira:dbmcp:setEnabled',
   dbMcpRegenerate: 'kira:dbmcp:regenerate',
-  dbMcpInstallClaudeCode: 'kira:dbmcp:installClaudeCode',
+  dbMcpInstallAgent: 'kira:dbmcp:installAgent',
   dbMcpPendingApprovals: 'kira:dbmcp:approval:pending',
   dbMcpApproveQuery: 'kira:dbmcp:approval:approve',
   dbMcpDenyQuery: 'kira:dbmcp:approval:deny',

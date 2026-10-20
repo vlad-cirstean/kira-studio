@@ -9,7 +9,7 @@ import { useSettingsStore } from './settings';
 const DEFAULT_STATUS: DbMcpStatus = {
   running: false,
   command: '',
-  claudeAvailable: false,
+  agentAvailable: false,
   probed: [],
   expiresAt: '',
   error: '',
@@ -83,7 +83,7 @@ export const useDbMcpStore = defineStore('dbMcp', () => {
   }
 
   async function installDbMcpClaudeCode(): Promise<void> {
-    state.installResult = await control.dbMcpInstallClaudeCode();
+    state.installResult = await control.dbMcpInstallAgent();
   }
 
   return {

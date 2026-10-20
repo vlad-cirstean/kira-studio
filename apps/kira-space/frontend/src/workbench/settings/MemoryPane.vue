@@ -5,8 +5,8 @@ import { Field, FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { t } from '@theme/i18n';
+import AgentMcpSection from '@workbench/memory/settings/AgentMcpSection.vue';
 import CheckHookSection from '@workbench/memory/settings/CheckHookSection.vue';
-import ClaudeCodeMcpSection from '@workbench/memory/settings/ClaudeCodeMcpSection.vue';
 import SemanticModelSection from '@workbench/memory/settings/SemanticModelSection.vue';
 import { useId } from 'vue';
 import type { SettingsPaneProps } from './types';
@@ -59,7 +59,7 @@ function modelLabel(m: ClaudeModel): string {
       </NativeSelect>
       <FieldDescription>{{ t('space.settings.memory.claudeModel.description') }}</FieldDescription>
     </Field>
-    <ClaudeCodeMcpSection />
+    <AgentMcpSection />
     <CheckHookSection />
     <SemanticModelSection />
   </div>

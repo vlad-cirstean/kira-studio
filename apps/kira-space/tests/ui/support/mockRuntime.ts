@@ -214,7 +214,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   memoryProjects: 'MemoryService.Projects',
   memoryMcpStatus: 'MemoryService.McpStatus',
   memoryCheckHook: 'MemoryService.CheckHook',
-  memoryMcpInstall: 'MemoryService.InstallClaudeCode',
+  memoryMcpInstall: 'MemoryService.InstallAgent',
   memorySemanticStatus: 'MemoryService.SemanticStatus',
   memorySemanticInstall: 'MemoryService.InstallSemanticModel',
   memorySemanticRetry: 'MemoryService.RetrySemantic',

@@ -6,7 +6,7 @@ import { z } from 'zod';
 export const dbMcpStatusSchema = /*#__PURE__*/ z.object({
   running: z.boolean(),
   command: z.string(),
-  claudeAvailable: z.boolean(),
+  agentAvailable: z.boolean(),
   probed: z.array(z.string()),
   // The current token's own expiry, RFC 3339, "" when nothing is running or the record has not
   // yet been stamped.

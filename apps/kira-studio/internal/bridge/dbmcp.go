@@ -25,7 +25,7 @@ const dbMcpServerName = "kira-db"
 const dbMcpTokenName = "mcp-db"
 
 // DbMcpService is the Database MCP section's whole surface (M1 §6.2): Status, SetEnabled,
-// Regenerate, InstallClaudeCode — it owns the embedded *dbmcp.Server's actual lifecycle,
+// Regenerate, InstallAgent — it owns the embedded *dbmcp.Server's actual lifecycle,
 // constructed and started when the setting turns on (or already is, at boot), stopped when it
 // turns off or the app quits.
 type DbMcpService struct {
@@ -89,7 +89,7 @@ func NewDbMcpService(deps appcore.Deps, installer harness.MCPInstaller, approval
 		},
 		StatusFn: func(srv *dbmcp.Server, startErr error) DbMcpStatus {
 			inst := s.Installer.Status()
-			st := DbMcpStatus{ClaudeAvailable: inst.Path != "", Probed: inst.Probed}
+			st := DbMcpStatus{AgentAvailable: inst.Path != "", Probed: inst.Probed}
 			if srv == nil {
 				if startErr != nil {
 					st.Error = startErr.Error()
@@ -117,10 +117,10 @@ func NewDbMcpService(deps appcore.Deps, installer harness.MCPInstaller, approval
 
 // DbMcpStatus is the wire projection every method below returns.
 type DbMcpStatus struct {
-	Running         bool     `json:"running"`
-	Command         string   `json:"command"`
-	ClaudeAvailable bool     `json:"claudeAvailable"`
-	Probed          []string `json:"probed"`
+	Running        bool     `json:"running"`
+	Command        string   `json:"command"`
+	AgentAvailable bool     `json:"agentAvailable"`
+	Probed         []string `json:"probed"`
 	// ExpiresAt is the current token's own expiry, RFC 3339, "" when nothing is running or the
 	// record has not yet been stamped.
 	ExpiresAt string `json:"expiresAt"`
@@ -316,10 +316,10 @@ func toWireDbMcpInstallResult(r harness.InstallResult) DbMcpInstallResult {
 	return DbMcpInstallResult{Outcome: r.Outcome, Detail: r.Detail, Probed: r.Probed}
 }
 
-// InstallClaudeCode never returns a Go error — MCPInstaller.Install's own contract, following
+// InstallAgent never returns a Go error — MCPInstaller.Install's own contract, following
 // connections.Service.Reveal's own precedent. A no-op result (outcome notFound) when nothing is
 // running: there is nothing to register yet.
-func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult {
+func (s *DbMcpService) InstallAgent(ctx context.Context) DbMcpInstallResult {
 	// The lock covers only the state check: the spawn below can take up to 30 s and names a fixed
 	// URL and helper path, so holding mu would block Status, the toggle and app quit behind it.
 	s.embedded.Mu.Lock()

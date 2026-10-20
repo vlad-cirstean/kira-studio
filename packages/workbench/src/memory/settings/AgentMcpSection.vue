@@ -11,22 +11,24 @@ import { useCopy } from '../../behaviour/clipboard';
 import QueryState from '../../components/QueryState.vue';
 import { useInstallMemoryMcp, useMemoryMcpStatus } from '../queries';
 
-// P201: registers the kira-memory stdio server with Claude Code, or shows the command to run.
+// P201: registers the kira-memory stdio server with the agent, or shows the command to run.
 const status = useMemoryMcpStatus();
 const install = useInstallMemoryMcp();
 const command = computed(() => status.data.value?.command ?? '');
 const { copy, copied } = useCopy();
+
+const agent = 'Claude Code';
 
 const message = computed(() => {
   const r = install.data.value;
   if (!r) return null;
   switch (r.outcome) {
     case 'installed':
-      return t('common.claudeCodeRegistered.description');
+      return t('common.agentRegistered.description', { agent });
     case 'notFound':
-      return t('common.claudeCliNotFound.error');
+      return t('common.agentCliNotFound.error', { agent });
     default:
-      return t('common.claudeRegistrationRefused.error', { detail: r.detail });
+      return t('common.agentRegistrationRefused.error', { agent, detail: r.detail });
   }
 });
 </script>
@@ -72,7 +74,7 @@ const message = computed(() => {
         variant="dialog-primary"
         size="kira-lg"
         :pending="install.isPending.value"
-        :disabled="!status.data.value?.claudeAvailable"
+        :disabled="!status.data.value?.agentAvailable"
         data-testid="memory-mcp-install"
         @click="install.mutate()"
       >

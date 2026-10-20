@@ -147,7 +147,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   dbMcpStatus: 'DbMcpService.Status',
   dbMcpSetEnabled: 'DbMcpService.SetEnabled',
   dbMcpRegenerate: 'DbMcpService.Regenerate',
-  dbMcpInstallClaudeCode: 'DbMcpService.InstallClaudeCode',
+  dbMcpInstallAgent: 'DbMcpService.InstallAgent',
   dbMcpPendingApprovals: 'DbMcpService.PendingApprovals',
   dbMcpApproveQuery: 'DbMcpService.ApproveQuery',
   dbMcpDenyQuery: 'DbMcpService.DenyQuery',
@@ -374,7 +374,7 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.dbMcpStatus]: JSON.stringify({
     running: false,
     command: '',
-    claudeAvailable: false,
+    agentAvailable: false,
     probed: [],
     expiresAt: '',
     error: '',

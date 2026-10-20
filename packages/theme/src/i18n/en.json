@@ -2024,6 +2024,15 @@
     "advanced": {
       "label": "Advanced"
     },
+    "agentCliNotFound": {
+      "error": "{agent}’s CLI isn’t available. Copy the command above and run it yourself once it is installed."
+    },
+    "agentRegistered": {
+      "description": "Registered with {agent}."
+    },
+    "agentRegistrationRefused": {
+      "error": "{agent} refused the registration: {detail}. Copy the command above and run it yourself."
+    },
     "appearance": {
       "label": "Appearance"
     },
@@ -2035,15 +2044,6 @@
     },
     "changed": {
       "status": "Changed"
-    },
-    "claudeCliNotFound": {
-      "error": "Claude Code’s CLI isn’t available. Copy the command above and run it yourself once it is installed."
-    },
-    "claudeCodeRegistered": {
-      "description": "Registered with Claude Code."
-    },
-    "claudeRegistrationRefused": {
-      "error": "Claude Code refused the registration: {detail}. Copy the command above and run it yourself."
     },
     "closed": {
       "status": "Closed"

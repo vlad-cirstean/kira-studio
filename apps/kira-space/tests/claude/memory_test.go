@@ -154,9 +154,9 @@ func storeThroughClaude(t *testing.T, app *realApp, cfg string) {
 // real claude list the server back.
 func TestMemoryInstallRegisters(t *testing.T) {
 	app := newRealApp(t)
-	res := app.W.Memory.InstallClaudeCode(ctx)
+	res := app.W.Memory.InstallAgent(ctx)
 	if res.Outcome != "installed" {
-		t.Fatalf("InstallClaudeCode = %+v, want installed", res)
+		t.Fatalf("InstallAgent = %+v, want installed", res)
 	}
 	// Proves the install used the temp HOME. The real ~/.claude.json is not checked: other claude
 	// processes rewrite it.

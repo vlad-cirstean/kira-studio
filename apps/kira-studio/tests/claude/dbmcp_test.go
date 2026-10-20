@@ -40,9 +40,9 @@ func enableDbMcp(t *testing.T, app *realApp) (connName, url, helper string) {
 	if err != nil || !st.Running {
 		t.Fatalf("DbMcp.SetEnabled = %+v, %v, want running", st, err)
 	}
-	// The harness's installer fake records what InstallClaudeCode would register; the call is
+	// The harness's installer fake records what InstallAgent would register; the call is
 	// synchronous, so Installs is stable after it.
-	app.W.DbMcp.InstallClaudeCode(ctx)
+	app.W.DbMcp.InstallAgent(ctx)
 	if len(app.McpInstaller.Installs) != 1 {
 		t.Fatalf("installer fake saw %d installs, want 1", len(app.McpInstaller.Installs))
 	}
