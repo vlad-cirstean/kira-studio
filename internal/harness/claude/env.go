@@ -1,4 +1,4 @@
-package claudeheadless
+package claude
 
 import "strings"
 

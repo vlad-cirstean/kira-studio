@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
@@ -21,8 +22,8 @@ import (
 )
 
 // Run returns the process exit code. promptsPath is the app's llm-prompts.json: the gate, reconcile
-// and server texts it overrides apply here too. models picks the Claude model per call. Diagnostics go to stderr: stdout is the protocol.
-func Run(args []string, promptsPath string, models memory.ModelSource) int {
+// and server texts it overrides apply here too. agents picks the provider and models its model per call. Diagnostics go to stderr: stdout is the protocol.
+func Run(args []string, promptsPath string, agents harness.Selector, models memory.ModelSource) int {
 	fs := flag.NewFlagSet("memory-mcp", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	importRef := fs.String("import-ref", "", "attribute every stored memory to this bulk-import file id")
@@ -46,13 +47,13 @@ func Run(args []string, promptsPath string, models memory.ModelSource) int {
 	if promptsPath != "" {
 		prompts = llmprompts.NewStore(promptsPath)
 	}
-	claude := memory.NewCLIRunner(models)
-	svc := memory.NewService(store, claude, memory.ServiceOptions{Embedder: embedder, Prompts: prompts})
+	agent := memory.NewAgentRunner(agents, models)
+	svc := memory.NewService(store, agent, memory.ServiceOptions{Embedder: embedder, Prompts: prompts})
 	defer svc.Close()
 	opts := mcpserver.Options{ImportRef: *importRef, Prompts: prompts, Project: detectProject(ctx)}
 	if *importRef == "" {
-		opts.Distill = importer.Distiller{Runner: claude, Prompts: prompts}
-		if ing, err := openIngest(store); err != nil {
+		opts.Distill = importer.Distiller{Runner: agent, Prompts: prompts}
+		if ing, err := openIngest(store, agent.Available); err != nil {
 			fmt.Fprintln(os.Stderr, "kira-memory: ingest tools off:", err)
 		} else {
 			defer ing.Close()
@@ -84,13 +85,13 @@ func detectProject(ctx context.Context) string {
 
 // openIngest is the control side of the import runner for this session's ingest tools. The runner it
 // launches is a detached process: it outlives this session.
-func openIngest(store *memory.Store) (*importer.Engine, error) {
+func openIngest(store *memory.Store, available func() error) (*importer.Engine, error) {
 	exe, err := os.Executable()
 	if err != nil {
 		return nil, err
 	}
 	return importer.Open(store, importer.Options{
 		Launcher:  importer.SpawnLauncher{Executable: exe, LogPath: importer.DefaultLogPath(store)},
-		Available: memory.ClaudeAvailable,
+		Available: available,
 	})
 }

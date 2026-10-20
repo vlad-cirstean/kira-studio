@@ -2,7 +2,11 @@
 // output formats, config files and model names.
 package claude
 
-import "github.com/kirathecat/kira-studio/internal/harness"
+import (
+	"os"
+
+	"github.com/kirathecat/kira-studio/internal/harness"
+)
 
 // ID is the agent.provider value of this provider.
 const ID = "claude"
@@ -11,7 +15,11 @@ const ID = "claude"
 var Catalog = harness.Catalog{Aliases: []string{"haiku", "sonnet", "opus"}, Default: "sonnet"}
 
 // Provider implements harness.Provider for Claude Code.
-type Provider struct{}
+type Provider struct {
+	// lookPath and stat are test seams for the CLI lookup; nil means exec.LookPath and os.Stat.
+	lookPath func(string) (string, error)
+	stat     func(string) (os.FileInfo, error)
+}
 
 // New returns the Claude Code provider.
 func New() *Provider { return &Provider{} }

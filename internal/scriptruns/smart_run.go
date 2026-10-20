@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
@@ -168,7 +169,7 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 	if s.SmartTimeout > 0 {
 		timeout, timeoutText = s.SmartTimeout, s.SmartTimeout.String()
 	}
-	env := claudeheadless.ScrubSessionEnv(loginshell.ScrubGitEnv(os.Environ()))
+	env := claude.ScrubSessionEnv(loginshell.ScrubGitEnv(os.Environ()))
 	env = append(env, "GIT_TERMINAL_PROMPT=0")
 	env = append(env, p.envList...)
 	spec := claudeheadless.Spec{

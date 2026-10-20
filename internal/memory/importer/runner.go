@@ -19,6 +19,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/kirathecat/kira-studio/internal/filelock"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
@@ -568,8 +569,8 @@ func (r *Runner) settle(jobID string) error {
 }
 
 func isFatal(err error) bool {
-	return errors.Is(err, memory.ErrClaudeNotFound) || errors.Is(err, memory.ErrClaudeAuth) ||
-		errors.Is(err, memory.ErrClaudeOutdated) || errors.Is(err, memory.ErrClaudeUsageLimit)
+	return errors.Is(err, harness.ErrNotFound) || errors.Is(err, harness.ErrAuth) ||
+		errors.Is(err, harness.ErrOutdated) || errors.Is(err, harness.ErrUsageLimit)
 }
 
 // retry runs op with exponential backoff. Fatal errors, a spent budget and a cancelled context
@@ -584,12 +585,12 @@ func (r *Runner) retry(ctx context.Context, op func() error) error {
 		if err == nil {
 			return nil
 		}
-		if ctx.Err() != nil || isFatal(err) || errors.Is(err, memory.ErrClaudeBudget) {
+		if ctx.Err() != nil || isFatal(err) || errors.Is(err, harness.ErrBudget) {
 			return backoff.Permanent(err)
 		}
 		return err
 	}, bo, func(err error, next time.Duration) {
-		if errors.Is(err, memory.ErrClaudeRateLimited) {
+		if errors.Is(err, harness.ErrRateLimited) {
 			r.cooldown(next)
 		}
 		slog.Warn("memory import: retrying", "scope", "memory", "err", err, "in", next)

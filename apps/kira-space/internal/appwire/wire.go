@@ -56,9 +56,9 @@ func RunArgvShim(args []string) (code int, ok bool) {
 	case "askpass":
 		return gitaskpass.RunHelper(args[2:], os.Environ(), os.Stdout), true
 	case "memory-mcp":
-		return memorycli.Run(args[2:], filepath.Join(config.KiraSpaceHome(), "llm-prompts.json"), memoryModelAt(config.DbPath())), true
+		return memorycli.Run(args[2:], filepath.Join(config.KiraSpaceHome(), "llm-prompts.json"), agentSelectorAt(config.DbPath()), memoryModelAt(config.DbPath())), true
 	case "memory-ingest":
-		return memorycli.RunIngest(args[2:], filepath.Join(config.KiraSpaceHome(), "llm-prompts.json"), memoryModelAt(config.DbPath())), true
+		return memorycli.RunIngest(args[2:], filepath.Join(config.KiraSpaceHome(), "llm-prompts.json"), agentSelectorAt(config.DbPath()), memoryModelAt(config.DbPath())), true
 	case "memory-embed":
 		return memembed.RunWorker(args[2:]), true
 	case "memory-check":

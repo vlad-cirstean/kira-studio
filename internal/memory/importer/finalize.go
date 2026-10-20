@@ -7,6 +7,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
 )
@@ -21,10 +22,10 @@ const (
 	mcpServerName       = "kira-memory"
 )
 
-var finalizeTools = []string{
-	"mcp__" + mcpServerName + "__store_memory",
-	"mcp__" + mcpServerName + "__search_memories",
-	"mcp__" + mcpServerName + "__memory_history",
+var finalizeTools = []harness.MCPTool{
+	{Server: mcpServerName, Tool: "store_memory"},
+	{Server: mcpServerName, Tool: "search_memories"},
+	{Server: mcpServerName, Tool: "memory_history"},
 }
 
 type finalizeDoc struct {
@@ -48,19 +49,14 @@ type finalizeWire struct {
 	Facts     []FinalFact `json:"facts"`
 }
 
-// mcpConfig names the one MCP server the finalize agent may use: this binary in import mode, so
+// mcpServer is the one MCP server the finalize agent may use: this binary in import mode, so
 // every memory it stores is attributed to the file.
-func mcpConfig(exe, home, fileID string, extraEnv map[string]string) string {
+func mcpServer(exe, home, fileID string, extraEnv map[string]string) harness.MCPServer {
 	env := map[string]string{"KIRA_MEMORY_HOME": home}
 	for k, v := range extraEnv {
 		env[k] = v
 	}
-	raw, _ := json.Marshal(map[string]any{"mcpServers": map[string]any{mcpServerName: map[string]any{
-		"command": exe,
-		"args":    []string{"memory-mcp", "--import-ref", fileID},
-		"env":     env,
-	}}})
-	return string(raw)
+	return harness.MCPServer{Name: mcpServerName, Command: exe, Args: []string{"memory-mcp", "--import-ref", fileID}, Env: env}
 }
 
 func finalizeLimits(facts int) (time.Duration, string) {
@@ -70,7 +66,7 @@ func finalizeLimits(facts int) (time.Duration, string) {
 	return timeout, fmt.Sprintf("%.2f", budget)
 }
 
-func (a ClaudeAgent) Finalize(ctx context.Context, in FinalizeInput) (FinalizeOutput, error) {
+func (a ModelAgent) Finalize(ctx context.Context, in FinalizeInput) (FinalizeOutput, error) {
 	input, err := json.Marshal(finalizeWire{
 		Document:   finalizeDoc{Path: in.Path, Title: in.Title, Chunks: in.ChunkCount},
 		Provenance: finalizeProv{Origin: in.Prov.Origin, SourceTag: in.Prov.SourceTag, Scope: in.Prov.Scope, Project: in.Prov.Project},
@@ -82,7 +78,7 @@ func (a ClaudeAgent) Finalize(ctx context.Context, in FinalizeInput) (FinalizeOu
 	timeout, budget := finalizeLimits(len(in.Facts))
 	res, err := a.Runner.RunResult(ctx, memory.Call{
 		System: llmprompts.MemoryImportFinalizeSystem.Text(a.prompts(), llmprompts.FinalizeVars{MaxItems: memory.MaxItems}), Input: string(input), Schema: llmprompts.MemoryImportFinalizeSystem.Schema(),
-		MCPConfig: mcpConfig(a.Executable, a.Home, in.FileID, a.Env), AllowedTools: finalizeTools,
+		MCPServers: []harness.MCPServer{mcpServer(a.Executable, a.Home, in.FileID, a.Env)}, MCPTools: finalizeTools,
 		Timeout: timeout, Budget: budget,
 	})
 	out := FinalizeOutput{CostUSD: res.CostUSD}
@@ -94,7 +90,7 @@ func (a ClaudeAgent) Finalize(ctx context.Context, in FinalizeInput) (FinalizeOu
 		Dropped    []DroppedFact
 	}
 	if err := json.Unmarshal(res.Output, &parsed); err != nil {
-		return out, memory.ErrClaudeOutput
+		return out, a.Runner.Fail(harness.ErrOutput)
 	}
 	out.Unresolved, out.Dropped = parsed.Unresolved, parsed.Dropped
 	return out, nil

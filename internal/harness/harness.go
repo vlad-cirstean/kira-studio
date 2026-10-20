@@ -22,6 +22,8 @@ type Provider interface {
 	// Models is the provider's model aliases.
 	Models() Catalog
 	Locator
+	Structured
+	MCPHost
 }
 
 // Locator finds the provider's CLI.

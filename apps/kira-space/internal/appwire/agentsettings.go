@@ -8,13 +8,14 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/harness/claude"
+	"github.com/kirathecat/kira-studio/internal/harness/providers"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
 // memoryModelFrom reads memory.claudeModel through the app's open settings handle.
 func memoryModelFrom(r *repos.SettingsRepo) memory.ModelSource {
-	return func() (string, error) {
+	return func(string) (string, error) {
 		s, err := r.GetAll()
 		if err != nil {
 			return "", err
@@ -57,7 +58,7 @@ func readSettingsAt(dbPath string) (model.Settings, error) {
 
 // memoryModelAt serves the memory-mcp and memory-ingest processes.
 func memoryModelAt(dbPath string) memory.ModelSource {
-	return func() (string, error) {
+	return func(string) (string, error) {
 		s, err := readSettingsAt(dbPath)
 		if err != nil {
 			return "", err
@@ -67,6 +68,22 @@ func memoryModelAt(dbPath string) memory.ModelSource {
 		}
 		return s.Memory.ClaudeModel, nil
 	}
+}
+
+// agentProviderAt serves the memory-mcp and memory-ingest processes.
+func agentProviderAt(dbPath string) func() (string, error) {
+	return func() (string, error) {
+		s, err := readSettingsAt(dbPath)
+		if err != nil {
+			return "", err
+		}
+		return s.Agent.Provider, nil
+	}
+}
+
+// agentSelectorAt serves the memory-mcp and memory-ingest processes.
+func agentSelectorAt(dbPath string) harness.Selector {
+	return harness.Selector{Registry: providers.New(), ID: agentProviderAt(dbPath)}
 }
 
 // agentSelector resolves the active provider from the app's settings.

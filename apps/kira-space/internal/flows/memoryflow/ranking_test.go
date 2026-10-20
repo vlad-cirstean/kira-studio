@@ -15,6 +15,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
@@ -23,6 +24,8 @@ const webKey = "github.com/acme/web"
 
 // acceptRunner accepts every item as one fact, keeping its text.
 type acceptRunner struct{}
+
+func (acceptRunner) Fail(kind error) error { return claude.New().Fail(kind) }
 
 func (acceptRunner) Run(_ context.Context, c memory.Call) (json.RawMessage, error) {
 	var in struct {

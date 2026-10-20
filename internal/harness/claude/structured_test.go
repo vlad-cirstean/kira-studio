@@ -1,4 +1,4 @@
-package memory
+package claude
 
 import (
 	"context"
@@ -8,10 +8,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
 // fakeClaude writes a shell script that records argv, stdin, cwd and env to dir, then prints out.
-func fakeClaude(t *testing.T, out string, exit int) (r *CLIRunner, dir string) {
+func fakeClaude(t *testing.T, out string, exit int) (r *Provider, dir string) {
 	t.Helper()
 	dir = t.TempDir()
 	script := filepath.Join(dir, "claude")
@@ -26,17 +28,17 @@ func fakeClaude(t *testing.T, out string, exit int) (r *CLIRunner, dir string) {
 	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	return &CLIRunner{lookPath: func(string) (string, error) { return script, nil }, stat: os.Stat}, dir
+	return &Provider{lookPath: func(string) (string, error) { return script, nil }, stat: os.Stat}, dir
 }
 
-func TestCLIRunnerIsolation(t *testing.T) {
+func TestStructuredIsolation(t *testing.T) {
 	t.Setenv("CLAUDECODE", "1")
 	t.Setenv("CLAUDE_CODE_SESSION_ID", "abc")
 	t.Setenv("ANTHROPIC_API_KEY", "sk-keep")
 	r, dir := fakeClaude(t, `{"type":"result","is_error":false,"structured_output":{"ok":true}}`, 0)
-	out, err := r.Run(context.Background(), Call{System: "sys", Input: `{"secret":"memory text"}`, Schema: []byte(`{"type":"object"}`)})
-	if err != nil || string(out) != `{"ok":true}` {
-		t.Fatalf("out=%s err=%v", out, err)
+	res, err := r.RunStructured(context.Background(), "sonnet", harness.StructuredCall{System: "sys", Input: `{"secret":"memory text"}`, Schema: []byte(`{"type":"object"}`)})
+	if err != nil || string(res.Output) != `{"ok":true}` {
+		t.Fatalf("out=%s err=%v", res.Output, err)
 	}
 	argv, _ := os.ReadFile(filepath.Join(dir, "argv"))
 	args := strings.Split(strings.TrimSpace(string(argv)), "\n")
@@ -64,32 +66,32 @@ func TestCLIRunnerIsolation(t *testing.T) {
 	}
 }
 
-func TestCLIRunnerErrorMapping(t *testing.T) {
+func TestStructuredErrorMapping(t *testing.T) {
 	cases := []struct {
 		name string
 		out  string
 		exit int
 		want error
 	}{
-		{"budget", `{"is_error":true,"subtype":"error_max_budget_usd"}`, 1, ErrClaudeBudget},
-		{"max turns", `{"is_error":true,"subtype":"error_max_turns"}`, 1, ErrClaudeMaxTurns},
-		{"auth from stderr", `{"is_error":true,"result":""}`, 1, ErrClaudeAuth},
-		{"is_error with exit 0", `{"is_error":true,"result":"please log in"}`, 0, ErrClaudeAuth},
-		{"missing structured output", `{"is_error":false,"result":"text"}`, 0, ErrClaudeOutput},
-		{"not json", `nope`, 0, ErrClaudeOutput},
-		{"rate limit", `{"is_error":true,"result":"API Error: 429 rate limit exceeded"}`, 0, ErrClaudeRateLimited},
-		{"overloaded", `{"is_error":true,"result":"API Error: 529 overloaded_error"}`, 0, ErrClaudeRateLimited},
-		{"usage limit", `{"is_error":true,"result":"Claude usage limit reached. Your limit resets at 5pm"}`, 0, ErrClaudeUsageLimit},
+		{"budget", `{"is_error":true,"subtype":"error_max_budget_usd"}`, 1, harness.ErrBudget},
+		{"max turns", `{"is_error":true,"subtype":"error_max_turns"}`, 1, harness.ErrMaxTurns},
+		{"auth from stderr", `{"is_error":true,"result":""}`, 1, harness.ErrAuth},
+		{"is_error with exit 0", `{"is_error":true,"result":"please log in"}`, 0, harness.ErrAuth},
+		{"missing structured output", `{"is_error":false,"result":"text"}`, 0, harness.ErrOutput},
+		{"not json", `nope`, 0, harness.ErrOutput},
+		{"rate limit", `{"is_error":true,"result":"API Error: 429 rate limit exceeded"}`, 0, harness.ErrRateLimited},
+		{"overloaded", `{"is_error":true,"result":"API Error: 529 overloaded_error"}`, 0, harness.ErrRateLimited},
+		{"usage limit", `{"is_error":true,"result":"Claude usage limit reached. Your limit resets at 5pm"}`, 0, harness.ErrUsageLimit},
 	}
 	for _, c := range cases {
 		r, _ := fakeClaude(t, c.out, c.exit)
-		_, err := r.Run(context.Background(), Call{System: "s", Input: "{}", Schema: []byte(`{}`)})
+		_, err := r.RunStructured(context.Background(), "sonnet", harness.StructuredCall{System: "s", Input: "{}", Schema: []byte(`{}`)})
 		if !errors.Is(err, c.want) {
 			t.Errorf("%s: err = %v, want %v", c.name, err, c.want)
 		}
 	}
-	r := &CLIRunner{lookPath: func(string) (string, error) { return "", errors.New("no") }, stat: func(string) (os.FileInfo, error) { return nil, errors.New("no") }}
-	if _, err := r.Run(context.Background(), Call{}); !errors.Is(err, ErrClaudeNotFound) {
+	r := &Provider{lookPath: func(string) (string, error) { return "", errors.New("no") }, stat: func(string) (os.FileInfo, error) { return nil, errors.New("no") }}
+	if _, err := r.RunStructured(context.Background(), "sonnet", harness.StructuredCall{}); !errors.Is(err, harness.ErrNotFound) {
 		t.Errorf("not found: %v", err)
 	}
 }

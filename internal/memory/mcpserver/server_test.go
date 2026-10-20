@@ -11,6 +11,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/importer"
 	"github.com/kirathecat/kira-studio/internal/testx"
@@ -19,6 +21,8 @@ import (
 func TestMain(m *testing.M) { os.Exit(testx.RunWithTempHomes(m)) }
 
 type acceptRunner struct{}
+
+func (acceptRunner) Fail(kind error) error { return claude.New().Fail(kind) }
 
 func (acceptRunner) Run(_ context.Context, c memory.Call) (json.RawMessage, error) {
 	var rec struct{ Facts []struct{ Index int } }
@@ -36,7 +40,7 @@ func (acceptRunner) Run(_ context.Context, c memory.Call) (json.RawMessage, erro
 		}
 	}
 	if err := json.Unmarshal([]byte(c.Input), &in); err != nil || len(in.Items) == 0 {
-		return nil, memory.ErrClaudeOutput
+		return nil, harness.ErrOutput
 	}
 	items := []map[string]any{}
 	for _, it := range in.Items {

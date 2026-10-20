@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
@@ -127,11 +126,20 @@ func (*Provider) Locate(ctx context.Context, bin string) (string, error) {
 }
 
 // Available is the quick probe without the login-shell fallback.
-func (*Provider) Available() error {
-	if _, _, found := toolexec.Locate(exec.LookPath, os.Stat, "claude", Candidates()); !found {
+func (p *Provider) Available() error {
+	if _, _, found := p.find(); !found {
 		return errNotFound
 	}
 	return nil
 }
 
-var errNotFound = &harness.Error{Kind: harness.ErrNotFound, Msg: "Claude Code CLI not found. Install it, then retry."}
+func (p *Provider) find() (string, []string, bool) {
+	lookPath, stat := p.lookPath, p.stat
+	if lookPath == nil {
+		lookPath = exec.LookPath
+	}
+	if stat == nil {
+		stat = os.Stat
+	}
+	return toolexec.Locate(lookPath, stat, "claude", Candidates())
+}

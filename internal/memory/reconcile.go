@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
@@ -170,7 +171,7 @@ func (s *Service) reconcile(ctx context.Context, works []*work) error {
 		Decisions []reconcileDecision `json:"decisions"`
 	}
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return fmt.Errorf("%w: reconcile: %v", ErrClaudeOutput, err)
+		return fmt.Errorf("%w: reconcile: %v", s.runner.Fail(harness.ErrOutput), err)
 	}
 	seen := make([]bool, len(works))
 	for _, d := range out.Decisions {
@@ -178,11 +179,11 @@ func (s *Service) reconcile(ctx context.Context, works []*work) error {
 			continue
 		}
 		seen[d.Index] = true
-		works[d.Index].dec = checkDecision(d, works[d.Index], tempIDs[d.Index])
+		works[d.Index].dec = s.checkDecision(d, works[d.Index], tempIDs[d.Index])
 	}
 	for i, ok := range seen {
 		if !ok {
-			works[i].dec = decision{Err: fmt.Errorf("%w: reconcile skipped this fact", ErrClaudeOutput)}
+			works[i].dec = decision{Err: fmt.Errorf("%w: reconcile skipped this fact", s.runner.Fail(harness.ErrOutput))}
 		}
 	}
 	return nil
@@ -194,9 +195,9 @@ const keptBesideWhy = "Kept beside a higher-graded fact."
 // keptApartWhy explains a kind-guard downgrade of noop or update to add.
 const keptApartWhy = "A rule and a fact stay separate memories."
 
-func checkDecision(d reconcileDecision, w *work, cands map[string]Memory) decision {
+func (s *Service) checkDecision(d reconcileDecision, w *work, cands map[string]Memory) decision {
 	fail := func(format string, a ...any) decision {
-		return decision{Err: fmt.Errorf("%w: reconcile: %s", ErrClaudeOutput, fmt.Sprintf(format, a...))}
+		return decision{Err: fmt.Errorf("%w: reconcile: %s", s.runner.Fail(harness.ErrOutput), fmt.Sprintf(format, a...))}
 	}
 	why := strings.TrimSpace(d.Why)
 	switch d.Action {

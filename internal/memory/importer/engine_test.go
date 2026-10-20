@@ -15,6 +15,8 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 	"github.com/kirathecat/kira-studio/internal/testx"
@@ -24,6 +26,8 @@ func TestMain(m *testing.M) { os.Exit(testx.RunWithTempHomes(m)) }
 
 // acceptRunner approves every gated fact and adds every reconciled one.
 type acceptRunner struct{}
+
+func (acceptRunner) Fail(kind error) error { return claude.New().Fail(kind) }
 
 func (acceptRunner) Run(_ context.Context, c memory.Call) (json.RawMessage, error) {
 	var rec struct{ Facts []struct{ Index int } }
@@ -41,7 +45,7 @@ func (acceptRunner) Run(_ context.Context, c memory.Call) (json.RawMessage, erro
 		}
 	}
 	if err := json.Unmarshal([]byte(c.Input), &in); err != nil || len(in.Items) == 0 {
-		return nil, memory.ErrClaudeOutput
+		return nil, harness.ErrOutput
 	}
 	items := []map[string]any{}
 	for _, it := range in.Items {
@@ -150,7 +154,7 @@ func (a *fakeAgent) Finalize(ctx context.Context, in FinalizeInput) (FinalizeOut
 	return FinalizeOutput{CostUSD: 0.02}, err
 }
 
-type harness struct {
+type engineHarness struct {
 	t     *testing.T
 	ms    *memory.Store
 	agent *fakeAgent
@@ -163,9 +167,9 @@ type harness struct {
 
 var smallBudget = Budget{Target: 60, Max: 100, MinFill: 15, MinTail: 1, Context: 5}
 
-func newHarness(t *testing.T, files int) *harness {
+func newHarness(t *testing.T, files int) *engineHarness {
 	t.Helper()
-	h := &harness{t: t, dir: t.TempDir()}
+	h := &engineHarness{t: t, dir: t.TempDir()}
 	for f := 0; f < files; f++ {
 		var b strings.Builder
 		fmt.Fprintf(&b, "# Doc%d\n\n", f)
@@ -186,14 +190,14 @@ func newHarness(t *testing.T, files int) *harness {
 	return h
 }
 
-func (h *harness) runnerOpts() RunnerOptions {
+func (h *engineHarness) runnerOpts() RunnerOptions {
 	return RunnerOptions{
 		Agent: h.agent, Docs: h.svc, Budget: smallBudget, Tick: 20 * time.Millisecond,
 		Backoff: func() backoff.BackOff { return backoff.NewConstantBackOff(0) },
 	}
 }
 
-func (h *harness) open() *Engine {
+func (h *engineHarness) open() *Engine {
 	h.t.Helper()
 	h.launcher = newInProcessLauncher(h.t, h.ms, h.runnerOpts())
 	e, err := Open(h.ms, Options{Launcher: h.launcher})
@@ -204,7 +208,7 @@ func (h *harness) open() *Engine {
 	return e
 }
 
-func (h *harness) create() Job {
+func (h *engineHarness) create() Job {
 	h.t.Helper()
 	j, err := h.e.Create(CreateArgs{Paths: []string{h.dir}})
 	if err != nil {
@@ -213,7 +217,7 @@ func (h *harness) create() Job {
 	return h.waitState(j.ID, JobAwaiting).Job
 }
 
-func (h *harness) detail(id string) JobDetail {
+func (h *engineHarness) detail(id string) JobDetail {
 	h.t.Helper()
 	d, err := h.e.Job(id)
 	if err != nil {
@@ -222,7 +226,7 @@ func (h *harness) detail(id string) JobDetail {
 	return d
 }
 
-func (h *harness) waitState(id, want string) JobDetail {
+func (h *engineHarness) waitState(id, want string) JobDetail {
 	h.t.Helper()
 	var d JobDetail
 	testx.WaitUntil(h.t, 10*time.Second, func() bool {
@@ -232,14 +236,14 @@ func (h *harness) waitState(id, want string) JobDetail {
 	return d
 }
 
-func (h *harness) mustStart(id string) {
+func (h *engineHarness) mustStart(id string) {
 	h.t.Helper()
 	if err := h.e.Start(id, StartArgs{}); err != nil {
 		h.t.Fatal(err)
 	}
 }
 
-func (h *harness) rows(q string, args ...any) []string {
+func (h *engineHarness) rows(q string, args ...any) []string {
 	h.t.Helper()
 	rs, err := h.e.st.db.Query(q, args...)
 	if err != nil {
@@ -327,7 +331,7 @@ func TestImportRetriesAndRetryFile(t *testing.T) {
 			return errors.New("Claude Code failed: blip")
 		}
 		if strings.HasSuffix(in.Path, "doc1.md") && in.Index == 1 && broken.Load() {
-			return memory.ErrClaudeOutput
+			return harness.ErrOutput
 		}
 		return nil
 	}
@@ -363,14 +367,14 @@ func TestImportFatalErrorPausesJob(t *testing.T) {
 	loggedOut.Store(true)
 	h.agent.extractHook = func(context.Context, ExtractInput) error {
 		if loggedOut.Load() {
-			return memory.ErrClaudeAuth
+			return claude.New().Fail(harness.ErrAuth)
 		}
 		return nil
 	}
 	j := h.create()
 	h.mustStart(j.ID)
 	d := h.waitState(j.ID, JobPaused)
-	if d.Job.Reason != memory.ErrClaudeAuth.Error() {
+	if d.Job.Reason != claude.New().Fail(harness.ErrAuth).Error() {
 		t.Errorf("reason = %q", d.Job.Reason)
 	}
 	time.Sleep(100 * time.Millisecond)

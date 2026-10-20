@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
@@ -19,6 +21,8 @@ type fakeRunner struct {
 	rec   func(in map[string]any) string
 	hook  func(kind string)
 }
+
+func (f *fakeRunner) Fail(kind error) error { return claude.New().Fail(kind) }
 
 func (f *fakeRunner) Run(_ context.Context, c Call) (json.RawMessage, error) {
 	kind := "reconcile"
@@ -238,7 +242,7 @@ func TestGateMissingIndexIsOutputError(t *testing.T) {
 	fr := &fakeRunner{gate: func(gateInput) string { return `{"items":[]}` }}
 	svc, st := newService(t, fr)
 	_, err := svc.Store(context.Background(), req(it("some fact", "r")))
-	if !errors.Is(err, ErrClaudeOutput) {
+	if !errors.Is(err, harness.ErrOutput) {
 		t.Fatalf("err = %v", err)
 	}
 	if rows, _ := st.Recent(context.Background(), 10); len(rows) != 0 {

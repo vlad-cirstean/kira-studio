@@ -15,6 +15,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/memory"
 )
@@ -127,8 +129,8 @@ func TestGateRejectsOrFails(t *testing.T) {
 
 	gate(t, app, "gate-malformed.json")
 	if _, err := app.W.Memory.Store(ctx, twoItemsArgs()); err == nil ||
-		!strings.Contains(err.Error(), memory.ErrClaudeOutput.Error()) {
-		t.Fatalf("malformed gate output error = %v, want %q", err, memory.ErrClaudeOutput)
+		!strings.Contains(err.Error(), claude.New().Fail(harness.ErrOutput).Error()) {
+		t.Fatalf("malformed gate output error = %v, want %q", err, claude.New().Fail(harness.ErrOutput))
 	}
 	empty("malformed gate output")
 

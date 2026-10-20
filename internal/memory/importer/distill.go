@@ -112,7 +112,7 @@ type DistillResult struct {
 // Distiller condenses text or a file into short lines without touching the store. It runs the import
 // pipeline (chunk, extract, cross-check, merge) and stops where import would store.
 type Distiller struct {
-	Runner  *memory.CLIRunner
+	Runner  memory.ResultRunner
 	Prompts llmprompts.Source
 }
 
@@ -198,7 +198,7 @@ func (d Distiller) Distill(ctx context.Context, req DistillRequest) (DistillResu
 		return DistillResult{}, invalidReason(ReasonTooManyParts, map[string]string{"count": strconv.Itoa(len(chunks)), "max": strconv.Itoa(MaxDistillChunks)},
 			"input splits into %d parts, the limit is %d", len(chunks), MaxDistillChunks)
 	}
-	run := &distillRun{agent: ClaudeAgent{Runner: d.Runner, Prompts: d.Prompts}, progress: req.Progress}
+	run := &distillRun{agent: ModelAgent{Runner: d.Runner, Prompts: d.Prompts}, progress: req.Progress}
 	res := DistillResult{Mode: ModeFacts, Chunks: len(chunks), InRunes: in}
 	finish := func(err error) (DistillResult, error) {
 		res.CostUSD = run.spent

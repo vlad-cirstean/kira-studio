@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
 )
@@ -61,7 +62,7 @@ type rewriteDraft struct {
 }
 
 // Rewrite runs the one rewrite call: no tools, structured output. An empty text is unusable output.
-func (a ClaudeAgent) Rewrite(ctx context.Context, text, code string) (rewriteDraft, error) {
+func (a ModelAgent) Rewrite(ctx context.Context, text, code string) (rewriteDraft, error) {
 	input, err := json.Marshal(rewriteWire{Text: text, Context: code})
 	if err != nil {
 		return rewriteDraft{}, err
@@ -81,14 +82,14 @@ func (a ClaudeAgent) Rewrite(ctx context.Context, text, code string) (rewriteDra
 		Reason  string        `json:"reason"`
 	}
 	if err := json.Unmarshal(res.Output, &parsed); err != nil || strings.TrimSpace(parsed.Text) == "" {
-		return out, memory.ErrClaudeOutput
+		return out, a.Runner.Fail(harness.ErrOutput)
 	}
 	out.Text, out.Dropped, out.Reason = parsed.Text, parsed.Dropped, parsed.Reason
 	return out, nil
 }
 
 // CheckRewrite asks whether the draft kept every fact of the original.
-func (a ClaudeAgent) CheckRewrite(ctx context.Context, original, draft, code string) (RewriteCheck, float64, error) {
+func (a ModelAgent) CheckRewrite(ctx context.Context, original, draft, code string) (RewriteCheck, float64, error) {
 	input, err := json.Marshal(checkWire{Original: original, Rewrite: draft, Context: code})
 	if err != nil {
 		return RewriteCheck{}, 0, err
@@ -103,7 +104,7 @@ func (a ClaudeAgent) CheckRewrite(ctx context.Context, original, draft, code str
 	}
 	var check RewriteCheck
 	if err := json.Unmarshal(res.Output, &check); err != nil {
-		return RewriteCheck{}, res.CostUSD, memory.ErrClaudeOutput
+		return RewriteCheck{}, res.CostUSD, a.Runner.Fail(harness.ErrOutput)
 	}
 	check.Lost, check.Wrong = nonNilStrings(check.Lost), nonNilStrings(check.Wrong)
 	return check, res.CostUSD, nil
@@ -113,7 +114,7 @@ func (a ClaudeAgent) CheckRewrite(ctx context.Context, original, draft, code str
 // mechanical gates, and an optional check call. A rejected draft keeps the original.
 func (d Distiller) rewrite(ctx context.Context, req DistillRequest) (DistillResult, error) {
 	run := &distillRun{progress: req.Progress}
-	agent := ClaudeAgent{Runner: d.Runner, Prompts: d.Prompts}
+	agent := ModelAgent{Runner: d.Runner, Prompts: d.Prompts}
 	res := DistillResult{Mode: ModeRewrite, InRunes: utf8.RuneCountInString(req.Text)}
 	finish := func(err error) (DistillResult, error) {
 		res.CostUSD = run.spent
@@ -137,7 +138,7 @@ func (d Distiller) rewrite(ctx context.Context, req DistillRequest) (DistillResu
 	for range 2 {
 		out, err := agent.Rewrite(ctx, req.Text, req.Context)
 		run.charge(out.CostUSD)
-		if errors.Is(err, memory.ErrClaudeOutput) {
+		if errors.Is(err, harness.ErrOutput) {
 			continue
 		}
 		if err != nil {
@@ -167,7 +168,7 @@ func (d Distiller) rewrite(ctx context.Context, req DistillRequest) (DistillResu
 	run.report(StageCheck, 0, 1)
 	check, cost, err := agent.CheckRewrite(ctx, req.Text, draft.Text, req.Context)
 	run.charge(cost)
-	if err != nil && !errors.Is(err, memory.ErrClaudeOutput) {
+	if err != nil && !errors.Is(err, harness.ErrOutput) {
 		return finish(err)
 	}
 	run.report(StageCheck, 1, 1)

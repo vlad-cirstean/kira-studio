@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
 )
@@ -69,7 +70,7 @@ func mergeLimits(facts int) (time.Duration, string) {
 
 // Merge runs the no-store half of import's finalize: one call, no tools, that merges duplicates across
 // parts, resolves unresolved facts and returns short lines. It never reads the store.
-func (a ClaudeAgent) Merge(ctx context.Context, in MergeInput) (MergeOutput, error) {
+func (a ModelAgent) Merge(ctx context.Context, in MergeInput) (MergeOutput, error) {
 	wire := mergeWire{Document: finalizeDoc{Path: in.Path, Title: in.Title, Chunks: in.ChunkCount}}
 	for _, f := range in.Facts {
 		wire.Facts = append(wire.Facts, mergeFact{ID: f.ID, Chunk: f.Chunk, Section: f.Section, Evidence: f.Evidence, Fact: f.Fact.Fact, Unresolved: f.Unresolved})
@@ -94,7 +95,7 @@ func (a ClaudeAgent) Merge(ctx context.Context, in MergeInput) (MergeOutput, err
 		Dropped    []DroppedFact
 	}
 	if err := json.Unmarshal(res.Output, &parsed); err != nil {
-		return out, memory.ErrClaudeOutput
+		return out, a.Runner.Fail(harness.ErrOutput)
 	}
 	out.Lines, out.Unresolved, out.Dropped = cleanLines(parsed.Lines), parsed.Unresolved, parsed.Dropped
 	return out, nil

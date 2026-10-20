@@ -3,7 +3,7 @@ package importer
 import "context"
 
 // Agent is the Claude steps the runner drives. The real one shells out to Claude Code
-// (ClaudeAgent); runner tests script a fake.
+// (ModelAgent); runner tests script a fake.
 type Agent interface {
 	// Available fails with a user-facing message when Claude Code cannot run.
 	Available() error

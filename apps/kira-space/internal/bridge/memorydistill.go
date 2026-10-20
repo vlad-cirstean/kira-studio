@@ -156,7 +156,7 @@ func (s *MemoryDistillService) Distill(ctx context.Context, args MemoryDistillAr
 	}
 	defer s.distilling.Unlock()
 
-	d := importer.Distiller{Runner: s.mem.claude, Prompts: s.mem.prompts}
+	d := importer.Distiller{Runner: s.mem.agent, Prompts: s.mem.prompts}
 	res, err := d.Distill(ctx, importer.DistillRequest{
 		Text: args.Text, Path: args.Path, Mode: args.Mode,
 		Progress: func(p importer.DistillProgress) {

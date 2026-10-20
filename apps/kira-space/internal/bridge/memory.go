@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/mcpinstall"
@@ -50,7 +51,7 @@ type MemoryService struct {
 	events    appcore.Emitter
 	installer MemoryMcpInstaller
 	prompts   llmprompts.Source
-	claude    *memory.CLIRunner
+	agent     *memory.AgentRunner
 
 	mu        sync.Mutex
 	svc       *memory.Service
@@ -73,8 +74,8 @@ type MemoryService struct {
 }
 
 // NewMemoryService wires the module; spec is the embedding model it installs and runs.
-func NewMemoryService(events appcore.Emitter, installer MemoryMcpInstaller, prompts llmprompts.Source, spec embed.Spec, models memory.ModelSource) *MemoryService {
-	s := &MemoryService{events: events, installer: installer, prompts: prompts, spec: spec, claude: memory.NewCLIRunner(models)}
+func NewMemoryService(events appcore.Emitter, installer MemoryMcpInstaller, prompts llmprompts.Source, spec embed.Spec, agents harness.Selector, models memory.ModelSource) *MemoryService {
+	s := &MemoryService{events: events, installer: installer, prompts: prompts, spec: spec, agent: memory.NewAgentRunner(agents, models)}
 	s.semanticEvents = newCoalescer(emitGap, func() { events.Emit(ChannelMemorySemantic, struct{}{}) })
 	s.importEvents = newCoalescer(emitGap, func() { events.Emit(ChannelMemoryImport, struct{}{}) })
 	return s
@@ -88,7 +89,7 @@ func (s *MemoryService) service() *memory.Service {
 	}
 	s.store = memory.OpenDefault()
 	s.embedder = embed.NewClient(embed.ClientOptions{Spec: s.spec, Home: memory.Home(), OnState: s.emitSemantic})
-	s.svc = memory.NewService(s.store, s.claude, memory.ServiceOptions{
+	s.svc = memory.NewService(s.store, s.agent, memory.ServiceOptions{
 		Embedder: s.embedder, OnChange: s.emitChanged, OnSemantic: s.emitSemantic, Prompts: s.prompts,
 	})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -119,7 +120,7 @@ func (s *MemoryService) importer() (*importer.Engine, error) {
 	}
 	s.engine, err = importer.Open(s.store, importer.Options{
 		Launcher:  importer.SpawnLauncher{Executable: exe, LogPath: importer.DefaultLogPath(s.store)},
-		Available: memory.ClaudeAvailable,
+		Available: s.agent.Available,
 		OnChange:  s.emitImport,
 	})
 	return s.engine, err
@@ -184,9 +185,9 @@ func memoryErr(err error) error {
 	switch {
 	case err == nil:
 		return nil
-	case errors.Is(err, memory.ErrInvalid), errors.Is(err, memory.ErrClaudeNotFound), errors.Is(err, memory.ErrClaudeAuth),
-		errors.Is(err, memory.ErrClaudeBudget), errors.Is(err, memory.ErrClaudeMaxTurns), errors.Is(err, memory.ErrClaudeTimeout), errors.Is(err, memory.ErrClaudeOutput),
-		errors.Is(err, memory.ErrClaudeOutdated), errors.Is(err, memory.ErrClaudeRateLimited), errors.Is(err, memory.ErrClaudeUsageLimit):
+	case errors.Is(err, memory.ErrInvalid), errors.Is(err, harness.ErrNotFound), errors.Is(err, harness.ErrAuth),
+		errors.Is(err, harness.ErrBudget), errors.Is(err, harness.ErrMaxTurns), errors.Is(err, harness.ErrTimeout), errors.Is(err, harness.ErrOutput),
+		errors.Is(err, harness.ErrOutdated), errors.Is(err, harness.ErrRateLimited), errors.Is(err, harness.ErrUsageLimit):
 		return ipcerr.BadRequest(err.Error())
 	case errors.Is(err, embed.ErrChecksum):
 		return ipcerr.BadRequest(err.Error())
