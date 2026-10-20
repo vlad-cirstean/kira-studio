@@ -269,7 +269,7 @@ func Build(opts Options) *Wired {
 		Arbiter: termBroker, Scripts: runs, Agent: w.Agents,
 	}}
 	// P116 G5 keep-awake toggle plus P188's agent reason: the live Claude Code session count —
-	// terminal agent tabs and running headless ade sessions — against claudeCode.keepAwakeWithAgents.
+	// terminal agent tabs and running headless ade sessions — against agent.keepAwakeWithAgents.
 	w.KeepAwakeCtl = keepawake.New(opts.KeepAwakeDriver)
 	w.KeepAwake = &bridge.KeepAwakeService{
 		Emit: emitter, Toggle: &keepawake.Toggle{Ctl: w.KeepAwakeCtl},

@@ -170,7 +170,7 @@ test('a settings field resets with Reset to default', async ({ relaunch }) => {
   const { window: page } = await relaunch();
   await emitWailsEvent(page, IPC.openSettings, undefined);
   await page.locator(t('settings-section-Claude Code')).click();
-  await expect(
-    page.locator(t('settings-reset-claudeCode-notifyIncludeMessage')),
-  ).toHaveAccessibleName('Reset to default');
+  await expect(page.locator(t('settings-reset-agent-notifyIncludeMessage'))).toHaveAccessibleName(
+    'Reset to default',
+  );
 });

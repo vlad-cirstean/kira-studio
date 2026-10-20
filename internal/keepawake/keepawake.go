@@ -18,7 +18,7 @@ type Reason string
 const (
 	// ReasonManual is the titlebar button's own on/off state — app-wide, process-scoped (§3.2).
 	ReasonManual Reason = "manual"
-	// ReasonAgent is claudeCode.keepAwakeWithAgents being on AND at least one Claude Code session
+	// ReasonAgent is agent.keepAwakeWithAgents being on AND at least one Claude Code session
 	// (P86's own tracked count) being live — recomputed wholesale on every input change, never an
 	// edge of its own.
 	ReasonAgent Reason = "agent"

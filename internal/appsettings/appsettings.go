@@ -1,7 +1,7 @@
 // Package appsettings is P103 Part 4 (§7.1)'s hoist of the settings sections that were
 // byte-identical, field for field and tag for tag, in both apps' own storage/model/settings.go:
 // AppearanceSettings. Each app's own Settings composes Appearance here alongside its own per-app
-// sections (Kira Studio's Data/Cache/Api/DbMcp/ClaudeCode/own advanced.logLevel key;
+// sections (Kira Studio's Data/Cache/Api/DbMcp/own advanced.logLevel key;
 // Kira Space's own GitSettings/InlineBlame/DateFormat/advanced.gitLogLevel key — P120: each app's
 // own diagnostic-log leaf has its own name/key now, so ValidLogLevel is the one thing genuinely
 // shared between them, not a common AdvancedCore struct).

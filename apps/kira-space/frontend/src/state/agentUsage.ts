@@ -13,7 +13,7 @@ export function useAgentUsage() {
   const mode = useModeStore();
   const settings = useSettingsStore();
   const queryClient = useQueryClient();
-  const enabled = computed(() => mode.active === 'ade' && settings.claudeCode.usageEnabled);
+  const enabled = computed(() => mode.active === 'ade' && settings.agent.usageEnabled);
 
   const stop = control.onAgentUsage((snapshot: AgentUsageSnapshot) => {
     queryClient.setQueryData(agentUsageKey, snapshot);

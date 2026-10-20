@@ -56,7 +56,7 @@ func (s deskSink) Send(n Note) error {
 	})
 }
 
-// Prefs are the claudeCode.notify* settings.
+// Prefs are the agent.notify* settings.
 type Prefs struct {
 	Enabled, OnFinished, OnNeedsInput, OnRunEnded, IncludeMessage bool
 }

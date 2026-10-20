@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CLAUDE_MODELS, type ClaudeModel } from '@shared/domain/claudeModels';
+import { CLAUDE_MODELS, type ClaudeModel, DEFAULT_CLAUDE_MODEL } from '@shared/domain/claudeModels';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field, FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
@@ -8,16 +8,20 @@ import { t } from '@theme/i18n';
 import AgentMcpSection from '@workbench/memory/settings/AgentMcpSection.vue';
 import CheckHookSection from '@workbench/memory/settings/CheckHookSection.vue';
 import SemanticModelSection from '@workbench/memory/settings/SemanticModelSection.vue';
-import { useId } from 'vue';
+import { computed, useId } from 'vue';
 import type { SettingsPaneProps } from './types';
 
 // P221: memory setup actions bypass draft/Save like ConnectedEditorsPane: a registration or a
-// model download is an action, not a settings leaf. P314: the Claude model is a leaf and saves with
+// model download is an action, not a settings leaf. P314: the model per provider is a leaf and saves with
 // the dialog.
 const props = defineProps<SettingsPaneProps>();
 
+const PROVIDER = 'claude';
+
+const model = computed(() => props.draft.memory.models[PROVIDER] ?? DEFAULT_CLAUDE_MODEL);
+
 function onModelChange(value: unknown): void {
-  props.draft.memory.claudeModel = String(value) as ClaudeModel;
+  props.draft.memory.models = { ...props.draft.memory.models, [PROVIDER]: String(value) };
 }
 
 const modelId = useId();
@@ -42,9 +46,9 @@ function modelLabel(m: ClaudeModel): string {
           icon="discard"
           :label="t('common.action.resetToDefault.label')"
           data-testid="settings-reset-memory-claudeModel"
-          :disabled-trigger="isAtDefault('memory', 'claudeModel')"
-          :disabled="isAtDefault('memory', 'claudeModel')"
-          @click="resetLeaf('memory', 'claudeModel')"
+          :disabled-trigger="isAtDefault('memory', 'models')"
+          :disabled="isAtDefault('memory', 'models')"
+          @click="resetLeaf('memory', 'models')"
         />
       </div>
       <NativeSelect
@@ -52,7 +56,7 @@ function modelLabel(m: ClaudeModel): string {
         variant="bordered"
         size="kira-lg"
         data-testid="settings-memory-claude-model"
-        :model-value="draft.memory.claudeModel"
+        :model-value="model"
         @update:model-value="onModelChange"
       >
         <option v-for="m in CLAUDE_MODELS" :key="m" :value="m">{{ modelLabel(m) }}</option>

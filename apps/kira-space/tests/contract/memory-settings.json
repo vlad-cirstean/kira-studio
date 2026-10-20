@@ -52,11 +52,13 @@
     "total": 0
   },
   "SettingsService.GetAll#memory": {
-    "claudeModel": "sonnet"
+    "models": {}
   },
   "SettingsService.Set#memory-model": {
     "memory": {
-      "claudeModel": "opus"
+      "models": {
+        "claude": "opus"
+      }
     }
   }
 }

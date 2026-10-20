@@ -156,7 +156,7 @@ test('hidden while the setting is off', async ({ relaunch }) => {
       channel: IPC.settingsGetAll,
       response: {
         ...defaultSettings,
-        claudeCode: { ...defaultSettings.claudeCode, usageEnabled: false },
+        agent: { ...defaultSettings.agent, usageEnabled: false },
       },
     },
   ]);
@@ -164,7 +164,7 @@ test('hidden while the setting is off', async ({ relaunch }) => {
   await expect(item(page)).toHaveCount(0);
 });
 
-test('the Settings switch saves claudeCode.usageEnabled', async ({ relaunch }) => {
+test('the Settings switch saves agent.usageEnabled', async ({ relaunch }) => {
   const { window: page, control } = await relaunch();
   await emitWailsEvent(page, IPC.openSettings, undefined);
   await page.locator('[data-testid="settings-section-Claude Code"]').click();
@@ -174,5 +174,5 @@ test('the Settings switch saves claudeCode.usageEnabled', async ({ relaunch }) =
   await page.locator('[data-testid="settings-save"]').click();
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.settingsSet)?.args)
-    .toEqual({ patch: { claudeCode: { usageEnabled: false } } });
+    .toEqual({ patch: { agent: { usageEnabled: false } } });
 });

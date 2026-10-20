@@ -37,7 +37,7 @@ test('Save writes the changed notify leaves and reset restores a default', async
   await openClaudeCodePane(page);
   await sw(page, '-finished').click();
   await sw(page, '-include-message').click();
-  const reset = page.locator('[data-testid="settings-reset-claudeCode-notifyIncludeMessage"]');
+  const reset = page.locator('[data-testid="settings-reset-agent-notifyIncludeMessage"]');
   await expect(reset).toBeEnabled();
   await reset.click();
   await expect(sw(page, '-include-message')).toHaveAttribute('aria-checked', 'true');
@@ -45,7 +45,7 @@ test('Save writes the changed notify leaves and reset restores a default', async
   await page.locator('[data-testid="settings-save"]').click();
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.settingsSet)?.args)
-    .toEqual({ patch: { claudeCode: { notifyOnFinished: false } } });
+    .toEqual({ patch: { agent: { notifyOnFinished: false } } });
 });
 
 test('the test button calls AgentNotifyService.SendTest', async ({ relaunch }) => {

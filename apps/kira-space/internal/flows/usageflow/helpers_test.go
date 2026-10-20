@@ -95,8 +95,8 @@ func waitState(t *testing.T, app *flowharness.App, pred func(agentusage.Snapshot
 
 func setUsage(t *testing.T, app *flowharness.App, on bool) {
 	t.Helper()
-	p := model.ClaudeCodePatch{UsageEnabled: &on}
-	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{ClaudeCode: &p}}); err != nil {
+	p := model.AgentPatch{UsageEnabled: &on}
+	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{Agent: &p}}); err != nil {
 		t.Fatalf("Settings.Set: %v", err)
 	}
 }

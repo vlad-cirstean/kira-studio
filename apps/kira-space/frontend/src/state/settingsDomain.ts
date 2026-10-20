@@ -1,4 +1,3 @@
-import { CLAUDE_MODELS, DEFAULT_CLAUDE_MODEL } from '@shared/domain/claudeModels';
 import {
   agentSettingsSchema,
   appearanceSettingsSchema,
@@ -10,7 +9,7 @@ import { z } from 'zod';
 
 // P103 Part 4 (§7.3): this app's own three-section settingsSchema/settingsPatchSchema/
 // defaultSettings, split out of the former one shared `@shared/domain/settings` — this store used
-// to carry Kira Studio's own data/cache/api/dbMcp/claudeCode sections dead (never populated by this
+// to carry Kira Studio's own data/cache/api/dbMcp sections dead (never populated by this
 // app's own Go backend, apps/kira-space/internal/storage/model/settings.go), the same "tab-kind
 // vocabulary" defect P103 Part 2 already fixed for tabs. appearance/logLevel enum stay genuinely
 // shared (this app's own leaf name stays `advanced.gitLogLevel`, P120); FONT_SIZE_RANGE is the one
@@ -124,10 +123,10 @@ const adeSettingsSchema = /*#__PURE__*/ z.object({
   sandboxKeychain: z.boolean().default(false),
 });
 
-// P188: keep this Mac awake while any Claude Code session runs, independent of the title bar's own
-// keep-awake toggle. Off by default — an OS power assertion is opt-in. Not exported, like the
-// other raw section schemas.
-const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
+// The shared agent.provider leaf plus this app's agent leaves. P188: keep this Mac awake while any
+// agent session runs, independent of the title bar's own keep-awake toggle. Off by default — an OS
+// power assertion is opt-in. Not exported, like the other raw section schemas.
+const appAgentSettingsSchema = /*#__PURE__*/ agentSettingsSchema.extend({
   keepAwakeWithAgents: z.boolean().default(false),
   // P238: desktop notifications. All on by default; notifyEnabled is the master switch.
   notifyEnabled: z.boolean().default(true),
@@ -135,7 +134,7 @@ const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
   notifyOnNeedsInput: z.boolean().default(true),
   notifyOnRunEnded: z.boolean().default(true),
   notifyIncludeMessage: z.boolean().default(true),
-  // P239: Claude Code usage limits in the ADE status bar.
+  // P239: agent usage limits in the ADE status bar.
   usageEnabled: z.boolean().default(true),
 });
 
@@ -148,13 +147,14 @@ const mobileSettingsSchema = /*#__PURE__*/ z.object({
   agentInput: z.boolean().default(false),
 });
 
-// P314: the Claude model for every memory call (gate, reconcile, import, distill).
+// P314: the model alias per provider id for every memory call (gate, reconcile, import, distill).
+// A provider without an entry uses its default.
 const memorySettingsSchema = /*#__PURE__*/ z.object({
-  claudeModel: z.enum(CLAUDE_MODELS).default(DEFAULT_CLAUDE_MODEL),
+  models: z.record(z.string(), z.string()).default({}),
 });
 
 // `.default(...)` on every section is load-bearing: an older kira-space.sqlite has a settings row
-// with no `advanced`/`git`/`ade`/`claudeCode` keys, and that row must still parse on next launch.
+// with no `advanced`/`git`/`ade`/`agent` keys, and that row must still parse on next launch.
 const settingsSchema = /*#__PURE__*/ z.object({
   appearance: appSpaceAppearanceSettingsSchema,
   advanced: advancedSettingsSchema.default({ gitLogLevel: 'info', notifyPrompts: true }),
@@ -175,7 +175,8 @@ const settingsSchema = /*#__PURE__*/ z.object({
     headlessSettingSources: 'all',
     sandboxKeychain: false,
   }),
-  claudeCode: claudeCodeSettingsSchema.default({
+  agent: appAgentSettingsSchema.default({
+    provider: DEFAULT_AGENT_PROVIDER,
     keepAwakeWithAgents: false,
     notifyEnabled: true,
     notifyOnFinished: true,
@@ -189,8 +190,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
     port: 7790,
     agentInput: false,
   }),
-  memory: memorySettingsSchema.default({ claudeModel: DEFAULT_CLAUDE_MODEL }),
-  agent: agentSettingsSchema.default({ provider: DEFAULT_AGENT_PROVIDER }),
+  memory: memorySettingsSchema.default({ models: {} }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -199,10 +199,9 @@ const settingsPatchSchema = /*#__PURE__*/ z.object({
   advanced: advancedSettingsSchema.partial().optional(),
   git: gitSettingsSchema.partial().optional(),
   ade: adeSettingsSchema.partial().optional(),
-  claudeCode: claudeCodeSettingsSchema.partial().optional(),
   mobile: mobileSettingsSchema.partial().optional(),
   memory: memorySettingsSchema.partial().optional(),
-  agent: agentSettingsSchema.partial().optional(),
+  agent: appAgentSettingsSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -237,7 +236,8 @@ export const defaultSettings: Settings = {
     headlessSettingSources: 'all',
     sandboxKeychain: false,
   },
-  claudeCode: {
+  agent: {
+    provider: DEFAULT_AGENT_PROVIDER,
     keepAwakeWithAgents: false,
     notifyEnabled: true,
     notifyOnFinished: true,
@@ -252,9 +252,6 @@ export const defaultSettings: Settings = {
     agentInput: false,
   },
   memory: {
-    claudeModel: DEFAULT_CLAUDE_MODEL,
-  },
-  agent: {
-    provider: DEFAULT_AGENT_PROVIDER,
+    models: {},
   },
 };

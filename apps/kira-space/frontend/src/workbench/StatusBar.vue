@@ -68,7 +68,7 @@ function onRevealBlameCommit(): void {
         <TooltipContent>{{ blameTooltip }}</TooltipContent>
       </Tooltip>
       <!-- P239: Claude Code usage limits, ADE module only. -->
-      <AgentUsageItem v-if="modeStore.active === 'ade' && settingsStore.claudeCode.usageEnabled" />
+      <AgentUsageItem v-if="modeStore.active === 'ade' && settingsStore.agent.usageEnabled" />
     </template>
     <template #right>
       <RunsStatusItem />

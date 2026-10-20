@@ -25,11 +25,11 @@ func wantModel(t *testing.T, app *flowharness.App, skip int, want string) int {
 	return len(calls)
 }
 
-// TestMemoryClaudeModel: memory.claudeModel picks the model of every memory claude call, in the
+// TestMemoryModels: memory.models picks the model of every memory claude call, in the
 // app and in a running memory-mcp process, from the next call on.
-// Contract memory-settings. UI half: settings-memory.spec.ts "memory model saves memory.claudeModel
+// Contract memory-settings. UI half: settings-memory.spec.ts "memory model saves memory.models
 // with the dialog".
-func TestMemoryClaudeModel(t *testing.T) {
+func TestMemoryModels(t *testing.T) {
 	app := flowharness.New(t)
 	app.Scenario(fakeagent.Scenario{Prompts: []fakeagent.PromptRule{extractRule(t, 0.01), mergeRule(t, 0.02)}})
 	text := "## Worker\n\nThe worker keeps port 8000 open and the queue never retries."
@@ -38,8 +38,8 @@ func TestMemoryClaudeModel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if settings.Memory.ClaudeModel != "sonnet" {
-		t.Fatalf("default model = %q, want sonnet", settings.Memory.ClaudeModel)
+	if len(settings.Memory.Models) != 0 {
+		t.Fatalf("default models = %v, want none", settings.Memory.Models)
 	}
 	app.Contract(t, "memory-settings", "SettingsService.GetAll#memory", settings.Memory)
 
@@ -48,8 +48,8 @@ func TestMemoryClaudeModel(t *testing.T) {
 	}
 	seen := wantModel(t, app, 0, "sonnet")
 
-	opus := "opus"
-	patch := model.SettingsPatch{Memory: &model.MemoryPatch{ClaudeModel: &opus}}
+	opus := map[string]string{"claude": "opus"}
+	patch := model.SettingsPatch{Memory: &model.MemoryPatch{Models: &opus}}
 	app.Contract(t, "memory-settings", "SettingsService.Set#memory-model", patch)
 	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: patch}); err != nil {
 		t.Fatal(err)
@@ -64,8 +64,8 @@ func TestMemoryClaudeModel(t *testing.T) {
 	callMCP(t, sess, "ingest_files", map[string]any{"distill": true, "text": text})
 	wantModel(t, app, seen, "opus")
 
-	bad := "gpt"
-	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{Memory: &model.MemoryPatch{ClaudeModel: &bad}}}); err == nil {
+	bad := map[string]string{"claude": "gpt"}
+	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{Memory: &model.MemoryPatch{Models: &bad}}}); err == nil {
 		t.Fatal("an unknown model alias was accepted")
 	}
 }

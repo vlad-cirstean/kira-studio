@@ -4,7 +4,7 @@ import { emitWailsEvent } from './support/mockRuntime';
 
 // P188: keep-awake while Claude Code runs is a Space setting, saved with the dialog.
 
-test('the Claude Code switch saves claudeCode.keepAwakeWithAgents with the dialog', async ({
+test('the Claude Code switch saves agent.keepAwakeWithAgents with the dialog', async ({
   relaunch,
 }) => {
   const { window: page, control } = await relaunch();
@@ -19,5 +19,5 @@ test('the Claude Code switch saves claudeCode.keepAwakeWithAgents with the dialo
   await page.locator('[data-testid="settings-save"]').click();
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.settingsSet)?.args)
-    .toEqual({ patch: { claudeCode: { keepAwakeWithAgents: true } } });
+    .toEqual({ patch: { agent: { keepAwakeWithAgents: true } } });
 });

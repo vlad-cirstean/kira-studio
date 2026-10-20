@@ -9052,29 +9052,7 @@
           "label": "Background agents ignore repository settings"
         }
       },
-      "appearance": {
-        "commitDate": {
-          "absolute": {
-            "option": "Absolute (2024-12-30 22:48)"
-          },
-          "description": "The Git graph’s commit timestamps.",
-          "label": "Commit date",
-          "relative": {
-            "option": "Relative (3 days ago)"
-          }
-        },
-        "inlineBlame": {
-          "description": "Shows who last changed the current line, at the end of that line, in the repository file viewer.",
-          "label": "Inline blame"
-        },
-        "rowDensity": {
-          "description": "Applies to the file tree and every list."
-        },
-        "wordWrap": {
-          "description": "Long lines wrap instead of scrolling, in the file viewer."
-        }
-      },
-      "claudeCode": {
+      "agent": {
         "keepAwake": {
           "description": "Prevents idle sleep, and system sleep on mains power, while a Claude Code terminal tab or a background agent is running. Independent of the title bar’s own keep-awake button. Either one is enough to keep the machine awake.",
           "label": "Keep this Mac awake while a Claude Code session is running"
@@ -9102,6 +9080,28 @@
         "usage": {
           "description": "Shows the 5-hour and weekly limits that Claude Code sessions started from Kira Space report. Claude Code hands the numbers to a status-line hook on this Mac. Nothing is sent anywhere, and no login or token is read. Applies to sessions started after you change it. Available on Claude subscription plans only.",
           "label": "Show Claude Code usage limits in the ADE status bar"
+        }
+      },
+      "appearance": {
+        "commitDate": {
+          "absolute": {
+            "option": "Absolute (2024-12-30 22:48)"
+          },
+          "description": "The Git graph’s commit timestamps.",
+          "label": "Commit date",
+          "relative": {
+            "option": "Relative (3 days ago)"
+          }
+        },
+        "inlineBlame": {
+          "description": "Shows who last changed the current line, at the end of that line, in the repository file viewer.",
+          "label": "Inline blame"
+        },
+        "rowDensity": {
+          "description": "Applies to the file tree and every list."
+        },
+        "wordWrap": {
+          "description": "Long lines wrap instead of scrolling, in the file viewer."
         }
       },
       "claudeUsage": {

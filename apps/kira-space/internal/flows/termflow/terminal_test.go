@@ -178,7 +178,7 @@ func TestAgentTabCountsForKeepAwake(t *testing.T) {
 	hold := filepath.Join(t.TempDir(), "hold")
 	app.Scenario(fakeagent.Scenario{Claude: map[string][]fakeagent.Action{"*": {{WaitFile: hold}}}})
 	on := true
-	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{ClaudeCode: &model.ClaudeCodePatch{KeepAwakeWithAgents: &on}}}); err != nil {
+	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{Agent: &model.AgentPatch{KeepAwakeWithAgents: &on}}}); err != nil {
 		t.Fatal(err)
 	}
 	if app.KeepAwake.Held() {

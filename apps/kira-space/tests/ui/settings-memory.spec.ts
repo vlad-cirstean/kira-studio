@@ -172,13 +172,13 @@ test('semantic unavailable: shows the reason and a retry', async ({ relaunch }) 
     .toBe(true);
 });
 
-// Contract memory-settings. Backend half: memoryflow TestMemoryClaudeModel.
-test('contract: memory model saves memory.claudeModel with the dialog', async ({ relaunch }) => {
-  const memory = contract<{ claudeModel: string }>(
+// Contract memory-settings. Backend half: memoryflow TestMemoryModels.
+test('contract: memory model saves memory.models with the dialog', async ({ relaunch }) => {
+  const memory = contract<{ models: Record<string, string> }>(
     'memory-settings',
     'SettingsService.GetAll#memory',
   );
-  const patch = contract<{ memory: { claudeModel: string } }>(
+  const patch = contract<{ memory: { models: Record<string, string> } }>(
     'memory-settings',
     'SettingsService.Set#memory-model',
   );
@@ -187,11 +187,11 @@ test('contract: memory model saves memory.claudeModel with the dialog', async ({
   });
   await openMemorySettings(page);
   const select = page.locator('[data-testid="settings-memory-claude-model"]');
-  const reset = page.locator('[data-testid="settings-reset-memory-claudeModel"]');
-  await expect(select).toHaveValue(memory.claudeModel);
+  const reset = page.locator('[data-testid="settings-reset-memory-models"]');
+  await expect(select).toHaveValue('sonnet');
   await expect(reset).toBeDisabled();
 
-  await select.selectOption(patch.memory.claudeModel);
+  await select.selectOption(patch.memory.models.claude ?? '');
   await expect(reset).toBeEnabled();
   expect(control.log().some((e) => e.channel === IPC.settingsSet)).toBe(false);
 

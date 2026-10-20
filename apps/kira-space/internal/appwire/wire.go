@@ -378,18 +378,18 @@ func wireTermBroker(tracker *ade.Tracker, registry *terminal.Registry, emitter a
 	})
 }
 
-// notifyPrefs reads the claudeCode.notify* leaves; a read failure turns notifications off.
-// usageEnabled reads claudeCode.usageEnabled fresh; a read failure counts as on (the default).
+// usageEnabled reads agent.usageEnabled fresh; a read failure counts as on (the default).
 func usageEnabled(repositories *repos.Repos) func() bool {
 	return func() bool {
 		s, err := repositories.Settings.GetAll()
 		if err != nil {
 			return true
 		}
-		return s.ClaudeCode.UsageEnabled
+		return s.Agent.UsageEnabled
 	}
 }
 
+// notifyPrefs reads the agent.notify* leaves; a read failure turns notifications off.
 func notifyPrefs(repositories *repos.Repos) func() agentnotify.Prefs {
 	return func() agentnotify.Prefs {
 		s, err := repositories.Settings.GetAll()
@@ -397,7 +397,7 @@ func notifyPrefs(repositories *repos.Repos) func() agentnotify.Prefs {
 			slog.Warn("notify: read settings", "scope", "notify", "err", err)
 			return agentnotify.Prefs{}
 		}
-		c := s.ClaudeCode
+		c := s.Agent
 		return agentnotify.Prefs{
 			Enabled: c.NotifyEnabled, OnFinished: c.NotifyOnFinished, OnNeedsInput: c.NotifyOnNeedsInput,
 			OnRunEnded: c.NotifyOnRunEnded, IncludeMessage: c.NotifyIncludeMessage,

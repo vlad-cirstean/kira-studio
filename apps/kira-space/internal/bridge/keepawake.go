@@ -11,7 +11,7 @@ import (
 // KeepAwakeService composes two keep-awake reasons on one internal/keepawake.Controller: the title
 // bar's manual toggle (Status/SetManual delegate entirely to internal/keepawake.Toggle, the shared
 // manual-reason half both apps' own bound service wraps, P116 H3) and, since P188, the
-// claudeCode.keepAwakeWithAgents setting applied against the live Claude Code session count. The
+// agent.keepAwakeWithAgents setting applied against the live Claude Code session count. The
 // agent half is the package-level KeepAwakeRecompute, since Wails binds every exported method.
 type KeepAwakeService struct {
 	Emit   appcore.Emitter
@@ -62,7 +62,7 @@ func KeepAwakeSystemDidWake(s *KeepAwakeService) {
 	s.Toggle.Ctl.Rearm()
 }
 
-// KeepAwakeRecompute applies claudeCode.keepAwakeWithAgents against the live session count and
+// KeepAwakeRecompute applies agent.keepAwakeWithAgents against the live session count and
 // broadcasts the status when the agent reason flips. The setting is read fresh each call: it can
 // change independently of a session starting or ending. A read failure leaves the reason as is.
 // mu spans the reads and Ctl.Set, so interleaved callers cannot apply results out of order.
@@ -73,7 +73,7 @@ func KeepAwakeRecompute(s *KeepAwakeService) {
 		s.mu.Unlock()
 		return
 	}
-	on := settings.ClaudeCode.KeepAwakeWithAgents && s.AgentCount() > 0
+	on := settings.Agent.KeepAwakeWithAgents && s.AgentCount() > 0
 	changed := on != s.agentOn
 	s.agentOn = on
 	s.Toggle.Ctl.Set(keepawake.ReasonAgent, on)

@@ -56,7 +56,7 @@ func setGitPath(t *testing.T, app *flowharness.App, path string) {
 
 func setAgentKeepAwake(t *testing.T, app *flowharness.App, on bool) {
 	t.Helper()
-	setSettings(t, app, model.SettingsPatch{ClaudeCode: &model.ClaudeCodePatch{KeepAwakeWithAgents: &on}})
+	setSettings(t, app, model.SettingsPatch{Agent: &model.AgentPatch{KeepAwakeWithAgents: &on}})
 }
 
 func realGit(t *testing.T) string {

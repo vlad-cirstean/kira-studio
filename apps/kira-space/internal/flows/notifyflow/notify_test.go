@@ -121,7 +121,7 @@ func TestPrefsToggles(t *testing.T) {
 	needs := `{"hook_event_name":"Notification","notification_type":"elicitation_dialog","message":"pick one"}`
 	pause := func() { time.Sleep(5 * time.Millisecond) }
 
-	setNotify(t, app, model.ClaudeCodePatch{NotifyOnFinished: off()})
+	setNotify(t, app, model.AgentPatch{NotifyOnFinished: off()})
 	stop(t, app, "tab-1", cwd, "x")
 	sink.none(t)
 	hook(t, app, "tab-1", needs)
@@ -130,20 +130,20 @@ func TestPrefsToggles(t *testing.T) {
 	}
 
 	on := true
-	setNotify(t, app, model.ClaudeCodePatch{NotifyOnFinished: &on, NotifyOnNeedsInput: off()})
+	setNotify(t, app, model.AgentPatch{NotifyOnFinished: &on, NotifyOnNeedsInput: off()})
 	pause()
 	hook(t, app, "tab-1", needs)
 	if len(sink.all()) != 1 {
 		t.Fatalf("notes = %+v, want no new needs-input note", sink.all())
 	}
 
-	setNotify(t, app, model.ClaudeCodePatch{NotifyIncludeMessage: off()})
+	setNotify(t, app, model.AgentPatch{NotifyIncludeMessage: off()})
 	stop(t, app, "tab-1", cwd, "secret reply")
 	if got := sink.all(); len(got) != 2 || strings.Contains(got[1].Body, "secret") || got[1].Body == "" {
 		t.Fatalf("notes = %+v, want the fixed body without the reply", got)
 	}
 
-	setNotify(t, app, model.ClaudeCodePatch{NotifyEnabled: off()})
+	setNotify(t, app, model.AgentPatch{NotifyEnabled: off()})
 	pause()
 	stop(t, app, "tab-1", cwd, "x")
 	hook(t, app, "tab-1", needs)
@@ -299,7 +299,7 @@ func TestSendTest(t *testing.T) {
 	if n := sink.only(t); n.Kind != agentnotify.KindTest {
 		t.Fatalf("note = %+v, want a test note", n)
 	}
-	setNotify(t, app, model.ClaudeCodePatch{NotifyEnabled: off()})
+	setNotify(t, app, model.AgentPatch{NotifyEnabled: off()})
 	if err := app.W.AgentNotifySvc.SendTest(); err != nil {
 		t.Fatal(err)
 	}
@@ -356,7 +356,7 @@ func TestAutomationNotifies(t *testing.T) {
 func TestAutomationQuietCases(t *testing.T) {
 	t.Run("done off", func(t *testing.T) {
 		app, sink := newApp(t)
-		setNotify(t, app, model.ClaudeCodePatch{NotifyOnRunEnded: off()})
+		setNotify(t, app, model.AgentPatch{NotifyOnRunEnded: off()})
 		claude(app, map[string][]fakeagent.Action{"*": {{Name: "done"}}})
 		id := smartRun(t, app)
 		waitScriptState(t, app, id, "done")

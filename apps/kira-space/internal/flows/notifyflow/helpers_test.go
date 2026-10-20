@@ -155,9 +155,9 @@ func focus(t *testing.T, app *flowharness.App, f bridge.ReportFocusArgs) {
 	}
 }
 
-func setNotify(t *testing.T, app *flowharness.App, p model.ClaudeCodePatch) {
+func setNotify(t *testing.T, app *flowharness.App, p model.AgentPatch) {
 	t.Helper()
-	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{ClaudeCode: &p}}); err != nil {
+	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{Agent: &p}}); err != nil {
 		t.Fatalf("Settings.Set: %v", err)
 	}
 }

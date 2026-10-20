@@ -12,7 +12,7 @@ const ChannelAgentUsage = "kira:agent:usage"
 // AgentUsageService is the renderer's read of the agent usage limits (P239).
 type AgentUsageService struct{ U *agentusage.Service }
 
-// Get returns the current snapshot; state "off" while claudeCode.usageEnabled is false.
+// Get returns the current snapshot; state "off" while agent.usageEnabled is false.
 func (s *AgentUsageService) Get() (agentusage.Snapshot, error) {
 	return s.U.Get(), nil
 }

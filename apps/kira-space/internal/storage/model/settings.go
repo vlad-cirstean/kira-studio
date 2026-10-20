@@ -2,15 +2,16 @@ package model
 
 import (
 	"fmt"
+	"log/slog"
 	"regexp"
 
 	"github.com/kirathecat/kira-studio/internal/appsettings"
-	"github.com/kirathecat/kira-studio/internal/harness/claude"
+	"github.com/kirathecat/kira-studio/internal/harness/providers"
 )
 
 // Kira Space's own trimmed Settings model (P100 Part 1). Data/Cache/Api/DbMcp are dropped
 // entirely: all four are DB-client-only concerns (page sizes, the query cache budget, HTTP client
-// tuning, the embedded DB MCP server) Kira Space has no use for. ClaudeCode is P188's own leaf.
+// tuning, the embedded DB MCP server) Kira Space has no use for. Agent carries P188's own leaves.
 // Appearance/Advanced/Git are this app's own (P120): the only app with a git module, so the two
 // appearance leaves only the git module uses (InlineBlame/DateFormat), its own diagnostic-log leaf
 // (GitLogLevel — Kira Studio's own is a same-shaped but separately named/keyed advanced.logLevel,
@@ -72,10 +73,12 @@ type AdeSettings struct {
 	SandboxKeychain bool `json:"sandboxKeychain"`
 }
 
-// ClaudeCodeSettings is P188's keep-awake-with-agents leaf: on, this Mac stays awake while any
-// Claude Code session runs (a terminal agent tab or a running headless ade session), independent of
-// the title bar's own keep-awake toggle. Off by default — an OS power assertion is opt-in.
-type ClaudeCodeSettings struct {
+// AgentSettings embeds appsettings.Agent (the provider both apps share) plus this app's agent
+// leaves. KeepAwakeWithAgents is P188's: on, this Mac stays awake while any agent session runs (a
+// terminal agent tab or a running headless ade session), independent of the title bar's own
+// keep-awake toggle. Off by default — an OS power assertion is opt-in.
+type AgentSettings struct {
+	appsettings.Agent
 	KeepAwakeWithAgents bool `json:"keepAwakeWithAgents"`
 	// Notify* are P238's desktop-notification leaves, all on by default: NotifyEnabled is the master
 	// switch, the next three pick which events notify, NotifyIncludeMessage puts the reply text in
@@ -90,10 +93,10 @@ type ClaudeCodeSettings struct {
 	UsageEnabled bool `json:"usageEnabled"`
 }
 
-// DefaultClaudeCodeSettings mirrors settingsDomain.ts's claudeCodeSettingsSchema defaults.
-func DefaultClaudeCodeSettings() ClaudeCodeSettings {
-	return ClaudeCodeSettings{
-		NotifyEnabled: true, NotifyOnFinished: true, NotifyOnNeedsInput: true, NotifyOnRunEnded: true,
+// DefaultAgentSettings mirrors settingsDomain.ts's agentSettingsSchema defaults.
+func DefaultAgentSettings() AgentSettings {
+	return AgentSettings{
+		Agent: appsettings.DefaultAgent(), NotifyEnabled: true, NotifyOnFinished: true, NotifyOnNeedsInput: true, NotifyOnRunEnded: true,
 		NotifyIncludeMessage: true, UsageEnabled: true,
 	}
 }
@@ -109,21 +112,21 @@ type MobileSettings struct {
 	AgentInput bool `json:"agentInput"`
 }
 
-// MemorySettings is P314's memory-feature leaf: ClaudeModel is the claude alias every memory Claude
-// call uses (gate, reconcile, import, distill).
+// MemorySettings is P314's memory-feature leaf: Models maps a provider id to the model alias its
+// memory calls use (gate, reconcile, import, distill). A provider with no entry uses its catalog
+// default.
 type MemorySettings struct {
-	ClaudeModel string `json:"claudeModel"`
+	Models map[string]string `json:"models"`
 }
 
 type Settings struct {
-	Appearance Appearance         `json:"appearance"`
-	Advanced   AdvancedSettings   `json:"advanced"`
-	Git        GitSettings        `json:"git"`
-	Ade        AdeSettings        `json:"ade"`
-	ClaudeCode ClaudeCodeSettings `json:"claudeCode"`
-	Mobile     MobileSettings     `json:"mobile"`
-	Memory     MemorySettings     `json:"memory"`
-	Agent      appsettings.Agent  `json:"agent"`
+	Appearance Appearance       `json:"appearance"`
+	Advanced   AdvancedSettings `json:"advanced"`
+	Git        GitSettings      `json:"git"`
+	Ade        AdeSettings      `json:"ade"`
+	Mobile     MobileSettings   `json:"mobile"`
+	Memory     MemorySettings   `json:"memory"`
+	Agent      AgentSettings    `json:"agent"`
 }
 
 // DefaultMobileSettings mirrors settingsDomain.ts's mobileSettingsSchema defaults.
@@ -166,13 +169,12 @@ func DefaultSettings() Settings {
 			InlineBlame: true,
 			DateFormat:  "relative",
 		},
-		Advanced:   AdvancedSettings{GitLogLevel: "info", NotifyPrompts: true},
-		Git:        DefaultGitSettings(),
-		Ade:        DefaultAdeSettings(),
-		ClaudeCode: DefaultClaudeCodeSettings(),
-		Mobile:     DefaultMobileSettings(),
-		Memory:     MemorySettings{ClaudeModel: claude.Catalog.Default},
-		Agent:      appsettings.DefaultAgent(),
+		Advanced: AdvancedSettings{GitLogLevel: "info", NotifyPrompts: true},
+		Git:      DefaultGitSettings(),
+		Ade:      DefaultAdeSettings(),
+		Mobile:   DefaultMobileSettings(),
+		Memory:   MemorySettings{Models: map[string]string{}},
+		Agent:    DefaultAgentSettings(),
 	}
 }
 
@@ -218,8 +220,9 @@ type AdePatch struct {
 	SandboxKeychain        *bool   `json:"sandboxKeychain,omitempty"`
 }
 
-// ClaudeCodePatch mirrors ClaudeCodeSettings' own `.partial()` shape.
-type ClaudeCodePatch struct {
+// AgentPatch mirrors AgentSettings' own `.partial()` shape.
+type AgentPatch struct {
+	appsettings.AgentPatch
 	KeepAwakeWithAgents  *bool `json:"keepAwakeWithAgents,omitempty"`
 	NotifyEnabled        *bool `json:"notifyEnabled,omitempty"`
 	NotifyOnFinished     *bool `json:"notifyOnFinished,omitempty"`
@@ -238,18 +241,18 @@ type MobilePatch struct {
 
 // MemoryPatch mirrors MemorySettings' own `.partial()` shape.
 type MemoryPatch struct {
-	ClaudeModel *string `json:"claudeModel,omitempty"`
+	// Models replaces the whole map.
+	Models *map[string]string `json:"models,omitempty"`
 }
 
 type SettingsPatch struct {
-	Appearance *AppearancePatch        `json:"appearance,omitempty"`
-	Advanced   *AdvancedPatch          `json:"advanced,omitempty"`
-	Git        *GitPatch               `json:"git,omitempty"`
-	Ade        *AdePatch               `json:"ade,omitempty"`
-	ClaudeCode *ClaudeCodePatch        `json:"claudeCode,omitempty"`
-	Mobile     *MobilePatch            `json:"mobile,omitempty"`
-	Memory     *MemoryPatch            `json:"memory,omitempty"`
-	Agent      *appsettings.AgentPatch `json:"agent,omitempty"`
+	Appearance *AppearancePatch `json:"appearance,omitempty"`
+	Advanced   *AdvancedPatch   `json:"advanced,omitempty"`
+	Git        *GitPatch        `json:"git,omitempty"`
+	Ade        *AdePatch        `json:"ade,omitempty"`
+	Mobile     *MobilePatch     `json:"mobile,omitempty"`
+	Memory     *MemoryPatch     `json:"memory,omitempty"`
+	Agent      *AgentPatch      `json:"agent,omitempty"`
 }
 
 // validateAppearanceSection mirrors upsertAppearance's own leaf list (repos/settings.go).
@@ -378,15 +381,40 @@ func validateMobileSection(m *MobilePatch) error {
 	return nil
 }
 
-// ValidClaudeModel is memory.claudeModel's allowed set.
-var ValidClaudeModel = claude.Catalog.Valid
+var providerRegistry = providers.New()
+
+// validMemoryModel reports whether alias is in provider's catalog. A provider that is not
+// registered passes: its entry is kept and ignored until the provider returns.
+func validMemoryModel(provider, alias string) bool {
+	p, ok := providerRegistry.Get(provider)
+	return !ok || p.Models().Valid(alias)
+}
+
+// CleanMemoryModels drops the entries whose provider id is malformed or whose alias is not in the
+// registered provider's catalog.
+func CleanMemoryModels(models map[string]string) map[string]string {
+	out := make(map[string]string, len(models))
+	for id, alias := range models {
+		if !appsettings.ValidProviderID(id) || !validMemoryModel(id, alias) {
+			slog.Warn("settings: ignoring memory model", "scope", "settings", "provider", id, "model", alias)
+			continue
+		}
+		out[id] = alias
+	}
+	return out
+}
 
 func validateMemorySection(m *MemoryPatch) error {
-	if m == nil {
+	if m == nil || m.Models == nil {
 		return nil
 	}
-	if m.ClaudeModel != nil && !ValidClaudeModel(*m.ClaudeModel) {
-		return fmt.Errorf("model: memory.claudeModel: invalid value %q", *m.ClaudeModel)
+	for id, alias := range *m.Models {
+		if !appsettings.ValidProviderID(id) {
+			return fmt.Errorf("model: memory.models: invalid provider id %q", id)
+		}
+		if !validMemoryModel(id, alias) {
+			return fmt.Errorf("model: memory.models.%s: invalid value %q", id, alias)
+		}
 	}
 	return nil
 }
@@ -413,5 +441,8 @@ func (p SettingsPatch) Validate() error {
 	if err := validateMemorySection(p.Memory); err != nil {
 		return err
 	}
-	return appsettings.ValidateAgent(p.Agent)
+	if p.Agent == nil {
+		return nil
+	}
+	return appsettings.ValidateAgent(&p.Agent.AgentPatch)
 }

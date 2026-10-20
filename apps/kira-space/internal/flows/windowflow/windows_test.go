@@ -100,7 +100,7 @@ func TestTwoWindowsIsolation(t *testing.T) {
 
 	// Settings are app-wide: one broadcast, not addressed to either window.
 	on := true
-	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{ClaudeCode: &model.ClaudeCodePatch{KeepAwakeWithAgents: &on}}}); err != nil {
+	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{Agent: &model.AgentPatch{KeepAwakeWithAgents: &on}}}); err != nil {
 		t.Fatal(err)
 	}
 	ev := app.Events.WaitAfter(t, mark, appevent.ChannelSettingsChanged, nil, waitFor)

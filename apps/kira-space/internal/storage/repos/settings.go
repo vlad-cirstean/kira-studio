@@ -45,9 +45,9 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	result.Git = readGit(stored)
 	result.Ade = readAde(stored)
 	result.Mobile = readMobile(stored)
-	readClaudeCode(stored, &result.ClaudeCode)
-	result.Agent = appsettings.ReadAgent(stored)
-	appsettings.LeafValid(stored, "memory.claudeModel", &result.Memory.ClaudeModel, model.ValidClaudeModel)
+	readAgent(stored, &result.Agent)
+	appsettings.Leaf(stored, "memory.models", &result.Memory.Models)
+	result.Memory.Models = model.CleanMemoryModels(result.Memory.Models)
 	appsettings.LeafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
 	appsettings.Leaf(stored, "advanced.notifyPrompts", &result.Advanced.NotifyPrompts)
 	return result, nil
@@ -105,7 +105,7 @@ func upsertMemory(tx *sql.Tx, m *model.MemoryPatch) error {
 	if m == nil {
 		return nil
 	}
-	return appsettings.UpsertOptional(tx, "memory.claudeModel", m.ClaudeModel)
+	return appsettings.UpsertOptional(tx, "memory.models", m.Models)
 }
 
 func upsertMobile(tx *sql.Tx, m *model.MobilePatch) error {
@@ -222,10 +222,7 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		if err := upsertMemory(tx, patch.Memory); err != nil {
 			return err
 		}
-		if err := upsertClaudeCode(tx, patch.ClaudeCode); err != nil {
-			return err
-		}
-		return appsettings.UpsertAgent(tx, patch.Agent)
+		return upsertAgent(tx, patch.Agent)
 	})
 	if err != nil {
 		return model.Settings{}, err
@@ -233,15 +230,15 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 	return r.GetAll()
 }
 
-// claudeCodeLeaf pairs one claudeCode.<key> bool leaf with its read target and patch field.
-type claudeCodeLeaf struct {
+// agentLeaf pairs one agent.<key> bool leaf with its read target and patch field.
+type agentLeaf struct {
 	key string
 	dst *bool
 	set *bool
 }
 
-func claudeCodeLeaves(c *model.ClaudeCodeSettings, p model.ClaudeCodePatch) []claudeCodeLeaf {
-	return []claudeCodeLeaf{
+func agentLeaves(c *model.AgentSettings, p model.AgentPatch) []agentLeaf {
+	return []agentLeaf{
 		{"keepAwakeWithAgents", &c.KeepAwakeWithAgents, p.KeepAwakeWithAgents},
 		{"notifyEnabled", &c.NotifyEnabled, p.NotifyEnabled},
 		{"notifyOnFinished", &c.NotifyOnFinished, p.NotifyOnFinished},
@@ -252,19 +249,24 @@ func claudeCodeLeaves(c *model.ClaudeCodeSettings, p model.ClaudeCodePatch) []cl
 	}
 }
 
-func readClaudeCode(stored map[string]json.RawMessage, c *model.ClaudeCodeSettings) {
-	for _, l := range claudeCodeLeaves(c, model.ClaudeCodePatch{}) {
-		appsettings.Leaf(stored, "claudeCode."+l.key, l.dst)
+// readAgent reads the shared agent.provider leaf and this app's bool leaves on top of dst.
+func readAgent(stored map[string]json.RawMessage, dst *model.AgentSettings) {
+	dst.Agent = appsettings.ReadAgent(stored)
+	for _, l := range agentLeaves(dst, model.AgentPatch{}) {
+		appsettings.Leaf(stored, "agent."+l.key, l.dst)
 	}
 }
 
-func upsertClaudeCode(tx *sql.Tx, p *model.ClaudeCodePatch) error {
+func upsertAgent(tx *sql.Tx, p *model.AgentPatch) error {
 	if p == nil {
 		return nil
 	}
-	var unused model.ClaudeCodeSettings
-	for _, l := range claudeCodeLeaves(&unused, *p) {
-		if err := appsettings.UpsertOptional(tx, "claudeCode."+l.key, l.set); err != nil {
+	if err := appsettings.UpsertAgent(tx, &p.AgentPatch); err != nil {
+		return err
+	}
+	var unused model.AgentSettings
+	for _, l := range agentLeaves(&unused, *p) {
+		if err := appsettings.UpsertOptional(tx, "agent."+l.key, l.set); err != nil {
 			return err
 		}
 	}
