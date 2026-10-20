@@ -30,7 +30,7 @@ type Prepared struct {
 	Exec *harness.SandboxExec
 	// Env are overrides for the child environment, on every OS.
 	Env []string
-	// AddDirs and Disallowed are the claude permission flags (second layer).
+	// AddDirs and Disallowed are the agent permission flags (second layer).
 	AddDirs, Disallowed []string
 }
 
@@ -91,16 +91,20 @@ func (s *system) Watch(pid int, runID string, on func(Denial)) func() {
 
 func (s *system) Release(runID string) { s.proxy.release(runID) }
 
-func (s *system) proxyURL(runID string) (string, error) {
+func (s *system) proxyURL(runID string, agent harness.Sandboxed) (string, error) {
 	s.proxy.once.Do(func() {
-		p, err := StartProxy(s.hub, ProxyAllowlist(osGetenv))
+		p, err := StartProxy(s.hub)
 		s.proxy.p.Store(p)
 		s.proxy.err = err
 	})
 	if s.proxy.err != nil {
 		return "", fmt.Errorf("agentsandbox: proxy: %w", s.proxy.err)
 	}
-	return s.proxy.p.Load().Register(runID), nil
+	var allow Allowlist = func(string) bool { return false }
+	if agent != nil {
+		allow = HostAllowlist(agent.APIHosts(osGetenv))
+	}
+	return s.proxy.p.Load().Register(runID, allow), nil
 }
 
 // hub routes denials to the run that owns them.

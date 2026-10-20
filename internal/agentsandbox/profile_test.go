@@ -7,14 +7,24 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
 )
 
 var update = flag.Bool("update", false, "rewrite golden profiles")
 
+// testRuntime is a Claude runtime on home with no resolved binary.
+func testRuntime(home string) Runtime {
+	p := claude.New()
+	return Runtime{Home: home, Agent: p.SandboxNeeds(home, ""), Provider: p}
+}
+
 func fakeRuntime() Runtime {
+	p := claude.New()
 	return Runtime{
 		Home:         "/Users/ada",
-		ClaudePrefix: "/Users/ada/.local/share/claude",
+		Agent:        p.SandboxNeeds("/Users/ada", "/Users/ada/.local/share/claude/bin/claude"),
+		Provider:     p,
 		PathPrefixes: []string{"/Users/ada/.nvm/versions/node/v22.1.0", "/Users/ada/go"},
 		UserTemp:     "/private/var/folders/ab/cd/T",
 		UserCache:    "/private/var/folders/ab/cd/C",

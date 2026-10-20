@@ -1,7 +1,6 @@
 package agentsandbox
 
 import (
-	"regexp"
 	"strings"
 	"sync"
 
@@ -56,11 +55,6 @@ func (t *Tracker) BlockedReason(reason string) string {
 	}
 	return msg + " " + reason
 }
-
-var authFailure = regexp.MustCompile(`(?i)login|invalid api key|not logged in|oauth`)
-
-// IsAuthFailure reports whether a stderr or result text reads as a failed Claude sign-in.
-func IsAuthFailure(text string) bool { return authFailure.MatchString(text) }
 
 // AuthReason is the outcome reason of a sign-in failure in a keychain-denied run.
 func AuthReason() string { return i18n.T("backend.space.ade.sandbox.auth.body", nil) }

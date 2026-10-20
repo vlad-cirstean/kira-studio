@@ -42,8 +42,8 @@ func (f *Fake) Prepare(p agentsandbox.Policy, rt agentsandbox.Runtime) (agentsan
 	f.mu.Lock()
 	f.policies = append(f.policies, p)
 	f.mu.Unlock()
-	pr := agentsandbox.Prepared{Profile: agentsandbox.Profile(p, rt), Env: agentsandbox.Env(p, "")}
-	pr.AddDirs, pr.Disallowed = agentsandbox.Flags(p)
+	pr := agentsandbox.Prepared{Profile: agentsandbox.Profile(p, rt), Env: agentsandbox.Env(p, rt, "")}
+	pr.AddDirs, pr.Disallowed = agentsandbox.Flags(p, rt.Provider)
 	if f.NotEnforced {
 		return pr, nil
 	}

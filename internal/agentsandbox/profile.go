@@ -5,13 +5,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
 var shellRC = []string{".zshenv", ".zprofile", ".zshrc", ".zlogin", ".bashrc", ".bash_profile", ".profile"}
-
-var claudeConfigFiles = []string{"settings.json", "settings.local.json", "CLAUDE.md", "keybindings.json"}
-
-var claudeExtensionDirs = []string{"commands", "agents", "skills", "plugins", "hooks", "output-styles"}
 
 // Per-worktree state files inside a main worktree's .git that commit, merge and rebase write.
 var mainStateFiles = []string{
@@ -53,8 +51,8 @@ func Profile(p Policy, rt Runtime) string {
 	var allowRead []string
 	if rt.Home != "" {
 		h := rt.Home
-		allowRead = append(allowRead, sub(filepath.Join(h, ".claude")), rx("^"+regexp.QuoteMeta(h)+`/\.claude\.json`),
-			lit(filepath.Join(h, ".gitconfig")), sub(filepath.Join(h, ".config", "git")))
+		allowRead = append(allowRead, agentConfig(rt.Agent)...)
+		allowRead = append(allowRead, lit(filepath.Join(h, ".gitconfig")), sub(filepath.Join(h, ".config", "git")))
 		for _, f := range shellRC {
 			allowRead = append(allowRead, lit(filepath.Join(h, f)))
 		}
@@ -64,8 +62,8 @@ func Profile(p Policy, rt Runtime) string {
 		}
 	}
 	allowRead = append(allowRead, subs(rt.PathPrefixes)...)
-	if rt.ClaudePrefix != "" {
-		allowRead = append(allowRead, sub(rt.ClaudePrefix))
+	if rt.Agent.InstallPrefix != "" {
+		allowRead = append(allowRead, sub(rt.Agent.InstallPrefix))
 	}
 	allowRead = append(allowRead, subs(p.Read)...)
 	allowRead = append(allowRead, subs(p.Allow)...)
@@ -99,7 +97,8 @@ func Profile(p Policy, rt Runtime) string {
 	}
 	if rt.Home != "" {
 		h := rt.Home
-		allowWrite = append(allowWrite, sub(filepath.Join(h, ".claude")), rx("^"+regexp.QuoteMeta(h)+`/\.claude\.json`), sub(filepath.Join(h, ".kira-memory")))
+		allowWrite = append(allowWrite, agentConfig(rt.Agent)...)
+		allowWrite = append(allowWrite, sub(filepath.Join(h, ".kira-memory")))
 	}
 	b.rule("allow", "file-write*", allowWrite...)
 	if len(p.Allow) > 0 {
@@ -127,17 +126,32 @@ func Profile(p Policy, rt Runtime) string {
 	return b.String()
 }
 
+// agentConfig is the agent's config dirs, then its config files.
+func agentConfig(n harness.SandboxNeeds) []string {
+	var out []string
+	for _, d := range n.ConfigDirs {
+		out = append(out, sub(d))
+	}
+	for _, f := range n.ConfigFiles {
+		out = append(out, rx("^"+regexp.QuoteMeta(f)))
+	}
+	return out
+}
+
 // protectWrites denies the config, hook and keychain writes last, so no allow path reopens them.
 func protectWrites(b *sbpl, rt Runtime) {
 	if rt.Home == "" {
 		return
 	}
-	protect := make([]string, 0, len(claudeConfigFiles)+len(claudeExtensionDirs)+1)
-	for _, f := range claudeConfigFiles {
-		protect = append(protect, lit(filepath.Join(rt.Home, ".claude", f)))
-	}
-	for _, d := range claudeExtensionDirs {
-		protect = append(protect, sub(filepath.Join(rt.Home, ".claude", d)))
+	n := rt.Agent
+	protect := make([]string, 0, len(n.ProtectFiles)+len(n.ProtectDirs)+1)
+	if len(n.ConfigDirs) > 0 {
+		for _, f := range n.ProtectFiles {
+			protect = append(protect, lit(filepath.Join(n.ConfigDirs[0], f)))
+		}
+		for _, d := range n.ProtectDirs {
+			protect = append(protect, sub(filepath.Join(n.ConfigDirs[0], d)))
+		}
 	}
 	protect = append(protect, sub(filepath.Join(rt.Home, "Library", "Keychains")))
 	b.section("protections")

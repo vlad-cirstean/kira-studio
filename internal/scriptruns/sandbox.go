@@ -25,6 +25,8 @@ type smartSandbox struct {
 	tracker agentsandbox.Tracker
 	tools   bool
 	release func()
+	// authFailed reads a sign-in failure in the agent's output.
+	authFailed func(string) bool
 }
 
 // prepareSandbox returns nil when the run is not confined.
@@ -40,7 +42,8 @@ func (s *Service) prepareSandbox(ctx context.Context, p *planned, runID string, 
 	if s.SandboxKeychain != nil {
 		in.Keychain = s.SandboxKeychain()
 	}
-	rt := agentsandbox.DiscoverRuntime(ctx, s.Agent.Active(), "")
+	agent := s.Agent.Active()
+	rt := agentsandbox.DiscoverRuntime(ctx, agent, "")
 	pol, _, err := agentsandbox.ResolvePolicy(in, rt)
 	if err != nil {
 		return nil, err
@@ -50,7 +53,7 @@ func (s *Service) prepareSandbox(ctx context.Context, p *planned, runID string, 
 		_ = os.RemoveAll(pol.Scratch)
 		return nil, err
 	}
-	return &smartSandbox{policy: pol, prep: prep, tools: p.preview.ADE != nil, release: func() { s.Sandbox.Release(runID) }}, nil
+	return &smartSandbox{policy: pol, prep: prep, tools: p.preview.ADE != nil, authFailed: agent.IsAuthFailure, release: func() { s.Sandbox.Release(runID) }}, nil
 }
 
 func (sb *smartSandbox) cleanup() {
@@ -111,7 +114,7 @@ func (sb *smartSandbox) outcome(out runoutcome.Outcome) runoutcome.Outcome {
 	if sb == nil || out.Status != runoutcome.StatusFailed {
 		return out
 	}
-	if !out.Reported && !sb.policy.Keychain && agentsandbox.IsAuthFailure(out.LastError) {
+	if !out.Reported && !sb.policy.Keychain && sb.authFailed(out.LastError) {
 		out.Reason = agentsandbox.AuthReason()
 		return out
 	}

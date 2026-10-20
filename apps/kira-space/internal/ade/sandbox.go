@@ -28,15 +28,16 @@ import (
 
 // sandboxRun is the live sandbox of one run.
 type sandboxRun struct {
-	access   agentsandbox.Access
-	prep     agentsandbox.Prepared
-	policy   agentsandbox.Policy
-	tracker  agentsandbox.Tracker
-	keychain bool
-	grant    *agentmcp.SandboxGrant
-	scratch  string
-	notes    []string
-	release  func()
+	access     agentsandbox.Access
+	prep       agentsandbox.Prepared
+	policy     agentsandbox.Policy
+	tracker    agentsandbox.Tracker
+	keychain   bool
+	authFailed func(string) bool
+	grant      *agentmcp.SandboxGrant
+	scratch    string
+	notes      []string
+	release    func()
 }
 
 // sandboxTarget is what the sandbox git tools act on: the run's own repo, branch and worktree.
@@ -106,7 +107,8 @@ func (b *TaskBoard) prepareSandbox(ctx context.Context, run model.AdeRun, l agen
 	if rebase {
 		sd = adewire.DefaultSandbox()
 	}
-	sr := &sandboxRun{access: agentsandbox.Access(sd.Access)}
+	agent := b.deps.Agent.Active()
+	sr := &sandboxRun{access: agentsandbox.Access(sd.Access), authFailed: agent.IsAuthFailure}
 	if sr.access == agentsandbox.AccessOff {
 		return sr, b.storeSandbox(run.ID, sr, false, "")
 	}
@@ -114,7 +116,7 @@ func (b *TaskBoard) prepareSandbox(ctx context.Context, run model.AdeRun, l agen
 	if err != nil {
 		return nil, err
 	}
-	rt := agentsandbox.DiscoverRuntime(ctx, b.deps.Agent.Active(), b.deps.AgentBin)
+	rt := agentsandbox.DiscoverRuntime(ctx, agent, b.deps.AgentBin)
 	pol, notes, err := agentsandbox.ResolvePolicy(in, rt)
 	if err != nil {
 		return nil, err
@@ -283,7 +285,7 @@ func (sr *sandboxRun) sandboxOutcome(out outcome, lastErr string) outcome {
 		return out
 	}
 	reason := out.out.Reason
-	if !out.out.Reported && !sr.keychain && agentsandbox.IsAuthFailure(lastErr+" "+out.out.LastError) {
+	if !out.out.Reported && !sr.keychain && sr.authFailed(lastErr+" "+out.out.LastError) {
 		reason = agentsandbox.AuthReason()
 	} else {
 		reason = sr.tracker.BlockedReason(reason)

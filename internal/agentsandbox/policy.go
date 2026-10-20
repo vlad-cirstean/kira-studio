@@ -147,7 +147,7 @@ func ResolvePolicy(in Input, rt Runtime) (Policy, []string, error) {
 		}
 		p.RunDir = r
 	}
-	guard := newGuard(rt.Home)
+	guard := newGuard(rt)
 	readExtra, n1, err := extraPaths(real, in.Read, guard)
 	if err != nil {
 		return Policy{}, nil, err
@@ -181,13 +181,14 @@ func ResolvePolicy(in Input, rt Runtime) (Policy, []string, error) {
 	return p, notes, nil
 }
 
-// guard holds the paths no read or allow entry may cover: the keychain directory, and the Claude
-// config directory, whose hooks run unsandboxed. An entry may not equal or contain either; the
-// keychain directory also rejects an entry inside it. The profile denies writes inside ~/.claude
+// guard holds the paths no read or allow entry may cover: the keychain directory, and the agent's
+// config directories, whose hooks run unsandboxed. An entry may not equal or contain either; the
+// keychain directory also rejects an entry inside it. The profile denies writes inside the agent
 // configs itself.
-type guard struct{ keychain, claude []string }
+type guard struct{ keychain, config []string }
 
-func newGuard(home string) guard {
+func newGuard(rt Runtime) guard {
+	home := rt.Home
 	if home == "" {
 		return guard{}
 	}
@@ -198,7 +199,11 @@ func newGuard(home string) guard {
 		}
 		return out
 	}
-	return guard{keychain: both(filepath.Join(home, "Library", "Keychains")), claude: both(filepath.Join(home, ".claude"))}
+	g := guard{keychain: both(filepath.Join(home, "Library", "Keychains"))}
+	for _, d := range rt.Agent.ConfigDirs {
+		g.config = append(g.config, both(d)...)
+	}
+	return g
 }
 
 func (g guard) covers(path string) bool {
@@ -207,7 +212,7 @@ func (g guard) covers(path string) bool {
 			return true
 		}
 	}
-	for _, p := range g.claude {
+	for _, p := range g.config {
 		if under(p, path) {
 			return true
 		}
@@ -216,7 +221,7 @@ func (g guard) covers(path string) bool {
 }
 
 // extraPaths canonicalizes user paths. A missing one is skipped with a note; one that covers a
-// guarded path (home, ~/Library, ~/.claude, the keychain directory) is an error.
+// guarded path (home, ~/Library, the agent config directory, the keychain directory) is an error.
 func extraPaths(real func(string) (string, error), list []string, g guard) ([]string, []string, error) {
 	var out, notes []string
 	for _, e := range list {

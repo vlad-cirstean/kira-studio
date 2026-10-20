@@ -3,32 +3,24 @@ package agentsandbox
 import (
 	"path/filepath"
 	"strings"
+
+	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
-// Flags are the `claude` permission flags that back the profile on every platform: the CLI refuses
-// early with a clear message, and on Linux they are the only layer.
-func Flags(p Policy) (addDirs, disallowed []string) {
+// Flags are the agent permission flags that back the profile on every platform: the CLI refuses
+// early with a clear message, and on Linux they are the only layer. The denials are the provider's.
+func Flags(p Policy, agent harness.Sandboxed) (addDirs, disallowed []string) {
 	addDirs = appendUnique(addDirs, p.Read...)
 	addDirs = appendUnique(addDirs, p.Allow...)
 	addDirs = appendUnique(addDirs, p.Scratch)
-	if p.Access == AccessRead {
-		disallowed = append(disallowed, "Edit", "Write", "NotebookEdit")
-	} else {
-		for _, r := range p.Read {
-			disallowed = append(disallowed, "Edit(/"+filepath.ToSlash(r)+"/**)")
-		}
-	}
-	for _, sub := range []string{"branch", "worktree", "checkout -b", "switch -c", "push", "fetch", "tag", "stash"} {
-		disallowed = append(disallowed, "Bash(git "+sub+":*)")
-	}
-	if !p.Network {
-		disallowed = append(disallowed, "WebFetch", "WebSearch")
+	if agent != nil {
+		disallowed = agent.SandboxDenies(p.Access == AccessRead, p.Read, p.Network)
 	}
 	return addDirs, disallowed
 }
 
 // Env is the sandboxed run's environment overrides. proxyURL is set when the network is off.
-func Env(p Policy, proxyURL string) []string {
+func Env(p Policy, rt Runtime, proxyURL string) []string {
 	cache := func(name string) string { return filepath.Join(p.Cache, name) }
 	env := []string{
 		"TMPDIR=" + filepath.Join(p.Scratch, "tmp"),
@@ -49,8 +41,8 @@ func Env(p Policy, proxyURL string) []string {
 	}
 	if proxyURL != "" {
 		env = append(env, "HTTPS_PROXY="+proxyURL, "HTTP_PROXY="+proxyURL, "https_proxy="+proxyURL, "http_proxy="+proxyURL,
-			"NO_PROXY=localhost,127.0.0.1,::1", "DISABLE_TELEMETRY=1", "DISABLE_ERROR_REPORTING=1",
-			"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1")
+			"NO_PROXY=localhost,127.0.0.1,::1")
+		env = append(env, rt.Agent.QuietEnv...)
 	}
 	return env
 }

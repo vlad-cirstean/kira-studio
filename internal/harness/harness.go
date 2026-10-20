@@ -27,6 +27,7 @@ type Provider interface {
 	Structured
 	Headless
 	Interactive
+	Sandboxed
 	MCPHost
 }
 

@@ -15,7 +15,7 @@ import (
 
 func osGetenv(k string) string { return os.Getenv(k) }
 
-// Prepare renders the profile and, on darwin, writes it and checks it compiles before claude
+// Prepare renders the profile and, on darwin, writes it and checks it compiles before the agent
 // starts, so a promised policy never silently drops.
 func (s *system) Prepare(p Policy, rt Runtime) (Prepared, error) {
 	pr, err := s.prepare(p, rt)
@@ -29,14 +29,14 @@ func (s *system) prepare(p Policy, rt Runtime) (Prepared, error) {
 	enforced := s.Support().Enforced
 	proxyURL := ""
 	if enforced && !p.Network {
-		u, err := s.proxyURL(p.RunID)
+		u, err := s.proxyURL(p.RunID, rt.Provider)
 		if err != nil {
 			return Prepared{}, err
 		}
 		proxyURL = u
 	}
-	pr := Prepared{Profile: Profile(p, rt), Env: Env(p, proxyURL)}
-	pr.AddDirs, pr.Disallowed = Flags(p)
+	pr := Prepared{Profile: Profile(p, rt), Env: Env(p, rt, proxyURL)}
+	pr.AddDirs, pr.Disallowed = Flags(p, rt.Provider)
 	if !enforced {
 		return pr, nil
 	}
