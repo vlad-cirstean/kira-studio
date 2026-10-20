@@ -460,7 +460,7 @@ var MemoryRewriteSystem = define(Entry{
 	PurposeKey:        "llmPrompts.entry.memoryRewriteSystem.description",
 	UsedByKey:         "llmPrompts.entry.memoryRewriteSystem.usedBy.body",
 	RequiredFragments: []ID{"memory.dataHygiene"},
-			Default: `You clean one short text, usually a code comment: drop its trivia, keep every fact and its form. Output only the schema.
+	Default: `You clean one short text, usually a code comment: drop its trivia, keep every fact and its form. Output only the schema.
 
 {{template "memory.dataHygiene"}}
 
@@ -472,24 +472,26 @@ Keep, exactly:
 - Negations (not, never, no, only, except), numbers, units, identifiers, paths, error strings, quoted literals and backticked spans, verbatim, backticks included.
 - Qualifiers of scope and place ("here", "itself", "per call", "on the server").
 - What the declaration below holds, when the text defines it.
+- Cross-references: "ports X", "mirrors X", "X's twin", and "see issue, PR or URL". A doc comment's opening clause that names the documented symbol stays.
 
 Drop:
-- Internal tracking labels whose meaning lives outside the text: ticket, phase, milestone, review-finding, iteration or version identifiers, and references to a plan or tracker document. Keep the fact a label tags. If removing a label leaves a claim false or dangling, keep the clause's truth: drop the whole clause or say what holds now. A number that names a part of the code or of the text itself (step 2, level 3, rule 1/3) is not a label.
-- History narration: who changed it, when, in which version, moved-from notes, "used to" with no consequence. Past-tense text that explains why current code is as it is (a rejected alternative, the bug a guard prevents, a verification, a consequence chain) is a current reason: keep it as written. An equivalence, safety or cost comparison (as safe as X, O(1) instead of O(n), provably unchanged) is a fact, not history.
-- A sentence that restates what the context code shows.
-- Filler, only these hedges: "really", "basically", "actually", "simply", and "just" as a hedge. Keep every other word, intensifiers and intent words included. "just" meaning "only" or "recently" stays.
+- Internal tracking labels whose meaning lives outside the text: ticket, phase, milestone, review-finding, iteration or version identifiers, and references to a plan or tracker document. Keep the fact a label tags. If removing a label leaves a claim false or dangling, keep the clause's truth: drop the whole clause or say what holds now. After removing a leading label, capitalise the sentence that now starts there. A number that names a part of the code or of the text itself (step 2, level 3, rule 1/3) is not a label.
+- History narration: who changed it, when, in which version, moved-from notes, "used to" with no consequence. A file or symbol reference goes only inside a moved-from or renamed-from clause, and any current fact that clause carries stays (who else uses it, what must stay identical). Past-tense text that explains why current code is as it is (a rejected alternative, the bug a guard prevents, a verification, a consequence chain) is a current reason: keep it as written. An equivalence, safety or cost comparison (as safe as X, O(1) instead of O(n), provably unchanged) is a fact, not history.
+- A sentence that restates what the context code shows and states nothing more. A stated invariant, contract or guarantee stays.
+- Filler, only these hedges: "really", "basically", "actually", "simply", and "just" as a hedge. Remove every occurrence. Keep every other word, intensifiers and intent words included. "just" meaning "only" or "recently" stays.
+- Prose notes (text that is not a code comment): history, dates, versions and old values are content. Drop only the listed hedges, never reflow, keep the line structure.
 
 Form:
 - Same form as the input: same comment markers, same kind of comment (a doc comment stays one and keeps the language's doc convention; Markdown stays Markdown).
 - Each line starts with the leading whitespace of the input line it replaces; block comment lines keep their prefix.
-- Lines at most {{.MaxWidth}} columns, indentation and markers included; a tab counts 4.
-- Words you keep stay as written: no rewording, no sentence split or merge, no punctuation change. Reflow only lines a drop touched, or lines over the width.
+- Code comment lines at most {{.MaxWidth}} columns, indentation and markers included; a tab counts 4. Prose has no width rule.
+- Words you keep stay as written: no rewording, no sentence split or merge, no punctuation change. Reflow only code comment lines a drop touched, or lines over the width.
 - Keep the input's trailing newline, or its absence.
 - Never add a fact, example or claim the text does not state. Never reword an identifier, literal or error string.
 - A tool directive (//go:build, //nolint, eslint-disable, @ts-ignore and the like) or a licence header stays byte for byte.
 - Never longer than the input.
 
-Already clean: no label, no history narration, no restated code, no listed hedge, every line within width. A clean text is returned verbatim, byte for byte. Style is never a reason to change text. A text you cleaned before comes back unchanged.
+Already clean: no label, no history narration, no restated code, no listed hedge, every code comment line within width. A clean text is returned verbatim, byte for byte. Style is never a reason to change text. A text you cleaned before comes back unchanged.
 
 "text": the full result, markers and indentation included; the input verbatim when already clean.
 "dropped": each word, label or clause of the input missing from "text", with "why": "tag", "history", "restatesCode" or "trivia". Empty when "text" is the input.
@@ -520,7 +522,7 @@ var MemoryRewriteCheckSystem = define(Entry{
 
 Input: "original", "rewrite", optional "context" (code around it; read it, never judge it).
 The rewrite may drop internal tracking labels (ticket, phase, milestone, review-finding, iteration or version identifiers, plan or tracker references), history narration that explains nothing about current code (who changed it, moved-from notes), sentences that restate the context code, and the hedges "really", "basically", "actually", "simply", "just" as a hedge, plus intensifiers.
-Past-tense text that explains why current code is as it is (a rejected alternative, the bug a guard prevents, a consequence chain) is a reason: dropping it is "lost". "wrong" also takes past-tense narration restated in present tense, and a claim a dropped label left false.
+Past-tense text that explains why current code is as it is (a rejected alternative, the bug a guard prevents, a consequence chain) is a reason: dropping it is "lost". So is dropping a cross-reference ("ports X", "mirrors X", "see issue N"), a doc comment's opening clause naming its symbol, a stated invariant or contract, or a current fact carried by a moved-from clause. For prose (not a code comment), history, dates, versions and old values are content: only the listed hedges may go. "wrong" also takes past-tense narration restated in present tense, and a claim a dropped label left false.
 Find every other fact of the original: literals, numbers, negations, qualifiers of scope and place, what the declaration below holds, cause links (because, so, otherwise), examples, cross-references to other files or settings.
 "lost": each such fact missing from the rewrite or weakened; a dropped cause link or qualifier counts.
 "wrong": each claim of the rewrite the original does not state, or states differently.
