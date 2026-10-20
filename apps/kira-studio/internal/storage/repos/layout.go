@@ -110,11 +110,12 @@ func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
 		merged = decodeLayout(stored)
 		applyLayoutPatch(&merged, patch)
 
-		leaves := []appstorage.Leaf{
-			{Key: "panel.project.visible", Value: merged.Panel.Project.Visible},
-			{Key: "panel.operations.visible", Value: merged.Panel.Operations.Visible},
-			{Key: "panel.cellEditor.height", Value: merged.Panel.CellEditor.Height},
-		}
+		leaves := make([]appstorage.Leaf, 0, 3+3*len(merged.Modes))
+		leaves = append(leaves,
+			appstorage.Leaf{Key: "panel.project.visible", Value: merged.Panel.Project.Visible},
+			appstorage.Leaf{Key: "panel.operations.visible", Value: merged.Panel.Operations.Visible},
+			appstorage.Leaf{Key: "panel.cellEditor.height", Value: merged.Panel.CellEditor.Height},
+		)
 		for mode, sizes := range merged.Modes {
 			leaves = append(leaves,
 				appstorage.Leaf{Key: modeWidthKey(mode), Value: sizes.Project.Width},

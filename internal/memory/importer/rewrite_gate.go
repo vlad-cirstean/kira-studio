@@ -242,7 +242,13 @@ var lineBreak = regexp.MustCompile(`[ \t]*\n[ \t]*(?:///?|\*|#|<!--)?[ \t]*`)
 // draft is also read with its line breaks and comment markers joined, so a reflow cannot split a token.
 func tokensKept(input, draft string, dropped []DroppedSpan) bool {
 	forms := []string{draft, lineBreak.ReplaceAllString(draft, ""), lineBreak.ReplaceAllString(draft, " ")}
-	present := func(tok string) bool {
+	present := tokenPresence(forms, dropped)
+	return protectedTokensKept(input, present) && quotedSpansKept(input, forms, present)
+}
+
+// tokenPresence reports whether a token sits in any draft form or any dropped span.
+func tokenPresence(forms []string, dropped []DroppedSpan) func(string) bool {
+	return func(tok string) bool {
 		for _, f := range forms {
 			if strings.Contains(f, tok) {
 				return true
@@ -255,21 +261,34 @@ func tokensKept(input, draft string, dropped []DroppedSpan) bool {
 		}
 		return false
 	}
+}
+
+// protectedTokensKept checks every protected token of input; a path token is checked per component.
+func protectedTokensKept(input string, present func(string) bool) bool {
 	for _, re := range protectedTokens {
 		for _, tok := range re.FindAllString(input, -1) {
-			if strings.Contains(tok, "/") && !strings.HasPrefix(tok, "`") {
-				for _, part := range strings.Split(tok, "/") {
-					if part != "" && !present(part) {
-						return false
-					}
-				}
-				continue
-			}
-			if !present(tok) {
+			if !tokenKept(tok, present) {
 				return false
 			}
 		}
 	}
+	return true
+}
+
+func tokenKept(tok string, present func(string) bool) bool {
+	if !strings.Contains(tok, "/") || strings.HasPrefix(tok, "`") {
+		return present(tok)
+	}
+	for _, part := range strings.Split(tok, "/") {
+		if part != "" && !present(part) {
+			return false
+		}
+	}
+	return true
+}
+
+// quotedSpansKept checks every double-quoted span of input, ignoring backticks in the draft forms.
+func quotedSpansKept(input string, forms []string, present func(string) bool) bool {
 	for _, tok := range quotesOutsideBackticks(input) {
 		found := false
 		for _, f := range forms {

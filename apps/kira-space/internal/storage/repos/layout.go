@@ -87,10 +87,11 @@ func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
 			}
 		}
 
-		leaves := []appstorage.Leaf{
-			{Key: "panel.project.visible", Value: merged.Panel.Project.Visible},
-			{Key: "panel.ade.width", Value: merged.Panel.Ade.Width},
-		}
+		leaves := make([]appstorage.Leaf, 0, 2+3*len(merged.Modes))
+		leaves = append(leaves,
+			appstorage.Leaf{Key: "panel.project.visible", Value: merged.Panel.Project.Visible},
+			appstorage.Leaf{Key: "panel.ade.width", Value: merged.Panel.Ade.Width},
+		)
 		for mode, sizes := range merged.Modes {
 			leaves = append(leaves,
 				appstorage.Leaf{Key: modeWidthKey(mode), Value: sizes.Project.Width},
