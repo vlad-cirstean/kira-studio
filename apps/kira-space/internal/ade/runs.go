@@ -16,7 +16,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
@@ -39,7 +39,7 @@ const (
 )
 
 // recordFinish is the MCP server's callback; the last call of a run wins and is applied at exit.
-func (b *TaskBoard) recordFinish(runID string, f claudeheadless.Finish) {
+func (b *TaskBoard) recordFinish(runID string, f agentmcp.Finish) {
 	if b.tuiBound(runID) {
 		b.goTracked(func() { b.applyTUIFinish(runID, f) }) // a taken-over run: applied at call time (R14)
 		return
@@ -49,7 +49,7 @@ func (b *TaskBoard) recordFinish(runID string, f claudeheadless.Finish) {
 	b.runMu.Unlock()
 }
 
-func (b *TaskBoard) takeFinish(runID string) (claudeheadless.Finish, bool) {
+func (b *TaskBoard) takeFinish(runID string) (agentmcp.Finish, bool) {
 	b.runMu.Lock()
 	defer b.runMu.Unlock()
 	f, ok := b.finishes[runID]
@@ -662,9 +662,9 @@ func (b *TaskBoard) configScope() harness.ConfigScope {
 
 func allowedTools(p harness.MCPHost, step []string, space bool) []string {
 	out := slices.Clone(step)
-	want := harness.ToolNames(p, claudeheadless.FinishStep, claudeheadless.RunOutcome)
+	want := harness.ToolNames(p, agentmcp.FinishStep, agentmcp.RunOutcome)
 	if space {
-		want = append(want, harness.ToolNames(p, claudeheadless.SpaceToolIDs...)...)
+		want = append(want, harness.ToolNames(p, agentmcp.SpaceToolIDs...)...)
 	}
 	for _, t := range want {
 		if !slices.Contains(out, t) {
@@ -685,13 +685,13 @@ type agentLaunch struct {
 	smart    *smartStep
 	// git, when set, makes the run a sandboxed git agent: only the listed built-ins, no settings files,
 	// the worktrees added as directories and the git tool granted.
-	git *claudeheadless.GitGrant
+	git *agentmcp.GitGrant
 	// review, when set, makes the run a review round: it may answer those comments.
-	review *claudeheadless.ReviewGrant
+	review *agentmcp.ReviewGrant
 }
 
 // grantResults are the results finish_step takes for a run: a rebase run or review round keeps the implicit pair.
-func grantResults(implicit bool, def stepDef) []claudeheadless.ResultSpec {
+func grantResults(implicit bool, def stepDef) []agentmcp.ResultSpec {
 	if implicit {
 		return nil
 	}
@@ -730,11 +730,11 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		return
 	}
 	defer b.endSandbox(run.ID, sbx)
-	var grantSandbox *claudeheadless.SandboxGrant
+	var grantSandbox *agentmcp.SandboxGrant
 	if sbx != nil {
 		grantSandbox = sbx.grant
 	}
-	cfg, release, err := b.agent.Register(claudeheadless.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space, Git: l.git, Review: l.review, Sandbox: grantSandbox, Results: grantResults(rebase || round, def)})
+	cfg, release, err := b.agent.Register(agentmcp.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space, Git: l.git, Review: l.review, Sandbox: grantSandbox, Results: grantResults(rebase || round, def)})
 	if err != nil {
 		fail(err)
 		return
@@ -804,7 +804,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		end := sbx.sandboxOutcome(fromOutcome(model.AdeRunFailed, o), sink.lastStderr())
 		end.out.ExitCode = &code
 		f, ok := b.takeFinish(run.ID)
-		var report *claudeheadless.Finish
+		var report *agentmcp.Finish
 		if ok {
 			report = &f
 		}
@@ -821,7 +821,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 
 // roundTools adds the reply tool to a review round's allowed tools.
 func roundTools(p harness.MCPHost, tools []string, round bool) []string {
-	reply := p.MCPToolName(claudeheadless.ReviewReply)
+	reply := p.MCPToolName(agentmcp.ReviewReply)
 	if round && !slices.Contains(tools, reply) {
 		return append(tools, reply)
 	}
@@ -862,7 +862,7 @@ func (b *TaskBoard) agentOutcome(runID string, exit harness.Exit, runErr error, 
 }
 
 // fromFinish is the outcome of a run whose agent called finish_step.
-func fromFinish(f claudeheadless.Finish, exit *int, results []adewire.StepResult) outcome {
+func fromFinish(f agentmcp.Finish, exit *int, results []adewire.StepResult) outcome {
 	o := runoutcome.Outcome{Source: runoutcome.SourceAgent, Reported: true, Summary: f.Summary, ExitCode: exit}
 	state := finishState(&o, f, results)
 	out := fromOutcome(state, o)
@@ -872,7 +872,7 @@ func fromFinish(f claudeheadless.Finish, exit *int, results []adewire.StepResult
 
 // finishState fills o from a finish_step call and returns the run state: done for an ok result,
 // failed for a not-ok one. results are the step's; none = the implicit done and failed.
-func finishState(o *runoutcome.Outcome, f claudeheadless.Finish, results []adewire.StepResult) string {
+func finishState(o *runoutcome.Outcome, f agentmcp.Finish, results []adewire.StepResult) string {
 	if f.Status == "needs_input" {
 		o.Status, o.Reason = runoutcome.StatusBlocked, cmpNonEmpty(f.Reason, f.Summary)
 		return model.AdeRunStuck
@@ -891,16 +891,16 @@ func finishState(o *runoutcome.Outcome, f claudeheadless.Finish, results []adewi
 }
 
 // resultSpecs are a step's results as the MCP grant takes them.
-func resultSpecs(results []adewire.StepResult) []claudeheadless.ResultSpec {
-	out := make([]claudeheadless.ResultSpec, len(results))
+func resultSpecs(results []adewire.StepResult) []agentmcp.ResultSpec {
+	out := make([]agentmcp.ResultSpec, len(results))
 	for i, r := range results {
-		out[i] = claudeheadless.ResultSpec{ID: r.ID, OK: r.OK, Description: r.Description}
+		out[i] = agentmcp.ResultSpec{ID: r.ID, OK: r.OK, Description: r.Description}
 	}
 	return out
 }
 
 // reportOf is the detail a finish_step call carried beyond status and summary, nil when none.
-func reportOf(f claudeheadless.Finish) *model.AgentReport {
+func reportOf(f agentmcp.Finish) *model.AgentReport {
 	if len(f.ConflictedFiles) == 0 && f.LastGitError == "" && f.Tried == "" {
 		return nil
 	}

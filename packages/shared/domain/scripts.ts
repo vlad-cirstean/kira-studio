@@ -142,7 +142,7 @@ export const scriptDirSchema = /*#__PURE__*/ z.object({
 });
 export type ScriptDir = z.infer<typeof scriptDirSchema>;
 
-// scriptMcpServerSchema mirrors claudeheadless.UserServer — a server of the user's Claude config,
+// scriptMcpServerSchema mirrors agentmcp.UserServer — a server of the user's Claude config,
 // never its args, env or headers.
 export const scriptMcpServerSchema = /*#__PURE__*/ z.object({
   name: z.string(),
@@ -151,7 +151,7 @@ export const scriptMcpServerSchema = /*#__PURE__*/ z.object({
 });
 export type ScriptMcpServer = z.infer<typeof scriptMcpServerSchema>;
 
-// scriptMcpToolSchema mirrors claudeheadless.UserTool.
+// scriptMcpToolSchema mirrors agentmcp.UserTool.
 export const scriptMcpToolSchema = /*#__PURE__*/ z.object({
   name: z.string(),
   description: z.string(),

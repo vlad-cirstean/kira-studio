@@ -7,7 +7,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/scripts"
@@ -80,9 +80,9 @@ func (b *TaskBoard) planSmartStep(tc *taskCtx, sb model.AdeTaskBranch, path stri
 		step.dir = dir.Path
 	}
 	body := scripts.PlainText(scripts.Compose(script.Command, rendered))
-	suffix := claudeheadless.FinishInstruction(b.prompts(), resultSpecs(def.Results))
+	suffix := agentmcp.FinishInstruction(b.prompts(), resultSpecs(def.Results))
 	if b.spaceEnabled(tc.task) {
-		suffix = claudeheadless.SpaceNote(b.prompts()) + "\n\n" + suffix
+		suffix = agentmcp.SpaceNote(b.prompts()) + "\n\n" + suffix
 	}
 	step.prompt = body + "\n\n" + suffix
 	return step, nil
@@ -99,9 +99,9 @@ func (s *smartStep) mcpNames() []string {
 
 // spec is the process spec of a smart step run; the caller adds the MCP config paths.
 func (s *smartStep) spec(agent harness.Provider, base harness.HeadlessSpec, space bool) harness.HeadlessSpec {
-	extra := harness.ToolNames(agent, claudeheadless.FinishStep, claudeheadless.RunOutcome)
+	extra := harness.ToolNames(agent, agentmcp.FinishStep, agentmcp.RunOutcome)
 	if space {
-		extra = append(extra, harness.ToolNames(agent, claudeheadless.SpaceToolIDs...)...)
+		extra = append(extra, harness.ToolNames(agent, agentmcp.SpaceToolIDs...)...)
 	}
 	base.Dir, base.Model, base.MaxBudgetUSD, base.Isolated = s.dir, s.script.Smart.Model, s.script.Smart.MaxBudgetUSD, true
 	base.Tools, base.AllowedTools = agent.ToolArgs(s.script.Smart.ToolPolicy(extra))
@@ -120,13 +120,13 @@ func (b *TaskBoard) smartOutcome(runID string, exit harness.Exit, runErr error, 
 		out = fromFinish(f, &code, results)
 	} else if lost, ok := lostOutcome(resumeLost, lastErr); ok {
 		out = lost
-	} else if o, ok := claudeheadless.ResultOutcome(res, exit.Code, step.script.Smart.MaxBudgetUSD); ok {
+	} else if o, ok := agentmcp.ResultOutcome(res, exit.Code, step.script.Smart.MaxBudgetUSD); ok {
 		out = fromOutcome(model.AdeRunFailed, o.WithLastError(lastErr))
 	} else {
 		o := runoutcome.ForProcess(agentEnd(exit, runErr, formatTimeout(step.timeout))).WithLastError(lastErr)
 		out = fromOutcome(model.AdeRunFailed, o)
 	}
-	out.out.Outcome = claudeheadless.ApplyResult(out.out.Outcome, res)
+	out.out.Outcome = agentmcp.ApplyResult(out.out.Outcome, res)
 	out.note = out.out.Reason
 	return out
 }

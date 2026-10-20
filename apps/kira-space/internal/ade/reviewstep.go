@@ -12,7 +12,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
@@ -661,7 +661,7 @@ func (b *TaskBoard) startRound(_ context.Context, tc *taskCtx, run model.AdeRun,
 		defer endRun()
 		b.superviseAgent(runCtx, updated, agentLaunch{
 			def: def, sessionID: sessionID, resume: launch.ResumeID, path: path, worktree: path, prompt: prompt,
-			timeout: parseStepTimeout(def.Timeout), review: &claudeheadless.ReviewGrant{CommentIDs: spec.CommentIDs},
+			timeout: parseStepTimeout(def.Timeout), review: &agentmcp.ReviewGrant{CommentIDs: spec.CommentIDs},
 		})
 	}()
 	return updated, nil
@@ -854,7 +854,7 @@ func (b *TaskBoard) resumeReviewRound(ctx context.Context, run model.AdeRun) err
 
 // --- reply and finish ----------------------------------------------------------------------------
 
-// Reply stores an agent's answer to one comment of its round (claudeheadless.ReviewReplier).
+// Reply stores an agent's answer to one comment of its round (agentmcp.ReviewReplier).
 func (b *TaskBoard) Reply(runID string, id int64, reply string, resolved bool) error {
 	run, err := b.deps.Tasks.GetRun(runID)
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
@@ -37,7 +37,7 @@ func rvStep(sendTo string) string {
 }
 
 func rvReply(id int64, text string) fakeagent.MCPCall {
-	return fakeagent.MCPCall{Server: claudeheadless.ServerName, Tool: "reply_review_comment",
+	return fakeagent.MCPCall{Server: agentmcp.ServerName, Tool: "reply_review_comment",
 		Args: map[string]any{"id": id, "reply": text, "resolved": true}}
 }
 
@@ -236,8 +236,8 @@ func TestReviewSendImplementer(t *testing.T) {
 	if got := argAfter(args, "--resume"); got != implementID {
 		t.Fatalf("round --resume = %q, want the implementer session %q", got, implementID)
 	}
-	if !strings.Contains(args, toolName(claudeheadless.ReviewReply)) {
-		t.Fatalf("round args lack %s:\n%s", toolName(claudeheadless.ReviewReply), args)
+	if !strings.Contains(args, toolName(agentmcp.ReviewReply)) {
+		t.Fatalf("round args lack %s:\n%s", toolName(agentmcp.ReviewReply), args)
 	}
 	prompt := fakeFile(t, f.app, "api-2.prompt")
 	for _, want := range []string{"#1 change r.txt:1", "rename this", "#2 question r.txt:3", "why twice?", "reply_review_comment", "finish_step"} {

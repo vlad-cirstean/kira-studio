@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
@@ -45,29 +45,29 @@ func (r *bgRun) endedBy() int {
 }
 
 // mcpServer returns the loopback report server, started on first use.
-func (s *Service) mcpServer() *claudeheadless.Server {
+func (s *Service) mcpServer() *agentmcp.Server {
 	if s.server == nil {
-		opts := claudeheadless.Options{Dir: filepath.Join(s.Home, "automations-mcp"), OnFinish: s.recordFinish, Prompts: s.llmPrompts(),
+		opts := agentmcp.Options{Dir: filepath.Join(s.Home, "automations-mcp"), OnFinish: s.recordFinish, Prompts: s.llmPrompts(),
 			Render: func(sv []harness.MCPServer) ([]byte, error) { return s.Agent.Active().MCPConfig(sv) }}
 		if s.ADE != nil {
 			opts.Space, opts.Outcomes = s.ADE.Tools()
 			opts.SandboxGit = s.ADE.SandboxGit()
 		}
-		s.server = claudeheadless.NewServer(opts)
+		s.server = agentmcp.NewServer(opts)
 	}
 	return s.server
 }
 
-func (s *Service) recordFinish(runID string, f claudeheadless.Finish) {
+func (s *Service) recordFinish(runID string, f agentmcp.Finish) {
 	s.mu.Lock()
 	if s.finishes == nil {
-		s.finishes = map[string]claudeheadless.Finish{}
+		s.finishes = map[string]agentmcp.Finish{}
 	}
 	s.finishes[runID] = f
 	s.mu.Unlock()
 }
 
-func (s *Service) takeFinish(runID string) (claudeheadless.Finish, bool) {
+func (s *Service) takeFinish(runID string) (agentmcp.Finish, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	f, ok := s.finishes[runID]
@@ -129,11 +129,11 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 		abandon()
 		return Started{}, ipcerr.InternalErr(err)
 	}
-	grant := claudeheadless.Grant{RunID: runID, TaskID: run.TaskID, Space: run.TaskID != ""}
+	grant := agentmcp.Grant{RunID: runID, TaskID: run.TaskID, Space: run.TaskID != ""}
 	releaseTarget := func() {}
 	if sbx != nil && p.preview.ADE != nil {
 		if rel, err := s.ADE.SandboxTarget(runID, p.preview.ADE.BranchID, p.dir.Path); err == nil {
-			grant.Sandbox, releaseTarget = &claudeheadless.SandboxGrant{Push: true}, rel
+			grant.Sandbox, releaseTarget = &agentmcp.SandboxGrant{Push: true}, rel
 		}
 	}
 	cfg, releaseGrant, err := srv.Register(grant)
@@ -218,7 +218,7 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 	return Started{RunID: runID}, nil
 }
 
-func (s *Service) takeFinishPtr(runID string) *claudeheadless.Finish {
+func (s *Service) takeFinishPtr(runID string) *agentmcp.Finish {
 	if f, ok := s.takeFinish(runID); ok {
 		return &f
 	}
@@ -276,7 +276,7 @@ func (s *Service) Close() {
 }
 
 type decision struct {
-	finish  *claudeheadless.Finish
+	finish  *agentmcp.Finish
 	res     *harness.Result
 	exit    harness.Exit
 	runErr  error
@@ -312,7 +312,7 @@ func decide(d decision) runoutcome.Outcome {
 	case d.resumeLost:
 		out = runoutcome.ForProcess(runoutcome.Process{End: runoutcome.EndResumeLost})
 	case resultEnds(d):
-		out, _ = claudeheadless.ResultOutcome(d.res, code, d.budget)
+		out, _ = agentmcp.ResultOutcome(d.res, code, d.budget)
 	default:
 		p := runoutcome.Process{Kind: runoutcome.KindAgent, ExitCode: code, Timeout: d.timeout}
 		switch {
@@ -323,13 +323,13 @@ func decide(d decision) runoutcome.Outcome {
 		}
 		out = runoutcome.ForProcess(p)
 	}
-	out = claudeheadless.ApplyResult(out, d.res)
+	out = agentmcp.ApplyResult(out, d.res)
 	return out.WithLastError(d.lastErr)
 }
 
 func resultEnds(d decision) bool {
-	_, ok := claudeheadless.ResultOutcome(d.res, d.exit.Code, d.budget)
+	_, ok := agentmcp.ResultOutcome(d.res, d.exit.Code, d.budget)
 	return ok
 }
 
-func firstNonEmpty(vals ...string) string { return claudeheadless.FirstNonEmpty(vals...) }
+func firstNonEmpty(vals ...string) string { return agentmcp.FirstNonEmpty(vals...) }

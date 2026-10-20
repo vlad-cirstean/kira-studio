@@ -2,7 +2,7 @@ import type { TextPart } from '@theme/varText';
 
 type ResultLike = { id: string; ok: boolean; description: string };
 
-/** True for no results or the implicit done/failed pair; mirrors Go `claudeheadless.IsImplicit`. */
+/** True for no results or the implicit done/failed pair; mirrors Go `agentmcp.IsImplicit`. */
 function isImplicit(results: readonly ResultLike[]): boolean {
   return (
     results.length === 0 ||

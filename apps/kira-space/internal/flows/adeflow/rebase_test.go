@@ -9,7 +9,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/testx"
@@ -61,7 +61,7 @@ func waitBehind(t *testing.T, app *flowharness.App, br adewire.Branch) {
 func (f *rbFx) agent(sh string, finish map[string]any) {
 	a := fakeagent.Action{Name: "nofinish", Sh: sh}
 	if finish != nil {
-		a.MCP = []fakeagent.MCPCall{{Server: claudeheadless.ServerName, Tool: "finish_step", Args: finish}}
+		a.MCP = []fakeagent.MCPCall{{Server: agentmcp.ServerName, Tool: "finish_step", Args: finish}}
 	}
 	claude(f.app, map[string][]fakeagent.Action{"*": {a}})
 }
@@ -293,13 +293,13 @@ func TestRebaseRun(t *testing.T) {
 			t.Fatalf("stack = %+v, want parent then child", pv.Stack)
 		}
 		gitCall := func(wt string, args ...string) fakeagent.MCPCall {
-			return fakeagent.MCPCall{Server: claudeheadless.ServerName, Tool: "git", Args: map[string]any{"worktree": wt, "args": args}}
+			return fakeagent.MCPCall{Server: agentmcp.ServerName, Tool: "git", Args: map[string]any{"worktree": wt, "args": args}}
 		}
 		claude(f.app, map[string][]fakeagent.Action{"*": {{Name: "nofinish", MCP: []fakeagent.MCPCall{
 			gitCall(br.Worktree, "fetch", "-q", "origin"),
 			gitCall(br.Worktree, "rebase", "-q", "origin/main"),
 			gitCall(cb.Worktree, "rebase", "-q", "--onto", "feat/a", oldTip),
-			{Server: claudeheadless.ServerName, Tool: "finish_step", Args: done()},
+			{Server: agentmcp.ServerName, Tool: "finish_step", Args: done()},
 		}}}})
 		run := f.waitRebase(t, task.ID, f.rebase(t, br, adewire.RebaseArgs{}).RunID)
 		if run.State != "done" || run.Outcome.Rebase == nil || len(run.Outcome.Rebase.Branches) != 2 || !run.Outcome.Rebase.Verified {
@@ -308,11 +308,11 @@ func TestRebaseRun(t *testing.T) {
 		matches, _ := filepath.Glob(filepath.Join(f.app.FakeDir, "*.args"))
 		var args string
 		for _, m := range matches {
-			if raw, err := os.ReadFile(m); err == nil && strings.Contains(string(raw), toolName(claudeheadless.Git)) {
+			if raw, err := os.ReadFile(m); err == nil && strings.Contains(string(raw), toolName(agentmcp.Git)) {
 				args = string(raw)
 			}
 		}
-		for _, want := range []string{"--add-dir\n" + br.Worktree, cb.Worktree, "--tools\nRead,Edit,Write,Grep,Glob", "--strict-mcp-config", toolName(claudeheadless.Git)} {
+		for _, want := range []string{"--add-dir\n" + br.Worktree, cb.Worktree, "--tools\nRead,Edit,Write,Grep,Glob", "--strict-mcp-config", toolName(agentmcp.Git)} {
 			if !strings.Contains(args, want) {
 				t.Errorf("rebase args lack %q:\n%s", want, args)
 			}
@@ -328,10 +328,10 @@ func TestRebaseRun(t *testing.T) {
 		task, br := f.task(t, "Fix", adewire.BaseChoice{})
 		claude(f.app, map[string][]fakeagent.Action{"*": {
 			{Name: "done"},
-			{Name: "nofinish", MCP: []fakeagent.MCPCall{{Server: claudeheadless.ServerName, Tool: "finish_step", Args: map[string]any{
+			{Name: "nofinish", MCP: []fakeagent.MCPCall{{Server: agentmcp.ServerName, Tool: "finish_step", Args: map[string]any{
 				"status": "failed", "summary": "conflict", "reason": "clash", "conflictedFiles": []string{"x.txt"},
 			}}}},
-			{Name: "done", MCP: []fakeagent.MCPCall{{Server: claudeheadless.ServerName, Tool: "run_outcome", Args: map[string]any{"kind": "rebase"}}}},
+			{Name: "done", MCP: []fakeagent.MCPCall{{Server: agentmcp.ServerName, Tool: "run_outcome", Args: map[string]any{"kind": "rebase"}}}},
 		}})
 		if err := f.startRun(t, task, br, "feat/api-work"); err != nil {
 			t.Fatal(err)
@@ -371,7 +371,7 @@ func TestRebaseRun(t *testing.T) {
 		gate := filepath.Join(f.app.Work, "release-rebase")
 		claude(f.app, map[string][]fakeagent.Action{"*": {
 			{Name: "done"},
-			{Name: "nofinish", Sh: rebaseSh, WaitFile: gate, MCP: []fakeagent.MCPCall{{Server: claudeheadless.ServerName, Tool: "finish_step", Args: done()}}},
+			{Name: "nofinish", Sh: rebaseSh, WaitFile: gate, MCP: []fakeagent.MCPCall{{Server: agentmcp.ServerName, Tool: "finish_step", Args: done()}}},
 			{Name: "done"},
 		}})
 		if err := f.startRun(t, task, br, "feat/api-work"); err != nil {
@@ -408,11 +408,11 @@ func TestRebaseRun(t *testing.T) {
 		commitIn(t, br.Worktree, "clash.txt")
 		f.advanceMain(t, "clash.txt", "clash.txt\n\ntheirs\n")
 		claude(f.app, map[string][]fakeagent.Action{"*": {
-			{Name: "nofinish", Sh: rebaseSh + " || true", MCP: []fakeagent.MCPCall{{Server: claudeheadless.ServerName, Tool: "finish_step", Args: map[string]any{
+			{Name: "nofinish", Sh: rebaseSh + " || true", MCP: []fakeagent.MCPCall{{Server: agentmcp.ServerName, Tool: "finish_step", Args: map[string]any{
 				"status": "failed", "summary": "conflict", "reason": "clash.txt conflicts",
 			}}}},
 			{Name: "nofinish", Sh: "printf 'merged\\n' > clash.txt && git add clash.txt && GIT_EDITOR=true git rebase --continue", MCP: []fakeagent.MCPCall{{
-				Server: claudeheadless.ServerName, Tool: "finish_step", Args: done(),
+				Server: agentmcp.ServerName, Tool: "finish_step", Args: done(),
 			}}},
 		}})
 		run := f.waitRebase(t, task.ID, f.rebase(t, br, adewire.RebaseArgs{}).RunID)
@@ -435,7 +435,7 @@ func TestRebaseRun(t *testing.T) {
 		f := newBaseFx(t)
 		task, br := f.task(t, "Fix", adewire.BaseChoice{})
 		claude(f.app, map[string][]fakeagent.Action{"*": {{Name: "nofinish", MCP: []fakeagent.MCPCall{{
-			Server: claudeheadless.ServerName, Tool: "finish_step",
+			Server: agentmcp.ServerName, Tool: "finish_step",
 			Args: map[string]any{"status": "failed", "summary": "stuck", "reason": "push rejected", "lastGitError": "non-fast-forward"},
 		}}}}})
 		if err := f.startRun(t, task, br, "feat/api-fix"); err != nil {

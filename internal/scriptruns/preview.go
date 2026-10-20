@@ -11,7 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/scripts"
@@ -177,12 +177,12 @@ func (s *Service) plan(args RunArgs, o planOpts) (*planned, error) {
 		return nil, err
 	}
 	pv.Prompt = scripts.Compose(body, rendered)
-	pv.Suffix = claudeheadless.ScriptReport(s.llmPrompts())
+	pv.Suffix = agentmcp.ScriptReport(s.llmPrompts())
 	agent := s.Agent.Active()
-	extraTools := []harness.MCPTool{claudeheadless.FinishStep}
+	extraTools := []harness.MCPTool{agentmcp.FinishStep}
 	if args.TaskID != "" {
-		pv.Suffix = claudeheadless.SpaceNote(s.llmPrompts()) + "\n\n" + pv.Suffix
-		extraTools = append(append(extraTools, claudeheadless.RunOutcome), claudeheadless.SpaceToolIDs...)
+		pv.Suffix = agentmcp.SpaceNote(s.llmPrompts()) + "\n\n" + pv.Suffix
+		extraTools = append(append(extraTools, agentmcp.RunOutcome), agentmcp.SpaceToolIDs...)
 	}
 	p.sent = scripts.PlainText(pv.Prompt) + "\n\n" + pv.Suffix
 	pv.Model, pv.MaxBudgetUSD, pv.Timeout = smart.Model, smart.MaxBudgetUSD, smart.Timeout

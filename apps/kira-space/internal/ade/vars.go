@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
@@ -54,7 +54,7 @@ func stepVars(in promptInput) llmprompts.StepVars {
 		StepNumber: in.Step, StepCount: in.Of, StepName: in.Def.Name,
 		StepPrompt: strings.TrimRight(substitute(in.Def.Prompt, in.Vars, false), "\n"),
 		Extra:      in.Extra, Context: in.Context, Space: in.Space,
-		Finish: claudeheadless.FinishVars(resultSpecs(in.Def.Results)),
+		Finish: agentmcp.FinishVars(resultSpecs(in.Def.Results)),
 	}
 	if in.Message != "" {
 		v.Message = strings.TrimRight(substitute(in.Message, in.Vars, false), "\n")
@@ -71,7 +71,7 @@ func composePrompt(src llmprompts.Source, in promptInput) string {
 // composeResumePrompt is the message a resumed run gets, after a send-back or a restart: the line, then
 // the finish_step instruction, which follows the current step results.
 func composeResumePrompt(src llmprompts.Source, line string, results []adewire.StepResult) string {
-	return line + "\n\n" + claudeheadless.FinishInstruction(src, resultSpecs(results)) + "\n"
+	return line + "\n\n" + agentmcp.FinishInstruction(src, resultSpecs(results)) + "\n"
 }
 
 // repoLine is one repo of a launch message.

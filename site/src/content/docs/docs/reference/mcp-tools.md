@@ -5,7 +5,7 @@ sources:
   - internal/llmprompts/registry.go
   - internal/memory/mcpserver
   - apps/kira-studio/internal/dbmcp/server.go
-  - internal/claudeheadless
+  - internal/agentmcp
   - internal/mcpinstall
 sidebar:
   order: 3

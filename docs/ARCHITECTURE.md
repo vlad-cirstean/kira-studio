@@ -791,7 +791,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - ScriptLauncher.Exited finishes a run from the session's exit code and the registry's close cause (CauseUser from Terminal.Close or ScriptRuns.Stop, CauseWindow, CauseQuit).
 - Recover runs at boot and fails every run a dead process left running, with the reason "interrupted: Kira Studio closed while it ran".
 - The scriptRuns frontend query is keyed ['scriptRuns','list'] and is patched in place by the push channel, with no polling; memory runs stay out of the Automations list.
-- A smart script (custom_scripts.kind = smart) runs as headless Claude via claude -p through internal/claudeheadless (moved from Space's adeagent), sharing the launch, stream-json parser and finish_step loopback server with the ADE run engine.
+- A smart script (custom_scripts.kind = smart) runs as headless Claude via claude -p through internal/agentmcp (moved from Space's adeagent), sharing the launch, stream-json parser and finish_step loopback server with the ADE run engine.
 - Smart script defaults are model sonnet, 1 USD budget (--max-budget-usd) and 15 min timeout; bounds in internal/scripts/smart.go are 20 params, 20000-char prompt, budget 0.05-25 USD, timeout 1 min-2 h.
 - Smart runs are Isolated: --setting-sources '' loads no Claude settings file, --strict-mcp-config allows only the report server plus the MCP servers the script ticked, and --permission-prompts none denies instead of asking.
 - A smart script's --tools and --allowedTools come from its tool allowlist (built-ins Read, Grep, Glob, Edit, Write, NotebookEdit, Bash; default Read, Grep, Glob).
@@ -1904,7 +1904,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 ### Process wiring
 
-- In internal/appwire/wire.go, wireAdeTask builds ade.TaskBoard from TaskBoardDeps: repos, discovery GitStatus (no GitPath), its own gitsession.Conn named ade-board, adeflow.Reader over <home>/workflows, the claudeheadless finish_step server, the Tracker, log sink and session store.
+- In internal/appwire/wire.go, wireAdeTask builds ade.TaskBoard from TaskBoardDeps: repos, discovery GitStatus (no GitPath), its own gitsession.Conn named ade-board, adeflow.Reader over <home>/workflows, the agentmcp finish_step server, the Tracker, log sink and session store.
 - wireAdeTask calls Recover() then Start() on the task board, and installs board.OnTUIStopped as the tracker's stopped handler.
 - bridge.AdeTaskService binds 64 methods, each with one adeTask* entry in frontend/src/bridge/index.ts.
 - AdeTaskService push channels are defined in bridge/adewire/channels.go with prefix kira:adetask: and suffixes board, backlog, workflows, repos, runs, log, sessions and open-session; open-session is emitted to one window via EmitTo.
@@ -1998,7 +1998,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 - Headless runs execute via a login shell running claude -p with --output-format stream-json, --verbose, --session-id, --mcp-config and --setting-sources, cwd the worktree, prompt on stdin, using Setsid and procgroup.GracefulCancel; no --permission-mode and no --strict-mcp-config.
 - App setting ade.headlessSettingSources is either all (the default, meaning user,project,local) or user.
-- The finish_step MCP server (internal/claudeheadless) uses one loopback listener with a bearer token per run (tokenauth); the last call wins and applies at process exit.
+- The finish_step MCP server (internal/agentmcp) uses one loopback listener with a bearer token per run (tokenauth); the last call wins and applies at process exit.
 - The per-run MCP config is <home>/ade/runs/<runId>.mcp.json with mode 0600, deleted at process exit; the token is never put on argv.
 - A grant with declared results (P247) gets its own per-run mcp.Server whose status enum is the result ids plus needs_input; implicit grants keep the shared servers and done|failed|needs_input.
 - suffix.go holds the text appended to the message; FinishStepSuffixFor(results) names the result ids, and the TS mirror is finishStepSuffix.
@@ -2014,7 +2014,7 @@ and `docs/HISTORY.md (v2.0)`.
 - A once step runs in the first mine branch's worktree (D12), and there is no concurrency cap (D8).
 - Restart recovery (D7): Recover() runs before Start(); running runs become stuck with note 'interrupted by restart', running setups fail, task sessions stop, and stale *.mcp.json files are removed.
 - After restart, pending runs keep their launch spec and launch when their gate opens; nothing auto-resumes, and a restart-stuck agent run offers Resume.
-- Agent tools (P199) are implemented in ade/agenttools.go as claudeheadless.SpaceTools on *ade.TaskBoard; the loopback MCP server issues scoped grants (run, task, Space) with one bearer token per launch.
+- Agent tools (P199) are implemented in ade/agenttools.go as agentmcp.SpaceTools on *ade.TaskBoard; the loopback MCP server issues scoped grants (run, task, Space) with one bearer token per launch.
 - A workflow with kira_space_mcp gives headless runs and the task's TUI sessions the Space grant: task_info, declare_repos, request_branch, branch_status.
 - declare_repos accepts registered repos only and is additive.
 - request_branch checks the name with git check-ref-format --branch, refuses main and integration branches, is idempotent, refuses rename and collisions, and sets up the worktree and prepare script through ensureWorktree/startSetup.
@@ -2033,7 +2033,7 @@ and `docs/HISTORY.md (v2.0)`.
 - Rebase and script-step runs, user stops and needs_input runs get no launch_resume_id; adewire.Run.resumable is stuck plus that id.
 - TaskBoard.ResumeRun clears the old spec first, so a second click refuses, then queues attempt+1 with Launch{ResumeID, Prompt: RunResumeLine, Note: "resumed after restart"}.
 - On resume, startRun reuses the Claude session id and composeResumePrompt appends the finish instruction; RunResumeLine (run.resume.line) is one shared prompt for ADE and smart scripts.
-- When claudeheadless.IsNoConversation matches the last stderr line, the outcome becomes runoutcome.EndResumeLost (failed, source start) with no automatic fresh run; Retry or Run again starts anew.
+- When agentmcp.IsNoConversation matches the last stderr line, the outcome becomes runoutcome.EndResumeLost (failed, source start) with no automatic fresh run; Retry or Run again starts anew.
 - Smart scripts in both apps store script_runs.resume_id and resumed_from (Studio migration 0038, Space 0035).
 - Repo.FailRunning and finish set resume_id = session_id for a smart run ended with source restart (crash and graceful quit).
 - Smart script resume: Service.Resume re-plans from the current script, TakeResume compare-and-swaps the id, and the new run row carries resumedFrom and the same session id.
@@ -2060,7 +2060,7 @@ and `docs/HISTORY.md (v2.0)`.
 - model.AdeRunOutcome is runoutcome.Outcome plus an optional Report (conflicted files, last git error, what was tried) and Rebase facts; finish_step takes reason, conflictedFiles, lastGitError, tried.
 - The rebase run timeout is Deps.RebaseTimeout.
 - The rebase agent has no Bash and loads no settings file (Isolated); git runs only through the git tool on the kira-ade MCP server.
-- The git tool requires worktree to be a stack worktree and args to match an exact shape in claudeheadless.CheckGitArgs; -c, -C, --output, --exec and --upload-pack are rejected, and unlisted options fail, abbreviations included.
+- The git tool requires worktree to be a stack worktree and args to match an exact shape in agentmcp.CheckGitArgs; -c, -C, --output, --exec and --upload-pack are rejected, and unlisted options fail, abbreviations included.
 - Stack worktrees are passed as --add-dir so child branches can restack and edit.
 - AbortRebase runs git rebase --abort in the worktree; BranchInventory keeps the worktree path of a mid-rebase branch (detached HEAD, read from rebase-merge/head-name) so abort and rebaseInProgress work.
 - MCP run_outcome (Space grant, same task only) returns the latest ended runs with outcome so another agent can read why a rebase failed; kind automation returns the task's ended script runs.
@@ -2097,7 +2097,7 @@ and `docs/HISTORY.md (v2.0)`.
 - The sandbox does not cover TUI sessions and Take over, script steps, setup scripts, folder-mode automations, or memory claude calls.
 - The Enforcer interface has Support, Prepare and Watch; System() is real only on darwin, elsewhere Support is Enforced:false with Reason NotEnforcedKey and Prepare still builds profile, flags and env but no wrapper.
 - sandboxtest.Fake stands in for flow tests; the flow harness defaults to a not-enforced fake so contracts do not depend on the host OS.
-- With claudeheadless.Spec.Sandbox, Script emits exec /usr/bin/env -u … K=V /usr/bin/sandbox-exec -f <profile> claude … after the login shell sources the user profile.
+- With agentmcp.Spec.Sandbox, Script emits exec /usr/bin/env -u … K=V /usr/bin/sandbox-exec -f <profile> claude … after the login shell sources the user profile.
 - The profile is checked with sandbox-exec -f <profile> /usr/bin/true first; a failure fails the run before claude starts.
 - The sandbox env redirects build caches to <AgentDir>/sandbox-cache/ and sets TMPDIR to the run scratch.
 - The second sandbox layer uses --add-dir and --disallowedTools (Bash(git branch:*), Bash(git worktree:*), edit tools for read); it is the only layer on Linux, where the notice says it does not stop shell commands.
@@ -2107,7 +2107,7 @@ and `docs/HISTORY.md (v2.0)`.
 - A failed run with denials gets reason 'Sandbox blocked <op> <path>.'; a sign-in failure with the keychain denied gets the token hint; denial and notice lines go to the run log on stdout.
 - Sandbox data is stored in table ade_run_sandbox (migration 0037): access, enforced, resolved policy JSON, profile, denials; AdeTaskService.Run.sandbox carries the badge and RunSandbox returns the detail.
 - Setting ade.sandboxKeychain defaults to false.
-- fetch_remote and push_branch run in the app, unsandboxed (TaskBoard implements claudeheadless.SandboxGit via Grant.Sandbox).
+- fetch_remote and push_branch run in the app, unsandboxed (TaskBoard implements agentmcp.SandboxGit via Grant.Sandbox).
 - push_branch pushes the run's branch to the same-named remote branch (RemoteOpParams.RemoteBranch), refuses protected branches, and is refused for read steps.
 - request_branch remains the way to create a branch and its worktree.
 
@@ -2116,7 +2116,7 @@ and `docs/HISTORY.md (v2.0)`.
 - toolexec.ResolveClaude finds the claude CLI before any launch by checking PATH, then well-known install paths (ClaudeCandidates), then the user's login shell, because a GUI app's PATH can differ.
 - Tests replace the system well-known claude install paths with SetSystemClaudePaths.
 - When ResolveClaude finds no claude CLI it returns ErrClaudeMissing, which lists every probed place.
-- ade.Tracker.Prepare, the terminal claude-code path and claudeheadless call RequireClaude, so a missing CLI shows a Kira error instead of the shell's text.
+- ade.Tracker.Prepare, the terminal claude-code path and agentmcp call RequireClaude, so a missing CLI shows a Kira error instead of the shell's text.
 - code_repos.hidden_rev (migration 0034) counts writes of the hidden flag.
 - A folder scan applies its stored hidden flag (ApplyFolderHidden) only to repos whose hidden_rev still equals the one stored at import, in one transaction, so a repo unhidden or toggled meanwhile is never re-hidden.
 
@@ -2189,7 +2189,7 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 | `session` | interactive tab: statusline `rate_limits.five_hour` and `seven_day` | `used_percentage` 0-100, `resets_at` epoch s |
 | `run` | headless run: stream-json `rate_limit_event.rate_limit_info.unifiedWindows` | `utilization` 0..1, `resetsAt` epoch s |
 
-- claude -p never invokes a statusLine (checked on claude 2.1.295), so headless runs feed usage limits through their output instead, via claudeheadless.Handler.OnRateLimits chained from ade/runs.go.
+- claude -p never invokes a statusLine (checked on claude 2.1.295), so headless runs feed usage limits through their output instead, via agentmcp.Handler.OnRateLimits chained from ade/runs.go.
 - For usage readings, the newest reading wins per window; the tooltip shows the source and its age.
 - Manager.ComposeLaunch(terminalID, cwd, command) writes <server dir>/settings-<12 hex>.json (0600; hooks plus a statusLine pointing at the shim in statusline mode) and passes it to --settings.
 - Claude Code replaces the user's own statusline for the session, so the shim runs the user's statusline command and prints its output; lookup is read-only: project .claude/settings.local.json, .claude/settings.json, then $CLAUDE_CONFIG_DIR or ~/.claude settings.json, passed as KIRA_USER_STATUSLINE. The user's files are never written.
@@ -2268,8 +2268,8 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 
 ### Tests
 
-- ADE Go tests cover internal/ade (board, integration, deploy, run engine, steps, tracker), adeflow, claudeheadless and bridge/adewire; run them with go test -race, together with gitsession.
-- The P199 protocol is covered by claudeheadless TestGrantScopes (go-sdk client) and agenttools_test.go.
+- ADE Go tests cover internal/ade (board, integration, deploy, run engine, steps, tracker), adeflow, agentmcp and bridge/adewire; run them with go test -race, together with gitsession.
+- The P199 protocol is covered by agentmcp TestGrantScopes (go-sdk client) and agenttools_test.go.
 - ADE frontend tests: tests/unit/ade-v2-* cover board parity with the mockup's logic, dialog, drop plan, progress and timeline; ade-notes-markdown is also covered; 17 tests/ui/ade-v2-*.spec.ts run on the mock runtime.
 - There is one ADE visual spec, tests/visual/ade-workflow-graph.spec.ts (P247).
 - The live smoke test (server build, real claude -p) covers runs, send-back, restart recovery, Spec/Start/Take over sessions, and merge, rebase and archive dialogs.
@@ -2624,11 +2624,11 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 - Server-side validation requires that the template parses, every prompt:"required" variable is referenced, every required fragment is included, and it executes against example vars.
 - The memory system prompts must include the memory.dataHygiene fragment, which is the injection defence.
 - Schema-bound prompts (gate, reconcile, merge, rewrite, rewrite check, import extract, verify and finalize) keep their JSON schema fixed, shown read-only in Settings.
-- There is no global prompt source; consumers get a llmprompts.Source (Resolve, Revision) through their options (memory.ServiceOptions, mcpserver.Options, claudeheadless, scriptruns, ADE, dbmcp).
+- There is no global prompt source; consumers get a llmprompts.Source (Resolve, Revision) through their options (memory.ServiceOptions, mcpserver.Options, agentmcp, scriptruns, ADE, dbmcp).
 - Defaults() is the registry-only source, and Store.Resolve stats the file per call and re-reads on mtime or size change.
 - Gate, reconcile, import, headless suffixes and ADE messages resolve per call, so an edit applies on the next call.
 - memory-mcp (stdio subprocess) builds server instructions, tool and argument descriptions once per process, so edits apply only to new Claude sessions (newSession, shown in Settings).
-- dbmcp and claudeheadless rebuild their MCP server when Revision() changes.
+- dbmcp and agentmcp rebuild their MCP server when Revision() changes.
 - LlmPromptsService (List, Save, Preview) exists in both apps and emits event kira:llmPrompts:changed with {revision}; Save is all-or-nothing with per-id errors returned as an E_BAD_REQUEST payload.
 - Preview with real vars also renders the ADE run dialog and step inspector, so no TypeScript copy of a prompt exists.
 - Settings has a Prompts section before Advanced in both apps (packages/workbench/src/llmPrompts/) with list, Monaco editor, diff against default, Preview and per-entry reset; drafts live in Pinia store llmPromptDrafts, and dialog Save saves prompts first, then the settings patch.
@@ -3134,7 +3134,7 @@ Performance:
 - **Semantic memory search is unverified on a Mac (P210).** Loading the bundled dylib from `Contents/Frameworks`, int8 kernels on arm64 and the worker footprint were checked on Linux only (95 MB loaded, 137 MB peak). Delete once checked on a Mac.
 - **Semantic search is English-oriented (P210).** arctic-embed-s is English-only; non-English memories rank by keywords mostly. The smallest multilingual alternative under 500 MB (multilingual-e5-small int8, 362 MB peak) retrieves worse on English.
 - **Headless ADE runs create unnamed branches before the agent can request one (P199).** `request_branch` names a branch only when the agent calls it; a branch the run already created keeps its generated name, and rename is refused.
-- **`declare_repos`, `request_branch` and `branch_status` are untested against a real board and real `claude` (P199).** Covered by the `claudeheadless` go-sdk client test and `agenttools_test.go` only; `task_info` runs in the real `TestSmartScriptRun`. Delete once one live run calls them.
+- **`declare_repos`, `request_branch` and `branch_status` are untested against a real board and real `claude` (P199).** Covered by the `agentmcp` go-sdk client test and `agenttools_test.go` only; `task_info` runs in the real `TestSmartScriptRun`. Delete once one live run calls them.
 - **Unsaved ADE workflow edits are lost when the whole Agents module is switched away (P196).** The leave guard covers list switch, import/new, mode toggle and shell tab change, not a module switch.
 - **PR facts correct on the next request, not by push (P189).** No server-to-client PR-changed notification exists; a client revalidation after `refsChanged` can hit a stale server entry, bounded by the TTL and the next refs change.
 - **The graph keeps its pre-refresh scroll offset after an auto refresh (P203).** A new tip is off screen until scrolled or remounted.

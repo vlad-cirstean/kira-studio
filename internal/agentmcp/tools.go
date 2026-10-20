@@ -1,4 +1,4 @@
-package claudeheadless
+package agentmcp
 
 import "github.com/kirathecat/kira-studio/internal/harness"
 

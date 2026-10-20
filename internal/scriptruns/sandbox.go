@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
@@ -74,7 +74,7 @@ func (s *Service) applySandbox(spec harness.HeadlessSpec, sb *smartSandbox) harn
 	}
 	spec.DisallowedTools = append(slices.Clone(spec.DisallowedTools), sb.prep.Disallowed...)
 	if sb.tools {
-		spec.AllowedTools = append(slices.Clone(spec.AllowedTools), harness.ToolNames(s.Agent.Active(), claudeheadless.SandboxToolIDs...)...)
+		spec.AllowedTools = append(slices.Clone(spec.AllowedTools), harness.ToolNames(s.Agent.Active(), agentmcp.SandboxToolIDs...)...)
 	}
 	note := llmprompts.HeadlessSandboxNote.Text(s.llmPrompts(), llmprompts.SandboxNoteVars{
 		Access: string(agentsandbox.AccessWrite), Worktree: sb.policy.RunDir, Network: true,

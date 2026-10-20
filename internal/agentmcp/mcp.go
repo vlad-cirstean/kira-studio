@@ -1,4 +1,4 @@
-package claudeheadless
+package agentmcp
 
 import (
 	"context"
@@ -197,7 +197,7 @@ func (s *Server) finishSchema(results []ResultSpec) (*jsonschema.Schema, error) 
 	})
 	status := sch.Properties["status"]
 	if status == nil {
-		return nil, errors.New("claudeheadless: finish_step schema has no status")
+		return nil, errors.New("agentmcp: finish_step schema has no status")
 	}
 	status.Enum = nil
 	for _, id := range statusIDs(results) {
@@ -307,14 +307,14 @@ func (s *Server) verify(_ context.Context, token string, _ *http.Request) (*auth
 // startLocked binds the listener and begins serving; s.mu is held.
 func (s *Server) startLocked() error {
 	if s.closed {
-		return errors.New("claudeheadless: server is closed")
+		return errors.New("agentmcp: server is closed")
 	}
 	if s.ln != nil {
 		return nil
 	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return fmt.Errorf("claudeheadless: bind: %w", err)
+		return fmt.Errorf("agentmcp: bind: %w", err)
 	}
 	handler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		reg, ok := s.registered(auth.TokenInfoFromContext(r.Context()))
@@ -356,10 +356,10 @@ func (s *Server) sharedServer(key [5]bool) *mcp.Server {
 // deletes that registration's file and token only; call it when the process has exited.
 func (s *Server) Register(g Grant) (configPath string, release func(), err error) {
 	if g.RunID == "" && !g.Space {
-		return "", nil, errors.New("claudeheadless: grant allows nothing")
+		return "", nil, errors.New("agentmcp: grant allows nothing")
 	}
 	if g.Space && (g.TaskID == "" || s.space == nil) {
-		return "", nil, errors.New("claudeheadless: space grant needs a task and space tools")
+		return "", nil, errors.New("agentmcp: space grant needs a task and space tools")
 	}
 	if g.Git != nil {
 		wts := make([]string, len(g.Git.Worktrees))
@@ -370,13 +370,13 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 	}
 	if g.Review != nil {
 		if g.RunID == "" || s.review == nil {
-			return "", nil, errors.New("claudeheadless: review grant needs a run and a review replier")
+			return "", nil, errors.New("agentmcp: review grant needs a run and a review replier")
 		}
 		g.Review = &ReviewGrant{CommentIDs: slices.Clone(g.Review.CommentIDs)}
 	}
 	if g.Sandbox != nil {
 		if g.RunID == "" || s.sandbox == nil {
-			return "", nil, errors.New("claudeheadless: sandbox grant needs a run and sandbox git tools")
+			return "", nil, errors.New("agentmcp: sandbox grant needs a run and sandbox git tools")
 		}
 		g.Sandbox = &SandboxGrant{Push: g.Sandbox.Push}
 	}
@@ -389,7 +389,7 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 		return "", nil, err
 	}
 	if err := os.MkdirAll(s.dir, 0o700); err != nil {
-		return "", nil, fmt.Errorf("claudeheadless: config dir: %w", err)
+		return "", nil, fmt.Errorf("agentmcp: config dir: %w", err)
 	}
 	s.mu.Lock()
 	if err := s.startLocked(); err != nil {
@@ -422,7 +422,7 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 	}
 	if err != nil {
 		release()
-		return "", nil, fmt.Errorf("claudeheadless: write mcp config: %w", err)
+		return "", nil, fmt.Errorf("agentmcp: write mcp config: %w", err)
 	}
 	return path, release, nil
 }

@@ -17,8 +17,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
@@ -33,7 +33,7 @@ type sandboxRun struct {
 	policy   agentsandbox.Policy
 	tracker  agentsandbox.Tracker
 	keychain bool
-	grant    *claudeheadless.SandboxGrant
+	grant    *agentmcp.SandboxGrant
 	scratch  string
 	notes    []string
 	release  func()
@@ -46,11 +46,11 @@ type sandboxTarget struct {
 
 // sandboxGrantFor is the tool grant of a run: nil when no sandbox git tool applies (rebase runs keep
 // their `git` tool, access off runs are unconfined).
-func sandboxGrantFor(rebase bool, access agentsandbox.Access) *claudeheadless.SandboxGrant {
+func sandboxGrantFor(rebase bool, access agentsandbox.Access) *agentmcp.SandboxGrant {
 	if rebase || access == agentsandbox.AccessOff {
 		return nil
 	}
-	return &claudeheadless.SandboxGrant{Push: access == agentsandbox.AccessWrite}
+	return &agentmcp.SandboxGrant{Push: access == agentsandbox.AccessWrite}
 }
 
 // sandboxInput builds the policy input of a launch.
@@ -197,7 +197,7 @@ func (b *TaskBoard) applySandbox(spec harness.HeadlessSpec, sr *sandboxRun, l ag
 	}
 	spec.DisallowedTools = append(slices.Clone(spec.DisallowedTools), sr.prep.Disallowed...)
 	if sr.grant != nil {
-		spec.AllowedTools = append(slices.Clone(spec.AllowedTools), harness.ToolNames(b.deps.Agent.Active(), claudeheadless.SandboxToolIDs...)...)
+		spec.AllowedTools = append(slices.Clone(spec.AllowedTools), harness.ToolNames(b.deps.Agent.Active(), agentmcp.SandboxToolIDs...)...)
 	}
 	sd := l.def.Sandbox.Normalized()
 	note := llmprompts.HeadlessSandboxNote.Text(b.prompts(), llmprompts.SandboxNoteVars{
@@ -302,63 +302,63 @@ func (b *TaskBoard) sandboxTargetOf(runID string) (sandboxTarget, error) {
 	return v.(sandboxTarget), nil
 }
 
-// FetchRemote implements claudeheadless.SandboxGit: it fetches one remote of the run's repo in the app.
-func (b *TaskBoard) FetchRemote(ctx context.Context, runID, remote string) (claudeheadless.RemoteResult, error) {
+// FetchRemote implements agentmcp.SandboxGit: it fetches one remote of the run's repo in the app.
+func (b *TaskBoard) FetchRemote(ctx context.Context, runID, remote string) (agentmcp.RemoteResult, error) {
 	t, err := b.sandboxTargetOf(runID)
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	mu := b.repoMutex(t.codeRepoID)
 	mu.Lock()
 	defer mu.Unlock()
 	entry, err := b.openRepo(ctx, t.codeRepoID)
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	names, err := entry.Remotes(ctx)
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	if !slices.Contains(names, remote) {
-		return claudeheadless.RemoteResult{}, claudeheadless.ToolError("remote must be one of: " + strings.Join(names, ", "))
+		return agentmcp.RemoteResult{}, agentmcp.ToolError("remote must be one of: " + strings.Join(names, ", "))
 	}
 	res, err := entry.RunRemote(ctx, b.conn, gitsession.RemoteOpParams{Kind: "fetch", Remote: remote}, gitsession.RemoteDeps{Askpass: b.deps.Askpass})
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	return remoteResult(remote, t.branch, res)
 }
 
-// PushBranch implements claudeheadless.SandboxGit: it pushes the run's own task branch.
-func (b *TaskBoard) PushBranch(ctx context.Context, runID string, force bool) (claudeheadless.RemoteResult, error) {
+// PushBranch implements agentmcp.SandboxGit: it pushes the run's own task branch.
+func (b *TaskBoard) PushBranch(ctx context.Context, runID string, force bool) (agentmcp.RemoteResult, error) {
 	t, err := b.sandboxTargetOf(runID)
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	mu := b.repoMutex(t.codeRepoID)
 	mu.Lock()
 	defer mu.Unlock()
 	entry, err := b.openRepo(ctx, t.codeRepoID)
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	head, err := entry.WorktreeHeadRef(ctx, t.worktree)
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	if head != "refs/heads/"+t.branch {
-		return claudeheadless.RemoteResult{}, claudeheadless.ToolError("your worktree is not on " + t.branch)
+		return agentmcp.RemoteResult{}, agentmcp.ToolError("your worktree is not on " + t.branch)
 	}
 	remote := forcePushRemote(ctx, entry, t.branch)
 	if remote == "" {
-		return claudeheadless.RemoteResult{}, claudeheadless.ToolError("the repo has no remote to push to")
+		return agentmcp.RemoteResult{}, agentmcp.ToolError("the repo has no remote to push to")
 	}
 	pf, err := entry.PushPreflightTo(ctx, remote, t.branch, t.branch)
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	if pf.ProtectedBy != nil {
-		return claudeheadless.RemoteResult{}, claudeheadless.ToolError(t.branch + " is a protected branch")
+		return agentmcp.RemoteResult{}, agentmcp.ToolError(t.branch + " is a protected branch")
 	}
 	params := gitsession.RemoteOpParams{Kind: "push", Remote: remote, Branch: t.branch, RemoteBranch: t.branch, SetUpstream: pf.Upstream == nil}
 	if force {
@@ -366,7 +366,7 @@ func (b *TaskBoard) PushBranch(ctx context.Context, runID string, force bool) (c
 	}
 	res, err := entry.RunRemote(ctx, b.conn, params, gitsession.RemoteDeps{Askpass: b.deps.Askpass})
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	out, err := remoteResult(remote, t.branch, res)
 	b.notifyBoard()
@@ -374,9 +374,9 @@ func (b *TaskBoard) PushBranch(ctx context.Context, runID string, force bool) (c
 }
 
 // remoteResult turns a remote op result into the tool result; a failed op is an error with its message.
-func remoteResult(remote, branch string, res gitsession.RemoteOpResult) (claudeheadless.RemoteResult, error) {
+func remoteResult(remote, branch string, res gitsession.RemoteOpResult) (agentmcp.RemoteResult, error) {
 	if res.Error != nil {
-		return claudeheadless.RemoteResult{}, claudeheadless.ToolError(res.Error.Message)
+		return agentmcp.RemoteResult{}, agentmcp.ToolError(res.Error.Message)
 	}
 	var lines []string
 	for _, u := range res.Updates {
@@ -392,7 +392,7 @@ func remoteResult(remote, branch string, res gitsession.RemoteOpResult) (claudeh
 	if len(lines) == 0 {
 		lines = append(lines, "up to date")
 	}
-	return claudeheadless.RemoteResult{Remote: remote, Branch: branch, Output: strings.Join(lines, "\n")}, nil
+	return agentmcp.RemoteResult{Remote: remote, Branch: branch, Output: strings.Join(lines, "\n")}, nil
 }
 
 func short(sha string) string {

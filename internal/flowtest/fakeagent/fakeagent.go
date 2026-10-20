@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/google/renameio/v2"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -288,7 +288,7 @@ func runSideEffects(action Action, dir, cwd string, args []string) (code int, do
 func finishAction(action Action, args []string, headless bool) int {
 	cfg := argAfter(args, "--mcp-config")
 	finish := func(status string) int {
-		if _, err := callTool([]string{cfg}, claudeheadless.ServerName, "finish_step", map[string]any{"status": status, "summary": "summary-" + status}); err != nil {
+		if _, err := callTool([]string{cfg}, agentmcp.ServerName, "finish_step", map[string]any{"status": status, "summary": "summary-" + status}); err != nil {
 			fmt.Fprintln(os.Stderr, "finish_step:", err)
 			return 3
 		}

@@ -9,14 +9,14 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 )
 
 func toolErrText(t *testing.T, err error) string {
 	t.Helper()
-	var te claudeheadless.ToolError
+	var te agentmcp.ToolError
 	if !errors.As(err, &te) {
-		t.Fatalf("err = %v; want an claudeheadless.ToolError", err)
+		t.Fatalf("err = %v; want an agentmcp.ToolError", err)
 	}
 	return te.Error()
 }

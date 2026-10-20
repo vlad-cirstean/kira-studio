@@ -16,7 +16,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
@@ -34,12 +34,12 @@ const (
 const defaultRebaseTimeout = 20 * time.Minute
 
 // rebaseBuiltins are the only built-ins a rebase run has: no Bash. Git goes through the validated
-// git tool, which only runs in the stack's worktrees (claudeheadless.CheckGitArgs).
+// git tool, which only runs in the stack's worktrees (agentmcp.CheckGitArgs).
 var rebaseBuiltins = []string{"Read", "Edit", "Write", "Grep", "Glob"}
 
 func rebaseTools(p harness.MCPHost) []string {
 	out := slices.Clone(rebaseBuiltins)
-	return append(out, harness.ToolNames(p, claudeheadless.Git, claudeheadless.FinishStep, claudeheadless.RunOutcome)...)
+	return append(out, harness.ToolNames(p, agentmcp.Git, agentmcp.FinishStep, agentmcp.RunOutcome)...)
 }
 
 // rebaseWorktrees are the stack's worktrees: where the git tool runs and what the run may edit.
@@ -398,7 +398,7 @@ func (b *TaskBoard) RebasePreview(ctx context.Context, args adewire.OntoArgs) (a
 	if err != nil {
 		return adewire.RebasePreview{}, err
 	}
-	out := adewire.RebasePreview{Suffix: claudeheadless.RebaseReport(b.prompts()), Stack: []adewire.RebaseStackItem{}, Blockers: p.blockers, NoOp: p.noOp}
+	out := adewire.RebasePreview{Suffix: agentmcp.RebaseReport(b.prompts()), Stack: []adewire.RebaseStackItem{}, Blockers: p.blockers, NoOp: p.noOp}
 	if out.Blockers == nil {
 		out.Blockers = []adewire.RebaseBlocker{}
 	}
@@ -545,7 +545,7 @@ func (b *TaskBoard) startRebase(run model.AdeRun, spec model.AdeRebaseSpec, prom
 		defer endRun()
 		b.superviseAgent(runCtx, updated, agentLaunch{
 			def: b.rebaseDef(), sessionID: sessionID, path: root.Worktree, prompt: prompt, timeout: b.rebaseTimeout(),
-			git: &claudeheadless.GitGrant{Worktrees: rebaseWorktrees(spec), Push: spec.Push},
+			git: &agentmcp.GitGrant{Worktrees: rebaseWorktrees(spec), Push: spec.Push},
 		})
 	}()
 	return updated, nil
@@ -553,7 +553,7 @@ func (b *TaskBoard) startRebase(run model.AdeRun, spec model.AdeRebaseSpec, prom
 
 // completeRebase verifies the result in git, then settles the run. f is the agent's last finish_step
 // call, nil when it made none; end says how the process ended.
-func (b *TaskBoard) completeRebase(run model.AdeRun, sessionID string, f *claudeheadless.Finish, end outcome) {
+func (b *TaskBoard) completeRebase(run model.AdeRun, sessionID string, f *agentmcp.Finish, end outcome) {
 	spec, err := specOf(run)
 	if err != nil {
 		slog.Warn("ade: rebase spec", "scope", "ade", "run", run.ID, "err", err)
@@ -628,7 +628,7 @@ func (b *TaskBoard) releaseRebaseGate(taskID string, spec model.AdeRebaseSpec) {
 
 // applyRebaseFinish applies a finish_step call of a taken-over rebase run: git decides again. The
 // task mutex is held.
-func (b *TaskBoard) applyRebaseFinish(run model.AdeRun, f claudeheadless.Finish) {
+func (b *TaskBoard) applyRebaseFinish(run model.AdeRun, f agentmcp.Finish) {
 	spec, err := specOf(run)
 	if err != nil {
 		slog.Warn("ade: rebase spec", "scope", "ade", "run", run.ID, "err", err)

@@ -10,7 +10,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
@@ -284,7 +284,7 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 	space := b.spaceEnabled(tc.task)
 	var release func()
 	if runID != "" || space {
-		grant := claudeheadless.Grant{RunID: runID, TaskID: tc.task.ID, Space: space}
+		grant := agentmcp.Grant{RunID: runID, TaskID: tc.task.ID, Space: space}
 		if runID != "" {
 			grant.Results = resultSpecs(stepResultsOf(tc, pa.StepID))
 		}
@@ -295,11 +295,11 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 		release = rel
 		var ids []harness.MCPTool
 		if runID != "" {
-			ids = append(ids, claudeheadless.FinishStep)
+			ids = append(ids, agentmcp.FinishStep)
 		}
-		ids = append(ids, claudeheadless.RunOutcome)
+		ids = append(ids, agentmcp.RunOutcome)
 		if space {
-			ids = append(ids, claudeheadless.SpaceToolIDs...)
+			ids = append(ids, agentmcp.SpaceToolIDs...)
 		}
 		tools := harness.ToolNames(b.deps.Agent.Active(), ids...)
 		pa.ExtraArgs = append(pa.ExtraArgs, "--mcp-config", cfg, "--allowedTools")
@@ -380,7 +380,7 @@ func (b *TaskBoard) tuiBound(runID string) bool {
 }
 
 // applyTUIFinish applies a finish_step call of a taken-over run at call time (R14).
-func (b *TaskBoard) applyTUIFinish(runID string, f claudeheadless.Finish) {
+func (b *TaskBoard) applyTUIFinish(runID string, f agentmcp.Finish) {
 	if b.ctx.Err() != nil {
 		return
 	}

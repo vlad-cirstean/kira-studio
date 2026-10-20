@@ -3,7 +3,7 @@ package scriptruns
 import (
 	"context"
 
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
@@ -21,9 +21,9 @@ type ADE interface {
 	// Busy says why a smart run cannot claim the branch now, "" when it can.
 	Busy(branchID string) string
 	// Tools are the Kira Space tools and run_outcome a task-bound smart run may call.
-	Tools() (claudeheadless.SpaceTools, claudeheadless.Outcomes)
+	Tools() (agentmcp.SpaceTools, agentmcp.Outcomes)
 	// SandboxGit serves fetch_remote and push_branch to a sandboxed smart run.
-	SandboxGit() claudeheadless.SandboxGit
+	SandboxGit() agentmcp.SandboxGit
 	// SandboxTarget points those tools at branchID's worktree for one run; release drops it.
 	SandboxTarget(runID, branchID, worktree string) (release func(), err error)
 }

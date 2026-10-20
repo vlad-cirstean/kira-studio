@@ -11,7 +11,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
@@ -82,7 +82,7 @@ func TestRunEngine_sendBack(t *testing.T) {
 		}
 		prompt := e.fakeFile("api-3.prompt")
 		if !strings.Contains(prompt, "tests failed on feat/fix-login: summary-failed. Fix the implementation.") ||
-			!strings.Contains(prompt, claudeheadless.FinishInstruction(llmprompts.Defaults(), nil)) || strings.Contains(prompt, "Step 1/2") {
+			!strings.Contains(prompt, agentmcp.FinishInstruction(llmprompts.Defaults(), nil)) || strings.Contains(prompt, "Step 1/2") {
 			t.Fatalf("fix prompt = %q", prompt)
 		}
 		rec, _ := e.repos.AdeSessions.Get(fix.SessionID)
@@ -310,7 +310,7 @@ func TestRunEngine_recoverHeldFixRun(t *testing.T) {
 		t.Fatalf("fix run argv = %s", args)
 	}
 	if prompt := e.fakeFile("api-2.prompt"); !strings.Contains(prompt, spec.Prompt) ||
-		!strings.Contains(prompt, claudeheadless.FinishInstruction(llmprompts.Defaults(), nil)) || strings.Contains(prompt, "Step 1/2") {
+		!strings.Contains(prompt, agentmcp.FinishInstruction(llmprompts.Defaults(), nil)) || strings.Contains(prompt, "Step 1/2") {
 		t.Fatalf("fix prompt = %q", prompt)
 	}
 	if rec, _ := e.repos.AdeSessions.Get(fix.SessionID); rec == nil || rec.Resumes != claudeID {
@@ -371,7 +371,7 @@ func TestRunEngine_takeOver(t *testing.T) {
 	}
 	composed := e.spawn(l)
 	if !strings.HasPrefix(composed, e.tracker.deps.AgentBin+" --resume '"+head.ClaudeSessionID+"' ") ||
-		!strings.Contains(composed, "'--allowedTools' '"+toolName(claudeheadless.FinishStep)+"'") {
+		!strings.Contains(composed, "'--allowedTools' '"+toolName(agentmcp.FinishStep)+"'") {
 		t.Fatalf("command = %s", composed)
 	}
 	rec, _ := e.repos.AdeSessions.Get(l.SessionID)

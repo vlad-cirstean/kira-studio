@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
@@ -57,9 +57,9 @@ type Service struct {
 	closed    bool
 	smart     map[string]*bgRun
 	bg        map[string]*bgRun
-	finishes  map[string]claudeheadless.Finish
+	finishes  map[string]agentmcp.Finish
 	launches  map[string]launch
-	server    *claudeheadless.Server
+	server    *agentmcp.Server
 	smartWait sync.WaitGroup
 	bgWait    sync.WaitGroup
 }

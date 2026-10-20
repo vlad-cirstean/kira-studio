@@ -10,7 +10,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
@@ -70,7 +70,7 @@ func TestSmartScriptSpace(t *testing.T) {
 	if o := run.Outcome; o == nil || !o.Reported || o.Source != "agent" {
 		t.Fatalf("outcome = %+v", o)
 	}
-	if want := scripts.PlainText(pv.Prompt) + "\n\n" + claudeheadless.ScriptReport(llmprompts.Defaults()); run.Prompt != want {
+	if want := scripts.PlainText(pv.Prompt) + "\n\n" + agentmcp.ScriptReport(llmprompts.Defaults()); run.Prompt != want {
 		t.Fatalf("prompt = %q, want %q", run.Prompt, want)
 	}
 	page, err := app.W.ScriptRuns.ReadLog(scriptruns.ReadLogArgs{ID: started.RunID})
