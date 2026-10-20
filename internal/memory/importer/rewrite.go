@@ -92,23 +92,17 @@ func (d Distiller) rewrite(ctx context.Context, req DistillRequest) (DistillResu
 	}
 
 	run.report(StageRewrite, 0, 1)
-	var draft rewriteDraft
-	usable := false
-	for range 2 {
-		out, err := agent.Rewrite(ctx, req.Text, req.Context)
-		run.charge(out.CostUSD)
-		if errors.Is(err, harness.ErrOutput) {
-			continue
-		}
-		if err != nil {
-			return finish(err)
-		}
-		draft, usable = out, true
-		break
+	draft, usable, err := agent.rewriteTwice(ctx, run, req)
+	if err != nil {
+		return finish(err)
 	}
 	run.report(StageRewrite, 1, 1)
 	if !usable {
 		res.Rewrite = &RewriteResult{Text: req.Text, Gate: GateOutput, Dropped: []DroppedSpan{}}
+		return finish(nil)
+	}
+	if hedgeLeft(draft.Text) {
+		res.Rewrite = kept(GateHedge, draft)
 		return finish(nil)
 	}
 	if draft.Text == req.Text {
@@ -121,6 +115,27 @@ func (d Distiller) rewrite(ctx context.Context, req DistillRequest) (DistillResu
 	}
 	res.Rewrite = &RewriteResult{Text: draft.Text, Changed: true, Reason: draft.Reason, Dropped: nonNilDropped(draft.Dropped)}
 	return finish(nil)
+}
+
+// rewriteTwice makes up to two rewrite calls: the second only after unusable output or a draft that
+// still holds a hedge word. The last draft is returned; usable is false when none was usable.
+func (a ModelAgent) rewriteTwice(ctx context.Context, run *distillRun, req DistillRequest) (draft rewriteDraft, usable bool, err error) {
+	for attempt := range 2 {
+		out, err := a.Rewrite(ctx, req.Text, req.Context)
+		run.charge(out.CostUSD)
+		if errors.Is(err, harness.ErrOutput) {
+			continue
+		}
+		if err != nil {
+			return draft, usable, err
+		}
+		draft, usable = out, true
+		if attempt == 0 && hedgeLeft(out.Text) {
+			continue
+		}
+		break
+	}
+	return draft, usable, nil
 }
 
 func nonNilDropped(d []DroppedSpan) []DroppedSpan {

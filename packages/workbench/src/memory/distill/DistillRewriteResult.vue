@@ -23,6 +23,7 @@ const KEPT = {
   directive: 'memory.distill.rewrite.kept.directive.body',
   tokens: 'memory.distill.rewrite.kept.tokens.body',
   output: 'memory.distill.rewrite.kept.output.body',
+  hedge: 'memory.distill.rewrite.kept.hedge.body',
 } as const satisfies Record<Exclude<DistillRewrite['gate'], ''>, MessageKey>;
 
 const WHY = {

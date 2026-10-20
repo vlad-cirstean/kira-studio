@@ -16,6 +16,7 @@ const (
 	GateDirective = "directive"
 	GateTokens    = "tokens"
 	GateOutput    = "output"
+	GateHedge     = "hedge"
 )
 
 // The gates only accept or reject a draft; none edits text.
@@ -360,4 +361,21 @@ func proseKept(input, draft string) bool {
 		}
 	}
 	return true
+}
+
+var hedgeWord = regexp.MustCompile(`(?i)\b(?:really|basically|actually|simply)\b`)
+
+var quotedSpan = regexp.MustCompile(`"[^"\n]{1,80}"`)
+
+// hedgeLeft reports whether text still holds an unambiguous hedge word outside backtick code and
+// double-quoted spans; the prompt requires every such word gone.
+func hedgeLeft(text string) bool {
+	for _, l := range splitLines(text) {
+		l = backtickSpan.ReplaceAllString(l, " ")
+		l = quotedSpan.ReplaceAllString(l, " ")
+		if hedgeWord.MatchString(l) {
+			return true
+		}
+	}
+	return false
 }

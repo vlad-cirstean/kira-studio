@@ -23,7 +23,7 @@ export type DistillMode = z.infer<typeof distillModeSchema>;
 export const distillRewriteSchema = /*#__PURE__*/ z.object({
   text: z.string(),
   changed: z.boolean(),
-  gate: z.enum(['', 'grew', 'form', 'indent', 'width', 'directive', 'tokens', 'output']),
+  gate: z.enum(['', 'grew', 'form', 'indent', 'width', 'directive', 'tokens', 'output', 'hedge']),
   reason: z.string(),
   dropped: z.array(
     z.object({

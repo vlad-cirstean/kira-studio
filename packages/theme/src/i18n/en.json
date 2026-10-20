@@ -5943,6 +5943,9 @@
           "grew": {
             "body": "Kept the original. The rewrite was longer."
           },
+          "hedge": {
+            "body": "Kept the original. The rewrite still held a hedge word."
+          },
           "indent": {
             "body": "Kept the original. The rewrite changed the indentation."
           },
