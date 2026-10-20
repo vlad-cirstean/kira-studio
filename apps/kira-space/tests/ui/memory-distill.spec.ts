@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { expect, test } from './fixtures';
+import { expect, type KiraApp, type RelaunchOptions, test } from './fixtures';
 import { contract } from './support/contract';
 import { installGitStreamMock } from './support/gitStreamMock';
 import { IPC } from './support/ipcChannels';
@@ -9,9 +9,19 @@ import { repoRowById, treeRow } from './support/repoRows';
 import type { ControlSnapshot } from './support/types';
 
 // P285 Part 4: distill in the Memory module against a mocked bridge. Backend half: memoryflow
-// TestBridgeDistill*; fixtures from contract memory-distill.
+// TestBridgeDistill*; fixtures from contract memory-distill. P315: rewrite mode, backend half
+// TestBridgeDistillRewrite.
 
+interface Rewritten {
+  text: string;
+  changed: boolean;
+  gate: string;
+  reason: string;
+  dropped: { text: string; why: string }[];
+}
 interface Distilled {
+  mode: 'facts' | 'rewrite';
+  rewrite: Rewritten | null;
   lines: { text: string; kind: 'fact' | 'rule' }[];
   unresolved: { fact: string; questions: string[] }[];
   costUsd: number;
@@ -26,9 +36,16 @@ interface Limits {
   maxParts: number;
   spendCapUsd: number;
   storeMaxLines: number;
+  rewriteMaxChars: number;
 }
 
 const done = contract<Distilled>('memory-distill', 'MemoryDistillService.Distill#done');
+const rewritten = contract<Distilled>('memory-distill', 'MemoryDistillService.Distill#rewrite');
+const unchanged = contract<Distilled>(
+  'memory-distill',
+  'MemoryDistillService.Distill#rewriteUnchanged',
+);
+const kept = contract<Distilled>('memory-distill', 'MemoryDistillService.Distill#rewriteKept');
 const limits = contract<Limits>('memory-distill', 'MemoryDistillService.Limits');
 const progress = contract<{
   requestId: string;
@@ -80,9 +97,9 @@ test('contract: distill: paste, size line, progress push, result summary and Cop
   await expect(page.locator('[data-testid="distill-size"]')).toContainText(
     `${TEXT.length} characters, about ${Math.floor((TEXT.length + 2) / 3)} tokens`,
   );
-  // One mode: no mode tabs, one static hint.
-  await expect(page.locator('[data-testid="distill-mode-facts"]')).toHaveCount(0);
-  await expect(page.locator('[data-testid="distill-mode-instructions"]')).toHaveCount(0);
+  // Facts is the default mode.
+  await expect(page.locator('[data-testid="distill-mode-facts"]')).toBeVisible();
+  await expect(page.locator('[data-testid="distill-mode-rewrite"]')).toBeVisible();
   await expect(page.locator('[data-testid="distill-hint"]')).toContainText(
     'rules as short imperatives',
   );
@@ -90,8 +107,7 @@ test('contract: distill: paste, size line, progress push, result summary and Cop
 
   await expect.poll(() => runCalls(control)).toHaveLength(1);
   const sent = runCalls(control)[0]?.args as { requestId: string; text: string };
-  expect(sent).toMatchObject({ text: TEXT });
-  expect(sent).not.toHaveProperty('mode');
+  expect(sent).toMatchObject({ text: TEXT, mode: 'facts' });
   await emitWailsEvent(page, IPC.memoryDistill, {
     ...progress,
     stage: 'extract',
@@ -147,6 +163,88 @@ test('contract: distill: paste, size line, progress push, result summary and Cop
         .map((l) => l.text)
         .join('\n'),
     );
+});
+
+async function runRewrite(
+  relaunch: (options?: RelaunchOptions) => Promise<KiraApp>,
+  response: Distilled,
+  input: string,
+) {
+  const { window: page, control } = await relaunch({
+    control: [...BASE, { channel: IPC.memoryDistillRun, response }],
+  });
+  await page.evaluate(() => {
+    const w = window as unknown as { __clipboard: string[] };
+    w.__clipboard = [];
+    navigator.clipboard.writeText = async (text: string) => {
+      w.__clipboard.push(text);
+    };
+  });
+  await openDistill(page);
+  await page.locator('[data-testid="distill-mode-rewrite"]').click();
+  await page.locator('[data-testid="distill-input"]').fill(input);
+  await page.locator('[data-testid="distill-run"]').click();
+  await expect(page.locator('[data-testid="distill-rewrite-text"]')).toBeVisible();
+  return { page, control };
+}
+
+const clipboard = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __clipboard: string[] }).__clipboard[0]);
+
+test('contract: distill: Rewrite sends mode rewrite and shows the text with Copy', async ({
+  relaunch,
+}) => {
+  const input = rewritten.rewrite?.text ?? '';
+  const { page, control } = await runRewrite(relaunch, rewritten, input);
+  expect(runCalls(control)[0]?.args).toMatchObject({ text: input, mode: 'rewrite' });
+  await expect(page.locator('[data-testid="distill-rewrite-text"]')).toHaveText(input);
+  await expect(page.locator('[data-testid="distill-rewrite-dropped-0"]')).toContainText(
+    rewritten.rewrite?.dropped[0]?.text ?? '',
+  );
+  await expect(page.locator('[data-testid="distill-rewrite-unchanged"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="distill-rewrite-kept"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="distill-store"]')).toHaveCount(0);
+  await page.locator('[data-testid="distill-rewrite-copy"]').click();
+  await expect.poll(() => clipboard(page)).toBe(input);
+});
+
+test('contract: distill: a kept rewrite shows the original and why', async ({ relaunch }) => {
+  const { page } = await runRewrite(relaunch, kept, kept.rewrite?.text ?? '');
+  await expect(page.locator('[data-testid="distill-rewrite-text"]')).toHaveText(
+    kept.rewrite?.text ?? '',
+  );
+  await expect(page.locator('[data-testid="distill-rewrite-kept"]')).toContainText(
+    'Kept the original. The rewrite was longer.',
+  );
+  await expect(page.locator('[data-testid="distill-rewrite-unchanged"]')).toHaveCount(0);
+});
+
+test('contract: distill: an already clean text comes back unchanged', async ({ relaunch }) => {
+  const text = unchanged.rewrite?.text ?? '';
+  const { page } = await runRewrite(relaunch, unchanged, text);
+  await expect(page.locator('[data-testid="distill-rewrite-text"]')).toHaveText(text);
+  await expect(page.locator('[data-testid="distill-rewrite-unchanged"]')).toContainText(
+    'Already concise',
+  );
+  await expect(page.locator('[data-testid="distill-rewrite-kept"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="distill-rewrite-dropped-"]')).toHaveCount(0);
+  await page.locator('[data-testid="distill-rewrite-copy"]').click();
+  await expect.poll(() => clipboard(page)).toBe(text);
+});
+
+test('contract: distill: in Rewrite mode a text over the rewrite limit blocks Run', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: BASE });
+  await openDistill(page);
+  await page.locator('[data-testid="distill-mode-rewrite"]').click();
+  await page.locator('[data-testid="distill-input"]').fill('a'.repeat(limits.rewriteMaxChars + 1));
+  await expect(page.locator('[data-testid="distill-size"]')).toContainText(
+    `Over the limit of ${limits.rewriteMaxChars.toLocaleString('en-US')} characters`,
+  );
+  await expect(page.locator('[data-testid="distill-run"]')).toBeDisabled();
+  await page.locator('[data-testid="distill-mode-facts"]').click();
+  await expect(page.locator('[data-testid="distill-run"]')).toBeEnabled();
 });
 
 test('contract: distill: Cancel cancels the call and shows the cancelled status', async ({
