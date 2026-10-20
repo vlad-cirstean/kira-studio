@@ -147,6 +147,20 @@ func TestMcpIngestDistillRewriteGates(t *testing.T) {
 	})
 }
 
+// Prose is accepted only as the input minus listed hedges: no reflow, no other word gone, no width rule.
+func TestMcpIngestDistillRewriteProse(t *testing.T) {
+	long := "The package is published on PyPI and it really only needs Python 3.9 or newer and has no compiled dependencies, so it works on Alpine images too."
+	_, _, out := rewriteVia(t, long, false, rewriteRule(t, strings.Replace(long, "really ", "", 1), nil))
+	if !out.Rewrite.Changed || out.Rewrite.Gate != "" {
+		t.Fatalf("hedge removal = %+v, want accepted", out.Rewrite)
+	}
+	note := "Changed: the page size is now 50 (was 25), actually."
+	_, _, out = rewriteVia(t, note, false, rewriteRule(t, "Changed: the page size is now 50.", nil))
+	if out.Rewrite.Changed || out.Rewrite.Gate != "form" {
+		t.Fatalf("dropped content = %+v, want gate form", out.Rewrite)
+	}
+}
+
 func TestMcpIngestDistillRewriteOutput(t *testing.T) {
 	unusable := fakeagent.PromptRule{System: rewriteSystem, Emit: costAnswer(t, rewriteCost, nil)}
 	app, _, out := rewriteVia(t, rewriteIn, false, unusable)

@@ -44,6 +44,17 @@ var protectedTokens = []*regexp.Regexp{
 
 // gateDraft returns the first gate that rejects the draft, or "" when every mechanical gate passes.
 func gateDraft(input, draft string, dropped []DroppedSpan) string {
+	if !isCommentText(input) {
+		switch {
+		case utf8.RuneCountInString(draft) > utf8.RuneCountInString(input):
+			return GateGrew
+		case !proseKept(input, draft):
+			return GateForm
+		case !tokensKept(input, draft, dropped):
+			return GateTokens
+		}
+		return ""
+	}
 	switch {
 	case utf8.RuneCountInString(draft) > utf8.RuneCountInString(input)+reflowAllowance(input, draft):
 		return GateGrew
@@ -268,6 +279,65 @@ func tokensKept(input, draft string, dropped []DroppedSpan) bool {
 			}
 		}
 		if !found && !present(tok) {
+			return false
+		}
+	}
+	return true
+}
+
+// isCommentText tells a code comment from prose: its first line opens with a comment marker, or every
+// non-blank line starts with "#".
+func isCommentText(s string) bool {
+	in := nonBlank(s)
+	if len(in) == 0 {
+		return false
+	}
+	first := strings.TrimLeft(in[0], " \t")
+	for _, m := range markers {
+		if !strings.HasPrefix(first, m) {
+			continue
+		}
+		if m != "#" {
+			return true
+		}
+		for _, l := range in {
+			if !strings.HasPrefix(strings.TrimLeft(l, " \t"), "#") {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+var hedgeToken = regexp.MustCompile(`(?i)^(?:really|basically|actually|simply|just)\W*$`)
+
+// proseKept accepts a prose draft that is the input with only listed hedge words removed: same line
+// structure, no reflow, no other word gone.
+func proseKept(input, draft string) bool {
+	in, out := splitLines(input), splitLines(draft)
+	if len(in) != len(out) {
+		return false
+	}
+	for i := range in {
+		if strings.TrimSpace(in[i]) == "" != (strings.TrimSpace(out[i]) == "") {
+			return false
+		}
+		if leading(in[i]) != leading(out[i]) {
+			return false
+		}
+		want := strings.Fields(out[i])
+		k := 0
+		for _, w := range strings.Fields(in[i]) {
+			switch {
+			case k < len(want) && strings.EqualFold(w, want[k]):
+				k++
+			case hedgeToken.MatchString(w):
+			default:
+				return false
+			}
+		}
+		if k != len(want) {
 			return false
 		}
 	}
