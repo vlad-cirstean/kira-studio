@@ -21,7 +21,7 @@ const (
 
 // The gates only accept or reject a draft; none edits text.
 
-// directives stay byte for byte; the prompt lists the same strings.
+// directives are tool directives and licence headers; a line holding one stays byte for byte.
 var directives = []string{
 	"//go:build", "//go:generate", "//go:embed", "//nolint", "eslint-disable", "biome-ignore",
 	"@ts-expect-error", "@ts-ignore", "/// <reference", "SPDX-License-Identifier", "Copyright",
