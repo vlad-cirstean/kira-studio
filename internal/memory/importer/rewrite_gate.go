@@ -3,6 +3,7 @@ package importer
 import (
 	"regexp"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -29,9 +30,11 @@ var directives = []string{
 // markers, longest first.
 var markers = []string{"///", "//", "/**", "/*", "<!--", "#"}
 
+var backtickSpan = regexp.MustCompile("`[^`\n]+`")
+
+// protectedTokens are matched on the input; quoted spans are paired by quotesOutsideBackticks.
 var protectedTokens = []*regexp.Regexp{
-	regexp.MustCompile("`[^`\n]+`"),
-	regexp.MustCompile(`"[^"\n]{1,80}"`),
+	backtickSpan,
 	regexp.MustCompile(`\b\d+(?:[.,:]\d+)*\b`),
 	regexp.MustCompile(`\b[A-Za-z_]\w*(?:[./]\w+)+\b`),
 	regexp.MustCompile(`\b[a-z][a-z0-9]*[A-Z]\w*\b`),
@@ -42,7 +45,7 @@ var protectedTokens = []*regexp.Regexp{
 // gateDraft returns the first gate that rejects the draft, or "" when every mechanical gate passes.
 func gateDraft(input, draft string, dropped []DroppedSpan) string {
 	switch {
-	case utf8.RuneCountInString(draft) > utf8.RuneCountInString(input):
+	case utf8.RuneCountInString(draft) > utf8.RuneCountInString(input)+reflowAllowance(input, draft):
 		return GateGrew
 	case !formKept(input, draft):
 		return GateForm
@@ -71,6 +74,9 @@ func nonBlank(s string) []string {
 }
 
 func formKept(input, draft string) bool {
+	if strings.HasSuffix(input, "\n") != strings.HasSuffix(draft, "\n") {
+		return false
+	}
 	in, out := nonBlank(input), nonBlank(draft)
 	if len(in) == 0 {
 		return true
@@ -176,22 +182,85 @@ func directivesKept(input, draft string) bool {
 	return true
 }
 
+// reflowAllowance is what a reflow of an over-width input may add: each extra line costs about twice its prefix
+// (indent and marker). It applies only when the draft fixes the width.
+func reflowAllowance(input, draft string) int {
+	if widest(input) <= RewriteWidth || widest(draft) > RewriteWidth {
+		return 0
+	}
+	in, out := nonBlank(input), nonBlank(draft)
+	if len(out) <= len(in) {
+		return 0
+	}
+	prefix := 0
+	for _, r := range out[0] {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			break
+		}
+		prefix++
+	}
+	return (len(out) - len(in)) * 2 * prefix
+}
+
+// quotesOutsideBackticks returns the double-quoted spans of s, paired in order per line, ignoring
+// backtick spans.
+func quotesOutsideBackticks(s string) []string {
+	var spans []string
+	for _, l := range splitLines(s) {
+		l = backtickSpan.ReplaceAllStringFunc(l, func(m string) string { return strings.Repeat(" ", len(m)) })
+		var at []int
+		for i := 0; i < len(l); i++ {
+			if l[i] == '"' {
+				at = append(at, i)
+			}
+		}
+		for k := 0; k+1 < len(at); k += 2 {
+			if n := at[k+1] - at[k] - 1; n >= 1 && n <= 80 {
+				spans = append(spans, l[at[k]:at[k+1]+1])
+			}
+		}
+	}
+	return spans
+}
+
+var lineBreak = regexp.MustCompile(`[ \t]*\n[ \t]*(?:///?|\*|#|<!--)?[ \t]*`)
+
+// tokensKept requires every protected token of the input in the draft, unless a dropped span holds it.
+// A path token is checked per component, so a dropped tag joined to it does not kill the rest. The
+// draft is also read with its line breaks and comment markers joined, so a reflow cannot split a token.
 func tokensKept(input, draft string, dropped []DroppedSpan) bool {
+	forms := []string{draft, lineBreak.ReplaceAllString(draft, ""), lineBreak.ReplaceAllString(draft, " ")}
+	present := func(tok string) bool {
+		for _, f := range forms {
+			if strings.Contains(f, tok) {
+				return true
+			}
+		}
+		for _, d := range dropped {
+			if strings.Contains(d.Text, tok) {
+				return true
+			}
+		}
+		return false
+	}
 	for _, re := range protectedTokens {
 		for _, tok := range re.FindAllString(input, -1) {
-			if strings.Contains(draft, tok) {
+			if strings.Contains(tok, "/") && !strings.HasPrefix(tok, "`") {
+				for _, part := range strings.Split(tok, "/") {
+					if part != "" && !present(part) {
+						return false
+					}
+				}
 				continue
 			}
-			excused := false
-			for _, d := range dropped {
-				if strings.Contains(d.Text, tok) {
-					excused = true
-					break
-				}
-			}
-			if !excused {
+			if !present(tok) {
 				return false
 			}
+		}
+	}
+	for _, tok := range quotesOutsideBackticks(input) {
+		if !present(tok) {
+			return false
 		}
 	}
 	return true
