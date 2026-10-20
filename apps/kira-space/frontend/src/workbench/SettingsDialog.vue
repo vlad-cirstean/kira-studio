@@ -59,6 +59,7 @@ async function save(patch: SettingsPatch): Promise<void> {
       advanced: defaultSettings.advanced,
       git: defaultSettings.git,
       claudeCode: defaultSettings.claudeCode,
+      memory: defaultSettings.memory,
       ade: {
         headlessSettingSources: defaultSettings.ade.headlessSettingSources,
         sandboxKeychain: defaultSettings.ade.sandboxKeychain,
@@ -69,6 +70,7 @@ async function save(patch: SettingsPatch): Promise<void> {
       advanced: settingsStore.advanced,
       git: settingsStore.git,
       claudeCode: settingsStore.claudeCode,
+      memory: settingsStore.memory,
       ade: {
         headlessSettingSources: settingsStore.ade.headlessSettingSources,
         sandboxKeychain: settingsStore.ade.sandboxKeychain,

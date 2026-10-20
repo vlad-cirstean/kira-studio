@@ -8,7 +8,10 @@ import type { Settings } from '../../state/settingsDomain';
 //
 // `ade` carries the one leaf the dialog edits (the other `ade` leaves are written live by the Plan
 // and its panel), so it saves with the rest instead of writing on toggle.
-type SettingsSections = Pick<Settings, 'appearance' | 'advanced' | 'git' | 'claudeCode'> & {
+type SettingsSections = Pick<
+  Settings,
+  'appearance' | 'advanced' | 'git' | 'claudeCode' | 'memory'
+> & {
   ade: Pick<Settings['ade'], 'headlessSettingSources' | 'sandboxKeychain'>;
 };
 

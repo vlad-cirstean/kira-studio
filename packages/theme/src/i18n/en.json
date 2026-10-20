@@ -9077,6 +9077,12 @@
           "title": "Git remote operations"
         }
       },
+      "memory": {
+        "claudeModel": {
+          "description": "Model for memory store checks, import and distill. Sonnet is the default.",
+          "label": "Claude model"
+        }
+      },
       "mobileAccess": {
         "agentInput": {
           "description": "Anyone holding a phone with this on can type into Claude Code and run commands as you. Each phone also needs agent input turned on in its own row below. Turning this off ends every phone terminal now.",

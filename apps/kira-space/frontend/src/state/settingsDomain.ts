@@ -1,3 +1,4 @@
+import { CLAUDE_MODELS, DEFAULT_CLAUDE_MODEL } from '@shared/domain/claudeModels';
 import { appearanceSettingsSchema, FONT_SIZE_RANGE, logLevelSchema } from '@shared/domain/settings';
 import { z } from 'zod';
 
@@ -141,6 +142,11 @@ const mobileSettingsSchema = /*#__PURE__*/ z.object({
   agentInput: z.boolean().default(false),
 });
 
+// P314: the Claude model for every memory call (gate, reconcile, import, distill).
+const memorySettingsSchema = /*#__PURE__*/ z.object({
+  claudeModel: z.enum(CLAUDE_MODELS).default(DEFAULT_CLAUDE_MODEL),
+});
+
 // `.default(...)` on every section is load-bearing: an older kira-space.sqlite has a settings row
 // with no `advanced`/`git`/`ade`/`claudeCode` keys, and that row must still parse on next launch.
 const settingsSchema = /*#__PURE__*/ z.object({
@@ -177,6 +183,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
     port: 7790,
     agentInput: false,
   }),
+  memory: memorySettingsSchema.default({ claudeModel: DEFAULT_CLAUDE_MODEL }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -187,6 +194,7 @@ const settingsPatchSchema = /*#__PURE__*/ z.object({
   ade: adeSettingsSchema.partial().optional(),
   claudeCode: claudeCodeSettingsSchema.partial().optional(),
   mobile: mobileSettingsSchema.partial().optional(),
+  memory: memorySettingsSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -234,5 +242,8 @@ export const defaultSettings: Settings = {
     enabled: false,
     port: 7790,
     agentInput: false,
+  },
+  memory: {
+    claudeModel: DEFAULT_CLAUDE_MODEL,
   },
 };
