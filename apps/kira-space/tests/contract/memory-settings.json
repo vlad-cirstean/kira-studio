@@ -50,5 +50,13 @@
     "model": "arctic-embed-s-int8-e596f50",
     "state": "notInstalled",
     "total": 0
+  },
+  "SettingsService.GetAll#memory": {
+    "claudeModel": "sonnet"
+  },
+  "SettingsService.Set#memory-model": {
+    "memory": {
+      "claudeModel": "opus"
+    }
   }
 }

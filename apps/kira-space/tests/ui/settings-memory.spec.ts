@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import { expect, test } from './fixtures';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
@@ -172,4 +173,33 @@ test('semantic unavailable: shows the reason and a retry', async ({ relaunch }) 
   await expect
     .poll(() => control.log().some((e) => e.channel === IPC.memorySemanticRetry))
     .toBe(true);
+});
+
+// Contract memory-settings. Backend half: memoryflow TestMemoryClaudeModel.
+test('contract: memory model saves memory.claudeModel with the dialog', async ({ relaunch }) => {
+  const memory = contract<{ claudeModel: string }>(
+    'memory-settings',
+    'SettingsService.GetAll#memory',
+  );
+  const patch = contract<{ memory: { claudeModel: string } }>(
+    'memory-settings',
+    'SettingsService.Set#memory-model',
+  );
+  const { window: page, control } = await relaunch({
+    control: [{ channel: IPC.settingsGetAll, response: { ...defaultSettings, memory } }],
+  });
+  await openMemorySettings(page);
+  const select = page.locator('[data-testid="settings-memory-claude-model"]');
+  const reset = page.locator('[data-testid="settings-reset-memory-claudeModel"]');
+  await expect(select).toHaveValue(memory.claudeModel);
+  await expect(reset).toBeDisabled();
+
+  await select.selectOption(patch.memory.claudeModel);
+  await expect(reset).toBeEnabled();
+  expect(control.log().some((e) => e.channel === IPC.settingsSet)).toBe(false);
+
+  await page.locator('[data-testid="settings-save"]').click();
+  await expect
+    .poll(() => control.log().find((e) => e.channel === IPC.settingsSet)?.args)
+    .toEqual({ patch });
 });
