@@ -229,7 +229,7 @@ func TestAutomationRun(t *testing.T) {
 			t.Fatalf("env = %v", env)
 		}
 		allowed := strings.Join(pv.Allowed, " ")
-		for _, want := range append([]string{claudeheadless.FinishStepTool, claudeheadless.RunOutcomeTool}, claudeheadless.SpaceToolNames...) {
+		for _, want := range append([]string{toolName(claudeheadless.FinishStep), toolName(claudeheadless.RunOutcome)}, spaceToolNames()...) {
 			if !strings.Contains(allowed, want) {
 				t.Errorf("allowed tools lack %q: %s", want, allowed)
 			}
@@ -481,7 +481,7 @@ func TestAutomationStep(t *testing.T) {
 			t.Fatalf("prompt = %q, want it to start with %q", got, want)
 		}
 		args := fakeFile(t, f.app, "api-1.args")
-		for _, want := range []string{"--model\nopus", "--max-budget-usd\n0.5", "--tools\nRead,Grep", "--strict-mcp-config", claudeheadless.FinishStepTool, claudeheadless.RunOutcomeTool} {
+		for _, want := range []string{"--model\nopus", "--max-budget-usd\n0.5", "--tools\nRead,Grep", "--strict-mcp-config", toolName(claudeheadless.FinishStep), toolName(claudeheadless.RunOutcome)} {
 			if !strings.Contains(args, want) {
 				t.Errorf("argv lacks %q:\n%s", want, args)
 			}

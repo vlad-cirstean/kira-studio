@@ -41,24 +41,3 @@ type Usage struct {
 	CostUSD float64
 	Turns   int
 }
-
-// MCPServer is an http (URL, Headers) or stdio (Command, Args, Env) server.
-type MCPServer struct {
-	Name    string
-	URL     string
-	Headers map[string]string
-	Command string
-	Args    []string
-	Env     map[string]string
-}
-
-// MCPTool names one tool of an MCP server.
-type MCPTool struct{ Server, Tool string }
-
-// MCPHost renders MCP wiring in the provider's formats.
-type MCPHost interface {
-	// MCPConfig is the provider's config document for servers.
-	MCPConfig(servers []MCPServer) ([]byte, error)
-	// MCPToolName is one MCP tool's name in tool permission lists.
-	MCPToolName(t MCPTool) string
-}

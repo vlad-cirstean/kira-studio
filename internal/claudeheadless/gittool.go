@@ -18,9 +18,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
-// GitTool is the allowed-tools name of the git MCP tool.
-const GitTool = "mcp__" + ServerName + "__git"
-
 const (
 	gitTimeout   = 2 * time.Minute
 	maxGitOutput = 64 << 10

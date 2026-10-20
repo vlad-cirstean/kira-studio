@@ -1,4 +1,4 @@
-package claudeheadless
+package claude
 
 import (
 	"context"
@@ -16,27 +16,14 @@ import (
 
 	"github.com/google/renameio/v2"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
 const (
 	listToolsTimeout = 15 * time.Second
 	maxListedTools   = 200
 )
-
-// UserServer is one MCP server from the user's own Claude config, described without its secrets.
-type UserServer struct {
-	Name string `json:"name"`
-	// Transport is stdio, http or sse.
-	Transport string `json:"transport"`
-	// Target is the command's base name or the URL host. Never args, env or headers.
-	Target string `json:"target"`
-}
-
-// UserTool is one tool a user MCP server offers.
-type UserTool struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
 
 type rawServer struct {
 	Type    string            `json:"type"`
@@ -88,19 +75,19 @@ func readUserServers(env func(string) string) (map[string]json.RawMessage, error
 	return doc.MCPServers, nil
 }
 
-// UserServers lists the MCP servers of the user's Claude config (user scope only), by name.
-func UserServers(env func(string) string) ([]UserServer, error) {
+// UserMCPServers lists the MCP servers of the user's Claude config (user scope only), by name.
+func (*Provider) UserMCPServers(env func(string) string) ([]harness.UserServer, error) {
 	raw, err := readUserServers(env)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]UserServer, 0, len(raw))
+	out := make([]harness.UserServer, 0, len(raw))
 	for name, msg := range raw {
 		var r rawServer
 		if json.Unmarshal(msg, &r) != nil {
 			continue
 		}
-		s := UserServer{Name: name, Transport: r.transport()}
+		s := harness.UserServer{Name: name, Transport: r.transport()}
 		if s.Transport == "stdio" {
 			s.Target = filepath.Base(r.Command)
 		} else if u, err := url.Parse(r.URL); err == nil {
@@ -125,9 +112,9 @@ func (h headerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	return h.base.RoundTrip(r)
 }
 
-// ListTools connects to one user MCP server as a client and lists its tools. cwd is the working
+// UserMCPTools connects to one user MCP server as a client and lists its tools. cwd is the working
 // directory of a stdio server.
-func ListTools(ctx context.Context, env func(string) string, name, cwd string) ([]UserTool, error) {
+func (*Provider) UserMCPTools(ctx context.Context, env func(string) string, name, cwd string) ([]harness.UserTool, error) {
 	tools, err := listTools(ctx, env, name, cwd)
 	if err != nil {
 		return nil, fmt.Errorf("could not list tools of %s: %w", name, err)
@@ -135,7 +122,7 @@ func ListTools(ctx context.Context, env func(string) string, name, cwd string) (
 	return tools, nil
 }
 
-func listTools(ctx context.Context, env func(string) string, name, cwd string) ([]UserTool, error) {
+func listTools(ctx context.Context, env func(string) string, name, cwd string) ([]harness.UserTool, error) {
 	all, err := readUserServers(env)
 	if err != nil {
 		return nil, err
@@ -178,7 +165,7 @@ func listTools(ctx context.Context, env func(string) string, name, cwd string) (
 	}
 	defer session.Close()
 
-	var out []UserTool
+	var out []harness.UserTool
 	for t, err := range session.Tools(ctx, nil) {
 		if err != nil {
 			return nil, err
@@ -186,7 +173,7 @@ func listTools(ctx context.Context, env func(string) string, name, cwd string) (
 		if len(out) == maxListedTools {
 			break
 		}
-		out = append(out, UserTool{Name: t.Name, Description: firstLine(t.Description)})
+		out = append(out, harness.UserTool{Name: t.Name, Description: firstLine(t.Description)})
 	}
 	return out, nil
 }
@@ -199,16 +186,9 @@ func firstLine(s string) string {
 	return line
 }
 
-// ErrServerGone is wrapped by WriteUserConfig when a named server left the user's config.
-type ErrServerGone struct{ Name string }
-
-func (e ErrServerGone) Error() string {
-	return "MCP server " + e.Name + " is no longer in your Claude config"
-}
-
-// WriteUserConfig copies the named servers from the user's Claude config into a 0600 --mcp-config
+// WriteUserMCPConfig copies the named servers from the user's Claude config into a 0600 --mcp-config
 // file under dir (0700). release removes the file.
-func WriteUserConfig(env func(string) string, dir, runID string, names []string) (path string, release func(), err error) {
+func (*Provider) WriteUserMCPConfig(env func(string) string, dir, runID string, names []string) (path string, release func(), err error) {
 	all, err := readUserServers(env)
 	if err != nil {
 		return "", nil, err
@@ -217,7 +197,7 @@ func WriteUserConfig(env func(string) string, dir, runID string, names []string)
 	for _, n := range names {
 		msg, ok := all[n]
 		if !ok {
-			return "", nil, ErrServerGone{Name: n}
+			return "", nil, harness.ErrServerGone{Name: n, Agent: "Claude"}
 		}
 		picked[n] = msg
 	}
@@ -226,11 +206,11 @@ func WriteUserConfig(env func(string) string, dir, runID string, names []string)
 		return "", nil, err
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", nil, fmt.Errorf("claudeheadless: config dir: %w", err)
+		return "", nil, fmt.Errorf("claude: config dir: %w", err)
 	}
 	path = filepath.Join(dir, runID+"-user.mcp.json")
 	if err := renameio.WriteFile(path, body, 0o600); err != nil {
-		return "", nil, fmt.Errorf("claudeheadless: write user mcp config: %w", err)
+		return "", nil, fmt.Errorf("claude: write user mcp config: %w", err)
 	}
 	return path, func() { _ = os.Remove(path) }, nil
 }

@@ -11,15 +11,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
-// SpaceToolNames are the allowed-tools names of the Kira Space tools; the headless run and a TUI
-// launch pass them next to finish_step when the workflow turns the tools on.
-var SpaceToolNames = []string{
-	"mcp__" + ServerName + "__task_info",
-	"mcp__" + ServerName + "__declare_repos",
-	"mcp__" + ServerName + "__request_branch",
-	"mcp__" + ServerName + "__branch_status",
-}
-
 const (
 	maxDeclareRepos = 20
 	maxWaitSeconds  = 600

@@ -17,6 +17,8 @@ const DefaultProvider = "claude"
 // Provider is one agent harness. ID is the agent.provider setting value.
 type Provider interface {
 	ID() string
+	// Label is the display name in Go-rendered text ("Claude").
+	Label() string
 	// Command is the agent CLI's name as a user types it ("claude").
 	Command() string
 	// Models is the provider's model aliases.

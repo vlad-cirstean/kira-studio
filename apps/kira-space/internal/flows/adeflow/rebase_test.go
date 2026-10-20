@@ -308,11 +308,11 @@ func TestRebaseRun(t *testing.T) {
 		matches, _ := filepath.Glob(filepath.Join(f.app.FakeDir, "*.args"))
 		var args string
 		for _, m := range matches {
-			if raw, err := os.ReadFile(m); err == nil && strings.Contains(string(raw), claudeheadless.GitTool) {
+			if raw, err := os.ReadFile(m); err == nil && strings.Contains(string(raw), toolName(claudeheadless.Git)) {
 				args = string(raw)
 			}
 		}
-		for _, want := range []string{"--add-dir\n" + br.Worktree, cb.Worktree, "--tools\nRead,Edit,Write,Grep,Glob", "--strict-mcp-config", claudeheadless.GitTool} {
+		for _, want := range []string{"--add-dir\n" + br.Worktree, cb.Worktree, "--tools\nRead,Edit,Write,Grep,Glob", "--strict-mcp-config", toolName(claudeheadless.Git)} {
 			if !strings.Contains(args, want) {
 				t.Errorf("rebase args lack %q:\n%s", want, args)
 			}

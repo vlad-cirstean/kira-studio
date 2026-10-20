@@ -17,7 +17,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/harness/claude"
-	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/memory"
 )
 
@@ -185,7 +184,7 @@ func TestConnectClaudeCode(t *testing.T) {
 		t.Fatalf("McpStatus = %+v, want claude found and an absolute executable", before)
 	}
 	res := app.W.Memory.InstallClaudeCode(ctx)
-	if res.Outcome != mcpinstall.OutcomeInstalled {
+	if res.Outcome != harness.OutcomeInstalled {
 		t.Fatalf("InstallClaudeCode = %+v, want installed", res)
 	}
 	app.Contract(t, "memory-settings", "MemoryService.InstallClaudeCode", res, exe)

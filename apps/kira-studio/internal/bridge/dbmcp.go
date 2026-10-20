@@ -11,8 +11,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
-	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 )
 
 // dbMcpServerName is the one name every Install call registers under — internal/dbmcp's own
@@ -24,20 +24,13 @@ const dbMcpServerName = "kira-db"
 // by.
 const dbMcpTokenName = "mcp-db"
 
-// McpInstaller is mcpinstall.Installer's own seam, declared where it is consumed rather than where
-// it is implemented — the caller states only the methods it actually calls.
-type McpInstaller interface {
-	Status() mcpinstall.Status
-	Install(ctx context.Context, name, url, token string) mcpinstall.Result
-}
-
 // DbMcpService is the Database MCP section's whole surface (M1 §6.2): Status, SetEnabled,
 // Regenerate, InstallClaudeCode — it owns the embedded *dbmcp.Server's actual lifecycle,
 // constructed and started when the setting turns on (or already is, at boot), stopped when it
 // turns off or the app quits.
 type DbMcpService struct {
 	Deps      appcore.Deps
-	Installer McpInstaller
+	Installer harness.MCPInstaller
 	// Approvals is M2's prompt-mode broker — constructed once in main.go and outliving this
 	// service's own server start/stop, so the event subscription wired at boot (Events.Attach)
 	// stays valid across a restart of the embedded server.
@@ -49,7 +42,7 @@ type DbMcpService struct {
 // NewDbMcpService wires the embedded lifecycle's own start/stop/status closures once, here, so
 // every other method can assume s.embedded is ready — a plain struct literal (main.go's own shape
 // before T2-13) would leave them nil.
-func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp.ApprovalBroker) *DbMcpService {
+func NewDbMcpService(deps appcore.Deps, installer harness.MCPInstaller, approvals *dbmcp.ApprovalBroker) *DbMcpService {
 	s := &DbMcpService{Deps: deps, Installer: installer, Approvals: approvals}
 	s.embedded = embedded.Service[*dbmcp.Server, DbMcpStatus]{
 		StartFn: func(mint bool) (*dbmcp.Server, error) {
@@ -96,7 +89,7 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 		},
 		StatusFn: func(srv *dbmcp.Server, startErr error) DbMcpStatus {
 			inst := s.Installer.Status()
-			st := DbMcpStatus{ClaudeAvailable: inst.ClaudePath != "", Probed: inst.Probed}
+			st := DbMcpStatus{ClaudeAvailable: inst.Path != "", Probed: inst.Probed}
 			if srv == nil {
 				if startErr != nil {
 					st.Error = startErr.Error()
@@ -111,7 +104,7 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 			// and stay valid.
 			if helperTokenValid(srv) {
 				helperPath := mcpauth.HeaderHelperScriptPath(config.KiraHome())
-				st.Command = mcpinstall.Command(dbMcpServerName, srv.URL(), helperPath)
+				st.Command = s.Installer.Command(dbMcpServerName, srv.URL(), helperPath)
 			}
 			if exp := srv.TokenExpiry(); !exp.IsZero() {
 				st.ExpiresAt = exp.Format(time.RFC3339)
@@ -311,7 +304,7 @@ func (s *DbMcpService) Regenerate() DbMcpStatus {
 	return s.embedded.StatusLocked()
 }
 
-// DbMcpInstallResult is mcpinstall.Result's wire projection — a domain package's plain Go struct
+// DbMcpInstallResult is harness.InstallResult's wire projection — a domain package's plain Go struct
 // never crosses the wire directly, only this tagged copy of it.
 type DbMcpInstallResult struct {
 	Outcome string   `json:"outcome"`
@@ -319,11 +312,11 @@ type DbMcpInstallResult struct {
 	Probed  []string `json:"probed"`
 }
 
-func toWireDbMcpInstallResult(r mcpinstall.Result) DbMcpInstallResult {
+func toWireDbMcpInstallResult(r harness.InstallResult) DbMcpInstallResult {
 	return DbMcpInstallResult{Outcome: r.Outcome, Detail: r.Detail, Probed: r.Probed}
 }
 
-// InstallClaudeCode never returns a Go error — mcpinstall.Install's own contract, following
+// InstallClaudeCode never returns a Go error — MCPInstaller.Install's own contract, following
 // connections.Service.Reveal's own precedent. A no-op result (outcome notFound) when nothing is
 // running: there is nothing to register yet.
 func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult {
@@ -335,7 +328,7 @@ func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult
 	// live record, not just "this run minted a fresh token".
 	if srv == nil || !helperTokenValid(srv) {
 		s.embedded.Mu.Unlock()
-		return DbMcpInstallResult{Outcome: mcpinstall.OutcomeNotFound}
+		return DbMcpInstallResult{Outcome: harness.OutcomeNotFound}
 	}
 	url := srv.URL()
 	s.embedded.Mu.Unlock()

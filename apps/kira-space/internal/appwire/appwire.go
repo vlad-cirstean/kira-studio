@@ -39,7 +39,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/harness/providers"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
-	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/internal/prompts"
@@ -284,7 +283,7 @@ func Build(opts Options) *Wired {
 	if opts.EmbedSpec != nil {
 		embedSpec = *opts.EmbedSpec
 	}
-	w.Memory = bridge.NewMemoryService(emitter, mcpinstall.New(mcpinstall.Deps{}), promptStore, embedSpec, w.Agents, memoryModelFrom(repositories.Settings))
+	w.Memory = bridge.NewMemoryService(emitter, harness.ActiveInstaller(w.Agents), promptStore, embedSpec, w.Agents, memoryModelFrom(repositories.Settings))
 	removeLegacyGitSocket()
 	go removeRetiredModels()
 

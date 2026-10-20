@@ -405,7 +405,7 @@ func TestRunEngine_eachRepoAutoAdvanceApprovalAndStepDone(t *testing.T) {
 	}
 
 	args := e.fakeFile("api-1.args")
-	for _, want := range []string{"--output-format\nstream-json", "--setting-sources\nuser,project,local", claudeheadless.FinishStepTool, "Bash(git *)"} {
+	for _, want := range []string{"--output-format\nstream-json", "--setting-sources\nuser,project,local", toolName(claudeheadless.FinishStep), "Bash(git *)"} {
 		if !strings.Contains(args, want) {
 			t.Fatalf("argv lacks %q:\n%s", want, args)
 		}

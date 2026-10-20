@@ -17,6 +17,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
@@ -659,11 +660,11 @@ func (b *TaskBoard) settingSources() string {
 	return settingSourcesAll
 }
 
-func allowedTools(step []string, space bool) []string {
+func allowedTools(p harness.MCPHost, step []string, space bool) []string {
 	out := slices.Clone(step)
-	want := []string{claudeheadless.FinishStepTool, claudeheadless.RunOutcomeTool}
+	want := harness.ToolNames(p, claudeheadless.FinishStep, claudeheadless.RunOutcome)
 	if space {
-		want = append(want, claudeheadless.SpaceToolNames...)
+		want = append(want, harness.ToolNames(p, claudeheadless.SpaceToolIDs...)...)
 	}
 	for _, t := range want {
 		if !slices.Contains(out, t) {
@@ -738,9 +739,10 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		fail(err)
 		return
 	}
+	agent := b.deps.Agent.Active()
 	spec := claudeheadless.Spec{
 		ClaudeBin: cmpNonEmpty(b.deps.AgentBin, "claude"), Dir: l.path, Prompt: l.prompt, SessionID: b.sessionClaudeID(sessionID),
-		Resume: l.resume, MCPConfigPath: cfg, SettingSources: b.settingSources(), AllowedTools: roundTools(allowedTools(def.AllowedTools, space), round), DisallowedTools: def.DisallowedTools,
+		Resume: l.resume, MCPConfigPath: cfg, SettingSources: b.settingSources(), AllowedTools: roundTools(agent, allowedTools(agent, def.AllowedTools, space), round), DisallowedTools: def.DisallowedTools,
 		Timeout: l.timeout,
 	}
 	spec.Env = gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: l.path})
@@ -751,9 +753,9 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		spec.Isolated, spec.Tools, spec.AddDirs = true, rebaseBuiltins, l.git.Worktrees
 	}
 	if l.smart != nil {
-		spec = l.smart.spec(spec, space)
+		spec = l.smart.spec(agent, spec, space)
 		if names := l.smart.mcpNames(); len(names) > 0 {
-			path, relUser, err := claudeheadless.WriteUserConfig(os.Getenv, b.deps.AgentDir, run.ID, names)
+			path, relUser, err := agent.WriteUserMCPConfig(os.Getenv, b.deps.AgentDir, run.ID, names)
 			if err != nil {
 				release()
 				fail(err)
@@ -817,9 +819,10 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 }
 
 // roundTools adds the reply tool to a review round's allowed tools.
-func roundTools(tools []string, round bool) []string {
-	if round && !slices.Contains(tools, claudeheadless.ReviewReplyTool) {
-		return append(tools, claudeheadless.ReviewReplyTool)
+func roundTools(p harness.MCPHost, tools []string, round bool) []string {
+	reply := p.MCPToolName(claudeheadless.ReviewReply)
+	if round && !slices.Contains(tools, reply) {
+		return append(tools, reply)
 	}
 	return tools
 }

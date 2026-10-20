@@ -14,7 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kirathecat/kira-studio/internal/harness/claude"
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
@@ -30,6 +31,8 @@ type Deps struct {
 	LookPath func(string) (string, error)
 	Stat     func(string) (os.FileInfo, error)
 	Run      func(ctx context.Context, path string, args []string) error
+	// Candidates are the absolute paths probed after PATH.
+	Candidates func() []string
 }
 
 // Installer is this package's whole surface, constructed once (main.go) and shared for the app's
@@ -39,12 +42,13 @@ type Installer struct {
 	lookPath func(string) (string, error)
 	stat     func(string) (os.FileInfo, error)
 	run      func(ctx context.Context, path string, args []string) error
+	cands    func() []string
 }
 
 // New constructs an Installer over d, substituting the real OS implementation for any zero-value
 // field.
 func New(d Deps) *Installer {
-	i := &Installer{lookPath: d.LookPath, stat: d.Stat, run: d.Run}
+	i := &Installer{lookPath: d.LookPath, stat: d.Stat, run: d.Run, cands: d.Candidates}
 	if i.lookPath == nil {
 		i.lookPath = realLookPath
 	}
@@ -54,63 +58,22 @@ func New(d Deps) *Installer {
 	if i.run == nil {
 		i.run = toolexec.Run
 	}
+	if i.cands == nil {
+		i.cands = func() []string { return nil }
+	}
 	return i
 }
-
-// Status is the pane's own pre-click render — advisory only: Install re-resolves everything
-// itself, so a `claude` installed after Status was last read still works on the next click.
-type Status struct {
-	// ClaudePath is "" when `claude` was not found at any probed location.
-	ClaudePath string
-	// Probed lists every path considered, in probe order — always populated, so a miss can be
-	// explained, not just reported.
-	Probed []string
-}
-
-// Result is Install's own outcome — see the Outcome* constants below. Install never returns a Go
-// error (connections.Service.Reveal's own precedent): a registration attempt is a value the pane
-// renders, not a failure the caller must handle specially.
-type Result struct {
-	Outcome string
-	// Detail is a bounded, single-line reason on installFailed — never the token, never a child's
-	// stderr verbatim beyond what exec.go's firstLineBounded already truncated it to.
-	Detail string
-	Probed []string
-}
-
-const (
-	// OutcomeInstalled: `claude` found, `mcp add` exited 0.
-	OutcomeInstalled = "installed"
-	// OutcomeNotFound: `claude` not found anywhere in the probe order — not a failure state (§7.2):
-	// the command is already on screen to copy, and needs no fallback of its own.
-	OutcomeNotFound = "notFound"
-	// OutcomeInstallFailed: `claude` was found but exited non-zero (e.g. a name collision) or could
-	// not be spawned.
-	OutcomeInstallFailed = "installFailed"
-)
 
 // locateClaude checks PATH first, then every absolute candidate in order, every path considered
 // recorded in probed regardless of outcome.
 func (i *Installer) locateClaude() (path string, probed []string, found bool) {
-	return toolexec.Locate(i.lookPath, i.stat, "claude", claude.Candidates())
+	return toolexec.Locate(i.lookPath, i.stat, "claude", i.cands())
 }
 
 // Status is the pane's own pre-click read.
-func (i *Installer) Status() Status {
+func (i *Installer) Status() harness.InstallStatus {
 	path, probed, _ := i.locateClaude()
-	return Status{ClaudePath: path, Probed: probed}
-}
-
-// ShellQuote wraps s in single quotes for embedding as a literal argument inside the
-// generated /bin/sh script above (the one place in this package that composes a shell string
-// rather than an argv slice, since the script itself IS shell) — escaping any embedded single
-// quote the standard POSIX way, as
-//
-//	'\''
-//
-// — close the quote, an escaped quote, reopen it.
-func ShellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+	return harness.InstallStatus{Path: path, Probed: probed}
 }
 
 // serverJSON is `claude mcp add-json`'s own input shape, restricted to the one field combination
@@ -133,10 +96,10 @@ type serverJSON struct {
 // $HOME with one, common on macOS for a custom KIRA_HOME) would otherwise break into two shell
 // words once Claude Code later runs the stored headersHelper string through a shell of its own,
 // silently sending no Authorization header and failing every call with an unexplained 401.
-func Command(name, url, helperPath string) string {
-	payload, _ := json.Marshal(serverJSON{Type: "http", URL: url, HeadersHelper: ShellQuote(helperPath)})
-	return "claude mcp remove --scope user " + ShellQuote(name) + " 2>/dev/null; claude mcp add-json --scope user " +
-		ShellQuote(name) + " " + ShellQuote(string(payload))
+func (*Installer) Command(name, url, helperPath string) string {
+	payload, _ := json.Marshal(serverJSON{Type: "http", URL: url, HeadersHelper: loginshell.Quote(helperPath)})
+	return "claude mcp remove --scope user " + loginshell.Quote(name) + " 2>/dev/null; claude mcp add-json --scope user " +
+		loginshell.Quote(name) + " " + loginshell.Quote(string(payload))
 }
 
 func detailFor(ctx context.Context, err error) string {
@@ -170,12 +133,12 @@ func isNotRegisteredError(err error) bool {
 // all — but the Install button itself can still be clicked again (a stale registration from an
 // older app version's `--header` form, or simply re-running it), so this stays idempotent
 // regardless. A "nothing to remove" outcome is not a failure and is never surfaced as one.
-func (i *Installer) Install(ctx context.Context, name, url, helperPath string) Result {
+func (i *Installer) Install(ctx context.Context, name, url, helperPath string) harness.InstallResult {
 	// F10: a relative helperPath resolves against Claude Code's own cwd, not Kira's — reachable
 	// when os.UserHomeDir fails and kirapaths.Home falls back to a relative path. Refuse outright
 	// rather than register a headersHelper that silently reads the wrong file (or nothing).
 	if !filepath.IsAbs(helperPath) {
-		return Result{Outcome: OutcomeInstallFailed, Detail: "internal error: header helper path is not absolute"}
+		return harness.InstallResult{Outcome: harness.OutcomeInstallFailed, Detail: "internal error: header helper path is not absolute"}
 	}
 
 	// F10: Claude Code runs the stored headersHelper string through a shell of its own at
@@ -183,7 +146,7 @@ func (i *Installer) Install(ctx context.Context, name, url, helperPath string) R
 	// splits into more than one word there, so no Authorization header is ever sent and every call
 	// gets a 401 with no hint why. Single-quoting here is the fix; EnsureHeaderHelperScript already
 	// quotes the token path the same way for the same reason, one level down.
-	return i.register(ctx, name, serverJSON{Type: "http", URL: url, HeadersHelper: ShellQuote(helperPath)})
+	return i.register(ctx, name, serverJSON{Type: "http", URL: url, HeadersHelper: loginshell.Quote(helperPath)})
 }
 
 // stdioServerJSON is add-json's shape for a stdio server: a command and its argv.
@@ -194,25 +157,25 @@ type stdioServerJSON struct {
 }
 
 // StdioCommand renders the same remove-then-add-json pair for a stdio server, as copy-paste text.
-func StdioCommand(name, command string, args []string) string {
+func (*Installer) StdioCommand(name, command string, args []string) string {
 	payload, _ := json.Marshal(stdioServerJSON{Type: "stdio", Command: command, Args: args})
-	return "claude mcp remove --scope user " + ShellQuote(name) + " 2>/dev/null; claude mcp add-json --scope user " +
-		ShellQuote(name) + " " + ShellQuote(string(payload))
+	return "claude mcp remove --scope user " + loginshell.Quote(name) + " 2>/dev/null; claude mcp add-json --scope user " +
+		loginshell.Quote(name) + " " + loginshell.Quote(string(payload))
 }
 
 // InstallStdio registers a stdio MCP server with Claude Code, replacing any registration of name.
-func (i *Installer) InstallStdio(ctx context.Context, name, command string, args []string) Result {
+func (i *Installer) InstallStdio(ctx context.Context, name, command string, args []string) harness.InstallResult {
 	if !filepath.IsAbs(command) {
-		return Result{Outcome: OutcomeInstallFailed, Detail: "internal error: server command path is not absolute"}
+		return harness.InstallResult{Outcome: harness.OutcomeInstallFailed, Detail: "internal error: server command path is not absolute"}
 	}
 	return i.register(ctx, name, stdioServerJSON{Type: "stdio", Command: command, Args: args})
 }
 
 // register is the shared remove-then-add-json path.
-func (i *Installer) register(ctx context.Context, name string, server any) Result {
+func (i *Installer) register(ctx context.Context, name string, server any) harness.InstallResult {
 	claudePath, probed, found := i.locateClaude()
 	if !found {
-		return Result{Outcome: OutcomeNotFound, Probed: probed}
+		return harness.InstallResult{Outcome: harness.OutcomeNotFound, Probed: probed}
 	}
 
 	spawnCtx, cancel := context.WithTimeout(ctx, spawnTimeout)
@@ -220,16 +183,16 @@ func (i *Installer) register(ctx context.Context, name string, server any) Resul
 
 	removeArgs := []string{"mcp", "remove", "--scope", "user", name}
 	if err := i.run(spawnCtx, claudePath, removeArgs); err != nil && !isNotRegisteredError(err) {
-		return Result{Outcome: OutcomeInstallFailed, Detail: detailFor(spawnCtx, err), Probed: probed}
+		return harness.InstallResult{Outcome: harness.OutcomeInstallFailed, Detail: detailFor(spawnCtx, err), Probed: probed}
 	}
 
 	payload, err := json.Marshal(server)
 	if err != nil {
-		return Result{Outcome: OutcomeInstallFailed, Detail: err.Error(), Probed: probed}
+		return harness.InstallResult{Outcome: harness.OutcomeInstallFailed, Detail: err.Error(), Probed: probed}
 	}
 	addArgs := []string{"mcp", "add-json", "--scope", "user", name, string(payload)}
 	if err := i.run(spawnCtx, claudePath, addArgs); err != nil {
-		return Result{Outcome: OutcomeInstallFailed, Detail: detailFor(spawnCtx, err), Probed: probed}
+		return harness.InstallResult{Outcome: harness.OutcomeInstallFailed, Detail: detailFor(spawnCtx, err), Probed: probed}
 	}
-	return Result{Outcome: OutcomeInstalled, Probed: probed}
+	return harness.InstallResult{Outcome: harness.OutcomeInstalled, Probed: probed}
 }

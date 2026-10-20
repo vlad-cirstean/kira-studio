@@ -46,7 +46,7 @@ type Options struct {
 	Emitter         appevent.Emitter
 	Dialogs         bridge.Dialogs
 	KeepAwakeDriver keepawake.Driver
-	McpInstaller    bridge.McpInstaller
+	McpInstaller    harness.MCPInstaller
 	// Browser opens external URLs (a deferred Wails opener in production).
 	Browser bridge.Browser
 	AppName string
@@ -185,7 +185,11 @@ func Build(opts Options) (*Wired, error) {
 	promptRouter := newPromptRouter(windows, repositories, opts.Emitter, w.reopenWindow)
 	windows.OnChange = promptRouter.Reroute
 
-	embedded := wireEmbeddedServices(deps, opts.McpInstaller, opts.KeepAwakeDriver, connectionsSvc, oplogWiring, metricsTicker, promptRouter, agents, opts)
+	installer := opts.McpInstaller
+	if installer == nil {
+		installer = harness.ActiveInstaller(agents)
+	}
+	embedded := wireEmbeddedServices(deps, installer, opts.KeepAwakeDriver, connectionsSvc, oplogWiring, metricsTicker, promptRouter, agents, opts)
 	lifecycle := wireLifecycle(windows, embedded.events, embedded.eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
 		embedded.dbMcpSvc, embedded.keepAwakeSvc, embedded.terminalSvc, updateInstaller, embedded.runs, embedded.sched, repositories, db)
 	embedded.sched.Start()

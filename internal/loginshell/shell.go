@@ -4,6 +4,7 @@ package loginshell
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // DefaultShell is D9/F16's own fallback — used whenever $SHELL is unset, not an absolute path, or
@@ -50,4 +51,10 @@ func BuildArgv(shell string, loginShell bool, scriptText string) []string {
 		return []string{shell, "-l", "-c", scriptText}
 	}
 	return []string{shell, "-c", scriptText}
+}
+
+// Quote wraps s in single quotes as one POSIX shell word. An embedded single quote becomes '\”:
+// close the quote, an escaped quote, reopen it.
+func Quote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }

@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/harness/claude"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
@@ -47,7 +48,8 @@ func (r *bgRun) endedBy() int {
 // mcpServer returns the loopback report server, started on first use.
 func (s *Service) mcpServer() *claudeheadless.Server {
 	if s.server == nil {
-		opts := claudeheadless.Options{Dir: filepath.Join(s.Home, "automations-mcp"), OnFinish: s.recordFinish, Prompts: s.llmPrompts()}
+		opts := claudeheadless.Options{Dir: filepath.Join(s.Home, "automations-mcp"), OnFinish: s.recordFinish, Prompts: s.llmPrompts(),
+			Render: func(sv []harness.MCPServer) ([]byte, error) { return s.Agent.Active().MCPConfig(sv) }}
 		if s.ADE != nil {
 			opts.Space, opts.Outcomes = s.ADE.Tools()
 			opts.SandboxGit = s.ADE.SandboxGit()
@@ -145,7 +147,7 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 	var extra []string
 	releaseUser := func() {}
 	if len(p.mcp) > 0 {
-		path, rel, err := claudeheadless.WriteUserConfig(s.getenv, filepath.Join(s.Home, "automations-mcp"), runID, p.mcp)
+		path, rel, err := s.Agent.Active().WriteUserMCPConfig(s.getenv, filepath.Join(s.Home, "automations-mcp"), runID, p.mcp)
 		if err != nil {
 			releaseGrant()
 			releaseTarget()

@@ -19,7 +19,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
-	"github.com/kirathecat/kira-studio/internal/mcpinstall"
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
+	"github.com/kirathecat/kira-studio/internal/harness/claude/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
@@ -232,11 +234,12 @@ func TestDbMcpApprovalFlow(t *testing.T) {
 	}
 }
 
-// noClaude is a real mcpinstall.Installer that finds nothing and must not spawn anything.
-func noClaude(t *testing.T) *mcpinstall.Installer {
+// noClaude is a real mcpinstall installer that finds nothing and must not spawn anything.
+func noClaude(t *testing.T) harness.MCPInstaller {
 	return mcpinstall.New(mcpinstall.Deps{
-		LookPath: func(string) (string, error) { return "", os.ErrNotExist },
-		Stat:     func(string) (os.FileInfo, error) { return nil, os.ErrNotExist },
+		Candidates: claude.Candidates,
+		LookPath:   func(string) (string, error) { return "", os.ErrNotExist },
+		Stat:       func(string) (os.FileInfo, error) { return nil, os.ErrNotExist },
 		Run: func(context.Context, string, []string) error {
 			t.Error("mcpinstall spawned a process although claude is missing")
 			return nil
@@ -248,7 +251,7 @@ func TestInstallClaudeCodeWithoutCli(t *testing.T) {
 	app := flowharness.New(t)
 	app.W.DbMcp.Installer = noClaude(t)
 
-	if res := app.W.DbMcp.InstallClaudeCode(ctx); res.Outcome != mcpinstall.OutcomeNotFound {
+	if res := app.W.DbMcp.InstallClaudeCode(ctx); res.Outcome != harness.OutcomeNotFound {
 		t.Fatalf("InstallClaudeCode with the server off = %+v, want notFound", res)
 	}
 	st, err := app.W.DbMcp.SetEnabled(bridge.DbMcpSetEnabledArgs{Enabled: true})
@@ -259,7 +262,7 @@ func TestInstallClaudeCodeWithoutCli(t *testing.T) {
 		t.Fatalf("Status = %+v, want claude unavailable, the probed paths and a copyable command", st)
 	}
 	res := app.W.DbMcp.InstallClaudeCode(ctx)
-	if res.Outcome != mcpinstall.OutcomeNotFound || len(res.Probed) == 0 {
+	if res.Outcome != harness.OutcomeNotFound || len(res.Probed) == 0 {
 		t.Fatalf("InstallClaudeCode = %+v, want notFound with the probed paths", res)
 	}
 	if strings.Contains(st.Command, helperToken(t, app)) {

@@ -7,21 +7,24 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/loginshell"
 )
 
-// TestShellSingleQuoteRoundTrips guards the one property Command/Install's own headersHelper value
+// TestQuoteRoundTrips guards the one property Command/Install's own headersHelper value
 // depends on (F10): wrapping in single quotes must survive a POSIX shell splitting the resulting
 // string on whitespace, including a path that itself contains a single quote.
-func TestShellSingleQuoteRoundTrips(t *testing.T) {
+func TestQuoteRoundTrips(t *testing.T) {
 	cases := []string{
 		"/plain/path/mcp-header-helper.sh",
 		"/Users/vlad cirstean/.kira/mcp-header-helper.sh",
 		"/tmp/weird's path/mcp-header-helper.sh",
 	}
 	for _, in := range cases {
-		quoted := ShellQuote(in)
+		quoted := loginshell.Quote(in)
 		if !strings.HasPrefix(quoted, "'") || !strings.HasSuffix(quoted, "'") {
-			t.Fatalf("ShellQuote(%q) = %q, want a leading and trailing single quote", in, quoted)
+			t.Fatalf("loginshell.Quote(%q) = %q, want a leading and trailing single quote", in, quoted)
 		}
 	}
 }
@@ -38,13 +41,13 @@ func TestCommandRoundTripsThroughShell(t *testing.T) {
 		"/Users/a b/.kira/mcp-header-helper.sh",
 		"/Users/o'n/.kira/mcp-header-helper.sh",
 	} {
-		cmd := Command("kira-db", "http://127.0.0.1:8766/mcp", helperPath)
+		cmd := New(Deps{}).Command("kira-db", "http://127.0.0.1:8766/mcp", helperPath)
 		script := "claude() { for a; do printf '%s\\n' \"$a\"; done; }\n" + cmd
 		out, err := exec.Command("sh", "-c", script).Output()
 		if err != nil {
 			t.Fatalf("sh rejected %q: %v", cmd, err)
 		}
-		payload, _ := json.Marshal(serverJSON{Type: "http", URL: "http://127.0.0.1:8766/mcp", HeadersHelper: ShellQuote(helperPath)})
+		payload, _ := json.Marshal(serverJSON{Type: "http", URL: "http://127.0.0.1:8766/mcp", HeadersHelper: loginshell.Quote(helperPath)})
 		want := "mcp\nremove\n--scope\nuser\nkira-db\nmcp\nadd-json\n--scope\nuser\nkira-db\n" + string(payload) + "\n"
 		if string(out) != want {
 			t.Errorf("helper %q: shell argv = %q, want %q", helperPath, out, want)
@@ -68,8 +71,8 @@ func TestInstallRefusesRelativeHeaderHelperPath(t *testing.T) {
 	})
 
 	res := installer.Install(context.Background(), "kira-db", "http://127.0.0.1:8766/mcp", "relative/path.sh")
-	if res.Outcome != OutcomeInstallFailed {
-		t.Fatalf("Outcome = %q, want %q", res.Outcome, OutcomeInstallFailed)
+	if res.Outcome != harness.OutcomeInstallFailed {
+		t.Fatalf("Outcome = %q, want %q", res.Outcome, harness.OutcomeInstallFailed)
 	}
 	if ran {
 		t.Fatal("Install spawned claude despite a relative helper path — must refuse before any spawn")
@@ -92,14 +95,14 @@ func TestInstallQuotesHeaderHelperPathInPayload(t *testing.T) {
 	})
 
 	res := installer.Install(context.Background(), "kira-db", "http://127.0.0.1:8766/mcp", helperPath)
-	if res.Outcome != OutcomeInstalled {
-		t.Fatalf("Outcome = %q, want %q (detail: %s)", res.Outcome, OutcomeInstalled, res.Detail)
+	if res.Outcome != harness.OutcomeInstalled {
+		t.Fatalf("Outcome = %q, want %q (detail: %s)", res.Outcome, harness.OutcomeInstalled, res.Detail)
 	}
 	var decoded serverJSON
 	if err := json.Unmarshal([]byte(addPayload), &decoded); err != nil {
 		t.Fatalf("captured add-json payload is not valid JSON: %v (%s)", err, addPayload)
 	}
-	want := ShellQuote(helperPath)
+	want := loginshell.Quote(helperPath)
 	if decoded.HeadersHelper != want {
 		t.Fatalf("HeadersHelper = %q, want %q (single-quoted)", decoded.HeadersHelper, want)
 	}

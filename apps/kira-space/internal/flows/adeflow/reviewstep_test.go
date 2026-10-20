@@ -236,8 +236,8 @@ func TestReviewSendImplementer(t *testing.T) {
 	if got := argAfter(args, "--resume"); got != implementID {
 		t.Fatalf("round --resume = %q, want the implementer session %q", got, implementID)
 	}
-	if !strings.Contains(args, claudeheadless.ReviewReplyTool) {
-		t.Fatalf("round args lack %s:\n%s", claudeheadless.ReviewReplyTool, args)
+	if !strings.Contains(args, toolName(claudeheadless.ReviewReply)) {
+		t.Fatalf("round args lack %s:\n%s", toolName(claudeheadless.ReviewReply), args)
 	}
 	prompt := fakeFile(t, f.app, "api-2.prompt")
 	for _, want := range []string{"#1 change r.txt:1", "rename this", "#2 question r.txt:3", "why twice?", "reply_review_comment", "finish_step"} {

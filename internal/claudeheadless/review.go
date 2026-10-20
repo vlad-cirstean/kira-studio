@@ -11,9 +11,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
-// ReviewReplyTool is reply_review_comment's name as an --allowedTools entry.
-const ReviewReplyTool = "mcp__" + ServerName + "__reply_review_comment"
-
 // MaxReviewReplyBytes bounds one reply; it matches the review comment body bound.
 const MaxReviewReplyBytes = 8 << 10
 

@@ -8,6 +8,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 )
@@ -97,13 +98,13 @@ func (s *smartStep) mcpNames() []string {
 }
 
 // spec is the process spec of a smart step run; the caller adds the MCP config paths.
-func (s *smartStep) spec(base claudeheadless.Spec, space bool) claudeheadless.Spec {
-	extra := []string{claudeheadless.FinishStepTool, claudeheadless.RunOutcomeTool}
+func (s *smartStep) spec(agent harness.Provider, base claudeheadless.Spec, space bool) claudeheadless.Spec {
+	extra := harness.ToolNames(agent, claudeheadless.FinishStep, claudeheadless.RunOutcome)
 	if space {
-		extra = append(extra, claudeheadless.SpaceToolNames...)
+		extra = append(extra, harness.ToolNames(agent, claudeheadless.SpaceToolIDs...)...)
 	}
 	base.Dir, base.Model, base.MaxBudgetUSD, base.Isolated = s.dir, s.script.Smart.Model, s.script.Smart.MaxBudgetUSD, true
-	base.Tools, base.AllowedTools = scripts.ToolArgs(*s.script.Smart, extra)
+	base.Tools, base.AllowedTools = agent.ToolArgs(s.script.Smart.ToolPolicy(extra))
 	base.SettingSources = ""
 	base.Env = append(base.Env, s.env...)
 	base.Timeout = s.timeout

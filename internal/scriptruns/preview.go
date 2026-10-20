@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
@@ -177,14 +178,15 @@ func (s *Service) plan(args RunArgs, o planOpts) (*planned, error) {
 	}
 	pv.Prompt = scripts.Compose(body, rendered)
 	pv.Suffix = claudeheadless.ScriptReport(s.llmPrompts())
-	extra := []string{claudeheadless.FinishStepTool}
+	agent := s.Agent.Active()
+	extraTools := []harness.MCPTool{claudeheadless.FinishStep}
 	if args.TaskID != "" {
 		pv.Suffix = claudeheadless.SpaceNote(s.llmPrompts()) + "\n\n" + pv.Suffix
-		extra = append(append(extra, claudeheadless.RunOutcomeTool), claudeheadless.SpaceToolNames...)
+		extraTools = append(append(extraTools, claudeheadless.RunOutcome), claudeheadless.SpaceToolIDs...)
 	}
 	p.sent = scripts.PlainText(pv.Prompt) + "\n\n" + pv.Suffix
 	pv.Model, pv.MaxBudgetUSD, pv.Timeout = smart.Model, smart.MaxBudgetUSD, smart.Timeout
-	pv.Tools, pv.Allowed = scripts.ToolArgs(smart, extra)
+	pv.Tools, pv.Allowed = agent.ToolArgs(smart.ToolPolicy(harness.ToolNames(agent, extraTools...)))
 	for _, c := range smart.MCP {
 		pv.MCP = append(pv.MCP, c.Server)
 	}
@@ -246,7 +248,8 @@ func (s *Service) smartBlocker(mcp []string) string {
 	if len(mcp) == 0 {
 		return ""
 	}
-	have, err := claudeheadless.UserServers(s.getenv)
+	agent := s.Agent.Active()
+	have, err := agent.UserMCPServers(s.getenv)
 	if err != nil {
 		return err.Error()
 	}
@@ -256,7 +259,7 @@ func (s *Service) smartBlocker(mcp []string) string {
 			found = found || h.Name == name
 		}
 		if !found {
-			return claudeheadless.ErrServerGone{Name: name}.Error()
+			return harness.ErrServerGone{Name: name, Agent: agent.Label()}.Error()
 		}
 	}
 	return ""

@@ -49,11 +49,11 @@ func (r *AgentRunner) model(p harness.Provider) string {
 	}
 	m, err := r.models(p.ID())
 	if err != nil {
-		slog.Warn("memory: read agent model, using default", "provider", p.ID(), "err", err)
+		slog.Warn("memory: read agent model, using default", "scope", "memory", "provider", p.ID(), "err", err)
 		return cat.Default
 	}
 	if !cat.Valid(m) {
-		slog.Warn("memory: invalid agent model, using default", "provider", p.ID(), "model", m)
+		slog.Warn("memory: invalid agent model, using default", "scope", "memory", "provider", p.ID(), "model", m)
 		return cat.Default
 	}
 	return m

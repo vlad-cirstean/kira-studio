@@ -9,12 +9,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
-// SandboxToolNames are the allowed-tools names of the sandbox git tools.
-var SandboxToolNames = []string{
-	"mcp__" + ServerName + "__fetch_remote",
-	"mcp__" + ServerName + "__push_branch",
-}
-
 // SandboxGrant adds the sandbox git tools to a run. Push allows push_branch; a read-only step
 // leaves it off.
 type SandboxGrant struct {

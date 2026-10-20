@@ -17,19 +17,10 @@ func FinishInstruction(src llmprompts.Source, results []ResultSpec) string {
 	return llmprompts.HeadlessFinishStepSuffix.Text(src, FinishVars(results))
 }
 
-// FinishStepTool is the allowed-tools name of the finish_step MCP tool: server "kira-ade", tool "finish_step".
-const FinishStepTool = "mcp__" + ServerName + "__finish_step"
-
-// ServerName is the MCP server name in the run's --mcp-config.
-const ServerName = "kira-ade"
-
 // SpaceNote goes before the finish instruction when the workflow turns the Kira Space tools on.
 func SpaceNote(src llmprompts.Source) string {
 	return llmprompts.HeadlessSpaceSuffix.Text(src, llmprompts.NoVars{})
 }
-
-// RunOutcomeTool is the allowed-tools name of the run_outcome MCP tool.
-const RunOutcomeTool = "mcp__" + ServerName + "__run_outcome"
 
 // RebaseReport ends every rebase run's prompt, edited ones included.
 func RebaseReport(src llmprompts.Source) string {

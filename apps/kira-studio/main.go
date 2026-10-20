@@ -18,7 +18,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
-	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -70,7 +69,6 @@ func main() {
 		// P87 §3/§4: a runtime.GOOS switch — a real caffeinate child on macOS, a documented no-op
 		// everywhere else.
 		KeepAwakeDriver: keepawake.NewPlatformDriver(),
-		McpInstaller:    mcpinstall.New(mcpinstall.Deps{}),
 		AppName:         "Kira Studio", Version: buildinfo.Version,
 	})
 	if err != nil {

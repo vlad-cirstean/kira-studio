@@ -371,7 +371,7 @@ func TestRunEngine_takeOver(t *testing.T) {
 	}
 	composed := e.spawn(l)
 	if !strings.HasPrefix(composed, e.tracker.deps.AgentBin+" --resume '"+head.ClaudeSessionID+"' ") ||
-		!strings.Contains(composed, "'--allowedTools' '"+claudeheadless.FinishStepTool+"'") {
+		!strings.Contains(composed, "'--allowedTools' '"+toolName(claudeheadless.FinishStep)+"'") {
 		t.Fatalf("command = %s", composed)
 	}
 	rec, _ := e.repos.AdeSessions.Get(l.SessionID)

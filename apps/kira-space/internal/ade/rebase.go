@@ -17,6 +17,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 )
@@ -36,9 +37,9 @@ const defaultRebaseTimeout = 20 * time.Minute
 // git tool, which only runs in the stack's worktrees (claudeheadless.CheckGitArgs).
 var rebaseBuiltins = []string{"Read", "Edit", "Write", "Grep", "Glob"}
 
-func rebaseTools() []string {
+func rebaseTools(p harness.MCPHost) []string {
 	out := slices.Clone(rebaseBuiltins)
-	return append(out, claudeheadless.GitTool, claudeheadless.FinishStepTool, claudeheadless.RunOutcomeTool)
+	return append(out, harness.ToolNames(p, claudeheadless.Git, claudeheadless.FinishStep, claudeheadless.RunOutcome)...)
 }
 
 // rebaseWorktrees are the stack's worktrees: where the git tool runs and what the run may edit.
@@ -60,7 +61,7 @@ func (b *TaskBoard) rebaseTimeout() time.Duration {
 }
 
 func (b *TaskBoard) rebaseDef() stepDef {
-	return stepDef{ID: rebaseStepID, Name: "Rebase", AllowedTools: rebaseTools(), DisallowedTools: []string{"Bash"}, Timeout: formatTimeout(b.rebaseTimeout())}
+	return stepDef{ID: rebaseStepID, Name: "Rebase", AllowedTools: rebaseTools(b.deps.Agent.Active()), DisallowedTools: []string{"Bash"}, Timeout: formatTimeout(b.rebaseTimeout())}
 }
 
 func formatTimeout(d time.Duration) string {

@@ -26,6 +26,8 @@ func New() *Provider { return &Provider{} }
 
 func (*Provider) ID() string { return ID }
 
+func (*Provider) Label() string { return "Claude" }
+
 func (*Provider) Command() string { return "claude" }
 
 func (*Provider) Models() harness.Catalog { return Catalog }

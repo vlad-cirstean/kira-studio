@@ -2,7 +2,6 @@ package claudeheadless
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/google/renameio/v2"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/tokenauth"
 	"github.com/modelcontextprotocol/go-sdk/auth"
@@ -111,6 +111,7 @@ type Server struct {
 	review   ReviewReplier
 	sandbox  SandboxGit
 	prompts  llmprompts.Source
+	render   func([]harness.MCPServer) ([]byte, error)
 
 	mu     sync.Mutex
 	seq    uint64
@@ -136,6 +137,8 @@ type Options struct {
 	SandboxGit SandboxGit
 	// Prompts resolves tool and instruction texts; nil means the registry defaults.
 	Prompts llmprompts.Source
+	// Render writes the run's MCP config in the active provider's format; resolved per Register.
+	Render func([]harness.MCPServer) ([]byte, error)
 }
 
 // NewServer returns a stopped Server; config files go in o.Dir (created 0700).
@@ -143,7 +146,7 @@ func NewServer(o Options) *Server {
 	if o.Prompts == nil {
 		o.Prompts = llmprompts.Defaults()
 	}
-	return &Server{dir: o.Dir, onFinish: o.OnFinish, space: o.Space, outcomes: o.Outcomes, review: o.Review, sandbox: o.SandboxGit, prompts: o.Prompts}
+	return &Server{dir: o.Dir, onFinish: o.OnFinish, space: o.Space, outcomes: o.Outcomes, review: o.Review, sandbox: o.SandboxGit, prompts: o.Prompts, render: o.Render}
 }
 
 type finishArgs struct {
@@ -399,9 +402,12 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 	s.tokens = append(s.tokens, registration{id: id, grant: g, hash: hash, salt: salt, server: perRun})
 	s.mu.Unlock()
 
-	cfg, err := json.Marshal(map[string]any{"mcpServers": map[string]any{ServerName: map[string]any{
-		"type": "http", "url": url, "headers": map[string]string{"Authorization": "Bearer " + plain},
-	}}})
+	var cfg []byte
+	if s.render == nil {
+		err = errors.New("no MCP config renderer")
+	} else {
+		cfg, err = s.render([]harness.MCPServer{{Name: ServerName, URL: url, Headers: map[string]string{"Authorization": "Bearer " + plain}}})
+	}
 	name := g.RunID
 	if name == "" {
 		name = "task-" + g.TaskID

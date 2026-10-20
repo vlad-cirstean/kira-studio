@@ -490,36 +490,12 @@ func resolveParam(p Param, vs []string) ([]string, error) {
 	return vs, nil
 }
 
-// ToolArgs returns the --tools list (the ticked built-ins) and the exact --allowedTools list: the
-// built-ins with Bash narrowed to its patterns, the ticked MCP tools, then extra, deduplicated.
-func ToolArgs(s Smart, extra []string) (tools, allowed []string) {
-	tools = append([]string{}, s.Tools...)
-	seen := map[string]bool{}
-	add := func(t string) {
-		if !seen[t] {
-			seen[t] = true
-			allowed = append(allowed, t)
-		}
-	}
-	for _, t := range s.Tools {
-		if t == "Bash" && len(s.BashPatterns) > 0 {
-			for _, p := range s.BashPatterns {
-				add("Bash(" + p + ")")
-			}
-			continue
-		}
-		add(t)
-	}
+// ToolPolicy is the script's tools in the provider-neutral vocabulary; extra are already-rendered
+// names appended last.
+func (s Smart) ToolPolicy(extra []string) harness.ToolPolicy {
+	pol := harness.ToolPolicy{Builtins: s.Tools, BashPatterns: s.BashPatterns, Extra: extra}
 	for _, c := range s.MCP {
-		for _, t := range c.Tools {
-			add("mcp__" + c.Server + "__" + t)
-		}
+		pol.MCP = append(pol.MCP, harness.MCPTools{Server: c.Server, Tools: c.Tools})
 	}
-	for _, t := range extra {
-		add(t)
-	}
-	if allowed == nil {
-		allowed = []string{}
-	}
-	return tools, allowed
+	return pol
 }

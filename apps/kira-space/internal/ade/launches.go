@@ -11,6 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
 // launches.go starts interactive Claude Code sessions for a task: Take over a run's session,
@@ -292,14 +293,15 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 			return adewire.Launch{}, err
 		}
 		release = rel
-		var tools []string
+		var ids []harness.MCPTool
 		if runID != "" {
-			tools = append(tools, claudeheadless.FinishStepTool)
+			ids = append(ids, claudeheadless.FinishStep)
 		}
-		tools = append(tools, claudeheadless.RunOutcomeTool)
+		ids = append(ids, claudeheadless.RunOutcome)
 		if space {
-			tools = append(tools, claudeheadless.SpaceToolNames...)
+			ids = append(ids, claudeheadless.SpaceToolIDs...)
 		}
+		tools := harness.ToolNames(b.deps.Agent.Active(), ids...)
 		pa.ExtraArgs = append(pa.ExtraArgs, "--mcp-config", cfg, "--allowedTools")
 		pa.ExtraArgs = append(pa.ExtraArgs, tools...)
 	}

@@ -142,7 +142,7 @@ type embeddedWired struct {
 // site here is at or after the point main's own deps.Events assignment (the emitter) has already
 // run — each bridge.XxxService{Deps: deps} literal below is exactly the same value copy the
 // original sequential code made in place.
-func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keepAwakeDriver keepawake.Driver, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker, promptRouter *prompts.Router, agents harness.Selector, opts Options) embeddedWired {
+func wireEmbeddedServices(deps appcore.Deps, installer harness.MCPInstaller, keepAwakeDriver keepawake.Driver, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker, promptRouter *prompts.Router, agents harness.Selector, opts Options) embeddedWired {
 	// M1 §3.3: the DB MCP server's embedded instance — owned by this app's own lifecycle.
 	// StartIfEnabled's own failure (a bind conflict) is logged, never fatal.
 	// M2 §5.1/§5.3: the approval broker outlives the server's own start/stop (constructed here, not

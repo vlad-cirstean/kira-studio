@@ -25,25 +25,6 @@ const (
 // readFilesTools are the built-ins a ReadFiles call may use.
 var readFilesTools = []string{"Read", "Grep"}
 
-// MCPToolName is the name claude lists in --allowedTools for an MCP tool.
-func (*Provider) MCPToolName(t harness.MCPTool) string {
-	return "mcp__" + t.Server + "__" + t.Tool
-}
-
-// MCPConfig is the --mcp-config document: http servers carry type, url and headers; stdio servers
-// carry command, args and env.
-func (*Provider) MCPConfig(servers []harness.MCPServer) ([]byte, error) {
-	m := make(map[string]any, len(servers))
-	for _, s := range servers {
-		if s.URL != "" {
-			m[s.Name] = map[string]any{"type": "http", "url": s.URL, "headers": s.Headers}
-			continue
-		}
-		m[s.Name] = map[string]any{"command": s.Command, "args": s.Args, "env": s.Env}
-	}
-	return json.Marshal(map[string]any{"mcpServers": m})
-}
-
 // structuredArgs is the isolation contract. Not --bare: it forces ANTHROPIC_API_KEY auth and never
 // reads OAuth/keychain, which breaks a subscription login.
 func structuredArgs(model string, c harness.StructuredCall, mcpConfig string, allowed []string) []string {

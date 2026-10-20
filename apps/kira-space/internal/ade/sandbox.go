@@ -19,6 +19,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
@@ -196,7 +197,7 @@ func (b *TaskBoard) applySandbox(spec claudeheadless.Spec, sr *sandboxRun, l age
 	}
 	spec.DisallowedTools = append(slices.Clone(spec.DisallowedTools), sr.prep.Disallowed...)
 	if sr.grant != nil {
-		spec.AllowedTools = append(slices.Clone(spec.AllowedTools), claudeheadless.SandboxToolNames...)
+		spec.AllowedTools = append(slices.Clone(spec.AllowedTools), harness.ToolNames(b.deps.Agent.Active(), claudeheadless.SandboxToolIDs...)...)
 	}
 	sd := l.def.Sandbox.Normalized()
 	note := llmprompts.HeadlessSandboxNote.Text(b.prompts(), llmprompts.SandboxNoteVars{
