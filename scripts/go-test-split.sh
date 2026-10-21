@@ -13,7 +13,12 @@ case "${1:-}" in
     exit 2
     ;;
 esac
+CMD="$1"
 shift
+
+if [ "$CMD" = containers ]; then
+  echo "go-test-split: docker kernel $(docker info --format '{{.KernelVersion}}' 2>/dev/null || echo unknown)"
+fi
 
 PKGS="$(go list ./... | grep "$FILTER" "$PATTERN")"
 # $PKGS is deliberately word-split into package paths.

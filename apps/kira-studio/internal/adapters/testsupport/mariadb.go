@@ -18,7 +18,7 @@ type MariaFixture = mysqlFamilyFixture
 var mariaMemo fixture[MariaFixture]
 
 const (
-	mariaImage        = "mariadb:11.4"
+	mariaImage        = "mariadb:11.4.13"
 	mariaRootPassword = FixturePassword
 	mariaDatabase     = "kira_test"
 	mariaAnalyticsDB  = "kira_analytics"

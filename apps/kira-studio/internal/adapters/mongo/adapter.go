@@ -126,6 +126,15 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 		_ = handle.Client.Disconnect(context.Background())
 		return adapters.ConnectInfo{}, mapError(err)
 	}
+	// buildInfo needs no auth before 8.0; this fails with Unauthorized on any auth-enabled server
+	// when no credentials were sent, and returns an empty list for a user with no privileges.
+	err = handle.Client.Database("admin").RunCommand(ctx, bson.D{
+		{Key: "listDatabases", Value: 1}, {Key: "nameOnly", Value: true}, {Key: "authorizedDatabases", Value: true},
+	}).Err()
+	if err != nil {
+		_ = handle.Client.Disconnect(context.Background())
+		return adapters.ConnectInfo{}, mapError(err)
+	}
 
 	a.setConnected(handle.Client, handle.DefaultDatabase, cfg.ReadOnly)
 

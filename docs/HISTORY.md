@@ -6738,3 +6738,15 @@ The comment cleanup requires building a comment-extraction tool.
 
 ### v2.8 P321 (Done)
 <!-- /chapter v2.8 -->
+
+## Fixes outside chapters
+
+### Release container tests (fix/release-container-tests)
+The v0.2.8 Release and its PR CI `go-containers` job failed because mongo:8.3 exits at startup on runner kernels 6.19 and newer (SERVER-121912, SERVER-125742).
+The runner pool mixes kernels, so the failure appeared only on some runs and passed on rerun.
+No 8.x or 9.x Mongo image starts on every runner kernel, so the container tests pin mongo:7.0.45, and MongoDB 8.x/9.x stay unverified in CI as a known open item.
+Every container test image is pinned to an exact patch tag, because PR CI caches images keyed on the testsupport source hash and ran stale floating-tag builds while Release pulled fresh ones.
+`test-matrix.sh` reads its image list from the testsupport package instead of a hand-copied column.
+The Kafka SASL fixture waits for broker readiness with a SASL client, like plain Kafka, because it raced the broker start.
+The container test scripts log the Docker host kernel so a kernel-dependent failure is recognizable.
+The Mongo adapter's Connect now runs listDatabases (names only) so a missing-credentials connect fails on auth-enabled servers before 8.0, where buildInfo needs no authentication.

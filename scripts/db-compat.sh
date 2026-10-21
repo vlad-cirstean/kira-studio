@@ -41,23 +41,25 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+echo "db-compat: docker kernel $(docker info --format '{{.KernelVersion}}' 2>/dev/null || echo unknown)"
+
 # --- the version table (P16 §3) --------------------------------------------------------------
-POSTGRES_MIN="postgres:14-alpine"
-POSTGRES_MAX="postgres:18-alpine"
-MARIADB_MIN="mariadb:10.11"
-MARIADB_MAX="mariadb:12.3"
-MYSQL_MIN="mysql:8.0"
-MYSQL_MAX="mysql:9.7"
-CLICKHOUSE_MIN="clickhouse/clickhouse-server:25.3"
-CLICKHOUSE_MAX="clickhouse/clickhouse-server:26.8"
-MONGO_MIN="mongo:4.4"
-MONGO_MAX="mongo:8.3"
-REDIS_MIN="redis:7.0"
-REDIS_MAX="redis:8.10"
+POSTGRES_MIN="postgres:14.24-alpine"
+POSTGRES_MAX="postgres:18.6-alpine"
+MARIADB_MIN="mariadb:10.11.19"
+MARIADB_MAX="mariadb:12.3.3"
+MYSQL_MIN="mysql:8.0.46"
+MYSQL_MAX="mysql:9.7.2"
+CLICKHOUSE_MIN="clickhouse/clickhouse-server:25.3.14"
+CLICKHOUSE_MAX="clickhouse/clickhouse-server:26.8.33"
+MONGO_MIN="mongo:4.4.30"
+MONGO_MAX="mongo:7.0.45"
+REDIS_MIN="redis:7.0.15"
+REDIS_MAX="redis:8.10.2"
 KAFKA_MIN="confluentinc/cp-kafka:7.4.0"
 KAFKA_MAX="confluentinc/cp-kafka:8.3.0"
-LOCALSTACK_MIN="localstack/localstack:3"
-LOCALSTACK_MAX="localstack/localstack:4"
+LOCALSTACK_MIN="localstack/localstack:3.8.1"
+LOCALSTACK_MAX="localstack/localstack:4.14.0"
 
 # kind|extreme|go package|env assignments (space-separated KEY=value), one line per invocation —
 # D3's 16-row table, verbatim. mysqlfamily sets both KIRA_COMPAT_IMAGE_MARIADB and

@@ -28,7 +28,7 @@ type ClickHouseFixture struct {
 var clickhouseMemo fixture[ClickHouseFixture]
 
 const (
-	clickhouseImage      = "clickhouse/clickhouse-server:26.3"
+	clickhouseImage      = "clickhouse/clickhouse-server:26.3.58"
 	clickhouseAdminUser  = "kira_admin"
 	clickhouseAdminPass  = FixturePassword
 	clickhouseDatabase   = "kira_test"

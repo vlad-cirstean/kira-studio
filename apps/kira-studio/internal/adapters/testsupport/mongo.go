@@ -19,8 +19,11 @@ import (
 // packages/db-fixtures/support/mongo.ts's own constants, ported verbatim (C21) — this Go seeder re-expresses
 // that TS function rather than reading a shared fixture file, since Mongo has no .sql-file seeding
 // path.
+//
+// MongoImage stays on 7.0: 8.x/9.x exit at startup on kernels 6.19-7.0.13 (SERVER-125742). Do not bump
+// until no runner kernel is in that range.
 const (
-	MongoImage             = "mongo:8.3"
+	MongoImage             = "mongo:7.0.45"
 	mongoRootUsername      = "root"
 	mongoRootPassword      = FixturePassword
 	MongoDatabase          = "kira_test"
@@ -76,7 +79,7 @@ func startMongo() (*MongoFixture, error) {
 		// that throwaway first boot; this is spelled out explicitly instead.
 		//
 		// Case-insensitive on purpose. 4.4+ logs structured JSON with
-		// "msg":"Waiting for connections" (capital W, verified against mongo:8.3); 4.2's plain-text
+		// "msg":"Waiting for connections" (capital W, verified against mongo:7.0.45); 4.2's plain-text
 		// logging spells the identical line lowercase — "waiting for connections on port 27017"
 		// (verified against mongo:4.2) — and the exact-case match above never saw it, timing out at
 		// 0/2 occurrences. A regex match with (?i) covers both without needing two wait strategies.

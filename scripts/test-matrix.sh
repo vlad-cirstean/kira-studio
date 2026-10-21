@@ -36,21 +36,23 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# --- the matrix (P25 §2.4-§2.9): kind|go package|image(s) needed --------------------------------
-# One row per adapter package's own authmatrix_test.go. Images are this script's own pinned
-# defaults (testsupport's own constants) — a compat-matrix cross product (min/max × auth matrix)
-# is explicitly out of scope (P25 doesn't ask for it, and db-compat.sh already covers the
-# min/max axis on the general-tier suite).
+echo "test-matrix: docker kernel $(docker info --format '{{.KernelVersion}}' 2>/dev/null || echo unknown)"
+
+# --- the matrix (P25 §2.4-§2.9): kind|go package ------------------------------------------------
+# One row per adapter package's own authmatrix_test.go. Images come from testsupport's own constants
+# (the testimages command). A compat-matrix cross product (min/max × auth matrix) is explicitly out
+# of scope (P25 doesn't ask for it, and db-compat.sh already covers the min/max axis on the
+# general-tier suite).
 MATRIX="
-postgres|./apps/kira-studio/internal/adapters/postgres/...|postgres:17-alpine
-mysqlfamily|./apps/kira-studio/internal/adapters/mysqlfamily/...|mariadb:11.4 mysql:8.4
-clickhouse|./apps/kira-studio/internal/adapters/clickhouse/...|clickhouse/clickhouse-server:26.3
-mongo|./apps/kira-studio/internal/adapters/mongo/...|mongo:8.3
-redis|./apps/kira-studio/internal/adapters/redis/...|redis:8.10
-kafka|./apps/kira-studio/internal/adapters/kafka/...|confluentinc/cp-kafka:8.0.7
-sqs|./apps/kira-studio/internal/adapters/sqs/...|localstack/localstack:4
-s3|./apps/kira-studio/internal/adapters/s3/...|localstack/localstack:4
-sqlite|./apps/kira-studio/internal/adapters/sqlite/...|
+postgres|./apps/kira-studio/internal/adapters/postgres/...
+mysqlfamily|./apps/kira-studio/internal/adapters/mysqlfamily/...
+clickhouse|./apps/kira-studio/internal/adapters/clickhouse/...
+mongo|./apps/kira-studio/internal/adapters/mongo/...
+redis|./apps/kira-studio/internal/adapters/redis/...
+kafka|./apps/kira-studio/internal/adapters/kafka/...
+sqs|./apps/kira-studio/internal/adapters/sqs/...
+s3|./apps/kira-studio/internal/adapters/s3/...
+sqlite|./apps/kira-studio/internal/adapters/sqlite/...
 "
 
 OLDIFS="$IFS"
@@ -72,7 +74,7 @@ if [ -z "$FILTERED" ]; then
 fi
 
 if [ "$NO_PULL" != "1" ]; then
-  IMAGES="$(printf '%s' "$FILTERED" | cut -d'|' -f3 | tr ' ' '\n' | sort -u)"
+  IMAGES="$(go run ./apps/kira-studio/internal/adapters/testsupport/cmd/testimages)"
   # shellcheck disable=SC2086
   pull_images test-matrix "$MIRROR" $IMAGES || exit 1
 fi
