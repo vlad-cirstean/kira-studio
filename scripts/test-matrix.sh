@@ -42,7 +42,7 @@ done
 # is explicitly out of scope (P25 doesn't ask for it, and db-compat.sh already covers the
 # min/max axis on the general-tier suite).
 MATRIX="
-postgres|./apps/kira-studio/internal/adapters/postgres/...|postgres:17-alpine
+postgres|./apps/kira-studio/internal/adapters/postgres/...|postgres:17.11-alpine
 mysqlfamily|./apps/kira-studio/internal/adapters/mysqlfamily/...|mariadb:11.4 mysql:8.4
 clickhouse|./apps/kira-studio/internal/adapters/clickhouse/...|clickhouse/clickhouse-server:26.3
 mongo|./apps/kira-studio/internal/adapters/mongo/...|mongo:7.0.45

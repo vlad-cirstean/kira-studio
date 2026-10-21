@@ -20,7 +20,7 @@ func startPostgres(t *testing.T) connections.Input {
 	t.Helper()
 	flowharness.RequireDocker(t)
 	const pass, dbName = "flowpass", "flowdb"
-	c, err := tcpostgres.Run(ctx, testsupport.ImageFor("postgres", "postgres:17-alpine"),
+	c, err := tcpostgres.Run(ctx, testsupport.ImageFor("postgres", "postgres:17.11-alpine"),
 		tcpostgres.WithDatabase(dbName), tcpostgres.WithUsername("postgres"), tcpostgres.WithPassword(pass),
 		testcontainers.WithWaitStrategy(wait.ForLog("database system is ready to accept connections").WithOccurrence(2).WithStartupTimeout(120*time.Second)),
 	)

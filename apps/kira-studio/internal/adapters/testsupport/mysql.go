@@ -19,7 +19,7 @@ type MysqlFixture = mysqlFamilyFixture
 var mysqlMemo fixture[MysqlFixture]
 
 const (
-	mysqlImage        = "mysql:8.4"
+	mysqlImage        = "mysql:8.4.11"
 	mysqlRootPassword = FixturePassword
 	mysqlDatabase     = "kira_test"
 	mysqlAnalyticsDB  = "kira_analytics"
