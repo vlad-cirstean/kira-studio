@@ -344,17 +344,26 @@ func (e *RepoEntry) hostSetting() string {
 // hostRepo resolves the host and repository identity of this entry's "origin" remote under the
 // current setting. It costs one git spawn (`git remote get-url origin`) per refsChanged, and none
 // when the setting is off, so a repo with no matching host never triggers a host call. A changed
-// setting drops every cached fact so nothing crosses hosts.
+// setting, host or repository drops every cached fact so nothing crosses hosts.
 func (e *RepoEntry) hostRepo(ctx context.Context) (githost.Provider, githost.Repo, bool) {
+	p, repo, ok, _ := e.hostRepoGen(ctx)
+	return p, repo, ok
+}
+
+// hostRepoGen is hostRepo plus the cache generation the answer belongs to, read under the same lock
+// hold that reads or writes the resolution. A fetch passes it to its cache puts, so a put from a
+// provider resolved before a reset never lands after it.
+func (e *RepoEntry) hostRepoGen(ctx context.Context) (githost.Provider, githost.Repo, bool, uint64) {
 	setting := e.hostSetting()
 	e.host.mu.Lock()
 	if e.host.setting != "" && e.host.setting != setting {
 		e.host.resetCaches()
 	}
+	gen := e.host.gen
 	if e.host.remoteChecked {
 		p, repo, ok := e.host.provider, e.host.repo, e.host.resolved
 		e.host.mu.Unlock()
-		return p, repo, ok
+		return p, repo, ok, gen
 	}
 	e.host.mu.Unlock()
 
@@ -366,17 +375,26 @@ func (e *RepoEntry) hostRepo(ctx context.Context) (githost.Provider, githost.Rep
 		}
 		if ctx.Err() != nil {
 			// A cancelled spawn says nothing about the remote; caching "no host" would stick.
-			return nil, githost.Repo{}, false
+			return nil, githost.Repo{}, false, gen
 		}
 	}
 	p, repo, ok := e.hosts.Resolve(ctx, setting, remoteURL)
 
 	e.host.mu.Lock()
+	defer e.host.mu.Unlock()
+	if e.host.gen != gen {
+		// A reset landed while resolving: this answer belongs to the old choice. Serve it under the
+		// old generation so its puts drop, and leave the slot for the next lookup.
+		return p, repo, ok, gen
+	}
+	if e.host.resolved && (!ok || e.host.provider.ID() != p.ID() || e.host.repo != repo) {
+		e.host.resetCaches()
+		gen = e.host.gen
+	}
 	e.host.remoteChecked = true
 	e.host.setting = setting
 	e.host.provider, e.host.repo, e.host.resolved = p, repo, ok
-	e.host.mu.Unlock()
-	return p, repo, ok
+	return p, repo, ok, gen
 }
 
 // ensureSnapshot is the repo-wide open snapshot, fetched lazily on first need and cached for
@@ -419,12 +437,11 @@ func (e *RepoEntry) fetchSnapshot(ctx context.Context) ([]githost.ChangeRequest,
 	if status, armed := e.host.breakerStatus(); armed {
 		return nil, status
 	}
-	p, repo, ok := e.hostRepo(ctx)
+	p, repo, ok, gen := e.hostRepoGen(ctx)
 	if !ok {
 		return nil, githost.Status{Kind: "disabled"}
 	}
 
-	gen := e.host.generation()
 	fetch, leader := e.host.claimSnapshotFetch()
 	if !leader {
 		<-fetch.done
@@ -450,12 +467,11 @@ func (e *RepoEntry) fetchSnapshot(ctx context.Context) ([]githost.ChangeRequest,
 // answer. Never returns a Go error: every outcome is a ChangeRequestLookup the RPC layer answers
 // with directly, so a host hiccup never blocks or fails the request.
 func (e *RepoEntry) ResolveCommitChangeRequests(ctx context.Context, sha string) ChangeRequestLookup {
-	p, repo, ok := e.hostRepo(ctx)
+	p, repo, ok, gen := e.hostRepoGen(ctx)
 	if !ok {
 		return disabledResult()
 	}
 	crs, state := e.host.commitCacheGet(sha)
-	gen := e.host.generation()
 	switch state {
 	case cacheFresh:
 		return okResult(crs)
@@ -494,11 +510,10 @@ func (e *RepoEntry) ResolveBranchChangeRequest(ctx context.Context, branch strin
 // resolveBranchChangeRequest serves stale cached facts while refreshing them, unless fresh is set
 // (the eager purge pass needs the current state to see a closed change request).
 func (e *RepoEntry) resolveBranchChangeRequest(ctx context.Context, branch string, fresh bool) ChangeRequestLookup {
-	p, repo, ok := e.hostRepo(ctx)
+	p, repo, ok, gen := e.hostRepoGen(ctx)
 	if !ok {
 		return disabledResult()
 	}
-	gen := e.host.generation()
 
 	// Reading the snapshot cache alone never populates it; ensureSnapshot does. On a cold cache the
 	// first lookup pays one bulk Open call and warms the snapshot for every other branch with an
