@@ -329,7 +329,7 @@ func isCommentText(s string) bool {
 	return false
 }
 
-var hedgeToken = regexp.MustCompile(`(?i)^(?:really|basically|actually|simply|just)\W*$`)
+var hedgeToken = regexp.MustCompile(`(?i)^(?:really|basically|actually|simply|just)(\W*)$`)
 
 // proseKept accepts a prose draft that is the input with only listed hedge words removed: same line
 // structure, no reflow, no other word gone.
@@ -346,18 +346,28 @@ func proseKept(input, draft string) bool {
 			return false
 		}
 		want := strings.Fields(out[i])
-		k := 0
+		var kept []string
 		for _, w := range strings.Fields(in[i]) {
+			m := hedgeToken.FindStringSubmatch(w)
 			switch {
-			case k < len(want) && strings.EqualFold(w, want[k]):
-				k++
-			case hedgeToken.MatchString(w):
+			case len(kept) < len(want) && strings.EqualFold(w, want[len(kept)]):
+				kept = append(kept, w)
+			case m != nil:
+				// Punctuation glued to a dropped hedge moves onto the word before it.
+				if m[1] != "" && len(kept) > 0 {
+					kept[len(kept)-1] = strings.TrimRight(kept[len(kept)-1], ".,;:!?") + m[1]
+				}
 			default:
-				return false
+				kept = append(kept, w)
 			}
 		}
-		if k != len(want) {
+		if len(kept) != len(want) {
 			return false
+		}
+		for j := range kept {
+			if !strings.EqualFold(kept[j], want[j]) {
+				return false
+			}
 		}
 	}
 	return true

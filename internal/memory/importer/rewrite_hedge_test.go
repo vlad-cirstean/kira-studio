@@ -21,3 +21,24 @@ func TestHedgeLeftQuoteMask(t *testing.T) {
 		}
 	}
 }
+
+func TestProseKeptHedgePunctuation(t *testing.T) {
+	cases := []struct {
+		name, in, draft string
+		want            bool
+	}{
+		{"hedge dropped", "It is really fast.", "It is fast.", true},
+		{"final hedge moves the period", "It is fast, really.", "It is fast.", true},
+		{"dangling comma rejected", "It is fast, really.", "It is fast,", false},
+		{"old punctuation kept rejected", "It is fast, really.", "It is fast,.", false},
+		{"mid hedge keeps the comma", "It is, really, fast.", "It is, fast.", true},
+		{"leading hedge", "Really, it is fast.", "it is fast.", true},
+		{"hedge kept", "It is fast, really.", "It is fast, really.", true},
+		{"other word gone", "It is fast, really.", "It fast.", false},
+	}
+	for _, c := range cases {
+		if got := proseKept(c.in, c.draft); got != c.want {
+			t.Errorf("%s: proseKept = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
