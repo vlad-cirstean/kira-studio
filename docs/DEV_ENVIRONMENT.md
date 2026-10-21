@@ -951,3 +951,15 @@ Every name read or set in Go. "Set by" says who supplies it; "you" means set it 
 | `KIRA_GIT_DIFFERENTIAL`, `KIRA_GIT_PERF` | `1` runs the git search differential test, the git perf probe | you |
 | `KIRA_DATAGRIP_REAL_PROJECT` | Path of a real DataGrip project for the opt-in import test | you |
 | `KIRA_EMBED_SMOKE_WORKER`, `KIRA_EMBED_FAKE_WORKER`, `KIRA_ASKPASS_HELPER_PROCESS`, `KIRA_TEST_MARKER` | Re-exec markers inside the owning package's tests; never set by hand | the tests themselves |
+
+## Comment sweep (P320)
+
+`go run ./scripts/commentsweep <cmd>`, from repo root. `run` spends tokens: needs an authenticated `claude` on `PATH`
+and builds `kira-space` (`bun run build:space` when `frontend/dist` or `dist-mobile` is missing). Work dir
+`.commentsweep/` (gitignored, resumable): `manifest.jsonl` holds every comment found, any size, with its status.
+
+- `scan [--min-chars 300]`: extract only, counts and cost projection. Refuses a dirty in-scope tree.
+- `run --max-usd X [--jobs 4] [--lang go|ts|vue]`: one `ingest_files` rewrite call per comment; rerun after a halt.
+- `apply --lang L [--dry-run]`: byte-splice, code-identity check, never commits. `restore --ids a,b` undoes units.
+- `report --not-applied`: every comment that did not ship, grouped by status. `report --sample N --out F`: judge sample.
+- `status`: outcomes, spend, applied files.
