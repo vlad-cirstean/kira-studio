@@ -179,11 +179,11 @@ func (r *AdeSessionsRepo) Delete(id string) error {
 	return sqlitex.RequireOneRow(res, "ade session "+id)
 }
 
-// SetAgentSessionID updates the tracked Claude session id — a session's own id can change across
+// SetAgentSessionID updates the tracked agent session id — a session's own id can change across
 // a /clear (a fresh SessionStart with a different session_id, same terminal_id); this keeps the
 // row pointed at whichever id `--resume` must pass next.
-func (r *AdeSessionsRepo) SetAgentSessionID(id, claudeSessionID string) error {
-	res, err := r.DB.Exec(`UPDATE ade_sessions SET agent_session_id = ? WHERE id = ?`, claudeSessionID, id)
+func (r *AdeSessionsRepo) SetAgentSessionID(id, agentSessionID string) error {
+	res, err := r.DB.Exec(`UPDATE ade_sessions SET agent_session_id = ? WHERE id = ?`, agentSessionID, id)
 	if err != nil {
 		return fmt.Errorf("repos: set ade session agent session id %s: %w", id, err)
 	}

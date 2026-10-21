@@ -571,7 +571,7 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 	if def.Kind == adewire.KindAgent {
 		sessionID = b.newID()
 		patch.SessionID = &sessionID
-		claudeID := cmpNonEmpty(spec.ResumeID, b.newID())
+		agentSessionID := cmpNonEmpty(spec.ResumeID, b.newID())
 		agent, err = b.agentForResume(spec.ResumeID)
 		if err != nil {
 			return run, err
@@ -590,7 +590,7 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		}
 		if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
 			ID: sessionID, Mode: model.AdeSessionModeHeadless, TaskID: tc.task.ID, BranchID: sb.ID,
-			StepID: def.ID, RunID: run.ID, Resumes: spec.ResumeID, AgentSessionID: claudeID, Cwd: runPath, Provider: agent.ID(),
+			StepID: def.ID, RunID: run.ID, Resumes: spec.ResumeID, AgentSessionID: agentSessionID, Cwd: runPath, Provider: agent.ID(),
 			State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 		}); err != nil {
 			return run, err
@@ -637,7 +637,7 @@ type outcome struct {
 	state, note, summary string
 	exit                 *int
 	noAdvance            bool // a user stop: the engine does not move the task on
-	lost                 bool // a resume whose Claude conversation is gone
+	lost                 bool // a resume whose agent conversation is gone
 	out                  model.AdeRunOutcome
 }
 
@@ -769,7 +769,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 	}
 	agent := l.agent
 	spec := harness.HeadlessSpec{
-		Bin: b.deps.AgentBin, Dir: l.path, Prompt: l.prompt, SessionID: b.sessionClaudeID(sessionID),
+		Bin: b.deps.AgentBin, Dir: l.path, Prompt: l.prompt, SessionID: b.sessionAgentID(sessionID),
 		Resume: l.resume, MCPConfigs: []string{cfg}, Config: b.configScope(), AllowedTools: roundTools(agent, allowedTools(agent, def.AllowedTools, space), round), DisallowedTools: def.DisallowedTools,
 		Timeout: l.timeout,
 	}
@@ -880,8 +880,8 @@ func roundTools(p harness.MCPHost, tools []string, round bool) []string {
 	return tools
 }
 
-// sessionClaudeID reads the Claude session id stored with the ade_sessions row.
-func (b *TaskBoard) sessionClaudeID(sessionID string) string {
+// sessionAgentID reads the agent session id stored with the ade_sessions row.
+func (b *TaskBoard) sessionAgentID(sessionID string) string {
 	rec, err := b.deps.Sessions.Get(sessionID)
 	if err != nil || rec == nil {
 		return b.newID()
@@ -889,7 +889,7 @@ func (b *TaskBoard) sessionClaudeID(sessionID string) string {
 	return rec.AgentSessionID
 }
 
-// lostOutcome is the outcome of a resume whose Claude conversation is gone.
+// lostOutcome is the outcome of a resume whose agent conversation is gone.
 func lostOutcome(agent runoutcome.Agent, lost bool, lastErr string) (outcome, bool) {
 	if !lost {
 		return outcome{}, false
@@ -1194,12 +1194,12 @@ func (b *TaskBoard) RetryRun(ctx context.Context, runID string) error {
 	return err
 }
 
-// runResumable says a restart stopped the run mid-session, so its Claude conversation can continue.
+// runResumable says a restart stopped the run mid-session, so its agent conversation can continue.
 func runResumable(run model.AdeRun) bool {
 	return run.Purpose != model.AdeRunPurposeRebase && run.State == model.AdeRunStuck && run.Launch.ResumeID != "" && run.StartedAt != nil
 }
 
-// ResumeRun continues the Claude session of a run a restart stopped, as a new attempt.
+// ResumeRun continues the agent session of a run a restart stopped, as a new attempt.
 func (b *TaskBoard) ResumeRun(ctx context.Context, runID string) error {
 	run, err := b.deps.Tasks.GetRun(runID)
 	if err != nil {

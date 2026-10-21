@@ -108,7 +108,7 @@ type PrepareArgs struct {
 	Purpose string
 }
 
-// PrepareResult is Prepare's own return shape. SessionID is the Claude session id (stable across
+// PrepareResult is Prepare's own return shape. SessionID is the agent session id (stable across
 // Compose but not across a /clear inside the session); Command is the base launch, without hooks
 // or a prompt — Compose adds both. Cwd is the effective cwd: args.Cwd for a new launch,
 // existing.Cwd for a resume — the caller opens the terminal there, so the PTY and the record
@@ -116,7 +116,7 @@ type PrepareArgs struct {
 type PrepareResult struct {
 	TerminalID string
 	// RecordID is the ade_sessions row id (the handle Send and FocusSession take); SessionID is the
-	// Claude session id.
+	// agent session id.
 	RecordID  string
 	SessionID string
 	Command   string
@@ -144,9 +144,9 @@ type Tracker struct {
 	// Stop/SessionEnd, on the grace-timeout Reconcile that stops a record, and on Close — not on
 	// every event, which would be one DB write per tool call.
 	lastActive map[string]int64
-	// claudeSessionID caches each live record's own current Claude session id, so HandleEvent can
+	// agentSessionID caches each live record's own current agent session id, so HandleEvent can
 	// detect a SessionStart naming a different one (a /clear) without a DB read on every event.
-	claudeSessionID map[string]string
+	agentSessionID map[string]string
 	// fresh marks records Compose inserted (not resumed), so Abort deletes rather than stops them.
 	fresh map[string]bool
 
@@ -169,15 +169,15 @@ func NewTracker(deps TrackerDeps) *Tracker {
 		deps.PendingTTL = defaultPendingTTL
 	}
 	return &Tracker{
-		deps:            deps,
-		pending:         map[string]pendingIntent{},
-		live:            map[string]string{},
-		byRecord:        map[string]string{},
-		spawnedAt:       map[string]time.Time{},
-		lastActive:      map[string]int64{},
-		claudeSessionID: map[string]string{},
-		fresh:           map[string]bool{},
-		graceTimers:     map[string]*time.Timer{},
+		deps:           deps,
+		pending:        map[string]pendingIntent{},
+		live:           map[string]string{},
+		byRecord:       map[string]string{},
+		spawnedAt:      map[string]time.Time{},
+		lastActive:     map[string]int64{},
+		agentSessionID: map[string]string{},
+		fresh:          map[string]bool{},
+		graceTimers:    map[string]*time.Timer{},
 	}
 }
 
@@ -245,12 +245,12 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	agent := t.deps.Agent.Active()
 	now := t.deps.Now()
 
-	var recordID, claudeSessionID, cwd string
+	var recordID, agentSessionID, cwd string
 	if args.Resume == "" {
 		recordID = uuid.NewString()
-		claudeSessionID = uuid.NewString()
+		agentSessionID = uuid.NewString()
 		if args.Resumes != "" {
-			claudeSessionID = args.Resumes
+			agentSessionID = args.Resumes
 		}
 		cwd = args.Cwd
 		if args.Resumes != "" && args.Provider != "" {
@@ -274,7 +274,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 			return PrepareResult{}, ErrSessionRunning
 		}
 		recordID = existing.ID
-		claudeSessionID = existing.AgentSessionID
+		agentSessionID = existing.AgentSessionID
 		if agent, err = t.deps.Agent.For(existing.Provider); err != nil {
 			return PrepareResult{}, err
 		}
@@ -294,15 +294,15 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	if _, err := agent.Locate(context.Background(), t.deps.AgentBin); err != nil {
 		return PrepareResult{}, err
 	}
-	claudeBin := cmpNonEmpty(t.deps.AgentBin, agent.Command())
+	agentBin := cmpNonEmpty(t.deps.AgentBin, agent.Command())
 	command := agent.InteractiveCommand(harness.InteractiveSpec{
-		Bin: claudeBin, SessionID: claudeSessionID, Resume: args.Resume != "" || args.Resumes != "",
+		Bin: agentBin, SessionID: agentSessionID, Resume: args.Resume != "" || args.Resumes != "",
 		AddDirs: args.AddDirs, MCPConfig: args.MCPConfig, AllowedTools: args.AllowedTools,
 	})
 
 	terminalID := uuid.NewString()
 	intent := pendingIntent{
-		RecordID: recordID, AgentSessionID: claudeSessionID, Cwd: cwd, Command: command, Message: args.Message,
+		RecordID: recordID, AgentSessionID: agentSessionID, Cwd: cwd, Command: command, Message: args.Message,
 		Resume: args.Resume != "", CreatedAt: now,
 		TaskID: args.TaskID, BranchID: args.BranchID, StepID: args.StepID, Resumes: args.Resumes, Purpose: args.Purpose,
 		Provider: agent.ID(),
@@ -328,7 +328,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	t.releaseExpired(expired)
 	time.AfterFunc(t.deps.PendingTTL, func() { t.expirePending(terminalID) })
 
-	return PrepareResult{TerminalID: terminalID, RecordID: recordID, SessionID: claudeSessionID, Command: command, Cwd: cwd}, nil
+	return PrepareResult{TerminalID: terminalID, RecordID: recordID, SessionID: agentSessionID, Command: command, Cwd: cwd}, nil
 }
 
 // expirePending releases an intent that never composed within PendingTTL, so an abandoned launch's
@@ -441,7 +441,7 @@ func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, er
 	t.live[terminalID] = intent.RecordID
 	t.byRecord[intent.RecordID] = terminalID
 	t.spawnedAt[intent.RecordID] = now
-	t.claudeSessionID[intent.RecordID] = intent.AgentSessionID
+	t.agentSessionID[intent.RecordID] = intent.AgentSessionID
 	if !intent.Resume {
 		t.fresh[intent.RecordID] = true
 	}
@@ -460,7 +460,7 @@ func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, er
 }
 
 // Abort is BoundService.AbortAgent's own target: Open failed after Compose, so the terminal never
-// ran. A fresh record is deleted (its Claude session never existed, so a resume would fail); a
+// ran. A fresh record is deleted (its agent session never existed, so a resume would fail); a
 // resumed one goes back to stopped. A terminal Compose tracked nothing for is a no-op.
 func (t *Tracker) Abort(terminalID string) {
 	t.mu.Lock()
@@ -474,7 +474,7 @@ func (t *Tracker) Abort(terminalID string) {
 	delete(t.byRecord, recordID)
 	delete(t.spawnedAt, recordID)
 	delete(t.lastActive, recordID)
-	delete(t.claudeSessionID, recordID)
+	delete(t.agentSessionID, recordID)
 	delete(t.fresh, recordID)
 	if timer := t.graceTimers[recordID]; timer != nil {
 		timer.Stop()
@@ -565,7 +565,7 @@ func (t *Tracker) Reconcile() {
 		} else {
 			flushed[recordID] = now.UnixMilli()
 		}
-		delete(t.claudeSessionID, recordID)
+		delete(t.agentSessionID, recordID)
 		delete(t.fresh, recordID)
 	}
 	t.mu.Unlock()
@@ -607,8 +607,8 @@ func (t *Tracker) HandleEvent(ev harness.AgentEvent) {
 
 	sessionChanged := false
 	// The id lands in a later shell command line; only a real UUID is trusted.
-	if _, perr := uuid.Parse(ev.SessionID); ev.Event == "SessionStart" && perr == nil && t.claudeSessionID[recordID] != ev.SessionID {
-		t.claudeSessionID[recordID] = ev.SessionID
+	if _, perr := uuid.Parse(ev.SessionID); ev.Event == "SessionStart" && perr == nil && t.agentSessionID[recordID] != ev.SessionID {
+		t.agentSessionID[recordID] = ev.SessionID
 		sessionChanged = true
 	}
 	flushNow := ev.Event == "Stop" || ev.Event == "SessionEnd"

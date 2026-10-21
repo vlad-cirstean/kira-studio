@@ -16,7 +16,7 @@ import (
 // route.go routes a finished step run on its result (R4, R5): forward, to the end of the workflow, to a
 // stop, or back to this step or an earlier one. A return (a loop) is bounded by the step's ReturnLimit,
 // counted per (task, step, branch) from its `back` rows and never reset. A loop to an earlier step resumes that step's
-// Claude session with a fix line; the chain then runs again (steps.go chainRerun).
+// agent session with a fix line; the chain then runs again (steps.go chainRerun).
 
 // runOpts are the per-run extras queueRun carries to launch. Launch lives on the run row until the
 // run launches, so a run held behind a setup resumes the same way after a restart.
@@ -155,7 +155,7 @@ func (b *TaskBoard) decideLoop(tc *taskCtx, plan []stepView, run model.AdeRun, o
 	}
 	loop.opts.Launch = model.AdeRunLaunch{Note: fmt.Sprintf("sent back by %s: %s", from.Name, reason)}
 	line := llmprompts.AdeSendBackLine.Text(b.prompts(), llmprompts.SendBackVars{From: from.Name, Branch: branchName, Reason: reason})
-	if id := b.claudeIDOfSession(prev.SessionID); id != "" {
+	if id := b.agentIDOfSession(prev.SessionID); id != "" {
 		loop.opts.Launch.ResumeID, loop.opts.Launch.Prompt = id, line
 	} else {
 		loop.opts.Launch.Extra = line
@@ -216,8 +216,8 @@ func countReturns(runs []model.AdeRun, step, branch string, upTo int) int {
 	return n
 }
 
-// claudeIDOfSession is the Claude session id behind an ade_sessions record id, "" when unknown.
-func (b *TaskBoard) claudeIDOfSession(sessionID string) string {
+// agentIDOfSession is the agent session id behind an ade_sessions record id, "" when unknown.
+func (b *TaskBoard) agentIDOfSession(sessionID string) string {
 	if sessionID == "" {
 		return ""
 	}

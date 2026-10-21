@@ -230,7 +230,7 @@ func (b *TaskBoard) reviewCandidates(tc *taskCtx, review model.AdeRun) ([]review
 			continue
 		}
 		r, ok := byStep[s.ID]
-		if !ok || r.State == model.AdeRunRunning || r.State == model.AdeRunPending || b.claudeIDOfSession(r.SessionID) == "" {
+		if !ok || r.State == model.AdeRunRunning || r.State == model.AdeRunPending || b.agentIDOfSession(r.SessionID) == "" {
 			continue
 		}
 		out = append(out, reviewCandidate{run: r, step: s.Name, allowed: s.AllowedTools})
@@ -494,15 +494,15 @@ func (b *TaskBoard) SendReview(ctx context.Context, args adewire.SendReviewArgs)
 			return invalid("%s", i18n.T("backend.space.ade.reviewStep.badTarget.body", nil))
 		}
 		target := cands[pick]
-		claudeID := b.claudeIDOfSession(target.run.SessionID)
-		if busy, err := b.claudeBusy(claudeID); err != nil {
+		agentSessionID := b.agentIDOfSession(target.run.SessionID)
+		if busy, err := b.agentBusy(agentSessionID); err != nil {
 			return err
 		} else if busy {
 			return invalid("%s", i18n.T("backend.space.ade.reviewStep.targetBusy.body", nil))
 		}
 		targetID = target.run.ID
 		spec.AllowedTools = target.allowed
-		launch.ResumeID = claudeID
+		launch.ResumeID = agentSessionID
 		launch.Prompt = llmprompts.AdeReviewFollowupMessage.Text(b.prompts(), b.roundVars(rc, tgt, round, open))
 	case rc.rev.DedicatedClaudeID != "":
 		launch.ResumeID = rc.rev.DedicatedClaudeID
@@ -529,14 +529,14 @@ func (b *TaskBoard) SendReview(ctx context.Context, args adewire.SendReviewArgs)
 	return err
 }
 
-// claudeBusy says a running session already uses the Claude conversation.
-func (b *TaskBoard) claudeBusy(claudeID string) (bool, error) {
+// agentBusy says a running session already uses the agent conversation.
+func (b *TaskBoard) agentBusy(agentSessionID string) (bool, error) {
 	rows, err := b.deps.Sessions.ListTask()
 	if err != nil {
 		return false, err
 	}
 	return slices.ContainsFunc(rows, func(s model.AdeSession) bool {
-		return s.AgentSessionID == claudeID && s.State == model.AdeSessionStateRunning
+		return s.AgentSessionID == agentSessionID && s.State == model.AdeSessionStateRunning
 	}), nil
 }
 
@@ -625,21 +625,21 @@ func (b *TaskBoard) startRound(_ context.Context, tc *taskCtx, run model.AdeRun,
 	}()
 	now := b.deps.Now().UnixMilli()
 	launch := run.Launch
-	sessionID, claudeID := b.newID(), cmpNonEmpty(launch.ResumeID, b.newID())
+	sessionID, agentSessionID := b.newID(), cmpNonEmpty(launch.ResumeID, b.newID())
 	agent, err := b.agentForResume(launch.ResumeID)
 	if err != nil {
 		return run, err
 	}
 	if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
 		ID: sessionID, Mode: model.AdeSessionModeHeadless, TaskID: tc.task.ID, BranchID: sb.ID,
-		StepID: run.StepID, RunID: run.ID, Resumes: launch.ResumeID, AgentSessionID: claudeID, Cwd: path, Provider: agent.ID(),
+		StepID: run.StepID, RunID: run.ID, Resumes: launch.ResumeID, AgentSessionID: agentSessionID, Cwd: path, Provider: agent.ID(),
 		State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 	}); err != nil {
 		return run, err
 	}
 	b.notifySessions()
 	if spec.Route == adewire.ReviewSendNew {
-		if err := b.deps.Tasks.SetReviewDedicated(spec.ReviewRunID, claudeID); err != nil {
+		if err := b.deps.Tasks.SetReviewDedicated(spec.ReviewRunID, agentSessionID); err != nil {
 			return run, err
 		}
 	}

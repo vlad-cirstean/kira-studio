@@ -524,11 +524,11 @@ func (b *TaskBoard) startRebase(run model.AdeRun, spec model.AdeRebaseSpec, prom
 		}
 	}()
 	now := b.deps.Now().UnixMilli()
-	sessionID, claudeID := b.newID(), b.newID()
+	sessionID, agentSessionID := b.newID(), b.newID()
 	agent := b.deps.Agent.Active()
 	if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
 		ID: sessionID, Mode: model.AdeSessionModeHeadless, TaskID: run.TaskID, BranchID: run.BranchID, StepID: rebaseStepID,
-		RunID: run.ID, AgentSessionID: claudeID, Cwd: root.Worktree, Provider: agent.ID(), State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
+		RunID: run.ID, AgentSessionID: agentSessionID, Cwd: root.Worktree, Provider: agent.ID(), State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 	}); err != nil {
 		return run, err
 	}
