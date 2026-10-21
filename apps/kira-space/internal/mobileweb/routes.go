@@ -88,6 +88,7 @@ func (s *Server) routes() []route {
 		read("/api/ade/workflows", readJSON(s, "workflows", false, s.cfg.Reader.Workflows)),
 		read("/api/ade/backlog", readJSON(s, "backlog", false, s.cfg.Reader.Backlog)),
 		read("/api/ade/repos", readJSON(s, "repos", false, s.repoNames)),
+		read("/api/ade/hosts", readJSON(s, "hosts", false, s.cfg.Reader.HostProviders)),
 		read("/api/ade/log", s.handleLog),
 		read("/api/agent/sessions", func(w http.ResponseWriter, _ *http.Request, _ repos.MobileDeviceRow) {
 			v, err := withoutCwd(s.cfg.AgentSessions())

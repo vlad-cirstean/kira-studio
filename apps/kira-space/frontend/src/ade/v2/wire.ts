@@ -1,6 +1,7 @@
 // Frozen at P143 (ADE v2 wire contract). Mirrors apps/kira-space/internal/bridge/adewire.
 // Changing a key, type or value set is a contract change (docs/HISTORY.md (v2.0 P143) rule 1).
 
+import type { GitHostInfo } from '@kira/git-ipc';
 import type { RunOutcome } from '@shared/domain/runOutcome';
 
 // ---- shared
@@ -367,6 +368,11 @@ type AdeRunOutcome = RunOutcome & {
   rebase?: RebaseFacts;
   route?: string;
 };
+/** A code host provider's display text, as `GitHostService.Providers` and `/api/ade/hosts` answer. */
+export type HostInfo = GitHostInfo;
+export interface HostProviders {
+  providers: HostInfo[];
+}
 export interface HostLink {
   provider: string;
   kind: 'changeRequest' | 'issue';

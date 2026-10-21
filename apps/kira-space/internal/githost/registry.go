@@ -88,6 +88,16 @@ func (r *Registry) LinkLabels() string {
 	return strings.Join(labels, " or ")
 }
 
+// Infos describes every provider in registration order.
+func (r *Registry) Infos() []Info {
+	all := r.All()
+	out := make([]Info, 0, len(all))
+	for _, p := range all {
+		out = append(out, Describe(p))
+	}
+	return out
+}
+
 // ParseLink asks each provider in order.
 func (r *Registry) ParseLink(raw string) (Link, bool) {
 	for _, p := range r.All() {

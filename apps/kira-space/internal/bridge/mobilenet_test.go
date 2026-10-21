@@ -12,6 +12,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileweb"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
@@ -36,6 +37,9 @@ func (idleReader) Backlog(context.Context) (adewire.BacklogResult, error) {
 }
 func (idleReader) Repos(context.Context) (adewire.ReposResult, error) {
 	return adewire.ReposResult{}, nil
+}
+func (idleReader) HostProviders(context.Context) (githost.Providers, error) {
+	return githost.Providers{}, nil
 }
 func (idleReader) ReadLog(context.Context, adewire.ReadLogArgs) (adewire.LogPage, error) {
 	return adewire.LogPage{}, nil

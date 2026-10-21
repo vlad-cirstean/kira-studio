@@ -15,6 +15,7 @@ export const backlogKey = ['adetask', 'backlog'] as const;
 export const runSandboxKey = ['ade', 'runSandbox'] as const;
 export const sessionsKey = ['adetask', 'sessions'] as const;
 export const repoNamesKey = ['adetask', 'repoNames'] as const;
+export const hostProvidersKey = ['adetask', 'hostProviders'] as const;
 
 export function useBoard() {
   const reader = useAdeReader();
@@ -53,6 +54,15 @@ export function useBacklog() {
   return useQuery({
     queryKey: backlogKey,
     queryFn: () => reader.backlog(),
+  });
+}
+
+/** Every registered code host provider; static for the life of the app, so never invalidated. */
+export function useGitHostProviders() {
+  const reader = useAdeReader();
+  return useQuery({
+    queryKey: hostProvidersKey,
+    queryFn: () => reader.hostProviders(),
   });
 }
 

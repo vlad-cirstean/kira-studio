@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
@@ -61,4 +62,30 @@ func (r *Router) handleChangeRequestBrowserUrl(ctx context.Context, c *gitsessio
 			return ChangeRequestBrowserUrlResult{URL: &urlStr}, nil
 		},
 	)
+}
+
+// handleGitHostInfo is gitHost.info's own handler: which provider this repository's change-request
+// calls go to, for naming it in the UI.
+func (r *Router) handleGitHostInfo(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+	return handleRepoCall(ctx, c, "gitHost.info", params,
+		func(p GitHostInfoParams) (string, error) {
+			if err := requireNonEmpty("gitHost.info", "repoId", p.RepoID); err != nil {
+				return "", err
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, _ GitHostInfoParams) (GitHostInfoResult, error) {
+			info, ok := entry.HostInfo(ctx)
+			if !ok {
+				return GitHostInfoResult{}, nil
+			}
+			return GitHostInfoResult{Host: &info}, nil
+		},
+	)
+}
+
+// handleGitHostProviders is gitHost.providers' own handler: every registered provider, for the
+// repository settings choice.
+func (r *Router) handleGitHostProviders(_ context.Context, _ *gitsession.Conn, _ json.RawMessage) (any, error) {
+	return githost.Providers{Providers: r.deps.Registry.Hosts.Registry.Infos()}, nil
 }

@@ -181,7 +181,8 @@ package gitrpc
 // changeRequest.browserUrl, pr.openExternal -> changeRequest.openExternal. GhStatus, PrRecord and
 // PrLookupResult become HostStatus, ChangeRequestRecord and ChangeRequestLookup; the lookup's prs
 // and gh fields become changeRequests and status. kiraSpace.github.enabled (boolean) becomes
-// kiraSpace.gitHost.provider (string).
+// kiraSpace.gitHost.provider (string). Two new requests, gitHost.info and gitHost.providers, name
+// the host a repository resolves to and every registered host.
 const ContractVersion = 50
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from

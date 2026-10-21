@@ -6,6 +6,7 @@
 // other half of this mapping.
 export const IPC = {
   gitHostOpenChangeRequestUrl: 'kira:githost:openChangeRequestUrl',
+  gitHostProviders: 'kira:githost:providers',
   linkOpenExternal: 'kira:link:openExternal',
 
   settingsGetAll: 'kira:settings:getAll',

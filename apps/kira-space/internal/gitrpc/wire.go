@@ -703,6 +703,17 @@ type ChangeRequestBrowserUrlResult struct {
 	URL *string `json:"url"`
 }
 
+// GitHostInfoParams is gitHost.info's own request.
+type GitHostInfoParams struct {
+	RepoID string `json:"repoId"`
+}
+
+// GitHostInfoResult is the host a repository resolves to under its current setting; Host is null
+// when the setting is off or no provider matches the origin remote.
+type GitHostInfoResult struct {
+	Host *githost.Info `json:"host"`
+}
+
 // ---------------------------------------------------------------------------------------
 // G25 — worktree support (D1-D14). worktree.list/preflight.worktreeAdd/preflight.worktreeRemove's
 // own results are gitsession's/gitpreflight's own wire-shaped types ([]gitsession.WorktreeEntry

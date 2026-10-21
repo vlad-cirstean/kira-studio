@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 )
 
@@ -17,6 +18,7 @@ type Reader interface {
 	Backlog(ctx context.Context) (adewire.BacklogResult, error)
 	Repos(ctx context.Context) (adewire.ReposResult, error)
 	ReadLog(ctx context.Context, args adewire.ReadLogArgs) (adewire.LogPage, error)
+	HostProviders(ctx context.Context) (githost.Providers, error)
 }
 
 // DeviceStore is the trust store for paired phones (storage/repos.MobileDevicesRepo).

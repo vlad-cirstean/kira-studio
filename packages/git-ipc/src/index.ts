@@ -29,6 +29,7 @@ export type {
   FileChange,
   FileChangeKind,
   FileDiffBody,
+  GitHostInfo,
   GitStatus,
   GoToFileOutcome,
   HeadState,

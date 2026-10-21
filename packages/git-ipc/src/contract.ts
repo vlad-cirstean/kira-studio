@@ -1171,6 +1171,23 @@ export interface ChangeRequestRecord {
 /** commit.resolveChangeRequests / branch.resolveChangeRequest's own shared result shape (D14). `"disabled"` covers both
  *  `kiraSpace.gitHost.provider === 'off'` and "no remote on a known code host" — the grid/badge/detail
  *  pane render nothing for either, so the two need no further distinction on the wire. */
+/** What the UI needs to name one code host provider (`githost.Info`). */
+export interface GitHostInfo {
+  readonly id: string;
+  /** "GitHub". */
+  readonly label: string;
+  /** "Pull request" — sentence start. */
+  readonly changeRequest: string;
+  /** "pull request" — mid-sentence. */
+  readonly changeRequestNoun: string;
+  /** "PR". */
+  readonly changeRequestShort: string;
+  /** "GitHub CLI (gh)"; empty when the host needs no CLI. */
+  readonly cli: string;
+  /** Whether the host can sync per-file viewed marks. */
+  readonly fileReviewSync: boolean;
+}
+
 export type ChangeRequestLookup =
   | { readonly kind: 'ok'; readonly changeRequests: readonly ChangeRequestRecord[] }
   | { readonly kind: 'disabled' }
@@ -2038,6 +2055,17 @@ export type Contract = {
     'changeRequest.browserUrl': {
       params: { repoId: string; number: number };
       result: { readonly url: string } | { readonly url: null };
+    };
+    /** The provider a repository's change-request calls go to under its `kiraSpace.gitHost.provider`
+     *  setting; `host: null` when the setting is `off` or no provider matches the origin remote. */
+    'gitHost.info': {
+      params: { repoId: string };
+      result: { readonly host: GitHostInfo | null };
+    };
+    /** Every registered provider, in registration order — the repository settings choice. */
+    'gitHost.providers': {
+      params: Record<string, never>;
+      result: { readonly providers: readonly GitHostInfo[] };
     };
     /** Host-answered (like every `editor.*` request before it, D3.3):
      *  requests `changeRequest.browserUrl` and hands the URL to the host's own

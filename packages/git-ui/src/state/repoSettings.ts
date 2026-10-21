@@ -1,5 +1,5 @@
 import { SETTINGS } from '@kira/git-core';
-import type { RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
+import type { GitHostInfo, RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
@@ -31,6 +31,8 @@ function defaultRepoSettingsSnapshot(): RepoSettingsSnapshot {
  */
 export class RepoSettingsState {
   readonly settings: ShallowRef<RepoSettingsSnapshot>;
+  /** Every registered git host provider, for the settings choice; loaded once by `loadProviders`. */
+  readonly providers: ShallowRef<readonly GitHostInfo[]> = shallowRef([]);
 
   readonly #bridge: BridgeClient;
   #repoId: string | undefined;
@@ -96,6 +98,13 @@ export class RepoSettingsState {
     if (this.#repoId !== repoId) return;
     this.#generation++;
     this.settings.value = settings;
+  }
+
+  /** Loads the provider list the first time it is asked for; a failed load can be retried. */
+  async loadProviders(): Promise<void> {
+    if (this.providers.value.length > 0) return;
+    const { providers } = await this.#bridge.request('gitHost.providers', {});
+    this.providers.value = providers;
   }
 
   dispose(): void {

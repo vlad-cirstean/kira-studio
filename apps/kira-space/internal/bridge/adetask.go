@@ -354,6 +354,11 @@ func (s *AdeTaskService) Repos(ctx context.Context) (adewire.ReposResult, error)
 	return r, adeTaskError(err)
 }
 
+// HostProviders lists every registered code host provider; the phone reads it for its link labels.
+func (s *AdeTaskService) HostProviders(context.Context) (githost.Providers, error) {
+	return githost.Providers{Providers: s.Hosts.Infos()}, nil
+}
+
 // --- writes ------------------------------------------------------------------------------------
 
 // validateHostLink refuses a non-empty value no registered provider recognises as an issue or

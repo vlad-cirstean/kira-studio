@@ -29,6 +29,7 @@ const BRIDGE_PKG = 'github.com/kirathecat/kira-studio/apps/kira-space/internal/b
 // not retyped from memory — the same discipline Kira Studio's own copy of this table follows.
 const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   gitHostOpenChangeRequestUrl: 'GitHostService.OpenChangeRequestURL',
+  gitHostProviders: 'GitHostService.Providers',
   linkOpenExternal: 'LinkService.OpenExternal',
   settingsGetAll: 'SettingsService.GetAll',
   settingsSet: 'SettingsService.Set',

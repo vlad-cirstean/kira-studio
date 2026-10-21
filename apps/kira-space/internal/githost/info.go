@@ -21,3 +21,8 @@ func Describe(p Provider) Info {
 	_, sync := p.(FileReviewSync)
 	return Info{ID: p.ID(), Terms: p.Terms(), FileReviewSync: sync}
 }
+
+// Providers is the wire result of listing every registered provider.
+type Providers struct {
+	Providers []Info `json:"providers"`
+}

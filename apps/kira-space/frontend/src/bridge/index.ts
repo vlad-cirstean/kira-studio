@@ -179,6 +179,8 @@ const spaceControl = {
 
   gitHostOpenChangeRequestUrl: (url: string): Promise<void> =>
     unwrap(GitHostService.OpenChangeRequestURL({ url })),
+  gitHostProviders: (): Promise<V2.HostProviders> =>
+    unwrap(GitHostService.Providers()).then((r) => trust<V2.HostProviders>(r)),
 
   gitCredentialPending: (): Promise<GitCredentialPrompt[]> =>
     unwrap(GitCredentialService.Pending()).then((r) => trust<GitCredentialPrompt[]>(r ?? [])),

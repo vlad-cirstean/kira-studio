@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/tokenauth"
@@ -114,6 +115,9 @@ func (f *fakeReader) Backlog(context.Context) (adewire.BacklogResult, error) {
 }
 func (f *fakeReader) Repos(context.Context) (adewire.ReposResult, error) {
 	return adewire.ReposResult{Repos: []adewire.Repo{{CodeRepoID: "r1", Name: "api", PrepareScript: "secret"}}}, nil
+}
+func (f *fakeReader) HostProviders(context.Context) (githost.Providers, error) {
+	return githost.Providers{}, nil
 }
 func (f *fakeReader) ReadLog(_ context.Context, a adewire.ReadLogArgs) (adewire.LogPage, error) {
 	return adewire.LogPage{NextSeq: a.AfterSeq + 1}, nil

@@ -42,3 +42,12 @@ func (s *GitHostService) OpenChangeRequestURL(args OpenChangeRequestURLArgs) err
 	}
 	return ipcerr.InternalErr(s.Browser.OpenURL(args.URL))
 }
+
+// Providers lists every registered code host provider, for naming it in the UI.
+func (s *GitHostService) Providers() githost.Providers {
+	var hosts *githost.Registry
+	if s.Deps.GitRegistry != nil {
+		hosts = s.Deps.GitRegistry.Hosts.Registry
+	}
+	return githost.Providers{Providers: hosts.Infos()}
+}

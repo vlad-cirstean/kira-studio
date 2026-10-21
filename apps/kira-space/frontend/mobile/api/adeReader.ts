@@ -2,6 +2,7 @@ import type { AdeReader } from '@ade/reader';
 import type {
   BacklogResult,
   Board,
+  HostProviders,
   LogPage,
   PrsResult,
   SessionsResult,
@@ -16,6 +17,7 @@ export const httpAdeReader: AdeReader = {
   workflows: () => getJson<WorkflowsResult>('/api/ade/workflows'),
   backlog: () => getJson<BacklogResult>('/api/ade/backlog'),
   repos: () => getJson('/api/ade/repos'),
+  hostProviders: () => getJson<HostProviders>('/api/ade/hosts'),
   readLog: (args) =>
     getJson<LogPage>('/api/ade/log', { kind: args.kind, id: args.id, afterSeq: args.afterSeq }),
 };

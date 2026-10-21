@@ -91,6 +91,7 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.codeWorkspaceListRepos, response: REPO_RECORDS },
     { channel: IPC.adeTaskBoard, response: adeFixture('board') },
     { channel: IPC.adeTaskPrs, response: adeFixture('prs') },
+    { channel: IPC.gitHostProviders, response: adeFixture('host-providers') },
     { channel: IPC.adeTaskWorkflows, response: adeFixture('workflows') },
     { channel: IPC.adeTaskRepos, response: adeFixture('repos') },
     { channel: IPC.adeTaskBacklog, response: adeFixture('backlog') },

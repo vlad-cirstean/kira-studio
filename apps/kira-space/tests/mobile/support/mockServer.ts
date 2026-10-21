@@ -165,6 +165,7 @@ export async function startMobileServer(): Promise<MobileServer> {
     '/api/ade/sessions': fixture('sessions'),
     '/api/ade/workflows': fixture('workflows'),
     '/api/ade/repos': { repos },
+    '/api/ade/hosts': fixture('host-providers'),
     '/api/ade/log': fixture('log-page'),
   };
 

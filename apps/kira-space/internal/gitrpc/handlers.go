@@ -296,6 +296,12 @@ var requestHandlers = map[string]requestHandler{
 	"branch.resolveChangeRequest": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleBranchResolveChangeRequest(ctx, c, params)
 	},
+	"gitHost.info": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleGitHostInfo(ctx, c, params)
+	},
+	"gitHost.providers": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleGitHostProviders(ctx, c, params)
+	},
 	"changeRequest.browserUrl": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleChangeRequestBrowserUrl(ctx, c, params)
 	},

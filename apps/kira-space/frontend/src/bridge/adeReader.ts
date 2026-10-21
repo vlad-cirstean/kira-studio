@@ -9,4 +9,5 @@ export const controlAdeReader: AdeReader = {
   backlog: () => control.adeTaskBacklog(),
   repos: () => control.adeTaskRepos(),
   readLog: (args) => control.adeTaskReadLog(args),
+  hostProviders: () => control.gitHostProviders(),
 };

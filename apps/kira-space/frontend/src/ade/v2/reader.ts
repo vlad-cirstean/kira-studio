@@ -3,6 +3,7 @@ import { inject } from 'vue';
 import type {
   BacklogResult,
   Board,
+  HostProviders,
   LogPage,
   PrsResult,
   ReadLogArgs,
@@ -24,6 +25,7 @@ export interface AdeReader {
   backlog(): Promise<BacklogResult>;
   repos(): Promise<{ repos: RepoName[] }>;
   readLog(args: ReadLogArgs): Promise<LogPage>;
+  hostProviders(): Promise<HostProviders>;
 }
 
 export const adeReaderKey: InjectionKey<AdeReader> = Symbol('adeReader');
