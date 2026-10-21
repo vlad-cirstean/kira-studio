@@ -86,7 +86,7 @@ func TestCredentialRoutes(t *testing.T) {
 		t.Fatal("no credential note")
 	}
 	app.Contract(t, "git-credential-route", "PromptsService.List#credential", e, flowharness.Mask("createdAt", "id", "ref"))
-	answer(t, app, "s3cret")
+	answerLogin(t, app, "ana", "s3cret")
 	<-done
 	noCredentialEntry(t, app)
 	testx.WaitUntil(t, wait, func() bool { _, ok := sink.Shown("prompt:git-credential"); return !ok })
@@ -128,7 +128,7 @@ func TestCredentialRoutes(t *testing.T) {
 	if e.Origin != "w1" {
 		t.Fatalf("second stream entry = %+v", e)
 	}
-	answer(t, app, "s3cret")
+	answerLogin(t, app, "ana", "s3cret")
 	select {
 	case got := <-res:
 		if got.Error != nil {

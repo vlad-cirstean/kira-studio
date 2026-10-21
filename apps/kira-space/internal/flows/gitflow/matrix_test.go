@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
@@ -537,20 +536,7 @@ func TestDisconnectDuringCredentialPromptFreesTheSlot(t *testing.T) {
 			time.Sleep(20 * time.Millisecond)
 		}
 	}()
-	var second string
-	testx.WaitUntil(t, wait, func() bool {
-		for _, p := range r.app.W.GitCredential.Pending() {
-			if p.RequestID != first {
-				second = p.RequestID
-				return true
-			}
-		}
-		return false
-	})
-	wrong := "wrong"
-	if ok, err := r.app.W.GitCredential.Provide(bridge.GitCredentialProvideArgs{RequestID: second, Secret: &wrong}); err != nil || !ok {
-		t.Fatalf("Provide = %v, %v", ok, err)
-	}
+	answerLogin(t, r.app, "ana", "wrong", first)
 	select {
 	case got := <-res:
 		remoteFailure(t, got, "AuthFailed")

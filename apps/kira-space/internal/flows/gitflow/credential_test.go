@@ -64,6 +64,40 @@ func answer(t *testing.T, app *flowharness.App, secret string) bridge.GitCredent
 	return prompt
 }
 
+// answerLogin answers the prompts of one fetch against a remote whose URL names the user: git
+// before 2.55 asks the password only, newer git asks the user name first. Prompts in skip are
+// ignored.
+func answerLogin(t *testing.T, app *flowharness.App, user, secret string, skip ...string) bridge.GitCredentialPrompt {
+	t.Helper()
+	seen := map[string]bool{}
+	for _, id := range skip {
+		seen[id] = true
+	}
+	for {
+		var prompt bridge.GitCredentialPrompt
+		testx.WaitUntil(t, wait, func() bool {
+			for _, p := range app.W.GitCredential.Pending() {
+				if !seen[p.RequestID] {
+					prompt = p
+					return true
+				}
+			}
+			return false
+		})
+		seen[prompt.RequestID] = true
+		answerWith := secret
+		if strings.HasPrefix(prompt.Prompt, "Username") {
+			answerWith = user
+		}
+		if ok, err := app.W.GitCredential.Provide(bridge.GitCredentialProvideArgs{RequestID: prompt.RequestID, Secret: &answerWith}); err != nil || !ok {
+			t.Fatalf("Provide = %v, %v", ok, err)
+		}
+		if answerWith == secret {
+			return prompt
+		}
+	}
+}
+
 func refreshOnce(app *flowharness.App) <-chan adewire.RefreshResult {
 	done := make(chan adewire.RefreshResult, 1)
 	go func() {
