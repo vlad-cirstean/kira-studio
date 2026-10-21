@@ -20,7 +20,7 @@ import type {
   Task,
 } from '../wire';
 
-// Pure templates and view model of the Claude dialog (mockup `dlg`, SPEC2 sections 5, 6, 9, 10).
+// Pure templates and view model of the Claude dialog (mockup `dlg`).
 // No Vue, no clock; `AdeAgentDialog.vue` wraps `composeDialog` in a computed. The session and start
 // templates mirror the server defaults (`composeManualMessage`, `composeStartMessage`): an unedited
 // message is sent as `''` and the server composes it, so these only show what it will say.

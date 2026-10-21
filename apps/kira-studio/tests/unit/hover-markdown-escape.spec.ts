@@ -1,4 +1,4 @@
-// P108 Part 11 F8: MonacoHost.vue's hover provider renders every ConsoleHoverInfo/HoverInfo `lines`
+// MonacoHost.vue's hover provider renders every ConsoleHoverInfo/HoverInfo `lines`
 // entry as a Markdown string — `supportHtml: false` blocks raw HTML only, Markdown syntax still
 // rendered. `lines` carries database content this app doesn't control (table/column names, a
 // column's `COMMENT ON COLUMN` description, a resolved variable's value's own explanation line), so

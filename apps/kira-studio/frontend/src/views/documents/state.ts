@@ -21,7 +21,7 @@ import { setPage } from './page';
 
 // Mirrors views/grid/state.ts's DataViewRuntime shape (status/pager/count) — projection, sort and
 // pageSize now live on DocumentTabState (mirroring DataTabState) rather than being grid-only, so
-// `searchOpen` (DataView.vue's precedent) and `selectedRow` (P43 F3/D4: highlight-only local UI
+// `searchOpen` (DataView.vue's precedent) and `selectedRow` (highlight-only local UI
 // state, narrowed to a single row index since a document has no columns to select within — this
 // view mounts no cell editor dock to publish into at all) are the only view-local runtime this
 // adds.
@@ -51,7 +51,7 @@ export const useDocumentViewStore = defineStore('documentView', () => {
     delete runtime[tabId];
   });
 
-  // P2 R2 (task #93): mirrors views/grid/state.ts's own `load()` — `revertPageIndexOnFailure`, when
+  // Mirrors views/grid/state.ts's own `load()` — `revertPageIndexOnFailure`, when
   // given, is the pageIndex this tab was showing before its caller optimistically advanced it. A
   // failed or cancelled load never calls setPage, so without this the pager would show the new page
   // number while the grid still renders the old page's rows.
@@ -65,9 +65,9 @@ export const useDocumentViewStore = defineStore('documentView', () => {
     const rt = ensureRuntime(tabId);
     // Mirrors views/grid/state.ts's `load()`: the fallback cursor tracks `pageIndex * pageSize`,
     // not a hardcoded 0 — this is what keeps a bare `load(tabId)` (reload, or any setter below)
-    // re-fetching the page the user is actually on instead of silently snapping back to page one.
-    // Applies on the default (unsorted/`_id`-sorted) view too (P43 iter2 D24): mongo/read.ts's
-    // `skip` now runs on any non-zero offset cursor, not just a real (non-`_id`) sort.
+    // re-fetching the page the user is on instead of silently snapping back to page one.
+    // Applies on the default (unsorted/`_id`-sorted) view too: mongo/read.ts's `skip` now runs on
+    // any non-zero offset cursor, not just a real (non-`_id`) sort.
     const effectiveCursor: PageCursor = cursor ?? {
       mode: 'offset',
       offset: tab.state.pageIndex * tab.state.pageSize,
@@ -129,7 +129,7 @@ export const useDocumentViewStore = defineStore('documentView', () => {
     );
   }
 
-  // I2-14: stop/goNext/goPrev/goFirst/goLast/goToPage/resetTokens — mirrors views/grid/state.ts's
+  // stop/goNext/goPrev/goFirst/goLast/goToPage/resetTokens — mirrors views/grid/state.ts's
   // own set exactly, modulo the tab accessor pair below. Mongo supports an arbitrary skip()/
   // limit() offset (unlike Redis's SCAN cursor or Kafka/SQS's per-partition offsets), so a
   // page-N jump is just as meaningful here as it is for SQL; goLast requires a count, same as the
@@ -156,10 +156,10 @@ export const useDocumentViewStore = defineStore('documentView', () => {
   }
 
   // Mirrors views/grid/state.ts's setProjection/setSort/setPageSize — each resets `pageIndex` to 0
-  // alongside the field it actually changes, same as the grid's own setters, since a new
+  // alongside the field it changes, same as the grid's own setters, since a new
   // filter/sort/projection/pageSize invalidates whatever "page N" meant under the old one. A
   // document tab pages by cursor token only when the sort is unset or purely by `_id` (mongo/
-  // read.ts's D6 keyset strategy); any other sort falls back to skip/limit and `pageIndex` is what
+  // read.ts's keyset strategy); any other sort falls back to skip/limit and `pageIndex` is what
   // goNext/goPrev (above) use to compute that offset.
   function setProjection(tabId: string, projection: string[] | null): void {
     const prevIndex = useTabsStore().findDocumentTab(tabId)?.state.pageIndex;
@@ -182,15 +182,15 @@ export const useDocumentViewStore = defineStore('documentView', () => {
     void load(tabId, undefined, prevIndex);
   }
 
-  // P43 F3/D4: the clicked row's own highlight — this view has no cell editor dock to publish a
-  // selection into (§8.7: a document's own row is already the read/write surface). A plain runtime
+  // The clicked row's own highlight — this view has no cell editor dock to publish a
+  // selection into (a document's own row is already the read/write surface). A plain runtime
   // field, not tab-persisted state — the same reasoning as the grid's own `selection`, which also
   // never round-trips through tabs.save.
   function selectRow(tabId: string, row: number | null): void {
     ensureRuntime(tabId).selectedRow = row;
   }
 
-  // P27 D2: a document is expanded by default now — `expanded[id] === undefined` means expanded,
+  // A document is expanded by default now — `expanded[id] === undefined` means expanded,
   // and only an explicit `false` collapses it. A tab saved under the old semantics (every row
   // missing meant collapsed) reads as `{}`, which under this new reading means "all expanded" —
   // exactly the new default, so no schema change and no migration.
@@ -213,11 +213,11 @@ export const useDocumentViewStore = defineStore('documentView', () => {
     useTabsStore().patchDocumentTabState(tabId, { expanded });
   }
 
-  // D2/D32: *Expand all* clears the map outright rather than writing one `true` per row — the
+  // *Expand all* clears the map outright rather than writing one `true` per row — the
   // default is already expanded, so a 10 000-row page writes an empty object to `state_json`
   // instead of 10 000 keys. *Collapse all* is unchanged: it still needs one `false` per row.
   //
-  // P21 round 3 functional finding 13: the collapse branch used to *replace* `state.expanded`
+  // The collapse branch used to *replace* `state.expanded`
   // wholesale with a fresh map containing only `ids` (the currently rendered page) — discarding
   // every `false` entry for a document on any other page. Since an absent key means expanded,
   // paging away and back re-expanded everything collapsed there, and the map is persisted tab

@@ -107,19 +107,19 @@ export const CHANNEL = {
   adeTaskReview: 'kira:adetask:review',
 } as const;
 
-/** Summed across every process metrics.Sample covers (P56's ticker) — a single app-wide readout
+/** Summed across every process metrics.Sample covers — a single app-wide readout
  *  for the status bar, not a per-process breakdown. No generated binding carries this shape: it
  *  is emitted (`kira:app:metrics`), never returned from a bound call, so it has no home in any
- *  service's models.ts and stays hand-written here instead (formerly ipc.ts's own type). Mirrors
+ *  service's models.ts and stays hand-written here instead. Mirrors
  *  `apps/kira-studio/internal/metrics.Sample`'s JSON tags.
  *
  *  cpuPercent is normalized to the machine's whole capacity (0-100), not the per-core-sum macOS's
  *  own Activity Monitor shows in its per-process "% CPU" column (which reads up to `logicalCPUs`
  *  times higher for the same load) — StatusBar.vue's tooltip states this explicitly since it's the
  *  exact cross-check a user is likely to make. memoryBytes is RSS everywhere except darwin, where
- *  it is phys_footprint — Activity Monitor's own "Memory" column, not its "Real Memory" one (P7
- *  F1/D2). logicalCPUs and processCount exist so the tooltip can say what cpuPercent is a
- *  percentage *of* and how many processes memoryBytes covers (P7 F6/D6). */
+ *  it is phys_footprint — Activity Monitor's own "Memory" column, not its "Real Memory" one.
+ *  logicalCPUs and processCount exist so the tooltip can say what cpuPercent is a
+ *  percentage *of* and how many processes memoryBytes covers. */
 export interface AppMetricsSample {
   cpuPercent: number;
   memoryBytes: number;
@@ -141,8 +141,8 @@ export interface ApiDataChangedEvent {
 }
 
 /** `kira:terminal:data`'s own payload (internal/bridge/terminal.go's TerminalEvent, field for
- *  field) — one coalesced chunk of a session's output, or its exit. Never a bound-call arg or
- *  return type, so it has no generated binding — a plain interface here, mirroring
+ *  field) — one coalesced chunk of a session's output, or its exit. Never a bound-call
+ *  arg or return type, so it has no generated binding — a plain interface here, mirroring
  *  AppMetricsSample just above: this event crosses no storage boundary and is never restored, so
  *  there is nothing for a zod schema to guard that this interface doesn't already state. */
 export interface TerminalEvent {

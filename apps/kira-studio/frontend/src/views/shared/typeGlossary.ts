@@ -1,14 +1,13 @@
 import { type MessageKey, t } from '@theme/i18n';
 
-// A short human-readable description for a column/field data type. P31 D28 widened this from
-// "just the exotica" to every type the app can show: the numeric family, the char/varchar/text/
-// blob families, the temporal family, boolean, serial/identity, arrays, plus MariaDB's own
-// spellings and the BSON type names $jsonSchema uses for Mongo's Validation section — the earlier
-// "obvious types need no gloss" rationale didn't survive contact with catalog spellings like
-// int2/int8/float8/bpchar/timestamptz, which are not obvious at all. Genuinely self-explanatory
-// container/primitive names (string, array, object, null) are still left uncovered on purpose —
-// the definition view's Columns section only shows an info icon when there is actually something
-// to explain (D30).
+// A short human-readable description for a column/field data type. Covers every type the app
+// can show: the numeric family, the char/varchar/text/blob families, the temporal family, boolean,
+// serial/identity, arrays, plus MariaDB's own spellings and the BSON type names $jsonSchema uses
+// for Mongo's Validation section — the earlier "obvious types need no gloss" rationale didn't
+// survive contact with catalog spellings like int2/int8/float8/bpchar/timestamptz, which are not
+// obvious at all. Genuinely self-explanatory container/primitive names (string, array, object,
+// null) are still left uncovered on purpose — the definition view's Columns section only shows an
+// info icon when there is something to explain.
 const DESCRIPTIONS: readonly { test: RegExp; key: MessageKey }[] = [
   // --- temporal family -------------------------------------------------------------------
   {
@@ -185,8 +184,8 @@ const DESCRIPTIONS: readonly { test: RegExp; key: MessageKey }[] = [
 ];
 
 // --- ClickHouse's own type family -------------------------------------------------------------
-// P36 D33: matched case-sensitively against the *un-normalized* text, before normalize()'s
-// lowercasing — ClickHouse's own catalog always spells these in exact PascalCase (F24), which is
+// Matched case-sensitively against the *un-normalized* text, before normalize()'s
+// lowercasing — ClickHouse's own catalog always spells these in exact PascalCase, which is
 // what lets "Int8" (an 8-bit signed integer here) resolve to its own entry instead of colliding
 // with the generic DESCRIPTIONS list's lowercase "int8" (Postgres/MariaDB's own shorthand for a
 // 64-bit bigint, a completely different width) — the two vocabularies use the same six characters
@@ -248,8 +247,8 @@ const CLICKHOUSE_DESCRIPTIONS: readonly { test: RegExp; key: MessageKey }[] = [
   },
 ];
 
-// P36 D33: strips Nullable(...) and LowCardinality(...) wrappers, recursively, in either nesting
-// order — the same two wrappers read.ts's own unwrapType (D17) strips server-side. Without this,
+// Strips Nullable(...) and LowCardinality(...) wrappers, recursively, in either nesting
+// order — the same two wrappers read.ts's own unwrapType strips server-side. Without this,
 // normalize()'s single, non-nested paren-stripping regex mangles "Nullable(LowCardinality(String))"
 // into "nullable)" (it stops at the *first* closing paren, the inner one) instead of reaching the
 // wrapped type at all.

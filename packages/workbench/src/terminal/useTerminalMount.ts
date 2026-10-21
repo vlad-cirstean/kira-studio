@@ -44,9 +44,9 @@ export interface UseTerminalMountOptions {
   resizeTerminal: (tabId: string, cols: number, rows: number) => void;
 }
 
-/** P107 T2-21: TerminalView.vue (Kira Studio) and RepoTerminalView.vue (Kira Space) — a duplicate,
+/** TerminalView.vue (Kira Studio) and RepoTerminalView.vue (Kira Space) — a duplicate,
  *  not an import (the two frontends are separate Vite apps with no shared package boundary; see
- *  TerminalView.vue's own P100 Part 2 header comment for why this whole area is "duplicate, don't
+ *  TerminalView.vue's own header comment for why this whole area is "duplicate, don't
  *  hoist", same call as the Monaco bootstrap and Go's internal/terminal package). This owns the
  *  one piece genuinely identical between the two views: the mount/resize/appearance-watch/unmount
  *  lifecycle around terminalRenderer.ts. Each view keeps its own template and whatever renders
@@ -104,7 +104,7 @@ export function useTerminalMount(options: UseTerminalMountOptions) {
 
     // No debounce needed — a ResizeObserver callback already coalesces synchronous layout thrash
     // into one notification per frame (SlickGridHost.vue's own precedent).
-    // P99 §9.3: not useResizeObserver — this construction sits after `await loadTerminalRenderer()`
+    // not useResizeObserver — this construction sits after `await loadTerminalRenderer()`
     // above, past the point Vue's synchronous "current instance" tracking a composable's automatic
     // onUnmounted registration relies on; moving it earlier would mean guarding every callback
     // invocation against `renderer` still being null, a real behavior change for a mechanical

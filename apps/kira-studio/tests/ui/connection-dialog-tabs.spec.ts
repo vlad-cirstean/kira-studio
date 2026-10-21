@@ -238,9 +238,9 @@ test('a save that fails validation on a Pre-connect-tab field switches to that t
   await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
 });
 
-// P19 D1/D2: one width (620) and one height for the whole dialog, both steps and every
-// tab/sub-tab/engine family included — see docs/HISTORY.md (v1.2 P19).
-// P104: height bumped 520 -> 544 — the shadcn Checkbox/ToggleGroup/Textarea swap's own row
+// One width (620) and one height for the whole dialog, both steps and every
+// tab/sub-tab/engine family included — see docs/HISTORY.md.
+// Height bumped 520 -> 544 — the shadcn Checkbox/ToggleGroup/Textarea swap's own row
 // heights run a little taller than the old hand-rolled primitives, and the MCP tab (this dialog's
 // tallest) no longer fit without a scrollbar at the old height.
 

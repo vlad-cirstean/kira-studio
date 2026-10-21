@@ -2,7 +2,7 @@ import { test as base, type Page } from '@playwright/test';
 import { startServer, type UiServer } from './server.ts';
 
 /**
- * P107 I2-42: Studio's and Space's `tests/ui/fixtures.ts` shared this whole frame — a worker-
+ * Studio's and Space's `tests/ui/fixtures.ts` shared this whole frame — a worker-
  * scoped static server, console-error collection, a `relaunch()` that opens a fresh page, installs
  * mocks before the first navigation, and waits for the shell to boot. The one real per-app
  * difference was what gets installed and what `KiraApp` carries beyond `window` (Space: `control`
@@ -12,13 +12,13 @@ import { startServer, type UiServer } from './server.ts';
 export interface UiFixturesOptions {
   /** Playwright's own `BrowserContextOptions.timezoneId`. */
   readonly timezoneId?: string;
-  /** P129 Part 5 §3.4: pins the boot-time wall clock (Playwright's own `page.clock`) to a known
+  /** Pins the boot-time wall clock (Playwright's own `page.clock`) to a known
    *  instant — for a spec that needs a deterministic weekday (weekend hatching, Monday separators)
-   *  rather than whatever day the suite happens to run on. Installed before the first navigation, so
-   *  the app's own `new Date()`/`Date.now()` reads read this pinned instant from its very first
-   *  render, then `resume()`s immediately: real timers (TanStack retries, `useTimeoutFn` resets,
-   *  `useIntervalFn` ticks) keep advancing at 1x from that pinned start, rather than freezing —
-   *  only "which real day is `today`" is pinned, not "does time pass". */
+   *  rather than whatever day the suite happens to run on. Installed before the first navigation,
+   *  so the app's own `new Date()`/`Date.now()` reads read this pinned instant from its very
+   *  first render, then `resume()`s immediately: real timers (TanStack retries, `useTimeoutFn`
+   *  resets, `useIntervalFn` ticks) keep advancing at 1x from that pinned start, rather than
+   *  freezing — only "which real day is `today`" is pinned, not "does time pass". */
   readonly clockTime?: number | string | Date;
   /** Replaces the default 1440 x 960 window. Used by the presentation screenshots (P280). */
   readonly viewport?: { readonly width: number; readonly height: number };

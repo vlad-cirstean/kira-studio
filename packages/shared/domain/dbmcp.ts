@@ -23,7 +23,7 @@ export const dbMcpInstallResultSchema = /*#__PURE__*/ z.object({
 });
 export type DbMcpInstallResult = z.infer<typeof dbMcpInstallResultSchema>;
 
-// M3 §6.2/§9.3: the plan evidence an approval request can carry — dbmcp.ApprovalPlan's wire
+// The plan evidence an approval request can carry — dbmcp.ApprovalPlan's wire
 // projection (bridge/dbmcp.go's DbMcpApprovalPlan). Issues are capped at 10 server-side
 // (warn-severity first), with issuesOmitted carrying the remainder — the same unbounded-render
 // hazard the statement text's own 4000-character cap guards for.
@@ -41,10 +41,10 @@ export const dbMcpApprovalPlanSchema = /*#__PURE__*/ z.object({
 });
 export type DbMcpApprovalPlan = z.infer<typeof dbMcpApprovalPlanSchema>;
 
-// M2 §5/§7.1: the prompt-mode approval queue — bridge/dbmcp.go's DbMcpApprovalRequest/
+// The prompt-mode approval queue — bridge/dbmcp.go's DbMcpApprovalRequest/
 // DbMcpApprovalSnapshot, gitPairingRequestSchema/gitPairingSnapshotSchema's own shape. statement
 // is sent uncapped.
-// M3 §6.2: reason distinguishes M2's own permission prompt from M3's heavy-plan flag — both raise
+// reason distinguishes the permission prompt from the heavy-plan flag — both raise
 // the same dialog, one queue, one question ("should this run?"); plan carries the evidence for
 // either, null for an ordinary permission prompt with no plan attached.
 export const dbMcpApprovalSchema = /*#__PURE__*/ z.object({

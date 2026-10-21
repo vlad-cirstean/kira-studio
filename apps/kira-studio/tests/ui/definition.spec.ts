@@ -11,7 +11,7 @@ import {
 } from './support/postgresFixture';
 import { expandRow, findRow, openRowMenu } from './support/tree';
 
-// Ported from tests/e2e/definition.spec.ts (P57 D16), against real captured
+// Ported from tests/e2e/definition.spec.ts, against real captured
 // treeDefinition responses (scripts/capture-postgres-tree.ts). Scenario 10 ("session restore")
 // is dropped — real cross-relaunch persistence, no backing store in this tier, same category as
 // workbench.spec.ts's five. Scenario 11 (MariaDB) was already explicitly skipped in the original
@@ -358,7 +358,7 @@ test('Definition tab — tree grouping: folders collapsed by default, zero-IPC e
     await expect(folder).toHaveAttribute('data-kind', 'group');
   }
 
-  // Collapsed by default (D4) — the Sequences folder's own member isn't rendered until toggled,
+  // Collapsed by default — the Sequences folder's own member isn't rendered until toggled,
   // and toggling costs zero network calls: a pure render over the schema's already-fetched
   // children (no treeChildren fixture entry exists for the folder path itself — a real call here
   // would 422 as E_FIXTURE_MISS, so a passing test already proves the claim).

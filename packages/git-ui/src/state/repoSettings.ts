@@ -23,8 +23,8 @@ function defaultRepoSettingsSnapshot(): RepoSettingsSnapshot {
 }
 
 /**
- * G18 D13: the per-repo display settings as reactive state, mirroring `StashState`'s own
- * "one instance for the life of the component, reset via `setRepoId`" shape (P9 W13) — a repo's
+ * The per-repo display settings as reactive state, mirroring `StashState`'s own
+ * "one instance for the life of the component, reset via `setRepoId`" shape — a repo's
  * own settings are exactly as reset-on-switch as its stash stack.
  *
  * `repoSettings.changed` naming a different repository than the one tracked is ignored.
@@ -37,7 +37,7 @@ export class RepoSettingsState {
   readonly #bridge: BridgeClient;
   #repoId: string | undefined;
   readonly #unsubscribe: () => void;
-  /** F5: one shared generation across `reload()`, `set()` and this event handler — bumped by
+  /** One shared generation across `reload()`, `set()` and this event handler — bumped by
    *  whichever of the three settles or arrives last, so a `reload()` (or a `set()`) left in
    *  flight when a fresher write settles or a live push arrives can never overwrite it with an
    *  older snapshot. Unlike `reload()`/`set()` elsewhere in this file, `set()`'s own result must
@@ -73,7 +73,7 @@ export class RepoSettingsState {
   async reload(): Promise<void> {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
-    // F5: claims this reload as the latest of the three writers of `settings` (this method,
+    // Claims this reload as the latest of the three writers of `settings` (this method,
     // `set()`, the `repoSettings.changed` handler above) before awaiting — a second `reload()`,
     // a `set()` result or a live push that lands first bumps `#generation` further, so THIS
     // reply is recognized as stale once it finally does arrive.
@@ -85,9 +85,9 @@ export class RepoSettingsState {
     this.settings.value = settings;
   }
 
-  /** `RepoSettingsDialog.vue`'s own save path — patches only the field(s) actually changed
+  /** `RepoSettingsDialog.vue`'s own save path — patches only the field(s) changed
    *  (`RepoSettingsPatch`'s own `.partial()` shape) and adopts the server's own resulting
-   *  snapshot as the new value, rather than optimistically applying the patch locally. F5: always
+   *  snapshot as the new value, rather than optimistically applying the patch locally. Always
    *  applies its own result (the user is waiting on it, unlike a background `reload()`) but bumps
    *  `#generation` first, so an in-flight `reload()` started before this call can never land on
    *  top of it afterward. */

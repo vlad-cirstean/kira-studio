@@ -1,10 +1,10 @@
 import { reactive } from 'vue';
 
-// P39 F9, grown by P48 F19: one factory behind all five page modules. grid/page.ts (P29 D7) and
-// console/resultPages.ts (P43 F2/D3) each grew the same two things separately — a two-level
-// decode cache (row -> subKey -> text) and visible-window pruning — while documents/keyvalue/
-// stream never got either. Both are folded in here: the three views that never call
-// setVisibleWindow simply never prune, which is today's behaviour for them unchanged.
+// One factory behind all five page modules. grid/page.ts and console/resultPages.ts each grew the
+// same two things separately — a two-level decode cache (row -> subKey -> text) and visible-window
+// pruning — while documents/keyvalue/stream never got either. Both are folded in here: the three
+// views that never call setVisibleWindow never prune, which is today's behaviour for them
+// unchanged.
 interface Entry<P> {
   page: P;
   decodeCache: Map<number, Map<string, string>>;
@@ -32,7 +32,7 @@ export interface PageStore<P extends { rowCount: number; byteSize: number }> {
     subKey: string,
     decode: (decoder: TextDecoder) => string,
   ): string;
-  /** P2 R2 (task #99): every page/*.ts row/cell accessor built above `cached`'s memoized text
+  /** Every page/*.ts row/cell accessor built above `cached`'s memoized text
    *  (grid/page.ts's `cell()`, console/resultPages.ts's `cell()`/`documentRow()`/`keyValueRow()`,
    *  documents/page.ts's `documentRow()`, keyvalue/page.ts's `keyValueRow()`, stream/page.ts's
    *  `streamRow()`) still allocated a fresh return object on *every* call, even though the decoded
@@ -49,7 +49,7 @@ export interface PageStore<P extends { rowCount: number; byteSize: number }> {
   setVisibleWindow(scope: string, startRow: number, endRow: number): void;
 }
 
-/** P5 C1: one page store's internals, read-only — what `retentionEntries` below reports for a
+/** One page store's internals, read-only — what `retentionEntries` below reports for a
  *  single scope (a tab id, or a console result key). `decodeCacheChars` sums the decoded string
  *  lengths `cached()` has memoized; `page` is handed back whole so a caller that knows its own
  *  concrete page kind (a page module, or main.ts's `__kiraRetention`) can read `byteSize` or walk
@@ -61,7 +61,7 @@ export interface RetentionEntry<P> {
   viewCacheRows: number;
 }
 
-// P5 C1: keyed by the store object itself, not exposed on `PageStore<P>` — the interface every
+// Keyed by the store object itself, not exposed on `PageStore<P>` — the interface every
 // view module already imports `cached`/`cachedView`/`setVisibleWindow` through stays exactly as
 // wide as it always was, so ordinary view code reaching for `store.<something>` can never stumble
 // onto a probe-only accessor. Only `retentionEntries` below (and, transitively, each page module's

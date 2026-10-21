@@ -2,13 +2,12 @@ import { type CellClassFlags, classesFrom } from '../../../theme/cellClass';
 import type { EdgeHash } from './cssLayers';
 import type { Selection } from './selection';
 
-// P22 D10 — moved verbatim out of views/grid/SlickGridHost.vue's own computeSelEdgeHashes
-// (F17/F18), so views/console/ConsoleSlickGrid.vue can share it instead of lacking it outright
-// (P19's port dropped it, leaving the console with a fill but no perimeter — F17). Pure, like
-// cssLayers.ts's searchCellLayers right above this file: no reference to `grid` or `dataSource`
-// themselves, every caller hands in its own rendered-bounds/page-row/field-name mapping as a
-// callback (biome.json's own views/<kind>/* boundary rule is why this has to live here rather
-// than be imported cross-kind).
+// So views/console/ConsoleSlickGrid.vue can share it instead of lacking it outright (the port
+// dropped it, leaving the console with a fill but no perimeter). Pure, like cssLayers.ts's
+// searchCellLayers right above this file: no reference to `grid` or `dataSource` themselves,
+// every caller hands in its own rendered-bounds/page-row/field-name mapping as a callback
+// (biome.json's own views/<kind>/* boundary rule is why this has to live here rather than be
+// imported cross-kind).
 
 export const SEL_EDGE_LAYER_KEYS = [
   'kira-sel-t',
@@ -26,8 +25,8 @@ export const SEL_EDGE_LAYER_KEYS = [
  *
  *  @param sel the current selection, in PAGE-row space (SlickGridHost.vue's own `rt().selection`,
  *    ConsoleSlickGrid.vue's own `currentSelection` after its existing `toPageRowSelection`).
- *  @param renderedBounds the display-position range actually in the DOM right now
- *    (`grid.lastRenderedRowBounds`) — bounds the walk to what SlickGrid can actually paint.
+ *  @param renderedBounds the display-position range in the DOM right now
+ *    (`grid.lastRenderedRowBounds`) — bounds the walk to what SlickGrid can paint.
  *  @param pageRowAt a display position -> page row (`dataSource.getItem(pos).row`).
  *  @param fieldAtDisplayCol a DISPLAY column index (gutter already excluded — `Selection`'s own
  *    convention, `selection.ts`'s own header comment) -> the SlickGrid column id `setCellCssStyles`
@@ -106,8 +105,8 @@ function markRowEdges(
 
 /** The `column` family: top/bottom is the rendered range's own first/last position (a column
  *  selection has no page-row bound), left/right is per selected column against its neighbours
- *  (§6 item 2, walked case: two non-adjacent selected columns, each keeping its own left+right
- *  edge rather than merging). */
+ *  (walked case: two non-adjacent selected columns, each keeping its own left+right edge rather
+ *  than merging). */
 function markColumnEdges(
   sel: Extract<Selection, { kind: 'column' }>,
   start: number,

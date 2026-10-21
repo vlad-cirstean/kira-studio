@@ -12,7 +12,7 @@ import { useModeStore } from './mode';
 import { ensureWorkspaceShell } from './repoTabs';
 import { closeWorkspaceTabs } from './tabs';
 
-// P100 Part 2: Kira Studio's own state/workspace.ts (Pinia store), adapted for an app with exactly
+// Kira Studio's own state/workspace.ts (Pinia store), adapted for an app with exactly
 // one workspace kind — a repository — instead of layering a repo key inside one of several
 // AppModes. packages/shared/domain/workspace.ts's WorkspaceKey (`AppMode | \`repo:${string}\``) had
 // no equivalent to port: here a WorkspaceKey **is** a bare code_repos id, so the prefix/parse pair
@@ -48,8 +48,9 @@ export function repoIdOfTab(tab: { workspaceId: string | null }): string | null 
 export const noRepositoryMessage = (): string => t('space.repo.view.noRepoTab.error');
 
 // The active workspace, the Git panel's repo switcher (`openRepos`), and which repo was last
-// active (`lastRepoKey`, persisted per window so a relaunch reopens on it) — Kira Studio's own useWorkspaceStore (state/workspace.ts).
-// P128 §2.6: this app now has its own mode dimension too (state/mode.ts), but `state.active` stays
+// active (`lastRepoKey`, persisted per window so a relaunch reopens on it) — Kira Studio's own
+// useWorkspaceStore (state/workspace.ts).
+// This app now has its own mode dimension too (state/mode.ts), but `state.active` stays
 // git-only — a module key (`terminal`/`ade`) never reaches it, `repoIdOfWorkspace`, `GitPanel`, or
 // `lastRepoKey`. `visibleWorkspace()` below is the one function that reads across both stores.
 export const useWorkspaceStore = defineStore('workspace', () => {
@@ -71,7 +72,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   // pinned graph tab exists, starts its index (fire-and-forget: a failed index start must never
   // block opening a workspace whose tree and viewer work regardless), then activates it.
   //
-  // P128 §2.6: also switches the mode to `git` — opening a repo from any path (a future
+  // Also switches the mode to `git` — opening a repo from any path (a future
   // command-palette entry, say) must show it, not leave it open behind whichever other module is
   // active. `activateWorkspace` itself does NOT do this (below): its own callers are either
   // already git-mode-only UI (GitPanel's row click, closeRepoWorkspace's own fallback) or this
@@ -131,7 +132,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   };
 });
 
-// P128 §2.6: which workspace's own tabs the tab strip currently shows — the active repo (or
+// Which workspace's own tabs the tab strip currently shows — the active repo (or
 // GENERAL_WORKSPACE) while the Git module is active, else the active module's own id. A module
 // tab (a Terminal-module terminal) always carries that same id as its `workspaceId`
 // (state/terminalTabs.ts's module opener), and `ade` opens no tab at all, so this is the one

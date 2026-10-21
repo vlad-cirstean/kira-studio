@@ -1,7 +1,7 @@
 import { type ShallowRef, shallowRef } from 'vue';
 
 /**
- * P107 I2-23: `ops.ts`'s six confirm-dialog quadruples (Checkout, Revert, Reset, CherryPick,
+ * `ops.ts`'s six confirm-dialog quadruples (Checkout, Revert, Reset, CherryPick,
  * ForcePush, StashPop) each hand-rolled this exact shape — a `pending` ref a dialog component
  * watches to render itself, a stashed Promise resolver, an `ask()` that sets `pending` and awaits
  * the user's choice, and a `resolve()` the dialog's own buttons call once they have one.
@@ -14,7 +14,7 @@ export interface PendingSlot<P, R> {
    *  that case. */
   ask(value: P): Promise<R>;
   resolve(result: R): void;
-  /** F6: clears `pending` and settles whatever `ask()` is in flight with `cancelValue`, exactly
+  /** Clears `pending` and settles whatever `ask()` is in flight with `cancelValue`, exactly
    *  like `resolve(cancelValue)` — named separately so a caller reads "this dialog no longer
    *  applies" (a repo switch, disposal) rather than "the user chose this". Nothing else ever
    *  settles that Promise on its own: without this, a switch mid-dialog leaves it pending

@@ -16,10 +16,10 @@ import {
 } from './support/postgresFixture';
 import { connectionRow, expandRow, openRowMenu } from './support/tree';
 
-// P18 (v1.1) C7: the DDL dialog round-trips through P17's own staging shape, and the language
-// service it feeds — completion, diagnostics, hovers — behaves exactly as today's console with no
-// DDL document (D5) and picks up real schema-aware behaviour once one is saved. §7.1's own
-// scenarios, ported to this file's postgres fixture.
+// The DDL dialog round-trips through the staging shape, and the language service it feeds —
+// completion, diagnostics, hovers — behaves exactly as today's console with no DDL document and
+// picks up real schema-aware behaviour once one is saved. The scenarios, ported to this file's
+// postgres fixture.
 
 // P4: no expandRow calls at all — the honest-degradation case a root console gets when the
 // connection was never expanded in the tree first (right-click a still-collapsed connection row
@@ -278,12 +278,11 @@ test('SQL console completes tables, columns and aliases once a DDL document exis
   expect(consoleErrors).toEqual([]);
 });
 
-// P19 D14: table names come from the tree's own cache (consoleRelationNames, mongoCollectionNames'
-// identical technique carried to SQL) even with no DDL document. P22c D4 widens this: with no
-// document, the metadata cache's own columns for this console's container (state/schemaColumns.ts,
-// filled automatically the moment the console opens — no manual step) now complete columns too,
-// with their types in the completion detail, exactly as a DDL document would have. Keyword
-// completion is untouched.
+// Table names come from the tree's own cache (consoleRelationNames, mongoCollectionNames'
+// identical technique carried to SQL) even with no DDL document. With no document, the metadata
+// cache's own columns for this console's container (state/schemaColumns.ts, filled automatically
+// the moment the console opens — no manual step) now complete columns too, with their types in
+// the completion detail, exactly as a DDL document would have. Keyword completion is untouched.
 test('with no DDL document, table names and columns complete from the cache (D4/D5/D14)', async ({
   relaunch,
   consoleErrors,
@@ -314,7 +313,7 @@ test('with no DDL document, table names and columns complete from the cache (D4/
 
   const tooltip = page.locator('.suggest-widget.visible');
   // lang-sql's own schemaCompletionSource returns null for an "empty" (no partial word typed
-  // yet) non-explicit context — the cached-columns branch (P22c D4) now goes through the same
+  // yet) non-explicit context — the cached-columns branch now goes through the same
   // schemaCompletionSource the document branch always did, so this asks for it explicitly, same
   // as the sibling "…once a DDL document exists" test above.
   await typeInto(view, page, 'select * from ');
@@ -351,7 +350,7 @@ test('with no DDL document, table names and columns complete from the cache (D4/
   expect(consoleErrors).toEqual([]);
 });
 
-// P4: a console opened at the connection ROOT (right-click the connection row itself, not a
+// A console opened at the connection ROOT (right-click the connection row itself, not a
 // table/schema row) used to get no schema-aware completion at all — containerPathFor/
 // consoleRelationNames both bailed the instant the path had no database:/schema: segment, even
 // though the tree already had everything cached. This fixture's own kira_test database has TWO
@@ -404,16 +403,15 @@ test('a console opened at the connection root still completes table names from w
   expect(consoleErrors).toEqual([]);
 });
 
-// P4: the honest-degradation boundary — a root console opened on a connection that was NEVER
+// The honest-degradation boundary — a root console opened on a connection that was NEVER
 // expanded in the tree has nothing cached to offer (no round trip fired to find out): no DDL
 // document, no cached columns, no tree-loaded relations. `sqlCompletionSources` already returned
-// `undefined` for exactly this case before P60b too (D5's own "no gap to patch" note) — under
-// CodeMirror that still showed keywords, since `undefined` meant "no override", and lang-sql's own
-// language-data keyword source stayed registered underneath regardless. Monaco has no such
-// implicit fallback (`monacoEntry.ts`'s own `sql` Monarch registers no completion items at all),
-// so `undefined` now means what the plan's own acceptance checklist says it should: no popup, no
-// error — not a regression to patch, since nothing here can tell a query keyword apart from a
-// column/table name it has never seen without something to complete against.
+// `undefined` for exactly this case (the "no gap to patch" note) — under CodeMirror that
+// still showed keywords, since `undefined` meant "no override", and lang-sql's own language-data
+// keyword source stayed registered underneath regardless. Monaco has no such implicit fallback
+// (`monacoEntry.ts`'s own `sql` Monarch registers no completion items at all), so `undefined`
+// now means no popup, no error — not a regression to patch, since nothing here can tell a query
+// keyword apart from a column/table name it has never seen without something to complete against.
 test('a console opened at the connection root with nothing expanded offers no completion at all (P4)', async ({
   relaunch,
   consoleErrors,
@@ -447,7 +445,7 @@ test('a console opened at the connection root with nothing expanded offers no co
   expect(consoleErrors).toEqual([]);
 });
 
-// P22c D6: a column the user never opened (no treeDescribe for order_items in this fixture) still
+// A column the user never opened (no treeDescribe for order_items in this fixture) still
 // hovers with its real type, and the linter never flags it — completion, diagnostics and hover all
 // read the same effective schema (state/schemaColumns.ts's effectiveSchema), so they cannot
 // disagree about what the console knows.
@@ -483,7 +481,7 @@ test('hovering a column the cache knows about, that the user never opened, shows
   await expect(view.locator('.squiggly-warning')).toHaveCount(0, { timeout: 3_000 });
 });
 
-// P22c D4: the hand-authored document still wins wholesale the moment it declares any table, even
+// The hand-authored document still wins wholesale the moment it declares any table, even
 // when the cache also has an answer for this container — a user who pasted a document
 // deliberately (a read replica they cannot introspect, a schema they are designing before it
 // exists) keeps getting exactly what they get today.
@@ -613,10 +611,10 @@ test('hovering a known column shows its verbatim declared type (D8)', async ({ r
   await expect(hover).toContainText('numeric(10,2)');
 });
 
-// P22c D7: P19 D15's "Fill from connection" button and D16's no-schema hint strip are gone — the
-// schema metadata they staged/explained is now served automatically by the cache, with no manual
-// step, so a strip explaining that completion is "off" would be false the moment D4 lands. The
-// Schema (DDL) dialog itself still opens from the connection row's menu and still saves.
+// The "Fill from connection" button and the no-schema hint strip are gone — the schema metadata
+// they staged/explained is now served automatically by the cache, with no manual step, so a strip
+// explaining that completion is "off" would be false. The Schema (DDL) dialog itself still opens
+// from the connection row's menu and still saves.
 test('the "Fill from connection" button and the no-schema hint are gone (D7)', async ({
   relaunch,
 }) => {

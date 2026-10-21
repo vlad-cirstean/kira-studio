@@ -1,12 +1,12 @@
 import { t } from '@theme/i18n';
 import type { PlanIssue, PlanNode, ScanEstimate } from './planModel';
 
-// P18 (v1.1) D15/D16: the pieces every per-dialect parser (planParsers/*.ts) shares once its own
+// The pieces every per-dialect parser (planParsers/*.ts) shares once its own
 // tree is built — a dialect-specific structural issue (full scan, missing index, filesort, an
 // un-narrowed ClickHouse primary key, ...) is attached to a node by that dialect's own parser,
 // since only it knows which raw field means what; what's shared is turning the collected scan
-// estimates into D14's single `estimatedRowsRead`/`overThreshold` pair and rolling every node's
-// issues up into the plan-level list the panel actually renders.
+// estimates into the single `estimatedRowsRead`/`overThreshold` pair and rolling every node's
+// issues up into the plan-level list the panel renders.
 
 /** D14's "wide scan" rule: any scan-type node whose own row estimate meets/exceeds the threshold.
  *  Pushed onto that node directly (not the roll-up alone) so the tree view can point at exactly
@@ -49,8 +49,8 @@ export function rollupIssues(root: PlanNode): PlanIssue[] {
   return out;
 }
 
-/** D14: strictly the row-count threshold — a plan can still carry a `warn` issue (a structural
- *  rule, or sqlite with no estimate at all) with `overThreshold` false; D19's auto-explain strip
+/** Strictly the row-count threshold — a plan can still carry a `warn` issue (a structural
+ *  rule, or sqlite with no estimate at all) with `overThreshold` false; the auto-explain strip
  *  trigger is the OR of the two, kept separate here rather than folded together so each stays
  *  independently inspectable in the panel. */
 export function isOverThreshold(
@@ -70,8 +70,8 @@ export function tableLabel(table: { table_name?: string; access_type?: string })
   return name;
 }
 
-/** P107 closing S1 sweep: mariadb.ts's `tableMetrics` and postgres.ts's `metricsFrom` were
- *  byte-identical past the parameter name — every untyped field of a raw node/table, stringified.
+/** mariadb.ts's `tableMetrics` and postgres.ts's `metricsFrom` were byte-identical past the
+ *  parameter name — every untyped field of a raw node/table, stringified.
  *  mysql.ts's own version nests a second pass over an object value and stays local — a genuinely
  *  different shape, not this pair. */
 export function rawFieldMetrics(

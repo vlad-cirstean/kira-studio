@@ -33,7 +33,7 @@ export const documentSchemaMetaSchema = /*#__PURE__*/ z.object({
 });
 export type DocumentSchemaMeta = z.infer<typeof documentSchemaMetaSchema>;
 
-/** P23 D6: a named block of name/value facts about an object that is neither SQL text nor
+/** A named block of name/value facts about an object that is neither SQL text nor
  *  ObjectMeta — a Kafka topic's partitions and its non-default config, a consumer group's members,
  *  an SQS queue's attributes. Rendered by views/definition/PropertiesSection.vue, one section per
  *  entry, in the order the adapter returned them. [] for postgres/mariadb/mongo. */

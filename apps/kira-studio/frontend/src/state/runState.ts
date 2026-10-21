@@ -37,16 +37,16 @@ const useRunStateStore = defineStore('runState', () => {
     }
   });
 
-  // LAW 12: a ring + elapsed time in the toolbar that started the work — never a bar across the
-  // view. Idle keeps the last op's duration in the same slot instead of blanking it, so the
-  // toolbar never reflows when the next run starts. Driven by the most recent op for this tab
-  // (opsStore is already live-streamed via control.onOpUpdate).
+  // A ring + elapsed time in the toolbar that started the work — never a bar across the view.
+  // Idle keeps the last op's duration in the same slot instead of blanking it, so the toolbar
+  // never reflows when the next run starts. Driven by the most recent op for this tab (opsStore is
+  // already live-streamed via control.onOpUpdate).
   function runStateFor(tabId: string): RunStateVm {
-    // P43 iter2 F14/D19: opsStore.records is newest-started-first (state/ops.ts), so a plain
+    // opsStore.records is newest-started-first (state/ops.ts), so a plain
     // `.find` picks whichever of two concurrent ops on the same tab started last — a fast op
     // (e.g. a page read) finishing first then reads as "idle" while a slower sibling (e.g. Σ) is
     // still running, and the toolbar's ring goes dark mid-query. Preferring a running record over
-    // any newer finished one answers the question the ring actually asks: is *anything* for this
+    // any newer finished one answers the question the ring asks: is *anything* for this
     // tab still waiting on the server. Falls back to the newest record when none is running, so
     // the idle slot's duration is unchanged from before.
     const record =

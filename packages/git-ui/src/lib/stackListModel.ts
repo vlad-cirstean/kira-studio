@@ -117,10 +117,10 @@ export function rowNeedsForcePush(
 // Navigation (D13/§7.3): alt+up/alt+down and the row menu's "Go to parent/child branch".
 // ---------------------------------------------------------------------------------------
 
-/** The recorded parent of `branch`, wherever it sits in the whole forest (every stack, D3's own
- *  forest model) — `undefined` at the top of a walk (the branch is not itself a stack member, or
- *  is a cycle-orphan whose own parent is nothing worth naming): navigation STOPS there rather than
- *  wrapping back to a leaf, the same "no cyclic wrap" behaviour `childOf` mirrors below. */
+/** The recorded parent of `branch`, wherever it sits in the whole forest (every stack) —
+ *  `undefined` at the top of a walk (the branch is not itself a stack member, or is a cycle-orphan
+ *  whose own parent is nothing worth naming): navigation STOPS there rather than wrapping back to a
+ *  leaf, the same "no cyclic wrap" behaviour `childOf` mirrors below. */
 export function parentOf(result: StackListResult, branch: string): string | undefined {
   for (const stack of result.stacks) {
     const row = stack.branches.find((b) => b.name === branch);

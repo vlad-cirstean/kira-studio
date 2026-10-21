@@ -130,8 +130,8 @@ const PORT: PortSnapshot[] = [...RW_PORT, ...RO_FIXTURE.port];
 
 // Every scenario, including 5 and the geometry tests: the real reka tooltip, rendered through a
 // TooltipPortal — `[data-slot="tooltip-content"]` is `ui/tooltip`'s own TooltipContent.vue marker
-// (§6.5's named migration selector), not tied to any one call site's DOM. AttributeTooltip.vue
-// (§6.4's grid-header bridge) renders through this exact same component. `tooltipContent`/
+// (the migration selector), not tied to any one call site's DOM. AttributeTooltip.vue
+// (the grid-header bridge) renders through this exact same component. `tooltipContent`/
 // `assertTooltipShows` live in `./support/tooltip` — the ipc/e2e-real specs' status-dot and
 // toolbar-button tooltip assertions share this exact helper, not a re-copy.
 
@@ -270,8 +270,8 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   await toggleButton.click(); // restore, so the tree is still usable if anything runs after this
   await expect(projectPanel).toHaveCount(wasVisible ? 1 : 0);
 
-  // --- scenario 5: a structured tooltip (P42 D19/D20) — the grid header's own name/type/
-  // description renders as three separate elements (AttributeTooltip.vue's title/meta/body, §6.4),
+  // --- scenario 5: a structured tooltip — the grid header's own name/type/
+  // description renders as three separate elements (AttributeTooltip.vue's title/meta/body),
   // while data-kira-tip stays the exact same newline-joined plain text every existing assertion
   // (and the a11y mirror) already reads. -----
   const tenantIdHeader = page.locator('[data-testid="grid-header-cell"][data-column="tenant_id"]');

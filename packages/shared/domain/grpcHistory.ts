@@ -1,5 +1,5 @@
-// P11 D11: the TypeScript mirrors of Go's model.GrpcCallHistoryEntry/GrpcCallSnapshot — following
-// response-history.ts's own precedent exactly (P2 D5's rule: types, not guards; control.ts
+// The TypeScript mirrors of Go's model.GrpcCallHistoryEntry/GrpcCallSnapshot — following
+// response-history.ts's own precedent exactly (the rule: types, not guards; control.ts
 // `trust<T>()`s them like every other bound result). Nothing here becomes tab state (a call's
 // result is runtime-only), so neither earns a Zod-parse boundary.
 import type { GrpcMessageWire, GrpcMetaPairWire } from './grpc';

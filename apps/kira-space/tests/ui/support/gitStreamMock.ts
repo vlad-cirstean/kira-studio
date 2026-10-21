@@ -120,7 +120,7 @@ function installInBrowser({
     });
   }
 
-  // P92 item 5: `blobFrame.ts`'s own layout, assembled here rather than decoded — the real
+  // `blobFrame.ts`'s own layout, assembled here rather than decoded — the real
   // client never sends a blob (that file's own doc comment), so no encoder exists there to
   // reuse. `id`/`version` are only known at this point (the request's own runtime fields),
   // which is why `graphStreamFixture.ts` hands over `meta`/`blob` separately instead of a
@@ -179,9 +179,9 @@ function installInBrowser({
         if (socket.readyState === CONNECTING) {
           throw new DOMException('Still in CONNECTING state.', 'InvalidStateError');
         }
-        // bridge/port.ts's own P57 D3 comment, describing the same WailsSocket: "throws on a
+        // bridge/port.ts's own comment, describing the same WailsSocket: "throws on a
         // CONNECTING socket and silently drops on a closed one" — a request sent over a
-        // transport whose lease/dispose tore down the underlying socket (bug 1, §2) must hang
+        // transport whose lease/dispose tore down the underlying socket must hang
         // exactly as the real bug did, not (wrongly) still answer.
         if (socket.readyState === CLOSED) return;
         let envelope: {
@@ -197,7 +197,7 @@ function installInBrowser({
         const frame = envelope.body;
         if (frame?.id === undefined) return;
         // `graph.stream` opens as `t: 'open'`, not `t: 'req'` — a real unary call's frame
-        // shape (rpc.ts's own `Frame` union). Only handled when a caller actually supplied
+        // shape (rpc.ts's own `Frame` union). Only handled when a caller supplied
         // chunks; otherwise this falls through to the `!== 'req'` guard below and hangs,
         // same as every other unlisted method here.
         const openChunks = graphStreamOpens

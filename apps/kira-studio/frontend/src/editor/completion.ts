@@ -1,4 +1,4 @@
-// P60a §3.1: the completion shapes `MonacoHost.vue`'s `completionSources` prop carries — pure data
+// The completion shapes `MonacoHost.vue`'s `completionSources` prop carries — pure data
 // in, pure data out, the same discipline `lintSource`/`rangeHighlights` already keep. Replaces
 // `@codemirror/autocomplete`'s `CompletionSource`/`Completion` at this one seam; every source this
 // app registers already produces exactly this shape (a synchronous lookup over a static array or

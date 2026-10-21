@@ -27,20 +27,19 @@ import {
 } from './support/postgresFixture';
 import { expandRow, findRow, openRowMenu } from './support/tree';
 
-// P22 spike, C6 — §7.4(a)'s eight sandbox-provable exit criteria. SlickGrid is the only engine
-// `relaunch()` ever boots (P22 Pass B, C17's cutover — the `window.__kiraGridEngine` flag this
-// file used to force before boot, via `forceSlickEngine`, no longer exists to force). This does
-// NOT and cannot answer §7.4(b) — the real-Mac perceptual/latency verdict, which needs a live
-// compositor this environment has no way to produce (see docs/PERF.md's own §2.1c/§7.4(b)
-// pointer). What this file proves is narrower and mechanical: the bridge decodes real data
-// correctly, the runway matches or exceeds what the incumbent once did, the DOM stays bounded, a
-// sub-row scroll touches nothing, and — the single item the brief singled out — closing the tab
-// actually tears the grid down.
+// Eight sandbox-provable exit criteria. SlickGrid is the only engine
+// `relaunch()` ever boots (the `window.__kiraGridEngine` flag this file used to force before boot,
+// via `forceSlickEngine`, no longer exists to force). This does NOT and cannot answer the real-Mac
+// perceptual/latency verdict, which needs a live compositor this environment has no way to produce
+// (see docs/PERF.md's own pointer). What this file proves is narrower and mechanical: the bridge
+// decodes real data correctly, the runway matches or exceeds what the incumbent once did, the DOM
+// stays bounded, a sub-row scroll touches nothing, and — the single item the brief singled out —
+// closing the tab tears the grid down.
 //
 // The fixture: a synthetic 61-column, 1000-row table ("spike_grid") — wide (like scroll_grid,
 // budgets.spec.ts) AND tall (unlike scroll_grid's own 100-row mock, which never scrolls), and
 // carrying at least one column from each type category `theme/icons.ts`'s categoryForTypeClass can
-// return (numeric/boolean/datetime/string) so the column-level type-colour class (§6 D6) has real
+// return (numeric/boolean/datetime/string) so the column-level type-colour class has real
 // material to colour. One page, `hasMore: false` — no pagination cursor to simulate.
 
 const CONNECTION_ID = 'conn-slick-spike';
@@ -302,9 +301,9 @@ function rightViewport(page: import('@playwright/test').Page) {
 }
 
 // Counts <style> elements holding a `.slickgrid_<uid>` rule, SlickGrid's per-grid sheet signature.
-// kiraSlickGrid.ts no longer creates one (columns position through custom properties, P139
-// Part 2), so this proves none appears; the shared column sheet's `.kira-sg` rules never match.
-// Module-scope so P22 iter2-pacing's own teardown test (T4) can reuse it.
+// kiraSlickGrid.ts no longer creates one (columns position through custom properties), so this
+// proves none appears; the shared column sheet's `.kira-sg` rules never match.
+// Module-scope so the teardown test can reuse it.
 async function slickStyleTagCount(page: import('@playwright/test').Page): Promise<number> {
   return page.evaluate(
     () =>
@@ -320,7 +319,7 @@ async function slickStyleTagCount(page: import('@playwright/test').Page): Promis
   );
 }
 
-// P22 iter2-pacing §1.2/§3 F2 — the doubling this phase's T1/T3 gate only reproduces under a
+// The doubling the gate only reproduces under a
 // page.mouse.wheel-driven scroll, never a `scrollTop +=` write: the two input paths give
 // *different* intra-frame orderings between the scroll-driven render and a same-frame chase. No
 // artificial delay between wheel calls — a real fling delivers scroll events far faster than
@@ -370,10 +369,10 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
 
   // --- 1. correct decoded text, cell for cell, across the first mounted window ------------------
   // Selected by position (`.nth()`), not by a column-name class — SlickGrid's own per-cell class is
-  // `column.cssClass` (the tc-<category> type-colour class, D6), never the column's name/field; a
-  // testid-free spike (D10 explicitly deferred to Pass B, §5.1 item 4) has no other stable per-
-  // column hook. Column order in the right (unfrozen) pane: id(0), active(1), created_at(2),
-  // col1(3), col2(4), … — the gutter (frozen, index 0 overall) lives in the left pane only.
+  // `column.cssClass` (the tc-<category> type-colour class), never the column's name/field; a
+  // testid-free spike has no other stable per-column hook. Column order in the right (unfrozen)
+  // pane: id(0), active(1), created_at(2), col1(3), col2(4), … — the gutter (frozen, index 0
+  // overall) lives in the left pane only.
   await rightViewport(page).evaluate((el) => {
     el.scrollTop = 0;
   });
@@ -394,9 +393,9 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
     ),
   ).toHaveText('1');
 
-  // Type-based cell colour (§6 D6): the numeric/boolean/datetime columns each carry their own
-  // tc-<category> class on every one of their own cells, AND (the P9 rowColoring setting defaults
-  // on) actually resolve to a distinct computed colour — asserting the class alone would pass even
+  // Type-based cell colour: the numeric/boolean/datetime columns each carry their own
+  // tc-<category> class on every one of their own cells, AND (the rowColoring setting defaults
+  // on) resolve to a distinct computed colour — asserting the class alone would pass even
   // if the .kira-grid--row-coloring gating class were never applied to the host root.
   await expect(dataRow(page, 0).nth(0)).toHaveClass(/tc-numeric/);
   await expect(dataRow(page, 0).nth(1)).toHaveClass(/tc-boolean/);
@@ -441,7 +440,7 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
   expect(afterScrollRows).toBeLessThan(200);
 
   // --- 3. sub-row scroll -> zero DOM mutations; a scroll past the whole runway -> some -----------
-  // P81 §4: `mutationsForScroll` waits for the grid to actually go quiet (no mutation records
+  // `mutationsForScroll` waits for the grid to go quiet (no mutation records
   // across 6 consecutive frames) before arming the measurement observer, in one page.evaluate —
   // a fixed sleep here raced the same multi-frame convergence §3a below proves takes ~10 frames.
   await rightViewport(page).evaluate((el) => {
@@ -566,10 +565,10 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
   expect(consoleErrors).toEqual([]);
 });
 
-// P22 iter2-pacing §6 — the frame-pacing fix's own sandbox-provable gates (T1/T3/T5). D1's whole
-// premise is a real WebKit measurement (§1.2 of that plan: two render() passes in 131 of 140
-// frames of a wheel-driven fling, reproduced with the exact pre-fix policy) — see wheelFling's own
-// comment for why page.mouse.wheel, not a scrollTop write, is load-bearing here.
+// The frame-pacing fix's own sandbox-provable gates (T1/T3/T5). The whole premise is a real WebKit
+// measurement (two render() passes in 131 of 140 frames of a wheel-driven fling, reproduced with
+// the exact pre-fix policy) — see wheelFling's own comment for why page.mouse.wheel, not a
+// scrollTop write, is load-bearing here.
 test('P22 iter2-pacing — a catch-up render never shares a frame with a scroll-driven one', async ({
   relaunch,
 }) => {
@@ -578,10 +577,10 @@ test('P22 iter2-pacing — a catch-up render never shares a frame with a scroll-
   await connectAndOpenSpikeGrid(page);
   const viewport = rightViewport(page);
 
-  // --- T1: at rest, the default policy never doubles a frame ------------------------------------
+  // --- At rest, the default policy never doubles a frame ------------------------------------
   // This gates the *policy* — never render twice in a frame while scroll events are arriving —
   // which is engine-independent; it is not a timing claim about WKWebView, which this sandbox has
-  // none of (§7.1's own line between what's provable here and what needs real hardware).
+  // none of (the line between what's provable here and what needs real hardware).
   await viewport.evaluate((el) => {
     el.scrollTop = 0;
   });
@@ -594,12 +593,12 @@ test('P22 iter2-pacing — a catch-up render never shares a frame with a scroll-
   expect(defaultResult).not.toBeNull();
   expect(doubledFramesDuringScroll(defaultResult?.frames ?? [])).toEqual([]);
 
-  // --- T5: the trace's per-frame accounting resets (D3) ------------------------------------------
+  // --- The trace's per-frame accounting resets ------------------------------------------
   // From frames[] directly, on this same recording: a frame with renderCount === 0 must report
-  // renderMs === 0 (before D3, it reported the *previous* frame's value), a multi-render frame's
-  // renderMs must be positive (it's a sum, not the sticky last value), and frameMs must show up
-  // once ticks are actually spaced (not every frame is guaranteed non-zero — a genuine same-
-  // timestamp double rAF tick is possible — so this checks the series as a whole, not one frame).
+  // renderMs === 0, a multi-render frame's renderMs must be positive (it's a sum, not the sticky
+  // last value), and frameMs must show up once ticks are spaced (not every frame is guaranteed
+  // non-zero — a genuine same-timestamp double rAF tick is possible — so this checks the series as
+  // a whole, not one frame).
   const frames = defaultResult?.frames ?? [];
   const noRenderFrame = frames.find((f) => f.renderCount === 0);
   expect(noRenderFrame).toBeDefined();
@@ -633,7 +632,7 @@ test('P22 iter2-pacing — a catch-up render never shares a frame with a scroll-
   expect(hasDoubledFrame).toBe(true);
 });
 
-// P22 iter2-pacing D4 — a chase armed just before teardown, and still pending (not yet fired) at
+// A chase armed just before teardown, and still pending (not yet fired) at
 // the moment `grid.destroy(true)` runs, must not re-enter render() afterwards. Against fce3e54
 // this throws: the pending rAF fires one frame later, re-enters render() past destroy(), and
 // dereferences an element SlickGrid's own destroy() already nulled — `!this.initialized` doesn't
@@ -735,9 +734,9 @@ test('P22 postscript — a scroll event anywhere in the document after grid tear
   expect(pageErrors).toEqual([]);
 });
 
-// P22 postscript follow-up — the "no exception" test above proves the listener's *effects* are
+// The "no exception" test above proves the listener's *effects* are
 // harmless once it's still attached wrongly (its target refs happen to be non-null this run), but
-// says nothing about whether `destroy()` actually calls `removeEventListener` at all. It previously
+// says nothing about whether `destroy()` calls `removeEventListener` at all. It previously
 // didn't: `ancestorScrollHandler`'s class-field initializer (`= null`) ran *after* `super()` — i.e.
 // after `bindAncestorScrollEvents()` already set the real handler during construction — clobbering
 // it back to `null` every time, so `destroy()`'s `if (this.ancestorScrollHandler)` guard was always
@@ -787,14 +786,14 @@ test('P22 postscript follow-up — grid teardown actually removes the document s
   expect(await netListeners()).toBe(0); // destroy() must see the real handler and remove it.
 });
 
-// P22 iter2-onset §6 — the gesture-onset defect's own sandbox-provable gates.
+// The gesture-onset defect's own sandbox-provable gates.
 //
 // What this proves, and what it does not. It gates the *mechanism*: no render pass sizes its
 // runway as if the grid were standing still while the viewport is measurably moving. That is a
 // property of this app's own sampling policy plus DOM event-listener ordering (spec-defined
 // registration order on one target), so it is engine-independent and provable here — unlike the
 // perceived "content isn't fully rendered for a few frames at the start of a fling" symptom that
-// motivated it, which needs the real macOS compositor and is docs/PERF.md §2.1c's job.
+// motivated it, which needs the real macOS compositor and is docs/PERF.md's job.
 //
 // Three separate rest-to-motion transitions per recording, not one: the defect is one frame per
 // gesture, so a single fling gives a one-frame margin and a flaky gate.
@@ -803,7 +802,7 @@ async function flingFromRest(
   viewport: ReturnType<typeof rightViewport>,
 ): Promise<void> {
   // Well past the sampler's own 150ms at-rest threshold (SlickGridHost.vue's velocity()), so each
-  // burst below really does start from "at rest" and not from the tail of the previous one. 500ms,
+  // burst below does start from "at rest" and not from the tail of the previous one. 500ms,
   // not 150-250: `page.mouse.wheel` returns before WebKit's own scroll animation finishes, and that
   // animation's trailing 2-3px scroll events kept arriving ~95ms after the last wheel call resolved
   // here — enough to warm the sampler and hide the defect on bursts 2 and 3 of a 250ms-gap run.
@@ -872,7 +871,7 @@ test('P22 iter2-onset — a fresh gesture sizes its runway from that gesture, no
   expect(staleRunwayFrames(fixedFrames)).toBe(0);
 
   // --- (b) THE REGRESSION GATE: the pacing fix still holds, on this same recording ---------------
-  // P22 iter2-pacing's own invariant — at most one render pass per animation frame while a scroll
+  // The invariant — at most one render pass per animation frame while a scroll
   // is live. The onset fix deliberately never touches `scheduleChase`'s quiescence gate (it widens
   // the *target* an already-scheduled render aims at, it does not let an extra render through), and
   // this is what proves that: three continuous, gapless wheel bursts, zero doubled frames.
@@ -901,12 +900,12 @@ test('P22 iter2-onset — a fresh gesture sizes its runway from that gesture, no
   expect(staleRunwayFrames(preFix?.frames ?? [])).toBe(3);
 
   // --- (d) the per-frame chase gate is what makes (b) hold, not the wall-clock one --------------
-  // P22 iter2-onset D2. CHASE_QUIET_MS is 24ms and frames here run p50 ~28 / p95 ~55 / max ~70ms
-  // (and p50 32.1ms on the real Mac, docs/PERF.md §2.1c) — so "24ms since the last scroll event"
+  // CHASE_QUIET_MS is 24ms and frames here run p50 ~28 / p95 ~55 / max ~70ms
+  // (and p50 32.1ms on the real Mac, docs/PERF.md) — so "24ms since the last scroll event"
   // routinely stops meaning "no scroll event is driving this frame". With the frame gate removed,
-  // leaving the shipped-at-a9dc570 wall-clock policy alone, this same fling doubles frames. This
+  // leaving the wall-clock policy alone, this same fling doubles frames. This
   // is the load-bearing half of (b): without it, (b) would be passing on a gate that only holds
-  // by accident. Uses wheelFling's own faster defaults — the harness the pacing pass's T1/T3 use.
+  // by accident. Uses wheelFling's own faster defaults.
   await viewport.evaluate((el) => {
     el.scrollTop = 0;
   });
@@ -927,10 +926,10 @@ test('P22 iter2-onset — a fresh gesture sizes its runway from that gesture, no
   expect(Object.keys(msGateHistogram).some((count) => Number(count) >= 2)).toBe(true);
 });
 
-// P22 Pass B, C6/§5 D6, T6 — select-all's own cost gate. P139 built D6's bypass (rt().selection
-// set directly, a `.kira-select-all` host class painting every `.slick-cell`, no range pushed into
-// the model; SlickGridHost.vue's onSelectAll): the model path cost 80-130 ms against this 150 ms
-// gate on the wide table. The gate now times the bypass.
+// Select-all's own cost gate. The bypass (rt().selection set directly, a `.kira-select-all` host
+// class painting every `.slick-cell`, no range pushed into the model;
+// SlickGridHost.vue's onSelectAll): the model path cost 80-130 ms against this 150 ms gate on the
+// wide table. The gate now times the bypass.
 test('P22 Pass B C6 — select-all completes within the 150ms sandbox gate, wide and tall', async ({
   relaunch,
 }) => {
@@ -1030,14 +1029,14 @@ test('P22 Pass B C6 — select-all completes within the 150ms sandbox gate, wide
   await expect(tall.locator('.slick-grid-host.kira-select-all')).toHaveCount(1);
 });
 
-// P22 Pass B, C12/§9.2 T7 — "the F5 merge cost" (Pass A §8.6 item 2's own open question, discharged
-// with a measurement, not an argument): with a 10 000-match search active, a selection change must
-// still land inside the same 150ms sandbox bound T6's own select-all gate uses. `kira-search` is
-// explicitly the one CSS layer §5 D5's own table allows to be O(matches) rather than
-// O(perimeter ∩ rendered) — this is what proves that choice doesn't tax anything *else* (the
-// selection's own O(area) select-all cost, C6) once a large search result is sitting on top of it.
-// Fails -> D5's own named fallback (a rendered-range ± hysteresis band for kira-search) lands in
-// this same commit.
+// "the F5 merge cost" (the open question, discharged with a measurement, not an argument): with a
+// 10 000-match search active, a selection change must still land inside the same 150ms sandbox
+// bound the select-all gate uses. `kira-search` is explicitly the one CSS layer the table allows
+// to be O(matches) rather than O(perimeter ∩ rendered) — this is what proves that choice doesn't
+// tax anything *else* (the selection's own O(area) select-all cost) once a large search result is
+// sitting on top of it.
+// Fails -> the named fallback (a rendered-range ± hysteresis band for kira-search) lands in this
+// same commit.
 test('P22 Pass B C12 T7 — select-all stays within the 150ms sandbox gate with 10 000 search matches active', async ({
   relaunch,
 }) => {
@@ -1234,10 +1233,9 @@ test('P22 Pass B follow-up — select-all under an active row filter copies only
 
   // The corner click above lands DOM focus on the header pane (SlickGrid's own header panes
   // carry `tabIndex=0`) rather than the grid canvas — true of clicking any header cell, not
-  // specific to select-all, and not touched by this fix. `onKeyDown`'s Ctrl+C handling is bound
-  // to the canvas/focus-sink elements only (slick.grid.ts), so refocus the canvas directly
-  // (never via another cell click, which would collapse the very selection under test) before
-  // sending Ctrl+C.
+  // specific to select-all. `onKeyDown`'s Ctrl+C handling is bound to the canvas/focus-sink
+  // elements only (slick.grid.ts), so refocus the canvas directly (never via another cell click,
+  // which would collapse the very selection under test) before sending Ctrl+C.
   await page.evaluate(() =>
     (document.querySelector('.grid-canvas') as HTMLElement | null)?.focus(),
   );
@@ -1252,12 +1250,12 @@ test('P22 Pass B follow-up — select-all under an active row filter copies only
   ]);
 });
 
-// P22 Pass B, C9/§9.2 T8 — the pacing invariant (T1's own histogram-all-1 assertion, above) held
-// again with N staged insert rows on screen. D9's own §0.3 acknowledgement: this is the one place
-// this pass returns DOM from a formatter (the insert region's own `<input>`, self-contained and
-// never re-touched by SlickGrid once built — see `cellFormatter`'s own comment, SlickGridHost.vue)
-// against `-iter2-pacing` D5's measured "text, never DOM" rule, so it gets its own gate, landed in
-// the same commit that adds the exception (§9.2's own text) so a regression stays bisectable to it.
+// The pacing invariant (the histogram-all-1 assertion, above) held again with N staged insert
+// rows on screen. This is the one place this pass returns DOM from a formatter
+// (the insert region's own `<input>`, self-contained and never re-touched by SlickGrid once built
+// — see `cellFormatter`'s own comment, SlickGridHost.vue) against the measured
+// "text, never DOM" rule, so it gets its own gate, landed in the same commit that adds the
+// exception so a regression stays bisectable to it.
 test('P22 Pass B C9 — the pacing invariant holds with N staged insert rows on screen', async ({
   relaunch,
 }) => {
@@ -1293,7 +1291,7 @@ test('P22 Pass B C9 — the pacing invariant holds with N staged insert rows on 
   }
   await expect(page.locator('[data-testid="grid-row-insert"]')).toHaveCount(5);
 
-  // Not a tight timing claim — this sandbox has no real compositor (§7.1's own line) — a generous
+  // Not a tight timing claim — this sandbox has no real compositor — a generous
   // same-run bound that only fails if the insert region's own DOM rode along on every scroll-
   // driven render instead of staying self-contained (the actual regression this gate exists to
   // catch). A CPU-starved run (parallel suites) can spike one fling's frames, so the gate takes up
@@ -1307,10 +1305,10 @@ test('P22 Pass B C9 — the pacing invariant holds with N staged insert rows on 
   expect(after.p95).toBeLessThan(before.p95 * 3 + 5);
 });
 
-// P22b D17: the inserts.length watcher invalidated and rendered the touched range but never
+// The inserts.length watcher invalidated and rendered the touched range but never
 // scrolled to it — on a page taller than the viewport, "Add a row" staged an insert nobody could
-// see (F25). One line, `grid.scrollRowIntoView`, guarded on growth (a discard shrinks the count
-// and must not scroll, the same D16 rule this suite's http/grpc/variable-set siblings each get).
+// see. One line, `grid.scrollRowIntoView`, guarded on growth (a discard shrinks the count
+// and must not scroll, the same rule this suite's http/grpc/variable-set siblings each get).
 test('P22b D17 — a staged insert row scrolls into view, and a discard does not scroll', async ({
   relaunch,
 }) => {
@@ -1450,10 +1448,10 @@ function gutterCell(page: import('@playwright/test').Page, row: number) {
   );
 }
 
-// P22 Pass B, C11/§9.2 T9 — the single host-owned nav button's own DOM invariant: exactly one
+// The single host-owned nav button's own DOM invariant: exactly one
 // `[data-testid="cell-nav-button"]` in the whole document at any time (never one-per-cell the way
 // the incumbent's own pure-CSS-hover button was), it sits within the left 24px of whichever cell
-// currently owns it (§5 D11a — the user's own explicit "move it to the left" request), and it is
+// currently owns it (the user's own explicit "move it to the left" request), and it is
 // absent for a column with no nav affordance at all. `order_items` (product_id/order_id both FK,
 // quantity plain) is this suite's own smallest fixture with two independent FK columns on one
 // row — interaction.spec.ts's own FK/PK nav section already covers the NULL-source absence case
@@ -1522,7 +1520,7 @@ test('P22 Pass B C11 T9 — the nav button is always visible per nav cell, posit
     page.locator('[data-testid="grid-header-cell"][data-column="product_id"]'),
   ).toBeVisible();
 
-  // P22 Pass B, item 12 (a later coordinator round) — deliberate redesign: the nav button is now
+  // Deliberate redesign: the nav button is now
   // always visible on every nav-eligible rendered cell, never hover-gated, and overlays the
   // cell's own text (no reserved padding) instead of a single JS-moved node. Superseded the old
   // "absent at rest / exactly one instance on hover / moves between cells" assertions below.
@@ -1551,7 +1549,7 @@ test('P22 Pass B C11 T9 — the nav button is always visible per nav cell, posit
   expect(bothPresent).toEqual([true, true]);
 });
 
-// P22 postscript §14.2 — root cause: `new KiraSlickGrid(...)` (SlickGridHost.vue's own onMounted)
+// Root cause: `new KiraSlickGrid(...)` (SlickGridHost.vue's own onMounted)
 // runs synchronously through slick.grid.ts's own `initialize()` -> `finishInitialization()` ->
 // `createColumnHeaders()`, firing `grid.onHeaderCellRendered` for the FIRST, constructor-built
 // header cells *before* this file's own `eventHandler.subscribe(grid.onHeaderCellRendered, ...)`
@@ -1564,9 +1562,7 @@ test('P22 Pass B C11 T9 — the nav button is always visible per nav cell, posit
 // tab switch (not a close) does, since a tab's own meta survives in its runtime record until the
 // tab itself closes (state.ts). SlickGridHost.vue now forces one extra header rebuild,
 // unconditionally, right after subscribing — this asserts a real PK/FK badge and the header
-// select-zone both still exist after switching away from a table's tab and back to it, the exact
-// scenario the postscript's own repro attempts (which always used a full tab close+reopen, which
-// re-fetches meta and accidentally re-triggers the masking rebuild) never covered.
+// select-zone both still exist after switching away from a table's tab and back to it.
 test('P22 postscript — PK/FK header badge and select-zone survive a tab switch, not just a fresh open', async ({
   relaunch,
 }) => {
@@ -1655,7 +1651,7 @@ test('P22 postscript — PK/FK header badge and select-zone survive a tab switch
 // Regression test — `suppressWidthEcho` (SlickGridHost.vue) is set true, patchDataTabState is
 // called, then reset false SYNCHRONOUSLY on the very next line, but the `columnWidths` watch
 // checking that flag ran on Vue's default `flush: 'pre'` (a microtask *after* that reset), so it
-// always read `false` and the guard never actually suppressed anything: every column-resize drag
+// always read `false` and the guard never suppressed anything: every column-resize drag
 // triggered a full `grid.setColumns(...)` rebuild — invalidating every row, recreating every
 // header/cell DOM node, rebuilding CSS rules, calling `resizeCanvas` — the exact cost the guard
 // exists to avoid, per its own comment.
@@ -1850,7 +1846,7 @@ test('P195 — a reload with very different data keeps the settled column widths
   expect(widthAfter).toBe(widthBefore);
 });
 
-// Finding 1 (round 2) — `selectedCellCssClass: 'kira-cell-selected'` makes SlickGrid itself paint
+// `selectedCellCssClass: 'kira-cell-selected'` makes SlickGrid itself paint
 // the highlight off `selectionModel`'s own DISPLAY-POSITION ranges, which the filter-toggle watch
 // used to never re-push: click id=2 (page row 1) while unfiltered (display position 1 == page row
 // 1), then filter to ids 2/4 (page rows 1 and 3) — id=4 renders down onto display position 1, the
@@ -1953,13 +1949,13 @@ test('P22 Pass B follow-up — the cell selection highlight tracks its row throu
   await expect(gridRow(page, 3)).not.toHaveClass(/pending-delete/);
 });
 
-// Finding 3 (round 2) — a `range`-kind selection stores only its two page-row corners, and every
-// consumer (copy, delete) used to walk the CONTIGUOUS page-row span between them, ignoring the
-// active filter entirely — `kind: 'row'`/`kind: 'column'` already applied P24 D10's "walk only the
-// visible rows" rule; only `range` didn't. Reproduced concretely: filter down to ids 1/2/3/90 (a
-// contiguous run plus one far outlier), shift-click id=1 to id=90 to select the range spanning
-// every hidden row in between, then Ctrl+C and Delete — pre-fix, copy pulled in all 90 page rows
-// and Delete staged all 90 for deletion; post-fix, both only touch the 4 rows actually on screen.
+// A `range`-kind selection stores only its two page-row corners, and every consumer (copy, delete)
+// used to walk the CONTIGUOUS page-row span between them, ignoring the active filter entirely —
+// `kind: 'row'`/`kind: 'column'` already applied the "walk only the visible rows" rule; only
+// `range` didn't. Reproduced concretely: filter down to ids 1/2/3/90 (a contiguous run plus one far
+// outlier), shift-click id=1 to id=90 to select the range spanning every hidden row in between,
+// then Ctrl+C and Delete — pre-fix, copy pulled in all 90 page rows and Delete staged all 90 for
+// deletion; post-fix, both only touch the 4 rows on screen.
 test('P22 Pass B follow-up — a range selection under an active filter only copies/deletes the visible rows in its span (finding 3)', async ({
   relaunch,
 }) => {
@@ -2065,10 +2061,9 @@ test('P22 Pass B follow-up — a range selection under an active filter only cop
   await expect(page.locator('[data-testid="pending-count-chip"]')).toHaveText('4 rows pending');
 });
 
-// P16 D3/D4: two new-coverage cases from §4 of the P16 plan. order_items (F2's own real-capture
-// table) has two short-data FK columns (order_id/product_id, values '1'/'2'/'5') — exactly the
-// combination whose header furniture (padding + sort indicator + FK badge, ~50px) the old flat
-// 64px floor didn't reserve room for.
+// order_items (the real-capture table) has two short-data FK columns (order_id/product_id, values
+// '1'/'2'/'5') — exactly the combination whose header furniture (padding + sort indicator +
+// FK badge, ~50px) the old flat 64px floor didn't reserve room for.
 test('P16 D3/D4 — a column min-width knows what its header renders, and overscroll agrees on all four edges', async ({
   relaunch,
 }) => {

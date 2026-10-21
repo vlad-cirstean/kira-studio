@@ -1,15 +1,14 @@
 /**
- * Copy for `GitBlockedPanel.vue` (§4.2's block state) — kept pure and separate from the
+ * Copy for `GitBlockedPanel.vue` — kept pure and separate from the
  * component so the text/branching logic is unit-testable without a DOM (the pure/DOM-split
- * precedent `palette.ts`/`rowSvg.ts`/`refBadges.ts` established in W7/W8).
+ * precedent `palette.ts`/`rowSvg.ts`/`refBadges.ts` established).
  *
- * §6.1 asks for "the platform's upgrade command" as a single line, but `GitStatus` carries no
- * platform field (`core`/`ipc` never learn the *host OS*) and P3's W1 deliberately left this as
- * UI copy rather than wire data. The
- * UI package runs inside a real browser-like environment regardless, though, so
- * `navigator.userAgent` is read directly here instead of guessing or listing all three
- * platforms' commands at once — the honest single-command copy §6.1 asks for, sourced from the
- * one place that can actually answer it.
+ * The panel needs "the platform's upgrade command" as a single line, but `GitStatus` carries no
+ * platform field (`core`/`ipc` never learn the *host OS*) and this was deliberately left as
+ * UI copy rather than wire data. The UI package runs inside a real browser-like environment
+ * regardless, though, so `navigator.userAgent` is read directly here instead of guessing or
+ * listing all three platforms' commands at once — the honest single-command copy asked for,
+ * sourced from the one place that can answer it.
  */
 import type { GitStatus } from '@kira/git-ipc';
 import { t } from '@theme/i18n';

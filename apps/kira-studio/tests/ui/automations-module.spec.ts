@@ -5,7 +5,7 @@ import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
-// P91 §17.2: TERMINAL_OPEN_OK's shape uses control.log() polling rather than call-count
+// TERMINAL_OPEN_OK's shape uses control.log() polling rather than call-count
 // assertions. The mocked DefaultCwd below is '/home/test' — mockRuntime.ts's own boot default
 // (IPC.terminalDefaultCwd) — so an unscoped terminal's title falls out of its basename, 'test'
 // (tabKinds.ts's terminal kind: `s.label || basename(s.cwd) || 'Terminal'`).

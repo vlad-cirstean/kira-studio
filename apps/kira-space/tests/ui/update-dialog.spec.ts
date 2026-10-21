@@ -2,7 +2,7 @@ import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 
-// P119: the status-bar update-available item and the modal update dialog it opens — Kira Studio's
+// The status-bar update-available item and the modal update dialog it opens — Kira Studio's
 // own tests/ui/update-dialog.spec.ts, trimmed to this app's own first three cases (the error state
 // is the same shared @workbench component, already covered there). Default boot answers "no
 // update" (mockRuntime.ts's own WILDCARD_DEFAULTS[IPC.updateStatus]).

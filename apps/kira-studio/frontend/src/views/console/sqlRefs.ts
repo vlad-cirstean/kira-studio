@@ -10,7 +10,7 @@ import {
   unquotedName,
 } from './sqlNodes';
 
-// P18 (v1.1) D7/D8: a from-scratch re-derivation of lang-sql's own getAliases (F2) — a table
+// A from-scratch re-derivation of lang-sql's own getAliases — a table
 // reference and its optional alias, walked from each statement's FROM/JOIN clause over the exact
 // same flat token stream the DDL extractor (ddl.ts) reads. Shared by sqlDiagnostics.ts (unknown
 // relation / unknown qualified column) and sqlHover.ts (resolving `alias.column` under the
@@ -173,10 +173,10 @@ function refsInStatement(toks: readonly LNode[], source: string): TableRef[] {
 /** Every top-level Statement in `source`, with its FROM/JOIN table refs and any WITH-declared CTE
  *  names. Subqueries are not walked — this is a best-effort binder, not a real one (D7's own
  *  false-positive rule: under-detect rather than guess). */
-// `root` lets a caller that has already parsed `source` (sqlHover.ts's resolveHover, P12 round 1
-// finding #13) pass the tree through instead of paying for a second, redundant parse of the exact
-// same string — measured ~5-13ms per hover on a moderately large script, half of it provably
-// redundant. Omitted, this parses `source` itself, unchanged from before.
+// `root` lets a caller that has already parsed `source` (sqlHover.ts's resolveHover) pass the tree
+// through instead of paying for a second, redundant parse of the exact same string — measured
+// ~5-13ms per hover on a moderately large script, half of it provably redundant. Omitted, this
+// parses `source` itself, unchanged from before.
 export function statementsWithRefs(
   dialect: SqlDialect,
   source: string,

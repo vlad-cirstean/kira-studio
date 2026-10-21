@@ -30,7 +30,7 @@ export function jsonArrayOf(items: readonly string[]): string {
   return `[\n${items.map((item) => indented(item)).join(',\n')}\n]`;
 }
 
-// P22b D11 fix: `toShellText` (P27 D12, unwrapped from `beautify.ts`'s own mode concept) always
+// `toShellText` always
 // pretty-prints -- its one caller before this was the document editor's own buffer, where an
 // indented literal is exactly what's wanted. "Copy all", one document per line, needs the
 // opposite: `beautifyShellText`'s existing 'compact' mode re-renders shell text without its own

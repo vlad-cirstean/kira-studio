@@ -29,11 +29,11 @@ export type GeneratorId =
   | 'json.object'
   | 'binary.hex';
 
-// D4/D12: `skip` (never sent — a generated column, a defaulted PK, an unresolved FK, or an
-// explicit user choice), `null` (an explicit SQL NULL), `constant` (fixed text, D8/F13's own
-// deterministic recipe for tests/ui), `sequence` (an editable-start integer counter, the only
-// client-side unique-by-construction number, F11) and `faker` (a named generator, resolved to a
-// call only in generate.ts).
+// `skip` (never sent — a generated column, a defaulted PK, an unresolved FK, or an explicit user
+// choice), `null` (an explicit SQL NULL), `constant` (fixed text, the deterministic recipe for
+// tests/ui), `sequence` (an editable-start integer counter, the only client-side
+// unique-by-construction number) and `faker` (a named generator, resolved to a call only in
+// generate.ts).
 export type Recipe =
   | { kind: 'skip' }
   | { kind: 'null' }

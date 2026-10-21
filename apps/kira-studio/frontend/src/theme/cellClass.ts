@@ -1,4 +1,4 @@
-// P16 design system's tabular-cell vocabulary (see primitives.css's "tabular body shared by
+// Design system's tabular-cell vocabulary (see primitives.css's "tabular body shared by
 // grid / kv / stream / console" section) is a fixed set of per-cell states — null value, numeric
 // alignment, selection, a staged edit, a foreign-key reference — that DataGrid.vue,
 // ConsoleResultGrid.vue and StreamView.vue each computed into a `:class` object ad hoc, using
@@ -13,10 +13,10 @@ export interface CellClassFlags {
   isNull?: boolean;
   /** Part of the current selection (single cell, range, row, or column). */
   selected?: boolean;
-  /** P42 D21: this edge sits on the selection's own outer perimeter — the neighbour in that
+  /** This edge sits on the selection's own outer perimeter — the neighbour in that
    *  direction isn't selected, or there isn't one. Four independent flags, since a selection is
    *  a rectangle (or, for a row/column selection, effectively one): only its outer boundary gets
-   *  a border, never a seam shared with a selected neighbour (F15's doubled-border bug). */
+   *  a border, never a seam shared with a selected neighbour (the doubled-border bug). */
   selEdgeTop?: boolean;
   selEdgeRight?: boolean;
   selEdgeBottom?: boolean;
@@ -60,7 +60,7 @@ function cellClass(flags: CellClassFlags): Record<string, boolean> {
 /** {@link cellClass}'s own keys, as a plain array — the shape `setCellCssStyles` (a lone class
  *  name per keyed layer, never a `:class` object) and a search/pending-edit one-off classname
  *  lookup both want. Shared by views/grid/SlickGridHost.vue's own search/pending-edit hashes and
- *  views/shared/slick/selectionEdges.ts's perimeter computation (P22 D10) — one definition rather
+ *  views/shared/slick/selectionEdges.ts's perimeter computation — one definition rather
  *  than two identical two-line copies. */
 export function classesFrom(flags: CellClassFlags): string[] {
   return Object.keys(cellClass(flags));

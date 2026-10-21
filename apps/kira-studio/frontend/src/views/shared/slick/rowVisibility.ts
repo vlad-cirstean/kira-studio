@@ -1,7 +1,7 @@
-// P107 T2-17: split out of grid/slick/rowValues.ts — that file's other exports (displayCell,
+// Split out of grid/slick/rowValues.ts — that file's other exports (displayCell,
 // rowSnapshot, cellNavEntry, ...) depend on grid-specific state (grid/menu, grid/page,
-// grid/pendingChanges), which views/console/** must not import (biome.json's noRestrictedImports,
-// SPEC §11) — these two functions carry no such dependency, so only they move here.
+// grid/pendingChanges), which views/console/** must not import (biome.json's noRestrictedImports)
+// — these two functions carry no such dependency, so only they move here.
 
 /** P24 D10: while filtering, column-scoped ops (copy column values, the column-selection copy
  *  branch) walk only the *visible* rows — the column the user can see has N rows, and copying
@@ -13,7 +13,7 @@ export function rowsForColumnOps(
   return displayRows ? [...displayRows] : Array.from({ length: rowCount }, (_, i) => i);
 }
 
-/** Finding 3 (round 2) — P24 D10's own rule ("a column-scoped op walks only the visible rows"),
+/** The rule ("a column-scoped op walks only the visible rows"),
  *  extended to a `range`-kind selection: its two corners (`anchorRow`/`row`) are page rows spanning
  *  a CONTIGUOUS block, which every consumer used to walk assuming nothing in between was filtered
  *  out — under an active "hide non-matching rows" filter that silently swept up hidden rows into

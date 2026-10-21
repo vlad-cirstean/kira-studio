@@ -37,13 +37,14 @@ export interface BuildPackedChunkOptions {
 }
 
 /**
- * Builds a `PackedCommitChunk` test fixture from `rows` — Space's UI suite's own shared shape (P107 I2-27), each of which previously hand-rolled its
- * own copy of this packing logic (a single-row root commit, or a whole multi-branch chunk whose
- * every parent link resolves within it). A row with no `parents` is a root commit; a later row
- * naming an earlier row's own `sha` as a parent resolves within this same chunk, same as
- * `CommitStore.appendPacked`'s own pending-parent pass does for a real one.
+ * Builds a `PackedCommitChunk` test fixture from `rows` — Space's UI suite's own shared shape,
+ * each of which previously hand-rolled its own copy of this packing logic (a single-row root
+ * commit, or a whole multi-branch chunk whose every parent link resolves within it). A row with no
+ * `parents` is a root commit; a later row naming an earlier row's own `sha` as a parent resolves
+ * within this same chunk, same as `CommitStore.appendPacked`'s own pending-parent pass does for
+ * a real one.
  *
- * Returns `packages/git-core`'s own `PackedCommitChunk` (B3: this package may not import
+ * Returns `packages/git-core`'s own `PackedCommitChunk` (this package may not import
  * `@kira/git-ipc`'s copy) — structurally identical, so it drops straight into any caller's own
  * `PackedCommitChunk`-typed slot. This repo carries no `wireConformance.spec.ts`
  * (`@kira/git-ipc`'s own `contract.ts` doc comment says why) — the two shapes are kept in step

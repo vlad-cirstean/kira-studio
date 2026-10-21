@@ -5,7 +5,7 @@ import { ref } from 'vue';
 import { control } from '../bridge/control';
 
 // The Go relay's snapshot of open git credential prompts (native git ops and the ADE board). The
-// prompt router (P246) picks the window and the order; GitCredentialDialog renders the entry whose
+// prompt router picks the window and the order; GitCredentialDialog renders the entry whose
 // ref is a request id here. Never logged or persisted: the typed secret lives only in the dialog
 // and the argument to `answer`. Answering an id the server already gave up on is a no-op.
 export const useGitCredentialStore = defineStore('gitCredential', () => {

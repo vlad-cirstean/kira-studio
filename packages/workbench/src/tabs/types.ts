@@ -1,7 +1,7 @@
 import type { TabScope } from '@shared/domain/tabs';
 import type { Component } from 'vue';
 
-// P103 Part 2 (§5.1): the generic contract both apps' own `state/tabKinds.ts` instantiate once,
+// The generic contract both apps' own `state/tabKinds.ts` instantiate once,
 // each with its own kind union `K`, record union `R`, and the three type parameters that
 // genuinely differ between them — Kira Studio's `TabIcon` is `string`, Kira Space's is
 // `string | { readonly filePath: string }`; Kira Studio's rail colour is `ConnectionColor`, Kira
@@ -22,9 +22,9 @@ export interface TabKindDef<
   /** A brand-new tab of this kind, opened with nothing to inherit. */
   defaultState(): Extract<R, { kind: K }>['state'];
   /** A restored record's raw `state`, normalized through this kind's own schema — the one place
-   *  every per-kind `*TabStateSchema`'s `.default()` actually fires. `null` means "not
+   *  every per-kind `*TabStateSchema`'s `.default()` fires. `null` means "not
    *  parseable" — every field the schema knows about is missing or malformed, since a schema
-   *  whose later fields all carry `.default(...)` (P108 Part 12 F14) already tolerates a row
+   *  whose later fields all carry `.default(...)` already tolerates a row
    *  missing just those. The caller (hydrateTabs) resets that row to `defaultState()` rather than
    *  keeping the unparsed, untrusted raw state. */
   parseState(raw: unknown): Extract<R, { kind: K }>['state'] | null;

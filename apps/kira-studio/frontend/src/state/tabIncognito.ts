@@ -2,9 +2,9 @@ import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
 
-// P71 §2.1: a per-tab in-memory flag suppressing every persistence write path a request tab can
-// reach (§1.1 of the plan) — one flag, checked at each write site, rather than a parallel
-// non-persisted store mirroring reads too (§2's own "suppress, don't mirror" decision). In-memory
+// A per-tab in-memory flag suppressing every persistence write path a request tab can reach
+// — one flag, checked at each write site, rather than a parallel non-persisted store mirroring
+// reads too (the "suppress, don't mirror" decision). In-memory
 // only, exactly like tabsState.hydrated/previewIdsByWorkspace (state/tabs.ts) — no schema change,
 // and a restored session has nothing to restore (an incognito tab was never saved).
 //
@@ -22,7 +22,7 @@ export const useTabIncognitoStore = defineStore('tabIncognito', () => {
     return state.ids.has(tabId);
   }
 
-  // P71 §3.1: turning incognito on must flush the tab's existing row immediately rather than at
+  // Turning incognito on must flush the tab's existing row immediately rather than at
   // whatever unrelated state change saves next — state/tabs.ts registers a listener below (rather
   // than this module calling into tabs.ts directly, which would recreate the cycle the module
   // comment above avoids) that does exactly that.

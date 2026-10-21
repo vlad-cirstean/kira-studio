@@ -2,11 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 
-// Parity oracle for the v2 board logic: the frozen P143-149 design mockup's own logic
-// (fixtures/ade-v2-mockup-logic.js — the inline <script> of the former
-// the v2.0 ADE mockup (docs/HISTORY.md (v2.0)), markup/CSS stripped since this oracle never reads them),
-// run unmodified, same mechanism as the v1 `mockupOracle.ts`. Evaluated in a `node:vm` context,
-// exposing the mockup's own `renderVals()` output. `renderVals()` never touches the DOM
+// Parity oracle for the v2 board logic: the frozen design mockup's own logic
+// (fixtures/ade-v2-mockup-logic.js — the inline <script> of the ADE mockup, markup/CSS stripped
+// since this oracle never reads them), run unmodified, same mechanism as the v1 `mockupOracle.ts`.
+// Evaluated in a `node:vm` context, exposing the mockup's own `renderVals()` output.
+// `renderVals()` never touches the DOM
 // synchronously, so the stubs are inert. The mockup's `TODAY` is a local-time
 // `new Date(2026, 8, 22)`; `TZ=UTC` keeps it equal to the calendar helpers' UTC arithmetic.
 process.env.TZ = 'UTC';

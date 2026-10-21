@@ -16,7 +16,7 @@ export function explicitContentType(headers: readonly HttpHeaderState[]): string
 
 /** Structurally identical to `editor/fieldCompletion.ts`'s own `Completion` (label, optional
  *  insert/detail/icon/caretOffsetFromEnd) — declared independently rather than imported, since
- *  `packages/api-core` is app-free, DOM-free logic (P12 D16(e)) and may not import anything under
+ *  `packages/api-core` is app-free, DOM-free logic and may not import anything under
  *  `apps/**`. TypeScript's structural typing makes `WELL_KNOWN_REQUEST_HEADERS` directly usable
  *  anywhere a `Completion[]` is expected, with no cast at the call site. */
 export interface HeaderCompletion {
@@ -33,7 +33,7 @@ function header(label: string, detail: string): HeaderCompletion {
   return { label, detail, icon: 'symbol-field' };
 }
 
-/** Request headers a person actually types into a request builder — RFC 9110's own set plus the
+/** Request headers a person types into a request builder — RFC 9110's own set plus the
  *  conventional non-standard ones. Response-only headers (`Set-Cookie`, `Location`, `Server`, …)
  *  are deliberately absent: this feeds the *request* headers table, never a response viewer.
  *  `detail` is the one-word category the completion popup right-aligns (the old hand-rolled
@@ -142,7 +142,7 @@ const CONTENT_TYPES: readonly HeaderCompletion[] = [
   value('application/pdf'),
 ];
 
-/** P22b D2: the value vocabulary, keyed by the header's own canonical name (lookup case-folds, so
+/** The value vocabulary, keyed by the header's own canonical name (lookup case-folds, so
  *  a user's `content-type` matches). Two entry kinds, distinguished by `insert`:
  *   - a complete value (`application/json`) — accepting it replaces the field;
  *   - a prefix (`Bearer `, with caretOffsetFromEnd 0) — accepting it leaves the caret after the

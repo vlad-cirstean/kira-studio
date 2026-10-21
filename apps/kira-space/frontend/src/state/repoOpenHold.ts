@@ -2,15 +2,15 @@ import type { Transport } from '@kira/git-ipc';
 import { logError } from '@workbench/bridge/log';
 
 /**
- * The per-connection `repo.open` hold `blameAnnotation.ts`'s `blame.line` calls need — moved out
- * of `views/repo/blameAnnotation.ts` (Group 3, P69 review) so `repo/git/transport.ts`'s own
- * `disposeGitTransport` can clear an entry on its own dispose path: `repo/` must not import
- * `views/` directly (C5 §2's restricted-imports rule), but both may import `state/`.
+ * The per-connection `repo.open` hold `blameAnnotation.ts`'s `blame.line` calls need, so
+ * `repo/git/transport.ts`'s own `disposeGitTransport` can clear an entry on its own dispose path:
+ * `repo/` must not import `views/` directly (the restricted-imports rule), but both may import
+ * `state/`.
  *
- * §4.2: `blame.line` needs this connection to already hold the repo. `repo.open` is idempotent
+ * `blame.line` needs this connection to already hold the repo. `repo.open` is idempotent
  * per (connection, repoId) and git-ui never calls `repo.close`, so the hold lives as long as the
  * transport — one memoised promise per gitRepoId, module-level so two open file tabs on the same
- * repository share it. Mirrors `reviewDecorations.ts`'s own `baseMemo` (C12-7/C13-14): only a
+ * repository share it. Mirrors `reviewDecorations.ts`'s own `baseMemo`: only a
  * SUCCESSFUL resolution stays cached, so a transient failure can retry on the next attach rather
  * than replay the same rejection forever.
  */

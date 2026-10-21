@@ -5,7 +5,7 @@ import { BASE64_STD_RE, BASE64_URL_RE, base64ToStd, pickCsvShape } from './detec
 import type { CellFormat } from './formats';
 import { parseTimestamp } from './timestamp';
 
-// P42 D26: the format picker's own answer to "is my json broken, or my timestamp wrong" — every
+// The format picker's own answer to "is my json broken, or my timestamp wrong" — every
 // format validates for real, against the *effective* format (auto or override), on the same
 // pure/synchronous 50 ms selection path detect.ts already runs on. An empty value is always
 // valid for every format: there is nothing yet to be wrong.
@@ -69,7 +69,7 @@ function validateHex(text: string): FormatProblem | null {
   return null;
 }
 
-// `truncated` short-circuits to null (P43 iter2 D29): the value on screen is a prefix the engine
+// `truncated` short-circuits to null: the value on screen is a prefix the engine
 // cut at MAX_CELL_BYTES, so "invalid at offset N" would be a statement about the truncation, not
 // the data, and the user has no way to act on it — the rest was never fetched. The truncated chip
 // (CellEditorView.vue's own `cell-editor-badge-truncated`) already says exactly what happened;

@@ -25,7 +25,8 @@ const WAILS_RUNTIME_JS = resolveWailsRuntimeJsPath(resolve(__dirname, '../../../
 const BRIDGE_PKG = 'github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge';
 
 // One line per request/response channel — the FQN half of each pair, read off the generated
-// bindings themselves (`grep -rhoE '\$Call\.ByName\("[^"]+"' apps/kira-space/frontend/bindings/…/bridge/*.js`),
+// bindings themselves (`grep -rhoE '\$Call\.ByName\("[^"]+"'
+// apps/kira-space/frontend/bindings/…/bridge/*.js`),
 // not retyped from memory — the same discipline Kira Studio's own copy of this table follows.
 const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   gitHostOpenChangeRequestUrl: 'GitHostService.OpenChangeRequestURL',
@@ -252,7 +253,7 @@ export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = bu
 // one of main.ts's own unconditional-every-boot Promise.all calls (bootstrap()'s own doc comment)
 // no committed fixture will ever snapshot, or a fire-and-forget call no spec asserts on the echo
 // of — the same reasoning Kira Studio's own WILDCARD_DEFAULTS carries per entry, trimmed to this
-// app's own boot sequence. P128 §2.2/§2.6: `windowsEnsure` joins this table with a static `'git'`
+// app's own boot sequence. `windowsEnsure` joins this table with a static `'git'`
 // answer, unlike Kira Studio's own copy — this app has no existing spec whose boot mode needs
 // inferring from an already-provided fixture (Studio's own inferredBootMode helper exists only
 // because some of its specs restore an Api-mode tab as active); every Space spec boots into `git`
@@ -305,15 +306,15 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.codeWorkspaceOpenWorkspace]: 'null',
   [IPC.codeWorkspaceCloseWorkspace]: 'null',
   [IPC.codeWorkspaceCancelSearch]: 'null',
-  // P116 G5: main.ts's bootstrap() joins keepAwakeStore.initKeepAwake() into the optional
+  // main.ts's bootstrap() joins keepAwakeStore.initKeepAwake() into the optional
   // Promise.allSettled group, same reasoning as the rest of this table's every-boot calls. The
-  // plan (docs/HISTORY.md (v1.9 P116)) names `supported: false` here, but this
+  // plan (docs/HISTORY.md) names `supported: false` here, but this
   // deliberately follows Kira Studio's own WILDCARD_DEFAULTS value instead (`supported: true`) —
   // Studio's own comment explains why: the UI suite runs against a static server, not a real Go
   // build, and a spec that never cares about keep-awake should still see the titlebar button it
   // will ship with. A spec that DOES care (window-chrome.spec.ts's own keep-awake cases) still wins
   // with its own snapshot.
-  // P238: every window reports its focus at boot.
+  // Every window reports its focus at boot.
   [IPC.agentNotifyReportFocus]: 'null',
   [IPC.agentNotifySendTest]: 'null',
   // P239: nothing reported yet.

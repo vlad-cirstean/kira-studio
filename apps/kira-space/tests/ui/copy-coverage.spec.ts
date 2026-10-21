@@ -11,7 +11,7 @@ import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
-// P265 Stream B: chrome text on the ADE, repos, settings, memory and title bar surfaces comes from
+// Chrome text on the ADE, repos, settings, memory and title bar surfaces comes from
 // the catalog. The pseudo-locale wraps catalog messages, so a literal shows as a letter outside the
 // markers. Fixture data (names, titles, ids, paths, times) is allowed by exact match. The git
 // surfaces are covered by copy-coverage-git.spec.ts.

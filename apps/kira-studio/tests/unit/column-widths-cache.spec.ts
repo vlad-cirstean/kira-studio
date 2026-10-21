@@ -5,11 +5,11 @@ import {
 } from '../../../../packages/shared/protocol/page';
 import { initialWidths, resetMeasureCtx } from '../../frontend/src/views/shared/page/columns';
 
-// P2 R1 regression: DataGrid.vue's `widths` computed depends on the tab's stored columnWidths, so
+// DataGrid.vue's `widths` computed depends on the tab's stored columnWidths, so
 // every pointermove of a column-resize drag used to re-run initialWidths' canvas-measurement pass
 // over every column and up to 50 sample rows each — real work, repeated on every pixel of mouse
 // movement, even though a resize never changes the page's own data. initialWidths now memoizes its
-// result by page object identity (the page is frozen and only replaced by a new fetch — P57's own
+// result by page object identity (the page is frozen and only replaced by a new fetch — the
 // `page` computed comment) — these tests prove that with a real TabularPage and a measureText call
 // counter standing in for "the expensive pass ran again", no DOM/browser required: initialWidths
 // and resetMeasureCtx only ever reach the DOM through document.createElement('canvas') and

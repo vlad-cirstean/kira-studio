@@ -3,7 +3,7 @@ import { type ShallowRef, shallowRef } from 'vue';
 export type FileListMode = 'tree' | 'flat';
 
 /**
- * P113 F8: `DetailState`/`WorkingDetailState`/`StashState` each carry this same file-list cursor
+ * `DetailState`/`WorkingDetailState`/`StashState` each carry this same file-list cursor
  * triple (`selectedFile`/`listMode`/`filter`) and its three setters verbatim — `selectedFile`'s
  * `-1` sentinel ("no file selected") is what `reset()` restores whenever a new commit/stash/
  * working-tree selection replaces the list underneath it.

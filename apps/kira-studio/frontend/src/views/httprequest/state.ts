@@ -23,7 +23,7 @@ export type { ResolvedRequest } from '@kira/api-core';
 
 // The state's own five-mode fields, translated onto the wire union. Only the fields the active
 // mode's own serializer reads are populated — the rest stay at their zero value, since `Body.Mode`
-// is what Go's buildBody() actually switches on (D5: every other member is ignored). D5: only
+// is what Go's buildBody() switches on (every other member is ignored). Only
 // enabled, named rows cross the wire (mirrors the header filter just below in send()).
 function buildBodyWire(state: HttpRequestTabState): HttpBodyWire {
   const empty: HttpBodyWire = {
@@ -69,15 +69,15 @@ function buildBodyWire(state: HttpRequestTabState): HttpBodyWire {
   }
 }
 
-/** D6 stage 1 / D7: resolves every non-secret {{name}} reference across the URL, enabled headers,
+/** Resolves every non-secret {{name}} reference across the URL, enabled headers,
  *  and the active body mode's own substitutable fields — a secret name is left verbatim and
- *  classified 'deferred' (Go finishes it, strictly after op.SetCommand, D6/F3). Pure over its
+ *  classified 'deferred' (Go finishes it, strictly after op.SetCommand). Pure over its
  *  arguments, called both by send() (to build the wire args) and by HttpRequestView.vue's own
  *  live "unresolved reference" chip (over the same tab state, before a send ever happens).
  *
- *  P6 D2: `dynamic`, when supplied, is send()'s own {{$name}} generator callback — forwarded to
+ *  `dynamic`, when supplied, is send()'s own {{$name}} generator callback — forwarded to
  *  every `resolve()` call this function makes, unchanged. HttpRequestView.vue's live preview never
- *  supplies it (F2: the chip must never generate a value, so it always calls this with three
+ *  supplies it (the chip must never generate a value, so it always calls this with three
  *  arguments, never four). */
 export function resolveTabState(
   state: HttpRequestTabState,
@@ -85,7 +85,7 @@ export function resolveTabState(
   secretNames: readonly string[],
   dynamic?: (name: string) => string | null,
 ): ResolvedRequest {
-  // Finding 6 (v1.2 P14 round 2): the URL is the one field with query-string delimiter syntax to
+  // The URL is the one field with query-string delimiter syntax to
   // break — a genuinely-terminal unresolved reference (a typo, an uncatalogued {{$generator}})
   // must not inject a raw space/&/#/= into it. A 'deferred' secret is unaffected either way:
   // sanitizeUrlSpan is never applied to it, so Go's own apivars.Resolve still finds it untouched.
@@ -105,7 +105,7 @@ interface HttpRequestViewRuntime {
   opId: string | null;
   /** True while send() resolves variables, before Go knows the op: Stop cancels locally. */
   preflight: boolean;
-  // P10 D15/C5: timeline is the failed send's own partial timeline (ipcerr.Error.Details,
+  // timeline is the failed send's own partial timeline (ipcerr.Error.Details,
   // mapHttpError) — undefined for every failure that isn't an HTTP send's own transport/body-read
   // error (classifySendErr is the only producer), so TimelinePane.vue's failure branch has
   // something to render beside the message this error strip has always shown.
@@ -131,7 +131,7 @@ function buildSettingsWire(s: HttpRequestSettingsState): HttpRequestSettingsWire
 export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
   const { runtime, ensureRuntime } = createRuntimeStore<HttpRequestViewRuntime>(defaultRuntime);
 
-  // P108 F8: gRPC's own cleanup already cancels an in-flight call here (state.ts); HTTP's did not
+  // gRPC's own cleanup already cancels an in-flight call here (state.ts); HTTP's did not
   // — a send kept running in Go and recording history for a tab already gone. stopOp before the
   // delete matches that shape (registerTabRuntimeCleanup is the one place a closing tab's cleanup
   // and an in-flight op's cancellation can share one call).
@@ -140,10 +140,10 @@ export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
     delete runtime[tabId];
   });
 
-  /** D3: one Send op, run through HttpService.Send → the existing op scheduler — mirrors
-   *  console/state.ts's own run() (manual status/opId preamble, no beginOp/applyLoadFailure — D8:
+  /** One Send op, run through HttpService.Send → the existing op scheduler — mirrors
+   *  console/state.ts's own run() (manual status/opId preamble, no beginOp/applyLoadFailure —
    *  an HTTP failure never touches tabsState.hydrated, since there is no connection to reconnect).
-   *  P5 D6: stage 1 (this function) resolves every non-secret reference before the wire args are
+   *  Stage 1 (this function) resolves every non-secret reference before the wire args are
    *  built; collectionId/environmentId travel alongside so Go's stage 2 can finish the rest. */
   async function send(tabId: string): Promise<void> {
     const tab = findHttpRequestTab(tabId);
@@ -188,7 +188,7 @@ export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
         incognito: useTabIncognitoStore().isIncognito(tabId),
         options: buildSettingsWire(tab.state.settings),
       });
-      // P108 F8: `rt` is a captured reference to the (possibly already cleaned-up) runtime object
+      // `rt` is a captured reference to the (possibly already cleaned-up) runtime object
       // — closing the tab mid-send never touched `rt.opId` itself (cleanup only stops the op and
       // deletes `runtime[tabId]`), so the opId check alone still passed for a tab that no longer
       // exists, and noteSendRecorded/invalidateJarCookies below ran for it, recreating a history
@@ -219,7 +219,7 @@ export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
       // deliberately not called here: a Reconnect gate has nothing to gate on a connectionless tab.
       rt.status = 'error';
       rt.response = null;
-      // P10 D15: classifyLoadError (viewOp.ts) is shared by every view's own load path and stays at
+      // classifyLoadError (viewOp.ts) is shared by every view's own load path and stays at
       // {kind, code, message} — widening it app-wide for one HTTP-only field would reach five other
       // views that have no use for it. `err.details` is control.ts's own unwrap() addition, read
       // directly here instead.
@@ -246,12 +246,11 @@ export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
   return { runtime, send, stop };
 });
 
-// P7 D10: the *Copy as curl* dialog's own frozen resolution — computed once on open, the same
-// shape send() already demonstrates (P6 D7's short-circuit: only a request that actually
-// references a dynamic value pays for loadDynamicGenerator()'s chunk). `http/state/curl.ts` cannot
-// import views/** (§0.3), so this lives here rather than there, and is called once rather than on
-// every render — re-running it on a later render would re-roll every {{$…}} the dialog is already
-// showing (D11's whole reason to exist).
+// The *Copy as curl* dialog's own frozen resolution — computed once on open, the same shape send()
+// already demonstrates (the short-circuit: only a request that references a dynamic value pays for
+// loadDynamicGenerator()'s chunk). `http/state/curl.ts` cannot import views/**, so this lives here
+// rather than there, and is called once rather than on every render — re-running it on a later
+// render would re-roll every {{$…}} the dialog is already showing.
 export interface ExportResolution {
   method: HttpMethod;
   resolved: ResolvedRequest;

@@ -1,4 +1,4 @@
-// P12 round 1 finding #4: ensureDdl used to await its own cached pending promise and only clear
+// ensureDdl used to await its own cached pending promise and only clear
 // pendingLoads on the success path — `pendingLoads.delete(connectionId)` sat after the `await`,
 // so a rejection never reached it. One transient control.schemaGet failure (a backend error, a
 // disconnect mid-boot) then poisoned the cache for the rest of the session: every later caller
@@ -51,7 +51,7 @@ describe('state/schemas.ts — ensureDdl pending-load cache (P12 round 1 F4)', (
     );
   });
 
-  // P12 round 2 finding #14: ensureDdl wrote `schemasState.byConnection[connectionId] = ddl`
+  // ensureDdl wrote `schemasState.byConnection[connectionId] = ddl`
   // unconditionally after its own await — a slow initial fetch resolving *after* a faster
   // saveDdl (a real user Save) had already written fresher text overwrote the store back to the
   // stale fetched value, with nothing left to notice until the next relaunch.

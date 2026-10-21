@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// P86: the TypeScript mirrors of Go's terminal.AgentSession/harness.AgentEvent wire shapes.
+// The TypeScript mirrors of Go's terminal.AgentSession/harness.AgentEvent wire shapes.
 // grpc-history.ts's own precedent — types, not guards: neither crosses a storage boundary or gets
 // restored, so nothing here earns a Zod-parse boundary. control.ts `trust<T>()`s them like every
 // other bound result.
@@ -38,10 +38,10 @@ export interface AgentEvent {
   lastAssistantMessage: string; // Stop, bounded server-side
 }
 
-// §13's own reducer output — one Claude Code tab's current activity, derived from the AgentEvent
-// stream by state/agentActivity.ts's reduceAgentActivity. 'waiting' is P129 Part 1's own addition:
-// a session that armed a wake tool (Monitor, ScheduleWakeup) before its own Stop is "waiting on
-// monitor", not plain idle (design mapping done in Part 3's UI, not here).
+// Reducer output — one Claude Code tab's current activity, derived from the AgentEvent
+// stream by state/agentActivity.ts's reduceAgentActivity. 'waiting': a session that armed a wake
+// tool (Monitor, ScheduleWakeup) before its own Stop is "waiting on monitor", not plain idle
+// (design mapping done in the UI, not here).
 export type AgentPhase = 'idle' | 'working' | 'attention' | 'waiting';
 
 export interface AgentActivity {

@@ -18,8 +18,8 @@ export interface RawWarning {
 
 export interface ParsedRawRequest {
   /** Only the fields raw HTTP text can express — urlEncoded/formData/binaryFile are untouched
-   *  (D10: a parsed body always lands in `raw` or `code`, never those three), so the caller's
-   *  patch leaves whatever those buffers already held (D8's own "every mode keeps its own
+   *  (a parsed body always lands in `raw` or `code`, never those three), so the caller's
+   *  patch leaves whatever those buffers already held (the "every mode keeps its own
    *  buffer" rule, applied here too). */
   state: Pick<
     HttpRequestTabState,
@@ -28,11 +28,11 @@ export interface ParsedRawRequest {
   warnings: RawWarning[];
 }
 
-/** D10 step 2's exact table: application/json → json; application/xml/text/xml → xml; text/html
+/** The exact table: application/json → json; application/xml/text/xml → xml; text/html
  *  → html; application/javascript → javascript; everything else (including
  *  application/x-www-form-urlencoded) → null, which lands the body in `raw`. Deliberately a
  *  narrower table than http/curl/parse.ts's own codeLanguageForContentType (no `+json`/`+xml`
- *  suffixes, no `text/javascript`) — D10 states this exact table, not that broader one. */
+ *  suffixes, no `text/javascript`). */
 function codeLanguageForContentType(contentType: string): HttpCodeLanguage | null {
   const type = contentType.split(';')[0].trim().toLowerCase();
   if (type === 'application/json') return 'json';
@@ -61,14 +61,13 @@ function resolveTarget(currentUrl: string, target: string): string {
 }
 
 /**
- * P9 D10/D11: raw HTTP/1.1 text → a tab state patch plus a warning list. Never throws — an
- * unparseable request comes back as `{error}` (D11's four error cases), mirroring P7's own
- * `ParsedCurl` shape so the dialog's warning/error strip needs no change (D11's own closing line).
+ * Raw HTTP/1.1 text → a tab state patch plus a warning list. Never throws — an unparseable
+ * request comes back as `{error}`, mirroring the `ParsedCurl` shape so the dialog's
+ * warning/error strip needs no change.
  *
- * The grammar, in full, is D11 — restated here only where the code needs a comment to say why:
  * 1. Request line: `METHOD SP target [SP HTTP-version]`. The version is optional and dropped — the
- *    app speaks whatever the transport negotiates (F2), so accepting `HTTP/1.1` and then possibly
- *    sending h2 would be exactly the lie D3 exists to prevent.
+ *    app speaks whatever the transport negotiates, so accepting `HTTP/1.1` and then possibly
+ *    sending h2 would be exactly the lie.
  * 2. The target is taken verbatim, `{{…}}` and all — no `new URL()`, no normalisation.
  * 3. Header lines until the first blank line, split at the first colon, value trimmed of one
  *    leading space. Name case and line order are preserved exactly; a duplicate name is a second

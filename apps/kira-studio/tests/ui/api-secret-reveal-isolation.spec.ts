@@ -4,7 +4,7 @@ import { openHttpMode } from './support/apiMode';
 import { collectionRow, variableRow } from './support/apiRows';
 import { IPC } from './support/ipcChannels';
 
-// Round-1 review finding 5: revealedValues (state/variables.ts) is shared between the Variables
+// revealedValues (state/variables.ts) is shared between the Variables
 // dialog and the Copy-as-curl dialog's own revealSecretValues loop (curl.ts), but only
 // closeVariablesDialog used to clear it — closeCopyAsCurlDialog cleared only its own, separate
 // revealedSecretValues map. A secret revealed via Copy-as-curl left a stale entry that
@@ -119,7 +119,7 @@ test('a secret revealed via Copy as curl does not skip re-auth in the later-open
   expect(control.log().filter((e) => e.channel === IPC.variablesReveal)).toHaveLength(2);
 });
 
-// Round-2 review finding 1: onUpdateSecret's read-back after `revealVariable(id)` used to consult
+// onUpdateSecret's read-back after `revealVariable(id)` used to consult
 // the *shared* revealedValues map instead of this call's own outcome. A variable revealed once
 // successfully earlier in the same dialog session leaves its plaintext sitting in that map — so a
 // later, freshly-*cancelled* re-auth (declining the confirm prompt when turning the secret flag

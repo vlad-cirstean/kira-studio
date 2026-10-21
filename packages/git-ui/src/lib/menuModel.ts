@@ -18,7 +18,7 @@ export interface MenuItem {
   /** Renders the item in the danger (destructive) visual treatment — matching the toolbar's own
    *  existing `push-menu-item` danger-colour precedent. Optional, defaults to `false`. */
   readonly danger?: boolean;
-  /** G34 D8: a secondary line under the label — muted, one type step down. `PullStrategyPicker`'s
+  /** A secondary line under the label — muted, one type step down. `PullStrategyPicker`'s
    *  own "Merge — from pull.rebase in your repository config" is the only producer today; it is a
    *  second LINE rather than Kira's right-aligned `.shortcut` slot because the string is a
    *  sentence, not a key chord, and right-aligning it in a 260px panel would truncate it away. */

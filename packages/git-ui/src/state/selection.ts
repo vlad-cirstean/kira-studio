@@ -2,10 +2,9 @@ import type { CommitStore } from '@kira/git-core';
 import { type ShallowRef, shallowRef } from 'vue';
 
 /**
- * §3.1's selection state, deferred by P3 to P4 W5. Stored **by sha as well as row**, because
- * §6.2 requires refresh to preserve selection and a re-walk renumbers every row — `row` is a
- * position in the *current* layout, `sha` is the commit itself, and only the latter survives a
- * reset unaided.
+ * Selection state. Stored **by sha as well as row**, because refresh has to preserve selection
+ * and a re-walk renumbers every row — `row` is a position in the *current* layout, `sha` is the
+ * commit itself, and only the latter survives a reset unaided.
  *
  * `select(row)` is what a click/keyboard-nav handler calls, resolving `sha` from `store`
  * immediately. `selectBySha(sha)` is the re-resolution path a reset triggers: called against
@@ -17,9 +16,8 @@ import { type ShallowRef, shallowRef } from 'vue';
  * behaviour in a tool whose next phase attaches destructive actions to the selected row.
  *
  * Takes `store` directly rather than a `GraphViewState` — this class only ever reads row/sha
- * lookups off it, and staying decoupled from `GraphViewState` matches the plan's own sketch,
- * where neither state class references the other; a component (W11's `App.vue`) is what wires
- * "the store reset, re-resolve the previous selection" between them.
+ * lookups off it, and neither state class references the other; a component (`App.vue`) is what
+ * wires "the store reset, re-resolve the previous selection" between them.
  */
 export class SelectionState {
   readonly row: ShallowRef<number> = shallowRef(-1);

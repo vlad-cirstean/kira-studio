@@ -14,7 +14,7 @@ import { type EdgeSegment, LayoutStore } from './layoutStore.ts';
  *  `[fromRow, toRow, fromLane, toLane, color]` tuples, already sorted by fromRow (the
  *  store's own invariant) since every edge here starts at `from`. `edgeIndex`'s CSR form follows
  *  mechanically: every row before `from + 1` (i.e. row `from` itself) contributes 0 edges to the
- *  running total, and the total from row `from + 1` onward is simply "all of them" (none of this
+ *  running total, and the total from row `from + 1` onward is "all of them" (none of this
  *  test's edges start anywhere but row `from`). */
 function buildChunk(
   from: number,
@@ -67,9 +67,9 @@ function buildPatchChunk(
   };
 }
 
-// G30 round-1 performance review, finding #3: `#collectLongSegments` used to build a full
-// `EdgeSegment` object (`readSegment`) for every candidate in `#longEdges` before checking
-// whether it actually covers the queried row — an edge that closed long ago (its own `toRow`
+// `#collectLongSegments` used to build a full `EdgeSegment` object (`readSegment`) for every
+// candidate in `#longEdges` before checking whether it covers the queried row — an edge that
+// closed long ago (its own `toRow`
 // PATCHED to a real, short value well before the query row) is never removed from `#longEdges`
 // (append-only, "long" membership is decided once at append time and frozen — see
 // `isLongAtAppendTime`'s own doc comment), so it stayed a candidate, and its allocation, for
@@ -145,7 +145,7 @@ describe('LayoutStore — long-edge segment collection stays correct after a pat
   });
 });
 
-// G31 round-2 performance review, finding #2: every open lane at a chunk boundary is added to
+// Every open lane at a chunk boundary is added to
 // #longEdges as UNRESOLVED_ROW (isLongAtAppendTime's own unconditional rule), and most resolve to
 // a genuinely short span in the very next chunk — but #longEdges used to be a true append-only log,
 // so each such chunk boundary left a permanent entry behind regardless, and #collectLongSegments

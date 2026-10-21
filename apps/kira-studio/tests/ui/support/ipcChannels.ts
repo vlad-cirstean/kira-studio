@@ -1,11 +1,11 @@
 // The legacy Electron/Node-engine-sidecar channel-name namespace this test tier still mocks
-// against (P50 D5/D15's own fixture-key convention, kept for continuity with tests/ipc/'s
-// committed fixtures — see mockRuntime.ts's CHANNEL_TO_FQN). Nothing under apps/kira-studio/frontend/src imports
-// this anymore: the real wire protocol today is the generated Wails bindings under
-// apps/kira-studio/frontend/bindings/. This is test-owned infrastructure now, not a live app protocol, which
-// is why it lives here rather than in packages/shared/protocol (P2 R1: it used to live there as
-// packages/shared/protocol/ipc.ts's `IPC` export, importable — misleadingly — as if it still described
-// something real).
+// against (the fixture-key convention, kept for continuity with tests/ipc/'s committed fixtures —
+// see mockRuntime.ts's CHANNEL_TO_FQN). Nothing under apps/kira-studio/frontend/src imports this
+// anymore: the real wire protocol today is the generated Wails bindings under
+// apps/kira-studio/frontend/bindings/. This is test-owned infrastructure now, not a live app
+// protocol, which is why it lives here rather than in packages/shared/protocol (it used to live
+// there as packages/shared/protocol/ipc.ts's `IPC` export, importable — misleadingly — as if it
+// still described something real).
 export const IPC = {
   appInfo: 'kira:app:info',
   settingsGetAll: 'kira:settings:getAll',
@@ -215,7 +215,7 @@ export const IPC = {
   opUpdate: 'kira:op:update',
   appMetrics: 'kira:app:metrics',
   dbMcpApproval: 'kira:dbmcp:approval',
-  // P83 §3.2: one terminal's coalesced output and its exit, EmitTo'd to one window — grpcCall's
+  // One terminal's coalesced output and its exit, EmitTo'd to one window — grpcCall's
   // own shape, restated for a byte payload. No FQN_SUFFIX_BY_IPC_KEY entry (it's a push channel,
   // never a bound call) — driven by emitWailsEvent(page, IPC.terminal, …), grpcCall's own
   // precedent above.
@@ -255,7 +255,7 @@ export const IPC = {
   scriptRunsReadLog: 'kira:scriptRuns:readLog',
   scriptRunsMcpServers: 'kira:scriptRuns:mcpServers',
   scriptRunsMcpTools: 'kira:scriptRuns:mcpTools',
-  // P87 §3.2/§10.3: the titlebar keep-awake toggle's own state, Emit'd (not EmitTo) —
+  // The titlebar keep-awake toggle's own state, Emit'd (not EmitTo) —
   // customScriptsChanged's own shape restated. Real wire channel string verbatim
   // (internal/appevent's ChannelKeepAwake), no FQN_SUFFIX_BY_IPC_KEY entry (a push channel, never
   // a bound call) — driven by emitWailsEvent(page, IPC.keepAwake, …), terminal's own precedent.

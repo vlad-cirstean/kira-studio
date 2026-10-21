@@ -29,10 +29,10 @@ export function sortSpecToText(sort: SortSpec | null): string {
   return `{ ${body} }`;
 }
 
-// Lenient by design (matches how a Mongo shell user actually types a sort document): braces are
+// Lenient by design (matches how a Mongo shell user types a sort document): braces are
 // optional, keys may be bare or quoted (single or double), and `asc`/`desc` are tolerated
 // alongside Mongo's own `1`/`-1` for anyone still transitioning off the old ORDER BY-style box.
-// Anything that isn't a `key: value` pair is simply skipped rather than rejecting the whole
+// Anything that isn't a `key: value` pair is skipped rather than rejecting the whole
 // string, since a half-typed sort document while the user is still editing is not an error.
 const SORT_TERM_RE = /(?:"([^"]+)"|'([^']+)'|([A-Za-z0-9_.$]+))\s*:\s*(-?1|asc|desc)/gi;
 

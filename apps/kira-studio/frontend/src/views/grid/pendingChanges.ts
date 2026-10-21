@@ -7,7 +7,7 @@ import { reactive, toRaw } from 'vue';
 import { data } from '../../bridge/data';
 import { cell, getPage, pageVersion } from './page';
 
-// Renderer-only, in-memory, per tab (D3) — never persisted (not tabs.state_json, not settings,
+// Renderer-only, in-memory, per tab — never persisted (not tabs.state_json, not settings,
 // not a new SQLite table). Closing a tab discards uncommitted edits, exactly like closing a
 // spreadsheet you never saved. A staged edit or delete is keyed by its row's primary key, not its
 // page position, so it survives paging, sort, filter, projection and Refresh; a page that no
@@ -68,11 +68,11 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
     return pendingState[tabId];
   }
 
-  // P21 round 3 performance finding 10: SlickGridHost.vue's own header states the rule — "Vue must
-  // not see the grid" — because the cell extractor runs *during* SlickGrid's own synchronous render,
-  // not Vue's. Reading pending state through pendingFor() breaks that rule in the one place that
-  // runs per cell: pendingState[tabId] is itself a reactive proxy, its `edits` a reactive-wrapped
-  // Map, so `pendingFor(tabId)?.edits.get(row)?.changes[column]` was up to four proxy traps (record,
+  // SlickGridHost.vue's own header states the rule — "Vue must not see the grid" — because the cell
+  // extractor runs *during* SlickGrid's own synchronous render, not Vue's. Reading pending state
+  // through pendingFor() breaks that rule in the one place that runs per cell:
+  // pendingState[tabId] is itself a reactive proxy, its `edits` a reactive-wrapped Map, so
+  // `pendingFor(tabId)?.edits.get(row)?.changes[column]` was up to four proxy traps (record,
   // TabPending, the Map collection handler's own toRaw-and-rewrap, then `changes`) for information
   // that cannot change mid-render. toRaw returns the same underlying object reactive() wraps —
   // nothing here is cloned, so this stays live as of whenever the caller took the snapshot; callers
@@ -254,8 +254,8 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
   // Every stage/discard function refuses while this tab's commit is in flight: a change staged
   // against ops already on the wire would be dropped by the post-commit clearPending.
   // A plain <input> can't distinguish "clear to NULL" from "clear to empty string" — every inline
-  // edit stages the typed text verbatim, `''` included. An explicit NULL affordance is not built
-  // in this phase (P6+ nicety); a NULL value's own cell must be retyped, not blanked.
+  // edit stages the typed text verbatim, `''` included. An explicit NULL affordance is not built;
+  // a NULL value's own cell must be retyped, not blanked.
   function stageEdit(tabId: string, row: number, column: string, value: string): void {
     stageChange(tabId, row, column, value);
   }
@@ -296,12 +296,12 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
     stageChange(tabId, row, column, null);
   }
 
-  // D6: "Duplicate row" — one addInsertRow + stageInsertValue per non-primary-key column, copied
+  // "Duplicate row" — one addInsertRow + stageInsertValue per non-primary-key column, copied
   // from the row's current *effective* value (staged edit if present, else the page's own cell).
   // Primary-key columns are left blank (null, addInsertRow's own default) for the user to fill in
   // — duplicating a PK verbatim would only ever produce a guaranteed-collision insert on commit.
-  // P36 D28: a generated column is skipped the same way — the server computes it, so copying its
-  // displayed value forward would only ever be rejected on commit (F18).
+  // A generated column is skipped the same way — the server computes it, so copying its
+  // displayed value forward would only ever be rejected on commit.
   function duplicateAsInsert(tabId: string, row: number): string | null {
     if (committingState[tabId]) return null;
     const page = getPage(tabId);
@@ -317,12 +317,12 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
         continue;
       }
       const view = cell(tabId, row, col);
-      // F2/P21 round 1: a truncated cell's `.text` is only the 64 KiB prefix the engine sent, the
-      // same reason P24 D27 makes such a cell non-editable ("committing the buffer verbatim would
-      // write the truncated text over the real value"). Duplicating it staged that prefix as a real
-      // insert value, silently corrupting the copy on Commit. Left unset (null, addInsertRow's own
-      // default) instead — the same "not carried over" treatment an unresolved value already gets —
-      // rather than ever staging a value known to be wrong.
+      // A truncated cell's `.text` is only the 64 KiB prefix the engine sent, the same reason
+      // such a cell is non-editable ("committing the buffer verbatim would write the truncated text
+      // over the real value"). Duplicating it staged that prefix as a real insert value, silently
+      // corrupting the copy on Commit. Left unset (null, addInsertRow's own default) instead — the
+      // same "not carried over" treatment an unresolved value already gets — rather than ever
+      // staging a value known to be wrong.
       if (!view.isNull && !view.truncated) stageInsertValue(tabId, id, descriptor.name, view.text);
     }
     return id;

@@ -47,18 +47,17 @@ const CONTROL: ControlSnapshot[] = [
 // @kira/git-ui's own BridgeClient.connectionState, exposed as text (App.vue/ReviewView.vue both
 // carry it) — 'connecting' forever (never 'connected', never 'error') is exactly what a hung
 // request over a silently-dropped-send dead socket looks like, so this is the assertion that
-// actually proves the bootstrap succeeded rather than merely that a container div exists. Scoped
-// to its own host: Review stays mounted via v-show once activated (§8.4), so both a graph tab and
+// proves the bootstrap succeeded rather than merely that a container div exists. Scoped
+// to its own host: Review stays mounted via v-show once activated, so both a graph tab and
 // an activated Review segment can carry their own `connection-state` span at the same time.
 function connectionStateIn(page: import('@playwright/test').Page, hostTestId: string) {
   return page.locator(`[data-testid="${hostTestId}"] [data-testid="connection-state"]`);
 }
 
-// Bug 2 (§3): a cold mount reached the graph only after a manual Retry, because the git stream
+// A cold mount reached the graph only after a manual Retry, because the git stream
 // channel sent app.init before the socket's own open ack — deterministic on a fresh repo open, not
-// flaky (§3's own root-cause section). The fix gates post() on the open ack instead of sending
-// synchronously (streamChannel.ts). This is the FIRST-EVER open of a repo workspace on a fresh
-// page — the one case bug 2 reproduced in.
+// flaky. The fix gates post() on the open ack instead of sending synchronously (streamChannel.ts).
+// This is the FIRST-EVER open of a repo workspace on a fresh page.
 test('bug 2 regression: a cold repo open reaches the graph with no boot-retry click', async ({
   relaunch,
 }) => {
@@ -75,14 +74,13 @@ test('bug 2 regression: a cold repo open reaches the graph with no boot-retry cl
   await expect(page.locator('[data-testid="boot-retry"]')).toHaveCount(0);
 });
 
-// Bug 1 (§2): opening a file (or anything that unmounts RepoGraphView.vue, e.g. a tab switch —
-// P72 §3 made a plain tab switch a KeepAlive deactivation instead, but closing the tab or an LRU
+// Opening a file (or anything that unmounts RepoGraphView.vue, e.g. closing the tab or an LRU
 // eviction past KEEP_ALIVE_MAX still unmounts it the same way) tore down the ONE shared Transport
 // every mount in the repo workspace shared — gitTransportFor's own cache handed back the same
 // now-dead object, so returning to the pinned graph tab (or switching the panel to Review, sharing
-// that same transport) hit a boot error instead of remounting live. The fix (repo/git/transport.ts's
-// per-mount lease, §2.1) makes each mount's own dispose() release only its own subscriptions, never
-// the shared socket.
+// that same transport) hit a boot error instead of remounting live. The fix
+// (repo/git/transport.ts's per-mount lease) makes each mount's own dispose() release only its own
+// subscriptions, never the shared socket.
 test('bug 1 regression: opening a file and returning to the graph tab keeps the graph (and Review) alive', async ({
   relaunch,
 }) => {
@@ -94,7 +92,7 @@ test('bug 1 regression: opening a file and returning to the graph tab keeps the 
   await expect(page.locator('[data-testid="repo-graph-host"]')).toBeVisible();
   await expect(connectionStateIn(page, 'repo-graph-host')).toHaveText('connected');
 
-  // Open a file from the tree — P72 §3: RepoGraphView.vue is now KeepAlive-included
+  // Open a file from the tree — RepoGraphView.vue is now KeepAlive-included
   // (MainView.vue), so this deactivates it rather than unmounting it; a deactivated component's
   // DOM moves to Vue's internal storage container, outside the live document tree, so it's still
   // unreachable here exactly as a genuine unmount would be (verified empirically, not assumed:

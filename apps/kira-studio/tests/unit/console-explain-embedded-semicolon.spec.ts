@@ -1,6 +1,6 @@
-// P108 Part 11 F2: isExplainable's raw-semicolon guard, the TS twin of the Go test in
+// isExplainable's raw-semicolon guard, the TS twin of the Go test in
 // statements_test.go. A leading SELECT/WITH is not enough — the splitter that decided this was
-// "one statement" can itself be fooled (F4: Postgres E'...' strings, `$` inside an identifier), and
+// "one statement" can itself be fooled (Postgres E'...' strings, `$` inside an identifier), and
 // wrapping a merged statement in EXPLAIN would still execute whatever follows the `;` (Postgres's
 // simple protocol runs every command in one Query message).
 import { describe, expect, test } from 'bun:test';

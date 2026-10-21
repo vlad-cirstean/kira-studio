@@ -3,7 +3,7 @@ import { setActivePinia } from 'pinia';
 import type { OpRecord } from '../../../../packages/shared/domain/ops';
 import { pinia } from '../../frontend/src/state/pinia';
 
-// P43 iter3 D37: state/runState.ts is a plain computed() over state/ops.ts's reactive() store —
+// state/runState.ts is a plain computed() over state/ops.ts's reactive() store —
 // no container, no Electron main process, nothing DOM-shaped read by either module. Vue's
 // reactivity core (ref/computed/watchEffect) runs the same anywhere with no DOM. The one obstacle
 // is bridge/control.ts:33's `const kira = window.kira;` at module scope (state/ops.ts's own

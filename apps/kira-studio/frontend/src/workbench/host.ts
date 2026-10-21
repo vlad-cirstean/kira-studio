@@ -9,7 +9,7 @@ import { TAB_KINDS } from '../state/tabKinds';
 import { useTabsStore } from '../state/tabs';
 import { TAB_VIEWS } from './tabViews';
 
-// P103 Part 2 (§5.4): the WorkbenchHost instance this app provides once, in App.vue — every field
+// The WorkbenchHost instance this app provides once, in App.vue — every field
 // ported verbatim from the old workbench/panels/TabStrip.vue's own `colorFor`/`titleFor`/
 // `isAttention`/badgeFor(bodies now behind TAB_KINDS itself, reached by the shared component)
 // bodies, minus what already lives on TAB_KINDS (title/pinned/menuExtras — the shared TabStrip.vue

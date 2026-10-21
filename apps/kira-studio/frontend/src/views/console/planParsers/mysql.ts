@@ -9,11 +9,11 @@ import {
 } from '../planIssues';
 import type { PlanNode, QueryPlan, ScanEstimate } from '../planModel';
 
-// P18 (v1.1) D13/D15/D16: MySQL 8.4's `EXPLAIN FORMAT=JSON` — F12. One row, one column, a
+// MySQL 8.4's `EXPLAIN FORMAT=JSON`. One row, one column, a
 // `query_block` whose real content sits under `table` (single-table), `nested_loop` (a join —
-// same key MariaDB's own JSON uses, but a genuinely different schema underneath it, F13), or a
+// same key MariaDB's own JSON uses, but a genuinely different schema underneath it), or a
 // wrapping `grouping_operation`/`ordering_operation`/`duplicates_removal` block around either.
-// F12's own three examples — a plain table, a materialized derived table, and a sort — are read
+// The three examples — a plain table, a materialized derived table, and a sort — are read
 // literally below; anything this shape doesn't name is skipped rather than guessed at.
 interface RawTable {
   table_name?: string;

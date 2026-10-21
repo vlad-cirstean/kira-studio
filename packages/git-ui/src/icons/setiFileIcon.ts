@@ -1,6 +1,6 @@
 /**
- * G-UX D3 (item 3): real per-language file icons for `FileTree.vue`, replacing the codicon set's
- * one shared file-code codicon glyph for every source language (F4's own survey — `.ts`, `.go`,
+ * Real per-language file icons for `FileTree.vue`, replacing the codicon set's
+ * one shared file-code codicon glyph for every source language (the survey — `.ts`, `.go`,
  * `.vue`, `.rs`, `.py`, `.css`, `.html` all land on that one icon today, since codicons has no
  * finer distinction). `seti-icons` (MIT) repackages jesseweed/seti-ui verbatim as plain JSON data
  * — the only surveyed option that ships both an icon body table AND a machine-readable
@@ -12,7 +12,7 @@
  * invisible on a light VS Code theme. It resolves to the host's own muted foreground instead, so
  * the fallback icon follows the user's theme exactly as every other muted glyph in this panel
  * already does. `ignore` is `#41535b` — VS Code's own real `vs-seti-icon-theme.json` value for its
- * ignored/git/npm-ignored icon set (P7, fetched and confirmed directly against microsoft/vscode;
+ * ignored/git/npm-ignored icon set (fetched and confirmed directly against microsoft/vscode;
  * this file previously guessed `#6d8086`/`grey-light`, since `seti-ui@1.11.0`'s own
  * `ui-variables.less` has no `ignore` entry of its own to copy).
  */
@@ -62,7 +62,7 @@ function maskUrlFor(svg: string): string {
   return url;
 }
 
-/** G-UX (item 10): `seti-icons`' own bundled data (last published years ago) has no `files` entry
+/** `seti-icons`' own bundled data (last published years ago) has no `files` entry
  *  for these — its own `getDetails` (`lib/index.js`) checks `files` (exact name), then walks
  *  `fileName.slice(fileName.indexOf('.'))` outward through `extensions` (so `go.mod` is tried as
  *  `.mod`, `.mod`.slice(1) etc — never `.go`, since `.go` is not a SUFFIX of `go.mod`), then
@@ -78,7 +78,7 @@ const GO_TOOLING_FILENAMES = new Set(['go.mod', 'go.sum', 'go.work', 'go.work.su
  *  to drive `GO_TOOLING_FILENAMES`' lookup through the real `themed()` call above. */
 const GO_EXTENSION_LOOKUP_NAME = 'main.go';
 
-/** P7 (item 3): a test/spec file keeps its language's ordinary glyph, colored orange instead of
+/** A test/spec file keeps its language's ordinary glyph, colored orange instead of
  *  that language's ordinary color — VS Code's own real `vs-seti-icon-theme.json`
  *  (`iconDefinitions`: `_typescript_1`/`_react_1`/`_javascript_1` share their non-`_1` sibling's
  *  `fontCharacter` verbatim, only `fontColor` differs, always `#e37933`). `seti-icons@0.0.4`'s own

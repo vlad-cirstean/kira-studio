@@ -20,7 +20,7 @@ function prettyJson(text: string): string {
 // A rejected clipboard write (denied permission, an unfocused window) must not vanish the same
 // way an unhandled promise rejection would — ContextMenu.vue's `onItemClick` is never awaited by
 // its own `@click` binding, so with nothing here to catch it, Copy would fail with zero visible
-// feedback (P43 F6/D7's own `actionError` exists for exactly this).
+// feedback (the `actionError` exists for exactly this).
 function copyOrReportError(tabId: string, text: string, announce: MessageKey): Promise<void> {
   return sharedCopyOrReportError(
     text,
@@ -50,7 +50,7 @@ export function rowMenu(
   tabId: string,
   id: string,
   body: string,
-  // P21 round 2 performance finding 2: a thunk, not an already-decoded array — right-click used
+  // A thunk, not an already-decoded array — right-click used
   // to decode every row's `_id` (idsOf, a full page walk through the page store's cached/
   // cachedView) up front regardless of whether Expand/Collapse all is ever picked, undoing the
   // visible-window pruning in one click. setAllExpanded's own `true` branch doesn't even read its
@@ -61,7 +61,7 @@ export function rowMenu(
   // keyvalue/menu.ts's own `editable`/label pair: a row's own Edit icon and this menu entry must
   // agree, or right-clicking would offer an action the toolbar button already refused.
   editGate: { editable: boolean; label: string },
-  // P108 Part 11 F17: same reasoning as editGate — the row's own Delete icon (DocumentView.vue's
+  // Same reasoning as editGate — the row's own Delete icon (DocumentView.vue's
   // canDelete/deleteTitle, itself caps.canDelete combined with the connection's readOnly flag)
   // used to gate only the toolbar button, leaving this menu's own Delete item always enabled and
   // able to fire a write the row button next to it already refuses.
@@ -91,7 +91,7 @@ export function rowMenu(
     },
     { type: 'separator' },
     {
-      // P22b D11: one named-format submenu, mirroring the SQL grid's own `Copy row(s) ▸`
+      // One named-format submenu, mirroring the SQL grid's own `Copy row(s) ▸`
       // shape (console/menu.ts's tabularRowMenu) — a user choosing between mongosh syntax and
       // `{"$oid": …}` has to be told which is which, not read two unlabelled sibling items.
       // Leaf ids preserved (`copy-document`/`copy-as-json`) so existing specs keep passing.

@@ -161,7 +161,7 @@ describe('classifyInProgress — precedence table (§7.11)', () => {
     });
   });
 
-  // F2: a paused multi-commit revert/cherry-pick whose current commit was finished with a plain
+  // A paused multi-commit revert/cherry-pick whose current commit was finished with a plain
   // `git commit` (instead of `--continue`) clears *_HEAD but leaves sequencer/ (and its todo)
   // behind -- git's own state machine is still mid-run, so this must not fall through to
   // unmergedOnly (or null, with no unmerged paths left either).

@@ -1,9 +1,8 @@
-// P108 Part 12 F7: hydrateOps used to subscribe to onOpUpdate only AFTER opsRecent's own snapshot
+// hydrateOps used to subscribe to onOpUpdate only AFTER opsRecent's own snapshot
 // await resolved — an op that both started and finished in that gap left a permanently 'running'
 // row in the snapshot, since the old subscribe never saw its update at all.
 //
-// P132 Part 1 (§0.7/§4.2): moved from apps/kira-studio/tests/unit/ops-hydrate-race.spec.ts onto
-// createOpLogStore directly — a fake OpLogControl replaces the window/bridge stub, and each test
+// A fake OpLogControl replaces the window/bridge stub, and each test
 // gets its own Pinia instance instead of one shared module-level store.
 import { describe, expect, test } from 'bun:test';
 import type { OpLogRecord } from '@shared/domain/ops';

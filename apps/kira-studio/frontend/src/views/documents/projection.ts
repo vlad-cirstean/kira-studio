@@ -1,5 +1,5 @@
-// P108 Part 11 F6: ProjectionMenu.vue's pure close-time decision, split into its own module so it
-// has a direct unit test (document-projection-menu-close.spec.ts) — mirrors grid/menu.ts's own
+// ProjectionMenu.vue's pure close-time decision, split into its own module so it has a direct unit
+// test (document-projection-menu-close.spec.ts) — mirrors grid/menu.ts's own
 // nextProjectionFromSelectedColumns/nextProjectionAfterHidingColumn split for the exact same
 // reason (tested at its own boundary, not through setProjection's real load() pipeline).
 
@@ -21,8 +21,7 @@ function setsEqual(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
 // even when its own resulting value happens to be set-equal to the untouched one. (2) "Everything"
 // comes only from `explicitAll`, never from a set-size coincidence. (3) An empty selection
 // resolves to null (Mongo's own empty-projection behaviour already returns every field; keeping
-// `projection: []` disagreed with the edit gate and the badge about what the connection was
-// actually doing).
+// `projection: []` disagreed with the edit gate and the badge about what the connection was doing).
 export function nextDocumentProjectionOnClose(
   selected: ReadonlySet<string>,
   initialSelected: ReadonlySet<string>,

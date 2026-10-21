@@ -320,10 +320,10 @@ describe('ChangeRequestState — ensureSnapshot warms only uncached branches', (
   });
 });
 
-// G31 round-2 performance review, finding #3: a branch whose resolvePr answer came back "ok" with
-// no PR at all never landed in byBranch (only a real ChangeRequestRecord goes in there), so ensureSnapshot's
-// own dedup filter (!byBranch.has(name) && !#branchRequests.has(name)) failed forever and every
-// PR-less branch was re-requested on every ensureSnapshot call, indefinitely.
+// A branch whose resolvePr answer came back "ok" with no PR at all never landed in byBranch (only a
+// real ChangeRequestRecord goes in there), so ensureSnapshot's own dedup filter
+// (!byBranch.has(name) && !#branchRequests.has(name)) failed forever and every PR-less branch was
+// re-requested on every ensureSnapshot call, indefinitely.
 describe('ChangeRequestState — resolveBranch caches a "no PR" answer', () => {
   test('a branch that resolves to no PR is not re-requested by a later ensureSnapshot', async () => {
     const transport = new FakeTransport();
@@ -347,10 +347,10 @@ describe('ChangeRequestState — resolveBranch caches a "no PR" answer', () => {
   });
 });
 
-// G30 round-1 performance review, finding #1: ensureSnapshot used to Promise.all every branch at
-// once — a repo with hundreds of branches fired hundreds of concurrent branch.resolveChangeRequest requests
-// with nothing capping it anywhere in the stack. Proves the worker-pool bound: with 20 branches to
-// warm and every request left hanging, no more than 6 are ever in flight at once.
+// ensureSnapshot used to Promise.all every branch at once — a repo with hundreds of branches fired
+// hundreds of concurrent branch.resolveChangeRequest requests with nothing capping it anywhere in
+// the stack. Proves the worker-pool bound: with 20 branches to warm and every request left hanging,
+// no more than 6 are ever in flight at once.
 describe('ChangeRequestState — ensureSnapshot bounds its own fan-out', () => {
   test('never more than 6 branch.resolveChangeRequest requests are in flight at once', async () => {
     const transport = new FakeTransport();
@@ -541,12 +541,11 @@ describe('ChangeRequestState — rebuildAncestry: bounded ancestry walk', () => 
     pr.dispose();
   });
 
-  // P79 fix, Functional finding HIGH: the walk used to have no stopping point at the PR's own
-  // base, tagging every ancestor of the tip including the base branch's own history behind the
-  // branch point. `main`'s tip is decorated here (the only fixture in this file that is) so
-  // `rowOfBranchTip` can resolve `baseRef` locally — every other test's chain has no decorations
-  // at all, which is exactly the "base not resolvable locally" fallback path those tests already
-  // cover by continuing to walk the whole chain.
+  // The walk used to have no stopping point at the PR's own base, tagging every ancestor of the tip
+  // including the base branch's own history behind the branch point. `main`'s tip is decorated here
+  // (the only fixture in this file that is) so `rowOfBranchTip` can resolve `baseRef` locally —
+  // every other test's chain has no decorations at all, which is exactly the "base not resolvable
+  // locally" fallback path those tests already cover by continuing to walk the whole chain.
   test('stops the walk at the PR base — commits behind it are never tagged', async () => {
     const mainTip = sha(3);
     const m1 = sha(4);

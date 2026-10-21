@@ -1,8 +1,8 @@
-// P94 pass 3 §4.3, shape 4 first pattern: CommitGrid.vue's handleKeyDown (35) — a dozen key
-// branches, six of them (the nav keys) each re-checking `length === 0` on their own — moved out
-// with everything it needs passed in explicitly (§4.2), never reaching back into the SFC's own
-// scope. The nav keys' shared `length === 0` guard is hoisted above their own switch, the biggest
-// single contributor to the original score; every other key's own guard is unchanged.
+// CommitGrid.vue's handleKeyDown (35) — a dozen key branches, six of them (the nav keys) each
+// re-checking `length === 0` on their own — moved out with everything it needs passed in
+// explicitly, never reaching back into the SFC's own scope. The nav keys' shared `length === 0`
+// guard is hoisted above their own switch, the biggest single contributor to the original
+// score; every other key's own guard is unchanged.
 import type { RowPlan } from '@kira/git-core';
 import type { Ref } from 'vue';
 

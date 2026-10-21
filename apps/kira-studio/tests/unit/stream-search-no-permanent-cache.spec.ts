@@ -1,4 +1,4 @@
-// P21 round 2 performance finding 1: runSearch used to read every row through streamRow(), which
+// runSearch used to read every row through streamRow(), which
 // goes through the page store's own memoizing decode/view cache (store.cached/cachedView) — so
 // the very first search keystroke on a page permanently decoded and cached *every* row, undoing
 // the visible-window pruning that otherwise only re-runs on a scroll event (setVisibleWindow).

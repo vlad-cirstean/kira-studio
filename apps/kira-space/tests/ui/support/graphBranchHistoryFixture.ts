@@ -2,7 +2,7 @@ import { buildPackedChunk, type PackedChunkRow } from '@kira/git-core/testing/pa
 import { PORT_REPO, refRow } from './gitUiPortFixtures';
 import { buildGraphStreamChunk, type GraphStreamChunkFixture } from './graphStreamFixture';
 
-// P278: a branchy history shaped like a real repo. Blocks of 20 rows: 15 on `main`, 5 exclusive to a
+// A branchy history shaped like a real repo. Blocks of 20 rows: 15 on `main`, 5 exclusive to a
 // side branch that forks off the next block's first main commit. Every other side tip is listed in
 // `refs.list`; the rest land in the `other` group. A tag every 37 rows, a merge of the block's side
 // tip every 60 rows.

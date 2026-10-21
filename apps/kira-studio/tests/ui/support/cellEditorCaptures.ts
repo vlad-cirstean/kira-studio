@@ -734,7 +734,7 @@ export const NULLS_AND_UNICODE_ROWS: (string | null)[][] = [
 
 export const NULLS_AND_UNICODE_TRUNCATED_CELLS = 2;
 
-// Which cells the two truncated ones above actually are — self-evident from the real capture (row
+// Which cells the two truncated ones above are — self-evident from the real capture (row
 // 3's big_text/big_blob are the only values exactly 65536 characters long, `0001_seed.sql`'s own
 // "oversized values" row) rather than a separate captured fact; decodePage() doesn't yet surface
 // page.ts's per-cell `truncated` bitset (see tests/ipc/support/types.ts's own doc comment), so

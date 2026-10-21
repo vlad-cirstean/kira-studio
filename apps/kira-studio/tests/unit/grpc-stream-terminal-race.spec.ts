@@ -1,4 +1,4 @@
-// P21 round 1 functional finding F5: a server-streaming call's messages arrive over the event
+// A server-streaming call's messages arrive over the event
 // channel (control.onGrpcCall), while the call's own CallResult returns over the control plane —
 // a separate HTTP request (control.grpcCall) — with nothing ordering the two. The return path's
 // own guard (`if (rt.opId !== opId) return`) assumed the terminal event always arrives first; when
@@ -19,7 +19,7 @@ import { pinia } from '../../frontend/src/state/pinia';
 setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
-// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — a real (never-settling in this harness) control.tabsSave triggered
 // incidentally by opening a tab below would otherwise wedge every later spec's own tabsSave
 // assertions for the rest of the process. This spec doesn't test persistence, so give it a
@@ -52,7 +52,7 @@ afterEach(() => {
   control.grpcHistoryList = originalGrpcHistoryList;
 });
 
-// P108 F1: counts how many times the gRPC call-history list query actually fetches — the
+// Counts how many times the gRPC call-history list query fetches — the
 // direct, observable signature of noteGrpcCallRecorded firing. Set to `historyListCalls = 0`
 // (below) and the tab's `responsePane` to 'history' (so noteRecorded's own eager branch fires a
 // real load()) at the top of any test that needs to assert on it.
@@ -170,7 +170,7 @@ describe("a server-streaming call's terminal event race (F5)", () => {
     expect(grpcRequestViewStore.runtime[id]?.trueMessageCount).toBe(2);
     expect(grpcRequestViewStore.runtime[id]?.messageBytes).toBe(20);
 
-    // P108 F1: both the control-plane return (above) and this terminal event observed "the call
+    // Both the control-plane return (above) and this terminal event observed "the call
     // finished" — each used to call noteGrpcCallRecorded unconditionally, recording this one call
     // twice and feeding history's own load() two overlapping refreshes close enough together to
     // retry-loop forever. `notifiedCallId` must have deduped them to exactly one history list
@@ -208,8 +208,8 @@ describe("a server-streaming call's terminal event race (F5)", () => {
   });
 });
 
-// P21 round 2 performance finding 6: rt.messages is a deep-reactive array (createRuntimeStore's
-// own reactive()), and every arriving message used to be pushed straight in with no markRaw,
+// rt.messages is a deep-reactive array (createRuntimeStore's own reactive()), and every arriving
+// message used to be pushed straight in with no markRaw,
 // letting Vue wrap each one in its own per-field reactive Proxy on top of the array's own
 // reactivity — wasted work for an immutable wire value this view never mutates in place.
 describe('live-stream message buffer (P21 round 2 performance finding 6)', () => {
@@ -241,7 +241,7 @@ describe('live-stream message buffer (P21 round 2 performance finding 6)', () =>
 
   // 10_000 (MAX_LIVE_MESSAGES) is state.ts's own private constant — restated here as a literal
   // rather than imported. An amortized 90%-of-cap trim target was tried and reverted (it broke
-  // D15/D17's "exactly the most recent 10,000" contract, caught by grpc-request.spec.ts's own
+  // the "exactly the most recent 10,000" contract, caught by grpc-request.spec.ts's own
   // "caps at 10,000" UI test); this pins the reverted, exact-cap behavior instead.
   test('crossing the cap trims back to exactly the cap', async () => {
     const id = setUpStreamingTab();

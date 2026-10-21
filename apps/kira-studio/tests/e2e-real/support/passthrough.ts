@@ -1,17 +1,17 @@
 import type { Page, Route } from '@playwright/test';
 import { CHANNEL_TO_FQN } from '../../ui/support/mockRuntime';
 
-// The inverse of tests/ui/support/mockRuntime.ts (P57-e2e-revisit.md §3.6/§8, D4): that module
+// The inverse of tests/ui/support/mockRuntime.ts: that module
 // fakes every bound call by default and answers from a fixture; this one leaves every bound call
 // alone by default (`route.continue()` — the real Go backend answers) and fakes only a named
 // allowlist. Server mode has no dialogs (`FilesService.ChooseSave`/`ChooseOpen` answer a real HTTP
 // 422, "file dialogs not available in server mode") — a spec that needs one stubs exactly that
 // method and nothing else, losing nothing `tests/e2e/s3.spec.ts`'s own dialog stub hadn't already
-// given up (§3.6).
+// given up.
 //
-// CHANNEL_TO_FQN is reused rather than re-derived, per D4 — its values are the literal
+// CHANNEL_TO_FQN is reused rather than re-derived — its values are the literal
 // `$Call.ByName("…")` strings the generated bindings send over the wire; the short "Service.Method"
-// names an allowlist is keyed by (matching how §3.6/§8 name them) are recovered from those same
+// names an allowlist is keyed by are recovered from those same
 // values, not retyped from memory.
 const FQN_BY_SHORT_NAME: Readonly<Record<string, string>> = Object.freeze(
   Object.fromEntries(

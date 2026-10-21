@@ -1,10 +1,10 @@
-// M5 §6.2/§6.3: the grid preview's own masking transform and tag cache.
+// The grid preview's own masking transform and tag cache.
 //
-// Framing, stated once (§6.1): the grid toggle is a preview, not a control. The security boundary
+// Framing, stated once: the grid toggle is a preview, not a control. The security boundary
 // is the MCP path (internal/dbmcp/render.go), where the user is not the adversary. This module
 // exists so a human can see what an AI client sees, over their own data, on their own machine —
 // where they already hold the real values. Find/search (grid/search.ts) stays over raw values;
-// copy-column-values follows display instead (SlickGridHost.vue's own columnValuesFor, §6.6) and
+// copy-column-values follows display instead (SlickGridHost.vue's own columnValuesFor) and
 // masks when preview is on. Either way, a cache miss here degrades to *less* information, never a
 // leaked one.
 
@@ -21,11 +21,11 @@ export type MaskedCellView = CellView & { masked?: boolean };
 
 /**
  * Builds one page's own tag cache: every distinct real value across every correlating masked
- * column, tagged once (§6.3's own "precompute tags per page, not per render" — SlickGrid's
+ * column, tagged once ("precompute tags per page, not per render" — SlickGrid's
  * cellFormatter runs synchronously and Web Crypto's HMAC does not). Empty when there is no key
  * (no correlating rule has minted one yet, or the connection has none) — every cache miss then
  * degrades the transform below to redaction without a tag, never a leaked value, only less
- * information (§6.3's own "fail-closed again").
+ * information ("fail-closed again").
  */
 export async function buildMaskTagCache(
   page: TabularPage,

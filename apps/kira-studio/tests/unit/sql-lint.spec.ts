@@ -1,4 +1,4 @@
-// P2 R2 (task #92): sql-lint.ts's lintSql shares sql-split.ts's quote-scanning lexer, including the
+// sql-lint.ts's lintSql shares sql-split.ts's quote-scanning lexer, including the
 // same dialect-conditional backslash-escaping fix — a standard-SQL (Postgres/SQLite) literal ending
 // in a real backslash right before its closing quote must not have that quote mistaken for an
 // escaped character, or the scanner runs past the literal's true end and misreports it as

@@ -8,11 +8,10 @@ export const ORDERS_PARTITION_COUNT = 2;
 export const ORDERS_MESSAGE_COUNT = 6; // > one partition's worth, so browsing genuinely spans both
 export const CONSUMER_GROUP = 'kira-test-group';
 
-// P32 D26: the seed runs the broker's own CLI inside the container instead of a JS Kafka client —
-// this is what keeps a JS client out of the Playwright/Node process entirely (F24), so `tests/e2e`
+// The seed runs the broker's own CLI inside the container instead of a JS Kafka client —
+// this is what keeps a JS client out of the Playwright/Node process entirely, so `tests/e2e`
 // never needs anything but the Electron-ABI build of the driver under test. It also stops the seed
-// from registering CONSUMER_GROUP by *joining* it, which was a standing absurdity in a phase about
-// not joining groups.
+// from registering CONSUMER_GROUP by *joining* it.
 // KafkaContainer configures two listeners (kafka-container.js): PLAINTEXT (9093), advertised as
 // <host>:<mapped-port> for clients connecting from outside the container (Testcontainers' own
 // KAFKA_PORT, used by support/kafka.ts's container.getMappedPort(9093) for the app under test),
@@ -23,9 +22,9 @@ export const CONSUMER_GROUP = 'kira-test-group';
 // listener - the host-mapped port - which is not reachable from inside the container itself, so it
 // hangs retrying forever rather than erroring. Confirmed by hand: `docker exec <id> kafka-topics
 // --bootstrap-server localhost:9093 --list` never returns; the same command against :9092 returns
-// immediately. This was never a Kafka-4.0-vs-3.6 metadata-quorum race - P32 D25's version bump
-// didn't change which port was wrong, it just landed on a machine (Colima, no host-side loopback
-// hairpin NAT for published ports) where the wrong port actually fails instead of quietly working.
+// immediately. This was never a Kafka-4.0-vs-3.6 metadata-quorum race - the version bump didn't
+// change which port was wrong, it landed on a machine (Colima, no host-side loopback
+// hairpin NAT for published ports) where the wrong port fails instead of quietly working.
 const BOOTSTRAP = 'localhost:9092';
 const SEED_FILE = '/tmp/kira-orders-seed.txt';
 
@@ -102,7 +101,7 @@ export async function seedKafka(container: StartedTestContainer): Promise<void> 
       `< ${SEED_FILE}`,
   ]);
 
-  // Registers CONSUMER_GROUP in admin.listGroups() (P10's root-level "topics, consumer groups"
+  // Registers CONSUMER_GROUP in admin.listGroups() (the root-level "topics, consumer groups"
   // tree, kafka/catalog.ts's listGroups()) with committed offsets and no members —
   // --reset-offsets --to-earliest --execute against a group that has never existed creates exactly
   // that state, which is what scenario 6 (packages/db-fixtures/kafka.spec.ts) asserts.

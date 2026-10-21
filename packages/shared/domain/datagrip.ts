@@ -1,4 +1,4 @@
-// The wire shape of internal/datagrip's Preview/Report (P25), hand-mirrored the same way
+// The wire shape of internal/datagrip's Preview/Report, hand-mirrored the same way
 // collections.ts's ImportReport mirrors internal/bridge's Go struct — kept here rather than
 // imported straight from the generated bindings so the frontend has one stable import regardless
 // of exactly which Go type crosses which bridge boundary.

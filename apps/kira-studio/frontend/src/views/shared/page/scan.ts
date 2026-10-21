@@ -2,7 +2,7 @@ import { cellText, isNull, type TabularPage, type TextColumnChunk } from '@share
 import { compileSearchPattern } from '../../../editor/searchPattern';
 import { visibleRowsOf } from './visibleRows';
 
-// P39 F10: grid/search.ts, documents/search.ts and keyvalue/search.ts declared the same
+// grid/search.ts, documents/search.ts and keyvalue/search.ts declared the same
 // SearchQuery/SearchHandle/CHUNK_ROWS/escapeRegExp and the same rAF-chunked driver with the same
 // cancel/zero-width-match/onProgress/resolve semantics, differing only in the per-row scan body.
 // stream/search.ts is deliberately NOT built on this — it is a simpler, different scanner
@@ -32,11 +32,11 @@ export interface SearchHandle<M> {
 
 const CHUNK_ROWS = 2000;
 
-// P21 round 3 performance finding 1: CHUNK_ROWS above budgets by *row count* alone, but the real
+// CHUNK_ROWS above budgets by *row count* alone, but the real
 // per-frame cost of a tabular scan is CHUNK_ROWS × columnCount — a wide table (docs/PERF.md's
 // `app.scroll_grid` fixture is 60 columns) did 2 000 × 60 = 120 000 decode+regex pairs inside one
-// requestAnimationFrame callback, five to fifteen times the 8-12 ms frame budget §2.1 gates scroll
-// on. chunkRowsForColumns turns the row budget into a cell budget so a wide page walks fewer rows
+// requestAnimationFrame callback, five to fifteen times the 8-12 ms frame budget gates scroll on.
+// chunkRowsForColumns turns the row budget into a cell budget so a wide page walks fewer rows
 // per frame and a narrow one (keyValueRowScanner's fixed 2-column shape, or a 1-2 column table) is
 // unaffected — Math.min keeps it from ever exceeding the original CHUNK_ROWS.
 const CELL_BUDGET_PER_FRAME = CHUNK_ROWS * 2; // unaffected columnCount<=2, e.g. keyValueRowScanner
@@ -45,14 +45,13 @@ export function chunkRowsForColumns(columnCount: number): number {
   return Math.min(CHUNK_ROWS, Math.max(1, Math.ceil(CELL_BUDGET_PER_FRAME / columnCount)));
 }
 
-// P5 C4/F6: a find's match set had no cap — ~101 B retained per match (F6), 38.8 MB at 400 000
-// matches, 96.2 MB at a million, held until the find is cleared or the tab closes. 50 000 is
-// generous for anything a person actually navigates (Prev/Next through a highlight list) and
-// bounded for a machine — ~5 MB by F6's own per-match figure, two orders of magnitude past
-// realistic use.
+// A find's match set had no cap — ~101 B retained per match, 38.8 MB at 400 000 matches,
+// 96.2 MB at a million, held until the find is cleared or the tab closes. 50 000 is generous for
+// anything a person navigates (Prev/Next through a highlight list) and bounded for a machine —
+// ~5 MB by the per-match figure, two orders of magnitude past realistic use.
 const MAX_SCAN_MATCHES = 50_000;
 
-/** P28 D11: the compiler itself moved down to editor/searchPattern.ts, so the request/response
+/** The compiler itself moved down to editor/searchPattern.ts, so the request/response
  *  find bar's own case/word/regex toggles mean exactly what these three mean here rather than
  *  growing a second, subtly different implementation. This wrapper keeps runChunkedScan's call
  *  site (and its SearchQuery shape) unchanged. Still throws SyntaxError synchronously for an
@@ -61,7 +60,7 @@ function compilePattern(q: SearchQuery): RegExp {
   return compileSearchPattern(q.text, q);
 }
 
-// F16 (P108 Part 10): a user regex with a nested quantifier (e.g. `(a+)+$`) exhibits catastrophic
+// A user regex with a nested quantifier (e.g. `(a+)+$`) exhibits catastrophic
 // backtracking against one long cell — chunking bounds rows *between* animation frames, not the
 // single `exec` call already in flight, so the main thread blocks with no escape (Stop can't run
 // either, since the event loop it needs is what's blocked). A full fix moves regex-mode scanning
@@ -77,7 +76,7 @@ export const REGEX_SCAN_TEXT_CAP = 10_000;
  *  match guard (a pattern like `x*` or `(?:)` that can match an empty string) that
  *  grid/documents/keyvalue's per-row scan bodies each wrote out identically. `pattern.lastIndex`
  *  is reset first so a shared RegExp scans from the start. `maxLength`, when given, truncates
- *  `text` before scanning (F16's partial ReDoS mitigation, REGEX_SCAN_TEXT_CAP above) — omitted by
+ *  `text` before scanning (the partial ReDoS mitigation, REGEX_SCAN_TEXT_CAP above) — omitted by
  *  every caller not passing a user-authored regex against untrusted cell content. */
 export function eachMatch(
   pattern: RegExp,
@@ -96,19 +95,19 @@ export function eachMatch(
   }
 }
 
-// §8.5 (D28): searches the loaded page only, never the server. Iterates in chunks of 2 000 rows
+// Searches the loaded page only, never the server. Iterates in chunks of 2 000 rows
 // per animation frame; a new keystroke cancels and restarts.
 //
-// P42 D37: `opts.priority`, when given, is scanned first — in its own frame, reported through
+// `opts.priority`, when given, is scanned first — in its own frame, reported through
 // `onProgress` — before the ordinary ascending pass starts from row 0. That ascending pass always
 // rebuilds `matches` from scratch and is what `done` resolves to, so the final array is strictly
-// ascending regardless of where the priority window sat (F30's contract); the window's own rows
+// ascending regardless of where the priority window sat; the window's own rows
 // are therefore scanned twice, which is free next to a page of thousands. `onProgress`'s 4th
 // argument is the matches found so far — for the priority tick, that window's own matches only
 // (never folded into `matches` itself); for every tick after, `matches` itself, as a fresh
 // ascending slice. Omitting `opts` is byte-for-byte today's behaviour, modulo the cap below.
 //
-// P5 C4/F6: both passes append through `appendCapped`, which stops growing the returned array
+// Both passes append through `appendCapped`, which stops growing the returned array
 // once it holds `MAX_SCAN_MATCHES` (or `opts.cap`, tests only) but keeps counting — `found`
 // (the first `onProgress` argument, and `ScanResult.found`) is always the true, uncapped total, so
 // the toolbar can say "N of `<found>` (first `<matches.length>` shown)". Each row's own matches are
@@ -198,7 +197,7 @@ export function emptyScan<M>(): SearchHandle<M> {
   return { cancel() {}, done: Promise.resolve({ matches: [], found: 0, matchedRows: [] }) };
 }
 
-// P107 I2-14: grid/search.ts, documents/search.ts and shared/keyvalue/search.ts each wrapped
+// grid/search.ts, documents/search.ts and shared/keyvalue/search.ts each wrapped
 // runChunkedScan in the same "no page or empty query -> emptyScan; else scan with this tab's
 // visible rows as scan priority" shell around their own per-row scanner. `visibleRowsOf` needs no
 // import at each call site any more; only the scanner itself (a plain row scan body, or one built
@@ -218,9 +217,9 @@ export function runPageScan<M, Pg extends { rowCount: number }>(
   });
 }
 
-/** P48 F9: the tabular per-row scan body grid/search.ts and console/search.ts's tabular branch
+/** The tabular per-row scan body grid/search.ts and console/search.ts's tabular branch
  *  each wrote out — every column, skipping a null cell. `make` builds the caller's own Match
- *  shape from the (row, col, start, end) the scan found. `regexTextCap` (F16), when given, is
+ *  shape from the (row, col, start, end) the scan found. `regexTextCap`, when given, is
  *  forwarded to eachMatch's own `maxLength` — a caller scanning with a user-authored regex passes
  *  REGEX_SCAN_TEXT_CAP; a literal/whole-word caller omits it. */
 export function tabularRowScanner<M>(
@@ -241,11 +240,11 @@ export function tabularRowScanner<M>(
   };
 }
 
-/** P48 F9: the two-chunk field/value scan keyvalue/search.ts and console/search.ts's keyvalue
+/** The two-chunk field/value scan keyvalue/search.ts and console/search.ts's keyvalue
  *  branch each wrote out, differing only in whether `col` is spelled `'field'|'value'` or `0|1`
  *  — `cols` supplies whichever pair the caller's own Match shape uses. Neither chunk is ever
  *  null by construction (KeyValuePageBuilder.push takes plain strings), so — unlike
- *  tabularRowScanner — there is no isNull check to share. `regexTextCap` (F16): same as
+ *  tabularRowScanner — there is no isNull check to share. `regexTextCap`: same as
  *  tabularRowScanner's own — forwarded to eachMatch's `maxLength`, omitted for a literal/
  *  whole-word scan. */
 export function keyValueRowScanner<M, C>(

@@ -8,11 +8,11 @@ import {
 } from '../planIssues';
 import type { PlanNode, QueryPlan, ScanEstimate } from '../planModel';
 
-// P18 (v1.1) D13/D15/D16: Postgres 18's `EXPLAIN (FORMAT JSON, COSTS TRUE, ...)` returns one row,
-// one column QUERY PLAN, whose text is a JSON array of one `{ Plan: {...} }` — F11. Only fields
-// available *without* ANALYZE are read here; §7.3's own check is that Actual Rows/Actual Total
-// Time/Rows Removed by Filter/Sort Method/Shared Hit Blocks never appear below — those require
-// ANALYZE, which this phase never issues (§0.3).
+// Postgres 18's `EXPLAIN (FORMAT JSON, COSTS TRUE, ...)` returns one row,
+// one column QUERY PLAN, whose text is a JSON array of one `{ Plan: {...} }`.
+// Only fields available *without* ANALYZE are read here; the check is that Actual Rows/Actual
+// Total Time/Rows Removed by Filter/Sort Method/Shared Hit Blocks never appear below
+// — those require ANALYZE, which this phase never issues.
 interface RawNode {
   'Node Type'?: string;
   'Relation Name'?: string;

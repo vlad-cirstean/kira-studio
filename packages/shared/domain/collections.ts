@@ -9,7 +9,7 @@ import {
   httpUrlEncodedFieldSchema,
 } from './http';
 
-// P4 D4: the TypeScript mirror of Go's model.SavedRequest — the **request half** of
+// The TypeScript mirror of Go's model.SavedRequest — the **request half** of
 // httpRequestTabStateSchema, field name for field name, and nothing else.
 //
 // Three things it deliberately is not:
@@ -19,8 +19,8 @@ import {
 //   - Not the wire body. httpBodyWire drops disabled rows; a saved request must keep one — that
 //     is the whole point of the checkbox.
 //   - Not opaque, unlike tabs.state_json. Go writes this document too (on import), so Go owns the
-//     type and this mirrors it — the same division httpclient.Body/HttpBodyWire already has (P3
-//     D5), applied to a stored document instead of a call argument.
+//     type and this mirrors it — the same division httpclient.Body/HttpBodyWire already has,
+//     applied to a stored document instead of a call argument.
 //
 // Unlike most mirrors in this file's neighbourhood, this one **is** Zod-parsed — at exactly one
 // boundary, `openCollectionRequestTab`, where the parsed result becomes tab state and a bad shape
@@ -28,7 +28,7 @@ import {
 // trust boundary.
 //
 // `method` is a plain string, not httpMethodSchema's seven-member enum: Postman's own method list
-// is 15 values plus any custom string (F4), and Go stores whatever the file said. The coercion to
+// is 15 values plus any custom string, and Go stores whatever the file said. The coercion to
 // a method the builder can show happens at that same one boundary, not here — rejecting the whole
 // document over one field would drop a request this app can otherwise open perfectly well.
 export const httpSavedRequestSchema = /*#__PURE__*/ z.object({
@@ -61,13 +61,10 @@ export function defaultHttpSavedRequest(): HttpSavedRequest {
   return httpSavedRequestSchema.parse({});
 }
 
-// P11 D12: the TypeScript mirror of Go's model.SavedGrpcRequest — the request half of
+// The TypeScript mirror of Go's model.SavedGrpcRequest — the request half of
 // grpcRequestTabStateSchema (domain/grpc.ts), field name for field name, following
 // httpSavedRequestSchema's own precedent exactly: not the tab state (the four UI-only fields stay
 // out), and Go owns the type since it writes this document too.
-//
-// P12 D3: HttpSavedGrpcRequest → GrpcSavedRequest — a module prefix on a gRPC type, matching Go's
-// own model.SavedGrpcRequest.
 export const grpcSavedRequestSchema = /*#__PURE__*/ z.object({
   target: z.string().default(''),
   tlsMode: grpcTlsModeSchema.default('tls'),
@@ -100,7 +97,7 @@ export interface CollectionSummary {
 }
 
 /** `method` and `url` are denormalized out of the saved request so the tree renders a method chip
- *  and searches URLs without reading a body; both are '' for a folder. `protocol` (P11 D12) is
+ *  and searches URLs without reading a body; both are '' for a folder. `protocol` is
  *  structural sibling data, not a third `kind` value — `kind` stays 'folder' vs. a leaf, and
  *  `protocol` says which document shape `request_json` holds for a leaf: 'http' ->
  *  model.SavedRequest, 'grpc' -> model.SavedGrpcRequest. Meaningless for a folder, defaulted to

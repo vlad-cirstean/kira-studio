@@ -6,7 +6,7 @@ import {
   selectionFromRanges,
 } from '../../frontend/src/views/shared/slick/selection';
 
-// P22 Pass B, C4/§5 D4 — selectionFromRanges/rangesFromSelection: the four Selection kinds, the
+// selectionFromRanges/rangesFromSelection: the four Selection kinds, the
 // ±1 gutter column offset (SlickRange's own cell space includes the frozen gutter at index 0;
 // Selection.col is a display column index), the empty case, and the row-mode union (a disjoint
 // ctrl/shift row selection produces one SlickRange per row, not one contiguous range). Both
@@ -112,7 +112,7 @@ describe('rangesFromSelection (P22 Pass B C4) — Selection -> SlickRange[]', ()
   });
 });
 
-// Real-interaction fix (§4a/§4d) — selectionCovers is what SlickGridHost.vue's onCellContextMenu
+// selectionCovers is what SlickGridHost.vue's onCellContextMenu
 // now uses to decide whether a right-click acts on the whole current selection (rowMenu(), via
 // rowsForSelection) or replaces it with just the clicked cell (cellMenu()). null/undefined and the
 // 'cell' kind (never covers anything but its own exact cell, which onCellContextMenu checks via

@@ -1,8 +1,7 @@
-// P94 pass 3 §4.3, shape 4 second pattern (a "fat" mount-time block owning real Vue lifecycle —
-// two watches plus a status-bar publish subscription): extracted as a composable, not a plain
-// function, because it owns that lifetime itself — `attach()` starts it, `dispose()` (called from
-// RepoFileView.vue's own onUnmounted) tears it down, mirroring the original inline
-// create-then-cleanup pairing exactly.
+// A "fat" mount-time block owning real Vue lifecycle (two watches plus a status-bar publish
+// subscription): extracted as a composable, not a plain function, because it owns that lifetime
+// itself — `attach()` starts it, `dispose()` (called from RepoFileView.vue's own onUnmounted) tears
+// it down, mirroring the original inline create-then-cleanup pairing exactly.
 import { watch } from 'vue';
 import { gitTransportFor } from '../../repo/git/transport';
 import { useBlameStatusStore } from '../../state/blameStatus';
@@ -26,7 +25,7 @@ interface InlineBlameAttachParams {
 export interface InlineBlameHandle {
   /** Starts blame resolution for this mount: one transport lease, the cursor-line controller
    *  (`blameLine.ts`), the status-bar publish subscription, and the inline decoration renderer
-   *  toggled live off `settingsStore.appearance.inlineBlame` (§5.3 — the setting governs the
+   *  toggled live off `settingsStore.appearance.inlineBlame` (the setting governs the
    *  renderer only; resolution and the status-bar publish run regardless). A no-op if called more
    *  than once without an intervening `dispose()`. */
   attach(params: InlineBlameAttachParams): void;

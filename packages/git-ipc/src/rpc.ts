@@ -110,7 +110,7 @@ interface PendingStream {
 }
 
 export interface RpcClientOptions {
-  /** G32 round-3 performance review, finding #5: a client that only relays chunks onward (the
+  /** A client that only relays chunks onward (the
    *  extension host's `graph.stream` proxy, which never reads a field of the chunk) has no use
    *  for `decodeStreamPayload`'s FlatBuffer materialization — it immediately re-encodes the same
    *  bytes for its own downstream client. When true, `onChunk` receives the still-wire-shaped
@@ -153,7 +153,7 @@ export function createRpcClient(
       case 'chunk': {
         const entry = pendingStreams.get(frame.id);
         if (!entry || entry.done) return;
-        // F2: this queued callback must never itself reject — a throwing `onChunk` or a bad
+        // This queued callback must never itself reject — a throwing `onChunk` or a bad
         // `decodeStreamPayload` would otherwise turn `entry.queue` into a rejected promise, and
         // every later `.then` chained onto it (including `end`'s own finish/resolve/reject) would
         // then be skipped per standard promise semantics, wedging the stream forever. Catch here,

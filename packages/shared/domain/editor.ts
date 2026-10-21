@@ -1,4 +1,4 @@
-// P12 F14/D5: EditorLanguageId lifted out of frontend/src/editor/languages.ts, whose module body
+// EditorLanguageId lifted out of frontend/src/editor/languages.ts, whose module body
 // imports four CodeMirror packages — a plain type-only import erases at build time
 // (verbatimModuleSyntax), so there was no runtime coupling, but a *package* still cannot
 // type-check against a file it cannot resolve (packages/api-core needs this type for

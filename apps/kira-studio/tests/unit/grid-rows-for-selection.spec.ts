@@ -14,7 +14,7 @@ const { rowsForSelection } = await import('../../frontend/src/views/grid/slick/r
 // SlickGridHost.vue/DataToolbar.vue call site that turns "the current selection" into "the rows
 // to act on" now goes through this one function. These are the cases that used to diverge across
 // those three hand-rolled switches — most importantly, `kind: 'column'` (never handled anywhere)
-// and the filter-aware `range`/`column` cases (P24 D10/Finding 3 round 2's own rule).
+// and the filter-aware `range`/`column` cases.
 
 describe('rowsForSelection (grid/slick/rowValues.ts)', () => {
   test('1. a row selection returns its own rows, sorted ascending', () => {

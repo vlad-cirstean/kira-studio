@@ -1,7 +1,7 @@
 // A second commit while the first awaits data.mutate used to rebuild and resend the same ops
-// (duplicate INSERTs, a failing second DELETE), and a discard or edit mid-flight raced clearPending.
-// pendingChanges.ts reaches bridge/data.ts -> '/wails/runtime.js' at module scope, hence the
-// dynamic imports after the window mock.
+// (duplicate INSERTs, a failing second DELETE), and a discard or edit mid-flight raced
+// clearPending. pendingChanges.ts reaches bridge/data.ts -> '/wails/runtime.js' at module scope,
+// hence the dynamic imports after the window mock.
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';

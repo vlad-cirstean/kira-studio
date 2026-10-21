@@ -1,7 +1,6 @@
-// C5 §15.1: the preview/pin interaction in state/tabs.ts — the one piece of this phase's own
-// tab-scoping rewrite that is genuinely several interacting rules over one mutable structure
-// (CLAUDE.md's own testing bar), tested directly against openTab/closeTab/moveTab/closeOthers/
-// closeAll rather than through any UI.
+// The preview/pin interaction in state/tabs.ts — the one piece of the tab-scoping rewrite that is
+// genuinely several interacting rules over one mutable structure (CLAUDE.md's own testing bar),
+// tested directly against openTab/closeTab/moveTab/closeOthers/closeAll rather than through any UI.
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
@@ -12,7 +11,7 @@ import { pinia } from '../../frontend/src/state/pinia';
 setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
-// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — restoreAfterEach restores control back to its real (never-settling in this
 // harness) tabsSave after every test, so a one-time override here only covered this file's first
 // test. The override is set *before* restoreAfterEach snapshots control, not in beforeEach: the
@@ -155,14 +154,14 @@ describe('P74 §5.2: the preview cohort ("Open all changes")', () => {
     expect(tabsForWorkspace(ws).map((t) => t.id)).toEqual([a.id, b.id, permanent.id]);
   });
 
-  // P79 review fix (Performance, MEDIUM): evicting a large cohort ("Open all changes" on a
-  // many-file commit) used to call tabsStore.closeTab() per evicted tab, each doing its own synchronous
-  // full-array control.tabsSave() round trip. Asserts the whole eviction now costs exactly one.
+  // Evicting a large cohort ("Open all changes" on a many-file commit) used to call
+  // tabsStore.closeTab() per evicted tab, each doing its own synchronous full-array
+  // control.tabsSave() round trip. Asserts the whole eviction now costs exactly one.
   //
-  // P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+  // createTabsStore's saveIfChanged now serialises every save through one
   // promise chain (enqueueSave) — the actual host.control.tabsSave call always happens on a later
   // microtask, never synchronously inside saveNow() itself, unlike before this fix. The counting
-  // wrapper below must stay installed until that queued link has actually run (a `setTimeout(0)`
+  // wrapper below must stay installed until that queued link has run (a `setTimeout(0)`
   // drains every pending microtask first, with time to spare since nothing here has a real async
   // delay of its own), not restored synchronously in a `finally` right after the call that queued
   // it, or it would be swapped back out before the chain ever reads it.

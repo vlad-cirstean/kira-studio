@@ -5,8 +5,8 @@ import { type DdlSchema, type DdlTable, findTable } from './ddl';
 import { childrenOf, type LNode, unquotedName } from './sqlNodes';
 import { deepCompositeIdentifiers, statementsWithRefs, type TableRef } from './sqlRefs';
 
-// P18 (v1.1) D7: two diagnostics, both warnings, both bounded by what the DDL can actually prove —
-// "a false positive is worse than a missing diagnostic" (§0.4). Deliberately not implemented:
+// Two diagnostics, both warnings, both bounded by what the DDL can prove —
+// "a false positive is worse than a missing diagnostic". Deliberately not implemented:
 // ambiguous-unqualified-column, which needs a real binder (USING, natural joins, lateral scopes)
 // this app has no reason to build.
 
@@ -96,12 +96,12 @@ function unknownColumnDiagnostics(
   return out;
 }
 
-/** DDL-driven diagnostics over `text` — empty when `schema` has no tables (D5: no DDL document,
+/** DDL-driven diagnostics over `text` — empty when `schema` has no tables (no DDL document,
  *  no diagnostics beyond the lexical ones lintSql already gives). `root`: an already-parsed tree
- *  (P12 round 2 finding #11, same optional third argument sqlHover.ts's own statementsWithRefs
- *  calls take) — a fresh parse only happens when none is supplied. Currently always undefined at
- *  this module's one call site (lint.ts), which is deliberately debounced 400ms and not (yet) worth
- *  the CodeMirror-internals plumbing hover.ts's own redundant-parse fix needed. */
+ *  (same optional third argument sqlHover.ts's own statementsWithRefs calls take) — a fresh parse
+ *  only happens when none is supplied. Currently always undefined at this module's one call site
+ *  (lint.ts), which is deliberately debounced 400ms and not (yet) worth the CodeMirror-internals
+ *  plumbing hover.ts's own redundant-parse fix needed. */
 export function ddlDiagnostics(
   dialect: SqlDialect,
   text: string,

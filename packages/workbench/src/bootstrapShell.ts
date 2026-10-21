@@ -6,12 +6,11 @@ import { logError } from './bridge/log';
 import BootFailure from './components/BootFailure.vue';
 import { useConfirmDialogStore } from './state/confirmDialog';
 
-// P113 F6: kira-space's and kira-studio's own main.ts each wrote this identical catch-and-retry
-// wrapper around their own app-specific mountShell() (P100 Part 2 F2 / P108 Part 12 F13) —
-// mountShell's own hydrates can reject (a DB error, or a busy DB past its lock timeout). Left
-// uncaught, that rejection skips app.mount entirely: a permanently blank window, logged only as an
-// unhandled rejection in the webview console. This mounts BootFailure instead, with a Retry that
-// re-runs the whole sequence.
+// kira-space's and kira-studio's own main.ts each wrote this identical catch-and-retry wrapper
+// around their own app-specific mountShell() — mountShell's own hydrates can reject (a DB error,
+// or a busy DB past its lock timeout). Left uncaught, that rejection skips app.mount entirely: a
+// permanently blank window, logged only as an unhandled rejection in the webview console. This
+// mounts BootFailure instead, with a Retry that re-runs the whole sequence.
 // Theme dialogs cannot import the confirm store, so the shell hands them a discard confirm built on
 // it. Call on the app before `mount`, after `app.use(pinia)`.
 const confirmDiscard: ConfirmDiscard = ({ title, body, confirmLabel }) =>

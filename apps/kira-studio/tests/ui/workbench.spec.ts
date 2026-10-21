@@ -2,15 +2,15 @@ import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
-// Ported from tests/e2e/workbench.spec.ts (P57 D16). Five of its seven scenarios asserted real
+// Ported from tests/e2e/workbench.spec.ts. Five of its seven scenarios asserted real
 // persistence across a relaunch (panel visibility, settings appearance/Advanced sections, word
 // wrap, a narrowed-patch write leaving other sections untouched) — real writes surviving a real
 // process restart, backed by src/main's own storage. This tier's `relaunch()` has no backing
 // store at all (a fresh page + fresh mocks every time, tests/ui/fixtures.ts's own doc comment),
 // so those five scenarios have no equivalent here and are not ported; they are also not covered
-// by tests/e2e/sqlite.spec.ts (the one full-stack anchor D16 keeps, and D16's own rule is that
-// its assertions do not grow to cover what this port drops), so this is a real, acknowledged
-// coverage loss — see docs/CLAUDE.md's P57 findings (M8) and P57-cutover.md §7. Only the two
+// by tests/e2e/sqlite.spec.ts (the one full-stack anchor kept, and the rule is that its
+// assertions do not grow to cover what this port drops), so this is a real, acknowledged
+// coverage loss — see docs/CLAUDE.md's findings. Only the two
 // scenarios below asserted pure rendering with no relaunch-persistence claim.
 
 test('the workbench is inset from the window edge on two sides, none from the title bar (P31 D8)', async ({
@@ -55,10 +55,10 @@ test("the scrollbar corner is not left at Chromium's opaque-white default (P42 F
   expect(corner).not.toBe('rgb(255, 255, 255)');
 });
 
-// P92 item 3: the title bar's own action button for shell.BuildMenu's ItemNewWindow, previously
-// reachable only from the native menu — nothing in the renderer could reach it before. P87 moved
-// it to the rightmost position, inserting the keep-awake button immediately to its left — this
-// test's own title and DOM-order assertion are updated to match, not ported unchanged.
+// The title bar's own action button for shell.BuildMenu's ItemNewWindow, previously reachable only
+// from the native menu — nothing in the renderer could reach it before. It moved to the rightmost
+// position, inserting the keep-awake button immediately to its left — this test's own title and
+// DOM-order assertion are updated to match, not ported unchanged.
 test('the title bar has a New window button, rightmost of the action row, that calls WindowsService.OpenNew once per click', async ({
   relaunch,
 }) => {
@@ -90,11 +90,10 @@ test('the title bar has a New window button, rightmost of the action row, that c
   await expect.poll(() => openNewCalls().length).toBe(1);
 });
 
-// P87 §10.3: the titlebar keep-awake toggle — renders (mockRuntime.ts's own default keepAwakeStatus
+// The titlebar keep-awake toggle — renders (mockRuntime.ts's own default keepAwakeStatus
 // has supported: true), one click issues exactly one KeepAwakeService.SetManual carrying
-// {enabled: true}, and the button gains aria-pressed="true". P110 B13 replaced the old `.is-on`
-// class with `:aria-pressed` (an intentional accessibility fix, per that commit's own message) --
-// this file's `.is-on` assertions are dropped as stale, aria-pressed alone is the toggle signal now.
+// {enabled: true}, and the button gains aria-pressed="true". This file's `.is-on` assertions are
+// dropped as stale, aria-pressed alone is the toggle signal now.
 test('the keep-awake button toggles on click, calling KeepAwakeService.SetManual once with {enabled: true}', async ({
   relaunch,
 }) => {

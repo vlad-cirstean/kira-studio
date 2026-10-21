@@ -1,9 +1,8 @@
 /**
- * §5.5's third memory rule, both halves of it: string interning (author names, emails, ref
- * names repeat — a repo with 20 authors should retain 20 strings, not 100k) and the subject
- * buffer (commit subjects are the one genuinely large, genuinely non-repeating set, so they go
- * into one concatenated `Uint8Array` with an offset index rather than 100k separate string
- * objects).
+ * String interning (author names, emails, ref names repeat — a repo with 20 authors should retain
+ * 20 strings, not 100k) and the subject buffer (commit subjects are the one genuinely large,
+ * genuinely non-repeating set, so they go into one concatenated `Uint8Array` with an offset index
+ * rather than 100k separate string objects).
  */
 import { assert } from '../lib/assert.ts';
 import { growUint32 } from '../lib/typed.ts';
@@ -90,7 +89,7 @@ function growBuffer(current: Uint8Array<ArrayBuffer>, minLength: number): Uint8A
  * A single growing `Uint8Array` of UTF-8 bytes plus a `Uint32Array` of start offsets: subject
  * `i` is `bytes[offsets[i] .. offsets[i+1])`. `append` always assigns the next sequential
  * index — there is no way to insert or overwrite out of order — so keeping subjects in row
- * order is a contract enforced by the caller: `CommitStore` (W4) asserts the index `append`
+ * order is a contract enforced by the caller: `CommitStore` asserts the index `append`
  * returns against its own row counter, which is what turns a caller that fell out of sync into
  * a loud failure instead of a subject silently misattributed to the wrong row.
  */
@@ -140,7 +139,7 @@ export class SubjectBuffer {
   }
 
   /** Bytes and chunk-relative offsets for rows `[from, to)` — the wire format's per-chunk
-   *  subject columns (W3). Subjects are appended contiguously in row order, so this is one
+   *  subject columns. Subjects are appended contiguously in row order, so this is one
    *  contiguous slice rather than `to - from` individual re-encodes; `bytes` is a view into the
    *  live buffer, not a copy, and the offsets are rebased to start at 0 for the slice. */
   rangeBytes(
@@ -153,7 +152,7 @@ export class SubjectBuffer {
     );
     const start = this.#offsets[from] as number;
     const end = this.#offsets[to] as number;
-    // G31 round-2 performance review, finding #2: `from === 0` (CommitStore's own
+    // `from === 0` (CommitStore's own
     // subjectBytes()/subjectOffsets(), the whole-loaded-range case every search scan calls) makes
     // `start === this.#offsets[0] === 0` always — the rebase loop below would then compute
     // `this.#offsets[i] - 0`, an identity copy, for every one of `to + 1` entries. `shaBytes()`'s

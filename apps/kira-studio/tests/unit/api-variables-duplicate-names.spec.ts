@@ -1,12 +1,12 @@
-// Finding 2 of the v1.2 P14 round-1 review: three separate code paths each resolve a duplicate
-// variable name within one scope, and disagreed on which one wins. The documented rule (P5 D12)
-// is first-wins by sort_order — isDuplicateName (VariablesDialog.vue's own chip) and
-// findSecretVariableId (curl.ts) already matched it; mergedValuesAndSecrets (this file) used to
-// overwrite on every iteration (last-wins). This pins the fix: given two same-named variables, the
-// one with the lower sort_order — the one control.variablesList returns first — is the value
-// mergeVariableRows actually reports, exactly what a live send or a copied curl command uses.
+// Three separate code paths each resolve a duplicate variable name within one scope, and disagreed
+// on which one wins. The documented rule is first-wins by sort_order — isDuplicateName
+// (VariablesDialog.vue's own chip) and findSecretVariableId (curl.ts) already matched it;
+// mergedValuesAndSecrets (this file) used to overwrite on every iteration (last-wins). This pins
+// the fix: given two same-named variables, the one with the lower sort_order — the one
+// control.variablesList returns first — is the value mergeVariableRows reports, exactly what a live
+// send or a copied curl command uses.
 //
-// P112: mergeVariableRows is a pure function over two already-loaded row arrays (no store, no
+// mergeVariableRows is a pure function over two already-loaded row arrays (no store, no
 // cache) — this spec calls it directly rather than going through ensureVariablesLoaded/a store.
 import { describe, expect, test } from 'bun:test';
 import type { ApiVariable } from '@shared/domain/variables';

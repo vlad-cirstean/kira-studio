@@ -2,8 +2,8 @@ import type { PullStrategy, PullStrategySource } from '@kira/git-ipc';
 import { type MessageKey, t } from '@theme/i18n';
 
 /**
- * `docs/plans/P8.md` §7.3: "the resolved strategy and its provenance are always shown before the
- * op runs" — this is the one place that provenance text is composed, so the toolbar caption and
+ * "the resolved strategy and its provenance are always shown before the op runs" — this is the one
+ * place that provenance text is composed, so the toolbar caption and
  * `PullStrategyPicker.vue`'s own popover never drift into two different wordings for the same
  * `PullStrategySource`.
  */

@@ -1,5 +1,5 @@
-// P12 D7: the package's real public surface — exactly what the app and its tests use. The
-// eleven-plus file-local exports F22 found (and the ones this move surfaced fresh: toBuilderMethod,
+// The package's real public surface — exactly what the app and its tests use. The
+// eleven-plus file-local exports found (and the ones this move surfaced fresh: toBuilderMethod,
 // SplitUrl, DynamicName, the curl-flags internals, the raw/tokenize warning-kind internals, the
 // dynamic generator internals) stay exported from their own file where a same-package importer
 // still needs them, but do not appear here — a package's public surface is not everything it

@@ -15,7 +15,7 @@ async function openBodyPane(page: Page): Promise<void> {
 }
 
 // insertText (a single CDP Input.insertText, not per-character key events) rather than
-// keyboard.type — Monaco's own `locator.fill()` never works on it at all (P60a §9.1), and a
+// keyboard.type — Monaco's own `locator.fill()` never works on it at all, and a
 // one-shot insert also sidesteps any per-keystroke input handler (auto-closing brackets/quotes)
 // that could otherwise fight an already-closed XML document (this file writes its own closing
 // tags) the way CodeMirror's autoCloseTags once did.
@@ -65,7 +65,7 @@ test('Http request body — code · XML round-trips through the builder and the 
   // way is the observable proof the xml() grammar (not plain text) is active.
   const editor = page.locator('[data-testid="http-request-pane"]');
   await typeInto(editor, page, '<root><a>1</a><b>two</b></root>');
-  // P96 §7: expect.poll (auto-retrying), not a one-shot evaluate() — the same reason
+  // expect.poll (auto-retrying), not a one-shot evaluate() — the same reason
   // api-ui-consistency.spec.ts's own token-colour check does (its comment at the same call).
   // Monaco's own debounced marker/tokenize pass can still be catching up on the language-mode
   // switch plus the insertText above when this first samples the DOM.
@@ -142,10 +142,10 @@ test('Http request body — form-data with a real file field sends a path, never
     { name: 'upload', kind: 'file', value: '', path: '/tmp/report.csv', contentType: 'text/csv' },
   ]);
 
-  // The load-bearing assertion (D4/F7): the picked file's bytes never crossed the bridge — every
+  // The load-bearing assertion: the picked file's bytes never crossed the bridge — every
   // call this test made (a no-args call logs `args: undefined`, which JSON.stringify reports as
   // `undefined`, not a string — treated as 0 bytes) is bounded against the picked file's own size,
-  // so no logged argument can be carrying it. A regression that actually put the file on the wire
+  // so no logged argument can be carrying it. A regression that put the file on the wire
   // would carry the file's bytes (base64-inflated, so even larger) and fail this bound.
   for (const entry of control.log()) {
     const size = entry.args === undefined ? 0 : JSON.stringify(entry.args).length;

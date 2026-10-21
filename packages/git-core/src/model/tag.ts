@@ -1,5 +1,5 @@
 /**
- * §7.9's two pure predicates over a `RefRecord`, named rather than inlined: `peeledObjectId ??
+ * The two pure predicates over a `RefRecord`, named rather than inlined: `peeledObjectId ??
  * objectId` appears at the badge placement, the checkout target, the revert target and the tag
  * list, and getting it backwards on an annotated tag produces a checkout of the *tag object*,
  * which git refuses with `reference is not a tree`.

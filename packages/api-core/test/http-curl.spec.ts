@@ -1,9 +1,9 @@
-// P7 D17: what earns a dedicated test is the interacting-rules half of this phase — mode selection
+// What earns a dedicated test is the interacting-rules half of this phase — mode selection
 // × the effective Content-Type, method inference × -G × -T × a body flag, @/< handling × the flag
 // it appears in, flag arity × an unknown flag × the URL pick, and the tokenizer's operator stop.
-// One JSON corpus (curl-cases.json) covers tokenize/parseCurl, the same shape P5 D18's substitution
-// corpus established — minus a second language, since D2 means there is no Go twin to be in parity
-// with, so it lives beside its one reader rather than in internal/*/testdata/.
+// One JSON corpus (curl-cases.json) covers tokenize/parseCurl, the same shape the substitution
+// corpus established — minus a second language, since there is no Go twin to be in parity with,
+// so it lives beside its one reader rather than in internal/*/testdata/.
 
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
@@ -177,13 +177,12 @@ describe('http/curl/generate.ts — toCurl (P7 D13-D16)', () => {
     expect(command).not.toContain("-F 'note");
   });
 
-  // P21 round 2 functional finding 5: internal/httpclient's formPartHeader sets a per-part
-  // Content-Type for a *text* form-data row whenever the row carries one, but toCurl used to emit
-  // every text row as --form-string unconditionally — which has no `;type=` syntax at all — so the
-  // generated command silently stopped being equivalent to what Send actually sends. This fails
-  // against the pre-fix generator (no 'type=' anywhere in the command) and passes once a text
-  // row's own Content-Type is emitted via -F, mirroring the file row's own already-correct case
-  // just below.
+  // internal/httpclient's formPartHeader sets a per-part Content-Type for a *text* form-data row
+  // whenever the row carries one, but toCurl used to emit every text row as --form-string
+  // unconditionally — which has no `;type=` syntax at all — so the generated command silently
+  // stopped being equivalent to what Send sends. This fails against the pre-fix generator
+  // (no 'type=' anywhere in the command) and passes once a text row's own Content-Type is emitted
+  // via -F, mirroring the file row's own already-correct case just below.
   test('a formdata text row with its own Content-Type uses -F with ;type=, not --form-string (finding 5)', () => {
     const command = toCurl(
       req({
@@ -224,12 +223,12 @@ describe('http/curl/generate.ts — toCurl (P7 D13-D16)', () => {
     expect(command).not.toContain("-F 'note");
   });
 
-  // P21 round 3 functional finding 9: `;` is -F's own parameter separator, and the guard above
-  // only checked the value's *first* character (the F10 `@`/`<` case). A text value containing a
+  // `;` is -F's own parameter separator, and the guard above
+  // only checked the value's *first* character (the `@`/`<` case). A text value containing a
   // `;` — "Hello; world", say — emitted as `-F 'note=Hello; world;type=text/plain'` sends `note` =
   // "Hello" (curl reads ` world` as an unrecognised parameter, not part of the value): the
-  // generated command silently stopped being equivalent to what Send actually puts on the wire,
-  // the exact failure class round 2 finding 5 introduced this branch to fix, reopened for a value
+  // generated command silently stopped being equivalent to what Send puts on the wire, the
+  // exact failure class this branch was introduced to fix, reopened for a value
   // containing `;` instead of a leading `@`/`<`. Falls back to --form-string, same tradeoff (the
   // type is lost) as the leading-`@`/`<` case just above.
   test('a formdata text row whose value contains a ";" falls back to --form-string, not a broken -F', () => {
@@ -414,8 +413,8 @@ describe('parseCurl(toCurl(x)) round-trips every mode (P7 D17)', () => {
     ]);
   });
 
-  // Finding 5 (v1.2 P14 round 2): toCurl joins a multi-row urlencoded body into exactly one
-  // --data-raw with its rows '&'-joined (F13) — the same shape every browser's "Copy as cURL"
+  // toCurl joins a multi-row urlencoded body into exactly one
+  // --data-raw with its rows '&'-joined — the same shape every browser's "Copy as cURL"
   // produces for a form POST. parseAsKeyValue used to split that one piece at only the *first*
   // '=' and never on '&', collapsing every field after the first into the first row's own value.
   test('urlencoded, with two or more fields, round-trips as separate rows (not collapsed into one)', () => {
@@ -485,10 +484,10 @@ describe('parseCurl(toCurl(x)) round-trips every mode (P7 D17)', () => {
         enabled: true,
         description: '',
       },
-      // P21 round 2 architecture/security finding 1: a re-parsed curl command never carries a
-      // live path — toCurl(x) is plain text once generated, indistinguishable from a pasted
-      // command an attacker wrote, so re-importing it never trusts an `@path` any more than
-      // Postman's own import does. Path is unresolved; only the display name survives.
+      // A re-parsed curl command never carries a live path — toCurl(x) is plain text once
+      // generated, indistinguishable from a pasted command an attacker wrote, so re-importing it
+      // never trusts an `@path` any more than Postman's own import does. Path is unresolved;
+      // only the display name survives.
       {
         name: 'file',
         kind: 'file',
@@ -503,10 +502,10 @@ describe('parseCurl(toCurl(x)) round-trips every mode (P7 D17)', () => {
     ]);
   });
 
-  // P21 round 2 functional finding 5: before the fix, a text row's own Content-Type never reached
+  // Before the fix, a text row's own Content-Type never reached
   // toCurl's output at all, so this round trip would come back with contentType: '' — silently
   // losing the field. Now that toCurl emits it via -F's own `;type=`, and parse.ts already reads
-  // that syntax (finding 5's own note: "the import half *does* read `;type=`"), the value survives
+  // that syntax (the note: "the import half *does* read `;type=`"), the value survives
   // the whole Copy-as-curl -> Import-curl round trip.
   test('formdata — a text row with its own Content-Type survives the round trip (finding 5)', () => {
     const result = roundTrip(

@@ -1,4 +1,4 @@
-// C13-1: openRepoReviewDiffTab (state/repoTabs.ts) reused an existing review diff tab keyed only on
+// openRepoReviewDiffTab (state/repoTabs.ts) reused an existing review diff tab keyed only on
 // (workspaceId, path, review !== null, left, right) — two DIFFERENT branches sharing the same tip
 // and merge base (e.g. a local branch and its remote-tracking counterpart, both pointing at the
 // same commit) collided onto one tab, so review.mark/review.comment.add calls kept writing to the
@@ -14,7 +14,7 @@ import { pinia } from '../../frontend/src/state/pinia';
 setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
-// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — restoreAfterEach restores control back to its real (never-settling in this
 // harness) tabsSave after every test, so a one-time override here only covered this file's first
 // test. The override is set *before* restoreAfterEach snapshots control, not in beforeEach: the

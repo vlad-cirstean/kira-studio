@@ -1,7 +1,7 @@
 import type { PageSize } from '@shared/domain/tabs';
 import { useTabsStore } from '../../../state/tabs';
 
-// P63 §2.2: the seam that lets views/shared/keyvalue/ (state.ts, mutations.ts, KeyValuePane.vue)
+// The seam that lets views/shared/keyvalue/ (state.ts, mutations.ts, KeyValuePane.vue)
 // address either a real KeyValue tab or the browse split's preview pane through one shape, instead
 // of reaching into state/tabs.ts's tab-only findKeyValueTab/patchKeyValueTabState directly. A real
 // tab never registers explicitly — resolveTabHost below is keyValueHost's own fallback, so every
@@ -28,7 +28,7 @@ export function unregisterKeyValueHost(viewKey: string): void {
 
 // The tab-backed fallback: any viewKey that resolves to a real KeyValueTabRecord (viewKey === the
 // tab's own id, the common case) is served from that tab's own state, with no explicit
-// registration required — "registered once, centrally" (§2.2 point 3) means this function, not a
+// registration required — "registered once, centrally" means this function, not a
 // per-tab call into registerKeyValueHost.
 function resolveTabHost(viewKey: string): KeyValueHost | null {
   const tabsStore = useTabsStore();

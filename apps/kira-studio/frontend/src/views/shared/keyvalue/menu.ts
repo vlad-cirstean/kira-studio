@@ -7,9 +7,9 @@ import type { MenuItem } from '@workbench/state/contextMenu';
 // so (KeyValueView.vue's `caps.fileTransfer`/`canUpdate`/`canDelete`, mirroring DataToolbar's
 // writability gating). Edit's `editable`/`editUnavailableLabel` pair is the caller's own gate
 // result — Redis scopes edit to string-type keys (see engine/adapters/redis/mutate.ts's
-// `assertEditableType`); S3 scopes it by size/truncation/UTF-8-validity (P33 D6/D7,
-// KeyValueView.vue's `objectEditGate`) — shown but disabled, with a label that says why, rather
-// than simply omitted, so the limit is visible rather than looking like a missing feature.
+// `assertEditableType`); S3 scopes it by size/truncation/UTF-8-validity (KeyValueView.vue's
+// `objectEditGate`) — shown but disabled, with a label that says why, rather than omitted, so the
+// limit is visible rather than looking like a missing feature.
 export function rowMenu(opts: {
   field: string;
   value: string;

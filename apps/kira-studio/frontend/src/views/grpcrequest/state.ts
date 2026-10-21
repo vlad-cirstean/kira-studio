@@ -23,12 +23,12 @@ import { grpcSchemaKey, grpcSchemaSourceFor } from './schemaQuery';
 // The oldest messages are dropped once this is exceeded; trueMessageCount (below) keeps the real
 // total so D17's "showing the most recent 10,000 of N" sentence can still name it.
 const MAX_LIVE_MESSAGES = 10_000;
-// P21 round 2 performance finding 6 first tried trimming back to 90% of the cap instead of the
-// cap itself, to amortize the splice cost once the ceiling is first reached — but D15/D17 promise
-// the live view keeps exactly the most recent MAX_LIVE_MESSAGES, and grpc-request.spec.ts's own
-// "caps at 10,000 and shows the true total" test asserts that count right after a single batch
-// crosses the ceiling. Trimming to 90% left it at 9,000 there, so the amortized target was
-// reverted — every push over the cap still trims back to exactly MAX_LIVE_MESSAGES.
+// First tried trimming back to 90% of the cap instead of the cap itself, to amortize the splice
+// cost once the ceiling is first reached — but the live view keeps exactly the most recent
+// MAX_LIVE_MESSAGES, and grpc-request.spec.ts's own "caps at 10,000 and shows the true total"
+// test asserts that count right after a single batch crosses the ceiling. Trimming to 90% left
+// it at 9,000 there, so the amortized target was reverted — every push over the cap still trims
+// back to exactly MAX_LIVE_MESSAGES.
 
 // D6: the response is runtime-only, never persisted.
 interface GrpcRequestViewRuntime {
@@ -36,7 +36,7 @@ interface GrpcRequestViewRuntime {
   opId: string | null;
   /** True while call() resolves variables, before Go knows the op: Stop cancels locally. */
   preflight: boolean;
-  /** F5/P21 round 1: the streaming event subscriber's own key, set alongside `opId` when a call
+  /** The streaming event subscriber's own key, set alongside `opId` when a call
    *  starts and never cleared early the way `opId` is. Messages arrive over the event channel
    *  while the call's own CallResult returns over the control plane — a separate HTTP request —
    *  with nothing ordering the two. If the control-plane response lands first, the return path
@@ -46,14 +46,14 @@ interface GrpcRequestViewRuntime {
    *  event outright. Matching against `lastCallId` instead keeps the event subscriber correct
    *  regardless of which side finishes first, since only a *new* call ever changes it. */
   lastCallId: string | null;
-  /** P108 F1: the callId `noteGrpcCallRecorded` has already fired for. For a server-streaming
-   *  call, both the control-plane return (`call`'s own success path) and the terminal streaming
-   *  event (`applyGrpcEvent`'s `done` branch) observe "this call finished" — same race F5 above
-   *  documents, whichever lands first. Both used to call `noteGrpcCallRecorded` unconditionally,
-   *  recording the same call twice and feeding history's own `load()` two overlapping refreshes
-   *  close enough together to retry-loop forever (F1). Guarding on this field records once per
-   *  callId regardless of which side notices completion first — unary (no streaming events) still
-   *  records once, from the return path, same as before. */
+  /** The callId `noteGrpcCallRecorded` has already fired for. For a server-streaming call,
+   *  both the control-plane return (`call`'s own success path) and the terminal streaming event
+   *  (`applyGrpcEvent`'s `done` branch) observe "this call finished" — whichever lands first.
+   *  Both used to call `noteGrpcCallRecorded` unconditionally, recording the same call twice and
+   *  feeding history's own `load()` two overlapping refreshes close enough together to retry-loop
+   *  forever. Guarding on this field records once per callId regardless of which side notices
+   *  completion first — unary (no streaming events) still records once, from the return path, same
+   *  as before. */
   notifiedCallId: string | null;
   streaming: boolean;
   error: { code: string; message: string } | null;
@@ -67,7 +67,7 @@ interface GrpcRequestViewRuntime {
   /** Running total of wireBytes across every message received so far, updated once per push
    *  rather than re-`reduce`d over `messages` on every read — the same reasoning as
    *  trueMessageCount, and what makes the response pane's own byte total O(1) per message instead
-   *  of O(N) per push (finding 11). */
+   *  of O(N) per push. */
   messageBytes: number;
 }
 
@@ -99,13 +99,14 @@ export function findMethod(
   return m ?? null;
 }
 
-// P94 pass 3 §4.3: the event handler's own per-call apply step, lifted out so
+// The event handler's own per-call apply step, lifted out so
 // ensureGrpcCallSubscription's callback only finds the matching tab and delegates. `rt` is the
 // same reactive runtime object the caller already found — mutated here exactly as it was inline,
 // so this carries no reactive-dependency-tracking risk (unlike a computed, a plain event handler
-// has no active effect to preserve; Vue only needs the write to happen, not where it's written from).
+// has no active effect to preserve; Vue only needs the write to happen, not where it's written
+// from).
 function applyGrpcEvent(tabId: string, rt: GrpcRequestViewRuntime, event: GrpcCallEvent): void {
-  // P21 round 2 performance finding 6: markRaw on each incoming message before it ever
+  // markRaw on each incoming message before it ever
   // touches the reactive rt.messages array — a GrpcMessageWire is an immutable wire value
   // (this view never mutates a field of one in place), so nothing here needs Vue to wrap it
   // in its own per-field reactive Proxy. Without this, every pushed message was itself
@@ -138,9 +139,10 @@ function applyGrpcEvent(tabId: string, rt: GrpcRequestViewRuntime, event: GrpcCa
 export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
   const { runtime, ensureRuntime } = createRuntimeStore<GrpcRequestViewRuntime>(defaultRuntime);
 
-  // D2: dropResources is noDrop (the registry entry) — the runtime lives here, and a still-running
-  // call must be cancelled through this hook rather than through dropResources (registerTabRuntimeCleanup
-  // is the one place a closing tab's cleanup and an in-flight op's cancellation can share one call).
+  // dropResources is noDrop (the registry entry) — the runtime lives here, and a still-running
+  // call must be cancelled through this hook rather than through dropResources
+  // (registerTabRuntimeCleanup is the one place a closing tab's cleanup and an in-flight op's
+  // cancellation can share one call).
   registerTabRuntimeCleanup((tabId) => {
     stopOp(runtime[tabId]);
     delete runtime[tabId];
@@ -175,7 +177,7 @@ export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
     const schema =
       queryClient.getQueryData<GrpcSchemaWire>(grpcSchemaKey(grpcSchemaSourceFor(tab))) ?? null;
     const method = findMethod(schema, tab.state.service, tab.state.method);
-    // P108 F14: this used to default `streaming` to false whenever the schema simply wasn't loaded
+    // This used to default `streaming` to false whenever the schema wasn't loaded
     // yet (a Call issued right after mount, or right after switching method, before its own
     // schema query round trip resolved) — a genuinely server-streaming method
     // then went out over the wire as a one-shot unary call, silently wrong rather than merely

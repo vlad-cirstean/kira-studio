@@ -43,7 +43,7 @@ function basename(path: string): string {
 /** UTF-8-correct, never-throwing base64 encode. `btoa` alone only handles Latin-1 code points: it
  *  throws `InvalidCharacterError` outside that range (breaking `parseCurl`'s "never throws"
  *  contract) and, for the codepoints it does accept, encodes them as Latin-1 bytes rather than the
- *  UTF-8 bytes curl itself sends (F9) — wrong credentials, silently. Encoding to UTF-8 bytes first
+ *  UTF-8 bytes curl itself sends — wrong credentials, silently. Encoding to UTF-8 bytes first
  *  and feeding `btoa` each byte as its own Latin-1 code unit sidesteps both: every byte is < 256,
  *  so `btoa` never throws. */
 function utf8Base64(s: string): string {
@@ -63,8 +63,8 @@ function parseAsKeyValue(piece: string): { name: string; value: string } | null 
 }
 
 /** The inverse of generate.ts's own `goQueryEscape` — decodes a piece's name/value back to plain
- *  text before it lands in a `urlEncoded` row (D17's round trip requires this: `toCurl` emits the
- *  already-encoded string as `--data-raw`, F13, so reconstructing the row has to undo that or a
+ *  text before it lands in a `urlEncoded` row (the round trip requires this: `toCurl` emits the
+ *  already-encoded string as `--data-raw`, so reconstructing the row has to undo that or a
  *  re-send would double-encode it). A malformed %-sequence falls back to the literal text rather
  *  than throwing — this is untrusted pasted input. */
 function decodeQueryComponent(s: string): string {
@@ -75,23 +75,23 @@ function decodeQueryComponent(s: string): string {
   }
 }
 
-/** Finding 5 (v1.2 P14 round 2): a `-d`/`--data-raw`/`--data-binary` piece is wire-ready text —
+/** A `-d`/`--data-raw`/`--data-binary` piece is wire-ready text —
  *  this app's own `toCurl` joins a multi-row urlencoded body into exactly one `--data-raw` with
- *  its rows `&`-joined (F13, generate.ts), and the browser "Copy as cURL" shape every form POST
- *  produces is the same single-flag, `&`-joined piece — so an unescaped `&` there really does
+ *  its rows `&`-joined (generate.ts), and the browser "Copy as cURL" shape every form POST
+ *  produces is the same single-flag, `&`-joined piece — so an unescaped `&` there does
  *  separate fields; splitting on it here is `toCurl`'s join, undone. `--data-urlencode`'s value is
- *  different: it is literal text curl itself percent-encodes before sending (D8), so an `&` inside
+ *  different: it is literal text curl itself percent-encodes before sending, so an `&` inside
  *  it is an ordinary character, never a field separator, and must not be split. */
 function toUrlEncodedRows(pieces: readonly RawDataPiece[]): HttpUrlEncodedFieldState[] {
   const rows: HttpUrlEncodedFieldState[] = [];
   for (const piece of pieces) {
-    // P21 round 3 functional finding 8: a `--data-urlencode` piece's value is literal text *curl
+    // A `--data-urlencode` piece's value is literal text *curl
     // itself* percent-encodes before putting it on the wire (the comment above the `&`-split
     // already says so) — decodeQueryComponent below used to run on it anyway, so a piece curl
     // would send byte-for-byte (`q=a+b` -> `q=a%2Bb` on the wire) got decoded into `"a b"` and
     // re-sent as a *different* value (`q=a%20b`). `--data`/`--data-raw`/`--data-binary` pieces are
     // the opposite case (already percent-encoded text this app's own toCurl produced) and still
-    // need decoding to avoid double-encoding on re-send (D17's round trip, described above).
+    // need decoding to avoid double-encoding on re-send (the round trip, described above).
     const isDataUrlencode = piece.id === 'data-urlencode';
     const subPieces = isDataUrlencode ? [piece.text] : piece.text.split('&');
     for (const sub of subPieces) {
@@ -126,10 +126,10 @@ function dataUrlencodeIsFile(value: string): boolean {
   return at !== -1 && (eq === -1 || at < eq);
 }
 
-/** P94 pass 3: the argv-loop's shared mutable state, named once so `handle` and its two flag
- *  helpers can be lifted out of `parseCurl` as module-level functions over it (§4.3, shape 2) —
+/** The argv-loop's shared mutable state, named once so `handle` and its two flag
+ *  helpers can be lifted out of `parseCurl` as module-level functions over it —
  *  the point is that each helper's own cognitive-complexity score, and its nesting penalty inside
- *  `parseCurl`, both leave the parent rather than just moving sideways. */
+ *  `parseCurl`, both leave the parent rather than moving sideways. */
 interface CurlAccumulator {
   warnings: CurlWarning[];
   requestFlagValue: string | undefined;
@@ -335,7 +335,7 @@ function handle(
       return;
     case 'user':
       if (v.includes('{{')) {
-        // F9: base64-encoding a value that still carries a {{variable}} reference would encode
+        // Base64-encoding a value that still carries a {{variable}} reference would encode
         // the literal braces and destroy the reference — curl never sees {{...}}, so this is
         // this app's own template syntax pasted into -u's value, meaningful only unencoded. Keep
         // the header unencoded and warn instead of silently destroying the reference.
@@ -372,7 +372,7 @@ function handle(
       });
       return;
     case 'json':
-      // F10: curl's --json is --data-binary plus these two headers — including --data-binary's
+      // curl's --json is --data-binary plus these two headers — including --data-binary's
       // own `@file` file-reference handling (unlike --data-raw, which never treats a leading `@`
       // as a file). Pushing it under 'data-binary' routes an `@path` value through the same
       // unresolved-file/file-mode handling `--data-binary` already gets, instead of importing the
@@ -618,7 +618,7 @@ function decideBodyFromPieces(acc: CurlAccumulator, literalPieces: RawDataPiece[
   return { ...noBody(), bodyMode: 'raw', bodyRaw: joined() };
 }
 
-/** D7/D8's body-mode dispatch: formdata wins outright, then a lone `--data-binary @path` is
+/** The body-mode dispatch: formdata wins outright, then a lone `--data-binary @path` is
  *  `file` mode, then any other data piece goes through `decideBodyFromPieces`, then a bare
  *  `-T`/`--upload-file` is `file` mode too. Must run after `resolveUrl`, whose `-G` merge can
  *  empty `acc.rawDataPieces` first. */

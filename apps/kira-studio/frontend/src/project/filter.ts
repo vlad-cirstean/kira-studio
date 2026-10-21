@@ -13,7 +13,7 @@ export function toSets(v: TreeVisibility): VisibilitySets {
   return { kinds: new Set(v.hiddenKinds), paths: new Set(v.hiddenPaths) };
 }
 
-// D13: filters are applied in the renderer, at render time, over cached nodes. They never change
+// Filters are applied in the renderer, at render time, over cached nodes. They never change
 // what is fetched or cached. Hiding a container hides its subtree implicitly — buildRows() only
 // recurses into rows it renders, so a hidden node's children are never reached, and their own
 // paths never need an entry in `paths`.

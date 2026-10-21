@@ -1,4 +1,3 @@
-// F15 (P108 Part 10):
 //  - parseTimestamp's epoch branches read bare `Number(t)`, which accepts `0x10` (16), `1e9` and
 //    `''` (0) as valid epoch text — an empty/blank cell silently read as 1970-01-01 for any caller
 //    other than validateFormat, and a hex/exponent spelling silently re-encoded as plain digits on
@@ -6,7 +5,7 @@
 //  - encodeTimestamp's epoch-seconds branch unconditionally `Math.round`ed to the nearest second,
 //    so a fractional epoch-seconds value (`1700000000.5`) lost its own sub-second digits on the
 //    very first re-encode even when nothing about the value had changed — breaking the "exact
-//    inverse" contract the adjacent iso8601 branch already keeps (P24 D16).
+//    inverse" contract the adjacent iso8601 branch already keeps.
 import { describe, expect, test } from 'bun:test';
 import {
   encodeTimestamp,

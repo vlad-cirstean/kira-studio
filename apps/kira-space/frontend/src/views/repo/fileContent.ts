@@ -14,7 +14,7 @@ export type FileContentResult =
   | { kind: 'error'; message: string };
 
 /** Reads `path` from the worktree (`rev === null`) or, for a revision-pinned tab, via the git
- *  transport's `file.read` (P74 §7.3 — the same request RepoDiffView.vue's own commit-diff sides
+ *  transport's `file.read` (the same request RepoDiffView.vue's own commit-diff sides
  *  use, never the worktree file). Never throws — a read failure or a missing git repo both come
  *  back as `{ kind: 'error' }`, `mount()`'s own contract for every failure mode it renders. */
 export async function loadFileContent(

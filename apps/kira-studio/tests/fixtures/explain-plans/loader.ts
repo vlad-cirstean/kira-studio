@@ -1,7 +1,7 @@
-// M3 §2.4: shared parity fixtures — one `<case>.input.json`/`<case>.expected.json` pair per case,
+// Shared parity fixtures — one `<case>.input.json`/`<case>.expected.json` pair per case,
 // read by both `tests/unit/explain-plan.spec.ts` (this loader) and
 // `internal/queryplan/parse_test.go` (its own Go reader). Generated from the TypeScript side first
-// (§11.1 step 2) — the Go port is what gets pinned to these files, never the reverse.
+// — the Go port is what gets pinned to these files, never the reverse.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

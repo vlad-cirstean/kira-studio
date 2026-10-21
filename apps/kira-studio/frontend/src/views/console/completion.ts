@@ -18,16 +18,16 @@ import { sqlDialectFor } from '../shared/sqlIdent';
 import { type DdlSchema, EMPTY_DDL_SCHEMA } from './ddl';
 import { sqlCompletionSources } from './sqlLanguageService';
 
-// P27 D17: reuses the same {insert, caretOffsetFromEnd} vocabulary the filter bar's plain
-// AutocompleteField consumes — only the caret-positioning mechanism differs. P60b: Monaco's own
-// snippet placeholder is `$0` (EditorCompletion.snippet's own doc comment, editor/completion.ts),
-// the successor to CodeMirror's `#{}`.
+// Reuses the same {insert, caretOffsetFromEnd} vocabulary the filter bar's plain AutocompleteField
+// consumes — only the caret-positioning mechanism differs. Monaco's own snippet placeholder is `$0`
+// (EditorCompletion.snippet's own doc comment, editor/completion.ts), the successor to CodeMirror's
+// `#{}`.
 function toSnippetTemplate(c: MongoValueConstructor): string {
   const pos = c.insert.length - c.caretOffsetFromEnd;
   return `${c.insert.slice(0, pos)}$0${c.insert.slice(pos)}`;
 }
 
-// P18 addendum D21: the first path segment is the database node's own key
+// The first path segment is the database node's own key
 // (`database:<name>`, shared/domain/tree.ts's encodePath) — a console opened from a database or
 // collection row always carries it; one opened from the connection root does not, and
 // mongoCollectionNames degrades to an empty list rather than guessing.
@@ -50,13 +50,13 @@ const RELATION_CONTAINER_KINDS = new Set(['database', 'schema']);
 
 const RELATION_NODE_KINDS = new Set(['table', 'view', 'matview']);
 
-// P19 D14: mongoCollectionNames' own technique, carried to SQL — reads the tree's own cache, no
+// mongoCollectionNames' own technique, carried to SQL — reads the tree's own cache, no
 // new round trip, no new cache, an empty list is the honest degradation. Walks the console's own
 // path back to the last database:/schema: segment (a table/view/matview console keeps its parent
 // container in its own path; a console opened on the container itself already ends there) and
-// reads whatever that row's own children already are. project/state/tree.ts's own F19 finding
+// reads whatever that row's own children already are. project/state/tree.ts's own finding
 // means this can never see 'column' nodes (they moved into the definition view), only relation
-// names. P4: a console opened from the connection root has no such segment — rootRelationNames
+// names. A console opened from the connection root has no such segment — rootRelationNames
 // below is its own branch, not this function degrading to [].
 export function consoleRelationNames(connectionId: string, path: string): string[] {
   let segments: PathSegment[];
@@ -78,7 +78,7 @@ export function consoleRelationNames(connectionId: string, path: string): string
   return nodes.filter((n) => RELATION_NODE_KINDS.has(n.kind)).map((n) => n.name);
 }
 
-/** P4: the root has no single database:/schema: container to scope relation names to (a
+/** The root has no single database:/schema: container to scope relation names to (a
  *  connection can have many) — schemaColumns.ts's rootContainerPathFor picks one for the cached-
  *  columns supply, but this is the wider, zero-I/O fallback: the union of relation names across
  *  EVERY container already loaded for this connection in the tree cache, deduped. Strictly a
@@ -98,7 +98,7 @@ function rootRelationNames(connectionId: string): string[] {
   return [...names];
 }
 
-// P22c D8: the last db.<collection>.<method>( call before the cursor — the field-name position
+// The last db.<collection>.<method>( call before the cursor — the field-name position
 // below (a filter/projection literal) is scoped to whatever collection that call addresses, the
 // same "look at the text before" technique every other position in this function already uses.
 // A heuristic, not a parse: good enough for the one-statement-per-console shape this grammar
@@ -115,13 +115,13 @@ function enclosingCollectionPath(path: string, before: string): string | null {
   return `${segment}/collection:${encodeURIComponent(last[1] as string)}`;
 }
 
-// D21: four contextual positions, each independent of the others — offering a method the engine
+// Four contextual positions, each independent of the others — offering a method the engine
 // will reject would be worse than offering nothing, so this stays exactly as narrow as
-// mongo/console.ts's own grammar (db.<collection>.<method>(<args>)). D8 adds the fourth: a bare
-// identifier inside a filter/projection literal offers field names sampled from whatever documents
-// that collection's own document tabs have loaded (views/shared/mongoFieldSample.ts) — a sample,
-// not a schema (F11: a Mongo collection has none), merged with the BSON-constructor list this
-// position already offered rather than replacing it.
+// mongo/console.ts's own grammar (db.<collection>.<method>(<args>)). A bare identifier inside a
+// filter/projection literal offers field names sampled from whatever documents that collection's
+// own document tabs have loaded (views/shared/mongoFieldSample.ts) — a sample, not a schema
+// (a Mongo collection has none), merged with the BSON-constructor list this position already
+// offered rather than replacing it.
 function mongoCompletionSource(connectionId: string, path: string): EditorCompletionSource {
   return ({ doc, offset }) => {
     // Deliberately not gated on "word non-empty or explicit" the way a generic word-completion
@@ -150,7 +150,7 @@ function mongoCompletionSource(connectionId: string, path: string): EditorComple
         options: MONGO_QUERY_OPERATORS.map((label) => ({ label, type: 'keyword' as const })),
       };
     }
-    // P27 D17 + P22c D8: the six BSON constructors — offered wherever a bare word starts, same as
+    // The six BSON constructors — offered wherever a bare word starts, same as
     // any other identifier completion — plus, when this word sits inside a recognisable
     // db.<collection>.<method>(…) call, that collection's own sampled field names ahead of them.
     // Monaco's own default matching narrows the combined list as more is typed.
@@ -180,10 +180,10 @@ interface RedisCommandInfo {
   hint: string;
 }
 
-// D22: the arity hint (`detail`) is the part a user actually cannot remember — the command list
-// itself is curated, not exhaustive (this app's own convention, P18 D8's rationale applies
-// equally here): common data-access commands across every type this app's KeyValueView renders
-// (string/hash/list/set/zset) plus the handful of housekeeping commands every session needs.
+// The arity hint (`detail`) is the part a user cannot remember — the command list
+// itself is curated, not exhaustive (this app's own convention): common data-access commands
+// across every type this app's KeyValueView renders (string/hash/list/set/zset) plus the handful
+// of housekeeping commands every session needs.
 const REDIS_COMMANDS: readonly RedisCommandInfo[] = [
   { name: 'GET', hint: 'GET key' },
   { name: 'SET', hint: 'SET key value' },
@@ -238,10 +238,10 @@ function redisCompletionSource(): EditorCompletionSource {
 }
 
 /** For the five SQL kinds: undefined with no DDL document AND no cached columns for this
- *  connection (D5 — the console's `autocomplete` prop is what gates SQL completion generally, and
+ *  connection (the console's `autocomplete` prop is what gates SQL completion generally, and
  *  with neither supply completion falls back to `relations`/`sqlKeywordCompletionSource` alone,
- *  never `undefined` outright unless all three are empty); P18 (v1.1)'s schema+keyword pair
- *  (sqlLanguageService.ts) once either exists. `cached` (P22c D4) is the metadata cache's own
+ *  never `undefined` outright unless all three are empty); the schema+keyword pair
+ *  (sqlLanguageService.ts) once either exists. `cached` is the metadata cache's own
  *  columns for this console's container — a plain value already in memory (state/schemaColumns.ts,
  *  filled by the view's own lifecycle hook), never fetched from here. */
 export function consoleCompletionSources(

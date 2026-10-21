@@ -454,7 +454,7 @@ test('Http history — the list refreshes after a send made while another pane w
     // Two historyList answers for the same (itemId: '') scope, consumed in order (mockRuntime.ts
     // strips tabId from the match key, so a scratch tab's own random id never has to be
     // predicted): the first is ResponsePane.vue's own "does this tab have any history at all"
-    // mount-time probe (P8 D11), before either send — empty. The second is what a real reopen of
+    // mount-time probe, before either send — empty. The second is what a real reopen of
     // the History pane fetches after both sends. Pre-fix, this second answer is never asked for
     // at all: `entries` is already non-null (from the first, empty answer) and `stale` has no
     // reader, so ensureLoaded's own guard silently returns without refetching.

@@ -20,11 +20,11 @@ function emptyResolution(base: string): BaseResolution {
 type ResolveBaseParams = { repoId: string; branch: string; base?: string };
 
 /**
- * F8's own scriptable fake `Transport`: every `review.resolveBase` call hangs until the test
+ * The scriptable fake `Transport`: every `review.resolveBase` call hangs until the test
  * settles it explicitly, by call order — so a background `#checkForChange()` (triggered via
  * `emit('repo.changed', ...)`, exactly like the real transport's live push) can be left in flight
- * while a real `setBase` call's OWN `review.resolveBase` lands and resolves first, the exact race
- * the finding names. Every resolution here uses `range.kind: 'empty'`, so `#applyResolution` never
+ * while a real `setBase` call's OWN `review.resolveBase` lands and resolves first.
+ * Every resolution here uses `range.kind: 'empty'`, so `#applyResolution` never
  * opens `graph.stream` — no `stream()` scripting needed.
  */
 class ReviewRaceTransport {

@@ -1,8 +1,8 @@
-// C13-3: closeRepoWorkspace (state/workspace.ts) used to close tabs and dispose the git transport
+// closeRepoWorkspace (state/workspace.ts) used to close tabs and dispose the git transport
 // but never dropped the repo's own file-tree/search/quick-open caches -- those were wired only to
 // removeCodeRepo (deleting the repo entirely), so opening and closing several large repos in one
 // session accumulated unbounded retained memory (measured ~55 MB per 50k-file repo). This asserts
-// the tree and search caches are actually gone after a plain close, and that a reopen rebuilds
+// the tree and search caches are gone after a plain close, and that a reopen rebuilds
 // cleanly from scratch rather than resurrecting stale state.
 import '@workbench/testing/unit/window';
 
@@ -54,7 +54,7 @@ describe('C13-3: closeRepoWorkspace drops per-repo caches', () => {
       }
     ).codeWorkspaceCloseWorkspace = async () => {};
     (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = async () => {};
-    // P128 §2.6: openRepoWorkspace now also schedules a debounced windowsSetMode('git') write
+    // openRepoWorkspace now also schedules a debounced windowsSetMode('git') write
     // (state/mode.ts's own createModeStore) — mocked for the same reason every other real bound
     // call this test's call graph reaches already is above: unmocked, it would eventually fire a
     // real, unmocked bound call once the debounce timer elapses.

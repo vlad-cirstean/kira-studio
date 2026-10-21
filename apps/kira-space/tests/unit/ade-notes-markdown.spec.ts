@@ -3,7 +3,7 @@ import { getSchema, resolveExtensions } from '@tiptap/core';
 import { MarkdownManager } from '@tiptap/markdown';
 import { notesExtensions } from '../../frontend/src/ade/v2/notes/notesExtensions';
 
-// P129 Part 6 §0.16/§3.1: a headless Markdown round-trip against the shared extension set
+// A headless Markdown round-trip against the shared extension set
 // (`notesExtensions.ts`) — no DOM (`bun test` has none), so no `@tiptap/vue-3` editor instance:
 // `MarkdownManager` parses/serializes directly, and `getSchema(...).nodeFromJSON` proves the parsed
 // JSON is a schema-valid document (catches an extension wired wrong before it ever reaches

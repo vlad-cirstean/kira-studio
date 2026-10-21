@@ -3,7 +3,7 @@ import { type ComputedRef, computed, shallowReactive } from 'vue';
 import type { SearchHandle, SearchQuery } from './scan';
 import { usePageSearchFilterStore } from './searchFilter';
 
-// P39 D9: what views/shared/page/SearchToolbar.vue is bound to. Each of grid/search.ts,
+// What views/shared/page/SearchToolbar.vue is bound to. Each of grid/search.ts,
 // documents/search.ts and keyvalue/search.ts exports one literal of this shape, built from
 // its own runSearch/clearSearchState/searchState/matchedRows plus its page module's
 // getPage/pageVersion — the toolbar itself never imports a specific view's page or search module.
@@ -43,17 +43,17 @@ function createSearchState<M extends { row: number }>(): {
   clearSearchState(tabId: string): void;
   matchedRows(tabId: string): number[] | null;
 } {
-  // P2 R1: every writer (SearchToolbar.vue's startSearch/goNext/goPrev) replaces a tab's whole
+  // Every writer (SearchToolbar.vue's startSearch/goNext/goPrev) replaces a tab's whole
   // entry atomically — a scan publishes a brand-new `matches` array wholesale, never pushes into an
   // existing one — so nothing below the top level needs field-by-field reactivity. `reactive()`
   // used to deep-wrap every match object in every tab's array (thousands, for a large scan) in a
-  // Proxy for no benefit; shallowReactive tracks exactly what's actually mutated: `searchState[id]`
+  // Proxy for no benefit; shallowReactive tracks exactly what's mutated: `searchState[id]`
   // being set to a new value.
   const searchState = shallowReactive({} as PageSearchApi<M>['searchState']);
 
   function clearSearchState(tabId: string): void {
     delete searchState[tabId];
-    // P63: BrowseView.vue's split keys its own preview pane's keyvalue search state
+    // BrowseView.vue's split keys its own preview pane's keyvalue search state
     // `${tabId}::preview` — not a real tab id, so it never closes on its own; it dies only when
     // the browse tab that owns it does. A no-op for every instance of this factory that never has
     // one (grid/documents/stream), harmless to widen generically here rather than per view.
@@ -73,7 +73,7 @@ function createSearchState<M extends { row: number }>(): {
   return { searchState, clearSearchState, matchedRows };
 }
 
-// P39 iter2 F2/D3: grid/search.ts, documents/search.ts and keyvalue/search.ts each assembled this
+// grid/search.ts, documents/search.ts and keyvalue/search.ts each assembled this
 // same six-ingredient PageSearchApi literal by hand from createSearchState()'s three return values
 // plus their own runSearch/pageVersion/getPage. One factory in one place instead of the same
 // assembly written out three times.
@@ -105,13 +105,13 @@ export function createPageSearch<M extends { row: number }>(opts: {
   };
 }
 
-// P48 F8: the deleted DataGrid.vue, KeyValueView.vue and ConsoleResultGrid.vue each built this same
+// The deleted DataGrid.vue, KeyValueView.vue and ConsoleResultGrid.vue each built this same
 // plus current-match computed, rebuilt only when the search result changes (a completed scan or
 // prev/next), not per cell — differing only in `col`'s type ('field' | 'value' for a key/value row,
 // a page column index everywhere else). `tabId` is a function, not a plain string, so the computed
 // re-tracks when a caller's own prop changes.
 //
-// P2 R1: this used to build a Set<string> of `${row}:${col}` template-literal keys — a string
+// This used to build a Set<string> of `${row}:${col}` template-literal keys — a string
 // allocation and concatenation per match, on every rebuild, purely to give `has` an O(1) lookup a
 // nested Map/Set gets for free with no string keys at all (row is already a native number; col is
 // whatever primitive type C already is). Mirrors DocumentView.vue's own docMatchIndex, which never
@@ -123,14 +123,14 @@ export function createMatchIndex<C>(
   has(row: number, col: C): boolean;
   isCurrent(row: number, col: C): boolean;
 } | null> {
-  // P21 round 2 performance finding 8: byRow used to rebuild from scratch on *every* call —
+  // byRow used to rebuild from scratch on *every* call —
   // including a bare Next/Prev, which only moves `index` by one (SearchToolbar.vue's
   // goNext/goPrev replace the whole entry with `{ ...e, index }`, so this computed's own tracked
   // dependency — `state[tabId()]`'s reference — changes even though `entry.matches` itself is the
   // *same* array both times, spread-copied by reference, not cloned). Vue's computed caching can
   // only invalidate at the granularity of "did any dependency I read change", not "did this one
   // field change" — reactive() has no visibility into a plain object's own nested fields once
-  // `searchState` is only shallowReactive (P2 R1's own reasoning for that choice) — so this adds
+  // `searchState` is only shallowReactive — so this adds
   // its own manual memo keyed on `entry.matches`' identity: pressing Next/Prev rebuilds nothing
   // (byRow is reused as-is), and only a genuinely new match array (a fresh scan tick or a
   // completed scan) pays the O(matches) rebuild.

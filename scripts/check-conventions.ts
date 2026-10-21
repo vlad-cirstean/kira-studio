@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 /**
- * P266 code convention guard N1-N7 (git show bd0c224688d9:docs/v2.2/plans/P266-consistency-audit.md section 2.10 and
- * 4.2) and N8-N12 (git show bd0c224688d9:docs/v2.2/plans/P267-ui-leftovers.md section 3).
+ * Code convention guard N1-N7 and N8-N12.
  *
  * N1 file names (.ts camelCase, .vue PascalCase), N2 no `.test.ts`, N3 no util/utils/helpers
  * folder, N4 Pinia id = export name without `use`/`create` and `Store`, N5 event names
@@ -10,10 +9,10 @@
  * (`packages/shared/domain/errorCodes.ts`) error-code registries list the same codes.
  *
  * N8 a spec helper (3+ lines) copied verbatim into 2+ spec files, or copied from a
- * `tests/<suite>/support` or `workbench/testing/ui` export, N9 no non-spec `.ts` under a package `components/` dir (outside
- * `components/ui`), N10 a `.vue` over 600 lines needs a named engine-host
- * exemption, N11 a non-global `shortcut: '<id>'` in a `menu.ts` is bound in its feature dir, N12 a
- * `state/` dir holds 2+ files and menu builders live in `menu.ts`.
+ * `tests/<suite>/support` or `workbench/testing/ui` export, N9 no non-spec `.ts` under a package
+ * `components/` dir (outside `components/ui`), N10 a `.vue` over 600 lines needs a named
+ * engine-host exemption, N11 a non-global `shortcut: '<id>'` in a `menu.ts` is bound in its feature
+ * dir, N12 a `state/` dir holds 2+ files and menu builders live in `menu.ts`.
  *
  * No pending list: every hit fails. N6 also fails on any retired-code registry (`Legacy` in Go,
  * `LEGACY_ERROR_CODES` in TS).

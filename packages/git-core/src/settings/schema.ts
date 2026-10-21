@@ -1,11 +1,10 @@
 /**
- * D25 — one settings schema in `core`, defined at P3, before ~15 settings accrete in two places; a
- * host's own settings surface reads the same schema rather than inventing a second one. `SETTINGS`
- * below is that one place.
+ * One settings schema in `core`, before ~15 settings accrete in two places; a host's own settings
+ * surface reads the same schema rather than inventing a second one. `SETTINGS` below is that one
+ * place.
  *
- * The keys this file defines are exactly the keys P3 consumes — each later phase adds its own
- * with its own consumer; the schema's value is being the one place, not being complete on day
- * one.
+ * Each later phase adds its own with its own consumer; the schema's value is being the one place,
+ * not being complete on day one.
  */
 import { assert } from '../lib/assert.ts';
 import type { TextRef } from '../lib/textRef.ts';
@@ -31,15 +30,15 @@ export interface SettingDef<T> {
 }
 
 export const SETTINGS = {
-  // G18 D1/D15: kiraSpace.git.path used to live here — it is server-owned (unchanged verdict)
-  // but its wiring was dead until this phase fixed it (Discovery.Status(ctx, "") hardcoded at
+  // kiraSpace.git.path used to live here — it is server-owned (unchanged verdict)
+  // but its wiring was dead (Discovery.Status(ctx, "") hardcoded at
   // every call site). Its fixed home is kira.db's existing `settings` table, surfaced in Kira
   // Studio's own "Git" settings section — not this schema, and not the new per-repo dialog either
   // (it answers "where is the git binary on this machine", not a per-repo fact). Leaving a dead
   // declaration here after wiring the real one would recreate the exact "a setting that silently
   // does nothing" anti-pattern this fix exists to close out.
   //
-  // G18 D1/D10: the keys below all moved from per-window settings into a new per-repo
+  // The keys below all moved from per-window settings into a new per-repo
   // table (storage/repos.GitRepoSettingsRepo), edited from git-ui's own RepoSettingsDialog —
   // `source: 'repo'` marks each as server-owned.
   // Which git host supplies change-request status for this repository: `auto` detects it from the
@@ -115,11 +114,11 @@ export const SETTINGS = {
     description: { key: 'git.settings.stashShowInGraph.description' },
     source: 'repo',
   },
-  // G28 D16: the one new leaf this phase adds — read CLIENT-SIDE ONLY (the server never consults
-  // it, so a stale or absent value can only ever produce the old CheckoutDialog, never an
-  // unexpected write). One behaviour, one switch: no separate setting for auto-detach (§10.7's own
-  // reasoning) — that route is announced loudly enough on its own that a preference would be
-  // solving a visibility problem with a switch.
+  // The one new leaf this phase adds — read CLIENT-SIDE ONLY (the server never consults it, so a
+  // stale or absent value can only ever produce the old CheckoutDialog, never an unexpected
+  // write). One behaviour, one switch: no separate setting for auto-detach — that route is
+  // announced loudly enough on its own that a preference would be solving a visibility problem
+  // with a switch.
   'kiraSpace.checkout.autoStash': {
     key: 'kiraSpace.checkout.autoStash',
     type: 'boolean',
@@ -242,9 +241,9 @@ export function coerceSettings(raw: Readonly<Record<string, unknown>>): CoerceRe
   return { settings: settings as Settings, problems };
 }
 
-/** G18 D10: the seven keys `source: 'repo'` marks — exactly the settings
- * `RepoSettingsDialog.vue`/`RepoSettingsState` show/carry, and the eight keys D11's migration
- * covers minus `kiraSpace.git.path` (which never lived in this schema — D15). Schema-driven
+/** The seven keys `source: 'repo'` marks — exactly the settings
+ * `RepoSettingsDialog.vue`/`RepoSettingsState` show/carry, and the eight keys the migration
+ * covers minus `kiraSpace.git.path` (which never lived in this schema). Schema-driven
  * rather than a hand-maintained list in `git-ui`, the same "one schema, one place" reason this
  * dialog is schema.ts's second consumer at all. */
 export function repoSettingKeys(): readonly SettingKey[] {

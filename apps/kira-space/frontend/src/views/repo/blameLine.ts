@@ -1,10 +1,10 @@
 /**
- * P62 §4 / P76 §4 — the cursor-line blame request lifecycle, extracted out of `blameAnnotation.ts`
+ * The cursor-line blame request lifecycle, extracted out of `blameAnnotation.ts`
  * so a second renderer (the status-bar widget, `RepoFileView.vue`) can share one request instead of
  * issuing its own. Cursor-line trigger, dedupe on the line (not the column), 150 ms debounce, an
- * `AbortController` per request, a per-mount cache and `repo.changed` invalidation — the same
- * lifecycle P62 §4.3 wrote and P76 §4 only relocates. `blameAnnotation.ts` keeps just the Monaco
- * decoration/hover/reveal-action rendering of `state` below.
+ * `AbortController` per request, a per-mount cache and `repo.changed` invalidation.
+ * `blameAnnotation.ts` keeps just the Monaco decoration/hover/reveal-action rendering of `state`
+ * below.
  */
 import type { EventPayload, ResultOf, Transport } from '@kira/git-ipc';
 import { t } from '@theme/i18n';
@@ -21,7 +21,7 @@ type CodeEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
  *  `blameState.ts`'s `UNCOMMITTED_BLAME_SHA` already carry. A third copy rather than a shared
  *  import: neither of those is reachable from this module (Go isn't importable; the extension's
  *  own `blameState.ts` is a different bundle) — `blame.go`'s own doc comment names this as the
- *  right call over inventing a boolean the wire does not have (§4.4). */
+ *  right call over inventing a boolean the wire does not have. */
 const UNCOMMITTED_BLAME_SHA = '0000000000000000000000000000000000000000';
 
 type BlameResult = ResultOf<'blame.line'>;
@@ -102,17 +102,17 @@ export function blameLineTooltip(state: Extract<BlameLineState, { kind: 'resolve
   ];
 }
 
-// §4.2: `blame.line` needs this connection to already hold the repo — `ensureRepoOpen` (moved to
-// state/repoOpenHold.ts, Group 3 P69 review, so `repo/git/transport.ts`'s own dispose path can
-// clear its memo entry without a views/ -> repo/ layering violation) memoises the `repo.open`
+// `blame.line` needs this connection to already hold the repo — `ensureRepoOpen` (moved to
+// state/repoOpenHold.ts, so `repo/git/transport.ts`'s own dispose path
+// can clear its memo entry without a views/ -> repo/ layering violation) memoises the `repo.open`
 // call per gitRepoId, one hold per transport for as long as it lives.
 
 /** Resolves `blame.line` for the cursor's current line, debounced/cached/cancelled, and publishes
  *  the result to `state`. Call once per consuming mount; `dispose()` on unmount. Transport
  *  ownership: the caller leases `deps.transport` and is the only one who may release it — this
  *  controller disposes only what it created (timers, subscriptions, the in-flight abort), never a
- *  lease it did not take (7d, moved from `blameAnnotation.ts` — that module is no longer the sole
- *  consumer of the transport it's handed). */
+ *  lease it did not take (`blameAnnotation.ts` is no longer the sole consumer of the transport it's
+ *  handed). */
 export function createBlameLineController(deps: BlameLineControllerDeps): BlameLineController {
   let disposed = false;
   const state = shallowRef<BlameLineState>({ kind: 'none' });
@@ -120,14 +120,14 @@ export function createBlameLineController(deps: BlameLineControllerDeps): BlameL
   // Dedupe on the line, not the column (a horizontal cursor move must not re-fire) — mirrors
   // `blameWidget.ts`'s own `lastLineKey`, minus its `isDirty` half: this view is
   // readOnly/domReadOnly and nothing in this app writes its model, so the buffer is always the
-  // saved file (§4.3) — P5's dirty-buffer state is structurally absent here, not skipped.
+  // saved file — the dirty-buffer state is structurally absent here, not skipped.
   let lastLine: number | undefined;
   let inFlight: AbortController | undefined;
   // Per-mount cache: the model is immutable for the life of the mount, so (path, line) is a
-  // stable key until `repo.changed` says otherwise (§4.3). A cached `null` is a resolved miss
+  // stable key until `repo.changed` says otherwise. A cached `null` is a resolved miss
   // (untracked path, line past EOF, a real RPC error) — not retried on every revisit.
   //
-  // P79 review fix (Performance, LOW): capped, not unbounded — holding the down-arrow through a
+  // Capped, not unbounded — holding the down-arrow through a
   // very large file could otherwise grow this to one entry per line in the file. A plain Map's
   // insertion order doubles as recency (touching a key deletes then re-inserts it), so the
   // least-recently-touched key is always whatever `cache.keys().next()` yields. A few thousand is a
@@ -188,7 +188,7 @@ export function createBlameLineController(deps: BlameLineControllerDeps): BlameL
       if (!controller.signal.aborted) touchCache(line, null);
       if (line === lastLine) paint(line, null);
     } finally {
-      // P79 review fix (Performance, LOW): cleared on every settle (success or failure), not left
+      // Cleared on every settle (success or failure), not left
       // pointing at an already-settled controller — otherwise a later cancelPending() couldn't tell
       // "a request is genuinely still live" from "the last one already finished" (harmless in
       // practice, since aborting a settled controller is a no-op, but not a signal any future
@@ -200,7 +200,7 @@ export function createBlameLineController(deps: BlameLineControllerDeps): BlameL
 
   function refresh(): void {
     const line = deps.cursor.getPosition()?.lineNumber;
-    // 5a: the `line === lastLine` early return must come BEFORE cancelPending — a same-line cursor
+    // The `line === lastLine` early return must come BEFORE cancelPending — a same-line cursor
     // move (a horizontal arrow key, a column click, a reveal-selection) used to cancel the request
     // already running for THIS line before this check ever ran, and since lastLine already equalled
     // line, nothing restarted it: no annotation ever appeared for that line. This file's own nearby

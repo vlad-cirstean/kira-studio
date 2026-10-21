@@ -1,9 +1,9 @@
-// P112 §7.2: kira:api:dataChanged is what another window's edit reaches this one through — these
-// three specs drive it directly with emitWailsEvent (the same push-channel mechanism grpc-
-// request.spec.ts's own D8 call streaming already exercises), rather than performing a second
-// mutation in this window, so each one pins the cross-window path on its own: an environments
-// change reaches the selector, a variables change reaches a URL's unresolved chip and Copy as cURL,
-// and a tree change reaches an open tab's orphan/Save-as fallback (D14).
+// kira:api:dataChanged is what another window's edit reaches this one through — these three specs
+// drive it directly with emitWailsEvent (the same push-channel mechanism grpc-request.spec.ts's own
+// call streaming already exercises), rather than performing a second mutation in this window, so
+// each one pins the cross-window path on its own: an environments change reaches the selector, a
+// variables change reaches a URL's unresolved chip and Copy as cURL, and a tree change reaches an
+// open tab's orphan/Save-as fallback.
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { modeTab, openHttpModeAndNewRequest } from './support/apiMode';
@@ -187,9 +187,9 @@ test('a tree change removes an open request item, and Save falls back to Save as
   await expect(page.locator('[data-testid="http-save"]')).toBeDisabled();
 
   // Another window deleted "Health check" — no local mutation here, only the push. The tab stays
-  // open (D14: a request delete never closes an open tab), but the row itself follows the tree, and
+  // open (a request delete never closes an open tab), but the row itself follows the tree, and
   // reconcileTree nulls the tab's own saved-request cache entry — which is what flips Save from
-  // "disabled, nothing to save" to the orphan/Save-as case (D14 again).
+  // "disabled, nothing to save" to the orphan/Save-as case.
   await emitWailsEvent(page, IPC.apiDataChanged, { changes: [{ kind: 'tree' }] });
   await expect(row).toHaveCount(0);
   await expect(page.locator('[data-testid="http-save"]')).toBeEnabled();

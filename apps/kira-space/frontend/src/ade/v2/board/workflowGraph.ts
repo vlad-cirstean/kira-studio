@@ -3,11 +3,11 @@ import type { StepKind, StepResult, Workflow, WorkflowStep } from '../wire';
 import { defaultRoute } from './stepResults';
 import { newStep } from './workflowForm';
 
-// Pure model behind the graph workflow editor (P247): the workflow as nodes and edges, the auto-layout,
+// Pure model behind the graph workflow editor: the workflow as nodes and edges, the auto-layout,
 // and every edit the canvas and the inspector make. All edits return a new workflow. Routes live in
-// `StepResult.next`; a loop edge is a result with `loop`, which the parser sets exactly when the target
-// is the step itself or an earlier one. The return limit lives on the step (`maxReturns`). A manual
-// step has no results: its one implicit `done` goes to the next step.
+// `StepResult.next`; a loop edge is a result with `loop`, which the parser sets exactly when
+// the target is the step itself or an earlier one. The return limit lives on the step
+// (`maxReturns`). A manual step has no results: its one implicit `done` goes to the next step.
 
 type EdgeTone = 'ok' | 'fail' | 'neutral';
 

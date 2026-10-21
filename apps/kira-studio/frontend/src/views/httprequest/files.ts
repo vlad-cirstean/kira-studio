@@ -1,5 +1,5 @@
-// P3 C8/D15: the one control.filesChooseOpen wrapper both file-body surfaces share — form-data's
-// file rows (FormDataTable.vue) and the binary body picker (BinaryBodyPicker.vue, C9). D4/F7: only
+// The one control.filesChooseOpen wrapper both file-body surfaces share — form-data's
+// file rows (FormDataTable.vue) and the binary body picker (BinaryBodyPicker.vue). Only
 // {path, name, size} ever crosses back — never a byte of the file's own contents. Mirrors
 // UploadObjectDialog.vue's own chooseFile (workbench/UploadObjectDialog.vue:42-49), the S3
 // precedent this design is built on.

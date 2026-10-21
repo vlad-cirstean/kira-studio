@@ -12,12 +12,12 @@ import {
 } from './support/postgresFixture';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
-// P1 C9/§6.2: the mode seam, observed from outside. Studio's own connect/expand/open flow is
-// ported straight from tabs.spec.ts's own createAndConnect (C1-C8 promise Studio's rendered
-// output doesn't change) — what's new here is Http mode existing at all, and the five properties
-// §6.2 names: two mode tabs; Http is genuinely empty with its own left-panel title; switching back
-// restores Studio's tab untouched; switching mode writes nothing; the left panel's width survives;
-// ⌘B still works in either mode.
+// The mode seam, observed from outside. Studio's own connect/expand/open flow is
+// ported straight from tabs.spec.ts's own createAndConnect (Studio's rendered output doesn't
+// change) — what's new here is Http mode existing at all, and the five properties: two mode tabs;
+// Http is genuinely empty with its own left-panel title; switching back restores Studio's tab
+// untouched; switching mode writes nothing; the left panel's width survives; ⌘B still works
+// in either mode.
 
 const CONNECTION_ID = 'conn-mode-switch';
 const FIXTURE = orderItemsFixture(CONNECTION_ID);
@@ -171,13 +171,13 @@ test('mode switch — four mode tabs, an empty Http mode, and Studio state that 
   await expect(page.locator('[data-testid="project-panel"]')).toContainText('Collections');
 });
 
-// P22 D12/F20/F21: a window remembers which module it was closed in and reopens into it. This
+// A window remembers which module it was closed in and reopens into it. This
 // tier's own relaunch() mocks both wire protocols from scratch each call (fixtures.ts's own header
 // comment) — there is nothing to persist to, so a real write-then-reboot round trip cannot be
 // proven here. What can: (a) boot honours whatever mode windowsEnsure's own snapshot answers with
 // (the hydration half — real cross-process persistence is Go's own windows_test.go/migration
 // coverage), and (b) switching mode eventually reaches windowsSetMode, debounced rather than
-// synchronous (F20's own invariant — the mode click itself schedules no tabsSave, still proven
+// synchronous (the invariant — the mode click itself schedules no tabsSave, still proven
 // unchanged by the existing case above).
 test('a window boots into whatever mode windowsEnsure answers with (P22 D12)', async ({
   relaunch,
@@ -249,11 +249,11 @@ test('switching mode reaches windowsSetMode eventually, never synchronously (P22
   expect(setModeCalls()[1]?.args).toMatchObject({ mode: 'api' });
 });
 
-// P18 D15/F18 built the box-level fix (a real fixed-size icon box and a real <span> label, both
-// real flex items with a measurable rect) and a guard that held *by construction*: the icon box
-// centres each glyph's own advance, not its ink, so the guard could never see the two things a
-// user actually reads — F8/F9 name this as the reason the same complaint came back a third time.
-// P22 D5 replaces both of that guard's assertions with an ink measurement: screenshot the icon
+// The box-level fix (a real fixed-size icon box and a real <span> label, both real flex items
+// with a measurable rect) came with a guard that held *by construction*: the icon box centres
+// each glyph's own advance, not its ink, so the guard could never see the two things a user
+// reads — this is the reason the same complaint came back a third time.
+// This replaces both of that guard's assertions with an ink measurement: screenshot the icon
 // and the label, find each one's own painted pixels (differing from its own sampled background)
 // rather than trust the fixed box each sits in, and compare the ink itself.
 async function inkBounds(
@@ -329,7 +329,7 @@ async function modeTabInk(
     iconCentreY: (iconInk.top + iconInk.bottom) / 2,
     labelCentreY: (labelInk.top + labelInk.bottom) / 2,
     // The icon box's own trailing edge to the glyph's own rightmost ink — how much of the box a
-    // rendered-at-native-size glyph actually fills, the direct, verifiable claim D6(a) makes
+    // rendered-at-native-size glyph fills, the direct, verifiable claim
     // ("the codicon's own 16-unit design grid and its 16px slot coincide"). At 13px-in-16px this
     // always carried (16-13)/2 = 1.5px of pure box slack *in addition to* the glyph's own side
     // bearing; at 16px only the glyph's own bearing remains.
@@ -349,29 +349,29 @@ test('a mode tab’s icon renders at its own design size, with its ink lined up 
   const terminal = await modeTabInk(page, 'automations');
   const docker = await modeTabInk(page, 'docker');
 
-  // (a) F9(a)/D6(a): both icons render close to filling their own 16px box — measured, not
-  // merely inferred from the font's stated design grid. Before D6 (a 13px glyph in a 16px box)
-  // this sandbox's own headless-Chromium render measures a 4px inset on "database" alone, purely
-  // from the box/glyph size mismatch, on top of whatever the glyph's own side bearing adds; at
-  // native size that mismatch is gone and only the glyph's own (smaller) bearing remains.
+  // (a) both icons render close to filling their own 16px box — measured, not merely inferred
+  // from the font's stated design grid. Before, with a 13px glyph in a 16px box, this sandbox's
+  // own headless-Chromium render measures a 4px inset on "database" alone, purely from the
+  // box/glyph size mismatch, on top of whatever the glyph's own side bearing adds; at native
+  // size that mismatch is gone and only the glyph's own (smaller) bearing remains.
   for (const { iconRightInset } of [studio, api, terminal, docker]) {
     expect(iconRightInset).toBeLessThanOrEqual(3.5);
   }
 
   // (b) the icon's ink and the label's ink are vertically centred on the same line, on both tabs
-  // — not merely the fixed boxes they sit in (F8's own point: a box-level guard can't see this).
-  // A generous tolerance: F9(b)'s own residual is sub-pixel on the two words this app actually
+  // — not merely the fixed boxes they sit in (a box-level guard can't see this).
+  // A generous tolerance: the residual is sub-pixel on the two words this app
   // renders ("Studio" has no descender, "Api" does — a real, permanent, per-word difference in
   // ink extent that a shared line-height can't and shouldn't erase). Terminal's own icon glyph
   // carries a real, permanent extra ~1-2px of its own vertical bearing on top of that (measured
-  // 1px on macOS WebKit, 2px on CI's WebKitGTK) — P91 §17.3 extended the guard to it without
+  // 1px on macOS WebKit, 2px on CI's WebKitGTK) — the guard was extended to it without
   // re-tuning this bound for its own glyph.
   for (const { iconCentreY, labelCentreY } of [studio, api, terminal, docker]) {
     expect(Math.abs(iconCentreY - labelCentreY)).toBeLessThanOrEqual(2.5);
   }
 
-  // F9(a)'s own point stands even after (a): "database" and "globe" are drawn with genuinely
-  // different side bearings at any shared box size, so their icon-to-label gaps are not expected
-  // to match pixel-for-pixel without normalizing the icon vocabulary itself (OQ-3, inline SVG) —
-  // that residual is deliberately not asserted here as a "must match" quantity.
+  // "database" and "globe" are drawn with genuinely different side bearings at any shared box size,
+  // their icon-to-label gaps are not expected to match pixel-for-pixel without normalizing the
+  // icon vocabulary itself (inline SVG) — that residual is deliberately not asserted here as a
+  // "must match" quantity.
 });

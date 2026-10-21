@@ -4,10 +4,10 @@ export type SortDirection = 'asc' | 'desc';
 export const sortDirectionSchema = /*#__PURE__*/ z.enum(['asc', 'desc']);
 
 /**
- * §8.5's two sort editors, one state (D6). Clicking a grid header produces the structured
+ * The two sort editors, one state. Clicking a grid header produces the structured
  * form and mirrors its equivalent string into the `ORDER BY` box; typing in the box switches
  * to the text form and clears the header indicators. Only the structured form is machine
- * readable enough to drive keyset pagination (D7) — a `text` sort is always `offset`.
+ * readable enough to drive keyset pagination — a `text` sort is always `offset`.
  */
 export const sortSpecSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
   /*#__PURE__*/ z.object({

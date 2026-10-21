@@ -18,8 +18,8 @@ import { runMockupV2 } from './support/mockupV2Oracle';
 
 // The dialog templates against the mockup run unmodified (rebase with a restack chain, queue onto a
 // review branch, merge), then the rules the mockup has no oracle for: busy and headless blocks,
-// target resolution, archive lines and the session and start mirrors of the server defaults. The turn
-// watcher's submit / stop / ended / live-seen rules close the file.
+// target resolution, archive lines and the session and start mirrors of the server defaults. The
+// turn watcher's submit / stop / ended / live-seen rules close the file.
 
 beforeAll(useClaudeAgentText);
 

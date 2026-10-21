@@ -1,23 +1,23 @@
-// P5 D17: the `{{name}}` substitution engine — a two-token grammar (find `{{`, find the next
-// `}}`), one pass, no expression language, no nesting. D1 declines a template engine (handlebars/
+// The `{{name}}` substitution engine — a two-token grammar (find `{{`, find the next
+// `}}`), one pass, no expression language, no nesting. It declines a template engine (handlebars/
 // mustache HTML-escape by default, which would corrupt a substituted `&`/`<`/`"`; their contract
-// is "render or fail", not the classified per-reference report D16 needs; and Postman variable
+// is "render or fail", not the classified per-reference report needed; and Postman variable
 // names — `{{base url}}`, `{{x-api-key}}` — are not identifiers, so a path-expression grammar would
 // be the wrong shape entirely).
 //
 // Implemented identically in Go (internal/apivars/resolve.go's Resolve) and pinned to that
-// file's behaviour by one shared corpus (internal/apivars/testdata/substitution.json, D18) read
+// file's behaviour by one shared corpus (internal/apivars/testdata/substitution.json) read
 // by both a Go test and tests/unit/http-substitution.spec.ts.
 //
 // Pure and dependency-free by design — no Vue, no DOM, no `@shared` import — which is what makes
-// the corpus test a plain import (D17).
+// the corpus test a plain import.
 //
-// P17 D3/D6: a pipe (`{{name | transform}}`) is read *after* the scan above, not by it — the scan
+// A pipe (`{{name | transform}}`) is read *after* the scan above, not by it — the scan
 // itself (find `{{`, find the next `}}`, one pass, no nesting) is bit-for-bit unchanged. What
 // changed is how the already-extracted, already-trimmed text between the delimiters is read:
 // `parseReference` below splits it into a bare name and an optional transform pipeline, and the
 // three value-producing branches in `resolve` apply the pipeline to the value they would otherwise
-// have emitted unchanged. See docs/HISTORY.md (v1.2 P17)/§5.
+// have emitted unchanged.
 import { applyPipeline, isTransformName, type TransformName } from './transforms';
 
 export type ReferenceKind = 'resolved' | 'deferred' | 'dynamic' | 'unknown';
@@ -45,8 +45,7 @@ export interface ParsedReference {
 
 /**
  * Splits `inner` — the already-extracted, already-trimmed text between `{{` and `}}` (the scanner
- * is not consulted and does not change) — into a bare name and an optional transform pipeline
- * (P17 D3).
+ * is not consulted and does not change) — into a bare name and an optional transform pipeline.
  *
  * The rules, in full:
  * 1. No `|` at all ⇒ today's behaviour exactly: `{name: inner, pipeline: [], normalized:
@@ -118,22 +117,22 @@ export interface SubstitutionResult {
  * `{{name with spaces}}` from injecting a raw space/`&`/`#`/`=` into `url.Parse`'s RawQuery or the
  * request line itself, without corrupting a name a later pass still needs to match.
  */
-/** P17 D12: a name is dynamic-shaped if it is `$`-prefixed (Postman's own spelling) or
+/** A name is dynamic-shaped if it is `$`-prefixed (Postman's own spelling) or
  *  `fake.`-prefixed (this app's additive, permanent alias namespace — never a migration of the
- *  former, D12) — the one predicate `classifyReference` below and Go's own resolve.go share,
+ *  former) — the one predicate `classifyReference` below and Go's own resolve.go share,
  *  rather than two copies of the same two-prefix check drifting apart. */
 export function isDynamicReference(name: string): boolean {
   return name.startsWith('$') || name.startsWith('fake.');
 }
 
-/** P15b D1: the classification `resolve` gives a name, extracted from its own branch order
+/** The classification `resolve` gives a name, extracted from its own branch order
  *  (dynamic-shaped → dynamic, then secret → deferred, then a known value → resolved, else
  *  unknown) so the highlighter (`variableHighlight.ts`), the hover (`variableCompletion.ts`) and
  *  this function itself agree, by construction, about what "unknown" means — `resolve` below
- *  *calls* this rather than duplicating the order, which is the whole point (D1's own doc
- *  comment). A dynamic-shaped name is classified 'dynamic' regardless of `isDynamicName`/
+ *  *calls* this rather than duplicating the order, which is the whole point.
+ *  A dynamic-shaped name is classified 'dynamic' regardless of `isDynamicName`/
  *  `isFakeName` — whether it is *catalogued* is a presentation detail for the caller
- *  (HttpRequestView.vue already does this, F5), not a fifth kind this function would need to
+ *  (HttpRequestView.vue already does this), not a fifth kind this function would need to
  *  grow. */
 export function classifyReference(
   name: string,
@@ -146,11 +145,11 @@ export function classifyReference(
   return 'unknown';
 }
 
-/** P94 pass 3 (§4.3): `resolve`'s three "no pipeline result" outcomes (still-dynamic,
+/** `resolve`'s three "no pipeline result" outcomes (still-dynamic,
  *  pipeline-failed, plain-unknown) used to repeat `sanitizeUnresolved ? sanitizeUnresolved(span) :
  *  span` at each of four call sites. This carries the resolved text when there is one, so the
  *  loop applies that one fallback exactly once, at the tail, regardless of which branch produced
- *  it. `dynamic` is still called at most once per occurrence (D8) — never re-invoked to recover
+ *  it. `dynamic` is still called at most once per occurrence — never re-invoked to recover
  *  which branch fired. */
 function resolveOne(
   kind: ReferenceKind,
@@ -160,12 +159,12 @@ function resolveOne(
   dynamic?: (name: string) => string | null,
 ): { kind: ReferenceKind; text: string } {
   if (kind === 'dynamic') {
-    // D2: a generated value is, from every consumer's point of view, finished — the text is
+    // A generated value is, from every consumer's point of view, finished — the text is
     // final and nothing downstream has work to do — which is exactly what 'resolved' already
     // means. No fifth ReferenceKind (Go's union would need one it could never produce).
     //
-    // D8: the pipe applies AFTER per-occurrence generation — `dynamic?.(name)` is still called
-    // once per occurrence, at this same point in the walk; D6 only wraps its *return value*.
+    // The pipe applies AFTER per-occurrence generation — `dynamic?.(name)` is still called
+    // once per occurrence, at this same point in the walk; the pipe only wraps its *return value*.
     const generated = dynamic?.(name) ?? null;
     if (generated === null) return { kind: 'dynamic', text: '' };
     const applied = applyPipeline(pipeline, generated);
@@ -221,9 +220,9 @@ export function resolve(
     const kind = classifyReference(name, values, secretNames);
     if (kind === 'deferred') {
       // Never sanitized, and never transformed here: a downstream pass (Go's apivars.Resolve)
-      // still has to find this span by its exact, untouched name and pipeline (D6's load-bearing
-      // row) — the plaintext never enters this function on the renderer side (D6/F3), so there is
-      // nothing here for a pipeline to transform yet.
+      // still has to find this span by its exact, untouched name and pipeline — the plaintext never
+      // enters this function on the renderer side, so there is nothing here for a pipeline to
+      // transform yet.
       pushRef('deferred');
       out += span;
       continue;
@@ -256,16 +255,15 @@ export function resolve(
   return { text: out, refs };
 }
 
-// Finding 6's own character set — a space (the HTTP request line's own token delimiter, the one
-// that actually turns a send into a 400) plus the query-string's structural delimiters (&, #, =)
+// The character set — a space (the HTTP request line's own token delimiter, the one
+// that turns a send into a 400) plus the query-string's structural delimiters (&, #, =)
 // and the other ASCII whitespace bytes that are just as line-breaking as a space. Braces and an
 // ordinary reference name's own characters are deliberately not in this table — they pass through
 // a plain find-and-replace unchanged, which is what keeps the token recognisable as `{{name}}`.
 //
-// P17 D11: `|` joins the set — it is not a legal URL character (RFC 3986) and a literal `|` in a
-// request line is exactly finding 6's class. This applies to exactly the two kinds it already
-// applied to (`unknown`, uncatalogued `dynamic`) and never to `deferred` — a piped secret still
-// reaches Go's stage 2 with its `|` intact.
+// `|` joins the set — it is not a legal URL character (RFC 3986). This applies to exactly the two
+// kinds it already applied to (`unknown`, uncatalogued `dynamic`) and never to `deferred` — a
+// piped secret still reaches Go's stage 2 with its `|` intact.
 const URL_UNSAFE_PATTERN = /[ \t\r\n&#=|]/g;
 const URL_UNSAFE_ENCODED: Readonly<Record<string, string>> = {
   ' ': '%20',
@@ -286,13 +284,13 @@ export function sanitizeUrlSpan(span: string): string {
 }
 
 /** One span of splitTemplateSpans' own walk — `text` is the literal run for a non-reference span,
- *  or the whole `{{name}}` (delimiters included) for a reference span. P15b D1: `from`/`to` are
+ *  or the whole `{{name}}` (delimiters included) for a reference span. `from`/`to` are
  *  the span's offsets into the original `text` (so `input.slice(from, to) === text` always holds
  *  — the invariant every consumer of the offsets depends on), and `name` is the trimmed reference
  *  name, `''` for a literal span. Additive: every existing caller (`url.ts`'s `buildQuery`,
- *  `escape.ts`'s `goQueryEscape`) reads only `text`/`isReference` and is unaffected. P17 D3/D13:
- *  `name` is the bare name (parseReference's own), and `pipeline` — present only when non-empty,
- *  same convention as `Reference` (D4) — is what the hover's D13(c) chain line reads. */
+ *  `escape.ts`'s `goQueryEscape`) reads only `text`/`isReference` and is unaffected. `name` is
+ *  the bare name (parseReference's own), and `pipeline` — present only when non-empty,
+ *  same convention as `Reference` — is what the hover's chain line reads. */
 export interface TemplateSpan {
   text: string;
   isReference: boolean;

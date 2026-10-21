@@ -6,16 +6,16 @@ import {
   rowRangeBounds,
 } from '../../frontend/src/views/shared/page/columns';
 
-// Finding 4 (round 2) — this arithmetic's real coverage (P22 iter2 D3: velocity-adaptive,
-// direction-biased row overscan — cursor/pagination-style boundary cases, CLAUDE.md's own bar for
-// a dedicated unit test) was genuinely lost, not "moved", when tests/unit/row-range.spec.ts was
-// deleted in P22 Pass B's cutover (commit 52b8a80) — kiraSlickGrid.ts and kira-slick-grid.spec.ts
-// both carried a stale, circular comment claiming the coverage lived in kira-slick-grid.spec.ts,
-// which in fact only ever covered clampColumnOverscan. Ported from the deleted file's own test
-// cases (`git show 52b8a80^:apps/kira-studio/tests/unit/row-range.spec.ts`) against the CURRENT
-// function: `rowRangeBounds` (this file, since P30 §3.6 C7 dropped the old `@tanstack/vue-virtual`-
-// shaped `rowRangeExtractor` wrapper this arithmetic used to sit behind) returns `{start, end}`
-// row bounds directly rather than a materialised array of row indices — every assertion below is
+// This arithmetic's real coverage (velocity-adaptive, direction-biased row overscan —
+// cursor/pagination-style boundary cases, CLAUDE.md's own bar for a dedicated unit test) was
+// genuinely lost, not "moved", when tests/unit/row-range.spec.ts was deleted in the cutover
+// (commit 52b8a80) — kiraSlickGrid.ts and kira-slick-grid.spec.ts both carried a stale, circular
+// comment claiming the coverage lived in kira-slick-grid.spec.ts, which in fact only ever covered
+// clampColumnOverscan. Ported from the deleted file's own test cases
+// (`git show 52b8a80^:apps/kira-studio/tests/unit/row-range.spec.ts`) against the CURRENT
+// function: `rowRangeBounds` (this file, which dropped the old `@tanstack/vue-virtual`-shaped
+// `rowRangeExtractor` wrapper this arithmetic used to sit behind) returns `{start, end}` row
+// bounds directly rather than a materialised array of row indices — every assertion below is
 // rewritten against that shape, not a blind restore of the deleted array-index assertions.
 
 const ROW_HEIGHT = 28; // BASE_LEAD_PX/BASE_TRAIL_PX (560) / 28 = 20 rows per side at rest.

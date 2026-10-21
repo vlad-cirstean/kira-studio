@@ -1,4 +1,4 @@
-// P108 Part 11 F6: ProjectionMenu.vue's own close-time decision — an untouched close silently
+// ProjectionMenu.vue's own close-time decision — an untouched close silently
 // cleared an active projection whenever the projected page's own (already-narrowed) field set
 // happened to match it exactly, and "None" wrote `[]` rather than null even though Mongo's own
 // empty-projection behaviour returns every field regardless. nextDocumentProjectionOnClose is the

@@ -28,15 +28,15 @@ function allBranchNames(
 }
 
 /**
- * G26 D3/F13: the stack forest as reactive state, mirroring `WorktreeState`'s own shape (reloaded
+ * The stack forest as reactive state, mirroring `WorktreeState`'s own shape (reloaded
  * on the same `repo.changed`/`refsChanged` signal, the same in-flight repo-switch guard on
  * `reload`). `previewRestack`/`runRestack`/`cancelRestack` are this class's own three mutating
  * entry points into `preflight.restack`/`stack.restack`/`stack.cancelRestack` — `StackDialog.vue`'s
  * whole restack flow is these three calls plus the reactive `restacking`/`progress` pair below.
  *
- * F13's own hand-forward is realized here exactly as G24 §9 anticipated: after every load, this
- * class calls `ChangeRequestState.ensureSnapshot` with the union of every branch name in the result — no new
- * RPC, no new cache, no new rate-limit exposure beyond the snapshot G24 already fetches lazily.
+ * The hand-forward is realized here: after every load, this class calls
+ * `ChangeRequestState.ensureSnapshot` with the union of every branch name in the result —
+ * no new RPC, no new cache, no new rate-limit exposure beyond the snapshot already fetched lazily.
  * `pr` is optional (mirroring `SearchState`'s own constructor) so a test — or a future host with no
  * change request surface at all — can construct this class without one.
  */
@@ -117,7 +117,7 @@ export class StackState {
     return this.#bridge.request('preflight.restack', { repoId, branch });
   }
 
-  /** Runs the whole restack, then reloads (D16: the server already dropped its own stack cache on
+  /** Runs the whole restack, then reloads (the server already dropped its own stack cache on
    *  the write, but this class's own reactive `stacks`/`orphans` need their own fresh read the same
    *  way every other mutating call in this codebase reloads its own state after `op.run`/
    *  `remote.run` settles). `progress` is cleared at the start of THIS run, never accumulating

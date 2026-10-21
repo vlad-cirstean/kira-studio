@@ -31,10 +31,9 @@ export const DEFAULT_PORT: Partial<Record<ConnectionKind, number>> = {
   kafka: 9092,
 };
 
-// P16: the minimum server version each adapter's client library (and this app's own catalog SQL)
-// actually supports — the verified floor of the on-demand compatibility suite
-// (docs/HISTORY.md (v1.1 P16)), not a marketing claim. SQS/S3 have no server
-// version at all (AWS's APIs are versionless), so they have no entry.
+// The minimum server version each adapter's client library (and this app's own catalog SQL)
+// supports — the verified floor of the on-demand compatibility suite, not a marketing claim.
+// SQS/S3 have no server version at all (AWS's APIs are versionless), so they have no entry.
 // Getters, not values: the text resolves through the catalog when read, never at module load.
 export const MIN_SERVER_VERSION: Partial<Record<ConnectionKind, string>> = {
   get postgres() {
@@ -70,20 +69,19 @@ export const CONNECTION_THROTTLE_RANGE = { min: 0.01, max: 1000 } as const;
 // P307 Part 2: whole seconds; 0 = off. 300 covers a browser-login tunnel; longer means run it by hand.
 export const PRECONNECT_DELAY_RANGE = { min: 0, max: 300 } as const;
 
-// P18 D18: promoted to domain/color.ts as paletteColorSchema/PaletteColor/PALETTE_COLOR_CHOICES —
-// one palette *by construction* now that an environment's colour (this phase) draws from the same
-// set. These three names stay as aliases so nothing in Studio (or its call sites' comments) has to
-// change.
+// Promoted to domain/color.ts as paletteColorSchema/PaletteColor/PALETTE_COLOR_CHOICES —
+// one palette *by construction* now that an environment's colour draws from the same set. These
+// three names stay as aliases so nothing in Studio (or its call sites' comments) has to change.
 export const connectionColorSchema = paletteColorSchema; // D18; matches --kira-conn-* in
 // tokens.css. 'none' is a real, stored value (the design system's own default — "no colour is the
 // default, the rail slot stays reserved either way") rather than the field being nullable, so no
 // DB/schema change is needed to add it.
 export type ConnectionColor = PaletteColor;
 
-/** P42 D34/D35: the *offered* subset, not the storable one — `connectionColorSchema` above stays
- *  whole on purpose (F27: a connection saved with a retired colour must keep parsing, listing and
+/** The *offered* subset, not the storable one — `connectionColorSchema` above stays
+ *  whole on purpose (a connection saved with a retired colour must keep parsing, listing and
  *  painting its own rail, or "trim the palette" silently deletes connections on next launch).
- *  Six hues chosen for a 42° minimum adjacent OKLCH hue gap (F28/F28a) at the app's one fixed
+ *  Six hues chosen for a 42° minimum adjacent OKLCH hue gap at the app's one fixed
  *  lightness/chroma (`oklch(0.72 0.09 h)`) — roughly double the full eleven-hue ring's own worst
  *  gap (25.6°, blue↔indigo), which is what makes a 2px tab rail or a 5px status dot legible at
  *  all. Retired from the picker: `orange`, `olive`, `teal`, `indigo`, `violet`. */
@@ -119,17 +117,17 @@ const connectionFieldsSchema = /*#__PURE__*/ z.object({
   // rather than an options_json key — options round-trips through the connection URI and the
   // Copy URI menu item, and a shell command must never be settable by pasting a URI.
   preconnect: z.string().trim().min(1).max(2000).nullable().default(null),
-  // Misc-fixes: overrides P11/D5's settle-window auto-detection with an explicit per-connection
-  // choice. false (default) = "run each time it tries to connect" — a fresh instance is spawned
-  // on every connect attempt and its exit is never monitored, whether or not it happens to still
-  // be alive at the settle window. true = "run once, and disconnect the db when it dies" — always
-  // arm() once the adapter connects, regardless of what the settle-window race resolved to (a
-  // no-op if the script already exited, since there's nothing left to monitor).
+  // Overrides the settle-window auto-detection with an explicit per-connection choice. false
+  // (default) = "run each time it tries to connect" — a fresh instance is spawned on every connect
+  // attempt and its exit is never monitored, whether or not it happens to still be alive at the
+  // settle window. true = "run once, and disconnect the db when it dies" — always arm() once the
+  // adapter connects, regardless of what the settle-window race resolved to (a no-op if the script
+  // already exited, since there's nothing left to monitor).
   preconnectSidecar: z.boolean().default(false),
   // P307 Part 2: seconds between starting the script and the first connect; 0 = off. `.default(0)`
   // is load-bearing for an older stored row, like throttlePerSec's.
   preconnectDelaySec: z.number().int().min(0).max(PRECONNECT_DELAY_RANGE.max).default(0),
-  // P18 (v1.1) D18: runs the connection's own EXPLAIN before every SELECT a console run issues on
+  // Runs the connection's own EXPLAIN before every SELECT a console run issues on
   // it, warning (never blocking) when the threshold or a structural issue fires. A first-class
   // column rather than an options_json key — the same reason preconnect above is one: `options`
   // round-trips through the connection URI and the Copy URI menu item, and a behaviour that issues
@@ -142,12 +140,12 @@ const connectionFieldsSchema = /*#__PURE__*/ z.object({
   // dialog's own field error, matching every other numeric field's split between "this schema
   // parses a stored row" and "Save enforces the real bound".
   throttlePerSec: z.number().min(0).max(CONNECTION_THROTTLE_RANGE.max).default(0),
-  // M1 §6.1: whether this connection is exposed to the local DB MCP server. Deny by default.
+  // Whether this connection is exposed to the local DB MCP server. Deny by default.
   // `.default(false)` is load-bearing the same way autoExplain's/throttlePerSec's are — an older
   // stored row has no such key. A first-class column, not an options_json key — the migration's
   // own comment carries the full argument (an access grant must not be settable by pasting a URI).
   mcpEnabled: z.boolean().default(false),
-  // M3: runs this connection's own EXPLAIN before every explainable run_query on the DB MCP path,
+  // Runs this connection's own EXPLAIN before every explainable run_query on the DB MCP path,
   // and pauses the query for a human decision when the plan crosses the expensive-query row
   // threshold. `.default(true)` is load-bearing the same way mcpEnabled's is — an older stored row
   // has no such key. Separate from autoExplain (above), which governs this app's own console — see
@@ -174,10 +172,10 @@ export const AWS_STYLE_KINDS: ReadonlySet<ConnectionKind> = new Set(['sqs', 's3'
 // mode repurposes `database` for the absolute path; host/port/username/password are unused.
 export const FILE_KINDS: ReadonlySet<ConnectionKind> = new Set(['sqlite']);
 
-// M3 §7/§9.1: the five kinds that have an EXPLAIN this app can parse — frontend/src/views/console/
+// The five kinds that have an EXPLAIN this app can parse — frontend/src/views/console/
 // explain.ts's explainStatementsFor switch is the real authority (its own comment cross-references
 // this constant); this copy exists so project/ConnectionDialog.vue's own auto-explain checkbox can
-// read it without project/ importing views/ directly (SPEC §11).
+// read it without project/ importing views/ directly.
 export const EXPLAIN_SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
   'postgres',
   'mysql',

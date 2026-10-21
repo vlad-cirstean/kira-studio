@@ -16,7 +16,7 @@ import {
  *  load naturally... once loaded, pause"). Without the immediate `pauseAt` below, real time spent
  *  on subsequent CDP round trips (e.g. `page.keyboard.type`'s per-character dispatches) keeps
  *  advancing the "fake" clock exactly like the real one — silently defeating the point of
- *  installing it at all. Confirmed empirically (P81): typing 20 characters can by itself burn
+ *  installing it at all. Confirmed empirically: typing 20 characters can by itself burn
  *  60-100ms of real time that a bare `install()` still counts.
  *
  *  Safe for this suite's mock transport: control answers are `page.route` network fulfills

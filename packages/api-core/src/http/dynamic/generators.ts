@@ -1,17 +1,17 @@
-// P6 D4/D5, re-keyed by P17 D12: the lazy half of the dynamic-value vocabulary — statically
+// The lazy half of the dynamic-value vocabulary — statically
 // imports `./fakerEntry` (fine here: this module itself is reached only through `catalog.ts`'s
-// dynamic `import()`), and exports one `Record<FakeName, (f: Faker) => string>` entry per D12's
+// dynamic `import()`), and exports one `Record<FakeName, (f: Faker) => string>` entry per the
 // catalogue — one generator per faker capability, addressed by its `fake.module.method` name
 // rather than by every Postman spelling that reaches it.
 //
-// F12/D12: this is the other half of the compile-time exhaustiveness guarantee `catalog.ts` sets
+// This is the other half of the compile-time exhaustiveness guarantee `catalog.ts` sets
 // up — `Record<FakeName, ...>` over a `const`-asserted tuple's derived union means a tuple entry
 // with no record line, or a record line whose key is not a tuple entry, is a `tsc` error, not
-// something a test has to catch. That is why this file has no accompanying unit test (§6.2/
-// CLAUDE.md: a 57-entry map of one-line faker calls whose completeness the compiler already
-// proves is exactly the "thin pass-through wrapper" category that earns nothing).
+// something a test has to catch. That is why this file has no accompanying unit test (a 57-entry
+// map of one-line faker calls whose completeness the compiler already proves is exactly the
+// "thin pass-through wrapper" category that earns nothing).
 //
-// F11: every call below was executed against the installed `@faker-js/faker@10.6.0` before being
+// Every call below was executed against the installed `@faker-js/faker@10.6.0` before being
 // written down. The five that return a non-string (`number.int`, `datatype.boolean`,
 // `location.latitude`, `location.longitude`) are `String(...)`-wrapped at the call site so the
 // record's value type stays `() => string` throughout.
@@ -28,10 +28,10 @@ type Faker = typeof faker;
 
 const GENERATORS: Record<FakeName, (f: Faker) => string> = {
   'fake.string.uuid': (f) => f.string.uuid(),
-  // D9/D12: the clock, not the RNG — Postman defines both $timestamp/$isoTimestamp as reading the
+  // The clock, not the RNG — Postman defines both $timestamp/$isoTimestamp as reading the
   // current time, so neither goes through faker even though they live in this same lazy-loaded
-  // record (D7 explains why they are not split into their own code path). The namespace's only
-  // two non-faker entries (D12).
+  // record (they are not split into their own code path). The namespace's only
+  // two non-faker entries.
   'fake.date.timestamp': () => String(Math.floor(Date.now() / 1000)),
   'fake.date.iso': () => new Date().toISOString(),
   'fake.number.int': (f) => String(f.number.int({ min: 0, max: 1000 })),
@@ -96,8 +96,8 @@ const GENERATORS: Record<FakeName, (f: Faker) => string> = {
  *  module (it is the one place `./fakerEntry` is statically imported), so this is the seam that
  *  lets `catalog.ts` stay faker-free at the type level while still calling into the record.
  *
- *  D12: accepts either spelling — a Postman `$name` (resolved through `ALIAS_TO_FAKE` first) or a
- *  `fake.` name directly — and returns `null` for anything else, matching D13's "an uncatalogued
+ *  Accepts either spelling — a Postman `$name` (resolved through `ALIAS_TO_FAKE` first) or a
+ *  `fake.` name directly — and returns `null` for anything else, matching the "an uncatalogued
  *  name behaves exactly as if no generator were supplied" contract. */
 export function generate(name: string): string | null {
   const fakeName: FakeName | undefined = isDynamicName(name)

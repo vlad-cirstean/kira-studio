@@ -7,10 +7,10 @@ import {
   rowHandleAt,
 } from '../../frontend/src/views/shared/slick/dataSource';
 
-// P30 §3 prerequisite: this file's subject moved from views/grid/slick/dataSource.ts to
+// This file's subject moved from views/grid/slick/dataSource.ts to
 // views/shared/slick/dataSource.ts — the generic display-position/RowHandle core split out of
 // that one file so views/console/ConsoleSlickGrid.vue could import it without reaching into
-// views/grid/* (SPEC §11). The split also drops this test's old dynamic-import workaround: the
+// views/grid/*. The split also drops this test's old dynamic-import workaround: the
 // grid-specific half left behind (createDisplayValueExtractor/pendingRowClasses, which transitively
 // reach pendingChanges.ts -> bridge/data.ts -> '/wails/runtime.js' at module scope) is what forced
 // it, and this file never exercised that half — a plain static import is correct here now.
@@ -77,10 +77,9 @@ describe('rowHandleAt/dataLength (P22 spike D1) — display-position -> RowHandl
   });
 });
 
-// P22 Pass B, C4/§5 D4: displayPositionOf/rowAtDisplayPosition move here from DataGrid.vue —
 // rowAtDisplayPosition reuses rowHandleAt's own pageRowAt arithmetic (never a second
-// implementation that could drift), and displayPositionOf is its inverse, real once C12 wires a
-// live search filter, identity until then.
+// implementation that could drift), and displayPositionOf is its inverse, real once a live search
+// filter is wired, identity until then.
 describe('displayPositionOf/rowAtDisplayPosition (P22 Pass B C4) — page row <-> display position', () => {
   test('1. unfiltered: identity in both directions', () => {
     const idx: DisplayRowIndex = { displayRows: null, pageRowCount: 100 };

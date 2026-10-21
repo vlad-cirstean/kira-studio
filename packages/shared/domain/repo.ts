@@ -31,10 +31,10 @@ export const fileListingSchema = /*#__PURE__*/ z.object({
 });
 export type FileListing = z.infer<typeof fileListingSchema>;
 
-// C5 §8.1: mirrors the git contract's own `file.read` result shape (found/tooLarge, packages/
+// Mirrors the git contract's own `file.read` result shape (found/tooLarge, packages/
 // git-ipc/src/contract.ts) rather than inventing one, plus `missing` (a path git listed that no
-// longer exists on disk) and `language` (this app's own id, §9.4 — resolved from the extension
-// only, never sniffed; the binary check is the one place this phase *does* sniff bytes, §8.1).
+// longer exists on disk) and `language` (this app's own id — resolved from the extension
+// only, never sniffed; the binary check is the one place this phase *does* sniff bytes).
 export const fileContentSchema = /*#__PURE__*/ z.object({
   kind: /*#__PURE__*/ z.enum(['found', 'binary', 'tooLarge', 'missing']),
   text: z.string(),
@@ -44,7 +44,7 @@ export const fileContentSchema = /*#__PURE__*/ z.object({
 });
 export type FileContent = z.infer<typeof fileContentSchema>;
 
-// C6 §5/D12: one side of a HEAD-vs-worktree diff — the same four-value classification
+// One side of a HEAD-vs-worktree diff — the same four-value classification
 // fileContentSchema already uses for the worktree side, so the diff view reuses one vocabulary
 // rather than inventing a second. No status field on the diff as a whole: the two sides already
 // say what happened (HEAD missing means added, worktree missing means deleted, both present means
@@ -75,9 +75,9 @@ export const searchRequestSchema = /*#__PURE__*/ z.object({
 });
 export type SearchRequest = z.infer<typeof searchRequestSchema>;
 
-// C7 §3.1/D6: one match within one file. line/column/endColumn are Monaco's own 1-based line and
+// One match within one file. line/column/endColumn are Monaco's own 1-based line and
 // 1-based UTF-16 column (the identical rules internal/codeworkspace/textpos.go's LineIndex uses).
-// preview is the line's own text (EOL stripped, possibly windowed, §3.5) with
+// preview is the line's own text (EOL stripped, possibly windowed) with
 // previewMatchStart/End as UTF-16 offsets *into preview*, so the renderer highlights without
 // re-deriving anything; truncatedStart/End say which side (if any) was windowed away — the string
 // itself never carries an ellipsis, so a copied preview is always real file text.
@@ -114,7 +114,7 @@ export const searchStatsSchema = /*#__PURE__*/ z.object({
 });
 export type SearchStats = z.infer<typeof searchStatsSchema>;
 
-// C7 D7: ChannelCodeSearch's own payload — one coalesced batch of file groups. seq is the index of
+// ChannelCodeSearch's own payload — one coalesced batch of file groups. seq is the index of
 // the first file group in this batch (the renderer merges by path, not by seq, but the field stays
 // for the same future-reviewer-detects-a-gap reason GrpcCallEvent's own seq exists);
 // stats/error are set only on the terminal event (done: true), which always fires exactly once,

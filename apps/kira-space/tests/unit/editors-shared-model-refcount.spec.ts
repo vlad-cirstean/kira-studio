@@ -1,10 +1,10 @@
-// C14-5: openRepoCommitDiffTab/openRepoReviewDiffTab deliberately keep two tabs open for what can
+// openRepoCommitDiffTab/openRepoReviewDiffTab deliberately keep two tabs open for what can
 // be an identical (path, left, right) revision pair, so monaco.ts's repoRevisionDiffUris (keyed by
 // revision alone) hands both tabs the exact same cached model objects via getOrCreateModel.
 // dropRepoDiffTab used to dispose every uri its own closing tab held, unconditionally -- closing
 // the first of two such tabs disposed models the second tab was still actively displaying, leaving
 // it blank or throwing. This pins that a model shared by two open tabs survives one tab closing,
-// and is only actually disposed once its last referencing tab closes too -- while a uri unique to
+// and is only disposed once its last referencing tab closes too -- while a uri unique to
 // one tab still disposes exactly when that tab closes, same as before.
 //
 // No DOM/monaco-editor needed: getOrCreateModel/registerDiffEditor/dropRepoDiffTab all take the

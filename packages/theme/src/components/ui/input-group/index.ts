@@ -31,17 +31,16 @@ export const inputGroupAddonVariants = cva(
 
 export type InputGroupVariants = VariantProps<typeof inputGroupAddonVariants>;
 
-// P110 B25: the box (root <fieldset>) itself. `default` is shadcn-vue's own registry string,
-// verbatim -- untouched, so every existing InputGroup consumer (the P104-era number-stepper
+// The box (root <fieldset>) itself. `default` is shadcn-vue's own registry string,
+// verbatim -- untouched, so every existing InputGroup consumer (the number-stepper
 // migration) renders byte-identical. `kira` is primitives.css's retired `.p-input` box translated
-// to Tailwind: height/gap/padding/radius/border/background/text tokens per the P110 plan's own
-// mapping table, `focus-within:` for the old `:focus-within` ring, `aria-invalid:` (a generic
-// Tailwind functional variant, not a fixed list -- compiles to `&[aria-invalid="true"]` for any
-// name) replacing the old `.is-invalid` class toggle. `min-w-0`: fieldset's own UA min-content
-// sizing quirk, same reason the `default` variant already carries it. `.is-grow`'s own height/
-// line-height/padding-block math stays live, unlayered CSS in primitives.css (B31 residue) --
-// unlayered beats this layered utility, so `h-control` here is a no-op once `.is-grow` also
-// applies, by design.
+// to Tailwind: height/gap/padding/radius/border/background/text tokens, `focus-within:` for the
+// old `:focus-within` ring, `aria-invalid:` (a generic Tailwind functional variant, not a fixed
+// list -- compiles to `&[aria-invalid="true"]` for any name) replacing the old `.is-invalid` class
+// toggle. `min-w-0`: fieldset's own UA min-content sizing quirk, same reason the `default` variant
+// already carries it. `.is-grow`'s own height/line-height/padding-block math stays live, unlayered
+// CSS in primitives.css -- unlayered beats this layered utility, so `h-control` here is a no-op
+// once `.is-grow` also applies, by design.
 export const inputGroupVariants = cva('', {
   variants: {
     variant: {

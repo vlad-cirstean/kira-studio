@@ -1,12 +1,10 @@
 /**
  * The type map every transport (real or mock) and the UI client are checked against.
- * P0 seeded four entries "enough to exercise all three mechanisms"; P3 grows this into the
- * surface §3.5 describes, restricted to what P3 or an immediately following phase calls —
- * every entry here has a producer and a consumer in P3 (`docs/plans/P3.md`, W1).
+ * Every entry here has a producer and a consumer.
  *
- * `core` and `ipc` both depend on nothing (§3.1), so the wire shapes below are *structural
+ * `core` and `ipc` both depend on nothing, so the wire shapes below are *structural
  * copies* of the corresponding `@kira/git-core` types, not imports of them — `ipc` may
- * not import `@kira/git-core` (B3). Drift between the two sides is caught by
+ * not import `@kira/git-core`. Drift between the two sides is caught by
  * `tests/unit/ipc/wireConformance.spec.ts`, which asserts assignability in both directions,
  * not by an import the lint rule would reject anyway.
  */
@@ -56,17 +54,17 @@ export interface RepoSettingsSnapshot {
    *  `off` (no host call, no cache fill: lookups answer `{kind:'disabled'}`) or a provider id.
    *  An unknown id behaves as `auto`. */
   readonly 'kiraSpace.gitHost.provider': string;
-  /** G25 D10: the worktree prepare script — one command-line string, never a path, never an argv
+  /** The worktree prepare script — one command-line string, never a path, never an argv
    *  array. Empty means the feature is off for this repository: no spawn, no shell, ever. Read
    *  ONLY from this table (`source: 'repo'`) — never from `.git/config`, a tracked file, or any
    *  repo-carried convention, which is the single highest-value safety property in the whole
-   *  feature (D10). Written only by Kira Space itself (P172): `RepoSettingsPatch` omits it and
+   *  feature. Written only by Kira Space itself: `RepoSettingsPatch` omits it and
    *  `repoSettings.set` refuses it with `E_READ_ONLY`. */
   readonly 'kiraSpace.worktree.prepareScript': string;
   /** G25 D10: pure UX — pre-fills `WorktreeDialog`'s own path field. Empty means no suggestion
    *  beyond the dialog's own basename default. Never a security boundary. */
   readonly 'kiraSpace.worktree.basePath': string;
-  /** G28 D16: whether a blocked checkout is automatically re-issued with `autoStash: true` instead
+  /** Whether a blocked checkout is automatically re-issued with `autoStash: true` instead
    *  of opening the old `CheckoutDialog`. Read CLIENT-SIDE ONLY — the server never consults this
    *  leaf, so a stale or absent value can only ever produce the OLD dialog, never an unexpected
    *  write (the fail-safe direction). Default true. */
@@ -177,7 +175,7 @@ export type GoToFileOutcome =
   | { readonly kind: 'unavailable'; readonly reason: 'notInRevision' | 'binary' | 'tooLarge' };
 
 /**
- * W3's wire shape for a slice of `CommitStore` rows — the packed, transferable representation
+ * The wire shape for a slice of `CommitStore` rows — the packed, transferable representation
  * `CommitStore.packSlice`/`appendPacked` (`packages/core/src/store/commitStore.ts`) produce and
  * consume. Declared here (structurally, not imported) because it is the payload of
  * `GraphChunk.commits` below; `wireConformance.spec.ts` is what keeps the two in step.
@@ -208,9 +206,9 @@ export interface PackedCommitChunk {
 }
 
 // ---------------------------------------------------------------------------------------
-// P6 — refs, status, pre-flight and operations. Structural copies of `packages/core`'s own
+// Refs, status, pre-flight and operations. Structural copies of `packages/core`'s own
 // (`model/ref.ts`, `model/operation.ts`, `model/status.ts`, `preflight/types.ts`, `undo/slot.ts`),
-// kept honest by `tests/unit/ipc/wireConformance.spec.ts` rather than an import (B3).
+// kept honest by `tests/unit/ipc/wireConformance.spec.ts` rather than an import.
 // ---------------------------------------------------------------------------------------
 
 export type RefKind = 'branch' | 'remoteBranch' | 'tag';
@@ -267,9 +265,8 @@ export interface InProgressOperation {
   readonly headName: string | undefined;
   readonly conflictedPaths: readonly string[];
   /** True only where `git <op> --continue` exists AND v1 offers it — false only for bisect
-   *  (nothing to continue) and unmergedOnly (no state file to advance). Rebase was false through
-   *  G25 (§9's "report-only posture", correct only while nothing in the app could START a
-   *  rebase); G26 D12 flips it to true once the stack.restack executor does start one. */
+   *  (nothing to continue) and unmergedOnly (no state file to advance). Rebase is true once the
+   *  stack.restack executor does start a rebase. */
   readonly canContinue: boolean;
   readonly canAbort: boolean;
   /** `.git/sequencer/` present: a multi-commit revert or cherry-pick mid-run, where --abort is
@@ -336,13 +333,13 @@ export interface CheckoutPreflight {
   /** "clean" = nothing local at all. "cleanCarry" = §7.5's carry case; still no prompt, but the
    *  confirmation copy differs and the UI announces what carried. */
   readonly verdict: 'clean' | 'cleanCarry' | 'blocked';
-  /** Which routes the UI may offer for a `blocked` verdict. P6 emits `["discard"]` (or `[]` when
-   *  an untracked block is also present); P9 adds `"stashAndCarry"`. G28 D2 adds two more:
+  /** Which routes the UI may offer for a `blocked` verdict. Emits `["discard"]` (or `[]` when
+   *  an untracked block is also present); adds `"stashAndCarry"`. Adds two more:
    *  `"autoStash"` (whole-tree `stash push [-u]`, tagged with the CURRENT branch, never popped
    *  back — offered whenever EITHER dirty-blocker kind is present, unlike the two routes above,
    *  which the untracked case suppresses) and `"detachHere"` (offered whenever a `worktreeConflict`
    *  blocker is present for a `switch`-mode request to a branch/remote-branch target — composes
-   *  freely with `"autoStash"` when both blocker kinds are present at once, D6). */
+   *  freely with `"autoStash"` when both blocker kinds are present at once). */
   readonly routes: readonly ('discard' | 'stashAndCarry' | 'autoStash' | 'detachHere')[];
 }
 
@@ -376,13 +373,13 @@ export interface RevertPreflight {
 }
 
 // ---------------------------------------------------------------------------------------
-// P9 — stash (§7.6). Structural copies of `@kira/git-core`'s own; `RefKind` stays
-// untouched (D59) — a stash is its own request, never part of `refs.list`.
+// Stash. Structural copies of `@kira/git-core`'s own; `RefKind` stays
+// untouched — a stash is its own request, never part of `refs.list`.
 // ---------------------------------------------------------------------------------------
 
 export interface StashEntry {
   /** The entry's own `stash@{N}` position — meaningful only for `scope: 'stack'`. `-1` for a
-   *  `scope: 'global'` entry, which has no stack position at all (G28 D17's own sentinel; guarded
+   *  `scope: 'global'` entry, which has no stack position at all (the sentinel; guarded
    *  structurally, not by convention — `stashPop`/`stashDrop` are never offered for a global entry,
    *  and `stashBranch` takes a sha-addressed arm for one instead of ever reading this field). */
   readonly index: number;
@@ -398,9 +395,9 @@ export interface StashEntry {
   readonly timestamp: number;
   readonly fileCount: number;
   readonly includedUntracked: boolean;
-  /** G28 D17: which bucket this entry lives in — `'stack'` (an ordinary `refs/stash` entry,
+  /** Which bucket this entry lives in — `'stack'` (an ordinary `refs/stash` entry,
    *  `stash.list`) or `'global'` (`refs/kira/globalstash/<sha>`, `globalStash.list`). Widening this
-   *  one field, rather than a parallel `GlobalStashEntry` interface, is D17's own closing
+   *  one field, rather than a parallel `GlobalStashEntry` interface, is the closing
    *  argument: a fork would touch `StashDetailPane.vue`, `stash.show`, `preflight.stashPop`,
    *  `preflight.stashBranch` and every announcement helper for one field's worth of real
    *  difference. */
@@ -444,7 +441,7 @@ export interface StashBranchPreflight {
 }
 
 // ---------------------------------------------------------------------------------------
-// P10 — reset and cherry-pick pre-flight (§7.7/§7.13). Structural copies of
+// Reset and cherry-pick pre-flight. Structural copies of
 // `@kira/git-core`'s own; `tests/unit/ipc/wireConformance.spec.ts` keeps the two in step.
 // ---------------------------------------------------------------------------------------
 
@@ -498,17 +495,15 @@ export interface CherryPickPreflight {
 }
 
 // ---------------------------------------------------------------------------------------
-// G25 — worktree support (D1/D4/D8/D9-D14). No upstream to structurally copy from (this
-// chapter's own SPEC row was a placeholder until this phase) — these are this phase's own
-// original design, ported to `@kira/git-core`'s `preflight/worktree.ts` verbatim so the two sides
-// never drift (the same "authoritative Go twin, ported TS copy" split `preflight/reset.ts`
-// already established).
+// Worktree support. No upstream to structurally copy from — these are the original design, ported
+// to `@kira/git-core`'s `preflight/worktree.ts` verbatim so the two sides never drift (the same
+// "authoritative Go twin, ported TS copy" split `preflight/reset.ts` already established).
 // ---------------------------------------------------------------------------------------
 
-/** `worktree.list`'s own per-entry shape (D1) — a direct read of `git worktree list --porcelain
+/** `worktree.list`'s own per-entry shape — a direct read of `git worktree list --porcelain
  *  -z`, crossed with this session's own identity (`isCurrent`) and every other connection's
- *  (`openElsewhere`, F7). Never cached (D1): the watcher's own `commonDir/worktrees` blind spot
- *  (D17) is exactly the kind of staleness a cache would make the first thing a user notices. */
+ *  (`openElsewhere`). Never cached: the watcher's own `commonDir/worktrees` blind spot
+ *  is exactly the kind of staleness a cache would make the first thing a user notices. */
 export interface WorktreeEntry {
   readonly path: string;
   readonly head: string | null;
@@ -522,7 +517,7 @@ export interface WorktreeEntry {
   readonly openElsewhere: boolean;
 }
 
-/** `preflight.worktreeAdd`'s own blocker union (D4) — five kinds, in the exact order the Go
+/** `preflight.worktreeAdd`'s own blocker union — five kinds, in the exact order the Go
  *  classifier reports them: `invalidPath`, `pathExists`, `branchCheckedOutElsewhere`,
  *  `branchExists`, `unknownStartPoint`. Every applicable blocker is reported at once — an earlier
  *  one never suppresses a later one. */
@@ -537,12 +532,11 @@ export type WorktreeAddBlocker =
   | { readonly kind: 'branchExists'; readonly branch: string }
   | { readonly kind: 'unknownStartPoint'; readonly startPoint: string };
 
-/** `preflight.worktreeAdd`'s own note union (D4) — informational only, never gates `verdict`.
- *  `pathInsideRepo` is D4's own named example (git allows nesting a worktree inside the
+/** `preflight.worktreeAdd`'s own note union — informational only, never gates `verdict`.
+ *  `pathInsideRepo` is the named example (git allows nesting a worktree inside the
  *  repository it belongs to; refusing a legal action would be this app deciding for the user).
- *  `parentDirectoryMissing`/`detachedHead` are this phase's own reasonable fill-in for the plan's
- *  "three notes" — flagged here, and in G25's own implementation report, as a genuine ambiguity
- *  resolved locally rather than a plan requirement. */
+ *  `parentDirectoryMissing`/`detachedHead` are a reasonable fill-in, flagged here as a genuine
+ *  ambiguity resolved locally. */
 export type WorktreeAddNote =
   | { readonly kind: 'pathInsideRepo'; readonly path: string }
   | { readonly kind: 'parentDirectoryMissing'; readonly path: string }
@@ -555,18 +549,18 @@ export interface WorktreeAddPreflight {
   readonly blockers: readonly WorktreeAddBlocker[];
   readonly notes: readonly WorktreeAddNote[];
   readonly verdict: 'clean' | 'blocked';
-  /** G28 D7: `["detachHere"]` iff `branchCheckedOutElsewhere` is the SOLE blocker — closing G25's
-   *  own hand-forward. Unlike `CheckoutPreflight.routes`' own `"detachHere"`, this one is only ever
+  /** `["detachHere"]` iff `branchCheckedOutElsewhere` is the SOLE blocker.
+   *  Unlike `CheckoutPreflight.routes`' own `"detachHere"`, this one is only ever
    *  OFFERED (a dialog button), never taken automatically: `worktree add` has no "never blocks"
    *  promise to keep, and a dialog is already open to ask in. */
   readonly routes: readonly 'detachHere'[];
 }
 
-/** `preflight.worktreeRemove`'s own blocker union (D8), verbatim. `notAWorktree` is ALSO the
+/** `preflight.worktreeRemove`'s own blocker union, verbatim. `notAWorktree` is ALSO the
  *  security check that guarantees the app never runs a destructive command against a
  *  caller-supplied arbitrary path — checked, and reported, first. `mainWorktree`/`currentWorktree`
  *  are unconditional (no force route ever unlocks them); `openInAnotherWindow` names its own
- *  remedy, no force route; `locked` gets no force route either (probe M5: git itself needs a
+ *  remedy, no force route; `locked` gets no force route either (git itself needs a
  *  second, undelivered `-f` to override a lock — this app never sends it). */
 export type WorktreeRemoveBlocker =
   | { readonly kind: 'notAWorktree'; readonly path: string }
@@ -588,9 +582,8 @@ export interface WorktreeRemovePreflight {
 }
 
 // ---------------------------------------------------------------------------------------
-// G26 — stacked branches: the parent pointer, the restack executor, and stack navigation
-// (D1-D17). No upstream to structurally copy from (SPEC's own row: "not designed at all" before
-// this phase's own planning pass) — these nine types are this phase's own original design.
+// Stacked branches: the parent pointer, the restack executor, and stack navigation.
+// No upstream to structurally copy from — these nine types are original design.
 // Unlike `preflight/reset.ts`'s own "authoritative Go twin, ported TS copy" split (needed there
 // for `previewResetMode`'s no-round-trip mode-radio recompute), `ClassifyRestack` itself is NOT
 // ported to `@kira/git-core`: nothing in `StackDialog.vue` recomputes a preflight verdict
@@ -602,7 +595,7 @@ export interface WorktreeRemovePreflight {
 // These nine types ARE structural copies of `internal/gitpreflight/stack.go`'s wire types
 // (`StackBranch`/`StackSummary`/`RestackPreflight`) and `internal/gitsession/stack.go`'s
 // (`RestackResult`/`RestackProgress`) — kept honest by hand (this repo carries no
-// `wireConformance.spec.ts`; see G24's own commit message for why) rather than by a
+// `wireConformance.spec.ts`) rather than by a
 // conformance test.
 // ---------------------------------------------------------------------------------------
 
@@ -655,7 +648,7 @@ export interface StackListResult {
   readonly orphans: readonly StackBranch[];
 }
 
-/** `preflight.restack`'s own blocker union (D14) — six kinds, in the exact fixed order the Go
+/** `preflight.restack`'s own blocker union — six kinds, in the exact fixed order the Go
  *  classifier reports them: `inProgressOperation`, `notStacked`, `cycle`, `parentMissing`,
  *  `checkedOutElsewhere`, `dirtyWorktree`. The first is the dialog's own headline, the same
  *  convention `CheckoutBlocker`/`CherryPickBlocker` already established. */
@@ -703,10 +696,10 @@ export interface RestackPreflight {
   readonly routes: readonly 'stashFirst'[];
 }
 
-/** `stack.restack`'s own result (D6/D8/D11) — a `Conflict`/dirty-tree/base-write failure pauses
- *  the restack at `stoppedAt` with NO undo record set (D8: replaying `update-ref`s underneath a
+/** `stack.restack`'s own result — a `Conflict`/dirty-tree/base-write failure pauses
+ *  the restack at `stoppedAt` with NO undo record set (replaying `update-ref`s underneath a
  *  running `rebase-merge` sequencer would leave it pointing at commits the refs no longer name).
- *  A cancellation (D9) stops between branches, never mid-rebase, and also sets no undo record. */
+ *  A cancellation stops between branches, never mid-rebase, and also sets no undo record. */
 export interface RestackResult {
   readonly ok: boolean;
   readonly error: { readonly kind: OpErrorKind; readonly message: string } | undefined;
@@ -718,7 +711,7 @@ export interface RestackResult {
   readonly inProgress: InProgressOperation | null;
 }
 
-/** `stack.progress`'s own event payload (D6 step 4) — emitted BEFORE each branch's own rebase
+/** `stack.progress`'s own event payload — emitted BEFORE each branch's own rebase
  *  spawn, the same "coalesce, never withhold past a bound" family `remote.progress`
  *  already established, though a restack's own per-branch granularity needs
  *  no throttling of its own (there is at most one event per branch, never a stream within one). */
@@ -730,9 +723,9 @@ export interface RestackProgress {
 }
 
 // ---------------------------------------------------------------------------------------
-// P8 — remote-op vocabulary, and pull/push pre-flight (§7.3/§7.4). Structural copies of
-// `@kira/git-core`'s own (B3 — core and ipc both depend on nothing, so neither imports the
-// other); `tests/unit/ipc/wireConformance.spec.ts` keeps the two in step.
+// Remote-op vocabulary, and pull/push pre-flight. Structural copies of `@kira/git-core`'s own (core
+// and ipc both depend on nothing, so neither imports the other);
+// `tests/unit/ipc/wireConformance.spec.ts` keeps the two in step.
 // ---------------------------------------------------------------------------------------
 
 export type PullStrategy = 'ff-only' | 'merge' | 'rebase';
@@ -790,18 +783,18 @@ export interface PushPreflight {
   /** The matched protected pattern, or `null` — never a bare boolean (D52). */
   readonly protectedBy: string | null;
   readonly fastForward: boolean;
-  /** The branch a force-push actually lands on: the resolved UPSTREAM remote branch name, which
-   *  can differ from the LOCAL branch name a stacked/renamed branch tracks (F2, P108 Part 16
-   *  review). `ForcePushDialog.vue` must gate its typed-confirmation on this name, not the local
-   *  one, to ever match what the server's own `ConfirmToken` check requires. */
+  /** The branch a force-push lands on: the resolved UPSTREAM remote branch name, which
+   *  can differ from the LOCAL branch name a stacked/renamed branch tracks. `ForcePushDialog.vue`
+   *  must gate its typed-confirmation on this name, not the local one, to ever match what the
+   *  server's own `ConfirmToken` check requires. */
   readonly resolvedBranch: string;
 }
 
-/** `remote.run`'s params — one request key for all five `RemoteOpKind`s (D51). `confirmToken`
+/** `remote.run`'s params — one request key for all five `RemoteOpKind`s. `confirmToken`
  *  is present only for a protected-branch force-push/delete: the typed branch name, checked
- *  server-side against Kira Space's own server-owned `protectedBranches` setting (G7 D16/D17,
- *  superseding D52's `kiraSpace.protectedBranches` — moved out of per-window settings because
- *  two windows disagreeing about it is a safety issue, not a preference) — never trusted from the
+ *  server-side against Kira Space's own server-owned `protectedBranches` setting (superseding
+ *  the `kiraSpace.protectedBranches` — moved out of per-window settings because two windows
+ *  disagreeing about it is a safety issue, not a preference) — never trusted from the
  *  UI alone. */
 export interface RemoteOpParams {
   readonly repoId: string;
@@ -819,9 +812,9 @@ export interface RemoteOpParams {
    *  user, or null when the dialog showed "nothing to overwrite". The server re-reads the
    *  remote-tracking ref immediately before spawning and compares against this value, failing
    *  with LeaseViolation on a mismatch even when git's own bare --force-with-lease
-   *  --force-if-includes would not itself object (D48's residual-hazard mitigation: a
-   *  background auto-fetch can silently satisfy git's own lease between dialog-open and spawn,
-   *  without the user — still looking at the dialog's now-stale remoteTip — ever finding out).
+   *  --force-if-includes would not itself object (a background auto-fetch can silently satisfy
+   *  git's own lease between dialog-open and spawn, without the user — still looking at the
+   *  dialog's now-stale remoteTip — ever finding out).
    *  undefined for every other kind. */
   readonly expectedRemoteTip: string | null | undefined;
   /** forcePush only: true selects plain --force; false/undefined selects the default
@@ -864,8 +857,8 @@ export type OpRequest =
       /** §7.5's "discard" route: `git switch --discard-changes`. Cannot clear an untracked
        *  block (probe P9) — the UI never offers it for one. */
       readonly discardLocalChanges: boolean;
-      /** G28 D3: prepend a whole-tree `stash push [-u]` tagged with the CURRENT branch, so the
-       *  switch cannot be blocked by a dirty tree. Never popped back (D1) — the entry stays in the
+      /** Prepend a whole-tree `stash push [-u]` tagged with the CURRENT branch, so the
+       *  switch cannot be blocked by a dirty tree. Never popped back — the entry stays in the
        *  stash list; cross-branch apply is the deliberate recovery path. Mutually exclusive with
        *  `discardLocalChanges` — the server refuses both at once rather than guessing. */
       readonly autoStash: boolean;
@@ -920,10 +913,10 @@ export type OpRequest =
     }
   | { readonly kind: 'stashDrop'; readonly sha: string; readonly index: number }
   /** Addressed by `stash@{index}`: given a raw sha, `stash branch` applies but silently never
-   *  drops (probe 8). G28 D12: `scope: 'global'` skips the stack-position verification entirely
+   *  drops. `scope: 'global'` skips the stack-position verification entirely
    *  (there is no position) and applies by sha instead — `index` is then ignored server-side
    *  (still present on the wire for shape uniformity; the client sends the entry's own `-1`
-   *  sentinel, D17). */
+   *  sentinel). */
   | {
       readonly kind: 'stashBranch';
       readonly branch: string;
@@ -949,14 +942,13 @@ export type OpRequest =
     }
   /** §7.11's third sequencer verb, for cherry-pick and revert only (probe 6). */
   | { readonly kind: 'opSkip' }
-  /** G25 D2/D3: three explicit creation modes, always with an explicit commit-ish — bare DWIM
+  /** Three explicit creation modes, always with an explicit commit-ish — bare DWIM
    *  (`worktree add <path>` with no commit-ish, which silently names a branch after the path's own
-   *  basename, probe M8) is never relied on. `branch`/`startPoint` are populated per mode:
+   *  basename) is never relied on. `branch`/`startPoint` are populated per mode:
    *  `existingBranch` needs only `branch` (itself the commit-ish); `newBranch` needs both;
    *  `detach` needs only `startPoint`. Deliberately no `force` — its only real use (forcing a
    *  branch already checked out elsewhere onto a worktree) enables exactly the hazard
-   *  `branchCheckedOutElsewhere` exists to prevent; a later phase owns the right "auto-detach"
-   *  answer for that. */
+   *  `branchCheckedOutElsewhere` exists to prevent. */
   | {
       readonly kind: 'worktreeAdd';
       readonly path: string;
@@ -964,8 +956,8 @@ export type OpRequest =
       readonly branch: string | undefined;
       readonly startPoint: string | undefined;
     }
-  /** G25 D2/D8: `force`/`confirmToken` are BOTH re-derived and re-checked host-side immediately
-   *  before the write, never trusted as the client's own claim (D8's own fail-safe-over-fail-open
+  /** `force`/`confirmToken` are BOTH re-derived and re-checked host-side immediately
+   *  before the write, never trusted as the client's own claim (the fail-safe-over-fail-open
    *  principle for this destructive path) — `force` becomes true only when the server's own fresh
    *  preflight verdict is `"dirty"`, and `confirmToken` must then equal that same fresh preflight's
    *  own `confirmToken` (the worktree's basename) exactly. */
@@ -979,9 +971,9 @@ export type OpRequest =
    *  writes (D2), always exit 0. `parent: undefined` removes `branch` from its stack (D2 writes
    *  `""` to both `kirastack*` keys server-side, never `git config --unset`, per F15/probe P5). */
   | { readonly kind: 'stackSet'; readonly branch: string; readonly parent: string | undefined }
-  /** G28 D10: saves an entry into the global stash bucket — ALWAYS COPIES, never drops its
+  /** Saves an entry into the global stash bucket — ALWAYS COPIES, never drops its
    *  source. `sha: undefined` snapshots the CURRENT working tree (tracked changes only — `git
-   *  stash create` cannot include untracked files, probe P5); otherwise the sha of an existing
+   *  stash create` cannot include untracked files); otherwise the sha of an existing
    *  stash-stack OR global entry to promote, resolved across BOTH buckets server-side. */
   | { readonly kind: 'globalStashSave'; readonly label: string; readonly sha: string | undefined }
   /** G28 D11: removes one entry from the global bucket — the cleanest undo in the whole table
@@ -1038,10 +1030,10 @@ export type OpErrorKind =
   | 'ProtectedBranch'
   /** P8: a remote op was cancelled mid-flight (D50) — never a git-reported failure either. */
   | 'Cancelled'
-  /** P9: a pop/apply merged with conflicts. Deliberately NOT detected from a stderr pattern — a
-   *  conflicting pop writes to stdout and leaves stderr empty (probe 5) — the service classifies
+  /** A pop/apply merged with conflicts. Deliberately NOT detected from a stderr pattern — a
+   *  conflicting pop writes to stdout and leaves stderr empty — the service classifies
    *  it from `exitCode !== 0` plus a post-op status read-back finding unmerged paths. The stash
-   *  is ALWAYS kept (§7.6); the message says so. */
+   *  is ALWAYS kept; the message says so. */
   | 'StashConflict'
   /** P9: `apply --index`/`pop --index` onto an already-conflicted index —
    *  `error: conflicts in index. Try without --index.` (probe 10). Distinct from `StashConflict`:
@@ -1062,8 +1054,8 @@ export type OpErrorKind =
   | 'ConfirmationRequired'
   /** P10, probe 8: `commit <sha> is a merge but no -m option was given.` */
   | 'MainlineRequired'
-  /** G25 D15, probe M5: `fatal: cannot remove a locked working tree, lock reason: <reason>` —
-   *  this phase's own ONE new member here (D16's own budget: exactly one new `OpErrorKind`).
+  /** `fatal: cannot remove a locked working tree, lock reason: <reason>` —
+   *  the ONE new member here (exactly one new `OpErrorKind`).
    *  Kept distinct from `LockHeld` (which means "another git process holds index.lock" — an
    *  entirely different remedy: `LockHeld` says wait/retry, `WorktreeLocked` says unlock the
    *  worktree first). */
@@ -1076,12 +1068,10 @@ export type OpErrorKind =
    *  create` answers exit 0 with empty output on a clean tree (probe P4), which becomes this named
    *  refusal rather than a silent no-op write. This phase's own ONE new `OpErrorKind`. */
   | 'NothingToStash'
-  /** G30 round-1 functional-correctness review, finding #2: `remote.run`'s pull integrate phase
-   *  (merge/rebase) re-checks HEAD is still the branch the pull was started for, immediately
-   *  before that write — a fetch can take arbitrary wall-clock time, during which another
-   *  window/terminal can check out a different branch, and without this the merge/rebase would
-   *  silently land on whatever is checked out now instead. This review round's own ONE new
-   *  `OpErrorKind`. */
+  /** `remote.run`'s pull integrate phase (merge/rebase) re-checks HEAD is still the branch the pull
+   *  was started for, immediately before that write — a fetch can take arbitrary wall-clock time,
+   *  during which another window/terminal can check out a different branch, and without this the
+   *  merge/rebase would silently land on whatever is checked out now instead. */
   | 'BranchChanged'
   | 'Unknown';
 
@@ -1134,8 +1124,8 @@ export interface ServerAppInitResult {
 }
 
 // ---------------------------------------------------------------------------------------
-// G24: change-request links (D1/D5/D14) — a structural copy of internal/githost.Status/ChangeRequest, kept honest
-// by hand (this repo carries no wireConformance.spec.ts — see G24's own commit message for why).
+// Change-request links — a structural copy of internal/githost.Status/ChangeRequest, kept honest
+// by hand (this repo carries no wireConformance.spec.ts — see the commit message for why).
 // ---------------------------------------------------------------------------------------
 
 /** D5's own four-kind actionability union: "ok" ⇒ the host's client is installed, authenticated and
@@ -1168,9 +1158,10 @@ export interface ChangeRequestRecord {
   readonly updatedAt: number;
 }
 
-/** commit.resolveChangeRequests / branch.resolveChangeRequest's own shared result shape (D14). `"disabled"` covers both
- *  `kiraSpace.gitHost.provider === 'off'` and "no remote on a known code host" — the grid/badge/detail
- *  pane render nothing for either, so the two need no further distinction on the wire. */
+/** commit.resolveChangeRequests / branch.resolveChangeRequest's own shared result shape.
+ *  `"disabled"` covers both `kiraSpace.gitHost.provider === 'off'` and
+ *  "no remote on a known code host" — the grid/badge/detail pane render nothing for either, so the
+ *  two need no further distinction on the wire. */
 /** What the UI needs to name one code host provider (`githost.Info`). */
 export interface GitHostInfo {
   readonly id: string;
@@ -1199,8 +1190,8 @@ export type RepoOpenResult =
   | { readonly kind: 'gitUnavailable'; readonly git: GitStatus };
 
 // ---------------------------------------------------------------------------------------
-// P7 — Branch review (§6.8). Structural copies of `core`'s `model/review.ts`, kept honest by
-// `tests/unit/ipc/wireConformance.spec.ts` rather than an import (B3).
+// Branch review. Structural copies of `core`'s `model/review.ts`, kept honest by
+// `tests/unit/ipc/wireConformance.spec.ts` rather than an import.
 // ---------------------------------------------------------------------------------------
 
 /** A `<base>..<branch>` two-dot range (§6.8/D30). Both are short ref names as the UI shows them
@@ -1255,7 +1246,7 @@ export interface BaseResolution {
 }
 
 // ---------------------------------------------------------------------------------------
-// G11 — incremental review (`docs/HISTORY.md (v1.3 G11)`).
+// Incremental review.
 // review.db's own per-file "last reviewed" state, the three-tier delta selection, and partial
 // review ranges — all new to v1.3, no upstream equivalent.
 // ---------------------------------------------------------------------------------------
@@ -1299,9 +1290,8 @@ export type ReviewDeltaSource =
 export type ReviewDiffMode = 'range' | 'sinceReview';
 
 // ---------------------------------------------------------------------------------------
-// G13 — inline AI review comments (`docs/HISTORY.md (v1.3 G13)`). A flat,
-// non-threaded annotation table anchored to the revision the reviewer was reading and projected
-// forward on read (D6/D7) — no upstream equivalent, same as G11.
+// Inline AI review comments. A flat, non-threaded annotation table anchored to the revision the
+// reviewer was reading and projected forward on read — no upstream equivalent.
 // ---------------------------------------------------------------------------------------
 
 /** How a stored comment's line range relates to the revision it was asked about (D7). */
@@ -1339,7 +1329,7 @@ export type ReviewCommentKind = 'change' | 'question';
 export type ReviewCommentState = 'open' | 'addressed';
 
 // ---------------------------------------------------------------------------------------
-// P11 — search. Structural copy of `packages/core`'s `search/query.ts` (minus `scope`: the
+// Search. Structural copy of `packages/core`'s `search/query.ts` (minus `scope`: the
 // tail scan is commits-only, and Refs/Both are resolved entirely client-side against
 // `RefsState`, no RPC), kept honest by `tests/unit/ipc/wireConformance.spec.ts`.
 // ---------------------------------------------------------------------------------------
@@ -1386,7 +1376,7 @@ export type SearchRunResult =
     }
   /** Never thrown (probe 4): a pattern the UI would not send still comes back as data. */
   | { readonly kind: 'invalidPattern'; readonly message: string }
-  /** G23: the pattern is valid JavaScript (the client compiled it before sending) but uses
+  /** The pattern is valid JavaScript (the client compiled it before sending) but uses
    *  syntax the Go tail scan's RE2 engine cannot run — lookahead, lookbehind, or a backreference.
    *  The loaded-commit half of the search is unaffected and still complete; only the not-yet-
    *  walked tail (and therefore any body-only match) is missing. */
@@ -1397,10 +1387,10 @@ export type SearchRunResult =
  *  command is an entry point, never a second implementation. */
 export type UiActionKind =
   | 'openBranchPicker'
-  /** P77: the same panel, opened on its Tags / Stashes / Worktrees / Stacks tab. Before this, all
+  /** The same panel, opened on its Tags / Stashes / Worktrees / Stacks tab. Before this, all
    *  twelve of `commands.ts`'s `MUTATING_COMMANDS` entries for those rows funnelled into
    *  `openBranchPicker` alone, which opens a five-tab panel on whichever tab it was last left on
-   *  and no closer to the row the command names. One member per tab, the same shape G22 D10 used
+   *  and no closer to the row the command names. One member per tab, the same shape used
    *  for `resetSelected`/`cherryPickSelected`. */
   | 'openTagPicker'
   | 'openStashPicker'
@@ -1431,14 +1421,14 @@ export type UiActionKind =
   /** G14 D10: "Open in graph" from the review diff toolbar — reveals and selects a commit named
    *  by `ui.action`'s optional `target`. Host -> webview only. */
   | 'revealCommit'
-  /** G17 D9: the palette's own route to `StashDialog.vue`'s create mode — the same assignment the
+  /** The palette's own route to `StashDialog.vue`'s create mode — the same assignment the
    *  toolbar's own "Stash changes…" button already makes (`App.vue`'s `@stash-changes` handler),
    *  so this is a second entry point into the same dialog, never a second implementation. The
    *  other four stash commands (`stashApply`/`stashPop`/`stashDrop`/`stashBranch`) reuse
    *  `openStashPicker` instead — no new member for those (`BranchPicker.vue`'s own Stashes tab
    *  already has row-level Apply/Pop/Drop/Branch actions). */
   | 'stashChanges'
-  /** G22 D10: the palette's own route into `ResetDialog.vue` — the same assignment the graph row
+  /** The palette's own route into `ResetDialog.vue` — the same assignment the graph row
    *  menu's own "Reset to This Commit…" entry already makes (`App.vue`'s
    *  `resetToThisCommit`/`runReset` handler), so this is a second entry point into the same
    *  dialog, never a second implementation. */
@@ -1447,25 +1437,25 @@ export type UiActionKind =
    *  row menu's own "Cherry-pick This Commit…" entry already makes (`App.vue`'s
    *  `cherryPickThisCommit`/`runCherryPick` handler). */
   | 'cherryPickSelected'
-  /** G25: the palette's own route into `WorktreeDialog.vue`'s create mode — the same assignment
+  /** The palette's own route into `WorktreeDialog.vue`'s create mode — the same assignment
    *  the branch picker's own worktree section "Create Worktree…" button already makes, so this is
    *  a second entry point into the same dialog, never a second implementation. The other worktree
    *  actions (switch, open in new window, remove) reuse `openWorktreePicker` instead, the same
    *  convention the five stash commands already established — `BranchPicker.vue`'s own Worktrees
    *  tab already has row-level actions for all three. */
   | 'createWorktree'
-  /** G26 D13: the palette's own route to "Restack this stack" — resolves the CURRENT branch's own
+  /** The palette's own route to "Restack this stack" — resolves the CURRENT branch's own
    *  stack client-side (`stackListModel`) and calls the same `runRestack` the row menu's
    *  "Restack this stack" entry and `StackList.vue`'s own header button already call, never a
    *  second implementation. */
   | 'restackStack'
-  /** G26 D13/§7.3's `alt+up`/`alt+down` stack navigation — resolves the current branch's parent
+  /** The `alt+up`/`alt+down` stack navigation — resolves the current branch's parent
    *  (`checkoutStackParent`) or child (`checkoutStackChild`) client-side and calls the existing
    *  `opsState.runCheckout`, exactly the same "resolve a target, call the existing op" shape
    *  `revertSelected`/`resetSelected`/`cherryPickSelected` already established. */
   | 'checkoutStackParent'
   | 'checkoutStackChild'
-  /** G28 D13: the palette's own route into `StashDialog.vue`'s fourth mode, save-to-global-stash —
+  /** The palette's own route into `StashDialog.vue`'s fourth mode, save-to-global-stash —
    *  the same assignment the global stash section's own "Save to global stash…" header button
    *  already makes, so this is a second entry point into the same dialog, never a second
    *  implementation. `globalStashRemove`/`stashBranch`-for-a-global-entry reuse `openStashPicker`
@@ -1527,7 +1517,7 @@ export type Contract = {
       result: Record<string, never>;
     };
     /**
-     * §6.8/D30. Called once when the review view targets a branch (no `base`), and again with
+     * Called once when the review view targets a branch (no `base`), and again with
      * an explicit `base` each time the header picker overrides it — the `merge-base` and
      * range-count checks must run for a chosen base exactly as they do for a detected one, so
      * both paths land here rather than the override taking a shortcut through the candidate
@@ -1586,7 +1576,7 @@ export type Contract = {
       };
     };
     /**
-     * G11 D1/D5/D10: marks (or unmarks) a file, in whole or in part. No `base` — a write is a fact
+     * Marks (or unmarks) a file, in whole or in part. No `base` — a write is a fact
      * about `(repo, branch, path)` only. `ranges` omitted (not merely empty) means the whole file.
      * Returns the resulting status so the file list updates from the response rather than
      * re-requesting `review.files` after every checkbox.
@@ -1602,7 +1592,7 @@ export type Contract = {
       result: { readonly review: ReviewFileStatus };
     };
     /**
-     * P150: the stored text of `path` as it was when last reviewed, read from review.db's own
+     * The stored text of `path` as it was when last reviewed, read from review.db's own
      * compressed snapshot (no git object read, so it survives a rewritten or unreachable tip).
      * `absent` = no record or no stored snapshot; `reviewedAtSha` is the tip at that review.
      */
@@ -1614,10 +1604,10 @@ export type Contract = {
         readonly reviewedAtSha: string | null;
       };
     };
-    /** G13 D11/D15: anchors a new comment to `at` — the revision the caller says it was reading,
-     *  required with no default (a default of "the tip" is exactly the silent mis-anchor D8
-     *  exists to prevent). Returns the whole comment, id included, so the caller can render its
-     *  thread from the response instead of re-listing. */
+    /** Anchors a new comment to `at` — the revision the caller says it was reading,
+     *  required with no default (a default of "the tip" is exactly the silent mis-anchor).
+     *  Returns the whole comment, id included, so the caller can render its thread from the
+     *  response instead of re-listing. */
     'review.comment.add': {
       params: {
         repoId: string;
@@ -1663,11 +1653,10 @@ export type Contract = {
       result: { readonly at: string; readonly text: string };
     };
     /**
-     * G19 D11b: the durable half of "back to branch selection" (F11/D11) — a small, additive
-     * pair, `CONTRACT_VERSION` 23's own one reason to move. Not commit or diff data, only the
-     * identifiers needed to re-ask `setTarget`/`setBase`'s own question fresh on the next resume
-     * (every resume re-runs `review.resolveBase` for real — there is no cached resolution to go
-     * stale). Answered entirely host-side, exactly
+     * The durable half of "back to branch selection" — a small, additive pair. Not commit or diff
+     * data, only the identifiers needed to re-ask `setTarget`/`setBase`'s own question fresh
+     * on the next resume (every resume re-runs `review.resolveBase` for real — there is no
+     * cached resolution to go stale). Answered entirely host-side, exactly
      * like `editor.openDiff` itself never reaching the Go backend for its own local concerns.
      * `session: null` clears the stored session for `repoId` — sent by `clearTarget()` itself, so
      * an explicit "go back" never leaves a stale resume-point the next cold boot would silently
@@ -1680,10 +1669,10 @@ export type Contract = {
       };
       result: Record<string, never>;
     };
-    /** G19 D11b: the read half — its own round trip, not carried on the bootstrap island, because
+    /** The read half — its own round trip, not carried on the bootstrap island, because
      *  a cold reveal's `repoId` is only known once the view's own `repo.list`
      *  call resolves — see `ReviewView.vue`'s own doc comment on `bootstrap()`'s resume path. A
-     *  snapshot older than 14 days (`savedAt`, matching G11's own `review.db` idle-purge number)
+     *  snapshot older than 14 days (`savedAt`, matching the `review.db` idle-purge number)
      *  is treated as expired and answered as `{session: null}`. */
     'review.session.load': {
       params: { repoId: string };
@@ -1710,7 +1699,7 @@ export type Contract = {
         readonly files: readonly FileChange[];
       };
     };
-    /** P5: the status bar's one-line-at-a-time query — never a whole-file blame (no such request
+    /** The status bar's one-line-at-a-time query — never a whole-file blame (no such request
      *  exists). Always blames the working tree, never a historical revision (no `atSha` param — no
      *  caller needs one). `sha` is the all-zero sentinel
      *  (`'0000000000000000000000000000000000000000'`) for a line whose content isn't in any commit
@@ -1725,7 +1714,7 @@ export type Contract = {
         readonly summary: string;
       };
     };
-    /** P7 (item 2): the uncommitted-changes strip's click-through — every staged/unstaged/
+    /** The uncommitted-changes strip's click-through — every staged/unstaged/
      *  untracked change against HEAD (or the empty tree, when HEAD is unborn), in the identical
      *  `FileChange` shape `commit.detail` already produces, so `FileTree.vue` renders it with no
      *  new component logic. No `sha`, `parents`, `author` or `subject` — the working tree is not a
@@ -1735,7 +1724,7 @@ export type Contract = {
       params: { repoId: string };
       result: { readonly files: readonly FileChange[] };
     };
-    /** P7 (item 2): opens the working-tree diff for one file — the one path this whole contract
+    /** Opens the working-tree diff for one file — the one path this whole contract
      *  intentionally sends a LIVE on-disk path for (every other `editor.*`
      *  method's own left/right documents are immutable history). Answered entirely host-side,
      *  exactly like `editor.openRangeDiff` — the Go server never sees this method.
@@ -1769,12 +1758,12 @@ export type Contract = {
         readonly body: FileDiffBody;
       };
     };
-    /** "Open in editor" (§6.4) — hands the same two blobs to the host's native diff.
+    /** "Open in editor" — hands the same two blobs to the host's native diff.
      *
-     *  G21 D12/D13: two additive params. `pinned` (optional so a caller that forgets it is a
+     *  Two additive params. `pinned` (optional so a caller that forgets it is a
      *  type error at the transport-building call site, never a silent default) —
      *  `true` opens a real, permanent tab and `false` a preview tab. `fallbackSha`
-     *  (D12) is the stash tree's own need: a stash's `-u` untracked files live only in its third
+     *  is the stash tree's own need: a stash's `-u` untracked files live only in its third
      *  parent (`entry.untrackedSha`), which has no `baseSha` of its own — the handler retries the
      *  whole `commit.detail`-composition against `fallbackSha` when `path` is not among `sha`'s
      *  own changed files, instead of throwing, mirroring the retry `state/stash.ts` already
@@ -1791,17 +1780,17 @@ export type Contract = {
       };
       result: Record<string, never>;
     };
-    /** G12 D1, reshaped G13 D8 — the review sidebar's own diff request: a two-revision comparison
+    /** The review sidebar's own diff request: a two-revision comparison
      *  for one path, which (unlike editor.openDiff) is not one commit's parent-child pair.
      *  Answered entirely host-side, exactly like editor.openDiff — the server never
      *  sees this method. `status` is carried rather than re-derived because the caller
      *  (review.files) already knows which side is `{kind: 'empty'}` (an added file has no
      *  base-side blob).
      *
-     *  G13 D8 reshapes this: both sides are now sha-addressed (never a branch name), and `branch`
+     *  Both sides are now sha-addressed (never a branch name), and `branch`
      *  is carried so the right-hand document can be marked as that branch's tip — the fourth
-     *  virtual-key field (`virtualKey.ts`) that is what lets G13 anchor a comment exactly, and
-     *  G14 anchor a hunk mark, rather than approximately. This closes three defects at once: a
+     *  virtual-key field (`virtualKey.ts`) that is what lets a comment, and a hunk mark, be
+     *  anchored exactly rather than approximately. This closes three defects at once: a
      *  branch-addressed document's content used to be cached per URI and never
      *  invalidated (a stale tab could silently mis-anchor a comment against content that had
      *  since moved); `range` mode's left side used to be `base` even though the file list beside
@@ -1831,13 +1820,13 @@ export type Contract = {
       result: Record<string, never>;
     };
     /**
-     * G21 D8a (item 8): "Open all changes" — composes the whole file list from **one**
+     * "Open all changes" — composes the whole file list from **one**
      * `commit.detail` (collapsing what used to be N separate `editor.openDiff` round trips, one
      * per file, into one), reusing the exact `DocumentRef` derivation `editor.openDiff`'s own
-     * handler already performs. Space's `editor.openAllChanges` handler (`hostHandlers.ts`) opens every file as a
-     * preview-cohort tab (P74 §5.2) — a bulk open item 8's original bug was about, and
-     * that bug is never regressed by D13's own per-file preview/pin split, but a whole commit's
-     * files permanently pinning the strip was never the ask either.
+     * handler already performs. Space's `editor.openAllChanges` handler (`hostHandlers.ts`) opens
+     * every file as a preview-cohort tab — a bulk open the original bug was about, and that bug is
+     * never regressed by the per-file preview/pin split, but a whole commit's files permanently
+     * pinning the strip was never the ask either.
      */
     'editor.openAllChanges': {
       params: { repoId: string; sha: string; parentIndex?: number };
@@ -1894,19 +1883,18 @@ export type Contract = {
       result: { entries: readonly StashEntry[] };
     };
     /** The stash's own file list for the detail pane — tracked and, with `-u`, untracked, from
-     *  one `stash show --numstat/--name-status -z -u -M -C` pair (probe 12). `scope` (G28 D17):
-     *  absent or `'stack'` resolves against the ordinary stack (unchanged for every pre-G28
-     *  caller); `'global'` resolves against the bucket instead — the same query either way, since
-     *  a stash commit's own tree diffed against its base means the same thing regardless of which
-     *  bucket the ref lives in. */
+     *  one `stash show --numstat/--name-status -z -u -M -C` pair. `scope`: absent or `'stack'`
+     *  resolves against the ordinary stack; `'global'` resolves against the bucket instead — the
+     *  same query either way, since a stash commit's own tree diffed against its base means the
+     *  same thing regardless of which bucket the ref lives in. */
     'stash.show': {
       params: { repoId: string; sha: string; scope?: 'stack' | 'global' };
       result: { sha: string; changes: readonly FileChange[] };
     };
     /** `targetSha` omitted ⇒ HEAD. Supplied by the `stashAndCarry` route, which predicts against
-     *  the commit it is about to switch to. `scope` (G28 D17): same optional 'stack'/'global' shape
+     *  the commit it is about to switch to. `scope`: same optional 'stack'/'global' shape
      *  as `stash.show` — the prediction machinery itself (`stashPopPrediction`,
-     *  `ClassifyStashPop`) is UNCHANGED either way (F2/D12): only which bucket the entry is
+     *  `ClassifyStashPop`) is UNCHANGED either way: only which bucket the entry is
      *  resolved from differs. */
     'preflight.stashPop': {
       params: {
@@ -1974,16 +1962,16 @@ export type Contract = {
     'remote.cancel': {
       params: { repoId: string };
       /** false when there was nothing to cancel (already finished, never running, or the op is
-       *  past its killable phase — push/forcePush/deleteRemoteBranch/pull's merge-rebase phase,
-       *  D50) — never an error: a cancel racing a just-finished op is an ordinary outcome, not a
+       *  past its killable phase — push/forcePush/deleteRemoteBranch/pull's merge-rebase phase)
+       *  — never an error: a cancel racing a just-finished op is an ordinary outcome, not a
        *  fault. */
       result: { readonly cancelled: boolean };
     };
     // ---- P11: search -----------------------------------------------------------------------
-    /** §7.8's git-backed half. One request, one cancellable read — no cancel key, no second walk
-     *  session (`docs/plans/P11.md`'s hard parts 3 and 6, and D51's contrast). Superseded by the
-     *  caller's own `AbortSignal`, which `rpc.ts` already threads to the spawn. Refs/Both are
-     *  resolved entirely client-side against `RefsState`; this request is commits-only. */
+    /** One request, one cancellable read — no cancel key, no second walk session.
+     *  Superseded by the caller's own `AbortSignal`, which `rpc.ts` already threads to the spawn.
+     *  Refs/Both are resolved entirely client-side against `RefsState`;
+     *  this request is commits-only. */
     'search.run': {
       params: { repoId: string; query: SearchQueryParams; limit?: number };
       result: SearchRunResult;
@@ -2024,10 +2012,10 @@ export type Contract = {
       params: { repoId: string };
       result: RepoSettingsSnapshot;
     };
-    /** Writes only the leaves the caller actually patched and returns the resulting snapshot —
+    /** Writes only the leaves the caller patched and returns the resulting snapshot —
      *  the same "patch, don't replace" discipline `RepoSettingsPatch` states at its own type.
      *  Also triggers `repoSettings.changed` (below) to every connected client, not only this
-     *  one (D7). */
+     *  one. */
     'repoSettings.set': {
       params: { repoId: string; patch: RepoSettingsPatch };
       result: RepoSettingsSnapshot;
@@ -2074,13 +2062,13 @@ export type Contract = {
       params: { repoId: string; number: number };
       result: Record<string, never>;
     };
-    /** P79 finding 4: opens an arbitrary URL `linkify.ts` found in a commit message body, in the
+    /** Opens an arbitrary URL `linkify.ts` found in a commit message body, in the
      *  OS browser — `CommitMeta.vue`'s message-body links, unlike the PR row above, cannot be
      *  server-composed (the URL *is* the untrusted renderer-visible content, a commit message).
-     *  Host-answered like `changeRequest.openExternal`, never proxied to the Go server; each host still
-     *  refuses anything that is not a well-formed http(s) URL before its own OS-open call ever
-     *  sees it — the same "boundary is the thing being defended" posture, applied to a URL this
-     *  process can only validate, never compose. */
+     *  Host-answered like `changeRequest.openExternal`, never proxied to the Go server; each host
+     *  still refuses anything that is not a well-formed http(s) URL before its own OS-open call
+     *  ever sees it — the same "boundary is the thing being defended" posture, applied to a URL
+     *  this process can only validate, never compose. */
     'link.openExternal': {
       params: { url: string };
       result: Record<string, never>;
@@ -2107,10 +2095,10 @@ export type Contract = {
       result: WorktreeRemovePreflight;
     };
     // ---- G26: stacked branches (D1-D17) -----------------------------------------------------
-    /** D3: one `git config --local --null --get-regexp` spawn, always; one `rev-list
+    /** One `git config --local --null --get-regexp` spawn, always; one `rev-list
      *  --left-right --count` spawn per stacked branch beyond that, bounded by
      *  `MaxStackedBranches` (64) — a repository with no stacked branches costs exactly the first
-     *  spawn and nothing else. Cache-reading (dropped on `refsChanged`/any write, D16). */
+     *  spawn and nothing else. Cache-reading (dropped on `refsChanged`/any write). */
     'stack.list': {
       params: { repoId: string };
       result: StackListResult;
@@ -2121,9 +2109,9 @@ export type Contract = {
       params: { repoId: string; branch: string };
       result: RestackPreflight;
     };
-    /** D6: a long, cancellable, streaming method modelled exactly on `remote.run` — its own
+    /** A long, cancellable, streaming method modelled exactly on `remote.run` — its own
      *  dedicated executor (`gitsession.RunRestack`), NOT server via the shared `op.run` table
-     *  (F7: recording each child's new base needs the parent's post-rebase tip, which no static
+     *  (recording each child's new base needs the parent's post-rebase tip, which no static
      *  argv list can express). Emits `stack.progress` before each branch. */
     'stack.restack': {
       params: { repoId: string; branch: string };
@@ -2131,7 +2119,7 @@ export type Contract = {
     };
     /** No-op if the run already finished or was never running — the same "never an error, a
      *  cancel racing a just-finished op is ordinary" shape `remote.cancel`
-     *  already uses. No palette command serves this directly (D13): cancel is a button on the
+     *  already uses. No palette command serves this directly: cancel is a button on the
      *  surface that started the work. */
     'stack.cancelRestack': {
       params: { repoId: string };
@@ -2140,11 +2128,11 @@ export type Contract = {
     // ---- P75 §2.3: reveal a review commit in the graph, from either host -------------------
     /** Replaces the review row's old `command:kiraSpace.openCommitInGraph?…` anchor (a webview link
      *  escape hatch — `RepoReviewView.vue` mounts the row component in a Wails WebView, where no
-     *  `command:` handler exists at any layer). Host-answered, never reaching Go (like `review.open`/
-     *  `editor.openRangeDiff`): the desktop answers by emitting/stashing `ui.action`'s own
-     *  `revealCommit` onto the pinned graph tab. `revealed: false` is a real, non-stub
-     *  answer — the desktop genuinely cannot reveal when this window has no record of the
-     *  repository, or its workspace has no pinned graph tab open. */
+     *  `command:` handler exists at any layer). Host-answered, never reaching Go
+     *  (like `review.open`/`editor.openRangeDiff`): the desktop answers by emitting/stashing
+     *  `ui.action`'s own `revealCommit` onto the pinned graph tab. `revealed: false` is a
+     *  real, non-stub answer — the desktop genuinely cannot reveal when this window has no record
+     *  of the repository, or its workspace has no pinned graph tab open. */
     'graph.revealCommit': {
       params: { repoId: string; sha: string };
       result: { readonly revealed: boolean };
@@ -2165,8 +2153,8 @@ export type Contract = {
     /** G26 D6 step 4: one event per planned branch (never a stream within one) for whichever
      *  `stack.restack` is in flight. */
     'stack.progress': RestackProgress;
-    /** G10: host -> whichever webview the action targets — the graph panel for every mutating op
-     *  (the review sidebar renders no operation UI), and, since G11 D17, the review sidebar for
+    /** Host -> whichever webview the action targets — the graph panel for every mutating op
+     *  (the review sidebar renders no operation UI), and the review sidebar for
      *  'toggleFileReviewed'. One palette command's action, routed to the affordance the toolbar or
      *  a context menu
      *  already drives — the palette is an entry point, never a second implementation. */
@@ -2181,8 +2169,8 @@ export type Contract = {
     'graph.stream': {
       params: {
         repoId: string;
-        /** Honored the same way with `range` present or absent (G32 round-3 performance review,
-         *  finding #1 — this field used to be structurally documented as ignored for a ranged
+        /** Honored the same way with `range` present or absent (this field used to be structurally
+         *  documented as ignored for a ranged
          *  request, but the server reuses the same walk, and so the same row cache, across every
          *  `graph.stream` call for one range spec exactly like the graph's own non-ranged walk;
          *  `review.ts`'s own `loadMore` needs this to resume past what it already applied instead

@@ -80,7 +80,7 @@ describe('SubjectBuffer', () => {
     expect(() => buffer.at(-1)).toThrow();
   });
 
-  // G31 round-2 performance review, finding #2: rangeBytes(0, count) used to rebase every
+  // rangeBytes(0, count) used to rebase every
   // offset — `this.#offsets[i] - this.#offsets[0]` — into a freshly allocated Uint32Array even
   // though `this.#offsets[0]` is always 0, making the whole rebase loop an identity copy. Proven
   // here by capacity: growOffsets's own doubling (1, 2, 4, 8, ...) leaves slack between

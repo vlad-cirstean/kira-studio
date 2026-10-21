@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { type HttpVersion, httpVersionSchema } from './settings';
 
-// P2 D5: the wire shapes live in Go (`internal/httpclient`) and are mirrored, not re-validated,
+// The wire shapes live in Go (`internal/httpclient`) and are mirrored, not re-validated,
 // here — `control.ts`'s `httpSend` `trust<T>()`s the bound call's result exactly as every other
 // bound call does. These types exist so the renderer has something to type against, not to guard
 // input Go already produced.
@@ -22,8 +22,8 @@ export interface HttpRedirectHop {
 }
 
 // The wire's own mode spelling — httpclient.BodyMode's values. Kept distinct from the state
-// schema's own httpBodyModeSchema below (same five values) — the wire never carries P2's legacy
-// 'json' alias, only what Go actually understands; state.ts's send() has already resolved the
+// schema's own httpBodyModeSchema below (same five values) — the wire never carries the legacy
+// 'json' alias, only what Go understands; state.ts's send() has already resolved the
 // alias by the time it builds this.
 export type HttpBodyModeWire = 'none' | 'raw' | 'code' | 'urlencoded' | 'formdata' | 'file';
 
@@ -44,10 +44,10 @@ export interface HttpFormFieldWire {
 }
 
 // httpclient.Body — a tagged union: `mode` selects which member is meaningful, every other member
-// is ignored (P3 D5), replacing P2's `body: string; hasBody: boolean` pair. `raw` is the plain-text
-// buffer (raw mode only); `code`/`codeLanguage` are the syntax-highlighted buffer and its language
-// (code mode only, one of CODE_LANGUAGES below) — two separate buffers so switching between the two
-// modes never loses either one's text (D8's "every mode keeps its own buffer" rule).
+// is ignored. `raw` is the plain-text buffer (raw mode only); `code`/`codeLanguage` are the
+// syntax-highlighted buffer and its language (code mode only, one of CODE_LANGUAGES below) — two
+// separate buffers so switching between the two modes never loses either one's text (the "every
+// mode keeps its own buffer" rule).
 export interface HttpBodyWire {
   mode: HttpBodyModeWire;
   raw: string;
@@ -58,7 +58,7 @@ export interface HttpBodyWire {
   file: string;
 }
 
-// httpclient.Request — what `HttpService.Send` sends to Go. P5 D6: `collectionId`/`environmentId`
+// httpclient.Request — what `HttpService.Send` sends to Go. `collectionId`/`environmentId`
 // are both possibly empty (a scratch tab has no collection; no environment may be selected) — Go
 // treats an id that resolves to nothing as "no entries" rather than an error, so a deleted
 // environment never makes a request unsendable.
@@ -71,12 +71,12 @@ export interface HttpRequestWire {
   environmentId: string;
 }
 
-// P9 D3: three states, computed from resp.ProtoMajor/resp.Proto and whether a proxy applied to
+// Three states, computed from resp.ProtoMajor/resp.Proto and whether a proxy applied to
 // this URL (http.ProxyFromEnvironment, the same function sharedClient.Transport.Proxy already is).
-// 'exact' — HTTP/1.1, no proxy: httputil.DumpRequestOut is byte-identical to the wire (P9 F7).
+// 'exact' — HTTP/1.1, no proxy: httputil.DumpRequestOut is byte-identical to the wire.
 // 'http2' — the exchange used HTTP/2, whose wire form is binary HPACK frames; the rendering below
-// is the equivalent HTTP/1.1 form (P9 F2). 'proxied' — HTTP/1.1 through a proxy: every byte matches
-// except the request line's target, which carried the absolute URL on the real wire (P9 F9).
+// is the equivalent HTTP/1.1 form. 'proxied' — HTTP/1.1 through a proxy: every byte matches
+// except the request line's target, which carried the absolute URL on the real wire.
 export type HttpWireFidelity = 'exact' | 'http2' | 'proxied';
 
 // P9 D13: the rendered exchange — Go's own `httpclient.WireExchange`, mirrored here. Live-only
@@ -96,22 +96,22 @@ export interface HttpWireExchange {
   requestBodyElided: boolean;
 }
 
-// P10 D4: one measured interval. Absent (an `undefined` field, never present as `0`) means the
-// phase did not happen — a reused connection has no DNS/connect/TLS (F3), a literal-IP URL has no
-// DNS (F5), a plain-`http://` URL has no TLS. That is a different fact from a phase that took no
-// measurable time, and the SPEC's own P10 row requires the two not be confused. Milliseconds,
-// fractional — not the truncated-to-integer unit `elapsedMs` above already uses (D4's own point:
-// the reused-connection case this exists to explain is exactly the sub-millisecond one).
+// One measured interval. Absent (an `undefined` field, never present as `0`) means the
+// phase did not happen — a reused connection has no DNS/connect/TLS, a literal-IP URL has no
+// DNS, a plain-`http://` URL has no TLS. That is a different fact from a phase that took no
+// measurable time. Milliseconds, fractional — not the truncated-to-integer unit `elapsedMs`
+// above already uses (the reused-connection case this exists to explain is exactly the
+// sub-millisecond one).
 export interface HttpPhase {
   startOffsetMs: number;
   durationMs: number;
 }
 
-// P10 D9: one hop's full detail — every redirect hop plus the final one, projected from the same
-// httptrace collector `Response.redirects` above is derived from (D3). `headers` and
+// One hop's full detail — every redirect hop plus the final one, projected from the same
+// httptrace collector `Response.redirects` above is derived from. `headers` and
 // `headersElided` are populated for intermediate hops only (the final hop's headers are already
-// `HttpResponseWire.headers`, D9's do-not-duplicate rule) and capped at 8 KiB rendered per hop
-// (F21). `error` is set only on the hop a failed send died on (D15).
+// `HttpResponseWire.headers`) and capped at 8 KiB rendered per hop. `error` is set only on
+// the hop a failed send died on.
 export interface HttpTimelineHop {
   index: number;
   method: string;
@@ -141,10 +141,10 @@ export interface HttpTimelineHop {
   download?: HttpPhase;
 }
 
-// P10 D2/D3: `httptrace.ClientTrace` installed once on the send's context, bucketed by
+// `httptrace.ClientTrace` installed once on the send's context, bucketed by
 // `checkRedirect` — the same delimiter `Response.redirects` above is derived from — into one hop
-// per response actually seen (F1/F2). `totalMs` is measured directly (`time.Since` over the whole
-// send), never summed from hops' own totals (D5: the phases do not sum to a hop's duration, and a
+// per response seen. `totalMs` is measured directly (`time.Since` over the whole
+// send), never summed from hops' own totals (the phases do not sum to a hop's duration, and a
 // hop's own total does not have to sum to the send's).
 export interface HttpTimeline {
   hops: HttpTimelineHop[];
@@ -185,17 +185,16 @@ export interface HttpResponseWire {
   /** P9 D2/D7: absent when the send failed before a response existed (D15), a dump error occurred
    *  (D2), or this response was read back out of P8's history store (D7 strips it before Record). */
   wire?: HttpWireExchange;
-  /** P10 D2/D10: populated for a real live send's response, and — unlike `wire` above — kept on a
-   *  response read back out of P8's history store (D10: a timeline is ~550 B–3 KB, nowhere near
-   *  P8 D6's per-entry cap, so there is no reason to strip it the way `wire` is). Optional here —
+  /** Populated for a real live send's response, and — unlike `wire` above — kept on a response
+   *  read back out of the history store (a timeline is ~550 B–3 KB, nowhere near the
+   *  per-entry cap, so there is no reason to strip it the way `wire` is). Optional here —
    *  not `?? {hops: [], totalMs: 0}` defaulted anywhere — so every `tests/ui`/`tests/unit` fixture
-   *  built before this phase (an `HttpResponseWire` object literal with no `timeline` field) stays
-   *  valid with no fixture edit (§6.6); `TimelinePane.vue`'s own empty state (D13) is what a
-   *  genuinely absent timeline renders as. */
+   *  (an `HttpResponseWire` object literal with no `timeline` field) stays valid with no fixture
+   *  edit; `TimelinePane.vue`'s own empty state is what a genuinely absent timeline renders as. */
   timeline?: HttpTimeline;
-  /** P90 item 2: what actually went out per hop (sentCookies) and every hop's own Set-Cookie
+  /** What went out per hop (sentCookies) and every hop's own Set-Cookie
    *  (receivedCookies) — both `omitempty` on the wire, so absent (not `[]`) whenever a send carried
-   *  no cookies either way. Kept on a response read back out of P8's history store, the same
+   *  no cookies either way. Kept on a response read back out of the history store, the same
    *  posture `timeline` above takes. */
   sentCookies?: HttpCookieWire[];
   receivedCookies?: HttpCookieWire[];
@@ -269,10 +268,10 @@ export const httpUrlEncodedFieldSchema = /*#__PURE__*/ z.object({
 });
 export type HttpUrlEncodedFieldState = z.infer<typeof httpUrlEncodedFieldSchema>;
 
-// One form-data row — a text row uses `value`, a file row uses `path` (D4: never bytes) plus
+// One form-data row — a text row uses `value`, a file row uses `path` (never bytes) plus
 // `fileName`/`fileSize` so the builder can render `report.csv (1.2 MB)` with no round trip back to
-// disk. `contentType` is the row's own per-part override; blank means the mode's default (D6/D7:
-// the row's own Content type field when set, else application/octet-stream for a file).
+// disk. `contentType` is the row's own per-part override; blank means the mode's default
+// (the row's own Content type field when set, else application/octet-stream for a file).
 export const httpFormDataFieldSchema = /*#__PURE__*/ z.object({
   name: z.string(),
   kind: /*#__PURE__*/ z.enum(['text', 'file']).default('text'),
@@ -306,12 +305,12 @@ export const httpRequestPaneSchema = /*#__PURE__*/ z.enum([
 ]);
 export type HttpRequestPane = z.infer<typeof httpRequestPaneSchema>;
 
-// P8 D10: 'history' is the third pane — F11 verified widening this enum cannot break a restored
-// tab (every stored value is still a member). P9 D12/F13: 'raw' is the fourth, verified safe by
+// 'history' is the third pane — widening this enum cannot break a restored
+// tab (every stored value is still a member). 'raw' is the fourth, verified safe by
 // the identical reasoning — the naming collision with responseView's own 'raw' value below is
-// resolved by F19 (the two are never rendered at once), not by renaming either. P10 D11/F19:
-// 'timeline' is the fifth, safe by the same reasoning again.
-// P90 §2.6: 'cookies' is the sixth member, safe by the same reasoning as every widening above.
+// resolved (the two are never rendered at once), not by renaming either. 'timeline' is the fifth,
+// safe by the same reasoning again.
+// 'cookies' is the sixth member, safe by the same reasoning as every widening above.
 export const httpResponsePaneSchema = /*#__PURE__*/ z.enum([
   'body',
   'headers',
@@ -325,7 +324,7 @@ export type HttpResponsePane = z.infer<typeof httpResponsePaneSchema>;
 export const httpResponseViewSchema = /*#__PURE__*/ z.enum(['pretty', 'raw']);
 export type HttpResponseView = z.infer<typeof httpResponseViewSchema>;
 
-// P90: one nullable twin per api settings leaf — null means "inherit the global default", which
+// One nullable twin per api settings leaf — null means "inherit the global default", which
 // is what a request that has never touched this panel carries. Not a sentinel string and not a
 // parallel `inherited` flag: `itemId` and `binaryFile` above already spell "absent" as null in
 // this same schema, and null is what the wire's own *T pointer decodes from. Bounds are
@@ -359,17 +358,17 @@ export interface HttpRequestSettingsWire {
   disableCookieJar?: boolean;
 }
 
-// D6: every field carries `.default()` so a tab saved by an older version still restores once a
+// Every field carries `.default()` so a tab saved by an older version still restores once a
 // later phase widens `bodyMode` or adds a field — the same discipline `keyValueTabStateSchema`'s
 // own comment records (tabs.ts), and it matters more here than anywhere else because
-// `repos/tabs.go` drops a row outright on a failed parse (P3 C3 fixed the restore path so these
-// defaults actually fire, `state/tabKinds.ts`'s `parseState`). There is deliberately no `params`
-// array: the URL is the single source of truth for the query string (D9), and the Params table is
+// `repos/tabs.go` drops a row outright on a failed parse (the restore path is fixed so these
+// defaults fire, `state/tabKinds.ts`'s `parseState`). There is deliberately no `params`
+// array: the URL is the single source of truth for the query string, and the Params table is
 // a derived editor over it.
 //
 // Every body mode keeps its own buffer (flat siblings, not one nullable per-mode object) —
 // switching between modes must not lose any of their text, and flat keeps every field individually
-// `.default()`-able, which is what the restore-through-schema normalization (C3) relies on.
+// `.default()`-able, which is what the restore-through-schema normalization relies on.
 const httpRequestTabStateShape = /*#__PURE__*/ z.object({
   method: httpMethodSchema.default('GET'),
   url: z.string().default(''),
@@ -381,24 +380,24 @@ const httpRequestTabStateShape = /*#__PURE__*/ z.object({
   urlEncoded: /*#__PURE__*/ z.array(httpUrlEncodedFieldSchema).default([]),
   formData: /*#__PURE__*/ z.array(httpFormDataFieldSchema).default([]),
   binaryFile: httpBinaryFileSchema,
-  // P22b D7: a query param has nowhere to store a description on its own row — there is no
+  // A query param has nowhere to store a description on its own row — there is no
   // `params` array (the comment above this shape explains why one is never added), so a
   // description is annotation over the URL's own query string, keyed by param name, never input to
   // buildQuery. A duplicate param name (`?a=1&a=2`) shares one description — a real, named
-  // limitation (OQ-2) rather than a second array that could disagree with the URL about what is
+  // limitation rather than a second array that could disagree with the URL about what is
   // sent.
   paramDescriptions: /*#__PURE__*/ z.record(z.string(), z.string()).default({}),
-  // P22b D7: FieldRowsTable's own description-column toggle, persisted per tab rather than
-  // runtime-only (OQ-1: a user who wants it always visible should not have to re-open it every
-  // time the tab restores) — shared by every one of this tab's row tables (headers, params,
-  // urlencoded, form-data), which is why it is one flag, not four.
+  // FieldRowsTable's own description-column toggle, persisted per tab rather than runtime-only
+  // (a user who wants it always visible should not have to re-open it every time the tab restores)
+  // — shared by every one of this tab's row tables (headers, params, urlencoded, form-data), which
+  // is why it is one flag, not four.
   fieldDescriptions: z.boolean().default(false),
-  // P4 D14: a saved request's identity and its name, both `.default()`ed like every other field
-  // so a tab saved before P4 restores unchanged. `itemId` is the api_items row this tab is bound
+  // A saved request's identity and its name, both `.default()`ed like every other field
+  // so a tab saved earlier restores unchanged. `itemId` is the api_items row this tab is bound
   // to (null = a scratch request that has never been saved); it lives here rather than in the
   // tab's `path` because duplicateTab copies `path` verbatim while duplicateState clears the id,
   // which would leave two disagreeing sources of one fact and make openTab's reuse lookup
-  // activate the *duplicate* when the user opened the original (F13). `name` is what keeps
+  // activate the *duplicate* when the user opened the original. `name` is what keeps
   // httpRequestTitle pure: without it a saved request called "Create order" would show as
   // /v2/orders everywhere, and the alternative is teaching every title consumer about collections.
   itemId: z.string().nullable().default(null),
@@ -422,15 +421,14 @@ const httpRequestTabStateShape = /*#__PURE__*/ z.object({
   requestPaneHeight: z.number().int().min(0).default(0),
 });
 
-// P2's own legacy alias, kept working: P2 shipped `bodyMode: 'json'` with its text in `body`. P3
-// mapped that mode value onto `raw` + `rawLanguage: 'json'`, since `raw` used to carry a language
-// sub-selector. Now that `raw` means plain text only, the equivalent mode is `code` with
-// `codeLanguage: 'json'` — and because `raw` and `code` are separate buffers, the legacy text has
-// to move from `body` into `code`, not just have its mode value renamed. That is the one thing a
-// per-field enum preprocess (mapping just `bodyMode`) cannot do, so this preprocesses the whole
+// The legacy alias, kept working: `bodyMode: 'json'` with its text in `body`. `raw` used to carry
+// a language sub-selector. Now that `raw` means plain text only, the equivalent mode is `code`
+// with `codeLanguage: 'json'` — and because `raw` and `code` are separate buffers, the legacy text
+// has to move from `body` into `code`, not just have its mode value renamed. That is the one thing
+// a per-field enum preprocess (mapping just `bodyMode`) cannot do, so this preprocesses the whole
 // object instead, only for exactly this legacy shape; every other value passes through untouched.
 // Works only because a restored tab's state is normalized through this schema at all
-// (`state/tabKinds.ts`'s `parseState`) — nothing parsed the restore path before that landed.
+// (`state/tabKinds.ts`'s `parseState`).
 export const httpRequestTabStateSchema = /*#__PURE__*/ z.preprocess((v) => {
   if (v !== null && typeof v === 'object' && (v as Record<string, unknown>).bodyMode === 'json') {
     const obj = v as Record<string, unknown>;
@@ -493,17 +491,17 @@ export function statusClass(status: number): 'info' | 'ok' | 'warn' | 'error' {
   return 'error';
 }
 
-// P4 D16, P17 D19: statusClass's exact sibling, in its exact home. Three surfaces need the same
-// map — the request view's own method chip/select, the response history list's chip, and the
-// collections tree's per-row chip — and `http/**` may not import `views/**` (biome.json), so it
-// lives here rather than being copied into all three.
+// statusClass's exact sibling, in its exact home. Three surfaces need the same map — the request
+// view's own method chip/select, the response history list's chip, and the collections tree's
+// per-row chip — and `http/**` may not import `views/**` (biome.json), so it lives here rather
+// than being copied into all three.
 //
-// Takes a plain `string`, not HttpMethod: an imported PROPFIND (F4) has to have a token rather
-// than throw. `httpMethodClass`'s four-family map (GET/HEAD/OPTIONS -> info, POST -> ok,
+// Takes a plain `string`, not HttpMethod: an imported PROPFIND has to have a token rather than
+// throw. `httpMethodClass`'s four-family map (GET/HEAD/OPTIONS -> info, POST -> ok,
 // PUT/PATCH -> warn, DELETE -> err) could not express "each of the five distinct" the SPEC asks
-// for — PUT and PATCH shared one family — so P17 D19 replaces it outright with a seven-method (plus
-// 'other') token, each aliased in tokens.css to a hue from the twelve-colour connection palette
-// rather than the four-family status palette. Nothing here reads httpMethodClass any more.
+// for — PUT and PATCH shared one family — so a seven-method (plus 'other') token replaces it
+// outright, each aliased in tokens.css to a hue from the twelve-colour connection palette rather
+// than the four-family status palette. Nothing here reads httpMethodClass any more.
 const METHOD_TOKEN: Readonly<Record<string, MethodToken>> = {
   GET: 'get',
   POST: 'post',

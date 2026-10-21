@@ -1,7 +1,7 @@
 import type { AgentEvent } from '@shared/domain/agent';
 
-// Completion detection for a delivered prompt. `UserPromptSubmit` starts every user turn; `Stop` ends
-// it, even when a wake tool leaves the session `waiting`. Pure, no Vue, no clock read;
+// Completion detection for a delivered prompt. `UserPromptSubmit` starts every user turn; `Stop`
+// ends it, even when a wake tool leaves the session `waiting`. Pure, no Vue, no clock read;
 // `installAdeSignals` feeds `onEvent` from `onAgentEvent` and `onLive` from the agent store's
 // live terminal ids.
 

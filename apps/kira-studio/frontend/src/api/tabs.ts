@@ -26,10 +26,10 @@ import { type OpenTabResult, useTabsStore } from '../state/tabs';
 // module's own code that happened to be written in a shell file, so this is a cut-and-paste onto
 // the generic openTab/patchTabState primitives the shell keeps, not a new abstraction.
 
-// P2 D2/D13: always a fresh tab — an HTTP request has no target to reuse by (its own id is its
-// identity, D2), the same "always new" shape openConsoleTab already has for the same reason.
-// `connectionId` is null (F3) and `path` is the literal constant 'request' (D2: non-empty per
-// F2, carrying no false uniqueness, safe through pathTail per F4).
+// Always a fresh tab — an HTTP request has no target to reuse by (its own id is its
+// identity), the same "always new" shape openConsoleTab already has for the same reason.
+// `connectionId` is null and `path` is the literal constant 'request' (non-empty, carrying no
+// false uniqueness, safe through pathTail).
 export function openApiRequestTab(): string {
   return useTabsStore().openTab(
     'http-request',
@@ -73,16 +73,16 @@ function openSavedRequestTab<S extends { itemId: string | null }>(opts: {
   return tabsStore.openTab(opts.kind, null, 'request', () => state, { reuse: false });
 }
 
-// P4 D14: a saved request opens the **existing** 'http-request' tab kind — the same view P2 and
-// P3 built, with its state sourced from a collection row instead of defaultHttpRequestTabState().
+// A saved request opens the **existing** 'http-request' tab kind — the same view, with its state
+// sourced from a collection row instead of defaultHttpRequestTabState().
 // No new tab kind, so tabKindSchema, RENDERABLE_TAB_KINDS, TAB_KIND_MODE, tabRecordSchema and Go's
-// model.RenderableTabKinds are all byte-identical after this phase (F8).
+// model.RenderableTabKinds are all byte-identical.
 //
-// `path` stays the literal constant 'request'. P2 D2 explicitly offered P4 a real
-// `collection:<id>/request:<id>` path and F13 is why it is declined: duplicateTab copies `path`
-// verbatim while duplicateState clears `itemId`, so a duplicated tab would carry the saved
-// request's path identity with a state saying it is unsaved — and openTab's reuse lookup (keyed on
-// kind + connectionId + path) would then activate the *duplicate* when the user opened the
+// `path` stays the literal constant 'request'. A real `collection:<id>/request:<id>` path is
+// declined: duplicateTab copies `path` verbatim while duplicateState clears `itemId`, so a
+// duplicated tab would carry the saved request's path identity with a state saying it is unsaved —
+// and openTab's reuse lookup (keyed on kind + connectionId + path) would then activate the
+// *duplicate* when the user opened the
 // original. Keeping identity in exactly one place and doing the lookup explicitly is four lines
 // and has no such failure mode.
 export function openCollectionRequestTab(
@@ -184,10 +184,10 @@ export function findGrpcRequestTab(id: string): GrpcRequestTabRecord | null {
   return asGrpcRequestTab(useTabsStore().tabs.find((t) => t.id === id));
 }
 
-// P17 D16: one tab kind, reused by scope — a collection's variable set and an environment's are
+// One tab kind, reused by scope — a collection's variable set and an environment's are
 // the same table over the same rows differing only in `scope` (VariablesRepo itself is one repo
 // for both, not two). `path` is `variables:<scope>:<ownerId>` and `reuse: true` — unlike a request
-// tab (P4 F13), a variable-set tab has no duplicate-carrying-the-original's-path hazard:
+// tab, a variable-set tab has no duplicate-carrying-the-original's-path hazard:
 // duplicateState (state/tabKinds.ts) returns the same owner, so a "duplicate" *is* the same tab's
 // target and reusing it is correct, not a bug.
 export function openVariableSetTab(

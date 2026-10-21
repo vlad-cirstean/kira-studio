@@ -1,5 +1,5 @@
-// P44 F43: shared/domain/sqlSplit.ts is a hand-written six-regime lexer that decides what SQL
-// actually gets sent to the server (views/console/ConsoleView.vue's "Run statement"/"Run all"),
+// shared/domain/sqlSplit.ts is a hand-written six-regime lexer that decides what SQL gets sent to
+// the server (views/console/ConsoleView.vue's "Run statement"/"Run all"),
 // and nothing in tests/ calls it directly. The only existing coverage is tests/e2e/console.spec.ts,
 // which is Docker-gated (isDockerAvailable() -> test.skip) and has never run in this sandbox — and
 // even on a box with containers, reproducing a dollar-quoted-body split means typing a multi-line
@@ -44,7 +44,7 @@ describe('splitSqlStatements — lexical regimes (P44 F43)', () => {
     expect(stmts[0]?.text).toBe(`SELECT '\\'; still one'`);
   });
 
-  // Finding #15, M6: a trailing backslash-escape as the very last character of source (with
+  // A trailing backslash-escape as the very last character of source (with
   // backslashEscapes: true and no closing quote) steps scanSqlSpan's cursor two past that
   // backslash — one past source.length — before the loop notices it ran out of source. The
   // returned span's own end must still never exceed source.length.
@@ -81,10 +81,10 @@ describe('splitSqlStatements — lexical regimes (P44 F43)', () => {
     expect(unterminated[0]?.text).toBe('SELECT $$ never closes; SELECT 2');
   });
 
-  // F10/P21 round 1: `$` is a legal (if unusual) MySQL/MariaDB identifier character — an
-  // identifier containing two of them used to read as an unterminated dollar-quote open tag
-  // regardless of dialect, swallowing the rest of the document into one statement ("Run all"
-  // silently ran one statement instead of two).
+  // `$` is a legal (if unusual) MySQL/MariaDB identifier character — an identifier containing two
+  // of them used to read as an unterminated dollar-quote open tag regardless of dialect, swallowing
+  // the rest of the document into one statement ("Run all" silently ran one statement instead of
+  // two).
   test('6b. dollarQuoting: false treats $ as an ordinary character (MySQL identifiers)', () => {
     const stmts = splitSqlStatements('SELECT a$b$c FROM t; SELECT 2', { dollarQuoting: false });
     expect(stmts.map((s) => s.text)).toEqual(['SELECT a$b$c FROM t', 'SELECT 2']);
@@ -134,7 +134,7 @@ describe('statementAtCursor (P44 F43)', () => {
   });
 });
 
-// P108 Part 11 F3: a caret right after a statement's own `;`, on the blank line between two
+// A caret right after a statement's own `;`, on the blank line between two
 // statements, or in trailing whitespace at the end of the document, must resolve to the *preceding*
 // statement — that is where the caret lands after typing `;` or pressing End. Boundary arithmetic
 // over statementAtCursor's own range logic, not a restated function body.

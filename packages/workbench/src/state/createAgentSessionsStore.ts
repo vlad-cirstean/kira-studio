@@ -18,7 +18,7 @@ export interface AgentSessionsControl {
   onAgentEvent(cb: (event: AgentEvent) => void): () => void;
 }
 
-// P86 §12: the running-agent-sessions widget's own store — state/cacheStats.ts's pushed-from-Go
+// The running-agent-sessions widget's own store — state/cacheStats.ts's pushed-from-Go
 // shape (a reactive store, one subscription, nothing else): the only writer here is Go, pushing
 // over the host's own agent-sessions/agent-event channels, so nothing needs arbitrating between two
 // same-window writers. createAppMetricsStore's own shape: no `extend` seam — nothing app-specific
@@ -67,7 +67,7 @@ export function createAgentSessionsStore(control: AgentSessionsControl) {
     // A host's own boot Promise.all: a window opened after every currently-live session already
     // started needs a snapshot, since the sessions channel only fires on change — dbmcp.ts's
     // hydrateDbMcp precedent. onAgentEvent has no boot-time hydrate of its own: activity is
-    // runtime-only, and a session already in progress simply renders with no activity until its
+    // runtime-only, and a session already in progress renders with no activity until its
     // next hook fires.
     async function initAgentSessions(): Promise<void> {
       unsubscribeSessions?.();

@@ -1,27 +1,27 @@
 import type { ItemMetadata } from 'slickgrid';
 
-// P22 spike, §6 D1 — the load-bearing decision the grid's SlickGrid migration lives or dies on:
+// The load-bearing decision the grid's SlickGrid migration lives or dies on:
 // SlickGrid's own `CustomDataView` seam over the app's EXISTING frozen-page/decode-cache/staged-
-// edit pipeline, never a materialised row array (that is `SlickDataView`'s job, declined — F9/§4).
-// Nothing here is Vue-reactive; `docs/ARCHITECTURE.md`'s Invariants section (no Vue reactivity on row data)
-// holds by construction because `RowHandle` is a plain frozen object and `GridDataSourceState` is
-// a plain object the host swaps by reassignment, never a `ref`/`reactive`.
+// edit pipeline, never a materialised row array (that is `SlickDataView`'s job, declined).
+// Nothing here is Vue-reactive; `docs/ARCHITECTURE.md`'s Invariants section (no Vue reactivity on
+// row data) holds by construction because `RowHandle` is a plain frozen object and
+// `GridDataSourceState` is a plain object the host swaps by reassignment, never a `ref`/`reactive`.
 //
-// P30 §3 prerequisite: this is the generic *core* of what was one file
+// This is the generic *core* of what was one file
 // (`views/grid/slick/dataSource.ts`) — display-position <-> page-row translation and the
 // `CustomDataView` bridge itself, with no dependency on a data tab's pending-changes state. That
 // dependency (`createDisplayValueExtractor`/`pendingRowClasses`, which read `pendingChanges.ts`)
 // stayed behind in `views/grid/slick/dataSource.ts`, which re-exports everything here verbatim
 // (SlickGridHost.vue's own import is unaffected) and adds those two grid-only functions.
-// `views/console/ConsoleSlickGrid.vue` imports this module directly — SPEC §11 forbids it
+// `views/console/ConsoleSlickGrid.vue` imports this module directly — SPEC forbids it
 // reaching into `views/grid/*` at all, and this core never needed to live there in the first
-// place (F1's own finding: "no data-tab dependency").
+// place.
 
 /** What SlickGrid hands a formatter/extractor as the rendered row's "item" — never a materialised
  *  row. `row` is the page-row index every other subsystem (selection, pending changes, search, the
  *  gutter number) addresses a row by; `pos` is display position only (pixel placement / SlickGrid's
- *  own row index), equal to `row` unless a filter is hiding non-matching rows (P24 D3/D4's own
- *  split, reused verbatim). Frozen: nothing downstream may treat this as a mutable row. */
+ *  own row index), equal to `row` unless a filter is hiding non-matching rows. Frozen: nothing
+ *  downstream may treat this as a mutable row. */
 export interface RowHandle {
   readonly row: number;
   readonly pos: number;
@@ -31,7 +31,7 @@ export interface RowHandle {
 
 /** The display-position space this grid renders in: `displayRows` (ascending page-row indices)
  *  when a filter is hiding non-matching rows, `null` when unfiltered — the
- *  `displayPositionOf`/`rowAtDisplayPosition` split (P24 D3/D4), originally written against the
+ *  `displayPositionOf`/`rowAtDisplayPosition` split, originally written against the
  *  now-deleted DataGrid.vue and reused here rather than re-derived. */
 export interface DisplayRowIndex {
   readonly displayRows: readonly number[] | null;
@@ -50,37 +50,37 @@ export function dataLength(idx: DisplayRowIndex, insertCount: number): number {
 /**
  * Display position -> `RowHandle`, across the filter and into the pending-insert region past the
  * last display row — the arithmetic the deleted DataGrid.vue's own `rowAtDisplayPosition` used,
- * plus its own `page.rowCount + idx` insert-identity rule (`onPaste`'s own comment). The one place this
- * translation lives for the Slick engine (D1 bullet 4): `getLength`/`getItem` below are its only
- * callers, replacing `displayPositionOf`/`rowAtDisplayPosition`'s use inside the old virtualizer.
+ * plus its own `page.rowCount + idx` insert-identity rule (`onPaste`'s own comment).
+ * The one place this translation lives for the Slick engine: `getLength`/`getItem` below are its
+ * only callers, replacing `displayPositionOf`/`rowAtDisplayPosition`'s use inside the old
+ * virtualizer.
  */
-/** P22 iter2-pacing D6 — the row-identity arithmetic alone, without allocating/freezing a
+/** The row-identity arithmetic alone, without allocating/freezing a
  *  RowHandle. `rowHandleAt` below is defined in terms of this so the two paths can never drift
  *  apart; `getItemMetadata` (createGridDataSource, below) uses this directly so a rendered row
- *  only pays for one frozen RowHandle allocation (getItem's), not two (§4.4 item 4 of that plan —
- *  appendRowHtml calls getDataItem AND getItemMetadaWhenExists per newly-built row, and the latter
- *  never needed a full handle, only the row number). */
+ *  only pays for one frozen RowHandle allocation (getItem's), not two (appendRowHtml calls
+ *  getDataItem AND getItemMetadaWhenExists per newly-built row, and the latter never needed a full
+ *  handle, only the row number). */
 function pageRowAt(idx: DisplayRowIndex, pos: number): number {
   const count = displayRowCount(idx);
   if (pos >= count) return idx.pageRowCount + (pos - count);
   return idx.displayRows ? (idx.displayRows[pos] ?? pos) : pos;
 }
 
-/** P22 Pass B, C4/§5 D4 — display position -> page row, exported: `selection.ts`'s own
+/** Display position -> page row, exported: `selection.ts`'s own
  *  `SlickRange`<->`Selection` translation needs exactly this arithmetic (a `SlickRange`'s
  *  row fields are always display positions — SlickGrid indexes the `CustomDataView` it was
  *  handed, never a page row), and it must be the SAME arithmetic `getItem`/`getItemMetadata`
  *  use, not a second implementation that could drift from it. Identity while nothing is
- *  filtered (`idx.displayRows === null`), which is Pass B's whole state until C12 wires a live
- *  search filter — this function is correct for that case by construction, not by luck. */
+ *  filtered (`idx.displayRows === null`) — this function is correct for that case by
+ *  construction, not by luck. */
 export function rowAtDisplayPosition(idx: DisplayRowIndex, pos: number): number {
   return pageRowAt(idx, pos);
 }
 
-/** The inverse of `rowAtDisplayPosition` — page row -> display position. The same
- *  `displayPositionOf` arithmetic the deleted DataGrid.vue used (P24 D3/D5/D6/D11):
- *  `displayRows` is always ascending (matchedRows'
- *  own contract), so an exact hit (the common case — the row is visible) is a binary search, and
+/** The inverse of `rowAtDisplayPosition` — page row -> display position.
+ *  `displayRows` is always ascending (matchedRows' own contract), so an exact hit (the common case
+ *  — the row is visible) is a binary search, and
  *  a miss (the row was just filtered out from under a live selection) falls through to the
  *  position it would sort into, landing on the nearest visible row instead of doing nothing. */
 export function displayPositionOf(idx: DisplayRowIndex, row: number): number {
@@ -98,7 +98,7 @@ export function displayPositionOf(idx: DisplayRowIndex, row: number): number {
   return Math.min(lo, Math.max(0, dr.length - 1));
 }
 
-/** Finding 2/round 2 — `displayPositionOf` deliberately falls through to the nearest visible row
+/** `displayPositionOf` deliberately falls through to the nearest visible row
  *  on a miss (its own doc comment: correct for scroll-into-view, wrong for a highlight/selection
  *  that must not silently jump to a neighboring row when its own row gets filtered out). Callers
  *  that need to know "is this page row still on screen" before deciding whether to translate or
@@ -145,13 +145,13 @@ export function rowHandleAt(
 /** The mutable state a `KiraGridDataSource` reads on every `getItem`/`getLength`/`getItemMetadata`/
  *  `extractValue` call — a plain object the host (SlickGridHost.vue/ConsoleSlickGrid.vue)
  *  reassigns wholesale via `setState` on a relevant change (page reload, filter, a staged insert),
- *  and never a Vue `ref`/`reactive` (D1's own rule: the extractor and formatter run *during*
+ *  and never a Vue `ref`/`reactive` (the rule: the extractor and formatter run *during*
  *  SlickGrid's own render, and must never touch Vue reactivity whose mutation could re-enter it).
  *
  *  `extractValue` itself lives in this state (not a separate, one-time constructor argument) for a
  *  load-bearing reason: SlickGrid's own `dataItemColumnValueExtractor` grid option is captured
  *  *once*, at construction — routing it through this mutable state (via `KiraGridDataSource.
- *  extractValue`, below) is what lets a page reload's new decode/staged-edit closure actually reach
+ *  extractValue`, below) is what lets a page reload's new decode/staged-edit closure reach
  *  the grid without reconstructing the whole instance. A first version of this file passed
  *  `extractValue` as a separate constructor argument instead; every cell after the first page
  *  reload silently kept reading the *original* (often `page === null`, "everything is NULL")
@@ -163,9 +163,9 @@ export interface GridDataSourceState {
   /** Per-page-row CSS classes (the dirty/deleted/inserted gutter rails, §5 item 18) — `undefined`
    *  renders no metadata for that row, matching `getItemMetadata`'s own `| null` contract. */
   rowClasses?: (row: number) => string | undefined;
-  /** C9/§5 D9 — per-row column metadata: `undefined` for a normal row (the overwhelming
+  /** Per-row column metadata: `undefined` for a normal row (the overwhelming
    *  majority), the insert region's own `{ editor: null, focusable: false }` override for the
-   *  handful of pending-insert rows (F11 — `getEditor`/`canCellBeActive` both consult this before
+   *  handful of pending-insert rows (`getEditor`/`canCellBeActive` both consult this before
    *  the column's own flag, which is what keeps SlickGrid's own editor from ever opening over the
    *  insert row's real `<input>`, and keeps Tab/arrow-key cell navigation off the region). Takes
    *  the handle, not just the row number `pageRowAt` alone could give `getItemMetadata` for free,
@@ -191,7 +191,7 @@ export interface KiraGridDataSource {
    */
   extractValue(item: RowHandle, field: string): unknown;
   /**
-   * F1's own insurance, not a real render-path seam (the render path is `extractValue`/
+   * The insurance, not a real render-path seam (the render path is `extractValue`/
    * `dataItemColumnValueExtractor`, above): a future call site — or SlickGrid's own
    * `autosizeColumns`, left off via `autosizeColsMode: LegacyOff` but still a public method someone
    * could call — that reaches for `getCellValue` gets the extractor's own answer instead of
@@ -203,7 +203,7 @@ export interface KiraGridDataSource {
 
 /**
  * A stable `CustomDataView` over frozen pages. Never materialises a row, never allocates one for a
- * row SlickGrid isn't actually building — a retained row is never revisited (F2), so this object's
+ * row SlickGrid isn't building — a retained row is never revisited, so this object's
  * own identity, and the `state` it closes over, are the only things that change across a render.
  */
 export function createGridDataSource(

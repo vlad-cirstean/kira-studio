@@ -1,4 +1,4 @@
-// P12 round 1 finding #8: Postgres/MySQL/MariaDB's JSON-format EXPLAIN returns the whole plan as
+// Postgres/MySQL/MariaDB's JSON-format EXPLAIN returns the whole plan as
 // one cell. A plan over MAX_CELL_BYTES (64 KiB) arrives clipped mid-JSON on the wire, with
 // `isTruncated` set on the cell — parseExplainPages used to ignore that flag entirely and hand
 // the (invalid, truncated) JSON straight to JSON.parse, which fails with an opaque "Unexpected end
@@ -18,7 +18,7 @@ setActivePinia(pinia);
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
 const { control } = await import('../../frontend/src/bridge/control');
-// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — a real (never-settling in this harness) control.tabsSave triggered
 // incidentally by opening a tab below would otherwise wedge every later spec's own tabsSave
 // assertions for the rest of the process. This spec doesn't test persistence, so give it a

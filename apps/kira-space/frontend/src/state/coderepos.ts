@@ -33,10 +33,9 @@ export function repoText(color: PaletteColor): { style: Record<string, string>; 
     : { style: {}, class: 'text-muted-foreground' };
 }
 
-// C5 §3.4: the repo list store, ConnectionsRepo's own shape for a repository entry — hydrate,
-// import, rename, reorder, remove. No connect/disconnect lifecycle (a repository is a path, not a live
-// session, D11) and no secret-storage concept (D1's own "nothing secret, nothing credential-
-// shaped").
+// The repo list store, ConnectionsRepo's own shape for a repository entry — hydrate, import,
+// rename, reorder, remove. No connect/disconnect lifecycle (a repository is a path, not a live
+// session) and no secret-storage concept (the "nothing secret, nothing credential-shaped").
 export const useCodeReposStore = defineStore('codeRepos', () => {
   const state = reactive({
     records: [] as RepoSummary[],
@@ -185,7 +184,7 @@ export const useCodeReposStore = defineStore('codeRepos', () => {
     );
   }
 
-  /** P82: "switch to this worktree". A worktree is its own repository root (gitclient.Identify's
+  /** "switch to this worktree". A worktree is its own repository root (gitclient.Identify's
    *  RepoID is the worktree root), so switching to one is opening its own workspace — the same
    *  premise WorktreeList.vue's own switch rests on, not a second worktree-switching path. Imports
    *  it first when this app has no row for that root yet. */

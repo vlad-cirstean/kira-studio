@@ -1,6 +1,5 @@
-// Round-2 review finding 1 (regression from round 1's own mongo fix): `canRoundTripToFields` must
-// stay false for `mongodb+srv://` — nothing downstream can actually represent the `+srv` scheme
-// (formatConnectionUri derives the scheme from `kind` alone, and the backend's
+// `canRoundTripToFields` must stay false for `mongodb+srv://` — nothing downstream can represent
+// the `+srv` scheme (formatConnectionUri derives the scheme from `kind` alone, and the backend's
 // buildURIFromFields hardcodes `mongodb://`), so allowing a +srv URI into fields mode silently
 // discards the scheme with no way back, and SRV hosts have no port to satisfy fields mode's
 // required-port validation. Plain `mongodb://` is unaffected and must keep round-tripping.

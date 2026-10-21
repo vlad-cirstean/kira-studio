@@ -1,7 +1,7 @@
 import { shortSha } from '../lib/sha.ts';
 
 /**
- * A structural, not imported, copy of `@kira/git-ipc`'s own `WorktreeEntry` shape (B3 — core and
+ * A structural, not imported, copy of `@kira/git-ipc`'s own `WorktreeEntry` shape (core and
  * ipc both depend on nothing, so neither imports the other) narrowed to the fields this label
  * needs. Every real `WorktreeEntry` already satisfies this shape, so both call sites pass their
  * own `WorktreeEntry` straight through with no cast.

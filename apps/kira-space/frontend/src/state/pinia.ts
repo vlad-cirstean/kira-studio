@@ -1,9 +1,9 @@
 import { createPinia } from 'pinia';
 
-// P98: the app's one Pinia instance, exported rather than created inline in main.ts so a unit
+// The app's one Pinia instance, exported rather than created inline in main.ts so a unit
 // test can `setActivePinia(pinia)` before touching a store defined outside a component.
 //
-// P103 Part 4 (§10 audit): byte-identical with Kira Studio's own copy, but declined as a
+// Byte-identical with Kira Studio's own copy, but declined as a
 // packages/workbench move (unlike queryClient.ts, its harmless twin) — sharing one `createPinia()`
 // instance would give both apps' same-named stores (`'tabs'`, `'settings'`, ... — CLAUDE.md's own
 // store-id-stability rule) the same Pinia registry, and `bun run test:unit` runs both apps' specs

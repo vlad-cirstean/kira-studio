@@ -4,13 +4,13 @@ import { t } from '@theme/i18n';
 import { typeClassColor } from '../../../theme/icons';
 import { typeDescription } from '../typeGlossary';
 
-// Exported (was module-local) so SlickGridHost.vue/ConsoleSlickGrid.vue can clamp to the exact
-// same floor a freshly measured column already gets — a stored/dragged width used to be able to
-// undercut it (their own `minWidth: 40` was a different, lower number), which is how a column as
-// short as "id" could persist at a one-character-wide render across a reload (found against the
-// real app: minWidth only ever bounded an interactive drag, never a width read back from storage).
+// Exported so SlickGridHost.vue/ConsoleSlickGrid.vue can clamp to the exact same floor a freshly
+// measured column already gets — a stored/dragged width used to be able to undercut it (their own
+// `minWidth: 40` was a different, lower number), which is how a column as short as "id" could
+// persist at a one-character-wide render across a reload (minWidth only ever bounded an
+// interactive drag, never a width read back from storage).
 const MIN_WIDTH = 64;
-// P28 D5: the floor a freshly *measured* column may not fall below, separate from MIN_WIDTH above.
+// The floor a freshly *measured* column may not fall below, separate from MIN_WIDTH above.
 // The two were one constant doing two different jobs: MIN_WIDTH is the interactive-resize floor (a
 // deliberate narrow drag must stay possible, and a width read back from storage is a deliberate
 // drag), while this is "how narrow may a column the user never touched be drawn". A column whose
@@ -21,7 +21,7 @@ const MIN_INITIAL_WIDTH = 96;
 const MAX_WIDTH = 480;
 const CELL_PADDING = 20; // px, both sides combined plus a little breathing room
 const SAMPLE_ROWS = 50;
-// P16 D4: the ceiling on headerAwareMinWidth below — without one, a column named
+// The ceiling on headerAwareMinWidth below — without one, a column named
 // `customer_subscription_renewal_reason` would become undraggable below ~280px. Under MAX_WIDTH's
 // 480 and above 42-58px of header chrome plus ~20 characters of name, which covers the
 // overwhelming majority of real column names; past it, ellipsising is the right answer and
@@ -35,10 +35,10 @@ export const GUTTER_WIDTH = 56;
 // P48 F9: the 96px fallback both grids' own widths computeds used when neither a stored width
 // nor a measured one is available yet.
 export const DEFAULT_COLUMN_WIDTH = 96;
-// P49 F9/D4: the pixel overscan budget the deleted DataGrid.vue's own column virtualizer used — kept for
+// The pixel overscan budget the deleted DataGrid.vue's own column virtualizer used — kept for
 // KiraSlickGrid's own column-overscan clamp (kiraSlickGrid.ts's clampColumnOverscan); the per-side
 // column *count* cap it was paired with (MAX_OVERSCAN_COLUMNS) died with the tanstack-virtual
-// column axis it belonged to (P30 §3.6 C7) — SlickGrid clamps by canvas width instead.
+// column axis it belonged to — SlickGrid clamps by canvas width instead.
 export const OVERSCAN_PX = 560;
 
 // P16 D4: a small Map keyed by size token, generalized from one memoized context — the header
@@ -61,7 +61,7 @@ function getMeasureCtx(sizeToken = '--kira-font-size'): CanvasRenderingContext2D
 }
 
 /** Drops the memoized measuring contexts so the next initialWidths()/headerAwareMinWidth() call
- *  re-reads the current appearance tokens (P31 D11) — without this, a font change leaves every
+ *  re-reads the current appearance tokens — without this, a font change leaves every
  *  unstored column sized for whatever font was active when this module first measured, for the
  *  rest of the session. Also drops initialWidths'/initialWidthsByIndex's own result caches below,
  *  for the same reason. */
@@ -82,8 +82,8 @@ export interface HeaderChrome {
   /** The flex gap before `.slick-sort-indicator` (4) + its own `width: 14px`, plus the flex gap
    *  before the always-present, 0px-at-rest `.slick-sort-indicator-numbered` — 0 when the
    *  column is not sortable (SlickGrid builds neither div under `m.sortable`).
-   *  P28 D4: 16, was 22. The control narrowed to 12px and now cancels the flex gap that used to
-   *  sit between it and the numbered badge, so what a sortable header actually spends here is one
+   *  The control narrowed to 12px and now cancels the flex gap that used to
+   *  sit between it and the numbered badge, so what a sortable header spends here is one
    *  4px gap plus the 12px control. */
   sortControl: number; // 16 | 0
   /** The flex gap before the PK/FK `.header-key` badge (4) + the badge's own
@@ -94,7 +94,7 @@ export interface HeaderChrome {
 }
 
 /** The narrowest this column may ever be drawn without its own header name ellipsising — the flat
- *  MIN_WIDTH floor when that is already enough, and never more than MIN_WIDTH_CAP (P16 D4). Feeds
+ *  MIN_WIDTH floor when that is already enough, and never more than MIN_WIDTH_CAP. Feeds
  *  both a column's initial `width` and its `minWidth` (SlickGridHost.vue) — fixing only the
  *  initial width would leave a drag able to crop the header again. */
 export function headerAwareMinWidth(name: string, chrome: HeaderChrome): number {
@@ -177,12 +177,12 @@ export function initialWidthsByIndex(page: TabularPage): number[] {
   return measuredWidths(page);
 }
 
-// P30 §3.6 C7: columnOffsets/columnRangeExtractor/observeScrollElementRect/
+// columnOffsets/columnRangeExtractor/observeScrollElementRect/
 // observeScrollElementOffset/MAX_OVERSCAN_COLUMNS — the tanstack-vue-virtual column axis these
-// four served retired once ConsoleResultGrid.vue's tabular branch (their only remaining caller
-// after P22 Pass B's own cutover) moved onto SlickGrid's own native column virtualization (P30
-// §3). Only this column axis retired — @tanstack/vue-virtual itself is still a real dependency
-// elsewhere (views/shared/keyvalue/KeyValuePane.vue, views/grpcrequest/ResponsePane.vue). See git
+// four served retired once ConsoleResultGrid.vue's tabular branch (their only remaining caller)
+// moved onto SlickGrid's own native column virtualization. Only this column axis retired —
+// @tanstack/vue-virtual itself is still a real dependency elsewhere
+// (views/shared/keyvalue/KeyValuePane.vue, views/grpcrequest/ResponsePane.vue). See git
 // history for the deleted implementations.
 
 // P22 iter2 D3: velocity-adaptive, direction-biased row overscan ("runway") — see the plan's §5 D3.
@@ -209,46 +209,46 @@ export const BASE_TRAIL_PX = 560;
 export const LEAD_FRAMES = 6;
 /** Provisional (see above): hard ceiling on the lead side regardless of velocity. */
 export const MAX_LEAD_PX = 2400;
-// P22 iter2 D3(c): the cap is expressed in *cells*, not rows — a wide table (e.g. 61 columns) is
-// already close to budgets.spec.ts's < 2 500 DOM-cell bound at rest (F6), so a flat row cap would
+// The cap is expressed in *cells*, not rows — a wide table (e.g. 61 columns) is
+// already close to budgets.spec.ts's < 2 500 DOM-cell bound at rest, so a flat row cap would
 // let it blow that budget while a two-column table barely used its own share. Set below the
 // existing bound so a wide table's extra lead self-limits well before the DOM-size gate would.
 export const CELL_BUDGET = 2200;
 
-// P22 iter2-scroll-gaps D2: provisional (same epistemic status as LEAD_FRAMES/MAX_LEAD_PX, above —
-// nobody has a real renderMs-per-cell figure from the SlickGrid engine yet; D1 is what produces the
-// first one). This is a PER-CALL cap on how many new (not-yet-cached) cells a single synchronous
+// Provisional (same epistemic status as LEAD_FRAMES/MAX_LEAD_PX, above —
+// nobody has a real renderMs-per-cell figure from the SlickGrid engine yet).
+// This is a PER-CALL cap on how many new (not-yet-cached) cells a single synchronous
 // SlickGrid render() pass may build, independent of CELL_BUDGET (which caps the TOTAL mounted
 // window across calls, not any one call's own new-row batch). Sized to keep one render() call's
 // synchronous work well under a single frame's budget even on a 120 Hz display; re-set once the
-// real-Mac protocol (docs/PERF.md §2.1c) reports actual renderMs figures for a cold batch of this
+// real-Mac protocol (docs/PERF.md) reports actual renderMs figures for a cold batch of this
 // size. Consumed by views/shared/slick/kiraSlickGrid.ts's own getRenderedRange override — the
 // deleted tanstack-virtual/DataGrid.vue grid had no equivalent single-call batch-size hazard
-// (P22-slickgrid-migration-plan.md's own F2: SlickGrid's render() builds every newly-entering row
-// synchronously in one unconditional DOM-construction pass, unlike Vue's own patch, which that grid
-// went through instead), so this constant is SlickGrid-only.
+// (SlickGrid's render() builds every newly-entering row synchronously in one unconditional
+// DOM-construction pass, unlike Vue's own patch, which that grid went through instead), so this
+// constant is SlickGrid-only.
 export const MAX_NEW_CELLS_PER_RENDER = 600;
 
-// P22 iter2-pacing D2: a separate, SEPARATELY-CAPPED per-render budget for *runway* (beyond
-// strictly-visible) growth only — MAX_NEW_CELLS_PER_RENDER above stays the absolute per-pass
-// ceiling and the step-6 floor short-circuit unchanged. Lowering this makes the runway grow in
-// small even steps instead of one large step followed by a cliff (a variance reduction, not a
-// total-work reduction), and it trades directly against how fast the runway converges
-// (uncoveredPx). Literal matches MAX_NEW_CELLS_PER_RENDER on purpose — i.e. behaviourally neutral, byte-
-// identical to today's emitted range — because nobody has a real-hardware number for it yet;
-// docs/PERF.md §2.1c step 4 is the A/B that sets it. Same precedent as forceSyncScrollingOverride
-// (main.ts): a dial with a documented default, not a silent behaviour change. Consumed by
+// A separate, SEPARATELY-CAPPED per-render budget for *runway* (beyond strictly-visible) growth
+// only — MAX_NEW_CELLS_PER_RENDER above stays the absolute per-pass ceiling and the step-6 floor
+// short-circuit unchanged. Lowering this makes the runway grow in small even steps instead of one
+// large step followed by a cliff (a variance reduction, not a total-work reduction), and it trades
+// directly against how fast the runway converges (uncoveredPx). Literal matches
+// MAX_NEW_CELLS_PER_RENDER on purpose — i.e. behaviourally neutral, byte-identical to today's
+// emitted range — because nobody has a real-hardware number for it yet; docs/PERF.md step 4 is the
+// A/B that sets it. Same precedent as forceSyncScrollingOverride (main.ts): a dial with a
+// documented default, not a silent behaviour change. Consumed by
 // views/shared/slick/kiraSlickGrid.ts's own getRenderedRange override, step 7.
 export const MAX_NEW_LEAD_CELLS_PER_RENDER = 600;
 
-// P22 iter2-pacing D1. Provisional, same epistemic status as LEAD_FRAMES/MAX_LEAD_PX/
+// Provisional, same epistemic status as LEAD_FRAMES/MAX_LEAD_PX/
 // MAX_NEW_CELLS_PER_RENDER: how long the viewport must go without a native scroll event before a
 // self-scheduled catch-up render is allowed to run. A catch-up that fires while a fling is still
 // delivering scroll events lands in the same animation frame as that frame's scroll-driven
-// render, doubling the frame's work (docs/HISTORY.md (v1.1 P22)
-// §1.2: 131 of 140 frames in a WebKit repro). ~1.5 frames at 60 Hz, ~3 at 120 Hz. 0 restores the
-// pre-fix "fire on the very next rAF, unconditionally" behaviour exactly — which is what makes the
-// real-Mac A/B a console line (docs/PERF.md §2.1c). Re-set from that A/B, not from here.
+// render, doubling the frame's work (docs/HISTORY.md: 131 of 140 frames in a WebKit repro). ~1.5
+// frames at 60 Hz, ~3 at 120 Hz. 0 restores the pre-fix
+// "fire on the very next rAF, unconditionally" behaviour exactly — which is what makes the
+// real-Mac A/B a console line (docs/PERF.md). Re-set from that A/B, not from here.
 export const CHASE_QUIET_MS = 24;
 
 export interface RowRangeExtractorConfig {
@@ -320,7 +320,7 @@ export function alignmentFor(descriptor: ColumnDescriptor): 'left' | 'right' {
 }
 
 /** The display order: stored order filtered to live columns, then any new columns appended. */
-// A2/P21 round 1: `kept.includes(n)` made the reordered branch O(cols²) — harmless at a normal
+// `kept.includes(n)` made the reordered branch O(cols²) — harmless at a normal
 // column count, but resolveColumnOrder is called *per cell* by displayCell/rowSnapshot (not once
 // per bulk operation, which is its own separate fix at those call sites), so a wide table with a
 // stored column order turned a full-page copy into ~600,000 calls each doing an O(cols²) scan —
@@ -379,7 +379,7 @@ export function pageColumnIndexFor(page: TabularPage, order: string[], displayCo
   return nameIndexFor(page).get(name) ?? -1;
 }
 
-// P48 F7 / P310: the column-header tooltip content the data tab and console grids share. The
+// The column-header tooltip content the data tab and console grids share. The
 // generated type explanation (`body`) and the DB comment (`note`) stay separate so the tooltip
 // stacks them; `tags` carry the key/nullability facts DESCRIBE knows. `dataType` is passed in
 // rather than read off `col`: the data tab overlays a DESCRIBE-derived type the console lacks.

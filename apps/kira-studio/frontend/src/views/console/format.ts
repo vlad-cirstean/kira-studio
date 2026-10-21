@@ -47,10 +47,10 @@ function formatterDialectFor(mod: SqlFormatterModule, kind: ConnectionKind) {
   }
 }
 
-// D4: keywordCase stays at the library default 'preserve' rather than the app's own uppercase
+// keywordCase stays at the library default 'preserve' rather than the app's own uppercase
 // completion house style (languages.ts) — 'upper' rewrites an unquoted identifier that collides
 // with a keyword (e.g. a `database` column becomes `DATABASE`), which is silently wrong for
-// ClickHouse's case-sensitive identifiers (F6).
+// ClickHouse's case-sensitive identifiers.
 const SQL_FORMAT_OPTIONS = {
   tabWidth: 2,
   useTabs: false,
@@ -93,11 +93,11 @@ function formatMongoStatement(
 
   const openParen = match.index + full.length - 1;
   const closeParen = findMatchingParen(stmt, openParen);
-  // P108 Part 11 F9: the return below rebuilds the statement from the parsed collection/method/args
+  // The return below rebuilds the statement from the parsed collection/method/args
   // alone — anything after the closing paren (a chained `.limit(5)`, a trailing comment) used to be
   // silently dropped, turning `db.c.find({}).limit(5)` into `db.c.find({})`. The Go console rejects
   // that trailing content outright (mongo/console.go's own "unexpected trailing content after
-  // statement") — refusing here instead keeps the statement verbatim, the same D5 contract every
+  // statement") — refusing here instead keeps the statement verbatim, the same contract every
   // other refusal in this function already follows, rather than Format silently changing the query.
   if (stmt.slice(closeParen + 1).trim().length > 0) {
     return { reason: { key: 'studio.console.format.trailing.error' } };
@@ -166,10 +166,10 @@ interface FormatFailure {
 
 export interface FormatResult {
   text: string;
-  /** False only when NOTHING formatted (P13's own all-broken behaviour, preserved for
+  /** False only when NOTHING formatted (the all-broken behaviour, preserved for
    *  tests/ui/console-format.spec.ts's all-broken case: text untouched, one reason shown). True
-   *  whenever at least one statement formatted, even if others didn't — D13's own reopening of
-   *  P13 §3: a broken neighbour no longer takes the whole press down with it. */
+   *  whenever at least one statement formatted, even if others didn't — a broken neighbour no
+   *  longer takes the whole press down with it. */
   ok: boolean;
   /** Present only when `ok` is false, mirroring BeautifyResult's own `reason` — the P13-era
    *  single-statement callers (formatConsoleText's own unit tests) still read this. */
@@ -179,14 +179,13 @@ export interface FormatResult {
   failures: FormatFailure[];
 }
 
-// P19 D13 (reopening P13 §3's declined statement-by-statement alternative): every statement that
-// formats, formats; one the grammar rejects is emitted VERBATIM, in place, never dropped — which
-// is what keeps D12's caret-by-index mapping exact (the statement count survives regardless of
-// how many failed). Splits with the same splitter and options Run all already uses
-// (ConsoleView.runAll's own splitSqlStatements call), so "what Format treats as a statement" and
-// "what Run all treats as a statement" can never disagree, and rejoins with `;\n\n` — the same
-// separator formatMongo already produced and what sql-formatter's own linesBetweenQueries: 1
-// produces for a single multi-statement call.
+// Every statement that formats, formats; one the grammar rejects is emitted VERBATIM, in place,
+// never dropped — which is what keeps the caret-by-index mapping exact (the statement count
+// survives regardless of how many failed). Splits with the same splitter and options Run all
+// already uses (ConsoleView.runAll's own splitSqlStatements call), so "what Format treats as a
+// statement" and "what Run all treats as a statement" can never disagree, and rejoins with `;\n\n`
+// — the same separator formatMongo already produced and what sql-formatter's own
+// linesBetweenQueries: 1 produces for a single multi-statement call.
 export async function formatConsoleText(kind: ConnectionKind, text: string): Promise<FormatResult> {
   if (text.trim().length === 0) return { text, ok: true, failures: [] };
 
@@ -252,12 +251,12 @@ export async function formatConsoleText(kind: ConnectionKind, text: string): Pro
   if (failures.length === statements.length) {
     return { text, ok: false, reason: failures[0]?.reason, failures };
   }
-  // P22b D12: splitSqlStatements' own pushIfNonEmpty slices up to, not through, each statement's
-  // terminator (sql-split.ts) — so `stmt.text` never carries its own ';'. A plain join(';\n\n')
+  // splitSqlStatements' own pushIfNonEmpty slices up to, not through, each statement's terminator
+  // (sql-split.ts) — so `stmt.text` never carries its own ';'. A plain join(';\n\n')
   // therefore emits N-1 semicolons for N statements, silently deleting the document's last one on
-  // every press: a regression against P13's whole-document formatDialect call, which preserved
-  // every ';' it was given. The terminator is now a property of the SOURCE, not of the join: a
-  // document that ended in ';' still does, one that did not still does not.
+  // every press: a regression against the whole-document formatDialect call, which preserved every
+  // ';' it was given. The terminator is now a property of the SOURCE, not of the join: a document
+  // that ended in ';' still does, one that did not still does not.
   const endedWithTerminator = /;\s*$/.test(text);
   const joined = joinFormattedStatements(out, hashCommentsFor(dialect));
   return { text: endedWithTerminator ? `${joined};` : joined, ok: true, failures };

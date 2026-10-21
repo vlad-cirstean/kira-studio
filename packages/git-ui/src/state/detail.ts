@@ -11,12 +11,11 @@ export type CommitDetail = ResultOf<'commit.detail'>;
 export type { FileListMode } from './fileListCursor.ts';
 
 /**
- * `docs/plans/P5.md` W7: the detail pane's state machine, kept out of any SFC so W13 can test
- * the transitions directly and a later phase can mount the same components in a sidebar. Every
- * field is `shallowRef` (§5.3) — `detail` payloads are plain data, never made reactive
- * themselves.
+ * The detail pane's state machine, kept out of any SFC so the transitions can be tested directly
+ * and a later phase can mount the same components in a sidebar. Every field is `shallowRef`
+ * — `detail` payloads are plain data, never made reactive themselves.
  *
- * G21 D12: `mode`/`diff`/`diffError`/`showTree()` and the `commit.fileDiff` fetch are gone — the
+ * `mode`/`diff`/`diffError`/`showTree()` and the `commit.fileDiff` fetch are gone — the
  * graph tree opens the host's diff editor now (`DetailPane.vue`'s own wiring to
  * `actions.openInEditor`), so this class no longer owns an embedded diff to drive. `selectedFile`
  * survives: it still drives the tree's own selected-row highlight and file cursor, both still
@@ -41,9 +40,9 @@ export class DetailState {
   readonly listMode = this.#fileList.listMode;
   readonly filter = this.#fileList.filter;
 
-  /** W10's copy/"Go to file" outcome text — fed into `App.vue`'s single shared live region
+  /** The copy/"Go to file" outcome text — fed into `App.vue`'s single shared live region
    *  alongside the load-more/refresh announcements it already carries. A plain string, not a
-   *  queue: a second announcement while the first is still being read simply replaces it, the
+   *  queue: a second announcement while the first is still being read replaces it, the
    *  same trade-off the existing live region already makes. */
   readonly announcement: Ref<string> = createAnnouncementRef();
 
@@ -65,7 +64,7 @@ export class DetailState {
    * Selects a different commit (`SelectionState`'s own sha, mirrored here by the caller):
    * resets `parentIndex` to 0 and clears `selectedFile` — the file you were looking at may not
    * exist in the other commit's tree at all, and carrying a stale selection across is confusing
-   * even with no diff attached to it. Selecting the *same* sha again is P4's toggle and never
+   * even with no diff attached to it. Selecting the *same* sha again is the toggle and never
    * reaches this method (callers only invoke it on an actual change).
    */
   select(sha: string | null): void {
@@ -91,7 +90,7 @@ export class DetailState {
   /** Moves the file cursor (a click, `Enter`, or arrow-nav in `FileTree.vue`) — the tree's own
    *  selected-row highlight follows this, independent of whether the row's own click also opened
    *  a native diff (`DetailPane.vue`'s own `actions.openInEditor` call, driven by the tree's
-   *  `openFile` emit, G21 D13). */
+   *  `openFile` emit). */
   selectFile(index: number): void {
     this.#fileList.selectFile(index);
   }

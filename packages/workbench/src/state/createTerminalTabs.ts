@@ -2,10 +2,10 @@ import type { PaletteColor } from '@shared/domain/color';
 import { canonicalPath } from '@shared/domain/path';
 import type { TerminalLaunchKind, TerminalTabState } from '@shared/domain/tabs';
 
-// P103 Part 2 (§5.2/§4.3): `state/terminalTabs.ts`'s only real divergence between the two apps was
-// the workspace-key type (`AppMode` in Kira Studio, `WorkspaceKey` in Kira Space) — everything
-// else, including the doc comments, was already identical. Each app now instantiates this once in
-// its own thin `state/terminalTabs.ts`.
+// `state/terminalTabs.ts`'s only real divergence between the two apps was the workspace-key type
+// (`AppMode` in Kira Studio, `WorkspaceKey` in Kira Space) — everything else, including the doc
+// comments, was already identical. Each app now instantiates this once in its own thin
+// `state/terminalTabs.ts`.
 
 /** What a non-plain launch (Claude Code, or a custom script) seeds a terminal tab with. `kind` is
  *  the tab's own launchKind — always given explicitly by the one caller that constructs one, never

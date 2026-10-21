@@ -8,10 +8,9 @@ import { markRaw } from 'vue';
 import { control } from '../../bridge/control';
 import { createPerRepoState } from './perRepo.ts';
 
-// C5 §7.2: the flat path list -> row model fold. No single-child directory compaction (VS Code's
+// The flat path list -> row model fold. No single-child directory compaction (VS Code's
 // `a/b/c` collapsing) — deliberately declined: it complicates the fold, the expand set and reveal,
-// for a cosmetic gain (§7.2's own note, so a later phase adds it on purpose rather than by
-// accident).
+// for a cosmetic gain (so a later phase adds it on purpose rather than by accident).
 interface FileNode {
   name: string;
   nameLower: string; // C13-6: precomputed once here rather than on every filter-pass visit
@@ -55,7 +54,7 @@ function buildTree(paths: readonly string[]): FileNode[] {
   }
 
   sortChildren(root);
-  // C13-6c: the tree is replaced wholesale on every refresh (never field-mutated afterward — the
+  // The tree is replaced wholesale on every refresh (never field-mutated afterward — the
   // only per-node state that changes live, `expanded`/`status`, lives separately on RepoTreeState)
   // — markRaw so assigning this into `state.tree` (inside this repo's reactive() state object)
   // doesn't deep-proxy every node, at every level, of what can be a 200,000-entry tree.

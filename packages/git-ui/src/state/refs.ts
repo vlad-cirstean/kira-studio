@@ -6,11 +6,11 @@ import { isCancelledTransport } from './isCancelled.ts';
 import { RepoScopedReload } from './repoScopedReload.ts';
 
 /**
- * `docs/plans/P6.md` W12: the ref list as reactive state. Loads once a repo is open, reloads on
+ * The ref list as reactive state. Loads once a repo is open, reloads on
  * `repo.changed` with `kind === "refsChanged"` — exactly the watcher signal `git branch`/`git
  * tag`/a ref write of any kind touches (`packages/git/src/watcher.ts`) — and derives the three
  * things more than one component needs (`currentBranchName`, `badgesBySha`, `worktreeBranches`)
- * so `BranchPicker.vue`, `TagList.vue` and the graph's own ref badges (`refBadges.ts`, P4) never
+ * so `BranchPicker.vue`, `TagList.vue` and the graph's own ref badges (`refBadges.ts`) never
  * each recompute their own copy.
  */
 export class RefsState {
@@ -86,7 +86,7 @@ export class RefsState {
     if (repoId === undefined) return;
     // A repo switch (or close) that lands while this request was in flight must not let a
     // stale reply overwrite the newer repo's own state — the same "does this answer still apply"
-    // guard `GraphViewState`'s own doc comment names for exactly this race — and F5: two
+    // guard `GraphViewState`'s own doc comment names for exactly this race — and two
     // `refsChanged` events in quick succession must not let the older one's reply land last.
     const outcome = await this.#reloadRequest.run(
       (signal) => this.#bridge.request('refs.list', { repoId }, signal),
@@ -103,7 +103,7 @@ export class RefsState {
 
   /** `ops.ts`'s own step 4: applies an `OpResult.head` synchronously, before the `repo.changed`
    *  event (and this class's own `reload()`) has had a chance to arrive — what keeps the
-   *  toolbar's branch name from lagging the watcher's debounce (W12's own "Done when"). Does not
+   *  toolbar's branch name from lagging the watcher's debounce. Does not
    *  touch `branches`/`tags`/`remoteBranches` — their `isHead`/track fields are only ever as
    *  fresh as the next `reload()`, which the same event triggers moments later. */
   applyHead(head: HeadState): void {

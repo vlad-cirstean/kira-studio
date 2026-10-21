@@ -10,7 +10,7 @@ export interface RefTrack {
   readonly behind: number;
 }
 
-/** §4.4/P6: the tagger identity and message subject of an *annotated* tag — `undefined` for a
+/** The tagger identity and message subject of an *annotated* tag — `undefined` for a
  *  lightweight one. Populated from `%(contents:subject)` only when `objecttype === "tag"`
  *  (`parse/refs.ts`): that placeholder returns the *pointed-at commit's* subject on a
  *  lightweight tag, which would read as an annotation that is not there. */
@@ -42,7 +42,7 @@ export interface RefRecord {
   readonly track: RefTrack | 'gone' | undefined;
   readonly committerDate: number; // unix seconds
   readonly isHead: boolean;
-  /** D12/P6. Absolute path of the worktree that has this ref checked out, when that worktree is
+  /** Absolute path of the worktree that has this ref checked out, when that worktree is
    *  NOT this session's own — `undefined` for every other ref, including the branch checked out
    *  in *this* worktree (`%(worktreepath)` is populated for both; the service subtracts its own
    *  toplevel — see `git/src/repoService.ts`'s `refs()`). */

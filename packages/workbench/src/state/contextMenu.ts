@@ -19,9 +19,9 @@ export type MenuItem =
       danger?: boolean;
       disabled?: boolean;
       checked?: boolean;
-      /** P42 D27: a hover explanation for this one row (e.g. the cell editor's format picker) —
+      /** A hover explanation for this one row (e.g. the cell editor's format picker) —
        *  rendered through the same Tooltip/TooltipTrigger/TooltipContent trio every other hint
-       *  uses (P104 §5.3), so it inherits the shared open-delay/rearm behavior for free rather than
+       *  uses, so it inherits the shared open-delay/rearm behavior for free rather than
        *  the row inventing its own. */
       hint?: string | readonly TextPart[];
       /** P21: names a binding in shared/domain/shortcuts.ts by id, never a display string — a typo is a
@@ -115,7 +115,7 @@ export const useContextMenuStore = defineStore('contextMenu', () => {
   };
 });
 
-// P21 D5: a new local keybinding dispatches through the same menu-builder function a right-click
+// A new local keybinding dispatches through the same menu-builder function a right-click
 // would call, rather than a parallel handler — the printed shortcut and the executed action are
 // then the same object, and `disabled` gating (canEdit, a missing record, …) is honoured for
 // free instead of being restated at the keydown site. Walks one level into submenus (e.g.

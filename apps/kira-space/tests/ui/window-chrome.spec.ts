@@ -4,7 +4,7 @@ import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
 
-// P116 §2: the sandbox-runnable proof of window-chrome parity — mirroring Kira Studio's own
+// The sandbox-runnable proof of window-chrome parity — mirroring Kira Studio's own
 // tests/ui/workbench.spec.ts:62-140 (New window button, keep-awake toggle, both directions) plus
 // the app-metrics readout and the five menu-pushed commands this app's own Go menu now emits
 // (internal/appshell/menu.go). Two unscoped terminal tabs stand in for "the tab set on screen" —

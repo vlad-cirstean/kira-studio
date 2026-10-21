@@ -7,7 +7,7 @@ import { logError } from '../bridge/log';
 import { useConfirmDialogStore } from './confirmDialog';
 import { cleanupTabRuntime } from './tabRuntime';
 
-// P103 Part 2 (§5.2): the shared skeleton both apps' `state/tabs.ts` used to duplicate —
+// The shared skeleton both apps' `state/tabs.ts` used to duplicate —
 // `persistableTabs`, `saveIfChanged`, the `saveNow`/`flushPendingTabState` pair and its two
 // `control.on*` registrations, `setActiveTabId`, `removeFromPreviewCohort`, `evictPreviewCohort`,
 // `reuseExistingTab`, `insertNewTabRecord`, `openTab`, `duplicateTab`, `closeTabInternal`,
@@ -159,8 +159,8 @@ export interface TabsHost<
    *  Required, even for a caller with nothing to add (`extend: () => ({})`) — a call that leaves
    *  `E` at its default with no argument to infer it from breaks Pinia's own action/state
    *  extraction for the *whole* store (every instantiation, not just that one), a real TS+Pinia
-   *  interaction found the hard way in P103 Part 2 (§5.3) — the fix as harmless as it is
-   *  unobvious, so it stays required rather than a trap for the next caller. */
+   *  interaction — the fix as harmless as it is unobvious, so it stays required rather than a
+   *  trap for the next caller. */
   extend(actions: TabsStoreActions<K, R>): E;
 }
 
@@ -197,8 +197,8 @@ export function createTabsStore<
     // D17: the last serialisation actually written — a save whose snapshot is identical to this
     // skips the IPC and the write entirely, not just the debounce.
     let lastSavedSnapshot: string | null = null;
-    // P108 Part 12 F12: `nextSnapshot` coalesces every change that arrives while a save is already
-    // chained down to just the latest one; `saveChain` is what actually serialises — each
+    // `nextSnapshot` coalesces every change that arrives while a save is already
+    // chained down to just the latest one; `saveChain` is what serialises — each
     // enqueueSave call chains its own link after whatever is already queued, so at most one
     // tabsSave call is ever in flight. Before this, two overlapping saves (an incognito toggle
     // firing saveNow() while an earlier debounced save was still in flight) had no ordering
@@ -266,7 +266,7 @@ export function createTabsStore<
         const kind = host.kinds[t.kind];
         const parsed = kind?.parseState(t.state);
         if (parsed) return { ...t, state: parsed } as R;
-        // P108 Part 12 F14: every per-kind schema's later fields now carry their own
+        // Every per-kind schema's later fields now carry their own
         // `.default(...)` (tabDomain.ts), so a row only reaches here when it fails on a field the
         // schema still requires — genuinely corrupt state, not merely an old row predating a
         // field. Reset to this kind's own defaultState() instead of keeping the unparsed raw
@@ -284,7 +284,7 @@ export function createTabsStore<
         const persistedActive = keyTabs.find((t) => t.active);
         const active = persistedActive ?? keyTabs[0];
         tabsState.activeIdByWorkspace[key] = active?.id ?? null;
-        // F7: no restored tab was `active` (the previously-active tab was incognito or a terminal,
+        // No restored tab was `active` (the previously-active tab was incognito or a terminal,
         // neither persisted) -- defaulting `activeIdByWorkspace` to the first tab without also
         // flipping its own `active` field left TabStrip (which reads that field) highlighting
         // nothing while MainView (which reads the id) rendered that tab.
@@ -589,10 +589,10 @@ export function createTabsStore<
       if (fromId === toId) return;
       const tabs = tabsState.tabs;
       const fromIdx = tabs.findIndex((t) => t.id === fromId);
-      // F6: the target's index in `tabs`, *before* the dragged tab is spliced out -- looking it up
+      // The target's index in `tabs`, *before* the dragged tab is spliced out -- looking it up
       // again in the post-splice array (the old code) shifts it left by one whenever the dragged
       // tab sat earlier in the list, so inserting there lands one slot short and a rightward drag
-      // never actually advances past the tab it's hovering.
+      // never advances past the tab it's hovering.
       const toIdx = tabs.findIndex((t) => t.id === toId);
       if (fromIdx < 0 || toIdx < 0) return;
       const fromTab = tabs[fromIdx];

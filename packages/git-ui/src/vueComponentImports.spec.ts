@@ -1,5 +1,5 @@
 /**
- * G14 D1/D11 — the guard for F1/F3's class of defect. A `.vue` file's default export is a
+ * The guard for the class of defect. A `.vue` file's default export is a
  * *value* — the component object the template instantiates. `import type` erases it at compile
  * time, so Vue renders the tag as an unknown element instead of the real component, and nothing
  * else in this repo's toolchain can catch it: it typechecks (`vue-tsc` only cares that the type
@@ -11,7 +11,7 @@
  *
  * This walks every `.vue` file under `packages/git-ui/src` and fails on any *default* type-only
  * import from another `.vue` file. Named type imports (`import type { FindBarHost } from
- * '…vue'`) are deliberately not matched — G14 F3 found one and it is legitimate, since a named
+ * '…vue'`) are deliberately not matched — it is legitimate, since a named
  * export can be a real type with no runtime value at all.
  */
 

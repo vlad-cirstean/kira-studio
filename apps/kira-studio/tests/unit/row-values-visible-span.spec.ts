@@ -2,16 +2,16 @@ import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 
-// Finding 3 (round 2) — a `range`-kind selection stores only its two page-row corners; every
+// A `range`-kind selection stores only its two page-row corners; every
 // consumer used to walk the CONTIGUOUS span between them, silently sweeping in rows the active
 // filter was hiding. `visibleRowsInSpan` (copy/delete) and `pasteTargetRows` (paste) are the fix —
 // boundary arithmetic worth its own coverage independent of the UI test (slick-grid.spec.ts's
-// finding-3 test), which only exercises the copy/delete path end to end.
+// test), which only exercises the copy/delete path end to end.
 //
 // rowValues.ts transitively reaches `bridge/control`/`bridge/data` (via `./menu`/`./pendingChanges`
 // — Bun's own module graph resolves those against `/wails/runtime.js` eagerly), so it has to be a
-// dynamic `import()` here, after `@workbench/testing/unit/window`'s mock.module registration has actually run —
-// the same pattern console-auto-explain-race.spec.ts and its siblings already use.
+// dynamic `import()` here, after `@workbench/testing/unit/window`'s mock.module registration
+// has run — the same pattern console-auto-explain-race.spec.ts and its siblings already use.
 const { pasteTargetRows, visibleRowsInSpan } = await import(
   '../../frontend/src/views/grid/slick/rowValues'
 );

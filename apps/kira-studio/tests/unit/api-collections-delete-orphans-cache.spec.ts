@@ -1,8 +1,8 @@
-// P21 round 2 functional finding 4: Go's own delete genuinely cascades (repos/collections.go's
+// Go's own delete genuinely cascades (repos/collections.go's
 // own comment: "the cascade is genuine") — deleting a folder or a collection removes every
 // descendant api_items row, not just the row clicked. deleteRow used to purge exactly one cache
 // entry (collectionsStore.requests[row.id] / grpcRequests[row.id]), leaving every *descendant*
-// request's cached HttpSavedRequest/GrpcSavedRequest behind. D14's orphan rule
+// request's cached HttpSavedRequest/GrpcSavedRequest behind. The orphan rule
 // (HttpRequestView.vue: canSave depends on the apiSavedRequestKey query reading non-null) then
 // silently misbehaved for any tab open on one of those orphaned descendants: the stale cache entry
 // made the tab look saveable when its row no longer existed at all.
@@ -10,8 +10,7 @@
 // This test fails against the pre-fix deleteRow (only the folder's own id is purged, both
 // descendant requests' cache entries survive) and passes once the whole subtree is purged.
 //
-// P112: rewritten off collectionsStore's own removed fetchSavedRequest/savedRequestFor wrappers —
-// asserts against the apiSavedRequestKey query cache directly (queryClient.getQueryData), which is
+// Asserts against the apiSavedRequestKey query cache directly (queryClient.getQueryData), which is
 // what deleteRow itself now writes `null` into for the whole orphaned subtree.
 import '@workbench/testing/unit/window';
 
@@ -37,7 +36,7 @@ const { control } = await import('../../frontend/src/bridge/control');
 // → afterTreeListChange → refreshApiQuery) behind it. Set before restoreAfterEach's own snapshot,
 // so each test's afterEach restores to this benign default rather than reintroducing the hang.
 //
-// P112: restoreAfterEach's own snapshot is taken *after* this override (deliberately, so the
+// restoreAfterEach's own snapshot is taken *after* this override (deliberately, so the
 // per-test reset keeps the benign default) — which never restores the *true* original, and
 // `control` is one process-wide singleton (restoreAfterEach.ts's own documented hazard: a spec's
 // stub that outlives its file leaks into whatever runs next in the same bun test process).

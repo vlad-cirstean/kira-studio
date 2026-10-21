@@ -1,20 +1,19 @@
 /**
- * `docs/plans/P4.md` W8: "The graph column is a column, not an overlay. Its formatter returns one
- * small `<svg>` holding only the slice of the graph that passes through *that row's* height"
- * (§5.3). Pure, no Vue, no library, no DOM query beyond the element construction itself — no
+ * "The graph column is a column, not an overlay. Its formatter returns one
+ * small `<svg>` holding only the slice of the graph that passes through *that row's* height".
+ * Pure, no Vue, no library, no DOM query beyond the element construction itself — no
  * component, no lifecycle, no `devicePixelRatio` handling, no resize path, no repaint coalescing
  * and no theme subscription, all of which existed only to keep a second drawing surface aligned
- * with rows it was not part of (§5.3's revision note). What remains is a pure function from a
+ * with rows it was not part of. What remains is a pure function from a
  * row's data to an element.
  *
- * Split, like W7's `refBadges.ts`, into a pure planning half (`planEdgePaths`/`planNode`, unit-
+ * Split, like the `refBadges.ts`, into a pure planning half (`planEdgePaths`/`planNode`, unit-
  * tested directly in `tests/unit/ui/rowSvg.spec.ts`) and a DOM-construction half
- * (`buildRowSvg`/its private helpers) exercised by W13's Playwright pass — this repo has no
- * jsdom/happy-dom wired into `bun:test` (confirmed by W6/W7, not assumed here).
+ * (`buildRowSvg`/its private helpers) exercised by the Playwright pass — this repo has no
+ * jsdom/happy-dom wired into `bun:test`.
  *
- * `GEOMETRY` itself lives in `./geometry.ts`, one level below both this file and W6's
- * `columns.ts` — see that file's own doc comment for why (the plan's dependency table has W8
- * depend on W6, not the reverse, so the shared constants had to exist before W8 could).
+ * `GEOMETRY` itself lives in `./geometry.ts`, one level below both this file and the
+ * `columns.ts` — see that file's own doc comment for why.
  */
 import { type DecorationRef, UNRESOLVED_ROW } from '@kira/git-core';
 import { GEOMETRY } from './geometry.ts';
@@ -26,8 +25,8 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 /**
  * One row's complete input to `buildRowSvg`: the reused `segments` buffer and how many of its
  * entries are valid (`segmentCount`) — mirroring `LayoutStore.segmentsInRow`'s own "write by
- * index, return a count, never reallocate" contract (W3) — plus this row's own lane/colour/shape.
- * `lane` is `undefined` for a row whose layout has not arrived yet (W5: text lands before lanes
+ * index, return a count, never reallocate" contract — plus this row's own lane/colour/shape.
+ * `lane` is `undefined` for a row whose layout has not arrived yet (text lands before lanes
  * do); `buildRowSvg` then draws an empty, correctly-sized cell rather than guessing a lane.
  */
 export interface RowSlice {
@@ -38,12 +37,12 @@ export interface RowSlice {
   readonly nodeKind: NodeKind;
   readonly segments: readonly EdgeSegment[];
   readonly segmentCount: number;
-  /** G19 D1: whether this row is HEAD (or a branch `ref.isHead`, detached-HEAD included) —
+  /** Whether this row is HEAD (or a branch `ref.isHead`, detached-HEAD included) —
    *  `graphColumn.ts`'s `readSlice` computes this the identical way `columns.ts`'s `rowMetadata`
    *  already does for the row-bold indicator (`isHeadDecoration`, below), never a second
    *  heuristic. Drives `planNode`'s own HEAD ring; does not affect `nodeKind`. */
   readonly isHead: boolean;
-  /** P93 §2/§6.2: this row's own upward link — its parent sits ABOVE it, in an earlier branch
+  /** This row's own upward link — its parent sits ABOVE it, in an earlier branch
    *  group, so it is deliberately not a lane (a lane per branch from its merge base down to its
    *  block blows past `GEOMETRY.maxLanes` on any repo with a dozen branches). Drawn as a short
    *  dashed run in this row's own lane, in the PARENT's lane colour, ending at the row's node.
@@ -58,9 +57,8 @@ export function isStashRow(decorations: readonly DecorationRef[]): boolean {
   return decorations.some((ref) => ref.kind === 'stash');
 }
 
-/** G19 D1: promoted out of `columns.ts` (F1: it was already the single source of truth for the
- *  row-bold indicator there) into this shared module, so `graphColumn.ts`'s `readSlice` and
- *  `columns.ts`'s `rowMetadata` both import the one function rather than each defining their own
+/** Lives in this shared module, so `graphColumn.ts`'s `readSlice` and `columns.ts`'s `rowMetadata`
+ *  both import the one function rather than each defining their own
  *  — mirroring `isStashRow`'s own already-established crossing of this exact boundary. */
 export function isHeadDecoration(ref: DecorationRef): boolean {
   return ref.kind === 'head' || (ref.kind === 'branch' && ref.isHead);
@@ -75,8 +73,8 @@ function fmt(value: number): string {
 
 /** The centre-x of a lane's own column within the gutter, clamped to the twelfth lane
  *  (`GEOMETRY.maxLanes`) rather than growing the gutter without bound — a fifty-lane repository
- *  is real (P2's `fan(50, …)` fixture), and letting the graph eat a panel that is short and wide
- *  is the worse failure (§the plan's own W8 text: "the message column is what the user reads"). */
+ *  is real (the `fan(50, …)` fixture), and letting the graph eat a panel that is short and wide
+ *  is the worse failure ("the message column is what the user reads"). */
 export function laneX(lane: number): number {
   const clamped = Math.min(lane, GEOMETRY.maxLanes - 1);
   return GEOMETRY.padLeft + clamped * GEOMETRY.laneWidth + GEOMETRY.laneWidth / 2;
@@ -155,7 +153,7 @@ export interface EdgePathPlan {
   readonly dashed?: boolean;
 }
 
-/** §5.3's first decision: "one `<path>` per lane colour present in the row, not one per segment"
+/** "one `<path>` per lane colour present in the row, not one per segment"
  *  — every covering segment's own command (`edgeCommand`) is concatenated into the one path its
  *  colour owns, which is what holds a row to ~4 elements typical rather than one per segment.
  *  Two *different* lanes sharing a colour (legal once `laneCount` exceeds the palette size) are
@@ -177,7 +175,7 @@ function planEdgePaths(
   return Array.from(commandsByColor, ([color, commands]) => ({ color, d: commands.join(' ') }));
 }
 
-/** P93 §6.2: one stub per row (the plan already reduced several upward links to the nearest one,
+/** One stub per row (the plan already reduced several upward links to the nearest one,
  *  `RowPlan.forkParentOf`'s own doc comment) — a dashed run from the row's own top edge down to
  *  its node, in the row's own lane, in the PARENT's colour. `undefined` when this row has no
  *  upward link or no lane yet (mirrors `planNode`'s own `slice.lane === undefined` guard). */
@@ -202,7 +200,7 @@ export interface NodeShapePlan {
    *  dot at all) and only an inline style reliably wins that cascade. */
   readonly filled: boolean;
   readonly dashed: boolean;
-  /** G19 D1: the HEAD ring — an unfilled ring in `--kira-focus` (the same token the existing
+  /** The HEAD ring — an unfilled ring in `--kira-focus` (the same token the existing
    *  branch-badge dot already uses), drawn in addition to whichever shapes `nodeKind` itself
    *  already returns (stash/merge precedence untouched). `true` only for this one shape; every
    *  other `NodeShapePlan` this module produces leaves it `undefined`, which `buildNodeElement`
@@ -216,10 +214,10 @@ export interface NodeShapePlan {
   readonly isHeadHalo?: boolean;
 }
 
-/** §5.3's fifth decision, the three node shapes: filled circle (ordinary), filled circle plus an
- *  unfilled ring (merge — `store.parentsOf(row).length > 1`), unfilled dashed ring alone (stash —
- *  `decorationAt(row)` carries the `stash` kind). Empty for a row with no layout yet
- *  (`slice.lane === undefined`) — nothing to draw, not a guessed lane.
+/** The three node shapes: filled circle (ordinary), filled circle plus an unfilled ring (merge —
+ *  `store.parentsOf(row).length > 1`), unfilled dashed ring alone (stash — `decorationAt(row)`
+ *  carries the `stash` kind). Empty for a row with no layout yet (`slice.lane === undefined`) —
+ *  nothing to draw, not a guessed lane.
  *
  *  `cy` is `nodeCenterY`, not `rowHeight / 2`: a badge line makes the row taller without moving the
  *  subject. The caller (`graphColumn.ts`) passes `rowHeight - compactRowHeight / 2`, the subject
@@ -230,7 +228,7 @@ export function planNode(slice: RowSlice, nodeCenterY: number): readonly NodeSha
   const cy = nodeCenterY;
   const color = slice.color;
 
-  // P93 §6.1: three small stacked dots in the group's lane colour, checked before the HEAD
+  // Three small stacked dots in the group's lane colour, checked before the HEAD
   // ring/halo logic below — a placeholder is never HEAD (`graphColumn.ts`'s `readSlice` always
   // sets `isHead: false` for a collapsed entry), so this returns before that computation rather
   // than relying on the flag alone to keep it empty.
@@ -243,7 +241,7 @@ export function planNode(slice: RowSlice, nodeCenterY: number): readonly NodeSha
     ];
   }
 
-  // G19 D1 / G21 D1: the HEAD ring is additive — appended to whichever shapes this kind already
+  // The HEAD ring is additive — appended to whichever shapes this kind already
   // returns, never replacing them. Built once, appended at every return below. Its own
   // `headRingRadius` (not `mergeRadius`, which a merge-at-HEAD's own merge ring already uses at
   // the identical centre) is what keeps a merge commit at HEAD showing both rings distinctly —
@@ -261,7 +259,7 @@ export function planNode(slice: RowSlice, nodeCenterY: number): readonly NodeSha
         },
       ]
     : [];
-  // G-UX (item 1): the halo, same additive shape as headRing above and always present alongside
+  // The halo, same additive shape as headRing above and always present alongside
   // it (both gated on the identical `slice.isHead`) — kept as its own array, not folded into
   // headRing, so `buildRowSvg` can paint it in a different position (under the row's own edges)
   // without needing to inspect each shape's flags to decide where it goes.
@@ -351,10 +349,11 @@ function buildNodeElement(plan: NodeShapePlan): SVGCircleElement {
   return circle;
 }
 
-/** Builds one row's `<svg>` — sized to `columnWidth()` (P92 item 1: the column's actual,
+/** Builds one row's `<svg>` — sized to `columnWidth()` (the column's actual,
  *  user-resizable width, `CommitGrid.vue`'s own `widths.value.graph`, not derived from
  *  `slice.laneCount` — a narrowed column must clip its lanes, not overflow into the message
- *  column) and `rowHeight` (this row's own real height, so lanes and rows cannot drift). Lane x-coordinates
+ *  column) and `rowHeight` (this row's own real height, so lanes and rows cannot drift). Lane
+ *  x-coordinates
  *  (`laneX`, `planEdgePaths`/`planNode`) are unchanged — only the box around the drawing is the
  *  column's; the `clip-path` utility on `graph-svg` cuts a lane at the column's right edge
  *  (`overflow: hidden` cannot: one non-visible axis forces the other to `auto`) while letting

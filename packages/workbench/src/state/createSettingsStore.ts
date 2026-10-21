@@ -4,18 +4,17 @@ import { reactive, ref, toRefs } from 'vue';
 import { ROW_HEIGHT_PX } from '../lib/rowHeight';
 import { hydrateThenSubscribe } from './hydrateThenSubscribe';
 
-// P103 Part 2 (§5.3): hoisted from Kira Studio's own state/settings.ts (P100 Part 2's comment on
-// Kira Space's copy: "ported"). `sections`/`Section` stay per-app (each dialog surfaces a
-// different subset of the one shared `Settings` schema — SettingsDialog.vue's own concern, not
-// this store's), so this factory is generic over `S`, the app's own Section union.
+// `sections`/`Section` stay per-app (each dialog surfaces a different subset of the one shared
+// `Settings` schema — SettingsDialog.vue's own concern, not this store's), so this factory is
+// generic over `S`, the app's own Section union.
 //
-// P103 Part 4 (§7.3): `Se`/`SeP`, the app's own Settings/SettingsPatch shape, join `S` as explicit
-// type parameters — each app now has its own `state/settingsDomain.ts` schema (no more one shared
+// `Se`/`SeP`, the app's own Settings/SettingsPatch shape, join `S` as explicit type parameters —
+// each app now has its own `state/settingsDomain.ts` schema (no more one shared
 // `@shared/domain/settings` shape both stores hardcoded). `Se` is bound to
 // `{ appearance: AppearanceSettings } & Record<string, Record<string, unknown>>` — the one section
-// applyAppearance() below reads directly, genuinely shared by both apps (§7.1/§7.3) — plus "every
-// section is an object", which is what applySettings' generic Object.assign loop needs to stay
-// type-safe without listing each app's own section names here.
+// applyAppearance() below reads directly, genuinely shared by both apps — plus "every section is
+// an object", which is what applySettings' generic Object.assign loop needs to stay type-safe
+// without listing each app's own section names here.
 //
 // Kira Studio's own appearanceVersion bump (measured-text re-measure signal, columns.ts) has no
 // equivalent in Kira Space (no data grid) — `extend`'s `onApplyAppearance` hook reproduces it
@@ -48,7 +47,7 @@ export interface SettingsStoreExtension<E extends Record<string, unknown>> {
 // applies across all of one call's type parameters, not just the ones given), which leaves `E` at
 // its default with nothing to infer it from — and that breaks Pinia's own action/state extraction
 // for the *whole* store (every instantiation, not just that one), a real TS+Pinia interaction found
-// the hard way in P103 Part 2 (§5.3). The inner call takes no explicit type arguments at all, so
+// the hard way. The inner call takes no explicit type arguments at all, so
 // `E` is always inferred fresh from `extend`'s actual return value.
 export function createSettingsStore<S extends string, Se extends SettingsShape, SeP>(defaults: Se) {
   return <E extends Record<string, unknown>>(
@@ -65,8 +64,8 @@ export function createSettingsStore<S extends string, Se extends SettingsShape, 
       const settingsOpen = ref(false);
 
       // null: no deep link pending — SettingsDialog.vue falls back to 'Appearance'. Set by
-      // openSettingsAt below, read once on the dialog's own mount, and cleared when it unmounts so a
-      // later plain open (TitleBar.vue's gear icon, the command palette) never inherits a stale
+      // openSettingsAt below, read once on the dialog's own mount, and cleared when it unmounts so
+      // a later plain open (TitleBar.vue's gear icon, the command palette) never inherits a stale
       // section.
       const settingsSection = ref<S | null>(null);
 
@@ -116,10 +115,9 @@ export function createSettingsStore<S extends string, Se extends SettingsShape, 
         });
       }
 
-      // P12 round 1 finding #9: applies `patch` only once the backend confirms it (settingsSet's
-      // own resolved value), never pre-applied — see Kira Studio's own git history for the rollback
-      // gap that left other windows and the database diverged from a pre-applied, later-rejected
-      // patch.
+      // Applies `patch` only once the backend confirms it (settingsSet's own resolved value),
+      // never pre-applied — see Kira Studio's own git history for the rollback gap that left other
+      // windows and the database diverged from a pre-applied, later-rejected patch.
       async function patchSettings(patch: SeP): Promise<void> {
         const updated = await control.settingsSet(patch);
         applySettings(updated);

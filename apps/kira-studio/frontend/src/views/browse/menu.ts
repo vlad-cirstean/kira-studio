@@ -12,9 +12,9 @@ import { useTabsStore } from '../../state/tabs';
 import { nodeIcon } from '../../theme/icons';
 import { useBrowseViewStore } from './state';
 
-// P41 D10: the bodies of project/menus.ts's now-deleted namespaceMenu/prefixMenu (a container row
+// The bodies of project/menus.ts's now-deleted namespaceMenu/prefixMenu (a container row
 // — redis 'namespace' / s3 'prefix') and keyMenu/objectMenu (a leaf row — redis 'key' / s3
-// 'object'), moved here verbatim once the tree stopped rendering any of these rows at all (D5).
+// 'object'), moved here verbatim once the tree stopped rendering any of these rows at all.
 // `refresh(parent)`'s tree-row refresh becomes a local level reload — there is no longer a parent
 // tree row to refresh, only this panel's own currently loaded level.
 

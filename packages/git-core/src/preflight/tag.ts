@@ -8,7 +8,7 @@ import { isAnnotated } from '../model/tag.ts';
 import type { TagCreatePreflight } from './types.ts';
 
 /**
- * A pure prefilter run before `git check-ref-format --branch` is ever spawned. Probe P3: that
+ * A pure prefilter run before `git check-ref-format --branch` is ever spawned. That
  * command **resolves** `@{-1}`-style shorthand rather than rejecting it as a literal name
  * (`check-ref-format --branch '@{-1}'` exits 0 and prints `cp`), so a name containing `@{` must be
  * rejected here — git would silently accept a name meaning "some other ref" instead of the literal

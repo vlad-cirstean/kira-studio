@@ -5,10 +5,10 @@ import { acceptConfirm } from './support/dialogs';
 import { editorText, stableBoundingBox } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
-// P13 §7: a small, Api-only spec (the SPEC's module-boundary rule — "a single test file covering
+// A small, Api-only spec (the SPEC's module-boundary rule — "a single test file covering
 // both is not") guarding three things a restyle can genuinely regress, not the restyles
 // themselves: a de-duplicated affordance staying de-duplicated, an HTML-validity fix staying
-// fixed, and one new control's enabled state actually tracking real data.
+// fixed, and one new control's enabled state tracking real data.
 
 test('collections empty state has no duplicate action buttons (D6)', async ({ relaunch }) => {
   // No control mock needed — mockRuntime.ts's own WILDCARD_DEFAULTS answers collectionsList with
@@ -109,7 +109,7 @@ test('gRPC history Clear tracks whether there is anything to clear (D12)', async
           grpcTab({ target: 'demo.example.com:443', service: 'demo.Echo', method: 'SayHello' }),
         ],
       },
-      // Pre-existing bug, unrelated to P112: a restored tab with no target never triggers
+      // Pre-existing bug: a restored tab with no target never triggers
       // loadSchema's own watch (GrpcRequestView.vue's `mode === 'reflection' && !target` early
       // return), so `methodResolved` never resolves and Call stays disabled forever —
       // grpc-request.spec.ts's own comment on this exact fix has the full rationale.
@@ -145,9 +145,9 @@ test('gRPC history Clear tracks whether there is anything to clear (D12)', async
   await expect(withEntries.window.locator('[data-testid="grpc-history-clear"]')).toBeEnabled();
 });
 
-// P22 D3/F5: a freshly opened gRPC tab has neither a service nor a method, so Call is disabled
+// A freshly opened gRPC tab has neither a service nor a method, so Call is disabled
 // from the moment the tab opens — the one place the app-wide disabled-primary-button defect
-// (every primary Button variant, not a gRPC-specific bug) was actually visible to a user.
+// (every primary Button variant, not a gRPC-specific bug) was visible to a user.
 // Asserted as "the disabled primary path uses opacity", not as a contrast number computed in the
 // test.
 test('a disabled Call button dims via opacity, not an unreadable label on a full-strength fill (D3)', async ({
@@ -382,8 +382,8 @@ test('hovering a resolved reference shows its value; hovering a secret never doe
   await expect(hover).not.toContainText('api_key');
 });
 
-// P22b D4/D5: the request body editors are the single largest place a user writes {{variables}}
-// (F6) — until now they only got rangeHighlights (colouring), and a resolved reference read as
+// The request body editors are the single largest place a user writes {{variables}}
+// — until now they only got rangeHighlights (colouring), and a resolved reference read as
 // exactly the same colour as the JSON keys around it (`--kira-syntax-property`, byte-identical to
 // the old `--kira-var-resolved` alias). This guards the fix end to end: a colour of its own, a
 // hover, and completion, all inside the JSON body — not just the URL field the tests above cover.
@@ -473,17 +473,17 @@ test('the request body: a resolved {{variable}} has a colour of its own, hovers,
   await expect(tooltip).toContainText('base_url');
 });
 
-// G20 D7: the actual originally-reported bug — the request body's {{variable}} hover tooltip
+// The actual originally-reported bug — the request body's {{variable}} hover tooltip
 // stayed nested inside two `overflow: hidden` ancestors (`MonacoHost.vue`'s own `.monaco-host`,
 // HttpRequestView.vue's `.request-pane`) with no shared, body-level `overflowWidgetsDomNode` to
 // escape them, and its z-index had no stated relationship to this app's real `--kira-z-*` ladder.
-// P60a dogfooding finding: `fixedOverflowWidgets: true` alone does NOT reparent a widget to
+// `fixedOverflowWidgets: true` alone does NOT reparent a widget to
 // `document.body` (verified against the pinned Monaco's own `view.js` — it appends the
 // "overflowing" widgets container to the editor's own root DOM node when no explicit
 // `overflowWidgetsDomNode` is supplied); `editor/monaco.ts`'s `overflowWidgetsContainer()` is the
 // fix, a single shared container every MonacoHost instance points at. Both are checked as direct
 // DOM/CSS facts rather than pixel geometry — a stronger, viewport-independent proof that the fix
-// actually landed, not a coincidence of one particular window size happening to leave enough room.
+// landed, not a coincidence of one particular window size happening to leave enough room.
 test('the request body {{variable}} hover escapes the editor pane and adopts the coordinated z-index (G20 D7)', async ({
   relaunch,
 }) => {
@@ -531,7 +531,7 @@ test('the request body {{variable}} hover escapes the editor pane and adopts the
     hover.evaluate((el) => el.closest('.monaco-host') === null),
     // main.ts mounts the whole app onto '#app' — escaping it entirely (not merely its two named
     // ancestors above) is the strongest, wrapper-depth-independent proof that
-    // `overflowWidgetsDomNode` actually re-parented this tooltip's own container, rather than
+    // `overflowWidgetsDomNode` re-parented this tooltip's own container, rather than
     // merely resolving true by accident of which two specific classes happened to be checked.
     hover.evaluate((el) => el.closest('#app') === null),
     hover.evaluate((el) => document.body.contains(el)),
@@ -980,8 +980,8 @@ test('the method select opens an app-drawn menu, and PATCH gets its own colour, 
   expect(putColor).not.toBe(patchColor);
 });
 
-// P22 D7/F11/F12: a method is coloured text on the control's own neutral ground, not a tinted
-// pill — the fill P17 D19 gave `.p-method` (to match `.p-chip`'s status variants) reads as a
+// A method is coloured text on the control's own neutral ground, not a tinted
+// pill — the fill on `.p-method` (to match `.p-chip`'s status variants) reads as a
 // second, competing control on the already-bordered method select. Colour survives; the fill
 // does not, on every `.p-method` site (the trigger and the head chip both).
 test('a method is coloured text on a neutral ground, not a tinted fill (D7)', async ({
@@ -1430,10 +1430,9 @@ test('the environment select opens an app-drawn menu carrying each environment�
   const menu = page.locator('[data-testid="api-environment-menu"]');
   await expect(menu).toBeVisible();
 
-  // Real-interaction fix (reported bug — this dropdown rendered right-aligned): the trigger sits
-  // flush against its own toolbar's right edge (`.p-push`), so the popover's own right edge is
-  // pinned to *this control's* right edge (anchor="right") — not, as it used to be, clamped
-  // against the viewport's right edge by shift() overriding a requested-but-unreachable
+  // The trigger sits flush against its own toolbar's right edge (`.p-push`), so the popover's own
+  // right edge is pinned to *this control's* right edge (anchor="right") — not, as it used to be,
+  // clamped against the viewport's right edge by shift() overriding a requested-but-unreachable
   // `anchor="left"`. Those two coincide at this test's own 1440px viewport width (the trigger
   // sits only ~15px from the edge), so this asserts the actual mechanism — flush with the
   // trigger — rather than a coincidence that would silently stop holding at a different width.
@@ -1494,11 +1493,10 @@ test('an environment’s colour reaches the request view’s toolbar cap and hea
   await expect(headDot).toHaveClass(/none/);
 });
 
-// P22b D9: one row grid, three consumers (F13) — VariableSetView's rows used to be independent
+// One row grid, three consumers — VariableSetView's rows used to be independent
 // flex items with their own per-field `flex` value, so a secret row's extra reveal affordance
 // shifted its neighbours out of alignment. This guards the fix directly: three consecutive rows,
-// one of them a secret (the row shape D9's own finding calls out), share left edges column by
-// column.
+// one of them a secret, share left edges column by column.
 test('a variable-set view: name/value/description cells of three consecutive rows share left edges (D9)', async ({
   relaunch,
 }) => {

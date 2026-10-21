@@ -1,4 +1,4 @@
-// P12 round 2 finding #4: run()'s two `rt.explainOpId = null` clears (the cancellation catch and
+// run()'s two `rt.explainOpId = null` clears (the cancellation catch and
 // the post-await settle path) were bare, unlike every other op-id field in this file — so an
 // overlapping second run's own explainOpId, stamped *after* the first run started, could be wiped
 // out when the first run's own EXPLAIN batch settles. `runStatement`/`runAll` have no `running`

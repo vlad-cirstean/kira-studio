@@ -10,10 +10,10 @@ export const buttonVariants = cva(
       variant: {
         ghost: 'hover:bg-field hover:text-fg aria-expanded:bg-field aria-expanded:text-fg',
         link: 'cursor-pointer text-primary underline-offset-4 hover:underline',
-        // P104 §3: AppButton's `kind`/`variant` vocabulary, collapsed onto this cva's own
-        // `variant` axis instead of a second wrapper prop layer (§0's "no hand-rolled fallback").
+        // AppButton's `kind`/`variant` vocabulary, collapsed onto this cva's own
+        // `variant` axis instead of a second wrapper prop layer.
         // Geometry stays on the `kira`/`kira-lg`/`kira-icon` sizes below (design-system tokens,
-        // runtime-adjustable via @theme's --spacing-control* -- see base.css §7.2).
+        // runtime-adjustable via @theme's --spacing-control* -- see base.css).
         toolbar:
           'rounded-kira-sm text-muted-foreground hover:bg-hover hover:text-fg aria-pressed:bg-field aria-pressed:text-fg data-[tone=error]:text-error data-[tone=error]:hover:text-error data-[tone=ok]:text-ok data-[tone=ok]:hover:text-ok',
         'toolbar-primary': 'rounded-kira-sm bg-primary text-primary-foreground hover:bg-primary/80',

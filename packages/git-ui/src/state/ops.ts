@@ -68,11 +68,10 @@ export type { StashPredictionMismatch } from './liveAnnouncements.ts';
 
 /** `StashPopPreflight.prediction`'s own inline shape, named here since `@kira/git-ipc` has no
  *  standalone export for it (it is a structural copy of core's `MergeOutcomePrediction`, inlined
- *  at each of its two call sites rather than given its own top-level name — §7.10/§7.6 both do
- *  this). */
+ *  at each of its two call sites rather than given its own top-level name). */
 type StashPrediction = StashPopPreflight['prediction'];
 
-/** `StashDialog.vue`'s own pending state for the shared apply/pop confirmation (OQ7: one dialog,
+/** `StashDialog.vue`'s own pending state for the shared apply/pop confirmation (one dialog,
  *  the verb and one sentence differing) — opened only when `preflight.stashPop`'s verdict is not
  *  `"clean"` (mirrors `RevertDialog`'s own threshold). There is no route data beyond
  *  proceed/cancel: `restoreIndex` is chosen by the caller before the preflight round trip even
@@ -83,8 +82,8 @@ export interface PendingStashPop {
   readonly preflight: StashPopPreflight;
 }
 
-/** The common subset of `OpResult` and `RemoteOpResult` the `stashAndCarry` route (§7.5/§7.3,
- *  OQ10) actually reads — `checkout` and `pull` return different result shapes (`undo` vs.
+/** The common subset of `OpResult` and `RemoteOpResult` the `stashAndCarry` route reads —
+ *  `checkout` and `pull` return different result shapes (`undo` vs.
  *  `updates`), but both carry exactly this much, which is all `#stashAndCarry` needs from
  *  whichever one its caller ran. */
 interface CarryMiddleResult {
@@ -94,10 +93,10 @@ interface CarryMiddleResult {
   readonly inProgress: InProgressOperation | null;
 }
 
-/** The route a confirmed `ForcePushDialog.vue` takes. `plain: true` selects §7.4's second,
+/** The route a confirmed `ForcePushDialog.vue` takes. `plain: true` selects the second,
  *  differently-worded confirmation (plain `--force`); `plain: false` is the default
- *  `--force-with-lease --force-if-includes` path (D48). `confirmToken` is the typed branch name,
- *  present only when `PushPreflight.protectedBy` was non-null — re-verified host-side (D52), so a
+ *  `--force-with-lease --force-if-includes` path. `confirmToken` is the typed branch name,
+ *  present only when `PushPreflight.protectedBy` was non-null — re-verified host-side, so a
  *  wrong value here surfaces as an ordinary `ProtectedBranch` failure, not a client-side check. */
 export interface ForcePushRoute {
   readonly plain: boolean;
@@ -114,7 +113,7 @@ export interface PendingForcePush {
 }
 
 /** The resolved pull strategy and its provenance, shown by the toolbar's pull-strategy picker
- *  before (and after) a pull runs (§7.3: "must not discover [a rebase] by watching their history
+ *  before (and after) a pull runs ("must not discover [a rebase] by watching their history
  *  get rewritten"). Set the moment it is known — from a preflight round trip, or immediately for
  *  an explicit override the user already picked — and left in place once the op finishes so it
  *  stays visible as a record of what just ran. */
@@ -124,9 +123,9 @@ export interface PullStrategyInfo {
 }
 
 /** The route a confirmed `blockedByTracked` checkout takes: discard the local changes and
- *  proceed, or (P9, when `preflight.routes` lists it) push them to a stash first and pop them
- *  back afterward — §7.5's `stashAndCarry`. `runCheckout` only ever opens the dialog for
- *  `"blocked"` at all (§7.5: clean and cleanCarry proceed with no prompt). */
+ *  proceed, or (when `preflight.routes` lists it) push them to a stash first and pop them
+ *  back afterward — the `stashAndCarry`. `runCheckout` only ever opens the dialog for
+ *  `"blocked"` at all (clean and cleanCarry proceed with no prompt). */
 export type CheckoutRoute = { readonly kind: 'discard' } | { readonly kind: 'stashAndCarry' };
 
 /** `PostCheckoutPullDialog.vue`'s own pending state (G-UX item 3) — everything the dialog needs
@@ -142,7 +141,8 @@ export interface PostCheckoutPullPrompt {
 /** `RefRow.upstream` is `%(upstream)`'s bare expansion — `refs/remotes/<remote>/<name>` for a
  *  remote-tracking upstream, or `refs/heads/<name>` for the (unusual, but legal) case of a branch
  *  tracking another local branch. Only the first has a *remote* to pull from at all — `undefined`
- *  for the second is deliberate, not a gap: `runPull` has no meaning for a purely local upstream. */
+ *  for the second is deliberate, not a gap: `runPull` has no meaning for a purely local upstream.
+ */
 export function remoteFromUpstreamRef(upstreamRef: string | undefined): string | undefined {
   if (upstreamRef === undefined) return undefined;
   const match = /^refs\/remotes\/([^/]+)\//.exec(upstreamRef);
@@ -157,12 +157,12 @@ export interface RevertRoute {
 }
 
 /** The route a confirmed `ResetDialog.vue` takes: `mode` is the radio the dialog settled on
- *  (`runReset`'s own `mode` argument is only the *initial* pre-flight's mode — OQ1's mixed
+ *  (`runReset`'s own `mode` argument is only the *initial* pre-flight's mode — the mixed
  *  default — the dialog may change it client-side via `previewResetMode`, never a second round
- *  trip, per OQ11). `stashFirst` selects §7.7's "stash first" route (judgment call 5: stash-
- *  then-stop, never P9's stash-and-carry); `token` is the typed short sha, present only when the
- *  chosen mode is destructive and `stashFirst` was not taken (judgment call 19 — requiring both
- *  would be theatre once the work is preserved). */
+ *  trip). `stashFirst` selects the "stash first" route (stash-then-stop, never the
+ *  stash-and-carry); `token` is the typed short sha, present only when the chosen mode is
+ *  destructive and `stashFirst` was not taken (requiring both would be theatre once the work is
+ *  preserved). */
 export interface ResetRoute {
   readonly mode: ResetMode;
   readonly stashFirst: boolean;
@@ -177,9 +177,9 @@ export interface CherryPickRoute {
 }
 
 /**
- * `docs/plans/P6.md` W12: one exported method per user-facing action, each the same four steps —
- * pre-flight, confirm (only when the pre-flight found a hazard), run, refresh/announce/surface —
- * so no component ever writes them out of order or calls `bridge.request("op.run", …)` itself.
+ * One exported method per user-facing action, each the same four steps — pre-flight, confirm
+ * (only when the pre-flight found a hazard), run, refresh/announce/surface — so no component ever
+ * writes them out of order or calls `bridge.request("op.run", …)` itself.
  *
  * The **confirm** step for `checkout`/`revert` is mediated entirely inside this class: a hazard
  * pre-flight sets `pendingCheckout`/`pendingRevert`, a dialog component watches that ref and
@@ -190,10 +190,9 @@ export interface CherryPickRoute {
  * has already run by the time it calls one of this class's methods.
  *
  * **The gate.** `canRun(opKind)` is `core`'s own pure `canRunOp` over this class's own
- * `statusSummary.inProgress` — never a component's `v-if` chain (W12's own "Done when"). **The
+ * `statusSummary.inProgress` — never a component's `v-if` chain. **The
  * busy flag.** One in-flight operation at a time; every method below is a no-op while `busy` is
- * true, on top of the driver's own serialization (P1) — belt and braces, matching W12's own
- * wording for step 4's synchronous head/inProgress apply.
+ * true, on top of the driver's own serialization — belt and braces.
  */
 export class OpsState {
   readonly busy: ShallowRef<boolean> = shallowRef(false);
@@ -232,12 +231,11 @@ export class OpsState {
   readonly pendingStashPop = this.#stashPopSlot.pending;
 
   // -------------------------------------------------------------------------------------
-  // P8 W17: remote ops. Deliberately a sibling to the four steps above, not folded into
-  // `#runSimple` — `docs/plans/P8.md`'s own W17 doc comment: cancellation and progress are
-  // genuinely different concerns, and merging them would make the local path pay for the
-  // remote path's complexity. `#applyRemoteResult` below (not `#applyResult`) is the other half
-  // of that split: `RemoteOpResult` carries no `undo` field at all, by construction (D51, OQ6 —
-  // no remote operation ever touches the undo slot in either direction).
+  // Remote ops. Deliberately a sibling to the four steps above, not folded into `#runSimple` —
+  // cancellation and progress are genuinely different concerns, and merging them would make the
+  // local path pay for the remote path's complexity. `#applyRemoteResult` below (not
+  // `#applyResult`) is the other half of that split: `RemoteOpResult` carries no `undo` field
+  // at all, by construction (no remote operation ever touches the undo slot in either direction).
   // -------------------------------------------------------------------------------------
 
   /** Which `RemoteOpKind` is currently running against this repo, or `undefined` — the toolbar's
@@ -253,7 +251,7 @@ export class OpsState {
   /** Set the moment a strategy is known (preflight response, or an explicit override) and left
    *  in place after the pull finishes — see `PullStrategyInfo`'s own doc comment. */
   readonly pullStrategy: ShallowRef<PullStrategyInfo | undefined> = shallowRef(undefined);
-  /** P9/OQ10: `runPull`'s own confirm step for a `dirtyNonFastForward` blocker — mirrors
+  /** `runPull`'s own confirm step for a `dirtyNonFastForward` blocker — mirrors
    *  `pendingCheckout`'s shape one field simpler, since `PullPreflight.routes` only ever offers
    *  `"stashAndCarry"` (its own doc comment): `resolvePullDialog`'s `boolean` says only whether
    *  to take that one route, there being no second one (no pull analogue of "discard"). */
@@ -266,7 +264,7 @@ export class OpsState {
 
   readonly #bridge: BridgeClient;
   readonly #refs: RefsState;
-  /** G26 D13/4.16: `runRestack`/`cancelRestack` DELEGATE to this instance's own execution
+  /** `runRestack`/`cancelRestack` DELEGATE to this instance's own execution
    *  (`StackState.runRestack`/`cancelRestack` already hold `restacking`/`progress` reactively,
    *  mirroring `WorktreeState`'s own "domain class holds the list and the read preview" scope) —
    *  this class only layers `busy`/`announcement` on top, the same uniform lifecycle every other
@@ -281,7 +279,7 @@ export class OpsState {
   #resolvePostCheckoutPull: ((proceed: boolean) => void) | undefined;
   readonly #unsubscribeProgress: () => void;
   readonly #unsubscribeAutoFetch: () => void;
-  /** F5: the server runs one goroutine per request, so two `refreshStatus`/`refreshUndo` calls in
+  /** The server runs one goroutine per request, so two `refreshStatus`/`refreshUndo` calls in
    *  quick succession (two `repo.changed` events back to back) can reply out of order — each its
    *  own tracker, so a stale status reply can never be mistaken for a stale undo reply or vice
    *  versa. */
@@ -304,7 +302,7 @@ export class OpsState {
     this.#repo = new RepoScopedReload(bridge, 'gitOps', {
       onChanged: () => {
         this.#repo.fireAndForget(() => this.refreshStatus());
-        // F4: the server's undo slot is per `RepoEntry`, shared by every surface holding this
+        // The server's undo slot is per `RepoEntry`, shared by every surface holding this
         // repo (another webview, the native app, a review view). An op run from one of those
         // replaces the slot; without this, this surface kept showing its own stale slot and got
         // NotFound on click. Previously refreshed only from `setRepoId` (this surface's own repo
@@ -327,13 +325,13 @@ export class OpsState {
     this.activeRemoteOp.value = undefined;
     this.remoteProgress.value = undefined;
     this.pullStrategy.value = undefined;
-    // F6: every `run*` method that opens a confirm dialog sets `busy = true` then awaits its own
+    // Every `run*` method that opens a confirm dialog sets `busy = true` then awaits its own
     // slot's `ask()` — nothing else ever settles that Promise. Without abandoning it here, a repo
     // switch mid-dialog leaves the OLD repo's dialog open over the new repo, and `busy` stuck true
     // (every op button disabled) until the user dismisses it — confirming then does nothing (the
     // post-`ask()` repo guard each of those methods already has returns), which reads as a silent
-    // failure. `this.#repo.repoId` is already the NEW repoId above, so each guard sees the mismatch and
-    // its own `finally` clears `busy` the same way a real cancel would.
+    // failure. `this.#repo.repoId` is already the NEW repoId above, so each guard sees the mismatch
+    // and its own `finally` clears `busy` the same way a real cancel would.
     this.#abandonPending();
     this.autoFetch.value = null;
     this.lastFailure.value = undefined;
@@ -399,11 +397,11 @@ export class OpsState {
     else if (outcome.status === 'error') throw new Error(outcome.message);
   }
 
-  /** `docs/plans/P7.md` W14: "Review branch changes", from either menu `buildRefMenu` puts it on
+  /** "Review branch changes", from either menu `buildRefMenu` puts it on
    *  (`BranchPicker.vue`'s own row menu, and `App.vue`'s ref-badge menu). This is a read, not an
    *  operation — no pre-flight, no hazard, no `canRunOp` gate, no `op.run` envelope, so it does
-   *  not go through `#runSimple` below; it is the one method on this class that is really just a
-   *  named `bridge.request` (§6.8's `review.open` reveals the sidebar view and either seeds a
+   *  not go through `#runSimple` below; it is the one method on this class that is a
+   *  named `bridge.request` (the `review.open` reveals the sidebar view and either seeds a
    *  cold resolve or pushes `review.target` to an already-open one, host-side — this class does
    *  not wait on, or need to know, which). */
   async openReview(branch: string): Promise<void> {
@@ -416,14 +414,14 @@ export class OpsState {
   // checkout
   // -------------------------------------------------------------------------------------
 
-  /** G28 D16's own routing table, checked in this exact order:
+  /** The routing table, checked in this exact order:
    *
    *  1. `inProgressOperation` among `blockers` -> fall through to the dialog below; neither new
-   *     route is ever offered by the server for that state (F15), so this branch is really "the
+   *     route is ever offered by the server for that state, so this branch is "the
    *     table below finds neither route and falls through on its own", stated here for clarity.
    *  2. `routes` has BOTH `'detachHere'` and `'autoStash'` -> re-issue with
    *     `{ mode: 'detach', autoStash: true }` — both blockers (a worktree conflict AND a dirty
-   *     tree) clear in one composed re-issue (D6's own "the two routes compose client-side" case).
+   *     tree) clear in one composed re-issue (the "the two routes compose client-side" case).
    *  3. `routes` has `'detachHere'` only -> `{ mode: 'detach', autoStash: false }`.
    *  4. `routes` has `'autoStash'` (only) AND the `kiraSpace.checkout.autoStash` SETTING is on
    *     -> `{ mode: <the originally requested mode>, autoStash: true }`.
@@ -445,7 +443,7 @@ export class OpsState {
   }
 
   /** The blocked-tracked/blocked-untracked path counts a pre-flight already reported — the exact
-   *  set an auto-stash's own whole-tree `stash push` sweeps (D4: whole-tree, never scoped), so
+   *  set an auto-stash's own whole-tree `stash push` sweeps (whole-tree, never scoped), so
    *  this is the same number `composeAutoStashAnnouncement` names, computed once here rather than
    *  re-derived at the announcement call site. */
   #blockedPathCount(preflight: CheckoutPreflight): number {
@@ -460,7 +458,7 @@ export class OpsState {
     const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value) return;
     this.busy.value = true;
-    // G-UX (item 3): captured here, before ANY write below, so the post-checkout pull prompt
+    // Captured here, before ANY write below, so the post-checkout pull prompt
     // (run once `busy` is released, at the very bottom of this method) always reads the target
     // branch's ahead/behind exactly as it stood before the switch — `RefsState.branches`'s own
     // `track` field is only as fresh as the next `refs.list` reload, which the checkout's own
@@ -513,7 +511,7 @@ export class OpsState {
       let discardLocalChanges = false;
       if (preflight.verdict === 'blocked') {
         const route = await this.#checkoutSlot.ask(preflight);
-        // G32 round-3 functional-correctness review, finding #7: the active repo can change
+        // The active repo can change
         // while this dialog is open (e.g. "Open in graph" calls repo.open directly, independent
         // of this method's own busy hold) — proceeding on a route the user chose for a DIFFERENT
         // repo than the one now active would run this repo's write against the right repo (repoId
@@ -527,13 +525,12 @@ export class OpsState {
           return;
         }
         if (route.kind === 'stashAndCarry') {
-          // §7.5's `stashAndCarry` route (P9) — `discardLocalChanges: false` for the checkout
-          // half below; the stash push `#stashAndCarry` runs first is what actually clears the
-          // tree. Handled inline (not via a public `runCheckoutStashAndCarry`) so it shares this
-          // call's own `busy` hold rather than needing a second one of its own. G28: UNTOUCHED
-          // (F2/D5's own grep-mechanised claim) — `autoStash: false` on the checkout half is a new
-          // required field, never a new behavior: this route never auto-stashes, it stash-and-
-          // carries, exactly as it always has.
+          // The `stashAndCarry` route — `discardLocalChanges: false` for the checkout half below;
+          // the stash push `#stashAndCarry` runs first is what clears the tree. Handled inline
+          // (not via a public `runCheckoutStashAndCarry`) so it shares this call's own `busy`
+          // hold rather than needing a second one of its own. UNTOUCHED — `autoStash: false`
+          // on the checkout half is a new required field, never a new behavior:
+          // this route never auto-stashes, it stash-and-carries, exactly as it always has.
           await this.#stashAndCarry(
             repoId,
             () =>
@@ -573,7 +570,7 @@ export class OpsState {
     if (landedOnBranch) await this.#maybePromptPostCheckoutPull(target, targetTrack);
   }
 
-  /** G-UX (item 3): "when checking out a branch that advanced, ask if I want to pull it too" —
+  /** "when checking out a branch that advanced, ask if I want to pull it too" —
    *  offered only once `runCheckout`'s own `busy` hold has already been released (`runPull` below
    *  is itself gated on `!busy`, and this method may call it). `targetTrack` is the pre-switch
    *  snapshot `runCheckout` captured — `'gone'`/`undefined`/`behind <= 0` all mean nothing to ask
@@ -635,9 +632,9 @@ export class OpsState {
   // -------------------------------------------------------------------------------------
 
   /**
-   * P107 I2-23: `runRevert`/`runCherryPick` share this exact flow — preflight already in hand,
+   * `runRevert`/`runCherryPick` share this exact flow — preflight already in hand,
    * an optional dialog for `mainline`/`noCommit` (skipped when nothing needs deciding), the
-   * G32 round-3 finding #7 repo-changed guard, a `null` route cancelling with `cancelText`, then
+   * repo-changed guard, a `null` route cancelling with `cancelText`, then
    * `op.run` + `#applyResult` + an announce step. Push/force-push keep their own `#runRemote` (no
    * `mainline`/`noCommit`, a differently-shaped route) and use their slot directly, per the doc.
    */
@@ -795,7 +792,7 @@ export class OpsState {
     }
   }
 
-  /** `ResetDialog.vue`'s own mode-radio recompute (OQ11): `destroys`/`requiresTypedConfirmation`/
+  /** `ResetDialog.vue`'s own mode-radio recompute: `destroys`/`requiresTypedConfirmation`/
    *  `routes`/`verdict` all depend only on `mode` and the ONE pre-flight's own `dirty` breakdown,
    *  already in hand — no round trip. Re-derived via `core`'s own `classifyReset`, never a hand-
    *  rolled duplicate, holding every other field fixed. `stagedNew: []` is not a loss of fidelity:
@@ -833,10 +830,10 @@ export class OpsState {
   // -------------------------------------------------------------------------------------
 
   /** Mirrors `runRevert` exactly, including the "skip the dialog when there is nothing to show"
-   *  shape — with one addition: the non-blocking `alreadyApplied` advisory (probe 6) also opens
-   *  the dialog, since it is a fact §7.13 wants the user to actually read before proceeding, not
-   *  one `classifyCherryPick` folds into `verdict`/`blockers` (it never blocks anything, judgment
-   *  call 9's own "guessing is not honest" reasoning applied to the dialog's own trigger). */
+   *  shape — with one addition: the non-blocking `alreadyApplied` advisory also opens the
+   *  dialog, since it is a fact the user should read before proceeding, not one
+   *  `classifyCherryPick` folds into `verdict`/`blockers` (it never blocks anything, the
+   *  "guessing is not honest" reasoning applied to the dialog's own trigger). */
   async runCherryPick(sha: string): Promise<void> {
     const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value) return;
@@ -888,7 +885,7 @@ export class OpsState {
     this.#cherryPickSlot.resolve(route);
   }
 
-  /** Hard part 7/D57: `CherryPickPreflight.prediction` is exact about the merge alone, reconciled
+  /** `CherryPickPreflight.prediction` is exact about the merge alone, reconciled
    *  after the fact exactly like `#reconcileStashPop` — a disagreement is announced, never
    *  swallowed. `unknown` predictions are never compared against, for the same reason
    *  `#reconcileStashPop` never does: there is nothing to disagree WITH. No `stashKept` half
@@ -914,10 +911,10 @@ export class OpsState {
 
   /** `StashDialog.vue`'s create mode IS the confirm step (no pre-flight endpoint exists for
    *  `stashPush` — there is nothing to classify before the fact), so this runs directly. The one
-   *  thing it still cannot take on faith is git's own `No local changes to save` no-op (probe
-   *  10): that spawn exits 0 with no error, so a stash-count comparison before/after is the only
-   *  way to tell "stashed" from "there was nothing to stash" apart — reporting the latter as a
-   *  plain success would be exactly the silent-no-op failure mode §6.4 already named. */
+   *  thing it still cannot take on faith is git's own `No local changes to save` no-op: that spawn
+   *  exits 0 with no error, so a stash-count comparison before/after is the only way to tell
+   *  "stashed" from "there was nothing to stash" apart — reporting the latter as a
+   *  plain success would be exactly the silent-no-op failure mode. */
   async runStashPush(input: {
     readonly message: string | undefined;
     readonly includeUntracked: boolean;
@@ -954,10 +951,10 @@ export class OpsState {
     }
   }
 
-  /** `apply` — the stash survives regardless of outcome (probe 8: it accepts a raw sha, so this
+  /** `apply` — the stash survives regardless of outcome (it accepts a raw sha, so this
    *  needs no `stash@{index}` addressing or position re-verification at all). `restoreIndex` is a
    *  plain caller preference (`StashList.vue`'s own row-menu choice), never discovered by the
-   *  pre-flight — the merge-tree prediction covers the worktree half only (§7.6). */
+   *  pre-flight — the merge-tree prediction covers the worktree half only. */
   async runStashApply(entry: StashEntry, restoreIndex = false): Promise<OpResult | undefined> {
     return this.#runStashPopLike('apply', entry, restoreIndex);
   }
@@ -978,10 +975,10 @@ export class OpsState {
     if (repoId === undefined || this.busy.value) return undefined;
     this.busy.value = true;
     try {
-      // G28 D12: entry.scope threads through to the pre-flight so a global entry's own
+      // entry.scope threads through to the pre-flight so a global entry's own
       // merge-tree prediction resolves it from the bucket — `op.run`'s own 'stashApply'/'stashPop'
-      // kinds need NO scope at all (`apply`/`pop` already address by sha/stack-position exactly
-      // as they did before this phase, D12's own "zero server plumbing" claim).
+      // kinds need NO scope at all (`apply`/`pop` already address by sha/stack-position, the
+      // "zero server plumbing" claim).
       const preflight = await this.#bridge.request('preflight.stashPop', {
         repoId,
         sha: entry.sha,
@@ -1035,13 +1032,12 @@ export class OpsState {
     this.#stashPopSlot.resolve(proceed);
   }
 
-  /** §7.6's concrete answer to hard part 1 (D... `docs/plans/P9.md`'s own worked example): only
-   *  ever non-null when reality disagreed with the prediction the user was shown. `unknown`
+  /** Only ever non-null when reality disagreed with the prediction the user was shown. `unknown`
    *  predictions are never compared against — there is nothing to disagree WITH when pre-flight
    *  itself could not predict. `actual` is read from `result.ok`/`result.error.kind` — `runOp`'s
    *  own read-back already turns a real conflicting pop into `StashConflict` (never a thrown
-   *  error), so no second git read is needed here. Every non-clean outcome keeps the stash
-   *  (probes 3-5); a genuinely clean `pop` is the one outcome that does not, `apply` never drops
+   *  error), so no second git read is needed here. Every non-clean outcome keeps the stash;
+   *  a genuinely clean `pop` is the one outcome that does not, `apply` never drops
    *  it either way. */
   #reconcileStashPop(
     verb: 'apply' | 'pop',
@@ -1059,12 +1055,11 @@ export class OpsState {
     return { predicted: predicted.kind, actual, stashKept };
   }
 
-  /** OQ8: §7.12 gives the undo slot no stash-specific exception — the very next operation clears
+  /** The undo slot has no stash-specific exception — the very next operation clears
    *  it exactly like any other undoable op — so the one honest thing to promise here is the bound
    *  itself, not a guarantee. No pre-flight endpoint exists for `stashDrop` (`git stash drop`
    *  cannot fail in a way worth predicting), so — like `tagDelete`/`branchDelete` — this runs
-   *  directly with no confirm dialog; the announcement below stands in as the "confirmation" OQ8
-   *  asks for. */
+   *  directly with no confirm dialog; the announcement below stands in as the "confirmation". */
   async runStashDrop(entry: StashEntry): Promise<OpResult> {
     return this.#runSimple(
       { kind: 'stashDrop', sha: entry.sha, index: entry.index },
@@ -1106,7 +1101,7 @@ export class OpsState {
   }
 
   // -------------------------------------------------------------------------------------
-  // G28: the global stash bucket (D10/D11/D13). Both are `#runSimple` one-liners like every
+  // The global stash bucket. Both are `#runSimple` one-liners like every
   // branch/tag mutation above — `StashDialog.vue`'s own fourth mode has already collected the
   // label/source by the time `runGlobalStashSave` is called, and `GlobalStashList.vue`'s own row
   // menu is the confirm step for `runGlobalStashRemove`, the same "no separate pre-flight, the
@@ -1134,7 +1129,7 @@ export class OpsState {
   }
 
   // -------------------------------------------------------------------------------------
-  // G25: worktree support. runWorktreeAdd/runWorktreeRemove are `#runSimple` one-liners like
+  // Worktree support. runWorktreeAdd/runWorktreeRemove are `#runSimple` one-liners like
   // every branch/tag mutation above — `WorktreeDialog.vue`'s own create phase and the Remove
   // confirmation have already collected/confirmed their input by the time either is called.
   // -------------------------------------------------------------------------------------
@@ -1152,10 +1147,10 @@ export class OpsState {
     );
   }
 
-  /** `confirmToken` is present only for the dirty route (D8) — WorktreeDialog's own Remove
+  /** `confirmToken` is present only for the dirty route — WorktreeDialog's own Remove
    *  confirmation reads it straight off a fresh `preflight.worktreeRemove` call, never typed blind.
    *  `force` is derived here from whether a token was supplied at all: the server re-derives it
-   *  fresh from its own preflight regardless (D8's fail-safe-over-fail-open principle), so a
+   *  fresh from its own preflight regardless (the fail-safe-over-fail-open principle), so a
    *  mismatched or stale claim here can only ever be REFUSED, never accepted. */
   async runWorktreeRemove(path: string, confirmToken?: string): Promise<OpResult> {
     return this.#runSimple(
@@ -1166,7 +1161,7 @@ export class OpsState {
   }
 
   // -------------------------------------------------------------------------------------
-  // G26 D10/D13: stackSet is an ordinary #runSimple one-liner (StackDialog's own set-parent mode
+  // stackSet is an ordinary #runSimple one-liner (StackDialog's own set-parent mode
   // has already collected the target branch/parent by the time this is called). runRestack/
   // cancelRestack delegate to StackState (see #stack's own doc comment above) and layer this
   // class's own busy/announcement lifecycle on top — StackState holds the reactive progress.
@@ -1185,8 +1180,8 @@ export class OpsState {
     );
   }
 
-  /** `stack.restack`'s own client-facing entry point (D6) — NOT an `op.run` kind (F7/D6's own
-   *  reason), so this bypasses `#runSimple` entirely and delegates the actual execution to
+  /** `stack.restack`'s own client-facing entry point — NOT an `op.run` kind, so this bypasses
+   *  `#runSimple` entirely and delegates the actual execution to
    *  `StackState.runRestack`, which already holds `restacking`/`progress` reactively. `busy` is
    *  set for the same duration `#runSimple` would set it, so every other button this app disables
    *  while `busy` is true (checkout, reset, …) is disabled during a restack too — a restack
@@ -1205,7 +1200,7 @@ export class OpsState {
     try {
       const result = await this.#stack.runRestack(branch);
       if (result !== undefined && repoId !== undefined) {
-        // F3: route through the same reconcile every other mutating op uses — this used to
+        // Route through the same reconcile every other mutating op uses — this used to
         // apply only `head` via `#refs.applyHead`, so a restack's own undo record never
         // appeared (the Undo button kept showing the previous op's, now-superseded, label) and
         // a restack paused on conflict left `statusSummary.inProgress` null (wrong `canRun`
@@ -1240,12 +1235,12 @@ export class OpsState {
   }
 
   /**
-   * §7.5/§7.3's `stashAndCarry` route (OQ10: pull ships it in this same phase, W10) — shared
+   * The `stashAndCarry` route — shared
    * between `runCheckout`'s and `runPull`'s own inline calls below (each confirms via its own
    * dialog first, so there is no separate public `run*StashAndCarry` entry point), which differ
    * only in `runMiddle` (the blocked operation itself) and its own success wording.
    *
-   * **Push, then run, then pop only if predicted clean (OQ1).** The middle op ALWAYS runs once
+   * **Push, then run, then pop only if predicted clean.** The middle op ALWAYS runs once
    * the stash push succeeds — carrying the user's changes across is the entire point of the
    * route, and a predicted-conflict pop is a reason to leave the stash for the user to resolve
    * by hand, never a reason to also withhold the checkout/pull they explicitly asked for. A
@@ -1262,7 +1257,7 @@ export class OpsState {
    * it is the ACTUAL resulting tree rather than a hypothetical one — so both routes share this one
    * predict-after shape rather than checkout alone taking the more elaborate predict-before path
    * the field's doc comment names. This is a deliberate, documented deviation from that comment's
-   * literal reading — see `docs/plans/P9.md`'s own Findings.
+   * literal reading.
    */
   /** `repoId` is the CALLER's own captured repo id (`runCheckout`/`runPull`), a required
    *  parameter rather than a fresh `this.#repo.repoId` read (G32 round-3 functional-correctness
@@ -1279,8 +1274,8 @@ export class OpsState {
     action: OpAction,
     announceMiddleOk: () => string,
   ): Promise<void> {
-    // G31 round-2 functional-correctness review, finding #1 (high): the stash-list snapshot
-    // taken AFTER stashPush is not, by itself, proof that stashPush created anything — an
+    // The stash-list snapshot taken AFTER stashPush is not, by itself, proof that stashPush created
+    // anything — an
     // untracked-only dirty tree makes `git stash push` (no `-u`) print "No local changes to
     // save" and exit 0 (`pushResult.ok` true) without touching the stack at all. The OLD check
     // below ("is the post-push list empty?") only caught that when the user had NO stash of
@@ -1330,7 +1325,7 @@ export class OpsState {
     const { entries } = await this.#bridge.request('stash.list', { repoId });
     const top = entries[0];
     if (top === undefined || entries.length <= beforePush.entries.length) {
-      // `stashPush` above was itself a no-op (probe 10) — either the worktree really was clean
+      // `stashPush` above was itself a no-op — either the worktree was clean
       // (top === undefined), or it was dirty only in a way `stashPush`'s own args don't capture
       // (untracked-only, no -u — the list is unchanged, and `top` is the caller's own
       // pre-existing, unrelated entry). Either way nothing THIS operation stashed, so nothing to
@@ -1456,7 +1451,7 @@ export class OpsState {
     );
   }
 
-  /** §7.11's third sequencer verb (probe 6) — `ConflictBanner.vue`'s Skip button, rendered only
+  /** The third sequencer verb — `ConflictBanner.vue`'s Skip button, rendered only
    *  when `inProgress.canSkip`. Joins `continueOp`/`abortOp` as a `#runSimple` one-liner: like
    *  them, the confirmation already happened (the banner itself), so there is no separate confirm
    *  step here either. */
@@ -1491,7 +1486,7 @@ export class OpsState {
   // remote ops (P8 W17)
   // -------------------------------------------------------------------------------------
 
-  /** `PullStrategyPicker.vue`'s own read: what the ladder in §7.3 would resolve to *right now*,
+  /** `PullStrategyPicker.vue`'s own read: what the ladder would resolve to *right now*,
    *  with no override — a read, not an operation (mirrors `openReview`'s own doc comment above),
    *  so the popover can show "follow your configuration (would run: rebase)" before the user
    *  commits to an override. */
@@ -1525,8 +1520,8 @@ export class OpsState {
   }
 
   /**
-   * §7.3: the resolved strategy and its provenance are shown before the operation runs, not
-   * after — `remote.pullPreflight` always runs first (P9: its `blockers`/`routes` are the only
+   * The resolved strategy and its provenance are shown before the operation runs, not
+   * after — `remote.pullPreflight` always runs first (its `blockers`/`routes` are the only
    * way to learn about a dirty tree that would rewrite history, so this can no longer be
    * short-circuited the way a bare strategy resolution once was) and `pullStrategy` is set from
    * it before `remote.run` is ever called, so what the toolbar displays is exactly what is about
@@ -1534,16 +1529,16 @@ export class OpsState {
    * user's own choice is authoritative, ladder step 1, `source: "explicit"` by construction) but
    * not the dirty-tree check: `blockers` is evaluated against the ladder's own default-resolved
    * strategy regardless, since `remote.pullPreflight` has no way to ask "would this be blocked
-   * under strategy X instead" — a known imprecision (see `docs/plans/P9.md`'s own Findings) that
+   * under strategy X instead" — a known imprecision that
    * only matters for the narrow case of an explicit override changing whether history would be
    * rewritten at all.
    *
-   * §7.3/§7.5's `stashAndCarry` route (OQ10/W10): a `dirtyNonFastForward` blocker opens
+   * The `stashAndCarry` route: a `dirtyNonFastForward` blocker opens
    * `pendingPull` (`PullDialog.vue`'s own confirm step, mirroring `pendingCheckout`) — cancelling
    * ends the pull with nothing run; confirming pushes a stash, runs the pull, and pops it back
    * exactly like `runCheckout`'s own inline call above (`#stashAndCarry`'s shared shape).
    *
-   * P111: `rebaseMerges` travels with the preflight-resolved strategy (`preflight.rebaseMerges`,
+   * `rebaseMerges` travels with the preflight-resolved strategy (`preflight.rebaseMerges`,
    * the server's own once-computed decision); an explicit override always sends `false` — never
    * derived here from `strategy === 'rebase'` or from `source`.
    */
@@ -1686,7 +1681,7 @@ export class OpsState {
    * remote tip it is about to overwrite and the matched protected pattern, if any), then the
    * dialog's own confirm/cancel promise, mirroring `#checkoutSlot.ask`/`#revertSlot.ask` above.
    * `expectedRemoteTip` is the preflight's `remoteTip` — re-read and compared host-side
-   * immediately before spawning (D48's residual-hazard mitigation), so a change between here and
+   * immediately before spawning, so a change between here and
    * the actual spawn fails with `LeaseViolation` rather than silently overwriting more than the
    * dialog showed.
    */
@@ -1781,10 +1776,10 @@ export class OpsState {
   }
 
   /** The remote-op half of `#applyResult`: reconciles `head`/`inProgress` exactly the same way
-   *  (so a conflicting pull lands in P6's existing in-progress banner, unchanged), but — unlike
+   *  (so a conflicting pull lands in the existing in-progress banner, unchanged), but — unlike
    *  `#applyResult` — never touches `undoSlot` in either direction. `RemoteOpResult` carries no
-   *  `undo` field at all, by construction (D51); this method's whole reason to exist separately
-   *  is that OQ6's answer must be structurally impossible to get wrong, not merely remembered. */
+   *  `undo` field at all, by construction; this method's whole reason to exist separately
+   *  is that the answer must be structurally impossible to get wrong, not merely remembered. */
   #applyRemoteResult(result: RemoteOpResult): void {
     if (result.ok) this.lastFailure.value = undefined;
     this.#refs.applyHead(result.head);
@@ -1870,18 +1865,17 @@ export class OpsState {
     }
   }
 
-  /** Step 4's synchronous half (W12's own doc comment): applies `head`/`inProgress`/`undo`
+  /** Step 4's synchronous half: applies `head`/`inProgress`/`undo`
    *  before the matching `repo.changed` event — which always follows a real op — has a chance to
    *  arrive and trigger `RefsState.reload()`/`refreshStatus()`'s own, fuller reconcile.
    *
-   *  `repoId` is the CALLING op's own captured repo id, not read fresh here (G32 round-3
-   *  functional-correctness review, finding #7): every caller already awaited at least one
-   *  request or dialog before reaching this point, during which the active repo can have changed
-   *  (`App.vue`'s "Open in graph" calls `repo.open` directly, independent of any op's own `busy`
-   *  hold). Applying a stale op's own head/inProgress/undo into `RefsState`/`statusSummary` after
-   *  such a switch would silently corrupt the NOW-displayed repo's state with another repo's own
-   *  result — the same identity check `refreshStatus`/`refreshUndo`/`#runRemote`
-   *  already apply to their own writes. */
+   *  `repoId` is the CALLING op's own captured repo id, not read fresh here: every caller already
+   *  awaited at least one request or dialog before reaching this point, during which the active
+   *  repo can have changed (`App.vue`'s "Open in graph" calls `repo.open` directly, independent of
+   *  any op's own `busy` hold). Applying a stale op's own head/inProgress/undo into
+   *  `RefsState`/`statusSummary` after such a switch would silently corrupt the NOW-displayed
+   *  repo's state with another repo's own result — the same identity check
+   *  `refreshStatus`/`refreshUndo`/`#runRemote` already apply to their own writes. */
   #applyResult(repoId: string, result: OpResult): void {
     if (this.#repo.repoId !== repoId) return;
     if (result.ok) this.lastFailure.value = undefined;

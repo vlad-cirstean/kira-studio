@@ -195,7 +195,7 @@ describe('parseTypeBounds (P15 D5) — the per-dialect declared-type lexer', () 
     });
   });
 
-  // F6/P21 round 1: MariaDB still emits a display width for *signed* integers too (int(11),
+  // MariaDB still emits a display width for *signed* integers too (int(11),
   // bigint(20), smallint(6), tinyint(4)) — the old regex only stripped it on the unsigned branch,
   // so these fell through to {} and generation used the unbounded 0..1,000,000 default against a
   // column whose real range could be as narrow as -128..127.

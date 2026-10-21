@@ -6,14 +6,14 @@ import { reactive } from 'vue';
 import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { getPage } from './page';
 
-// Item 5's precedent (grid/search.ts): filters purely client-side against the already-fetched
+// The precedent (grid/search.ts): filters purely client-side against the already-fetched
 // page, never a fresh server call — `getPage`'s rowCount is the only thing this ever iterates.
 // Kept deliberately simpler than grid/search.ts's own module: one case-insensitive substring
 // match across all five columns (no whole-word/regex toggles, no requestAnimationFrame chunking)
 // — a stream page's five fixed short-text columns are a much smaller, much more uniform search
 // surface than a SQL grid's arbitrary N-column, arbitrary-width page, so the extra machinery grid/
 // search.ts needs to stay off the frame budget for a big page isn't earning its keep here. Applies
-// identically to Kafka and SQS pages (search is read-only, no protocol difference — item 5).
+// identically to Kafka and SQS pages (search is read-only, no protocol difference).
 interface StreamSearchState {
   query: string;
   matches: number[]; // row indices, ascending
@@ -31,7 +31,7 @@ export const useStreamSearchStore = defineStore('streamSearch', () => {
   // mirrors grid/search.ts's own registration.
   registerTabRuntimeCleanup(clearSearchState);
 
-  // P21 round 2 performance finding 1: rowMatches used to be `streamRow(tabId, row)` — every field
+  // rowMatches used to be `streamRow(tabId, row)` — every field
   // read that way, page.ts's own comment explains, goes through store.cachedView/store.cached (the
   // same memoizing decode/view cache the grid/documents/console hosts use), so the very first
   // search keystroke on a page permanently decoded and cached *every* row, undoing the visible-

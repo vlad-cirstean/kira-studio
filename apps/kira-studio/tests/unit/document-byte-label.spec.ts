@@ -1,10 +1,10 @@
-// P2 R2 (task #99): views/shared/document/rows.ts's parseRow() used to compute a document row's
-// byteLabel by re-encoding the already-decoded `body` string with `new TextEncoder()` just to read
+// views/shared/document/rows.ts's parseRow() used to compute a document row's
+// byteLabel by re-encoding the already-decoded `body` string with `new TextEncoder()` to read
 // its `.length` — a redundant decode-then-reencode round trip. The fix reads the byte length
 // straight from the wire's own chunk offsets (`cellByteLength`, threaded through documentRow()).
 // This is the regression case that would fail silently under a naive `body.length` shortcut: a
 // multi-byte UTF-8 character's *byte* length differs from its UTF-16 string length, so a body
-// containing one lets a wrong byte count slip through undetected by anything that just checks
+// containing one lets a wrong byte count slip through undetected by anything that checks
 // "some number came back".
 import { describe, expect, test } from 'bun:test';
 import { createDocumentPageBuilder, unpagedPosition } from '@shared/protocol/page';

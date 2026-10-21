@@ -128,7 +128,7 @@ describe('createMatchIndex (P2 R1: Map-based, no string-key allocation)', () => 
     expect(index.value).toBeNull();
   });
 
-  // P21 round 2 performance finding 8: byRow used to rebuild from scratch on every access,
+  // byRow used to rebuild from scratch on every access,
   // including a bare Next/Prev — SearchToolbar.vue's goNext/goPrev replace the whole entry with
   // `{ ...e, index }`, the same array reference for `matches`, only `index` genuinely different.
   // This fails against the pre-fix createMatchIndex (each access below re-iterates `matches`, so

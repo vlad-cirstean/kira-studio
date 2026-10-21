@@ -2,7 +2,7 @@ import type { HttpHeaderState } from '@kira/shared/domain/http';
 import { isRawEmittedHeader } from './generate';
 
 /**
- * P175 D6: the raw editor emits only enabled, named header rows and the parser gives every row an
+ * The raw editor emits only enabled, named header rows and the parser gives every row an
  * empty description, so applying its text verbatim drops disabled/blank rows and descriptions.
  * This merges the parsed rows back onto the tab's `original` rows:
  *  1. a parsed row takes the description of the first unused emitted original with the same

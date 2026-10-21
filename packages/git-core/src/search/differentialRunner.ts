@@ -1,8 +1,8 @@
-// G23 D10: the JS half of the Go<->Bun differential fuzz test. Invoked exactly once per
+// The JS half of the Go<->Bun differential fuzz test. Invoked exactly once per
 // `go test -run TestDifferential` run (KIRA_GIT_DIFFERENTIAL=1), from
 // `apps/kira-space/internal/gitsearch/differential_test.go`, via `bun run` against this file's
 // own absolute path — a relative import of `compileQuery` (not `@kira/git-core`) deliberately,
-// since a workspace package's own name only resolves from inside a package that actually
+// since a workspace package's own name only resolves from inside a package that
 // DECLARES it as a dependency (its own node_modules/@kira/* symlink); nothing makes that true for
 // a Go test's working directory. Reads one JSON object off stdin, writes one JSON array to
 // stdout — no other side effects, no console output on success (stderr is reserved for an actual

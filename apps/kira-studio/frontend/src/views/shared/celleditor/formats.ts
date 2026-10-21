@@ -7,9 +7,9 @@ import {
   beautifyXml,
 } from '../../../beautify';
 
-/** §8.6's closed vocabulary, decided once (D8). P42 D23/D25: uuid/url dropped (F19 — both were
- *  inert on selection, changing nothing but a label and, for uuid, whether one button was
- *  enabled); reordered common-first (D15) into three groups the picker separates (D27):
+/** The closed vocabulary, decided once. uuid/url dropped (both were inert on selection,
+ *  changing nothing but a label and, for uuid, whether one button was enabled);
+ *  reordered common-first into three groups the picker separates:
  *  read-it-directly formats, then time, then binary encodings. */
 export const CELL_FORMATS = [
   'text',
@@ -81,10 +81,10 @@ export function canBeautify(format: CellFormat): boolean {
 }
 
 /**
- * Applied to whatever `text` the caller passes in — the current edit buffer (P24 D21), so
+ * Applied to whatever `text` the caller passes in — the current edit buffer, so
  * hand-editing then beautifying formats the edit instead of discarding it. Reversibility
  * (indented <-> compact) comes from both modes being lossless, not from always starting over at
- * the stored value. Offered for `json` and `xml` only (D11); every other format has no lossless
+ * the stored value. Offered for `json` and `xml` only; every other format has no lossless
  * formatter and the caller must not invoke this for one (see `canBeautify` above).
  */
 export function beautifyFor(format: CellFormat, text: string, mode: BeautifyMode): BeautifyResult {

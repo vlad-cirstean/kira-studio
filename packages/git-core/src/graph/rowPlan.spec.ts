@@ -3,9 +3,9 @@ import { CommitStore } from '../store/commitStore.ts';
 import { buildRowPlan, identityRowPlan, projectLayoutInput, type TipRef } from './rowPlan.ts';
 
 /**
- * P93 §8.1: `rowPlan.ts` clears `CLAUDE.md`'s unit-test bar on its own — priority propagation and
+ * `rowPlan.ts` clears `CLAUDE.md`'s unit-test bar on its own — priority propagation and
  * group-major ordering interact, index math (display-vs-store) has real boundaries, contraction
- * has several interacting rules of its own (§4.1/§4.3), and "final on arrival" is an
+ * has several interacting rules of its own, and "final on arrival" is an
  * incremental-arrival invariant invisible in the output of any single call.
  *
  * Every fixture below numbers commits so a commit's own number equals its own store row — the

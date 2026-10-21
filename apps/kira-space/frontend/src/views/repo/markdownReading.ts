@@ -1,4 +1,4 @@
-// P67c D10/D13: the markdown reading view's own render pipeline — split out of RepoFileView.vue
+// The markdown reading view's own render pipeline — split out of RepoFileView.vue
 // for the same reason blameAnnotation.ts is: a whole feature's worth of setup, kept out of the
 // view's own script so that file stays about mounting Monaco, not about markdown.
 //

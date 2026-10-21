@@ -1,4 +1,4 @@
-// P21 round 1 functional findings F2/F3: rowsToInsert used to hard-code `"${c}"` for the column
+// rowsToInsert used to hard-code `"${c}"` for the column
 // list regardless of dialect (a syntax error on MySQL/MariaDB/ClickHouse, where a double-quoted
 // column name is a string literal, not an identifier) and staged a truncated cell's 64 KiB prefix
 // as if it were the real value.

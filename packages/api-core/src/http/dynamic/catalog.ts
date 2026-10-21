@@ -1,18 +1,17 @@
-// P6 D4/D5: the eager half of the dynamic-value vocabulary — names only, imports nothing from
+// The eager half of the dynamic-value vocabulary — names only, imports nothing from
 // `@faker-js/faker`, so nothing about this module being statically imported (by the live-preview
-// chip, D8) pulls faker or its generators into the boot bundle. `generators.ts` is the lazy half.
+// chip) pulls faker or its generators into the boot bundle. `generators.ts` is the lazy half.
 //
-// D4: 58 names, Postman's own `$name` spellings — verified against the installed
-// `@faker-js/faker@10.6.0` before being written down (F11), not invented. Adopting Postman's
+// 58 names, Postman's own `$name` spellings — verified against the installed
+// `@faker-js/faker@10.6.0` before being written down, not invented. Adopting Postman's
 // spellings is what makes a `{{$randomEmail}}` reference imported from a real Postman collection
-// keep working here, for the same reason it works there (F6). Case-sensitive, exact match:
-// `{{$randomemail}}` is not `{{$randomEmail}}` and is reported as an unknown dynamic value (D13) —
+// keep working here, for the same reason it works there. Case-sensitive, exact match:
+// `{{$randomemail}}` is not `{{$randomEmail}}` and is reported as an unknown dynamic value —
 // a case-insensitive lookup would make `{{$RANDOMEMAIL}}` work here and fail in Postman.
 //
-// What is deliberately excluded, and why, is enumerated in the plan (docs/HISTORY.md (v1.2)
-// P6-faker-dynamic-values.md, D4) rather than repeated here: the ~17-name image family (faker only
-// has two image calls), the `$randomBs*`/word-fragment families (faker 10 removed `company.bs*`),
-// `$randomArrayElement`/`$randomObjectElement` (meaningless without argument syntax, D10), names
+// What is deliberately excluded: the ~17-name image family (faker only has two image calls), the
+// `$randomBs*`/word-fragment families (faker 10 removed `company.bs*`),
+// `$randomArrayElement`/`$randomObjectElement` (meaningless without argument syntax), names
 // with no single-call faker mapping (`$randomStreetName`, `$randomAirport`), names that fail the
 // "plausibly useful in a request" half of the inclusion rule rather than the "faker can produce it"
 // half, and `$randomCreditCardMask` (faker's nearest call returns a full number, not a masked tail
@@ -80,7 +79,7 @@ export const DYNAMIC_NAMES = [
 
 export type DynamicName = (typeof DYNAMIC_NAMES)[number];
 
-// F12: the compiler-checked half of the exhaustiveness guarantee — `generators.ts`'s
+// The compiler-checked half of the exhaustiveness guarantee — `generators.ts`'s
 // `Record<DynamicName, ...>` is the other half. A name added here with no entry there fails
 // `tsc` with a missing-property error; an entry there with a key not here fails with an
 // excess-property error. Neither drift is a test's job.
@@ -90,16 +89,16 @@ export function isDynamicName(name: string): name is DynamicName {
   return DYNAMIC_NAME_SET.has(name);
 }
 
-// P17 D12: the `fake.` namespace — faker's own module.method paths, additive and permanent
+// The `fake.` namespace — faker's own module.method paths, additive and permanent
 // alongside the `$name` spellings above (never migrated, never rewritten in a stored request —
 // see the doc comment below). This is not a new vocabulary invented for this app: it is the
-// literal `GeneratorId` spelling `views/grid/fakeData/recipes.ts` already uses one directory over
-// (F5), prefixed with `fake.`.
+// literal `GeneratorId` spelling `views/grid/fakeData/recipes.ts` already uses one directory over,
+// prefixed with `fake.`.
 //
 // 57 entries, one per DYNAMIC_NAMES entry except `$guid`/`$randomUUID`, which both alias
 // `fake.string.uuid` — a single faker call reached by two Postman spellings collapses to one
 // `fake.` spelling, not two. `$timestamp`/`$isoTimestamp` are the namespace's only two non-faker
-// entries (`fake.date.timestamp`/`fake.date.iso`) — they read the clock, not the RNG (P6 D9), and
+// entries (`fake.date.timestamp`/`fake.date.iso`) — they read the clock, not the RNG, and
 // faker has no path for them, but a user reaching for date/time generators would look for them
 // here regardless.
 export const FAKE_NAMES = [
@@ -234,7 +233,7 @@ export const ALIAS_TO_FAKE: Record<DynamicName, FakeName> = {
   $randomMimeType: 'fake.system.mimeType',
 };
 
-// D5/D7: memoised at module scope, exactly `views/grid/fakeData/generate.ts`'s `getFaker()`
+// Memoised at module scope, exactly `views/grid/fakeData/generate.ts`'s `getFaker()`
 // technique — a dynamic `import('./generators')`, so nothing about this module being eager pulls
 // the generators, or faker, into the boot bundle. Only the first call in a session (a send that
 // references a dynamic value, or the reference dialog's own open) pays the parse.
@@ -242,12 +241,12 @@ let generatorPromise: Promise<(name: string) => string | null> | null = null;
 
 async function loadGenerators(): Promise<(name: string) => string | null> {
   const { generate } = await import('./generators');
-  // D13: a name outside the catalogue — a typo, an excluded Postman name, or an argument form
-  // D10 does not parse — returns null rather than throwing. resolve()'s caller (D2) treats that
-  // exactly like having supplied no callback at all: the reference is left verbatim and classified
-  // 'dynamic', and the send proceeds (D13). D12: `generate` itself accepts both spellings — a
-  // `$name` (resolved through ALIAS_TO_FAKE) and a `fake.` name directly — so this wrapper needs
-  // no branch of its own beyond what `generate` already returns.
+  // A name outside the catalogue — a typo, an excluded Postman name, or an argument form that
+  // is not parsed — returns null rather than throwing. resolve()'s caller treats that exactly
+  // like having supplied no callback at all: the reference is left verbatim and classified
+  // 'dynamic', and the send proceeds. `generate` itself accepts both spellings — a `$name`
+  // (resolved through ALIAS_TO_FAKE) and a `fake.` name directly — so this wrapper needs no
+  // branch of its own beyond what `generate` already returns.
   return (name: string): string | null => generate(name);
 }
 

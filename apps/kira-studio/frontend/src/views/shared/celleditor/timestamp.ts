@@ -96,7 +96,7 @@ function parseIso8601Shaped(text: string): { date: Date; shape: TimestampShape }
   const { style: offset, minutes: offsetMinutes } = parseOffsetPart(offsetRaw);
   const fractionDigits = frac ? frac.length : 0;
   const ms = frac ? Math.round(Number(`0.${frac}`) * 1000) : 0;
-  // P21 round 3 functional finding 10: Date.UTC (like `new Date(...)`) applies ECMAScript's legacy
+  // Date.UTC (like `new Date(...)`) applies ECMAScript's legacy
   // two-digit-year rule to its own year argument — a value in 0..99 is silently remapped to
   // 1900 + year, so a Postgres sentinel like `0001-01-01` built a Date at 1901-01-01 instead. 2000
   // is a placeholder year (a leap year, so a real Feb 29 still computes the right month/day here)
@@ -137,7 +137,7 @@ export function parseTimestamp(
 ): { date: Date; shape: TimestampShape } | null {
   const t = text.trim();
   if (format === 'epochSeconds' || format === 'epochMillis') {
-    // F15 (P108 Part 10): bare `Number(t)` accepted `0x10` (16), `1e9` and `''` (0) as valid epoch
+    // Bare `Number(t)` accepted `0x10` (16), `1e9` and `''` (0) as valid epoch
     // text — an empty/blank cell silently read as 1970-01-01 for any caller other than
     // validateFormat (which pre-checks empty itself), and a hex/exponent spelling silently
     // re-encoded as plain digits on the very next edit. Only a plain, optionally signed,
@@ -167,7 +167,7 @@ export function parseTimestamp(
  */
 export function encodeTimestamp(shape: TimestampShape, date: Date): string {
   if (shape.kind === 'epochSeconds') {
-    // F15 (P108 Part 10): a fractional epoch-seconds value (`1700000000.5`) used to round-trip
+    // A fractional epoch-seconds value (`1700000000.5`) used to round-trip
     // through Math.round(ms / 1000), silently losing its own sub-second digits on the very next
     // re-encode even though nothing about the instant's millisecond value had changed — breaking
     // the "exact inverse" contract iso8601 below already keeps. Mirrors iso8601's own "reuse the
@@ -212,14 +212,14 @@ export function encodeTimestamp(shape: TimestampShape, date: Date): string {
     // `Date` only holds millisecond precision, so a microsecond-or-finer original (Postgres's
     // default) can't be regenerated purely from `shifted` — reuse the original digits verbatim
     // whenever the millisecond-level value is unchanged (true for every edit this app's UI can
-    // make, since none of them touch sub-second precision directly); only actually round when the
+    // make, since none of them touch sub-second precision directly); only round when the
     // instant's own millisecond value moved, which is the genuinely unrepresentable case.
     const msNow = String(shifted.getUTCMilliseconds()).padStart(3, '0');
     // Rounded the same way parseIso8601Shaped built the original `Date`'s own ms field (line ~95)
     // — truncating fractionRaw's first 3 digits instead would desync from that rounding whenever
     // the 4th+ digit rolls the ms value up (".901743" rounds to Date ms 902, but truncates to
     // "901"), making this comparison spuriously see a change and round away real precision on
-    // every edit that didn't actually touch the sub-second value.
+    // every edit that didn't touch the sub-second value.
     const msOriginal = shape.fractionRaw
       ? String(Math.round(Number(`0.${shape.fractionRaw}`) * 1000)).padStart(3, '0')
       : '000';
@@ -257,7 +257,7 @@ export interface TimestampReading {
 // (Intl/Date already know it), so this is pure client-side math against a value already sitting
 // in the buffer — never something that needs asking the server. Only the zone abbreviation
 // (e.g. "GMT+2") comes from Intl; the digits themselves use the Date object's own local getters
-// so both halves are built the same way, just against UTC vs. local getters.
+// so both halves are built the same way, against UTC vs. local getters.
 function formatUtcAndLocal(d: Date): { local: string; utc: string } {
   const utc = `${MONTH_ABBR[d.getUTCMonth()]} ${pad(d.getUTCDate())} ${d.getUTCFullYear()}, ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
   const zoneName =

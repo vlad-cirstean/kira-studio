@@ -10,13 +10,12 @@ import {
 } from '../planIssues';
 import type { PlanNode, QueryPlan, ScanEstimate } from '../planModel';
 
-// P18 (v1.1) D13/D15/D16: MariaDB 11.4's `EXPLAIN FORMAT=JSON` — same statement spelling as
-// MySQL's, a genuinely different response schema (F13): every table sits inside a `nested_loop`
-// array (even a single-table query), wrapped in `read_sorted_file`/`filesort` for a sort and
-// (per F13's own prose) `block-nl-join` for a block nested-loop join; the scalar cost field is
-// named `cost` (≈ seconds under MariaDB 11.x's model) rather than MySQL's `cost_info.query_cost`,
-// and `filtered` is a plain number, not MySQL's string. `FORMAT=TREE` is a hard error on this
-// engine (ERROR 1791) — never used.
+// MariaDB 11.4's `EXPLAIN FORMAT=JSON` — same statement spelling as MySQL's, a genuinely different
+// response schema: every table sits inside a `nested_loop` array (even a single-table query),
+// wrapped in `read_sorted_file`/`filesort` for a sort and `block-nl-join` for a block nested-loop
+// join; the scalar cost field is named `cost` (≈ seconds under MariaDB 11.x's model) rather than
+// MySQL's `cost_info.query_cost`, and `filtered` is a plain number, not MySQL's string.
+// `FORMAT=TREE` is a hard error on this engine (ERROR 1791) — never used.
 interface RawTable {
   table_name?: string;
   access_type?: string;

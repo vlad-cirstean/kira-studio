@@ -100,7 +100,7 @@ async function retainedBytes(page: Page): Promise<number> {
   return page.evaluate(() => window.__kiraRetainedBytes?.() ?? -1);
 }
 
-// P5 C1: the retention probe — asserted for exact-baseline equality the same way retainedBytes()
+// The retention probe — asserted for exact-baseline equality the same way retainedBytes()
 // above is, but over the structures that hook cannot see (decode/view caches, the document parse
 // cache, per-tab search matches, distinct retained frame buffers). `toEqual` on the whole object
 // is deliberate: any one field drifting from baseline is a genuine regression.
@@ -295,7 +295,7 @@ test('leak sweep — tab/store symmetry, connection delete purges the tree', asy
 
   await connectAndExpand(page, 'Leaks A');
 
-  // --- scenario 1: tab open/close symmetry across all five page stores (F4, F5, D4, D5) -------
+  // --- scenario 1: tab open/close symmetry across all five page stores -------
   // A data tab and a console tab (with a large result set) both retain bytes in one of the five
   // stores this file's own `__kiraRetainedBytes` sums; a definition tab retains none of them but
   // must still close cleanly alongside the other two.

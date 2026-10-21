@@ -1,9 +1,9 @@
 import type { HttpSavedRequest } from '@kira/shared/domain/collections';
 import { HTTP_METHODS, type HttpMethod, type HttpRequestTabState } from '@kira/shared/domain/http';
 
-// P4 D15: two views of the same request exist by construction — api_items.request_json (the
-// saved one) and tabs.state_json (the tab's, autosaved on the existing 1 s debounce). P4 does not
-// merge them, deliberately:
+// Two views of the same request exist by construction — api_items.request_json (the saved one)
+// and tabs.state_json (the tab's, autosaved on the existing 1 s debounce).
+// They are deliberately not merged:
 //
 //   - Autosaving edits straight into the collection row was considered — it is what tabs, layout
 //     and settings all do. Declined: it makes "open a saved request and try something"
@@ -53,12 +53,12 @@ export function fromSavedRequest(saved: HttpSavedRequest): Partial<HttpRequestTa
   };
 }
 
-// P4 D7/F4: Postman's method list is 15 members plus any custom string; this app's builder shows
+// Postman's method list is 15 members plus any custom string; this app's builder shows
 // seven, and httpRequestTabStateSchema's enum would *throw* on the rest (a Zod .default() only
 // fires for `undefined`, never for a bad value). So the coercion happens here — the one function
 // every read path goes through — rather than at each call site. The original spelling stays in
 // api_items.request_json and in origin_json, so an untouched request still exports as PROPFIND;
-// widening the vocabulary is a request-builder change and P4's §8 OQ-3 hands it forward.
+// widening the vocabulary is a request-builder change.
 const BUILDER_METHODS = new Set<string>(HTTP_METHODS);
 
 export function toBuilderMethod(method: string): HttpMethod {
@@ -73,7 +73,7 @@ export function isDirty(state: HttpRequestTabState, saved: HttpSavedRequest | nu
   if (!saved) return false;
   // The saved side is compared through the same coercion the tab was opened with, so a request
   // whose method this builder cannot show does not read as edited the instant it is opened. Once
-  // the user genuinely edits it, Save writes the coerced method — which is D6's own stated
+  // the user genuinely edits it, Save writes the coerced method — which is the stated
   // boundary (an edited member is rebuilt in this app's canonical form), not a silent loss.
   return !sameRequest(toSavedRequest(state), { ...saved, method: toBuilderMethod(saved.method) });
 }

@@ -10,12 +10,11 @@ import { type FkNavContext, foreignKeyNavItems, referencedByItems } from '../men
 import { cell } from '../page';
 import { usePendingChangesStore } from '../pendingChanges';
 
-// P22 Pass B, C7/§5 D7 — the small module DataGrid.vue kept inline, extracted so both the three
-// context menus and the clipboard (this commit) and the FK/PK nav button (C11) can share one copy
-// of it, and so DataGrid.vue can be deleted in one commit later rather than picked apart. §1's
-// line, applied: no SlickGrid API appears anywhere in this file — every function here is content,
-// the same behaviour DataGrid.vue's own identically-named methods had, taking the page/column
-// order/tabId it used to close over as plain parameters instead.
+// The small module DataGrid.vue kept inline, extracted so both the three context menus and the
+// clipboard and the FK/PK nav button can share one copy of it, and so DataGrid.vue can be deleted
+// in one commit later rather than picked apart. No SlickGrid API appears anywhere in this file —
+// every function here is content, the same behaviour DataGrid.vue's own identically-named methods
+// had, taking the page/column order/tabId it used to close over as plain parameters instead.
 
 export interface DisplayCellView {
   text: string;
@@ -76,7 +75,7 @@ export function rowSnapshot(
 // every existing `from './slick/rowValues'` site (SlickGridHost.vue) is unchanged.
 export { rowsForColumnOps, visibleRowsInSpan };
 
-/** Finding 3 (round 2) — paste's own version of the same rule: a paste starting at `startRow`
+/** Paste's own version of the same rule: a paste starting at `startRow`
  *  writes `count` clipboard rows in order, but `startRow + ri` (the old, purely arithmetic target)
  *  can land on a row the active filter is hiding. The ri-th clipboard row instead lands on the
  *  ri-th *visible* page row at or after `startRow` — `displayRows` only ever holds real, loaded
@@ -109,8 +108,8 @@ export function pasteTargetRows(
  *  routes to rowMenu() the same way the gutter path always has), and DataToolbar.vue's own
  *  toolbar Delete button. Before this, each of those three hand-rolled its own row/cell/range
  *  switch, and none of the three ever grew a `column` branch — a `Selection.kind` this file (and
- *  onCopy, which already handles all four kinds — Finding 3 round 2) has covered since P24 D10,
- *  just never plumbed through to Delete. One switch, covering every `Selection` kind that exists,
+ *  onCopy, which already handles all four kinds) has covered,
+ *  never plumbed through to Delete. One switch, covering every `Selection` kind that exists,
  *  is the fix: a kind newly needs coverage here exactly once, not in three call sites that can
  *  silently drift out of sync with each other.
  *  `displayRows`/`rowCount` mirror `visibleRowsInSpan`'s own contract (real page rows only,
@@ -128,10 +127,10 @@ export function rowsForSelection(
     case 'range':
       return visibleRowsInSpan(displayRows, sel.anchorRow, sel.row);
     case 'column':
-      // A column selection spans every currently-displayed row (D7's own header-select-zone
+      // A column selection spans every currently-displayed row (the header-select-zone
       // semantics — clicking a header selects the whole column, not a row range within it), so
       // "the rows this selection covers" is every visible row, same as rowsForColumnOps' own
-      // column-scoped-op rule (P24 D10) already applies to Copy for this exact kind.
+      // column-scoped-op rule already applies to Copy for this exact kind.
       return rowsForColumnOps(displayRows, rowCount);
     default:
       return [];
@@ -214,12 +213,12 @@ export interface CellNavEntry {
   items: MenuItem[];
 }
 
-/** P7 D3/D5/D7: the single source of truth for a cell's nav affordance — both the button (C11)
+/** The single source of truth for a cell's nav affordance — both the button
  *  and the cell menu's FK/PK items read this, so they can never disagree about what's showing.
- *  'fk' wins over 'pk' when a cell is somehow both (D7); null before meta has loaded or when
+ *  'fk' wins over 'pk' when a cell is somehow both; null before meta has loaded or when
  *  there's nothing navigable. Unlike DataGrid.vue's own version, this does not veto on "is this
- *  cell being edited" — that is a SlickGrid-editor concept (D8/C8), and this module carries no
- *  SlickGrid API by design; C11's own placement call site is where that veto belongs. */
+ *  cell being edited" — that is a SlickGrid-editor concept, and this module carries no
+ *  SlickGrid API by design; the placement call site is where that veto belongs. */
 export function cellNavEntry(
   tabId: string,
   page: TabularPage | null,

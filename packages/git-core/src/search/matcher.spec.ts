@@ -5,10 +5,10 @@ import type { CompiledQuery, SearchQuery } from './query.ts';
 import { compileQuery } from './query.ts';
 
 /**
- * `docs/plans/P11.md` W16 — exit criterion 1: the semantics table, driven as data rather than
- * prose, over the one matcher every half of search shares (`compileQuery` + `matchCommitFields` +
- * `matchRef`). Table numbers below (row 1, row 2, …) are the plan's own numbering, so a failure
- * here points straight back at the row it broke.
+ * The semantics table, driven as data rather than prose, over the one matcher every half of
+ * search shares (`compileQuery` + `matchCommitFields` + `matchRef`). Table numbers below (row 1,
+ * row 2, …) are the table's own numbering, so a failure here points straight back at the row it
+ * broke.
  */
 
 function query(partial: Partial<SearchQuery>): SearchQuery {

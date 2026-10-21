@@ -22,7 +22,7 @@ import {
 import { drop, setPage } from './page';
 import { useStreamFilterHistoryStore } from './streamFilterHistory';
 
-// D10/D12: SQS's 'batch' pagination must never be re-read except on an explicit Poll press —
+// SQS's 'batch' pagination must never be re-read except on an explicit Poll press —
 // every read is a real ReceiveMessage against the live queue. StreamView.vue's own isBatch
 // computed reads this same field off caps; mirrored here (rather than imported) because state.ts
 // has no dependency on the view layer.
@@ -31,10 +31,10 @@ function isBatchPagination(connectionId: string): boolean {
 }
 
 // Mirrors views/keyvalue/state.ts's KeyValueViewRuntime shape, minus pageIndex (StreamTabState
-// is deliberately empty, §tabs.ts — offsetWindow is always token-driven, batch has no position
+// is deliberately empty — offsetWindow is always token-driven, batch has no position
 // at all) plus `polled`: runtime-only (never persisted) tracking of whether this tab has loaded
 // at least once, so SQS's view (caps.pagination === 'batch') can show a "click Poll" placeholder
-// until the user explicitly asks for a page (D10/D12 — never auto-loaded).
+// until the user explicitly asks for a page (never auto-loaded).
 interface StreamViewRuntime extends PagedViewRuntime {
   rowCount: number;
   visibilityTimeoutSeconds: number | null;
@@ -57,14 +57,13 @@ function defaultRuntime(): StreamViewRuntime {
   };
 }
 
-// currentStreamFilter is load()'s own filter encoding, factored out so runCount (P21 round 2
-// functional finding 7) can send the *same* filter a browse under this tab is actually scoped to,
-// rather than re-deriving (or, before this fix, simply not deriving) it. Kafka-only in effect;
+// currentStreamFilter is load()'s own filter encoding, factored out so runCount can send the *same*
+// filter a browse under this tab is scoped to, rather than re-deriving it. Kafka-only in effect;
 // always null for SQS, since StreamView.vue never lets an SQS tab's three filter fields become
 // non-null in the first place — encodeKafkaStreamFilter itself would still collapse them to null
 // even if it did.
 function currentStreamFilter(tab: StreamTabRecord): string | null {
-  // P31 D14/F17: Date.parse returns NaN for junk, and isEmptyKafkaStreamFilter's own `!== null`
+  // Date.parse returns NaN for junk, and isEmptyKafkaStreamFilter's own `!== null`
   // check doesn't catch it — a NaN would silently ride through encodeKafkaStreamFilter (JSON.
   // stringify turns it into `null` on the wire, so the engine reads "no timestamp filter" while
   // the field looks applied). StreamView.vue validates before ever calling load(), but this guard
@@ -109,10 +108,9 @@ export const useStreamViewStore = defineStore('streamView', () => {
     delete runtime[tabId];
   });
 
-  // P108 Part 11 F14: adopts shared/page/load.ts's runPagedLoad frame (P107 I2-14), which
-  // documents/grid/keyvalue's own load() already use — this view's supersede/tab-closed/kind-check/
-  // applyLoadFailure tail was the exact same shape load.ts's own F20 note (P108 Part 10) flagged as
-  // a candidate, just never migrated.
+  // Adopts shared/page/load.ts's runPagedLoad frame, which documents/grid/keyvalue's own load()
+  // already use — this view's supersede/tab-closed/kind-check/applyLoadFailure tail was the exact
+  // same shape load.ts's own note flagged as a candidate, never migrated.
   async function load(tabId: string, cursor?: PageCursor): Promise<void> {
     const tab = useTabsStore().findStreamTab(tabId);
     if (!tab?.connectionId) return;
@@ -160,7 +158,7 @@ export const useStreamViewStore = defineStore('streamView', () => {
     const tab = useTabsStore().findStreamTab(tabId);
     if (!tab?.connectionId) return;
     await data.invalidate(tab.connectionId, tab.path);
-    // P21 round 2 functional finding 1: reload() is reached from three paths that are not the
+    // reload() is reached from three paths that are not the
     // explicit Poll button — a Send/Delete-message mutation's own reload-self, that same
     // mutation's fan-out to sibling tabs on the same queue (reloadTabsForTarget), and a
     // project-tree double-click on an already-open tab (ProjectTree.vue's `reused` branch). None
@@ -185,7 +183,7 @@ export const useStreamViewStore = defineStore('streamView', () => {
     if (!tab?.connectionId) return;
     const connectionId = tab.connectionId;
     const rt = ensureRuntime(tabId);
-    // P21 round 2 functional finding 7: this used to hard-code `filter: null`, so the Σ readout
+    // This used to hard-code `filter: null`, so the Σ readout
     // answered a different question than the rows beside it — the high-low watermark summed across
     // *every* partition, printed next to a page that load() had already scoped to the selected
     // partition/offset/timestamp filter. Sending the same encoded filter here scopes the count
@@ -207,10 +205,10 @@ export const useStreamViewStore = defineStore('streamView', () => {
     stopOp(runtime[tabId]);
   }
 
-  // D10: SQS's toolbar calls this directly from an explicit "Poll" click — same operation as
+  // SQS's toolbar calls this directly from an explicit "Poll" click — same operation as
   // `load`, named separately so the view never has to explain why a batch-strategy tab "loads".
   //
-  // P2 R1: SQS has no addressable position (read.go's own comment: "every poll is an independent,
+  // SQS has no addressable position (read.go's own comment: "every poll is an independent,
   // non-resumable snapshot"), so every poll's data:read carries the identical connectionId/path/
   // pageSize/cursor — the exact same enginecache.PageCacheKey as the poll before it. Without
   // invalidating first, a second Poll click would silently be served the first poll's cached page
@@ -278,7 +276,7 @@ export const useStreamViewStore = defineStore('streamView', () => {
     await load(tabId, { mode: 'offset', offset: 0 });
   }
 
-  // Item 2 — Kafka-only (StreamView.vue only renders the filter row, and thus only ever calls
+  // Kafka-only (StreamView.vue only renders the filter row, and thus only ever calls
   // this, when connection.kind === 'kafka'). Mirrors grid/state.ts's setFilter: reset the
   // continuation token, persist, record it in the (session-only) filter history, and restart the
   // browse fresh — a filter changes which messages a *new* browse would see, so continuing an old
@@ -310,7 +308,7 @@ export const useStreamViewStore = defineStore('streamView', () => {
     await load(tabId, { mode: 'offset', offset: 0 });
   }
 
-  // Item 6: the row last clicked — StreamView.vue pairs this with cellSelection.ts's
+  // The row last clicked — StreamView.vue pairs this with cellSelection.ts's
   // publishSelectedCell(). Kept here (rather than only local component state) so SQS's Delete
   // message toolbar action, which lives beside the row list but isn't itself a per-row control,
   // can read the same target.

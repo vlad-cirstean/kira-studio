@@ -1,4 +1,4 @@
-// P28 D19: looksLikeCurlCommand earns a dedicated test where the rest of the batch does not. It is
+// looksLikeCurlCommand earns a dedicated test where the rest of the batch does not. It is
 // a recogniser with several interacting rules (prompt prefixes, quoting, a path-qualified command
 // name, a whole-token match, a required argument) guarding a destructive action: a false positive
 // silently replaces the user's entire request with whatever parseCurl makes of text that was never

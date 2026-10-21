@@ -1,7 +1,7 @@
 import type { ListGrid } from 'cheetah-grid';
 import { HEADER_ROWS } from './state';
 
-// Late-data trace for the prototype pages (plan §8.2). DOM grids can scroll ahead of their mounted
+// Late-data trace for the prototype pages. DOM grids can scroll ahead of their mounted
 // rows (SlickGrid's uncoveredPx); a canvas grid cannot, so Cheetah's analogue is how far its
 // painted content lags the scroll offset (lagPx) and, as pixel truth, how many visible rows hold
 // no ink (blankRows). Playwright-only and the HUD's Trace button; compiled out of release builds.

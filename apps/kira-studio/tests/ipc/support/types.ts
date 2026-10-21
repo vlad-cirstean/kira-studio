@@ -6,9 +6,8 @@ import type { ColumnDescriptor, PagePosition } from '@shared/protocol/page';
  * that is the vital rule, and it is enforced by both halves importing the same fixture module.
  */
 export interface ControlSnapshot<T = unknown> {
-  /** A value from tests/ui/support/ipcChannels.ts's IPC map (P2 R1: relocated there from
-   *  shared/protocol/ipc.ts, which nothing under apps/kira-studio/frontend/src had imported since the P57/P58
-   *  Electron/Node-engine cutover — this tier's own fixture-key namespace, not a live app protocol). */
+  /** A value from tests/ui/support/ipcChannels.ts's IPC map (this tier's own fixture-key namespace,
+   *  not a live app protocol). */
   channel: string;
   /** Exactly what the renderer sends — used by the frontend half to match a request to a
    *  snapshot when a channel has more than one (e.g. treeChildren for different paths); a
@@ -19,14 +18,14 @@ export interface ControlSnapshot<T = unknown> {
   /** Optional for the same reason `args` is — a channel that resolves `void` (e.g. `opsCancel`)
    *  captures `response: undefined`, which JSON.stringify drops from the committed fixture. */
   response?: T;
-  /** tests/ui/-only (P57): when set, `mockRuntime.ts` answers this snapshot as a failed bound
+  /** tests/ui/-only: when set, `mockRuntime.ts` answers this snapshot as a failed bound
    *  call instead of a 200 — `control.ts`'s `unwrap` reads `.cause.code`/`.cause.message` off the
    *  thrown error, so this is the shape a real business-rule rejection (not a schema-validation
    *  one, which never reaches the wire) takes. Mutually exclusive with `response` — a snapshot
    *  answers as one or the other, never both. No `tests/ipc/**` fixture sets this; the backend
-   *  capture/replay half has no concept of it. `details` is P10 D15's own addition — ipcerr.Error's
-   *  optional `json.RawMessage` field, so far only ever set by HttpService.Send's own failed-send
-   *  timeline; every other seeded error leaves it unset. */
+   *  capture/replay half has no concept of it. `details` is ipcerr.Error's optional
+   *  `json.RawMessage` field, so far only ever set by HttpService.Send's own failed-send timeline;
+   *  every other seeded error leaves it unset. */
   error?: { code: string; message: string; details?: unknown };
   /** tests/ui/-only (P108 Part 12 F4): holds this call's reply until the spec calls
    *  `control.release(channel)` — see `@workbench/testing/ui/mockRuntime`'s own doc comment on
@@ -41,7 +40,7 @@ export interface PortSnapshot {
   op: string;
   payload: unknown;
   response?: LogicalPortResponse;
-  /** tests/ui/-only (P57), mirrors ControlSnapshot.error above: a failed bulk-data op (e.g. a
+  /** tests/ui/-only, mirrors ControlSnapshot.error above: a failed bulk-data op (e.g. a
    *  mutate that violates a constraint) — port.ts's handleMessage rejects with `.message`/`.code`
    *  read straight off this. Mutually exclusive with `response`. No `tests/ipc/**` fixture sets
    *  this. */
@@ -75,7 +74,7 @@ export interface LogicalTabularPage extends LogicalPageBase {
   columns: ColumnDescriptor[];
   rows: (string | null)[][];
   truncatedCells: number;
-  /** tests/ui/-only (P57): per-column row indices whose value came back truncated — the logical
+  /** tests/ui/-only: per-column row indices whose value came back truncated — the logical
    *  counterpart of page.ts's `TextColumnChunk.truncated` bitset (read via `isTruncated`), which
    *  `decodePage()` does not surface (nothing needed it before cell-editor.spec.ts's port).
    *  Optional and index-aligned with `columns`; absent (every page literal that predates this

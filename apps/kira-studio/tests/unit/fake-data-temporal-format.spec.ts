@@ -1,11 +1,11 @@
-// P21 round 1 functional finding F7: formatTemporal's ISO-8601-with-`Z` fall-through is correct
+// formatTemporal's ISO-8601-with-`Z` fall-through is correct
 // for Postgres and harmless for SQLite, but wrong for the mysql family and ClickHouse, whose
 // datetime/timestamp/year columns reject or mangle a trailing `Z` (in strict mode, an outright
 // "Incorrect datetime value"; a `year` column against a full ISO string is unambiguous — there is
 // no reading under which it works).
 // generate.ts imports bridge/data.ts, which reaches '/wails/runtime.js' at module scope — this has
-// to be a dynamic import(), after @workbench/testing/unit/window's mock.module registration has run (the same
-// pattern row-values-visible-span.spec.ts already uses).
+// to be a dynamic import(), after @workbench/testing/unit/window's mock.module registration has run
+// (the same pattern row-values-visible-span.spec.ts already uses).
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';

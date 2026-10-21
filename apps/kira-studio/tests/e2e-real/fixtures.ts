@@ -6,11 +6,11 @@ import { test as base, type Page } from '@playwright/test';
 import { acquireBuildLock, bound, getFreePort, waitForHealth } from '@workbench/testing/e2eReal';
 import { type FlowServers, startFlowServers } from './support/flowServers';
 
-// The tests/e2e-real/ counterpart to tests/e2e/fixtures.ts's `_electron.launch()`
-// (P57-e2e-revisit.md §8). There is no Electron process and no native window: `relaunch`-equivalent
+// The tests/e2e-real/ counterpart to tests/e2e/fixtures.ts's `_electron.launch()`.
+// There is no Electron process and no native window: `relaunch`-equivalent
 // setup here means "build (if needed) and spawn a `go build -tags server` binary, wait for it to
 // answer /health, then open a plain browser page against it" — a real Go backend, a real embedded
-// engine, a real database adapter, reached over plain HTTP/WebSocket (§1/§3).
+// engine, a real database adapter, reached over plain HTTP/WebSocket.
 
 const ROOT_DIR = resolve(__dirname, '../../../..');
 const APP_DIR = resolve(ROOT_DIR, 'apps/kira-studio');
@@ -31,10 +31,10 @@ function envWithGoBin(): NodeJS.ProcessEnv {
   return { ...process.env, PATH: path.includes(extra) ? path : `${path}:${extra}` };
 }
 
-// Build prerequisites, all idempotent (P57-e2e-revisit.md §8/§10): `scripts/setup.sh` (pinned
-// wails3, generated bindings — no vendored Node runtime or bundled engine to check for since P58f)
+// Build prerequisites, all idempotent: `scripts/setup.sh` (pinned
+// wails3, generated bindings — no vendored Node runtime or bundled engine to check for)
 // plus `bun run build:test:studio` (apps/kira-studio/frontend/dist, which main.go's `//go:embed
-// all:frontend/dist` picks up — the hooks-enabled build, same as test:ui/test:ipc:fe, P29 F1),
+// all:frontend/dist` picks up — the hooks-enabled build, same as test:ui/test:ipc:fe),
 // then the one step that script doesn't do — `go build -tags server`. Memoized per worker process
 // so a spec file with multiple tests builds once, not once per test.
 let prerequisitesReady: Promise<void> | undefined;
@@ -164,7 +164,7 @@ export const test = base.extend<KiraFixtures, { prerequisites: true }>({
       // Linux has no real keychain backing (CLAUDE.md) — same Linux-only development fallback
       // tests/e2e/fixtures.ts already sets, a no-op on macOS.
       KIRA_INSECURE_SECRETS: '1',
-      // Non-negotiable (§8): bind to 127.0.0.1 always, set explicitly rather than trusted as a
+      // Non-negotiable: bind to 127.0.0.1 always, set explicitly rather than trusted as a
       // default. There is no authentication of any kind on /wails/runtime — a server-mode binary
       // exposes the entire bound surface, secrets and file services included, to anyone who can
       // reach the port. This binary is a test artifact and must never be reachable beyond

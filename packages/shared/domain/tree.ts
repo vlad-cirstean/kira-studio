@@ -28,9 +28,9 @@ const NODE_KINDS = [
 export const nodeKindSchema = /*#__PURE__*/ z.enum(NODE_KINDS);
 export type NodeKind = z.infer<typeof nodeKindSchema>;
 
-// P5 C5/F7: decodePath and pathTail run on every tree row (ProjectTree.vue's row building,
-// MainView.vue's per-entry icon choice, SlickGridHost.vue's qualifiedName()) to answer a question that
-// is membership in this fixed, small literal set — not validation of untrusted input, which is
+// decodePath and pathTail run on every tree row (ProjectTree.vue's row building,
+// MainView.vue's per-entry icon choice, SlickGridHost.vue's qualifiedName()) to answer a question
+// that is membership in this fixed, small literal set — not validation of untrusted input, which is
 // what nodeKindSchema (still exported, still used by the wire-boundary tiers that do validate
 // untrusted data) is for. A `safeParse` there cost 1 443 ns/call (three segments) measured on this
 // render path; a Set lookup is the same answer for orders of magnitude less.
@@ -140,7 +140,7 @@ export const objectMetaSchema = /*#__PURE__*/ z.object({
 });
 export type ObjectMeta = z.infer<typeof objectMetaSchema>;
 
-// P22c D1: SchemaColumns' own element — one relation's columns, reusing columnMetaSchema verbatim
+// SchemaColumns' own element — one relation's columns, reusing columnMetaSchema verbatim
 // (never a second, parallel column shape) so a completion source built from this can never
 // disagree with Describe about the same column's type. Deliberately smaller than ObjectMeta: no
 // primaryKey/foreignKeys/referencedBy/indexes/rowEstimate/object-level comment — SchemaColumns

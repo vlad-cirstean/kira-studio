@@ -24,12 +24,12 @@ export type { ControlLogEntry, ControlMockHandle } from '@workbench/testing/ui/m
 // together with the rest of the app at Vite/esbuild build time, the way the generated bindings
 // already are. A real packaged Wails app serves something else entirely at the literal URL
 // `/wails/runtime.js`: a single, dependency-free, pre-minified bundle the `wails3` CLI embeds,
-// found by actually reading the pinned module (P57 finding — tried serving the npm package's
+// found by reading the pinned module (tried serving the npm package's
 // dist/ tree directly first; a same-name collision surfaced immediately: `calls.js`'s own `import
 // … from "./runtime.js"` resolves, relative to its own URL `/wails/calls.js`, to the exact same
 // `/wails/runtime.js` path the *app* imports for the aggregate bundle, but needs the low-level
 // dist/runtime.js file instead — two different files, one URL, unresolvable by aliasing alone).
-// `go list` resolves the on-disk path for whatever version go.mod actually pins, rather than
+// `go list` resolves the on-disk path for whatever version go.mod pins, rather than
 // hand-writing a GOPATH-shaped path that would silently go stale on a version bump.
 const WAILS_RUNTIME_JS = resolveWailsRuntimeJsPath(resolve(__dirname, '../../../'));
 
@@ -236,9 +236,9 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   dockerWatch: 'DockerService.Watch',
 };
 
-/** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
- *  P50 D5/D15) mapped onto the FQN `$Call.ByName` actually sends over the wire today. This table
- *  is the one piece of new coupling P57's bridge rewrite introduces (§4.10) —
+/** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by)
+ *  mapped onto the FQN `$Call.ByName` sends over the wire today. This table
+ *  is the one piece of new coupling the bridge rewrite introduces —
  *  tests/unit/mock-runtime-bindings.spec.ts asserts its values equal the generated bindings' own
  *  `$Call.ByName("…")` literals. */
 export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(
@@ -304,9 +304,9 @@ const EMPTY_OBJECT_META = {
 };
 const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.filtersList]: JSON.stringify({ hiddenKinds: [], hiddenPaths: [] }),
-  // P18 (v1.1): every SQL console loads its connection's own DDL document on mount
+  // Every SQL console loads its connection's own DDL document on mount
   // (state/schemas.ts's ensureDdl) — a spec with no Schema (DDL)… of its own gets the same
-  // "absent until the user writes one" empty document D2 gives a fresh connection, not a fixture
+  // "absent until the user writes one" empty document a fresh connection gets, not a fixture
   // miss. connectionId is echoed as '' here since the frontend only reads `.ddl` off this call.
   [IPC.schemaGet]: JSON.stringify({ connectionId: '', ddl: '', updatedAt: '' }),
   [IPC.windowsSetMode]: 'null',
@@ -331,26 +331,26 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.queriesHistoryRecord]: 'null',
   [IPC.treeInvalidate]: 'null',
   [IPC.treeDescribe]: JSON.stringify({ meta: EMPTY_OBJECT_META, source: 'server' }),
-  // M5 §6.2: SlickGridHost.vue's own onMounted loads a tab's connection's mask rules
+  // SlickGridHost.vue's own onMounted loads a tab's connection's mask rules
   // unconditionally (so folding is ready the instant the preview is toggled on) — a spec with no
   // maskRulesList snapshot of its own gets "no rules configured", the correct default for every
   // connection this chapter's own fixtures predate, not a fixture miss.
   [IPC.maskRulesList]: '[]',
   [IPC.maskRulesCounts]: '{}',
   [IPC.maskRulesCorrelationKey]: '""',
-  // P22c D3: every SQL console/data-tab fetches its container's cached columns on
+  // Every SQL console/data-tab fetches its container's cached columns on
   // mount/activation (state/schemaColumns.ts's ensureSchemaColumns) — a spec with no
   // treeSchemaColumns snapshot of its own gets "nothing cached for this container yet", the same
   // reasoning treeDescribe's own wildcard above already carries, not a fixture miss.
   [IPC.treeSchemaColumns]: JSON.stringify({ relations: [], source: 'server' }),
-  // P63: BrowseView.vue's own ensureKeyTypes fires on every VirtualList visible-range tick for a
+  // BrowseView.vue's own ensureKeyTypes fires on every VirtualList visible-range tick for a
   // redis browse tab — `paths` is whatever happens to be on screen at whatever moment a headless
   // run's own scroll/render timing lands on, so unlike treeChildren there is no fixed args shape
   // any fixture could capture even in principle. ensureKeyTypes itself already treats a failed
   // batch as silent (a decorative badge must never raise the error strip a failed *listing*
-  // owns) — this just answers "nothing yet" instead of a network-level miss for the same call.
+  // owns) — this answers "nothing yet" instead of a network-level miss for the same call.
   [IPC.treeKeyTypes]: '[]',
-  // P4 F11: Http's left panel fetches its whole tree on mount, and the call is NOT wrapped in a
+  // Http's left panel fetches its whole tree on mount, and the call is NOT wrapped in a
   // try/catch — a fixture miss would leave the panel permanently empty rather than degrade. Every
   // spec that switches to Http mode without seeding a collections fixture (mode-switch.spec.ts
   // boots with none and asserts the panel still says "Collections") gets "no collections yet",
@@ -364,12 +364,11 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.queriesList]: '[]',
   [IPC.queriesListConsole]: '[]',
   [IPC.queriesHistoryList]: '[]',
-  // P8 F11's sibling reasoning: mode-switch.spec.ts and both existing http-request*.spec.ts specs
-  // boot with no history fixture at all — ResponsePane.vue's History segment fetches on mount
-  // (C4), so "no history yet for a request never seen before" is the right default rather than a
-  // fixture miss.
+  // mode-switch.spec.ts and both existing http-request*.spec.ts specs boot with no history fixture
+  // at all — ResponsePane.vue's History segment fetches on mount, so "no history yet for a request
+  // never seen before" is the right default rather than a fixture miss.
   [IPC.historyList]: '[]',
-  // M2: hydrateDbMcpApprovals() joins the same unconditional-every-boot Promise.all every other
+  // hydrateDbMcpApprovals() joins the same unconditional-every-boot Promise.all every other
   // hydrate* call in main.ts's bootstrap() does — nothing in tests/ui/ exercises a prompt-mode
   // approval queue, so "nothing pending" is the correct empty answer for a spec with no fixture of
   // its own, the same reasoning every other unawaited-by-a-spec boot call above already gets.
@@ -385,7 +384,7 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
     expiresAt: '',
     error: '',
   }),
-  // P66: initAppUpdate() polls this unconditionally right after mount, on every boot — the same
+  // initAppUpdate() polls this unconditionally right after mount, on every boot — the same
   // no-committed-fixture-will-ever-snapshot-this reasoning as dbMcpStatus above. "no update" is
   // the honest default for a dev-server run under Playwright, which never reports a tagged release
   // version.
@@ -399,12 +398,12 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // Promise.all as updateStatus above, same reasoning — a spec that never configures a
   // script gets "no scripts yet", not a fixture miss.
   [IPC.customScriptsList]: '{"collections":[],"scripts":[]}',
-  // P91: main.ts's bootstrap() joins hydrateTerminalDefaults() to the same unconditional-every-boot
-  // Promise.all, same reasoning — a spec that never cares about the Automations module's own default
-  // cwd gets a plausible home directory, not a fixture miss. A spec that DOES care (terminal-
-  // module.spec.ts's own unscoped-launch case) still wins with its own snapshot.
+  // main.ts's bootstrap() joins hydrateTerminalDefaults() to the same unconditional-every-boot
+  // Promise.all, same reasoning — a spec that never cares about the Automations module's own
+  // default cwd gets a plausible home directory, not a fixture miss. A spec that DOES care
+  // (terminal- module.spec.ts's own unscoped-launch case) still wins with its own snapshot.
   [IPC.terminalDefaultCwd]: JSON.stringify({ path: '/home/test' }),
-  // P87: main.ts's bootstrap() joins initKeepAwake() to the same unconditional-every-boot
+  // main.ts's bootstrap() joins initKeepAwake() to the same unconditional-every-boot
   // Promise.all above, same reasoning. supported: true so the titlebar button renders in every
   // spec — the UI suite runs against a static server, not a real Go build, and a spec that never
   // cares about keep-awake should still see the titlebar it will ship with. A spec that DOES care
@@ -412,27 +411,26 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.keepAwakeStatus]: JSON.stringify({ manual: false, supported: true, error: '' }),
 });
 
-// Structured clone (what ipcRenderer.invoke actually used, pre-P57) preserves a key whose value
+// Structured clone (what ipcRenderer.invoke used) preserves a key whose value
 // is `undefined`; the wire format here is JSON, which drops it outright — both are normalised the
 // same way before comparing, so a fixture recorded from either transport matches. `tabId` is
 // excluded outright — a per-tab UUID the renderer generates at tab-open time, never reproducible
 // from a fixture (same reasoning mockPort.ts's own matchKey already applies). `refresh` defaults
 // to `false` at every call site (control.ts's own `refresh ?? false`), so a live call always
 // carries it explicitly — but a captured fixture snapshot can predate that default becoming part
-// of the args shape and simply omit the key; dropping an explicit `false` too means the two
+// of the args shape and omit the key; dropping an explicit `false` too means the two
 // compare equal, the same way an absent key already does.
 const CANONICAL_OPTIONS = {
   excludeKeys: ['tabId'],
   dropKey: (key: string, value: unknown) => key === 'refresh' && value === false,
 };
 
-// P22 D12: the mode a fresh boot answers windowsEnsure with, when a spec provides no explicit
+// The mode a fresh boot answers windowsEnsure with, when a spec provides no explicit
 // snapshot for it — read the (mode-independent) tabsList snapshot the spec *did* configure, so a
-// spec restoring an Api-mode tab as active boots displaying it, the same way it always did before
-// mode became its own persisted column. Only ever consults the first tabsList snapshot (a spec
-// keying tabsList by args to answer differently per window is not a shape any spec uses today) and
-// only its args-less/single form — args-matched multi-snapshot tabsList specs fall back to
-// 'studio', same as providing no tabsList snapshot at all.
+// spec restoring an Api-mode tab as active boots displaying it. Only ever consults the first
+// tabsList snapshot (a spec keying tabsList by args to answer differently per window is not a shape
+// any spec uses today) and only its args-less/single form — args-matched multi-snapshot tabsList
+// specs fall back to 'studio', same as providing no tabsList snapshot at all.
 function inferredBootMode(byChannel: ReadonlyMap<string, ControlSnapshot[]>): string {
   const tabsSnaps = byChannel.get(IPC.tabsList);
   const tabs = (tabsSnaps?.length === 1 ? tabsSnaps[0].response : undefined) as
@@ -447,9 +445,9 @@ function inferredBootMode(byChannel: ReadonlyMap<string, ControlSnapshot[]>): st
 }
 
 /**
- * Replaces the control channel's answers at the network layer (P57 D13) — `page.route`
+ * Replaces the control channel's answers at the network layer — `page.route`
  * intercepts every request under `/wails/`: the real runtime bundle itself (served for real, off
- * disk) and the one RPC endpoint bound calls POST to. Unlike the pre-P57
+ * disk) and the one RPC endpoint bound calls POST to. Unlike the
  * `tests/ipc/support/mockControl.ts` (which sat behind a real `contextBridge`/`ipcRenderer.invoke`
  * inside an Electron main process), this sits behind nothing — the mocked HTTP response is exactly
  * what `unwrap`/`trust` in `bridge/control.ts` are written to consume, so a frontend spec still
@@ -464,11 +462,11 @@ export async function installControlMocks(
     wildcardDefaults: WILDCARD_DEFAULTS,
     runtimeJsPath: WAILS_RUNTIME_JS,
     canonicalOptions: CANONICAL_OPTIONS,
-    // P57 finding: `refresh:true` never appears in a captured fixture (D15/D5's own write-mode
-    // capture always reads `refresh:false` first, the same discipline
-    // tests/ipc/support/harness.ts's own cache-aside stand-in follows) — a real Wails backend
-    // still answers it with the same data a `refresh:false` read would, since nothing in a static
-    // fixture's world ever actually changes between the two.
+    // `refresh:true` never appears in a captured fixture (the write-mode capture always reads
+    // `refresh:false` first, the same discipline tests/ipc/support/harness.ts's own cache-aside
+    // stand-in follows) — a real Wails backend still answers it with the same data a
+    // `refresh:false` read would, since nothing in a static fixture's world ever changes between
+    // the two.
     resolveSnapshotFallback: (_channel, args, findSnap) => {
       if (args && typeof args === 'object' && (args as { refresh?: unknown }).refresh === true) {
         return findSnap({ ...args, refresh: false });

@@ -1,8 +1,8 @@
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 
-// P130: guards the shared focus ring (packages/theme/src/base.css) against animating on focus —
-// see docs/HISTORY.md (v2.0 P130) Before the fix, `outline-color` (and, on
+// Guards the shared focus ring (packages/theme/src/base.css) against animating on focus —
+// see docs/HISTORY.md Before the fix, `outline-color` (and, on
 // `transition-all` elements, `outline-width`/`outline-offset`) interpolated from `currentcolor`/
 // `medium`/`0px` over Tailwind's default 150ms transition, so a freshly-focused element showed a
 // white-to-blue (or thick-to-thin) flash instead of the ring's resting state on the first frame.
@@ -21,7 +21,7 @@ async function resolveFocusColor(page: import('@playwright/test').Page): Promise
 // Real, trusted Tab keypresses, not a script-invoked el.focus() — WebKit only matches
 // `:focus-visible` on a button/toggle when focus arrives from an actual keyboard event; a
 // programmatic focus() never does, regardless of what was focused just before (confirmed live
-// against this dialog: plan §4.1's own standalone repro page had no prior pointer interaction to
+// against this dialog: the standalone repro page had no prior pointer interaction to
 // set that modality, which this real click-driven dialog does). Capped and asserted so a future
 // tab-order change fails loudly instead of silently sampling the wrong element.
 async function tabUntilTestId(

@@ -1,8 +1,8 @@
 /**
- * P2's own `graph/types.ts` names the missing piece: "the reassembler (the consumer holding
+ * The `graph/types.ts` names the missing piece: "the reassembler (the consumer holding
  * every chunk) maps a global index back to (chunk, local offset)". This is that consumer
- * (docs/plans/P4.md W3) — the main-thread, UI-only, pure accumulator that owns every
- * `LayoutChunk` a repo's session has produced (one per appended page, per P2 W9) and answers
+ * — the main-thread, UI-only, pure accumulator that owns every
+ * `LayoutChunk` a repo's session has produced (one per appended page) and answers
  * the two queries the renderer needs: a row's lane/colour, and every edge segment crossing a
  * given row's band. No Vue, no DOM, no SlickGrid — unit-testable in `bun test` without a
  * browser, and the type of thing worth keeping that way.
@@ -34,7 +34,7 @@ export interface RowVisual {
 /** One edge's crossing of a row's band, in the same absolute-row coordinates the edge is stored
  *  in — `fromRow`/`toRow` name the edge's own full extent (`toRow` may be `UNRESOLVED_ROW`, a
  *  parent not loaded yet), not a value relative to the queried row. A consumer building a row's
- *  SVG (W8) derives "does this row start/end/merely cross the edge" itself by comparing its own
+ *  SVG derives "does this row start/end/merely cross the edge" itself by comparing its own
  *  row number against these two fields — trivial once both are in hand, and what keeps
  *  `segmentsInRow`'s results a plain per-row shape. */
 export interface EdgeSegment {
@@ -125,7 +125,7 @@ interface ChunkSlice {
 
 /**
  * Accumulates every `LayoutChunk` a repo's session has produced into the two queries the graph
- * column needs, without ever flattening chunks into one array (§5.5 — the whole reason chunks
+ * column needs, without ever flattening chunks into one array (the whole reason chunks
  * are transferred rather than copied). `laneOf`/`colorOf` are a binary search over chunk starts
  * plus one typed-array read. `segmentsInRow` partitions an edge into exactly one of two disjoint
  * scans: a bounded CSR window over the `LONG_EDGE_ROWS` rows just above the query row catches
@@ -249,7 +249,7 @@ export class LayoutStore {
   // ---------------------------------------------------------------------------------------
 
   /** Patches name edges an *earlier* chunk left dangling that this chunk's own page resolved —
-   *  either a `toRow` an `UNRESOLVED_ROW` parent just resolved to, or (G21 D3) a `toLane`
+   *  either a `toRow` an `UNRESOLVED_ROW` parent just resolved to, or a `toLane`
    *  a lane just discovered to converge into another. Each `PATCH_STRIDE`-wide record carries
    *  `PATCH_UNCHANGED` in whichever of `toRow`/`toLane` it is not setting, so one loop
    *  applies both kinds of patch without needing to know which it is. Writes directly into the
@@ -272,7 +272,7 @@ export class LayoutStore {
     }
   }
 
-  /** G31 round-2 performance review, finding #2: `isLongAtAppendTime` unconditionally classifies
+  /** `isLongAtAppendTime` unconditionally classifies
    *  any still-`UNRESOLVED_ROW` edge as long — every open lane at a chunk boundary, not just a
    *  genuine long-lived merge. Most of those resolve in the very next chunk to a genuinely SHORT
    *  span; the frozen-at-append-time membership (`isLongAtAppendTime`'s own doc comment, to avoid
@@ -405,9 +405,9 @@ export class LayoutStore {
   }
 
   /** The long-edge scan: the row's own `#longBlocks` bucket plus the still-unresolved edges, so
-   *  cost follows the long edges that actually touch this block, not every long edge above it
-   *  (G30 finding #3's allocation concern still holds: only a covering edge is read into an
-   *  object). Edges come out ordered by `fromRow`, as the segment painter expects. */
+   *  cost follows the long edges that touch this block, not every long edge above it
+   *  (only a covering edge is read into an object). Edges come out ordered by `fromRow`, as the
+   *  segment painter expects. */
   #collectLongSegments(row: number, out: EdgeSegment[], countIn: number): number {
     let count = countIn;
     const bucket = this.#longBlocks[Math.floor(row / LONG_EDGE_ROWS)];

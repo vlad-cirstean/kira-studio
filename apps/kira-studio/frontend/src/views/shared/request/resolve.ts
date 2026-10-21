@@ -1,6 +1,6 @@
 import { type Reference, resolve, sanitizeUrlSpan } from '@kira/api-core';
 
-// P107 I2-16: httprequest/state.ts's resolveTabState and grpcrequest/state.ts's
+// httprequest/state.ts's resolveTabState and grpcrequest/state.ts's
 // resolveGrpcTabState each hand-rolled the same refs accumulator + sub closure over resolve(),
 // and the same enabled-and-named pair filter/map (headers vs metadata). HTTP additionally needs
 // a URL-safe variant (subUrl) neither request kind's other substitutable fields do.

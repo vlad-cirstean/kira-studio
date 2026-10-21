@@ -147,8 +147,8 @@ function orderGlobalStash(entries: readonly StashEntry[]): StashEntry[] {
   return [...entries].sort((a, b) => b.timestamp - a.timestamp || compareNatural(a.sha, b.sha));
 }
 
-/** The expensive half of the fold (§5.1's filter, plus §5.3's cross-tab counts) — depends only on
- *  `(input, filter)`, never on `activeTab`/`capSteps`. P79: split out of `buildPickerModel` so
+/** The expensive half of the fold (the filter, plus the cross-tab counts) — depends only on
+ *  `(input, filter)`, never on `activeTab`/`capSteps`. Split out of `buildPickerModel` so
  *  clicking a different tab or "show more" (which only ever changes ordering/capping below) does
  *  not re-lowercase/re-filter every one of the eight lists on a repo with thousands of rows. */
 export interface FilteredPicker {

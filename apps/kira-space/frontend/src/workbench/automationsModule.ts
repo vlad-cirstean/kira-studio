@@ -7,10 +7,11 @@ import { useTabsStore } from '../state/tabs';
 import { useTerminalsStore } from '../state/terminals';
 import { openTerminalTab } from '../state/terminalTabs';
 
-// P128 §2.4/§2.7: this app's own Automations-module context, provided once in App.vue (alongside
+// This app's own Automations-module context, provided once in App.vue (alongside
 // workbenchHostKey) for the shared AutomationsPanel.vue/AutomationsStart.vue/AutomationsNewTab.vue/
-// TerminalTabView.vue to inject. `'automations' is this app's own module workspace (state/workspace.ts's `visibleWorkspace`
-// reads the mode store for it directly; it never reaches `repoIdOfWorkspace`/`GitPanel`).
+// TerminalTabView.vue to inject. `'automations' is this app's own module workspace
+// (state/workspace.ts's `visibleWorkspace` reads the mode store for it directly; it never reaches
+// `repoIdOfWorkspace`/`GitPanel`).
 export function createAutomationsModule(): AutomationsModuleContext {
   const customScriptsStore = useCustomScriptsStore();
   const settingsStore = useSettingsStore();

@@ -1,12 +1,12 @@
-// P103 Part 1: `MonacoModule`/`cssVar`/`KIRA_EDITOR_THEME` used to live in each app's own
-// editor/monaco.ts (P60a §2.1/D2), byte-identical there in both apps save for one header comment —
-// moved here, this file's own sole real consumer, when this file (and monacoEntry.ts alongside it)
-// hoisted to packages/workbench. Each app's own monaco.ts now re-exports `cssVar`/
+// `MonacoModule`/`cssVar`/`KIRA_EDITOR_THEME` used to live in each app's own editor/monaco.ts,
+// byte-identical there in both apps save for one header comment — moved here, this file's own sole
+// real consumer, when this file (and monacoEntry.ts alongside it) hoisted to packages/workbench.
+// Each app's own monaco.ts now re-exports `cssVar`/
 // `KIRA_EDITOR_THEME` from here unchanged, so every existing external consumer of either symbol
 // (MonacoHost.vue, ResponseDiffDialog.vue, useDiffEditor.ts, RepoFileView.vue, …) needs no edit.
 export type MonacoModule = typeof import('./monacoEntry');
 
-// §9.3: read once from getComputedStyle against tokens.css — this app has one fixed (dark) visual
+// Read once from getComputedStyle against tokens.css — this app has one fixed (dark) visual
 // design with no light/dark toggle today (its own tokens.css literally maps each value to VS
 // Code's own theme keys, e.g. "--kira-bg: #1f1f1f; /* editor.background */"), so `base: 'vs-dark'`
 // is correct and there is only one theme to define.
@@ -37,14 +37,15 @@ export const KIRA_EDITOR_THEME = 'kira-editor';
 // `getImageData` hands back its actual RGBA bytes, no string grammar to keep up with.
 let normalizeCanvasCtx: CanvasRenderingContext2D | null | undefined;
 
-// D6 (P67c §3.2) — the alpha trap: a translucent token (`--kira-scrollbar: #79797966`, or a
-// `color-mix(… transparent)` token like `--kira-search-match`) is not opaque, so `editor.defineTheme`'s
-// `colors` values -- which go through `Color.fromHex` (`StandaloneTheme.getColors()`,
-// standaloneThemeService.js), accepting only `#RGB`/`#RGBA`/`#RRGGBB`/`#RRGGBBAA` -- need the alpha
-// byte carried through, not dropped. Always emitting `#rrggbbaa` (never bare `#rrggbb`) is what lets
-// `defineKiraTheme` map a translucent `--kira-*` token at all without silently painting a widget red;
-// `ColorMap.getId`'s own regex (`tokenization.js`) accepts the trailing alpha pair for token `rules`
-// foregrounds too, so one format serves both call sites below.
+// The alpha trap: a translucent token (`--kira-scrollbar: #79797966`, or a
+// `color-mix(… transparent)` token like `--kira-search-match`) is not opaque, so
+// `editor.defineTheme`'s `colors` values -- which go through `Color.fromHex`
+// (`StandaloneTheme.getColors()`, standaloneThemeService.js), accepting only
+// `#RGB`/`#RGBA`/`#RRGGBB`/`#RRGGBBAA` -- need the alpha byte carried through, not dropped. Always
+// emitting `#rrggbbaa` (never bare `#rrggbb`) is what lets `defineKiraTheme` map a translucent
+// `--kira-*` token at all without silently painting a widget red; `ColorMap.getId`'s own regex
+// (`tokenization.js`) accepts the trailing alpha pair for token `rules` foregrounds too, so one
+// format serves both call sites below.
 function normalizeColor(color: string): string {
   if (normalizeCanvasCtx === undefined) {
     const canvas = document.createElement('canvas');
@@ -70,7 +71,7 @@ export function cssVar(name: string, fallback: string): string {
   return normalizeColor(value || fallback);
 }
 
-// P60a §4.1: `theme.ts`'s 283 CodeMirror lines split three ways. This file carries the first two —
+// `theme.ts`'s 283 CodeMirror lines split three ways. This file carries the first two —
 // editor chrome colours and token colours — as one Monaco `defineTheme` call. The third
 // (app-owned `.cm-kira-*` classes) becomes plain scoped CSS on `MonacoHost.vue` itself, renamed
 // `.kira-ed-*`.
@@ -104,7 +105,7 @@ function tokenRules(): { token: string; foreground: string }[] {
     { token: 'string.escape', foreground: bare(string) },
     { token: 'number', foreground: bare(number) },
     { token: 'keyword', foreground: bare(keyword) },
-    // D4 checked and declined a separate `type.identifier` row (TS/JS emit it for any `[A-Z]…`
+    // Checked and declined a separate `type.identifier` row (TS/JS emit it for any `[A-Z]…`
     // identifier): `ThemeTrieElement.match` (tokenization.js) walks the dotted scope by segment and
     // falls back to the nearest registered ancestor, so `type.identifier` already resolves to this
     // `type` rule with no extra entry needed.
@@ -116,7 +117,7 @@ function tokenRules(): { token: string; foreground: string }[] {
     // `clojure.js` all still emit a bare `key` token — several only reachable since D3 registered
     // their grammars at all (verified with a grep across every `languages/definitions/*/*.js`).
     { token: 'key', foreground: bare(property) },
-    // D1/D4: Monaco's own JSON tokenizer (`languages/features/json/tokenization.js`) emits
+    // Monaco's own JSON tokenizer (`languages/features/json/tokenization.js`) emits
     // `string.key.json` for an object key and `string.value.json` for a string value — distinct
     // scopes so a package.json's keys and values no longer share one color. `string.value` is
     // explicit (not left to inherit `string`'s own rule) so it can never accidentally pick up
@@ -173,12 +174,12 @@ export function defineKiraTheme(mod: MonacoModule): void {
       'editorSuggestWidget.selectedBackground': cssVar('--kira-select', '#04395e'),
       'editorSuggestWidget.highlightForeground': cssVar('--kira-syntax-function', '#dcdcaa'),
 
-      // D6 (P67c §3.2): the ~16 keys above cover the editor surface itself; the context menu, the
+      // The ~16 keys above cover the editor surface itself; the context menu, the
       // rest of the suggest widget, the find/peek widgets and every reparented list read from a
       // ~40-key set `base: 'vs-dark'` otherwise answers with its own hardcoded literals (e.g. the
       // menu's `#3C3C3C` against this app's `--kira-bg-elevated` `#202020`) — visibly a different
       // palette. Every key below was read out of the Monaco stylesheet or default-style object that
-      // actually consumes it (`base/browser/ui/menu/menu.js`'s `getMenuWidgetCSS`,
+      // consumes it (`base/browser/ui/menu/menu.js`'s `getMenuWidgetCSS`,
       // `editor/contrib/suggest/browser/media/suggest.css`, `platform/theme/common/colors/
       // listColors.js`), mapped from an existing `--kira-*` token — no new token, no new literal.
       'menu.background': cssVar('--kira-bg-elevated', '#202020'),

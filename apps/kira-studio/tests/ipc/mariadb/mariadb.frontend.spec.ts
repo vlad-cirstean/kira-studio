@@ -4,9 +4,9 @@ import { assertTooltipShows } from '../../ui/support/tooltip';
 import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
 import { controlSnapshots, portSnapshots } from './mariadb.fixture';
 
-// P50 §4.2 / P57 D13-D16 — the pilot adapter's frontend half. Real Vue and real bridge/{control,
+// The pilot adapter's frontend half. Real Vue and real bridge/{control,
 // port}.ts; both wire protocols mocked from the exact same fixture mariadb.backend.spec.ts asserts
-// against (the vital rule). No container, no adapter, no network, and (since P57) no Electron
+// against (the vital rule). No container, no adapter, no network, and no Electron
 // process either — this file needs no Docker at all and is expected to run in this sandbox.
 
 const DB_PATH = 'database:kira_test';

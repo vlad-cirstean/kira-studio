@@ -1,26 +1,26 @@
-// P60b §3.3: the per-dialect keyword/type vocabularies `sql-tokens.ts`'s scanner classifies a
+// The per-dialect keyword/type vocabularies `sql-tokens.ts`'s scanner classifies a
 // word against. Curated, not exhaustive — the same "most likely to collide" judgement
-// `views/shared/sqlIdent.ts`'s own `COMMON_RESERVED` set already makes for this app (D8's own
-// rationale), and the one `editor/languages.ts`'s now-removed `ClickHouseDialect` string already
+// `views/shared/sqlIdent.ts`'s own `COMMON_RESERVED` set already makes for this app, and the one
+// `editor/languages.ts`'s now-removed `ClickHouseDialect` string already
 // made for ClickHouse specifically. Exhaustive (lang-sql's own Postgres list runs 763 words) would
 // classify far more identifiers as `Keyword`, which every consumer already tolerates in a name
 // position (`isNameNode`) but which widens accidental `END_FROM`/`joinStart`-style matches for a
 // column or table that happens to share a word with some obscure clause keyword.
 //
 // Not `SqlDialect` from `views/shared/sqlIdent.ts` — this package (`packages/shared/domain`) is
-// imported by more than this app's renderer (D9's own precedent, `ddl.ts`'s header comment) and
+// imported by more than this app's renderer (the precedent, `ddl.ts`'s header comment) and
 // must not depend on a frontend-only module. The four members below are structurally identical to
 // that app-level type, so passing one of its values in here needs no import, no cast.
 export type SqlDialect = 'postgres' | 'mysql' | 'sqlite' | 'clickhouse';
 
 // The union every dialect's set must contain, regardless of curation — a word missing here
 // silently changes what `sql-tokens.ts`'s grouping/consumers see as a `Keyword` vs. a plain
-// `Identifier` (§3.3's own worked example: without `primary`, `PRIMARY KEY (a, b)` parses as a
+// `Identifier` (the worked example: without `primary`, `PRIMARY KEY (a, b)` parses as a
 // *column* named `PRIMARY`, the exact phantom `ddl.ts`'s `TABLE_CONSTRAINT_LEADING` exists to
 // prevent). Assembled from every consumer that branches on `name === 'Keyword'`:
 // `ddl.ts`'s `TABLE_CONSTRAINT_LEADING`/`TYPE_STOP_WORDS`, `sqlRefs.ts`'s `END_FROM`/`joinStart`,
 // plus the statement/clause words the walkers themselves consume.
-// P107 I2-41: exported so `sql-keywords.spec.ts` asserts against this set directly, rather than
+// Exported so `sql-keywords.spec.ts` asserts against this set directly, rather than
 // keeping its own duplicated copy that could drift from it silently.
 export const REQUIRED_MINIMUM = new Set([
   // TABLE_CONSTRAINT_LEADING (ddl.ts)
@@ -236,10 +236,9 @@ const SQLITE_ONLY = new Set([
   'vacuum',
 ]);
 
-// P36 D30: moved here verbatim from `editor/languages.ts`'s now-removed `ClickHouseDialect` —
-// same curated string, split on whitespace — widened by REQUIRED_MINIMUM below (this repo's own
-// pre-P60b list did not cover `unique`/`foreign`/`references`/`column`/`add`/`recursive`/…, which
-// §3.3 requires for every dialect now that lang-sql's own broader keyword set is gone).
+// Curated string, split on whitespace — widened by REQUIRED_MINIMUM below (this repo's own list
+// did not cover `unique`/`foreign`/`references`/`column`/`add`/`recursive`/…, which is required
+// for every dialect now that lang-sql's own broader keyword set is gone).
 const CLICKHOUSE_CURATED =
   'select from where group by order having limit offset with as distinct into values ' +
   'insert update delete alter create drop table database view materialized dictionary ' +
@@ -336,7 +335,7 @@ function buildTypes(dialect: SqlDialect): ReadonlySet<string> {
 /** The full keyword vocabulary for `dialect` — every word `sql-tokens.ts`'s scanner classifies as
  *  a `Keyword` node rather than a plain `Identifier`. Memoised: the same `ReadonlySet` reference
  *  comes back for a given dialect every call, which is what lets `sql-tokens.ts`'s own tokenize
- *  memo (D2) compare `SqlTokenOptions` by reference. */
+ *  memo compare `SqlTokenOptions` by reference. */
 export function keywordsFor(dialect: SqlDialect): ReadonlySet<string> {
   let cached = keywordCache.get(dialect);
   if (!cached) {
@@ -348,7 +347,7 @@ export function keywordsFor(dialect: SqlDialect): ReadonlySet<string> {
 
 /** Type names for `dialect`, uppercased at the completion boundary (`sqlKeywordCompletion.ts`) —
  *  not classified as `Keyword` by the scanner itself (a declared column type is an ordinary
- *  `Identifier` in `ddl.ts`'s own type-slice reading, F5.2's own comment), only offered as
+ *  `Identifier` in `ddl.ts`'s own type-slice reading), only offered as
  *  completion vocabulary. */
 export function typesFor(dialect: SqlDialect): ReadonlySet<string> {
   let cached = typeCache.get(dialect);

@@ -1,13 +1,13 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect } from '../fixtures';
 
-// Ported byte-identically from tests/e2e/support/tree.ts (P57 D16) — no DOM behaviour here is
+// Ported byte-identically from tests/e2e/support/tree.ts — no DOM behaviour here is
 // Electron-specific, so nothing changed except which fixtures.ts's `expect` this resolves to.
 //
-// P28 F6: these five functions were copied, byte-identically or nearly so, into twenty spec
+// These five functions were copied, byte-identically or nearly so, into twenty spec
 // files — seventeen of them the naive `waitForTimeout(30)` variant `tree.spec.ts`'s own history
 // documents as flaky under load. One copy here, imported everywhere, is what makes any future
-// change to "how a tree row is reached" (P28's sticky band among them) a one-file edit instead of
+// change to "how a tree row is reached" (the sticky band among them) a one-file edit instead of
 // a twenty-file one.
 
 export function treeContainer(page: Page): Locator {
@@ -20,7 +20,7 @@ export function treeContainer(page: Page): Locator {
 // on a timer the browser controls. A blind `waitForTimeout` after the write is a guess at that
 // timing; under load it guesses wrong and the event fires later, right after a click that opened
 // a fresh menu, closing it before the next assertion sees it. So this waits for the 'scroll'
-// event itself (falling back to a short timeout for a write that doesn't actually move
+// event itself (falling back to a short timeout for a write that doesn't move
 // scrollTop, which fires no event at all) before ever proceeding — the row is only found or
 // clicked once no scroll event from this helper's own writes can still be in flight.
 export async function scrollAndSettle(
@@ -52,7 +52,7 @@ export async function scrollAndSettle(
   );
 }
 
-// P28 D8: the sticky ancestor band is interactive, so it occludes the real rows scrolled up
+// The sticky ancestor band is interactive, so it occludes the real rows scrolled up
 // behind it — Playwright's actionability check fails a click whose hit-test lands on the band,
 // and (since the row is already inside the scrollport) `scrollIntoViewIfNeeded` is a no-op that
 // never fixes it. Scrolling the row clear of the band's own measured height, once, here, is what
@@ -117,7 +117,7 @@ export async function findRow(page: Page, path: string): Promise<Locator> {
       // on once it's gone, and retrying that same action never brings it back on its own, since
       // nothing drives the scroll toward where it would remount. Falling through to the
       // scroll-search loop below (which actively drives the scroll, the same recovery every
-      // off-screen row already relies on) is what actually recovers it.
+      // off-screen row already relies on) is what recovers it.
     }
   }
   await scrollAndSettle(container, 'reset');

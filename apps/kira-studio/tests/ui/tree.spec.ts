@@ -130,7 +130,8 @@ const CONTROL: ControlSnapshot[] = [
   },
 ];
 
-// The exact channel set apps/kira-studio/internal/storage/model/ops.go's own `opKinds` table logs as an "op"
+// The exact channel set apps/kira-studio/internal/storage/model/ops.go's own `opKinds` table logs
+// as an "op"
 // (connectionsTest/data-plane read/count/mutate/execute/transfer included for completeness, even
 // though this spec never issues them) — the real substitute for the original's
 // `window.kira.opsRecent()`, not an approximation of it.
@@ -262,15 +263,15 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await page.click('[data-testid="menu-item-refresh"]');
   await expect.poll(() => opsCount(control.log())).toBe(opsBeforeCollapse + 1);
 
-  // P24 D7: that refresh routes through treeInvalidate first — the schema's WHOLE row (all four
+  // That refresh routes through treeInvalidate first — the schema's WHOLE row (all four
   // kinds: children/describe/definition/columns), not loadChildren's own refresh:true, which
-  // only ever rewrote 'children' and left the other three kinds sharing that row untouched (F8).
+  // only ever rewrote 'children' and left the other three kinds sharing that row untouched.
   // treeInvalidate is void and outside opsCount()'s own op-channel set (control.log() records it
   // regardless, since every intercepted call is logged before any snapshot/wildcard lookup runs).
   const invalidateOnRefresh = control.log().filter((e) => e.channel === IPC.treeInvalidate);
   expect(invalidateOnRefresh.at(-1)?.args).toEqual({ connectionId: CONNECTION_ID, path: APP_PATH });
 
-  // P24 D8/F10: refreshing a TABLE (a tree leaf, P19 D5) no longer calls Children on it — every
+  // Refreshing a TABLE (a tree leaf) no longer calls Children on it — every
   // adapter answers a leaf's Children with an empty list nobody renders, so the old refresh flow
   // both wasted a real round trip AND wrote junk `{"children":[]}` into the same row describe/
   // definition live on. Right-click wide_table's own Refresh and assert the op delta contains no
@@ -280,7 +281,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   const invalidateBeforeLeafRefresh = invalidateOnRefresh.length;
   await openRowMenu(page, WIDE_TABLE_PATH);
   await page.click('[data-testid="menu-item-refresh"]');
-  // A leaf has no twisty spinner to poll (P19 D5: wide_table's own `[data-testid="tree-twisty"]`
+  // A leaf has no twisty spinner to poll (wide_table's own `[data-testid="tree-twisty"]`
   // is `invisible`, and
   // refreshObject never touches `treeState.loading` for it either way) — wait out the mocked
   // round trip with a fixed settle window instead, long enough for either the fixed behaviour
@@ -423,10 +424,10 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await expect(stickyRows.nth(1)).toHaveAttribute('data-depth', '1');
   await expect(stickyRows.nth(2)).toHaveAttribute('data-depth', '2');
 
-  // P41 F1/D1/D4: the band pins to the *top* of the scrollport, not its bottom — no earlier
-  // assertion in this suite ever compared a sticky row's own viewport box to the scrollport's, so
-  // this is the one that would have failed against the pre-fix "sticky slot is the last child"
-  // layout (it rendered at the end of the content instead of pinning at all).
+  // The band pins to the *top* of the scrollport, not its bottom — no earlier assertion in this
+  // suite ever compared a sticky row's own viewport box to the scrollport's, so this is the one
+  // that would have failed against the pre-fix "sticky slot is the last child" layout (it rendered
+  // at the end of the content instead of pinning at all).
   const treeScrollBox = await treeScroll.boundingBox();
   const firstStickyBox = await stickyRows.first().boundingBox();
   if (!treeScrollBox || !firstStickyBox) throw new Error('expected both boxes to be measurable');
@@ -522,7 +523,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   // join the band anyway (stickyBand.ts only self-pins a row that is showing its own children).
   // Give it the same connection/database/schema depth as the first connection so there is real
   // content — and a real handoff — to scroll through. Both connections share the same catalog, so
-  // `path` alone is ambiguous the moment both are expanded (D9's whole reason for deleting this
+  // `path` alone is ambiguous the moment both are expanded (the whole reason for deleting this
   // one afterwards) — every step below walks from `conn2Row` via DOM sibling order instead of the
   // path-based `findRow`/`expandRow` helpers.
   async function expandNext(row: Locator): Promise<Locator> {
@@ -577,7 +578,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
 
   // Right at the boundary: the band's outermost — only — row is now the second connection.
   // stickyBand.ts's own kept-loop requires a candidate's natural top to be strictly less than its
-  // pinned slot (D4's "passed", not "arrived") — landing exactly on the row's natural offset
+  // pinned slot (the "passed", not "arrived") — landing exactly on the row's natural offset
   // (what scrollIntoView's block:'start' does) is the tie, not the pass, so nudge one pixel
   // further to cross it without pulling in a second candidate (conn2's own database row, one
   // full rowHeight below, would join too).
@@ -615,8 +616,8 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
 
   // --- disconnect: cached nodes still render; expanding any node (cached or not) reconnects
   // first rather than surfacing a disconnected error — the twisty is the primary way users
-  // browse, so it shouldn't require a separate explicit "Connect" click first (P16 §8,
-  // state/tree.ts's expand()). ---------------------------------------------------------------
+  // browse, so it shouldn't require a separate explicit "Connect" click first (state/tree.ts's
+  // expand()). ---------------------------------------------------------------
   await openRowMenu(page, '');
   await page.click('[data-testid="menu-item-disconnect"]');
   await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'disconnected');
@@ -624,7 +625,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   // app is cached (L1 survives disconnect) — collapse/re-expand reconnects first (silently),
   // then still renders from cache with no error. See header comment: this tier's mockRuntime has
   // no Events.On mock at all, so the automatic cache-invalidate-and-refetch the original asserted
-  // here (D11) never fires — only the reconnect's own `connectionsConnect` call happens.
+  // here never fires — only the reconnect's own `connectionsConnect` call happens.
   const opsBeforeReconnect = opsCount(control.log());
   await (await findRow(page, APP_PATH)).locator('[data-testid="tree-twisty"]').click();
   const appRowAgain = await expandRow(page, APP_PATH);
@@ -713,7 +714,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await expect(filterObjectRow(APP_PATH)).toHaveAttribute('data-state', 'on');
   await cancelFilters();
 
-  // --- tri-state (D15): unticking both schemas of kira_test partials the database row;
+  // --- tri-state: unticking both schemas of kira_test partials the database row;
   // ticking the database row restores both and leaves the persisted path set empty -----------
   // Focused on APP_PATH so the database (both schemas' shared parent) is pre-expanded,
   // revealing both app and analytics without a manual expand click.
@@ -737,10 +738,10 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await filterObjectRow(APP_PATH).locator('[data-testid="tree-twisty"]').click();
   await expect(filterObjectCheckbox(SEQUENCE_PATH)).toBeDisabled();
   await expect(filterObjectRow(SEQUENCE_PATH)).toHaveAttribute('data-state', 'off');
-  // P104 §6.2: the disabled-row reason moved off data-kira-tip onto the real Tooltip system
+  // The disabled-row reason moved off data-kira-tip onto the real Tooltip system
   // (FiltersDialog.vue's `Tooltip :disabled="!row.disabledReason"`) -- hover to read it instead.
-  // Expanding the schema re-lays the row out after the pointer lands; a tooltip opens on pointerenter,
-  // so leave and re-enter on the settled layout.
+  // Expanding the schema re-lays the row out after the pointer lands; a tooltip opens on
+  // pointerenter, so leave and re-enter on the settled layout.
   await expect(async () => {
     await page.mouse.move(0, 0);
     await filterObjectRow(SEQUENCE_PATH).locator('.object-checkbox-label').hover();

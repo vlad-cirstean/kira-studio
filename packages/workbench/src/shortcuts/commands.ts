@@ -1,4 +1,4 @@
-// D11: a tiny per-id registry the active view's own component registers into on mount and
+// A tiny per-id registry the active view's own component registers into on mount and
 // unregisters on unmount. Exactly one of DataView.vue/DefinitionView.vue/ConsoleView.vue is ever
 // mounted at a time (MainView.vue's `v-else-if` chain), so "run the active tab's own Find/
 // Refresh/Run/Run all" falls out for free with no active-tab-kind branching here.

@@ -55,7 +55,7 @@ export const useDatagripImportStore = defineStore('datagripImport', () => {
     return false;
   }
 
-  /** Opens the native folder picker and scans the chosen project (D13/D9). Returns false when the
+  /** Opens the native folder picker and scans the chosen project. Returns false when the
    *  picker was cancelled or failed or the scan failed. A failure opens the dialog on its error
    *  alert (a closed dialog would make it look like a cancelled picker). Callers own the pending
    *  state (`useAsyncAction`), which also stops a double click opening two pickers. */
@@ -96,8 +96,8 @@ export const useDatagripImportStore = defineStore('datagripImport', () => {
     resetDialogState();
   }
 
-  /** D9's second step: the dialog's own confirm action. Nothing is written before this runs — the
-   *  preview is a real review step, not decoration (D10). The created connections themselves reach
+  /** The dialog's own confirm action. Nothing is written before this runs — the
+   *  preview is a real review step, not decoration. The created connections themselves reach
    *  connectionsState.records through the existing connectionsChanged broadcast
    *  (connections.Service.emitListChanged), so nothing here has to re-fetch the list by hand. */
   async function confirmDataGripImport(): Promise<DataGripReport | null> {

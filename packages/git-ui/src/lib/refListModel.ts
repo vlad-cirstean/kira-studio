@@ -1,5 +1,5 @@
 /**
- * `docs/plans/P6.md` W13: the pure half of `BranchPicker.vue`/`TagList.vue` — the filter (one box,
+ * The pure half of `BranchPicker.vue`/`TagList.vue` — the filter (one box,
  * matching across all three sections), the per-section sort, the "N more" cap, and the small
  * per-row facts (`formatTrack`, the remote-checkout label) neither component should recompute on
  * its own. Follows `fileTreeModel.ts`/`columns.ts`'s precedent of splitting the pure fold from the
@@ -35,10 +35,10 @@ export interface RefListSection {
   readonly hiddenCount: number;
 }
 
-/** The generic half of `capSection` below — split out at P9 W14 so `StashList.vue` gets the same
+/** The generic half of `capSection` below — split out so `StashList.vue` gets the same
  *  "N more" cap over `StashEntry[]` (an already-ordered stack, never filtered or re-sorted) without
- *  a second list implementation, exactly as `docs/plans/P9.md`'s W14 bullet asks for. `capSection`
- *  itself is kept as the thin `RefRow`-typed wrapper every existing caller (`BranchPicker.vue`,
+ *  a second list implementation. `capSection` itself is kept as the thin `RefRow`-typed wrapper
+ *  every existing caller (`BranchPicker.vue`,
  *  `TagList.vue`) already uses, unchanged. */
 export function capItems<T>(
   items: readonly T[],
@@ -89,7 +89,7 @@ export function formatTrack(track: RefTrack | 'gone' | undefined): string | unde
 /** `origin/feature` → `feature` — the local name a remote branch's tracking branch would take,
  *  used both to decide `remoteCheckoutLabel`'s wording and as the `branch` argument the checkout
  *  op itself resolves server-side (`RepoService.runOp`'s own `localNameForRemoteBranch`, which
- *  this mirrors so the label the user reads matches the branch git actually creates). */
+ *  this mirrors so the label the user reads matches the branch git creates). */
 export function localNameForRemoteBranch(remoteShortName: string): string {
   const slash = remoteShortName.indexOf('/');
   return slash === -1 ? remoteShortName : remoteShortName.slice(slash + 1);
@@ -107,8 +107,8 @@ export function remoteCheckoutLabel(remoteRow: RefRow, branches: readonly RefRow
 }
 
 /** The `op.run`/`preflight.checkout` `target` string a remote branch row's row-level checkout
- *  should actually send — `RepoService`'s own `resolveCheckoutTarget` looks the target up in
- *  `branches` *before* `remoteBranches` (D-something: "a same-named local branch wins"), so
+ *  should send — `RepoService`'s own `resolveCheckoutTarget` looks the target up in
+ *  `branches` *before* `remoteBranches` ("a same-named local branch wins"), so
  *  sending the remote ref's own name when a local counterpart already exists would silently miss
  *  it and fall through to the tracking-creation path instead. Naming the local branch directly
  *  when it exists is what makes `remoteCheckoutLabel`'s "Switch to …" wording true, not merely a

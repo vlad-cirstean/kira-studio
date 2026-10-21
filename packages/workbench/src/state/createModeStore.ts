@@ -7,12 +7,12 @@ import { fireAndForget } from '../bridge/fireAndForget';
 // P128 §2.3: hoisted from Kira Studio's own state/mode.ts — mode is this app's one-dimensional
 // "which module" state, there is no second dimension layered on top of it.
 
-// P22 D12: which module a window was in, so it reopens into the same one. `windows.bounds_json`'s
+// Which module a window was in, so it reopens into the same one. `windows.bounds_json`'s
 // own persistence (internal/shell/window.go's Attach) is entirely native-event-driven
 // (WindowDidResize/WindowDidMove) with no frontend IPC counterpart at all — there is no "on close"
 // hook this module could piggyback on the way the row's other shutdown state suggests. So mode is
 // pushed on every change instead, through the same debounced-writer shape state/layout.ts's own
-// patchLayout uses: never a synchronous IPC per mode click (F20's own invariant — the one thing
+// patchLayout uses: never a synchronous IPC per mode click (the invariant — the one thing
 // that must not happen), only an eventual one after the window has sat on a mode for a beat.
 
 export interface ModeControl<M extends string> {
@@ -27,8 +27,8 @@ export interface ModeStoreActions<M extends string> {
 
 // `extend` is required, even for a caller with nothing to add (createKeepAwakeStore.ts's own
 // pattern) — a call that leaves `E` uninferred breaks Pinia's action/state extraction for the whole
-// store. Studio passes `activeTab` through it (state/mode.ts); Kira Space's own copy (P128 §2.6)
-// adds nothing, so `E`'s default matters: `Record<string, never>` carries a `[key: string]: never`
+// store. Studio passes `activeTab` through it (state/mode.ts); Kira Space's own copy adds nothing,
+// so `E`'s default matters: `Record<string, never>` carries a `[key: string]: never`
 // index signature, and spreading a value of that type LAST in an object literal
 // (`{ ...toRefs(state), hydrateMode, setMode, ...extra }` below) makes every key the index
 // signature also matches — including `hydrateMode`/`setMode` themselves — resolve to `never` in
@@ -54,7 +54,7 @@ export function createModeStore<
     // P99 §9.3: useDebounceFn replaces a hand-rolled clearTimeout/setTimeout pair.
     const scheduleModeWrite = useDebounceFn(writeMode, TIMING.persist);
 
-    // P108 Part 12 F13: a mode change within TIMING.persist of the window closing must not
+    // A mode change within TIMING.persist of the window closing must not
     // be lost — control.onFlushBeforeClose/onWindowFlushBeforeClose are the native "about to
     // close/quit" signals Go already blocks the close on (internal/shell/closeflush.go), reliable
     // across both the quit-handshake and per-window-close paths — unlike a browser `beforeunload`,

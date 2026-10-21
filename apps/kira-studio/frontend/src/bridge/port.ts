@@ -24,7 +24,7 @@ let nextId = 1;
 const pending = new Map<number, PendingRequest>();
 const eventListeners = new Map<string, Set<(payload: unknown) => void>>();
 
-// P52 §7.2 / P56: one named stream, matching bridge/stream.go's StreamName. Wails supersedes an
+// One named stream, matching bridge/stream.go's StreamName. Wails supersedes an
 // older page generation's session itself (stream.ts's WailsSocket._closed + the poll loop it
 // aborts), which is what retires src/main/index.ts's own `generation` counter — nothing here
 // re-implements it.
@@ -77,16 +77,16 @@ function handleMessage(message: PortResponse | PortEvent): void {
 
 socket.onopen = () => resolveReady();
 
-// P11: decodeFrame still throws on a structurally corrupt or truncated frame (a mismatched "KIF1"
+// decodeFrame still throws on a structurally corrupt or truncated frame (a mismatched "KIF1"
 // file identifier, a missing envelope field such as an event's topic) — genuinely reachable, not
 // just a defensive check, and with no id to reject a specific pending request with either, so it
 // is dropped here, the same move dataframe.go's own probe-decode makes on an unparseable frame.
 // This callback runs synchronously from DOM event dispatch, which swallows a listener's throw into
 // an uncaught-error report rather than routing it anywhere a promise could see it, so the
-// try/catch here (the same shape as P2 R2's fix for the pre-P11 decoder) is what keeps one of
-// those genuinely-unparseable frames from leaving some pending request hanging forever.
+// try/catch here is what keeps one of those genuinely-unparseable frames from leaving some pending
+// request hanging forever.
 //
-// F6 (P108 Part 6): a `res` frame's own *payload* failing to decode is different — its id is
+// A `res` frame's own *payload* failing to decode is different — its id is
 // already known by the time that happens, so decodeFrame itself now resolves that case as an
 // ordinary `{ok:false}` response (handleMessage below rejects the matching pending call with it)
 // rather than throwing; nothing here needs to catch that case specially any more.
@@ -141,7 +141,7 @@ export function request(
           }, timeoutMs);
     pending.set(id, { resolve, reject, timer });
     const req: PortRequest = { kind: 'req', id, op, payload };
-    // P57 D3: send() throws on a CONNECTING socket and silently drops on a closed one, so the
+    // send() throws on a CONNECTING socket and silently drops on a closed one, so the
     // send is gated on the open ack rather than fired synchronously. The timer starts now, not
     // after the ack — a request issued during a slow open must still time out on the caller's
     // schedule, which is the behaviour today's null-port rejection approximates.

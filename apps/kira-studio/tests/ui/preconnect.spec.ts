@@ -4,14 +4,14 @@ import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 import { connectionRow } from './support/tree';
 
-// Ported from tests/e2e/preconnect.spec.ts (P57 D16). That file is split in two, mirroring
+// Ported from tests/e2e/preconnect.spec.ts. That file is split in two, mirroring
 // connections.spec.ts/tree.spec.ts's own discipline: a dialog+failure-before-connect half that
 // needs no real adapter, and a "sidecar lifecycle against a live connection" half that spawns a
 // real shell process and inspects its real PID on the filesystem. Only the first half ports —
 // the second has no equivalent in a tier with no real backend process to spawn or supervise
 // (same reasoning as workbench.spec.ts's dropped relaunch scenarios), and is covered instead by
-// apps/kira-studio/internal/preconnect/supervisor_test.go and tail_test.go (real Go coverage of exactly the
-// exit-drops-the-connection and one-shot-exit-is-fine behaviors that half asserted).
+// apps/kira-studio/internal/preconnect/supervisor_test.go and tail_test.go (real Go coverage of
+// exactly the exit-drops-the-connection and one-shot-exit-is-fine behaviors that half asserted).
 //
 // Two of the first half's own checks are also dropped: "saving persists it" and "the stored value
 // survives a relaunch" both needed a real relaunch to prove (tests/ui/fixtures.ts's own header

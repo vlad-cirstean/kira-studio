@@ -9,7 +9,7 @@ import { createAnnouncementRef } from './liveAnnouncements.ts';
 import { PackedStreamState } from './packedStream.ts';
 
 /**
- * The sidebar review view's whole state machine (P7 W10, §6.8):
+ * The sidebar review view's whole state machine:
  *
  * ```
  * idle ──setTarget(branch)──> resolving ──> ask | unrelated | empty | listing
@@ -17,11 +17,10 @@ import { PackedStreamState } from './packedStream.ts';
  *                                                └──── setBase ─────────┘
  * ```
  *
- * Composes `PackedStreamState` (P7 W10's own extraction, open question 8) with no `onReset`
- * hook — a range walk draws no lanes (§6.8/D41), so there is nothing beyond the packed columns
- * themselves to reset. Every request is supersede-and-verify, `DetailState`'s own discipline:
- * a response checks the branch/base it was requested for is still current before committing
- * itself, because an abort racing a resolution can still resolve.
+ * Composes `PackedStreamState` with no `onReset` hook — a range walk draws no lanes, so there is
+ * nothing beyond the packed columns themselves to reset. Every request is supersede-and-verify,
+ * `DetailState`'s own discipline: a response checks the branch/base it was requested for is still
+ * current before committing itself, because an abort racing a resolution can still resolve.
  */
 export type ReviewPhase =
   | 'idle'
@@ -37,7 +36,7 @@ export interface ReviewExpansion {
   readonly actions: DetailActions;
 }
 
-/** D40's cold-bootstrap arm, threaded from `main.ts`'s `MountOptions.target` down to
+/** The cold-bootstrap arm, threaded from `main.ts`'s `MountOptions.target` down to
  *  `ReviewView.vue`'s own `target` prop — kept here, a plain `.ts` module, rather than exported
  *  from `ReviewView.vue` itself: a Vue SFC's `<script setup>` module shim has no named type
  *  exports (only the default component), so `main.ts`/`index.ts` could not otherwise import it
@@ -51,7 +50,7 @@ export interface ReviewTarget {
   readonly pane?: ReviewPane;
 }
 
-/** "The outcome or the count changed" (D39's mid-review `refsChanged` resolution) — compares the
+/** "The outcome or the count changed" (the mid-review `refsChanged` resolution) — compares the
  *  two things a background re-resolve can find different: which base (and thus which range
  *  shape) applies, and, when both are `ready`, how many commits are in it. `reason` is
  *  deliberately not compared: the same base re-detected via a different reason (say, an upstream
@@ -85,7 +84,7 @@ export class ReviewSessionState {
    *  every expanded row's `DetailActions` writes here rather than each owning its own region. */
   readonly announcement: Ref<string> = createAnnouncementRef();
   readonly expandedShas: ShallowRef<ReadonlySet<string>> = shallowRef(new Set());
-  /** P75 §1.2: the row-level action bundle, one per targeted session rather than one per expanded
+  /** The row-level action bundle, one per targeted session rather than one per expanded
    *  row — every bundle `#createRowActions` ever built closed over `repoId` and nothing else, so
    *  N bundles for N expanded rows were N identical closures. `undefined` until `setTarget`, which
    *  is what let a collapsed row's own "Open all changes" reach nothing at all (it read its whole
@@ -101,16 +100,16 @@ export class ReviewSessionState {
   #streamController: AbortController | undefined;
   #loadController: AbortController | undefined;
   #checkController: AbortController | undefined;
-  /** F8: bumped by every `setTarget`/`setBase`/`dispose` (`swapBaseAndBranch` bumps it twice,
+  /** Bumped by every `setTarget`/`setBase`/`dispose` (`swapBaseAndBranch` bumps it twice,
    *  transitively, since it calls both) — `#checkForChange`'s own session-identity guard,
    *  alongside `resolution`'s object identity below. A background re-resolve started before one
    *  of those landed must never apply (or even flag a banner for) a comparison the user has
    *  already moved past. */
   #sessionGeneration = 0;
-  /** The base actually in effect — `undefined` until a `ready`/`unrelated`/`empty` resolution
+  /** The base in effect — `undefined` until a `ready`/`unrelated`/`empty` resolution
    *  lands (never set while `reason: "none"`, since there is no base at all then). Distinct
    *  from `resolution.value.base` only in that this is what `loadMore`/re-open/the background
-   *  check reuse, so an override survives a background re-check exactly as §6.8 says it should
+   *  check reuse, so an override survives a background re-check
    *  ("the override holds for the session"). */
   #base: string | undefined;
   #pendingResolution: BaseResolution | undefined;
@@ -147,8 +146,8 @@ export class ReviewSessionState {
   }
 
   /** Targets a new branch — aborts everything in flight, clears rows and expansions, and
-   *  requests `review.resolveBase` with no override. The entry point for all three of §6.8's
-   *  "how the view learns which branch to review" arms (D40): a cold bootstrap target, a
+   *  requests `review.resolveBase` with no override. The entry point for all three of the
+   *  "how the view learns which branch to review" arms: a cold bootstrap target, a
    *  `review.target` push, and the palette's own branch picker once it has one to hand over. */
   async setTarget(
     repoId: string,
@@ -172,7 +171,7 @@ export class ReviewSessionState {
     await this.#resolve(repoId, branch, open?.base);
   }
 
-  /** G19 D5 (item 5): the header's swap button — re-targets the session through the two RPCs it
+  /** The header's swap button — re-targets the session through the two RPCs it
    *  already has, the same two-round-trip sequence a manual re-pick-then-override would already
    *  produce. Only meaningful once a `ready` comparison exists (a `null` base has nothing to
    *  swap in); a no-op otherwise. */
@@ -187,9 +186,9 @@ export class ReviewSessionState {
     await this.setBase(branch);
   }
 
-  /** G19 D11a (item 11): "back to branch selection" — mirrors `setTarget`'s own reset lines, but
+  /** "back to branch selection" — mirrors `setTarget`'s own reset lines, but
    *  sets `phase.value = 'idle'` and, critically, clears `branch.value` back to `undefined` — the
-   *  one field `setTarget` never touches (F11), and the one flip that makes the template's own
+   *  one field `setTarget` never touches, and the one flip that makes the template's own
    *  `v-else-if="!review.branch.value"` true again. `repoId.value` is left as-is: the user is
    *  still browsing the same repo, just picking a different (or the same) branch to compare. */
   clearTarget(): void {
@@ -361,8 +360,8 @@ export class ReviewSessionState {
   }
 
   /** `resumeThroughRow` defaults to this session's own currently-loaded row count — mirrors
-   *  `GraphViewState.openStream`'s own default exactly (G32 round-3 performance review, finding
-   *  #1): `loadMore`'s own re-open must resume past what it already applied, not restart the
+   *  `GraphViewState.openStream`'s own default exactly: `loadMore`'s own re-open must resume past
+   *  what it already applied, not restart the
    *  whole ranged walk from row 0 (the server now honors this for a ranged request the same way
    *  it always has for the graph's own). A genuine fresh open (`setTarget`/`setBase`/
    *  `acknowledgeStaleReview`, each after its own `#packed.reset()`) passes the default
@@ -425,7 +424,7 @@ export class ReviewSessionState {
     const branch = this.branch.value;
     const current = this.resolution.value;
     if (!repoId || !branch || !current) return;
-    // F8: a real setTarget/setBase (a user picking a different base than the one this check
+    // A real setTarget/setBase (a user picking a different base than the one this check
     // started against) landing while this request is in flight must never have its OWN resolve's
     // fresh-but-now-stale result flag a banner for, or (via a since-superseded #pendingResolution)
     // silently apply on click, a comparison the user has already moved past. The session token

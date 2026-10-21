@@ -1,11 +1,11 @@
-// P12 round 1 finding #6: run() used to write `rt.autoExplain = await autoExplainCheck(...)`
+// run() used to write `rt.autoExplain = await autoExplainCheck(...)`
 // *before* checking whether this run had been superseded — so a superseded, slower run's own
-// EXPLAIN result could land after the run that actually superseded it had already finished and
+// EXPLAIN result could land after the run that superseded it had already finished and
 // cleared/repopulated rt.autoExplain, silently overwriting it with a warning for a statement that
-// was never the one actually executed (its own "Show plan" action would show a plan for a
+// was never the one executed (its own "Show plan" action would show a plan for a
 // statement that was never run as the current result set). This drives run() end to end (same
 // style as console-result-cap.spec.ts/console-stop-auto-explain.spec.ts) with the exact
-// interleaving the finding describes: a slow, wide-scan run (A) started first, then superseded by
+// interleaving: a slow, wide-scan run (A) started first, then superseded by
 // a fast, non-explainable run (B) whose own explain check resolves — and finishes entirely —
 // before A's slow EXPLAIN finally settles.
 import '@workbench/testing/unit/window';

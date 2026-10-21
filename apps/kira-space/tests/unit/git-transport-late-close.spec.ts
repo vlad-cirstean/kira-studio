@@ -1,4 +1,4 @@
-// P108 Part 20 F3 — transport.ts's createNativeGitTransport used to delete
+// transport.ts's createNativeGitTransport used to delete
 // sharedClientsByCodeRepoId's own entry unconditionally on the channel's onClose. But onClose
 // fires asynchronously — from the socket's own close event, strictly after channel.close()
 // returns (streamChannel.ts's own fireClose/onclose wiring) — so disposeGitTransport(id) followed
@@ -57,7 +57,7 @@ describe('P108 Part 20 F3: transport.ts stale onClose vs. a newer shared client'
     // Cleanup — socket.close() stays the no-op here: the shared fake socket refires 'close'
     // unconditionally on every close() call (a real socket does not, once already closed), so
     // restoring the real one before disposing B would recurse through its own onClose handler.
-    // Orthogonal to F3 itself; keeping the no-op in place for this one teardown call sidesteps it.
+    // Keeping the no-op in place for this one teardown call sidesteps it.
     disposeGitTransport(codeRepoId);
     socket.close = realClose;
   });

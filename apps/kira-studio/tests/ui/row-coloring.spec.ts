@@ -11,10 +11,10 @@ import {
 } from './support/postgresFixture';
 import { expandRow, findRow, openRowMenu } from './support/tree';
 
-// P9: appearance.rowColoring, and the string/uuid colour drop from icons.ts's CATEGORY_COLOR
+// appearance.rowColoring, and the string/uuid colour drop from icons.ts's CATEGORY_COLOR
 // (verified by scenario 1 below — before that change `hash` read #ce9178, not --kira-fg).
 // bigRowsFixture's page is the minimal shape that distinguishes all three states: `id` is
-// typeClass 'number' (colours), `hash` is typeClass 'text' (plain, post-P9).
+// typeClass 'number' (colours), `hash` is typeClass 'text' (plain).
 
 const CONNECTION_ID = 'conn-row-coloring';
 const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Row Coloring DB', 'blue');

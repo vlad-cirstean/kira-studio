@@ -1,4 +1,4 @@
-// C13-4: fileTree.ts's buildTree sorted with a fresh `localeCompare(..., { sensitivity: 'base' })`
+// fileTree.ts's buildTree sorted with a fresh `localeCompare(..., { sensitivity: 'base' })`
 // call per comparison -- measured 20x slower than one hoisted Intl.Collator at scale (200k files,
 // the MaxListedFiles cap: 3,760ms -> 322ms). This locks in that the visible ordering is unchanged
 // (directories first, case-insensitive collation) after switching to the shared collator.

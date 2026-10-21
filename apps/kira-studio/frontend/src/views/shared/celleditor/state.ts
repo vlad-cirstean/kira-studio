@@ -4,14 +4,14 @@ import type { SelectedCell } from '../../../state/cellSelection';
 import { useConnectionsStore } from '../../../state/connections';
 import type { CellFormat } from './formats';
 
-/** P5 adds 'no-primary-key' — a table with no primary key can't identify a row to write. P24 D27
- *  adds 'value-truncated' — the buffer holds only the first 64 KB (§0 note 9), so committing it
- *  verbatim would silently overwrite the full value with a truncated one; refused outright rather
- *  than half-supported, the same "no half-implementations" rule the rest of this phase follows. */
-// M5 §6.5 adds 'masked' — the grid's own preview toggle is showing a redaction, not the stored
+/** Adds 'no-primary-key' — a table with no primary key can't identify a row to write. Adds
+ *  'value-truncated' — the buffer holds only the first 64 KB, so committing it verbatim would
+ *  silently overwrite the full value with a truncated one; refused outright rather than
+ *  half-supported. */
+// Adds 'masked' — the grid's own preview toggle is showing a redaction, not the stored
 // value, in this exact cell. Checked first (below): it is the one reason the user can fix
 // immediately, by turning the preview off, unlike every other reason here.
-// F3 (P108 Part 10) adds 'generated-column' and 'pending-delete' — readOnlyReasonFor used to say
+// Adds 'generated-column' and 'pending-delete' — readOnlyReasonFor used to say
 // nothing was wrong with either, so the dock looked editable while the grid's own onBeforeEditCell/
 // stageEdit would refuse (silently, for a pending delete) the exact same write.
 export type ReadOnlyReason =

@@ -166,7 +166,7 @@ export const useWorktreesStore = defineStore('worktrees', () => {
     }
   }
 
-  // §6.6: eviction, without inverting an import — state/workspace.ts must not import this module
+  // Eviction, without inverting an import — state/workspace.ts must not import this module
   // (it already imports fileTree.ts/search.ts, and this module imports it), so both closures are
   // watched here instead, the pattern quickOpen.ts's own equivalent watches established for
   // exactly this.

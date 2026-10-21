@@ -3,7 +3,7 @@ import { inject } from 'vue';
 import type { MenuItem } from './state/contextMenu';
 import type { TabKindRegistry, TabViewMap } from './tabs/types';
 
-// P103 Part 2 (§5.4): the seam MainView/TabStrip/WorkbenchShell/TitleBar/StatusBar share instead
+// The seam MainView/TabStrip/WorkbenchShell/TitleBar/StatusBar share instead
 // of importing an app's own `state/tabs`/`state/tabKinds`/`state/mode`(`workspace`) directly — a
 // `provide`/`inject` host object (Vue's own mechanism, no dependency) each app builds once, in its
 // own `App.vue`, from its real stores/registries.
@@ -21,7 +21,7 @@ export interface TabLike {
   active: boolean;
 }
 
-/** The one axis every generic component actually calls on the tabs store — `activeWorkspace`
+/** The one axis every generic component calls on the tabs store — `activeWorkspace`
  *  scoped, kind-registry aware. Deliberately narrower than `createTabsStore`'s full
  *  `TabsStoreActions<K, R>` (this package's own state factory): a structural subset, so a host
  *  built from either app's real Pinia store instance satisfies it by shape with no adapter. */
@@ -40,7 +40,7 @@ export interface WorkbenchTabsHost<WK extends string, R extends TabLike> {
   promoteTab(id: string): void;
 }
 
-/** A tab's icon, resolved into the one shape `TabStrip.vue` actually renders — Kira Studio's own
+/** A tab's icon, resolved into the one shape `TabStrip.vue` renders — Kira Studio's own
  *  `TabIcon` (`string`, a codicon name) always resolves to `{ codicon }`; Kira Space's
  *  (`string | { filePath }`) resolves either branch, `{ fileStyle }` mirroring
  *  `RepoTreeRow.vue`'s own seti-icon `mask-image` style object for a `repo-file` tab. */
@@ -80,10 +80,7 @@ export interface TabStripHost<WK extends string, R extends TabLike> {
   tabBadge?(tab: R): { icon: string; tooltip: string } | null;
   /** A leading mark before the tab title, the one per-tab extra neither `iconFor` (the tab's own
    *  icon) nor `tabBadge` (a trailing, kind-supplied mark) covers — Kira Studio's own incognito eye
-   *  glyph, uniform across every kind rather than supplied by one kind's own registry entry. Found
-   *  reading `TabStrip.vue` side by side with Kira Space's, the same way P103 Part 2 §5.2 found
-   *  `createTabsStore`'s hook surface needed more than the plan's own two-hook sketch — not named
-   *  in the plan's own condensed `WorkbenchHost` table, but load-bearing for pixel parity. */
+   *  glyph, uniform across every kind rather than supplied by one kind's own registry entry. */
   tabIndicator?(tab: R): { icon: string; tooltip: string } | null;
 }
 

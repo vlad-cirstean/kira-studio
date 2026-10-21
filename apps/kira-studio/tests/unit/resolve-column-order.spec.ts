@@ -1,4 +1,4 @@
-// P21 round 1 performance finding A2: resolveColumnOrder's reordered branch used
+// resolveColumnOrder's reordered branch used
 // `kept.includes(n)` to build `missing` — O(cols²) per call. It's called *per cell* by
 // displayCell/rowSnapshot (SlickGridHost.vue), not once per bulk operation, so a wide table with a
 // stored column order turned a full-page copy into hundreds of thousands of calls each doing an

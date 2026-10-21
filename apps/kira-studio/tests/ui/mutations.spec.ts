@@ -19,13 +19,13 @@ const RO_CONNECTION_SUMMARY = {
 };
 const RO_FIXTURE = compositePkConnectAndOpen(RO_CONNECTION_ID);
 
-// Ported from tests/e2e/mutations.spec.ts (P57 D16), against real captures of app.composite_pk's
+// Ported from tests/e2e/mutations.spec.ts, against real captures of app.composite_pk's
 // preview/mutate/count responses (scripts/capture-postgres-tree.ts, including the real
 // "duplicate key value violates unique constraint" error text — not invented). Every scenario
 // here is single-session (no relaunch), so all of it ports; the one thing genuinely new to this
 // tier is that `data:preview` and a failed `data:mutate` had no mock support at all before this —
 // see tests/ipc/support/types.ts's PortSnapshot.error and the new 'preview' LogicalPortResponse
-// kind, both added getting this file green.
+// kind.
 
 const CONNECTION_ID = 'conn-mutations';
 const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Mutations DB', 'green');
@@ -297,8 +297,8 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   await expect(insertRow).toHaveCount(0);
 
   // --- scenario 5: delete-row marks a row struck-through, non-committed until commit -------
-  // P22 Pass B — page-row-scoped (support/grid.ts's own gutterCell), not a raw DOM-order `.nth(1)`:
-  // SlickGrid recycles row DOM nodes as it renders (F2), so their physical DOM order does not
+  // Page-row-scoped (support/grid.ts's own gutterCell), not a raw DOM-order `.nth(1)`:
+  // SlickGrid recycles row DOM nodes as it renders, so their physical DOM order does not
   // track visual/page-row order the way the incumbent's own always-append-in-order rows did.
   await gutterCell(page, 1).click();
   await page.click('[data-testid="toolbar-delete-row"]');

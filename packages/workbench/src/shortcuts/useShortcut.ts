@@ -11,7 +11,8 @@ interface ShortcutOptions {
 }
 
 /** The one local keydown handler for a `SHORTCUTS` chord. Listens on `target` (an element, a ref,
- *  or `window`), skips IME composition, skips events from a text field when `ignoreTextFields` is set, and `preventDefault`s on a match before calling `handler`.
+ *  or `window`), skips IME composition, skips events from a text field when `ignoreTextFields` is
+ *  set, and `preventDefault`s on a match before calling `handler`.
  *  `capture` runs before the focused child sees the key, for a chord an embedded editor (Monaco's
  *  Cmd+Enter) would claim and `preventDefault` first.
  *  Global chords stay Go menu accelerators plus `registerCommand`; this is for chords that only

@@ -6,7 +6,7 @@ import type { SearchQuery } from './query.ts';
 import { compileQuery } from './query.ts';
 
 /**
- * `docs/plans/G23-search.md` D9: the shared conformance corpus, read from BOTH languages —
+ * The shared conformance corpus, read from BOTH languages —
  * `apps/kira-space/internal/gitsearch/conformance_test.go` reads the exact same JSON and runs
  * `Compile`/`MatchFields`. A row failing here and passing there (or vice versa) is exactly the
  * silent divergence SPEC's own open item (`docs/HISTORY.md (v1.3)`) forbids.
@@ -74,7 +74,7 @@ describe('search conformance corpus (git-core side)', () => {
       const compiled = compileQuery(toSearchQuery(row.query));
       if (!row.expect.supported) {
         // JS has no RE2 to reject a pattern against -- an "unsupported in Go" row must still
-        // compile fine as JS (that is the whole premise of D6's honest unsupportedPattern
+        // compile fine as JS (that is the whole premise of the honest unsupportedPattern
         // member: the pattern IS valid JavaScript). This corpus does not assert anything about
         // what compileQuery itself returns for such a row beyond "it must not be 'invalid'".
         expect(compiled.kind, `row ${row.name}: JS must be able to compile this pattern`).toBe(

@@ -1,11 +1,9 @@
-// C5 §9.1/§9.3: the sole contact point with `monaco-editor` for the repo workspace's own
-// URI/model-cache machinery. P60a §2.1/D2 moved the engine-generic bootstrap (`loadMonaco`,
-// `MonacoModule`, the theme definition) into `editor/monaco.ts`, shared by every editor surface in
-// Kira Studio — re-exported here unchanged so this file's own consumers (RepoFileView.vue,
-// RepoDiffView.vue) need no edit. P100 Part 2 moved this file to apps/kira-space alongside its own
-// consumers, re-pointed at this app's own local `../../editor/monaco` (a duplicate, not an import —
-// see that file's own doc comment for why). P103 Part 4: that per-app duplicate hoisted to
-// `@workbench/editor/monaco` (§10's closing audit) — re-exported from there now instead.
+// The sole contact point with `monaco-editor` for the repo workspace's own
+// URI/model-cache machinery. The engine-generic bootstrap (`loadMonaco`,
+// `MonacoModule`, the theme definition) moved into `editor/monaco.ts`, shared by every editor
+// surface in Kira Studio — re-exported here unchanged so this file's own consumers
+// (RepoFileView.vue, RepoDiffView.vue) need no edit.
+// Re-exported from `@workbench/editor/monaco` now instead.
 export {
   KIRA_EDITOR_THEME,
   loadMonaco,

@@ -27,16 +27,16 @@ interface ScrollTraceEvent {
   /**
    * Whether this event's own timestamp falls after the rAF tick it got bucketed into.
    *
-   * P22 iter2-pacing §3 F2 correction: this field's ordering premise, as originally written here,
+   * Correction: this field's ordering premise, as originally written here,
    * was that `scroll` always dispatches *before* "run the animation frame callbacks" in the same
    * rendering update (per the HTML spec's own step order), so `true` should be rare and only
    * `requestAnimationFrame`-timestamp jitter. That premise does not hold universally — this
    * investigation's own sandbox reproduction found `afterRaf: true` on essentially *every* event
-   * under a wheel/compositor-driven scroll in WebKit (the plan's own §1.2/§3 F2: `tick, chase,
+   * under a wheel/compositor-driven scroll in WebKit (`tick, chase,
    * scrollEvent, scrollRender` in 131 of 131 doubled frames), the opposite ordering from a
    * `scrollTop +=` write driven from inside a rAF callback. The ordering is engine- and
-   * input-path-dependent, not a fixed spec guarantee this app can rely on. P22 iter2-pacing's own
-   * fix (D1, `CHASE_QUIET_MS`) deliberately does not depend on which ordering a given frame has —
+   * input-path-dependent, not a fixed spec guarantee this app can rely on. The
+   * fix (`CHASE_QUIET_MS`) deliberately does not depend on which ordering a given frame has —
    * see kiraSlickGrid.ts's own `scheduleChase` comment. A real-Mac trace's `afterRaf` values are
    * therefore the first honest reading of this field on the real target platform; `true` there is
    * expected, not a bug signal, until proven otherwise.
@@ -71,28 +71,28 @@ interface ScrollTraceFrame {
    *  duration series the "smooth, ideally 60fps, but it can be lower with proper pacing" goal is
    *  stated in directly. 0 on the first frame of a recording (no previous tick to diff against). */
   frameMs: number;
-  /** P22 iter2-pacing D3: how many render passes (Vue notify-and-flush cycles, or KiraSlickGrid
+  /** How many render passes (Vue notify-and-flush cycles, or KiraSlickGrid
    *  render() calls) completed since the previous tick. The pacing bug's own direct signal: a
    *  self-scheduled catch-up render sharing a frame with a scroll-driven one shows up here as > 1
    *  — invisible before this field existed. */
   renderCount: number;
   /** The SUM of this frame's render passes' own durations (Vue: nextTick wall time per notify;
-   *  SlickGrid: KiraSlickGrid.render()'s own performance.now() delta per call) — not, as before
-   *  P22 iter2-pacing, the most recent pass's duration carried forward unreset into every later
-   *  frame. Resets to 0 at the top of every tick, so a frame with `renderCount === 0` reports
-   *  `renderMs === 0` rather than silently repeating whatever the previous render cost. */
+   *  SlickGrid: KiraSlickGrid.render()'s own performance.now() delta per call) — not the most
+   *  recent pass's duration carried forward unreset into every later frame. Resets to 0 at the top
+   *  of every tick, so a frame with `renderCount === 0` reports `renderMs === 0` rather than
+   *  silently repeating whatever the previous render cost. */
   renderMs: number;
   /**
-   * P22 iter2-onset D3: the largest velocity, in px/frame, that any of this frame's render passes
-   * actually fed into the runway arithmetic (`columns.ts`'s `rowRangeBounds`). 0 when nothing
+   * The largest velocity, in px/frame, that any of this frame's render passes
+   * fed into the runway arithmetic (`columns.ts`'s `rowRangeBounds`). 0 when nothing
    * rendered this frame, and 0 when the render itself read "at rest".
    *
-   * Deliberately *not* the same quantity as `pxPerFrame` above, which is what the viewport actually
+   * Deliberately *not* the same quantity as `pxPerFrame` above, which is what the viewport
    * moved: the gap between the two is the runway's own **input lag**, and it is the one input to
    * the whole runway computation that no trace in this investigation's history has ever been able
    * to see. A frame that renders with `runwayVelocity === 0` while `pxPerFrame` is a plausible
    * fling delta is a render that sized its runway as if the grid were standing still — the
-   * gesture-onset defect P22 iter2-onset exists to fix (`summary.staleVelocityFrames` tallies
+   * gesture-onset defect (`summary.staleVelocityFrames` tallies
    * exactly those frames). Reported by `KiraSlickGrid.getRenderedRange`, the only place this app
    * computes it; always 0 for the incumbent tanstack engine, whose own `rangeExtractor` has no
    * equivalent reporting seam.
@@ -124,13 +124,13 @@ interface ScrollTraceSummary {
    *  scrollEventsHistogram. A key >= 2 anywhere during a live scroll is the doubling this phase's
    *  D1 fix exists to remove — T1/T3 (tests/ui/slick-grid.spec.ts) gate exactly this field. */
   renderCountHistogram: Record<number, number>;
-  /** P22 iter2-onset D3: the runway's own velocity input, as a series — see
+  /** The runway's own velocity input, as a series — see
    *  ScrollTraceFrame.runwayVelocity. Compare its `mean`/`p95` against `pxPerFrame`'s: the runway
    *  is sized from the former while the viewport moves at the latter, so a persistent shortfall
    *  here is a persistent runway shortfall. */
   runwayVelocity: ScrollTraceStats;
   /**
-   * P22 iter2-onset D3: how many frames rendered *while the viewport was measurably moving* but
+   * How many frames rendered *while the viewport was measurably moving* but
    * sized their runway at zero velocity (`renderCount > 0 && pxPerFrame > 0 && runwayVelocity ===
    * 0`). The gesture-onset defect's own direct signal — before the fix this is ~one frame per
    * rest-to-motion transition (the first render of every fling, which read a scroll sample taken
@@ -152,16 +152,14 @@ export interface ScrollTraceResult {
 let recording = false;
 let rafId = 0;
 let gridEl: HTMLElement | null = null;
-// P22 spike D9: the mounted-row selector `measureMountedBand` queries — the default was the
-// deleted DataGrid.vue's own `[data-testid="grid-row"]` (kept so the deleted caller was
-// unaffected, and still the correct value: SlickGridHost.vue's own rows carry the same testid, see
-// its own comment); it was originally overridable to '.slick-row' so the same probe could A/B both
-// engines on one build during the migration (§7.4(b)).
+// The mounted-row selector `measureMountedBand` queries — the default
+// `[data-testid="grid-row"]` is still the correct value: SlickGridHost.vue's own rows carry the
+// same testid, see its own comment.
 let mountedRowSelector = '[data-testid="grid-row"]';
 
 let pendingEvents: { offset: number; t: number }[] = [];
 let pendingNotified = false;
-// P22 iter2-pacing D3: accumulators, drained and reset by every tick() — see that function's own
+// Accumulators, drained and reset by every tick() — see that function's own
 // comment for why this replaces the old sticky `lastRenderMs` (never reset, so a no-render frame
 // reported the *previous* frame's duration and a doubled-render frame reported only its second
 // render's cost).
@@ -173,10 +171,10 @@ let prevRafT = 0;
 let prevLiveScrollTop = 0;
 let frames: ScrollTraceFrame[] = [];
 
-/** Called from SlickGridHost.vue's own onMounted/onUnmounted (and, before it was deleted,
- *  DataGrid.vue's) — at most one grid is ever mounted at a time (MainView.vue keys its DataView by
- *  tab id), so a single module-level target is enough. `rowSelector` (P22 spike D9) is the
- *  mounted-row query `measureMountedBand` below uses — defaults to `[data-testid="grid-row"]`. */
+/** Called from SlickGridHost.vue's own onMounted/onUnmounted — at most one grid is ever mounted at
+ *  a time (MainView.vue keys its DataView by tab id), so a single module-level target is enough.
+ *  `rowSelector` is the mounted-row query `measureMountedBand` below uses — defaults to
+ *  `[data-testid="grid-row"]`. */
 export function registerGrid(el: HTMLElement, rowSelector = '[data-testid="grid-row"]'): void {
   gridEl = el;
   mountedRowSelector = rowSelector;
@@ -194,12 +192,12 @@ export function noteScrollEvent(offset: number, t: number): void {
   pendingEvents.push({ offset, t });
 }
 
-/** P22 iter2-scroll-gaps D1: for an engine whose render pass is fully synchronous (SlickGrid — no
- *  Vue patch/flush involved on this path at all), the caller already has the duration in hand;
- *  report it directly rather than approximating it through a Vue `nextTick` the way the deleted
- *  DataGrid.vue's own markScrollWork did. Called from KiraSlickGrid's own `render()` override —
- *  including a chase-scheduled catch-up render, so two calls landing in the same frame (the P22
- *  iter2-pacing bug, before D1's fix) both accumulate rather than one clobbering the other. */
+/** For an engine whose render pass is fully synchronous (SlickGrid — no Vue patch/flush involved
+ *  on this path at all), the caller already has the duration in hand; report it directly rather
+ *  than approximating it through a Vue `nextTick` the way the deleted DataGrid.vue's own
+ *  markScrollWork did. Called from KiraSlickGrid's own `render()` override — including a
+ *  chase-scheduled catch-up render, so two calls landing in the same frame both accumulate rather
+ *  than one clobbering the other. */
 export function noteRenderMs(ms: number): void {
   if (!recording) return;
   pendingNotified = true;
@@ -207,8 +205,8 @@ export function noteRenderMs(ms: number): void {
   pendingRenderCount++;
 }
 
-/** P22 iter2-onset D3 — called from `KiraSlickGrid.getRenderedRange` with the velocity that call
- *  actually handed `rowRangeBounds`. Keeps the *largest* value seen this frame rather than the last:
+/** Called from `KiraSlickGrid.getRenderedRange` with the velocity that call handed
+ *  `rowRangeBounds`. Keeps the *largest* value seen this frame rather than the last:
  *  a quiescent catch-up render legitimately reads 0, and a frame that contains both it and a
  *  scroll-driven render must not report the runway as having been sized at rest. See
  *  ScrollTraceFrame.runwayVelocity for what the number is and is not. */

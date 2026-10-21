@@ -1,14 +1,14 @@
-// P112: the module owning the collections and variables server-state caches (jar cookies, history
+// The module owning the collections and variables server-state caches (jar cookies, history
 // and gRPC schema live in views/httprequest/cookies.ts, api/state/history.ts and
 // views/grpcrequest/schemaQuery.ts) — keys, query options, the
-// imperative loaders non-component code uses, the one invalidation helper (refreshApiQuery,
-// F2's successor) and the boot-time listener that turns a Go `kira:api:dataChanged` broadcast
+// imperative loaders non-component code uses, the one invalidation helper (refreshApiQuery)
+// and the boot-time listener that turns a Go `kira:api:dataChanged` broadcast
 // into cache invalidation (initApiDataSync). Precedents: state/schemas.ts (options object,
 // never stale because Go pushes, broadcast → invalidateQueries) and state/maskRules.ts.
 //
-// Query keys follow P99 §5.5's flat `[domain, ...ids]` convention (workbench/state/queryClient.ts).
+// Query keys follow the flat `[domain, ...ids]` convention (workbench/state/queryClient.ts).
 //
-// ---- reactivity rule (§3.5) — two reader kinds ----
+// ---- reactivity rule — two reader kinds ----
 // notifyManager batches observer notifications on a zero-delay timer, and vue-query never swaps the
 // scheduler — a useQuery result's `.data` lags the cache by one macrotask after a fetch resolves.
 //   - Reactive readers (computeds, templates, watches) read a useQuery result's `data`.
@@ -64,9 +64,9 @@ export function apiCollectionsTreeQueryOptions() {
 }
 
 // `null` means "confirmed orphan" (GetRequest answered E_NOT_FOUND — the row was deleted, in this
-// window or another); `undefined` (no data) means "not loaded yet". Keeps P108 F4's
+// window or another); `undefined` (no data) means "not loaded yet". Keeps the
 // orphan/not-loaded split exactly, without two parallel maps. Any other failure rethrows, so a
-// transient error never caches as "deleted" under the never-stale default (P175 D5).
+// transient error never caches as "deleted" under the never-stale default.
 function nullOnNotFound(err: unknown): null {
   if ((err as { code?: string }).code === 'E_NOT_FOUND') return null;
   throw err;
@@ -142,12 +142,12 @@ export function loadSavedGrpcRequest(itemId: string): Promise<GrpcSavedRequest |
   return queryClient.query(apiSavedGrpcRequestQueryOptions(itemId));
 }
 
-// ---- refreshApiQuery — the one invalidation helper (F2's successor) ----
+// ---- refreshApiQuery — the one invalidation helper ----
 //
 // Every invalidation goes through this: the event handler below and every mutation's onSuccess
 // where a re-list is needed.
 //
-// The second invalidate is the F2 race, restated for TanStack: a fetch that was already running
+// The second invalidate is the race, restated for TanStack: a fetch that was already running
 // when a change landed is never trusted as the post-change answer (query.fetch joins an in-flight
 // fetch with no data yet rather than cancelling it, and invalidateQueries only refetches an
 // `active` query by default — an observer-less in-flight `queryClient.query` caller, e.g. send(),

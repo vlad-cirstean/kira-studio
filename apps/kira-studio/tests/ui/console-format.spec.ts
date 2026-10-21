@@ -54,7 +54,7 @@ async function connectAndExpandPostgres(page: Page, name: string, color: string)
 
 /** `editorText()`, not `.innerText()` — Monaco virtualises `.view-lines` (only the currently
  *  rendered subset of a large document is ever a real DOM child), so reading the model's own
- *  value through `MonacoHost.vue`'s debug-hook attribute (P60a §9.1/OQ-3) is the only way to get
+ *  value through `MonacoHost.vue`'s debug-hook attribute is the only way to get
  *  the *whole* document back, not just whatever happens to be on screen. */
 async function consoleText(view: Locator): Promise<string> {
   return editorText(view);
@@ -85,7 +85,7 @@ test('Query console — Format reformats a Postgres statement in place', async (
 
   const before = Date.now();
   await page.click('[data-testid="console-format"]');
-  // §6.2: the emitted chunk's own cost (F4's ~180ms cold import + first format) lands here, on
+  // The emitted chunk's own cost (the ~180ms cold import + first format) lands here, on
   // the first press of the whole test run — a coarse in-process measurement, logged rather than
   // asserted on (docs/PERF.md's own rule for this timing tier). Matches the reformatted shape
   // specifically (a lone "SELECT" first line) — the *unformatted* source also starts with the
@@ -228,9 +228,9 @@ test('Query console — pressing Format twice shows "Already formatted" the seco
   );
 });
 
-// P22b D12: splitSqlStatements' pushIfNonEmpty slices up to, not through, a statement's own ';'
+// splitSqlStatements' pushIfNonEmpty slices up to, not through, a statement's own ';'
 // — a plain join(';\n\n') used to delete the document's LAST semicolon on every Format press.
-// F18's own reported symptom: a user writes `select * from t;`, presses Format, and watches
+// The reported symptom: a user writes `select * from t;`, presses Format, and watches
 // their semicolon disappear.
 test("Query console — Format keeps the document's last semicolon (P22b D12)", async ({
   relaunch,
@@ -314,7 +314,7 @@ test('Query console — Redis has no Format button (D6)', async ({ relaunch }) =
   const view = page.locator('[data-testid="console-view"]');
   await expect(view).toBeVisible();
 
-  // D6: a Redis statement is a flat token list with nothing to reformat — the toolbar mounts
+  // A Redis statement is a flat token list with nothing to reformat — the toolbar mounts
   // (Run is there) and the button is deliberately absent, not the whole view missing. This is
   // the assertion most likely to be quietly "fixed" later by someone who assumes the missing
   // button is an oversight rather than a deliberate decision.
@@ -379,7 +379,7 @@ test('Query console — Format leaves the caret in the statement it was in, so R
   expect(statements?.[0]).not.toContain('as c');
 });
 
-// v1.4 follow-up, ported to Monaco by P60a §4.7: CodeMirrorHost's old external-sync dispatch (used
+// CodeMirrorHost's old external-sync dispatch (used
 // by Format's own setText(), and by loading a saved query) had no undo-boundary annotation, so it
 // could merge into whatever undo group was still open — the ordinary case of typing a query then
 // immediately clicking Format, right next to it. One Cmd+Z then wiped the WHOLE query back to
@@ -421,7 +421,7 @@ test('Query console — Format immediately after typing, then undo, restores the
   await expect.poll(() => consoleText(view)).toBe(original);
 });
 
-// P89 §5: `localDoc` is a shallowRef, and Vue skips a dep trigger when an assigned value equals
+// `localDoc` is a shallowRef, and Vue skips a dep trigger when an assigned value equals
 // the ref's current one — so an external write (here, Format's own result) equal to the last
 // value written to `localDoc` never reached Monaco, leaving the editor showing stale text while
 // the store believed it had already advanced. Format-undo-format is the deterministic repro: the

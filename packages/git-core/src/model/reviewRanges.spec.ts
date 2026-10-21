@@ -1,9 +1,10 @@
 /**
- * G15 D10 — the one new test file this phase adds. `normalizeRanges` is interval arithmetic with genuinely interacting rules (overlap vs. adjacency vs. containment
- * vs. a subtraction that splits one range into two), `selectionToRange` is boundary arithmetic
- * with an off-by-one rule that is wrong in both directions if misread, and `hunkChangeBlock`'s
- * `newLine === undefined` handling is the difference between a correct block and a silently
- * shifted one. All pure, no editor import, runs under plain `bun test`.
+ * `normalizeRanges` is interval arithmetic with genuinely interacting rules (overlap vs.
+ * adjacency vs. containment vs. a subtraction that splits one range into two),
+ * `selectionToRange` is boundary arithmetic with an off-by-one rule that is wrong in both
+ * directions if misread, and `hunkChangeBlock`'s `newLine === undefined` handling is the
+ * difference between a correct block and a silently shifted one. All pure, no editor import,
+ * runs under plain `bun test`.
  */
 import { describe, expect, test } from 'bun:test';
 import type { DiffHunk, DiffLine } from './diff.ts';
@@ -124,7 +125,7 @@ describe('coverage', () => {
     expect(coverage(target, [])).toBe('none');
   });
 
-  // G31 round-2 performance review, finding #4: coverage() no longer normalizes `ranges` itself
+  // coverage() no longer normalizes `ranges` itself
   // (it used to, on every call — pure repetition, since its one real caller always passes
   // already-normalized wire data). It still gives the right answer for genuinely normalized
   // input, sorted or not (order alone never affects the sum-of-overlaps below), and its own doc

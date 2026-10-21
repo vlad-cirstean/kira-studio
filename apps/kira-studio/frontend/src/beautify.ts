@@ -17,7 +17,7 @@ import {
 export type { BeautifyMode, BeautifyResult };
 
 // ---------------------------------------------------------------------------------------------
-// JSON — a lossless scanner (D10). Never JSON.parse/JSON.stringify: a number is reproduced from
+// JSON — a lossless scanner. Never JSON.parse/JSON.stringify: a number is reproduced from
 // its exact raw slice, never round-tripped through a JS `number`, so a numeric(20,6)-shaped
 // literal survives byte-identical. Structural whitespace is the only thing that changes.
 // ---------------------------------------------------------------------------------------------
@@ -134,7 +134,7 @@ export function beautifyJson(text: string, mode: BeautifyMode): BeautifyResult {
 }
 
 // ---------------------------------------------------------------------------------------------
-// XML / HTML — a lossless scanner (§6b). Attributes are copied verbatim inside their tag, never
+// XML / HTML — a lossless scanner. Attributes are copied verbatim inside their tag, never
 // re-quoted/reordered/entity-normalised: only tag boundaries are found, never attribute contents.
 // ---------------------------------------------------------------------------------------------
 
@@ -166,9 +166,9 @@ type XmlToken =
   | { kind: 'close'; raw: string; name: string; offset: number };
 
 /** One scan's result: the token it read, and the index just past it — every `scanXml*` below
- *  shares this shape (P94 pass 3 §4.3, shape 1: `tokenizeXml` dispatches, one scanner per
- *  construct owns its own loop and its own error). Offsets and error strings are asserted
- *  byte-identical against the pre-split version (§4.1). */
+ *  shares this shape (`tokenizeXml` dispatches, one scanner per construct owns its own loop and
+ *  its own error). Offsets and error strings are asserted byte-identical against the pre-split
+ *  version. */
 interface XmlScanStep {
   token: XmlToken;
   next: number;

@@ -11,17 +11,17 @@ import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { createCancellableTimer } from './cancellableTimer.ts';
 
-/** G30 round-1 performance review, finding #1: `ensureSnapshot`'s own worker-pool cap — see that
+/** `ensureSnapshot`'s own worker-pool cap — see that
  *  method's doc comment. Six, not one and not unbounded: small enough that a repo with hundreds of
  *  branches never opens more than a handful of requests at once, large enough that warming a
  *  normal-sized branch list still finishes in one or two batches rather than trickling one at a
  *  time. */
 const CHANGE_REQUEST_ENSURE_SNAPSHOT_CONCURRENCY = 6;
 
-/** §4.2's own budget on `rebuildAncestry`'s breadth-first walk — bounds the cost to the loaded
+/** The budget on `rebuildAncestry`'s breadth-first walk — bounds the cost to the loaded
  *  window rather than the repository: a long-lived `main` whose own tip has a PR would otherwise
  *  walk the entire loaded history on every rebuild. 50,000 rows is well past any window a session
- *  actually loads (`graph.loadMore`'s own default page size is 5,000), so this only ever fires
+ *  loads (`graph.loadMore`'s own default page size is 5,000), so this only ever fires
  *  against a pathological case, never an ordinary one. */
 const CHANGE_REQUEST_ANCESTRY_WALK_BUDGET = 50_000;
 
@@ -83,11 +83,11 @@ export class ChangeRequestState {
    *  "one line of `Status.Reason`" in the commit-detail pane reads this. Never used to decide
    *  what the grid renders (the grid only ever consults `bySha`/`byBranch`). */
   readonly status: ShallowRef<HostStatus | undefined> = shallowRef(undefined);
-  /** The raw result of the most recently SETTLED `commit.resolveChangeRequests` for whichever sha is
-   *  currently selected — `CommitMeta.vue`'s own change request row (D12) needs the full
-   *  discriminated union (`disabled` ⇒ row absent; `unavailable` ⇒ `status.reason`; `ok` with an empty
-   *  list ⇒ "No change request"; `ok` with entries ⇒ one row each), which `bySha`'s collapsed shape
-   *  cannot answer on its own. `undefined` while nothing is selected or a request is still
+  /** The raw result of the most recently SETTLED `commit.resolveChangeRequests` for whichever sha
+   *  is currently selected — `CommitMeta.vue`'s own change request row needs the full
+   *  discriminated union (`disabled` ⇒ row absent; `unavailable` ⇒ `status.reason`; `ok` with an
+   *  empty list ⇒ "No change request"; `ok` with entries ⇒ one row each), which `bySha`'s collapsed
+   *  shape cannot answer on its own. `undefined` while nothing is selected or a request is still
    *  in-flight/debounced. */
   readonly selected: ShallowRef<ChangeRequestLookup | undefined> = shallowRef(undefined);
   /** The host serving this repo (its wording for change requests); `null` with no remote on a
@@ -103,17 +103,17 @@ export class ChangeRequestState {
   }, TIMING.preview);
   #selectController: AbortController | undefined;
   readonly #branchRequests = new Set<string>();
-  /** G31 round-2 performance review, finding #3: branches whose `branch.resolveChangeRequest` answer came
-   *  back `"ok"` with no PR at all. `byBranch` only ever holds an actual `ChangeRequestRecord`, so a
-   *  no-PR branch never appeared in it — `ensureSnapshot`'s own dedup filter (`!byBranch.has(name)
-   *  && !#branchRequests.has(name)`) then failed both checks forever, and every `BranchPicker.vue`
-   *  open / search-scope change / stack reload re-issued `branch.resolveChangeRequest` for every PR-less
-   *  branch, indefinitely. Tracked separately (rather than widening `byBranch`'s value type) so
-   *  every existing `byBranch.value.get(name)` call site keeps meaning "the branch's PR, if any"
-   *  with no signature change. */
+  /** Branches whose `branch.resolveChangeRequest` answer came back `"ok"` with no PR at all.
+   *  `byBranch` only ever holds an actual `ChangeRequestRecord`, so a no-PR branch never appeared
+   *  in it — `ensureSnapshot`'s own dedup filter (`!byBranch.has(name) &&
+   *  !#branchRequests.has(name)`) then failed both checks forever, and every `BranchPicker.vue`
+   *  open / search-scope change / stack reload re-issued `branch.resolveChangeRequest` for every
+   *  PR-less branch, indefinitely. Tracked separately (rather than widening `byBranch`'s value
+   *  type) so every existing `byBranch.value.get(name)` call site keeps meaning "the branch's PR,
+   *  if any" with no signature change. */
   readonly #noBranchChangeRequest = new Set<string>();
-  /** Set the first time EITHER lookup answers `"disabled"` for the current repo (gitHost.provider off
-   *  off, or no host remote) — every later selection/branch resolve for this same repo then
+  /** Set the first time EITHER lookup answers `"disabled"` for the current repo (gitHost.provider
+   *  off off, or no host remote) — every later selection/branch resolve for this same repo then
    *  answers `"disabled"` synchronously, with no request at all, until the repo changes or
    *  refsChanged clears it (a remote could have been added since). Not required for correctness
    *  (a disabled repo already costs the server nothing beyond a settings/remote-cache read), but
@@ -129,7 +129,7 @@ export class ChangeRequestState {
   #headIndexGeneration = -1;
   /** Last-known facts of repos switched away from, oldest first. */
   readonly #repoFacts = new Map<string, RepoFacts>();
-  /** F9: bumped by every `#clear()` — `setRepoId` (a repo switch) AND the `refsChanged` handler
+  /** Bumped by every `#clear()` — `setRepoId` (a repo switch) AND the `refsChanged` handler
    *  (same repo, server caches dropped) alike. `ensureSnapshot`'s worker pool and `resolveBranch`
    *  each capture this alongside `repoId` at their own start: a repo switch alone (`repoId`
    *  changing) already stopped a *different* repo's warm-up, but nothing stopped THIS repo's own
@@ -262,9 +262,9 @@ export class ChangeRequestState {
   }
 
   /** Selection changed (`SelectionState`'s own sha, mirrored here by the caller, exactly as
-   *  `DetailState.select` already is) — starts D7's own selection debounce (`TIMING.preview`), aborting any in-flight
-   *  request first. `null` clears the current selection's own result immediately, with no
-   *  request. */
+   *  `DetailState.select` already is) — starts the selection debounce (`TIMING.preview`),
+   *  aborting any in-flight request first. `null` clears the current selection's own result
+   *  immediately, with no request. */
   select(sha: string | null): void {
     this.#selectController?.abort();
     this.#selectTimer.stop();
@@ -328,19 +328,19 @@ export class ChangeRequestState {
   }
 
   /** Warms `byBranch` for every branch in `branchNames` not already cached — see this class's own
-   *  doc comment for why this takes an explicit list rather than D10's literal zero-argument
+   *  doc comment for why this takes an explicit list rather than the literal zero-argument
    *  signature. Safe to call repeatedly (e.g. on every `BranchPicker.vue` open): a branch already
    *  in `byBranch`, or already in flight, is skipped.
    *
-   *  G30 round-1 performance review, finding #1: this used to `Promise.all` every branch at once —
-   *  a repo with hundreds of branches fired hundreds of concurrent `branch.resolveChangeRequest` requests,
-   *  with nothing anywhere in the stack capping it. The server side of this same finding (one bulk
-   *  snapshot fetch instead of one host call per branch) already answers "how much this costs the
-   *  host"; a small worker pool here bounds "how many requests are ever in flight at once",
-   *  independent of how many branches the repo has. */
+   *  This used to `Promise.all` every branch at once — a repo with hundreds of branches fired
+   *  hundreds of concurrent `branch.resolveChangeRequest` requests, with nothing anywhere
+   *  in the stack capping it. The server side (one bulk snapshot fetch instead of one host call
+   *  per branch) already answers "how much this costs the host"; a small worker pool here bounds
+   *  "how many requests are ever in flight at once", independent of how many
+   *  branches the repo has. */
   async ensureSnapshot(branchNames: readonly string[]): Promise<void> {
     const repoId = this.#repoId;
-    // F9: captured once, before the pool ever starts — a repo switch OR a same-repo `refsChanged`
+    // Captured once, before the pool ever starts — a repo switch OR a same-repo `refsChanged`
     // clear landing mid-warm-up must stop every worker from issuing its NEXT request, not just
     // stop this repo's answers from being applied (wasted host calls against a repo
     // nobody is looking at any more otherwise keep firing for as long as `toFetch` has entries).
@@ -422,7 +422,7 @@ export class ChangeRequestState {
     } catch {
       // Fail-open (D9/§0.4) — same posture as #requestCommit above.
     } finally {
-      // F9: a clear that landed while this request was in flight already let a NEWER call for
+      // A clear that landed while this request was in flight already let a NEWER call for
       // the same branch name re-`add()` it under the current generation — this stale call's own
       // delete must not remove that entry (the classic "two owners, one shared boolean" bug: it
       // would let a second, duplicate concurrent fetch start for a branch already back in flight).

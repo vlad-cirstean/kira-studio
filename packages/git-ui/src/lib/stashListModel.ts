@@ -1,5 +1,5 @@
 /**
- * G28 D5/D13: `StashList.vue`'s pure half, mirroring `refListModel.ts`'s own "no component
+ * `StashList.vue`'s pure half, mirroring `refListModel.ts`'s own "no component
  * touches this logic un-tested" convention. Everything here is a plain function over a
  * `StashEntry` (and, for `originLabel`/`applyMenuLabel`, the currently checked-out branch) — no
  * Vue, no bridge, no reactivity, so `stashListModel.spec.ts` exercises it directly with plain
@@ -13,12 +13,12 @@ import { t } from '@theme/i18n';
  *  field, and `isAutoStash`/`stashLabel` below are the only two readers. */
 const AUTO_STASH_PREFIX = 'auto-stash: ';
 
-/** git's own reflog-subject framing (probe P3/D1): `"WIP on <b>: "` (the default push message) or
- *  `"On <b>: "` (an explicit `-m`, including G28's own auto-stash message and every
+/** git's own reflog-subject framing: `"WIP on <b>: "` (the default push message) or
+ *  `"On <b>: "` (an explicit `-m`, including the auto-stash message and every
  *  `globalStashSave` label). `stashLabel` strips whichever prefix matched so the row shows the
  *  user's own text, not git's own framing — today `StashList.vue` renders the raw `message` field
- *  verbatim, which is why every manual stash reads `"On main: my label"` instead of just
- *  `"my label"`. A message with NEITHER prefix (a `stash store`-restored entry, porcelain probe 9)
+ *  verbatim, which is why every manual stash reads `"On main: my label"` instead of
+ *  `"my label"`. A message with NEITHER prefix (a `stash store`-restored entry)
  *  passes through unchanged — there is no framing to strip. */
 export function stashLabel(entry: StashEntry): string {
   for (const prefix of ['WIP on ', 'On ']) {
@@ -35,7 +35,7 @@ export function stashLabel(entry: StashEntry): string {
   return entry.message;
 }
 
-/** D1's own deliberate marker: an auto-stashed entry's message always starts with
+/** The deliberate marker: an auto-stashed entry's message always starts with
  *  `AutoStashMessagePrefix` AFTER git's own "On &lt;branch&gt;: " framing is stripped — checked
  *  against the STRIPPED label (`stashLabel`), not the raw message, since the marker is meant to be
  *  the user-visible text's own prefix, not a coincidental substring of the branch name. A user
@@ -48,7 +48,7 @@ export function isAutoStash(entry: StashEntry): boolean {
 /** `undefined` when the entry's own origin branch IS the current branch (or the entry has no
  *  origin branch at all — a detached-HEAD stash, `entry.branch === null`) — the row then renders
  *  no chip, exactly matching today's un-chipped appearance for the common case. Otherwise the
- *  origin branch name, which is what turns the row into a visibly CROSS-branch one (D5). A
+ *  origin branch name, which is what turns the row into a visibly CROSS-branch one. A
  *  detached `currentBranch` (the checkout state carries no branch name at all) can never equal any
  *  real branch name, so every entry with a real origin renders its chip in that state — correct:
  *  there is no "same branch" to suppress it for. */
@@ -77,7 +77,7 @@ export function applyMenuLabel(
 /** One global-bucket row's own display fields, computed once per render rather than re-derived by
  *  `GlobalStashList.vue` at three separate template expressions — `label` reuses `stashLabel`,
  *  `auto` reuses `isAutoStash`, `origin` is `entry.branch` verbatim (a global entry ALWAYS shows
- *  its origin chip, unlike a stack row — D13: the whole point of the bucket's own section is that
+ *  its origin chip, unlike a stack row — the whole point of the bucket's own section is that
  *  every entry in it came from *some* branch, possibly the current one, and the chip is how the
  *  user tells them apart at a glance without opening each one). */
 export interface GlobalStashRowModel {

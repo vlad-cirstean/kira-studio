@@ -15,10 +15,10 @@ import { visibleRowsOf } from '../shared/page/visibleRows';
 import { pageVersion } from './resultPages';
 import { useConsoleViewStore } from './state';
 
-// P40 D9: the search scope stays the *tab id*, same as grid/documents/keyvalue's own
+// The search scope stays the *tab id*, same as grid/documents/keyvalue's own
 // PageSearchApi — this file alone resolves "which of the tab's N result sets is active" via
 // state.ts's activePage, so views/shared/page/'s two cleanup handlers never have to learn a
-// per-result-set key scheme (F9). `col` is a page column index for a tabular result; a document
+// per-result-set key scheme. `col` is a page column index for a tabular result; a document
 // row has no per-column projection so it is always 0, and a key/value row is 0 for the field, 1
 // for the value — mirroring keyvalue/search.ts's own fixed-column convention.
 export interface Match {
@@ -48,10 +48,10 @@ function runSearch(
   // since only the active result set is ever rendered (and therefore reportable) at a time.
   const priority = { priority: visibleRowsOf(tabId) ?? undefined };
 
-  // P108 Part 11 F12: Part 10 F16 capped grid/search.ts and keyvalue/search.ts only, deliberately
-  // leaving these three branches uncapped — a user regex like `(a+)+$` against one long console
-  // cell still blocked the main thread. Same partial mitigation, same condition: only a regex
-  // search has user-controlled quantifiers to backtrack on.
+  // Only grid/search.ts and keyvalue/search.ts were capped, deliberately leaving these three
+  // branches uncapped — a user regex like `(a+)+$` against one long console cell still blocked
+  // the main thread. Same partial mitigation, same condition: only a regex search has
+  // user-controlled quantifiers to backtrack on.
   const regexTextCap = q.regex ? REGEX_SCAN_TEXT_CAP : undefined;
 
   if (page.kind === 'tabular') {

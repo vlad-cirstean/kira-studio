@@ -1,4 +1,4 @@
-// P21 round 3 functional finding 10: parseIso8601Shaped/fromEditableText built the instant via
+// parseIso8601Shaped/fromEditableText built the instant via
 // Date.UTC(Number(y), ...) / new Date(y, ...), which apply ECMAScript's legacy rule mapping a
 // `year` argument in 0..99 to 1900 + year — silently remapping a common sentinel like
 // `0001-01-01` (Postgres's own "unknown date" convention) to 1901-01-01. encodeTimestamp's own
@@ -53,7 +53,7 @@ describe('two-digit and sub-1000 years are not remapped or truncated (finding 10
 
   test('opening the cell editor on a sub-100-year sentinel and committing with no edit must not change the value', () => {
     // Simulates the Translate pane: parse the stored value, then re-encode it unchanged — the
-    // failure scenario the finding names ("if the user touches anything in that pane and commits,
+    // failure scenario ("if the user touches anything in that pane and commits,
     // the cell is written back as 1901-01-01 — a silent data change caused purely by opening the
     // editor").
     for (const original of ['0001-01-01', '0050-06-15T10:20:30Z', '0099-12-31']) {

@@ -1,9 +1,9 @@
-// P74 §7.2: hostHandlers.ts's 'editor.goToFile' — composes file.goToTarget's three outcomes onto
+// hostHandlers.ts's 'editor.goToFile' — composes file.goToTarget's three outcomes onto
 // openRepoFileTab plus @kira/git-core's mapLineAcrossDiff. Three branches, a line remap only one
 // of them applies, and an id-space translation (gitRepoId -> codeRepoId) that throws on a miss
 // rather than guessing — worth a direct test at the handler itself rather than through the whole
 // transport/UI stack this repo has no mock for yet (gitStreamMock.ts answers only app.init/
-// repo.list/refs.list, and has no streaming support at all — see docs/HISTORY.md (v1.8)'s P74 result).
+// repo.list/refs.list, and has no streaming support at all — see docs/HISTORY.md).
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
@@ -12,7 +12,7 @@ import { setActivePinia } from 'pinia';
 import type { Transport } from '../../../../packages/git-ipc/src/transport';
 
 const { control } = await import('../../frontend/src/bridge/control');
-// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — restoreAfterEach restores control back to its real (never-settling in this
 // harness) tabsSave after every test, so a one-time override here only covered this file's first
 // test. The override is set *before* restoreAfterEach snapshots control, not in beforeEach: the

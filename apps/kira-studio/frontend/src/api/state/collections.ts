@@ -44,9 +44,9 @@ import {
 } from './apiQueries';
 import { useSaveRequestDialogStore } from './saveRequestDialog';
 
-// P4 D13: Api's own tree store. Studio's tree is lazy because its data is remote — expanding a
+// Api's own tree store. Studio's tree is lazy because its data is remote — expanding a
 // node connects a connection and issues an IPC call, which is what its children cache, loading
-// set, 150 ms search debounce and "searching cached nodes only" note all exist for (F15). A
+// set, 150 ms search debounce and "searching cached nodes only" note all exist for. A
 // collections tree has none of that: the whole tree is rows in a local SQLite table, listable in
 // one call, so `visibleRows` below is a **pure computed** over one array. That is a genuine
 // simplification rather than a shape to copy.
@@ -54,8 +54,7 @@ import { useSaveRequestDialogStore } from './saveRequestDialog';
 /** The row TreeHost renders. Four structural members (key/depth/hasChildren/expanded — TreeHost's
  *  own StickyRowLike contract) plus seven of its own, against TreeRowVm's fourteen: connectionId,
  *  color, status, statusDetail, groupKind, badges, loading and error have no meaning here. The
- *  mechanics generalize; the rows do not, which is exactly why P1 factored TreeHost out and left
- *  TreeRow where it was. */
+ *  mechanics generalize; the rows do not. */
 export interface CollectionRowVm {
   key: string;
   depth: number;
@@ -89,10 +88,9 @@ function rowMatches(name: string, url: string, query: string): boolean {
   return matchesQuery(name, query) || matchesQuery(url, query);
 }
 
-// P112: state.requests/grpcRequests/orphanRequests/orphanGrpcRequests are gone — a saved request's
-// dirty-comparison cache and its D14 orphan status both live in the apiSavedRequest(Grpc)Key query
-// now (null data === confirmed orphan, undefined === not loaded yet, apiQueries.ts's own
-// convention), not a second local Record.
+// A saved request's dirty-comparison cache and its orphan status both live in the
+// apiSavedRequest(Grpc)Key query now (null data === confirmed orphan, undefined === not loaded yet,
+// apiQueries.ts's own convention), not a second local Record.
 interface CollectionsState {
   selected: string | null;
   search: string;
@@ -103,17 +101,17 @@ interface CollectionsState {
   /** D16: "N secret values were not written to the file" — set after an export that stripped at
    *  least one, shown alongside the import report strip. */
   exportWarning: string | null;
-  /** P108 F10: a tree mutation's (create/rename/delete/duplicate/save/import/export) own failure
+  /** A tree mutation's (create/rename/delete/duplicate/save/import/export) own failure
    *  message — every one of them used to let this throw uncaught from a fire-and-forget `void`
    *  call in CollectionsPanel.vue/CollectionsTree.vue, so a failed write left the row exactly as it
    *  was with nothing telling the user why. Cleared on the next attempt that succeeds. */
   error: string | null;
 }
 
-// ---- saving a request into a collection (D15) ----
+// ---- saving a request into a collection ----
 //
 // The dialog's own open/tabId/suggestedName/payload UI state lives in useSaveRequestDialogStore
-// (P108 F16 — one-store-one-concern). submitSaveDialog stays here: it reaches deep into the
+// (one-store-one-concern). submitSaveDialog stays here: it reaches deep into the
 // tree's own load/reveal/cache machinery below, so a full split would only trade one store for
 // two stores calling each other for everything that matters.
 
@@ -144,7 +142,7 @@ export const useCollectionsStore = defineStore('collections', () => {
     state.error = null;
   }
 
-  // P112: the tree is now TanStack Query's cache, not a store field — this observer is
+  // The tree is now TanStack Query's cache, not a store field — this observer is
   // app-lifetime (created once, with the setup store's own effect scope owning it), so
   // invalidateQueries always has an active observer to refetch. queryClient is passed explicitly
   // (not injected): main.ts creates stores before app.use(VueQueryPlugin), and unit tests mount no
@@ -164,8 +162,8 @@ export const useCollectionsStore = defineStore('collections', () => {
     treeQuery.error.value ? errorText(treeQuery.error.value) : null,
   );
 
-  /** Every tree mutation below refreshes this one key then reconciles — reconcileTree (F9's
-   *  successor) drops any cached saved-request query whose item no longer exists and evicts any
+  /** Every tree mutation below refreshes this one key then reconciles — reconcileTree drops any
+   *  cached saved-request query whose item no longer exists and evicts any
    *  cached collection-scope variables query whose collection no longer exists, local mutation or
    *  remote push alike. */
   async function afterTreeListChange(): Promise<void> {
@@ -173,16 +171,15 @@ export const useCollectionsStore = defineStore('collections', () => {
     reconcileTree();
   }
 
-  // P112: the store's own compatibility surface for saved-request reads
+  // The store's own compatibility surface for saved-request reads
   // (fetchSavedRequest/savedRequestFor/isOrphanRequest/ensureSavedRequestLoaded and their gRPC
   // siblings) is gone — CollectionsTree.vue's own onOpen and both request views call
   // loadSavedRequest/useSavedRequest (apiQueries.ts) directly now, and nothing else in the app
-  // still called the wrappers (commit 8's own grep confirmed it), so there was no reader left to
-  // keep them thin for.
+  // still called the wrappers, so there was no reader left to keep them thin for.
 
   // ---- the row model ----
 
-  /** Finding 14: childrenOf used to filter+sort the whole flat `items` array on every single call,
+  /** childrenOf used to filter+sort the whole flat `items` array on every single call,
    *  and both visibleRows and subtreeMatches call it once per row per level — an O(N²)-ish walk on
    *  every keystroke for a collection of any real size. Built once per `items` change (a computed,
    *  not per childrenOf call), keyed by collectionId+parentId, each bucket pre-sorted once. */
@@ -202,11 +199,11 @@ export const useCollectionsStore = defineStore('collections', () => {
     return childrenIndex.value.get(`${collectionId}\x00${parentId ?? ''}`) ?? [];
   }
 
-  // Finding 14: the same 150ms debounce this app already uses for a fast typist
+  // The same 150ms debounce this app already uses for a fast typist
   // (TIMING.search) — state.search itself stays immediate (so the
   // input never stutters), and activeSearchQuery/visibleRows read the debounced value instead, so a
   // fast typist causes one recompute per pause rather than one per character.
-  // P99 §9.3: refDebounced replaces the watch+setTimeout pair this used to hand-roll.
+  // refDebounced replaces the watch+setTimeout pair this used to hand-roll.
   const debouncedSearch = refDebounced(toRef(state, 'search'), TIMING.search);
 
   /** Lower-cased once per render rather than per row. '' means "no search active". */
@@ -298,7 +295,7 @@ export const useCollectionsStore = defineStore('collections', () => {
 
   /** Every ancestor of an item, so a freshly created row is visible without the user expanding to
    *  it. Walks parent ids rather than the row model, which may not contain the row yet. Called
-   *  right after a mutation's own mutateAsync resolves (§3.5: imperative code after an await) — the
+   *  right after a mutation's own mutateAsync resolves — the
    *  cache is already fresh at that point, but the reactive `items` computed may still lag one
    *  macrotask behind it (notifyManager's own batching), so this reads the cache directly rather
    *  than `items.value`. */
@@ -318,8 +315,8 @@ export const useCollectionsStore = defineStore('collections', () => {
   // ---- mutations ----
   //
   // Every one of them re-lists rather than patching the local arrays: the tree is one call and a
-  // pure computed over it (F15), so a re-list is both simpler and impossible to get out of step
-  // with what Go actually stored. D13's inline rename doubles as the naming step for all three
+  // pure computed over it, so a re-list is both simpler and impossible to get out of step
+  // with what Go stored. The inline rename doubles as the naming step for all three
   // creation paths — one naming interaction instead of a prompt dialog this app does not have, and
   // VS Code's own explorer behaviour, which is the tree this panel is modelled on.
 
@@ -474,14 +471,14 @@ export const useCollectionsStore = defineStore('collections', () => {
     }
   }
 
-  /** P21 round 2 functional finding 4: Go's own delete genuinely cascades (repos/collections.go's
+  /** Go's own delete genuinely cascades (repos/collections.go's
    *  own comment: "the cascade is genuine") — deleting a folder or a collection removes every
    *  descendant `api_items` row, not just the row itself. This walks the *pre-delete* tree
    *  (still valid — nothing has re-listed yet) to find every item id that the delete about to
    *  happen will also remove, so the caller can purge all of them from the renderer's own request
    *  caches, not just `row.id`. A request row's own subtree is itself.
    *
-   *  §3.5: imperative, called before the delete mutation fires — reads the cache directly (the
+   *  Imperative, called before the delete mutation fires — reads the cache directly (the
    *  reactive `items` computed can lag it by one macrotask) rather than `childrenOf`'s own index,
    *  which is built from that same reactive computed. */
   function subtreeItemIds(row: CollectionRowVm): string[] {
@@ -522,17 +519,17 @@ export const useCollectionsStore = defineStore('collections', () => {
     const orphaned = subtreeItemIds(row);
     try {
       await deleteRowMutation.mutateAsync({ id: row.id, target });
-      // Deleting a request does **not** close its open tabs (D14's orphan rule): a tab is an
+      // Deleting a request does **not** close its open tabs (the orphan rule): a tab is an
       // editing surface with its own persisted state, and silently closing one because a tree row
       // went away would lose work. Its cached saved request goes, though, so the tab reads as
-      // unsaved — and (finding 4) so does every *descendant* request's cache entry a
+      // unsaved — and so does every *descendant* request's cache entry a
       // folder/collection delete just cascaded away, so `savedRequestFor` correctly reports null
       // for all of them instead of a stale entry that `onSave` would fail against with no visible
       // error.
-      // P112: writes `null` into each orphaned id's own query directly rather than only relying on
+      // Writes `null` into each orphaned id's own query directly rather than only relying on
       // afterTreeListChange's reconcileTree (already awaited above, inside onSuccess, by the time
       // mutateAsync resolves) — explicit and idempotent either way, and it never depends on exactly
-      // when reconcileTree ran relative to this line. `null` is itself the orphan marker (D14) —
+      // when reconcileTree ran relative to this line. `null` is itself the orphan marker —
       // spares any still-open tab's own ensureSavedRequestLoaded a doomed GetRequest/GetGrpcRequest
       // round trip that would only reach the same conclusion via a fetch.
       for (const id of orphaned) {
@@ -594,8 +591,8 @@ export const useCollectionsStore = defineStore('collections', () => {
   }
 
   /** Opens a request row into its tab (reusing one already bound to the row). A row deleted between
-   *  the tree listing and the fetch loads as `null` (D14's orphan case) and opens as a brand-new
-   *  saved row; any other load failure lands in `state.error` and opens nothing. P11 D12: a gRPC row
+   *  the tree listing and the fetch loads as `null` and opens as a brand-new
+   *  saved row; any other load failure lands in `state.error` and opens nothing. A gRPC row
    *  opens the 'grpc-request' kind, which the protocol column alone tells apart. */
   async function openRequestRow(row: CollectionRowVm): Promise<void> {
     try {
@@ -726,7 +723,7 @@ export const useCollectionsStore = defineStore('collections', () => {
    *  — Go opens the file (F16: a 10-50 MB collection through the control plane is 20-100 serial
    *  round trips, and above 64 MiB an unattributable refusal). Returns false when cancelled. */
   async function importCollection(): Promise<boolean> {
-    // P28 D18: a real re-entry guard. Until this, the only thing stopping a second concurrent
+    // A real re-entry guard. Until this, the only thing stopping a second concurrent
     // import was the panel button disabling itself while `busy` — and that button has moved to the
     // menu bar, which has no such state. Two overlapping imports would interleave their
     // afterTreeListChange()/report writes.
@@ -749,7 +746,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       state.selected = collectionKey(report.collectionId);
       return true;
     } catch (err) {
-      // P108 F10: this used to let the error propagate uncaught, and (since it ran only in the
+      // This used to let the error propagate uncaught, and (since it ran only in the
       // try's success path) never reloaded the tree on failure either — a partially-applied import
       // (Go's own import is not one transaction; some rows can land before a later one fails) left
       // the panel showing the pre-import tree until something else happened to reload it.
@@ -775,12 +772,11 @@ export const useCollectionsStore = defineStore('collections', () => {
 
   /** Opens the native save dialog and writes the collection there as Collection v2.1 JSON. As with
    *  import, only the path crosses the bridge — Go writes the file. Returns false when cancelled.
-   *  D16: a secret exports valueless, and ExportReport.secretCount is what surfaces that once,
-   *  rather than it being a fact only discoverable by opening the file. P108 F11: Postman
-   *  Collection v2.1 has no representation for a gRPC request (P11 D12/F22), so Go's own Export
-   *  skips every protocol='grpc' item and reports the count in ExportReport.skippedGrpc — this used
-   *  to read secretCount only, silently dropping the skipped-request half of the same report the
-   *  Go side already produces. */
+   *  A secret exports valueless, and ExportReport.secretCount is what surfaces that once,
+   *  rather than it being a fact only discoverable by opening the file. Postman Collection v2.1
+   *  has no representation for a gRPC request, so Go's own Export skips every protocol='grpc' item
+   *  and reports the count in ExportReport.skippedGrpc — this used to read secretCount only,
+   *  silently dropping the skipped-request half of the same report the Go side already produces. */
   async function exportCollection(collectionId: string, name: string): Promise<boolean> {
     // Same re-entry guard as import: this `finally` would otherwise clear a running import's busy.
     if (state.busy) return false;

@@ -74,8 +74,8 @@ import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
 import { apiControl } from './apiControl';
 
-// bridge/index.ts is the composition root (round-1 review finding 19): the only file that imports
-// every part of the app's own bound-call surface — the methods §5.6/P119 moved into
+// bridge/index.ts is the composition root: the only file that imports
+// every part of the app's own bound-call surface — the methods moved into
 // createCoreControl.ts (shared verbatim with Kira Space's own copy of this file), Studio's own
 // remaining methods, defined right here, and the Api module's 40 (apiControl.ts) — and combines
 // them into the one `control` object every other file in the app imports. None of the three
@@ -125,10 +125,10 @@ const studioControl = {
     error: string | null;
     outcome: string;
   }> => unwrap(ConnectionsService.Reveal({ id, confirmed })),
-  // The generated TestResult's serverVersion/error are `string | null | undefined`; the pre-P57
+  // The generated TestResult's serverVersion/error are `string | null | undefined`; the
   // shape was `string | undefined` only (no null) — normalized here rather than pushed onto
   // ConnectionDialog.vue, which assigns straight into its own `?: string` reactive state.
-  // P14 D3: id is the dialog's editingId (empty for a brand-new connection) — the backend fills in
+  // id is the dialog's editingId (empty for a brand-new connection) — the backend fills in
   // the stored secret server-side when the draft carries none, so Test on an existing connection
   // whose password field was never revealed still probes with the real credential.
   connectionsTest: (
@@ -452,13 +452,12 @@ const studioControl = {
     unwrap(ScriptRunsService.McpTools({ server })).then((r) => trust<ScriptMcpTool[]>(r ?? [])),
 };
 
-// P103 Part 2 (§5.6): one exported object, composed from the methods shared with Kira Space
+// One exported object, composed from the methods shared with Kira Space
 // (createCoreControl.ts), Studio's own 94 remaining methods (studioControl, above) and the module's
 // own 40 (apiControl.ts) — every one of the ~200 `control.xxx()` call sites in the app is
 // unchanged, and mockRuntime.ts's channel map is unchanged, since neither the method names nor
 // their bound-call FQNs moved. Spread order matters not at all here (the three objects' key sets
-// are disjoint by construction — §5.6's own survey), but studioControl last keeps this
-// line's own diff-history the smallest against the pre-§5.6 file.
+// are disjoint by construction).
 export const control = {
   ...createCoreControl<Settings, Layout, TabRecord, SettingsPatch, AppMode>({
     settings: SettingsService,

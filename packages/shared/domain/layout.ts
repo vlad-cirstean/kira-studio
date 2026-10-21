@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
-// C11 §14 OQ2 (S14): widthUserSet distinguishes a width the user actually dragged (setProjectWidth,
+// widthUserSet distinguishes a width the user dragged (setProjectWidth,
 // state/layout.ts's own sole caller of it) from one this app set for them — the signal "has the
 // user resized this panel" the review segment's first-activation widen needs and no existing field
-// answers. `.default(false)` keeps a layout saved before this phase valid (never treated as
-// user-set, so the one-time widen still applies for a window that saved before this field existed).
+// answers. `.default(false)` keeps a layout saved before this field existed valid
+// (never treated as user-set, so the one-time widen still applies).
 const projectSizeSchema = /*#__PURE__*/ z.object({
   width: z.number(),
   widthUserSet: z.boolean().default(false),

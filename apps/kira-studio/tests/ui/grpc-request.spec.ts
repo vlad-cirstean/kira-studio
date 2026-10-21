@@ -27,7 +27,7 @@ async function openHttpModeAndNewGrpcRequest(page: Page): Promise<void> {
 // A restored 'grpc-request' tab (grpcRequestTabStateSchema's own defaults, overridden per test) —
 // the same "skip the UI's own build-up path and start from a known state" shortcut
 // collections.spec.ts and http-request.spec.ts's third test both already use. This file's own
-// tests run with the Messages pane showing by default (see the D1 case below) — every other
+// tests run with the Messages pane showing by default — every other
 // caller of the shared `grpcTab` defaults to History instead, so this stays a thin local wrapper
 // supplying that one divergent field as `base` rather than changing the shared default.
 function grpcTab(state: Record<string, unknown> = {}): Record<string, unknown> {
@@ -178,10 +178,10 @@ test('gRPC request — the method select is as wide as the address field beside 
   expect(Math.abs(methodBox.width - targetBox.width) / targetBox.width).toBeLessThan(0.1);
 });
 
-// Finding 13: GrpcRequestView.vue's own watcher used to call loadSchema immediately on every
+// GrpcRequestView.vue's own watcher used to call loadSchema immediately on every
 // keystroke of the target field, with no debounce — a fast typist fired one Describe round trip
 // per character. Typing character-by-character (page.keyboard.type, unlike page.fill's single
-// input event) is what actually exercises that path.
+// input event) is what exercises that path.
 test('gRPC request — typing the target debounces schema loads to one call', async ({
   relaunch,
 }) => {
@@ -340,8 +340,8 @@ test('gRPC request — a non-OK status is a result, not an error', async ({ rela
   await expect(page.locator('[data-testid="grpc-call-error"]')).toHaveCount(0);
 });
 
-/** F20: holds the `GrpcService.Call` bound call open forever, exactly the way the real backend's
- *  own `runServerStream` blocks for the life of the stream (D8) — every UI update for a streaming
+/** Holds the `GrpcService.Call` bound call open forever, exactly the way the real backend's
+ *  own `runServerStream` blocks for the life of the stream — every UI update for a streaming
  *  test comes from `emitWailsEvent`'s own push channel instead, never from this promise settling.
  *  Registered after `relaunch()` so it is the most-recently-added `page.route` handler for
  *  `/wails/runtime` and therefore wins (Playwright evaluates routes in reverse registration order);
@@ -434,7 +434,7 @@ test('gRPC request — a server-streaming call appends messages as they arrive',
   await expect(page.locator('[data-testid="grpc-request-stop"]')).toBeDisabled();
 });
 
-// Finding 11: the live message list used to grow without bound and re-`reduce` its whole array
+// The live message list used to grow without bound and re-`reduce` its whole array
 // on every single push. Sends one batch well past the 10,000-message live-view ceiling
 // (state.ts's MAX_LIVE_MESSAGES) in a single event — real messages arrive one at a time, but a
 // live server sending 10,000+ individual push events in a test would only slow the suite down,
@@ -498,9 +498,9 @@ test('gRPC request — the live message list caps at 10,000 and shows the true t
 
   // The true total (10,037 × 10 bytes = 100,370) is what the byte summary shows too — it is kept
   // as a running total (state.ts's rt.messageBytes), not re-derived from the now-capped array.
-  // Round-2 review finding 10: the message *count* alongside it must be the same true total, not
-  // messages.length (capped at 10,000) — the old capped reading contradicted the elided-messages
-  // strip's own "10000 of 10037" right below it.
+  // The message *count* alongside it must be the same true total, not messages.length (capped at
+  // 10,000) — the old capped reading contradicted the elided-messages strip's own "10000 of 10037"
+  // right below it.
   await expect(page.locator('[data-testid="grpc-message-summary"]')).toContainText(
     `${total.toLocaleString('en-US')} messages`,
   );
@@ -694,7 +694,7 @@ test('gRPC request — Beautify formats the request message', async ({ relaunch 
   expect(await editorText(editor)).toBe(BEAUTIFIED);
 });
 
-// P60a §4.7/§12.1: the v1.4 regression this migration's own undo boundary
+// The regression this migration's own undo boundary
 // (`MonacoHost.vue`'s `doc` watcher — two `model.pushStackElement()` calls around
 // `pushEditOperations()`, never `model.setValue()`) exists to keep fixed. A Beautify (an
 // external write, same path as the `doc` prop round trip) must not merge into the undo stack
@@ -726,8 +726,8 @@ test('gRPC request — one undo after Beautify undoes only the beautify, not the
   expect(await editorText(editor)).toBe(TYPED);
 });
 
-// P13 D12: clearGrpcHistory has been implemented and bound since P11/P12, reachable from
-// nowhere until CallHistoryList.vue's own toolbar. F20's structural guard (the delete control is
+// clearGrpcHistory has been implemented and bound, reachable from nowhere until
+// CallHistoryList.vue's own toolbar. The structural guard (the delete control is
 // no longer a <button> nested inside a <button>) lives in api-ui-consistency.spec.ts; this test
 // drives the Clear behaviour end to end.
 test('gRPC request — the history pane gets a real Clear action', async ({ relaunch }) => {
@@ -750,10 +750,10 @@ test('gRPC request — the history pane gets a real Clear action', async ({ rela
   };
   const scope = { itemId: '', tabId: 'tab-grpc-1' };
   const CONTROL: ControlSnapshot[] = [
-    // P18 D14: the response section is now a panel from tab-open (F12), not gated on
+    // The response section is now a panel from tab-open, not gated on
     // hasResult || hasHistory — so ResponsePane.vue's own mount-time "does this tab have any
     // history" probe fires immediately, before either the call or the pane switch below (empty).
-    // P18 D1: switching to History afterwards then genuinely refetches (the call was made while
+    // Switching to History afterwards then genuinely refetches (the call was made while
     // Messages was showing, so it went through the lazy/stale branch) — one more real list() call
     // than this fixture needed before that fix, which is why there are three answers, not two.
     {
@@ -762,7 +762,7 @@ test('gRPC request — the history pane gets a real Clear action', async ({ rela
         grpcTab({ target: 'demo.example.com:443', service: 'demo.Echo', method: 'SayHello' }),
       ],
     },
-    // Pre-existing bug, unrelated to P112: a restored tab with no target never triggers
+    // Pre-existing bug: a restored tab with no target never triggers
     // loadSchema's own watch (GrpcRequestView.vue's `mode === 'reflection' && !target` early
     // return), so `methodResolved` never resolves and Call stays disabled forever. Every sibling
     // test in this file that clicks Call already sets `target` + a grpcDescribe snapshot (e.g.
@@ -809,7 +809,7 @@ test('gRPC request — the history pane gets a real Clear action', async ({ rela
   expect(control.log().filter((e) => e.channel === IPC.grpcHistoryClear)).toHaveLength(1);
 });
 
-// Finding 8: a server-streaming call's history entry used to always store zero messages (call.go's
+// A server-streaming call's history entry used to always store zero messages (call.go's
 // ServerStream never populated CallResult.Messages), so grpc-history.ts's own messagesElided field
 // never carried real data. Viewing a stored streaming entry whose call produced more than the
 // 100-message cap must now show the "first N of M" note the domain type's own comment always
@@ -875,10 +875,10 @@ test('gRPC request — a stored streaming history entry with elided messages sho
     'Metadata, headers and trailers weren’t stored because they were too large for history.',
   );
   await page.click('[data-testid="grpc-response-pane-messages"]');
-  // The message list is virtualized (finding 11) — only the visible window actually renders, so
+  // The message list is virtualized — only the visible window renders, so
   // the data length is asserted through the status row's own summary rather than a DOM node
-  // count. Round-2 review finding 10: that summary must read the stored entry's true messageCount
-  // (137) here, not the 100 messages the elided snapshot actually carries — otherwise it
+  // count. That summary must read the stored entry's true messageCount
+  // (137) here, not the 100 messages the elided snapshot carries — otherwise it
   // contradicts the "first 100 of 137" strip right above it.
   await expect(page.locator('[data-testid="grpc-message-summary"]')).toContainText('137 messages');
 });
@@ -1119,11 +1119,10 @@ test('the gRPC target field fills the toolbar row (P18 D14)', async ({ relaunch 
 
   const target = page.locator('[data-testid="grpc-target"]');
   const widthAt = () => target.evaluate((el) => el.getBoundingClientRect().width);
-  // P22b D10: the method select is now `flex: 1` too, the address field's own sibling in the same
-  // row — so the two now share the window's added width roughly evenly, not "the target absorbs
-  // (almost) all of it" this test originally pinned before D10 gave the method select a width
-  // rule of its own. TLS toggle/Call stay fixed either way — the exact defect F14 found (a no-op
-  // `style="flex: 1"` on the target field itself, which never grew at all).
+  // The method select is now `flex: 1` too, the address field's own sibling in the same row — so
+  // the two now share the window's added width roughly evenly, not "the target absorbs (almost)
+  // all of it" this test originally pinned. TLS toggle/Call stay fixed either way — the exact
+  // defect (a no-op `style="flex: 1"` on the target field itself, which never grew at all).
   const methodWidthAt = () =>
     page
       .locator('[data-testid="grpc-method-select"]')

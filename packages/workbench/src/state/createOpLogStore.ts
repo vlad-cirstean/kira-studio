@@ -6,10 +6,10 @@ import { logError } from '../bridge/log';
 const MAX_RECORDS = 500;
 const HYDRATE_LIMIT = 200;
 
-// P132 Part 1 (§2.2): Studio's own state/ops.ts, generalized so Kira Space's git op log (Part 2)
-// can reuse the same hydrate/subscribe/filter logic without a second copy. `control` wraps each
-// app's own bound bridge call, and `searchText` is the one app-specific filter extra (Studio's
-// connection-name match, state/ops.ts's old line 82).
+// Studio's own state/ops.ts, generalized so Kira Space's git op log can reuse the same
+// hydrate/subscribe/filter logic without a second copy. `control` wraps each app's own bound
+// bridge call, and `searchText` is the one app-specific filter extra (Studio's connection-name
+// match, state/ops.ts's old line 82).
 export interface OpLogControl<R extends OpLogRecord> {
   recent(limit: number): Promise<R[]>;
   onUpdate(cb: (record: R) => void): () => void;
@@ -55,23 +55,21 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
     }
 
     async function hydrateOps(): Promise<void> {
-      // P21 round 3 performance finding 13: every op emits op:start then op:end, and each used to
-      // run an O(500) findIndex scan of this deep-reactive array — pure bookkeeping, but each
-      // comparison was a proxy trap, since a plain object read out of a reactive array/state is
-      // wrapped in its own nested reactive proxy the moment it's accessed. markRaw (the same
-      // argument round 2 used for the gRPC message buffer) marks these immutable wire records so
-      // Vue never wraps them: every `.id`/`.status` read anywhere they're accessed (this
-      // findIndex, visibleOps/runningCount's own filters) becomes a plain property read instead of
-      // a trap.
+      // Every op emits op:start then op:end, and each used to run an O(500) findIndex scan of this
+      // deep-reactive array — pure bookkeeping, but each comparison was a proxy trap, since a
+      // plain object read out of a reactive array/state is wrapped in its own nested reactive
+      // proxy the moment it's accessed. markRaw marks these immutable wire records so Vue never
+      // wraps them: every `.id`/`.status` read anywhere they're accessed (this findIndex,
+      // visibleOps/runningCount's own filters) becomes a plain property read instead of a trap.
       //
-      // P108 Part 12 F7: subscribe BEFORE the opsRecent await, not after — an op that both started
-      // and finished in that gap used to leave a permanently 'running' row in the snapshot, since
-      // the old subscribe (below the await) never saw its update at all. Every update arriving
-      // before the snapshot lands is buffered here (by id, so a start-then-finish pair for the
-      // same op collapses to just its final state) instead of touching state.records; replayed
-      // over the snapshot once it resolves, in arrival order, matching applyUpdate's own
-      // newest-first unshift for an id the snapshot never had. `hydrated` flips the handler over to
-      // applying live from then on.
+      // Subscribe BEFORE the opsRecent await, not after — an op that both started and finished in
+      // that gap used to leave a permanently 'running' row in the snapshot, since the old
+      // subscribe (below the await) never saw its update at all. Every update arriving before the
+      // snapshot lands is buffered here (by id, so a start-then-finish pair for the same op
+      // collapses to just its final state) instead of touching state.records; replayed over the
+      // snapshot once it resolves, in arrival order, matching applyUpdate's own newest-first
+      // unshift for an id the snapshot never had. `hydrated` flips the handler over to applying
+      // live from then on.
       let hydrated = false;
       const buffered = new Map<string, R>();
       unsubscribe?.();

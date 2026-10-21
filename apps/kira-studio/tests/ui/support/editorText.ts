@@ -1,6 +1,6 @@
 import { expect, type Locator } from '@playwright/test';
 
-// P60a §9.1/OQ-3: Monaco virtualises lines — `.view-lines` only ever contains the currently
+// Monaco virtualises lines — `.view-lines` only ever contains the currently
 // rendered subset of a large document, unlike CodeMirror's `.cm-content` (whose `innerText` was
 // the whole document) before it. `MonacoHost.vue` exposes its model's full text through a
 // `__KIRA_DEBUG_HOOKS__`-gated `data-kira-editor-text` attribute on its own root element — the
@@ -22,7 +22,7 @@ export async function editorText(container: Locator): Promise<string> {
   );
   // `getAttribute` alone does not retry on the *value* — the host element itself renders
   // synchronously (`.monaco-host`'s own div is the host's single root, present even while still
-  // `pending`, §3.3), but `data-kira-editor-text` isn't set until `loadMonaco()` actually resolves
+  // `pending`), but `data-kira-editor-text` isn't set until `loadMonaco()` resolves
   // and the model exists. `toHaveAttribute` with a catch-all pattern auto-retries exactly that —
   // present at all (any value, including a legitimately empty document) — before the plain read.
   await expect(host).toHaveAttribute('data-kira-editor-text', /^[\s\S]*$/);

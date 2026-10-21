@@ -1,4 +1,4 @@
-// P12 round 2 finding #13: worstIndex used to be plans.findIndex(...) — the *first* flagged
+// worstIndex used to be plans.findIndex(...) — the *first* flagged
 // statement in a Run-all, not the worst one. On a multi-statement run where an early statement
 // trips a mild warning and a later one is far more expensive, the strip's "Show plan" action
 // pointed at the mild one. This drives run() end to end (same style as
@@ -19,7 +19,7 @@ setActivePinia(pinia);
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
 const { control } = await import('../../frontend/src/bridge/control');
-// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — a real (never-settling in this harness) control.tabsSave triggered
 // incidentally by opening a tab below would otherwise wedge every later spec's own tabsSave
 // assertions for the rest of the process. This spec doesn't test persistence, so give it a

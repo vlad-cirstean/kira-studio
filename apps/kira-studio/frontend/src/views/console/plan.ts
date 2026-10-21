@@ -10,7 +10,7 @@ import { parseSqlitePlan, type SqliteExplainRow } from './planParsers/sqlite';
 
 const decoder = new TextDecoder();
 
-// P12 round 1 finding #8: Postgres/MySQL/MariaDB's JSON-format EXPLAIN returns the whole plan as
+// Postgres/MySQL/MariaDB's JSON-format EXPLAIN returns the whole plan as
 // one cell — a plan over page/chunk.go's 64 KiB MaxCellBytes arrives with that cell clipped mid-
 // JSON, `isTruncated` set, and would otherwise fail JSON.parse with an opaque "Unexpected end of
 // JSON input". A distinct, named condition lets each caller show something specific instead: the
@@ -40,11 +40,11 @@ function columnIndex(page: TabularPage, name: string): number {
   return page.columns.findIndex((c) => c.name === name);
 }
 
-/** D13/D16: turns the `TabularPage`(s) `explain()`'s own `data.execute` call returned back into
- *  one normalized `QueryPlan` — the glue between C9's statement composer and C10's per-dialect
- *  parsers. Throws on a page shape that doesn't match what the plan's F11-F15 verified against
+/** Turns the `TabularPage`(s) `explain()`'s own `data.execute` call returned back into
+ *  one normalized `QueryPlan` — the glue between the statement composer and the per-dialect
+ *  parsers. Throws on a page shape that doesn't match what was verified against
  *  real servers; both callers (the Explain button, auto-explain) run this inside a try/catch —
- *  D19 rule 6 is explicit that a failure here must never surface as an error for the auto-explain
+ *  a failure here must never surface as an error for the auto-explain
  *  path, only degrade silently to "run normally". */
 export function parseExplainPages(
   kind: ConnectionKind,
@@ -85,14 +85,14 @@ export function parseExplainPages(
       return parseSqlitePlan(rows);
     }
     case 'clickhouse': {
-      // P12 round 2 finding #6: ClickHouse's EXPLAIN also returns its whole plan as one cell
+      // ClickHouse's EXPLAIN also returns its whole plan as one cell
       // (same truncation risk as postgres/mysql/mariadb above) — missing this check produced a
       // raw "JSON Parse error: Unterminated string" for the manual button and silently showed
       // nothing for auto-explain.
       if (firstCellTruncated(first)) throw new ExplainTruncatedError();
-      // D13: the second Execute page is EXPLAIN ESTIMATE's own result — absent only if the
+      // The second Execute page is EXPLAIN ESTIMATE's own result — absent only if the
       // server returned fewer pages than requested, which parseExplainPages treats as "no
-      // estimate" rather than throwing (§7.3: page order is asserted in the unit test, not
+      // estimate" rather than throwing (page order is asserted in the unit test, not
       // trusted blindly at runtime).
       const estimatePage = pages[1];
       const estimateRows: Array<{ rows: number }> = [];

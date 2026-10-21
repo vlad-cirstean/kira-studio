@@ -1,10 +1,10 @@
 import { t } from '@theme/i18n';
 import { z } from 'zod';
 
-// P11 D5: the wire shapes live in Go (internal/grpcclient) and are mirrored, not re-validated,
+// The wire shapes live in Go (internal/grpcclient) and are mirrored, not re-validated,
 // here — control.ts's grpcDescribe/grpcCall trust<T>() the bound call's result exactly as every
-// other bound call does (P2 D5's rule, applied a fourth time). These types exist so the renderer
-// has something to type against, not to guard input Go already produced.
+// other bound call does. These types exist so the renderer has something to type against, not to
+// guard input Go already produced.
 
 /** internal/grpcclient.MetaPair — one gRPC metadata name/value pair. F6: keys are lowercased by
  *  the time this reaches the renderer. */
@@ -104,30 +104,28 @@ export const GRPC_CODE_NAMES: Readonly<Record<number, string>> = {
   16: 'Unauthenticated',
 };
 
-/** D14: the status chip's colour — OK is 'ok', a handful of "try again"-shaped codes are 'warn',
+/** The status chip's colour — OK is 'ok', a handful of "try again"-shaped codes are 'warn',
  *  everything else (including Canceled, which the app itself only ever produces via Stop) is
- *  'error'. Mirrors statusClass's own four-value vocabulary (domain/http.ts) over .p-chip's existing
- *  ok/warn/error/info variants (P2 F17) — no new colour token (F23). */
+ *  'error'. Mirrors statusClass's own four-value vocabulary (domain/http.ts) over .p-chip's
+ *  existing ok/warn/error/info variants — no new colour token. */
 export function grpcCodeClass(code: number): 'info' | 'ok' | 'warn' | 'error' {
   if (code === 0) return 'ok';
   if (code === 4 || code === 8 || code === 14) return 'warn'; // DeadlineExceeded/ResourceExhausted/Unavailable
   return 'error';
 }
 
-/** P4 D16's exact reason, applied to gRPC (D12): the collections tree's own row needs a class for
- *  its leading chip and http/** may not import views/** (biome.json), so this lives here rather
- *  than in views/grpcrequest/. The tree's own denormalised columns (method/url, reused verbatim
- *  for a gRPC row's "pkg.Service/Method" and target) carry no streaming flag — that lives in the
- *  method's own descriptor, which a collections row cannot resolve without a live call — so every
- *  gRPC row gets the one neutral class from the status family (P17 D19 retired `httpMethodClass`
- *  in favour of `httpMethodToken`'s own seven-plus-'other' vocabulary for HTTP methods
- *  specifically; a gRPC call has no per-verb distinction to colour-code at all, so this stays on
- *  the plain status palette rather than adopting that new one). */
+/** The collections tree's own row needs a class for its leading chip and http/** may not import
+ *  views/** (biome.json), so this lives here rather than in views/grpcrequest/. The tree's own
+ *  denormalised columns (method/url, reused verbatim for a gRPC row's "pkg.Service/Method" and
+ *  target) carry no streaming flag — that lives in the method's own descriptor, which a
+ *  collections row cannot resolve without a live call — so every gRPC row gets the one neutral
+ *  class from the status family (a gRPC call has no per-verb distinction to colour-code at all,
+ *  so this stays on the plain status palette). */
 export function grpcMethodClass(_method: string): 'info' | 'ok' | 'warn' | 'error' {
   return 'info';
 }
 
-// P18 D13 (P15 D2's gRPC sibling): a per-code sentence, statusHint's own shape and register
+// A per-code sentence, statusHint's own shape and register
 // (domain/http.ts) — lowercase, no trailing period, a sentence a person can act on. Lives here,
 // not in the view, for grpcCodeClass's own stated reason: http/** may not import views/**, and the
 // collections tree already needs code vocabulary. No Go mirror, matching statusHint.
@@ -157,12 +155,11 @@ export function grpcCodeHint(code: number): string {
   return GRPC_CODE_HINTS[code] ?? 'an unrecognised status code';
 }
 
-/** D5: {name, value, enabled} — deliberately the same three fields as httpHeaderSchema
- *  (domain/http.ts) with the same "enabled is builder-state-only" rule (P2 D6), because it is the
+/** {name, value, enabled} — deliberately the same three fields as httpHeaderSchema
+ *  (domain/http.ts) with the same "enabled is builder-state-only" rule, because it is the
  *  same idea and a person moving between the two tabs should not have to learn a second one. Not
- *  the same *type*: gRPC lowercases keys (F6) and has its own validity rule (call.go's own
- *  metadataKeyPattern), and sharing the Zod object across two protocols to save four lines is the
- *  coupling P12 would then have to unpick. */
+ *  the same *type*: gRPC lowercases keys and has its own validity rule (call.go's own
+ *  metadataKeyPattern). */
 export const grpcMetadataSchema = /*#__PURE__*/ z.object({
   name: z.string(),
   value: z.string(),

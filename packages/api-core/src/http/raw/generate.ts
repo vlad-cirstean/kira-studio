@@ -6,7 +6,7 @@ import type {
 } from '@kira/shared/domain/http';
 import { goQueryEscape } from '../escape';
 
-// P9 D10: the raw editor is generated for these four modes only — `formdata`/`file` have no text
+// The raw editor is generated for these four modes only — `formdata`/`file` have no text
 // form that can be edited and parsed back (a file part is bytes on disk, not text). The caller
 // (HttpRequestView.vue's toolbar button, http.editRaw's command) disables Edit as raw HTTP for the
 // other two rather than generating an elided body the parser would take literally.
@@ -16,9 +16,9 @@ export function canEditAsRaw(bodyMode: HttpRequestTabState['bodyMode']): boolean
   return (RAW_EDITABLE_BODY_MODES as readonly string[]).includes(bodyMode);
 }
 
-/** The active mode's own text, pre-substitution — `{{name}}` references are never touched (D9's
- *  whole point). `urlencoded` renders the *encoded* string, mirroring D4's Go rendering and
- *  toCurl's own `--data-raw` emission for the same mode: that is what the body will actually
+/** The active mode's own text, pre-substitution — `{{name}}` references are never touched.
+ *  `urlencoded` renders the *encoded* string, mirroring the Go rendering and
+ *  toCurl's own `--data-raw` emission for the same mode: that is what the body will
  *  become the moment this is parsed back and sent, so the editor shows exactly that. */
 function bodyTextFor(state: HttpRequestTabState): string {
   switch (state.bodyMode) {
@@ -49,22 +49,22 @@ function hasUserContentType(state: HttpRequestTabState): boolean {
 }
 
 /**
- * P9 D9: tab state → raw HTTP/1.1 text, generated pre-substitution — `{{base_url}}`, `{{token}}`
+ * Tab state → raw HTTP/1.1 text, generated pre-substitution — `{{base_url}}`, `{{token}}`
  * and `{{$guid}}` all appear literally, verbatim, exactly as the tab's own fields hold them. A
  * post-substitution buffer would not be editable at all (applying it would write today's resolved
  * values back into the tab and destroy every variable reference). Only enabled, named header rows
  * are emitted — the same filter send() itself applies — since a disabled header sends nothing and
  * has no place in a request about to be sent.
  *
- * `defaultContentType` mirrors D7's own precedent (client.go's Content-Type default, and
+ * `defaultContentType` mirrors the precedent (client.go's Content-Type default, and
  * curl/generate.ts's own `toCurl` — computed by the caller via body.ts's own defaultContentTypeFor
  * rather than recomputed here): emitted only when the user set no
- * Content-Type header of their own. Without this, a no-edit round trip through the dialog (D11's
- * own Content-Type → mode table has nothing to map from) would silently apply-and-send a `code`
+ * Content-Type header of their own. Without this, a no-edit round trip through the dialog (the
+ * Content-Type → mode table has nothing to map from) would silently apply-and-send a `code`
  * body with `raw`'s text/plain default instead of the mode's real one — a wire-level change, not a
  * cosmetic one.
  *
- * Never called for a `formdata`/`file` body (D10) — the caller refuses those before this runs.
+ * Never called for a `formdata`/`file` body — the caller refuses those before this runs.
  */
 export function generateRawRequest(state: HttpRequestTabState, defaultContentType: string): string {
   const lines = [`${state.method} ${state.url} HTTP/1.1`];
@@ -78,8 +78,8 @@ export function generateRawRequest(state: HttpRequestTabState, defaultContentTyp
   return `${lines.join('\n')}\n\n${body}`;
 }
 
-/** P18 D8: a stored history entry's Raw pane reader — the same rendering as `generateRawRequest`
- *  above, given the four fields a `ResponseHistorySnapshot.request` actually carries (method, url,
+/** A stored history entry's Raw pane reader — the same rendering as `generateRawRequest`
+ *  above, given the four fields a `ResponseHistorySnapshot.request` carries (method, url,
  *  headers, body) rather than a live tab's `HttpRequestTabState`. A small adapter, not a second
  *  generator: the stored request is already the "as sent" projection (headers/urlEncoded rows are
  *  the enabled, named ones only — the wire shape, not the builder's row list with its own
@@ -100,7 +100,7 @@ export function generateRawRequestFromStored(
 }
 
 /** `bodyTextFor`'s own switch, over the wire's `HttpBodyWire` shape (`mode`/`raw`/`urlEncoded`)
- *  rather than the builder's `bodyMode`/`body`/`urlEncoded` — same four editable modes (D10),
+ *  rather than the builder's `bodyMode`/`body`/`urlEncoded` — same four editable modes,
  *  `formdata`/`file` never reached since a stored entry's request is always one of the other four
  *  or empty. */
 function storedBodyTextFor(body: HttpBodyWire): string {

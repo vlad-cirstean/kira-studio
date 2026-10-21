@@ -35,9 +35,9 @@ export interface FakeSocket extends EventTarget {
   send(value: unknown): void;
   close(): void;
   /** Every value passed to `send`, in order — what the test asserts requests against. Requests
-   *  stay JSON text (P11 D3), and port.ts itself calls `JSON.stringify` before `send` now (it used
-   *  to rely on the pre-P11 JSON-wrapping stream helper doing that), so this is always the
-   *  already-stringified JSON frame, real `Stream` or this fake alike. */
+   *  stay JSON text, and port.ts itself calls `JSON.stringify` before `send` now (it used to rely
+   *  on the JSON-wrapping stream helper doing that), so this is always the already-stringified
+   *  JSON frame, real `Stream` or this fake alike. */
   sent: unknown[];
   /** Test control: moves to OPEN and fires `onopen`. */
   __open(): void;

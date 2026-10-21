@@ -71,16 +71,16 @@ import type { TabRecord } from '../state/tabDomain';
 import { memoryControl } from './memoryControl';
 
 // bridge/index.ts is this app's own composition root — Kira Studio's own bridge/index.ts, trimmed
-// to the 15 services apps/kira-space/main.go actually binds (Part 1's own service list, plus
-// LinkService added alongside this file — P100 Part 2 found repo/git/hostHandlers.ts's
-// link.openExternal handler had no Go counterpart here; see internal/bridge/link.go). No
-// apiControl.ts equivalent: this app has exactly one bound-call surface, not two composed halves.
-// P103 Part 2 (§5.6): a growing subset of that surface's own methods — the ones byte-for-byte
-// identical with Kira Studio's own studioControl — now come from createCoreControl.ts, shared with
-// Kira Studio's own copy of this file; this app's own remaining methods are defined right here.
-// P116 H5 moved ten more (open-settings/toggle-project-panel/tab-next/prev/close, keep-awake, app-metrics,
-// windowsOpenNew) into that same shared factory once this app grew its own window-chrome parity
-// (G1-G5/G7) — this app now has its own metrics ticker (main.go's own metrics.NewAppTicker) and
+// to the 15 services apps/kira-space/main.go binds (LinkService added alongside this file —
+// repo/git/hostHandlers.ts's link.openExternal handler had no Go counterpart here; see
+// internal/bridge/link.go). No apiControl.ts equivalent: this app has exactly one bound-call
+// surface, not two composed halves.
+// A growing subset of that surface's own methods — the ones byte-for-byte identical with Kira
+// Studio's own studioControl — now come from createCoreControl.ts, shared with Kira Studio's own
+// copy of this file; this app's own remaining methods are defined right here.
+// Ten more (open-settings/toggle-project-panel/tab-next/prev/close, keep-awake, app-metrics,
+// windowsOpenNew) moved into that same shared factory once this app grew its own window-chrome
+// parity — this app now has its own metrics ticker (main.go's own metrics.NewAppTicker) and
 // keep-awake controller, so both are wired the same way Kira Studio's own copy of this file is.
 const spaceControl = {
   customScriptsList: (): Promise<ScriptsSnapshot> =>

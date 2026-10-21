@@ -45,7 +45,7 @@ export async function deleteKey(viewKey: string, keyName: string): Promise<void>
   });
 }
 
-// Scoped to string-type keys only (same D2 as edit — see redis/mutate.ts's assertEditableType).
+// Scoped to string-type keys only (same as edit — see redis/mutate.ts's assertEditableType).
 // Unlike edit/delete, there is no existing key for `plan.path` to already point at, so the new
 // key's name travels entirely through the `insert` op's own `_key`/`$value` sentinels; the plan's
 // path only needs to resolve to the right database (the current host's own path already does).

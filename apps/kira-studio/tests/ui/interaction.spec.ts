@@ -118,9 +118,9 @@ const FIXTURE = compositePkConnectAndOpen(CONNECTION_ID);
 const ORDER_ITEMS_FIXTURE = orderItemsFixture(CONNECTION_ID);
 
 // Real captures (scripts/capture-postgres-tree.ts) of the regions -> customers -> orders ->
-// order_items <- products FK graph's own describe() output — see packages/db-fixtures/fixtures/0001_seed.sql's
-// own comment for why this shape exists. Transcribed verbatim from the capture tool's output, not
-// hand-written (P50 D5's discipline).
+// order_items <- products FK graph's own describe() output — see
+// packages/db-fixtures/fixtures/0001_seed.sql's own comment for why this shape exists. Transcribed
+// verbatim from the capture tool's output, not hand-written.
 const ORDERS_META: ObjectMeta = {
   path: ORDERS_PATH,
   kind: 'table',
@@ -351,7 +351,7 @@ function readPayload(
   };
 }
 
-// P67 §4.1: the FK preview popover's own tab-free fetch — same shape as readPayload() above but
+// The FK preview popover's own tab-free fetch — same shape as readPayload() above but
 // always pageSize 10 (fkPreview.ts's own fetchReferencedRow, MAX_PAGE_SIZE's smallest), so it is a
 // distinct mock entry from the pageSize-100 read the same filter serves when "Open in new tab" or
 // a real tab open follows it.
@@ -1120,7 +1120,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await expect(headerCell(page, 'name')).toBeVisible();
 
   // =============================================================================================
-  // D4: cell context menu — Copy / Copy with header / Copy as JSON / Edit / Set NULL /
+  // Cell context menu — Copy / Copy with header / Copy as JSON / Edit / Set NULL /
   // Filter by this value.
   // =============================================================================================
   const row0Name = await cellText(page, 0, 'name');
@@ -1200,7 +1200,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   expect(await cellText(page, 0, 'name')).toBe(row0Name);
 
   // =============================================================================================
-  // D2/D3/D6: row selection accumulation (Shift range, Ctrl toggle) and the row context menu's
+  // Row selection accumulation (Shift range, Ctrl toggle) and the row context menu's
   // selection convention — right-clicking inside the current selection acts on all of it,
   // right-clicking outside it replaces the selection with just that row first.
   // =============================================================================================
@@ -1239,7 +1239,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   );
 
   // =============================================================================================
-  // P2 R1: the same [0,1,2] row range as above, but built by a real mousedown -> mouseenter ->
+  // The same [0,1,2] row range as above, but built by a real mousedown -> mouseenter ->
   // mouseup drag across the gutter instead of shift-click. DataGrid.vue's onGutterMouseDown/
   // onGutterMouseEnter used to close over rowVm.row via a template call expression; they now read
   // it back off the row's own data-row attribute instead — a wrong attribute name here would fail
@@ -1262,8 +1262,8 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
 
   // Same drag gesture over grid cells instead of the gutter (SlickHybridSelectionModel's own
   // dragToSelect) — a same-column, multi-row drag keeps the resulting `kira-cell-selected` count
-  // unambiguous: exactly one cell per row. P22 Pass B — `kira-cell-selected` (§5 D4), not the
-  // incumbent's own bare `.selected`.
+  // unambiguous: exactly one cell per row. `kira-cell-selected`, not the incumbent's own bare
+  // `.selected`.
   await gridCell(page, 0, 'name').hover();
   await page.mouse.down();
   await gridCell(page, 1, 'name').hover();
@@ -1308,8 +1308,8 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   expect(await cellText(page, 0, 'name')).toBe(row0OriginalName);
 
   // =============================================================================================
-  // D7/D8: header context menu — Sort asc/desc/Clear sort, Hide column/Show all columns,
-  // Copy column name/values. M5 §6.7 adds "Mark column as PII" as a trailing submenu.
+  // Header context menu — Sort asc/desc/Clear sort, Hide column/Show all columns,
+  // Copy column name/values. The menu adds "Mark column as PII" as a trailing submenu.
   // =============================================================================================
   await rightClick(headerCell(page, 'entity_id'));
   expect(await menuItemIds(page)).toEqual([
@@ -1361,7 +1361,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await expect(headerCell(page, 'entity_id')).toBeVisible();
 
   // =============================================================================================
-  // D1/D13: local grid copy/paste via Ctrl+C/Ctrl+V — anchor-and-fill, rows beyond the loaded
+  // Local grid copy/paste via Ctrl+C/Ctrl+V — anchor-and-fill, rows beyond the loaded
   // page become new pending inserts. The grid binds the platform primary modifier (grid.paste).
   // =============================================================================================
   await page.evaluate(() => navigator.clipboard.writeText('typed via paste'));
@@ -1389,12 +1389,12 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await expect(pastedInsertInputs.nth(1)).toHaveValue('3');
   await expect(pastedInsertInputs.nth(2)).toHaveValue('brand new row');
 
-  // P2 R2 regression: pasting again onto that same staged insert row (selected via its gutter,
+  // Regression: pasting again onto that same staged insert row (selected via its gutter,
   // a 'row'-kind selection) must update the row already staged there, not append a second one.
-  // P22 Pass B — the gutter lives in the frozen LEFT pane's own clone of this row (F4), a
+  // The gutter lives in the frozen LEFT pane's own clone of this row, a
   // different DOM subtree than `pastedInsertRow` (the right pane's clone, the only one carrying
-  // `data-testid="grid-row-insert"`, D10) — `gutterCell`'s own page-row-scoped locator reaches it
-  // regardless of which pane it's actually in. SlickGrid also marks an insert row's own identity
+  // `data-testid="grid-row-insert"`) — `gutterCell`'s own page-row-scoped locator reaches it
+  // regardless of which pane it's in. SlickGrid also marks an insert row's own identity
   // on the row (`kira-row-inserted`), not a per-cell `.gutter-cell.inserted` combo like the
   // incumbent did.
   const pastedRow = Number(await pastedInsertRow.getAttribute('data-row'));
@@ -1409,8 +1409,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await discardChanges(page);
 
   // =============================================================================================
-  // P21: the grid cell's new Paste row (D12) — an existing Cmd/Ctrl+V handler with no menu row
-  // before this phase.
+  // The grid cell's new Paste row — an existing Cmd/Ctrl+V handler.
   // =============================================================================================
   await page.evaluate(() => navigator.clipboard.writeText('typed via paste menu'));
   await rightClick(gridCell(page, 0, 'name'));
@@ -1423,7 +1422,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await discardChanges(page);
 
   // =============================================================================================
-  // P176: Ctrl/Cmd+V inside the open cell editor is the browser's own paste, not the grid's
+  // Ctrl/Cmd+V inside the open cell editor is the browser's own paste, not the grid's
   // spread-down paste. A multi-line clipboard must not stage rows below, and the editor must hold
   // a line break exactly.
   // =============================================================================================
@@ -1445,7 +1444,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await discardChanges(page);
 
   // =============================================================================================
-  // P21: the row menu's new Duplicate/Delete shortcuts — dispatched through the exact same
+  // The row menu's new Duplicate/Delete shortcuts — dispatched through the exact same
   // rowMenu() builder a right-click uses (runMenuShortcut), so a real keypress produces the same
   // pending-change state the menu item does.
   // =============================================================================================
@@ -1474,7 +1473,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await discardChanges(page);
 
   // =============================================================================================
-  // P21 D13: a tab-scoped shortcut prints on the tab menu even though the key acts on the
+  // A tab-scoped shortcut prints on the tab menu even though the key acts on the
   // *active* tab, not the one right-clicked.
   // =============================================================================================
   await page.locator('[data-testid="tab"]').first().click({ button: 'right' });
@@ -1485,8 +1484,8 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
 
   // =============================================================================================
-  // P21: the project tree's own local keyboard shortcuts — Copy name, F2 rename, Ctrl/Cmd+D
-  // duplicate — dispatch through menuForRow(), the same builder a right-click uses. D8's own
+  // The project tree's own local keyboard shortcuts — Copy name, F2 rename, Ctrl/Cmd+D
+  // duplicate — dispatch through menuForRow(), the same builder a right-click uses. The
   // guard: the tree's per-row Refresh never prints a shortcut, since F5 is the *active tab's*
   // refresh, a different command on a different object.
   // =============================================================================================
@@ -1523,11 +1522,11 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   );
 
   // =============================================================================================
-  // P67 §3 (D2)/§7: an outbound FK-cell click now opens a read-only preview popover, anchored at
-  // the click, instead of jumping straight there — SPEC's own P67 row description of what clicking
-  // an FK cell does ("shows the referenced row"). "Open in new tab" inside it is P7's own unchanged
-  // jump (navigateForeignKey), one click further in. A PK cell ("Referenced by") is untouched (§9)
-  // — it names *tables*, plural, with no single record to preview.
+  // An outbound FK-cell click now opens a read-only preview popover, anchored at the click,
+  // instead of jumping straight there — SPEC's own description of what clicking an FK cell does
+  // ("shows the referenced row"). "Open in new tab" inside it is the unchanged jump
+  // (navigateForeignKey), one click further in. A PK cell ("Referenced by")
+  // is untouched — it names *tables*, plural, with no single record to preview.
   // =============================================================================================
   const ordersRow = await findRow(page, ORDERS_PATH);
   await ordersRow.dblclick();
@@ -1554,7 +1553,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   expect(await cellText(page, 0, 'name')).toBe('Acme Co');
 
   // customers.id is referenced by exactly one table (orders.customer_id) — a "pk"-kind button,
-  // single candidate, direct nav to the filtered referencing rows. P22 Pass B — D11b's single
+  // single candidate, direct nav to the filtered referencing rows. The single
   // button only lives in a cell once it's hovered or selected (never a pure-CSS always-in-the-
   // DOM affordance the way the incumbent's own per-cell button was), so this needs its own
   // explicit selection first, same as `clickCellNav`'s own first step just below.
@@ -1569,8 +1568,8 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   expect(await cellText(page, 0, 'customer_id')).toBe('1');
 
   // =============================================================================================
-  // P7: self-referencing FK — employees.manager_id -> employees.id. Ada (id 1) has no manager
-  // (NULL): her manager_id cell renders no nav button at all (P7 D2: a missing/NULL source value
+  // Self-referencing FK — employees.manager_id -> employees.id. Ada (id 1) has no manager
+  // (NULL): her manager_id cell renders no nav button at all (a missing/NULL source value
   // means there's no row to jump to). Her id cell's "Referenced by" is a single candidate
   // (employees itself) that opens a *new* tab on the same table, filtered to her direct reports.
   // =============================================================================================
@@ -1595,8 +1594,8 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
 
   // Row 0 here (either direct report — both have manager_id 1) has a nav button on its
   // manager_id cell, and the right-click cell menu offers the same navigation as a "Go to
-  // referenced row" item (P7 D3: the button and the menu share one function, so they can never
-  // disagree about what's navigable).
+  // referenced row" item (the button and the menu share one function, so they can never disagree
+  // about what's navigable).
   await rightClick(gridCell(page, 0, 'manager_id'));
   const fkMenuIds = await menuItemIds(page);
   expect(fkMenuIds.some((id) => id.startsWith('go-to-referenced-'))).toBe(true);
@@ -1607,7 +1606,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
 
   // =============================================================================================
-  // P7: a row with two independent outbound FKs (order_items.order_id -> orders,
+  // A row with two independent outbound FKs (order_items.order_id -> orders,
   // order_items.product_id -> products) gets two independent nav buttons, each targeting its own
   // table — the two never share or overwrite each other's target.
   // =============================================================================================
@@ -1619,8 +1618,8 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   expect(await cellText(page, 0, 'order_id')).toBe('1');
   expect(await cellText(page, 0, 'product_id')).toBe('1');
 
-  // P67 §7 case 3 / P89: the cell menu's "Edit referenced row" item (the popover dropped its own
-  // "Edit this record" — P89 §2) opens a new tab on the referenced table, lands the caret on its
+  // The cell menu's "Edit referenced row" item (the popover dropped its own
+  // "Edit this record") opens a new tab on the referenced table, lands the caret on its
   // first non-primary-key column ('name' — 'id' is products' own primary key) and enters edit
   // mode; typing into the dock stages into that NEW tab's own pending set — the *existing* edit
   // surface, never a second one.
@@ -1670,7 +1669,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   expect(await cellText(page, 0, 'customer_id')).toBe('1');
 
   // =============================================================================================
-  // P67 §7 case 4: no matching row. orders row 1's customer_id (2) filtered against customers
+  // No matching row. orders row 1's customer_id (2) filtered against customers
   // comes back empty (an orphaned FK value, or the row deleted since the page loaded) — "Open in
   // new tab" stays offered.
   // =============================================================================================

@@ -3,17 +3,16 @@ import { cva } from 'class-variance-authority';
 
 export { default as NativeSelect } from '@theme/components/ui/native-select/NativeSelect.vue';
 
-// P110 B24: fetched from shadcn-vue.com/r/styles/reka-nova/native-select.json (P99 §4.2's
-// direct-curl procedure), then fully restyled -- the registry's own default look is
-// appearance-none plus a manually-positioned ChevronDownIcon requiring a wrapper div, but this
-// app ships in Wails WebKit (WKWebView/WebKitGTK; see P61), the same engine the UI tests pin, so
-// it keeps the Customizable Select API instead: a bare
+// Fetched from shadcn-vue.com/r/styles/reka-nova/native-select.json, then fully restyled -- the
+// registry's own default look is appearance-none plus a manually-positioned ChevronDownIcon
+// requiring a wrapper div, but this app ships in Wails WebKit (WKWebView/WebKitGTK), the same
+// engine the UI tests pin, so it keeps the Customizable Select API instead: a bare
 // <select appearance:base-select>, no wrapper, no manual icon -- the browser draws
 // ::picker-icon/::picker(select) itself, themed below. `[appearance:base-select]`,
-// `[&::picker(select)]:…`, `[&::picker-icon]:…` are §1.2's own allowlisted arbitrary values,
+// `[&::picker(select)]:…`, `[&::picker-icon]:…` are allowlisted arbitrary values,
 // confined to this file only.
 export const nativeSelectVariants = cva(
-  // P61: WebKit's `appearance: base-select` box carries its own intrinsic min-height floor
+  // WebKit's `appearance: base-select` box carries its own intrinsic min-height floor
   // (font-metric-driven, ~24px at this font-size/line-height) that wins over an authored height
   // even under box-sizing: border-box -- since Playwright 1.63's bundled WebKit, this floor sits
   // above --kira-control-h and breaks the height match with every other control. min-h-0 removes

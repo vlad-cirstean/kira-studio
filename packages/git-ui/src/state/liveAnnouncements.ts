@@ -1,14 +1,14 @@
 /**
- * `docs/plans/P4.md` W14's "one polite live region" — pure text composition for the two events it
- * announces (Load-more's own doc comment in `LoadMoreButton.vue` names both: "the Load-more result
+ * The "one polite live region" — pure text composition for the two events it announces
+ * (Load-more's own doc comment in `LoadMoreButton.vue` names both: "the Load-more result
  * ... and Refresh completion"). Kept separate from `App.vue`, which only owns *when* to set the
  * region's text (watching `GraphViewState.loading`'s transitions back to `"idle"`), so the exact
  * wording is unit-testable on its own, the same split `rowAccessibility.ts` makes for a row's
  * accessible name.
  *
- * `docs/plans/P6.md` W12 adds the op-outcome half: every announcement `ops.ts` produces — success
- * or failure — is composed here too, per that phase's own rule that a destructive action which
- * silently does nothing is the same failure mode §6.4 already named for the clipboard.
+ * Every announcement `ops.ts` produces — success or failure — is composed here too, per the rule
+ * that a destructive action which silently does nothing is the same failure mode already named
+ * for the clipboard.
  */
 import { shortSha } from '@kira/git-core';
 import type {
@@ -62,15 +62,14 @@ export function composeRefreshAnnouncement(totalLoaded: number): string {
   return t('git.announce.refreshed.announce', { count: totalLoaded });
 }
 
-/** `docs/plans/P11.md` W13: `GraphViewState.revealSha`'s own live-region text — §5.1.1's
- *  "selecting such a result loads the pages up to it" can be several seconds of paging on a large
- *  repository, which must not read as a hang to a user who cannot see the toolbar's own loading
- *  indicator. There is no `"found"` text: the row selection that follows a successful reveal
- *  already moves real focus onto it, and that row's own composed accessible name
- *  (`rowAccessibility.ts`) is the completion signal — a second announcement here would only repeat
- *  it. A hit that is *not* found (the history paged to exhaustion without it — most likely a stale
- *  hit from before a force-push) gets nothing else at all otherwise, which is the silent-no-op
- *  failure mode §6.4 already names for the clipboard. */
+/** `GraphViewState.revealSha`'s own live-region text — "selecting such a result loads the pages up
+ *  to it" can be several seconds of paging on a large repository, which must not read as a hang to
+ *  a user who cannot see the toolbar's own loading indicator. There is no `"found"` text: the row
+ *  selection that follows a successful reveal already moves real focus onto it, and that row's own
+ *  composed accessible name (`rowAccessibility.ts`) is the completion signal — a second
+ *  announcement here would only repeat it. A hit that is *not* found (the history paged to
+ *  exhaustion without it — most likely a stale hit from before a force-push) gets nothing else at
+ *  all otherwise. */
 export function composeRevealSearchHitAnnouncement(outcome: 'loading' | 'notFound'): string {
   return outcome === 'loading'
     ? t('git.announce.revealLoading.announce')
@@ -95,12 +94,12 @@ export function composeCheckoutAnnouncement(preflight: CheckoutPreflight, target
   return t('git.op.checkout.announce', { where });
 }
 
-/** G28 D16: the auto-stash announcement — mandatory, never decoration, since the working tree
+/** The auto-stash announcement — mandatory, never decoration, since the working tree
  *  reads as clean on the new branch and this sentence is the only place the user learns where
  *  their work went. `fileCount` is summed from the blocked-tracked/blocked-untracked blocker
  *  paths the pre-flight already reported (the exact set the server's own `stash push` swept).
- *  `fromBranch` is the ORIGIN branch (where the switch started, not the target) — matching D1's
- *  own tagging: the entry is tagged with the branch it came FROM. */
+ *  `fromBranch` is the ORIGIN branch (where the switch started, not the target) — the entry is
+ *  tagged with the branch it came FROM. */
 export function composeAutoStashAnnouncement(fileCount: number, fromBranch: string): string {
   return t('git.op.autoStash.body', { count: fileCount, branch: fromBranch });
 }
@@ -140,11 +139,11 @@ export function composeCherryPickAnnouncement(sha: string, noCommit: boolean): s
   });
 }
 
-/** `docs/plans/P10.md` W10, hard part 7's own answer, given a voice: `CherryPickPreflight`'s
- *  `merge-tree` prediction inherits D57's whole posture (P9's own stash-pop precedent) — exact
- *  about the merge, reconciled after the fact by `runOp`'s read-back, never swallowed. No
- *  `stashKept` half exists here (unlike `StashPredictionMismatch`): a cherry-pick never touches
- *  the stash, so this is its own, one-field-simpler shape rather than a forced reuse. */
+/** `CherryPickPreflight`'s `merge-tree` prediction inherits the whole posture (the stash-pop
+ *  precedent) — exact about the merge, reconciled after the fact by `runOp`'s read-back, never
+ *  swallowed. No `stashKept` half exists here (unlike `StashPredictionMismatch`): a cherry-pick
+ *  never touches the stash, so this is its own, one-field-simpler shape rather than a forced
+ *  reuse. */
 export interface CherryPickPredictionMismatch {
   readonly predicted: 'clean' | 'conflicts';
   readonly actual: 'clean' | 'conflicts' | 'refused';
@@ -296,18 +295,18 @@ export function firstLine(text: string | undefined): string | undefined {
   return line.length > MAX_DETAIL_LENGTH ? `${line.slice(0, MAX_DETAIL_LENGTH)}…` : line;
 }
 
-/** `docs/plans/P9.md` W13: git's own `No local changes to save` no-op (probe 10) exits 0 with no
- *  error, so a plain "succeeded" announcement would be the silent-no-op failure mode §6.4 already
+/** git's own `No local changes to save` no-op exits 0 with no
+ *  error, so a plain "succeeded" announcement would be the silent-no-op failure mode already
  *  named for the clipboard — `pushed` is `ops.ts`'s own before/after stash-count comparison,
  *  the only way to tell the two outcomes apart. */
 export function composeStashPushAnnouncement(pushed: boolean): string {
   return t(pushed ? 'git.op.stashed.announce' : 'git.op.nothingToStash.announce');
 }
 
-/** §7.6's concrete answer to hard part 1: non-null only when an executed pop/apply disagreed with
- *  the prediction the user was shown (a race between pre-flight and write, or a gap pre-flight
+/** Non-null only when an executed pop/apply disagreed with the prediction the user was shown
+ *  (a race between pre-flight and write, or a gap pre-flight
  *  could not see — never a false positive, since `composeStashAnnouncement` never compares at all
- *  when the prediction itself was `"unknown"`). `stashKept` is a fact for every failure mode P9
+ *  when the prediction itself was `"unknown"`). `stashKept` is a fact for every failure mode
  *  probed (conflict, untracked collision, local-overwrite refusal) — the stash always survives —
  *  except a genuinely CLEAN `pop` (as opposed to `apply`), which removes it exactly as intended
  *  even when that clean outcome is itself the surprise (`predicted: "conflicts"`). */
@@ -320,8 +319,8 @@ export interface StashPredictionMismatch {
 // The backend owns this label (`RepoService`'s stash-drop undo capture) and it stays English.
 const STASH_DROP_UNDO_LABEL_PREFIX = 'Dropped stash@{';
 
-/** `docs/plans/P9.md` W15: undoing a dropped stash does not restore it to its old stack position
- *  — probe 9 found it always lands back at `stash@{0}` — so the generic "Undone: `<label>`" text
+/** Undoing a dropped stash does not restore it to its old stack position
+ *  — it always lands back at `stash@{0}` — so the generic "Undone: `<label>`" text
  *  would read as if `stash@{2}` (say) came back exactly as it was, which a user watching for that
  *  position would take as a sign the undo failed. Detected from the slot's own `label` rather
  *  than a dedicated field: `UndoSlotSnapshot` carries no "kind" to switch on. */
@@ -336,11 +335,10 @@ export function stashRef(index: number | string): string {
   return `stash@{${index}}`;
 }
 
-/** `docs/plans/P10.md` W14, hard part 1's own table, given a voice: the undo button's tooltip is
- *  the one place a user learns *what a reset's undo actually restores* before they need it, and
- *  the three modes are not interchangeable (probe 5's own finding — a mixed reset's undo does not
- *  bring back what was staged, because that index state was never written to the object database
- *  at all). Detected from `UndoRecord.label`'s own text (backend-owned, English), the same way
+/** The undo button's tooltip is the one place a user learns *what a reset's undo restores* before
+ *  they need it, and the three modes are not interchangeable (a mixed reset's undo does not bring
+ *  back what was staged, because that index state was never written to the object database at all).
+ *  Detected from `UndoRecord.label`'s own text (backend-owned, English), the same way
  *  `composeUndoAnnouncement` detects a dropped stash above. */
 const RESET_UNDO_LABEL_PATTERN = /^Reset \((soft|mixed|hard)\) to /;
 
@@ -385,19 +383,18 @@ const STASH_MISMATCH: Record<
   },
 };
 
-/** §7.6's own worked example, given a voice: *"This pop conflicted, though the pre-flight
+/** The worked example, given a voice: *"This pop conflicted, though the pre-flight
  *  predicted a clean apply. The tree changed in between. Your stash was kept."* A `mismatch`
  *  takes priority over the plain success/failure text — it is the more specific, more surprising
- *  fact, and staying silent about it is exactly the "silently rendering the outcome" §7.6 rules
- *  out. With no mismatch, this reads exactly like `composeOpFailureAnnouncement`'s own output for
- *  a failure, or a short "Applied"/"Popped" sentence for a plain, agreeing success.
+ *  fact. With no mismatch, this reads exactly like `composeOpFailureAnnouncement`'s own output
+ *  for a failure, or a short "Applied"/"Popped" sentence for a plain, agreeing success.
  *
- *  G28 D5: `currentBranch` (optional — omitted means "the caller does not know", which suppresses
+ *  `currentBranch` (optional — omitted means "the caller does not know", which suppresses
  *  the origin clause rather than comparing against `undefined`) adds the origin whenever `entry`'s
  *  own origin branch differs from it — the cross-branch apply's own "you're not where this came
  *  from" reminder. `label` reads `stashLabel(entry)` (the user's own text) rather than the
- *  position-addressed `stash@{N}` — correct for a global entry too, whose `index` is D17's own
- *  `-1` sentinel. */
+ *  position-addressed `stash@{N}` — correct for a global entry too, whose `index` is the `-1`
+ *  sentinel. */
 export function composeStashAnnouncement(
   verb: 'apply' | 'pop',
   entry: StashEntry,
@@ -424,7 +421,7 @@ export function composeStashAnnouncement(
   });
 }
 
-/** G26 D8/D11: `stack.restack`'s own live-region text — a full success, a paused conflict
+/** `stack.restack`'s own live-region text — a full success, a paused conflict
  *  (`stoppedAt` set), and a cancellation (`stoppedAt` undefined but `remaining` non-empty) all read
  *  differently. `StackList.vue`'s own paused-restack strip renders the same "paused on X" text
  *  inline, not just the live region — kept as one function so the two can never disagree. */

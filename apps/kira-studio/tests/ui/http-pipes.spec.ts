@@ -4,8 +4,8 @@ import { httpResponse, openHttpModeAndNewRequest } from './support/apiMode';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
-// P17 §4.4: the end-to-end proof §5 needs, which no unit test can give because it is a property
-// of what actually reaches the wire — three cases, mirroring http-variables.spec.ts's own
+// The end-to-end proof, which no unit test can give because it is a property
+// of what reaches the wire — three cases, mirroring http-variables.spec.ts's own
 // "substitution reaches the wire, and a secret does not" (its own line 185) and http-raw.spec.ts's
 // "the inspector, http2 and masked", extended to a piped secret.
 //
@@ -16,9 +16,9 @@ import { IPC } from './support/ipcChannels';
 // client-side" property http-variables.spec.ts:185 already asserts for a bare secret; and
 // (b) every copyable surface (Raw pane, Timeline hop, persisted history entry) renders exactly
 // what a real Go backend's masking pipeline would have handed back, with neither the plaintext nor
-// the transformed (piped) plaintext ever appearing — the properties R3's own Go tests
+// the transformed (piped) plaintext ever appearing — the properties the Go tests
 // (bridge/http_test.go's TestMaskSecrets_MasksPipedSecretsBase64Form et al.) prove are what Go
-// actually computes; this file proves the UI never adds a leak of its own on top.
+// computes; this file proves the UI never adds a leak of its own on top.
 
 // ---- 1. Stage 1 never resolves a piped secret — the literal reference is what leaves the renderer ----
 

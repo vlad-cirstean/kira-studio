@@ -6,10 +6,10 @@ import { markRaw, type ShallowRef, shallowRef } from 'vue';
 export type ChunkSource = StreamChunkOf<'graph.stream'>['source'];
 
 /** The row range a chunk just appended — `{from, to}` straight off `PackedCommitChunk`, handed
- *  back to the caller so it can do whatever comes after the append (P4's lane-layout submission;
- *  P7's review view does nothing with it at all). `undefined` when the chunk was corrupted and
+ *  back to the caller so it can do whatever comes after the append (the lane-layout submission;
+ *  the review view does nothing with it at all). `undefined` when the chunk was corrupted and
  *  recovery already kicked off a fresh re-open — there is nothing for the caller to do with a
- *  range that was never actually applied. */
+ *  range that was never applied. */
 export interface AppliedChunkRange {
   readonly from: number;
   readonly to: number;
@@ -19,8 +19,8 @@ export interface AppliedChunkRange {
 
 export interface ApplyChunkHooks {
   /** Called when this chunk triggers a restart-at-row-0 reset, *before* the reset itself runs —
-   *  the caller's own chance to clear whatever it layers on top of the store (P4's lane layout;
-   *  P7's `review.ts` has nothing extra to clear and omits this). Not called for a staged restart:
+   *  the caller's own chance to clear whatever it layers on top of the store (the lane layout;
+   *  the `review.ts` has nothing extra to clear and omits this). Not called for a staged restart:
    *  the live store and its layout stay valid until the swap. */
   readonly onReset?: () => void;
   /** Called instead of applying the chunk when `CommitStore.appendPacked` rejects it (an
@@ -38,15 +38,14 @@ export interface ApplyChunkHooks {
 const MAX_CONSECUTIVE_CORRUPTIONS = 1;
 
 /**
- * The chunk-application core `GraphViewState` (P4) and `ReviewSessionState` (P7) both need,
- * extracted verbatim from `GraphViewState`'s original `#applyChunk`/`#reset` (P7 W10, open
- * question 8): the reset-on-`from: 0` rule, the `appendPacked` call, the corrupted-chunk
- * recovery (log, let the caller re-open from row 0), and the `loadedRows`/`remaining`/
- * `exhausted`/`lastChunkSource`/`generation` reactive scalars. It owns a `CommitStore` and
- * nothing else — no layout, no bridge, no knowledge of what a "row" means beyond a slice of
- * that store. `GraphViewState` composes this and layers its own lane-layout submission and
- * `laneCount` on top via `ApplyChunkHooks.onReset`; the review view's `ReviewSessionState`
- * composes it with no such hook, because a range walk draws no lanes (§6.8/D41).
+ * The chunk-application core `GraphViewState` and `ReviewSessionState` both need: the
+ * reset-on-`from: 0` rule, the `appendPacked` call, the corrupted-chunk recovery (log, let the
+ * caller re-open from row 0), and the `loadedRows`/`remaining`/`exhausted`/`lastChunkSource`/
+ * `generation` reactive scalars. It owns a `CommitStore` and nothing else — no layout, no bridge,
+ * no knowledge of what a "row" means beyond a slice of that store. `GraphViewState` composes this
+ * and layers its own lane-layout submission and `laneCount` on top via `ApplyChunkHooks.onReset`;
+ * the review view's `ReviewSessionState` composes it with no such hook, because a range walk
+ * draws no lanes.
  *
  * With `stageRestarts`, a restart-at-row-0 chunk leaves the live store alone and starts a staging
  * store; that chunk and the rest append there. Staging is ready once it holds as many rows as the
@@ -54,7 +53,7 @@ const MAX_CONSECUTIVE_CORRUPTIONS = 1;
  * ended (a history that shrank). `commitStaged()` then moves it into the live store in one step,
  * so the list never passes through empty.
  *
- * `store` is `markRaw`'d and never becomes reactive (§5.3) — only the scalars below are.
+ * `store` is `markRaw`'d and never becomes reactive — only the scalars below are.
  * **`generation` is the mechanism that makes a reset visible to a grid or list** built on top:
  * nothing else changes when rows are dropped and re-walked from row 0 (`loadedRows` might land
  * on the same number), so every consumer that caches anything derived from the store
@@ -190,10 +189,10 @@ export class PackedStreamState {
     return { from: chunk.commits.from, to: chunk.commits.to };
   }
 
-  /** G16 D7: terminal state from a `graph.status` request, applied after a load's resync
+  /** Terminal state from a `graph.status` request, applied after a load's resync
    *  re-stream — not a chunk, so deliberately not folded into `applyChunk`, which would drag the
-   *  reset-on-`from === 0` logic somewhere it does not belong. This is what closes F7's
-   *  zero-chunk hole: a re-stream that emits nothing (because the client already holds every row
+   *  reset-on-`from === 0` logic somewhere it does not belong. This is what closes the zero-chunk
+   *  hole: a re-stream that emits nothing (because the client already holds every row
    *  the host has) never calls `applyChunk` at all, so `exhausted`/`remaining` would otherwise be
    *  stuck at whatever the last real chunk said. */
   applyStatus(remaining: number, exhausted: boolean): void {

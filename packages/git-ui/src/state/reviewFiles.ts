@@ -15,7 +15,7 @@ import { isCancelledTransport } from './isCancelled.ts';
 
 export type ReviewFileDiffBody = ResultOf<'review.fileDiff'>['body'];
 
-/** editor.openRangeDiff's status is a four-way enum (G12 D1); `copied`/`typeChanged`/`unmerged`
+/** editor.openRangeDiff's status is a four-way enum; `copied`/`typeChanged`/`unmerged`
  *  fold to `modified` because the handler treats them identically — both sides present, `path`
  *  (and `originalPath` when set) name them. Only `added` (no base side) and `deleted` (no branch
  *  side) change which side is `{kind: 'empty'}`. */
@@ -40,7 +40,7 @@ export interface ReviewFilesTarget {
 }
 
 /**
- * The review sidebar's Files pane (G11 D16) — `DetailState`'s own supersede-and-verify discipline,
+ * The review sidebar's Files pane — `DetailState`'s own supersede-and-verify discipline,
  * applied to review.files/review.fileDiff/review.mark instead of commit.detail/commit.fileDiff.
  * Kept as its own class (not folded into `ReviewSessionState`) since it answers a different
  * question (which files has THIS branch's diff, and what state do they carry) than the commit
@@ -70,7 +70,7 @@ export class ReviewFilesState {
   /** A review.mark request in flight or queued — the two header buttons disable themselves while
    *  true rather than let a double-click race two writes against the same file. */
   readonly pending: ShallowRef<boolean> = shallowRef(false);
-  // G30 round-1 functional-correctness review, finding #7: mark()'s own request had no catch at
+  // mark()'s own request had no catch at
   // all — a rejection propagated straight out of mark() as a rejected promise, and every caller
   // (ReviewFilesPane.vue's onToggleReviewed among them) calls it as `void mark(...)`, discarding
   // that promise outright. The failure became an unhandled rejection with nothing user-visible:
@@ -106,7 +106,7 @@ export class ReviewFilesState {
     this.markError.value = undefined;
     this.selectedPath.value = null;
     this.#clearDiff();
-    // G30 round-1 functional-correctness review, finding #6: mark()'s own `finally` only clears
+    // mark()'s own `finally` only clears
     // `pending` when `this.#target === target` still holds for the SAME target identity that was
     // current when the request started — a `setTarget` call that lands while a mark() is in
     // flight (a base-resolution change, the stale-review banner, clicking Refresh review) swaps
@@ -146,12 +146,12 @@ export class ReviewFilesState {
     });
   }
 
-  /** Opens path in the host's native diff (G12 D12) — a no-op re-selection of the file already
+  /** Opens path in the host's native diff — a no-op re-selection of the file already
    *  open re-opens it anyway, since the editor tab may since have been closed. `#loadDiff` runs
    *  alongside, independently: it fetches metadata this pane still renders (the delta status
    *  line, the per-file reviewed marks), never the diff body the host owns.
    *
-   *  G21 D13: `opts.pinned` — `false`/omitted for a click or arrow-key move (navigational, the
+   *  `opts.pinned` — `false`/omitted for a click or arrow-key move (navigational, the
    *  default here matches every other "selecting = opening" caller in this file), `true` for a
    *  double click/`Enter` (`FileTree.vue`'s own `openFile` emit). */
   selectFile(path: string, opts: { pinned?: boolean } = {}): void {
@@ -177,10 +177,10 @@ export class ReviewFilesState {
     }
   }
 
-  /** G12 D12, reshaped G13 D8: composes the reshaped `editor.openRangeDiff` params from data this
+  /** Composes the reshaped `editor.openRangeDiff` params from data this
    *  class already holds — `sinceReview` uses the file's own `reviewedAtSha`, falling back to
-   *  `#mergeBase` when it is `null` (never reviewed); `range` mode always uses `#mergeBase` (F7:
-   *  the three-dot set `review.files` already returns, not a two-dot diff against `target.base`).
+   *  `#mergeBase` when it is `null` (never reviewed); `range` mode always uses `#mergeBase` (the
+   *  three-dot set `review.files` already returns, not a two-dot diff against `target.base`).
    *  A fire-and-forget host action, not a fetch: nothing here is superseded the way `#loadDiff`'s
    *  reactive state is. */
   async #openInEditor(pinned: boolean): Promise<void> {
@@ -191,7 +191,7 @@ export class ReviewFilesState {
     const entry = this.files.value.find((e) => e.change.path === path);
     if (!entry) return;
     const change = entry.change;
-    // G30 round-1 functional-correctness review, finding #3: this used to read the shared
+    // This used to read the shared
     // `reviewedAtSha` ref, which #loadDiff (fired concurrently, not awaited — see selectFile)
     // only populates from ITS OWN response, arriving after this runs. On the very first click
     // after setTarget, or on the file switch immediately following one, that ref still held
@@ -251,8 +251,8 @@ export class ReviewFilesState {
   }
 
   /**
-   * Marks (or unmarks) path — the whole file when ranges is omitted, a sub-range otherwise (G11
-   * D13). Applies the returned status to the in-memory file list directly, so the list updates
+   * Marks (or unmarks) path — the whole file when ranges is omitted, a sub-range otherwise.
+   * Applies the returned status to the in-memory file list directly, so the list updates
    * from the response rather than a second review.files round trip; when path is the file
    * currently open, its diff is re-fetched too (a mark can change reviewedRanges/deltaSource for
    * the very diff the user is looking at).
@@ -309,7 +309,7 @@ export class ReviewFilesState {
     }
   }
 
-  /** G15 D9: re-runs `#loadFiles` against the current target — the review sidebar's own answer to
+  /** Re-runs `#loadFiles` against the current target — the review sidebar's own answer to
    *  an editor-side range mark, which emits no `repo.changed` (it touches `review.db`, not refs)
    *  and would otherwise leave the file list stale until an unrelated repo change. A no-op with no
    *  target set. */

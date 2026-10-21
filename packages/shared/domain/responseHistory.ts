@@ -1,7 +1,7 @@
-// P8 D9: the TypeScript mirrors of Go's model.ResponseHistoryEntry/ResponseHistorySnapshot.
-// Following P2 D5's rule — "the wire shapes live in Go and are mirrored, not re-validated" — these
+// The TypeScript mirrors of Go's model.ResponseHistoryEntry/ResponseHistorySnapshot.
+// Following the rule — "the wire shapes live in Go and are mirrored, not re-validated" — these
 // are types, not guards; control.ts `trust<T>()`s them like every other bound result. Nothing here
-// becomes tab state (the response is runtime-only, P2 D6), so neither earns a Zod-parse boundary.
+// becomes tab state (the response is runtime-only), so neither earns a Zod-parse boundary.
 import type { HttpBodyWire, HttpHeaderWire, HttpResponseWire } from './http';
 
 // P18 D4: mirrors repos/response_history.go's own historyPerScopeLimit, pinned equal by

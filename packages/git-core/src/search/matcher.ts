@@ -1,10 +1,10 @@
 /**
- * `docs/plans/P11.md` W5: the one predicate every half of search — the loaded-row scan, the
- * streamed git tail, and the mock bridge's fixture-backed stand-in (W9) — runs, so there is
- * exactly one place §7.8's six-field-OR-plus-sha-prefix semantics is implemented and one place
- * W16's semantics table is asserted against.
+ * The one predicate every half of search — the loaded-row scan, the streamed git tail, and the
+ * mock bridge's fixture-backed stand-in — runs, so there is exactly one place the
+ * six-field-OR-plus-sha-prefix semantics is implemented and one place the semantics table is
+ * asserted against.
  *
- * G23: `matchCommitFields` is this feature's own conformance ORACLE for the Go tail scan's twin,
+ * `matchCommitFields` is this feature's own conformance ORACLE for the Go tail scan's twin,
  * `apps/kira-space/internal/gitsearch`'s `(*Matcher).MatchFields` — both are asserted against
  * the same `packages/git-core/testdata/searchConformance.json` (this file's own
  * `conformance.spec.ts`, and that package's `conformance_test.go`), so a change to either
@@ -56,9 +56,9 @@ const NO_FIELDS: readonly SearchField[] = Object.freeze([]);
 
 /**
  * A straight OR over seven tests — the AND-across-categories semantics `git log --grep --author`
- * would give is exactly what probe 1 rules out. Returns every field that matched, not a boolean:
+ * would give is exactly what is ruled out. Returns every field that matched, not a boolean:
  * a hit's `fields` is what the dropdown labels it with, and what the loaded/tail de-duplicator
- * (hard part 5) merges on. Allocation-light on the miss path (the common case): `NO_FIELDS`, not
+ * merges on. Allocation-light on the miss path (the common case): `NO_FIELDS`, not
  * a fresh `[]`, when nothing matches.
  */
 export function matchCommitFields(
@@ -129,10 +129,10 @@ function matchesPrefix(matcher: PrefixMatcher, shas: Uint8Array, rowStart: numbe
 const rowDecoder = new TextDecoder('utf-8', { fatal: false });
 
 /**
- * Cheapest-first per row: the four identity columns as integer `Set.has` checks (probe 9b's
+ * Cheapest-first per row: the four identity columns as integer `Set.has` checks (the
  * once-per-query dictionary match turns a per-row string compare into this), then the sha prefix
  * (byte compares, only when the query has one), then the subject — the one per-row decode this
- * function performs. `body` is always `""` here (hard part 1: the store holds no bodies at all),
+ * function performs. `body` is always `""` here (the store holds no bodies at all),
  * so a body-only match can only ever come from the streamed tail, never from this scan.
  */
 function matchLoadedRow(
@@ -164,7 +164,7 @@ function matchLoadedRow(
 }
 
 /**
- * Probe 9b's strategy: a once-per-query dictionary pre-match into a `Set<number>` (single-digit
+ * The strategy: a once-per-query dictionary pre-match into a `Set<number>` (single-digit
  * ms over ~40k distinct identity strings), then an integer scan of the four identity columns plus
  * a byte-compare sha-prefix test and one subject decode per row — 13-38 ms at 100k rows against
  * the 120 ms client-side budget. Every column view this reads is valid only until the store's
@@ -226,12 +226,12 @@ export function searchLoadedCommits(
 /**
  * `shortName` first (the common case), then an annotated tag's own message — `subject` and
  * `body` — never a lightweight tag's borrowed commit subject (`ref.annotation` is already
- * `undefined` there; see `parse/refs.ts`). `pr` is G24's own activation of P12's seam (§7.8's own
- * paragraph on the boundary): when the branch this ref names has an associated change request
- * (`ChangeRequestState.byBranch`), its number and title are matched too — a `#123`-or-bare-`123` two-form
- * number test (upstream §7.8 verbatim) and a plain title match. `pr === undefined` (every P11
- * caller, and a branch with no resolved PR) is byte-identical to this seam's pre-G24 inert
- * behaviour — a strict addition, never a change to the refName/tagAnnotation arms above it.
+ * `undefined` there; see `parse/refs.ts`). `pr` is the activation of the seam: when the branch
+ * this ref names has an associated change request (`ChangeRequestState.byBranch`), its number and
+ * title are matched too — a `#123`-or-bare-`123` two-form number test (upstream verbatim) and a
+ * plain title match. `pr === undefined` (every caller, and a branch with no resolved PR) is
+ * byte-identical to this seam's inert behaviour — a strict addition, never a change to the
+ * refName/tagAnnotation arms above it.
  */
 export function matchRef(
   ref: MatchableRef,

@@ -1,15 +1,14 @@
-// P13 D10: formatConsoleText's Mongo branch is a composed statement parser (mongoStatement.ts) +
+// formatConsoleText's Mongo branch is a composed statement parser (mongoStatement.ts) +
 // argument splitter + emitter (ejson.ts's beautifyShellText) with real boundary cases — nested
 // constructor calls, an empty argument list, a trailing comma — the "parser or splitter with
 // several interacting lexical rules" CLAUDE.md's own bar names explicitly. The SQL branch is a
 // per-kind dialect lookup plus a library call, plumbing well below that bar, and is covered by
 // tests/ui/console-format.spec.ts alone.
 //
-// P19 D13: every case below now carries its own `failures: []` — formatConsoleText's return
-// shape gained a per-statement `failures` array (reopening P13 §3's declined statement-by-
-// statement alternative), and the cases at the bottom exercise it directly: one statement failing
-// no longer takes its neighbours down with it, and the statement COUNT survives every case
-// (what D12's caret-by-index mapping in ConsoleView.onFormat depends on).
+// Every case below now carries its own `failures: []` — formatConsoleText's return shape
+// gained a per-statement `failures` array, and the cases at the bottom exercise it directly:
+// one statement failing no longer takes its neighbours down with it, and the statement COUNT
+// survives every case (what the caret-by-index mapping in ConsoleView.onFormat depends on).
 import { describe, expect, test } from 'bun:test';
 import {
   formatConsoleText,
@@ -165,9 +164,9 @@ describe('formatConsoleText — mongodb', () => {
   });
 });
 
-// P22b D12: splitSqlStatements' pushIfNonEmpty slices up to, not through, a statement's own ';'
+// splitSqlStatements' pushIfNonEmpty slices up to, not through, a statement's own ';'
 // (sql-split.ts), so a plain join(';\n\n') emitted N-1 semicolons for N statements — silently
-// deleting the document's LAST one on every press, a regression against P13's whole-document
+// deleting the document's LAST one on every press, a regression against the whole-document
 // formatDialect call. None of the cases above happen to end their input in ';', which is exactly
 // why the regression went unnoticed; these are the ones that would have caught it.
 describe("formatConsoleText — D12 preserves the document's own trailing terminator", () => {
@@ -208,7 +207,7 @@ describe("formatConsoleText — D12 preserves the document's own trailing termin
   });
 });
 
-// P108 Part 11 F9: `stmt.text` never carries its own ';' — when a formatted statement's own last
+// `stmt.text` never carries its own ';' — when a formatted statement's own last
 // line holds a line comment, a plain join(';\n\n') put the ';' inside that comment, and the
 // splitter then saw one statement instead of two on the next Run all/Format press. Splitter rules
 // (what counts as "the last line's own comment") interacting with the rejoin — the bar this

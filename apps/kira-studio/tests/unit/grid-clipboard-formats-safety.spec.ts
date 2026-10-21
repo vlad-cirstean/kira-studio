@@ -1,13 +1,11 @@
-// P21 round 3 findings:
-//  - architecture/security #10: a cell is untrusted database content, but CSV/TSV copy handed it
-//    straight to a spreadsheet — a value starting with `=`/`+`/`-`/`@` is evaluated as a formula on
-//    paste (CWE-1236).
-//  - functional #6: the TSV branch of parseDelimited kept the trailing empty row the CSV branch
+//  - A cell is untrusted database content, but CSV/TSV copy handed it straight to a spreadsheet
+//    — a value starting with `=`/`+`/`-`/`@` is evaluated as a formula on paste (CWE-1236).
+//  - The TSV branch of parseDelimited kept the trailing empty row the CSV branch
 //    already dropped, silently blanking or inserting an extra row on paste.
-//  - functional #7: rowsToTsv/columnsToTsv emitted tab/newline verbatim, so a cell containing
+//  - rowsToTsv/columnsToTsv emitted tab/newline verbatim, so a cell containing
 //    either corrupted the row layout on a copy→paste round trip.
 //
-// F5 (P108 Part 10) revises the first finding: the formula-injection guard moved off TSV entirely.
+// The formula-injection guard moved off TSV entirely.
 // TSV is Plain Copy's own format, not an explicit spreadsheet-bound export — applying it there
 // meant a plain range/row/column copy of `-5` wrote `'-5` to the clipboard, and pasting it back
 // into this app's own grid staged the literal `'-5`, corrupting a same-app round trip to guard
@@ -105,7 +103,7 @@ describe('TSV trailing empty row (finding 6)', () => {
   });
 });
 
-// F5 (P108 Part 10), bug points 2 and 3: a single-cell copy used to be raw text while every other
+// A single-cell copy used to be raw text while every other
 // copy kind went through the (then formula-guarded) TSV quoting — same value, two different
 // clipboard texts. And any clipboard text with no tab fell through to CSV regardless of its real
 // source, so a single cell copied from this app itself split on commas/newlines on paste.

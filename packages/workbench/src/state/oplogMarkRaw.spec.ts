@@ -1,14 +1,13 @@
-// P21 round 3 performance finding 13: onOpUpdate's own findIndex scan (up to 500 comparisons per
-// op:start/op:end) used to compare plain records read out of opsState's deep-reactive array — each
-// read wraps the record in its own nested reactive proxy (cached, but still a proxy trap on every
-// subsequent `.id` read), the same cost round 2 already fixed for the gRPC message buffer via
-// markRaw. This pins that hydrateOps/onUpdate now markRaw every incoming record: a markRaw'd
-// object is never wrapped when read back out of a reactive container, so the exact same reference
-// comes back out — the observable, testable consequence of the fix.
+// onOpUpdate's own findIndex scan (up to 500 comparisons per op:start/op:end) used to compare plain
+// records read out of opsState's deep-reactive array — each read wraps the record in its own nested
+// reactive proxy (cached, but still a proxy trap on every subsequent `.id` read), the same cost
+// already fixed for the gRPC message buffer via markRaw. This pins that hydrateOps/onUpdate now
+// markRaw every incoming record: a markRaw'd object is never wrapped when read back out of a
+// reactive container, so the exact same reference comes back out — the observable, testable
+// consequence of the fix.
 //
-// P132 Part 1 (§0.7/§4.2): moved from apps/kira-studio/tests/unit/ops-markraw.spec.ts onto
-// createOpLogStore directly — a fake OpLogControl replaces the window/bridge stub, and each test
-// gets its own Pinia instance instead of one shared module-level store.
+// A fake OpLogControl replaces the window/bridge stub, and each test gets its own Pinia instance
+// instead of one shared module-level store.
 import { describe, expect, test } from 'bun:test';
 import type { OpLogRecord } from '@shared/domain/ops';
 import { createPinia, setActivePinia } from 'pinia';

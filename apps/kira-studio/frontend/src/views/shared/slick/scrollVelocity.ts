@@ -1,4 +1,4 @@
-// P107 T2-17: recordOffsetSample/velocity, byte-identical across SlickGridHost.vue/
+// recordOffsetSample/velocity, byte-identical across SlickGridHost.vue/
 // ConsoleSlickGrid.vue (the latter's own comment already called it "Mirrors SlickGridHost.vue's
 // own onScroll velocity sampler verbatim"). Plain mutable state, not refs — read only from
 // KiraSlickGrid's own `velocity` callback, itself called only from inside getRenderedRange
@@ -11,7 +11,7 @@ export interface ScrollVelocityTracker {
   velocity(): { pxPerFrame: number; direction: 1 | -1 | 0 };
   /** `grid.lastScrollEventAt`'s own reader (P22 iter2-pacing D1's chase quiescence gate). */
   lastScrollEventAt(): number;
-  /** P22 iter2-onset D1 — seeds the sampler's baseline at mount (after the restored scroll
+  /** Seeds the sampler's baseline at mount (after the restored scroll
    *  position is applied, before the first render), so the *first* gesture in a tab's life has a
    *  `prev` sample to diff against. A raw set, not recordOffsetSample: at mount `lastOffset` is
    *  still its initial 0, and a fresh tab's own scrollTop is also 0, so the dedupe there would

@@ -1,8 +1,8 @@
 import { defineConfig } from '@playwright/test';
 
-// P27: titles of every test with a real-millisecond wall-clock assertion — budgets.spec.ts's and
-// perf.spec.ts's own single test each, plus slick-grid.spec.ts's two "150ms sandbox gate" tests
-// (P22 Pass B C6 and C12 T7). `ui-timing` (below) selects exactly these four by title (grep), not
+// Titles of every test with a real-millisecond wall-clock assertion — budgets.spec.ts's and
+// perf.spec.ts's own single test each, plus slick-grid.spec.ts's two "150ms sandbox gate" tests.
+// `ui-timing` (below) selects exactly these four by title (grep), not
 // by file alone, since slick-grid.spec.ts's testMatch entry would otherwise also pull in its other
 // 15 tests, which carry no wall-clock assertion of their own and gain nothing from running
 // serially; `ui` excludes them the same way (grepInvert) so nothing runs twice.
@@ -25,11 +25,11 @@ const wallClockBudgetTitles = /150ms sandbox gate|interaction budgets|perf tripw
 // `ipc-frontend` keeps its name, `testDir` and settings; only its mocking mechanism moves
 // (D13/D14) once its seven specs are re-pointed.
 export default defineConfig({
-  // P27: the actual worker-process pool size — a project's own `workers` (below) can only narrow
+  // The actual worker-process pool size — a project's own `workers` (below) can only narrow
   // this, never widen it (testProject.workers' own doc: "Playwright will limit the number of
   // workers used ... however, it cannot increase the total number of workers above the value
   // specified by testConfig.workers"). Left at the default (100% of logical cores) so `ui` and
-  // `ipc-frontend` actually get every core; `ui-timing` and `e2e-real` still narrow themselves down
+  // `ipc-frontend` get every core; `ui-timing` and `e2e-real` still narrow themselves down
   // via their own explicit `workers`.
   workers: '100%',
   // 1 on CI (the first attempt plus one retry) to absorb shared-runner timing noise without
@@ -83,18 +83,18 @@ export default defineConfig({
       fullyParallel: true,
       workers: '100%',
     },
-    // v1.4 P6: a bounded first pixel-diff tier, deliberately its own project rather than folded
+    // A bounded first pixel-diff tier, deliberately its own project rather than folded
     // into `ui` — the same "a different measurement contract earns its own project" reasoning
-    // `ui-timing` already established, just for a different contract (screenshot comparison, not
+    // `ui-timing` already established, for a different contract (screenshot comparison, not
     // wall-clock timing). No `dependencies: ['ui']` edge: unlike `ui-timing`, nothing about a
     // screenshot comparison degrades under CPU contention, so this runs fully parallel like `ui`
     // itself. `animations: 'disabled'` is Playwright's own default already, stated explicitly here
     // so it's not accidentally lost to a future edit — freezes every CSS animation/transition to
-    // its terminal frame before capture (docs/HISTORY.md (v1.4 P6)(b)'s own
-    // inventory of this app's `infinite` animations). `stylePath` collapses --kira-font-ui/
+    // its terminal frame before capture (docs/HISTORY.md's inventory of this app's `infinite`
+    // animations). `stylePath` collapses --kira-font-ui/
     // --kira-font-data to their own trailing generic keyword only for this project — removing the
     // multi-hop fallback chain's own run-to-run fontconfig ambiguity on the CI image that is this
-    // tier's sole baseline authority (P6 plan §2(a)/(c); never applied to `ui`, whose own
+    // tier's sole baseline authority (never applied to `ui`, whose own
     // font-roles.spec.ts specifically wants to see the real configured stacks resolve).
     {
       name: 'visual',
@@ -120,12 +120,12 @@ export default defineConfig({
       workers: 1,
       retries: 0,
     },
-    // P57-e2e-revisit.md §6/§8: a real Go backend (`go build -tags server`), a real embedded
+    // A real Go backend (`go build -tags server`), a real embedded
     // engine and a real database adapter, reached over plain HTTP/WebSocket by a plain Chromium
-    // tab — no mock, no native window. A *wiring* tier, not a UI-fidelity one (D5): `chromium`,
+    // tab — no mock, no native window. A *wiring* tier, not a UI-fidelity one: `chromium`,
     // not `webkit`, is the right default here, since the point is proving the backend is wired,
     // not proxying the packaged app's own webview (`ui`'s job). `fullyParallel`/`workers: 2` is
-    // proven safe (§3.5): per-test KIRA_HOME + WAILS_SERVER_PORT gives each instance its own
+    // proven safe: per-test KIRA_HOME + WAILS_SERVER_PORT gives each instance its own
     // SQLite app-storage, secrets file and engine child.
     // Only what cannot split at the IPC boundary stays (real Docker adapters, multi-window routing,
     // the built bundle wiring); the rest is a flow test plus a tests/ui contract spec.

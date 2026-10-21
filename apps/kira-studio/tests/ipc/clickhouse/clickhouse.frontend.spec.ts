@@ -5,7 +5,7 @@ import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support
 import type { ControlSnapshot } from '../support/types';
 import { controlSnapshots, portSnapshots } from './clickhouse.fixture';
 
-// P50 §4.4 / P57 D13-D16 — clickhouse's frontend half, same shape as mysql's (§4.4). The
+// Clickhouse's frontend half, same shape as mysql's. The
 // engine-picker/Add Connection dialog flow is left to tests/e2e/connections.spec.ts (kept,
 // unchanged, generic connection-dialog UI, full-stack) — this spec starts from an already-listed
 // connection, both wire protocols mocked from the exact fixture the backend half asserts against.

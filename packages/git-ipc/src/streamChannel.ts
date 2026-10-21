@@ -1,11 +1,11 @@
 /**
- * The native channel (C10 §3.4) — a `MessageChannelLike` over a Wails stream.
+ * The native channel — a `MessageChannelLike` over a Wails stream.
  * `internal/bridge/gitstream.go` hands `*application.StreamConn` straight to
  * `rpcstream.NewSession` with no length prefix at all (a Wails stream is message-framed already),
  * so every inbound message here is one whole frame body. A Wails stream carries real
  * `ArrayBuffer`s.
  *
- * The frame *body* shape is the one `blobFrame.ts` (C10 S1) already owns: a `0x00` first byte is a
+ * The frame *body* shape is the one `blobFrame.ts` already owns: a `0x00` first byte is a
  * blob frame (`0x00 | uint32BE headerLen | headerJSON | blob…`), anything else is a plain JSON
  * frame. One implementation of that layout.
  *
@@ -93,7 +93,7 @@ export function createStreamChannel(socket: StreamSocketLike): StreamChannel {
     for (const handler of [...closeHandlers]) handler(err);
   }
 
-  // P67b §3.1 (bug 2): `Stream()` returns a socket in the CONNECTING state, and Wails' own
+  // `Stream()` returns a socket in the CONNECTING state, and Wails' own
   // `send()` throws on a CONNECTING socket rather than queueing — `post` must stay synchronous
   // (rpc.ts calls it from inside a Promise executor and from the credit path) so this is a FIFO
   // queue, not a promise chain, preserving frame order relative to credit/cancel.
@@ -109,7 +109,7 @@ export function createStreamChannel(socket: StreamSocketLike): StreamChannel {
   };
 
   socket.onmessage = (ev: { data: ArrayBuffer }) => {
-    // F3: decode and delivery share one try/catch —
+    // Decode and delivery share one try/catch —
     // a synchronous throw from the handler (the RPC client's own ContractVersionMismatchError/
     // ContractShapeError/TransportError) must destroy the connection the same way a malformed
     // frame does, never escape uncaught and silently drop the frame.
@@ -143,7 +143,7 @@ export function createStreamChannel(socket: StreamSocketLike): StreamChannel {
       // 'closed': dropped — the peer is gone; onclose has already fired. This file makes no
       // guarantee that pending requests get rejected on its own — that is up to whoever created
       // this channel subscribing to onClose (createNativeGitTransport does, via
-      // remote.dispose() — F3); before that fix nothing did, and every already-in-flight
+      // remote.dispose()); before that fix nothing did, and every already-in-flight
       // request/stream on a dead channel hung forever instead.
     },
 

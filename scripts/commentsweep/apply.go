@@ -155,13 +155,9 @@ func (h *tsHelper) diff(name string, before, after []byte) (string, error) {
 	if !r.OK {
 		return r.Reason, nil
 	}
-	if len(r.Ranges) != len(r.RangesBefore) {
-		return fmt.Sprintf("comment ranges %d != %d", len(r.RangesBefore), len(r.Ranges)), nil
-	}
-	for i := range r.Ranges {
-		if r.Ranges[i].Kind != r.RangesBefore[i].Kind {
-			return fmt.Sprintf("comment %d changes kind", i), nil
-		}
+	ga, gb := tsGroups(before, r.RangesBefore), tsGroups(after, r.Ranges)
+	if len(ga) != len(gb) {
+		return fmt.Sprintf("comment groups %d != %d", len(ga), len(gb)), nil
 	}
 	return "", nil
 }

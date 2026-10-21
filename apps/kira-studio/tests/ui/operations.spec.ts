@@ -9,12 +9,12 @@ import {
   SERVER_VERSION,
 } from './support/postgresFixture';
 
-// P22b D14: the op log (workbench/panels/OperationsPanel.vue) is the fifth of the five search
-// gaps F21 found. Its own always-visible filter (a TextField with icon="filter", opsState.ts's
-// own filterText) already existed at b52fd72 — F21's grep for icon="search"/PanelSearchBox missed
-// it — and already matched command/kind/error. The one real gap this phase closes is the
-// connection's own name, which the row asks for explicitly ("the op label and its connection
-// name") and which the pre-existing filter did not match.
+// The op log (workbench/panels/OperationsPanel.vue) is the fifth of the five search gaps found.
+// Its own always-visible filter (a TextField with icon="filter", opsState.ts's own filterText)
+// already existed — the grep for icon="search"/PanelSearchBox missed it — and already matched
+// command/kind/error. The one real gap is the connection's own name, which the row asks for
+// explicitly ("the op label and its connection name") and which the pre-existing filter
+// did not match.
 
 const NOW = '2026-01-01T00:00:00.000Z';
 
@@ -64,8 +64,8 @@ test('Operations panel — the filter matches the connection name, not only the 
   await expect(rows).toHaveCount(2);
 });
 
-// P23 D1(c)/§4.4: commandTruncated disables Re-run but not Copy command — the one product surface
-// this phase's op_log byte cap adds. Both rows share a connected connection (caps.sql: true) and a
+// commandTruncated disables Re-run but not Copy command — the one product surface the op_log byte
+// cap adds. Both rows share a connected connection (caps.sql: true) and a
 // non-empty command, so a plain rows-not-connected/no-command guard cannot explain the difference
 // — only commandTruncated can.
 test('Operations panel — a truncated command cannot be re-run, but can still be copied', async ({
@@ -127,10 +127,10 @@ test('Operations panel — a truncated command cannot be re-run, but can still b
   );
 });
 
-// P132 Part 1 (§4.1): the row's own acceptance for the full-width dock fix (§0.1/§2.4) — the dock
-// no longer sits in a nested SplitterGroup under just the main panel, so it spans project's left
-// edge to main's right edge, and project's own bottom now moves with main's (no more blank strip
-// below a shorter project panel, no margin hack to produce it).
+// The row's own acceptance for the full-width dock fix — the dock no longer sits in a nested
+// SplitterGroup under just the main panel, so it spans project's left edge to main's right edge,
+// and project's own bottom now moves with main's (no more blank strip below a shorter project
+// panel, no margin hack to produce it).
 test('Operations panel — the dock spans the full shell width, flush under project and main (P132 Part 1)', async ({
   kira,
 }) => {

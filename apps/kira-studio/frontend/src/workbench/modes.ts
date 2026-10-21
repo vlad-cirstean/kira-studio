@@ -11,14 +11,12 @@ import StudioStart from './panels/StudioStart.vue';
 // the old TitleBar.vue at P128 §2.3: one file lists a module.
 export const MODE_ORDER: AppMode[] = ['studio', 'api', 'automations', 'docker'];
 
-// P1 D6/C6: mode content comes from a registry, mirroring D4's tab-kind registry. Api's own
-// entries are both EmptyState-based (§0.2) — P1 adds no HTTP functionality, only the seam.
-// `Component` already covers `defineAsyncComponent`'s return either way. P128 §2.3: ModeDef/
-// ModeRegistry hoisted to packages/workbench/src/modes.ts. P128 §2.4: `terminal`'s panel/start/
-// newTab now live in the shared terminal module (packages/workbench/src/terminal/) — no
-// `modeStore.active === 'terminal'` branch anywhere in WorkbenchShell.vue any more, the module
-// owns its own "+" via `newTab`.
-// P129 Part 3 §0.12: every one of this app's own modes is a panel module, so `MODES` is typed
+// Mode content comes from a registry, mirroring the tab-kind registry. Api's own entries are both
+// EmptyState-based — this adds no HTTP functionality, only the seam. `Component` already covers
+// `defineAsyncComponent`'s return either way. `terminal`'s panel/start/newTab now live in the
+// shared terminal module (packages/workbench/src/terminal/) — no `modeStore.active === 'terminal'`
+// branch anywhere in WorkbenchShell.vue any more, the module owns its own "+" via `newTab`.
+// Every one of this app's own modes is a panel module, so `MODES` is typed
 // `ModeRegistry<AppMode, PanelModeDef>` rather than the base `ModeDef` union — a one-line type
 // change, no behavior change, since this app's own shell already reads `.panel`/`.start`
 // unconditionally.

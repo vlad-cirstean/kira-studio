@@ -14,11 +14,12 @@ import HttpRequestTabView from '../views/httprequest/HttpRequestView.vue';
 import KeyValueTabView from '../views/keyvalue/KeyValueView.vue';
 import StreamTabView from '../views/stream/StreamView.vue';
 
-// P1 D4: the component half of the tab-kind registry — split from state/tabKinds.ts because
-// state/ -> workbench/ is a lint-forbidden edge (F19), while workbench/ -> views/ is not. STATIC
+// The component half of the tab-kind registry — split from state/tabKinds.ts because
+// state/ -> workbench/ is a lint-forbidden edge, while workbench/ -> views/ is not. STATIC
 // imports, deliberately: this is a registry lookup, not a lazy-load boundary, so the bundle keeps
-// exactly the two dynamic chunks docs/ARCHITECTURE.md's Stack section records (sql-formatter, @faker-js/faker).
-// P103 Part 2 (§5.1): `StudioTabKind` covers this app's own real vocabulary only, so this is a
+// exactly the two dynamic chunks docs/ARCHITECTURE.md's Stack section records (sql-formatter,
+// @faker-js/faker).
+// `StudioTabKind` covers this app's own real vocabulary only, so this is a
 // total function over it with no unreachable member to keep total against a wider union.
 export const TAB_VIEWS: TabViewMap<StudioTabKind> = {
   data: DataTabView,
@@ -32,8 +33,8 @@ export const TAB_VIEWS: TabViewMap<StudioTabKind> = {
   'grpc-request': GrpcRequestTabView,
   'variable-set': VariableSetTabView,
   environments: EnvironmentsTabView,
-  // P83 §6.2: the embedded terminal — a static entry like every kind above; @xterm/xterm itself
-  // stays behind terminalRenderer.ts's own dynamic import(). P128 §2.5: the tab view itself is now
+  // The embedded terminal — a static entry like every kind above; @xterm/xterm itself
+  // stays behind terminalRenderer.ts's own dynamic import(). The tab view itself is now
   // one shared component (packages/workbench/src/terminal/TerminalTabView.vue), rendering either a
   // Terminal-module tab or a repo terminal — the two differ only in workspaceId/codeRepoId, set by
   // whichever opener built the tab.

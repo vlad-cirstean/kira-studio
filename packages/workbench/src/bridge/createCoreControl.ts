@@ -123,7 +123,7 @@ export interface CoreBindings {
   };
 }
 
-// P25 D13's folder-picker result — identical shape in both apps' own generated
+// The folder-picker result — identical shape in both apps' own generated
 // FilesChooseFolderResult (`{ canceled: boolean; path: string | null }`, confirmed by reading both
 // apps' generated bridge/models.ts side by side), restated here rather than imported from either
 // app's own `@bindings/*` output for the same reason `CoreBindings` above stays on `unknown`.
@@ -150,13 +150,13 @@ export interface AppUpdateStatus {
 }
 
 // `S`/`L`/`T`/`P` are each app's own Settings, Layout, TabRecord and SettingsPatch shape. Layout is
-// actually the same type in both apps today (both import `@shared/domain/layout`'s `Layout`
+// the same type in both apps today (both import `@shared/domain/layout`'s `Layout`
 // verbatim, with no bridge-level narrowing — unlike SettingsShell.vue's own `Pick<Settings, …>`
-// narrowing, which is a UI-layer concern §5.5 added, not a bridge one), but TabRecord genuinely
+// narrowing, which is a UI-layer concern, not a bridge one), but TabRecord genuinely
 // differs (each app's own `state/tabDomain.ts` declares a different `z.discriminatedUnion`), and
-// Settings/SettingsPatch now genuinely differ too (P103 Part 4 §7.3: each app's own
+// Settings/SettingsPatch now genuinely differ too (each app's own
 // `state/settingsDomain.ts`, not one shared `@shared/domain/settings` shape) — so all four stay
-// generic, matching the plan's own `createCoreControl<Settings, Layout, TabRecord, SettingsPatch>
+// generic, matching the `createCoreControl<Settings, Layout, TabRecord, SettingsPatch>
 // (...)` call-site shape, rather than only genericizing the ones that must be.
 export interface CoreControl<S, L, T, P, M> {
   settingsGetAll: () => Promise<S>;

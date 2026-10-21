@@ -1,9 +1,8 @@
-// P18 (v1.1) C3/C6: the DDL extractor (ddl.ts) and the alias/reference walk diagnostics and hovers
+// The DDL extractor (ddl.ts) and the alias/reference walk diagnostics and hovers
 // both share (sqlRefs.ts) walk the same shallow token tree `@shared/domain/sqlTokens.ts` builds.
-// This file was `lezerNodes.ts` through P60a — its own tree came from `@codemirror/lang-sql`'s
-// Lezer parser; P60b's `sql-tokens.ts` produces the identical `LNode` shape from this app's own
-// in-house tokenizer instead (docs/HISTORY.md (v1.6 P60b)'s library
-// survey), so every helper below — and every consumer's own `LNode`-typed code — is unchanged.
+// The `sql-tokens.ts` produces the identical `LNode` shape from this app's own
+// in-house tokenizer instead (docs/HISTORY.md's library survey), so every helper below — and every
+// consumer's own `LNode`-typed code — is unchanged.
 import { keywordsFor } from '@shared/domain/sqlKeywords';
 import { type LNode, tokenizeSql } from '@shared/domain/sqlTokens';
 import { lexOptionsFor, type SqlDialect } from '../shared/sqlIdent';
@@ -26,7 +25,7 @@ export function text(node: LNode, source: string): string {
 
 const NAME_NODE_KINDS = new Set(['Identifier', 'QuotedIdentifier', 'Keyword']);
 
-// F5.1: a column or table literally named `id`/`name` tokenises as a bare Keyword under
+// A column or table literally named `id`/`name` tokenises as a bare Keyword under
 // Postgres's own 763-word keyword list (kw.includes('id')/('name') === true) — lang-sql's own
 // sourceContext accepts Identifier/QuotedIdentifier/Keyword alike in a name position, and this
 // extractor must too, or it silently drops the single most common column name in a real schema.
@@ -102,7 +101,7 @@ export class TokenCursor {
   }
 }
 
-// P60b's own C1 (`editor/languages.ts`'s now-removed `dialectObjectFor`'s direct successor): the
+// (`editor/languages.ts`'s now-removed `dialectObjectFor`'s direct successor): the
 // one place a `SqlDialect` id becomes `sql-tokens.ts`'s own `SqlTokenOptions` — every consumer that
 // used to call `dialectObjectFor` + `dialect.language.parser.parse(source)` now calls
 // `tokenizeSql(source, tokenOptionsFor(dialect))` instead. Which quote character(s) denote an
@@ -118,9 +117,9 @@ const IDENTIFIER_QUOTES: Record<SqlDialect, string> = {
 };
 
 // Memoised per dialect (not recomputed per call) so repeated calls for the same dialect hand back
-// the identical `SqlTokenOptions` object reference — `sql-tokens.ts`'s own D2 memo compares its
+// the identical `SqlTokenOptions` object reference — `sql-tokens.ts`'s own memo compares its
 // `options` argument by reference, and this is what lets a hover/lint/completion call over the
-// same untouched document string actually share one tokenize.
+// same untouched document string share one tokenize.
 const optionsCache = new Map<SqlDialect, ReturnType<typeof buildTokenOptions>>();
 
 function buildTokenOptions(dialect: SqlDialect) {

@@ -14,16 +14,15 @@ import {
 } from './support/postgresFixture';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
-// P22 D2: the row's premise ("the page-number input is visibly taller than the controls beside
-// it") is not reproducible from the stylesheet (F3) — every control in the pager's own toolbar
+// The row's premise ("the page-number input is visibly taller than the controls beside
+// it") is not reproducible from the stylesheet — every control in the pager's own toolbar
 // row already resolves to one height under one box-sizing. This measures that directly rather
-// than guess a pixel change against an unmeasured complaint (P16's own D2 correction is exactly
-// what guessing produced last time).
+// than guess a pixel change against an unmeasured complaint.
 //
-// P22 D1: the control-role layer (--kira-control-h/-lg/-sm) is a pure alias over the existing
+// The control-role layer (--kira-control-h/-lg/-sm) is a pure alias over the existing
 // --kira-h-* scale — every control keeps today's rendered height. The one deliberate exception is
-// .p-view-head, which moves onto the --kira-bar-h band to close the split fb7476e's bar-height
-// family left between it and the now-taller .p-toolbar (F2(c)).
+// .p-view-head, which moves onto the --kira-bar-h band to close the split the bar-height
+// family left between it and the now-taller .p-toolbar.
 
 const CONNECTION_ID = 'conn-control-sizing';
 const FIXTURE = orderItemsFixture(CONNECTION_ID);
@@ -101,7 +100,7 @@ function rootVar(page: Page, name: string): Promise<number> {
   }, name);
 }
 
-// P122: the one shared focus ring (packages/theme/src/base.css's `focus-ring`) -- 1px solid
+// The one shared focus ring (packages/theme/src/base.css's `focus-ring`) -- 1px solid
 // --kira-focus, laid inset over the element's own 1px edge, no box-shadow halo. Asserted on the
 // actual computed style rather than the class string: the value must render identically whether
 // the base `:focus-visible` rule, a `has-[...]:focus-visible:focus-ring` box, or an explicit
@@ -130,8 +129,8 @@ async function expectFocusRing(el: Locator): Promise<void> {
   expect(style.boxShadow).toBe('none');
 }
 
-// Clicks `anchorTestid` (a mouse click, which never itself triggers :focus-visible on a button --
-// P122 plan §2.1) when given, then presses Tab until the next tabbable element is `targetTestid`
+// Clicks `anchorTestid` (a mouse click, which never itself triggers :focus-visible on a button)
+// when given, then presses Tab until the next tabbable element is `targetTestid`
 // -- a real keyboard focus, the only way a button's own :focus-visible rule ever paints. Disabled
 // controls in between are skipped by the browser's own native Tab order, so this is robust to
 // which of the toolbar's own buttons happen to be enabled in the fixture. `anchorTestid: null`
@@ -194,10 +193,10 @@ test('the .md control family in SettingsDialog is one height, equal to --kira-co
   const controlHLg = await rootVar(page, '--kira-control-h-lg');
   expect(controlHLg).toBeGreaterThan(0);
 
-  // P104 §2: settings-font-size is now InputGroupInput's own borderless leaf, nested one level
+  // settings-font-size is now InputGroupInput's own borderless leaf, nested one level
   // inside the bordered InputGroup box (the stepper recipe's own box-model split) -- the group's
-  // own root is what actually renders at --kira-control-h-lg, so that's what this measures.
-  // P105 §16: InputGroup's own root is a <fieldset> (implicit role="group"), not a <div>.
+  // own root is what renders at --kira-control-h-lg, so that's what this measures.
+  // InputGroup's own root is a <fieldset> (implicit role="group"), not a <div>.
   const fontSizeInputHeight = await page
     .locator('[data-testid="settings-font-size"]')
     .locator('xpath=ancestor::fieldset[@data-slot="input-group"][1]')
@@ -433,8 +432,8 @@ test('the HTTP request pane toggle items are rounded, at 22px (P121 S14)', async
   }
 });
 
-// P121 §6.2: the row-density ToggleGroup is `variant="outline"`, so it stays connected (spacing 0,
-// the K1 KuiSegmented precedent) -- only its two outer corners round, and the shared inner edge
+// The row-density ToggleGroup is `variant="outline"`, so it stays connected (spacing 0,
+// the KuiSegmented precedent) -- only its two outer corners round, and the shared inner edge
 // keeps a single 1px divider (the second/last item's own border-left drops to 0, rather than
 // doubling the first item's border-right).
 test('the row-density ToggleGroup keeps a connected outline with 4px outer corners (P121 S4)', async ({
@@ -464,10 +463,10 @@ test('the row-density ToggleGroup keeps a connected outline with 4px outer corne
   expect(await comfortable.evaluate((el) => getComputedStyle(el).borderLeftWidth)).toBe('0px');
 });
 
-// P121 §6.2: the mode Fields/URI toggle (S5) and the MCP read/write/DDL toggles (S6) moved to
+// The mode Fields/URI toggle and the MCP read/write/DDL toggles moved to
 // `size="kira-lg"` -- dialog density, matching this dialog's own 26px inputs and kira-lg buttons.
-// Font size is 12px, not P121's original 11px: P123 moved toggleVariants' base class onto the
-// control-text role (text-kira-md), landed here by the P121/P123 rebase merge.
+// Font size is 12px, not the original 11px: toggleVariants' base class moved onto the
+// control-text role (text-kira-md).
 test('connection dialog toggles render at dialog density, 26px/12px (P121 S5, S6)', async ({
   relaunch,
 }) => {
@@ -533,10 +532,9 @@ test('connection detail tabs: hover, 2px gap, and arrow-key roving focus (P121 T
   await expect(advanced).toHaveAttribute('data-state', 'on');
 });
 
-// P121 §6.2: the console's own result chips ("Result 1", "Result 2") were the one tab-chip copy
-// off the shared scale (22px/10px, a 4px strip gap) -- now tab-strip size (T1's own 26px/12px/2px,
-// 12px not P121's original 11px: P123 moved tabChipVariants onto the control-text role, landed
-// here by the P121/P123 rebase merge -- tabs/index.ts is a P121-only file no P123 commit touches).
+// The console's own result chips ("Result 1", "Result 2") were the one tab-chip copy
+// off the shared scale (22px/10px, a 4px strip gap) -- now tab-strip size (26px/12px/2px,
+// 12px not the original 11px: tabChipVariants moved onto the control-text role).
 test('console result tabs render at tab-strip size, 2px strip gap (P121 T4)', async ({
   relaunch,
 }) => {
@@ -612,12 +610,11 @@ function computedFontSize(el: Locator): Promise<number> {
   return el.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize));
 }
 
-// P123 §6.3: the four-value chrome type scale itself, read from the live --kira-t-sm/md/lg
+// The four-value chrome type scale itself, read from the live --kira-t-sm/md/lg
 // custom properties (not a hard-coded pixel value, since Data font size can move what "12px"
-// means) and asserted on one representative of each §1.2 role. Button/tab/Label are the changed
-// rows -- 11px (sm) before this phase, 12px (md) after; confirmed failing at 907c8204 before
-// landing here. Status-bar item and the dialog title were already on their assigned role and stay
-// unchanged, proving the phase touched only the rows it meant to.
+// means) and asserted on one representative of each role. Button/tab/Label are the changed
+// rows -- 11px (sm) before, 12px (md) after. Status-bar item and the dialog title were already
+// on their assigned role and stay unchanged.
 test('the chrome type scale renders --kira-t-sm/md/lg on their assigned roles (P123)', async ({
   relaunch,
 }) => {

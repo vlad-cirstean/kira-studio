@@ -53,12 +53,12 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<SqliteFixture> 
   try {
     db.exec(readFileSync(SEED_SQL_PATH, 'utf8'));
 
-    // Gated: the harness only needs to prove it can build the table; P2's paging is what
-    // actually consumes 1M rows. Default true, unlike P1, because P2 genuinely consumes them —
+    // Gated: the harness only needs to prove it can build the table; the paging is what
+    // consumes 1M rows. Default true because the paging genuinely consumes them —
     // same rule support/mariadb.ts's own gate follows.
     //
     // Unlike MariaDB's SEQUENCE-engine seq_1_to_N or MySQL's chunked digits cross join, one plain
-    // WITH RECURSIVE CTE inserts all 1,000,000 rows directly (~1s, F11) — no chunking, no PRAGMA
+    // WITH RECURSIVE CTE inserts all 1,000,000 rows directly (~1s) — no chunking, no PRAGMA
     // adjustment needed.
     if (opts?.seedBigTable ?? true) {
       db.exec(

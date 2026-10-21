@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-// P201, P272: internal/memory's wire shapes (Memory, Event, History, Context, StoreResult) and
+// internal/memory's wire shapes (Memory, Event, History, Context, StoreResult) and
 // bridge/memory.go's MemoryMcpStatus/MemoryInstallResult.
-// Who decided a fact. Grade: user (challenged by a human, correct) above external (correct, probably
-// incomplete) above agent (reference only).
+// Who decided a fact. Grade: user (challenged by a human, correct) above external (correct,
+// probably incomplete) above agent (reference only).
 export const memoryOriginSchema = /*#__PURE__*/ z.enum(['user', 'agent', 'external']);
 export type MemoryOrigin = z.infer<typeof memoryOriginSchema>;
 

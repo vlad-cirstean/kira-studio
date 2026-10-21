@@ -25,7 +25,7 @@ import {
 } from './support/postgresFixture';
 import { connectionRow, expandRow, openRowMenu } from './support/tree';
 
-// Ported from tests/e2e/console.spec.ts (P57 D16), against real captures of app.order_items'
+// Ported from tests/e2e/console.spec.ts, against real captures of app.order_items'
 // execute() responses (scripts/capture-postgres-tree.ts, including the real "relation ... does
 // not exist" error text). Scenario 6 (session restore) is dropped — no backing store in this
 // tier, same category as workbench.spec.ts's five. Scenario 7 (undo/redo) keeps only its
@@ -230,8 +230,8 @@ test('Query console — open, run statement/all, errors, saved queries', async (
   // heuristic, unlike CodeMirror's explicit `newGroupDelay: 500` — a single ⌘Z after
   // `page.keyboard.type()` is not guaranteed to undo the whole typed string in one press the way
   // it was before. `pressUndoUntil` presses the key repeatedly (bounded) until the document
-  // reaches the expected text, which is what this scenario actually cares about (undo/redo work
-  // via the keyboard at all — the WebKit-focus bug P60a's own MonacoHost.vue fix targets) rather
+  // reaches the expected text, which is what this scenario cares about (undo/redo work
+  // via the keyboard at all — the WebKit-focus bug the MonacoHost.vue fix targets) rather
   // than the exact number of internal undo groups Monaco chose to make.
   async function pressUndoUntil(key: string, expected: string): Promise<void> {
     for (let i = 0; i < 10; i++) {
@@ -254,8 +254,7 @@ test('Query console — open, run statement/all, errors, saved queries', async (
   // Undoing a saved-query load restores the previous text and leaves the cursor where typing was
   // left off, not pinned at 0 — typing after undo appends at the end. This one is a single ⌘Z,
   // not `pressUndoUntil`: the saved-query load is an external-sync write, isolated into exactly
-  // one undo group by construction (MonacoHost.vue's own `pushStackElement()` pair around it,
-  // P60a §4.7's port of the v1.4 Format-then-undo fix).
+  // one undo group by construction (MonacoHost.vue's own `pushStackElement()` pair around it).
   await page.click('[data-testid="console-saved-toggle"]');
   await page.locator('[data-testid="console-saved-entry"]', { hasText: 'My saved query' }).click();
   await expect.poll(() => editorText(consoleView5)).toContain('SELECT 42 AS answer;');
@@ -265,7 +264,7 @@ test('Query console — open, run statement/all, errors, saved queries', async (
   await expect.poll(() => editorText(consoleView5)).toBe('SELECT 1; -- more!');
 });
 
-// P40: the result-set strip (new-vs-reuse toggle, per-result ×, chip switching) and the shared
+// The result-set strip (new-vs-reuse toggle, per-result ×, chip switching) and the shared
 // find toolbar over the active result set — a separate test rather than folding into the scenario
 // above, since it needs its own connection/tab and shouldn't perturb that test's own tab-id-keyed
 // assertions.
@@ -362,7 +361,7 @@ test('Query console — result-set strip, new-vs-reuse toggle, find toolbar (P40
   await expect(results.locator('[data-testid="console-result-row"]')).toHaveCount(2);
 });
 
-// Finding 6 — the one-cell selection highlight (ConsoleSlickGrid.vue) used to be keyed straight
+// The one-cell selection highlight (ConsoleSlickGrid.vue) used to be keyed straight
 // off the DISPLAY position at click time, which goes stale the moment `matchedRows` changes what
 // that position means. Reproduced here concretely: click row n=2 (page row 1) while unfiltered
 // (display position == page row, so the layer keys on position 1); then filter to rows n=2 and
@@ -370,14 +369,14 @@ test('Query console — result-set strip, new-vs-reuse toggle, find toolbar (P40
 // the stale layer entry still points at. Pre-fix, the highlight visibly jumps onto n=4's row
 // instead of staying on n=2's. The gutter-click half (clearing a stale highlight instead of
 // leaving it behind) is covered in the same test, at the end.
-// P19 D8: the console's tabular result now carries a real SlickHybridSelectionModel (superseding
-// finding 6's own one-cell layer, below) — configured identically to SlickGridHost.vue's own, so
-// a filter change is handled the same simpler way D8 point 1 chose over that finding's per-row
+// The console's tabular result now carries a real SlickHybridSelectionModel (superseding the
+// one-cell layer, below) — configured identically to SlickGridHost.vue's own, so
+// a filter change is handled the same simpler way chosen over the per-row
 // remap: a display-position range built under the OLD filter can silently point at a different
 // page row under the NEW one, so the console just clears the selection outright rather than
 // tracking it (ConsoleResultGrid.vue's own one-click highlight already clears on a page swap for
 // the identical reason). A gutter click is also new behaviour: the gutter is now focusable/
-// selectable (F14), so `rowSelectColumnIds` turns it into a real row selection.
+// selectable, so `rowSelectColumnIds` turns it into a real row selection.
 test('Query console — a filter change clears the tabular selection, and a gutter click selects the whole row (P19 D8)', async ({
   relaunch,
 }) => {
@@ -457,12 +456,12 @@ test('Query console — a filter change clears the tabular selection, and a gutt
   await expect(cellAt(1)).toHaveClass(/kira-cell-selected/);
 });
 
-// Finding 2 (round 2), from before P19 D8's selection-model rewrite (above): a stale,
-// position-keyed highlight's nearest-match fallback used to land on a neighboring cell instead of
-// clearing when its own row was filtered out. D8 point 1 now clears on any filter change
-// regardless (a strict superset), so this case still holds — kept as its own test since a
-// filtered-OUT row is the sharper regression case for "does it clear at all", independent of the
-// "does it land on the wrong cell" question the test above now covers differently.
+// From before the selection-model rewrite (above): a stale, position-keyed highlight's
+// nearest-match fallback used to land on a neighboring cell instead of clearing when its own row
+// was filtered out. Point 1 now clears on any filter change regardless (a strict superset), so
+// this case still holds — kept as its own test since a filtered-OUT row is the sharper regression
+// case for "does it clear at all", independent of the "does it land on the wrong cell" question
+// the test above now covers differently.
 test('Query console — the one-cell selection highlight clears (not jumps) when its own row is filtered out (finding 2)', async ({
   relaunch,
 }) => {
@@ -704,12 +703,12 @@ test('Query console — two duplicate-named columns render and select their own 
   await expect.poll(cellEditorText).toBe('222');
 });
 
-// Finding 6 (round 2) — round 1's duplicate-column fix (above) addresses cells/selection by
-// index, but ConsoleSlickGrid.vue's own column WIDTH still read `initialWidths(page)[col.name]`
-// (columns.ts, name-keyed) — a duplicate name silently collapses onto whichever duplicate was
-// measured LAST, so both columns rendered at that one's own width. Reproduced here concretely: a
-// short value in the first "dup" column, a much longer one in the second — pre-fix, both columns
-// render at the second (longer) column's own measured width; post-fix, the first stays narrow.
+// The duplicate-column fix (above) addresses cells/selection by index, but ConsoleSlickGrid.vue's
+// own column WIDTH still read `initialWidths(page)[col.name]` (columns.ts, name-keyed) — a
+// duplicate name silently collapses onto whichever duplicate was measured LAST, so both columns
+// rendered at that one's own width. Reproduced here concretely: a short value in the first "dup"
+// column, a much longer one in the second — pre-fix, both columns render at the second (longer)
+// column's own measured width; post-fix, the first stays narrow.
 test("Query console — two duplicate-named columns each measure their own width, not the last one's (finding 6)", async ({
   relaunch,
 }) => {
@@ -760,10 +759,10 @@ test("Query console — two duplicate-named columns each measure their own width
   expect(secondWidth - firstWidth).toBeGreaterThan(100);
 });
 
-// P19 T7/D9/D10: a selection over the tabular result copies as TSV/CSV/JSON, both via ⌘/Ctrl+C
+// A selection over the tabular result copies as TSV/CSV/JSON, both via ⌘/Ctrl+C
 // and a context menu, per selection kind (cell/range/row/column). Same clipboard-spy technique as
 // autocomplete.spec.ts's own installClipboardSpy — this tier runs WebKit, which has no
-// Chromium-style clipboard-permission grant to make, so spying on writeText proves what actually
+// Chromium-style clipboard-permission grant to make, so spying on writeText proves what
 // landed without a real OS clipboard round trip.
 function twoColPage(rows: [string, string][]): LogicalPage {
   const columns: ColumnDescriptor[] = [
@@ -859,7 +858,7 @@ test('Query console — a tabular selection copies as TSV/CSV/JSON, rows/columns
 
   // Copy is exercised through the context menu throughout, matching interaction.spec.ts's own
   // established convention for the data grid's identical selection kinds — a direct
-  // page.keyboard.press chord depends on SlickGrid's own internal focus sink actually holding
+  // page.keyboard.press chord depends on SlickGrid's own internal focus sink holding
   // real DOM focus after a plain Playwright click, which that suite never relies on either.
 
   // --- gutter click selects the whole row; the row menu's JSON copies every column ---------------
@@ -1022,7 +1021,7 @@ test('Query console — a Mongo document result copies as JSON, one row or all d
   await expect(docRows).toHaveCount(3);
 
   // --- one row's own body -------------------------------------------------------------------
-  // P22b D11: Copy document is now a named-format submenu (Shell mode / Canonical Extended
+  // Copy document is now a named-format submenu (Shell mode / Canonical Extended
   // JSON / Relaxed Extended JSON) — open it the same way the SQL grid's own Copy row(s) ▸
   // submenu is opened a few lines above (hover the parent, wait for the panel).
   await docRows.nth(0).click({ button: 'right' });

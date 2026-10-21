@@ -7,7 +7,7 @@ import type { ScrollVelocityTracker } from './scrollVelocity';
 // wiring (comment there: "grid.velocity/lastScrollEventAt/scrollEventSeq are wired the same
 // four-field way").
 
-/** C4/§5 D4 — F1: near-exact match for this app's four selection kinds; the gutter is the one
+/** Near-exact match for this app's four selection kinds; the gutter is the one
  *  rowSelectColumnIds entry (clicking it selects the row). enableMultiSelection: false is a
  *  parity choice, not a limitation — multi-cell disjoint selection has no consumer (Selection has
  *  no shape for it). showDragHandle: false — no Excel-style fill affordance. */
@@ -26,7 +26,7 @@ export function createHybridSelectionModel(gutterField: string): SlickHybridSele
 
 /** Wires the host's own scroll-velocity sampler into the three fields KiraSlickGrid's row-range
  *  override reads (see its own doc comments): the raw `velocity` reader, `lastScrollEventAt`
- *  (P22 iter2-pacing D1's chase quiescence gate) and `scrollEventSeq` (iter2-onset D2's per-frame
+ *  (the chase quiescence gate) and `scrollEventSeq` (the per-frame
  *  gate — the host's own counter, not the tracker's). */
 export function attachScrollProbes(
   grid: KiraSlickGrid,

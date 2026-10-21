@@ -1,20 +1,20 @@
-// P60b §3.1: the quote/comment/dollar-quote scanning rules `sql-split.ts` and `sql-lint.ts` each
+// The quote/comment/dollar-quote scanning rules `sql-split.ts` and `sql-lint.ts` each
 // carried as their own independent copy (the duplication `sql-lint.ts`'s own header comment
 // already named: "Sibling of sql-split.ts: same lexical states … reused here"), hoisted into one
 // shared scanner both now call — closing that duplication, and giving `sql-tokens.ts` a third,
-// identical caller rather than a third independent copy (D1's own reasoning).
+// identical caller rather than a third independent copy.
 export interface SqlLexOptions {
   /** Whether a backslash escapes the next character inside a '...'/"..."/`...` run — true for
    *  MySQL/MariaDB/ClickHouse, false for standard-SQL dialects (Postgres, SQLite) where a bare
-   *  backslash is not special and only a doubled quote escapes (P2 R2). `resolveLexOptions`
-   *  defaults this to true, the pre-P2-R2 universal behaviour, for a caller that doesn't know its
+   *  backslash is not special and only a doubled quote escapes. `resolveLexOptions`
+   *  defaults this to true for a caller that doesn't know its
    *  dialect. */
   backslashEscapes: boolean;
   /** Whether `$$.../$tag$...$tag$` opens a Postgres-style dollar-quoted string — a Postgres-only
    *  convention. `$` is a legal (if unusual) identifier character on MySQL/MariaDB, so an
    *  identifier containing two of them reads as an unterminated dollar-quote open tag there and
    *  swallows the rest of the document into one statement. `resolveLexOptions` defaults this to
-   *  true, the pre-fix universal behaviour, for a caller that doesn't know its dialect. */
+   *  true for a caller that doesn't know its dialect. */
   dollarQuoting: boolean;
   /** P108 Part 11 F4: MySQL, MariaDB and ClickHouse also start a line comment with `#` — undefined/
    *  false leaves `#` an ordinary character (every other dialect here, and the unknown-dialect
@@ -30,7 +30,7 @@ export interface SqlLexOptions {
   /** F4: SQLite (and SQL Server) accept a `[bracket]`-quoted identifier — a doubled `]]` inside
    *  escapes a literal `]`, mirroring the doubled-quote escape every other quote kind here uses. */
   bracketIdentifiers?: boolean;
-  /** F4: Postgres's `E'...'`/`e'...'` escape-string syntax honours backslash escapes inside it
+  /** Postgres's `E'...'`/`e'...'` escape-string syntax honours backslash escapes inside it
    *  regardless of `backslashEscapes` — Postgres's own default is `false` for an ordinary `'...'`
    *  literal (standard_conforming_strings), but `E'...'` is the one syntax that always opts back
    *  in. Only examined for a single-quoted run whose `E`/`e` is itself a standalone token (not the
@@ -134,7 +134,7 @@ function scanBracketIdent(source: string, i: number, n: number): SqlLexSpan {
   return { kind: 'bracketIdent', start: i, end: j, closed };
 }
 
-// F4: the dollar-quote-open guard and the E'...' guard both need "is this character part of a
+// The dollar-quote-open guard and the E'...' guard both need "is this character part of a
 // longer identifier token" — Postgres allows `$` inside an unquoted identifier (`a$b$c`), and an
 // `E`/`e` immediately preceding a quote only means the escape-string prefix when it is itself a
 // standalone token, not the tail of a longer name (`TABLEE'x'` is one identifier, not `TABLE` then
@@ -206,7 +206,7 @@ export function scanSqlSpan(source: string, i: number, options: SqlLexOptions): 
     return scanLineComment(source, i, n, 2);
   }
   if (c === "'" || c === '"' || c === '`') {
-    // F4: Postgres's E'...'/e'...' escape string — backslash escapes are honoured inside it
+    // Postgres's E'...'/e'...' escape string — backslash escapes are honoured inside it
     // regardless of the dialect's own backslashEscapes setting. `source[i - 1]` is the 'E'/'e'
     // itself; `source[i - 2]` must not be an identifier character, or this 'E' is the tail of a
     // longer name, not the escape-string prefix.
