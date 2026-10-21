@@ -4,4 +4,12 @@ First phase `P322` (highest in `docs/HISTORY.md` is `P321`). Branch `v2.10`. Pha
 
 | # | Phase | Status |
 |---|-------|--------|
-| P322 | Over-length comments. Handle what the v2.8 P320 sweep skipped: comments over 2000 characters (56 listed: Go 17, TS 31, Vue 8) plus the comments left as `kept:<gate>` (width, hedge, tokens, grew, form, directive) and the TS pointer losses the P320 judge flagged. Input: `plans/P320-not-applied.md` (line numbers refer to scan base `aee071c`, since rebased; re-extract with `scripts/commentsweep`). Opus plan decides the approach per case (split at paragraph boundaries with the marker handled, condense by hand-reviewed rewrite, or leave) and the cost. Plan and cost estimate need owner acceptance before running. | Todo |
+| P322 | MCP required params enforced at the schema level. Parameters such as `database` that a tool needs must be required in the MCP tool input schema (and rejected with a clear error otherwise) so the AI builds the request correctly the first time. Audit every MCP tool (`dbmcp`, `agentmcp`, memory tools) for params that are optional in the schema but required in practice. | Todo |
+| P323 | SQL approval dialog. When the user approves an SQL command from the agent, show it formatted with syntax highlighting, in a much larger dialog. | Todo |
+| P324 | Selection styling. Selecting a cell, row or similar drops the border; the background change alone marks the selection. | Todo |
+| P325 | Working indicators on Connect, Reconnect and Load buttons. Show progress while a DB connection or load takes a while. | Todo |
+| P326 | Keep fetched data when a connection drops. Show the drop clearly (banner or status, plus the Reconnect button) while the already fetched data stays visible and selectable. Stale data cannot be edited or committed; no update can be triggered from it. | Todo |
+| P327 | Pending changes show a real diff. In the SQL data view, a pending edit currently shows the new value as one long string; show before and after as a diff, like code. | Todo |
+| P328 | Cell editor before/after diff. Highlight the change between the original and the edited value in the cell editor, as a code-style diff. | Todo |
+
+## Results
