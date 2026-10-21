@@ -116,14 +116,16 @@ external editor, then Continue, Skip or Abort.
   one tab still hints a match on another), HEAD and any branch checked out in another worktree
   pinned to the top, the rest ranked by recency, a per-list "Show more" step, and
   arrow-key/Home/End/Enter roaming from the filter box down into the rows.
-- **GitHub PR links** — resolved **per commit**, not per branch tip, so the indicator shows on a
-  commit in the middle of a branch's history or in a detached `HEAD`, not only on a checked-out
-  tip. Authentication is delegated entirely to the `gh` CLI already on your machine: this app never
-  holds a GitHub token, and never reads `gh`'s own stored credential. A commit's PR now renders
-  **inline in the detail panel** with its open/closed/merged state, and the link opens in the OS
-  browser — never an embedded webview and never a real `<a href>`. **GitHub Enterprise hosts work**
-  too: the host check accepts `github.com` plus any host the `gh` CLI has itself authenticated
-  against, rather than a hardcoded literal.
+- **Code host change request links** (pull or merge requests) — resolved **per commit**, not per
+  branch tip, so the indicator shows on a commit in the middle of a branch's history or in a
+  detached `HEAD`, not only on a checked-out tip. A provider-neutral host layer picks the provider
+  per repository (setting `Show status from`: detect from remote, off, or a provider). GitHub is
+  the one provider shipped. Its authentication is delegated entirely to the `gh` CLI already on
+  your machine: this app never holds a token, and never reads `gh`'s own stored credential. A
+  commit's change request renders **inline in the detail panel** with its open/closed/merged
+  state, and the link opens in the OS browser — never an embedded webview and never a real
+  `<a href>`. **GitHub Enterprise hosts work** too: the host check accepts `github.com` plus any
+  host the `gh` CLI has itself authenticated against.
 Two limits worth knowing up front:
 
 - **Git 2.38 or newer is required** — `git merge-tree --write-tree`, which conflict prediction
@@ -137,8 +139,8 @@ Two limits worth knowing up front:
 - Optional: an authenticated `claude` CLI for Agents
   and Memory.
 - Optional: the [GitHub CLI](https://cli.github.com) (`gh`), already
-  logged in, for PR links — without it the PR indicator simply stays blank and nothing else
-  changes.
+  logged in, for GitHub PR links — without it the PR indicator simply stays blank and nothing
+  else changes.
 - The rest of the toolchain (Go, Bun, the Wails v3 CLI, Xcode command-line tools) is the same as
   Kira Studio's own — see the root [`README.md`](../../README.md)'s Requirements section. This app
   lives in the same monorepo and Bun workspace, so a single `bun install`/`bun run setup` covers

@@ -19,7 +19,7 @@ import DocShot from '../../../../components/DocShot.astro';
 ## Requirements
 
 - Git 2.38 or newer on `PATH`. Conflict prediction needs `git merge-tree --write-tree`. Below 2.38 the Git module shows a blocked state.
-- Optional: the GitHub CLI (`gh`), logged in, for PR links.
+- Optional: the GitHub CLI (`gh`), logged in, for GitHub PR links.
 
 ## Commit graph
 
@@ -81,6 +81,8 @@ PR links resolve per commit, not per branch tip. The commit detail shows the PR 
 
 The app never holds a GitHub token. Authentication goes through the `gh` CLI. GitHub Enterprise hosts work if `gh` is logged in to them.
 
+GitHub is the one code host today. The host layer is provider-neutral, so labels and links follow the repository's host. Pick the host per repository under **Repository settings**: detect it from the remote, turn it off, or choose a provider.
+
 ## Repository settings
 
 Open **Repository settings** from the Git toolbar. Each setting applies to one repository:
@@ -91,7 +93,7 @@ Open **Repository settings** from the Git toolbar. Each setting applies to one r
 - Stash entries as nodes in the graph.
 - The untracked files option in the stash dialog.
 - Candidate base branches for branch review, one per line.
-- Pull request status for this repository.
+- Code host for this repository: detect from the remote, off, or a provider.
 - The pull strategy.
 
 `Settings > Git` holds the global settings: protected branches, the auto-fetch interval, the git path and the graph font size.

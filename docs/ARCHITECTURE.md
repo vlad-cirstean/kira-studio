@@ -1527,7 +1527,7 @@ packaged app does not), where the identical application code runs unchanged over
 - The update check and in-app install (P66, P119) are shared by both apps. The status bar's right-hand group can show an update-available item, placed first so the app-metrics readout keeps its position.
 - Clicking the update item, or a new version becoming available while the app is open, opens a modal UpdateDialog.vue with an Update button. P119 deliberately replaced Kira Studio's click-opens-the-release-page behavior with this dialog.
 - Repo-root internal/appupdate.Checker, moved out of Kira Studio's internal/ at P119 so Kira Space can share it, makes one plain net/http GET against the kira-studio GitHub releases/latest API and imports nothing under either app's internal/.
-- The update checker does not depend on internal/ghclient (it needs an authenticated gh CLI, the wrong precondition for a check run for every user) or internal/httpclient (the user-facing request builder); it only restates their GitHub API version header value.
+- The update checker does not depend on githost/github (it needs an authenticated gh CLI, the wrong precondition for a check run for every user) or internal/httpclient (the user-facing request builder); it only restates their GitHub API version header value.
 - When buildinfo.Version is a dev sentinel (0.0.0, 0.0.0-dev, 0.0.0-unknown), the update check is suppressed entirely (no request, cache write or goroutine) and InstallUpdate refuses. Only tagged release builds reach the network or install.
 - Each app's renderer polls for updates hourly after the first window mounts, off the boot critical path. Go caches the answer for 6 hours after a successful check and 30 minutes after a failed one, and singleflight collapses concurrent callers, so Go sets the real network cadence.
 - A failed update check (network error, 404, or 403 rate-limit) is silent: no item, no error dialog, no console output, only a debug-level log. A 404 occurs because release.yml publishes only after all gates pass and drafts are invisible to /releases/latest.
@@ -1622,7 +1622,7 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 
 ### Go packages
 
-- Every git package in Kira Space's git module is its own internal/git* package (plus internal/ghclient); no phase merged git code into a shared file where a per-module one would do.
+- Every git package in Kira Space's git module is its own internal/git* package (plus internal/githost); no phase merged git code into a shared file where a per-module one would do.
 - startupfail is not a git package; it is repo-root shared infrastructure, hoisted by P100 Part 1 and reused by both apps' boot sequences. It is listed in the git module's package table only because Kira Space's boot depends on it.
 - TestDomainPackagesDoNotImportBridge in apps/kira-space/internal/layering_test.go covers the git packages, as Kira Studio's own copy covers the Studio and Api domain packages.
 - No internal/git* package imports internal/bridge, and none imports or is imported by an adapter package.
@@ -1638,12 +1638,12 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 | `gitops` | The write side: branch, checkout, tag, revert, reset, cherry-pick, stash, fetch, push, pull, worktree, stack/restack, conflict handling, and stderr progress parsing |
 | `gitsearch` | The cancellable, time-boxed tail scan and the Go matcher, plus the RE2/`RegExp` dialect reconciliation (below) |
 | `gitreview` | `review.db`'s whole surface: compressed content snapshots, fast/slow-path diff selection, partial-review ranges, the flat AI-comment list, and the TTL reaper (Storage, above) |
-| `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `ghclient` and stdlib only |
-| `gitrpc` | The method table (`app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**48**, P257), and the wire types |
+| `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `githost` and stdlib only |
+| `gitrpc` | The method table (`app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**50**, P318), and the wire types |
 | `gitwire` | Generated FlatBuffers code for the git data plane |
 | `gitaskpass` | The credential broker and its `GIT_ASKPASS` shim, over its own private socket, with a bounded wait |
 | `gitprepare` | The worktree prepare script's execution seam, called by ADE only — the one shell exception, below |
-| `ghclient` | `gh` CLI discovery and spawn discipline mirroring `gitclient`'s own `Locator`/probe/TTL-cache shape, a `GhStatus` classification, and PR lookup through `gh api` |
+| `githost` | Provider-neutral code host contract and registry (see Git host abstraction, below). `githost/github` is the `gh` provider: CLI discovery and spawn discipline mirroring `gitclient`'s own `Locator`/probe/TTL-cache shape, a status classification, and change request lookup through `gh api`. `githost/providers` builds the registry |
 | `startupfail` (repo-root, shared — not a git package, see above) | Native, pre-window failure alerts for every boot step (below) |
 | `rpcstream` (repo-root, shared) | The correlated-RPC-with-credits protocol (above) — module-agnostic by design, hoisted out of `apps/kira-studio/internal/bridge` at P100 so both apps import it |
 | `config` (`AcquireLock`) | The `app.lock` single-instance flock (Transport, above) |
@@ -1652,9 +1652,9 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - Never interpolate an app-supplied value into the gitprepare command string; the string is the user's own typed command, and app data (worktree path, branch, repo root) reaches the script only as environment variable values.
 - repoSettings.set refuses to set the prepare command on every gitrpc connection (P172), so no renderer can choose or change what runs; ADE runs the prepare script and the Git window never does (P202).
 - The gitprepare package imports only the standard library and knows nothing about repositories, sessions or approval; gitsession owns every policy decision, so the feature can be tested without spawning a real shell.
-- GitHub authentication is delegated entirely to gh and the app holds no GitHub credential: no OAuth flow, no token prompt, no reading of gh's keychain entry; PR lookups go through gh api.
-- GhStatus is a discriminated union mirroring GitStatus: ok, notFound (install gh), unauthenticated (run gh auth login), and forbidden (403 from insufficient scope or unauthorized org SSO, shown as the fix rather than a raw HTTP status).
-- GhStatus failures never block git itself; they only blank the PR indicator (fail-open).
+- A provider owns its credentials; the app holds none. The github provider delegates to gh: no OAuth flow, no token prompt, no reading of gh's keychain entry; lookups go through gh api.
+- githost.Status kind is ok, notFound (install the CLI), unauthenticated (log in) or forbidden (403 from insufficient scope or unauthorized org SSO, shown as the fix rather than a raw HTTP status). It mirrors GitStatus.
+- A Status failure never blocks git itself; it only blanks the change request indicator (fail-open).
 - gh stdout is capped at 64 MiB while reading, derived from the worst case of a 100-item open-PR page; overflow reports forbidden with a too-large reason, never "unreadable response".
 - autoFetchOutcome classifies ticks: busy (OperationInProgress, Cancelled) reschedules at the normal interval and counts nothing; transient (NetworkFailed, LockHeld) backs off; permanent (every other kind, including AuthFailed, RemoteNotFound, Unknown) stops auto-fetch.
 - Transient auto-fetch failures reschedule at min(interval << failures, max(interval, 60 min)) with the shift clamped at 16 and no attempt limit, so an offline night never stops it; a success resets the count.
@@ -1780,8 +1780,8 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - In Kira Space a tab switch fully unmounts and remounts the graph; there is no KeepAlive around MainView.vue's component :is, so continuity comes from persisted view state.
 - RepoGraphView.vue constructs a TabViewStateStore per mount; git-ui's unmount()/mount() serialize the lane layout, scroll position and loaded rows into the pinned graph tab's persisted state.viewState and rebuild from it on the next mount.
 - graphVisibility.ts's GRAPH_VISIBLE_KEY/MountHandle.setVisible (background-pause optimization) is unreachable in Kira Space because no caller invokes it and there is no mounted-but-backgrounded state; RepoGraphView.vue has no such hooks.
-- PR ancestry is rebuilt with a base cutoff (state/pr.ts rebuildAncestry): each PR's baseRef is resolved locally via rowOfBranchTip (a decoration scan, no new RPC) and its ancestors excluded, so PR badges no longer tag nearly all loaded history behind a PR branch.
-- Bursts of individually-resolving PR branches coalesce into one ancestry rebuild per tick via scheduleAncestryRebuild's nextTick drain.
+- Change request ancestry is rebuilt with a base cutoff (state/changeRequests.ts rebuildAncestry): each baseRef is resolved locally via rowOfBranchTip (a decoration scan, no new RPC) and its ancestors excluded, so badges no longer tag nearly all loaded history behind a branch.
+- Bursts of individually-resolving change request branches coalesce into one ancestry rebuild per tick via scheduleAncestryRebuild's nextTick drain.
 - There is no gitrpc method allowlist (removed in P243 Part 2 with the extension): every gitrpc method is served, and a method the contract does not name does not exist.
 - guardRepoSettingsSet in gitstream.go refuses repoSettings.set with E_READ_ONLY when its patch touches the prepare script or worktreeBasePath, which only Kira Space writes in-process (ADE repo config).
 - The gitrpc Router refuses the prepare-script leaf on every connection (P172), and there is no gitrpc method for shell execution since 46 removed worktree.prepare.
@@ -1827,9 +1827,9 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - GraphOrderState.rebuild reconciles tips against the store: because refs reload before the graph re-walks, a tip sha the store lacks keeps the sha its group last used (HEAD by index, others by key), else HEAD's group would empty and the history collapse.
 - The auto-refresh viewport restore anchors on the top row's sha, and CommitGrid resizes the SlickGrid canvas on a height-only change.
 - A walk reset remembers its loaded row count (gitsession.Walk.keepRows); the next graph.stream re-reads whole pages until the store holds that many rows, so Refresh after Show more keeps the loaded depth.
-- GitHub PR facts (gitsession/gh.go) survive a refs change: markStale() drops only GitHub-remote detection, stale entries (up to ghStaleMax 1 h) serve at once with one single-flight background refresh per key, and the post-fetch purge reads fresh so closed PRs still purge.
-- pr.ts keeps last-known PR facts per repo (cap 8), restores them on setRepoId and revalidates.
-- CommitGrid badges a PR only on the commit its head points at (PrState.prsHeadedAt(sha)); the details pane keeps the ancestry-derived prForCommit.
+- Change request facts (gitsession/changerequests.go) survive a refs change: markStale() drops only remote detection, stale entries (up to 1 h) serve at once with one single-flight background refresh per key, and the post-fetch purge reads fresh so closed change requests still purge.
+- changeRequests.ts keeps last-known facts per repo (cap 8), restores them on setRepoId and revalidates.
+- CommitGrid badges a change request only on the commit its head points at; the details pane keeps the ancestry-derived changeRequestForCommit.
 - The graph column never renders narrower than graphColumnWidth(laneCount) (at most 12 lanes, 173px) in any mode.
 - CommitGrid keeps a grow-only lane floor per mount: a refresh restarts laneCount at 0 and never shrinks it, and a repo switch remounts and resets it.
 - On a first-ever mount (no persisted view state) the graph column tracks the lane floor, even below the stored width, until the user drags it; stored widths are preferences and only a drag writes one.
@@ -1885,6 +1885,18 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - Date formatting for git UI lives in @workbench/behaviour/format (formatAbsoluteUtc, formatAgeCompact, formatDateTime); packages/git-ui/src/lib/dateFormat.ts keeps only the DOM-bound measureAbsoluteDateWidth, with no second copy.
 - appearance.inlineBlame is a settings toggle, defaulted on, that gates only the inline renderer and is watched live by RepoFileView.vue so toggling affects open tabs immediately.
 - Settings are Go-persisted, one row per leaf, typed via AppearanceSettings/AppearancePatch in internal/storage/model/settings.go; a leaf without a Go counterpart is silently discarded on Set and reverts to its zod default on read.
+
+### Git host abstraction (P318)
+
+- internal/githost is the neutral contract. A Provider composes four roles: Remotes (ParseRemote, Claims), Auth (Status, Account), ChangeRequests (ForCommit, ForBranch, Open) and URLs (ChangeRequestURL, RepoURL, BranchURL, IsChangeRequestURL, ParseLink). FileReviewSync (ChangeFiles, SetFilesViewed) is optional. Callers depend on the narrowest role.
+- "Change request" is the neutral name for a pull or merge request. A provider supplies Terms (label, change request, noun, short, CLI); the UI reads them from githost.Info. No neutral caller holds a provider word.
+- providers.New builds the Registry: github first, then extras. appwire.Options.GitHosts (a Registry; nil is github alone) and flowharness.WithGitHost add providers. flowharness/fakehost is the test-only second host (forge.test, merge requests).
+- Selector.Resolve(setting, remoteURL) picks the provider. Setting kiraSpace.gitHost.provider (per repo) is auto, off or a provider id. auto picks the first provider that parses the origin remote and Claims its host. An unknown id logs a warning and falls back to auto. A pinned id that does not parse the remote resolves to none.
+- The server composes every link (changeRequest.browserUrl, ChangeRequestsResult.BranchURLs, HostLink on tasks and backlog items); the renderer never builds a host URL. Only URLs a provider approves via IsChangeRequestURL open.
+- git-ipc adds gitHost.info (the repo's resolved host, null for none) and gitHost.providers. Space adds GitHostService.Providers and AdeTaskService.HostProviders (phone). Contract version 50 renames the PR-named requests and fields to change request names.
+- Breaker, snapshot and per-branch caches live in the repo entry's host state, not in a provider.
+- ADE storage: ade_tasks.host_url, ade_backlog.host_url, ade_viewed_sync (provider, change_number). Migration 0044 renames github_url, ade_gh_synced and pr_number.
+- No CI status or change request comment roles exist. Add one as a new optional role beside FileReviewSync.
 
 ## Agent harness (P316)
 
@@ -2307,8 +2319,8 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - A stopped review agent row resumes with --resume and the same claudeSessionId; if the recorded cwd is gone, the old row loses purpose and a new one launches.
 - TakeOver of the review agent row goes through launchReviewAgent.
 - Questions to the review agent are pasted bracketed through Tracker.Send, and Send is disabled while the agent waits on input.
-- GitHub sync is one way and uses gh only: GitHubSyncPlan decides per file (ghSyncDecision), and Apply marks files with one aliased markFileAsViewed mutation via gh api graphql.
-- ade_gh_synced records files this app marked as viewed; un-reviewing one fires unmarkFileAsViewed server side through the unmark observer (SetObserver), for ledger files only. Partial reviews never sync.
+- Viewed sync is one way and needs a provider with FileReviewSync (status unsupported otherwise): ViewedSyncPlan decides per file, and Apply marks files through the provider. The github provider uses one aliased markFileAsViewed mutation via gh api graphql.
+- ade_viewed_sync (provider, change_number per row) records files this app marked as viewed; a row of another provider or change request drops at the next plan; un-reviewing one fires unmarkFileAsViewed server side through the unmark observer (SetObserver), for ledger files only. Partial reviews never sync.
 - Review comments carry kind (change|question) and state (open|addressed) plus the agent's reply, repliedAt and sentAt (gitreview 0004); older rows read as change/open.
 - review.comment.add takes kind; review.comment.setState reopens or addresses a comment; the export marks the kind and state.
 - The review window's right pane has SecondaryTabs (ade-review-right-tabs): AdeWorkflowReviewPanel (comments, route, Send to agent, round block, finish buttons; shown while the branch has a review step run) and the review agent. The tab pick lives in useAdeReviewWindowStore.
@@ -2732,19 +2744,19 @@ the git UI is its only caller (`repo/git/hostHandlers.ts:433`), binding Space's 
 (P74 §3, P79 batch B).** That package used to be outside the `window.open` deny row's own scope.
 Every externally-openable link in the git UI is a `<button>` calling a host capability, never an
 anchor: the PR surfaces (`CommitMeta.vue`, `BranchPicker.vue`/`StackList.vue` stack badges,
-`refBadges.ts`'s SlickGrid formatter) go through `pr.browserUrl`/`GitHubService.OpenPullRequestURL`,
+`refBadges.ts`'s SlickGrid formatter) go through `changeRequest.browserUrl`/`GitHostService.OpenChangeRequestURL`,
 and a URL found inside a commit message body (`linkify.ts`) goes through a new generic
 `link.openExternal`. Both are gated on `capabilities.openExternal`, and a surface renders a
 plain `<span>` when the host does not report it (`CommitMeta.vue`'s own button/span split — P79
 batch F closed the one PR icon that was missing the gate). `link.openExternal` is generic where
-`pr.openExternal` is not, per `internal/bridge/link.go`'s own reasoning: a PR URL is composed
+`changeRequest.openExternal` is not, per `internal/bridge/link.go`'s own reasoning: a change request URL is composed
 server-side from data the app controls, while a commit-body URL **is** the untrusted content,
 already visible to the renderer as linkified text — so the only check left is the URL's own shape.
 `LinkService.OpenExternal` refuses anything that is not a well-formed `http`/`https` URL with a
 non-empty host, before `Browser.OpenURL` ever sees it, and the git-ui host handlers do the
-equivalent shape validation. The host check for a PR URL is
-`gitsession.IsGitHubHost` — `github.com` plus any host `gh`'s own `Discovery` has authenticated
-against — shared by the composer and the validator, not two hand-rolled allowlists (P79 batch B; the
+equivalent shape validation. The check for a change request URL is
+`Registry.IsChangeRequestURL`: some registered provider accepts it (github: `github.com` plus any host `gh`'s own `Discovery` has authenticated
+against) — shared by the composer and the validator, not two hand-rolled allowlists (P79 batch B; the
 previous hardcoded literal broke GitHub Enterprise Server entirely, since the validator's allowlist
 was not really an allowlist for a GHES host).
 
@@ -2808,10 +2820,10 @@ repo's CI runs.
 - The flow gRPC server runs unary methods through its interceptor, so Calls() and required metadata cover unary and streams.
 - createTerminalsStore (shared by both apps and the Docker exec store) keeps one terminalWrite in flight per tab and coalesces chunks typed meanwhile (state/orderedWrites.ts), because concurrent bound calls reach the backend in any order.
 - Space flow tier: apps/kira-space/internal/appwire is the composition root; Build(Options) wires repos, git, terminal, ADE, memory, mobile and bound services; main.go supplies native pieces and tests supply fakes.
-- Space flow harness uses real SQLite, git (fixed dates, git fast-import history), git stream, PTY, watchers and mobile HTTP; it fakes the claude and gh CLIs (internal/flowtest/fakeagent, scenario JSON), dialogs, browser, keep-awake, LAN detection and window manager.
+- Space flow harness uses real SQLite, git (fixed dates, git fast-import history), git stream, PTY, watchers and mobile HTTP; it fakes the claude and gh CLIs (internal/flowtest/fakeagent, scenario JSON), a second code host (flowharness/fakehost, registered with WithGitHost), dialogs, browser, keep-awake, LAN detection and window manager.
 - appwire.Options exposes test seams GhLocator, TrackerGrace and MobilePoll, set via flowharness.WithoutGh, WithTrackerGrace and WithMobilePoll.
 - The fake claude prints no stream init line under --output-format json, accepts an inline --mcp-config, and answers headless calls by --system-prompt through scenario prompts rules.
-- Space flow tests live in internal/flows/{gitflow,repoflow,editorflow,adeflow,memoryflow,termflow,appflow,mobileflow}; bun run test:flows:space is the general suite, and test:flows:space:complete sets KIRA_FLOW_COMPLETE=1 and adds slow permutation coverage.
+- Space flow tests live in internal/flows/{gitflow,repoflow,editorflow,adeflow,memoryflow,termflow,appflow,mobileflow,githostflow}; bun run test:flows:space is the general suite, and test:flows:space:complete sets KIRA_FLOW_COMPLETE=1 and adds slow permutation coverage.
 - Space e2e-real tier (project e2e-real, bun run test:e2e-real:space) uses a go build -tags server binary on a temp home, fake claude/gh first on PATH, and Chromium on /?window=<uuid>.
 - The Space server build locates git through gitclient.NewHostLocator (locator_server.go), not the darwin-only locator.
 - Space e2e-real has no native dialogs (stubbed with page.route) and no mobile access.
@@ -3186,7 +3198,7 @@ Performance:
 - **Headless ADE runs create unnamed branches before the agent can request one (P199).** `request_branch` names a branch only when the agent calls it; a branch the run already created keeps its generated name, and rename is refused.
 - **`declare_repos`, `request_branch` and `branch_status` are untested against a real board and real `claude` (P199).** Covered by the `agentmcp` go-sdk client test and `agenttools_test.go` only; `task_info` runs in the real `TestSmartScriptRun`. Delete once one live run calls them.
 - **Unsaved ADE workflow edits are lost when the whole Agents module is switched away (P196).** The leave guard covers list switch, import/new, mode toggle and shell tab change, not a module switch.
-- **PR facts correct on the next request, not by push (P189).** No server-to-client PR-changed notification exists; a client revalidation after `refsChanged` can hit a stale server entry, bounded by the TTL and the next refs change.
+- **Change request facts correct on the next request, not by push (P189).** No server-to-client change notification exists; a client revalidation after `refsChanged` can hit a stale server entry, bounded by the TTL and the next refs change.
 - **The graph keeps its pre-refresh scroll offset after an auto refresh (P203).** A new tip is off screen until scrolled or remounted.
 - **`ui-timing` budgets fail in the WebKit sandbox even on an idle host (P250, P264, P266, P267, P277).** Two Studio tests fail (`budgets.spec.ts` interactions, `perf.spec.ts` scroll); the rest of `ui-timing` passes. Measured idle (load below 2, no leftover process): scroll work p50 17-18 ms vs 16, `perf.spec.ts` scroll frame p95 89-96 ms vs 80, tab switch p95 up to 363 ms vs 300, cached tree expand p95 58 ms vs 50, console keystroke p50 55 ms vs 50. Cause: this host's WebKit runs JS work 1.8x and DOM work 2.9x slower than Chromium on the same host. The same code passes in Chromium with margin. Profiling found no hot-path work left to cut (SlickGrid render, keystroke and tree paths are already batched), so no `perf` change landed. Budgets are never loosened. Delete once the project passes on the CI runner, a Mac or a faster host.
 - **Docker: remote `tcp://` without TLS is allowed (P200),** flagged `secure: false` in the UI. Exec sessions stay in the Terminal tab's chip list after the container stops; close the chip by hand.

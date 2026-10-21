@@ -274,8 +274,8 @@ historical prose.
 - **The session's own auto-mode permission classifier blocks `git remote set-url`/`git remote add`
   outright, even against a disposable scratch repo built for a live check** (P129 Part 6's own
   `§6.1`) — flagged as a "Remote Repoint" regardless of intent. A live check that needs a
-  GitHub-shaped `origin` to exercise a GitHub-gated code path (`githubRepo`'s own host check,
-  `gh.go`) cannot repoint an existing scratch remote to fake that shape in this environment; plan
+  GitHub-shaped `origin` to exercise a GitHub-gated code path (`githost/github`'s `ParseRemote`
+  and `Claims`) cannot repoint an existing scratch remote to fake that shape in this environment; plan
   around it (seed the scratch repo with the right remote URL from the start, before it exists as a
   git remote at all) or fall back to reading the gate's own source plus its existing unit coverage,
   rather than spending a retry loop on the same denied action.
@@ -440,6 +440,10 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`. Run `bun run build:space-
   (builds `apps/kira-space/bin/kira-space-server-test` and `bin/fakeclaude`, gitignored).
 - Fake `claude`/`gh`: the test binary or `fakeclaude` symlinked as `claude`/`gh`. Scenario JSON
   path in `KIRA_FAKE_SCEN`, call records (`.args`, `.cwd`, `.prompt`) in `KIRA_FAKE_DIR`.
+- Second code host: `flowharness.WithGitHost(fakehost.New())` registers an in-process `forge.test` host
+  (merge requests) after GitHub. No CLI, no PATH. Use `WithoutGh()` to prove no step reaches `gh`.
+  `fakehost.WithoutSync` hides `FileReviewSync`. Flow: `flows/githostflow`; UI half
+  `tests/ui/git-host-provider.spec.ts`.
 - Harness roots use a short `os.MkdirTemp("", "ksf")` path: unix-socket paths cap near 108 bytes.
 - Many watchers per parallel test can hit the inotify limit; raise `fs.inotify.max_user_instances`.
 - Run `go test` with `CGO_ENABLED=1`; lint with `PATH=$HOME/go/bin:$PATH`.
