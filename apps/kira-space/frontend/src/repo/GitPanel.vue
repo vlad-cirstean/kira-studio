@@ -36,8 +36,8 @@ const repoPanelTabStore = useRepoPanelTabStore();
 const repoSearchStore = useRepoSearchStore();
 const reposDialog = useReposDialogStore();
 
-// P67b §4.4: the Git module's own panel — one PanelShell, not a shell inside a shell. Absorbs the
-// repository list that used to live in ProjectPanel.vue's "Connections" section (§0's own
+// The Git module's own panel — one PanelShell, not a shell inside a shell. Absorbs the
+// repository list that used to live in ProjectPanel.vue's "Connections" section (the
 // complaint: "so there are no repos alingside connections") — it is now the title bar's former
 // repo switcher, relocated and widened, sitting directly above whichever repo workspace's own
 // Files/Search/Review body is active. `repoId` is still derived from the active workspace (never a
@@ -48,10 +48,10 @@ const repoId = computed(() => repoIdOfWorkspace(workspaceStore.active) ?? '');
 // hides rows on the other. Each keeps its own text across tab switches.
 const local = reactive({ repoSearch: '', fileSearch: '' });
 
-// P220: tab persists (state/search.ts, `kira.git.panelTab`, default Repos); no auto-switch on repo
+// Tab persists (state/search.ts, `kira.git.panelTab`, default Repos); no auto-switch on repo
 // open or mount. With no repo workspace active, Files/Review have nothing to show: display Repos
 // without writing it, so the stored choice returns once a repo is active.
-// P92 item 6: backed by useRepoPanelTabStore — hostHandlers.ts's review.open flips it from outside.
+// Backed by useRepoPanelTabStore — hostHandlers.ts's review.open flips it from outside.
 const tab = computed({
   get: () => (repoId.value ? repoPanelTabStore.repoPanelTab() : 'repos'),
   set: (v: 'repos' | 'files' | 'review') => repoPanelTabStore.setRepoPanelTab(v),
@@ -78,11 +78,11 @@ const viewOptions = computed(() => [
   { value: 'search' as const, label: t('common.action.search.label'), testid: 'repo-view-search' },
 ]);
 
-// C11 §8.4/§5.3: this panel is one persistent component instance across every repo workspace
+// This panel is one persistent component instance across every repo workspace
 // (WorkbenchShell.vue's `<component :is="activeModePanel" />` carries no per-repo key, unlike a
-// tab), so "kept alive with v-show while the workspace is open" (§8.4) is tracked per repoId here
+// tab), so "kept alive with v-show while the workspace is open" is tracked per repoId here
 // rather than with a single boolean — switching to a DIFFERENT repo's workspace and back remounts
-// (review.session.save/load, S6, is exactly the resume path that makes that safe) while switching
+// (review.session.save/load is exactly the resume path that makes that safe) while switching
 // between this SAME repo's Files/Search/Review segments never does, since the set entry it added
 // on first activation never goes away.
 const reviewActivatedRepoIds = reactive(new Set<string>());
@@ -234,10 +234,10 @@ onUnmounted(() => {
                       t('space.repo.panel.treeTruncated.hint')
                     }}</AlertDescription>
                   </Alert>
-                  <!-- Always mounted, never gated on isRepoTreeLoaded — RepoFileTree's own onMounted
-                     is what calls ensureRepoTreeLoaded in the first place; gating on the state it
-                     sets would mean it never gets the chance to. Its own `rows` computed is empty
-                     until the load resolves, then updates reactively — no separate loading
+                  <!-- Always mounted, never gated on isRepoTreeLoaded — RepoFileTree's own
+                     onMounted is what calls ensureRepoTreeLoaded in the first place; gating on the
+                     state it sets would mean it never gets the chance to. Its own `rows` computed
+                     is empty until the load resolves, then updates reactively — no separate loading
                      placeholder needed for a first open this fast. -->
                   <RepoFileTree
                     class="flex-1 min-h-0"

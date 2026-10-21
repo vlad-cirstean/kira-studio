@@ -53,11 +53,11 @@ const reposDialog = useReposDialogStore();
 // Every top-level repo hidden and Show hidden off: the list is empty by choice, not for lack of imports.
 const allHidden = computed(() => visibility.listed.length === 0 && visibility.hasHidden);
 
-// P67b §4.4: a single click opens (if not yet open) or activates (if open) — OQ-2's adopted
-// recommendation. This panel's entire subject is repositories, so a click that only paints a
-// highlight is a dead control; double-click still works, since it is a click first.
+// A single click opens (if not yet open) or activates (if open). This panel's entire subject is
+// repositories, so a click that only paints a highlight is a dead control; double-click still
+// works, since it is a click first.
 //
-// P84 §6.3: an anchor row whose *worktree* is the open workspace must not read as closed — "open"
+// An anchor row whose *worktree* is the open workspace must not read as closed — "open"
 // now also means "some row parented to me is open". Guarded on `id` since worktreeRecordId can
 // return '' for a worktree never opened in this app, and '' would otherwise match every open
 // top-level repo (every anchor's own parentId is '' too).
@@ -135,7 +135,7 @@ async function onHideRepo(id: string): Promise<void> {
   closeRepo(id);
 }
 
-// P107 I2-20: the Rename…/Close/Remove triple onRepoContextMenu and onWorktreeContextMenu below
+// The Rename…/Close/Remove triple onRepoContextMenu and onWorktreeContextMenu below
 // both build — same three items, same handlers, only "which record" differs. Close only renders
 // while `id` isOpen (both callers'); Rename/Remove always render (both callers already gate
 // whether to offer this triple at all before calling — onWorktreeContextMenu only for a worktree
@@ -255,10 +255,10 @@ function terminalTooltip(n: number): string {
   return t('space.repo.panel.terminalOpen.tooltip', { count: n });
 }
 
-// P83 §10.2: a worktree row's own context menu — out of scope for P82 (nothing needed one yet),
-// needed now since without it a terminal could never be opened at a worktree that isn't the active
-// workspace. "Copy path" rides along since the menu must exist anyway and a one-item menu reads
-// like an accident — the same item the repo row already offers above.
+// A worktree row's own context menu — needed now since without it a terminal could never be opened
+// at a worktree that isn't the active workspace. "Copy path" rides along since the menu must exist
+// anyway and a one-item menu reads like an accident — the same item the repo row already offers
+// above.
 function worktreeMenuItems(repo: RepoSummary, wt: WorktreeEntry): MenuItem[] {
   const items: MenuItem[] = [
     {
@@ -469,7 +469,7 @@ useTreeShortcuts(nav, {
         <span v-else class="min-w-0 flex-1"
           ><TruncatedText :text="repo.root">{{ repo.name }}</TruncatedText></span
         >
-        <!-- P83 plan §12.4: a repo row's checked-out branch. The name span's own flex-1
+        <!-- A repo row's checked-out branch. The name span's own flex-1
            above keeps it yielding first, so this is what survives on a narrow panel. Same
            size/colour
            pair as `.worktree-badge` below, so a collapsed row's branch and its expanded

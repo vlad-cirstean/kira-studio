@@ -24,25 +24,24 @@ import { useDynamicValuesStore } from './state/dynamicValues';
 
 const dynamicValuesStore = useDynamicValuesStore();
 
-// P6 D11: a read-only discovery surface for the dynamic-value catalogue — nothing here edits,
-// saves, or reaches Go. `catalog.ts` carries names only (no description strings, D11: "the sample
+// A read-only discovery surface for the dynamic-value catalogue — nothing here edits,
+// saves, or reaches Go. `catalog.ts` carries names only (no description strings, "the sample
 // is the description" — a generated example says more precisely what Postman's own docs would in
 // a sentence, for one call to a record this dialog is loading anyway).
 const samples = reactive<Record<string, string>>({});
 
-// P28 D15(b): one vocabulary. P17 D12 listed the Postman `$name` spellings after the `fake.` ones,
-// tagged `postman alias`; this dialog is the app's own reference sheet for what to type, so it now
+// One vocabulary. This dialog is the app's own reference sheet for what to type, so it now
 // teaches only the spelling the app offers. The `$name` catalogue is unchanged and still resolves —
-// it is simply no longer taught, and a Postman import rewrites what it can up front.
+// it is no longer taught, and a Postman import rewrites what it can up front.
 interface CatalogueEntry {
   name: string;
 }
 const ALL_ENTRIES: CatalogueEntry[] = FAKE_NAMES.map((name): CatalogueEntry => ({ name }));
 
-// D11: awaits loadDynamicGenerator() on open — a user-initiated action, exactly like *Generate
+// Awaits loadDynamicGenerator() on open — a user-initiated action, exactly like *Generate
 // data…*'s own first open, and the same memoised promise a send would use. One sample per name,
 // freshly generated every time the dialog opens (closing and reopening shows a different one).
-// `generate` already accepts either spelling (generators.ts's own D12 dispatch).
+// `generate` already accepts either spelling (generators.ts's own dispatch).
 const error = ref<string | null>(null);
 onMounted(async () => {
   try {

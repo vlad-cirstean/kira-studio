@@ -21,12 +21,11 @@ import { useSettingsStore } from '../state/settings';
 import { blameLineText, blameLineTooltip } from '../views/repo/blameLine';
 import AgentUsageItem from './AgentUsageItem.vue';
 
-// P103 Part 2 (§5.4): Kira Studio's own workbench/StatusBar.vue, trimmed to the blame item (P76
-// §5.2) on the left. Now a thin composition over the shared bar chrome
-// (packages/workbench/src/components/StatusBar.vue). P116 G7 adds the app-metrics item back —
-// AppMetricsItem.vue, shared with Kira Studio's own copy of this file. P119 adds the update item,
-// same shared component (UpdateAvailableItem.vue) and the same in-app dialog Kira Studio's own
-// copy opens.
+// Kira Studio's own workbench/StatusBar.vue, trimmed to the blame item on the left. Now a thin
+// composition over the shared bar chrome (packages/workbench/src/components/StatusBar.vue). The
+// app-metrics item is added back — AppMetricsItem.vue, shared with Kira Studio's own copy of this
+// file. The update item is added, same shared component (UpdateAvailableItem.vue) and the same
+// in-app dialog Kira Studio's own copy opens.
 const blameStatusStore = useBlameStatusStore();
 const appMetricsStore = useAppMetricsStore();
 const appUpdateStore = useAppUpdateStore();
@@ -84,7 +83,7 @@ function onRevealBlameCommit(): void {
       />
       <AppMetricsItem :sample="appMetricsStore.sample" />
     </template>
-    <!-- P110 I2-19 (§3.5.3): `.blame`'s font: inherit + color/disabled rules, and `.blame-text`'s
+    <!-- `.blame`'s font: inherit + color/disabled rules, and `.blame-text`'s
          truncation, folded onto the button/span above -- Preflight already sets `font: inherit` on
          every <button>, so `text-kira-sm` was redundant with what the button already inherits and
          was dropped; `text-fg` and `disabled:cursor-default` stay explicit (a plain <button> resets

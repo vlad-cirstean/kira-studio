@@ -27,12 +27,12 @@ watch(
   (id) => fileTreeStore.ensureRepoTreeLoaded(id),
 );
 
-// C13-6d: project/state/tree.ts's own debounce for the Studio schema tree's identical shape of
+// project/state/tree.ts's own debounce for the Studio schema tree's identical shape of
 // problem — the input itself (PanelShell's own model-value, bound above props.search) stays
-// instantly responsive, only the expensive filter recompute (a full tree walk, §7.2) waits for
+// instantly responsive, only the expensive filter recompute (a full tree walk) waits for
 // typing to settle. 150ms matches that precedent. Measured (200k files, the cap): 538ms per
 // keystroke reactive vs 200ms plain filter cost — debouncing turns "every keystroke pays this"
-// into "one pause pays this", which is what actually fixes the perceived lag.
+// into "one pause pays this", which is what fixes the perceived lag.
 const debouncedSearch = ref(props.search);
 // SchemaDialog.vue's own useDebounceFn precedent (Part 2) — cancel() in onUnmounted/the repoId
 // watch replaces the clearTimeout below.

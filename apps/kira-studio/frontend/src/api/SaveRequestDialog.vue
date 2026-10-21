@@ -23,9 +23,9 @@ import { useSaveRequestDialogStore } from './state/saveRequestDialog';
 const collectionsStore = useCollectionsStore();
 const saveDialogStore = useSaveRequestDialogStore();
 
-// P4 D15: Save as… — one text field for the name and one indented native select of every collection and
+// Save as… — one text field for the name and one indented native select of every collection and
 // folder as the target, on the existing DialogFrame. Driven by useSaveRequestDialogStore's own
-// open/suggestedName state (P108 F16) so the request view can open it without importing this
+// open/suggestedName state so the request view can open it without importing this
 // component (the same shape state/objectStore.ts's own upload dialog uses).
 const name = ref('');
 const target = ref('');

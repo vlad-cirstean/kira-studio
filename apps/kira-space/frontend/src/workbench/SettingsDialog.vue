@@ -17,11 +17,10 @@ import GitPane from './settings/GitPane.vue';
 import MemoryPane from './settings/MemoryPane.vue';
 import MobileAccessPane from './settings/MobileAccessPane.vue';
 
-// P100 Part 2: Kira Studio's own workbench/SettingsDialog.vue, the plan's own "small rewrite" —
-// only the sections still relevant to a repo-only workbench (state/settings.ts's own `sections`).
-// P103 Part 2 (§5.5): now a thin composition over SettingsShell.vue plus this app's own panes
-// (workbench/settings/*.vue, extracted verbatim from this file's own former inline
-// `<template v-if>` branches — see SettingsShell.vue's own file-level comment for what stays
+// Kira Studio's own workbench/SettingsDialog.vue — only the sections still relevant to a repo-only
+// workbench (state/settings.ts's own `sections`).
+// Now a thin composition over SettingsShell.vue plus this app's own panes
+// (workbench/settings/*.vue — see SettingsShell.vue's own file-level comment for what stays
 // app-side and why). Everything genuinely app-specific stays here: which three of Settings'
 // sections this dialog edits, the dialog's own width/height, the deep-link reset, and the footer
 // markup (its one small, real difference from Kira Studio's own — see SettingsShell.vue's

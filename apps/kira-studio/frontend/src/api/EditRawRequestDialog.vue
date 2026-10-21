@@ -21,11 +21,11 @@ import { useEditRawStore } from './state/raw';
 
 const editRawStore = useEditRawStore();
 
-// P9 D8/D9: a raw HTTP/1.1 text buffer the user hand-edits, parsed back into the structured model
+// A raw HTTP/1.1 text buffer the user hand-edits, parsed back into the structured model
 // on Apply — never a second send path (there is exactly one, and it takes tab state). MonacoHost
 // editable (RequestBodyPane.vue's own `:readonly="false"` shape), not a plain <textarea>: unlike a
 // single-line curl command, a raw request is genuinely multi-line and benefits from real line
-// numbers (F17 — no new primitive, no new dependency).
+// numbers (no new primitive, no new dependency).
 const text = ref('');
 
 // Round-2 review finding 7 (the same class ImportCurlDialog.vue's own finding 15 fixed for curl

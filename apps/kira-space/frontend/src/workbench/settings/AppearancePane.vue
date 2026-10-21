@@ -18,10 +18,8 @@ import { useId } from 'vue';
 import DateFormatField from './DateFormatField.vue';
 import type { SettingsPaneProps } from './types';
 
-// P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
-// `v-if="activeSection === 'Appearance'"` branch — trimmed to typography + repo-file-viewer
-// leaves (P100 Part 2's own comment: no row density preview, no data-grid page size, none of
-// which this app has a feature for).
+// Trimmed to typography + repo-file-viewer leaves (no row density preview, no data-grid page
+// size, none of which this app has a feature for).
 const props = defineProps<SettingsPaneProps>();
 
 function onInlineBlameChange(checked: boolean): void {

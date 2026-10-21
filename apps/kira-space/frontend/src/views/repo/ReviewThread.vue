@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// C11 §7.4 (S10) — one review thread's body over Monaco, mounted into an IViewZone by
-// reviewDecorations.ts (S9) via createApp/unmount, never routed through the workbench's own tab
+// One review thread's body over Monaco, mounted into an IViewZone by
+// reviewDecorations.ts via createApp/unmount, never routed through the workbench's own tab
 // system (this is editor-surface furniture, not a view). Two modes: 'view' renders an existing
 // ReviewComment (body, anchor label, Delete); 'compose' is the empty add-comment form
 // (reviewComments.ts:5-7's own "the gutter + is the discoverable affordance", ported as a glyph +

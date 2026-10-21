@@ -20,11 +20,11 @@ import { useImportCurlStore } from './state/curl';
 
 const importCurlStore = useImportCurlStore();
 
-// P7 D12: paste, live preview, live warnings, Import. A plain <textarea> rather than CodeMirror —
-// there is no grammar to highlight and P3 D1's bundle argument applies. Everything below the
-// textarea recomputes on every input (parseCurl is pure and synchronous, D12) — the warnings are
+// Paste, live preview, live warnings, Import. A plain <textarea> rather than CodeMirror —
+// there is no grammar to highlight and the bundle argument applies. Everything below the
+// textarea recomputes on every input (parseCurl is pure and synchronous) — the warnings are
 // shown *before* Import is pressed, deliberately diverging from ImportReportStrip's post-hoc
-// report (D4): a curl paste is a short string sitting right there, so the honest place to say
+// report: a curl paste is a short string sitting right there, so the honest place to say
 // "-k was ignored" is beside it, while it can still be edited.
 const text = ref('');
 

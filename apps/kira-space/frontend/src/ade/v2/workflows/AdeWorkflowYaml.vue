@@ -15,7 +15,7 @@ import { useAdeWorkflowsUiStore } from '../state/adeWorkflowsUi';
 import type { WorkflowEntry, WorkflowError } from '../wire';
 import AdeWorkflowSaveBar from './AdeWorkflowSaveBar.vue';
 
-// YAML mode (R27): validates 300 ms after a keystroke; Save writes the draft, Discard restores the
+// YAML mode: validates 300 ms after a keystroke; Save writes the draft, Discard restores the
 // saved text. The draft is the source while it has unsaved edits, so a push never resets it. Save
 // sends the hash of the text the draft was edited from; a file changed elsewhere is refused with
 // Reload and Overwrite, as in the graph editor.

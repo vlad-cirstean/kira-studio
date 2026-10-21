@@ -29,19 +29,19 @@ const confirmDialogStore = useConfirmDialogStore();
 const variablesStore = useVariablesStore();
 const connectionsStore = useConnectionsStore();
 
-// P28 D16(c): the environment list, re-hosted in a tab. Every behaviour below is
+// The environment list, re-hosted in a tab. Every behaviour below is
 // EnvironmentsDialog.vue's, ported unchanged — name/description inline editing committed together
-// on blur (P17 D14), *Edit variables…*, delete behind a confirm, an *Active* radio, drag/keyboard
-// reordering refused while filtered (D14), Duplicate (P17 D17) and *New environment*. What changed
+// on blur, *Edit variables…*, delete behind a confirm, an *Active* radio, drag/keyboard
+// reordering refused while filtered, Duplicate and *New environment*. What changed
 // is the chrome: this view's own head/toolbar bands instead of DialogFrame, the filter in the
 // toolbar band every other view puts its filter in, *New environment* in the trailing action
 // group, and no Close button — a tab is closed the way every other tab is.
 //
-// `showRunControls: false`'s own reasoning (D16a) still holds — there is no operation here to
+// `showRunControls: false`'s own reasoning still holds — there is no operation here to
 // refresh or stop, and two permanently-disabled buttons say something different from "not right
 // now" — so the refresh/stop group below is omitted outright rather than rendered disabled.
 //
-// P104 §3: ViewChrome/ViewHeader/RunState inlined at this call site (no library counterpart).
+// ViewChrome/ViewHeader/RunState inlined at this call site (no library counterpart).
 const props = defineProps<{ tab: EnvironmentsTabRecord }>();
 
 const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));

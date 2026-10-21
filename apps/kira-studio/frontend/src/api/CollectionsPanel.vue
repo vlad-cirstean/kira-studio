@@ -23,29 +23,29 @@ const collectionsStore = useCollectionsStore();
 const importCurlStore = useImportCurlStore();
 const variablesStore = useVariablesStore();
 
-// P4 C5: the placeholder is gone — this is a real tree now, mounted through the same panel-shell
+// The placeholder is gone — this is a real tree now, mounted through the same panel-shell
 // geometry Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
-// collections yet", which is also what gates the search box below (F14).
+// collections yet", which is also what gates the search box below.
 //
-// The header's own `new-request` testid is the one front door left (P1's own affordance) — P13
-// D6 removed the empty state's duplicate `new-request-empty`/`new-collection-empty`/
-// `import-collection-empty` actions entirely; tests/ui/api-ui-consistency.spec.ts asserts none of
-// the three exist, not that they are preserved.
-// P28 D16(d): back to "no collections" alone. P22b D8 had widened this to also require no
-// environments, because the environments category lived in this panel and a project with
-// environments but no collections still had something to show; with that category gone, this
-// panel shows collections and nothing else, so an environment must not keep the empty state away.
+// The header's own `new-request` testid is the one front door left — the empty state's duplicate
+// `new-request-empty`/`new-collection-empty`/`import-collection-empty` actions were removed
+// entirely; tests/ui/api-ui-consistency.spec.ts asserts none of the three exist, not that they are
+// preserved.
+// Back to "no collections" alone. It had been widened to also require no environments, because the
+// environments category lived in this panel and a project with environments but no collections
+// still had something to show; with that category gone, this panel shows collections and nothing
+// else, so an environment must not keep the empty state away.
 const empty = computed(() => collectionsStore.collections.length === 0);
 
-// P112: useCollectionsStore's own app-lifetime query observer fetches the tree on store creation
+// useCollectionsStore's own app-lifetime query observer fetches the tree on store creation
 // (same as useVariablesStore's own environments query below) — there is nothing left to trigger
 // on mount here. PanelShell still renders #body only once `empty` reads false, which now follows
 // the query's own data rather than a mount-triggered fetch.
 
-// P22b D8: runtime-only collapse state for the two categories — a panel section is not a
+// Runtime-only collapse state for the two categories — a panel section is not a
 // preference worth a storage round trip (ConsoleViewRuntime's own "runtime-only, never saved"
 // rule). Collections starts expanded (today's only view of the tree); Environments starts
-// collapsed (F11: it was behind a dialog before this, so a user has never had it open by default).
+// collapsed (it was behind a dialog before this, so a user has never had it open by default).
 const collectionsExpanded = ref(true);
 function onSearch(value: string): void {
   collectionsStore.search = value;
@@ -68,7 +68,7 @@ function onImport(): void {
   void collectionsStore.importCollection();
 }
 
-// P5 D11, re-homed to a tab by P17 D16: the palette's Variables… entry — opens the tab for
+// The palette's Variables… entry — opens the tab for
 // whichever collection is currently selected in the tree (a collection row directly, or a
 // folder/request's own collection). A no-op with nothing selected, the same "view-scoped, no-op
 // elsewhere" shape view.run/api.save already have.
@@ -150,10 +150,10 @@ onUnmounted(() => {
           data-testid="new-collection"
           @click="onNewCollection"
         />
-        <!-- P28 D18: the Postman import moved to the menu bar (App → Import Postman Collection…)
-           and to the command palette entry it already had. D11's spinner-on-the-action reasoning
-           went with the button; collectionsState.busy still gates re-entry inside
-           importCollection() itself, so a second import cannot start while one is running. -->
+        <!-- The Postman import moved to the menu bar (App → Import Postman Collection…)
+           and to the command palette entry it already had. collectionsState.busy still gates
+           re-entry inside importCollection() itself, so a second import cannot start while one
+           is running. -->
         <!-- P5 D3/D11: the environments dialog's own entry point — environments exist
            independently of collections, so this lives in the panel's header, not the tree. -->
         <TooltipIconButton
@@ -188,7 +188,7 @@ onUnmounted(() => {
             />
             <CollectionsTree v-if="collectionsExpanded" class="flex-1 min-h-0" />
           </div>
-          <!-- P28 D16(d) removes P22b D8's environments category from this panel by user request
+          <!-- Removes the environments category from this panel by user request
                ("remove the environment list from alongside the collections list entirely"). The
                environments themselves did not go anywhere: the header's own action opens the
                environments tab, which lists and manages them, and each row there still opens the

@@ -18,7 +18,7 @@ import { useCopyAsCurlStore } from './state/curl';
 
 const copyAsCurlStore = useCopyAsCurlStore();
 
-// P7 D10: the generated command, masked by default. Secrets are still {{token}} until Show secret
+// The generated command, masked by default. Secrets are still {{token}} until Show secret
 // values is pressed — the gate is `revealSecretValues`'s own `revealVariable` calls
 // (http/state/variables.ts's existing four-outcome flow), not anything here. Built on ui/dialog
 // + the shared Alert `note`/`warn` variants (ImportReportStrip.vue's own technique).

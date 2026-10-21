@@ -29,7 +29,7 @@ const emit = defineEmits<{
 // to port, so none is invented here). A file's own icon comes from fileIconStyle below instead.
 const dirIcon = computed(() => (props.row.expanded ? 'folder-opened' : 'folder'));
 
-// §7.1's four-value status glyph — 'M'/'A' amber-ish/green-ish, 'D' struck, '?' muted, matching
+// The four-value status glyph — 'M'/'A' amber-ish/green-ish, 'D' struck, '?' muted, matching
 // the connection tree's own status-color convention. data-status stays on the row for tests/
 // styling hooks; the label's own colour is now a direct computed class rather than an
 // attribute-selector CSS rule keyed off it.

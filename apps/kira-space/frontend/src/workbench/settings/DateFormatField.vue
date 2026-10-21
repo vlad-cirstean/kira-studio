@@ -7,8 +7,8 @@ import { t } from '@theme/i18n';
 import { useId } from 'vue';
 import type { Settings } from '../../state/settingsDomain';
 
-// I2-18: the commit-date leaf (select, reset button, helper text) was byte-identical between
-// kira-studio's and kira-space's own AppearancePane.vue. P120: dateFormat is this app's own leaf
+// The commit-date leaf (select, reset button, helper text) was byte-identical between
+// kira-studio's and kira-space's own AppearancePane.vue. dateFormat is this app's own leaf
 // now (only its git module reads it), so this field types on this app's own Settings['appearance']
 // instead of the former shared AppearanceSettings.
 type AppearanceSettings = Settings['appearance'];
@@ -23,7 +23,7 @@ function onDateFormatChange(value: unknown): void {
   props.appearance.dateFormat = String(value) as AppearanceSettings['dateFormat'];
 }
 
-// F3: a native label delegates its click to its first labelable descendant -- with the Reset
+// A native label delegates its click to its first labelable descendant -- with the Reset
 // button living inside the label (the old markup), that was the button, not the select, so
 // clicking the title/helper text reset the field instead of focusing the control. `for` + `id`
 // ties the label to the select explicitly instead, with the button as a sibling outside it.

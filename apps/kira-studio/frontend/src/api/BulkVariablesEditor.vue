@@ -16,16 +16,16 @@ import { useVariableSetStore } from './state/variables';
 const confirmDialogStore = useConfirmDialogStore();
 const variableSetStore = useVariableSetStore();
 
-// P17 D21/D22/D23, item 5: the `.env`-format bulk editor, hosted inside VariableSetView.vue's own
-// bulk-mode toggle (a component-local lens, never persisted to tab state — D16's own rule for the
+// The `.env`-format bulk editor, hosted inside VariableSetView.vue's own
+// bulk-mode toggle (a component-local lens, never persisted to tab state — the rule for the
 // filter query applies here too: an unapplied text buffer is exactly the kind of thing a restored
 // tab must never silently reopen holding). `serializeEnv`/`parseEnv`/`reconcileEnv` are api-core's
-// pure logic (R8) — this component is the DOM around it: seed the buffer once on entry, recompute
-// the diff on every keystroke, and hand the parsed entries to ApplyBulk (R9) on Apply. There is no
+// pure logic — this component is the DOM around it: seed the buffer once on entry, recompute
+// the diff on every keystroke, and hand the parsed entries to ApplyBulk on Apply. There is no
 // second parser here and no second reconcile rule — every branch below is either "call api-core" or
 // "render what it returned".
-// P105 §13: `scope` collides with the HTML global `scope` attribute name — Biome's `noHeaderScope`
-// reads the attribute, not the Vue prop, at every call site that binds it. Renamed.
+// `scope` collides with the HTML global `scope` attribute name — Biome's `noHeaderScope`
+// reads the attribute, not the Vue prop, at every call site that binds it.
 const props = defineProps<{
   tabId: string;
   variableScope: VariableScope;

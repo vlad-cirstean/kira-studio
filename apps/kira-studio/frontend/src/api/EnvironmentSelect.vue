@@ -21,7 +21,7 @@ const variablesStore = useVariablesStore();
 // Popover anchors `end`: the trigger sits flush against the toolbar's right edge.
 // App-drawn, not native: each row carries a colour dot.
 
-// P71 §3.3: an optional tabId — present from both request views, so their own selection can be an
+// An optional tabId — present from both request views, so their own selection can be an
 // incognito tab's own in-memory override instead of the app-wide active environment.
 // environmentIdForTab/selectEnvironmentForTab already fall back to the app-wide behaviour for a
 // tab that isn't incognito, and `isIncognito('')` is false for the empty-string default below (no
