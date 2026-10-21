@@ -17,8 +17,8 @@ const usage = `usage: go run ./scripts/commentsweep <cmd> [flags]
   run    --max-usd X [--jobs 4] [--lang go|ts|vue] [--limit N] [--files a,b]   rewrite the units (costs tokens, resumable)
   apply  --lang go|ts|vue [--files a,b] [--dry-run]   splice rewritten units, check the code is unchanged; never commits
   restore --ids a,b                      put the original text back for named units
-  report --not-applied [--out docs/v2.8/plans/P320-not-applied.md]   every comment that did not make it, by status
-  report --sample 120 --seed 320 --out docs/v2.8/plans/P320-report.md   sampled before/after for the judge
+  report --not-applied [--out plans/P320-not-applied.md]   every comment that did not make it, by status
+  report --sample 120 --seed 320 --out plans/P320-report.md   sampled before/after for the judge
   status                                 units, outcomes, spend, applied files`
 
 func main() {
