@@ -15,7 +15,7 @@ type wireError struct {
 }
 
 // frame is every member of rpc.ts's Frame union folded into one struct — a field not
-// meaningful for a given T is simply absent (omitempty on encode, ignored on decode). The union
+// meaningful for a given T is absent (omitempty on encode, ignored on decode). The union
 // is small and every variant's fields are primitives-or-raw-JSON, so one struct with a `t`
 // discriminant reads clearer here than eight Go types behind an interface would.
 type frame struct {
@@ -39,14 +39,14 @@ type envelope struct {
 
 func boolPtr(b bool) *bool { return &b }
 
-// blobFrameDiscriminant is a blob frame body's first byte (G3 plan D4) — 0x00 can never begin a
+// blobFrameDiscriminant is a blob frame body's first byte — 0x00 can never begin a
 // JSON control frame (whose first byte is always '{'), so a peer that has never opened a stream
 // never needs to know this byte exists at all: the handshake, app.init, repo.open, repo.close and
-// repo.changed are byte-identical to what G1/G2 shipped.
+// repo.changed are byte-identical to what shipped before.
 const blobFrameDiscriminant = 0x00
 
-// encodeBody marshals env as one frame's body. blob == nil produces a plain JSON body, unchanged
-// from G1/G2. blob != nil produces D4's own layout instead:
+// encodeBody marshals env as one frame's body. blob == nil produces a plain JSON body, unchanged.
+// blob != nil produces the layout instead:
 //
 //	0x00 | uint32BE headerLen | headerJSON | blob…to the end of the frame
 //

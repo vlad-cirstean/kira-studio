@@ -54,7 +54,7 @@ func mutate(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuer
 		return runCommand(ctx, conn, sql, params, op, track, CommandOptions{SuppressCommand: true})
 	}
 
-	// P2 R2: rollback runs on its own detached, timeout-bounded ctx (RunSQLMutation's own rule) so it
+	// Rollback runs on its own detached, timeout-bounded ctx (RunSQLMutation's own rule) so it
 	// always reaches the server even when the caller's own ctx is already cancelled — the ad-hoc
 	// `_, _ = execCommand("ROLLBACK", nil)` this replaced ran through runCommand's CheckNotStarted,
 	// which refuses outright on an already-cancelled ctx, leaving conn (pinned for this adapter's

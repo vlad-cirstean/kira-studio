@@ -9,7 +9,7 @@ import (
 )
 
 // HelperNeedles is AppProcessSet's own second needle set — the native-webview helper processes
-// macOS itself attributes to one of a running app's own executables (P58f: no vendored Node child
+// macOS itself attributes to one of a running app's own executables (no vendored Node child
 // needle any more — every adapter is served in-process by the app's own binary). Shared by every
 // app's own metrics ticker; the anchor needle (the app's own executable name) is not shared — see
 // NewAppTicker.
@@ -19,7 +19,7 @@ const Interval = 5 * time.Second
 
 // RescanEvery is how many Interval ticks pass between CachedPIDs' full process-table resolves.
 //
-// One, i.e. every tick. P2 R1 originally set this to 12 (60s) to avoid "walking every process on
+// One, i.e. every tick. It was originally set to 12 (60s) to avoid "walking every process on
 // the machine every single tick for the life of the app", and traded a rescan interval's worth of
 // staleness for it. That trade was a bad one in both directions, and the staleness was not
 // cosmetic:
@@ -37,10 +37,10 @@ const Interval = 5 * time.Second
 // the reading correct within one Interval in every case, at a cost that does not register.
 const RescanEvery = 1
 
-// Ticker samples on a fixed cadence and fans each Sample out to every OnSample subscriber. P52
-// §8.4's measurement (Sampler, AppProcessSet) is done; this is only the cadence P55 §6.1 adds —
-// main.go starts it with no subscriber yet, which is a complete behaviour (D15), not a stub.
-// Emitting to the renderer (`app.Event.Emit`) and stopping it on quit are both P56.
+// Ticker samples on a fixed cadence and fans each Sample out to every OnSample subscriber.
+// The measurement (Sampler, AppProcessSet) is done; this is only the cadence —
+// main.go starts it with no subscriber yet, which is a complete behaviour, not a stub.
+// Emitting to the renderer (`app.Event.Emit`) and stopping it on quit are not done here.
 type Ticker struct {
 	sampler  *Sampler
 	interval time.Duration
@@ -65,8 +65,8 @@ func NewTicker(pids func() ([]int32, map[int32]procSample, error), interval time
 }
 
 // NewAppTicker builds a Ticker sampling appName's own process set — CachedPIDs + AppProcessSet +
-// NewTicker wired together the same way every app's own main.go used to duplicate inline (P116
-// H4). appName is the anchor needle: the app's own shipping executable name (its own
+// NewTicker wired together the same way every app's own main.go used to duplicate inline.
+// appName is the anchor needle: the app's own shipping executable name (its own
 // Taskfile.yml's APP_NAME), matched since AppProcessSet finds an app's own process by executable
 // path substring, not by pid tree — see sampler.go's header comment. Call Start() on the result.
 func NewAppTicker(appName string) *Ticker {
@@ -92,8 +92,8 @@ func (t *Ticker) run() {
 
 	// A priming sample establishes Sampler.prevAt/prevCPU before the loop's first real tick, so the
 	// first *emitted* sample differences against an Interval-old baseline instead of skipping the
-	// delta (prevAt.IsZero()) and reporting a placeholder 0% CPU no matter how busy the app actually
-	// is at startup (F4). The result itself is discarded — only the side effect matters — and a
+	// delta (prevAt.IsZero()) and reporting a placeholder 0% CPU no matter how busy the app is at
+	// startup. The result itself is discarded — only the side effect matters — and a
 	// failure here is not fatal: the first real tick below recovers on its own, same as any other
 	// sample failure.
 	if _, err := t.sampler.Sample(); err != nil {

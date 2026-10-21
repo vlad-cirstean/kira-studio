@@ -1,7 +1,7 @@
 package adapters
 
 // This file hoists the sslmode vocabulary switch all six TLS-capable adapters' own client.go
-// independently re-implemented (H1, P115 Part 2): re-read Options["sslmode"], treat "" and
+// independently re-implemented: re-read Options["sslmode"], treat "" and
 // "disable" as no TLS, and fail loudly on anything outside that adapter's own accepted vocabulary.
 // Each adapter keeps its own tls.Config construction — the mysql-family TLS registry, pg
 // verify-ca's hostname-skipping chain check, ClickHouse's scheme choice, and redis's rediss://

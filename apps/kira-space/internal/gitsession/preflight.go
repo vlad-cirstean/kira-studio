@@ -17,7 +17,7 @@ import (
 
 // rewrittenPaths reads T — the paths target's checkout would rewrite (gitops.RewrittenPathsArgs).
 //
-// F1 (P108 Part 16 review): target reaches RewrittenPathsArgs as a bare argv token — a leading "-"
+// target reaches RewrittenPathsArgs as a bare argv token — a leading "-"
 // would be read by `git diff`/`git diff-index` as a flag of its own (e.g. `--output=<path>`, an
 // arbitrary-file-write primitive) rather than the ref it is meant to be. validOpArg is the same
 // guard op.run's prepare* functions already use at their own point of use.
@@ -36,10 +36,10 @@ func (e *RepoEntry) rewrittenPaths(ctx context.Context, target string) ([]string
 	return out, nil
 }
 
-// PreflightCheckout is preflight.checkout's own orchestration (D12): gather the reads in
-// parallel, resolve the wire's bare target against a FRESH ref snapshot (never the cache, D10/
-// F16), call the pure classifier. StashAvailable: false through G5-G16 — G17 D8 flips it to true
-// unconditionally, which alone is what turns ClassifyCheckout's own "stashAndCarry" route on.
+// PreflightCheckout is preflight.checkout's own orchestration: gather the reads in parallel,
+// resolve the wire's bare target against a FRESH ref snapshot (never the cache), call the pure
+// classifier. StashAvailable: false; flipping it to true unconditionally, which alone is what turns
+// ClassifyCheckout's own "stashAndCarry" route on.
 func (e *RepoEntry) PreflightCheckout(ctx context.Context, target, mode string) (gitpreflight.CheckoutPreflight, error) {
 	snapshot, err := e.refsSnapshot(ctx)
 	if err != nil {
@@ -80,13 +80,13 @@ func (e *RepoEntry) PreflightCheckout(ctx context.Context, target, mode string) 
 	}), nil
 }
 
-// revertMergeParents looks up, for every MERGE commit among shas, its parents' shas and subjects
-// (D13): one `show -s` per requested sha to learn its parent count/shas, then one more per
+// revertMergeParents looks up, for every MERGE commit among shas, its parents' shas and subjects:
+// one `show -s` per requested sha to learn its parent count/shas, then one more per
 // DISTINCT parent sha across every merge found (deduplicated) to learn that parent's subject.
-// Sequential, not concurrent (F18's deviation from upstream's own Promise.all): the read pool is
+// Sequential, not concurrent (the deviation from upstream's own Promise.all): the read pool is
 // four wide and shared with every other connection on the repository, so a large multi-select
 // revert firing dozens of concurrent reads would starve the graph stream of another window.
-// F1 (P108 Part 16 review): every sha reaches ShowMetadataArgs (`git show -s ...`) as a bare argv
+// Every sha reaches ShowMetadataArgs (`git show -s ...`) as a bare argv
 // token, reached by both PreflightRevert and PreflightCherryPick — validated once here, at the one
 // choke point both callers share, rather than duplicated in each.
 func (e *RepoEntry) revertMergeParents(ctx context.Context, shas []string) (map[string][]gitpreflight.RevertParentChoice, error) {
@@ -153,9 +153,9 @@ func (e *RepoEntry) revertMergeParents(ctx context.Context, shas []string) (map[
 	return result, nil
 }
 
-// predictRevert runs D13's own merge-tree prediction for firstSha, scoped exactly to shas[0]
+// predictRevert runs the merge-tree prediction for firstSha, scoped exactly to shas[0]
 // (predictedFor says so). A merge commit with no mainline chosen yet gets {kind:"unknown"} rather
-// than a guess (§7.10's "rather than guessing -m 1"); exit 0/1 are both real predictions (D14/D15),
+// than a guess ("rather than guessing -m 1"); exit 0/1 are both real predictions,
 // gated by runAllowingExit rather than gitclient.Classify.
 func (e *RepoEntry) predictRevert(
 	ctx context.Context, firstSha string, mergeParents map[string][]gitpreflight.RevertParentChoice, mainline *int,
@@ -262,13 +262,13 @@ type resolvedCommit struct {
 }
 
 // resolveCommit resolves ref (anything `git show` can resolve — a branch, tag, or bare sha) to its
-// canonical sha and subject, or (nil, nil) when ref does not resolve at all — probe 3's bad-target
+// canonical sha and subject, or (nil, nil) when ref does not resolve at all — the bad-target
 // guard, shared by preflightReset (target existence + display subject) and prepareReset's own
 // re-check host-side immediately before the write. Exit 128 is a resolution failure, never a spawn
 // error to propagate: `show -s` on an unresolvable ref exits non-zero with real stderr, cleanly
 // distinguishable from a genuine spawn failure.
 //
-// G32 round-3 architecture/security review, finding #4: ref reaches ShowMetadataArgs as a bare
+// ref reaches ShowMetadataArgs as a bare
 // argv token — a leading "-" would let it be read by `git show` as a flag of its own (e.g.
 // --output=<path>, an arbitrary-file-write primitive) rather than the rev it is meant to be, and
 // none of resolveCommit's four callers (PreflightReset, PreflightCherryPick,
@@ -294,13 +294,13 @@ func (e *RepoEntry) resolveCommit(ctx context.Context, ref string) (*resolvedCom
 	return &resolvedCommit{Sha: parsed.SHA, Subject: parsed.Subject}, nil
 }
 
-// PreflightReset is preflight.reset's own orchestration (D8/F14): target may be anything `git
+// PreflightReset is preflight.reset's own orchestration: target may be anything `git
 // show` can resolve — a branch, tag, or bare sha — so the first read is resolveCommit, which
 // doubles as probe 3's bad-target guard and the source of the canonical sha leaving/gaining/
 // leavingCommits are all computed against (never the wire's own possibly-abbreviated target
 // string). An unresolved target short-circuits the range reads entirely: there is no commit to
 // diff, count, or confirm against, and ClassifyReset's own unknownTarget blocker is what the
-// dialog renders instead. Target is passed to ClassifyReset verbatim (F14) — never resolved.sha.
+// dialog renders instead. Target is passed to ClassifyReset verbatim — never resolved.sha.
 func (e *RepoEntry) PreflightReset(ctx context.Context, target, mode string) (gitpreflight.ResetPreflight, error) {
 	var statusResult porcelain.StatusResult
 	var inProgress *gitpreflight.InProgressOperation
@@ -380,11 +380,11 @@ func (e *RepoEntry) PreflightReset(ctx context.Context, target, mode string) (gi
 	}), nil
 }
 
-// predictCherryPick runs D2's own merge-tree prediction for sha — the exact INVERSE of
+// predictCherryPick runs the merge-tree prediction for sha — the exact INVERSE of
 // predictRevert's own arrangement: HEAD is the base, sha is the other side, --merge-base=<sha>^
 // <mainline> — because a pick applies its diff forwards and a revert backwards. Left to itself git
 // would pick merge-base(HEAD, sha), against which a commit that undoes an earlier one on this same
-// branch reads as no change at all (probe 2) — reporting a genuinely conflicting pick as clean.
+// branch reads as no change at all — reporting a genuinely conflicting pick as clean.
 // nil effectiveMainline (a merge with none chosen) predicts nothing: there is no single "other"
 // tree to diff against yet, and mainlineRequired already names why.
 func (e *RepoEntry) predictCherryPick(ctx context.Context, sha string, effectiveMainline *int) gitpreflight.RevertPrediction {
@@ -407,9 +407,9 @@ func (e *RepoEntry) predictCherryPick(ctx context.Context, sha string, effective
 	return gitpreflight.RevertPrediction{Kind: "conflicts", Paths: pred.Paths}
 }
 
-// cherryPickCommitPaths is §7.13's path-scoped blockers' own input: the picked commit's own
-// changed paths split "added" (probe 7E: an untracked file at one of these is refused) from
-// everything else (probe 7C: an unstaged change overlapping one of these is refused) — reuses
+// cherryPickCommitPaths is the path-scoped blockers' own input: the picked commit's own
+// changed paths split "added" (an untracked file at one of these is refused) from
+// everything else (an unstaged change overlapping one of these is refused) — reuses
 // CommitDetail's own metadata/diff-tree plumbing against whichever parent effectiveMainline names,
 // rather than a third parser for the same two spawns. A renamed/copied path counts as "touched"
 // under both its new and its original name. nil effectiveMainline (a merge with no mainline chosen
@@ -448,11 +448,11 @@ func (e *RepoEntry) isAncestorOrNot(ctx context.Context, a, b string) (bool, err
 	return res.ExitCode == 0, nil
 }
 
-// PreflightCherryPick is preflight.cherryPick's own orchestration (§7.13) — PreflightRevert's
+// PreflightCherryPick is preflight.cherryPick's own orchestration — PreflightRevert's
 // direct structural sibling. mergeParents reuses the same revertMergeParents lookup (empty unless
-// sha is a merge); alreadyApplied is isAncestor(sha, HEAD) (an advisory note, never a blocker —
-// probe 8); commitPaths and the prediction are only ever computed once a mainline is actually
-// known — with none chosen for a merge commit there is no single parent to diff against, and
+// sha is a merge); alreadyApplied is isAncestor(sha, HEAD) (an advisory note, never a blocker);
+// commitPaths and the prediction are only ever computed once a mainline is known — with none
+// chosen for a merge commit there is no single parent to diff against, and
 // mainlineRequired already blocks the pick regardless of what either would say.
 func (e *RepoEntry) PreflightCherryPick(ctx context.Context, sha string, mainline *int) (gitpreflight.CherryPickPreflight, error) {
 	// F1 (P108 Part 16 review): sha reaches isAncestorOrNot/MergeTreeArgs/CommitDetail as a bare
@@ -539,18 +539,18 @@ func (e *RepoEntry) PreflightCherryPick(ctx context.Context, sha string, mainlin
 	}), nil
 }
 
-// PreflightStashPop is preflight.stashPop's own orchestration (D3, §7.6): re-resolves the stash
+// PreflightStashPop is preflight.stashPop's own orchestration: re-resolves the stash
 // entry fresh (resolveStashEntryScoped's own doc comment), gathers stashPaths (stash.show's own
 // name-status), stashUntrackedPaths (an ls-tree over the untracked helper commit, when one exists),
-// dirty/inProgress and D4's own filesystem-stat existingUntrackedPaths, plus the merge-tree
+// dirty/inProgress and the filesystem-stat existingUntrackedPaths, plus the merge-tree
 // prediction against targetSha (defaulting to HEAD — the `stashAndCarry` route's own use of a
 // non-HEAD target, per the contract's own doc comment on preflight.stashPop's targetSha param) —
-// then calls the pure classifier. G28 D12: scope ("" or "stack" for the ordinary stack, "global"
+// then calls the pure classifier. Scope ("" or "stack" for the ordinary stack, "global"
 // for the bucket) only changes how entry is resolved — everything downstream (ClassifyStashPop,
 // stashPopPrediction, the untracked-collision os.Stat loop) takes a porcelain.StashEntry and does
-// not care where it came from, so this is the ONLY line in this function that changes for G28.
+// not care where it came from.
 // resolveStashPopTarget resolves PreflightStashPop's own targetSha param: a client-supplied value
-// (validated — F1, P108 Part 16 review: it reaches MergeTreeArgs as a bare argv token) or, absent
+// (validated — it reaches MergeTreeArgs as a bare argv token) or, absent
 // one, a fresh `rev-parse HEAD`. Split out of PreflightStashPop itself to keep that function's own
 // cognitive complexity under the linter's threshold.
 func (e *RepoEntry) resolveStashPopTarget(ctx context.Context, targetSha *string) (string, error) {
@@ -639,11 +639,11 @@ func (e *RepoEntry) PreflightStashPop(ctx context.Context, sha string, targetSha
 	}), nil
 }
 
-// PreflightStashBranch is preflight.stashBranch's own orchestration (D3, §7.6): re-resolves the
+// PreflightStashBranch is preflight.stashBranch's own orchestration: re-resolves the
 // stash entry fresh, then reuses the PreflightCheckout-shaped classification path at the stash's
-// own base as the target (probe 11: "no pop prediction — clean by construction", so this reuses
+// own base as the target ("no pop prediction — clean by construction", so this reuses
 // ClassifyCheckout, never ClassifyStashPop), plus the branch-name validation ClassifyStashBranch
-// itself performs. G28 D12: scope-aware via resolveStashEntryScoped, same one-line change as
+// itself performs. Scope-aware via resolveStashEntryScoped, same one-line change as
 // PreflightStashPop above.
 func (e *RepoEntry) PreflightStashBranch(ctx context.Context, sha, branch, scope string) (gitpreflight.StashBranchPreflight, error) {
 	entry, err := e.resolveStashEntryScoped(ctx, sha, scope)

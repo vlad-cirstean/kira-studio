@@ -28,7 +28,7 @@ type OrderTerm struct {
 
 // QuoteIdentDouble is read.ts's quoteIdent for the double-quote dialects (Postgres, SQLite): NUL
 // is unreachable through any real identifier but panics rather than threading an error return
-// through every call site, matching each adapter's own note (P58 D16's recover() boundary turns
+// through every call site, matching each adapter's own note (the recover() boundary turns
 // this into a failed op, never a crash).
 func QuoteIdentDouble(name string) string {
 	if strings.ContainsRune(name, '\x00') {
@@ -56,7 +56,7 @@ type ReadReq struct {
 }
 
 // BuildKeysetWhereSQL extends whereSQL with the keyset boundary predicate decoded from the cursor
-// token, when the request actually wants one. addParam appends a value and returns its 1-based
+// token, when the request wants one. addParam appends a value and returns its 1-based
 // placeholder index (a "?"-style placeholder ignores the index; a "$N"-style one needs it).
 // Token values are cell display text; isBinary names the columns whose "0x<hex>" display text must
 // be decoded back to raw bytes before binding, or the predicate compares the column with the ASCII
@@ -249,7 +249,7 @@ func ResolveProjection(columns []model.ColumnMeta, requested []string) ([]model.
 		resolved = append(resolved, col)
 	}
 	sort.Slice(resolved, func(i, j int) bool { return resolved[i].Position < resolved[j].Position })
-	// F1/P21 round 1: belt-and-braces. The renderer now maps every "would end up with zero
+	// Belt-and-braces. The renderer now maps every "would end up with zero
 	// selected columns" case back to null ("all columns") at its own choke points, but a resolved
 	// projection of zero columns has no honest reading, and every SQL adapter's selectList would
 	// otherwise become an empty string — SELECT  FROM ... — a syntax error rather than a
@@ -272,7 +272,7 @@ func SafeInt(value int, label string) (int, error) {
 
 // WhereClause ports sql-text.ts's whereClause: WHERE (<filter>) or "" — always parenthesised so a
 // keyset predicate joined by a bare AND never silently changes the user's own filter's meaning. The
-// closing paren sits on its own line, after a newline (finding F10): a filter ending in a `--` line
+// closing paren sits on its own line, after a newline: a filter ending in a `--` line
 // comment (`x = 1 -- note`) would otherwise comment out the closing paren itself — and, for a
 // keyset request, everything BuildKeysetWhereSQL appends after it too — breaking every read/count
 // against that filter. A `/* */` block comment has no such gap (it terminates itself), only a
@@ -411,10 +411,10 @@ func JoinConsoleStatements(statements []string, lineCommentPrefixes ...string) s
 	return strings.Join(parts, ";\n")
 }
 
-// BeginReadOnlyConsole opens a console batch's BEGIN READ ONLY wrap (P113 G1): postgres and
+// BeginReadOnlyConsole opens a console batch's BEGIN READ ONLY wrap: postgres and
 // mysqlfamily's own console.go each hand-rolled this identically apart from the BEGIN SQL text and
 // how their own conn type executes a statement and maps its error. exec runs one statement against
-// that connection; waitInFlight is the connection's own RunWithAbortRace drain (F2: every
+// that connection; waitInFlight is the connection's own RunWithAbortRace drain (every
 // in-flight background goroutine touching conn must finish before COMMIT); mapErr is the adapter's
 // own driver-error mapper.
 //
@@ -464,8 +464,8 @@ type EffectiveOrder struct {
 
 // ValidateRequestedTerms is ComputeEffectiveOrder's own column-existence and direction check, split
 // out to keep that function's own cognitive complexity down (golangci-lint's gocognit), and shared
-// with ClickHouse's own sort validation (H3, P115 Part 2), which has no keyset pipeline of its own
-// but needs the identical column-exists/direction check. F11: BuildOrderBy uppercases Direction for
+// with ClickHouse's own sort validation, which has no keyset pipeline of its own
+// but needs the identical column-exists/direction check. BuildOrderBy uppercases Direction for
 // the ORDER BY text itself (so "ASC"/"Asc" still produce correct SQL there), but the keyset
 // comparison further down the pipeline (BuildKeysetPredicate) compares the lowercase literal "asc"
 // — an upper-case direction would build the ORDER BY correctly while silently mismatching the

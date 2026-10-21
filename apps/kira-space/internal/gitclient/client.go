@@ -3,8 +3,8 @@ package gitclient
 import "context"
 
 // Client is the discovery/runner pair bridge/git.go and gitrpc hold — repository lifecycle itself
-// is gitsession's job now (D18): repo.open/repo.close route through gitsession.Registry/Conn, not
-// through this type, which is why it carries no Registry of its own any more (F7's fix: a single
+// is gitsession's job now: repo.open/repo.close route through gitsession.Registry/Conn, not
+// through this type, which is why it carries no Registry of its own any more (a single
 // global registry evicting a repo for every connection on one repo.close).
 type Client struct {
 	Runner    Runner

@@ -43,7 +43,7 @@ func (f *fakeRunner) Start(ctx context.Context, gitPath string, spec Spec) (Proc
 }
 
 // fakeProcess is the canned-bytes Process discovery_test.go's fakes construct — Run(ctx, r, ...)
-// drains it exactly like a real execProcess. Wait returns the full result (Stdout included, F5):
+// drains it exactly like a real execProcess. Wait returns the full result (Stdout included):
 // the real buffered path (bufferedExecProcess) carries Stdout on Wait rather than a separate
 // Stdout() read, and Run relies on that same contract for every Process it drives, fake or real.
 type fakeProcess struct {
@@ -144,7 +144,7 @@ func TestDiscovery_UnusableOnSpawnFailure(t *testing.T) {
 	}
 }
 
-// TestDiscovery_VersionProbeTimesOut proves D5 without a real 5s sleep: probe's own
+// TestDiscovery_VersionProbeTimesOut proves without a real 5s sleep: probe's own
 // context.WithTimeout(ctx, versionProbeTimeout) inherits the sooner of the two deadlines, so a
 // caller ctx with a short timeout of its own makes the fake's blocked Start observe Done() (and
 // DeadlineExceeded) almost immediately, well under versionProbeTimeout itself.
@@ -165,8 +165,7 @@ func TestDiscovery_VersionProbeTimesOut(t *testing.T) {
 	}
 }
 
-// TestDiscovery_CancelledCallerContextIsNotCachedAsUnusable proves G31 round-2 architecture/
-// security review finding #1 — a regression from ARCH-10 (c5ea760): a caller cancelling its own
+// TestDiscovery_CancelledCallerContextIsNotCachedAsUnusable proves a caller cancelling its own
 // ctx (not probe's internal versionProbeTimeout) while the --version probe is in flight must not
 // poison the 30s cache with an "unusable" verdict for every OTHER connection's app.init/repo.open.
 // Without the fix, fakeRunner's blockOnCtx path returning ctx.Err() (context.Canceled) landed in
@@ -321,10 +320,9 @@ func TestDarwinLocator_PATHResolvingToShimDoesNotShortCircuit(t *testing.T) {
 }
 
 func TestDarwinLocator_NeverStatsShimWhenCLToolsMissing(t *testing.T) {
-	// D3's actual safety property: when Command Line Tools are not installed, isExecutable must
+	// The safety property: when Command Line Tools are not installed, isExecutable must
 	// never even be asked about /usr/bin/git — asking (a stat) is harmless, but this proves the
-	// gate is checked BEFORE any attempt to touch that path at all, matching the plan's "probe
-	// xcode-select -p first and never spawn the shim blind."
+	// gate is checked BEFORE any attempt to touch that path at all.
 	statCalls := []string{}
 	l := &darwinLocator{
 		lookPath: func(string) (string, error) { return "", os.ErrNotExist },

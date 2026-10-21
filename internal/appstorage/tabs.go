@@ -36,7 +36,7 @@ type TabFields struct {
 // renderable, state is a JSON object), plus the non-empty identity fields no SQL constraint
 // covers. isRenderable is the caller's own RenderableTabKinds lookup; requireWorkspace reports
 // whether that kind needs a non-empty WorkspaceID — Kira Studio requires it only for "terminal",
-// Kira Space for every kind (P107 I2-30).
+// Kira Space for every kind.
 func ValidateTab(t TabFields, isRenderable, requireWorkspace func(kind string) bool) error {
 	if t.ID == "" {
 		return fmt.Errorf("model: tab: id is required")
@@ -57,7 +57,7 @@ func ValidateTab(t TabFields, isRenderable, requireWorkspace func(kind string) b
 }
 
 // ReplaceKeyed runs the tx/upsert/prune-not-in-keys/commit frame both apps' own TabsRepo.Save
-// shares (P107 I2-2): begin a transaction, hand it to upsert (which writes each record's own row,
+// shares: begin a transaction, hand it to upsert (which writes each record's own row,
 // in whatever column shape the caller's table has), then delete every row scoped by keyColumn =
 // scopeValue whose id is not in keys, then commit. keys empty means "delete every scoped row"
 // (every tab closed) rather than relying on an empty `NOT IN ()`, which SQLite accepts but reads
@@ -104,10 +104,10 @@ type WindowExistsChecker interface {
 	Exists(key string) (bool, error)
 }
 
-// CheckWindow is List/Save's shared guard (P113 G4, P107 I2-6): reject a windowKey that names no
-// `windows` row with a real E_CONTRACT, rather than letting Save surface TabsRepo.Save's own raw
-// FOREIGN KEY constraint failure (C4) — List has no such constraint to fall back on, so it runs the
-// same check up front purely for a consistent error.
+// CheckWindow is List/Save's shared guard: reject a windowKey that names no `windows` row with a
+// real E_CONTRACT, rather than letting Save surface TabsRepo.Save's own raw FOREIGN KEY constraint
+// failure — List has no such constraint to fall back on, so it runs the same check up front purely
+// for a consistent error.
 func CheckWindow(windows WindowExistsChecker, windowKey string) error {
 	ok, err := windows.Exists(windowKey)
 	if err != nil {

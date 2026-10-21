@@ -54,7 +54,7 @@ func toRecordHeaders(headers []adapters.HeaderPair) []kgo.RecordHeader {
 	return out
 }
 
-// produce is produce.ts's produce (P58e E14): kgo.ProduceSync on the adapter's own long-lived
+// produce is produce.ts's produce: kgo.ProduceSync on the adapter's own long-lived
 // client, which already carries kgo.DisableIdempotentWrite() (client.go) — matching librdkafka's
 // own default and sidestepping the InitProducerId hang a single-broker cluster's default
 // transaction-log replication factor would otherwise cause. No separate producer client, unlike

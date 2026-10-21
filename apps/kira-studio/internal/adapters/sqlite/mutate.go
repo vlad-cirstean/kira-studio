@@ -9,7 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// endTransactionTimeout bounds mutate's own cleanup ROLLBACK (P2 R2), mirroring postgres/console.go
+// endTransactionTimeout bounds mutate's own cleanup ROLLBACK, mirroring postgres/console.go
 // and mysqlfamily/console.go's identically-named const: it must run even when the op's own ctx is
 // already cancelled (Stop pressed mid-batch, or the op's deadline expired), since database/sql's
 // ExecContext refuses outright on an already-done ctx without ever reaching the driver — skipping

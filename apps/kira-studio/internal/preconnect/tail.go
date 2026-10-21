@@ -16,11 +16,11 @@ type tailTracker struct {
 	last  string
 }
 
-// P21 round 2 performance finding 5: for a sidecar whose stderr carries no newline at all for a
+// For a sidecar whose stderr carries no newline at all for a
 // long stretch — a progress bar rewriting its line with a bare '\r' (curl, rsync, docker pull, and
 // many cloud-proxy CLIs all do this), or any tool that streams without newlines — push used to
 // grow carry without any cap: stderrTailMax was applied only in value(), at read time, bounding
-// nothing that was actually *retained*. A sidecar lives as long as its connection, so carry could
+// nothing that was *retained*. A sidecar lives as long as its connection, so carry could
 // grow for the process's entire runtime, and each push cost O(len(carry)) for `t.carry + chunk`
 // plus ReplaceAll/Split — O(n^2) in total stderr volume.
 //

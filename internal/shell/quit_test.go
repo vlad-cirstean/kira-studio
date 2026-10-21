@@ -73,7 +73,7 @@ func (o *order) snapshot() []string {
 // newTestQuitter wires a Quitter against the shared testApp (main_test.go) with counting,
 // OnceFunc-wrapped teardown halves — exactly the shape main.go is required to pass in — plus a
 // channel closed when teardown has run. keys is the live window set flushThenQuit seeds its
-// pending ack set from (P8 C8) — most tests here only ever had one window, so newTestQuitter1
+// pending ack set from — most tests here only ever had one window, so newTestQuitter1
 // below covers that shape without every existing call site having to spell out `[]string{"main"}`.
 func newTestQuitter(timeout time.Duration, keys []string) (q *shell.Quitter, emitter *quitEmitter, ord *order, teardownDone chan struct{}) {
 	emitter = &quitEmitter{}
@@ -187,12 +187,12 @@ func TestSecondShouldQuitReturnsTrue(t *testing.T) {
 		}
 	}
 
-	// Pre-existing race, fixed here (P103 Part 3): flushThenQuit populates the pending set and
-	// broadcasts the flush signal on its own goroutine, asynchronously to ShouldQuit() returning
-	// above — wait for that broadcast (as TestFlushAckCompletesTeardown/TestQuitWaitsForEveryWindowAck
-	// already do) before acking, so Flushed("main") can't race a still-nil pending set and get
-	// silently swallowed as an unknown key under heavy scheduler contention (e.g. the full `go test
-	// ./...` run, not this package in isolation).
+	// flushThenQuit populates the pending set and broadcasts the flush signal on its own goroutine,
+	// asynchronously to ShouldQuit() returning above — wait for that broadcast (as
+	// TestFlushAckCompletesTeardown/TestQuitWaitsForEveryWindowAck already do) before acking, so
+	// Flushed("main") can't race a still-nil pending set and get silently swallowed as an unknown
+	// key under heavy scheduler contention (e.g. the full `go test ./...` run, not this package in
+	// isolation).
 	deadline := time.Now().Add(time.Second)
 	for len(emitter.names()) == 0 && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
@@ -206,10 +206,10 @@ func TestSecondShouldQuitReturnsTrue(t *testing.T) {
 	}
 }
 
-// TestQuitWaitsForEveryWindowAck is P8 D13.2's rule, restoring the pre-Go-port behaviour
+// TestQuitWaitsForEveryWindowAck is the rule, restoring the pre-Go-port behaviour
 // (18fe7bb^:src/main/index.ts:47-60's Promise.all over every window): the handshake must not
 // release until every live window has acked, or the timeout fires regardless. This is exactly
-// the shape F3 named as a regression — with two windows, the old single sync.Once-closed channel
+// the shape named as a regression — with two windows, the old single sync.Once-closed channel
 // let the first window's ack release teardown while the second's own tabsSave was still in
 // flight, racing db.Close() against it.
 func TestQuitWaitsForEveryWindowAck(t *testing.T) {

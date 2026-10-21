@@ -12,11 +12,11 @@ import (
 
 var authPrefixRE = regexp.MustCompile(`(?i)^(NOAUTH|WRONGPASS|NOPERM)\b|invalid password`)
 
-// mapError mirrors errors.ts's mapError (C13) — a single place that turns a driver-thrown error
+// mapError mirrors errors.ts's mapError — a single place that turns a driver-thrown error
 // into the closed AdapterError code set, preserving the server's own message verbatim. ioredis's
 // two message-text tests ("connection is closed"/"stream isn't writeable") are deleted, not
 // ported: go-redis's own *net.OpError/*net.DNSError and context errors already cover that ground
-// through Go's own error types, not string matching (C13).
+// through Go's own error types, not string matching.
 func mapError(err error) *adapters.Error {
 	if err == nil {
 		return nil

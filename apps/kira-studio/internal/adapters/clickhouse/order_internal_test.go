@@ -1,9 +1,8 @@
-// order_internal_test.go is P21 round 3 functional finding 15: computeOrderBySql fell back to
-// target.SortingKey verbatim, which is "" for an `ORDER BY tuple()` MergeTree table and for
-// Log/TinyLog/Memory/Merge engines — readPage still pages with LIMIT/OFFSET regardless, so two
-// pages of the same request became two independent unordered scans with no ORDER BY at all,
-// silently able to repeat or drop rows across pages even though caps.Pagination advertises
-// "offset" pagination unconditionally.
+// computeOrderBySql fell back to target.SortingKey verbatim, which is "" for an `ORDER BY tuple()`
+// MergeTree table and for Log/TinyLog/Memory/Merge engines — readPage still pages with
+// LIMIT/OFFSET regardless, so two pages of the same request became two independent unordered scans
+// with no ORDER BY at all, silently able to repeat or drop rows across pages even though
+// caps.Pagination advertises "offset" pagination unconditionally.
 package clickhouse
 
 import (

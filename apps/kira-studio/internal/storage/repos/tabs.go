@@ -69,23 +69,23 @@ func (r *TabsRepo) List(windowKey string) ([]model.TabRecord, error) {
 }
 
 // Save replaces windowKey's own tab set in one transaction, rewriting `order` as the array index
-// so the stored order is always dense (tabs.ts's replaceTabs). Every record is validated up front
-// (P2 R2), the same envelope List() enforces on read: unlike List, which must tolerate legacy
+// so the stored order is always dense (tabs.ts's replaceTabs). Every record is validated up front,
+// the same envelope List() enforces on read: unlike List, which must tolerate legacy
 // rows already on disk by dropping and logging, Save is the boundary where bad data should be
 // refused outright rather than silently written and then vanish on the next restore.
 //
-// Scoping the DELETE by window_key is F6's fix: this used to be `DELETE FROM tabs` with no
+// Scoping the DELETE by window_key is the fix: this used to be `DELETE FROM tabs` with no
 // scope at all, so whichever window saved last erased every other open window's tabs outright —
-// reproduced against a real two-client `-tags server` binary before this fix existed (P8 §1.3(c)).
+// reproduced against a real two-client `-tags server` binary before this fix existed.
 //
-// P21 round 3 performance finding 9: this used to DELETE every row for the window and re-INSERT
+// This used to DELETE every row for the window and re-INSERT
 // every record regardless of what changed — tabs.ts's saveDebounced() calls this once a second
 // while someone types in a console tab, so an unchanged 1 MB `state_json` for nine untouched tabs
 // was rewritten every second purely because a tenth tab's own text changed. `id` is the table's
 // own PRIMARY KEY (globally unique — every tab id is a crypto.randomUUID(), and the original code
 // already assumed as much: an INSERT colliding with a row under a *different* window_key would
 // have failed outright before this fix, same as it would now), so `ON CONFLICT(id) DO UPDATE`
-// rewrites only the row for the record it was actually asked to write, and SQLite skips
+// rewrites only the row for the record it was asked to write, and SQLite skips
 // re-writing a page whose column values are byte-identical to what's already stored. The prune
 // (appstorage.ReplaceKeyed) removes only what fell out of `records` (a closed tab), never a row
 // that survived.

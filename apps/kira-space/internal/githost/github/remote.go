@@ -13,16 +13,15 @@ type Repo struct {
 	Name  string
 }
 
-// Path returns "owner/repo", the shape `gh api`'s own REST paths and D4's own calls build against.
+// Path returns "owner/repo", the shape `gh api`'s own REST paths and the calls build against.
 // Owner and Name normally hold nothing that needs escaping (GitHub's own username/repo-name
 // character sets), but both are parsed out of a git remote URL (ParseRemote, below) rather than
 // validated against those character sets — a maliciously crafted remote (e.g. a cloned repo's own
-// .git/config) can put "?", "#", or other URL-special characters into either segment. G31 round-2
-// architecture/security review, finding #6: pr.go's own callers splice this string directly into a
-// `gh api` path that also carries a literal "?"-prefixed query string of its own (state=open&...),
-// so an unescaped Owner/Name segment can inject or override query parameters rather than simply
-// 404ing. url.PathEscape treats each segment as opaque, exactly as pr.go already does for
-// individually-escaped sha/branch values (G30 round-1 finding #6).
+// .git/config) can put "?", "#", or other URL-special characters into either segment. pr.go's own
+// callers splice this string directly into a `gh api` path that also carries a literal
+// "?"-prefixed query string of its own (state=open&...), so an unescaped Owner/Name segment can
+// inject or override query parameters rather than 404ing. url.PathEscape treats each segment
+// as opaque, exactly as pr.go already does for individually-escaped sha/branch values.
 func (r Repo) Path() string { return url.PathEscape(r.Owner) + "/" + url.PathEscape(r.Name) }
 
 // trimGitSuffix strips a trailing ".git" — every documented remote form may or may not carry one.
@@ -30,7 +29,7 @@ func trimGitSuffix(s string) string {
 	return strings.TrimSuffix(s, ".git")
 }
 
-// ParseRemote accepts D15's own documented forms:
+// ParseRemote accepts the documented forms:
 //   - https://host/owner/repo(.git)
 //   - http://host/owner/repo(.git)
 //   - ssh://[user@]host[:port]/owner/repo(.git)
@@ -100,9 +99,7 @@ func parseSSHURLForm(rest string) (Repo, bool) {
 
 // parseSCPForm parses "[user@]host:owner/repo(.git)" — git's own scp-like short form, the one shape
 // with no "://" scheme at all. Like parseURLForm/parseSSHURLForm, a query string or fragment is
-// dropped, not parsed — G31 round-2 architecture/security review, finding #6, noted this form was
-// missing the same "?"/"#" stripping its URL-shaped siblings already had, letting either character
-// survive into Repo.Owner/Repo.Name.
+// dropped, not parsed.
 func parseSCPForm(s string) (Repo, bool) {
 	s = strings.SplitN(s, "?", 2)[0]
 	s = strings.SplitN(s, "#", 2)[0]

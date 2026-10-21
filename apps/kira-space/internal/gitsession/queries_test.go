@@ -92,16 +92,15 @@ func runOutput(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
-// TestBlob_NewlineInRevDoesNotDesyncTheSharedSession is G31 round-2 architecture/security review
-// finding #2: Blob used to sniff only `path` for a newline (the batch protocol's one-line-per-
-// request limit), not `rev` — so a newline embedded in `rev` still reached the shared, persistent
-// cat-file session's normal Read/Check path. Git then read the embedded newline as a SECOND
-// request line, but this code only ever consumes ONE response per call, leaving a leftover
-// response sitting in the session's own buffered reader — silently answering the NEXT, entirely
-// unrelated caller sharing this RepoEntry's session (every connection on the repository, SPEC
-// §6's split rule) with stale, misaligned data. Proven here by an evil rev followed immediately by
-// an ordinary, correct call: the second call must see its own real content, not corruption left
-// behind by the first.
+// TestBlob_NewlineInRevDoesNotDesyncTheSharedSession: Blob used to sniff only `path` for a newline
+// (the batch protocol's one-line-per-request limit), not `rev` — so a newline embedded in `rev`
+// still reached the shared, persistent cat-file session's normal Read/Check path. Git then read the
+// embedded newline as a SECOND request line, but this code only ever consumes ONE response per
+// call, leaving a leftover response sitting in the session's own buffered reader — silently
+// answering the NEXT, entirely unrelated caller sharing this RepoEntry's session (every connection
+// on the repository, the split rule) with stale, misaligned data. Proven here by an evil rev
+// followed immediately by an ordinary, correct call: the second call must see its own real content,
+// not corruption left behind by the first.
 func TestBlob_NewlineInRevDoesNotDesyncTheSharedSession(t *testing.T) {
 	t.Parallel()
 	skipWithoutGitQueries(t)
@@ -228,10 +227,10 @@ func TestGoToTarget_PathEscapingRootIsRefused(t *testing.T) {
 	}
 }
 
-// TestGoToTarget_BareRepoAlwaysTakesTheHistoricalBranch proves a bare repository (Root == "",
-// F11's own case) never reaches the on-disk check at all — it has no checkout, so the object
+// TestGoToTarget_BareRepoAlwaysTakesTheHistoricalBranch proves a bare repository (Root == "")
+// never reaches the on-disk check at all — it has no checkout, so the object
 // database alone decides, and no host method may join(repoId, path) against a bare repo's own
-// RepoID (which is the git dir, not a worktree root, G3 D7).
+// RepoID (which is the git dir, not a worktree root).
 func TestGoToTarget_BareRepoAlwaysTakesTheHistoricalBranch(t *testing.T) {
 	t.Parallel()
 	skipWithoutGitQueries(t)
@@ -317,8 +316,8 @@ func TestBlameLine_PathEscapingRootIsRefused(t *testing.T) {
 
 // refsChangeDuringFirstForEachRefRunner wraps a real Runner, firing entry's own refsChanged
 // signal (note()) exactly once, synchronously, the first time it sees a for-each-ref spawn —
-// simulates a ref change landing WHILE refsSnapshot's own read is still in flight, deterministically
-// rather than racing real timing.
+// simulates a ref change landing WHILE refsSnapshot's own read is still in flight,
+// deterministically rather than racing real timing.
 type refsChangeDuringFirstForEachRefRunner struct {
 	gitclient.Runner
 	entry   atomic.Pointer[RepoEntry]
@@ -336,11 +335,11 @@ func (r *refsChangeDuringFirstForEachRefRunner) Start(ctx context.Context, gitPa
 	return r.Runner.Start(ctx, gitPath, spec)
 }
 
-// TestRefs_ConcurrentInvalidationDuringSpawnNotClobbered is F10's own regression proof (P108 Part
-// 16 review): nothing stopped a Refs() read that started BEFORE a ref change from calling its own
-// e.refs.set() AFTER that change already cleared the cache for it -- serving pre-change data even
-// to the client's own refetch after the very repo.changed event this change triggers, until the
-// next ref change happens to clear it again.
+// TestRefs_ConcurrentInvalidationDuringSpawnNotClobbered is the regression proof: nothing stopped a
+// Refs() read that started BEFORE a ref change from calling its own e.refs.set() AFTER that change
+// already cleared the cache for it -- serving pre-change data even to the client's own refetch
+// after the very repo.changed event this change triggers, until the next ref change happens to
+// clear it again.
 func TestRefs_ConcurrentInvalidationDuringSpawnNotClobbered(t *testing.T) {
 	t.Parallel()
 	skipWithoutGitQueries(t)

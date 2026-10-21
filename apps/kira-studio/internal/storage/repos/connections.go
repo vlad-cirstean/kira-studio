@@ -22,8 +22,8 @@ type ConnectionsRepo struct {
 	DB *sql.DB
 }
 
-// connectionColumns is the connections table's 21 config columns, shared by every write below
-// (P107 I2-9) — id/created_at/updated_at/sort_order/password/uri sit outside it since which of those a
+// connectionColumns is the connections table's 21 config columns, shared by every write below —
+// id/created_at/updated_at/sort_order/password/uri sit outside it since which of those a
 // statement needs (and how) is exactly what differs between Insert/InsertWithSecret/
 // InsertDuplicateWithSecret and Update/UpdateWithSecret; connectionSetColumns is the same list as
 // an UPDATE "col = ?" clause.
@@ -43,7 +43,7 @@ const connectionSetColumns = `name = ?, kind = ?, color = ?, mode = ?, read_only
 // binds the full column set (Insert, InsertWithSecret, Update, UpdateWithSecret) uses this. It
 // never binds f.URI: the column is ciphertext the caller seals (SecretWrite / uriEnc).
 // InsertDuplicateWithSecret does not use it: it forces mcp_enabled to a SQL literal 0 regardless
-// of f.McpEnabled (see its own doc comment), so one of these 21 values would never actually be
+// of f.McpEnabled (see its own doc comment), so one of these 21 values would never be
 // bound there — it builds its own arg list by hand instead of trimming this one.
 func connectionArgs(f model.ConnectionFields, optionsJSON string) []any {
 	return []any{
@@ -60,9 +60,10 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-// scanConnectionRow never reads uri (P181): the column is ciphertext only SecretsRepo.GetURI opens,
-// so every summary the repo returns has URI == nil. It scans one row in connectionSelectColumns's order and validates it the same
-// way connections.ts's parseRow does: a hand-mangled row is dropped (nil, nil), not propagated —
+// scanConnectionRow never reads uri: the column is ciphertext only SecretsRepo.GetURI opens,
+// so every summary the repo returns has URI == nil. It scans one row in connectionSelectColumns's
+// order and validates it the same way connections.ts's parseRow does: a hand-mangled row is
+// dropped (nil, nil), not propagated —
 // unlike settings/layout, a bad connection row must not make the whole app unlaunchable.
 func scanConnectionRow(row rowScanner) (*model.ConnectionSummary, error) {
 	var (
@@ -172,7 +173,7 @@ func (r *ConnectionsRepo) List() ([]model.ConnectionSummary, error) {
 // routing decision. A plain DB read for now, not the connections service's own in-memory state
 // map: main.go constructs the router before connections.Service exists (the router is one of
 // that service's own Deps), so there is no earlier in-memory source to prefer yet. Worth
-// revisiting once nativeKinds is non-empty and this is on every data op's hot path (M5).
+// revisiting once nativeKinds is non-empty and this is on every data op's hot path.
 func (r *ConnectionsRepo) KindOf(connID string) (string, bool) {
 	summary, err := r.Get(connID)
 	if err != nil || summary == nil {
@@ -193,8 +194,8 @@ func (r *ConnectionsRepo) Get(connID string) (*model.ConnectionSummary, error) {
 }
 
 // insertTx runs the begin/next-sort-order/commit/Get-after frame Insert/InsertWithSecret/
-// InsertDuplicateWithSecret all three share (P113 G11) — insert receives the open tx and the
-// freshly computed next sort_order, and does only the one INSERT statement that actually differs
+// InsertDuplicateWithSecret all three share — insert receives the open tx and the
+// freshly computed next sort_order, and does only the one INSERT statement that differs
 // between the three (column list, whether password is bound directly or copied via subquery,
 // InsertDuplicateWithSecret's forced mcp_enabled literal). connID is the row insert is expected to
 // have written, read back via Get once the transaction commits.
@@ -258,14 +259,14 @@ func (r *ConnectionsRepo) Update(connID string, f model.ConnectionFields, update
 }
 
 // InsertWithSecret is Insert plus the row's password column, written in the very same INSERT
-// statement — P21 round 3 finding 4: connections.Service.Create used to Insert the row and then
-// Secrets.Set the password as two separate statements, so a Secrets.Set failure (SQLite busy/IO, a
-// keychain item that vanished between the cipher probe and the write — anything other than "cipher
-// unavailable", which is pre-validated by the caller before either write) left a passwordless
-// connection row committed and visible in the list, with the caller told the create had failed.
-// secretEnc is the already-encrypted ciphertext (or nil for "no password"); this method never
-// touches the cipher itself; uriEnc is the sealed connection URI, bound the same way. Mirrors SecretsRepo's own "one file touches connections.password"
-// discipline as closely as a single combined statement allows.
+// statement — connections.Service.Create used to Insert the row and then Secrets.Set the password
+// as two separate statements, so a Secrets.Set failure (SQLite busy/IO, a keychain item that
+// vanished between the cipher probe and the write — anything other than "cipher unavailable", which
+// is pre-validated by the caller before either write) left a passwordless connection row committed
+// and visible in the list, with the caller told the create had failed. secretEnc is the
+// already-encrypted ciphertext (or nil for "no password"); this method never touches the cipher
+// itself; uriEnc is the sealed connection URI, bound the same way. Mirrors SecretsRepo's own "one
+// file touches connections.password" discipline as closely as a single combined statement allows.
 func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFields, createdAt string, secretEnc, uriEnc *string) (model.ConnectionSummary, error) {
 	optionsJSON, err := json.Marshal(f.Options)
 	if err != nil {
@@ -332,10 +333,10 @@ func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnecti
 	})
 }
 
-// SetMcpEnabled flips mcp_enabled alone — Duplicate's own fix (finding #4, M7): the new row is
+// SetMcpEnabled flips mcp_enabled alone — Duplicate's own fix: the new row is
 // always inserted with MCP forced off (InsertDuplicateWithSecret's own doc comment on this), and
 // this is what flips it on afterward, once the mask rule copy that must precede any live MCP
-// exposure has actually succeeded. A narrow single-column UPDATE rather than a full Update() call
+// exposure has succeeded. A narrow single-column UPDATE rather than a full Update() call
 // with a stale field snapshot, so it can't stomp a concurrent edit made in the brief window between
 // the two writes. Checks RowsAffected and returns the wrapped sql.ErrNoRows sentinel for "not
 // found" rather than silently no-op-succeeding.
@@ -363,7 +364,7 @@ type SecretWrite struct {
 }
 
 // UpdateWithSecret is Update plus, in the same UPDATE statement, the row's password and uri
-// columns — P21 round 3 finding 4: connections.Service.Update used to Secrets.Set the password and
+// columns — connections.Service.Update used to Secrets.Set the password and
 // then Conns.Update the rest of the row as two separate statements, so a Conns.Update failure
 // after a successful Secrets.Set left the new password stored against the old destination, the
 // state destinationUnchanged exists to prevent. Each SecretWrite distinguishes "leave the stored

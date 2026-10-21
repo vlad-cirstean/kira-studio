@@ -25,7 +25,7 @@ const RequiredVersion = "2.38.0"
 // imported (Go cannot import TypeScript; OQ-2 defers real settings-surface integration).
 const GitPathSettingID = "git.path"
 
-// GitStatus is D4's blocking-state discriminant — the wire shape crossing as 'app.init's `git`
+// GitStatus is the blocking-state discriminant — the wire shape crossing as 'app.init's `git`
 // field, structurally matching @kira/git-ipc's own GitStatus union (contract.ts) field-for-field;
 // git-ui's GitBlockedPanel.vue/gitBlockedCopy.ts already render every non-"ok" Kind unchanged.
 // Every field below is used by exactly one Kind — see gitBlockedCopy.ts's own switch for which.
@@ -42,7 +42,7 @@ type GitStatus struct {
 
 // Locator resolves a candidate git binary path via one platform's own probe order, without
 // running or validating it — Discovery.Status (below) is what runs --version and enforces
-// RequiredVersion. Kept separate from Discovery so D3's per-platform strategy is a small,
+// RequiredVersion. Kept separate from Discovery so the per-platform strategy is a small,
 // independently fakeable seam (darwinLocator's own test never has to run a real --version).
 type Locator interface {
 	// Locate returns the first usable candidate, and the full list of paths considered (in probe
@@ -55,7 +55,7 @@ type Locator interface {
 // git.path of "/usr/bin/git/" or similar still matches.
 const clToolsShim = "/usr/bin/git"
 
-// darwinLocator implements D3's exact probe order: git.path setting -> PATH ->
+// darwinLocator implements the exact probe order: git.path setting -> PATH ->
 // /opt/homebrew/bin -> /usr/local/bin -> /usr/bin/git. A PATH resolution that lands on the CL
 // Tools shim is deliberately NOT accepted at the PATH step (unlike every other step, which
 // accepts its candidate immediately) — it falls through to the final, xcode-select-gated step
@@ -207,7 +207,7 @@ func versionLess(a, b string) bool {
 }
 
 // discoveryTTL bounds how long a resolved GitStatus is trusted before Status re-probes — long
-// enough that app.init and a repo.open moments later share one probe (D3's version check is a
+// enough that app.init and a repo.open moments later share one probe (the version check is a
 // real spawn), short enough that installing/upgrading git and switching back to this app picks it
 // up within a session without a restart.
 const discoveryTTL = 30 * time.Second
@@ -247,8 +247,7 @@ func (d *Discovery) Status(ctx context.Context, configuredPath string) GitStatus
 
 	status := d.probe(ctx, configuredPath)
 
-	// G31 round-2 architecture/security review, finding #1 — a regression from ARCH-10 (c5ea760):
-	// that rpcstream fix made an in-flight repo.open's ctx reliably cancel on disconnect where it
+	// The rpcstream fix made an in-flight repo.open's ctx reliably cancel on disconnect where it
 	// used to usually race and lose, which made this bug deterministic rather than latent. A
 	// caller-cancelled ctx kills the --version probe mid-flight, and probe() used to have no way
 	// to tell that apart from "git itself is unusable" — so it got cached process-wide for
@@ -270,7 +269,7 @@ func (d *Discovery) Status(ctx context.Context, configuredPath string) GitStatus
 	return status
 }
 
-// versionProbeTimeout bounds the --version probe (G2 plan D5): the caller's own ctx has no
+// versionProbeTimeout bounds the --version probe: the caller's own ctx has no
 // deadline of its own (an rpcstream request context is undeadlined), so without this a wedged
 // binary — the exact macOS Command Line Tools trap darwinLocator's own gate exists to route
 // around — would hang app.init for as long as the extension is willing to wait.

@@ -32,8 +32,8 @@ func literalFor(value *string) string {
 	return "'" + escaped + "'"
 }
 
-// renderInsert is mutate.ts's own — D24: every insert op in one plan renders as a single multi-row
-// INSERT statement, cheaper than one round trip per row, and what mutate() actually executes, so
+// renderInsert is mutate.ts's own — every insert op in one plan renders as a single multi-row
+// INSERT statement, cheaper than one round trip per row, and what mutate() executes, so
 // preview() must render the same shape it would run. Columns are the union across every op, not
 // assumed uniform: an op missing a given column pads that row's tuple with NULL rather than
 // silently misaligning.

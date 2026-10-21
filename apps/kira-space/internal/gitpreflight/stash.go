@@ -15,10 +15,10 @@ type StashPopBlocker struct {
 	Operation *InProgressOperation `json:"operation,omitempty"`
 }
 
-// StashPopPreflight mirrors @kira/git-ipc's own StashPopPreflight field for field. Prediction reuses
-// RevertPrediction (already this package's own Go shape of MergeOutcomePrediction — TypeScript's
-// own `RevertPrediction` stays an alias of `MergeOutcomePrediction` for the identical reason,
-// preflight/types.ts:58): both share the exact three-armed {clean}/{conflicts,paths}/
+// StashPopPreflight mirrors @kira/git-ipc's own StashPopPreflight field for field. Prediction
+// reuses RevertPrediction (already this package's own Go shape of MergeOutcomePrediction —
+// TypeScript's own `RevertPrediction` stays an alias of `MergeOutcomePrediction` for the identical
+// reason, preflight/types.ts:58): both share the exact three-armed {clean}/{conflicts,paths}/
 // {unknown,reason} wire shape, so no second prediction type is needed.
 type StashPopPreflight struct {
 	StashSha   string            `json:"stashSha"`
@@ -137,9 +137,8 @@ type ClassifyStashBranchInput struct {
 
 // validateRefName is preflight/tag.ts's own validateRefName, ported verbatim (three rules, no
 // more) — the one small piece classifyStashBranch needs that no Go port existed for yet:
-// TagCreatePreflight (tag.ts's other export) is never wire-carried, so nothing before this phase
-// needed a Go copy of this specific function; StashBranchPreflight IS wire-carried, so this phase
-// is what needs it.
+// TagCreatePreflight (tag.ts's other export) is never wire-carried, so it needed no Go copy of
+// this specific function; StashBranchPreflight IS wire-carried, so it needs it.
 func validateRefName(name string) (valid bool, errMsg string) {
 	if name == "" {
 		return false, "Name cannot be empty."
@@ -153,10 +152,10 @@ func validateRefName(name string) (valid bool, errMsg string) {
 	return true, ""
 }
 
-// ClassifyStashBranch is §7.6's stash-branch classifier — a direct Go port of
-// preflight/stashPop.ts's classifyStashBranch (D2): `stash branch <name> <sha>` creates the branch
+// ClassifyStashBranch is the stash-branch classifier — a direct Go port of
+// preflight/stashPop.ts's classifyStashBranch: `stash branch <name> <sha>` creates the branch
 // at the stash's own base then applies against that same base, so the apply half is clean by
-// construction (probe 11) — what CAN fail is the branch-creation half, exactly like any other
+// construction — what CAN fail is the branch-creation half, exactly like any other
 // checkout, hence the composed CheckoutPreflight here rather than a bespoke blocker set.
 func ClassifyStashBranch(in ClassifyStashBranchInput) StashBranchPreflight {
 	valid, errMsg := validateRefName(in.Name)

@@ -52,9 +52,9 @@ func pushWideScanIssue(node *Node, rows float64, thresholdRows int) {
 	pushWideScanIssueTo(&node.Issues, node.Label, rows, thresholdRows)
 }
 
-// tableLabel mirrors mysqlTableLabel/mariadbTableLabel (P113 G14) — MySQL and MariaDB's own EXPLAIN
+// tableLabel mirrors mysqlTableLabel/mariadbTableLabel — MySQL and MariaDB's own EXPLAIN
 // JSON name a table-level node identically ("Full scan on t" / "ref access on t" / bare name),
-// even though the two engines' raw table structs otherwise stay separate (F13: genuinely different
+// even though the two engines' raw table structs otherwise stay separate (genuinely different
 // schemas beyond this shared name/access_type pair).
 func tableLabel(name, accessType *string) string {
 	label := "?"
@@ -70,8 +70,8 @@ func tableLabel(name, accessType *string) string {
 	return label
 }
 
-// pushIndexIssues mirrors the D15 full-scan/unused-index issue pair MySQL and MariaDB's own
-// per-table node builders push identically (P113 G14): relation is the resolved "?"-placeholder
+// pushIndexIssues mirrors the full-scan/unused-index issue pair MySQL and MariaDB's own
+// per-table node builders push identically: relation is the resolved "?"-placeholder
 // name already used for the node's other messages; accessType/possibleKeys/key are that engine's
 // own raw table fields, read verbatim.
 func pushIndexIssues(node *Node, relation string, accessType *string, possibleKeys []string, key *string) {
@@ -132,10 +132,10 @@ func isOverThreshold(estimatedRowsRead *float64, thresholdRows int) bool {
 	return estimatedRowsRead != nil && *estimatedRowsRead >= float64(thresholdRows)
 }
 
-// sortMetricsByLabel is §2.3's shared helper: every parser emits its untyped/fallthrough metrics
+// sortMetricsByLabel is the shared helper: every parser emits its untyped/fallthrough metrics
 // sorted by label, since a Go map has no insertion order to preserve the way
 // Object.entries(raw) does on the TypeScript side. Declared non-contractual (plan.go's own doc
-// comment) and sorted on both sides before the parity fixtures compare (§2.4).
+// comment) and sorted on both sides before the parity fixtures compare.
 func sortMetricsByLabel(metrics []Metric) []Metric {
 	sort.Slice(metrics, func(i, j int) bool { return metrics[i].Label < metrics[j].Label })
 	return metrics

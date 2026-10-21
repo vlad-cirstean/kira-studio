@@ -23,7 +23,7 @@ type Resolved struct {
 }
 
 // Resolve reproduces sqs/client.ts's and s3/client.ts's shared connectX logic exactly, for both
-// modes (P58d D7). kindLabel is the adapter's own kind ("sqs" | "s3"), used only for the endpoint-
+// modes. kindLabel is the adapter's own kind ("sqs" | "s3"), used only for the endpoint-
 // override log line's prefix, matching each TypeScript file's own `log('info', '<kind>: overriding
 // endpoint to <endpoint>')`.
 func Resolve(ctx context.Context, cfg model.ResolvedConnectionConfig, kindLabel string, log func(level, message string)) (Resolved, error) {
@@ -82,10 +82,9 @@ func Resolve(ctx context.Context, cfg model.ResolvedConnectionConfig, kindLabel 
 }
 
 // mapConfigError is for a pre-connect configuration failure — a malformed URI or a missing region
-// — that never reaches the network at all. P25 §1.5c: these were previously coded E_QUERY via
-// mapPlainError, indistinguishable from an ordinary query-time condition against a live
-// connection; E_CONNECT is the correct code for a failure that happens before any connection
-// attempt.
+// — that never reaches the network at all. These were previously coded E_QUERY via mapPlainError,
+// indistinguishable from an ordinary query-time condition against a live connection; E_CONNECT is
+// the correct code for a failure that happens before any connection attempt.
 func mapConfigError(message string) *adapters.Error {
 	return adapters.New(adapters.CodeConnect, message, nil)
 }

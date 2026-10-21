@@ -26,21 +26,21 @@ import (
 )
 
 // NFC returns p in Unicode Normalization Form C — composed, not decomposed; canonical, not
-// compatibility. Applied ONLY to absolute/directory paths (G27 D2 tier 1); never to a
-// repository-relative path (see the package doc comment and probe P7).
+// compatibility. Applied ONLY to absolute/directory paths; never to a
+// repository-relative path (see the package doc comment).
 //
 // Unguarded on purpose: norm.NFC.String is 46.5ns/0 allocs on an already-NFC input and returns it
-// unchanged (P11), while an `if !norm.NFC.IsNormalString(s)` guard measured 58.7ns/1 alloc (P12)
+// unchanged, while an `if !norm.NFC.IsNormalString(s)` guard measured 58.7ns/1 alloc
 // — strictly worse, because norm.NFC.String already has its own fast path. Do not add the guard
 // back; it has been measured, not merely reasoned about.
 //
-// Byte-transparent for invalid UTF-8 (P9: a lone 0xff, a truncated multi-byte sequence, an
+// Byte-transparent for invalid UTF-8 (a lone 0xff, a truncated multi-byte sequence, an
 // invalid continuation byte, and a CESU-8 surrogate all pass through unchanged), so it has no
 // failure mode and returns no error.
 func NFC(p string) string { return norm.NFC.String(p) }
 
 // CleanNFC is filepath.Clean composed with NFC, in that order — the form every absolute path in
 // this module is stored and compared in. Clean runs first because it is a pure ASCII-separator
-// operation (probe P10: NFC creates and destroys no "/"), so the two commute; fixing the order
+// operation (NFC creates and destroys no "/"), so the two commute; fixing the order
 // makes call sites and test goldens deterministic.
 func CleanNFC(p string) string { return NFC(filepath.Clean(p)) }

@@ -106,11 +106,11 @@ func TestProgressParser_NoProgressAtAllEmitsNothing(t *testing.T) {
 	}
 }
 
-// TestProgressParser_UnterminatedOversizedLineDoesNotGrowBufUnbounded is G31 round-2
-// architecture/security review, finding #8: before maxBufferedLine, p.buf had no upper bound at
-// all — bytes arriving with neither '\r' nor '\n' anywhere in them just kept appending forever, for
-// as long as the underlying git operation (and whatever is on the other end of its remote) kept
-// running. Feeding a chunk well past the cap with no terminator must not leave p.buf holding onto
+// TestProgressParser_UnterminatedOversizedLineDoesNotGrowBufUnbounded: before maxBufferedLine,
+// p.buf had no upper bound at all — bytes arriving with neither '\r' nor '\n' anywhere in them
+// kept appending forever, for as long as the underlying git operation (and whatever is on the
+// other end of its remote) kept running. Feeding a chunk well past the cap with no terminator must
+// not leave p.buf holding onto
 // it, and the parser must still decode a normal line correctly right afterward — proving this isn't
 // a "stuck forever" state, just a dropped oversized one (exactly what an equally oversized but
 // still-terminated line would suffer anyway, since it would never match either regex).

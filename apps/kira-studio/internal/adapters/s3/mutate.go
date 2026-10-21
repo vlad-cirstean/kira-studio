@@ -107,12 +107,12 @@ func renderOpText(bucket string, op model.MutationRowOp) (string, error) {
 	}
 }
 
-// preservedAttributes is mutate.ts's preservedAttributes (P58d D13): carries over every attribute
+// preservedAttributes is mutate.ts's preservedAttributes: carries over every attribute
 // HeadObject returns and PutObject accepts. PutObject replaces an object wholesale, so anything
 // not resent here is gone — silently turning application/json into binary/octet-stream, or
 // dropping Content-Encoding: gzip, would change how the object is served to everything downstream.
 //
-// F5: also carries SSE (ServerSideEncryption/SSEKMSKeyId/BucketKeyEnabled — a real security
+// Also carries SSE (ServerSideEncryption/SSEKMSKeyId/BucketKeyEnabled — a real security
 // downgrade left out: an SSE-KMS-encrypted object silently re-encrypted under the bucket default
 // after any edit, no longer needing kms:Decrypt to read), Expires, WebsiteRedirectLocation, and the
 // three object-lock fields, all confirmed present on both HeadObjectOutput and PutObjectInput.
@@ -222,7 +222,7 @@ func aclGrantHeaders(ctx context.Context, client *s3.Client, bucket, key string,
 }
 
 // isConditionalPutUnsupported reports whether err is an S3-compatible endpoint's own signal that it
-// doesn't honour IfMatch/IfNoneMatch on PutObject (F5) — real for some older S3-compatible object
+// doesn't honour IfMatch/IfNoneMatch on PutObject — real for some older S3-compatible object
 // stores (pre-conditional-write MinIO/Ceph releases), which reject the header outright with
 // NotImplemented rather than evaluating it.
 func isConditionalPutUnsupported(err error) bool {
@@ -252,7 +252,7 @@ func applyUpdate(ctx context.Context, client *s3.Client, bucket string, op model
 	if err != nil {
 		return 0, mapError(err)
 	}
-	// F5: this editor has no path to carry object tags across a PutObject replace (which drops
+	// This editor has no path to carry object tags across a PutObject replace (which drops
 	// them outright) without a second GetObjectTagging/PutObjectTagging round trip — refusing the
 	// edit is the more contained fix (over adding that second call's own surface) and never
 	// silently drops data the user did not know was there.

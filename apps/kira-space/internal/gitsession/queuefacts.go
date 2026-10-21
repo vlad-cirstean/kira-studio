@@ -13,11 +13,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 )
 
-// queuefacts.go is P129 Part 2 §3's own thin-wrapper seam: every git read internal/ade's facts
-// engine needs, so `ade` never builds git argv itself and every read goes through this entry's own
-// runner, read pool and caches (runOne/runAllowingExit/fileChanges/mergeBase, all queries.go/
-// incremental.go's own unexported machinery, reused rather than duplicated). No new signature on any
-// existing exported method — additions only.
+// queuefacts.go is the thin-wrapper seam: every git read internal/ade's facts engine needs, so
+// `ade` never builds git argv itself and every read goes through this entry's own runner,
+// read pool and caches (runOne/runAllowingExit/fileChanges/mergeBase, all queries.go/
+// incremental.go's own unexported machinery, reused rather than duplicated). No new signature
+// on any existing exported method — additions only.
 
 // BranchInventory is queue Snapshot's own first read: every local and remote-tracking branch,
 // newest commit first (porcelain.InventoryArgs/ParseInventory).
@@ -70,7 +70,7 @@ func rebaseHeadName(gitDir string) string {
 	return ""
 }
 
-// MainRef is §0.6's own rule: origin/HEAD's target when it resolves to a ref that exists, else the
+// MainRef is the rule: origin/HEAD's target when it resolves to a ref that exists, else the
 // first of the repo's own ReviewBaseCandidates that resolves — tried as `<defaultRemote>/<c>` then
 // local `<c>` — else ok=false ("noMain": branches then carry meta only). Reuses review.go's own
 // originHead/findBranchRef and the same DefaultBaseCandidates fallback ResolveReviewBase already
@@ -128,7 +128,7 @@ func (e *RepoEntry) AheadBehind(ctx context.Context, left, right string) (ahead,
 // (base, tip), then name-status from there to tip — a PR-shaped diff, not a
 // literal two-dot `base..tip` (which would include base's own unrelated later history too when the
 // two have diverged in both directions). No merge base at all (unrelated histories): diffs against
-// base directly rather than failing outright — the same "always return something" spirit §0.7's
+// base directly rather than failing outright — the same "always return something" spirit the
 // merge-tree fallback follows for the conflict side of this same problem.
 func (e *RepoEntry) RangeChanges(ctx context.Context, base, tip string) ([]porcelain.FileChange, error) {
 	from := base
@@ -142,8 +142,8 @@ func (e *RepoEntry) RangeChanges(ctx context.Context, base, tip string) ([]porce
 
 // RangeCommits is `log --format=%H%x1f%s -z -N base..tip` (porcelain.RangeSubjectsArgs/
 // ParseRangeSubjects), newest first, capped at limit. The full count comes from AheadBehind
-// separately (§4.2's own commitCount = ahead) — this wrapper drops ParseRangeSubjects' own
-// truncated flag rather than serving a second, redundant count.
+// separately (commitCount = ahead) — this wrapper drops ParseRangeSubjects' own truncated flag
+// rather than serving a second, redundant count.
 func (e *RepoEntry) RangeCommits(ctx context.Context, base, tip string, limit int) ([]porcelain.RangeCommit, error) {
 	raw, err := e.runOne(ctx, porcelain.RangeSubjectsArgs(base, tip, limit))
 	if err != nil {
@@ -174,10 +174,10 @@ func (e *RepoEntry) Ancestors(ctx context.Context, tip string, among []string) (
 	return strings.Split(text, "\n"), nil
 }
 
-// MergeTreeConflicts is §0.1's own in-memory three-way merge prediction: the merge base of (a, b),
+// MergeTreeConflicts is the in-memory three-way merge prediction: the merge base of (a, b),
 // then `merge-tree --write-tree --messages --name-only -z --merge-base=<base> a b`, tolerating exit
-// 0 (clean) or 1 (conflicts) as ordinary outcomes (D14, same as every other runAllowingExit caller
-// in this package). No merge base (unrelated histories, §0.1/§0.7): a clean prediction with no
+// 0 (clean) or 1 (conflicts) as ordinary outcomes (same as every other runAllowingExit caller
+// in this package). No merge base (unrelated histories): a clean prediction with no
 // paths, never an error — merge-tree itself would otherwise pick its own (misleading) base.
 func (e *RepoEntry) MergeTreeConflicts(ctx context.Context, a, b string) (porcelain.MergePrediction, error) {
 	base, ok, err := e.mergeBase(ctx, a, b)

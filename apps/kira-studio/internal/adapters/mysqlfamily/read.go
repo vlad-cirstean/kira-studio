@@ -34,7 +34,7 @@ var tinyint1 = regexp.MustCompile(`^tinyint\(1\)`)
 var numberType = regexp.MustCompile(`^(tinyint|smallint|mediumint|int|integer|bigint|decimal|numeric|float|double)\b`)
 var temporalType = regexp.MustCompile(`^(date|datetime|timestamp|time|year)\b`)
 
-// binaryType classifies bit alongside binary/blob/geometry (finding F7): binaryDatabaseTypes above
+// binaryType classifies bit alongside binary/blob/geometry: binaryDatabaseTypes above
 // already renders a BIT column's cellText as 0x<hex> (go-sql-driver's own DatabaseTypeName()
 // reports it as "BIT"), but typeClassFor used to classify catalog type "bit(8)" as a number
 // (matched by numberType above, which used to list bit too) — that mismatch let BinaryColumnsOf's

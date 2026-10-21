@@ -7,8 +7,8 @@ import (
 )
 
 // fakeDriver asserts its own invariant — it fails the test on Acquire while already acquired, or
-// Release while not — so every case below checks double-acquire and premature-release for free
-// (P87 plan §10.1). t.Errorf is used rather than Fatalf/FailNow: the concurrent test drives this
+// Release while not — so every case below checks double-acquire and premature-release for free.
+// t.Errorf is used rather than Fatalf/FailNow: the concurrent test drives this
 // from goroutines other than the test's own, and only Errorf is safe to call from those.
 type fakeDriver struct {
 	t *testing.T

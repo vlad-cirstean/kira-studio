@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Store is review.db's whole surface (D2/D3). Construction is free: the file is neither created
+// Store is review.db's whole surface. Construction is free: the file is neither created
 // nor opened until the first call that needs it (ensureOpen, db.go) — a Kira Space instance that
 // never serves a review request (including a second instance that lost the app.lock flock)
 // never creates the file and never starts the reaper.

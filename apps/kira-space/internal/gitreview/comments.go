@@ -37,9 +37,9 @@ const (
 const MaxCommentBytes = 8 << 10
 
 // AddComment inserts one comment, creating (repoID, branch)'s review_session row if this is the
-// first thing ever recorded for it (D4) and bumping last_used_at either way. Returns the row with
+// first thing ever recorded for it and bumping last_used_at either way. Returns the row with
 // its assigned id — AUTOINCREMENT guarantees that id is never reused by a later insert even after
-// this row is deleted (F10/probe P1), which is what makes it safe for a client to hold across a
+// this row is deleted, which is what makes it safe for a client to hold across a
 // remove.
 func (s *Store) AddComment(ctx context.Context, repoID, branch string, c Comment) (Comment, error) {
 	db, err := s.conn()

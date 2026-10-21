@@ -1,8 +1,8 @@
 // Package mcpinstall registers MCP servers with Claude Code's own CLI — the one client the apps
-// install for (docs/HISTORY.md (v1.7 M1)). Every real
-// spawn Install makes is argv-only, never a shell, never writes another program's config file
-// directly. Command is the one exception: it renders shell syntax (`;`, redirection) purely as
-// copy-paste TEXT for the pane's fallback UI, never executed by this package itself.
+// install for. Every real spawn Install makes is argv-only, never a shell, never writes another
+// program's config file directly. Command is the one exception: it renders shell syntax (`;`,
+// redirection) purely as copy-paste TEXT for the pane's fallback UI, never executed by this
+// package itself.
 package mcpinstall
 
 import (
@@ -125,13 +125,13 @@ func isNotRegisteredError(err error) bool {
 }
 
 // Install re-resolves `claude` fresh and never returns a Go error — every outcome is a named
-// Result value (§7.2's own "Install button" spec). helperPath is EnsureHeaderHelperScript's own
+// Result value. helperPath is EnsureHeaderHelperScript's own
 // return value — the local script's path, never a token.
 //
-// Removes any existing registration under name first (F3): add-json fails outright on a name
-// collision, and F2's headersHelper design means a token rotation never needs re-registration at
+// Removes any existing registration under name first: add-json fails outright on a name
+// collision, and the headersHelper design means a token rotation never needs re-registration at
 // all — but the Install button itself can still be clicked again (a stale registration from an
-// older app version's `--header` form, or simply re-running it), so this stays idempotent
+// older app version's `--header` form, or re-running it), so this stays idempotent
 // regardless. A "nothing to remove" outcome is not a failure and is never surfaced as one.
 func (i *Installer) Install(ctx context.Context, name, url, helperPath string) harness.InstallResult {
 	// F10: a relative helperPath resolves against Claude Code's own cwd, not Kira's — reachable
@@ -141,7 +141,7 @@ func (i *Installer) Install(ctx context.Context, name, url, helperPath string) h
 		return harness.InstallResult{Outcome: harness.OutcomeInstallFailed, Detail: "internal error: header helper path is not absolute"}
 	}
 
-	// F10: Claude Code runs the stored headersHelper string through a shell of its own at
+	// Claude Code runs the stored headersHelper string through a shell of its own at
 	// connection time — an unquoted path containing a space (or any other shell metacharacter)
 	// splits into more than one word there, so no Authorization header is ever sent and every call
 	// gets a 401 with no hint why. Single-quoting here is the fix; EnsureHeaderHelperScript already

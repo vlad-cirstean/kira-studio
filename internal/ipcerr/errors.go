@@ -1,4 +1,4 @@
-// Package ipcerr is the Go analogue of src/main/ipc/errors.ts — retired, not ported (P52 §5.3).
+// Package ipcerr is the Go analogue of src/main/ipc/errors.ts — retired, not ported.
 // The `[CODE] message` folding existed solely because Electron's IPC error serialisation
 // preserves only `.message`; Wails has no such constraint, so every bound service method here
 // returns a structured {code, message} error instead.
@@ -15,9 +15,9 @@ import (
 type Error struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
-	// Details is P10 D15's own addition: optional structured context for one specific failure, for
-	// a renderer that knows how to read it (HttpService.Send's own failed-send timeline, so far the
-	// only producer). omitempty keeps Error()'s JSON byte-identical for every other bound method,
+	// Details is optional structured context for one specific failure, for a renderer that knows
+	// how to read it (HttpService.Send's own failed-send timeline, so far the only producer).
+	// omitempty keeps Error()'s JSON byte-identical for every other bound method,
 	// which leaves this nil.
 	Details json.RawMessage `json:"details,omitempty"`
 }
@@ -74,7 +74,7 @@ func Wrap(err error) error {
 	return Internal(err.Error())
 }
 
-// InternalResult is the bridge layer's dominant shape (P113 G3): a bound method that calls a repo/
+// InternalResult is the bridge layer's dominant shape: a bound method that calls a repo/
 // service method and, on error, folds it into Internal(err.Error()) verbatim — never Wrap's
 // structured-error passthrough. A call site reads `return ipcerr.InternalResult(svc.X(...))`
 // instead of the five-line if-err block. On error it returns T's zero value, matching every

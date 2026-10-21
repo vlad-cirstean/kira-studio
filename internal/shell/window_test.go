@@ -10,12 +10,11 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
-// fakeWindowStore is a plain in-memory shell.WindowStore — P103 Part 3 turned WindowDeps.Windows
-// into an interface (exactly the methods window.go's Attach actually calls: SetBounds), so a test
-// double replaces the real *repos.WindowsRepo/SQLite round trip this file used before the hoist:
-// Attach's own logic never touches SQL, only calls through the interface, so a fake proves the
-// same debounce/detach behaviour without a per-app storage package the shared package cannot
-// import.
+// fakeWindowStore is a plain in-memory shell.WindowStore — WindowDeps.Windows is an interface
+// (exactly the methods window.go's Attach calls: SetBounds), so a test double replaces the real
+// *repos.WindowsRepo/SQLite round trip this file used before the hoist: Attach's own logic never
+// touches SQL, only calls through the interface, so a fake proves the same debounce/detach
+// behaviour without a per-app storage package the shared package cannot import.
 type fakeWindowStore struct {
 	mu     sync.Mutex
 	bounds map[string]shell.WindowBounds
@@ -72,7 +71,7 @@ func TestAttach_PersistsResizeAfterDebounce(t *testing.T) {
 	}
 }
 
-// TestAttach_DetachStopsPersisting covers the half of the P2 R1 fix that a unit test actually can:
+// TestAttach_DetachStopsPersisting covers the half of the fix that a unit test can:
 // main.go used to discard shell.Attach's returned detach entirely, instead of wiring it into
 // beforeFlush the way Attach's own doc comment says it must be — a resize or move landing during
 // the shutdown flush-wait (after beforeFlush runs but before teardown closes the DB) could still
@@ -104,7 +103,7 @@ func TestAttach_DetachStopsPersisting(t *testing.T) {
 	}
 }
 
-// TestDefaultBounds covers P22 D6(a)'s clamp arithmetic — a large screen leaves the 1280×800
+// TestDefaultBounds covers the clamp arithmetic — a large screen leaves the 1280×800
 // default untouched, a screen exactly that size still shrinks it (the margin, not just an
 // inequality, is what's under test), a small screen floors at the app's own minimum rather than
 // the screen's, and a nil or empty work area — the case this app's own startup order hits today,

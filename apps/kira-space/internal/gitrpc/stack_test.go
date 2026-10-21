@@ -71,7 +71,7 @@ func (r *verbCountingRunner) Start(ctx context.Context, gitPath string, spec git
 
 func (r *verbCountingRunner) count(verb string) int32 { return atomic.LoadInt32(r.counts[verb]) }
 
-// TestStackList_UnstackedRepo_OneConfigReadNothingElse is §7.1 item 6's own exact exit criterion: a
+// TestStackList_UnstackedRepo_OneConfigReadNothingElse: a
 // Router over a counting fake runner drives app.init, repo.open, refs.list, graph.loadMore,
 // status.get, then stack.list — asserting exactly one `config --local --null --get-regexp` and no
 // `rev-list`.
@@ -181,8 +181,8 @@ func TestStackRestack_BlockedPreflightSpawnsNoRebase(t *testing.T) {
 	}
 }
 
-// TestStackRestack_ConflictOverDispatch is this step's own "manual smoke against a real
-// three-branch fixture, including a deliberately conflicting one" (plan §6 step 9) — driven through
+// TestStackRestack_ConflictOverDispatch is the "manual smoke against a real
+// three-branch fixture, including a deliberately conflicting one" — driven through
 // the exact Router.ForConn dispatch path a raw socket client uses (JSON decode via wire.go's own
 // param types, then gitsession's real orchestration), rather than gitsession's own direct-call
 // tests.

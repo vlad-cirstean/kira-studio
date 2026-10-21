@@ -153,10 +153,10 @@ func TestParseStatus_UnrecognisedMarker(t *testing.T) {
 	}
 }
 
-// TestParseStatus_UntrackedPathStaysDecomposed is G27 D2/D12's tier-2 negative: a status record's
-// Path is repository-relative (probe P7 — handed straight back to git as a pathspec), so it must
+// TestParseStatus_UntrackedPathStaysDecomposed is the tier-2 negative: a status record's
+// Path is repository-relative (handed straight back to git as a pathspec), so it must
 // stay byte-exact even when git's own readdir-sourced bytes are decomposed. This is the test that
-// stops a future contributor from "finishing the job" by normalizing this field too (D12).
+// stops a future contributor from "finishing the job" by normalizing this field too.
 func TestParseStatus_UntrackedPathStaysDecomposed(t *testing.T) {
 	t.Parallel()
 	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"

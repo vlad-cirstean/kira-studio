@@ -17,7 +17,7 @@ func literalRenderer(name string, value *string, _ *[]any) (string, error) {
 // resolveTablePath is mutate.ts's own resolveTablePath — postgres's three-segment
 // database/schema/table form, distinct from sql-mutate.go's ResolveDatabaseTablePath (the
 // two-segment form clickhouse/mysql-family/sqlite share). The database segment stays
-// kind-unconstrained (P113 G2), same as before: Mutate's own root check already ran by the time this
+// kind-unconstrained, same as before: Mutate's own root check already ran by the time this
 // is called.
 func resolveTablePath(path model.NodePath) (schema, table string, err error) {
 	segs, err := adapters.RequirePath(path, "mutate", adapters.AnySeg("database"), adapters.Seg("schema"), adapters.Seg("table"))
@@ -61,14 +61,14 @@ func mutate(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track Tr
 		return runCommand(ctx, conn, sql, params, op, track, CommandOptions{SuppressCommand: true})
 	}
 
-	// P2 R2: rollback runs on its own detached, timeout-bounded ctx (RunSQLMutation's own rule) so it
+	// Rollback runs on its own detached, timeout-bounded ctx (RunSQLMutation's own rule) so it
 	// always reaches the server even when the caller's own ctx is already cancelled — the ad-hoc
 	// `_, _ = execCommand("ROLLBACK", nil)` this replaced ran through runCommand's CheckNotStarted,
 	// which refuses outright on an already-cancelled ctx, leaving conn (pinned for this adapter's
 	// lifetime) stuck inside a stale, still-open transaction for whatever op runs on it next.
 	rollback := func(ctx context.Context) {
-		// F2: wait for every RunWithAbortRace goroutine this mutate's own statements spawned to
-		// actually finish touching conn before issuing ROLLBACK on it — otherwise an aborted
+		// Wait for every RunWithAbortRace goroutine this mutate's own statements spawned to
+		// finish touching conn before issuing ROLLBACK on it — otherwise an aborted
 		// statement's own background goroutine (still running conn.Exec) races this cleanup on the
 		// same non-concurrency-safe *pgx.Conn.
 		conn.waitInFlight()

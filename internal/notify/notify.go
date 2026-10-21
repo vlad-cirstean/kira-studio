@@ -34,8 +34,7 @@ func (e *Emitter[T]) Subscribe(fn func(T)) (unsubscribe func()) {
 }
 
 // Emit snapshots the current subscriber list under the lock and calls each callback with the
-// lock released, so a callback that subscribes, unsubscribes or emits re-entrantly cannot
-// deadlock — the exact class of bug P54 §1.2 found three of in enginehost's own concurrency.
+// lock released, so a callback that subscribes, unsubscribes or emits re-entrantly cannot deadlock.
 // Callers must likewise never hold their own service mutex across a call to Emit.
 func (e *Emitter[T]) Emit(v T) {
 	e.mu.Lock()

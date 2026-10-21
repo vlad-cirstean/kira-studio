@@ -65,7 +65,7 @@ func TestHandleDataFrame_SessionClose_CancelsInFlightOp(t *testing.T) {
 	}
 }
 
-// P2 R1: ServeEngineStream used to spawn `go router.HandleDataFrame(...)` per inbound frame with no
+// ServeEngineStream used to spawn `go router.HandleDataFrame(...)` per inbound frame with no
 // cap — a burst of frames could grow goroutines (and the driver work each one holds open) without
 // bound. HandleDataFrameAsync now blocks acquiring one of a fixed number of concurrency slots
 // before spawning, so a session pinned at the cap makes the next frame wait rather than spawn.

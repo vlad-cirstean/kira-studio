@@ -92,7 +92,7 @@ func (e *Service[S, ST]) Stop() {
 // that step stays in each SetEnabled itself): start (enable=true) or stop (enable=false) the
 // embedded instance, returning the resulting status snapshot. A start failure is returned
 // alongside the (now-stopped) status rather than swallowed — SetEnabled's own caller logs it and
-// folds it into the wire Error field, exactly as its non-generic predecessor did.
+// folds it into the wire Error field.
 func (e *Service[S, ST]) SetRunning(enable bool) (ST, error) {
 	e.Mu.Lock()
 	defer e.Mu.Unlock()

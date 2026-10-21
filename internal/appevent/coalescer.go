@@ -8,8 +8,8 @@ import (
 // Coalescer batches pushed items and flushes the accumulated batch on whichever comes first: an
 // accumulated size (sizeOf-weighted) threshold, an interval timer, or Finish — the shape
 // bridge/terminal.go's terminalCoalescer, bridge/grpc.go's grpcCoalescer and
-// bridge/codeworkspace.go's searchCoalescer each restated by hand for their own payload type
-// (P107 T2-7). sizeOf lets one accumulator serve all three: a message counts as 1 (grpcCoalescer),
+// bridge/codeworkspace.go's searchCoalescer each restated by hand for their own payload type.
+// sizeOf lets one accumulator serve all three: a message counts as 1 (grpcCoalescer),
 // a file-match group counts by its own match count (searchCoalescer), a terminal chunk counts by
 // its byte length (terminalCoalescer) — each push is still exactly one item, one call.
 //

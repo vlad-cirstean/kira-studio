@@ -18,16 +18,16 @@ type RunningQuery struct {
 	QueryID string
 }
 
-// TrackQuery is query.ts's TrackQuery — P13 D3's tracker shape, reused verbatim: registers the
+// TrackQuery is query.ts's TrackQuery — the tracker shape, reused verbatim: registers the
 // query about to run and hands back its own release, identity-checked by the caller (adapter.go's
 // trackerFor) so a later statement in the same multi-statement op is never unregistered by an
 // earlier one settling after it.
 type TrackQuery func(RunningQuery) (release func())
 
-// nullSentinel is the *Strings JSON formats' own literal for a Nullable NULL (D16) — chosen by
+// nullSentinel is the *Strings JSON formats' own literal for a Nullable NULL — chosen by
 // ClickHouse itself specifically so it can't collide with an empty string. Verified empirically
-// against clickhouse-server:26.3 in M6.0's own CH-1 probe: a Nullable(String) NULL and an empty string come
-// back as "ᴺᵁᴸᴸ" and "" respectively, never JSON null. It can still collide with a real string of
+// against clickhouse-server:26.3: a Nullable(String) NULL and an empty string come back as
+// "ᴺᵁᴸᴸ" and "" respectively, never JSON null. It can still collide with a real string of
 // the same text: decodeRow reads it as NULL only in a Nullable column, and the table read path
 // resolves a Nullable column exactly with an isNull flag (read.go).
 const nullSentinel = "ᴺᵁᴸᴸ"
@@ -54,9 +54,9 @@ func decodeRow(values []string, nullable []bool) []*string {
 	return out
 }
 
-// buildURL is client.ts's own per-request URL construction (B11: no persistent client-level
-// session, so every setting travels as a query parameter on every request). extraParams are
-// catalog bound values, sent as ClickHouse's own `param_<name>` convention (D19) — never
+// buildURL is client.ts's own per-request URL construction (no persistent client-level session,
+// so every setting travels as a query parameter on every request). extraParams are
+// catalog bound values, sent as ClickHouse's own `param_<name>` convention — never
 // interpolated into the SQL text.
 func buildURL(h *Handle, queryID string, settings, extraParams map[string]string, readOnly bool) string {
 	q := url.Values{}
@@ -82,13 +82,13 @@ func buildURL(h *Handle, queryID string, settings, extraParams map[string]string
 }
 
 // escapeParamValue doubles a raw backslash before it goes into a `param_<name>` value. The
-// server-side value of one of these query parameters (D19) is run through ClickHouse's own
+// server-side value of one of these query parameters is run through ClickHouse's own
 // string-literal escape-sequence parser, not taken verbatim — url.Values.Set already handles the
 // HTTP transport encoding, but that happens after this: an un-escaped backslash server-side either
 // combines with the next character into an unintended escape (e.g. "a\bc" silently becomes
 // "a<backspace>c", since \b is a real recognized escape) or, dangling at the end of the value,
 // fails outright with CANNOT_PARSE_ESCAPE_SEQUENCE — both observed against a real table named
-// with a trailing backslash (P2 R1).
+// with a trailing backslash.
 //
 // A raw tab, newline or carriage return stops the same parser early ("only 1 of 3 bytes was
 // parsed"), so those are escaped too — a database or table name containing one otherwise fails
@@ -125,9 +125,9 @@ const (
 	scanBufferBytes = 8 * 1024 * 1024
 )
 
-// streamRows is query.ts's streamQuery, the reading half — D16's wire format: line 1 is column
+// streamRows is query.ts's streamQuery, the reading half — the wire format: line 1 is column
 // names, line 2 is column types, everything after is one JSON array of strings (or the sentinel)
-// per row. Three terminal conditions (§4.3's own three, B12's third extraction site being the one
+// per row. Three terminal conditions (the third extraction site being the one
 // @clickhouse/client hid): a non-2xx status, a clean end of body, or a line that fails to parse as
 // a JSON array — which means the `__exception__` trailer has begun.
 func streamRows(resp *http.Response, onHeader func(names, types []string), onRow func(values []*string) bool) error {
@@ -237,7 +237,7 @@ func writtenRowsFromSummary(header string) int64 {
 
 // RunCatalogQuery is query.ts's runCatalogQuery — the catalog/read path's own entry point: calls
 // op.SetCommand() (Adapter rule 3), binds params as real ClickHouse query parameters
-// (`{name:Type}` placeholders, D19 — never interpolated), and parses the response as `FORMAT JSON`
+// (`{name:Type}` placeholders — never interpolated), and parses the response as `FORMAT JSON`
 // (appended to the adapter-composed SQL text here, never to a user's own console statement) —
 // catalog rows are small metadata, not data the page builder needs to see as pre-stringified text.
 func RunCatalogQuery[T any](ctx context.Context, h *Handle, queryID string, sql string, op *adapters.OpCtx, track TrackQuery, params map[string]string) ([]T, error) {

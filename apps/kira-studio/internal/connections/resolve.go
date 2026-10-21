@@ -93,8 +93,8 @@ func mergeOptions(base, over map[string]any) map[string]any {
 // "Test connection" button tests the input as typed, not what is on disk) — connections.ts:146's
 // literals `sortOrder: 0`, empty timestamps.
 //
-// P21 round 2 architecture/security finding 9: the id used to be the literal "test", a faithful
-// port of the TypeScript's own literal that predates multi-window (P8). Preconnect.Start keys its
+// The id used to be the literal "test", a faithful port of the TypeScript's own literal that
+// predates multi-window. Preconnect.Start keys its
 // tracked sidecar process on this same id and kills anything already tracked under it
 // (preconnect/supervisor.go's own Start) — with two workbench windows open, two concurrent Test
 // connection presses on two different drafts both used the key "test", so the second Start

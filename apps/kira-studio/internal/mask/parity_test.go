@@ -10,11 +10,10 @@ import (
 	"testing"
 )
 
-// §5/§8: the cross-language parity fixtures — tests/fixtures/mask/*.{input,expected}.json,
-// generated from this Go package (the plan's own step 2: "Fixtures are generated from the Go side
-// here and consumed by the TS port in step 6"), read by both this file and
-// tests/unit/mask-parity.spec.ts. A drift in either port fails on the same bytes — the same
-// pattern M3's queryplan/parse_test.go + explain-plan.spec.ts already established.
+// The cross-language parity fixtures — tests/fixtures/mask/*.{input,expected}.json, generated
+// from this Go package, read by both this file and tests/unit/mask-parity.spec.ts. A drift in
+// either port fails on the same bytes — the same pattern the queryplan/parse_test.go +
+// explain-plan.spec.ts already established.
 
 const fixturesDir = "../../tests/fixtures/mask"
 

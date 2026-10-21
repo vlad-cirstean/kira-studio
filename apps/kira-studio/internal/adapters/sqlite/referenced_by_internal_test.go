@@ -1,6 +1,6 @@
-// referenced_by_internal_test.go is P21 round 3 performance finding 6: listReferencedBy used to
-// run one `SELECT * FROM pragma_foreign_key_list(?)` per table in the database looking for one
-// that pointed back at the target — describing one table in a 500-table file was ~501 serialised
+// referenced_by_internal_test.go: listReferencedBy used to run one
+// `SELECT * FROM pragma_foreign_key_list(?)` per table in the database looking for one that
+// pointed back at the target — describing one table in a 500-table file was ~501 serialised
 // round trips on the single pinned connection. fetchReferencingForeignKeys now joins every table's
 // own pragma_foreign_key_list against sqlite_master in one query.
 package sqlite

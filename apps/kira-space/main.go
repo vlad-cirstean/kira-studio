@@ -35,11 +35,12 @@ var assets embed.FS
 //go:embed all:frontend/dist-mobile
 var mobileAssets embed.FS
 
-// Startup order: the argv shims (askpass, memory-mcp, memory-embed) -> config.EnsureLayout -> logging.Init/Sweep ->
-// storage.Open (migrates) -> repos.New -> appwire.Build (terminal registry, ADE tracker
-// with the Claude Code hooks, task board, keep-awake, the 20 bound services) -> application.New
-// (the bound services plus the git stream registration) -> the menu -> the startup window list,
-// opened -> app.Run(). No adapters, connections, HTTP/gRPC or DB MCP: not this app's module.
+// Startup order: the argv shims (askpass, memory-mcp, memory-embed) -> config.EnsureLayout ->
+// logging.Init/Sweep -> storage.Open (migrates) -> repos.New -> appwire.Build (terminal registry,
+// ADE tracker with the Claude Code hooks, task board, keep-awake, the 20 bound services) ->
+// application.New (the bound services plus the git stream registration) -> the menu -> the
+// startup window list, opened -> app.Run(). No adapters, connections, HTTP/gRPC or DB MCP:
+// not this app's module.
 func main() {
 	if code, ok := appwire.RunArgvShim(os.Args); ok {
 		os.Exit(code)
@@ -130,7 +131,7 @@ func main() {
 	attachBrowser(app)
 	quitter.Attach(app)
 
-	// The sheet a folder-picker dialog attaches to is the window that actually asked — Current()
+	// The sheet a folder-picker dialog attaches to is the window that asked — Current()
 	// resolves the real key window on darwin; the registry fallback only matters where Current()
 	// can't resolve one (this sandbox's Linux build, mid-startup before any window is focused).
 	// Kira Studio's own main.go carries the identical fallback (wireWindowsAndMenu's

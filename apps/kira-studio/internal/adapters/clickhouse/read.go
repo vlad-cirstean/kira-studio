@@ -11,10 +11,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// quoteIdent is read.ts's own — F28/D29: ClickHouse quotes identifiers with backticks, the same
+// quoteIdent is read.ts's own — ClickHouse quotes identifiers with backticks, the same
 // character its own create_table_query output uses.
 //
-// P2 R1: ClickHouse's lexer reads a backtick-quoted identifier with the same backslash-escape
+// ClickHouse's lexer reads a backtick-quoted identifier with the same backslash-escape
 // rules as a string literal, not just SQL-style doubled-quote escaping — a raw backslash must be
 // doubled too, or a name ending in one (or containing "\`") lets the following character,
 // including the identifier's own closing backtick, be consumed as an escape sequence instead of
@@ -120,7 +120,7 @@ func computeOrderBySql(sort *model.SortSpec, target ReadTarget) (string, error) 
 	if key := strings.TrimSpace(target.SortingKey); key != "" {
 		return key, nil
 	}
-	// P21 round 3 functional finding 15: SortingKey is "" for an `ORDER BY tuple()` MergeTree
+	// SortingKey is "" for an `ORDER BY tuple()` MergeTree
 	// table and for Log/TinyLog/Memory/Merge engines. readPage still pages with LIMIT/OFFSET
 	// regardless, so with no ORDER BY at all two pages of the same request are two independent
 	// unordered scans — with multiple parts and more than one reading thread, rows can repeat
@@ -144,7 +144,7 @@ const noKeysetMessage = "keyset pagination is unavailable for ClickHouse: a Merg
 // readReq is adapter.ts's ReadRequest minus Path.
 type readReq = adapters.ReadReq
 
-// readPage is read.ts's own — D20: caps.Pagination is offset, unconditionally; a cursor in
+// readPage is read.ts's own — caps.Pagination is offset, unconditionally; a cursor in
 // after/before mode is refused outright rather than silently falling back to offset, since a
 // silent strategy switch out from under a caller expecting keyset semantics would be its own kind
 // of dishonesty.

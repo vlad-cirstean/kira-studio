@@ -18,7 +18,7 @@ type RangeCommit struct {
 	Subject string `json:"subject"`
 }
 
-// LeftRightCountArgs is `rev-list --count --left-right <a>...<b>` (probe 4). THREE dots, not two:
+// LeftRightCountArgs is `rev-list --count --left-right <a>...<b>`. THREE dots, not two:
 // RangeToken's own two-dot token answers only "what leaves"; a reset target can diverge from HEAD
 // in both directions and the dialog reports both. Deliberately not routed through RangeToken,
 // whose doc comment states it exists so "no call site can drift to three-dot" — this is the one
@@ -48,10 +48,10 @@ func ParseLeftRightCount(stdout []byte) (left, right int, err error) {
 }
 
 // RangeSubjectsArgs is `log --format=%H%x1f%s -z -<cap+1> <base>..<tip>`. Deliberately `log`, not
-// the plan's literally-named `rev-list`: upstream verified empirically that `rev-list --format=…
-// -z` prepends a `commit <sha>` line and ignores -z for record separation, while `log --format=…
-// -z` gives clean NUL-delimited two-field records (queries.ts:281-286) — the same convention
-// StashBaseSubjectArgs already follows here.
+// `rev-list`: upstream verified empirically that `rev-list --format=… -z` prepends a `commit <sha>`
+// line and ignores -z for record separation, while `log --format=… -z` gives clean NUL-delimited
+// two-field records (queries.ts:281-286) — the same convention StashBaseSubjectArgs already follows
+// here.
 func RangeSubjectsArgs(base, tip string, cap int) []string {
 	return []string{"log", "--format=%H%x1f%s", "-z", fmt.Sprintf("-%d", cap+1), base + ".." + tip}
 }

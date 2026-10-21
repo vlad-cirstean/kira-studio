@@ -14,7 +14,7 @@ import (
 
 const noOptionsNote = "This collection has no creation options set (no validator, no capped-collection settings, etc)."
 
-// stringifyRelaxed is definition.ts's stringifyRelaxed: relaxed mode is deliberate (P19 D12) —
+// stringifyRelaxed is definition.ts's stringifyRelaxed: relaxed mode is deliberate —
 // strict EJSON would render a schema's `minimum: 5` as `{"$numberInt":"5"}` in a pane whose whole
 // job is readability, and a $jsonSchema is plain JSON by construction, so nothing is lost by
 // relaxing it. Go's json.Indent does the 2-space pretty-printing MarshalExtJSON's own indent

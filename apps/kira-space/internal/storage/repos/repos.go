@@ -11,11 +11,11 @@ import (
 
 // Repos is every storage repo this app needs, constructed once at startup — Kira Studio's own
 // Repos aggregate carries eighteen repos across connections/queries/collections/history/git;
-// Kira Space's own trimmed copy (P100 Part 1) carried only the five this app's own services
+// Kira Space's own trimmed copy carried only the five this app's own services
 // (CodeWorkspaceService, GithubService, this app's own window shell, and
-// SettingsService reads for advanced.gitLogLevel/git.*) actually touched. Layout and Tabs are
-// P100 Part 2's own addition, once the frontend gave both a real consumer
-// (migrations/0002_p100_tabs_layout.sql). AdeSessions is P129 Part 1's own addition — ade.Tracker's
+// SettingsService reads for advanced.gitLogLevel/git.*) touched. Layout and Tabs are
+// an addition, once the frontend gave both a real consumer
+// (migrations/0002_p100_tabs_layout.sql). AdeSessions is an addition — ade.Tracker's
 // persisted history of every Claude Code session it has spawned or resumed
 // (migrations/0004_p129_ade_sessions.sql).
 type Repos struct {

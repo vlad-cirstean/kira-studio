@@ -24,7 +24,7 @@ const dbMcpServerName = "kira-db"
 // by.
 const dbMcpTokenName = "mcp-db"
 
-// DbMcpService is the Database MCP section's whole surface (M1 §6.2): Status, SetEnabled,
+// DbMcpService is the Database MCP section's whole surface: Status, SetEnabled,
 // Regenerate, InstallAgent — it owns the embedded *dbmcp.Server's actual lifecycle,
 // constructed and started when the setting turns on (or already is, at boot), stopped when it
 // turns off or the app quits.
@@ -75,8 +75,8 @@ func NewDbMcpService(deps appcore.Deps, installer harness.MCPInstaller, approval
 			return srv, nil
 		},
 		// Approvals stays usable — a later re-enable within the same app run constructs a fresh
-		// server against it. AbandonAll runs before Close, not after (finding #17, M6): a run_query
-		// handler mid-flight can be parked in ApprovalBroker.Request (M2 §5.3) waiting on a human
+		// server against it. AbandonAll runs before Close, not after: a run_query
+		// handler mid-flight can be parked in ApprovalBroker.Request waiting on a human
 		// who will never answer once the server is going away. Close's own closeHTTP calls
 		// http.Server.Shutdown, which waits for every in-flight handler to return — closing before
 		// abandoning would have that handler, and Shutdown itself, both wait on each other with
@@ -97,7 +97,7 @@ func NewDbMcpService(deps appcore.Deps, installer harness.MCPInstaller, approval
 				return st
 			}
 			st.Running = true
-			// F8: Command is "" whenever the on-disk helper token mirror is missing or does not
+			// Command is "" whenever the on-disk helper token mirror is missing or does not
 			// verify against the currently-held record — never gated on whether *this run* minted
 			// the token, which stayed false across every ordinary restart within the token's own
 			// TTL even though the helper file (and the record it matches) both survive restarts
@@ -158,7 +158,7 @@ func dbMcpTokenProviderFor(home string, mint bool) dbmcp.TokenProvider {
 			}
 			return rec, plain, minted, nil
 		}
-		// F8: a loaded (not minted) record must still have a helper mirror whose plaintext
+		// A loaded (not minted) record must still have a helper mirror whose plaintext
 		// verifies against it. A missing file (never written on some older run), or a mismatch
 		// (Save succeeded then SaveHelperToken failed on a previous run, or a stale copy left
 		// over some other way), would otherwise leave every client silently 401ing forever — this
@@ -212,7 +212,7 @@ func helperTokenValid(srv *dbmcp.Server) bool {
 
 // explainThreshold is dbmcp.Config.ExplainThreshold's real backend: settingsState.advanced.
 // expensiveQueryRows's own Go leaf, read fresh on every call — never cached, since a stale
-// threshold would silently mis-flag every query after the user changes it (M3 §3.3). A settings
+// threshold would silently mis-flag every query after the user changes it. A settings
 // read failure must not break a query; it falls back to the documented default and logs once.
 func (s *DbMcpService) explainThreshold() int {
 	settings, err := s.Deps.Repos.Settings.GetAll()
@@ -337,7 +337,7 @@ func (s *DbMcpService) InstallAgent(ctx context.Context) DbMcpInstallResult {
 }
 
 // dbMcpApprovalPlanIssuesCap bounds DbMcpApprovalPlan.Issues on the wire — the dbmcp package's own
-// approvalPlanFrom already caps at this same figure (M3 §6.2), so this is a defense-in-depth
+// approvalPlanFrom already caps at this same figure, so this is a defense-in-depth
 // re-application at the wire boundary. Unlike the statement text below it, eliding some of these
 // issues never hides part of the statement itself from the human approving it.
 const dbMcpApprovalPlanIssuesCap = 10
@@ -406,10 +406,10 @@ func toWireApprovalSnapshot(snap dbmcp.ApprovalSnapshot) DbMcpApprovalSnapshot {
 		out.Pending = &DbMcpApprovalRequest{
 			RequestID: snap.Pending.RequestID, ConnectionID: snap.Pending.ConnectionID,
 			ConnectionName: snap.Pending.ConnectionName, Kind: snap.Pending.Kind,
-			// Statement carries the full text, uncapped (M7 finding — a byte cap that elided the
-			// middle let a hidden clause sit entirely inside the omitted span; the dialog's own
-			// `.statement` is a fixed-height scroll container (DbMcpApprovalDialog.vue), so nothing
-			// here bounds the DOM by hiding text a human is being asked to approve).
+			// Statement carries the full text, uncapped (a byte cap that elided the middle let a
+			// hidden clause sit entirely inside the omitted span; the dialog's own `.statement` is
+			// a fixed-height scroll container (DbMcpApprovalDialog.vue), so nothing here bounds the
+			// DOM by hiding text a human is being asked to approve).
 			Class: string(snap.Pending.Class), Statement: snap.Pending.Statement,
 			ExpiresAtMs: snap.Pending.ExpiresAt.UnixMilli(),
 			Reason:      string(snap.Pending.Reason),

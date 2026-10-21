@@ -2,11 +2,11 @@ package shell
 
 import "strings"
 
-// Chord is the Go port of packages/shared/domain/shortcuts.ts's chord shape, for the 13 `global: true`
-// bindings menu.ts consumes. Only the modifier vocabulary differs: Wails' parseAccelerator
-// (keys.go:182-217) accepts "Ctrl", never "Control", and SetAccelerator silently drops an
-// accelerator it cannot parse (menuitem.go:275-287) — so a verbatim port would leave Next/Previous
-// Tab with no accelerator at all (P56 §1.4).
+// Chord is the Go port of packages/shared/domain/shortcuts.ts's chord shape, for the 13
+// `global: true` bindings menu.ts consumes. Only the modifier vocabulary differs: Wails'
+// parseAccelerator (keys.go:182-217) accepts "Ctrl", never "Control", and SetAccelerator silently
+// drops an accelerator it cannot parse (menuitem.go:275-287) — so a verbatim port would leave
+// Next/Previous Tab with no accelerator at all.
 type Chord struct {
 	Key       string // "N", "Return", "Tab", "F5", ","
 	CmdOrCtrl bool

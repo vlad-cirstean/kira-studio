@@ -99,9 +99,9 @@ type approvalEntry struct {
 	result chan ApprovalOutcome // buffered 1; exactly one send over the entry's lifetime.
 }
 
-// ApprovalBroker implements M2 §5.1's queue/deadline/injected-clock state machine: a FIFO of
+// ApprovalBroker implements the queue/deadline/injected-clock state machine: a FIFO of
 // pending requests (at most one "presented", always the head) and a
-// notify.OrderedEmitter[ApprovalSnapshot] fanning out every change (P107 T2-8: the queue and the
+// notify.OrderedEmitter[ApprovalSnapshot] fanning out every change (the queue and the
 // ordered-emit guard both come from the shared repo-root internal/notify package). Request selects
 // on the MCP request's own ctx as well as its deadline, so a disconnected client stops the query
 // without any external expiry ticker.

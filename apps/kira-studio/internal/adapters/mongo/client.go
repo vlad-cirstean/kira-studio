@@ -107,8 +107,9 @@ func buildURIFromFields(cfg model.ResolvedConnectionConfig) string {
 	}
 	auth := ""
 	if cfg.Username != nil && *cfg.Username != "" {
-		// F13a: the driver decodes URI userinfo with url.PathUnescape (connstring.go), not the
-		// url.QueryEscape scheme this used to hand-roll with — the two diverge on a space (QueryEscape
+		// The driver decodes URI userinfo with url.PathUnescape (connstring.go), not the
+		// url.QueryEscape scheme this used to hand-roll with — the two diverge on a space
+		// (QueryEscape
 		// writes "+", which PathUnescape never turns back into one), breaking auth for any password
 		// containing one. url.UserPassword builds userinfo exactly the way net/url's own URI writer
 		// does, matching what PathUnescape expects on the way back in.
@@ -124,7 +125,7 @@ func buildURIFromFields(cfg model.ResolvedConnectionConfig) string {
 	if cfg.Database != nil && *cfg.Database != "" {
 		db = "/" + url.QueryEscape(*cfg.Database)
 	}
-	// P25 §1.2: the URI path is MongoDB's own *defaultauthdb* — it sets authSource as well as the
+	// The URI path is MongoDB's own *defaultauthdb* — it sets authSource as well as the
 	// default database. A user created in `admin` with roles on the application database (the most
 	// common real posture) therefore cannot authenticate in fields mode at all, and fails with a
 	// bare "Authentication failed" that names nothing the user could act on. authSource has to be

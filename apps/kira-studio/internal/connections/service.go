@@ -28,7 +28,7 @@ import (
 )
 
 // Backend is the slice of adapter lifecycle operations this service calls through instead of
-// straight into internal/adapterhost (A11's per-consumer-interface discipline — the same shape as
+// straight into internal/adapterhost (the per-consumer-interface discipline — the same shape as
 // tree.Backend and bridge.Canceller). *adapterhost.Router satisfies this structurally; a two-line
 // fake can too, which is what keeps this package's own tests simple. Three methods: Test and
 // Connect each need their own method (they resolve config differently and return different
@@ -44,8 +44,8 @@ type Backend interface {
 	Test(ctx context.Context, cfg model.ResolvedConnectionConfig) (serverVersion string, err error)
 	// Disconnect is fire-and-forget at every call site today, so it stays that shape here.
 	Disconnect(ctx context.Context, connectionID string) error
-	// SetThrottle installs (perSec > 0) or clears (perSec == 0) connectionID's command rate limit
-	// (P28 §5.5). Called just before Connect (attemptConnect) and, when the connection is
+	// SetThrottle installs (perSec > 0) or clears (perSec == 0) connectionID's command rate limit.
+	// Called just before Connect (attemptConnect) and, when the connection is
 	// currently connected, after a successful Update — so tuning the limit while hitting it
 	// applies live, with no disconnect/reconnect round trip.
 	SetThrottle(connectionID string, perSec float64)
@@ -113,7 +113,7 @@ type Deps struct {
 	Auth       Authorizer
 	Backend    Backend
 	Preconnect *preconnect.Supervisor
-	// MaskRules is M5's rule store — Duplicate's own use (finding #6, M6): a duplicated connection
+	// MaskRules is the rule store — Duplicate's own use: a duplicated connection
 	// must carry over the source's mask rules, not just its MCP exposure, or it silently exposes
 	// PII the original was protecting. Nil is tolerated (a test harness with nothing to duplicate
 	// against masking need not set it) — Duplicate then skips copying rather than panicking.
@@ -121,9 +121,9 @@ type Deps struct {
 }
 
 // attempt is one in-flight Connect(id) call, shared by every caller that asks for the same id
-// while it is running (D11: at most one in-flight connect per connection). cancel is F4's own
-// addition (P108 Part 3): Disconnect/Remove call it to abort an attempt racing ahead of them,
-// rather than letting it finish unobserved and resurrect what they just asked to go away.
+// while it is running (at most one in-flight connect per connection). cancel: Disconnect/Remove
+// call it to abort an attempt racing ahead of them, rather than letting it finish unobserved and
+// resurrect what they just asked to go away.
 type attempt struct {
 	done   chan struct{}
 	state  model.ConnectionState
@@ -390,11 +390,11 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 		return model.ConnectionSummary{}, err
 	}
 
-	// P21 round 2 architecture/security finding 2: read the stored row before it's overwritten,
-	// so a live connection's destination and ReadOnly flag can be compared against the draft
-	// below. A connected adapter and both cache layers are stamped with the config resolved at
-	// Connect time and never revisit it — editing them here would otherwise silently do nothing
-	// (ReadOnly) or serve the old destination's cached data under the new one's name.
+	// Read the stored row before it's overwritten, so a live connection's destination and ReadOnly
+	// flag can be compared against the draft below. A connected adapter and both cache layers are
+	// stamped with the config resolved at Connect time and never revisit it — editing them here
+	// would otherwise silently do nothing (ReadOnly) or serve the old destination's cached data
+	// under the new one's name.
 	existing, err := s.deps.Conns.Get(id)
 	if err != nil {
 		return model.ConnectionSummary{}, ipcerr.Wrap(err)
@@ -403,9 +403,9 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 		return model.ConnectionSummary{}, errConnectionNotFound()
 	}
 
-	// P25 D6: encrypt before writing anything — a failure here (cipher unavailable) means Update
+	// Encrypt before writing anything — a failure here (cipher unavailable) means Update
 	// never runs, leaving every other field exactly as it was rather than a half-applied edit.
-	// P21 round 3 finding 4: the row and its secrets are written by the same UPDATE statement
+	// The row and its secrets are written by the same UPDATE statement
 	// (UpdateWithSecret), so a failed write cannot leave a new secret against the old destination.
 	password, uri, err := s.secretWrites(id, existing, in)
 	if err != nil {
@@ -421,20 +421,20 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 		return model.ConnectionSummary{}, ipcerr.Wrap(err)
 	}
 
-	// P21 round 2 architecture/security finding 2: destinationUnchanged is the same denylist Test
+	// destinationUnchanged is the same denylist Test
 	// already trusts to decide whether the old destination's password may be injected — it is a
 	// deliberate denylist (not host/port/database alone) so a future new field defaults to gated.
 	// ReadOnly is the one field it excludes on purpose (safe to change without re-gating Test's
 	// password injection) that still needs to force a reconnect here: it is captured once into
 	// the adapter at Connect time (postgres/mysqlfamily/sqlite/redis/sqs/kafka each read their own
 	// captured copy), so toggling it on a live connection was otherwise silently inert.
-	// P168 Part 2 F3: an in-flight attempt resolved its config before this edit, so it counts as
+	// An in-flight attempt resolved its config before this edit, so it counts as
 	// live — Disconnect aborts and waits it out, then Connect starts fresh on the new config.
 	if (s.StateOf(id).Status == "connected" || s.connecting(id)) &&
 		(!unchanged || in.ReadOnly != existing.ReadOnly) {
 		// Disconnect (which already drops the enginecache's pages/counts for this connection,
 		// adapterhost/router.go's own DropConnection) then reconnect — attemptConnect moves the
-		// connection's metadata_cache epoch forward (P24 D6) and emits the invalidation on its own,
+		// connection's metadata_cache epoch forward and emits the invalidation on its own,
 		// exactly the sequence setConnectionReadOnly's frontend precedent runs for the read-only-
 		// only case. A failed reconnect lands the connection in its normal "error" state, which the
 		// UI already renders — never a silent no-op.
@@ -445,7 +445,7 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 			slog.Warn("reconnect after update failed", "scope", "connections", "id", id, "err", err)
 		}
 	} else if s.StateOf(id).Status == "connected" {
-		// P28 §5.5: applies live, but only while actually connected — an edit to a disconnected
+		// Applies live, but only while connected — an edit to a disconnected
 		// connection has nothing running to pace yet, and attemptConnect installs the right value
 		// on the next connect regardless. Skipped above when a reconnect already happened, since
 		// attemptConnect installs the current throttle itself.
@@ -466,11 +466,11 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	newID := uuid.NewString()
 	fields := existing.ConnectionFields
 	fields.Name = duplicateName(fields.Name)
-	// P25 D11 (a raw column copy, not decrypt-then-re-encrypt — the plaintext is never used, so
-	// there is no reason for this path to need the OS key at all) plus the review finding's own
-	// atomicity fix: the new row and its copied password column are now written by the very same
-	// INSERT statement (InsertDuplicateWithSecret, P21 round 3 finding 4's precedent), never as two
-	// separate writes — a crash between them can no longer leave a passwordless duplicate behind.
+	// (a raw column copy, not decrypt-then-re-encrypt — the plaintext is never used, so
+	// there is no reason for this path to need the OS key at all) plus the atomicity fix: the
+	// new row and its copied password column are now written by the very same INSERT statement
+	// (InsertDuplicateWithSecret), never as two separate writes — a crash between them can no
+	// longer leave a passwordless duplicate behind.
 	// mcp_enabled is always inserted off (that method's own doc comment) — flipped on below, once
 	// mask rules are copied.
 	created, err := s.deps.Conns.InsertDuplicateWithSecret(id, newID, fields, kiratime.NowISO())
@@ -484,21 +484,20 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	// whatever PII the original was protecting.
 	if s.deps.MaskRules != nil {
 		if err := s.copyMaskRules(id, newID); err != nil {
-			// F8 (P108 Part 3): the new row is already committed above (InsertDuplicateWithSecret)
-			// — keep the UI in sync with what storage actually holds (a real, if not fully set up,
+			// The new row is already committed above (InsertDuplicateWithSecret)
+			// — keep the UI in sync with what storage holds (a real, if not fully set up,
 			// duplicate) rather than returning an error the caller sees while emitListChanged never
 			// ran, leaving the new row invisible until the next unrelated list refresh.
 			s.emitListChanged()
 			return model.ConnectionSummary{}, ipcerr.Wrap(err)
 		}
 	}
-	// Finding #4, M7: only now — after the mask rule copy above has actually succeeded — is MCP
-	// exposure switched on to match the source. Before this, InsertDuplicateWithSecret copied
-	// McpEnabled verbatim in the same INSERT that committed the row, so an error from copyMaskRules
-	// above still returned to the caller, but the already-committed duplicate was left live and
-	// MCP-exposed with zero mask rules — M6 finding #6's own gap, reopened via this error path. A
-	// crash between this write and the one above leaves the duplicate merely not-yet-MCP-enabled
-	// (safe), never exposed-without-rules (unsafe).
+	// Only now — after the mask rule copy above has succeeded — is MCP exposure switched on to
+	// match the source. Before this, InsertDuplicateWithSecret copied McpEnabled verbatim in the
+	// same INSERT that committed the row, so an error from copyMaskRules above still returned to
+	// the caller, but the already-committed duplicate was left live and MCP-exposed with zero mask
+	// rules. A crash between this write and the one above leaves the duplicate merely
+	// not-yet-MCP-enabled (safe), never exposed-without-rules (unsafe).
 	if fields.McpEnabled {
 		if err := s.deps.Conns.SetMcpEnabled(newID, true, kiratime.NowISO()); err != nil {
 			s.emitListChanged() // F8: same reasoning as the mask-rule-copy failure above.
@@ -510,12 +509,12 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	return created, nil
 }
 
-// copyMaskRules copies every mask rule on fromID onto toID — Duplicate's own step (finding #6,
-// M6). uuid.NewString is passed through as the repo's own id-mint function (F8, P108 Part 3): the
-// list and every insert it drives now run inside CopyForConnection's own single transaction,
-// rather than this method listing once (to count rows and mint that many ids) before a second,
-// separate list call inside the repo — closing the "N ids for M rules" mismatch a concurrent rule
-// add/remove on fromID could otherwise produce between those two, previously-separate list calls.
+// copyMaskRules copies every mask rule on fromID onto toID — Duplicate's own step.
+// uuid.NewString is passed through as the repo's own id-mint function: the list and every insert
+// it drives now run inside CopyForConnection's own single transaction, rather than this method
+// listing once (to count rows and mint that many ids) before a second, separate list call inside
+// the repo — closing the "N ids for M rules" mismatch a concurrent rule add/remove on fromID could
+// otherwise produce between those two, previously-separate list calls.
 func (s *Service) copyMaskRules(fromID, toID string) error {
 	return s.deps.MaskRules.CopyForConnection(fromID, toID, uuid.NewString, kiratime.NowISO())
 }
@@ -612,12 +611,12 @@ func (s *Service) Reveal(id string, confirmed bool) RevealResult {
 // on Test below): a draft edited to reach a different destination must never get the old
 // destination's password handed to it.
 //
-// F5 (P108 Part 3): a real denylist, not one shaped like an allowlist that merely happened to
-// cover every currently-present field — zeroExemptFields clears every member this function does
-// not gate on, then reflect.DeepEqual compares what is left. Every field zeroExemptFields does
-// not name is therefore gated by construction: a future new ConnectionFields member defaults to
-// gated (safe) instead of silently falling through an allowlist the way P12 round 1's original
-// fix (host/port/database/URI only, missing Preconnect/PreconnectSidecar/Options) once did.
+// A real denylist, not one shaped like an allowlist that merely happened to cover every
+// currently-present field — zeroExemptFields clears every member this function does not gate on,
+// then reflect.DeepEqual compares what is left. Every field zeroExemptFields does not name is
+// therefore gated by construction: a future new ConnectionFields member defaults to gated (safe)
+// instead of silently falling through an allowlist the way the original fix
+// (host/port/database/URI only, missing Preconnect/PreconnectSidecar/Options) once did.
 func destinationUnchanged(in Input, stored model.ConnectionFields) bool {
 	a, b := in.ConnectionFields, stored
 	zeroExemptFields(&a)
@@ -645,12 +644,12 @@ func (s *Service) destinationUnchangedFor(id string, in Input, stored *model.Con
 // exactly what destinationUnchanged compares.
 //
 // Name/Color are purely cosmetic. ReadOnly/AutoExplain gate this app's own console, never what a
-// connection connects to. P28 §5.5: ThrottlePerSec paces commands against whatever destination is
-// already resolved, so it never changes what a destination-unchanged edit actually connects to —
-// "edit the throttle → Test connection" must still inject the stored password. M1 §6.1: McpEnabled
-// gates whether this connection is exposed to the DB MCP server, never what it connects to. M2:
-// McpDescription is free-text metadata, never interpreted; McpReadMode/McpWriteMode/McpDdlMode gate
-// DB-MCP-path permissions, not the destination. M3: McpAutoExplain gates DB-MCP-path plan-first
+// connection connects to. ThrottlePerSec paces commands against whatever destination is
+// already resolved, so it never changes what a destination-unchanged edit connects to —
+// "edit the throttle → Test connection" must still inject the stored password. McpEnabled
+// gates whether this connection is exposed to the DB MCP server, never what it connects to.
+// McpDescription is free-text metadata, never interpreted; McpReadMode/McpWriteMode/McpDdlMode
+// gate DB-MCP-path permissions, not the destination. McpAutoExplain gates DB-MCP-path plan-first
 // behaviour, the same non-destination footing as AutoExplain. PreconnectDelaySec is timing only,
 // never the destination.
 func zeroExemptFields(f *model.ConnectionFields) {
@@ -670,21 +669,21 @@ func zeroExemptFields(f *model.ConnectionFields) {
 
 // Test never errors: a test run is never armed and never leaves a process behind, however it
 // ended (the deferred Stop mirrors connections.ts:348-351's `finally`). It still runs the same
-// Validate() Create/Update do (P2 R1: this was the one Input-accepting entry point that skipped
+// Validate() Create/Update do (this was the one Input-accepting entry point that skipped
 // it) — without that, an out-of-range Port reaches postgres/client.go's `uint16(*cfg.Port)`
 // unchecked and silently wraps around to a different, in-range port instead of being rejected.
 //
-// P14 D3: existingID is the dialog's editingId, optional. Since D1 stopped pre-filling the draft's
-// password on open, testing an existing connection the user hasn't retyped credentials for would
+// existingID is the dialog's editingId, optional. Since the draft's password is no longer
+// pre-filled on open, testing an existing connection the user hasn't retyped credentials for would
 // otherwise probe with no password at all — resolving the stored secret here, server-side, fixes
-// that properly for both fields and URI mode (URI mode already had this exact gap before P14, for
-// the same reason: an unchanged draft carries `password: null`). Not gated (D2): Test uses the
-// secret without displaying it, the same footing as Connect. A missing or undecryptable secret
-// here is not fatal — resolveFromInput/Backend.Test below still run and report failure the normal
-// way, exactly as an actually-wrong password would.
+// that properly for both fields and URI mode (URI mode already had this exact gap, for the same
+// reason: an unchanged draft carries `password: null`). Not gated: Test uses the secret without
+// displaying it, the same footing as Connect. A missing or undecryptable secret here is not
+// fatal — resolveFromInput/Backend.Test below still run and report failure the normal way,
+// exactly as a wrong password would.
 //
-// P12 round 1 finding #1 (widened by round 2 finding #1): the stored secret is only injected when
-// destinationUnchanged holds — otherwise "Edit connection → change Host (or Preconnect, or
+// The stored secret is only injected when destinationUnchanged holds — otherwise
+// "Edit connection → change Host (or Preconnect, or
 // Options["sslmode"]/["endpoint"]) → Test" would decrypt the old destination's password and send
 // it down whatever route the draft currently points at, with no auth gate on this path at all
 // (Test is deliberately not auth-gated, see above). An edited destination instead tests with no
@@ -746,7 +745,7 @@ func (s *Service) Test(in Input, existingID string) TestResult {
 	return TestResult{OK: true, ServerVersion: &serverVersion}
 }
 
-// fillFromStored supplies what a draft leaves to the stored row (Test, P14 D3/P181): a fields-mode
+// fillFromStored supplies what a draft leaves to the stored row: a fields-mode
 // draft with no password gets the stored one, a URI-mode draft with no URI (masked, never
 // revealed) gets the stored decrypted URI — both only while destinationUnchanged holds. A URI
 // decrypt failure is returned: there is nothing else to test.
@@ -773,11 +772,11 @@ func (s *Service) fillFromStored(in Input, existingID string) (Input, error) {
 	return in, nil
 }
 
-// Connect deduplicates concurrent calls for the same id (D11): every caller that arrives while an
+// Connect deduplicates concurrent calls for the same id: every caller that arrives while an
 // attempt is already running gets that same attempt's result instead of starting a second one.
-// F4 (P108 Part 3): the attempt's own ctx is cancelled by Disconnect/Remove (abortInFlight) if
-// either races ahead of it — threaded through to attemptConnect below. F13 (P108 Part 7): refuses
-// outright once Shutdown has run — see Shutdown's own doc comment for why.
+// The attempt's own ctx is cancelled by Disconnect/Remove (abortInFlight) if either races ahead
+// of it — threaded through to attemptConnect below. Refuses outright once Shutdown has run — see
+// Shutdown's own doc comment for why.
 func (s *Service) Connect(id string) (model.ConnectionState, error) {
 	for {
 		s.mu.Lock()
@@ -844,7 +843,7 @@ func (s *Service) beginTeardown(id string) (end func()) {
 }
 
 // abortInFlight cancels id's in-flight Connect attempt, if any, and waits for it to unwind —
-// Disconnect, Remove and Update call it first (F4, P108 Part 3; P168 Part 2 F4). Cancelling only
+// Disconnect, Remove and Update call it first. Cancelling only
 // *asks* the attempt to stop, promptly inside a cancellation-aware wait (Backend.Connect,
 // Preconnect.Start's settle window) and otherwise at its next check; finalizeAbortedAttempt
 // undoes whatever it had registered. Waiting guarantees the attempt's last state emit lands before
@@ -964,12 +963,12 @@ func (s *Service) attemptConnect(id string, ctx context.Context) (model.Connecti
 	return state, nil
 }
 
-// finalizeAbortedAttempt is attemptConnect's own unwind for F4 (P108 Part 3): ctx was cancelled by
+// finalizeAbortedAttempt is attemptConnect's own unwind: ctx was cancelled by
 // a Disconnect/Remove that raced ahead of this attempt — undo whatever it had already registered
 // (a live adapter, an armed sidecar) rather than letting it finalize as "connected" and resurrect
 // a connection the caller already asked to go away. Backend.Disconnect/Preconnect.Stop are each
 // idempotent no-ops when there is nothing to undo (Router.Disconnect's own "no live adapter"
-// no-op; F1's own already-dead-entry guard in killEntry), so both run unconditionally rather than
+// no-op; the already-dead-entry guard in killEntry), so both run unconditionally rather than
 // tracking exactly how far this attempt got before it was cancelled.
 func (s *Service) finalizeAbortedAttempt(id string) (model.ConnectionState, error) {
 	_ = s.deps.Backend.Disconnect(context.Background(), id)

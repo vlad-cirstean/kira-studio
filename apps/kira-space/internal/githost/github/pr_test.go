@@ -113,11 +113,10 @@ func TestPullsForBranch_ArgvGolden(t *testing.T) {
 	}
 }
 
-// G30 round-1 architecture/security review, finding #6: branch reached PullsForBranch's own query
-// value unescaped — "+", "%", "&", "#" are all legal in a real git ref, so an ordinary branch name
-// containing them silently corrupted the query (branch.resolveChangeRequest's own doc comment gives
-// "feature/a+b" as the concrete repro: decoded server-side as "feature/a b"). Proves each is now
-// percent-encoded in the argv gh itself receives.
+// Branch reached PullsForBranch's own query value unescaped — "+", "%", "&", "#" are all legal in a
+// real git ref, so an ordinary branch name containing them silently corrupted the query
+// (branch.resolveChangeRequest's own doc comment gives "feature/a+b" as the concrete repro: decoded
+// server-side as "feature/a b"). Proves each is now percent-encoded in the argv gh itself receives.
 func TestPullsForBranch_EscapesSpecialCharsInBranchName(t *testing.T) {
 	runner := &recordingRunner{result: Result{ExitCode: 0, Stdout: []byte(`[]`)}}
 	c := testClient(t, runner)

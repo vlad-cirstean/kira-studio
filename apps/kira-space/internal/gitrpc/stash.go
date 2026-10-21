@@ -10,10 +10,10 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// stash.list, stash.show, preflight.stashPop, preflight.stashBranch and G28's own globalStash.list
-// — thin dispatch (D20, matching refs.go's own shape for this exact category of handler): decode
+// stash.list, stash.show, preflight.stashPop, preflight.stashBranch and the globalStash.list
+// — thin dispatch (matching refs.go's own shape for this exact category of handler): decode
 // params, resolve c's held RepoEntry, call one RepoEntry method, marshal. All five are reads, so
-// none of them detach ctx (D8 — that's op.run/undo.run's own concern, ops.go).
+// none of them detach ctx (that's op.run/undo.run's own concern, ops.go).
 
 // validStashScope is G28 D17's own closed vocabulary for the three widened requests' Scope param:
 // "" and "stack" both mean the ordinary stack (D12 — every pre-G28 caller keeps its exact

@@ -189,7 +189,7 @@ func TestSelfInflictedKillDoesNotFireOnExit(t *testing.T) {
 	})
 }
 
-// TestStopOnAlreadyDeadEntrySkipsSignalling is P21 round 3 finding 6: an entry whose sidecar died
+// TestStopOnAlreadyDeadEntrySkipsSignalling: an entry whose sidecar died
 // on its own before Arm was ever called (the exact case entryDead/TestDiedBetweenStartAndArm
 // above covers) is deliberately left tracked in s.entries for Arm to consume — but Arm may never
 // come (a connection removed, or a connect that fails, before arming). killEntry used to signal
@@ -318,10 +318,10 @@ func readPID(t *testing.T, path string) int {
 	return pid
 }
 
-// TestStartAbortsOnContextCancellationDuringSettle is F4 (P108 Part 3): a caller racing Start with
+// TestStartAbortsOnContextCancellationDuringSettle: a caller racing Start with
 // a context that gets cancelled before the script settles (connections.Service.Disconnect/Remove
 // against an in-flight Connect) must get an aborted Start back promptly, with the spawned process
-// actually killed — it never got far enough to settle into s.entries, so an external Stop(id)
+// killed — it never got far enough to settle into s.entries, so an external Stop(id)
 // call would otherwise find nothing tracked and leave it running untracked.
 func TestStartAbortsOnContextCancellationDuringSettle(t *testing.T) {
 	pidFile, err := os.CreateTemp(t.TempDir(), "pid")

@@ -25,9 +25,9 @@ type Target struct {
 	// both tested resolver schemes dial correctly).
 	Dial string
 	// TLS is the effective decision after a recognised *web* scheme (if any) has overridden the
-	// caller's own toggle — a scheme is not part of a gRPC address (F12), but a URL-shaped target
-	// is the single most likely thing anyone arriving from the HTTP tab next door types (P2 D4's
-	// own "a URL with no scheme resolves to https://" teaches exactly that habit).
+	// caller's own toggle — a scheme is not part of a gRPC address, but a URL-shaped target
+	// is the single most likely thing anyone arriving from the HTTP tab next door types (the
+	// "a URL with no scheme resolves to https://" teaches exactly that habit).
 	TLS bool
 }
 
@@ -88,11 +88,10 @@ func NormalizeTarget(raw string, tlsRequested bool) (Target, error) {
 	return Target{Dial: rest, TLS: tls}, nil
 }
 
-// dialConn builds one *grpc.ClientConn for one call (D7, F16: grpc.NewClient is lazy — dialling
-// happens on the first RPC, so building one per call costs microseconds plus the connection the
-// call needs anyway). InsecureSkipVerify is never offered (§0.2/D6): TLS verification is always on
-// when TLS is enabled, with only a plaintext toggle and an optional CA-certificate file to cover
-// the two real cases.
+// dialConn builds one *grpc.ClientConn for one call (grpc.NewClient is lazy — dialling happens on
+// the first RPC, so building one per call costs microseconds plus the connection the call needs
+// anyway). InsecureSkipVerify is never offered: TLS verification is always on when TLS is enabled,
+// with only a plaintext toggle and an optional CA-certificate file to cover the two real cases.
 func dialConn(ctx context.Context, target string, tlsCfg TLSConfig) (*grpc.ClientConn, error) {
 	norm, err := NormalizeTarget(target, tlsCfg.Enabled)
 	if err != nil {
@@ -161,10 +160,10 @@ func awaitReady(ctx context.Context, conn *grpc.ClientConn, target string) error
 // characters" (still reachable, but only for a key this check somehow missed).
 var metadataKeyPattern = regexp.MustCompile(`^[0-9a-z._-]+$`)
 
-// withMetadata attaches D9's already-resolved metadata to ctx — F6: keys are lowercased, and an
-// illegal key is refused here as E_BAD_REQUEST with D17's own sentence, rather than reaching
+// withMetadata attaches the already-resolved metadata to ctx — keys are lowercased, and an
+// illegal key is refused here as E_BAD_REQUEST with the sentence, rather than reaching
 // grpc-go's own codes.Internal at send time. Shared by reflect.go's own reflection call and
-// call.go's Unary/ServerStream — a reflection fetch may need the same auth (§0.3).
+// call.go's Unary/ServerStream — a reflection fetch may need the same auth.
 func withMetadata(ctx context.Context, pairs []MetaPair) (context.Context, error) {
 	if len(pairs) == 0 {
 		return ctx, nil

@@ -9,10 +9,10 @@ import (
 )
 
 // ErrStreamFull is what enqueue returns when the session's queue has no room for a frame right
-// now. Moved from enginehost (P58f D9): HandleDataFrame's own dispatch is the only caller of
-// enqueue/enqueueLocal, and enginehost's own retry-with-backoff around it (stream.go) has no
-// counterpart here — a locally-produced or forwarded frame that finds the queue full is dropped,
-// not retried (enqueueLocal's own comment explains why).
+// now. HandleDataFrame's own dispatch is the only caller of enqueue/enqueueLocal, and enginehost's
+// own retry-with-backoff around it (stream.go) has no counterpart here — a locally-produced or
+// forwarded frame that finds the queue full is dropped, not retried (enqueueLocal's own comment
+// explains why).
 var ErrStreamFull = errors.New("adapterhost: stream sink full")
 
 // StreamSession is the whole of what the router needs from a renderer connection — the same
@@ -32,20 +32,20 @@ const (
 
 	// maxDataFrameBytes mirrors Wails' own streamMaxFrameBytes, same as enginehost's own copy of
 	// this constant. A pathological Go-produced page can approach it (MaxPageSize 10 000 rows,
-	// MaxCellBytes 64 KiB, §4.10) — this is the check that catches it. The FlatBuffers wire format
-	// (P11) carries raw bytes with no base64 inflation, so this budget is more headroom than it
+	// MaxCellBytes 64 KiB) — this is the check that catches it. The FlatBuffers wire format
+	// carries raw bytes with no base64 inflation, so this budget is more headroom than it
 	// used to be, not less.
 	maxDataFrameBytes = 64 << 20
 
-	// sessionMaxInFlightOps bounds HandleDataFrameAsync's own goroutine-per-frame (P2 R1): without
-	// a cap, a burst of frames — a renderer bug looping, or just many rapid UI actions arriving
+	// sessionMaxInFlightOps bounds HandleDataFrameAsync's own goroutine-per-frame: without
+	// a cap, a burst of frames — a renderer bug looping, or many rapid UI actions arriving
 	// faster than the driver can answer them — spawns unbounded goroutines, each holding open a
 	// driver call. Matches sessionQueueFrames' own order of magnitude: answering more ops than that
-	// concurrently would just queue their responses behind writeLoop's own bound anyway.
+	// concurrently would queue their responses behind writeLoop's own bound anyway.
 	sessionMaxInFlightOps = 64
 )
 
-// Session is A18: one writer goroutine per attached renderer connection, owning a bounded queue
+// Session: one writer goroutine per attached renderer connection, owning a bounded queue
 // that HandleDataFrame's locally-produced responses enqueue into (via enqueueLocal). A dedicated
 // writer goroutine is what keeps there being exactly one caller of conn.Send, since a blocking
 // conn.Send called from two goroutines directly would be a data race waiting to be found on macOS
@@ -59,10 +59,10 @@ type Session struct {
 	done        chan struct{}
 	closeOnce   sync.Once
 
-	// ctx/cancel back handleDataOp's own per-op context (P2 R1): it used to be
+	// ctx/cancel back handleDataOp's own per-op context: it used to be
 	// context.Background(), so an op outlived its session indefinitely — a renderer reload/close
 	// abandons the pending request client-side, but nothing ever told the adapter call itself to
-	// stop. Close cancels ctx, so a session going away actually unblocks whatever op is still
+	// stop. Close cancels ctx, so a session going away unblocks whatever op is still
 	// running against it (a well-behaved adapter observes ctx and returns; CancelOp's explicit,
 	// opID-addressed path is unaffected — RunOp derives its own context from this one either way).
 	ctx    context.Context
@@ -135,7 +135,7 @@ func (s *Session) writeLoop() {
 
 // enqueueLocal is HandleDataFrame's own path for an unsolicited event frame this process produced
 // itself (a cache:stats push) — not correlated with any renderer-side pending request, so a full
-// queue can safely just drop it: the next stats-changed notification supersedes it, and nothing is
+// queue can safely drop it: the next stats-changed notification supersedes it, and nothing is
 // left waiting on this one specifically.
 func (s *Session) enqueueLocal(frame []byte) {
 	if err := s.enqueue(frame); err != nil {
@@ -146,14 +146,14 @@ func (s *Session) enqueueLocal(frame []byte) {
 // enqueueResponse is HandleDataFrame's own path for a response frame, correlated by id with a
 // renderer-side pending request (port.ts's `pending` map). Unlike enqueueLocal's events, silently
 // dropping this frame would leave that request unanswered forever: a data op's request has no
-// client-side timeout of its own (§5.1/D25 — cancellation is meant to be the only escape hatch),
+// client-side timeout of its own (cancellation is meant to be the only escape hatch),
 // and cancellation itself only resolves the pending promise by producing a response through this
 // same path. So this never drops: it blocks for room in the queue instead (safe because
 // HandleDataFrame already runs on its own goroutine per inbound frame — this never serialises
 // behind the next Receive()), unblocking either once the writer drains the queue or once the
 // session closes, at which point port.ts's own onclose already rejects every pending request.
 //
-// P2 R2 (task #97): "room in the queue" used to mean only the channel's own sessionQueueFrames
+// "room in the queue" used to mean only the channel's own sessionQueueFrames
 // (64) capacity — a burst of large data-plane pages, each well under maxDataFrameBytes on its
 // own, could sit in the queue simultaneously with nothing checking their combined size against
 // sessionQueueBytes (32 MiB) at all, since the byte counter was updated but never consulted here.

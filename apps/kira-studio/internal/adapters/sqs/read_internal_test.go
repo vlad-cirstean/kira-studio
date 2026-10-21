@@ -7,7 +7,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 )
 
-// TestReceiptHandles_ForDelete_ExpiredHandleRefused is F10's own regression: a cached receipt
+// TestReceiptHandles_ForDelete_ExpiredHandleRefused is the regression: a cached receipt
 // handle past its own recorded visibility timeout must be refused outright, rather than letting
 // AWS silently accept a delete with a stale handle and report a false success. White-box (package
 // sqs), no live queue needed — receivedAt is set directly, simulating time having passed rather

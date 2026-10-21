@@ -171,7 +171,7 @@ func TestScopeBindsCiphertextToItsKind(t *testing.T) {
 // TestDecryptRefusesAnOlderEnvelopeEvenWithTheRightKey is the property that makes "no dual-read
 // path" a fact the suite checks rather than an intention: a byte-perfect kira:v3: envelope, sealed
 // under the very key the process holds, is refused the instant its prefix is downgraded to
-// kira:v2: or kira:v1: — before any key or tag work runs at all, since D6's sentence is produced by
+// kira:v2: or kira:v1: — before any key or tag work runs at all, since the sentence is produced by
 // the prefix check, not by a failed Open.
 func TestDecryptRefusesAnOlderEnvelopeEvenWithTheRightKey(t *testing.T) {
 	c := availableCipher(t)

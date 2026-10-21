@@ -13,11 +13,11 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// closeHTTPGraceTimeout bounds closeHTTP's own graceful Shutdown wait (finding #17, M6):
+// closeHTTPGraceTimeout bounds closeHTTP's own graceful Shutdown wait:
 // http.Server.Shutdown given context.Background() blocks until every in-flight handler returns,
-// with no deadline of its own — a run_query handler parked in ApprovalBroker.Request (M2 §5.3)
-// would never return on its own, so an unbounded Shutdown here would hang the whole app-quit path
-// on it. bridge/dbmcp.go's stopLocked unblocks that handler first (AbandonAll before Close), so
+// with no deadline of its own — a run_query handler parked in ApprovalBroker.Request would never
+// return on its own, so an unbounded Shutdown here would hang the whole app-quit path on it.
+// bridge/dbmcp.go's stopLocked unblocks that handler first (AbandonAll before Close), so
 // this deadline is normally never reached — it exists as the hard backstop for whatever ordering
 // mistake or slow handler reaches it anyway, matching mcpinstall/exec.go's own
 // grace-then-force shape.
@@ -39,7 +39,7 @@ var requestContextKey requestContextKeyType
 // withRequestContext stores the HTTP request's own context where tool handlers can read it back.
 // go-sdk v1.8.0 detaches the handler context from the request unless PropagateRequestCancellation
 // applies, and a client's cancel arrives on a separate stateless POST, so a disconnect or
-// client-side timeout otherwise never reaches the handler (P168 Part 6 F2). Context values survive
+// client-side timeout otherwise never reaches the handler. Context values survive
 // the detach.
 func withRequestContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -58,11 +58,11 @@ func bindRequestCancellation(ctx context.Context) (context.Context, context.Canc
 	return ctx, cancel
 }
 
-// bindHTTP binds DefaultPort — never 0.0.0.0, always loopback only (§3.2) — mounts the auth-wrapped
+// bindHTTP binds DefaultPort — never 0.0.0.0, always loopback only — mounts the auth-wrapped
 // Streamable HTTP handler, and records the bound listener. Does not start serving; call Serve for
 // that.
 //
-// F11: DefaultPort conflict is refused outright, never silently falls back to an OS-assigned
+// DefaultPort conflict is refused outright, never silently falls back to an OS-assigned
 // ephemeral port. Every existing registration (Command's own text, or whatever the user already
 // ran) names DefaultPort — with no re-registration signal of its own, a fallback would leave that
 // registration pointing at a port another local uid could hold instead, silently receiving
@@ -86,7 +86,7 @@ func (s *Server) bindHTTP() error {
 	verifier := s.tokenVerifier()
 	protected := auth.RequireBearerToken(verifier, &auth.RequireBearerTokenOptions{
 		// mcpauth.Check does its own expiry test and reports OutcomeExpired with an actionable
-		// message (M1 §2.5); the SDK's own Expiration-based check would only ever see a zero
+		// message; the SDK's own Expiration-based check would only ever see a zero
 		// TokenInfo.Expiration (deliberately left empty, see tokenVerifier below) and produce its
 		// own flat "token missing expiration" body instead, so that check stays opted out here.
 		AllowMissingExpiration: true,

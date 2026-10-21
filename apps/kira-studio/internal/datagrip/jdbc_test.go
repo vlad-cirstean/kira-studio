@@ -10,8 +10,8 @@ import (
 // writeSyntheticProject builds a one-off .idea/dataSources.xml (+ optional dataSources.local.xml)
 // under a fresh temp dir, using the same element/attribute shapes as testdata/project-six's real,
 // citation-backed fixture — a temp file rather than another static testdata/ directory per case,
-// since §4.2 cases 5-11 are many small, one-field-different variants better expressed inline than
-// as a dozen near-duplicate checked-in files. Returns the project directory (the picker's own
+// since many small, one-field-different variants are better expressed inline than as a dozen
+// near-duplicate checked-in files. Returns the project directory (the picker's own
 // return value) to pass to resolveFields/Scan.
 func writeSyntheticProject(t *testing.T, sharedXML, localXML string) string {
 	t.Helper()
@@ -143,9 +143,9 @@ func TestSQLiteMacroExpansion(t *testing.T) {
 	}
 }
 
-// TestSQLiteMacroExpansionWhenPickingIdeaDirDirectly is the review finding: a $PROJECT_DIR$-relative
+// TestSQLiteMacroExpansionWhenPickingIdeaDirDirectly: a $PROJECT_DIR$-relative
 // SQLite path must resolve against the real project root even when the caller/picker pointed at the
-// .idea folder itself (D13) rather than the project folder — never against .idea, which would put
+// .idea folder itself rather than the project folder — never against .idea, which would put
 // the resolved path a level too deep (e.g. "<project>/.idea/db.sqlite" instead of
 // "<project>/db.sqlite").
 func TestSQLiteMacroExpansionWhenPickingIdeaDirDirectly(t *testing.T) {
@@ -266,10 +266,10 @@ func TestRedactURLCredentials(t *testing.T) {
 	}
 }
 
-// TestSkipDetailNeverLeaksURLCredentials is the review finding: a JDBC URL's own embedded
-// "user:password@host" userinfo (D7's configured-by-url exception, or any other URL DataGrip wrote
+// TestSkipDetailNeverLeaksURLCredentials: a JDBC URL's own embedded
+// "user:password@host" userinfo (the configured-by-url exception, or any other URL DataGrip wrote
 // credentials into) must never appear verbatim in a skip/error string that crosses the bridge —
-// D9's "a password never crosses the bridge" guarantee applies to skip/error text exactly as much
+// the "a password never crosses the bridge" guarantee applies to skip/error text exactly as much
 // as to a successfully-resolved row's own fields.
 func TestSkipDetailNeverLeaksURLCredentials(t *testing.T) {
 	const secret = "hunter2secret"

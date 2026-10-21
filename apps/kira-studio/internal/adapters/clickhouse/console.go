@@ -16,10 +16,10 @@ func (a *Adapter) ClassifyStatement(_ context.Context, statement string) (adapte
 	return classifyClickHouseSQL(statement), nil
 }
 
-// classifyClickHouseSQL corrects ClassifySQL's own default for a bare (non-ANALYZE) EXPLAIN (M7
-// finding #10): on Postgres/MySQL/MariaDB/SQLite an EXPLAIN without ANALYZE never executes its
-// target, so ClassifySQL classifies it ClassRead unconditionally — docs/HISTORY.md (v1.7 M3)'s own §8.1
-// records that ClickHouse is "the one it does not clear", the reason queryplan.Explainable already
+// classifyClickHouseSQL corrects ClassifySQL's own default for a bare (non-ANALYZE) EXPLAIN:
+// on Postgres/MySQL/MariaDB/SQLite an EXPLAIN without ANALYZE never executes its
+// target, so ClassifySQL classifies it ClassRead unconditionally — docs/HISTORY.md records that
+// ClickHouse is "the one it does not clear", the reason queryplan.Explainable already
 // refuses to ever compose a ClickHouse EXPLAIN over anything but SELECT/WITH. That restriction only
 // covers explain_query's own composed statements, not run_query, which accepts raw SQL text a
 // caller could type `EXPLAIN <DELETE ...>` into directly — classified ClassRead by the shared
@@ -29,7 +29,7 @@ func (a *Adapter) ClassifyStatement(_ context.Context, statement string) (adapte
 // either.
 func classifyClickHouseSQL(statement string) adapters.OpClass {
 	// Embedded-semicolon guard against the RAW statement, same reasoning and same direction as
-	// ClassifySQL's own (finding F1) — checked here too since the EXPLAIN-target recursion below
+	// ClassifySQL's own — checked here too since the EXPLAIN-target recursion below
 	// calls adapters.ClassifySQL on a substring that no longer includes whatever preceded the
 	// EXPLAIN keyword itself.
 	raw := adapters.StripOneTrailingSemicolon(strings.TrimSpace(statement))
@@ -41,7 +41,7 @@ func classifyClickHouseSQL(statement string) adapters.OpClass {
 	fields := strings.Fields(stripped)
 	if len(fields) > 0 && strings.EqualFold(fields[0], "EXPLAIN") {
 		rest := strings.TrimSpace(stripped[len(fields[0]):])
-		// F4: ClickHouse's own EXPLAIN grammar allows an optional kind keyword
+		// ClickHouse's own EXPLAIN grammar allows an optional kind keyword
 		// (AST/SYNTAX/QUERY TREE/PLAN/PIPELINE/ESTIMATE/TABLE OVERRIDE), and PLAN accepts an
 		// optional `k = v, ...` settings list, both before the actual target statement —
 		// queryplan.StatementsFor composes exactly this shape ("EXPLAIN PLAN json = 1, ... SELECT
@@ -82,7 +82,7 @@ func stripClickHouseExplainKindAndSettings(rest string) string {
 	return rest
 }
 
-// leadingCommentRE/rowReturningRE are console.ts's own — D19: the HTTP interface gives no cheap
+// leadingCommentRE/rowReturningRE are console.ts's own — the HTTP interface gives no cheap
 // "will this return rows" check before executing (unlike SQLite's own zero-column QueryContext
 // signal or MariaDB's OkPacket-vs-rows shape) — a leading-keyword heuristic decides a streamed
 // query vs a command, skipping past leading comments first. This matters beyond cosmetics:

@@ -3,7 +3,7 @@ package porcelain
 import "strings"
 
 // EmptyTreeHashArgs builds `hash-object -t tree /dev/null` — the empty-tree object id, derived
-// from THIS repository's own object format rather than assumed (F18): the empty-tree hash is a
+// from THIS repository's own object format rather than assumed: the empty-tree hash is a
 // well-known constant, but only within one hash algorithm — SHA-1's is
 // "4b825dc642cb6eb9a060e54bf8d69288fbee4904", SHA-256's is a completely different 64-hex value
 // (verified against real git 2.43 with --object-format=sha256), so a hardcoded SHA-1-width

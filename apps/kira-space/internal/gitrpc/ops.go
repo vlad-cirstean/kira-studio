@@ -9,8 +9,8 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// op.run and undo.run are G5's two write methods — both run RunOp/UndoRun under
-// context.WithoutCancel (D8): a write already in flight must never be killed by a client
+// op.run and undo.run are the two write methods — both run RunOp/UndoRun under
+// context.WithoutCancel: a write already in flight must never be killed by a client
 // disconnect or a `cancel` frame, because head/undo/refs are SHARED state a second window might
 // read, and the post-op read-back is part of that same detached unit, not just the write itself.
 // undo.peek is a read and stays on the request ctx.

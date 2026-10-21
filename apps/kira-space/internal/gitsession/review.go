@@ -9,11 +9,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 )
 
-// reviewRangeCountSlot is D9's own one-entry per-repo slot: a rev-list --count remembered for
+// reviewRangeCountSlot is a one-entry per-repo slot: a rev-list --count remembered for
 // exactly one <base>..<branch> pair, computed by ResolveReviewBase and peeked (never blocking) by
 // the ranged graph.* handlers. A miss -- an empty slot, or one for a different range -- is a
 // correct optimisation fallback, never a correctness dependency: logsession runs its own
-// rev-list --count when this misses (F4). One slot, not a map, matching upstream's
+// rev-list --count when this misses. One slot, not a map, matching upstream's
 // lastReviewResolution.
 type reviewRangeCountSlot struct {
 	mu           sync.Mutex
@@ -82,11 +82,11 @@ func (e *RepoEntry) originHead(ctx context.Context) (string, error) {
 	return strings.TrimSpace(string(res.Stdout)), nil
 }
 
-// sharesHistory is `merge-base <base> <branch>` (D7c step 5, probe P2): exit 0 means the two share
+// sharesHistory is `merge-base <base> <branch>`: exit 0 means the two share
 // history, exit 1 means they do not (BaseResolution's "unrelated" outcome) -- anything else is a
-// classified error, never a silent "unrelated" (upstream's own V6). A thin wrapper over G11's own
-// mergeBase (incremental.go, D6) — one helper, two callers, one spawn: mergeBase reads the sha this
-// call used to throw away, and this collapses into mergeBase's own `ok` return.
+// classified error, never a silent "unrelated". A thin wrapper over the mergeBase (incremental.go)
+// — one helper, two callers, one spawn: mergeBase reads the sha this call used to throw away,
+// and this collapses into mergeBase's own `ok` return.
 func (e *RepoEntry) sharesHistory(ctx context.Context, base, branch string) (bool, error) {
 	_, ok, err := e.mergeBase(ctx, base, branch)
 	return ok, err
@@ -139,9 +139,9 @@ func (e *RepoEntry) naturalResolution(ctx context.Context, branchRef porcelain.R
 	}), nil
 }
 
-// ResolveReviewBase is review.resolveBase's own orchestration (D7c) -- upstream's
+// ResolveReviewBase is review.resolveBase's own orchestration -- upstream's
 // resolveReviewBase, computed fresh on every call before any row is painted. The candidates are
-// this repo's own stored kiraSpace.review.baseCandidates (G18 D6), falling back to
+// this repo's own stored kiraSpace.review.baseCandidates, falling back to
 // gitreview.DefaultBaseCandidates when none are stored.
 func (e *RepoEntry) ResolveReviewBase(ctx context.Context, branch string, base *string) (gitreview.BaseResolution, error) {
 	candidates := e.RepoSettings().ReviewBaseCandidates

@@ -31,10 +31,10 @@ type RepoCloseParams struct {
 }
 
 // RepoOpenResult is repo.open's result — structurally matches @kira/git-ipc's own RepoOpenResult
-// union. Moved here from gitclient/client.go (D18): it is a wire type, and SPEC §2 makes gitrpc the
-// owner of wire types — gitclient itself no longer has an opinion on repo.open's shape. JSON tags
-// unchanged. A classified error other than "not a repository" (permission denied, an unexpected
-// spawn failure) is not one of this union's members and crosses as a plain RpcError instead
+// union. It is a wire type, and gitrpc is the owner of wire types — gitclient itself no longer
+// has an opinion on repo.open's shape. JSON tags unchanged. A classified error other than
+// "not a repository" (permission denied, an unexpected spawn failure) is not one of this
+// union's members and crosses as a plain RpcError instead
 // (mapGitError, handlers.go).
 type RepoOpenResult struct {
 	Kind string                 `json:"kind"` // "ok" | "notARepository" | "gitUnavailable"
@@ -56,7 +56,7 @@ type CommitRangeParams struct {
 }
 
 // ---------------------------------------------------------------------------------------
-// search.run (G23 D13) -- @kira/git-ipc's own SearchQueryParams/SearchRunResult, commits-only
+// search.run -- @kira/git-ipc's own SearchQueryParams/SearchRunResult, commits-only
 // (no `scope`: refs/both are resolved entirely client-side, contract.ts:900-903).
 // ---------------------------------------------------------------------------------------
 
@@ -87,7 +87,7 @@ type SearchHit struct {
 
 // SearchRunResult is search.run's result — @kira/git-ipc's own three-member SearchRunResult
 // union, flattened onto one struct the way RepoOpenResult already is (Kind selects which fields
-// are meaningful): "ok" | "invalidPattern" | "unsupportedPattern" (D6 — the new member this
+// are meaningful): "ok" | "invalidPattern" | "unsupportedPattern" (the new member this
 // phase adds, for a `regex`-mode pattern using syntax RE2 cannot express at all).
 type SearchRunResult struct {
 	Kind string `json:"kind"`
@@ -143,7 +143,7 @@ type GraphStreamParams struct {
 	Range            *CommitRangeParams `json:"range,omitempty"`
 }
 
-// commitsBlob marshals as {"$fb":"gitwire/1","d":{"$blob":true}} — D4's own marker naming where
+// commitsBlob marshals as {"$fb":"gitwire/1","d":{"$blob":true}} — the marker naming where
 // the frame's out-of-band FlatBuffer belongs once rpcstream substitutes it.
 // rpcstream never learns what a graph chunk is (session.go:1-9's own module doc); this is the one
 // place that shape is stated.
@@ -154,16 +154,16 @@ func (commitsBlob) MarshalJSON() ([]byte, error) {
 }
 
 // ---------------------------------------------------------------------------------------
-// commit.detail/commit.fileDiff/file.read/file.goToTarget (D3, D6) — @kira/git-ipc's own request
+// commit.detail/commit.fileDiff/file.read/file.goToTarget — @kira/git-ipc's own request
 // shapes. Results are gitsession's own wire-shaped types (porcelain.CommitDetail,
-// gitsession.FileDiffResult/BlobResult/GoToTarget) — D5's own precedent (gitclient.RepoSummary
+// gitsession.FileDiffResult/BlobResult/GoToTarget) — the precedent (gitclient.RepoSummary
 // crossing the wire directly) applied again: no second, gitrpc-owned copy of a shape gitsession
 // already produces JSON-tagged.
 // ---------------------------------------------------------------------------------------
 
-// MaxResultBytes is D2(b)'s own cap on commit.fileDiff/file.read's *encoded* result — comfortably
+// MaxResultBytes is the cap on commit.fileDiff/file.read's *encoded* result — comfortably
 // under rpcstream's frame cap, far above anything a 1 MiB patch (gitsession.MaxPatchBytes)
-// produces in practice (F9: ~2.5 MiB worst realistic case). Not measured against a real budget —
+// produces in practice (~2.5 MiB worst realistic case). Not measured against a real budget —
 // there is no decision this number would change.
 const MaxResultBytes = 6 << 20
 
@@ -235,12 +235,12 @@ type graphChunk struct {
 }
 
 // ---------------------------------------------------------------------------------------
-// P6 (G5) — refs, status, pre-flight and operations (D20). Results are gitsession's/
+// Refs, status, pre-flight and operations. Results are gitsession's/
 // gitpreflight's own wire-shaped types (RefsResult, StatusSummary, CheckoutPreflight,
-// RevertPreflight, OpResult, UndoSlotSnapshot) — D5's own precedent applied again: no second,
+// RevertPreflight, OpResult, UndoSlotSnapshot) — the precedent applied again: no second,
 // gitrpc-owned copy of a shape those packages already produce JSON-tagged. CONTRACT_VERSION stays
-// 14 (D1): every one of these seven request keys, and every P6 type, has been in contract.ts/
-// validate.ts since G1.
+// 14: every one of these seven request keys, and every type, has been in contract.ts/
+// validate.ts.
 // ---------------------------------------------------------------------------------------
 
 type RefsListParams struct {
@@ -299,12 +299,12 @@ type UndoRunParams struct {
 }
 
 // ---------------------------------------------------------------------------------------
-// G17 — stash. Results are gitsession's/gitpreflight's own wire-shaped types
+// Stash. Results are gitsession's/gitpreflight's own wire-shaped types
 // ([]porcelain.StashEntry wrapped in StashListResult, gitsession.StashShowResult,
-// gitpreflight.StashPopPreflight, gitpreflight.StashBranchPreflight) — D5's own precedent applied
+// gitpreflight.StashPopPreflight, gitpreflight.StashBranchPreflight) — the precedent applied
 // again: no second, gitrpc-owned copy of a shape those packages already produce JSON-tagged.
-// CONTRACT_VERSION stays 21 (F1): every one of these four request keys, and every stash type, has
-// been in contract.ts/validate.ts since G1.
+// CONTRACT_VERSION stays 21: every one of these four request keys, and every stash type, has
+// been in contract.ts/validate.ts.
 // ---------------------------------------------------------------------------------------
 
 type StashListParams struct {
@@ -354,10 +354,9 @@ type GlobalStashListParams struct {
 }
 
 // ---------------------------------------------------------------------------------------
-// P7 (G6) — branch review (D1, D18). review.resolveBase's own result is gitreview.BaseResolution
-// (D5's own precedent applied again — no second, gitrpc-owned copy of a shape gitreview already
-// produces JSON-tagged). CONTRACT_VERSION moves 14 -> 15 for this phase: review.resolveBase gains
-// one optional param.
+// Branch review. review.resolveBase's own result is gitreview.BaseResolution (the precedent
+// applied again — no second, gitrpc-owned copy of a shape gitreview already produces
+// JSON-tagged). CONTRACT_VERSION moves 14 -> 15: review.resolveBase gains one optional param.
 // ---------------------------------------------------------------------------------------
 
 // ReviewResolveBaseParams is review.resolveBase's own request.
@@ -368,11 +367,11 @@ type ReviewResolveBaseParams struct {
 }
 
 // ---------------------------------------------------------------------------------------
-// G7 — remote ops and the credential relay (D2). remote.pullPreflight/remote.pushPreflight's own
-// results are gitpreflight's own wire-shaped types (PullPreflight/PushPreflight) — D5's own
-// precedent applied again: no second, gitrpc-owned copy of a shape that package already produces
-// JSON-tagged. CONTRACT_VERSION moves 15 -> 16 for exactly three additions: credential.request,
-// credential.provide, and remote.pullPreflight's own optional strategySetting param.
+// Remote ops and the credential relay. remote.pullPreflight/remote.pushPreflight's own
+// results are gitpreflight's own wire-shaped types (PullPreflight/PushPreflight) — no second,
+// gitrpc-owned copy of a shape that package already produces JSON-tagged. CONTRACT_VERSION moves
+// 15 -> 16 for exactly three additions: credential.request, credential.provide, and
+// remote.pullPreflight's own optional strategySetting param.
 // ---------------------------------------------------------------------------------------
 
 // RemotePullPreflightParams is remote.pullPreflight's own request.
@@ -409,12 +408,11 @@ type RemoteCancelResult struct {
 }
 
 // ---------------------------------------------------------------------------------------
-// G11 — incremental review: review.files/review.fileDiff/review.mark (D1, D13). Results are
-// gitsession's own wire-shaped types (RangeFilesResult, ReviewFileDiffResult, ReviewFileStatus) —
-// D5's own precedent applied again: no second, gitrpc-owned copy of a shape gitsession already
-// produces JSON-tagged. CONTRACT_VERSION moves 17 -> 18 for exactly these three requests plus one
-// new UiActionKind member (toggleFileReviewed, a webview-local control frame the Go server never
-// sees, D1).
+// incremental review: review.files/review.fileDiff/review.mark. Results are gitsession's own
+// wire-shaped types (RangeFilesResult, ReviewFileDiffResult, ReviewFileStatus) — no second,
+// gitrpc-owned copy of a shape gitsession already produces JSON-tagged. CONTRACT_VERSION moves
+// 17 -> 18 for exactly these three requests plus one new UiActionKind member (toggleFileReviewed,
+// a webview-local control frame the Go server never sees).
 // ---------------------------------------------------------------------------------------
 
 // ReviewFilesParams is review.files' own request — D5's session key: base is needed to compute the
@@ -462,9 +460,9 @@ type ReviewSnapshotParams struct {
 type ReviewSnapshotResult = gitsession.ReviewSnapshotResult
 
 // ---------------------------------------------------------------------------------------
-// G13 — inline AI review comments (D1, D11). review.comment.list's own result is gitsession's own
-// wire-shaped type (gitsession.CommentListResult) — D5's own precedent applied again. Every method
-// runs validRefArg on branch, exactly like every other review.* method.
+// Inline AI review comments. review.comment.list's own result is gitsession's own wire-shaped type
+// (gitsession.CommentListResult). Every method runs validRefArg on branch,
+// exactly like every other review.* method.
 // ---------------------------------------------------------------------------------------
 
 // ReviewCommentAddParams is review.comment.add's own request. `at` is required, with no default
@@ -546,7 +544,7 @@ type ReviewCommentExportResult struct {
 }
 
 // ---------------------------------------------------------------------------------------
-// G18 — repoSettings.get/set/changed (D3/D4). Wire-tagged with their literal kiraSpace.* dotted
+// repoSettings.get/set/changed. Wire-tagged with their literal kiraSpace.* dotted
 // keys so RepoSettingsSnapshot is a direct structural copy of @kira/git-ipc's own
 // RepoSettingsSnapshot, needing no translation layer on either side — the same discipline
 // gitclient.GitStatus's own JSON tags already follow for GitStatus.
@@ -602,19 +600,20 @@ type RepoSettingsSetParams struct {
 	Patch  RepoSettingsPatchWire `json:"patch"`
 }
 
-// RepoSettingsChangedPayload is repoSettings.changed's own event payload (D4/D7) — emitted to
+// RepoSettingsChangedPayload is repoSettings.changed's own event payload — emitted to
 // every currently connected client, not only the one that made the change, via
 // internal/notify.Emitter[T] (the same mechanism dbmcp and gitcred use), regardless of which key
-// changed. RepoID names which repo's own write triggered the emit; a viewer decides for itself whether that repoId is relevant.
+// changed. RepoID names which repo's own write triggered the emit; a viewer decides for itself
+// whether that repoId is relevant.
 type RepoSettingsChangedPayload struct {
 	RepoID   string               `json:"repoId"`
 	Settings RepoSettingsSnapshot `json:"settings"`
 }
 
 // ---------------------------------------------------------------------------------------
-// G24 — commit.resolveChangeRequests / branch.resolveChangeRequest (D9/D14). HostStatus/ChangeRequestRecord/ChangeRequestLookup are direct
-// structural copies of @kira/git-ipc's own types of the same name, kept honest by hand (this repo
-// carries no wireConformance.spec.ts — see this phase's own commit message) the same way
+// commit.resolveChangeRequests / branch.resolveChangeRequest. HostStatus/ChangeRequestRecord/
+// ChangeRequestLookup are direct structural copies of @kira/git-ipc's own types of the same name,
+// kept honest by hand (this repo carries no wireConformance.spec.ts) the same way
 // gitclient.GitStatus's JSON tags already mirror GitStatus's TS twin.
 // ---------------------------------------------------------------------------------------
 
@@ -688,9 +687,10 @@ type BranchResolveChangeRequestParams struct {
 	Branch string `json:"branch"`
 }
 
-// ChangeRequestBrowserUrlParams is changeRequest.browserUrl's own request (P74 §3.3) — hostHandlers.ts/proxyHandlers.ts
-// answer changeRequest.openExternal by requesting this over the git socket, then handing the URL to the
-// host's own browser-open path (never the reverse: the renderer never supplies a URL).
+// ChangeRequestBrowserUrlParams is changeRequest.browserUrl's own request —
+// hostHandlers.ts/proxyHandlers.ts answer changeRequest.openExternal by requesting this over the
+// git socket, then handing the URL to the host's own browser-open path (never the reverse: the
+// renderer never supplies a URL).
 type ChangeRequestBrowserUrlParams struct {
 	RepoID string `json:"repoId"`
 	Number int    `json:"number"`
@@ -715,11 +715,11 @@ type GitHostInfoResult struct {
 }
 
 // ---------------------------------------------------------------------------------------
-// G25 — worktree support (D1-D14). worktree.list/preflight.worktreeAdd/preflight.worktreeRemove's
+// Worktree support. worktree.list/preflight.worktreeAdd/preflight.worktreeRemove's
 // own results are gitsession's/gitpreflight's own wire-shaped types ([]gitsession.WorktreeEntry
 // wrapped in WorktreeListResult, gitpreflight.WorktreeAddPreflight, gitpreflight.
-// WorktreeRemovePreflight) — D5's own precedent applied again: no second, gitrpc-owned copy of a
-// shape those packages already produce JSON-tagged. CONTRACT_VERSION moved 27 -> 28 (D16).
+// WorktreeRemovePreflight): no second, gitrpc-owned copy of a
+// shape those packages already produce JSON-tagged.
 // ---------------------------------------------------------------------------------------
 
 // WorktreeListParams is worktree.list's own request.
@@ -748,7 +748,7 @@ type PreflightWorktreeRemoveParams struct {
 	Path   string `json:"path"`
 }
 
-// StackListParams is stack.list's own request (G26 D3) — the RESULT is
+// StackListParams is stack.list's own request — the RESULT is
 // gitsession.RepoEntry.Stacks' own gitpreflight.StackListResult, returned directly with no wrapper,
 // the same "handler returns the gitpreflight/gitsession struct as-is" convention
 // preflight.worktreeAdd/preflight.worktreeRemove already established.

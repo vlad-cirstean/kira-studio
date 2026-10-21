@@ -1,6 +1,6 @@
 // Package storage owns Kira Space's SQLite database: opening it, migrating it, and the hot-path
 // repo queries. Mirrors apps/kira-studio/internal/storage's own shape, built on repo-root
-// internal/sqlitex's shared open/pragma/migrate mechanics (P100 Part 1) rather than duplicating
+// internal/sqlitex's shared open/pragma/migrate mechanics rather than duplicating
 // them — see internal/sqlitex's own doc comment for what it owns versus what each app keeps for
 // itself.
 package storage

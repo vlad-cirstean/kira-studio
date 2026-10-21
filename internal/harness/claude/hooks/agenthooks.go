@@ -1,6 +1,6 @@
-// Package agenthooks is a repo-root shared package (P127; originally P86, inside
-// apps/kira-studio): a per-process HTTP-over-unix-socket listener that a launched `claude`
-// process's own lifecycle hooks report into (§5.1). Go's internal/ visibility rule makes this
+// Package agenthooks is a repo-root shared package: a per-process HTTP-over-unix-socket listener
+// that a launched `claude` process's own lifecycle hooks report into. Go's internal/ visibility
+// rule makes this
 // importable from any app under apps/ but never the reverse, so it must not (and, structurally,
 // cannot) import an apps/<app>/internal/... package such as internal/bridge — a host's own bridge
 // package is the one place that turns Options.OnEvent's callback into a push-channel event and
@@ -30,8 +30,8 @@ import (
 // this is a generous backstop, not a value tuned against a known slow path.
 const closeHTTPGraceTimeout = 5 * time.Second
 
-// Server owns, for its own lifetime: a 0700 temp directory, the generated hooks.json (§2.4), the
-// shim script (§5.2), a 0600 unix socket and the http.Server serving POST /hook over it. One
+// Server owns, for its own lifetime: a 0700 temp directory, the generated hooks.json, the
+// shim script, a 0600 unix socket and the http.Server serving POST /hook over it. One
 // instance per enable — internal/bridge/agenthooks.go's AgentHooksService constructs and closes
 // one each time the setting toggles on, mirroring internal/dbmcp.Server's own start/stop shape.
 type Server struct {
@@ -52,7 +52,7 @@ type Server struct {
 
 // New resolves curl, builds the temp directory/shim/socket/hooks.json, starts serving in its own
 // goroutine, and returns. A failure here is never fatal to the caller — AgentHooksService.
-// SetEnabled/startLocked surfaces it as AgentHooksStatus.Error (§5.2), the same "enabling fails
+// SetEnabled/startLocked surfaces it as AgentHooksStatus.Error, the same "enabling fails
 // loudly, nothing silently degrades" posture DbMcpService already takes for a bind failure.
 func New(opts harness.HookOptions) (*Server, error) {
 	curlPath, err := exec.LookPath("curl")
@@ -163,7 +163,7 @@ func (s *Server) Env(terminalID string) []string {
 // Close shuts the HTTP server down with a bounded context (dbmcp/http.go's own closeHTTP
 // precedent) and removes the whole temp directory — the shim, hooks.json and the socket file
 // along with it. A running Claude Code session whose hooks now post into a closed socket is
-// unaffected (§7): the shim always exits 0.
+// unaffected: the shim always exits 0.
 func (s *Server) Close() error {
 	ctx, cancel := context.WithTimeout(context.Background(), closeHTTPGraceTimeout)
 	defer cancel()

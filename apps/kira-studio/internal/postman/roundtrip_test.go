@@ -1,7 +1,7 @@
-// P4 §6.2: internal/postman is CLAUDE.md's named category — a parser with several interacting
+// internal/postman is CLAUDE.md's named category — a parser with several interacting
 // rules over a real wire format, where every failure mode is silent (a dropped event[] is
 // invisible until someone opens the export in Postman; a scrambled sort_order looks like the
-// user's own ordering). The one assertion that matters is D6's rule at scale:
+// user's own ordering). The one assertion that matters is the rule at scale:
 // import(origin.X) == stored.X ? origin.X : build(stored.X).
 package postman_test
 
@@ -237,8 +237,8 @@ func TestEveryOneOfParsesAndSurvives(t *testing.T) {
 				t.Fatalf("collection-level %q changed:\n got %#v\nwant %#v", member, out[member], in[member])
 			}
 		}
-		// P5 D15: collection-level `variable` is promoted, not inert — it round-trips through
-		// VariablesRepo's own TEXT columns, so a numeric/boolean `value` (F2's own untyped-value
+		// Collection-level `variable` is promoted, not inert — it round-trips through
+		// VariablesRepo's own TEXT columns, so a numeric/boolean `value` (the untyped-value
 		// finding) re-exports as the equivalent JSON string rather than byte-identically. This is
 		// the same lossy-scalar handling `decodeScalarString` already applies to header/url values
 		// elsewhere in this package, not a new corner cut for variables specifically.
@@ -246,7 +246,7 @@ func TestEveryOneOfParsesAndSurvives(t *testing.T) {
 		if !ok || len(gotVars) != 3 {
 			t.Fatalf("out[\"variable\"] = %#v, want 3 promoted rows", out["variable"])
 		}
-		// P17 D14/F10: "port"'s description arrived as an object (`{content: ...}, Postman's own
+		// "port"'s description arrived as an object (`{content: ...}, Postman's own
 		// richer shape, mirroring info.description above) and re-exports as a plain string —
 		// decodeDescription's own leniency, and buildVariables' own "never round-trip an opaque
 		// object through a column the user can edit" rule. "baseUrl"'s arrived as a plain string
@@ -471,7 +471,7 @@ func TestAnEditedParamDescriptionExportsAndShedsItsOrigin(t *testing.T) {
 	}
 }
 
-// TestObjectFormAliasesRoundTripUntouchedAndSurviveShedOrigin is P108 F7: buildRequest's and
+// TestObjectFormAliasesRoundTripUntouchedAndSurviveShedOrigin: buildRequest's and
 // ShedOrigin's object-form branches used to compare origin's raw, un-rewritten alias spelling
 // ({{$guid}}) against the stored request's already-rewritten spelling ({{fake.string.uuid}}),
 // so an object-form request using a Postman dynamic-variable alias in its url/header/body always
@@ -518,8 +518,8 @@ func TestObjectFormAliasesRoundTripUntouchedAndSurviveShedOrigin(t *testing.T) {
 	})
 }
 
-// TestExportStripsLocalFilePathsToTheirBaseName is P21 round 3 architecture/security finding 9:
-// buildBody (the "the body actually changed" branch) used to write a formdata file row's or a
+// TestExportStripsLocalFilePathsToTheirBaseName: buildBody (the "the body actually changed" branch)
+// used to write a formdata file row's or a
 // file-mode body's real absolute local Path straight into `src` — the exact opposite of import's
 // own rule, applied a few lines above in this same file, that src is never trustworthy and Path
 // stays empty on the way in. An export is a share artefact; the absolute path discloses the OS
@@ -763,9 +763,9 @@ func TestMalformedItemsAreSkippedOrClassifiedStructurally(t *testing.T) {
 	}
 }
 
-// ---- 9. An export re-imports to the same tree ----
+// ---- An export re-imports to the same tree ----
 //
-// The bar §6.4 step 2 sets — "import that file into Postman" — needs real Postman. This is the
+// The bar — "import that file into Postman" — needs real Postman. This is the
 // half that can be checked here: whatever Write emits, Parse reads back as the same tree, so an
 // export can never be a file this app itself would refuse or read differently. It runs over every
 // fixture in the corpus rather than one, since each isolates a different shape.

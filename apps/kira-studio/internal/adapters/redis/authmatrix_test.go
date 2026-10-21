@@ -66,7 +66,7 @@ func TestRedis_AuthMatrix(t *testing.T) {
 						},
 					}},
 				}, 1),
-				// finding 10: the write above left its key behind in the shared container —
+				// The write above left its key behind in the shared container —
 				// mongo's own equivalent write scenario cleans up after itself
 				// (mongo/authmatrix_test.go's "the authSource-fixed connection can actually
 				// write"); mirrored here as a plain delete rather than folded into the write
@@ -91,9 +91,9 @@ func TestRedis_AuthMatrix(t *testing.T) {
 		},
 		{
 			// Deviation from the plan's own row: it asserts "~* +@read" connects post-fix. Verified
-			// against a real container that it still does not — PING (§1.3's own "left fatal,
+			// against a real container that it still does not — PING (the "left fatal,
 			// deliberately") is in Redis's @connection/@fast categories, not @read, so a bare
-			// +@read grant was never enough even before this phase, matching §1.3's own transcript
+			// +@read grant was never enough even before this phase, matching the transcript
 			// for "~* +@read +client|setname" (still NOPERM on ping there too, pre-fix). Dropping
 			// ClientName only removed the *first* blocker for a read-only ACL; PING remains one.
 			// This row now asserts the real, current behaviour rather than the plan's claim.
@@ -115,15 +115,13 @@ func TestRedis_AuthMatrix(t *testing.T) {
 			Expect: testsupport.Outcome{Succeed: true},
 			Then: []testsupport.Scenario{
 				{
-					// Deviation from the plan's own row: redis/errors.go's authPrefixRE maps
-					// *every* NOPERM (command-category or key-pattern) to E_AUTH, not merely a
-					// credential failure — verified directly. So a permission refusal from a
-					// missing keyspace pattern still surfaces as E_AUTH today, the same as it did
-					// before this phase; §1.3's fix only concerned Connect's own probe sequence,
-					// not this broader "every NOPERM is E_AUTH" mapping, which is a real
-					// permission/auth conflation of its own but outside this phase's scope. This
-					// case is left asserting the real, current behaviour rather than the
-					// not-yet-true "not E_AUTH" the plan's own row states.
+					// redis/errors.go's authPrefixRE maps *every* NOPERM (command-category or
+					// key-pattern) to E_AUTH, not merely a credential failure — verified directly.
+					// So a permission refusal from a missing keyspace pattern still surfaces as
+					// E_AUTH today; the fix only concerned Connect's own probe sequence, not this
+					// broader "every NOPERM is E_AUTH" mapping, which is a real permission/auth
+					// conflation of its own. This case is left asserting the real, current
+					// behaviour rather than the not-yet-true "not E_AUTH".
 					Name: "Read of a key fails, and today that is coded E_AUTH (not yet distinguished from a credential failure)",
 					Run: func(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig) {
 						_, err := a.Read(context.Background(), adapters.ReadRequest{

@@ -7,7 +7,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// P28 D19: the rewrite earns a test where the rest of this batch does not — it edits user data at
+// The rewrite earns a test where the rest of this batch does not — it edits user data at
 // import across five field families, and the rules interact (whole-name match, an unmapped alias
 // left alone, an unterminated reference, several per string). The alias table itself is guarded
 // against drifting from its TypeScript twin by go-ts-api-parity.spec.ts, not from here.

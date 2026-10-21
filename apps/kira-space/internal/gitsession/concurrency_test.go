@@ -13,15 +13,15 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 )
 
-// This file is G8's own concurrency tier (D9): every test here is designed to fail only for a
-// concurrency reason (ordering, a lost release, a double-close, a race on shared state) and is run
-// at `-race -count=10` by name (every test here begins TestConcurrent, D16's own filter). Each of
-// the first several reproduces one of G8's findings on the pre-fix tree — the exact pre-fix output
-// is quoted in its own comment so a future reader can tell a regression test from a speculative one.
+// This file is the concurrency tier: every test here is designed to fail only for a concurrency
+// reason (ordering, a lost release, a double-close, a race on shared state) and is run at
+// `-race -count=10` by name (every test here begins TestConcurrent, the filter). Each of the first
+// several reproduces one of the findings on the pre-fix tree — the exact pre-fix output is quoted
+// in its own comment so a future reader can tell a regression test from a speculative one.
 
-// TestConcurrent_OpenAfterCloseIsARelease is F1's deterministic ordering: Close() then Open() for
+// TestConcurrent_OpenAfterCloseIsARelease is the deterministic ordering: Close() then Open() for
 // the same connection must release rather than store the ref Open takes, and the caller still gets
-// a correct summary back. On the pre-fix tree this leaves refs=1 forever (F1's own probe: "after
+// a correct summary back. On the pre-fix tree this leaves refs=1 forever (the probe: "after
 // Close-then-Open: entry present=true refs=1 heldLen=1").
 func TestConcurrent_OpenAfterCloseIsARelease(t *testing.T) {
 	reg := newTestRegistry()
@@ -56,7 +56,7 @@ func TestConcurrent_OpenAfterCloseIsARelease(t *testing.T) {
 	}
 }
 
-// TestConcurrent_OpenRacingCloseNeverLeaksAHold is F1's own probe, promoted to a permanent
+// TestConcurrent_OpenRacingCloseNeverLeaksAHold is the probe, promoted to a permanent
 // regression test: 200 iterations of a real Open racing a real Close on the same connection. On
 // the pre-fix tree this reproduced "leaked holds in 200 Open/Close races: 160" — an Open that wins
 // the race against Close's map swap stores its hold into the map Close already replaced, and
@@ -111,8 +111,8 @@ func TestConcurrent_OpenRacingCloseNeverLeaksAHold(t *testing.T) {
 	}
 }
 
-// TestConcurrent_SubscribeRacingTeardown is F2(a)'s own probe: 200 iterations of a real Subscribe
-// racing a real Registry.Close (which tears entries down regardless of refcount, D14) — reachable
+// TestConcurrent_SubscribeRacingTeardown is the probe: 200 iterations of a real Subscribe
+// racing a real Registry.Close (which tears entries down regardless of refcount) — reachable
 // whenever a repo.open/repo.close is still in flight when the app quits. On the pre-fix tree this
 // panics with "assignment to entry in nil map" the moment Subscribe's own critical section runs
 // after teardown has already nilled e.subs.
@@ -140,7 +140,7 @@ func TestConcurrent_SubscribeRacingTeardown(t *testing.T) {
 	}
 }
 
-// TestConcurrent_UnsubscribeAfterTeardown is F2(b)'s own probe: a Subscribe that completes BEFORE
+// TestConcurrent_UnsubscribeAfterTeardown is the probe: a Subscribe that completes BEFORE
 // teardown, whose unsubscribe is then called AFTER teardown already closed every subscriber it
 // found. On the pre-fix tree this panics with "close of closed channel" — teardown's own close and
 // this unsubscribe's close both fire on the same subscriber.
@@ -158,8 +158,8 @@ func TestConcurrent_UnsubscribeAfterTeardown(t *testing.T) {
 	}
 }
 
-// TestConcurrent_SubscribeSameConnNeverOrphansTheWinner is F3's own regression proof (P108 Part 16
-// review, its own probe: 8 concurrent Opens x 200 trials, 27/200 ended with zero subscribers).
+// TestConcurrent_SubscribeSameConnNeverOrphansTheWinner is the regression proof (probe: 8
+// concurrent Opens x 200 trials, 27/200 ended with zero subscribers).
 // Two (or more) concurrent Subscribe calls for the SAME conn id — conn.Open's own real race, two
 // repo.open requests for one repo dispatched on their own goroutines by rpcstream, each calling
 // entry.Subscribe(c.ID, ...) before either learns which one "wins" c.held — used to collide on
@@ -221,7 +221,7 @@ func TestConcurrent_SubscribeSameConnNeverOrphansTheWinner(t *testing.T) {
 	}
 }
 
-// TestConcurrent_CatFileAfterTeardownIsRefused is F3's own probe: CatFile() after teardown must
+// TestConcurrent_CatFileAfterTeardownIsRefused is the probe: CatFile() after teardown must
 // return nil (never a live, unmemoised session nothing will ever close) so its callers can refuse
 // with ErrRepoTornDown instead of leaking a `cat-file --batch` pair. On the pre-fix tree this
 // returns a fresh, live session every time.
@@ -242,8 +242,8 @@ func TestConcurrent_CatFileAfterTeardownIsRefused(t *testing.T) {
 	}
 }
 
-// TestConcurrent_AutoFetchArmsOnOpen is F4's own probe: a repository opened while the auto-fetch
-// interval reads as 0 gets no timer at construction (correct); the off→on direction is what G7's
+// TestConcurrent_AutoFetchArmsOnOpen is the probe: a repository opened while the auto-fetch
+// interval reads as 0 gets no timer at construction (correct); the off→on direction is what the
 // startAutoFetch-only-from-newRepoEntry wiring never handled — on the pre-fix tree no LATER Open,
 // however many windows, ever arms one. A second Open (already armed) must arm no second timer, and
 // an entry `disabled` by a real fetch failure must never be resurrected by an Open.
@@ -311,7 +311,7 @@ func TestConcurrent_AutoFetchArmsOnOpen(t *testing.T) {
 	}
 }
 
-// TestConcurrent_RemoteOpSlotAdmitsExactlyOne is F9's own pin: opSlot.claim is a
+// TestConcurrent_RemoteOpSlotAdmitsExactlyOne is the pin: opSlot.claim is a
 // mutex-guarded CAS, and the existing gitflow coverage already drives it with a
 // genuinely in-flight op — what nothing exercises is N goroutines calling claim at the SAME
 // instant. Already correct today; this locks it in under real concurrency rather than a sequential
@@ -359,7 +359,7 @@ func TestConcurrent_RemoteOpSlotAdmitsExactlyOne(t *testing.T) {
 	slot.release()
 }
 
-// TestConcurrent_WalkPairIsolationUnderLoad is G6 D3's own pin under real concurrency, which its
+// TestConcurrent_WalkPairIsolationUnderLoad is the pin under real concurrency, which its
 // single-threaded coverage cannot give: paging the graph walk and the review walk on the same Conn
 // simultaneously, 100 iterations each, must never let one reset the other's store or run its
 // nextSeq backwards.

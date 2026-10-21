@@ -55,10 +55,10 @@ func TestCommandRoundTripsThroughShell(t *testing.T) {
 	}
 }
 
-// TestInstallRefusesRelativeHeaderHelperPath guards F10's other half: a relative helperPath
-// resolves against Claude Code's own cwd, not Kira's (reachable when os.UserHomeDir fails and
-// kirapaths.Home falls back to a relative path) — Install must refuse outright rather than
-// register a headersHelper that silently reads the wrong file.
+// TestInstallRefusesRelativeHeaderHelperPath: a relative helperPath resolves against
+// Claude Code's own cwd, not Kira's (reachable when os.UserHomeDir fails and kirapaths.Home falls
+// back to a relative path) — Install must refuse outright rather than register a headersHelper
+// that silently reads the wrong file.
 func TestInstallRefusesRelativeHeaderHelperPath(t *testing.T) {
 	ran := false
 	installer := New(Deps{

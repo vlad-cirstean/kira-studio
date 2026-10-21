@@ -77,10 +77,10 @@ func Subtract(a, b []LineRange) []LineRange {
 	return Normalize(out)
 }
 
-// Expand turns the "full" state into its concrete range — D10's own "Expand is the only thing
-// that turns [state=full] into a materialised [1..N]", used solely by an unmark of part of a
-// fully-reviewed file (the one path that needs a concrete range to subtract from). lineCount <= 0
-// (a non-text record, or a genuinely empty file) expands to nothing.
+// Expand turns the "full" state into its concrete range — "Expand is the only thing that turns
+// [state=full] into a materialised [1..N]", used solely by an unmark of part of a fully-reviewed
+// file (the one path that needs a concrete range to subtract from). lineCount <= 0 (a non-text
+// record, or a genuinely empty file) expands to nothing.
 func Expand(lineCount int) []LineRange {
 	if lineCount <= 0 {
 		return nil

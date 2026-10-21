@@ -18,11 +18,11 @@ func init() {
 }
 
 // connState is every field Connect/Disconnect write concurrently with an in-flight op reading them
-// (F3) — a real, race-detector-confirmed data race, not a theoretical one, the same class P58b
-// M6.1 already found for the running-query bookkeeping below (tracker's own, unrelated to this
-// state: pgx's own *Conn is not safe for concurrent use, and closing one mid-Query, were Disconnect
-// to race a still-in-flight query, is what tracker.Drain() itself guards against — see its own doc
-// comment). Guarded together via adapters.Guarded (P113 G1); shared with mysqlfamily's identical
+// — a real, race-detector-confirmed data race, not a theoretical one, the same class already found
+// for the running-query bookkeeping below (tracker's own, unrelated to this state: pgx's own *Conn
+// is not safe for concurrent use, and closing one mid-Query, were Disconnect to race a
+// still-in-flight query, is what tracker.Drain() itself guards against — see its own doc
+// comment). Guarded together via adapters.Guarded; shared with mysqlfamily's identical
 // shape via relational.ConnState.
 type connState = relational.ConnState[*ConnSet]
 
@@ -35,7 +35,7 @@ type Adapter struct {
 	tracker adapters.QueryTracker[RunningQuery]
 }
 
-// setConnSet is Connect's own locked write of ConnSet/Cfg together (F3) — P13 D1: assigned before
+// setConnSet is Connect's own locked write of ConnSet/Cfg together — assigned before
 // anything is opened, not after the probe succeeds, so the handle is reachable by Disconnect from
 // the instant connSet.Primary() could have opened a socket, and a probe failure (or a dropped
 // session mid-probe) never leaks it.
@@ -102,7 +102,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 }
 
 // Disconnect is index.ts's disconnect — relational.Disconnect carries the body shared with
-// mysqlfamily's identical Disconnect (P113 G1): F4's cancel-then-drain sequencing, nothing else
+// mysqlfamily's identical Disconnect: the cancel-then-drain sequencing, nothing else
 // makes RunWithAbortRace's own background goroutines (inFlight's own doc comment) stop touching
 // their connection, and Drain's own wait is bounded by ctx rather than able to block this call for
 // as long as the longest still-running query.
@@ -173,7 +173,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 
 	objectSegment := segments[2]
 	if len(segments) == 3 {
-		// Rule 5 (Adapter doc comment): Children returns [] for a leaf, never an error. P19 D5:
+		// Children returns [] for a leaf, never an error.
 		// table/view/matview are leaves too now — their columns moved into the definition view,
 		// and catalog.go's own hasChildren:false for relations is what keeps the tree from ever
 		// showing a twisty here in the first place.
@@ -419,7 +419,7 @@ func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 	return cancelled, nil
 }
 
-// trackerFor is index.ts's trackerFor (P13 D3): registers the running query and hands back its
+// trackerFor is index.ts's trackerFor: registers the running query and hands back its
 // own release. The identity check in the release closure is what makes a multi-statement op
 // (mutate's BEGIN/…/COMMIT, console's "Run all") correct — an earlier statement settling after a
 // later one has started must not unregister the later one, since both share this one opId.

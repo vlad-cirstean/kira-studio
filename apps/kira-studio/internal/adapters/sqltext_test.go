@@ -10,7 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// Ported one for one from tests/unit/sql-text.spec.ts (P44 F44) — see that file's own header for
+// Ported one for one from tests/unit/sql-text.spec.ts — see that file's own header for
 // why these cases exist (computeEffectiveOrder/decodePageToken are reached by seven adapters and
 // named in no live-server spec; the eligible-and-correct path is the only one Testcontainers-backed
 // suites ever exercise).
@@ -103,11 +103,11 @@ func TestComputeEffectiveOrder_TiebreakerAppendedDeduped(t *testing.T) {
 	}
 }
 
-// P2 R2 (task #89): a requested sort column that is nullable disqualifies keyset pagination even
+// A requested sort column that is nullable disqualifies keyset pagination even
 // though a tiebreaker is present — `(col, pk) > (val, pk)` is SQL-UNKNOWN wherever col IS NULL, so
 // a naive grant here would either silently drop every NULL row from all keyset pages forever, or
-// hard-fail a page whose boundary row has a NULL sort value. D7 only required the tiebreaker
-// itself to be non-nullable; it never checked the user's own requested sort columns.
+// hard-fail a page whose boundary row has a NULL sort value. Only the tiebreaker itself had to be
+// non-nullable; the user's own requested sort columns were never checked.
 func TestComputeEffectiveOrder_NullableSortColumnDisqualifiesKeyset(t *testing.T) {
 	columns := []model.ColumnMeta{col("id", 0, true), nullableCol("name", 1), col("created_at", 2, false)}
 	sort := structuredSort(model.SortTerm{Column: "name", Direction: "asc"})
@@ -130,7 +130,7 @@ func TestComputeEffectiveOrder_NullableSortColumnDisqualifiesKeyset(t *testing.T
 	}
 }
 
-// Finding F11: BuildOrderBy (called from BuildScanOrderBy) uppercases Direction into the ORDER BY
+// BuildOrderBy (called from BuildScanOrderBy) uppercases Direction into the ORDER BY
 // text, so an upper-case or mixed-case direction still *builds* correct SQL there — but the keyset
 // comparison operator/reversal logic (BuildKeysetPredicate) compares the exact lowercase literal
 // "asc", never normalizing case itself. Pre-fix, "ASC" sailed through ComputeEffectiveOrder,
@@ -163,7 +163,7 @@ func TestComputeEffectiveOrder_InvalidDirectionRejected(t *testing.T) {
 }
 
 // The exact operator-mismatch BuildKeysetPredicate itself would have produced had an upper-case
-// direction ever reached it (confirming F11's own "silent mispaging", not just a rejected input,
+// direction ever reached it (confirming the "silent mispaging", not just a rejected input,
 // is what ComputeEffectiveOrder's new guard prevents): "after" with the lowercase-correct "asc"
 // picks ">", but the same "after" with "ASC" — never matching the lowercase-only comparison —
 // wrongly picks "<", reversing the page's own scan direction.
@@ -428,7 +428,7 @@ func TestWhereClause_TrailingLineCommentDoesNotEatClosingParen(t *testing.T) {
 	}
 }
 
-// P108 Part 11 F5: a console statement whose own last line ends in a line comment used to have its
+// A console statement whose own last line ends in a line comment used to have its
 // joining ";\n" separator land on that same line — the ";" reads as part of the comment, and
 // sql-split.ts's own re-split then merges this statement with the next one (Operations panel
 // re-run). JoinConsoleStatements must insert an extra "\n" whenever that would happen, for every

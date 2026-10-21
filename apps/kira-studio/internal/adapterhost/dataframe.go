@@ -13,10 +13,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
 )
 
-// This file is bridge/stream.go's real subject after M4 (§4.10): the data plane stops being a
+// This file is bridge/stream.go's real subject: the data plane stops being a
 // byte forwarder and becomes a server. A frame from the renderer is parsed just enough to decide
 // routing (op, and for a connection-scoped op, its connectionId) — never fully, and never at all
-// for a frame the router only relays. Requests arrive as JSON text (P11 D3); responses, errors and
+// for a frame the router only relays. Requests arrive as JSON text; responses, errors and
 // events leave through frame.go as FlatBuffers frames.
 
 // AttachStream makes conn the current renderer connection: a Session (A18's single writer)
@@ -45,9 +45,9 @@ func (r *Router) pushCacheStats(session *Session, stats enginecache.CacheStats) 
 }
 
 // HandleDataFrame is rpc.ts's dispatch, reimagined as a router: ping is answered in-process — the
-// engine is this process now (P58f D11); cache:stats/cache:clear are not connection-scoped (A16);
-// every other op is served in-process too, since every kind has been native since P58e M9.3
-// (P58f Phase 4 deleted the Node child this used to forward a non-native kind's op to).
+// engine is this process now; cache:stats/cache:clear are not connection-scoped;
+// every other op is served in-process too, since every kind has been native
+// (deleted the Node child this used to forward a non-native kind's op to).
 func (r *Router) HandleDataFrame(session *Session, frame []byte) {
 	var probe struct {
 		Kind    string          `json:"kind"`
@@ -92,7 +92,7 @@ func (r *Router) HandleDataFrame(session *Session, frame []byte) {
 }
 
 // HandleDataFrameAsync is ServeEngineStream's own per-frame dispatch: HandleDataFrame runs on its
-// own goroutine so a slow op never serialises behind it, but bounded (P2 R1) — it blocks until a
+// own goroutine so a slow op never serialises behind it, but bounded — it blocks until a
 // concurrency slot is free (or the session closes) before spawning, so a burst of frames can't grow
 // goroutines/driver work without bound. Returns immediately (without spawning) once the session has
 // closed, matching every other session-scoped operation's own no-op-after-close contract.
@@ -200,7 +200,7 @@ func (r *Router) handleDataOp(session *Session, op string, id int, payload json.
 // maxResponsePayloadBytes leaves generous room for the frame's own envelope (kind/id/ok) below
 // session.go's hard maxDataFrameBytes cap — resp is checked against this before ever reaching the
 // queue, so a payload that would be silently unrepresentable there is turned into an error response
-// instead of a frame that can never be delivered (P2 R1: a dropped response has no other way to
+// instead of a frame that can never be delivered (a dropped response has no other way to
 // ever settle its pending request, per enqueueResponse's own doc comment).
 const maxResponsePayloadBytes = maxDataFrameBytes - 4096
 
@@ -230,12 +230,12 @@ func (r *Router) respond(session *Session, id int, payload any, err error) {
 		r.respondError(session, id, err)
 		return
 	}
-	// A9/P21 round 1: a page's own byte size is already known before encoding (it's exactly what
-	// estimateFrameSize below uses to pre-size the FlatBuffers builder, docs/PERF.md §2.8) — an
-	// oversized page used to be fully built into a frame (~1.06x the page's own size, tens of MB
-	// for a pathological one) purely to be discarded by the post-encode check further down. The
-	// post-encode check stays as the correctness backstop for every payload type this estimate
-	// doesn't cover (or underestimates).
+	// A page's own byte size is already known before encoding (it's exactly what estimateFrameSize
+	// below uses to pre-size the FlatBuffers builder, docs/PERF.md) — an oversized page used to be
+	// fully built into a frame (~1.06x the page's own size, tens of MB for a pathological one)
+	// purely to be discarded by the post-encode check further down. The post-encode check stays as
+	// the correctness backstop for every payload type this estimate doesn't cover (or
+	// underestimates).
 	if oversizedPagePayload(payload) {
 		r.deps.Log("error", "response frame exceeds the size limit, substituting an error response")
 		r.respondError(session, id, adapters.T(adapters.CodeQuery, "backend.studio.adapter.responseTooLarge.body", nil, nil))
@@ -258,7 +258,7 @@ func (r *Router) respond(session *Session, id int, payload any, err error) {
 // oversizedPagePayload answers the size question estimateFrameSize already knows how to compute,
 // before encodePayload ever runs — the same two payload shapes (ReadResponse/ExecuteResponse)
 // that shape already special-cases, since those are the ones whose size the app doesn't have to
-// guess at (page.Page.Size() is measured, not estimated, per docs/PERF.md §2.2).
+// guess at (page.Page.Size() is measured, not estimated, per docs/PERF.md).
 func oversizedPagePayload(payload any) bool {
 	switch v := payload.(type) {
 	case ReadResponse:

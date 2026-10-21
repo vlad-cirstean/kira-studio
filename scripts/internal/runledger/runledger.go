@@ -60,7 +60,7 @@ func TotalCharged(dir string) float64 {
 var (
 	refusalRe   = regexp.MustCompile(`the limit is|splits into|too many facts|spend cap|invalid`)
 	capSpentRe  = regexp.MustCompile(`([0-9.]+) USD spent`)
-	rateLimitRe = regexp.MustCompile(`(?i)rate.?limit|usage limit|\b429\b|overloaded|too many requests|limit reached`)
+	rateLimitRe = regexp.MustCompile(`(?i)rate.?limit|usage limit|session limit|hit your .* limit|\b429\b|overloaded|too many requests|limit reached`)
 )
 
 func IsRateLimit(err error) bool { return rateLimitRe.MatchString(err.Error()) }

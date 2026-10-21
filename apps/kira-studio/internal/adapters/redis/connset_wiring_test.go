@@ -11,9 +11,9 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 )
 
-// White-box (package redis) coverage for newDbConnectionSet's own wiring onto adapters.ConnSet
-// (P107 T2-2): the LRU/single-flight behaviour itself is covered once, generically, by
-// internal/adapters's own connset_test.go — this just confirms get (via the real Dial/Close
+// White-box (package redis) coverage for newDbConnectionSet's own wiring onto adapters.ConnSet:
+// the LRU/single-flight behaviour itself is covered once, generically, by
+// internal/adapters's own connset_test.go — this confirms get (via the real Dial/Close
 // closures newDbConnectionSet builds) still serializes concurrent dials for the same db index with
 // no real Redis server needed.
 func TestGet_SingleFlightPerDbIndex(t *testing.T) {

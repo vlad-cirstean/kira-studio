@@ -1,6 +1,6 @@
-// authmatrix_test.go is the complete (Tier 2) suite's own table for sqlite — P25 §2.9. SQLite has
-// no credentials at all (Username/Password are never read, §1.6), so its permutation axis is path
-// handling, not auth. File-permission cases are declined per §1.6/§2.9: this sandbox runs as root,
+// authmatrix_test.go is the complete suite's own table for sqlite. SQLite has
+// no credentials at all (Username/Password are never read), so its permutation axis is path
+// handling, not auth. File-permission cases are declined: this sandbox runs as root,
 // which bypasses file modes entirely, so no claim is made either way.
 package sqlite_test
 
@@ -50,7 +50,7 @@ func TestSqlite_AuthMatrix(t *testing.T) {
 				// mutate.go:64's own adapters.AssertWritable(readOnly) guard refuses before any
 				// statement reaches the driver — the app-layer check, not sqlite/errors.go:44-45's
 				// driver-level SQLITE_READONLY (code 8) mapping; the sibling ExecuteIsRefused below
-				// is the one that actually reaches the driver's own readOnly case.
+				// is the one that reaches the driver's own readOnly case.
 				testsupport.MutateIsRefused(model.MutationPlan{
 					Path: testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "main"), testsupport.Seg("table", "regions")),
 					Ops: []model.MutationRowOp{{
@@ -120,7 +120,7 @@ func TestSqlite_AuthMatrix(t *testing.T) {
 		{
 			// SQLite is the only engine where "two connections, one file" is an ordinary user
 			// situation (two windows on the same database) — and the only adapter for which the DDL
-			// catalog round trip §3.3(3) already proves is also a *file* round trip: a second, wholly
+			// catalog round trip already proves is also a *file* round trip: a second, wholly
 			// independent connection must see what the first one's own Execute created.
 			Name:   "the seeded file, read-write (two connections)",
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig { return c },

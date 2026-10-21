@@ -31,9 +31,9 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// DefaultPort is the one port this instance ever binds (§3.2) — there is at most one instance per
+// DefaultPort is the one port this instance ever binds — there is at most one instance per
 // KIRA_HOME in practice, and bindHTTP refuses to start rather than silently fall back to an
-// ephemeral port when it is taken (F11): every existing registration names this port, and a
+// ephemeral port when it is taken: every existing registration names this port, and a
 // fallback would leave it pointing at whatever else is now listening there.
 const DefaultPort = 8766
 
@@ -69,7 +69,7 @@ type QueryRunner interface {
 	ClassifyStatement(ctx context.Context, connectionID, statement string) (adapters.OpClass, error)
 }
 
-// MaskRules is dbmcp's own consumer-declared interface over *maskrules.Service (M5 §4.6). A nil
+// MaskRules is dbmcp's own consumer-declared interface over *maskrules.Service. A nil
 // Config.MaskRules is a construction error, not a default (New rejects it, the same way it rejects
 // a nil Approvals): a silently-nil masker would mean every query returns unmasked data with
 // nothing surfacing, exactly the failure mode ExplainThreshold's own comment above guards against
@@ -122,7 +122,7 @@ type Server struct {
 
 	// tokenMu guards token: Regenerate (bridge.DbMcpService's own restart-recovery action) mutates
 	// it on a live, already-serving instance, concurrently with tokenVerifier reading it on every
-	// in-flight request (http.go). F8: the plaintext is never held here beyond New's own call —
+	// in-flight request (http.go). The plaintext is never held here beyond New's own call —
 	// bridge.dbMcpTokenProviderFor persists it to the helper token mirror file itself before
 	// returning it, and the "can Command/Install show" gate reads that file back and verifies it
 	// against TokenRecord() below, rather than an in-memory "this run minted a fresh token" flag
@@ -254,7 +254,7 @@ func (s *Server) buildMCPServer() *mcp.Server {
 	return srv
 }
 
-// withPanicRecovery wraps every MCP tool handler mcp.AddTool registers (F7): go-sdk v1.8.0 runs
+// withPanicRecovery wraps every MCP tool handler mcp.AddTool registers: go-sdk v1.8.0 runs
 // each request in its own goroutine with no recover() anywhere in the module, so an unguarded nil
 // deref or index panic in any handler — render.go scanning client SQL, queryplan parsing server
 // EXPLAIN output, a mask transform, a tree.Service call — kills the whole desktop app, including
@@ -278,7 +278,7 @@ func withPanicRecovery[In any](s *Server, name string, h func(context.Context, *
 }
 
 // TokenRecord returns the currently-held auth record (hash+salt+expiry, never the plaintext) —
-// F8's own gate seam: bridge.DbMcpService checks Command/Install availability by reading the
+// the gate seam: bridge.DbMcpService checks Command/Install availability by reading the
 // helper token mirror file back and verifying it against this record, not an in-memory
 // "this run minted" flag.
 func (s *Server) TokenRecord() mcpauth.Record {
@@ -297,7 +297,7 @@ func (s *Server) TokenExpiry() time.Time {
 
 // SetToken replaces this instance's own live auth record — bridge.DbMcpService's Regenerate
 // action, safe to call while requests are in flight: the very next request is checked against the
-// new record, never a stale in-memory copy. The plaintext itself is not stored here (F8) — the
+// new record, never a stale in-memory copy. The plaintext itself is not stored here — the
 // caller persists it to the helper token mirror file itself, the same file the gate above reads
 // back.
 func (s *Server) SetToken(rec mcpauth.Record) {

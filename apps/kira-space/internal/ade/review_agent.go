@@ -12,10 +12,10 @@ import (
 // reviewStepID is the id of the manual review step; ▶ Review there opens the review agent.
 const reviewStepID = "review"
 
-// launchReviewAgent is the one launcher of a task's review agent: a new conversation, or the stopped
-// one resumed with fresh --add-dir directories. message is the user's first message ("" = none on a
-// resume, the composed review message on a new launch). step, when set, adds its prompt to the
-// composed message. The task mutex is held.
+// launchReviewAgent is the one launcher of a task's review agent: a new conversation, or the
+// stopped one resumed with fresh --add-dir directories. message is the user's first message ("" =
+// none on a resume, the composed review message on a new launch). step, when set, adds its prompt
+// to the composed message. The task mutex is held.
 func (b *TaskBoard) launchReviewAgent(ctx context.Context, tc *taskCtx, tr *Tracker, message string, step *adewire.WorkflowStep) (adewire.Launch, bool, string, error) {
 	row, err := b.deps.Sessions.ReviewAgent(tc.task.ID)
 	if err != nil {

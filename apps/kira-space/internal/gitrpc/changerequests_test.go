@@ -51,11 +51,11 @@ func activationGit(t *testing.T, dir string, args ...string) {
 	}
 }
 
-// TestActivation_ZeroHostSpawnsUntilResolveChangeRequest is D13's own exit criterion 7, verbatim: driving
-// app.init, repo.open, refs.list, graph.loadMore, status.get and commit.detail against a COUNTING
-// fake github.Runner must produce EXACTLY ZERO spawns of any kind — this feature probes nothing,
-// spawns nothing, and caches nothing until the very first commit.resolveChangeRequests/branch.resolveChangeRequest a
-// client actually makes.
+// TestActivation_ZeroHostSpawnsUntilResolveChangeRequest: driving app.init, repo.open, refs.list,
+// graph.loadMore, status.get and commit.detail against a COUNTING fake github.Runner must produce
+// EXACTLY ZERO spawns of any kind — this feature probes nothing, spawns nothing, and caches
+// nothing until the very first commit.resolveChangeRequests/branch.resolveChangeRequest a client
+// makes.
 func TestActivation_ZeroHostSpawnsUntilResolveChangeRequest(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")

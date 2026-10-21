@@ -27,11 +27,11 @@ type HttpService struct {
 }
 
 // HttpSendArgs carries httpclient.Request's fields plus the op-log addressing every op needs
-// (OpID minted by the renderer, exactly as every data-plane op's already is — F16; TabID so the
-// Operations panel can resolve a tab column for a connectionless op, F9). CollectionID/
-// EnvironmentID are P5 D6's own addition — both possibly empty (a scratch tab has no collection;
-// no environment may be selected) — and are used for exactly one thing: naming the scope stage 2
-// resolves secrets against.
+// (OpID minted by the renderer, exactly as every data-plane op's already is; TabID so the
+// Operations panel can resolve a tab column for a connectionless op). CollectionID/
+// EnvironmentID are both possibly empty (a scratch tab has no collection; no environment may be
+// selected) and are used for exactly one thing: naming the scope stage 2 resolves secrets
+// against.
 type HttpSendArgs struct {
 	OpID          string              `json:"opId"`
 	TabID         string              `json:"tabId"`
@@ -41,10 +41,9 @@ type HttpSendArgs struct {
 	Body          httpclient.Body     `json:"body"`
 	CollectionID  string              `json:"collectionId"`
 	EnvironmentID string              `json:"environmentId"`
-	// ItemID is P8 D2's own addition: the saved request this tab is bound to, or "" for a
-	// scratch tab — supplied by state.ts's send() as tab.state.itemId ?? '' (the tab already
-	// knows it, http.ts:208), and used for exactly one thing, recording a response-history
-	// entry under the right scope.
+	// ItemID is the saved request this tab is bound to, or "" for a scratch tab — supplied by
+	// state.ts's send() as tab.state.itemId ?? '' (the tab already knows it, http.ts:208), and used
+	// for exactly one thing, recording a response-history entry under the right scope.
 	ItemID string `json:"itemId"`
 	// Incognito is P71 §4: mirrors ItemID's optional-on-the-TS-side shape (default false on the
 	// zero value). Suppresses the response-history Record call below and rides along on the op
@@ -55,15 +54,15 @@ type HttpSendArgs struct {
 	Options httpclient.Options `json:"options"`
 }
 
-// Send runs one HTTP request through Host.RunOp with ConnectionID: nil (D3, proven safe by F10 —
+// Send runs one HTTP request through Host.RunOp with ConnectionID: nil (proven safe —
 // both connection-dependent branches in RunOp/CancelOp already self-guard on a nil connection
 // id). ctx is Wails-injected (the method's first parameter is context.Context, bindings.go's
 // needsContext), so closing the window mid-request aborts it via CancelWindowCalls; RunOp derives
 // its own cancellable context from it, which is what the Stop button's opsCancel path (the app's
-// existing cancel mechanism, not Wails' own $CancellablePromise, per F11/D3) actually cancels.
+// existing cancel mechanism, not Wails' own $CancellablePromise) cancels.
 //
 // A non-2xx response is not a Go error, so RunOp naturally logs it 'ok' — the op is the exchange,
-// and a 404 is what testing an endpoint is for (D3). op.SetCommand carries the human-readable
+// and a 404 is what testing an endpoint is for. op.SetCommand carries the human-readable
 // outcome for the Operations panel: the method+URL before send, overwritten with "→ status text"
 // once the response is known.
 func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.Response, error) {
@@ -88,7 +87,7 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 
 	_, value, err := s.Deps.Router.Host().RunOp(ctx, spec,
 		func(runCtx context.Context, op *adapters.OpCtx) (any, error) {
-			// P5 D6/F3: op.SetCommand is called with the *unresolved* URL, both times — op_log.
+			// op.SetCommand is called with the *unresolved* URL, both times — op_log.
 			// command is a persisted SQLite column rendered in the Operations panel, and a
 			// {{token}} in a URL is exactly the kind of thing a user puts a credential in.
 			// Resolving secrets before this line would write a plaintext credential into
@@ -104,8 +103,8 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 				return nil, resolveErr
 			}
 
-			// P108 F12: opts is built once, before usedSecrets is known — a per-send copy carries
-			// the replacer wire.go needs to mask a body BEFORE truncating it to D4's cap, not
+			// opts is built once, before usedSecrets is known — a per-send copy carries
+			// the replacer wire.go needs to mask a body BEFORE truncating it to the cap, not
 			// after (the old order could leave an unmasked secret prefix when a secret straddled
 			// the cut byte). nil (secretReplacer's own "nothing to mask" case) is exactly opts'
 			// existing zero value, so a request using no secret costs nothing extra.
@@ -118,8 +117,8 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 				Body:    body,
 			}, sendOpts)
 			if sendErr != nil {
-				// P10 D14/D15: a failed send's own Timeline (classifySendErr always attaches one,
-				// C2) carries the same resolved hop URLs a successful send's does, and mapHttpError
+				// A failed send's own Timeline (classifySendErr always attaches one) carries the
+				// same resolved hop URLs a successful send's does, and mapHttpError
 				// — outside this closure, past where usedSecrets goes out of scope — is what turns
 				// it into ipcerr.Error.Details, a copyable surface. Masked here, the one place that
 				// still has usedSecrets, rather than never masked at all.
@@ -128,21 +127,20 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 			}
 			op.SetCommand(fmt.Sprintf("%s %s → %d %s", args.Method, args.URL, resp.Status, resp.StatusText))
 
-			// P9 D6, widened by P10 D14/F16: the rendered exchange, the timeline's hop URLs and
-			// hop headers, and Redirects/FinalURL are all built from the *resolved* request or a
-			// resolved redirect chain, so every one of them carries a secret's plaintext — the
-			// exact situation P7 D10 already ruled on for a generated curl command (a copyable
-			// text surface), and F16 found that Redirects[].URL/FinalURL have been persisted to
-			// kira.sqlite unmasked since P8 landed. Masked here, at the point the values are
-			// already known, rather than inventing a second reveal gate (OQ-4): a secret's
-			// plaintext must never reach a copyable surface ungated, nor kira.sqlite outside
-			// api_variables.secret_value (§0.3).
+			// The rendered exchange, the timeline's hop URLs and hop headers, and
+			// Redirects/FinalURL are all built from the *resolved* request or a resolved redirect
+			// chain, so every one of them carries a secret's plaintext — the exact situation
+			// already ruled on for a generated curl command (a copyable text surface), and
+			// Redirects[].URL/FinalURL have been persisted to kira.sqlite unmasked. Masked here, at
+			// the point the values are already known, rather than inventing a second reveal gate: a
+			// secret's plaintext must never reach a copyable surface ungated, nor kira.sqlite
+			// outside api_variables.secret_value.
 			maskSecrets(&resp, usedSecrets)
 
-			// P8 D2: recorded from args (stage 1 — F3), never from resolved. Best-effort: a
+			// Recorded from args, never from resolved. Best-effort: a
 			// failed insert logs and the send still returns its response — a history feature
 			// must never be the reason a user loses the answer they were waiting for.
-			// P71 §4.1: skipped entirely for an incognito tab — nothing about this send reaches
+			// Skipped entirely for an incognito tab — nothing about this send reaches
 			// SQLite.
 			if !args.Incognito {
 				if err := s.Deps.Repos.ResponseHistory.Record(model.ResponseHistoryRecord{
@@ -270,7 +268,7 @@ func secretReplacer(used []apivars.UsedSecret) *strings.Replacer {
 			continue
 		}
 		pairs = append(pairs, u.Rendered, u.Placeholder)
-		// F: url.QueryEscape rewrites space/+//=&%@: and non-ASCII — most real passwords and any
+		// url.QueryEscape rewrites space/+//=&%@: and non-ASCII — most real passwords and any
 		// base64 token — so a urlencoded body's rendered wire text (encodeURLEncodedFields' own
 		// output, wire.go's renderRequestBody) would otherwise carry the rendered text in
 		// cleartext, just percent-encoded, with the pane still claiming "N secret values shown as
@@ -278,7 +276,7 @@ func secretReplacer(used []apivars.UsedSecret) *strings.Replacer {
 		if encoded := url.QueryEscape(u.Rendered); encoded != u.Rendered {
 			pairs = append(pairs, encoded, u.Placeholder)
 		}
-		// Round-2 review finding 4: a secret used in a URL *path* segment (e.g.
+		// A secret used in a URL *path* segment (e.g.
 		// https://api.example.com/{{secret}}/orders) is percent-encoded via url.PathEscape /
 		// EscapedPath(), which differs from QueryEscape for several characters (a space becomes
 		// %20 via PathEscape but + via QueryEscape) — that form isn't covered by the QueryEscape
@@ -303,26 +301,24 @@ func distinctSecretNames(used []apivars.UsedSecret) int {
 	return len(seen)
 }
 
-// maskSecrets is P9 D6, widened by P10 D14/F16 to four fields instead of one. F16 found that
-// resp.Redirects[].URL and resp.FinalURL — P2 fields, persisted by P8 since it landed — are
-// resolved URLs already reaching kira.sqlite unmasked today, and that this phase's own per-hop
-// URL/header list would widen the same gap rather than open a new one. All four are masked here,
-// at the point the values are already known, rather than inventing a second reveal gate (OQ-4).
-// A no-op when there is no rendered exchange (a dump error, D2) or no secret was actually
-// substituted.
+// maskSecrets is widened to four fields instead of one. resp.Redirects[].URL and resp.FinalURL are
+// resolved URLs already reaching kira.sqlite unmasked today, and the per-hop URL/header list would
+// widen the same gap rather than open a new one. All four are masked here, at the point the values
+// are already known, rather than inventing a second reveal gate. A no-op when there is no rendered
+// exchange (a dump error) or no secret was substituted.
 func maskSecrets(resp *httpclient.Response, used []apivars.UsedSecret) {
 	replacer := secretReplacer(used)
 	if replacer == nil {
 		return
 	}
 	if resp.Wire != nil {
-		// P108 F12: Send's own Options.WireMask already masked the body portion of Wire.Request
-		// BEFORE wire.go truncated it to D4's cap — this replace is a second pass over the whole
+		// Send's own Options.WireMask already masked the body portion of Wire.Request
+		// BEFORE wire.go truncated it to the cap — this replace is a second pass over the whole
 		// string, catching the request head httputil.DumpRequestOut renders (never capped, so
 		// never at risk of the straddle-the-cut bug WireMask exists for) and cheap idempotent
 		// no-ops over whatever WireMask already replaced in the body.
 		resp.Wire.Request = replacer.Replace(resp.Wire.Request)
-		// F16's own reasoning ("a Location header is a URL too — the most likely place for a
+		// The reasoning ("a Location header is a URL too — the most likely place for a
 		// secret-bearing query string to reappear on a redirect") applies identically here:
 		// ResponseHead renders the final hop's own header list, the same bytes the Timeline pane
 		// already masks per-hop. Leaving it unmasked let RawExchangePane.vue's "N secret values
@@ -396,12 +392,12 @@ func maskSendErrTimeline(err error, used []apivars.UsedSecret) {
 	}
 }
 
-// mapHttpError joins httpclient's own four-code vocabulary into the ipcerr family (D8) — not
+// mapHttpError joins httpclient's own four-code vocabulary into the ipcerr family — not
 // adapters.ErrorCode, whose CodeConnect/CodeEngineDown views/shared/viewOp.ts's
 // DISCONNECTED_CODES would misread as "the database connection is gone" and pop a Reconnect gate
-// over a tab that has no connection to reconnect. P10 D15: when the failure carries a Timeline —
+// over a tab that has no connection to reconnect. When the failure carries a Timeline —
 // already masked by maskSendErrTimeline above, before the error ever left the RunOp closure — it
-// is marshalled into Details for a renderer that knows how to read it (control.ts/state.ts, C5).
+// is marshalled into Details for a renderer that knows how to read it (control.ts/state.ts).
 func mapHttpError(err error) error {
 	var herr *httpclient.Error
 	if errors.As(err, &herr) {

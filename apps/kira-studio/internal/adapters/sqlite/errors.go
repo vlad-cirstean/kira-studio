@@ -11,9 +11,9 @@ import (
 )
 
 // SQLite's own primary result codes (sqlite3.h) — an extended code (e.g. 2067 for
-// SQLITE_CONSTRAINT_UNIQUE) always has the primary code in its low byte (F6), exactly as
+// SQLITE_CONSTRAINT_UNIQUE) always has the primary code in its low byte, exactly as
 // errors.ts's own mapError already assumed; modernc.org/sqlite's *Error.Code() is re-derived here
-// against the real driver (SQ-1), not assumed to still return the same shape node:sqlite did.
+// against the real driver, not assumed to still return the same shape node:sqlite did.
 const (
 	cantOpen = 14
 	notADB   = 26
@@ -22,7 +22,7 @@ const (
 	readOnly = 8
 )
 
-// mapError is errors.ts's mapError, P35 D26's discipline unchanged: classify by the driver's own
+// mapError is errors.ts's mapError, the discipline unchanged: classify by the driver's own
 // numeric code, never by sniffing message text. CONSTRAINT (19) and plain ERROR (1) fall through
 // to E_QUERY with SQLite's own message verbatim (Adapter rule 4) — its constraint messages
 // ("UNIQUE constraint failed: t.a") are already better than anything a wrapper would compose.

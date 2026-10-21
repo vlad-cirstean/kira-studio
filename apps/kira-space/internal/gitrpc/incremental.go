@@ -9,9 +9,9 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// D19: thin dispatch, three handlers — decode, validate (repoId/branch/path non-empty, validRefArg
+// Thin dispatch, three handlers — decode, validate (repoId/branch/path non-empty, validRefArg
 // on branch/base, the same guard review.resolveBase already uses at the same entrance), entryFor,
-// one RepoEntry call, marshal (with D15's size guard on review.fileDiff). No handler here computes
+// one RepoEntry call, marshal (with the size guard on review.fileDiff). No handler here computes
 // anything itself.
 
 func (r *Router) handleReviewFiles(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
@@ -49,7 +49,7 @@ func (r *Router) handleReviewFiles(ctx context.Context, c *gitsession.Conn, para
 	)
 }
 
-// handleReviewFileDiff is D15's other size-sensitive handler here: the same marshal-once /
+// handleReviewFileDiff is the other size-sensitive handler here: the same marshal-once /
 // check MaxResultBytes / replace-body-with-tooLarge / re-marshal shape commit.fileDiff already
 // uses — the body is the same FileDiffBody union, so the same {kind: "tooLarge", ...} arm applies
 // with no new type.
@@ -101,7 +101,7 @@ func (r *Router) handleReviewMark(ctx context.Context, c *gitsession.Conn, param
 			if err := validRefArg("branch", p.Branch); err != nil {
 				return "", err
 			}
-			// F7 (P108 Part 17 review): gitreview.Normalize only drops a range where End < Start,
+			// gitreview.Normalize only drops a range where End < Start,
 			// and clampToLineCount only clamps the UPPER bound — so a range like {Start:-9, End:0}
 			// on a 10-line file was accepted and stored, and CountLines then equalled the file's
 			// own lineCount, reading as "fully reviewed" with zero actual lines marked. Every

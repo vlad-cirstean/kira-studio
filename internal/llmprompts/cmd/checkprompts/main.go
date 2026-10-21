@@ -1,7 +1,7 @@
 // Command checkprompts fails when an LLM prompt lives outside internal/llmprompts: a jsonschema
 // tag, an MCP description or system prompt that is not an llmprompts call, or a copy of a
-// registry default in Go, TS or Vue code. It also fails a default that holds filler words and an entry
-// over its line in internal/llmprompts/testdata/budget.tsv. Run from the repo root.
+// registry default in Go, TS or Vue code. It also fails a default that holds filler words and an
+// entry over its line in internal/llmprompts/testdata/budget.tsv. Run from the repo root.
 package main
 
 import (

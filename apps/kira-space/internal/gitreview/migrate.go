@@ -9,11 +9,10 @@ import (
 )
 
 // migrate runs review.db's schema_version steps through sqlitex.Migrate — internal/storage's own
-// forward-only runner, generalized (P107 I2-32; T1-8 named this residue, this finishes it). Then
-// runs the idempotent Go sweep below, unconditionally, every lazy-open. sqlitex.Migrate's error is
-// returned unwrapped, like storage.OpenAt's own: a *sqlitex.SchemaTooNewError must reach the
-// caller as-is for internal/startupfail's Classify to recognise it (a direct type assertion, not
-// errors.As).
+// forward-only runner, generalized. Then runs the idempotent Go sweep below, unconditionally, every
+// lazy-open. sqlitex.Migrate's error is returned unwrapped, like storage.OpenAt's own: a
+// *sqlitex.SchemaTooNewError must reach the caller as-is for internal/startupfail's Classify to
+// recognise it (a direct type assertion, not errors.As).
 func migrate(db *sql.DB) error {
 	steps, err := migrations.All()
 	if err != nil {

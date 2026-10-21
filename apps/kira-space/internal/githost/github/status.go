@@ -1,10 +1,10 @@
 package github
 
-// Status is D1/D5's own four-kind actionability union — SPEC §3.5's own gloss
-// ("ok" | "notFound" | "unauthenticated" | "forbidden") widened, per D5, to carry the real six-shape
-// failure surface (F15) as Reason detail rather than as a fifth/sixth Kind: the badge/search/reaper
-// callers above this package only ever need to know WHICH of these four classes they got, never the
-// underlying HTTP status or gh exit code — that stays inside errors.go's own classify.
+// Status is the four-kind actionability union ("ok" | "notFound" | "unauthenticated" | "forbidden")
+// widened to carry the real six-shape failure surface as Reason detail rather than as a fifth/sixth
+// Kind: the badge/search/reaper callers above this package only ever need to know WHICH of these
+// four classes they got, never the underlying HTTP status or gh exit code — that stays inside
+// errors.go's own classify.
 type Status struct {
 	Kind string `json:"kind"` // "ok" | "notFound" | "unauthenticated" | "forbidden"
 	// Path is the resolved `gh` binary's path — set only for "ok" (mirrors gitclient.GitStatus's

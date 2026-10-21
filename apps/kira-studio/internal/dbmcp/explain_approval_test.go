@@ -11,7 +11,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// TestExplainQueryRefusesApprovedReadAfterReadModeDeniedMidWait guards F6: explainQuery's own
+// TestExplainQueryRefusesApprovedReadAfterReadModeDeniedMidWait: explainQuery's own
 // approval path resolves summary/verdict before ApprovalBroker.Request's own up-to-2-minute wait,
 // mirroring runQuery's awaitApproval — an Approve landing after the user tightened read mode to
 // deny mid-wait must not still run the composed EXPLAIN.

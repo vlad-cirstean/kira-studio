@@ -9,12 +9,12 @@ import (
 )
 
 // historyTable is the read/adopt/orphan-sweep/single-delete shape grpc_history.go and
-// response_history.go each rebuilt per table (T2-14): identical SQL, differing only in table
+// response_history.go each rebuilt per table: identical SQL, differing only in table
 // name, the timestamp column ORDER BY/tiebreak against (called_at vs. sent_at), the summary
 // column list, and the entry type T decodes into. Record/Get/Clear stay outside this generic:
-// each table's own Record applies a genuinely different cap policy (D6 vs. D11) and Get decodes a
+// each table's own Record applies a genuinely different cap policy and Get decodes a
 // differently-shaped snapshot_json — folding either in would hide real per-table policy behind a
-// shared shape that does not actually fit.
+// shared shape that does not fit.
 type historyTable[T any] struct {
 	// table is the SQL table name; scope is the shorter name every error string here is already
 	// prefixed with ("grpc_history" / "response_history" — kept distinct from table so error text
@@ -93,13 +93,13 @@ func (h historyTable[T]) SweepOrphans(db *sql.DB) error {
 // historyRecordInput is Record's own common envelope — the three fields its shared chain
 // (environment resolution, id minting, scope-key derivation) needs, out of each table's own
 // larger, genuinely different rec type (grpc_history.go's own model.GrpcCallHistoryRecord vs
-// response_history.go's own model.ResponseHistoryRecord, P107 I2-8).
+// response_history.go's own model.ResponseHistoryRecord).
 type historyRecordInput struct {
 	TabID, ItemID, EnvironmentID string
 }
 
 // Record is the transaction/environment-resolve/elide-once/insert/cap/sweep/commit chain both
-// grpc_history.go's and response_history.go's own Record share (P107 I2-8) — everything around
+// grpc_history.go's and response_history.go's own Record share — everything around
 // the two tables' genuinely different snapshot shape and INSERT column list, which is exactly
 // what build/elide/insert supply:
 //
@@ -114,7 +114,7 @@ type historyRecordInput struct {
 //     resolved timestamp/environment, storedBytes, the final snapshotJSON) and runs its own
 //     column-specific statement.
 //
-// perScopeCap/byteBudget are each table's own constant/var (P8 D6 vs P11 D11); the cap DELETE and
+// perScopeCap/byteBudget are each table's own constant/var; the cap DELETE and
 // the global byte sweep below are otherwise identical SQL, parameterized by h.table/h.timeColumn
 // (already on this struct) the same way List/Delete/Adopt/SweepOrphans above already are.
 func (h historyTable[T]) Record(
@@ -204,7 +204,7 @@ func (h historyTable[T]) Record(
 }
 
 // GetHistory is the lookup-by-id shape both grpc_history.go's and response_history.go's own Get
-// share (P107 I2-8): query the summary columns plus snapshot_json in one row and hand it to
+// share: query the summary columns plus snapshot_json in one row and hand it to
 // scanAndAssemble. A package-level function, not a historyTable[T] method: Get's result is never
 // T (List's own summary Entry) but each table's own richer Snapshot, and Go allows no additional
 // type parameter on a method beyond its receiver's own — the doc's own stated

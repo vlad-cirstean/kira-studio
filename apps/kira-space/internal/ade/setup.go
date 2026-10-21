@@ -128,10 +128,11 @@ type worktreeResult struct {
 	Fresh bool
 }
 
-// ensureWorktree makes the branch's worktree exist (R14): a branch checked out anywhere, the repo
-// root included, runs there as is; a created branch without one gets an existingBranch worktree (a remote-only one a newBranch tracking it); a
-// not-created branch gets its name, then a newBranch worktree from its base. wanted is the caller's
-// name for a not-created branch ("" = derived from the task title).
+// ensureWorktree makes the branch's worktree exist: a branch checked out anywhere, the repo root
+// included, runs there as is; a created branch without one gets an existingBranch worktree (a
+// remote-only one a newBranch tracking it); a not-created branch gets its name, then a newBranch
+// worktree from its base. wanted is the caller's name for a not-created branch ("" = derived from
+// the task title).
 func (b *TaskBoard) ensureWorktree(ctx context.Context, title string, rec model.CodeRepo, sb model.AdeTaskBranch, wanted string) (worktreeResult, error) {
 	if err := b.checkNotArchiving(sb.TaskID); err != nil {
 		return worktreeResult{}, err

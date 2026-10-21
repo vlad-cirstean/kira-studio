@@ -53,7 +53,7 @@ var opKinds = map[string]bool{
 	"http": true,
 	// P11 D7: a gRPC unary or server-streaming call (internal/grpcclient via bridge/grpc.go).
 	"grpc": true,
-	// P108 Part 6 F3: Router.SchemaColumns/KeyTypes (router.go) were already passing these two
+	// Router.SchemaColumns/KeyTypes (router.go) were already passing these two
 	// kinds to RunOp, but neither was ever a recognized OpKind — oplog.handleOpStart rejected the
 	// op:start (never Appended), so the matching op:end fell through handleOpEnd's own
 	// no-matching-start fallback and emitted a phantom "test"-kind record with a null

@@ -1,6 +1,6 @@
-// Package logsession is the paged history walk (docs/HISTORY.md (v1.3 G3),
-// D10): a paused, resumable `git log` process. A page's own limit IS the pause — the
-// read loop simply stops calling Read on the child's stdout once a page is full, and git's own
+// Package logsession is the paged history walk (docs/HISTORY.md): a paused, resumable `git log`
+// process. A page's own limit IS the pause — the read loop stops calling Read on the child's stdout
+// once a page is full, and git's own
 // write() blocks against the now-unread OS pipe, holding the process (and its walk position)
 // exactly where the caller left it, with no explicit protocol needed to say "pause" or "resume".
 package logsession
@@ -23,8 +23,8 @@ import (
 // DefaultPageSize is upstream's own default (logSession.ts's DEFAULT_PAGE_SIZE).
 const DefaultPageSize = 5000
 
-// defaultIdleReclaim is the deliberate departure from upstream's own knob (F10/D10): a
-// per-connection walk (SPEC §6/G3 D13/F9) multiplies the number of paused, held-open `git log`
+// defaultIdleReclaim is the deliberate departure from upstream's own knob: a
+// per-connection walk multiplies the number of paused, held-open `git log`
 // processes by the number of open windows, so unlike upstream (which never switches its own
 // idleReclaimMs on) this backend reclaims one after 5 minutes idle — matching
 // gitsession.defaultLingerFor, so a walk's process and its RepoEntry age out on the same clock.
@@ -35,7 +35,7 @@ const readChunkSize = 64 * 1024
 
 // Deps is what a Session needs to spawn processes and run bounded, ordinary reads. Read is
 // (*gitclient.Repo).Read, injected rather than imported so this package needs no registry to be
-// testable, and so D10's split ("short spawns through the gate, the paused one direct") is
+// testable, and so the split ("short spawns through the gate, the paused one direct") is
 // visible in the type: the paused `git log` itself is spawned through Runner directly, never
 // through Read.
 type Deps struct {
@@ -90,16 +90,16 @@ type Session struct {
 	// re-walk and re-queue those same records a second time.
 	readCount int
 	// eof is whether the walk's process has drained — not whether the caller has seen everything
-	// it produced. G16 D6: kept apart from "exhausted" (exhaustedLocked, below) specifically so
+	// it produced. Kept apart from "exhausted" (exhaustedLocked, below) specifically so
 	// EOF can be reached with records still queued in pending; folding the two together is what
-	// let a page filling exactly at the walk's last record report Exhausted too late (F5), and
-	// separately let EOF-with-pending silently drop those records (F6).
+	// let a page filling exactly at the walk's last record report Exhausted too late, and
+	// separately let EOF-with-pending silently drop those records.
 	eof          bool
 	baseSnapshot map[string]string // refname -> object id, captured before the first spawn (D9)
 	reclaimTimer *time.Timer
 	cachedTotal  *int
-	// failed is set once, permanently, by consumeChunkLocked/failLocked on a split or parse error
-	// (F2): the process is killed immediately rather than left running with the splitter's stream
+	// failed is set once, permanently, by consumeChunkLocked/failLocked on a split or parse error:
+	// the process is killed immediately rather than left running with the splitter's stream
 	// position desynced from readCount, and every subsequent ReadPage returns this same error
 	// instead of silently spawning a --skip=readCount resume that would duplicate the records the
 	// corrupt chunk never delivered.
@@ -141,9 +141,9 @@ func (s *Session) ReadPage(ctx context.Context, sink func(porcelain.CommitRecord
 		return Outcome{Exhausted: true}, nil
 	}
 
-	// G16 D6: guards against re-spawning after EOF while a lookahead record is still parked in
-	// pending (F6's state) — without !s.eof here, that pending-but-not-yet-exhausted case would
-	// send this call into spawnOrResumeLocked and re-walk the history instead of just draining
+	// Guards against re-spawning after EOF while a lookahead record is still parked in
+	// pending — without !s.eof here, that pending-but-not-yet-exhausted case would
+	// send this call into spawnOrResumeLocked and re-walk the history instead of draining
 	// the queue below.
 	if s.proc == nil && !s.eof {
 		stale, err := s.spawnOrResumeLocked(ctx)
@@ -184,7 +184,7 @@ func (s *Session) drainPendingLocked(sink func(porcelain.CommitRecord), pageSize
 }
 
 // fillLocked is ReadPage's own read-until-page-full-or-EOF loop, continuing from appended already
-// delivered by drainPendingLocked. G16 D6/F5: the lookahead — it keeps reading until either one
+// delivered by drainPendingLocked. The lookahead — it keeps reading until either one
 // record parks in pending (so there is definitely more — exhaustedLocked() is then false) or EOF is
 // observed (so there is definitely not). Without this, a page that fills exactly at the walk's last
 // record would exit with pending still empty and eof still false, leaving exhaustedLocked() wrongly
@@ -213,7 +213,7 @@ func (s *Session) fillLocked(ctx context.Context, sink func(porcelain.CommitReco
 }
 
 // consumeChunkLocked splits one raw chunk into fields, groups every FieldCount of them into one
-// record (F3: LogFormat is NUL-delimited field to field, so s.splitter's own NUL delimiter now
+// record (LogFormat is NUL-delimited field to field, so s.splitter's own NUL delimiter now
 // splits fields, not whole records — s.grouper is what finds each record's own boundary) and
 // delivers or queues each resulting record — fillLocked's own per-chunk paging step. Caller holds
 // mu.

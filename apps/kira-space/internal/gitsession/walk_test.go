@@ -213,13 +213,13 @@ func captureGitOutput(t *testing.T, dir string, args []string) []byte {
 	return out
 }
 
-// TestWalk_ReadPageCancelDoesNotDiscardLoadedStore is F4's own regression proof (P108 Part 16
-// review): Part 14's own F2 fix reset the whole walk on EVERY ReadPage error, not just a
-// permanently-failed session. A client `cancel` frame cancels the host ctx — resumable, readCount
-// left exact — but hit the same resetLocked call and wrongly discarded every row already loaded,
-// breaking the "rows already read are kept" contract; the follow-up re-stream then reloaded from
-// row 0 instead of resuming. Uses scriptedWalkRunner so the cancellation lands on a genuinely
-// in-flight read, deterministically, rather than racing real OS pipe buffering.
+// TestWalk_ReadPageCancelDoesNotDiscardLoadedStore is the regression proof: the fix reset the
+// whole walk on EVERY ReadPage error, not just a permanently-failed session. A client `cancel`
+// frame cancels the host ctx — resumable, readCount left exact — but hit the same resetLocked call
+// and wrongly discarded every row already loaded, breaking the "rows already read are kept"
+// contract; the follow-up re-stream then reloaded from row 0 instead of resuming. Uses
+// scriptedWalkRunner so the cancellation lands on a genuinely in-flight read, deterministically,
+// rather than racing real OS pipe buffering.
 func TestWalk_ReadPageCancelDoesNotDiscardLoadedStore(t *testing.T) {
 	t.Parallel()
 	skipWithoutGitWalk(t)
@@ -228,7 +228,7 @@ func TestWalk_ReadPageCancelDoesNotDiscardLoadedStore(t *testing.T) {
 
 	refArgs := porcelain.RefSnapshotArgs()
 	logArgs := porcelain.LogSessionArgs(spec)
-	// logsession's own lookahead (Part 14's G16 D6): a page never returns after exactly filling
+	// logsession's own lookahead: a page never returns after exactly filling
 	// pageSize alone — it keeps reading until one more record parks in pending (definite proof
 	// there is more) or EOF (definite proof there is not). So chunk1 carries pageSize+1 (3)
 	// records: page 1 delivers 2 and queues the 3rd to pending in ONE raw read, with nothing left
@@ -504,12 +504,11 @@ func TestWalk_ReopenDoesNotReadAnUnrequestedPage(t *testing.T) {
 	}
 }
 
-// TestWalk_StreamReplayReportsExhausted is G16 F4's direct regression guard: a cache-replay
+// TestWalk_StreamReplayReportsExhausted is the direct regression guard: a cache-replay
 // re-stream of an already-exhausted walk must end with Exhausted:true, not the hardcoded false
 // emitRange's replay loop used to pass. Every re-stream (a webview hide/reveal, graph.loadMore's
 // own resync, the review sidebar's own always-from-zero replay) goes through exactly this path,
-// and this is the state that produced the reported "Load the last 0" button. Before D5 this test
-// fails on the second Stream call.
+// and this is the state that produced the reported "Load the last 0" button.
 func TestWalk_StreamReplayReportsExhausted(t *testing.T) {
 	t.Parallel()
 	skipWithoutGitWalk(t)
@@ -589,7 +588,7 @@ func TestWalk_DisposingConnDoesNotBlockAFreshOpenOfTheSameRepo(t *testing.T) {
 	}
 }
 
-// TestConn_WalkReplaceDoesNotBlockOtherConnOps is F7's own regression proof (P108 Part 16 review):
+// TestConn_WalkReplaceDoesNotBlockOtherConnOps is the regression proof:
 // Conn.Walk used to dispose the OLD walk (rebuilt because its spec no longer matches) while still
 // holding c.mu. dispose() takes the walk's own lock, which a running Stream holds across its own
 // emit call (Stream's own doc comment: "emit runs synchronously while mu is held for the whole
@@ -671,7 +670,7 @@ func TestConn_WalkReplaceDoesNotBlockOtherConnOps(t *testing.T) {
 	}
 }
 
-// TestWalk_DisposedRefusesEveryOperation is F8's own regression proof (P108 Part 16 review): a
+// TestWalk_DisposedRefusesEveryOperation is the regression proof: a
 // disposed walk had no disposed flag at all, so a handler that grabbed the *Walk reference before
 // CloseRepo (or a spec-change rebuild) disposed it could still call ReadPage/Stream/Status/Search,
 // reopening a fresh logsession and spawning a brand-new `git log` nothing then closes until the

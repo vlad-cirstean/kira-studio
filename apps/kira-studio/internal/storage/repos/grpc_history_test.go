@@ -238,10 +238,10 @@ func TestGrpcHistoryOversizedRequestMessageDoesNotEmptyTable(t *testing.T) {
 	r := newGrpcHistoryRepo(t)
 
 	// Shrink the budget far below what even a capped (256 KiB) row costs, reproducing the
-	// pre-D7 hazard: on the old code, an *uncapped* multi-MiB request message would make every
+	// hazard: on the old code, an *uncapped* multi-MiB request message would make every
 	// row's running-sum window (newest first) exceed this budget, so the sweep's own
 	// `WHERE running <= ?` would match zero rows and delete the entire table, including the row
-	// just inserted. With D7's cap in place, the row is bounded at ~256 KiB and the budget below
+	// just inserted. With the cap in place, the row is bounded at ~256 KiB and the budget below
 	// is set well above that, so the row must survive.
 	repos.SetGrpcHistoryByteBudgetForTest(t, 300*1024)
 
@@ -261,7 +261,7 @@ func TestGrpcHistoryOversizedRequestMessageDoesNotEmptyTable(t *testing.T) {
 	}
 }
 
-// F9/P21 round 1: Metadata crosses the control plane uncapped (up to 64 MiB, twice the gRPC
+// Metadata crosses the control plane uncapped (up to 64 MiB, twice the gRPC
 // budget) — unlike Message/Messages, which are capped above. A single call carrying enough
 // metadata to push the marshaled snapshot past half the byte budget on its own would otherwise
 // break the sweep's own safety invariant and empty the whole table on insert. Metadata/Header/

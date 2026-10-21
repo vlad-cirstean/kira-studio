@@ -22,9 +22,9 @@ func normalizeMessage(s string) string {
 }
 
 // pasteBytes renders message as a bracketed-paste write followed by the Enter that submits it —
-// two separate byte slices (§4.5) so Tracker.Send can write them as two separate WriteTerminal
-// calls: whether Claude Code's TUI needs a pause between paste-end and Enter is unverified (P129
-// Part 1 §8), and keeping them apart lets a delay be added later without restructuring the call.
+// two separate byte slices so Tracker.Send can write them as two separate WriteTerminal
+// calls: whether Claude Code's TUI needs a pause between paste-end and Enter is unverified,
+// and keeping them apart lets a delay be added later without restructuring the call.
 func pasteBytes(message string) (paste []byte, enter []byte) {
 	normalized := normalizeMessage(message)
 	paste = []byte(bracketedPasteStart + normalized + bracketedPasteEnd)

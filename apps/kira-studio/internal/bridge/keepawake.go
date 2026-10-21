@@ -9,8 +9,7 @@ import (
 // DbMcpService's own shape: the renderer-facing methods are exported, the app-internal triggers
 // (system wake, teardown) are package-level functions, since Wails binds every exported method of a
 // registered service and none of those may be renderer-callable. The manual half (Toggle) is
-// shared with Kira Space's own KeepAwakeService. P188: the agent-aware setting lives in Kira Space
-// only.
+// shared with Kira Space's own KeepAwakeService. The agent-aware setting lives in Kira Space only.
 type KeepAwakeService struct {
 	Deps appcore.Deps
 	// Ctl and Toggle are exported so main.go can inject the platform driver and the shared manual

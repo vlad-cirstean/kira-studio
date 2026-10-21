@@ -69,7 +69,7 @@ type fakeMaskRulesNone struct{}
 func (fakeMaskRulesNone) MaskSetFor(string) (mask.Set, error)   { return mask.Set{}, nil }
 func (fakeMaskRulesNone) List(string) ([]model.MaskRule, error) { return nil, nil }
 
-// TestRunQueryRefusesApprovedWriteAfterPermissionRevokedMidWait is the M7 finding: summary/verdict
+// TestRunQueryRefusesApprovedWriteAfterPermissionRevokedMidWait: summary/verdict
 // are resolved before ApprovalBroker.Request's own up-to-2-minute wait, and were never re-checked
 // after Approve landed. A user reacting to an unexpected write prompt by tightening the
 // connection's write mode to deny, then someone (or the same person) approving the now-stale

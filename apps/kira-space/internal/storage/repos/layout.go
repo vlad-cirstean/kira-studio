@@ -72,7 +72,7 @@ func (r *LayoutRepo) GetAll() (model.Layout, error) {
 // Set writes every leaf every time, mirroring Kira Studio's own LayoutRepo.Set (the read-modify-
 // write runs inside one transaction — storage/db.go's SetMaxOpenConns(1) makes that transaction's
 // Begin() hold the database's one connection exclusively until Commit/Rollback, so no concurrent
-// Set can race it — same C7/F7 fix Kira Studio's own copy documents).
+// Set can race it — same fix Kira Studio's own copy documents).
 func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
 	var merged model.Layout
 	err := appstorage.UpdateLeaves(r.DB, r.selectAll, appstorage.LayoutSelectAllSQL, func(tx *sql.Tx, stored map[string]json.RawMessage) error {

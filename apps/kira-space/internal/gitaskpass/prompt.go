@@ -1,7 +1,7 @@
 // Package gitaskpass is the credential broker + GIT_ASKPASS/SSH_ASKPASS shim over its own private
-// unix socket (SPEC's own package table; docs/HISTORY.md (v1.3 G7), D7-D10). It imports stdlib only —
-// gitsession supplies the one production Prompter (its Conn's own credential waiters), which is
-// what keeps this package free of any dependency on gitsession, bridge or rpcstream.
+// unix socket. It imports stdlib only — gitsession supplies the one production Prompter
+// (its Conn's own credential waiters), which is what keeps this package free of any dependency on
+// gitsession, bridge or rpcstream.
 package gitaskpass
 
 import (
@@ -18,7 +18,7 @@ type Request struct {
 	RepoLabel string
 	Prompt    string
 	Masked    bool
-	// Confirm (F19) is true for a yes/no confirmation prompt (OpenSSH's own
+	// Confirm is true for a yes/no confirmation prompt (OpenSSH's own
 	// SSH_ASKPASS_PROMPT=confirm — e.g. "Allow user@host to reset the passphrase?") rather than
 	// an ordinary masked/unmasked text prompt. A Prompter should render Yes/No for one of these,
 	// never a text field; Masked is always false when Confirm is true (a yes/no question is not
@@ -41,7 +41,7 @@ var usernamePromptRe = regexp.MustCompile(`(?i)^Username`)
 // DeriveMasked reports whether prompt should be masked in the relayed UI. Ported verbatim from
 // upstream's own rule: everything unrecognised is masked, because showing an unrecognised secret
 // in the clear is the worse of the two failure modes — the set of prompt shapes git can produce is
-// not closed (probe P1).
+// not closed.
 func DeriveMasked(prompt string) bool {
 	return !usernamePromptRe.MatchString(prompt)
 }

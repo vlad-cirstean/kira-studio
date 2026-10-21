@@ -9,7 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// TestConnectionsServiceRejectsBareID is a regression test for the P2 R1 finding that
+// TestConnectionsServiceRejectsBareID is a regression test for the finding that
 // bridge.ConnectionsService's id-taking methods — unlike bridge/tree.go, ops.go, queries.go and
 // filters.go, which all guard their own connectionId/id args the same way — never checked for an
 // empty id before handing it to internal/connections.Service. Deps.Connections is left nil here on

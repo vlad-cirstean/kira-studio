@@ -44,7 +44,7 @@ func queueContentBasedDedupEnabled(ctx context.Context, client *sqs.Client, queu
 	return result.Attributes["ContentBasedDeduplication"] == "true", nil
 }
 
-// resolveFIFOInsertFields is F9's own fix: SendMessage never set MessageGroupId or
+// resolveFIFOInsertFields is the fix: SendMessage never set MessageGroupId or
 // MessageDeduplicationId, both required by AWS on a .fifo queue (the former unconditionally, the
 // latter unless content-based dedup is on) — every FIFO insert failed with AWS's own opaque
 // rejection despite caps.CanInsert reporting true for every queue, FIFO included. A non-FIFO queue
@@ -103,7 +103,7 @@ func preview(plan model.MutationPlan, queueName string) ([]string, error) {
 
 // mutateQueue is mutate.ts's mutateQueue. handles is the adapter-local, mutex-guarded receipt-
 // handle cache read.go populates — a receipt handle is only ever valid for the message that was
-// actually received, not a stable identifier of the message itself; deleting a message the
+// received, not a stable identifier of the message itself; deleting a message the
 // current session never polled is reported as E_QUERY rather than silently doing nothing.
 func mutateQueue(ctx context.Context, client *sqs.Client, queueURL, queueName string, readOnly bool, plan model.MutationPlan, handles *receiptHandles, op *adapters.OpCtx) (model.MutationResult, error) {
 	if err := adapters.AssertWritable(readOnly); err != nil {

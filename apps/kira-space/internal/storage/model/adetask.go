@@ -25,10 +25,10 @@ const (
 	AdeSetupFailed  = "failed"
 )
 
-// AdeTask is one row of ade_tasks. EntryStepID is the step the task last entered ("done" when finished,
-// "" without a workflow). SinceJSON is the pass watermark, {"<stepId>/<branchId>": attempt}; "" stores
-// NULL. WorkflowJSON is the whole workflow the task began with ("" = not started, follows
-// the live file) and WorkflowHash its content hash.
+// AdeTask is one row of ade_tasks. EntryStepID is the step the task last entered ("done" when
+// finished, "" without a workflow). SinceJSON is the pass watermark, {"<stepId>/<branchId>":
+// attempt}; "" stores NULL. WorkflowJSON is the whole workflow the task began with ("" = not
+// started, follows the live file) and WorkflowHash its content hash.
 type AdeTask struct {
 	ID           string
 	Kind         string

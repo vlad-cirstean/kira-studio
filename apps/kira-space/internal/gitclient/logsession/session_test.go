@@ -158,7 +158,7 @@ func TestSession_ReclaimAndSkipResume(t *testing.T) {
 		t.Fatalf("page 2 (post-reclaim): %v", err)
 	}
 	// Exactly 2 commits remain (4 total, pageSize 2): the page fills at exactly the walk's last
-	// record, but G16 D6's one-record lookahead reads one chunk further before returning — that
+	// record, but the one-record lookahead reads one chunk further before returning — that
 	// read observes EOF, so exhaustion is discovered in this same call rather than only on a
 	// further, empty ReadPage.
 	if !outcome2.Exhausted || outcome2.Appended != 2 {
@@ -180,12 +180,12 @@ func TestSession_ReclaimAndSkipResume(t *testing.T) {
 	}
 }
 
-// TestSession_ExactMultiplePageIsExhaustedImmediately is G16 F5's regression guard: a page that
+// TestSession_ExactMultiplePageIsExhaustedImmediately is the regression guard: a page that
 // fills exactly at the walk's last record (total commits is an exact multiple of PageSize) must
-// report Exhausted:true in the SAME ReadPage call that delivers that last record, via D6's
+// report Exhausted:true in the SAME ReadPage call that delivers that last record, via the
 // one-record lookahead — not only on a further, empty ReadPage, which is what the old exhausted
 // field (set only inside the io.EOF branch) produced and what session_test.go used to assert as
-// intended before this phase.
+// intended.
 func TestSession_ExactMultiplePageIsExhaustedImmediately(t *testing.T) {
 	skipWithoutGit(t)
 	const total = 6
@@ -320,10 +320,10 @@ func (r *routingRunner) Start(ctx context.Context, gitPath string, spec gitclien
 	return r.blocking, nil
 }
 
-// corruptLogRecord is a full 10-field LogFormat record (F3: NUL-delimited, matching
+// corruptLogRecord is a full 10-field LogFormat record (NUL-delimited, matching
 // porcelain.FieldCount exactly, so consumeChunkLocked's own FieldGrouper completes a group and
 // hands it to ParseLogRecord) whose author-time field ("BADTIME") is not a valid integer —
-// F2's own parse-error trigger.
+// the parse-error trigger.
 var corruptLogRecord = []byte("sha\x00\x00an\x00ae\x00BADTIME\x00cn\x00ce\x00123\x00\x00subject\x00")
 
 // corruptLogRunner answers a for-each-ref (the ref-snapshot guard) with a canned empty snapshot
@@ -348,7 +348,7 @@ func (r *corruptLogRunner) logSpawns() int {
 	return r.spawns
 }
 
-// TestSession_ParseErrorPermanentlyFailsSession is F2's own regression guard: a parse error must
+// TestSession_ParseErrorPermanentlyFailsSession is the regression guard: a parse error must
 // kill the walk's process and fail the Session permanently, never silently resume past the
 // corrupt chunk on a later ReadPage (which would drop the rest of that chunk's records and drift
 // readCount, duplicating rows on a --skip resume).

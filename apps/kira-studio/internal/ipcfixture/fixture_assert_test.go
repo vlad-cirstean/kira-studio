@@ -13,8 +13,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// readFirstIDThenFilterToOne is clickhouse_test.go's and mysql_test.go's own shared shape (P107
-// I2-28): read tablePath's first page, pull the first row's id column, then re-read filtered to
+// readFirstIDThenFilterToOne is clickhouse_test.go's and mysql_test.go's own shared shape: read
+// tablePath's first page, pull the first row's id column, then re-read filtered to
 // `id = '<value>'` and assert exactly one row survives. Neither caller reuses readReq/tabular
 // afterward, so only the extracted id is returned.
 func readFirstIDThenFilterToOne(t *testing.T, rec *Recorder, connectionID, tablePath string) *string {
@@ -111,8 +111,8 @@ func assertMatchesCommittedJSONFixture(t *testing.T, rec *Recorder, jsonFixtureP
 }
 
 // repoRootForWrite resolves the repository root from this package's own path
-// (apps/kira-studio/internal/ipcfixture), the same way every other repo-relative path this package needs
-// (write.go's FixturePathFor) is anchored — os.Getwd() during `go test` is always the package
+// (apps/kira-studio/internal/ipcfixture), the same way every other repo-relative path this package
+// needs (write.go's FixturePathFor) is anchored — os.Getwd() during `go test` is always the package
 // directory, never the module root.
 func repoRootForWrite(t *testing.T) string {
 	t.Helper()
@@ -123,7 +123,7 @@ func repoRootForWrite(t *testing.T) string {
 	return filepath.Clean(filepath.Join(wd, "..", "..", "..", ".."))
 }
 
-// maybeWriteFixture is P58f §4.5 step 3/D15's write-mode branch, the Go analogue of every
+// maybeWriteFixture is the write-mode branch, the Go analogue of every
 // backend.spec.ts's own `if (isFixtureWriteMode()) { writeFixtureModule(...); return; }` — when
 // KIRA_IPC_FIXTURES=write, this writes rec's own captured (and already adapter-frozen, per
 // frozen.go) snapshots straight to the real tests/ipc/<adapterName>/<adapterName>.fixture.ts,

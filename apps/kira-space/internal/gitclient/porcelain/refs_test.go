@@ -164,10 +164,10 @@ func TestParseRefRows_NULFramingMalformed(t *testing.T) {
 	}
 }
 
-// TestParseRefRows_WorktreePathComposesToNFC is G27 D5c/D12's tier-1 positive: %(worktreepath) is
+// TestParseRefRows_WorktreePathComposesToNFC is the tier-1 positive: %(worktreepath) is
 // an absolute worktree directory, so a decomposed spelling in git's own output must come back
-// composed. A hand-built NUL-framed record (RefsFormat's own eleven \x00-delimited fields, F3), not a
-// testdata fixture (D12 forbids adding a new one this phase has no real macOS output to record).
+// composed. A hand-built NUL-framed record (RefsFormat's own eleven \x00-delimited fields), not a
+// testdata fixture (adding a new one is forbidden: there is no real macOS output to record).
 func TestParseRefRows_WorktreePathComposesToNFC(t *testing.T) {
 	t.Parallel()
 	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
@@ -192,8 +192,7 @@ func TestParseRefRows_WorktreePathComposesToNFC(t *testing.T) {
 // setupRepoWithRemoteHead builds a repo with a real bare remote and runs `git remote set-head`
 // against it — the exact condition every `git clone`d repo is already in, and the one that
 // produces the symbolic refs/remotes/<remote>/HEAD pointer TestHeadsRefsArgs_
-// ExcludesRemoteHeadPointer and TestLogSessionArgs_ExcludesRemoteHeadDecoration (G32 round-3
-// functional-correctness review, finding #5) are about.
+// ExcludesRemoteHeadPointer and TestLogSessionArgs_ExcludesRemoteHeadDecoration are about.
 func setupRepoWithRemoteHead(t *testing.T) *repoBuilder {
 	t.Helper()
 	b := newRepoBuilder(t)

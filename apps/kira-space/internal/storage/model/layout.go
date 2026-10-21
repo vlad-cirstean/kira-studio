@@ -3,7 +3,7 @@ package model
 // PanelProject is the repo-tree panel's own persisted state — Kira Studio's own model.Layout
 // carries three panels (project/operations/cellEditor, storage/model/layout.go); Kira Space has
 // no cell editor (a DB-grid concept this app's ported views never use) and persists no Operations
-// dock visibility, so this copy keeps only Project (P100 Part 2, plan §5.4).
+// dock visibility, so this copy keeps only Project.
 type PanelProject struct {
 	Visible bool `json:"visible"`
 }

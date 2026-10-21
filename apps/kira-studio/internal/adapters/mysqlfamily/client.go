@@ -40,7 +40,7 @@ func applyFixedDefaults(mc *mysql.Config) {
 	mc.ParseTime = false
 	mc.MultiStatements = false
 	mc.AllowNativePasswords = true
-	// P2 R2: without CLIENT_FOUND_ROWS, MySQL/MariaDB report "rows changed" from an UPDATE, not
+	// Without CLIENT_FOUND_ROWS, MySQL/MariaDB report "rows changed" from an UPDATE, not
 	// "rows matched" — so editing a cell back to the value it already had returns affectedRows=0,
 	// which mutate()'s AssertAffectedExactlyOne(kind, 0) then rejects as a failed update, rolling
 	// back the whole batch even though the row was found and the statement succeeded. Postgres and
@@ -203,7 +203,7 @@ func BuildConfig(cfg model.ResolvedConnectionConfig, database string, profile Pr
 }
 
 // parseHost extracts the bare host from a "host:port" address for use as a TLS ServerName.
-// P21 round 2 architecture/security finding 8: a hand-rolled strings.LastIndex split used to be
+// A hand-rolled strings.LastIndex split used to be
 // used here instead of the standard library's net.SplitHostPort — for a URI-mode IPv6 address
 // (net/url.Parse's own Host field, e.g. "[::1]:3306"), that returned ServerName = "[::1]",
 // brackets included, which cannot match any certificate (a real server's certificate names the
@@ -220,7 +220,7 @@ func parseHost(addr string) string {
 }
 
 // connEntry pairs one database's pinned *sql.Conn with the mutex that serializes every use of it
-// (P21 round 2 performance finding 3, mirroring postgres/client.go's own connEntry): a *sql.Conn
+// (mirroring postgres/client.go's own connEntry): a *sql.Conn
 // is not safe for concurrent use by multiple goroutines any more than a *pgx.Conn is, but nothing
 // above this package serializes ops against the same Adapter — adapterhost dispatches each inbound
 // frame on its own goroutine (bounded only by the session's own in-flight cap), so two Reads on two
@@ -229,10 +229,10 @@ func parseHost(addr string) string {
 // surfaces as a busy-buffer/bad-connection error rather than silently corrupting anything — still a
 // real, user-visible failure with no cause the error message names.
 //
-// inFlight (finding F2, MEDIUM-HIGH/data integrity) is this entry's own count of still-running
+// inFlight is this entry's own count of still-running
 // adapters.RunWithAbortRace background goroutines — see postgres/client.go's own connEntry doc
 // comment for the full reasoning (identical here): RunWithAbortRace can return to its own caller
-// (on a Stop/cancel) well before the goroutine it spawned actually stops calling
+// (on a Stop/cancel) well before the goroutine it spawned stops calling
 // conn.QueryContext/conn.ExecContext, so Acquire's release and a detached ROLLBACK/COMMIT cleanup
 // must both wait for every such goroutine this acquisition spawned before touching the connection
 // again. database/sql serializes concurrent use of one *sql.Conn rather than racing it the way
@@ -262,11 +262,11 @@ func (e *connEntry) alive() bool {
 	return err == nil
 }
 
-// ConnSet is client.ts's ConnectionSet (B5, mirrors postgres/client.go's ConnSet): one *sql.DB per
+// ConnSet is client.ts's ConnectionSet (mirrors postgres/client.go's ConnSet): one *sql.DB per
 // (connection, database), each bounded to a single open connection (SetMaxOpenConns(1)) so a
-// pinned *sql.Conn — never a pool — is what every query in this package actually runs against.
+// pinned *sql.Conn — never a pool — is what every query in this package runs against.
 // KILL QUERY needs a known thread id, which a pool does not reliably give you. The LRU pool with
-// single-flight dial (P21 round 3 performance finding 5) is adapters.ConnSet — only Dial and the
+// single-flight dial is adapters.ConnSet — only Dial and the
 // eviction Close stay dialect-specific here.
 type ConnSet struct {
 	cfg     model.ResolvedConnectionConfig
@@ -310,7 +310,7 @@ func NewConnSet(cfg model.ResolvedConnectionConfig, profile Profile, log LogFunc
 // Entry is one pinned connection plus its own server-assigned thread id, cached at Acquire time
 // (the Go-only addition query.ts's own RunningQuery gets for free from the driver's own
 // conn.threadId). Conn is embedded so every existing conn.QueryContext/conn.ExecContext call site
-// stays unchanged; track/waitInFlight expose the entry's own inFlight WaitGroup (F2).
+// stays unchanged; track/waitInFlight expose the entry's own inFlight WaitGroup.
 type Entry struct {
 	*sql.Conn
 	ThreadID uint32
@@ -320,7 +320,7 @@ type Entry struct {
 // track registers one RunWithAbortRace background goroutine against this connection's own entry.
 // Call synchronously, at the same point a TrackQuery closure is called — before
 // adapters.RunWithAbortRace's own goroutine starts — and compose the returned done into whatever
-// release RunWithAbortRace already calls once that goroutine actually finishes.
+// release RunWithAbortRace already calls once that goroutine finishes.
 func (e Entry) track() (done func()) {
 	return e.entry.guard.Track()
 }
@@ -331,16 +331,16 @@ func (e Entry) running() RunningQuery {
 }
 
 // waitInFlight blocks until every RunWithAbortRace goroutine track() has registered against this
-// connection has actually finished touching it. A detached cleanup statement (mutate's own
+// connection has finished touching it. A detached cleanup statement (mutate's own
 // ROLLBACK, console's read-only-wrap COMMIT) calls this immediately before its own
 // conn.ExecContext, so it never races — or queues, on this dialect, possibly past its own 5s
-// deadline — a just-aborted op's background goroutine still using the same *sql.Conn (F2).
+// deadline — a just-aborted op's background goroutine still using the same *sql.Conn.
 func (e Entry) waitInFlight() {
 	e.entry.guard.WaitInFlight()
 }
 
 // mysqlNewConnector — the exact function dial calls to produce the driver.Connector db.Conn then
-// actually dials through — is a package-level var (the same seam-by-var shape postgres/client.go's
+// dials through — is a package-level var (the same seam-by-var shape postgres/client.go's
 // own pgxConnect establishes) so a test can substitute a fake with a controlled delay and outcome,
 // with no real network dial needed, to observe get()'s own single-flight behavior under genuine
 // goroutine concurrency.
@@ -403,8 +403,8 @@ func (s *ConnSet) dial(ctx context.Context, database string) (*connEntry, error)
 // per-connection lock connEntry's own doc comment describes, for the caller's own entire op, not
 // just one statement: a Mutate's several sequential statements or a console Execute's "run all"
 // must keep any concurrent op off this same conn for its whole duration, not just between
-// individual statements, or a racing Read could execute between two of them (P21 round 2
-// performance finding 3, mirroring postgres/client.go's own Acquire and its identical reasoning).
+// individual statements, or a racing Read could execute between two of them (mirroring
+// postgres/client.go's own Acquire and its identical reasoning).
 func (s *ConnSet) Acquire(ctx context.Context, database string) (Entry, func(), error) {
 	key := database
 	if key == "" {
@@ -418,7 +418,7 @@ func (s *ConnSet) Acquire(ctx context.Context, database string) (Entry, func(), 
 		if err := entry.guard.Lock(ctx); err != nil {
 			return Entry{}, nil, err
 		}
-		// F3: an LRU eviction's own Close (adapters.ConnSet.Get's own doc comment) contends for this
+		// An LRU eviction's own Close (adapters.ConnSet.Get's own doc comment) contends for this
 		// same entry.mu, so it may already have closed entry.conn by the time this Lock succeeds.
 		// Re-check that entry is still the set's own live entry for key before trusting it — retry
 		// from the top rather than hand back a connection that was just closed out from under it.

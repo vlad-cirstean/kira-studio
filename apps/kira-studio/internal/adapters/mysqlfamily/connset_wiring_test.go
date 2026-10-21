@@ -14,8 +14,8 @@ import (
 )
 
 // TestAcquire_SingleFlightPerDatabase is white-box (package mysqlfamily) coverage for NewConnSet's
-// own wiring onto adapters.ConnSet (P107 T2-2): the LRU/single-flight behaviour itself is covered
-// once, generically, by internal/adapters's own connset_test.go — this just confirms Acquire (via
+// own wiring onto adapters.ConnSet: the LRU/single-flight behaviour itself is covered
+// once, generically, by internal/adapters's own connset_test.go — this confirms Acquire (via
 // the real key-normalization/Dial closure NewConnSet builds) still serializes concurrent dials for
 // the same database with no real MySQL server needed.
 func TestAcquire_SingleFlightPerDatabase(t *testing.T) {

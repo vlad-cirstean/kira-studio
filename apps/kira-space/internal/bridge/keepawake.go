@@ -10,7 +10,7 @@ import (
 
 // KeepAwakeService composes two keep-awake reasons on one internal/keepawake.Controller: the title
 // bar's manual toggle (Status/SetManual delegate entirely to internal/keepawake.Toggle, the shared
-// manual-reason half both apps' own bound service wraps, P116 H3) and, since P188, the
+// manual-reason half both apps' own bound service wraps) and the
 // agent.keepAwakeWithAgents setting applied against the live Claude Code session count. The
 // agent half is the package-level KeepAwakeRecompute, since Wails binds every exported method.
 type KeepAwakeService struct {

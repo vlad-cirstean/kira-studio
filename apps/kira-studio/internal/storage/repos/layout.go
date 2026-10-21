@@ -94,14 +94,14 @@ func (r *LayoutRepo) GetAll() (model.Layout, error) {
 	return decodeLayout(stored), nil
 }
 
-// Set writes every leaf every time (unlike SettingsRepo.Set's patched-leaves-only write —
-// P53 §4.5 deliberately keeps the two repos different), mirroring layout.ts's flatten(merged).
+// Set writes every leaf every time (unlike SettingsRepo.Set's patched-leaves-only write),
+// mirroring layout.ts's flatten(merged).
 //
-// The read that feeds the merge runs inside this same transaction (P8 C7/F7's fix), not before
+// The read that feeds the merge runs inside this same transaction, not before
 // Begin() the way it used to: two concurrent Set calls patching disjoint leaves would otherwise
 // each compute their merge from a pre-write snapshot, and the loser's upsert of all six leaves
 // would silently overwrite the winner's — measured at 109 lost patches out of 200 rounds against
-// the pre-fix code (P8 plan §1.3(d)). storage/db.go's SetMaxOpenConns(1) means Begin() here holds
+// the pre-fix code. storage/db.go's SetMaxOpenConns(1) means Begin() here holds
 // the database's one connection exclusively until Commit/Rollback, so no other Set's read or
 // write can land between this one's own read and write.
 func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {

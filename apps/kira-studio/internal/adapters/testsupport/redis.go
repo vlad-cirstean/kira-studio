@@ -50,7 +50,7 @@ var RedisHashFields = map[string]string{"age": "30", "city": "NYC"}
 // RedisStreamFields is the field order every seeded stream entry's own XAdd uses below —
 // deliberately not alphabetical ("zLast" sorts last, but is added first), so a read path that
 // discards XADD's field order and falls back to Go's default map/JSON key sort (alphabetical)
-// is caught rather than accidentally matching by coincidence (P2 R1).
+// is caught rather than accidentally matching by coincidence.
 var RedisStreamFields = []string{"zLast", "type", "seq"}
 
 // RedisFixture is support/redis.ts's RedisFixture.
@@ -152,8 +152,8 @@ func resetRedis(f *RedisFixture) error {
 
 // RedisAclUser is a Principal that creates a Redis ACL user with the given rule tokens (bare ACL
 // SETUSER tokens, e.g. "~*", "+@all", "-@dangerous") over a side admin connection, torn down when
-// the test ends. Optional sugar over ACL SETUSER for the complete matrix's own Redis cases (P25
-// §2.3) — every rule is passed through to the server verbatim, so the matrix table stays the
+// the test ends. Optional sugar over ACL SETUSER for the complete matrix's own Redis cases —
+// every rule is passed through to the server verbatim, so the matrix table stays the
 // source of truth for which ACL shape each case exercises.
 func RedisAclUser(name, password string, rules ...string) *Principal {
 	return &Principal{

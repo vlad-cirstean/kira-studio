@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Options is one send's resolved client configuration (P90 item 1). Every field is a pointer and
+// Options is one send's resolved client configuration. Every field is a pointer and
 // nil means "this package's own default" — never the type's zero value, which for SSLVerify would
 // mean "verification off". bridge/http.go always passes a fully-populated Options (resolved
 // against model.ApiSettings, packages/shared/domain/settings.ts's own apiSettingsSchema); the nil
@@ -26,15 +26,14 @@ type Options struct {
 	// Ephemeral routes this send's cookies to a throwaway jar instead of the shared one — set by
 	// bridge/http.go for an incognito tab (cookies.go). Never surfaced in Settings.
 	Ephemeral bool `json:"ephemeral,omitempty"`
-	// WireMask is P108 F12's fix: bridge/http.go builds this from the secrets stage 2 actually
-	// substituted (apivars.UsedSecret has already been resolved by the time it calls Send) and
-	// passes it in so wire.go's capWireText can mask a body BEFORE truncating it to D4's cap,
-	// never after. Masking only after capping (the old order — mask the whole already-built
-	// WireExchange.Request in bridge/http.go's maskSecrets) can leave an unmasked secret prefix
-	// when the secret straddles the cut: the kept bytes no longer match the full registered
-	// pattern, so the replacer can't find it. httpclient never sees apivars.UsedSecret directly —
-	// only this already-built stdlib Replacer — so this package takes on no dependency on
-	// apivars. Never populated from IPC JSON.
+	// WireMask: bridge/http.go builds this from the secrets stage 2 substituted (apivars.UsedSecret
+	// has already been resolved by the time it calls Send) and passes it in so wire.go's
+	// capWireText can mask a body BEFORE truncating it to the cap, never after. Masking only after
+	// capping (the old order — mask the whole already-built WireExchange.Request in
+	// bridge/http.go's maskSecrets) can leave an unmasked secret prefix when the secret straddles
+	// the cut: the kept bytes no longer match the full registered pattern, so the replacer can't
+	// find it. httpclient never sees apivars.UsedSecret directly — only this already-built stdlib
+	// Replacer — so this package takes on no dependency on apivars. Never populated from IPC JSON.
 	WireMask *strings.Replacer `json:"-"`
 }
 
@@ -53,7 +52,7 @@ type resolved struct {
 // normalize resolves every field to a concrete value, clamping to the same bounds
 // packages/shared/domain/settings.ts's REQUEST_TIMEOUT_MS_RANGE/MAX_RESPONSE_MB_RANGE/
 // MAX_REDIRECTS_RANGE state — a value out of range reaches here only via a hand-edited or
-// pre-P90 stored tab row, never the dialog's own bounded inputs, so clamping (not rejecting) is
+// stored tab row, never the dialog's own bounded inputs, so clamping (not rejecting) is
 // what keeps a send working rather than failing on stale local state.
 //
 // Every default below must equal model.DefaultSettings().Api field for field — internal/storage/
@@ -106,7 +105,7 @@ func (o Options) normalize() resolved {
 
 // transportKey is the only two fields of a send's resolved configuration that change how a
 // *http.Transport itself is built — everything else (redirects, jar, timeout) varies per
-// *http.Client instead, so connection reuse (sharedClient's whole reason to exist, D4) survives
+// *http.Client instead, so connection reuse (sharedClient's whole reason to exist) survives
 // per-send Options.
 // maxResponseHeaderBytes bounds one response's header block.
 const maxResponseHeaderBytes = 1 << 20
@@ -152,7 +151,7 @@ func transportFor(k transportKey) *http.Transport {
 	return tr
 }
 
-// checkRedirectFor is checkRedirect (client.go, pre-P90) closed over one send's resolved
+// checkRedirectFor is checkRedirect (client.go) closed over one send's resolved
 // redirect policy — everything but the two branches below (the follow-redirects gate and the
 // max-redirects bound, both newly variable per-send) is unchanged from before this phase, in the
 // same order: closeHop, then the cross-host header-stripping block.
@@ -174,16 +173,16 @@ func checkRedirectFor(r resolved) func(*http.Request, []*http.Request) error {
 			tl.closeHop(req.Response, req.Method, req.URL.String())
 		}
 
-		// P21 round 3 finding 5: net/http's redirect machinery re-copies every header from the
+		// net/http's redirect machinery re-copies every header from the
 		// *original* request onto each new hop (makeHeadersCopier closes over ireq, not the
 		// previous hop's request), stripping only Authorization/WWW-Authenticate/Cookie/Cookie2
 		// when the host changed from the original. A saved request's own custom headers —
 		// X-Api-Key, PRIVATE-TOKEN, X-Amz-Security-Token and the like are at least as common in
 		// this app's requests as Authorization — would otherwise silently follow a redirect to a
 		// different host, replaying a secret to whatever answered the redirect. Drop every header
-		// the user actually typed the moment a hop crosses hosts.
+		// the user typed the moment a hop crosses hosts.
 		//
-		// F2: comparing only against the immediately-previous hop misses A -> B -> B — the second
+		// Comparing only against the immediately-previous hop misses A -> B -> B — the second
 		// hop is same-host relative to B, but the headers being carried were re-copied from the
 		// *original* A request, so what matters is whether the current hop differs from the
 		// original, not from the previous one. Since net/http always re-copies from the original,

@@ -6,12 +6,12 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// ResponseHistoryService is D8 — the CollectionsService shape (a typed-struct wrapper per method,
+// ResponseHistoryService is the CollectionsService shape (a typed-struct wrapper per method,
 // with an explicit guard and an ipcerr translation) over Deps.Repos.ResponseHistory. No op-log
-// row and no new op kind (P4 D11's reasoning applied unchanged): every method here is a single
-// indexed local read or a single-row write the pane renders into directly, not a network
-// exchange the op ring's ~150 ms invariant is about. Recording itself is not here at all — it is
-// D2's one call inside bridge/http.go's existing Send closure.
+// row and no new op kind: every method here is a single indexed local read or a single-row
+// write the pane renders into directly, not a network exchange the op ring's ~150 ms invariant
+// is about. Recording itself is not here at all — it is the one call inside bridge/http.go's
+// existing Send closure.
 type ResponseHistoryService struct{ Deps appcore.Deps }
 
 // scopeKey computes the same scope a history row's own GENERATED column does (itemId when

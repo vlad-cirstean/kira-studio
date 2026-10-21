@@ -1,8 +1,8 @@
-// wire.go is P9 D2's whole rendering: "raw" is rendered in Go from the real *http.Request and
-// *http.Response, never captured from the wire (F2-F6 measured capture unavailable) and never
-// reconstructed in the renderer (F7/F14 measured the dump reflects transport-added facts a
-// TypeScript reconstruction cannot know). The request half is exact (F7); the response half is an
-// explicitly labelled reconstruction (F10) — D3's fidelity value says which.
+// wire.go is the whole rendering: "raw" is rendered in Go from the real *http.Request and
+// *http.Response, never captured from the wire (measured capture unavailable) and never
+// reconstructed in the renderer (measured the dump reflects transport-added facts a
+// TypeScript reconstruction cannot know). The request half is exact; the response half is an
+// explicitly labelled reconstruction — the fidelity value says which.
 package httpclient
 
 import (
@@ -35,10 +35,10 @@ type WireExchange struct {
 // proxy function for D3's classification cases without setting a real HTTPS_PROXY.
 var wireProxyFunc = http.ProxyFromEnvironment
 
-// classifyFidelity is D3, computed after Do returns because both resp.ProtoMajor and whether a
+// classifyFidelity is computed after Do returns because both resp.ProtoMajor and whether a
 // proxy applied are only known then. The proxy check calls wireProxyFunc directly — the same
 // function the transport itself consults — so the classification can never disagree with what the
-// transport actually did (F5).
+// transport did.
 func classifyFidelity(resp *http.Response, httpReq *http.Request) string {
 	if resp.ProtoMajor >= 2 {
 		return "http2"
@@ -49,14 +49,15 @@ func classifyFidelity(resp *http.Response, httpReq *http.Request) string {
 	return "exact"
 }
 
-// capWireText applies D4's cap to a free-form buffer (raw/code/urlencoded bodies) — truncated with
+// capWireText applies the cap to a free-form buffer (raw/code/urlencoded bodies) — truncated with
 // a visible marker naming exactly how much was cut, never silently.
 //
-// P108 F12: mask runs BEFORE the cap, never after. A secret straddling the cut byte would
+// mask runs BEFORE the cap, never after. A secret straddling the cut byte would
 // otherwise leave the kept prefix not matching the replacer's full registered pattern, so masking
 // the already-truncated text (the old call order, in bridge/http.go's maskSecrets) could leave an
 // unmasked secret prefix on the wire pane. mask is nil in every context with no secret to mask
-// (the common case) or that predates F12 (wire_test.go's own direct calls).
+// (the common case) or in wire_test.go's own
+// direct calls.
 func capWireText(s string, mask *strings.Replacer) (string, bool) {
 	if mask != nil {
 		s = mask.Replace(s)
@@ -83,10 +84,10 @@ func binaryMarker(n int64, name string) string {
 	return fmt.Sprintf("[… %d bytes of %s …]", n, name)
 }
 
-// renderRequestBody is D4's per-mode dispatch, run over the exact same Body/formBoundary Send just
+// renderRequestBody is the per-mode dispatch, run over the exact same Body/formBoundary Send just
 // used to build the real request — never a resolved or renderer-derived value. fileContentLength is
-// httpReq.ContentLength for a `file` body: buildFile's own os.Stat already resolved it once: D4's
-// own "the Content-Length in the head is always the real one" invariant extended to the marker's
+// httpReq.ContentLength for a `file` body: buildFile's own os.Stat already resolved it once: the
+// "the Content-Length in the head is always the real one" invariant extended to the marker's
 // count, rather than a second, possibly-racing os.Stat here.
 func renderRequestBody(body Body, formBoundary string, fileContentLength int64, mask *strings.Replacer) (text string, elided bool, err error) {
 	mode := body.Mode
@@ -119,10 +120,10 @@ func renderRequestBody(body Body, formBoundary string, fileContentLength int64, 
 	return "", false, nil
 }
 
-// renderFormDataBody is F20's dry-run trick a second time, with a strings.Builder standing in for
+// renderFormDataBody is the dry-run trick a second time, with a strings.Builder standing in for
 // countWriter: the identical boundary and formPartHeader output the real pass writes, so the
 // framing this renders is exactly what went out. Each file part's payload is replaced by its
-// marker (never read); each text part is kept verbatim under D4's cap.
+// marker (never read); each text part is kept verbatim under the cap.
 func renderFormDataBody(fields []FormField, boundary string, mask *strings.Replacer) (string, bool, error) {
 	parts, err := prepareFormParts(fields)
 	if err != nil {
@@ -163,10 +164,10 @@ func renderFormDataBody(fields []FormField, boundary string, mask *strings.Repla
 	return b.String(), elided, nil
 }
 
-// renderRequest is D2/D4: the head verbatim from httputil.DumpRequestOut(httpReq, false) — exact
-// per F7, including the transport's own Accept-Encoding, the real Content-Length, Go's header
-// ordering and a Host: override (F14) — plus the body, appended directly onto the dump's own
-// trailing blank line (DumpRequestOut with body=false already ends the head at "\r\n\r\n", F8).
+// renderRequest is the head verbatim from httputil.DumpRequestOut(httpReq, false) — exact,
+// including the transport's own Accept-Encoding, the real Content-Length, Go's header ordering
+// and a Host: override — plus the body, appended directly onto the dump's own trailing blank
+// line (DumpRequestOut with body=false already ends the head at "\r\n\r\n").
 func renderRequest(httpReq *http.Request, body Body, formBoundary string, mask *strings.Replacer) (text string, elided bool, err error) {
 	head, dumpErr := httputil.DumpRequestOut(httpReq, false)
 	if dumpErr != nil {
@@ -179,10 +180,10 @@ func renderRequest(httpReq *http.Request, body Body, formBoundary string, mask *
 	return string(head) + bodyText, bodyElided, nil
 }
 
-// renderResponseHead is D5: the status line and headers only, from httputil.DumpResponse(resp,
-// false) — F10's measured reconstruction (alphabetised, canonicalised, and for an h2 response an
+// renderResponseHead is the status line and headers only, from httputil.DumpResponse(resp,
+// false) — the measured reconstruction (alphabetised, canonicalised, and for an h2 response an
 // honest status line over HTTP/1.1-style header lines). The body is deliberately not included here
-// (D5) — RawExchangePane.vue concatenates the Response object's own body locally rather than this
+// — RawExchangePane.vue concatenates the Response object's own body locally rather than this
 // duplicating it across the bridge.
 func renderResponseHead(resp *http.Response) (string, error) {
 	head, err := httputil.DumpResponse(resp, false)

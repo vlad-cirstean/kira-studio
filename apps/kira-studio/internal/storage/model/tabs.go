@@ -8,7 +8,7 @@ import (
 
 // TabRecord's `State` stays raw JSON here — packages/shared/domain/tabs.ts's per-kind discriminated
 // union (data/definition/console/document/keyvalue/stream/browse) is renderer-side validation
-// logic, not storage shape (D3). Go validates only the envelope it owns: kind is in
+// logic, not storage shape. Go validates only the envelope it owns: kind is in
 // RenderableTabKinds and State parses as a JSON object; per-kind shape and forward-compatible
 // defaults stay renderer-side.
 type TabRecord struct {
@@ -44,10 +44,9 @@ var RenderableTabKinds = map[string]bool{
 	// environment is created/renamed/duplicated/deleted/reordered. Same F8 warning as the line
 	// above: forget this and a row of this kind is silently dropped on restore.
 	"environments": true,
-	// P83 §7.1: an embedded shell tab. Never actually reaches restore (persistableTabs() filters
-	// it out before save, tabs.ts:132) — still required here, same F8 warning: the parity test
-	// (go-ts-vocabulary-parity.spec.ts) demands a vocabulary complete regardless of what currently
-	// reaches it.
+	// An embedded shell tab. Never reaches restore (persistableTabs() filters it out before save,
+	// tabs.ts:132) — still required here: the parity test (go-ts-vocabulary-parity.spec.ts) demands
+	// a vocabulary complete regardless of what currently reaches it.
 	"terminal": true,
 	// P242: a smart script run; never persisted either, still part of the vocabulary.
 	"script-run": true,
@@ -66,7 +65,7 @@ func IsJSONObject(raw []byte) bool {
 
 // Validate asserts the same envelope repos.TabsRepo.List already enforces on read (kind is
 // renderable, state is a JSON object), plus the non-empty identity fields no SQL constraint
-// covers (P2 R2: Save previously wrote records unvalidated, so a bad row round-tripped silently —
+// covers (Save previously wrote records unvalidated, so a bad row round-tripped silently —
 // it persisted, then vanished on the next List() with nothing at the write site to say why).
 // WorkspaceID is required only for "terminal" — every other kind derives its workspace from
 // TAB_KIND_MODE instead.

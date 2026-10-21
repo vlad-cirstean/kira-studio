@@ -10,11 +10,11 @@ import (
 	"strings"
 )
 
-// ChunkJSON splits a JSON document at element boundaries. Units are the top-level array's elements or
-// the top-level object's members; one over Budget.Max splits into its children, an over-size string
-// into text chunks. Elements stay raw bytes (key order and number spelling survive) and render with
-// two-space indent. HeadingPath is the JSON path of the chunk's first unit. Invalid JSON is an error
-// naming the byte, never a silent text fallback.
+// ChunkJSON splits a JSON document at element boundaries. Units are the top-level array's elements
+// or the top-level object's members; one over Budget.Max splits into its children, an over-size
+// string into text chunks. Elements stay raw bytes (key order and number spelling survive) and
+// render with two-space indent. HeadingPath is the JSON path of the chunk's first unit. Invalid
+// JSON is an error naming the byte, never a silent text fallback.
 func ChunkJSON(src string, b Budget) ([]Chunk, error) {
 	var top json.RawMessage
 	if err := json.Unmarshal([]byte(src), &top); err != nil {

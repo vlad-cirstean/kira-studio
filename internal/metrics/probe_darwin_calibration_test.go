@@ -9,16 +9,15 @@ import (
 	"time"
 )
 
-// C6 (P7 plan §6): calibrates probe_darwin.go's mach-timebase conversion
+// Calibrates probe_darwin.go's mach-timebase conversion
 // (ri_user_time+ri_system_time -> seconds) against syscall.Getrusage(RUSAGE_SELF)'s Utime+Stime —
 // a Timeval, unambiguously seconds and microseconds, POSIX, no cgo of its own. Apple's own
 // proc_info.h documents no unit for the pti_total_user/_system fields rusage_info_v2's equivalents
-// share the convention of (P7 §2.4, OQ-1); if mach_timebase_info's numer/denom is applied when the
+// share the convention of; if mach_timebase_info's numer/denom is applied when the
 // fields are already nanoseconds (or vice versa), the resulting error is ~41.7x on Apple silicon
 // while still looking like a plausible CPU reading — nothing else in this package can catch that.
-// Cannot run in this sandbox (§1.4, no macOS toolchain); must be run on a real Mac before P7 is
-// closed (plan §7.2 item 4), and its result — including the machine's own mach_timebase_info
-// numer/denom — belongs in docs/PERF.md (C8) once it has.
+// Cannot run in this sandbox (no macOS toolchain); must be run on a real Mac, and its result —
+// including the machine's own mach_timebase_info numer/denom — belongs in docs/PERF.md once it has.
 func TestDefaultProbe_CPUTimeMatchesGetrusage(t *testing.T) {
 	pid := int32(os.Getpid())
 

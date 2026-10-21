@@ -3,7 +3,7 @@ package adapters
 import "sync"
 
 // Guarded holds a value behind a mutex — the mutex-plus-field-set shape every adapter hand-wrote a
-// getX/setConnected/clearConnected trio around for its own connection state (P113 G1). Load takes
+// getX/setConnected/clearConnected trio around for its own connection state. Load takes
 // the lock, copies the value out, and releases it; Update takes the lock, applies fn to the value
 // in place, and releases it. Neither ever holds the lock across a network call — fn must not do
 // I/O, and neither should whatever a caller does with a value Load returned.

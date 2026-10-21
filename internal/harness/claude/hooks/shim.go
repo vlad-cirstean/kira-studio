@@ -9,7 +9,7 @@ import (
 // statusLineThrottleSeconds bounds how often the statusline mode forwards one terminal's payload.
 const statusLineThrottleSeconds = 30
 
-// buildShim renders the shim script every hook event runs (§5.2) — curlPath is resolved once by
+// buildShim renders the shim script every hook event runs — curlPath is resolved once by
 // New (exec.LookPath("curl")) and written in verbatim, so a PATH difference inside the launched
 // session can never change which binary runs. Always exits 0: a non-zero exit from a PreToolUse
 // hook blocks the agent's own tool call, and this shim only reports. stderr is discarded for the

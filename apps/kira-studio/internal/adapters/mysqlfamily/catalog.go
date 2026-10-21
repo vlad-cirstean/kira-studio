@@ -190,12 +190,12 @@ func listColumns(ctx context.Context, exec queryExec, database, table string) ([
 	return columns, err
 }
 
-// listSchemaColumns is P22c D1's SchemaColumns, F9's schema-wide widening of listColumns above:
+// listSchemaColumns is the SchemaColumns, the schema-wide widening of listColumns above:
 // the same information_schema.COLUMNS join, minus the TABLE_NAME filter, plus COLUMN_KEY (already
 // on the same row — no second query) so IsPrimaryKey is populated without listIndexes' own
 // per-relation round trip. Views (COLUMN_KEY is always empty for them) are included; sequences and
 // routines have no columns and are excluded by the JOIN itself. Every column here is
-// byte-identical to what listColumns/Describe reports for the same column (P22c §4.1).
+// byte-identical to what listColumns/Describe reports for the same column.
 func listSchemaColumns(ctx context.Context, exec queryExec, database string) ([]model.RelationColumns, error) {
 	byName := map[string]*model.RelationColumns{}
 	var order []string
@@ -360,11 +360,11 @@ func queryForeignKeys(ctx context.Context, exec queryExec, query string, params 
 // in first-seen order — shared by listForeignKeys/listReferencedBy's own mirror-image column
 // mapping (get picks which raw field plays which role).
 //
-// P2 R2: grouped by (refDatabase, refTable, name), not name alone — a MySQL/MariaDB constraint
+// Grouped by (refDatabase, refTable, name), not name alone — a MySQL/MariaDB constraint
 // name is only required to be unique within its own schema, not across the whole server. For
 // listForeignKeys the query is already scoped to one (database, table), so refDatabase/refTable
 // (the *referenced* table) is constant across every row of a real constraint and this is a no-op
-// widening. For listReferencedBy, though, the query spans every database on the server (D17: any
+// widening. For listReferencedBy, though, the query spans every database on the server (any
 // table anywhere can reference this one) with refDatabase/refTable holding the *referencing*
 // table's own schema/table (see its own get closure) — there, two unrelated tables in different
 // databases reusing a common constraint name (e.g. "fk_customer_id") would otherwise fold into

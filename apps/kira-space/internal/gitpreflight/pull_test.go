@@ -100,7 +100,7 @@ func TestResolvePullStrategy_BranchConfigValueMapping(t *testing.T) {
 	}
 }
 
-// TestMapRebaseValue_GitOwnSynonyms is P108 Part 15 F6's own regression proof: git's own
+// TestMapRebaseValue_GitOwnSynonyms is the regression proof: git's own
 // git_config_bool accepts these synonyms case-insensitively, and "i"/"m" as interactive/merges'
 // own short forms — before this fix, only the four exact strings "true"/"false"/"interactive"/
 // "merges" were recognised, so e.g. pull.rebase=yes silently fell through to the ff-only default.

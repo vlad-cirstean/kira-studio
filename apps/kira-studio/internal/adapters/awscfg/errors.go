@@ -11,7 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 )
 
-// authErrorCodes is P58d D4's union of sqs/errors.ts's and s3/errors.ts's own E_AUTH lists, plus
+// authErrorCodes is the union of sqs/errors.ts's and s3/errors.ts's own E_AUTH lists, plus
 // S3's InvalidAccessKeyId — the widening is deliberate and recorded (SigV4 rejects an unknown
 // access key identically for both services; the TypeScript split was an oversight, not a design
 // choice).
@@ -23,8 +23,8 @@ var authErrorCodes = map[string]bool{
 	"InvalidAccessKeyId":          true,
 }
 
-// MapError is the shared table both sqs/errors.go and s3/errors.go wrap in a three-line function —
-// P58d D4. Dispatch order ports errors.ts's own verbatim: cancellation first, then auth, then
+// MapError is the shared table both sqs/errors.go and s3/errors.go wrap in a three-line function.
+// Dispatch order ports errors.ts's own verbatim: cancellation first, then auth, then
 // timeout, then connect, then E_QUERY as the default. A missing queue/bucket/object falls through
 // to E_QUERY deliberately, not E_NOT_FOUND — an ordinary query-time condition against a connection
 // that is still perfectly live (sqs/errors.ts's and s3/errors.ts's own comment).

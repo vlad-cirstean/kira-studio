@@ -45,9 +45,9 @@ type blockingConn struct{}
 func (blockingConn) Send(frame []byte) error  { select {} }
 func (blockingConn) Receive() ([]byte, error) { select {} }
 
-// P2 R1: unlike enqueueLocal's events, enqueueResponse must never drop a response frame on a
+// Unlike enqueueLocal's events, enqueueResponse must never drop a response frame on a
 // saturated queue — that frame is the only way a renderer-side pending request (which has no
-// client-side timeout of its own, §5.1/D25) ever settles. It blocks for room instead, and
+// client-side timeout of its own) ever settles. It blocks for room instead, and
 // unblocks once the session closes rather than hanging forever.
 func TestSession_EnqueueResponse_BlocksInsteadOfDroppingUntilRoomOrClose(t *testing.T) {
 	conn := &blockingConn{}
@@ -91,7 +91,7 @@ func TestSession_EnqueueResponse_BlocksInsteadOfDroppingUntilRoomOrClose(t *test
 	}
 }
 
-// P2 R2 (task #97): enqueueResponse must block once the queue's byte budget (sessionQueueBytes,
+// enqueueResponse must block once the queue's byte budget (sessionQueueBytes,
 // 32 MiB) is exhausted, not only once its frame-count budget (sessionQueueFrames, 64) is — a
 // handful of large data-plane pages can hit the byte budget while leaving the channel's frame
 // slots mostly empty, and the bug this guards against let enqueueResponse push straight past that

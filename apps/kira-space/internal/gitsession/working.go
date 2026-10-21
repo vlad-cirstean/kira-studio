@@ -7,7 +7,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 )
 
-// WorkingDetail is working.detail's own query (P7, item 2): the file list behind the uncommitted-
+// WorkingDetail is working.detail's own query: the file list behind the uncommitted-
 // changes strip's click-through, composed the same way CommitDetail composes commit.detail's own —
 // a status spawn first (statusAndInProgress, already shared with Status/preflight/RunOp), then the
 // two working-tree diff spawns concurrently. Unlike CommitDetail, never cached: the working tree
@@ -22,10 +22,10 @@ func (e *RepoEntry) WorkingDetail(ctx context.Context) ([]porcelain.FileChange, 
 
 	base := "HEAD"
 	if statusResult.Branch.Unborn {
-		// F18 cross-chunk fix (Part 14, flagged for Part 16's own reviewer): the empty-tree hash
-		// is only a fixed constant WITHIN one hash algorithm (SHA-1 vs. SHA-256 have different
-		// values) — derived here from this repository's own object format, via a real spawn,
-		// rather than a hardcoded SHA-1-width literal that silently broke this in a SHA-256 repo.
+		// The empty-tree hash is only a fixed constant WITHIN one hash algorithm (SHA-1 vs.
+		// SHA-256 have different values) — derived here from this repository's own object format,
+		// via a real spawn, rather than a hardcoded SHA-1-width literal that silently broke this
+		// in a SHA-256 repo.
 		hashRaw, herr := e.runOne(ctx, porcelain.EmptyTreeHashArgs())
 		if herr != nil {
 			return nil, herr

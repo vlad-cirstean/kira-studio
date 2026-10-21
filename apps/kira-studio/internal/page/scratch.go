@@ -55,7 +55,7 @@ func truncateUTF8ToBoundary(b []byte, maxBytes int) []byte {
 	// byte checked at each step is b[end], the first EXCLUDED byte (b[:end] is what gets kept) —
 	// a continuation byte there means the cut split whatever rune b[end-1] belongs to, so back off
 	// one more and check again. RuneStart(x) is the same "not a continuation byte" test as TS's own
-	// bit mask, just spelled the other way round.
+	// bit mask, spelled the other way round.
 	end := maxBytes
 	for i := 0; i < utf8.UTFMax-1 && end > 0 && !utf8.RuneStart(b[end]); i++ {
 		end--

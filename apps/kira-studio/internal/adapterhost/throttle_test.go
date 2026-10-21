@@ -17,7 +17,7 @@ func noopFn(ctx context.Context, op *adapters.OpCtx) (any, error) { return nil, 
 // pacing, not the burst formula, so it installs the limiter directly). Five sequential reads at
 // 50/s and burst 1 must take at least ~4/50s to let the last four through — a high rate
 // deliberately, so this costs milliseconds and cannot flake on a slow machine the way a 1/s test
-// would (§7).
+// would.
 func TestThrottle_BurstThenPaces(t *testing.T) {
 	h := NewHost(adapters.Deps{}, nil)
 	const connID = "conn-throttle-pace"
@@ -59,7 +59,7 @@ func TestThrottle_UnsetMeansNoDelayAndNoEntry(t *testing.T) {
 // connect/disconnect/test must bypass the gate outright — even under a limiter so restrictive its
 // burst is already exhausted, none of the three lifecycle kinds ever waits. A misconfigured
 // throttle must never be able to lock a user out of connecting to, or disconnecting from, the
-// connection it throttles (§5.5).
+// connection it throttles.
 func TestThrottle_LifecycleKindsBypassGate(t *testing.T) {
 	h := NewHost(adapters.Deps{}, nil)
 	const connID = "conn-throttle-lifecycle"

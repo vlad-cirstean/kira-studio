@@ -15,7 +15,7 @@ import (
 // alwaysGitLocator is a gitclient.Locator fake that always reports the real "git" on PATH as
 // found — handleSearchRun (like handleGraphLoadMore/handleGraphStream) resolves its own gitPath
 // through Discovery.Status independently of conn.Open's own raw-gitPath bypass (resetSmokeConn's
-// own doc comment), so a search.run end-to-end test needs a Discovery that actually succeeds,
+// own doc comment), so a search.run end-to-end test needs a Discovery that succeeds,
 // unlike reset_test.go's flow (preflight.reset/op.run/undo.peek), which never reaches Discovery.
 type alwaysGitLocator struct{}
 

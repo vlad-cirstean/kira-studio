@@ -1,5 +1,5 @@
-// Package appevent is the Go->renderer push seam (P56 D1/D4) and the small set of IPC channel
-// strings both apps' menu/quit/close-flush handshakes emit on, shared verbatim (P103 Part 3):
+// Package appevent is the Go->renderer push seam and the small set of IPC channel
+// strings both apps' menu/quit/close-flush handshakes emit on, shared verbatim:
 // apps/kira-studio/internal/appcore.Emitter and apps/kira-space/internal/appcore.Emitter were
 // identical three-method interfaces, and bridge.Events' Signal/SignalTo/Broadcast/NewEvents core
 // was byte-identical in both apps too. Each app's own internal/bridge/events.go still owns its
@@ -67,9 +67,9 @@ const (
 	ChannelTabClose           = "kira:menu:tabClose"
 	ChannelKeepAwake          = "kira:keepAwake:changed"
 	ChannelAppMetrics         = "kira:app:metrics"
-	// ChannelAgentSessions/ChannelAgentEvent are P127's own hoist — Claude Code agent-activity
-	// monitoring's two wire channels moved here with internal/agenthooks and its Manager (P86 was
-	// Kira Studio-only; no app wires either channel as of P127, TS's own CHANNEL.agentSessions/
+	// ChannelAgentSessions/ChannelAgentEvent are the hoist — Claude Code agent-activity
+	// monitoring's two wire channels moved here with internal/agenthooks and its Manager (no app
+	// wires either channel, TS's own CHANNEL.agentSessions/
 	// agentEvent in packages/shared/protocol/events.ts). ChannelAgentSessions is every live Claude
 	// Code session across every window; ChannelAgentEvent is one hook firing for one tab. Both
 	// Emit'd (not EmitTo), ChannelKeepAwake's own shape: one process-wide fact, not

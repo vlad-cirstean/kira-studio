@@ -10,7 +10,7 @@ import (
 
 // userinfoPassword returns the userinfo password of uri, decoded; nil when uri has no "://", no
 // userinfo, or no ':' in it. Deliberate string surgery on the userinfo segment only, not a round
-// trip through WHATWG URL (P55 §2 D10: net/url's own serialisation does not match it byte for byte).
+// trip through WHATWG URL (net/url's own serialisation does not match it byte for byte).
 //
 // Algorithm: locate "://"; the authority runs to the first /, ? or # after it; if it contains @,
 // split at the last @ (a password can itself contain an encoded @); the userinfo's password is
@@ -155,11 +155,11 @@ func findAuthority(uri string) (start, end int, ok bool) {
 	return start, end, true
 }
 
-// uriHasAmbiguousPassword detects a URI-mode password containing a raw (unencoded) /, ? or # —
-// F3, P108 Part 3. findAuthority ends the authority at the first such character after "://", so
+// uriHasAmbiguousPassword detects a URI-mode password containing a raw (unencoded) /, ? or #.
+// findAuthority ends the authority at the first such character after "://", so
 // e.g. "postgres://u:pa/ss@h/db" detects an authority of "u:pa" (no '@' in it, so
 // userinfoPassword returns nil) while the URI's real '@' sits past that point — foldPassword would
-// then inject a second password next to the raw one (P181).
+// then inject a second password next to the raw one.
 //
 // Heuristic: an '@' exists after the first /, ? or # following "://", AND the segment before
 // that delimiter (what findAuthority mistook for the whole authority) has no '@' of its own (one

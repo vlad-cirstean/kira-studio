@@ -15,7 +15,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 )
 
-// kafkaTombstoneKey is this test's own extra message (P168 Part 12 F17, run in P180): a record
+// kafkaTombstoneKey is this test's own extra message: a record
 // with a nil Value, Kafka's tombstone convention. Produced here rather than in testsupport's
 // shared seed so it stays scoped to this one read assertion instead of shifting
 // testsupport.KafkaOrdersMessageCount for every other Kafka test.
@@ -62,8 +62,8 @@ func sectionByTitle(sections []model.DefinitionSection, title string) *model.Def
 	return nil
 }
 
-// TestFixture_Kafka is P58f §4.5 step 2 (the last fifth of it), against
-// tests/ipc/kafka/kafka.fixture.ts's own committed scenario: connect, a tree with topics and
+// TestFixture_Kafka runs against tests/ipc/kafka/kafka.fixture.ts's own committed scenario:
+// connect, a tree with topics and
 // consumer groups both at root, a partition-filter popover's own children() call, an offsetWindow
 // read of the orders topic (its own arrival order and wall-clock timestamps frozen), an empty
 // topic's zero-row read, the orders topic's own definition (Partitions + Configuration), and the
@@ -71,9 +71,9 @@ func sectionByTitle(sections []model.DefinitionSection, title string) *model.Def
 //
 // The consumer group's own Group section carries two fewer rows than the committed fixture
 // (type, partitionAssignor) — kadm.DescribedGroup exposes neither field, a permanent capability
-// difference already documented at the adapter level (P58e E13, kafka/definition.go's own
-// comment), reconciled at comparison time by frozen.go's own MaskContinuationTokens rather than
-// re-created here or silently regenerated over.
+// difference already documented at the adapter level (kafka/definition.go's own comment),
+// reconciled at comparison time by frozen.go's own MaskContinuationTokens rather than re-created
+// here or silently regenerated over.
 func TestFixture_Kafka(t *testing.T) {
 	fixture := testsupport.StartKafka(t)
 	app := NewApp(t)

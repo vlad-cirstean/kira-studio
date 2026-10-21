@@ -81,7 +81,7 @@ func listTablesAndViews(ctx context.Context, h *Handle, queryID string, op *adap
 	if err != nil {
 		return nil, err
 	}
-	// P21 round 3 performance finding 7: this used to be a hand-rolled insertion sort over an
+	// This used to be a hand-rolled insertion sort over an
 	// index slice, justified only by "sort.SliceStable would need the `sort` import" — a premise
 	// that was already wrong (sqlite/catalog.go imports `sort` for exactly this). The cost was
 	// real: lessTable below allocates two strings.ToLower copies per comparison, and the rank
@@ -141,8 +141,8 @@ func lessTableIdx(tables []systemTableRow, lowerNames []string, i, j int) bool {
 	}
 	// catalog.ts's own listing sorted with String.prototype.localeCompare, which (for this driver's
 	// plain-ASCII table names) is case-insensitive — plain byte comparison would instead sort every
-	// uppercase-leading name before every lowercase one (a P58f-port-time finding, caught by fixture
-	// regeneration reordering "Order Items" ahead of "big_rows" instead of next to "order_items").
+	// uppercase-leading name before every lowercase one (caught by fixture regeneration reordering
+	// "Order Items" ahead of "big_rows" instead of next to "order_items").
 	return lowerNames[i] < lowerNames[j]
 }
 
@@ -165,10 +165,10 @@ func listColumnsRaw(ctx context.Context, h *Handle, queryID string, op *adapters
 	 ORDER BY position`, op, track, map[string]string{"db": schema, "tbl": table})
 }
 
-// toColumnMeta is catalog.ts's own — F15/D28: nullability lives inside the type string, not a
-// separate column. D18/D23: isPrimaryKey is always false — a MergeTree PRIMARY KEY is a sparse
+// toColumnMeta is catalog.ts's own — nullability lives inside the type string, not a
+// separate column. isPrimaryKey is always false — a MergeTree PRIMARY KEY is a sparse
 // index, not a unique row identity, and showing a PK badge here would claim exactly the
-// uniqueness F16 says does not exist.
+// uniqueness that does not exist.
 func toColumnMeta(row systemColumnRow) model.ColumnMeta {
 	_, nullable := unwrapType(row.Type)
 	var def *string
@@ -186,10 +186,10 @@ func toColumnMeta(row systemColumnRow) model.ColumnMeta {
 	}
 }
 
-// listSchemaColumns is P22c D1's SchemaColumns, F9's schema-wide widening: relevantTables' own
+// listSchemaColumns is the SchemaColumns, the schema-wide widening: relevantTables' own
 // table/view/matview listing (already excludes system engines, kindForEngine) joined against one
 // schema-wide system.columns query, rather than one listColumnsRaw call per relation.
-// IsPrimaryKey is always false, mirroring toColumnMeta's own D18/D23 rule — a MergeTree PRIMARY
+// IsPrimaryKey is always false, mirroring toColumnMeta's own rule — a MergeTree PRIMARY
 // KEY is a sparse index, not a uniqueness constraint.
 func listSchemaColumns(ctx context.Context, h *Handle, tablesQueryID, columnsQueryID string, op *adapters.OpCtx, track TrackQuery, schema string) ([]model.RelationColumns, error) {
 	tables, err := relevantTables(ctx, h, tablesQueryID, op, track, schema)
@@ -258,11 +258,11 @@ func splitTopLevelCommas(expr string) []string {
 	return parts
 }
 
-// listIndexes is catalog.ts's own — D18: system.data_skipping_indices plus one synthetic entry
+// listIndexes is catalog.ts's own — system.data_skipping_indices plus one synthetic entry
 // for the sparse primary index — without it the definition view would show nothing at all about
 // the one thing that most determines how a MergeTree table behaves. unique: false throughout: a
 // skipping index is a pruning aid, and the primary index is a sparse index, neither a uniqueness
-// constraint (F16).
+// constraint.
 func listIndexes(ctx context.Context, h *Handle, queryID string, op *adapters.OpCtx, track TrackQuery, schema, table, primaryKeyExpression string) ([]model.IndexMeta, error) {
 	skipping, err := RunCatalogQuery[struct {
 		Name string `json:"name"`
@@ -299,11 +299,11 @@ type constraintRow struct {
 // user would recognise as one, so only CONSTRAINT ... CHECK ... clauses are matched.
 var checkConstraintRE = regexp.MustCompile(`(?is)^CONSTRAINT\s+(` + "`" + `(?:[^` + "`" + `]|` + "``" + `)+` + "`" + `|\S+)\s+CHECK\s+([\s\S]+)$`)
 
-// listCheckConstraints is catalog.ts's own — F18 (revised): system.constraints is documented but
+// listCheckConstraints is catalog.ts's own — system.constraints is documented but
 // does not exist on the server this adapter is built/tested against (checked against
 // clickhouse/clickhouse-server:26.3), so this parses CHECK constraints out of the CREATE TABLE DDL
 // text itself instead of querying a catalog table. This is the one thing in this package that
-// clears CLAUDE.md's unit-test bar on its own (§5.5): a small parenthesis-aware parser with several
+// clears CLAUDE.md's unit-test bar on its own: a small parenthesis-aware parser with several
 // interacting lexical rules.
 func listCheckConstraints(createTableQuery string) []constraintRow {
 	start := strings.IndexByte(createTableQuery, '(')

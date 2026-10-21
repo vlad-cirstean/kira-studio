@@ -5,14 +5,14 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// MenuDeps is BuildMenu's dependencies. P103 Part 3: Template replaces a call into each app's own
+// MenuDeps is BuildMenu's dependencies. Template replaces a call into each app's own
 // BuildTemplate (menu.go can no longer import an app-specific one) — each app's own main.go builds
 // its own template (via its own internal/appshell.BuildTemplate) and passes it in already built.
 // OnEmit replaces the *bridge.Events field an ItemEmit item used to call Signal on directly — a
 // template with no ItemEmit item (Kira Space's own, today) never calls it, so OnEmit may be nil
-// there. NewWindow (P8 D8) is deliberately not routed through OnEmit like the other Window-section
+// there. NewWindow is deliberately not routed through OnEmit like the other Window-section
 // items: it is an ItemNewWindow, whose action runs in Go and never travels through the renderer
-// (§0.4's "renderer opens no window").
+// ("renderer opens no window").
 type MenuDeps struct {
 	AppName   string
 	IsDev     bool
@@ -127,9 +127,9 @@ func AppMenuTail(appName string) []Item {
 }
 
 // WindowMenuTail is the Window section's own identical closing, after each app's own tab/New-
-// Window items (P107 I2-7): Minimise, Zoom, CloseWindow. closeAccelerator re-accelerates
+// Window items: Minimise, Zoom, CloseWindow. closeAccelerator re-accelerates
 // CloseWindow — Kira Studio's own Shift+W remap (menu.ts:120-122): role:'close' defaults to
-// CmdOrCtrl+W, which "Close Tab" already claims. Kira Space's own menu (P116 G4) grew a "Close Tab"
+// CmdOrCtrl+W, which "Close Tab" already claims. Kira Space's own menu grew a "Close Tab"
 // item too, so both apps now pass Shortcuts["window.close"].Accelerator() here — "" (the role
 // default, unaccelerated) stays supported as a parameter for a future app with no "Close Tab" to
 // collide with, rather than hard-coding the remap into this function.

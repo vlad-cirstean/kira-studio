@@ -62,14 +62,14 @@ func TestCaffeinateDriverLifecycle(t *testing.T) {
 	waitUntil(t, 5*time.Second, func() bool { return !processAlive(pid) })
 }
 
-// TestCaffeinateDriverReapIgnoresSupersededChild deterministically reproduces F12's Rearm race:
+// TestCaffeinateDriverReapIgnoresSupersededChild deterministically reproduces the Rearm race:
 // Release immediately followed by Acquire, with the old child's reap goroutine still not back to
 // the lock when the new child's state is published. The review's own overlay test only landed this
 // 1/40 runs at default GOMAXPROCS (37/40 at GOMAXPROCS=1) — real OS process-death timing in this
 // sandbox doesn't reproduce it at all (fork/exec for the new child is slower than the kernel
 // reaping a SIGKILLed one, so the old reaper usually wins the lock first). This test forces the
 // exact interleaving instead of hoping for it: it holds d.mu itself across the kill-then-replace
-// window — same critical section Release+Acquire run under, just driven from the test — guaranteeing
+// window — same critical section Release+Acquire run under, driven from the test — guaranteeing
 // child 2's state is visible before child 1's reap goroutine ever gets the lock.
 func TestCaffeinateDriverReapIgnoresSupersededChild(t *testing.T) {
 	helper := writeSleepHelper(t)

@@ -7,8 +7,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 )
 
-// CacheStats is data-ops.ts's CacheStats, six ints. A16 governs how the router merges this with
-// the Node engine's own stats during coexistence — that merge lives in the router, not here.
+// CacheStats is data-ops.ts's CacheStats, six ints. The router merges this with the Node engine's
+// own stats during coexistence — that merge lives in the router, not here.
 // JSON tags matter here, not just style: this struct crosses the wire directly as a data-plane
 // response/event payload, and the renderer's CacheStats expects these exact lowercase-first
 // key names — without the tags, encoding/json would emit "L2Bytes" and the renderer's zod parse
@@ -27,8 +27,8 @@ func (a CacheStats) equal(b CacheStats) bool { return a == b }
 
 // Cache is the Go analogue of cache/index.ts: L2 (pages) + L3 (counts) plus the throttled
 // stats-changed notification. Unlike the TypeScript module-level singleton, this is a value
-// constructed by main.go and held by the router (§4.7's Go-specific note #1) — one mutex guards
-// pages, counts and the listener/throttle state together, since ByteLru itself has none.
+// constructed by main.go and held by the router — one mutex guards pages, counts and the
+// listener/throttle state together, since ByteLru itself has none.
 type Cache struct {
 	log func(level, message string)
 
@@ -132,8 +132,8 @@ func (c *Cache) CurrentGeneration(connectionID, path string) GenerationSnapshot 
 	return c.gen.snapshot(connectionID, path)
 }
 
-// StorePageIfCurrent is StorePage, but only actually stores when gen (from a CurrentGeneration
-// call made before the now-finished op was issued) still matches this target's generation — F4:
+// StorePageIfCurrent is StorePage, but only stores when gen (from a CurrentGeneration
+// call made before the now-finished op was issued) still matches this target's generation —
 // a cache miss that raced InvalidateAfterMutation/DropTarget/DropConnection/DropPagesOnly/Clear
 // (including mid-reconnect) while the op was in flight must never cache its own now-stale,
 // pre-invalidation result as fresh.

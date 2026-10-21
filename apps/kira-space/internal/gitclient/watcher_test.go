@@ -33,7 +33,7 @@ func TestClassify(t *testing.T) {
 		{"a file inside sequencer, not watched at that depth", "/repo/.git/sequencer/todo", "", false},
 		{"a loose object", "/repo/.git/objects/ab/cdef0123456789", "", false},
 		{"COMMIT_EDITMSG", "/repo/.git/COMMIT_EDITMSG", "", false},
-		// G25 D17/F9: a detached `worktree add`/`remove` from ANOTHER window writes only under
+		// A detached `worktree add`/`remove` from ANOTHER window writes only under
 		// commonDir/worktrees/<name>/ — this repo's own gitDir here is commonDir itself (the main
 		// worktree), so none of the basename/dir-equality rules above ever matched a SIBLING
 		// worktree's own metadata files before this arm existed.
@@ -77,11 +77,11 @@ func TestClassify(t *testing.T) {
 	}
 }
 
-// TestClassify_NFDEventPathMatchesNFCCommonDir is G27 F2's regression guard: a repository at a
-// non-ASCII path must not silence the watcher forever just because the OS handed back a different
-// byte spelling of the same directory than Identify recorded. Byte literals throughout (D12) — no
+// TestClassify_NFDEventPathMatchesNFCCommonDir is the regression guard: a repository at a
+// non-ASCII path must not silence the watcher forever because the OS handed back a different
+// byte spelling of the same directory than Identify recorded. Byte literals throughout — no
 // filesystem involved, so this proves the fix regardless of what this container's own filesystem
-// does with the two forms (P1).
+// does with the two forms.
 func TestClassify_NFDEventPathMatchesNFCCommonDir(t *testing.T) {
 	composedE := string([]byte{0xc3, 0xa9})         // U+00E9, composed "é"
 	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
@@ -167,11 +167,11 @@ func TestRepoWatcher_AddProducesWorktreeChanged(t *testing.T) {
 	awaitSignal(t, w.Signals(), SignalWorktreeChanged)
 }
 
-// TestRepoWatcher_DetachedWorktreeAddProducesRefsChanged is G25 D17/F9's own end-to-end proof: a
+// TestRepoWatcher_DetachedWorktreeAddProducesRefsChanged is the end-to-end proof: a
 // `worktree add` run as a SEPARATE process (simulating another window/terminal creating a
 // worktree this watcher's own entry did not initiate) writes only under
-// commonDir/worktrees/<name>/ — a real, pre-existing G5-era blind spot this phase makes reachable
-// for the first time. Exercises the real fsnotify backend end to end, not just classify()'s own
+// commonDir/worktrees/<name>/ — a real, pre-existing blind spot.
+// Exercises the real fsnotify backend end to end, not just classify()'s own
 // pure table.
 func TestRepoWatcher_DetachedWorktreeAddProducesRefsChanged(t *testing.T) {
 	dir, _, w := newWatcherFixture(t)
@@ -183,7 +183,7 @@ func TestRepoWatcher_DetachedWorktreeAddProducesRefsChanged(t *testing.T) {
 // TestRepoWatcher_SecondDetachedWorktreeAlsoProducesRefsChanged is the worktree-tree analogue of
 // TestRepoWatcher_NewRefNamespaceSeenOnSecondUpdateToo: the FIRST worktree add creates
 // commonDir/worktrees itself, which this backend was not watching at startup — this proves the
-// reactive maybeWatchWorktreesDir extension actually took effect, by requiring a SECOND, distinct
+// reactive maybeWatchWorktreesDir extension took effect, by requiring a SECOND, distinct
 // worktree add (a new sibling directory under the now-existing commonDir/worktrees) to be seen
 // too, not just the one that happened to create the parent directory.
 func TestRepoWatcher_SecondDetachedWorktreeAlsoProducesRefsChanged(t *testing.T) {
@@ -237,9 +237,9 @@ loop:
 	}
 }
 
-// TestRepoWatcher_NewRefNamespaceSeenOnSecondUpdateToo is D10's own proof: a branch under a
+// TestRepoWatcher_NewRefNamespaceSeenOnSecondUpdateToo is the proof: a branch under a
 // brand-new refs/heads/<namespace>/ directory must be seen — and, critically, so must a SECOND
-// update to it, which only works if the watcher actually added the new directory to its watch set
+// update to it, which only works if the watcher added the new directory to its watch set
 // rather than merely happening to observe the first event from a parent watch.
 func TestRepoWatcher_NewRefNamespaceSeenOnSecondUpdateToo(t *testing.T) {
 	dir, _, w := newWatcherFixture(t)
@@ -276,18 +276,17 @@ func TestRepoWatcher_Close_StopsSignals(t *testing.T) {
 	}
 }
 
-// TestRepoWatcher_SymlinkedRepoStillClassifies guards D7/F9: a repository opened through a
+// TestRepoWatcher_SymlinkedRepoStillClassifies guards: a repository opened through a
 // symlinked ancestor must still classify. `git rev-parse --absolute-git-dir`/`--git-common-dir`
-// do not resolve symlinks (F9), so without NewRepoWatcher resolving CommonDir/GitDir once up
+// do not resolve symlinks, so without NewRepoWatcher resolving CommonDir/GitDir once up
 // front, a real macOS FSEvents backend — which always reports realpaths — would prefix-match
 // nothing and this would hang forever.
 //
 // This is a partial guard, not a reproduction of that failure: fsnotify (this platform's backend)
 // echoes back whatever path it was told to watch, unresolved or not, so it cannot by itself
-// exhibit F9's mismatch the way FSEvents does. What it does prove is that resolveOrKeep runs,
+// exhibit the mismatch the way FSEvents does. What it does prove is that resolveOrKeep runs,
 // that it does not desync the backend's watch roots from classify's comparison target, and that a
-// repository whose CommonDir/GitDir contain a symlink component still works end to end. §7.3 step
-// 1 is what exercises the real macOS failure mode.
+// repository whose CommonDir/GitDir contain a symlink component still works end to end.
 func TestRepoWatcher_SymlinkedRepoStillClassifies(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("no symlink semantics to exercise on Windows-like platforms")
@@ -325,7 +324,7 @@ func (b *fakeBackend) Events() <-chan rawEvent { return b.events }
 func (b *fakeBackend) Close() error            { return nil }
 
 // TestRepoWatcher_RescanRaisesBothSignals is the first automated coverage of the overflow/dropped-
-// events rule (D9/G2 D10) — real fsnotify overflow and real FSEvents drop flags are not producible
+// events rule — real fsnotify overflow and real FSEvents drop flags are not producible
 // on demand, but the rule itself lives above the backend seam, so exercising it through a fake
 // backend covers both real backends at once.
 func TestRepoWatcher_RescanRaisesBothSignals(t *testing.T) {

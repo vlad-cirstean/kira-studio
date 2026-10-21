@@ -17,9 +17,9 @@ import (
 
 // AU/install_test.go earns its keep against CLAUDE.md's unit-test bar: process-lifecycle
 // concurrency (hand-off ordering, cancellation, whole-group kill) is exactly the kind of thing
-// this repo's own testing rule calls out. Not tested here (see the plan): validateScript (two line
+// this repo's own testing rule calls out. Not tested here: validateScript (two line
 // compares), the dev-build guard and the already-in-progress guard (one `if` each), and the
-// deadline path (same code as Cancel, just a different ctx.Err()).
+// deadline path (same code as Cancel, a different ctx.Err()).
 
 func newTestInstaller(t *testing.T, script string) (*Installer, string) {
 	t.Helper()

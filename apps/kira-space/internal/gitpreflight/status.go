@@ -11,7 +11,7 @@ type HeadState struct {
 	SHA  string `json:"sha,omitempty"`
 }
 
-// DirtyPathsDisplayCap is StatusSummary.dirtyPaths' own display cap (D11) — applied by gitsession's
+// DirtyPathsDisplayCap is StatusSummary.dirtyPaths' own display cap — applied by gitsession's
 // handler, never here: the checkout/revert classifiers below must see the FULL, uncapped set (a
 // wrong verdict is worse than a long dialog), so capping belongs at the one layer that knows what
 // "too many to show" means.
@@ -55,9 +55,9 @@ type StatusSummary struct {
 
 // HeadStateFromBranch derives HeadState from status --branch's own header — free, since
 // statusAndInProgress already has this on hand, versus a third rev-parse/symbolic-ref spawn
-// (gitclient.ResolveHead's own route). Unborn is exactly probe P11's rule: a named branch with no
-// commit behind it yet ("(initial)"). Exported so gitsession's own headStateFromStatusBranch (H8,
-// P115 Part 2) can call this instead of duplicating it, converting the result at its own boundary
+// (gitclient.ResolveHead's own route). Unborn is exactly the rule: a named branch with no
+// commit behind it yet ("(initial)"). Exported so gitsession's own headStateFromStatusBranch can
+// call this instead of duplicating it, converting the result at its own boundary
 // (this type's own doc comment).
 func HeadStateFromBranch(b porcelain.StatusBranchInfo) HeadState {
 	if b.Detached {
@@ -72,8 +72,7 @@ func HeadStateFromBranch(b porcelain.StatusBranchInfo) HeadState {
 // SummarizeStatus is the wire-shaped fold from one porcelain.StatusResult (plus the in-progress
 // classification, joined by the caller — gitsession's statusAndInProgress, never here) into
 // StatusSummary — a direct port of model/status.ts's own summarizeStatus. dirtyPaths is always the
-// FULL, uncapped list; DirtyTruncated is always false here (the cap is gitsession's own concern,
-// D11).
+// FULL, uncapped list; DirtyTruncated is always false here (the cap is gitsession's own concern).
 func SummarizeStatus(result porcelain.StatusResult, inProgress *InProgressOperation) StatusSummary {
 	var staged, unstaged, untracked, unmerged int
 	dirtyPaths := []string{}
@@ -160,9 +159,7 @@ func UnmergedPaths(result porcelain.StatusResult) []string {
 // DirtySplit ports repoService.ts's own dirtySplitFrom — the staged/unstaged/untracked split
 // ClassifyReset and ClassifyCherryPick both need, which DirtyPaths' own tracked/untracked
 // discrimination cannot make. An unmerged path counts as BOTH staged and unstaged — the XY code's
-// two halves can each be non-'.' on a real merge conflict, and there is no case in this phase's
-// scope where either classifier reaches this fold with one outstanding without inProgress already
-// blocking first.
+// two halves can each be non-'.' on a real merge conflict.
 func DirtySplit(result porcelain.StatusResult) ResetDirty {
 	staged := []string{}
 	unstaged := []string{}
@@ -190,7 +187,7 @@ func DirtySplit(result porcelain.StatusResult) ResetDirty {
 	return ResetDirty{Staged: staged, Unstaged: unstaged, Untracked: untracked}
 }
 
-// StagedNewPaths ports stagedNewPathsFrom — probe 1's third finding: a staged-but-uncommitted NEW
+// StagedNewPaths ports stagedNewPathsFrom. A staged-but-uncommitted NEW
 // file (status `A.`) reads as "added", not "modified". --hard destroys it exactly as it does a
 // staged edit, but it is neither DirtySplit's `unstaged` (nothing in the worktree differs from the
 // index) nor its `untracked` (the index already has it staged) list, so ClassifyReset's `destroys`

@@ -1,4 +1,4 @@
-// Package appshell is Kira Studio's own residue of the app-shell composition (P103 Part 3): the
+// Package appshell is Kira Studio's own residue of the app-shell composition: the
 // generic half (window/menu/quit/close-flush machinery, the deferred Wails adapters) is repo-root
 // internal/shell, shared with Kira Space; this package is everything left over that is genuinely
 // this app's own — its own menu content, its own dialog request-struct adapter, its own stream
@@ -19,7 +19,7 @@ func BuildTemplate(appName string, isDev bool) []shell.Section {
 	appItems := shell.AppMenuHead()
 	appItems = append(appItems,
 		shell.Item{Kind: shell.ItemEmit, Label: i18n.T("backend.menu.newConnection.label", nil), Accelerator: shell.Shortcuts["app.newConnection"].Accelerator(), Channel: bridge.ChannelNewConnection},
-		// P28 D18: three actions that were prominent panel buttons for how rarely they are used
+		// Three actions that were prominent panel buttons for how rarely they are used
 		// — the two imports outright, New Request additionally (its panel + button stays, since
 		// creating a request is frequent and the panel is where the collections are). No
 		// accelerators: none is frequent enough to spend one, and accel.go's Shortcuts map is

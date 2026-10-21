@@ -17,7 +17,7 @@ const (
 
 // Item.Role is application.Role, so this file is not literally Wails-free — but Role is a bare
 // uint constant in roles.go with no cgo behind it, and the package as a whole imports Wails for
-// menu.go anyway (§1.8). Stated plainly rather than pretending the split buys a build-tag win it
+// menu.go anyway. Stated plainly rather than pretending the split buys a build-tag win it
 // does not.
 type Item struct {
 	Kind        ItemKind

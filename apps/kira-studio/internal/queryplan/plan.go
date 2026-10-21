@@ -1,13 +1,13 @@
 // Package queryplan is the Go port of the console's EXPLAIN plan normalizer
-// (frontend/src/views/console/plan.ts, planModel.ts, planIssues.ts, planParsers/*.ts) —
-// docs/HISTORY.md (v1.7 M3) It is a port, not a bridge (§2.1): every function
+// (frontend/src/views/console/plan.ts, planModel.ts, planIssues.ts, planParsers/*.ts).
+// It is a port, not a bridge: every function
 // involved is pure data transformation over the page each dialect's EXPLAIN returns, so this
 // package imports internal/page and stdlib only — never internal/dbmcp, never internal/adapters.
 //
 // The two implementations are pinned to the same behaviour by a shared fixture set,
 // tests/fixtures/explain-plans/*.{input,expected}.json, read by both this package's own
 // parse_test.go and tests/unit/explain-plan.spec.ts's own parity block — a drift in either
-// language fails a test in that language, on the same bytes (§2.4).
+// language fails a test in that language, on the same bytes.
 package queryplan
 
 // CostUnit is the unit a dialect's own native cost figure is reported in — never compared across
@@ -31,12 +31,11 @@ type Issue struct {
 }
 
 // Metric mirrors planModel.ts's PlanNode.metrics entry — every field a dialect reported that this
-// model has no typed slot for, projected as a label/value pair. §2.3: Go decodes each node twice
+// model has no typed slot for, projected as a label/value pair. Go decodes each node twice
 // (once into a typed struct, once into a map) since a Go map has no insertion order the way
 // Object.entries(raw) does on the TypeScript side; the untyped keys are emitted sorted by label
 // instead, through parse.go's own shared helper. That order is deliberately non-contractual — see
-// this field's own note below and §2.4, whose parity check sorts metrics on both sides before
-// comparing.
+// this field's own note below.
 type Metric struct {
 	Label string `json:"label"`
 	Value string `json:"value"`

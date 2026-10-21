@@ -34,7 +34,7 @@ func ValidateWindowBounds(key string, order int) error {
 
 // WindowRecord is one row of the `windows` table's identity/geometry columns, minus `mode` — both
 // apps' own storage/model.WindowRecord carry Mode themselves instead (Studio's own
-// 0014_p22_window_mode.sql; Space's own 0003_p128_window_mode.sql, P128 §2.2), so List/Delete below
+// 0014_p22_window_mode.sql; Space's own 0003_p128_window_mode.sql), so List/Delete below
 // move here while GetMode/SetMode below stay separate, vocabulary-parametrised calls each app's own
 // WindowsRepo delegates into — internal/shell's own WindowRecord (no per-app fields at all) also
 // aliases this.
@@ -50,7 +50,7 @@ func (w WindowRecord) Validate() error {
 }
 
 // WindowRepo reads and writes the `windows` table's identity/geometry columns, plus the shared,
-// vocabulary-parametrised GetMode/SetMode below (P128 §2.2: both apps now carry a `mode` column).
+// vocabulary-parametrised GetMode/SetMode below (both apps now carry a `mode` column).
 // Each app's own WindowsRepo embeds one of these (constructed against its own DB) for Exists/
 // Create/EnsureExists/SetBounds/GetMode/SetMode, and keeps its own List/Delete on top since those
 // touch app-specific model types this package deliberately stays clear of.
@@ -119,7 +119,7 @@ func (r *WindowRepo) Exists(key string) (bool, error) {
 	return true, nil
 }
 
-// Create inserts a new window record. The caller mints key (D2: a UUID the shell owns); bounds may
+// Create inserts a new window record. The caller mints key (a UUID the shell owns); bounds may
 // be nil (a freshly minted window with no stored rectangle yet). Never writes `mode` — Studio's
 // own mode column always falls back to the migration's own DEFAULT 'studio' on insert, set only
 // afterward via Studio's own SetMode, so dropping it here changes nothing observable.

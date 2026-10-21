@@ -11,9 +11,9 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// mapDetailError maps gitsession's own closed error vocabulary for this phase's four queries into
+// mapDetailError maps gitsession's own closed error vocabulary for the four queries into
 // ipcerr — every one of these is a caller mistake the webview cannot have made from data it read
-// out of a previous result (D6/D8's own validation rules), so all three are E_BAD_REQUEST; any
+// out of a previous result (the validation rules), so all three are E_BAD_REQUEST; any
 // other error falls through to mapGitError, same as every other repo-touching handler.
 func mapDetailError(err error) error {
 	switch {
@@ -39,11 +39,11 @@ func mapDetailError(err error) error {
 }
 
 // entryFor resolves c's held RepoEntry for repoID, or ErrRepoNotHeld mapped the same way graph.*
-// already maps it (D18) — repo.open must precede every one of these four methods, exactly as it
-// must for every other per-repo request. G27 D6: repoID is normalized to NFC here, at the layer
+// already maps it — repo.open must precede every one of these four methods, exactly as it
+// must for every other per-repo request. repoID is normalized to NFC here, at the layer
 // that owns wire ingestion — Registry.Entry stays a pure map lookup with no opinion about string
-// forms (D6's own rejected alternative), and a persisted pre-G27 client's un-normalized repoId
-// resolves against a post-G27 registry rather than erroring (F6).
+// forms, and a persisted client's un-normalized repoId resolves against the registry rather
+// than erroring.
 func entryFor(c *gitsession.Conn, repoID string) (*gitsession.RepoEntry, error) {
 	entry, ok := c.Entry(gitpath.CleanNFC(repoID)) // G27 D6
 	if !ok {
@@ -87,11 +87,11 @@ func (r *Router) handleCommitDetail(ctx context.Context, c *gitsession.Conn, par
 	)
 }
 
-// handleCommitFileDiff is one of D2(b)'s two size-sensitive handlers: it marshals its own result
+// handleCommitFileDiff is one of the two size-sensitive handlers: it marshals its own result
 // once and, only if the *encoded* result exceeds MaxResultBytes, replaces the body with
 // FileDiffBody's own "tooLarge" arm (carrying the real raw patch size, gitsession.FileDiffResult's
 // own RawPatchBytes — never re-derived from the encoded bytes) and marshals again. Returned as
-// json.RawMessage, which rpcstream's own json.Marshal passes through unchanged (D2's own note).
+// json.RawMessage, which rpcstream's own json.Marshal passes through unchanged.
 func (r *Router) handleCommitFileDiff(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p CommitFileDiffParams
 	if err := json.Unmarshal(params, &p); err != nil {

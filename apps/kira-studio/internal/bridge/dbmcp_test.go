@@ -6,8 +6,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
 )
 
-// TestDbMcpTokenProviderForRemintsOnMissingHelperFile guards F8: a record that loads fine but has
-// no helper token mirror on disk at all (never written, e.g. by a pre-F2 install) must not be
+// TestDbMcpTokenProviderForRemintsOnMissingHelperFile guards: a record that loads fine but has
+// no helper token mirror on disk at all (never written) must not be
 // served as-is — no client could ever present a plaintext that verifies against it. The provider
 // must remint fresh, both files together.
 func TestDbMcpTokenProviderForRemintsOnMissingHelperFile(t *testing.T) {
@@ -40,7 +40,7 @@ func TestDbMcpTokenProviderForRemintsOnMissingHelperFile(t *testing.T) {
 	}
 }
 
-// TestDbMcpTokenProviderForRemintsOnMismatchedHelperFile guards the other F8 half: a helper file
+// TestDbMcpTokenProviderForRemintsOnMismatchedHelperFile guards the other half: a helper file
 // that exists but holds a plaintext that does NOT verify against the loaded record (Save
 // succeeded, SaveHelperToken failed or wrote something else on a previous run) is just as broken
 // as a missing one — every client would 401 forever with nothing here able to recover the real

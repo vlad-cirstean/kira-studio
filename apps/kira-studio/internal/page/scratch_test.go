@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// F8 (P108 Part 6, wire mirror): Go's truncateUTF8ToBoundary used to back off with
+// Go's truncateUTF8ToBoundary used to back off with
 // utf8.DecodeLastRune, which treats any trailing byte invalid in isolation as "back off one more"
 // — unbounded for a run of bytes that merely resemble a UTF-8 lead byte without ever completing
 // one, clipping a value far below the intended limit. page.ts's own truncateUtf8ToBoundary only

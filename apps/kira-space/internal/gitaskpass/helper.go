@@ -15,15 +15,15 @@ import (
 // broker that set it correctly always wins; this is a fail-closed floor, not the normal path.
 const helperFallbackTimeout = DefaultTimeout
 
-// RunHelper is the askpass helper's whole client half (D8) — main.go's askpass subcommand
+// RunHelper is the askpass helper's whole client half — main.go's askpass subcommand
 // dispatches straight to this before anything Wails-related runs. Fail closed throughout: any
 // missing env, any malformed response, any deadline exceeded is exit 1 and prints nothing —
-// probe P2's own finding is that git treats a non-zero askpass exit as immediately fatal, with no
+// the finding is that git treats a non-zero askpass exit as immediately fatal, with no
 // retry, which is what turns every one of this function's failure paths into "the op fails
 // promptly" rather than a hang. Never writes the prompt or the answer anywhere but stdout, and
 // only the answer, only on success.
 func RunHelper(args []string, env []string, stdout io.Writer) int {
-	// F19: OpenSSH sets SSH_ASKPASS_PROMPT for two variants this helper otherwise mishandled by
+	// OpenSSH sets SSH_ASKPASS_PROMPT for two variants this helper otherwise mishandled by
 	// treating both as an ordinary masked text prompt, leaving a stale, meaningless prompt on
 	// screen — "none" for a FIDO/security-key touch notification (no text answer is ever
 	// expected; OpenSSH kills the helper itself once the touch happens or times out) and
@@ -58,10 +58,11 @@ func RunHelper(args []string, env []string, stdout io.Writer) int {
 	return 0
 }
 
-// exchange is RunHelper's whole client half of D8's one-round-trip protocol: dial the broker's
-// private socket, send prompt (Confirm as given, F19), and read back its answer. ok is false for
-// ANY transport-level failure (missing env, dial/write/read error, malformed JSON) — indistinguishable
-// from a declined prompt to the caller, which is exactly RunHelper's own fail-closed contract.
+// exchange is RunHelper's whole client half of the one-round-trip protocol: dial the broker's
+// private socket, send prompt (Confirm as given), and read back its answer. ok is false for
+// ANY transport-level failure (missing env, dial/write/read error, malformed JSON) —
+// indistinguishable from a declined prompt to the caller, which is exactly RunHelper's own
+// fail-closed contract.
 func exchange(env []string, prompt string, confirm bool) (resp socketResponse, ok bool) {
 	sockPath, has := lookupEnv(env, "KIRA_ASKPASS_SOCK")
 	if !has || sockPath == "" {

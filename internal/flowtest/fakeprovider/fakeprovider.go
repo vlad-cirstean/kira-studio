@@ -1,8 +1,8 @@
 // Package fakeprovider is a second agent provider for flow tests: it proves a provider registered
 // next to claude drives every consumer with no caller change. Its structured and headless roles run
-// in the test process; its interactive sessions run the fakeagent.Persona binary. The roles it does not
-// play (MCP host, sandbox rules, env scrub) are the Claude provider's, embedded. It is neither a
-// harness.HookHost nor a harness.UsageReporter.
+// in the test process; its interactive sessions run the fakeagent.Persona binary. The roles it does
+// not play (MCP host, sandbox rules, env scrub) are the Claude provider's, embedded. It is neither
+// a harness.HookHost nor a harness.UsageReporter.
 package fakeprovider
 
 import (

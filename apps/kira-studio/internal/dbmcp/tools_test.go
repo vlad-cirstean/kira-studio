@@ -67,7 +67,7 @@ func isErrorResult(t *testing.T, res *mcp.CallToolResult) string {
 	return tc.Text
 }
 
-// TestSchemaBrowsingToolsRefuseWhenReadModeDeny is M7 finding #8: listChildren/describeTable/
+// TestSchemaBrowsingToolsRefuseWhenReadModeDeny: listChildren/describeTable/
 // describeSchema previously checked only resolveEnabled (mcp_enabled) and never consulted the
 // connection's own read permission mode at all — a connection whose read mode is "deny" still had
 // its full schema browsable by an MCP client. Each must refuse before ever reaching the tree

@@ -68,7 +68,7 @@ func (s *ConnectionsService) Reorder(args ConnectionsReorderArgs) ([]model.Conne
 type ConnectionsRevealArgs struct {
 	ID string `json:"id"`
 	// Confirmed is honoured ONLY when the backend has itself determined OS authentication is
-	// unavailable (P14 D6) — on a machine where LocalAuthentication works, this field cannot
+	// unavailable — on a machine where LocalAuthentication works, this field cannot
 	// influence the result; internal/connections.Service.Reveal's own Authorizer call enforces
 	// that, not this method.
 	Confirmed bool `json:"confirmed"`

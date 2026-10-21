@@ -8,7 +8,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/loginshell"
 )
 
-// TestBuildArgv_Golden is the exit-criteria's own golden test: the argv is EXACTLY
+// TestBuildArgv_Golden is the golden test: the argv is EXACTLY
 // [shell, "-l", "-c", script] in the login-shell branch, and EXACTLY [shell, "-c", script] in the
 // /bin/sh fallback branch — scriptText is the literal, unmodified last element in both cases,
 // asserted with a script text containing shell metacharacters, quotes, newlines and a NUL-adjacent

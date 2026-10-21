@@ -11,9 +11,9 @@ import (
 	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
-// maxHookPayloadBytes bounds one hook request's body (§6.1) — 4 MiB is generous for a real
+// maxHookPayloadBytes bounds one hook request's body — 4 MiB is generous for a real
 // PreToolUse/PostToolUse payload (tool_input/tool_response can carry a large diff or command
-// output) while still refusing an unbounded body. Over this, 413 and the event is dropped; §13's
+// output) while still refusing an unbounded body. Over this, 413 and the event is dropped; the
 // reducer is built to tolerate a dropped PostToolUse (paired by tool_use_id, reset by Stop and by
 // a session leaving the registry), so a drop here can never strand the UI.
 const maxHookPayloadBytes = 4 * 1024 * 1024
@@ -47,7 +47,7 @@ func (s *Server) mux() http.Handler {
 	return mux
 }
 
-// handleHook is POST /hook's own handler (§5.1/§6): token check, then X-Kira-Terminal, then the
+// handleHook is POST /hook's own handler: token check, then X-Kira-Terminal, then the
 // bounded body — in that order, so a request failing the token check never reaches the body
 // reader at all (an attacker who knows the socket path but not the token gets nothing back,
 // including a size-limit response that would leak information about the bound).
@@ -110,7 +110,7 @@ func bearerToken(r *http.Request) string {
 }
 
 // truncateMessage bounds s to maxHookMessageBytes, backing off to the nearest earlier rune
-// boundary so a multi-byte UTF-8 character is never split in half (§6.1). A byte-blind slice at
+// boundary so a multi-byte UTF-8 character is never split in half. A byte-blind slice at
 // exactly maxHookMessageBytes can land inside a multi-byte character's own trailing bytes;
 // DecodeLastRuneInString reports that as RuneError/size 1, so trimming one byte at a time until
 // it stops doing so removes exactly the truncated fragment and nothing more.

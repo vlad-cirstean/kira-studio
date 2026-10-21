@@ -10,8 +10,8 @@ import (
 
 // Ported from tests/unit/engine-cache.spec.ts's "L2 page cache" and "L3 count cache" describe
 // blocks. Each test builds its own Cache, unlike the TypeScript spec's process-global singleton
-// that has to call clearPages()/clearCounts() between cases — the exact reason §4.7 gives for
-// making Cache a constructed value here instead of a package-level one.
+// that has to call clearPages()/clearCounts() between cases — the exact reason for making Cache a
+// constructed value here instead of a package-level one.
 
 func fakePage(byteSize int) page.Page {
 	return page.TabularPage{ByteSize: byteSize}
@@ -45,11 +45,11 @@ func TestCache_L3BoundedAtExactly2048Entries(t *testing.T) {
 	}
 }
 
-// InvalidateAfterMutation's asymmetry (§7, P43 F12/D17) is not exercised by the ported TypeScript
-// unit spec (it is presumably covered indirectly by a higher-level packages/db-fixtures/ mutate case), but it
-// is one of the four behaviours P58a §4.7 explicitly flags as looking like a bug without its reason
-// attached, so it gets its own direct Go coverage: a local mutation must drop the target's pages
-// outright but only mark its counts stale, never drop them — DropTarget is the one that drops both.
+// InvalidateAfterMutation's asymmetry is not exercised by the ported TypeScript unit spec (it is
+// presumably covered indirectly by a higher-level packages/db-fixtures/ mutate case), but it is
+// one of the four behaviours flagged as looking like a bug without its reason attached, so it gets
+// its own direct Go coverage: a local mutation must drop the target's pages outright but only mark
+// its counts stale, never drop them — DropTarget is the one that drops both.
 func TestCache_InvalidateAfterMutation_DropsPagesButOnlyStalesCounts(t *testing.T) {
 	const connID, path = "conn", "database:kira_test/schema:app/table:order_items"
 	filter := "status = 'open'"

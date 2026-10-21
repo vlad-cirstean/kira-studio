@@ -2,7 +2,8 @@ package loginshell
 
 import "strings"
 
-// gitEnvKeys is D12/F12's exact, exhaustive removal list — eighteen keys plus the GIT_CONFIG_KEY_*/GIT_CONFIG_VALUE_* prefixes, REMOVED (never
+// gitEnvKeys is the exact, exhaustive removal list — eighteen keys plus the
+// GIT_CONFIG_KEY_*/GIT_CONFIG_VALUE_* prefixes, REMOVED (never
 // merely overwritten with an empty value, which would still leave the key present for a script
 // that checks `[ -n "$GIT_DIR" ]` rather than reading its value) from the inherited environment
 // before any KIRA_*/hygiene addition below. Every key here carries either a mis-targeting hazard

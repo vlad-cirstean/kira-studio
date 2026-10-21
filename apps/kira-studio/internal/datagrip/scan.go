@@ -50,9 +50,9 @@ type Preview struct {
 }
 
 // Scan parses projectDir's two data-source files, maps engines and fields, locates the IntelliJ
-// Platform config directory, and reads security.xml — all file reads, no keychain touched (D9).
+// Platform config directory, and reads security.xml — all file reads, no keychain touched.
 // The config-directory lookup exists only to read security.xml's PROVIDER, which lets a
-// KEEPASS-configured project (D1 follow-up: the file-based PasswordSafe store this app used to
+// KEEPASS-configured project (the file-based PasswordSafe store this app used to
 // also read is gone) get OutlookStoreUnsupported instead of a misleading OutlookWillAttempt.
 func Scan(projectDir string) (*Preview, error) {
 	project, err := ParseProject(projectDir)
@@ -112,7 +112,7 @@ func previewRowFor(ds DataSource, projectDir string, cfg SecurityConfig) Preview
 	return row
 }
 
-// outlookFor is D9's classification — file reads and in-memory facts only. cfg.Provider ==
+// outlookFor is the classification — file reads and in-memory facts only. cfg.Provider ==
 // "KEEPASS" is checked ahead of LookupOrder for the same reason lookupPassword checks it directly
 // (apply.go): it is a real, readable-by-DataGrip store this app does not support, which is a
 // different outlook than "DataGrip never saved a password" (OutlookNotSaved).

@@ -1,9 +1,8 @@
 package model
 
-// ResolvedConnectionConfig is engine-ops.ts's ResolvedConnectionConfig — moved here from
-// internal/connections (P58a A3) once an in-process Adapter needed to name the type directly.
+// ResolvedConnectionConfig is engine-ops.ts's ResolvedConnectionConfig.
 // internal/connections' own resolve() still builds it (and still holds the secret-injection
-// logic); this is just the shape.
+// logic); this is the shape.
 //
 // This is the one shape that carries a secret (Password) — it must never cross the control-plane
 // wire to the renderer. Only an Adapter's Connect and, historically, the engine child ever saw it.

@@ -7,7 +7,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 )
 
-// TestStripSQLComments exercises the scanner's per-state arms directly (P94 pass 2, CLAUDE.md §9):
+// TestStripSQLComments exercises the scanner's per-state arms directly:
 // quote-awareness, dollar quoting, nested block comments and MySQL/MariaDB executable comments all
 // interact through shared depth/execComment state, which AssertNoTransactionEscalation's own tests
 // above cover only indirectly.
@@ -50,8 +50,8 @@ func TestStripSQLComments(t *testing.T) {
 		// An identifier merely ending in e/E (no word boundary before the quote) must not be
 		// mistaken for the E-string prefix: were it, the backslash right before the quote would
 		// wrongly be read as an escape too, extending the "string" past its real end (right after
-		// that quote) and hiding the genuine `; DROP TABLE x` that follows as if it were part of the
-		// string's own content instead of live SQL text.
+		// that quote) and hiding the genuine `; DROP TABLE x` that follows as if it were part of
+		// the string's own content instead of live SQL text.
 		{"identifier ending in e is not mistaken for the E-string prefix", `SELECT value'\' ; DROP TABLE x -- ' FROM t`, `SELECT value'\' ; DROP TABLE x  `},
 	}
 	for _, tt := range tests {
@@ -120,8 +120,8 @@ func TestAssertNoTransactionEscalation(t *testing.T) {
 		{"transaction_read_only yes is not an escalation", []string{"SET transaction_read_only = yes"}, false},
 		{"transaction_read_only set to on is not an escalation", []string{"SET transaction_read_only = on"}, false},
 		{"default_transaction_read_only set to true is not an escalation", []string{"SET default_transaction_read_only = true"}, false},
-		// A bare COMMIT/END/ROLLBACK ends the wrapping read-only transaction itself (review finding,
-		// case 2): confirmed against real MariaDB and MySQL servers that `COMMIT; SET SESSION
+		// A bare COMMIT/END/ROLLBACK ends the wrapping read-only transaction itself: confirmed
+		// against real MariaDB and MySQL servers that `COMMIT; SET SESSION
 		// tx_read_only/transaction_read_only = OFF; <write>` lets the write through once the
 		// wrapper's own COMMIT has ended it — postgres was not itself vulnerable to this exact
 		// sequence, but a read-only console session never has a legitimate reason to end its own
@@ -139,7 +139,7 @@ func TestAssertNoTransactionEscalation(t *testing.T) {
 		{"rollback to a named savepoint without keyword", []string{"ROLLBACK TO sp1"}, false},
 		{"savepoint itself is not rejected", []string{"SAVEPOINT sp1"}, false},
 		{"commit mentioned mid-statement is not rejected", []string{"SELECT 'please COMMIT' AS note"}, false},
-		// M7 finding #2 (high): MySQL/MariaDB executes the body of `/*! ... */`/`/*M! ... */` as
+		// MySQL/MariaDB executes the body of `/*! ... */`/`/*M! ... */` as
 		// real SQL — confirmed against a real MariaDB server that `/*!COMMIT*/ /*!SET SESSION
 		// tx_read_only = OFF*/ DELETE FROM users` ends the wrapping read-only transaction and flips
 		// the session writable, though a naive comment-stripping scanner sees only whitespace here.

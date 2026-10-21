@@ -253,8 +253,8 @@ type rerun struct {
 	Loops   int
 }
 
-// chainRerun finds, per target branch, the first step that must run again after a send-back fix
-// (R4). Walking the branch's route path, round is the highest loops among the done runs so far; a
+// chainRerun finds, per target branch, the first step that must run again after a send-back fix.
+// Walking the branch's route path, round is the highest loops among the done runs so far; a
 // done or `back` run with fewer loops than the round is stale and is queued again with loops =
 // round. A missing, running, pending, stuck or failed run ends the walk.
 func chainRerun(steps []stepView, entry int) []rerun {
@@ -312,10 +312,10 @@ func chainRerunBranch(steps []stepView, entry int, bid string) (rerun, bool) {
 }
 
 // nextAction looks at the end of the route path from the entry step: the first step not done. A
-// manual step waits for the user. A running, stuck or failed step waits (a failure was routed when it
-// was recorded: looped, continued or stopped). A pending step with runs waits on its worktree gate;
-// without runs it starts (auto) or waits for Approve, except the first of the path, which only
-// StartRun starts. A path that runs past the last step = the workflow is complete.
+// manual step waits for the user. A running, stuck or failed step waits (a failure was routed when
+// it was recorded: looped, continued or stopped). A pending step with runs waits on its worktree
+// gate; without runs it starts (auto) or waits for Approve, except the first of the path, which
+// only StartRun starts. A path that runs past the last step = the workflow is complete.
 func nextAction(steps []stepView, entry int) action {
 	path, _ := walkPath(steps, entry)
 	if len(path) == 0 {

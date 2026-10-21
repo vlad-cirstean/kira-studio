@@ -38,7 +38,7 @@ func (e *RepoEntry) Refs(ctx context.Context) (RefsResult, error) {
 	return result, nil
 }
 
-// refsSnapshot is refs.list's ALWAYS-FRESH twin (D10/F16): both HeadsRefsArgs and TagRefsArgs,
+// refsSnapshot is refs.list's ALWAYS-FRESH twin: both HeadsRefsArgs and TagRefsArgs,
 // split by kind, %(worktreepath)-subtracted, and never read from the cache — pre-flight and the
 // write executor's own checkout arm call this directly, never Refs, because a decision that
 // precedes a write must see git's own current state, not a value that predates a `git fetch
@@ -89,7 +89,7 @@ func (e *RepoEntry) refsSnapshot(ctx context.Context) (RefsResult, error) {
 	// %(HEAD) is authoritative for the overwhelmingly common case (on a branch) and free — no
 	// third spawn. A detached or unborn HEAD is invisible to for-each-ref entirely, so those fall
 	// back to Head(ctx), which re-resolves through ResolveHead only if a ref change since marked
-	// it stale (D16) — stronger than upstream's own unconditional cache trust.
+	// it stale — stronger than upstream's own unconditional cache trust.
 	var head gitclient.HeadState
 	if headBranch != nil {
 		head = gitclient.HeadState{Kind: "branch", Name: headBranch.ShortName}
@@ -107,7 +107,7 @@ func (e *RepoEntry) refsSnapshot(ctx context.Context) (RefsResult, error) {
 }
 
 // subtractOwnWorktree turns %(worktreepath) — populated for the branch checked out in ANY
-// worktree, including this session's own (probe P2) — into "checked out ELSEWHERE": equal to our
+// worktree, including this session's own — into "checked out ELSEWHERE": equal to our
 // own root (both filepath.Clean'd, so a trailing separator can never produce a false positive) ⇒
 // omitted; anything else ⇒ kept.
 func subtractOwnWorktree(rows []porcelain.RefRow, ownRoot string) []porcelain.RefRow {
@@ -132,10 +132,10 @@ type resolvedCheckoutTarget struct {
 }
 
 // resolveCheckoutTarget resolves the wire's bare target string against a FRESH ref snapshot
-// (never the cache, F16) into resolvedCheckoutTarget — branches checked before tags before remote
+// (never the cache) into resolvedCheckoutTarget — branches checked before tags before remote
 // branches, so a local branch always wins a same-named ambiguity. Anything matching none of the
 // three is a raw sha, passed through verbatim: ClassifyCheckout's "sha" kind always detaches, and
-// git itself refuses a target resolving to nothing when the argv actually runs.
+// git itself refuses a target resolving to nothing when the argv runs.
 func resolveCheckoutTarget(snapshot RefsResult, target string) resolvedCheckoutTarget {
 	for _, r := range snapshot.Branches {
 		if r.ShortName == target {
@@ -156,7 +156,7 @@ func resolveCheckoutTarget(snapshot RefsResult, target string) resolvedCheckoutT
 }
 
 // localNameForRemoteBranch: "origin/topic" -> "topic" — the executor's own choice of the actual
-// branch name switchCreateTrackingArgs will create (F10's "origin/topic -> topic" heuristic,
+// branch name switchCreateTrackingArgs will create (the "origin/topic -> topic" heuristic,
 // duplicated from gitpreflight's own stripRemotePrefix rather than imported: that one is a pure
 // label concern, this one picks the argv's real branch name).
 func localNameForRemoteBranch(remoteBranchName string) string {

@@ -14,7 +14,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 )
 
-// TestFixture_SQS is P58f §4.5 step 2 (a fifth of it), against tests/ipc/sqs/sqs.fixture.ts's own
+// TestFixture_SQS is against tests/ipc/sqs/sqs.fixture.ts's own
 // committed scenario: connect, a synthetic opsRecent snapshot (the TypeScript harness never issued
 // a real backend call for this channel either — see the file header this ports), a flat queue
 // tree, a poll read (its own randomly-generated MessageIds/timestamps frozen after being validated

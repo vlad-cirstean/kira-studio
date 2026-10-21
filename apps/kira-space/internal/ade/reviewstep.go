@@ -18,7 +18,7 @@ import (
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
-// reviewstep.go: the review step (P286). A review step run has no process: it waits in state `review`
+// reviewstep.go: the review step. A review step run has no process: it waits in state `review`
 // while the user comments in the review window. "Send to agent" queues a round, a headless run
 // (purpose `review`) that answers the open comments through reply_review_comment. Finish routes the
 // step on a result the user picks.

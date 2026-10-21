@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// RefSnapshotArgs is the paged walk's own narrow ref snapshot (D9) — refname -> object id only,
+// RefSnapshotArgs is the paged walk's own narrow ref snapshot — refname -> object id only,
 // deliberately smaller than refs.list's own for-each-ref query (no upstream tracking, no
 // worktree path, no tag annotation: those cost git a reachability computation per ref this
 // comparison never needs).

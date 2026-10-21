@@ -9,13 +9,13 @@ import (
 	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
-// Kira Space's own trimmed Settings model (P100 Part 1). Data/Cache/Api/DbMcp are dropped
+// Kira Space's own trimmed Settings model. Data/Cache/Api/DbMcp are dropped
 // entirely: all four are DB-client-only concerns (page sizes, the query cache budget, HTTP client
-// tuning, the embedded DB MCP server) Kira Space has no use for. Agent carries P188's own leaves.
-// Appearance/Advanced/Git are this app's own (P120): the only app with a git module, so the two
+// tuning, the embedded DB MCP server) Kira Space has no use for. Agent carries the leaves.
+// Appearance/Advanced/Git are this app's own: the only app with a git module, so the two
 // appearance leaves only the git module uses (InlineBlame/DateFormat), its own diagnostic-log leaf
 // (GitLogLevel — Kira Studio's own is a same-shaped but separately named/keyed advanced.logLevel,
-// not a shared struct any more) and the server-owned git leaves (G7 D16) all live here rather than
+// not a shared struct any more) and the server-owned git leaves all live here rather than
 // in the shared appsettings package.
 type AdvancedSettings struct {
 	// GitLogLevel is P72 §9.2's genuinely app-wide replacement for the per-repo kiraSpace.log.level
@@ -27,8 +27,8 @@ type AdvancedSettings struct {
 }
 
 // Appearance embeds appsettings.Appearance for the five leaves both apps share, plus the two only
-// this app's git module uses: InlineBlame (P62's git-blame annotation toggle in the repo file
-// viewer) and DateFormat (P72 §9.1's relative-vs-absolute commit timestamp preference). The
+// this app's git module uses: InlineBlame (the git-blame annotation toggle in the repo file
+// viewer) and DateFormat (the relative-vs-absolute commit timestamp preference). The
 // embedding flattens on the wire — encoding/json promotes an embedded struct's fields on both
 // marshal and unmarshal.
 type Appearance struct {
@@ -44,8 +44,7 @@ type GitSettings struct {
 	ProtectedBranches []string `json:"protectedBranches"`
 	// FetchAutoIntervalMinutes is minutes between automatic background fetches; 0 disables it.
 	FetchAutoIntervalMinutes int `json:"fetchAutoIntervalMinutes"`
-	// GitPath is G18 D15's fix: this leaf was always classified server-owned but its wiring was
-	// dead (Discovery.Status(ctx, "") hardcoded at every call site) until that phase. Empty means
+	// GitPath: this leaf was always classified server-owned. Empty means
 	// "auto-discover" — gitclient.Discovery's own existing contract, unvalidated beyond "is a
 	// string" (a bad path is tolerated the same way Discovery's own probe already falls through
 	// its classified-error states rather than pre-validating).
@@ -74,9 +73,9 @@ type AdeSettings struct {
 }
 
 // AgentSettings embeds appsettings.Agent (the provider both apps share) plus this app's agent
-// leaves. KeepAwakeWithAgents is P188's: on, this Mac stays awake while any agent session runs (a
-// terminal agent tab or a running headless ade session), independent of the title bar's own
-// keep-awake toggle. Off by default — an OS power assertion is opt-in.
+// leaves. KeepAwakeWithAgents: on, this Mac stays awake while any agent session runs (a terminal
+// agent tab or a running headless ade session), independent of the title bar's own keep-awake
+// toggle. Off by default — an OS power assertion is opt-in.
 type AgentSettings struct {
 	appsettings.Agent
 	KeepAwakeWithAgents bool `json:"keepAwakeWithAgents"`
@@ -281,8 +280,7 @@ func validateAdvancedSection(a *AdvancedPatch) error {
 
 // ValidFetchAutoIntervalMinutes and ValidGraphFontSize are exported (not just used by
 // validateGitSection below): repos/settings.go's own readGit needs the identical bound to filter a
-// stored leaf on read, the same way the former appsettings.ReadGit did in one package with its own
-// validators.
+// stored leaf on read.
 var (
 	ValidFetchAutoIntervalMinutes = appsettings.InRange(0, 1440)
 	// P92 item 9: settingsDomain.ts's own FONT_SIZE_RANGE, floored at 0 (the "follow the app"

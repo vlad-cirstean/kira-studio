@@ -1,6 +1,6 @@
 // Package pathsafe is a leaf package (zero internal imports, internal/gitpath's own precedent):
 // the repository-relative path-containment check several otherwise-unrelated packages need and
-// share no sane common import for (C8 plan D6). codeworkspace/paths.go's ValidateRelPath delegates
+// share no sane common import for. codeworkspace/paths.go's ValidateRelPath delegates
 // here; codeworkspace/search.go calls it directly for its own per-match path check.
 package pathsafe
 
@@ -16,11 +16,11 @@ import (
 // absolute path, a ".." segment, or a symlink (ancestor directory or leaf) resolving outside root.
 var ErrPathEscapesRoot = errors.New("pathsafe: path escapes repository root")
 
-// ValidateRelPath is codeworkspace's own §11 path-safety boundary, moved here unchanged in
+// ValidateRelPath is codeworkspace's own path-safety boundary, moved here unchanged in
 // behaviour: reject an absolute path, reject any ".." segment, then resolve the joined path with
 // filepath.EvalSymlinks and require the result to remain under root. A repository can contain a
 // symlink pointing anywhere on the machine, so resolving before the containment check — not after
-// joining alone — is what actually prevents a read-only caller from being used to read
+// joining alone — is what prevents a read-only caller from being used to read
 // ~/.ssh/id_rsa.
 //
 // EvalSymlinks requires its argument to exist, which a listed-but-since-deleted file (a race

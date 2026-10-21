@@ -17,8 +17,8 @@ type PR struct {
 	State   string `json:"state"` // "open" | "draft" | "merged" | "closed" — derived, see deriveState.
 	HeadRef string `json:"headRef"`
 	HeadSha string `json:"headSha"`
-	// HeadRepoOwner is the owner of the repo HeadRef actually lives in — the SAME repo as this
-	// PR's own base for an ordinary PR, but a DIFFERENT owner for one opened from a fork (F11):
+	// HeadRepoOwner is the owner of the repo HeadRef lives in — the SAME repo as this
+	// PR's own base for an ordinary PR, but a DIFFERENT owner for one opened from a fork:
 	// matching a snapshot entry by HeadRef alone, with no owner check, can badge a fork's PR from
 	// a commonly-named branch ("main", "master", "patch-1") onto an unrelated local branch of the
 	// same name. Empty when GitHub reports head.repo as null (the source repo/fork was deleted) —
@@ -54,7 +54,7 @@ type rawPull struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
-// deriveState is D4's own derivation, verbatim — GitHub's own `state` field is only ever "open" or
+// deriveState is the derivation, verbatim — GitHub's own `state` field is only ever "open" or
 // "closed"; "merged" and "draft" are never returned as `state` itself and must be derived from
 // merged_at/draft:
 //
@@ -110,10 +110,10 @@ func toPRs(raw []rawPull) []PR {
 // own noted asymmetry with PullsForBranch, which cannot).
 func (c *Client) PullsForCommit(ctx context.Context, repo Repo, sha string) ([]PR, Status) {
 	var raw []rawPull
-	// G30 round-1 architecture/security review, finding #6: sha is client-supplied (only checked
-	// non-empty at gitrpc/gh.go) and reached this path unescaped — `gh api` parses `path` as a
-	// URL before requesting it, so a sha containing "?"/"#"/"../" reshapes the request path/query
-	// rather than 404ing. url.PathEscape keeps this a single path segment regardless of content.
+	// sha is client-supplied (only checked non-empty at gitrpc/gh.go) and reached this path
+	// unescaped — `gh api` parses `path` as a URL before requesting it, so a sha containing
+	// "?"/"#"/"../" reshapes the request path/query rather than 404ing. url.PathEscape keeps this
+	// a single path segment regardless of content.
 	path := fmt.Sprintf("repos/%s/commits/%s/pulls?per_page=10", repo.Path(), url.PathEscape(sha))
 	status := c.get(ctx, repo, path, &raw)
 	if !status.OK() {
@@ -147,10 +147,10 @@ func (c *Client) PullsForBranch(ctx context.Context, repo Repo, branch string) (
 // own rate-limit arithmetic assumes exactly this cap.
 const maxSnapshotPages = 3
 
-// OpenPulls is D4(c): the repo-wide open-PR snapshot, 1-3 calls
+// OpenPulls is the repo-wide open-PR snapshot, 1-3 calls
 // (`repos/{owner}/{repo}/pulls?state=open&sort=updated&direction=desc&per_page=100&page={1..3}`),
-// stopping early the moment a page returns fewer than per_page elements — no `--paginate` (D4:
-// considered and rejected, a version-dependent output shape) and no `--jq` (a second expression
+// stopping early the moment a page returns fewer than per_page elements — no `--paginate`
+// (considered and rejected, a version-dependent output shape) and no `--jq` (a second expression
 // language this package would then have to keep in step with the Go-side field list above).
 func (c *Client) OpenPulls(ctx context.Context, repo Repo) ([]PR, Status) {
 	const perPage = 100
@@ -165,8 +165,8 @@ func (c *Client) OpenPulls(ctx context.Context, repo Repo) ([]PR, Status) {
 				return nil, status
 			}
 			// A later page failing after at least one page already succeeded is treated as "the
-			// snapshot is what we got" rather than discarding everything already fetched — SPEC's
-			// own fail-open posture (a GitHub hiccup mid-snapshot never blocks git, and the caller
+			// snapshot is what we got" rather than discarding everything already fetched — the
+			// fail-open posture (a GitHub hiccup mid-snapshot never blocks git, and the caller
 			// still gets a usable, if incomplete, snapshot).
 			return all, Status{Kind: KindOK, Host: repo.Host}
 		}

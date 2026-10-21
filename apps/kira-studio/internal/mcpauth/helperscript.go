@@ -9,7 +9,7 @@ import (
 )
 
 // headerHelperScriptName is the fixed script name every DB MCP registration's own headersHelper
-// points at (P108 Part 7 F2). Its content is a fixed template with no secret embedded — only the
+// points at. Its content is a fixed template with no secret embedded — only the
 // helper token file's own path, which is not itself sensitive — so it is written once and then
 // left alone; EnsureHeaderHelperScript rewrites it unconditionally anyway (idempotent, cheap) so it
 // self-heals if it is ever missing or a future version changes the template.

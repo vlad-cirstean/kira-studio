@@ -158,13 +158,13 @@ func TestFileDelta_FastAfterANormalEdit(t *testing.T) {
 	}
 }
 
-// TestFileDelta_FastPathTooLargePatch_StillReportsTheRealCurrentLineCount is G31 round-2
-// functional-correctness review, finding #7: when the fast (tier-1) path's own raw patch exceeds
-// MaxPatchBytes, parseAndResolve returns a zero-value ParsedBody (no hunks) — CurrentLineCount
-// used to be computed as `rec.LineCount + sumHunkDelta(nil)`, silently equal to rec.LineCount
-// (the SNAPSHOT's own line count), even though ancestorRes.ExitCode == 0 already proved the file
-// changed. Rewrites a.txt from 3 lines to 9000 DIFFERENT lines (a diff comfortably over the 1 MiB
-// cap) — CurrentLineCount must report 9000, not the stale snapshot's 3.
+// TestFileDelta_FastPathTooLargePatch_StillReportsTheRealCurrentLineCount: when the fast (tier-1)
+// path's own raw patch exceeds MaxPatchBytes, parseAndResolve returns a zero-value ParsedBody
+// (no hunks) — CurrentLineCount used to be computed as `rec.LineCount + sumHunkDelta(nil)`,
+// silently equal to rec.LineCount (the SNAPSHOT's own line count),
+// even though ancestorRes.ExitCode == 0 already proved the file changed.
+// Rewrites a.txt from 3 lines to 9000 DIFFERENT lines (a diff comfortably over the 1 MiB cap) —
+// CurrentLineCount must report 9000, not the stale snapshot's 3.
 func TestFileDelta_FastPathTooLargePatch_StillReportsTheRealCurrentLineCount(t *testing.T) {
 	t.Parallel()
 	dir, sha1 := buildFileDeltaFixture(t)
@@ -393,10 +393,10 @@ func TestReviewFileDiff_NoSnapshotForAFileWithNoRecord(t *testing.T) {
 	}
 }
 
-// TestRangeFiles_MergeBaseIsCachedAcrossRequests is G30 round-1 performance review finding #8's
-// own proof: RangeFiles (review.files' own orchestration) used to spawn `git merge-base` uncached
-// on every single call, even for the identical (base, branch) pair a review session's own
-// review.files/review.fileDiff round trips repeat over and over while the session sits open.
+// TestRangeFiles_MergeBaseIsCachedAcrossRequests is the proof: RangeFiles (review.files' own
+// orchestration) used to spawn `git merge-base` uncached on every single call, even for the
+// identical (base, branch) pair a review session's own review.files/review.fileDiff round trips
+// repeat over and over while the session sits open.
 func TestRangeFiles_MergeBaseIsCachedAcrossRequests(t *testing.T) {
 	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -465,13 +465,12 @@ func TestRangeFiles_MergeBaseIsCachedAcrossRequests(t *testing.T) {
 	}
 }
 
-// TestMarkFile_StoredBlobOIDMatchesGit is G31 round-2 performance review, finding #5's own
-// regression coverage: MarkFile's own currentOID used to come from a SECOND, separately-spawned
-// blobOID(ctx, tip, path) call, after readSnapshotSource had already resolved (and discarded) the
-// identical rev's OID as part of its own Read. MarkFile now takes currentOID straight off
-// readSnapshotSource's own return (readCurrentContent's own doc comment) — this proves that
-// plumbing is correct, not just "compiles": the stored record's BlobOID must still equal what an
-// independent `git rev-parse <tip>:<path>` reports.
+// TestMarkFile_StoredBlobOIDMatchesGit is the regression coverage: MarkFile's own currentOID used
+// to come from a SECOND, separately-spawned blobOID(ctx, tip, path) call, after readSnapshotSource
+// had already resolved (and discarded) the identical rev's OID as part of its own Read. MarkFile
+// now takes currentOID straight off readSnapshotSource's own return (readCurrentContent's own doc
+// comment) — this proves that plumbing is correct, not just "compiles": the stored record's
+// BlobOID must still equal what an independent `git rev-parse <tip>:<path>` reports.
 func TestMarkFile_StoredBlobOIDMatchesGit(t *testing.T) {
 	t.Parallel()
 	dir, sha1 := buildFileDeltaFixture(t)
@@ -498,7 +497,7 @@ func TestMarkFile_StoredBlobOIDMatchesGit(t *testing.T) {
 
 // waitForRefsChangedInc polls entry.refs until it reports invalid (dropped by note() on
 // refsChanged) or the timeout expires — the watcher's own signal is asynchronous (fsnotify), so a
-// test proving cache invalidation on a real ref move cannot simply call RangeFiles immediately
+// test proving cache invalidation on a real ref move cannot call RangeFiles immediately
 // after the commit above.
 func waitForRefsChangedInc(t *testing.T, entry *RepoEntry) {
 	t.Helper()

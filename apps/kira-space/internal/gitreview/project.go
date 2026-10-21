@@ -8,7 +8,7 @@ import (
 
 // ProjectRanges maps ranges (in the OLD/snapshot side's line numbers) forward through hunks (a
 // snapshot->current patch, old = snapshot, new = current) into new-side (current/branch-tip) line
-// numbers (D10, F7). Outside every hunk, unchanged regions shift uniformly by the running total of
+// numbers. Outside every hunk, unchanged regions shift uniformly by the running total of
 // each hunk's (NewLines - OldLines); inside a hunk, only context lines have an image (a `del` line
 // has none and drops out — exactly right: those lines no longer exist to be "reviewed"). The
 // result is normalized and clamped to [1, newLineCount] — a stored range that outlived the file
@@ -30,7 +30,7 @@ func ProjectRanges(ranges []LineRange, hunks []porcelain.DiffHunk, newLineCount 
 
 // projectOne projects a single old-side range through hunks (assumed sorted ascending by
 // OldStart, as every real diff's hunk list is) by walking the gaps between hunks — where the
-// mapping is a pure offset shift — and, for the portion actually inside a hunk, mapping context
+// mapping is a pure offset shift — and, for the portion inside a hunk, mapping context
 // lines one at a time (bounded by that hunk's own size, never by the range's).
 func projectOne(r LineRange, hunks []porcelain.DiffHunk) []LineRange {
 	var out []LineRange

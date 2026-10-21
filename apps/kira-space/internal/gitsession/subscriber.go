@@ -6,12 +6,12 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 )
 
-// subscriber is D14's coalescing per-connection delivery: the watcher goroutine's note() never
+// subscriber is the coalescing per-connection delivery: the watcher goroutine's note() never
 // blocks and never allocates per event — it ORs a flag under a small mutex and does a
 // non-blocking wake — and one dedicated goroutine per subscriber turns that into at most one
-// deliver call per signal kind, however many events arrived in between. This is what SPEC §6 means
-// by "fanned out ... over its own coalescing buffered channel so one slow client can't stall the
-// watcher for others": coalescing lives in the flags, not in a channel of events, so a burst never
+// deliver call per signal kind, however many events arrived in between. This is what "fanned
+// out ... over its own coalescing buffered channel so one slow client can't stall the watcher
+// for others" means: coalescing lives in the flags, not in a channel of events, so a burst never
 // queues N deliveries and a client stuck for a second only ever gets one repo.changed once it's
 // unstuck.
 type subscriber struct {

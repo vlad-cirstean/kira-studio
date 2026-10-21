@@ -1,9 +1,7 @@
-// Package gitclient is the Go rewrite of the source project's Node `child_process`-based git
-// driver (docs/HISTORY.md (v1.3), "A Node → Go port of the process-spawning half"). It spawns the
-// user's own `git` binary through os/exec — no bundled git, no native bindings — and owns every
-// process this app runs against a repository. Zero I/O beyond os/exec and the filesystem, zero
-// Wails dependency: bridge/git.go is the thin adapter that turns this package's plain Go types
-// into bound-service and stream responses.
+// Package gitclient spawns the user's own `git` binary through os/exec — no bundled git, no native
+// bindings — and owns every process this app runs against a repository. Zero I/O beyond os/exec and
+// the filesystem, zero Wails dependency: bridge/git.go is the thin adapter that turns this
+// package's plain Go types into bound-service and stream responses.
 package gitclient
 
 import (
@@ -37,17 +35,17 @@ type Spec struct {
 	// write's lock. Never set for a command that itself writes (a future phase's checkout/reset/
 	// stash), which needs the lock.
 	ReadOnly bool
-	// Stdin requests a writable stdin pipe on the returned Process (G2 §10's handed-forward seam;
-	// G3's gitclient/catfile is its first caller — a persistent `cat-file --batch[-check]` process
-	// is driven by writing one revision per line). False (the default) leaves stdin closed, exactly
-	// as every G1/G2 spawn already behaves.
+	// Stdin requests a writable stdin pipe on the returned Process (the gitclient/catfile is its
+	// first caller — a persistent `cat-file --batch[-check]` process is driven by writing one
+	// revision per line). False (the default) leaves stdin closed, exactly as every spawn already
+	// behaves.
 	Stdin bool
 	// Env is appended AFTER hygieneEnv (G7 D5), so a spec's own entry wins on a duplicate key — the
 	// askpass broker's only caller: GIT_ASKPASS/SSH_ASKPASS, SSH_ASKPASS_REQUIRE and the broker's
 	// own session/op tokens. Every other caller leaves this nil and is byte-for-byte unaffected.
 	Env []string
 	// OnStderr is called with each stderr chunk as it arrives, from the drain goroutine, BEFORE the
-	// chunk is appended to the bounded buffer Wait() reports (G7 D5) — one read, two consumers,
+	// chunk is appended to the bounded buffer Wait() reports — one read, two consumers,
 	// never a second reader that could disagree with the buffer classification depends on. Never
 	// called after Wait returns. A panic in it would take the drain goroutine down, so gitops' own
 	// progress pump is written not to panic; nothing else is defended here.
@@ -64,7 +62,7 @@ type Spec struct {
 	// cat-file, rev-parse, for-each-ref) stays on Setpgid — a read cannot trigger an interactive
 	// prompt, so it is safe by construction and untouched since G2.
 	Setsid bool
-	// buffered is Run's own private signal to Start (F5, unexported — never set by a caller of
+	// buffered is Run's own private signal to Start (unexported — never set by a caller of
 	// Run, which is the only place that sets it): give cmd.Stdout/cmd.Stderr a plain io.Writer
 	// directly rather than StdoutPipe()/StderrPipe(). Go's os/exec spins its own internal copy
 	// goroutine only for the direct-Writer form, and WaitDelay can force-close ITS OWN pipe once
@@ -84,7 +82,7 @@ type Result struct {
 	ExitCode int
 }
 
-// gracefulStopDelay bounds every graceful-stop window this package uses (G2 plan D3): on
+// gracefulStopDelay bounds every graceful-stop window this package uses: on
 // cancellation or explicit Close, the process group is sent SIGTERM and given this long to exit
 // before escalating to SIGKILL — long enough for git to unwind an in-progress write cleanly, short
 // enough that a Stop button or a window close is never left waiting on a hung child indefinitely.
@@ -92,16 +90,15 @@ type Result struct {
 // SIGKILL_GRACE_MS.
 //
 // A var, not a const (mirrors internal/preconnect/supervisor.go's own killGrace/settleWindow
-// precedent, P55 §2 D9): runner_test.go lowers it so a G31 round-2 architecture/security review
-// finding #11 regression test — proving cmd.Cancel's escalation timer is actually stopped once the
-// process exits cleanly, not left armed toward a SIGKILL nothing needs — doesn't cost 2s of real
-// wall-clock time.
+// precedent): runner_test.go lowers it so a regression test — proving cmd.Cancel's escalation
+// timer is stopped once the process exits cleanly, not left armed toward a SIGKILL nothing
+// needs — doesn't cost 2s of real wall-clock time.
 var gracefulStopDelay = 2 * time.Second
 
 // maxStderrBytes/stderrTruncationMarker bound how much of a child's stderr this package retains
-// (G2 plan D4) — stderr is attacker-adjacent (a pre-push hook, a remote's message) and lands in an
+// — stderr is attacker-adjacent (a pre-push hook, a remote's message) and lands in an
 // error message, so it is capped rather than trusted to be small the way a normal command's stdout
-// is not (D4: stdout is never capped here, only stderr).
+// is not (stdout is never capped here, only stderr).
 const maxStderrBytes = 1 << 20
 
 const stderrTruncationMarker = "\n…[stderr truncated]"
@@ -152,9 +149,8 @@ var configOverrides = []string{
 //   - GIT_PAGER=cat — paired with --no-pager in buildArgv; some git plumbing still consults
 //     GIT_PAGER directly.
 //   - GIT_EDITOR=true — no interactive editor exists here; without this, an operation like
-//     `merge --continue` blocks forever and leaves MERGE_HEAD in place (a later phase's problem to
-//     avoid, not this one's to introduce).
-//   - LC_ALL=C — already load-bearing in this phase: errors.go classifies stderr by English
+//     `merge --continue` blocks forever and leaves MERGE_HEAD in place.
+//   - LC_ALL=C — already load-bearing: errors.go classifies stderr by English
 //     substring match, and this is what guarantees git's own messages are in English regardless of
 //     the machine's locale. LC_ALL also overrides LANG/LC_MESSAGES per POSIX, so nothing else needs
 //     unsetting.
@@ -166,14 +162,15 @@ var hygieneEnv = []string{
 	"LC_ALL=C",
 }
 
-// gitRedirectEnvKeys (F16) retarget every git spawn to a DIFFERENT repository regardless of
+// gitRedirectEnvKeys retarget every git spawn to a DIFFERENT repository regardless of
 // Spec.Dir when inherited from this process's own parent (a wrapper script, an IDE task runner):
 // GIT_DIR/GIT_WORK_TREE point git at a whole different repo/worktree; GIT_INDEX_FILE, GIT_OBJECT_
 // DIRECTORY and GIT_COMMON_DIR retarget the index/object store/shared dir of whatever repo IS
 // used; GIT_NAMESPACE silently prefixes every ref this app reads or writes. Stripped from the base
 // environment before spawning (not merely overridden with an empty value — git does not treat an
-// empty GIT_DIR the same as unset) — the same precaution githost/github's own GH_REPO= clear takes for
-// `gh api`, applied by removal here since these can't be safely neutralised with an empty value.
+// empty GIT_DIR the same as unset) — the same precaution githost/github's own GH_REPO= clear takes
+// for `gh api`, applied by removal here since these can't be safely neutralised with an empty
+// value.
 var gitRedirectEnvKeys = []string{
 	"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "GIT_NAMESPACE",
 }
@@ -201,8 +198,8 @@ func stripEnvKeys(base []string, keys []string) []string {
 // buildEnv returns the process environment for one spawn — os.Environ() (real inherited
 // environment) is not read directly by tests, which pass their own base instead (see
 // runner_test.go), keeping this pure and independent of the machine it runs on. base is stripped
-// of gitRedirectEnvKeys first (F16) — before hygieneEnv and extra are appended, so neither could
-// ever reintroduce one of them by accident. extra (G7 D5) is appended last, so a spec's own entry
+// of gitRedirectEnvKeys first — before hygieneEnv and extra are appended, so neither could
+// ever reintroduce one of them by accident. extra is appended last, so a spec's own entry
 // wins over hygieneEnv on a duplicate key — the askpass broker's own GIT_ASKPASS/SSH_ASKPASS/
 // tokens are the one caller today.
 func buildEnv(base []string, extra []string) []string {
@@ -263,8 +260,8 @@ type Runner interface {
 // the process could not be started or reaped at all; a non-zero exit is reported through
 // Result.ExitCode, exactly the shape errors.go's Classify expects.
 //
-// F5: sets spec.buffered so Start gives cmd.Stdout/cmd.Stderr a direct io.Writer instead of
-// *Pipe() — see Spec.buffered's own doc comment for why that is what lets WaitDelay actually
+// Sets spec.buffered so Start gives cmd.Stdout/cmd.Stderr a direct io.Writer instead of
+// *Pipe() — see Spec.buffered's own doc comment for why that is what lets WaitDelay
 // unblock this call against a hook's background process inheriting stdout/stderr, rather than
 // leaving Run blocked reading to an EOF a live grandchild can hold off forever.
 func Run(ctx context.Context, r Runner, gitPath string, spec Spec) (Result, error) {
@@ -280,19 +277,19 @@ func Run(ctx context.Context, r Runner, gitPath string, spec Spec) (Result, erro
 	return res, nil
 }
 
-// killGroup signals pid's whole process group — the negative pid targets the group (D3), which is
+// killGroup signals pid's whole process group — the negative pid targets the group, which is
 // what reaches a grandchild (ssh, a credential helper, a hook) the direct child spawned, not just
 // the direct child itself. ESRCH (no such process/group — already gone) is not an error: the
 // intended outcome already holds.
 //
 // A var, not a plain func (internal/preconnect/supervisor.go's own killSignal is this codebase's
 // precedent for the pattern) so a test can observe whether cmd.Cancel's SIGKILL escalation was
-// actually invoked — proving a stopped timer, not merely inferring it from a real pid-reuse
+// invoked — proving a stopped timer, not merely inferring it from a real pid-reuse
 // scenario, which isn't reproducible on demand.
 var killGroup = procgroup.Kill
 
-// killAndWait is execProcess.Close/bufferedExecProcess.Close's own shared shape (P113 G10): send a
-// group SIGTERM, arm a SIGKILL escalation, wait for the process to actually exit, then disarm the
+// killAndWait is execProcess.Close/bufferedExecProcess.Close's own shared shape: send a
+// group SIGTERM, arm a SIGKILL escalation, wait for the process to exit, then disarm the
 // timer. Unlike cmd.Cancel's own escalation (wired once, at Start, for a ctx-driven cancellation),
 // this is a second, explicit kill path a caller triggers directly by calling Close — so it arms its
 // own separate timer rather than reusing stopEscalate/cmd.Cancel's.
@@ -322,9 +319,9 @@ func (execRunner) Start(ctx context.Context, gitPath string, spec Spec) (Process
 	cmd := exec.CommandContext(ctx, gitPath, buildArgv(spec)...)
 	cmd.Dir = spec.Dir
 	cmd.Env = buildEnv(os.Environ(), spec.Env)
-	// D3: every git child gets its own process group, so a group signal reaches whatever it
-	// forked (git fetch/push spawn ssh, git-remote-https, credential helpers). Setsid (G7 D6 for
-	// remote ops, G8 D6 for local writes too) additionally detaches the child from any controlling
+	// Every git child gets its own process group, so a group signal reaches whatever it
+	// forked (git fetch/push spawn ssh, git-remote-https, credential helpers). Setsid (for
+	// remote ops, for local writes too) additionally detaches the child from any controlling
 	// terminal — pgid == pid either way, so killGroup(-pid, …) is unaffected by which one a spawn
 	// asked for.
 	if spec.Setsid {
@@ -335,19 +332,19 @@ func (execRunner) Start(ctx context.Context, gitPath string, spec Spec) (Process
 	// Replaces exec.CommandContext's default Cancel (an immediate, ungraceful Process.Kill()) with
 	// a group SIGTERM, escalating to a group SIGKILL after gracefulStopDelay if the group hasn't
 	// exited by then. This — not cmd.WaitDelay's own escalation, which reaches only the direct
-	// child and never the pipes obtained via *Pipe() below — is what actually unblocks a Stdout
-	// reader parked behind a grandchild that outlived git itself (F3): only a group-wide kill
+	// child and never the pipes obtained via *Pipe() below — is what unblocks a Stdout
+	// reader parked behind a grandchild that outlived git itself: only a group-wide kill
 	// reaches that grandchild and lets it close its own copy of the pipe.
 	//
-	// stopEscalate is read by execProcess.reap, below, once cmd.Wait has returned — G31 round-2
-	// architecture/security review, finding #11: without stopping it there, a group that exits
-	// cleanly on SIGTERM (the overwhelmingly common case) still left this timer armed for the full
-	// gracefulStopDelay, each one a live goroutine referencing this cmd, and — narrower but
-	// real — a SIGKILL fired at cmd.Process.Pid's process GROUP after that delay could land on an
-	// unrelated group that has since reused the same pid. Calling stopEscalate only after cmd.Wait
-	// returns is safe with no lock: Wait is documented to block until any goroutine running Cancel
-	// has finished, which is exactly the happens-before this needs (execProcess.Close, just below,
-	// already relies on the identical guarantee for its own, separately-armed escalate timer).
+	// stopEscalate is read by execProcess.reap, below, once cmd.Wait has returned — without
+	// stopping it there, a group that exits cleanly on SIGTERM (the overwhelmingly common case)
+	// still left this timer armed for the full gracefulStopDelay, each one a live goroutine
+	// referencing this cmd, and — narrower but real — a SIGKILL fired at cmd.Process.Pid's
+	// process GROUP after that delay could land on an unrelated group that has since reused the
+	// same pid. Calling stopEscalate only after cmd.Wait returns is safe with no lock: Wait is
+	// documented to block until any goroutine running Cancel has finished, which is exactly the
+	// happens-before this needs (execProcess.Close, just below, already relies on the identical
+	// guarantee for its own, separately-armed escalate timer).
 	stopEscalate := procgroup.GracefulCancel(cmd, gracefulStopDelay, killGroup)
 
 	if spec.buffered {
@@ -390,12 +387,12 @@ func startStreaming(cmd *exec.Cmd, spec Spec, stopEscalate func()) (Process, err
 	return p, nil
 }
 
-// startBuffered is Run's own path (F5): cmd.Stdout/cmd.Stderr get a plain io.Writer directly, so
+// startBuffered is Run's own path: cmd.Stdout/cmd.Stderr get a plain io.Writer directly, so
 // Go's own internal copy goroutines run — and WaitDelay can force-close ITS OWN pipe against a
 // hook's background process still holding the write end open, once the direct child has exited —
 // instead of this package reading a *Pipe() to an EOF that process could hold off forever.
 // Spec.buffered's own doc comment has the full reasoning. stderrTee gives the same
-// OnStderr-then-bounded-buffer behavior the streaming path's drainStderr gives, just invoked by
+// OnStderr-then-bounded-buffer behavior the streaming path's drainStderr gives, invoked by
 // Go's own copy goroutine instead of one of ours.
 func startBuffered(cmd *exec.Cmd, spec Spec, stopEscalate func()) (Process, error) {
 	if spec.Stdin {
@@ -431,7 +428,7 @@ func (t *stderrTee) Write(p []byte) (int, error) {
 }
 
 // boundedWriter caps how many bytes it retains, appending stderrTruncationMarker once the cap is
-// reached and silently discarding the rest (D4). Not safe for concurrent use — the stderr-drain
+// reached and silently discarding the rest. Not safe for concurrent use — the stderr-drain
 // goroutine is its only writer, and its buffer is only ever read after that goroutine has finished
 // (execProcess.stderrDone), so no lock is needed.
 type boundedWriter struct {
@@ -466,10 +463,9 @@ type execProcess struct {
 	// onStderr is G7 D5's tee — nil for every caller before this phase (fetch/push/pull's progress
 	// pump is the first).
 	onStderr func([]byte)
-	// stopEscalate stops cmd.Cancel's own SIGKILL-escalation timer, if one was ever armed (G31
-	// round-2 architecture/security review, finding #11) — called from reap, below, once cmd.Wait
-	// has confirmed the process is actually gone, so a clean SIGTERM exit never leaves that timer
-	// ticking uselessly toward a SIGKILL nothing needs.
+	// stopEscalate stops cmd.Cancel's own SIGKILL-escalation timer, if one was ever armed — called
+	// from reap, below, once cmd.Wait has confirmed the process is gone, so a clean SIGTERM exit
+	// never leaves that timer ticking uselessly toward a SIGKILL nothing needs.
 	stopEscalate func()
 
 	stderrDone chan struct{}
@@ -545,7 +541,7 @@ func (p *execProcess) Close() error {
 	return nil
 }
 
-// bufferedExecProcess is Process for the F5 buffered path (Run's only spawn shape): stdout/stderr
+// bufferedExecProcess is Process for the buffered path (Run's only spawn shape): stdout/stderr
 // are captured directly by cmd's own internal copy goroutines rather than read incrementally by
 // this package (startBuffered's own doc comment), so Stdout/Stdin return placeholders — nothing in
 // this package reads either on a bufferedExecProcess; Wait's own Result carries everything a
@@ -573,7 +569,7 @@ func (p *bufferedExecProcess) reap() {
 	p.stopEscalate()
 	// cmd.ProcessState is set once the DIRECT CHILD itself has exited — before Wait ever gets to
 	// the separate "wait for the I/O copy goroutines" phase WaitDelay bounds — so it is populated
-	// for a clean exit, a non-zero exit (err is *exec.ExitError), AND F5's own scenario: a
+	// for a clean exit, a non-zero exit (err is *exec.ExitError), AND the scenario: a
 	// grandchild still holding cmd.Stdout/cmd.Stderr's write end open after the direct child has
 	// already exited, which surfaces as a distinct "WaitDelay expired before I/O complete" error,
 	// not an *exec.ExitError. That last case is not a spawn/reap failure — the command itself
@@ -581,7 +577,7 @@ func (p *bufferedExecProcess) reap() {
 	// direct child wrote (it has already exited, so it wrote nothing more after that point), only
 	// possibly missing whatever a STILL-RUNNING grandchild might separately write to the same fd —
 	// never the case for git's own child processes. Reporting the real exit code either way is
-	// what lets a caller no longer wait forever on a hook's background process (F5) while still
+	// what lets a caller no longer wait forever on a hook's background process while still
 	// treating an ordinary non-zero git exit exactly as before.
 	if p.cmd.ProcessState != nil {
 		p.waitResult = Result{Stdout: p.stdout.Bytes(), Stderr: p.stderr.buf.Bytes(), ExitCode: p.cmd.ProcessState.ExitCode()}

@@ -11,7 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )
 
-// P8 §6.2: seven cases, each guarding a rule genuinely easy to get wrong when three caps and a
+// Seven cases, each guarding a rule genuinely easy to get wrong when three caps and a
 // generated scope column interact (Record is "cache eviction with interacting rules",
 // CLAUDE.md's own named category) — not CRUD round trips. Explicitly not tested here: that List
 // returns what Record inserted, that Delete deletes, that Get decodes a snapshot it just wrote,
@@ -235,8 +235,7 @@ func TestResponseHistoryGlobalByteBudgetEvictsOldestAcrossScopes(t *testing.T) {
 	// Shrink the real budget to "both mid-* rows, plus generous headroom for one more small row"
 	// — comfortably more than the "newest" row inserted below (an ordinary small body, the same
 	// size class as mid-A/mid-B) needs, and comfortably less than either padded old-* row costs on
-	// its own, so the boundary is robust to encoding noise rather than balanced on it (§6.2's
-	// "shrink the budget for the test").
+	// its own, so the boundary is robust to encoding noise rather than balanced on it.
 	repos.SetHistoryByteBudgetForTest(t, midBytes+600)
 
 	if err := r.Record(rec(item1, "tab1", 200, "newest")); err != nil {
@@ -282,7 +281,7 @@ func TestResponseHistoryGlobalByteBudgetEvictsOldestAcrossScopes(t *testing.T) {
 	}
 }
 
-// F9/P21 round 1: capBody only bounds 'raw'/'code' bodies — a urlencoded body's field values have
+// capBody only bounds 'raw'/'code' bodies — a urlencoded body's field values have
 // no per-field cap at all. A single request carrying enough of them to push the marshaled
 // snapshot past half the byte budget on its own would otherwise break the sweep's own safety
 // invariant ("no single row can exceed the budget") and empty the whole table on insert, the same
@@ -400,7 +399,7 @@ func TestResponseHistoryAdopt(t *testing.T) {
 	}
 }
 
-// ---- 8. P9 D7/F12: a rendered exchange never reaches kira.sqlite ----
+// ---- A rendered exchange never reaches kira.sqlite ----
 //
 // A security assertion, not a CRUD round trip: it is the test that would catch a future refactor
 // reintroducing the field. A non-nil Wire on the Response Record is given comes back nil after a
@@ -447,12 +446,12 @@ func TestResponseHistoryRecordStripsWireBeforePersisting(t *testing.T) {
 	}
 }
 
-// ---- 9. P10 D10: a stored snapshot keeps its timeline ----
+// ---- 9. A stored snapshot keeps its timeline ----
 //
-// The deliberate mirror of case 8 above: Wire is live-only and stripped (P9 D7), but Timeline is
-// small enough (F17) and valuable enough (D10) that it is kept — this is the test that would catch
-// a future refactor nil-ing the wrong field. A non-nil Timeline on the Response Record is given
-// comes back with the same hop count and the same hop URL after a Get.
+// The deliberate mirror of case 8 above: Wire is live-only and stripped, but Timeline is small
+// enough and valuable enough that it is kept — this is the test that would catch a future refactor
+// nil-ing the wrong field. A non-nil Timeline on the Response Record is given comes back with the
+// same hop count and the same hop URL after a Get.
 
 func TestResponseHistoryRecordKeepsTimeline(t *testing.T) {
 	r, db := newResponseHistoryRepo(t)

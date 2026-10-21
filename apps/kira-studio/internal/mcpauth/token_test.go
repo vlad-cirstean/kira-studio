@@ -132,10 +132,10 @@ func TestZeroExpiresAtNeverExpires(t *testing.T) {
 	}
 }
 
-// TestLoadOrMintTTLStampsZeroExpiryOnceNotRepeatedly covers the one-shot side effect §8 calls out:
-// a zero-ExpiresAt record (a pre-M1 file) gets stamped with now+ttl on its first load, reported as
-// a load rather than a mint, and the stamped ExpiresAt must not move on a later load — otherwise
-// the clock resets on every restart and rotation never actually bites.
+// TestLoadOrMintTTLStampsZeroExpiryOnceNotRepeatedly covers the one-shot side effect:
+// a zero-ExpiresAt record gets stamped with now+ttl on its first load, reported as a load rather
+// than a mint, and the stamped ExpiresAt must not move on a later load — otherwise
+// the clock resets on every restart and rotation never bites.
 func TestLoadOrMintTTLStampsZeroExpiryOnceNotRepeatedly(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "token.json")
 	plain, rec, err := MintTTL(0) // ExpiresAt = now+0 = now, but we overwrite it below to simulate a pre-M1 file

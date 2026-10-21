@@ -22,18 +22,17 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// TestMaskSecrets_RedirectURLsFinalURLAndTimelineHopsBeforePersisting is P10 D14/F16's own
-// security assertion — not a CRUD round trip — the same posture P9's own masking commit took for
-// header/body masking (tests/ui/http-raw.spec.ts's "N secret values are shown as {{name}}" case).
+// TestMaskSecrets_RedirectURLsFinalURLAndTimelineHopsBeforePersisting is the security assertion
+// — not a CRUD round trip — the same posture the masking commit took for header/body masking
+// (tests/ui/http-raw.spec.ts's "N secret values are shown as {{name}}" case).
 //
-// F16 found that Response.Redirects[].URL and Response.FinalURL — resolved URLs, P2 fields — have
-// been persisted to kira.sqlite unmasked since P8 landed, and that this phase's own per-hop
-// Timeline URL/header list would widen the same gap. This proves the fix at the exact point it
-// runs (maskSecrets), then proves it end to end through the real path a live send actually takes:
-// mask, then Record, then read the raw snapshot_json column back out of a real, migrated SQLite
-// database — the secret's plaintext must appear in neither, the same way
-// TestResponseHistoryRecordStripsWireBeforePersisting (response_history_test.go) proves Wire never
-// reaches the column at all.
+// Response.Redirects[].URL and Response.FinalURL — resolved URLs — have been persisted to
+// kira.sqlite unmasked, and the per-hop Timeline URL/header list would widen the same gap. This
+// proves the fix at the exact point it runs (maskSecrets), then proves it end to end through the
+// real path a live send takes: mask, then Record, then read the raw snapshot_json column back out
+// of a real, migrated SQLite database — the secret's plaintext must appear in neither, the same
+// way TestResponseHistoryRecordStripsWireBeforePersisting (response_history_test.go) proves Wire
+// never reaches the column at all.
 func TestMaskSecrets_RedirectURLsFinalURLAndTimelineHopsBeforePersisting(t *testing.T) {
 	const secret = "sk_live_super_secret_token"
 	const masked = "{{apiKey}}"
@@ -132,11 +131,11 @@ func TestMaskSecrets_RedirectURLsFinalURLAndTimelineHopsBeforePersisting(t *test
 	assertMasked(t, "decoded FinalURL", snap.Response.FinalURL)
 }
 
-// TestMaskSecrets_MasksResponseHeadAndHeaders is P21 round 1 architecture/security finding 4:
-// maskSecrets masked the timeline and redirect chain but never resp.Wire.ResponseHead or
-// resp.Headers — the exact response half RawExchangePane.vue renders and
-// ResponseHistoryRepo.Record persists, under a UI note claiming the whole exchange is masked.
-// F16's own reasoning ("a Location header is a URL too") applies identically to a response header.
+// TestMaskSecrets_MasksResponseHeadAndHeaders: maskSecrets masked the timeline and redirect chain
+// but never resp.Wire.ResponseHead or resp.Headers — the exact response half RawExchangePane.vue
+// renders and ResponseHistoryRepo.Record persists, under a UI note claiming the whole exchange is
+// masked. The reasoning ("a Location header is a URL too")
+// applies identically to a response header.
 func TestMaskSecrets_MasksResponseHeadAndHeaders(t *testing.T) {
 	const secret = "sk_live_super_secret_token"
 	const masked = "{{apiKey}}"
@@ -169,9 +168,9 @@ func TestMaskSecrets_MasksResponseHeadAndHeaders(t *testing.T) {
 	}
 }
 
-// TestMaskSendErrTimeline_MasksFailedSendHopURL is D14's reach into D15's own new failure
-// channel: mapHttpError marshals herr.Timeline into ipcerr.Error.Details — a copyable surface,
-// per §0.3 — so a failed send's own hop URL must be masked before that happens too, not only a
+// TestMaskSendErrTimeline_MasksFailedSendHopURL is the reach into the new failure channel:
+// mapHttpError marshals herr.Timeline into ipcerr.Error.Details — a copyable surface —
+// so a failed send's own hop URL must be masked before that happens too, not only a
 // successful one's.
 func TestMaskSendErrTimeline_MasksFailedSendHopURL(t *testing.T) {
 	const secret = "sk_live_super_secret_token"
@@ -256,14 +255,13 @@ func TestMaskSendErrTimeline_MasksHopHeadersAndHopError(t *testing.T) {
 	}
 }
 
-// TestMaskSendErrTimeline_MasksMessageForTransportAndBadURLErrors is finding 1 of the round-1
-// review: client.go's classifySendErr (transport failure) and resolveURL (bad-URL-parse failure)
-// both build herr.Message from the *resolved* URL — net/http's own *url.Error and url.Parse's own
-// error both embed the URL they were given verbatim — yet maskSendErrTimeline used to touch only
-// herr.Timeline.Hops[].URL, never herr.Message itself. A bad-URL-parse failure in particular has no
-// Timeline at all (it fails before classifySendErr ever runs), so that path went entirely
-// unmasked. Both shapes are covered here since gRPC's own mapHttpError/RunOp.Error() reads
-// herr.Message verbatim either way.
+// TestMaskSendErrTimeline_MasksMessageForTransportAndBadURLErrors: client.go's classifySendErr
+// (transport failure) and resolveURL (bad-URL-parse failure) both build herr.Message from the
+// *resolved* URL — net/http's own *url.Error and url.Parse's own error both embed the URL they
+// were given verbatim — yet maskSendErrTimeline used to touch only herr.Timeline.Hops[].URL,
+// never herr.Message itself. A bad-URL-parse failure in particular has no Timeline at all (it
+// fails before classifySendErr ever runs), so that path went entirely unmasked. Both shapes are
+// covered here since gRPC's own mapHttpError/RunOp.Error() reads herr.Message verbatim either way.
 func TestMaskSendErrTimeline_MasksMessageForTransportAndBadURLErrors(t *testing.T) {
 	const secret = "sk_live_super_secret_token"
 	usedSecrets := []apivars.UsedSecret{{Name: "apiKey", Rendered: secret, Placeholder: "{{apiKey}}"}}
@@ -311,7 +309,7 @@ func TestMaskSendErrTimeline_MasksMessageForTransportAndBadURLErrors(t *testing.
 	}
 }
 
-// TestHttpSendFailure_OpLogErrorNeverContainsSecret proves finding 1 end to end, through the exact
+// TestHttpSendFailure_OpLogErrorNeverContainsSecret proves end to end, through the exact
 // path a live failed send takes: RunOp's own err.Error() (host.go) is persisted verbatim to
 // op_log.error by oplog's Wiring — reproduced here against a real Host and a real, migrated SQLite
 // database (storage.Open(), the same helper the redirect/timeline masking test above uses) rather
@@ -391,10 +389,10 @@ func TestHttpSendFailure_OpLogErrorNeverContainsSecret(t *testing.T) {
 	}
 }
 
-// TestMaskSecrets_MasksURLEncodedBodyDespiteQueryEscape is finding 6: secretReplacer used to build
+// TestMaskSecrets_MasksURLEncodedBodyDespiteQueryEscape: secretReplacer used to build
 // its strings.Replacer over each secret's own *plaintext*, but a urlencoded body's rendered wire
 // text (resp.Wire.Request) is the *url.QueryEscape'd* form buildURLEncoded/encodeURLEncodedFields
-// actually produced — url.QueryEscape rewrites space, '+', '@' (among others), so a secret value
+// produced — url.QueryEscape rewrites space, '+', '@' (among others), so a secret value
 // containing any of them survived masking in cleartext, right next to the pane's own "N secret
 // values shown as {{name}}" claim. Driven through a real httpclient.Send (a real httptest server),
 // not a hand-built Response, so a future change to how the wire text is rendered would still be
@@ -448,10 +446,10 @@ func TestMaskSecrets_MasksURLEncodedBodyDespiteQueryEscape(t *testing.T) {
 	}
 }
 
-// TestMaskSecrets_MasksPathEscapedSecret is round-2 review finding 4: round 1 (finding 6) added
-// url.QueryEscape's own form of a secret as a second replacer pair, but a secret used in a URL
-// *path* segment (e.g. https://api.example.com/{{secret}}/orders) is percent-encoded via
-// url.PathEscape/EscapedPath() instead, which differs from QueryEscape for several characters —
+// TestMaskSecrets_MasksPathEscapedSecret: url.QueryEscape's own form of a secret is a second
+// replacer pair, but a secret used in a URL *path* segment (e.g.
+// https://api.example.com/{{secret}}/orders) is percent-encoded via url.PathEscape/EscapedPath()
+// instead, which differs from QueryEscape for several characters —
 // a space becomes %20 via PathEscape but + via QueryEscape. That form wasn't in the replacer and
 // leaked in FinalURL, Timeline.Hops[].URL and Wire.Request's request line. Driven through a real
 // httpclient.Send with the secret embedded in a path segment, not a hand-built Response, so a
@@ -508,9 +506,9 @@ func TestMaskSecrets_MasksPathEscapedSecret(t *testing.T) {
 	assertMasked(t, "Wire.Request", resp.Wire.Request)
 }
 
-// TestMaskSecrets_MasksPipedSecretsBase64Form is P17 §5's own worked example: a secret piped
+// TestMaskSecrets_MasksPipedSecretsBase64Form is the worked example: a secret piped
 // through `{{token | base64}}` never puts its plaintext on the wire at all — `UsedSecret.Rendered`
-// is the base64 form apivars.Resolver actually wrote — so the masking replacer must be built over
+// is the base64 form apivars.Resolver wrote — so the masking replacer must be built over
 // *that* rendered text, not the secret's plaintext (which would never match anything and leave
 // the base64-encoded credential sitting in every copyable surface, right next to the pane's own
 // "N secret values shown as {{name}}" claim). Every surface maskSecrets exists to cover is
@@ -552,10 +550,10 @@ func TestMaskSecrets_MasksPipedSecretsBase64Form(t *testing.T) {
 	}
 }
 
-// TestMaskSecrets_MasksBothPlainAndPipedFormsOfOneSecret is P17 D9(d)'s own case: a request using
+// TestMaskSecrets_MasksBothPlainAndPipedFormsOfOneSecret is the case: a request using
 // a secret both plainly (`{{token}}`) and piped (`{{token | base64}}`) must mask BOTH wire forms —
-// the exact case a name-keyed masking model (this bridge's pre-P17 shape) could not represent at
-// all, since it can only ever record one value per secret name.
+// the exact case a name-keyed masking model could not represent at all, since it can only ever
+// record one value per secret name.
 func TestMaskSecrets_MasksBothPlainAndPipedFormsOfOneSecret(t *testing.T) {
 	const plaintext = "sk_live_super_secret_token"
 	b64 := base64.StdEncoding.EncodeToString([]byte(plaintext))
@@ -591,7 +589,7 @@ func TestMaskSecrets_MasksBothPlainAndPipedFormsOfOneSecret(t *testing.T) {
 	}
 }
 
-// TestSecretReplacer_LongerRenderedFormIsNotShadowedByAShorterOne is D9(f): entries must be
+// TestSecretReplacer_LongerRenderedFormIsNotShadowedByAShorterOne: entries must be
 // sorted by len(Rendered) descending before the replacer is built, or a shorter rendered form
 // that is a prefix of a longer one shadows it — strings.Replacer matches at each position by the
 // earliest-listed pattern, not the longest, so listing the short one first would under-mask the

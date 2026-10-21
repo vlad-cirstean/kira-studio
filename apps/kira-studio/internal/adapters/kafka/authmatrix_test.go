@@ -1,7 +1,6 @@
-// authmatrix_test.go is the complete (Tier 2) suite's own table for kafka — P25 §2.7. Kafka has
+// authmatrix_test.go is the complete suite's own table for kafka. Kafka has
 // no "database" analogue at all; its axes are mechanism, credentials and broker address. Two
-// fixtures: the existing PLAINTEXT broker and the SASL_PLAINTEXT/PLAIN one testsupport.go adds for
-// this phase.
+// fixtures: the existing PLAINTEXT broker and the SASL_PLAINTEXT/PLAIN one testsupport.go adds.
 package kafka_test
 
 import (
@@ -26,11 +25,10 @@ func TestKafka_AuthMatrix(t *testing.T) {
 			Expect: testsupport.Outcome{Succeed: true},
 		},
 		{
-			// Deviation from the plan's own row: it expects this to connect. Reproduced against a
-			// real PLAINTEXT-only broker: it does not — the broker replies
-			// "ILLEGAL_SASL_STATE: Request is not valid given the current SASL state", a
+			// Reproduced against a real PLAINTEXT-only broker: it does not connect — the broker
+			// replies "ILLEGAL_SASL_STATE: Request is not valid given the current SASL state", a
 			// protocol-level refusal with no kerr.Error case of its own in kafka/errors.go, so it
-			// falls through to the default E_QUERY. Still worth pinning, just as a failure rather
+			// falls through to the default E_QUERY. Still worth pinning, as a failure rather
 			// than a success — asserting only that it is not silently successful and not
 			// misclassified as an auth failure (nothing was authenticated; the broker refused the
 			// handshake shape itself).
@@ -42,12 +40,12 @@ func TestKafka_AuthMatrix(t *testing.T) {
 			Expect: testsupport.Outcome{NotCode: adapters.CodeAuth},
 		},
 		{
-			// finding 6: a half-filled username/password pair must not hard-fail against a broker
+			// A half-filled username/password pair must not hard-fail against a broker
 			// that never asked for SASL at all — ConnectionDialog.vue pairs the two fields on one
 			// row, so a stray, half-typed credential is a common state to leave a PLAINTEXT
 			// connection in. client.go's own guard only applies when the anonymous dial itself
 			// fails the way a SASL-requiring broker does; against this PLAINTEXT broker the dial
-			// just succeeds, ignoring the stray field, exactly as it did before P25 §1.4.
+			// succeeds, ignoring the stray field.
 			Name: "PLAINTEXT broker, username set, password unset (half-filled)",
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
 				c.Username, c.Password = testsupport.Strp("kira"), nil
@@ -83,11 +81,11 @@ func TestKafka_AuthMatrix(t *testing.T) {
 			Expect: testsupport.Outcome{Succeed: true, Details: map[string]string{"brokers": "1"}},
 			Then: []testsupport.Scenario{
 				{
-					// P26 §3.8: no produce or consume had ever run over a SASL connection before this
+					// No produce or consume had ever run over a SASL connection before this
 					// — franz-go re-authenticates on new connections and the produce path opens its
 					// own, so the connect-only assertion above never exercised it. Mirrors
-					// TestKafka_Mutate_ProduceThenBrowse's own assertions, against the authenticated
-					// broker instead of the PLAINTEXT one.
+					// TestKafka_Mutate_ProduceThenBrowse's own assertions, against the
+					// authenticated broker instead of the PLAINTEXT one.
 					Name: "produce then browse over the authenticated broker",
 					Run: func(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig) {
 						const topic = "p26-matrix-sasl-produce"
@@ -163,7 +161,7 @@ func TestKafka_AuthMatrix(t *testing.T) {
 			Expect: testsupport.Outcome{Succeed: true, Details: map[string]string{"brokers": "1"}},
 			Then: []testsupport.Scenario{
 				{
-					// finding 4's pin: errors.go:58-59 maps TopicAuthorizationFailed into the same
+					// errors.go:58-59 maps TopicAuthorizationFailed into the same
 					// E_AUTH branch as SaslAuthenticationFailed — a correctly-authenticated
 					// principal refused by ACL reads exactly like a wrong password, the same
 					// conflation clickhouse/authmatrix_test.go:79-86, mongo/authmatrix_test.go's

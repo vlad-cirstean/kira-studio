@@ -1,6 +1,6 @@
 // Package config resolves this app's on-disk locations and dev/packaged mode.
 //
-// The path logic itself (P100 Part 1) is repo-root internal/kirapaths, shared with
+// The path logic itself is repo-root internal/kirapaths, shared with
 // apps/kira-studio — this file is a thin wrapper supplying Kira Space's own env var
 // (KIRA_SPACE_HOME), directory name (.kira-space) and database file name (kira.db). Kira Space
 // never shares a home or a database with Kira Studio.

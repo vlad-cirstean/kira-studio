@@ -8,9 +8,9 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// maxNameLength (UTF-16 units, as zod counts) is connectionInputSchema's own name cap — the single source Validate and
-// Service.Duplicate's generated "<name> copy" both read, so the two can never drift apart (review
-// finding: Duplicate used to append " copy" with no cap at all, which Validate would then have
+// maxNameLength (UTF-16 units, as zod counts) is connectionInputSchema's own name cap — the single
+// source Validate and Service.Duplicate's generated "<name> copy" both read, so the two can never
+// drift apart (Duplicate used to append " copy" with no cap at all, which Validate would then have
 // rejected outright for any name already close to the limit).
 const maxNameLength = 120
 
@@ -175,8 +175,8 @@ func (in Input) normalized() Input {
 const copySuffix = " copy"
 
 // duplicateName is Service.Duplicate's name generator: name + copySuffix, capped at
-// maxNameLength UTF-16 units — the base name is truncated (never the suffix, so the result always reads as a
-// copy) at a rune boundary so it is never invalid UTF-8. Review finding: Duplicate used to append
+// maxNameLength UTF-16 units — the base name is truncated (never the suffix, so the result always
+// reads as a copy) at a rune boundary so it is never invalid UTF-8. Duplicate used to append
 // copySuffix with no cap at all, which Validate would then reject outright for any name already
 // within copySuffix's own length of the limit — Duplicate itself never calls Validate (an
 // already-stored name is by definition valid input; a rejection here would be a duplicate that

@@ -14,10 +14,9 @@ type ConsoleRequest struct {
 }
 
 // MongoConsoleMethods mirrors domain/console.ts's MONGO_CONSOLE_METHODS — the ten shell methods
-// mongo/console.go dispatches. The renderer's own completion source (TypeScript, unaffected by
-// P58c) reads the TS list directly; this is the single Go-side copy every native Mongo console
-// caller shares, so the method set is never spelled out twice within the Go codebase either
-// (P18 addendum D21).
+// mongo/console.go dispatches. The renderer's own completion source (TypeScript) reads the TS list
+// directly; this is the single Go-side copy every native Mongo console
+// caller shares, so the method set is never spelled out twice within the Go codebase either.
 var MongoConsoleMethods = []string{
 	"find",
 	"findOne",

@@ -54,7 +54,7 @@ func TestSend_RedirectChain(t *testing.T) {
 	}
 }
 
-// TestSend_CrossHostRedirectStripsUserHeaders is P21 round 3 finding 5: Go's net/http strips only
+// TestSend_CrossHostRedirectStripsUserHeaders: Go's net/http strips only
 // Authorization/WWW-Authenticate/Cookie/Cookie2 on a cross-host redirect — every other header a
 // saved request carries (X-Api-Key, PRIVATE-TOKEN, X-Amz-Security-Token, …) is copied verbatim to
 // whatever answered the redirect. A same-host redirect must still carry the header (that's the
@@ -109,7 +109,7 @@ func TestSend_CrossHostRedirectStripsUserHeaders(t *testing.T) {
 	}
 }
 
-// TestSend_RedirectHeaderStrippingComparesAgainstOrigin is P108 F2: net/http's redirect
+// TestSend_RedirectHeaderStrippingComparesAgainstOrigin: net/http's redirect
 // machinery always re-copies headers from the *original* request onto every new hop (it never
 // copies from the previous hop's already-modified request), so checkRedirectFor must compare
 // each hop against via[0] (the origin), not the immediately-previous hop — otherwise an
@@ -153,7 +153,7 @@ func TestSend_RedirectHeaderStrippingComparesAgainstOrigin(t *testing.T) {
 	}
 }
 
-// TestSend_SchemeDowngradeRedirectStripsAuthAndCookie is P108 F3: net/http's own sensitive-header
+// TestSend_SchemeDowngradeRedirectStripsAuthAndCookie: net/http's own sensitive-header
 // stripping (shouldCopyHeaderOnRedirect) compares hostnames only, never scheme, so an https to
 // http redirect on the same host keeps Authorization and Cookie on the wire in clear unless
 // checkRedirectFor strips them explicitly.
@@ -269,7 +269,7 @@ func TestSend_TimeoutVsCancellation(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		<-block
 	}))
-	// Registered after srv.Close() so defers run in the order that actually unblocks it (LIFO):
+	// Registered after srv.Close() so defers run in the order that unblocks it (LIFO):
 	// close(block) first, letting the handler goroutines return and their connections close,
 	// then srv.Close() — the reverse order left Close() waiting up to its own hardcoded timeout
 	// for connections whose handlers were still parked on a channel Close() itself was blocking.
@@ -298,7 +298,7 @@ func TestSend_TimeoutVsCancellation(t *testing.T) {
 	})
 }
 
-// TestSend_TimeoutZeroMeansNone is P90 §2.3/§6.1: RequestTimeoutMs 0 disables the deadline
+// TestSend_TimeoutZeroMeansNone: RequestTimeoutMs 0 disables the deadline
 // entirely, so a server sleeping past the old 30s default still returns, and cancelling the
 // caller's own ctx still classifies CodeCancelled (sendCtx.Err() can only ever be
 // context.Canceled with no deadline set).
@@ -348,9 +348,9 @@ func TestSend_HostHeaderReachesServer(t *testing.T) {
 // below needs several of these.
 func ptr[T any](v T) *T { return &v }
 
-// TestSend_FollowRedirectsOff is P90 §6.1: FollowRedirects: ptr(false) must return the 3xx itself
+// TestSend_FollowRedirectsOff: FollowRedirects: ptr(false) must return the 3xx itself
 // as the response, with Redirects empty, FinalURL the original URL, and exactly one Timeline hop
-// — this is the assertion that catches the ErrUseLastResponse-before-closeHop ordering (§2.3) if
+// — this is the assertion that catches the ErrUseLastResponse-before-closeHop ordering if
 // it is ever written the other way round (closing the hop twice, or not at all).
 func TestSend_FollowRedirectsOff(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

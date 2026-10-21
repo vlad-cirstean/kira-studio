@@ -311,10 +311,10 @@ func TestTracker_SendRefusedWhenNotRunning(t *testing.T) {
 	}
 }
 
-// TestTracker_ConcurrentComposeReconcileHandleEvent is P129 Part 1 §6.1's own race guard: three
-// call sources (BoundService.Open's own goroutine via Compose, Registry.OnChange's own goroutine
-// via Reconcile, the hooks listener's request-handler goroutine via HandleEvent) genuinely run
-// concurrently in production. Run with -race.
+// TestTracker_ConcurrentComposeReconcileHandleEvent is the race guard: three call sources
+// (BoundService.Open's own goroutine via Compose, Registry.OnChange's own goroutine via Reconcile,
+// the hooks listener's request-handler goroutine via HandleEvent) genuinely run concurrently in
+// production. Run with -race.
 func TestTracker_ConcurrentComposeReconcileHandleEvent(t *testing.T) {
 	tr, _, live, _ := newTestTracker(t)
 

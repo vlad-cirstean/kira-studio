@@ -14,11 +14,11 @@ func newLayoutRepo(t *testing.T) *repos.LayoutRepo {
 
 func floatPtr(f float64) *float64 { return &f }
 
-// TestLayoutRepoSetSurvivesConcurrentDisjointPatches is P8 D13.1's rule: LayoutRepo.Set rewrites
+// TestLayoutRepoSetSurvivesConcurrentDisjointPatches is the rule: LayoutRepo.Set rewrites
 // every leaf on each call (unlike SettingsRepo.Set), so its read-modify-write must be atomic —
 // two concurrent Set calls patching entirely different leaves must both survive, not have one
-// silently overwrite the other from a stale pre-write snapshot (F7, measured at 109/200 rounds
-// lost against the pre-fix code, P8 plan §1.3(d)).
+// silently overwrite the other from a stale pre-write snapshot (measured at 109/200 rounds
+// lost against the pre-fix code).
 func TestLayoutRepoSetSurvivesConcurrentDisjointPatches(t *testing.T) {
 	const rounds = 50
 	lost := 0

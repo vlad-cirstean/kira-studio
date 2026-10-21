@@ -227,8 +227,8 @@ func TestUnary_RequestJSONStrictness(t *testing.T) {
 	}
 }
 
-// TestUnary_MessageOverCapYieldsResourceExhausted is §6.2 case 6: a message over the 16 MiB cap
-// yields ResourceExhausted (F9, D15) — the server replies with a message bigger than
+// TestUnary_MessageOverCapYieldsResourceExhausted: a message over the 16 MiB cap yields
+// ResourceExhausted — the server replies with a message bigger than
 // grpc.MaxCallRecvMsgSize(16 MiB), which is this app's own client-side receive cap, not the
 // server's send limit (grpc-go's own server default has no send cap at all).
 func TestUnary_MessageOverCapYieldsResourceExhausted(t *testing.T) {
@@ -247,7 +247,7 @@ func TestUnary_MessageOverCapYieldsResourceExhausted(t *testing.T) {
 	}
 }
 
-// TestServerStream_CoalescingUnderRace is §6.2 case 7: a server emitting 500 messages as fast as
+// TestServerStream_CoalescingUnderRace: a server emitting 500 messages as fast as
 // it can produces every message exactly once with contiguous Seq — run under -race, since
 // onMessage is invoked from the goroutine reading the stream while the caller (bridge/grpc.go's
 // coalescing buffer, exercised for real in the bridge-level test) reads it concurrently in the
@@ -287,7 +287,7 @@ func TestServerStream_CoalescingUnderRace(t *testing.T) {
 	}
 }
 
-// TestUnmarshalRequestJSON_SyntaxErrorDropsTheOffendingToken is P108 F13: a request JSON built by
+// TestUnmarshalRequestJSON_SyntaxErrorDropsTheOffendingToken: a request JSON built by
 // stage 2's own {{secret}} substitution can have a secret's raw value break the JSON string
 // literal it landed in (an embedded quote or backslash) — protojson's own syntax-error message
 // quotes that broken token straight from the input, which is then a fragment of the secret too

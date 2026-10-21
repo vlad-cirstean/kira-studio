@@ -1,5 +1,5 @@
-// Package mongo is the native Go adapter for MongoDB (P58c). literal.go is its first file, written
-// alone before any driver or container involvement (P58 D11, P58c C4): a hand port of
+// Package mongo is the native Go adapter for MongoDB. literal.go is its first file, written
+// alone before any driver or container involvement: a hand port of
 // src/engine/adapters/mongo/literal.ts, the JSON5-lite tokenizer and BSON-constructor parser every
 // Mongo filter/document/console text surface in the app runs through. No eval, no Function, no
 // third-party expression evaluator — user-supplied text must never reach one.
@@ -72,8 +72,8 @@ func isIdentPart(r rune) bool { return isIdentStart(r) || isDigit(r) }
 
 // jsonQuoteString is JSON.stringify(s) for the tokenizer's own "unexpected character" message —
 // encoding/json's default Marshal HTML-escapes '<', '>' and '&', which JSON.stringify never does,
-// so escaping is disabled explicitly (the same divergence P58c's own MG-1 probe found in
-// MarshalExtJSON and the plan requires disabling there too).
+// so escaping is disabled explicitly (the same divergence found in MarshalExtJSON, where
+// disabling is required too).
 func jsonQuoteString(s string) string {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -281,7 +281,7 @@ var constructors = map[string]constructorFn{
 	// becomes JS's own "Invalid Date" (getTime() is NaN), which BSON would then encode as a date
 	// with a NaN millisecond count. Go's time.Time has no such value and bson.DateTime is a plain
 	// int64, so there is no faithful equivalent to silently produce; this port surfaces an E_QUERY
-	// error instead (a deliberate, documented, tested divergence, the same shape as C4's own
+	// error instead (a deliberate, documented, tested divergence, the same shape as the
 	// "invalid number" addition) rather than fabricating an arbitrary timestamp no user asked for.
 	"ISODate": func(arg any, hasArg bool, pos int) (any, error) {
 		s := jsToString(arg, hasArg)
@@ -311,8 +311,8 @@ var constructors = map[string]constructorFn{
 		return v, nil
 	},
 	// NumberInt(s): literal.ts's own `Number(arg)` produces a plain JS number, leaving BSON's own
-	// width choice to the driver (P58c §1.4/§4.1) — this Go port deliberately narrows it to int32
-	// per P58c's own decision table; the acceptance suite asserts only the resulting *value*,
+	// width choice to the driver — this Go port deliberately narrows it to int32
+	// per the decision table; the acceptance suite asserts only the resulting *value*,
 	// never the wire width, so this narrowing is invisible to it.
 	"NumberInt": func(arg any, hasArg bool, pos int) (any, error) {
 		s := jsToString(arg, hasArg)
@@ -398,10 +398,10 @@ func (p *LiteralParser) ExpectIdent(expected string) (string, error) {
 	return t.value, nil
 }
 
-// ParseValue parses one value: an object becomes a bson.D (never a bson.M — C2's key-order
+// ParseValue parses one value: an object becomes a bson.D (never a bson.M — the key-order
 // requirement applies to parsed values too, since a parsed filter's key order is visible in
-// op.SetCommand's rendered text), an array a bson.A, a string a string, a number a float64 (C5 —
-// literal.ts:161 is `Number(t.value)`, a JS double, not an int64), a boolean a bool, and null/
+// op.SetCommand's rendered text), an array a bson.A, a string a string, a number a float64
+// (literal.ts:161 is `Number(t.value)`, a JS double, not an int64), a boolean a bool, and null/
 // undefined a nil `any`.
 func (p *LiteralParser) ParseValue() (any, error) {
 	p.depth++
@@ -565,7 +565,8 @@ func ParseJSON5Literal(text string) (any, error) {
 
 // --- EJSON wrapper resolution ----------------------------------------------------------------
 
-// The EJSON v2 wrapper keys (literal.ts:259-273) plus the deprecated `$symbol`/`$undefined`/`$dbPointer` canonical output emits. A plain object
+// The EJSON v2 wrapper keys (literal.ts:259-273) plus the deprecated
+// `$symbol`/`$undefined`/`$dbPointer` canonical output emits. A plain object
 // matching one of these shapes is a BSON value spelled as extended JSON rather than a shell
 // constructor call — `ObjectId(...)` is already resolved to a real bson.ObjectID by the
 // constructor table above, at parse time; `{"$oid": "..."}` is not.
@@ -606,7 +607,7 @@ func looksLikeEJSONWrapper(d bson.D) bool {
 // decodes it into the real BSON value the wrapper denotes.
 //
 // The wrapper is wrapped in a one-field document ({"v": <wrapper>}) before marshalling, exactly
-// like IDText's own MarshalExtJSON direction (P58c M7.0/MG-2 findings, CLAUDE.md): the extJSON
+// like IDText's own MarshalExtJSON direction: the extJSON
 // reader only special-cases a `$oid`/`$date`/… shape when it appears as a *field's* value inside a
 // document, not at the very top level being decoded directly into a scalar — a top-level `{"$oid":
 // "..."}` decodes as an ordinary two-key-lookalike document, silently failing to resolve, which is
@@ -629,7 +630,7 @@ func tryResolveEJSONWrapper(d bson.D) (any, bool) {
 // ResolveEJSONWrappers recursively replaces every extended-JSON wrapper object ({$oid}, {$date},
 // {$numberLong}, {$binary}, …) with the BSON value it denotes. Leaves every other value alone —
 // including an already-resolved BSON instance (bson.ObjectID, time.Time, int64, bson.Decimal128):
-// those simply never match the bson.D/bson.A cases below, so they fall through the default case
+// those never match the bson.D/bson.A cases below, so they fall through the default case
 // untouched, which is Go's structural equivalent of literal.ts's own explicit
 // isResolvedBsonInstance check (literal.ts:285-292) — walking a resolved instance's own fields
 // would be wrong.

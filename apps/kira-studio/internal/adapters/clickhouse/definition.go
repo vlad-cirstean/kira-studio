@@ -14,7 +14,7 @@ func toConstraintMeta(row constraintRow) model.ConstraintMeta {
 	return model.ConstraintMeta{Name: row.Name, Type: "check", Definition: row.Expression}
 }
 
-// buildTableSection is definition.ts's own — P23 D6: the "Table properties" section, this
+// buildTableSection is definition.ts's own — the "Table properties" section, this
 // adapter's first real use of the generic name/value block every other SQL engine's definition()
 // leaves empty, since none of Engine, Sorting key, Partition key or the sparse Primary key
 // expression has anywhere else in ObjectDefinition to live.

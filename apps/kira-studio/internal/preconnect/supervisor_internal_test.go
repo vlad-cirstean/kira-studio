@@ -15,11 +15,11 @@ func init() {
 	killGrace = 120 * time.Millisecond
 }
 
-// TestWithAugmentedPath_NeverLeadsWithAnEmptyElement is P21 round 1 architecture/security
-// finding 8: a leading empty PATH element is `.` to /bin/sh, and cmd.Dir is the user's own home
-// directory — an arbitrary file dropped there (named kubectl, aws, psql, ...) would be executed
-// in preference to nothing. Covers both ways withAugmentedPath used to produce one: no PATH= entry
-// at all, and a PATH= entry present but empty.
+// TestWithAugmentedPath_NeverLeadsWithAnEmptyElement: a leading empty PATH element is `.` to
+// /bin/sh, and cmd.Dir is the user's own home directory — an arbitrary file dropped there (named
+// kubectl, aws, psql, ...) would be executed in preference to nothing. Covers both ways
+// withAugmentedPath used to produce one: no PATH= entry at all, and a PATH= entry present
+// but empty.
 func TestWithAugmentedPath_NeverLeadsWithAnEmptyElement(t *testing.T) {
 	assertNoLeadingColon := func(t *testing.T, env []string) {
 		t.Helper()

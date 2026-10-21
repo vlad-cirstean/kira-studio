@@ -1,4 +1,4 @@
-// Package appshell is Kira Space's own residue of the app-shell composition (P103 Part 3): the
+// Package appshell is Kira Space's own residue of the app-shell composition: the
 // generic half (window/menu/quit/close-flush machinery, the deferred Wails adapters) is repo-root
 // internal/shell, shared with Kira Studio; this package is everything left over that is genuinely
 // this app's own — its own menu content, its own dialog request-struct adapter and its own stream
@@ -15,9 +15,7 @@ import (
 
 // BuildTemplate is Kira Space's own menu — Kira Studio's own BuildTemplate
 // (apps/kira-studio/internal/appshell/menu.go) trimmed to this app's own commands: no connections/
-// requests/import items, no run/format (this app has none of those). P116 G1-G4 grew
-// this from the P103 Part 1 stub (App/Edit/Window only, no ItemEmit item at all): Settings…, a View
-// section with the project-panel toggle, tab navigation, dev-only Reload/DevTools.
+// requests/import items, no run/format (this app has none of those).
 func BuildTemplate(appName string, isDev bool) []shell.Section {
 	appItems := shell.AppMenuHead()
 	appItems = append(appItems,

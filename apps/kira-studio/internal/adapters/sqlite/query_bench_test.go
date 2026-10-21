@@ -12,8 +12,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// White-box (package sqlite) allocation regression guard for readPage's row-scan hot path — task
-// #95 (P2 R2). readPage used to rebuild the `cells []*string` scratch handed to
+// White-box (package sqlite) allocation regression guard for readPage's row-scan hot path.
+// readPage used to rebuild the `cells []*string` scratch handed to
 // page.TabularPageBuilder.AppendRow with make() on every row, even though AppendRow only ever
 // reads through it synchronously and never retains it (unlike `row []any`, which readPage does
 // retain via firstRow/lastRow for keyset boundary extraction, and so must stay freshly allocated

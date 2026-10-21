@@ -237,9 +237,11 @@ func quotesOutsideBackticks(s string) []string {
 
 var lineBreak = regexp.MustCompile(`[ \t]*\n[ \t]*(?:///?|\*|#|<!--)?[ \t]*`)
 
-// tokensKept requires every protected token of the input in the draft, unless a dropped span holds it.
+// tokensKept requires every protected token of the input in the draft, unless a dropped span holds
+// it.
 // A path token is checked per component, so a dropped tag joined to it does not kill the rest. The
-// draft is also read with its line breaks and comment markers joined, so a reflow cannot split a token.
+// draft is also read with its line breaks and comment markers joined, so a reflow cannot split a
+// token.
 func tokensKept(input, draft string, dropped []DroppedSpan) bool {
 	forms := []string{draft, lineBreak.ReplaceAllString(draft, ""), lineBreak.ReplaceAllString(draft, " ")}
 	present := tokenPresence(forms, dropped)

@@ -55,12 +55,12 @@ var level slog.LevelVar
 
 // Init installs a slog handler writing to dir/kira-YYYY-MM-DD.log as the process default, so every
 // existing slog.Default() call in storage/repos and enginehost lands there with zero change to
-// those packages (P54 §1.6). In a dev build (isDev) the same records also go to stderr, mirroring
+// those packages. In a dev build (isDev) the same records also go to stderr, mirroring
 // electron-log's console transport (silenced only under NODE_ENV=test, which has no Go analogue
-// since tests here use their own captured logger, per P54's helpers_test.go).
+// since tests here use their own captured logger, per the helpers_test.go).
 //
-// dir/isDev are explicit arguments, not read from internal/config directly, since P100 Part 1
-// hoisted this package to repo-root internal/ — it can no longer import either app's own
+// dir/isDev are explicit arguments, not read from internal/config directly, since this package was
+// hoisted to repo-root internal/ — it can no longer import either app's own
 // internal/config (Go's internal/ visibility rule). Each app's own main.go passes
 // config.LogsDir()/config.IsDev() in.
 func Init(dir string, isDev bool) error {
@@ -78,7 +78,7 @@ func Init(dir string, isDev bool) error {
 }
 
 // SetLevel adjusts the process-wide log verbosity at runtime — advanced.gitLogLevel's own actual
-// mechanism (until this phase the setting existed with no consumer). "off" needs a threshold
+// mechanism. "off" needs a threshold
 // above every standard level: slog's Enabled check is level >= threshold, and slog.LevelError is
 // the highest standard level, so setting the threshold to LevelError would still let Error
 // records through. An unrecognized value is a no-op, never a panic — it can only reach here from

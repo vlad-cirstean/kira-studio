@@ -1,4 +1,4 @@
-// url.go is P4 D8's half of the boundary: this app's model is URL-authoritative (the raw string
+// url.go is the half of the boundary: this app's model is URL-authoritative (the raw string
 // is canonical), Postman's `url` is a broken-down object. A Go sibling of
 // frontend/src/views/httprequest/url.ts, deliberately NOT net/url.Parse — like the TypeScript
 // half it must handle a half-formed or {{variable}}-bearing URL without throwing, and net/url has
@@ -123,9 +123,9 @@ func isAllDigits(s string) bool {
 	return len(s) > 0
 }
 
-// ImportParamDescriptions extracts a query param's own description (P22b D7) from Postman's
+// ImportParamDescriptions extracts a query param's own description from Postman's
 // url.query array — the one place a per-param description can arrive, since this app has no
-// native params row of its own (F10). raw is the same `url` member ImportURL reads; a bare
+// native params row of its own. raw is the same `url` member ImportURL reads; a bare
 // string (no query array at all) yields an empty, non-nil map.
 func ImportParamDescriptions(raw json.RawMessage) map[string]string {
 	out := map[string]string{}
@@ -149,7 +149,7 @@ func ImportParamDescriptions(raw json.RawMessage) map[string]string {
 	return out
 }
 
-// BuildWithDescriptions is Build plus each query param's own description (P22b D7), attached to
+// BuildWithDescriptions is Build plus each query param's own description, attached to
 // the matching `query` entry when one exists — a separate entry point rather than widening
 // Build's own signature, since every existing caller (this package's own tests included) calls
 // Build with exactly the one argument Import(Build(s)) == s already depends on.
@@ -201,7 +201,7 @@ func ImportURL(raw json.RawMessage) string {
 }
 
 // reconstructURL rebuilds the string from protocol/host/port/path/query/hash, with `host` and
-// `path` each handling both their string and array forms (F2). A `query` entry with
+// `path` each handling both their string and array forms. A `query` entry with
 // `disabled: true` is omitted — a disabled param has no representation in a URL-authoritative
 // model — and survives in origin regardless.
 func reconstructURL(obj map[string]json.RawMessage) string {

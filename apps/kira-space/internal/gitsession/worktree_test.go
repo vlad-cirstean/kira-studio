@@ -117,10 +117,10 @@ func TestWorktreeRemovePreflight_MainAndCurrentBlocked(t *testing.T) {
 	}
 }
 
-// TestRunOp_WorktreeRemove_DirtyRequiresConfirmation is the plan's own "confirmation-refusal test"
-// (§7.1 item 1's own enumeration, plan exit criterion "a dirty forced removal requires a typed
-// token re-checked against a freshly-read status"): no token -> refused; wrong token -> refused;
-// the worktree survives both refusals; the correct token (the worktree's own basename) succeeds.
+// TestRunOp_WorktreeRemove_DirtyRequiresConfirmation is the "confirmation-refusal test" ("a dirty
+// forced removal requires a typed token re-checked against a freshly-read status"): no token ->
+// refused; wrong token -> refused; the worktree survives both refusals; the correct token (the
+// worktree's own basename) succeeds.
 func TestRunOp_WorktreeRemove_DirtyRequiresConfirmation(t *testing.T) {
 	t.Parallel()
 	skipWithoutGitQueries(t)

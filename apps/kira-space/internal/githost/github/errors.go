@@ -46,7 +46,7 @@ func tooLargeReason() string {
 	return fmt.Sprintf("GitHub's response was over %d MiB, too large to read", maxStdoutBytes>>20)
 }
 
-// classify is D5's full table, the ONE place an HTTP status or a gh exit code is interpreted
+// classify is the full table, the ONE place an HTTP status or a gh exit code is interpreted
 // anywhere in this package. res/runErr are Client.get's own raw outcome (a successful `gh api`
 // invocation with a non-2xx HTTP status still exits gh 1 with a JSON body on stdout — decoding it
 // is a separate, orthogonal step api.go's own get performs); ctxErr is the request ctx's own Err()

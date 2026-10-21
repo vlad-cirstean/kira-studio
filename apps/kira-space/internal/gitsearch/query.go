@@ -25,9 +25,9 @@ type Query struct {
 }
 
 // ErrUnsupportedPattern is Compile's answer for `regex` mode syntax RE2 cannot express at all —
-// lookahead, lookbehind, or a numbered/named backreference (D4). Distinct from ErrInvalidPattern:
+// lookahead, lookbehind, or a numbered/named backreference. Distinct from ErrInvalidPattern:
 // the pattern IS valid JavaScript (the webview client already compiled it with `new RegExp`
-// before ever sending it), just not RE2 — D6's honest `unsupportedPattern` wire member exists
+// before ever sending it), just not RE2 — the honest `unsupportedPattern` wire member exists
 // specifically so this is never confused with a pattern the client would not have sent.
 var ErrUnsupportedPattern = errors.New("gitsearch: pattern uses lookahead/lookbehind/backreference syntax RE2 cannot run")
 
@@ -39,7 +39,7 @@ var ErrUnsupportedPattern = errors.New("gitsearch: pattern uses lookahead/lookbe
 var ErrInvalidPattern = errors.New("gitsearch: invalid pattern")
 
 // Matcher is Compile's own result — the one thing MatchFields runs. An empty-text Query compiles
-// to a matcher that matches nothing (D7): compileQuery's own "empty" branch never reaches a regex
+// to a matcher that matches nothing: compileQuery's own "empty" branch never reaches a regex
 // engine either, and building one from an empty needle would (both here and in JS) match
 // everywhere rather than nowhere.
 type Matcher struct {
@@ -113,8 +113,7 @@ func isRE2Limit(err error) bool {
 
 // isHexPrefixText mirrors query.ts's HEX_PREFIX test (`^[0-9a-fA-F]{4,40}$`) without a regex
 // engine — a plain byte scan, since this is a general sha-prefix utility, not literal-mode
-// matching itself (that guarantee is literal.go's own, and is what the exit criteria's "literal
-// mode runs no regexp" check greps for).
+// matching itself (that guarantee is literal.go's own).
 func isHexPrefixText(text string) bool {
 	n := len(text)
 	if n < MinShaPrefix || n > maxShaPrefix {

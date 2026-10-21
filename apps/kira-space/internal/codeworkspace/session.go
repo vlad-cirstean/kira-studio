@@ -1,9 +1,9 @@
-// Package codeworkspace is C5's own read-only surface over an imported repository: listing its
-// files (§7.1), reading one (§8.1), and validating every path crossing the boundary (§11), plus
-// diff reading (diff.go) and repository-wide search (search.go). It imports gitclient/catfile but
-// never internal/bridge (internal/layering_test.go picks this up automatically) — the bound
-// service (internal/bridge/codeworkspace.go) is the one place that resolves a `code_repos` row and
-// this app's own git.path setting into the Session this package's functions take.
+// Package codeworkspace is the read-only surface over an imported repository: listing its files,
+// reading one, and validating every path crossing the boundary, plus diff reading (diff.go) and
+// repository-wide search (search.go). It imports gitclient/catfile but never internal/bridge
+// (internal/layering_test.go picks this up automatically) — the bound service
+// (internal/bridge/codeworkspace.go) is the one place that resolves a `code_repos` row and this
+// app's own git.path setting into the Session this package's functions take.
 package codeworkspace
 
 import (
@@ -15,8 +15,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/catfile"
 )
 
-// ErrSessionClosed is returned by any Session operation attempted after Close has already run
-// (F4): a caller can still be holding a *Session another goroutine just closed (CloseWorkspace,
+// ErrSessionClosed is returned by any Session operation attempted after Close has already run:
+// a caller can still be holding a *Session another goroutine just closed (CloseWorkspace,
 // RemoveRepo, or a git.path change through Registry.Open replacing it) — without this guard,
 // catfileSession would spawn a fresh, never-closed cat-file pair on a session already out of the
 // registry (CloseAll cannot reach it either), and BeginSearch would hand out a live, uncancellable
@@ -54,10 +54,10 @@ func NewRegistry() *Registry {
 }
 
 // Open returns repoID's own session, reusing it when its Root and GitPath are unchanged from the
-// last call (C6 §3.2) — a catfile.Session's two cat-file processes cannot be torn down and rebuilt
-// on every bound-service request the way C5's stateless four-field Session could. A Root or
+// last call — a catfile.Session's two cat-file processes cannot be torn down and rebuilt
+// on every bound-service request the way the stateless four-field Session could. A Root or
 // GitPath change (a git.path setting edit, or — in principle — a repository moved on disk) closes
-// the stale session (catfile stopped) and builds a fresh one, so C5's own stated property ("a
+// the stale session (catfile stopped) and builds a fresh one, so the stated property ("a
 // git.path change takes effect on the next call, with no explicit reopen step") still holds; a
 // call that changes nothing reuses the live cat-file processes instead of leaking a new pair every
 // time the tree panel refreshes.
@@ -79,7 +79,7 @@ func (r *Registry) Open(repoID, root string, runner gitclient.Runner, gitPath st
 	return s
 }
 
-// Peek returns repoID's own live session, or nil if none is open — C7's CancelSearch's own
+// Peek returns repoID's own live session, or nil if none is open — CancelSearch's own
 // accessor: stopping a search must never create a session the way Open's normal fallback would,
 // and must not depend on git being reachable right now the way every read path's own availability
 // check does.
@@ -118,7 +118,7 @@ func (r *Registry) CloseAll() {
 
 // catfileSession lazily constructs this session's own catfile.Session on first use (diff.go's own
 // HEAD-side reader) — a workspace that never opens a diff tab never pays for the two extra
-// processes. Returns ErrSessionClosed once Close has run (F4) rather than building a pair nothing
+// processes. Returns ErrSessionClosed once Close has run rather than building a pair nothing
 // will ever stop.
 func (s *Session) catfileSession() (*catfile.Session, error) {
 	s.mu.Lock()
@@ -132,8 +132,8 @@ func (s *Session) catfileSession() (*catfile.Session, error) {
 	return s.catfile, nil
 }
 
-// Close stops this session's catfile session and cancels any in-flight search (C7 D8). Idempotent.
-// Marks the session closed under the same lock (F4), so any later catfileSession/BeginSearch call
+// Close stops this session's catfile session and cancels any in-flight search. Idempotent.
+// Marks the session closed under the same lock, so any later catfileSession/BeginSearch call
 // on this exact *Session — held by a caller that raced this Close — fails or self-cancels instead
 // of quietly reviving a session already out of the registry.
 func (s *Session) Close() {
@@ -155,16 +155,15 @@ func (s *Session) Close() {
 	})
 }
 
-// BeginSearch cancels this workspace's previous search, if any (C7 D8: one in flight per
-// workspace — starting a new one is by construction the only way a user's single query box can
-// mean "stop the old one and run this instead"), and returns the context the new one runs under.
+// BeginSearch cancels this workspace's previous search, if any (one in flight per workspace —
+// starting a new one is by construction the only way a user's single query box can mean "stop the
+// old one and run this instead"), and returns the context the new one runs under.
 // Rooted at context.Background(), not any per-call ctx: StartSearch's own bound call returns long
 // before a full-worktree scan finishes, so the search must outlive it — CancelSearch and
-// Session.Close are the only two ways this context ever ends. Exported (the plan's own §4.3 names
-// it lowercase, but internal/bridge — a separate package — is its one caller alongside Close, so it
-// must be; disclosed as a plan correction, not a design change).
+// Session.Close are the only two ways this context ever ends. Exported (internal/bridge — a
+// separate package — is its one caller alongside Close, so it must be).
 //
-// F4: on a session Close already ran on, returns an already-cancelled context instead of
+// On a session Close already ran on, returns an already-cancelled context instead of
 // installing a live searchCancel — codeworkspace.Search then sees ctx.Err() == context.Canceled
 // immediately, the same clean "user stopped it" path StartSearch's own caller already treats a
 // real CancelSearch as, rather than running a full-worktree scan nothing can reach to cancel

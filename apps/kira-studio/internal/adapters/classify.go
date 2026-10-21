@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// OpClass is what one console statement would do, as the connection's MCP permissions name it
-// (M2). A classification is about the statement's declared shape, not its effects: `SELECT
+// OpClass is what one console statement would do, as the connection's MCP permissions name it.
+// A classification is about the statement's declared shape, not its effects: `SELECT
 // write_function()` reads as ClassRead. This sits on top of the connection's own ReadOnly flag and
 // each adapter's own enforcement (BEGIN READ ONLY, Mongo's per-method check, Redis's COMMAND
 // check), never instead of them.
@@ -79,13 +79,13 @@ func isSQLWordBoundary(r rune) bool {
 // EXPLAIN keyword and reports whether ANALYZE was requested — either the bare `EXPLAIN ANALYZE
 // ...` form or Postgres's parenthesised option-list form, `EXPLAIN (ANALYZE) ...` / `EXPLAIN
 // (ANALYZE, BUFFERS) ...` — since either genuinely executes the target statement, unlike a plain
-// EXPLAIN (finding #2, M6: the parenthesised form was previously missed entirely, since the token
+// EXPLAIN (the parenthesised form was previously missed entirely, since the token
 // right after EXPLAIN there is `(ANALYZE)`/`(ANALYZE,`, never exactly "ANALYZE"). target is what
 // remains to classify when hasAnalyze is true. ok is false only when rest opens with `(` but the
 // option list never balances — the caller must not default to ClassRead over text it can't parse,
 // since an unparseable option list might be hiding ANALYZE inside it.
 //
-// Exported (M7 finding #10) so a per-dialect ClassifyStatement — clickhouse/console.go's own — can
+// Exported so a per-dialect ClassifyStatement — clickhouse/console.go's own — can
 // reuse this same parsing rather than re-implementing it, for a dialect where ClassifySQL's default
 // EXPLAIN-without-ANALYZE-is-a-read assumption does not hold.
 func ExplainAnalyzeTarget(rest string) (hasAnalyze bool, target string, ok bool) {
@@ -134,12 +134,12 @@ func ClassifySQL(statement string, d SQLDialect) OpClass {
 
 	// Embedded-semicolon guard: a leading keyword says nothing about a second statement smuggled
 	// behind it, and whether a driver executes both is a per-driver DSN detail this classifier must
-	// not depend on. Run against the RAW statement (finding F1, HIGH/security) — never the
+	// not depend on. Run against the RAW statement — never the
 	// comment-stripped stripped above: StripSQLComments' quote scanner can itself be fooled by a
 	// backslash-escaped quote in a dialect whose strings honour backslash (Postgres
 	// E'...'/standard_conforming_strings=off, MySQL/MariaDB's own default), closing a quoted run
 	// early and exposing a real trailing `;` as though it sat inside a `--` comment it never
-	// actually was — checking raw text side-steps that class of bug entirely. A semicolon inside a
+	// was — checking raw text side-steps that class of bug entirely. A semicolon inside a
 	// legitimate string literal (or genuinely inside a real comment) costs a false ClassUnknown (a
 	// prompt); a missed second statement costs a silent write. Only one of those is acceptable.
 	raw := StripOneTrailingSemicolon(strings.TrimSpace(statement))

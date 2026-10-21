@@ -30,8 +30,8 @@ func strPtr(s string) *string { return &s }
 func intPtr(i int) *int       { return &i }
 
 // fakeBackend replaces the real adapterhost.Router (via a real Node engine fixture) these tests
-// used before P58f Phase 4 deleted the Node sidecar — every kind has been Go-native since P58e
-// M9.3, so there is no more Node-served path left to exercise here, only Backend's own contract.
+// used before the Node sidecar was deleted — every kind has been Go-native, so there is no more
+// Node-served path left to exercise here, only Backend's own contract.
 // Connect blocks on release until it is closed, for TestInFlightConnectDedupe's slow-connect case.
 type fakeBackend struct {
 	mu          sync.Mutex
@@ -81,7 +81,7 @@ func (b *fakeBackend) Connect(ctx context.Context, cfg model.ResolvedConnectionC
 }
 
 // Test never itself rejects a bad Port the way a real adapter would (postgres/client.go's
-// uint16(*cfg.Port) truncation being the concrete case, P2 R1) — it always answers OK, so
+// uint16(*cfg.Port) truncation being the concrete case) — it always answers OK, so
 // TestTestValidatesInputBeforeProbing below can only pass by Service.Test's own Validate() call
 // stopping a bad request before it ever reaches here.
 func (b *fakeBackend) Test(ctx context.Context, cfg model.ResolvedConnectionConfig) (string, error) {
@@ -130,8 +130,8 @@ func (b *fakeBackend) lastConnectConfig() model.ResolvedConnectionConfig {
 	return b.lastConfig
 }
 
-// fakeAuthorizer replaces the real internal/localauth.Authorizer (P14): a canned outcome/error per
-// call, with the (reason, confirmed) arguments it was actually called with recorded, so a test can
+// fakeAuthorizer replaces the real internal/localauth.Authorizer: a canned outcome/error per
+// call, with the (reason, confirmed) arguments it was called with recorded, so a test can
 // both drive Reveal's response and assert the gate saw what it should have. Defaults to Granted —
 // harmless for every test that doesn't itself exercise Reveal.
 type fakeAuthorizer struct {
@@ -395,7 +395,7 @@ func TestUpdateWritesSecretBeforeRow(t *testing.T) {
 	}
 }
 
-// TestUpdateDoesNotLeaveANewPasswordStoredAgainstOldFields is P21 round 3 finding 4:
+// TestUpdateDoesNotLeaveANewPasswordStoredAgainstOldFields:
 // connections.Service.Update used to write the new password (Secrets.Set) *before* writing the
 // rest of the row (Conns.Update) — reasoning only about the "cipher unavailable" failure, which
 // that ordering does correctly abort before touching anything. But Conns.Update can fail for a
@@ -404,7 +404,7 @@ func TestUpdateWritesSecretBeforeRow(t *testing.T) {
 // programmatic caller, can construct one even though the IPC/JSON boundary cannot). Under the old
 // ordering, that failure happened *after* the new password had already been committed, leaving it
 // stored against the connection's old host/port/database — exactly the "old destination's password
-// on a new destination" state destinationUnchanged elsewhere in this file exists to prevent, just
+// on a new destination" state destinationUnchanged elsewhere in this file exists to prevent,
 // reached by a different path. UpdateWithSecret's single combined statement computes and validates
 // everything (including the json.Marshal) before issuing any write, so this failure now aborts with
 // nothing changed at all.
@@ -480,7 +480,7 @@ func TestInFlightConnectDedupe(t *testing.T) {
 	}
 }
 
-// TestDisconnectWhileConnectingAbortsTheInFlightAttempt is F4 (P108 Part 3): a Disconnect that
+// TestDisconnectWhileConnectingAbortsTheInFlightAttempt: a Disconnect that
 // arrives while a Connect for the same id is still in flight must not be silently undone once
 // that Connect finishes — without cancelling the attempt, Backend.Connect (fakeBackend, gated on
 // the "slow-conn" name) finishes after Disconnect already reported "disconnected", finalizes as
@@ -747,7 +747,7 @@ func TestShutdownWaitsOutInFlightConnectBeforeStoppingPreconnect(t *testing.T) {
 	}
 }
 
-// TestTestValidatesInputBeforeProbing is a regression test for the P2 R1 finding where Test was
+// TestTestValidatesInputBeforeProbing is a regression test for the finding where Test was
 // the one Input-accepting entry point (unlike Create/Update) that never called Validate() —  a
 // port outside 1-65535 reached the backend unchecked, and postgres/client.go's own
 // `uint16(*cfg.Port)` would silently wrap it around to a different, in-range port rather than
@@ -772,8 +772,8 @@ func TestTestValidatesInputBeforeProbing(t *testing.T) {
 	}
 }
 
-// TestTestDoesNotLeakStoredPasswordToARetargetedDraft is a regression test for the P12 round 1
-// finding #1 credential-reveal bypass: editing an existing connection's Host (or Port/Database/
+// TestTestDoesNotLeakStoredPasswordToARetargetedDraft is a regression test for the
+// credential-reveal bypass: editing an existing connection's Host (or Port/Database/
 // URI) and pressing "Test connection" with no password retyped must not decrypt the stored
 // secret and send it to the new, unverified destination — it should test with no password at
 // all, exactly as a brand-new draft would.
@@ -894,8 +894,8 @@ func TestTestGatesOnPreconnectAndOptionsOnlyEdits(t *testing.T) {
 	})
 }
 
-// TestUpdateAppliesThrottleLiveOnlyWhenConnected covers §5.5's "applies live" rule directly: an
-// edit reaches Backend.SetThrottle while the connection is actually connected, but a throttle
+// TestUpdateAppliesThrottleLiveOnlyWhenConnected covers the "applies live" rule directly: an
+// edit reaches Backend.SetThrottle while the connection is connected, but a throttle
 // edit to a connection with nothing running yet gets no such call (attemptConnect installs the
 // right value on the next connect regardless — no double-install to reconcile).
 func TestUpdateAppliesThrottleLiveOnlyWhenConnected(t *testing.T) {
@@ -966,8 +966,8 @@ func TestTestInjectsStoredPasswordAcrossThrottleOnlyEdit(t *testing.T) {
 	}
 }
 
-// TestUpdateReconnectsALiveConnectionOnDestinationOrReadOnlyChange is the P21 round 2
-// architecture/security finding 2 regression: a connected adapter and both cache layers are
+// TestUpdateReconnectsALiveConnectionOnDestinationOrReadOnlyChange is the regression: a connected
+// adapter and both cache layers are
 // stamped with the config resolved at Connect time and never revisit it on their own. Before the
 // fix, Update wrote the new row and, at most, pushed the throttle live — a destination change
 // (host/port/database/etc.) left the old adapter connected to the old server, and toggling
@@ -1072,14 +1072,14 @@ func TestUpdateReconnectsALiveConnectionOnDestinationOrReadOnlyChange(t *testing
 	})
 }
 
-// TestConnectKeepsMetadataCacheAndEmitsInvalidation is P24 D6's own regression guard: a successful
-// connect must no longer delete the connection's metadata_cache rows (F4/F5's actual bug — a
-// delete guarantees a miss on every path for the rest of the session, which is the "refetched all
-// the time" the user actually reported) while still emitting metadataInvalidated, so the
-// renderer's own in-memory copies (the tree's expanded set, schemaColumnsState) drop and re-read
-// through internal/tree.Service's own freshness rule (P24 G3) rather than serving something
-// genuinely stale. Fails on main: attemptConnect's DropConnection call empties the table before
-// this assertion could ever see a row.
+// TestConnectKeepsMetadataCacheAndEmitsInvalidation is the regression guard: a successful connect
+// must no longer delete the connection's metadata_cache rows (the actual bug — a delete
+// guarantees a miss on every path for the rest of the session, which is the "refetched all
+// the time" the user reported) while still emitting metadataInvalidated, so the renderer's own
+// in-memory copies (the tree's expanded set, schemaColumnsState) drop and re-read through
+// internal/tree.Service's own freshness rule rather than serving something genuinely stale. Fails
+// on main: attemptConnect's DropConnection call empties the table before this assertion could ever
+// see a row.
 func TestConnectKeepsMetadataCacheAndEmitsInvalidation(t *testing.T) {
 	h := newHarness(t)
 	created := mustCreate(t, h.svc, fieldsInput("keeps-metadata"))
@@ -1112,7 +1112,7 @@ func TestConnectKeepsMetadataCacheAndEmitsInvalidation(t *testing.T) {
 	}
 }
 
-// TestDuplicateCapsGeneratedNameAtMaxLength is the review finding: Duplicate used to append " copy"
+// TestDuplicateCapsGeneratedNameAtMaxLength: Duplicate used to append " copy"
 // with no length cap at all — a 118-character name plus " copy" (5 more) is 123 characters, over
 // connectionInputSchema's own 120-character cap that a hand-typed name of that length would have
 // been rejected for at Create time.
@@ -1147,12 +1147,12 @@ func TestDuplicateCapsGeneratedNameAtMaxLength(t *testing.T) {
 	}
 }
 
-// TestDuplicateCopiesThePasswordAtomically is the review finding's other half: Duplicate used to
-// Conns.Insert the row and Secrets.Copy the password as two separate statements with no
-// transaction, so a crash between them left a passwordless duplicate. InsertDuplicateWithSecret
-// copies the password in the very same INSERT statement the row itself is written by — this
-// confirms the happy path actually commits both together against a real database (a crash injected
-// between two statements that no longer exist has nothing left to inject between).
+// TestDuplicateCopiesThePasswordAtomically: Duplicate used to Conns.Insert the row and
+// Secrets.Copy the password as two separate statements with no transaction, so a crash between
+// them left a passwordless duplicate. InsertDuplicateWithSecret copies the password in the very
+// same INSERT statement the row itself is written by — this confirms the happy path commits both
+// together against a real database (a crash injected between two statements that no longer exist
+// has nothing left to inject between).
 func TestDuplicateCopiesThePasswordAtomically(t *testing.T) {
 	h := newHarness(t)
 	in := fieldsInput("with-a-password")
@@ -1185,8 +1185,8 @@ func TestDuplicateCopiesThePasswordAtomically(t *testing.T) {
 	}
 }
 
-// TestDuplicateCopiesMaskRules is finding #6 (M6): ConnectionFields carries MCP exposure over to a
-// duplicate, but mask rules live in a separate table keyed by connection_id and were never copied
+// TestDuplicateCopiesMaskRules: ConnectionFields carries MCP exposure over to a duplicate, but
+// mask rules live in a separate table keyed by connection_id and were never copied
 // — a duplicated connection that was masked-and-MCP-exposed became immediately MCP-exposed with
 // zero mask rules, silently exposing whatever PII the original was protecting.
 func TestDuplicateCopiesMaskRules(t *testing.T) {
@@ -1254,10 +1254,10 @@ func TestDuplicateCopiesMaskRules(t *testing.T) {
 	}
 }
 
-// TestDuplicateEnablesMcpOnlyAfterMaskRulesCopySucceeds is finding #4 (M7): a source with MCP
-// exposure and mask rules must still end up MCP-enabled on the happy path — InsertDuplicateWithSecret
-// now always inserts the duplicate with mcp_enabled off, so this confirms Duplicate's own follow-up
-// SetMcpEnabled call actually restores the source's real state once the mask rule copy succeeds,
+// TestDuplicateEnablesMcpOnlyAfterMaskRulesCopySucceeds: a source with MCP exposure and mask rules
+// must still end up MCP-enabled on the happy path — InsertDuplicateWithSecret now always inserts
+// the duplicate with mcp_enabled off, so this confirms Duplicate's own follow-up SetMcpEnabled
+// call restores the source's real state once the mask rule copy succeeds,
 // both in the returned summary and in storage.
 func TestDuplicateEnablesMcpOnlyAfterMaskRulesCopySucceeds(t *testing.T) {
 	h := newHarness(t)
@@ -1296,13 +1296,13 @@ func TestDuplicateEnablesMcpOnlyAfterMaskRulesCopySucceeds(t *testing.T) {
 	}
 }
 
-// TestDuplicateLeavesMcpDisabledWhenMaskRuleCopyFails is finding #4 (M7)'s own named defect: before
-// this fix, InsertDuplicateWithSecret copied McpEnabled verbatim in the same INSERT that committed
-// the duplicate row, so an error from the mask-rule copy that ran afterward still surfaced to the
-// caller — but the already-committed duplicate was left live and MCP-exposed with zero mask rules.
-// This forces that copy to fail (the mask rules table is dropped after the source's own rule is
-// written, so ListForConnection errors) and confirms the duplicate row that HAS been committed by
-// then is not MCP-exposed, closing exactly that gap.
+// TestDuplicateLeavesMcpDisabledWhenMaskRuleCopyFails: before this fix, InsertDuplicateWithSecret
+// copied McpEnabled verbatim in the same INSERT that committed the duplicate row, so an error from
+// the mask-rule copy that ran afterward still surfaced to the caller — but the already-committed
+// duplicate was left live and MCP-exposed with zero mask rules. This forces that copy to fail (the
+// mask rules table is dropped after the source's own rule is written, so ListForConnection errors)
+// and confirms the duplicate row that HAS been committed by then is not MCP-exposed, closing
+// exactly that gap.
 func TestDuplicateLeavesMcpDisabledWhenMaskRuleCopyFails(t *testing.T) {
 	h := newHarness(t)
 	in := fieldsInput("masked-and-exposed")
@@ -1342,10 +1342,10 @@ func TestDuplicateLeavesMcpDisabledWhenMaskRuleCopyFails(t *testing.T) {
 	}
 }
 
-// TestDuplicateEmitsListChangedEvenWhenMaskRuleCopyFails is F8 (P108 Part 3): the new duplicate
-// row is already committed (InsertDuplicateWithSecret) by the time copyMaskRules can fail —
-// emitListChanged must still run on this failure path, or the UI's own connection list never
-// learns the new row exists until some unrelated later refresh.
+// TestDuplicateEmitsListChangedEvenWhenMaskRuleCopyFails: the new duplicate row is already
+// committed (InsertDuplicateWithSecret) by the time copyMaskRules can fail — emitListChanged must
+// still run on this failure path, or the UI's own connection list never learns the new row exists
+// until some unrelated later refresh.
 func TestDuplicateEmitsListChangedEvenWhenMaskRuleCopyFails(t *testing.T) {
 	h := newHarness(t)
 	created := mustCreate(t, h.svc, fieldsInput("masked-list-changed"))

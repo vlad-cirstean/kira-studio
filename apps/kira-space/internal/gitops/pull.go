@@ -15,13 +15,12 @@ func MergeArgs(upstream string) []string {
 }
 
 // RebaseArgs builds `git rebase <upstream>` (or `git rebase --rebase-merges <upstream>` when
-// rebaseMerges is set — F6 fix: a `pull.rebase`/`branch.<name>.rebase` value of "merges"/"m" asks
+// rebaseMerges is set — a `pull.rebase`/`branch.<name>.rebase` value of "merges"/"m" asks
 // git to preserve merge commits during the rebase rather than linearizing them away; the caller
 // passes remote.run's own rebaseMerges param, resolved at preflight
 // (gitpreflight.ResolveRebaseMerges)) — pull's integrate phase, rebase strategy.
-// A conflicting rebase lands in G5's existing in-progress banner, offering Abort and never
-// Continue (SPEC's own v1 rebase posture) — this file adds no interactive-rebase support of any
-// kind.
+// A conflicting rebase lands in the existing in-progress banner, offering Abort and never
+// Continue — this file adds no interactive-rebase support of any kind.
 func RebaseArgs(upstream string, rebaseMerges bool) []string {
 	if rebaseMerges {
 		return []string{"rebase", "--rebase-merges", upstream}

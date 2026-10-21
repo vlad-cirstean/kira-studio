@@ -16,8 +16,8 @@ func init() {
 	})
 }
 
-// connState is every field Connect/Disconnect write concurrently with an in-flight op reading them
-// (F3), guarded together via adapters.Guarded (P113 G1). It also folds in the pre-existing "two
+// connState is every field Connect/Disconnect write concurrently with an in-flight op reading them,
+// guarded together via adapters.Guarded. It also folds in the pre-existing "two
 // tabs on one connection are two goroutines through one *Adapter in Go" guard the queueURLs cache
 // already carried.
 type connState struct {
@@ -82,7 +82,7 @@ func (a *Adapter) requireClient() (*awssqs.Client, error) {
 	return adapters.RequireConnected(a.state.Load().client)
 }
 
-// cacheQueueURL is a no-op once Disconnect has nilled queueURLs (F3): an op already past
+// cacheQueueURL is a no-op once Disconnect has nilled queueURLs: an op already past
 // requireClient can still reach this call (or Children's own listing loop) after a concurrent
 // Disconnect, and writing to a nil map panics — recovered by safeRun into a bare E_INTERNAL before
 // this fix, but a genuine bug regardless of the recover.
@@ -146,8 +146,8 @@ func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *ad
 	return nil, adapters.Unsupported("sqs", "schemaColumns")
 }
 
-// resolveQueueTarget is Definition/Read/Count/Preview/Mutate's shared single-queue path check
-// (P113 G2). The message text stays hardcoded to "read" regardless of the actual caller, a
+// resolveQueueTarget is Definition/Read/Count/Preview/Mutate's shared single-queue path check.
+// The message text stays hardcoded to "read" regardless of the actual caller, a
 // pre-existing quirk kept as-is. A queue is a tree leaf, so RequirePath's exact-length match (vs.
 // the old check's mere non-emptiness) changes nothing for any real caller.
 func (a *Adapter) resolveQueueTarget(path model.NodePath) (string, error) {
@@ -255,11 +255,10 @@ func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adap
 	return nil, adapters.Unsupported("sqs", "key types")
 }
 
-// Cancel is index.ts's cancel — a permanent no-op. Unlike every native adapter built before this
-// sub-phase, SQS has no server-side kill mechanism at all: the op's own context.Context, passed
-// directly to every SDK call in read.go/mutate.go (P58d D3, never adapters.RunWithAbortRace), is
-// the entire cancellation story. AWS-1(e) confirmed a cancelled context aborts an in-flight
-// ReceiveMessage promptly through the SDK's own plumbing.
+// Cancel is index.ts's cancel — a permanent no-op. SQS has no server-side kill mechanism at all:
+// the op's own context.Context, passed directly to every SDK call in read.go/mutate.go (never
+// adapters.RunWithAbortRace), is the entire cancellation story. A cancelled context aborts an
+// in-flight ReceiveMessage promptly through the SDK's own plumbing.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 	return false, nil
 }

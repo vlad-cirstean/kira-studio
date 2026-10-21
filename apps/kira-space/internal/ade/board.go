@@ -32,7 +32,7 @@ import (
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
-// board.go is the ADE v2 engine: tasks hold branches across repos; this type assembles the
+// board.go is the ADE engine: tasks hold branches across repos; this type assembles the
 // adewire.Board snapshot from the task store plus git facts. It returns wire types directly
 // (internal/bridge/adewire is a pure type leaf the layering test allows). Shared git fact helpers
 // live in gitfacts.go.

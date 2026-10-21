@@ -75,7 +75,7 @@ func TestRevSetArgs_IncludeStashShasAppendAfterExcludes(t *testing.T) {
 }
 
 // parseFixture reads and fully parses a committed .bin fixture into every CommitRecord it holds,
-// in the order git emitted them. F3: LogFormat is NUL-delimited field to field, so splitter.Push
+// in the order git emitted them. LogFormat is NUL-delimited field to field, so splitter.Push
 // returns individual fields, not whole records — a FieldGrouper groups every FieldCount of them
 // into one record, same as production's logsession.consumeChunkLocked.
 func parseFixture(t *testing.T, relPath string) []porcelain.CommitRecord {

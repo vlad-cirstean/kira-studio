@@ -1,9 +1,9 @@
-// docs/plans/P10.md §7.13's cherry-pick classifier — the direct structural sibling of
-// ClassifyRevert, with different blockers (probe 7): there is no blanket dirty-worktree blocker
-// here. Probe 7A found a clean pick proceeds even with an unrelated dirty file present, so every
-// blocker below is a set intersection against the picked commit's OWN paths (mirroring
-// ClassifyCheckout's D∩T pattern), except `stagedChanges`, which git refuses no matter what it
-// touches (probe 7 B/D). Ported verbatim from @kira/git-core's own preflight/cherryPick.ts (D2).
+// The cherry-pick classifier — the direct structural sibling of ClassifyRevert, with different
+// blockers: there is no blanket dirty-worktree blocker here. A clean pick proceeds even with an
+// unrelated dirty file present, so every blocker below is a set intersection against the picked
+// commit's OWN paths (mirroring ClassifyCheckout's D∩T pattern), except `stagedChanges`, which git
+// refuses no matter what it touches. Ported verbatim from @kira/git-core's own
+// preflight/cherryPick.ts.
 package gitpreflight
 
 // CherryPickCommitPaths is the picked commit's own changed paths, split "added" (probe 7E: an

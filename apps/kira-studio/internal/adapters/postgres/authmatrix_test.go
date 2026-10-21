@@ -1,7 +1,6 @@
-// authmatrix_test.go is the complete (Tier 2) suite's own table for postgres — P25 §2.4. Row 6
+// authmatrix_test.go is the complete suite's own table for postgres. Row 6
 // generalizes across every adapter's own matrix: a permission failure and an authentication
-// failure must get different codes, because P24's two bugs and P25 §1.2-1.5's four all presented
-// as the wrong one of those two.
+// failure must get different codes.
 package postgres_test
 
 import (
@@ -98,9 +97,9 @@ func TestPostgres_AuthMatrix(t *testing.T) {
 				),
 				testsupport.CountMatchesRead(testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "kira_test"), testsupport.Seg("schema", "app"), testsupport.Seg("table", "customers"))),
 				// SQLSTATE 42501 (insufficient_privilege) is not in mapError's auth switch
-				// (errors.go:32-37) — the single most valuable new assertion in the phase: it pins
-				// that a missing GRANT does *not* read as a wrong password, the property P24/P25 were
-				// both about, asserted for the first time past Connect().
+				// (errors.go:32-37) — the single most valuable new assertion: it pins
+				// a missing GRANT does *not* read as a wrong password, asserted for the first time
+				// past Connect().
 				testsupport.MutateIsRefused(model.MutationPlan{
 					Path: testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "kira_test"), testsupport.Seg("schema", "app"), testsupport.Seg("table", "regions")),
 					Ops: []model.MutationRowOp{{

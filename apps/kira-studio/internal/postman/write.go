@@ -1,4 +1,4 @@
-// write.go turns a Tree back into a Collection v2.1 file under P4 D6's one rule, applied per
+// write.go turns a Tree back into a Collection v2.1 file under the one rule, applied per
 // request item:
 //
 //	Start from origin. Set `name`. For each of `url`, `header` and `body`: if re-running the
@@ -59,7 +59,7 @@ func Write(w io.Writer, t *Tree) error {
 }
 
 // buildItems rebuilds one `item[]` array from the flat list, ordered by Order — the exact inverse
-// of walkItems, with no sorting anywhere else in the pipeline. D12/F22: a protocol='grpc' item is
+// of walkItems, with no sorting anywhere else in the pipeline. A protocol='grpc' item is
 // skipped outright — the format has no representation for one, and CollectionsService.Export
 // counts the same skip (scanning t.Items itself) to report it rather than silently dropping it.
 func buildItems(t *Tree, parent int) json.RawMessage {
@@ -93,11 +93,11 @@ func buildItem(t *Tree, idx int) json.RawMessage {
 }
 
 // importedOriginForCompare re-imports origin — a request member's raw bytes, object or string
-// form, nil included — through the one real importer, importRequest, so its P28 D15(c) alias
+// form, nil included — through the one real importer, importRequest, so its alias
 // rewrite ({{$guid}} -> {{fake.string.uuid}}) always runs before the result is compared against a
 // stored (and therefore already-rewritten) model.SavedRequest.
 //
-// F7: buildRequest's and ShedOrigin's object-form branches used to call ImportURL/importHeaders/
+// buildRequest's and ShedOrigin's object-form branches used to call ImportURL/importHeaders/
 // importBody directly on origin's members, bypassing rewriteRequestAliases entirely — origin's
 // alias spelling never matched saved's rewritten spelling, so every alias-bearing field compared
 // "changed" even when the user never touched it. Export wrote a fresh member
@@ -160,9 +160,9 @@ func buildRequest(origin json.RawMessage, saved model.SavedRequest) json.RawMess
 	return mustRaw(out)
 }
 
-// buildVariables emits `[{key, value, type?}]` — D16: a secret's `value` is always "" in the
+// buildVariables emits `[{key, value, type?}]` — a secret's `value` is always "" in the
 // written file, regardless of what LoadTree read (which is itself always "" for a secret row,
-// D4's own CHECK constraint), stated here rather than relied upon implicitly. `type` is "secret"
+// the CHECK constraint), stated here rather than relied upon implicitly. `type` is "secret"
 // for any secret entry (even one created in this app, which never had an original Postman `type`
 // string) and otherwise the original string verbatim, when there was one.
 func buildVariables(vars []Variable) json.RawMessage {
@@ -206,10 +206,10 @@ func buildHeaders(headers []model.SavedHeader) json.RawMessage {
 	return mustRaw(rows)
 }
 
-// ShedOrigin is D6's other half, called by CollectionsRepo.SaveRequest: it deletes each member the
-// user has actually changed from the stored origin, so an edited request stops carrying a stale
-// duplicate of its own body (D5's cost) and export's rule degenerates correctly — with the member
-// gone from origin, the `else` branch is taken.
+// ShedOrigin is called by CollectionsRepo.SaveRequest: it deletes each member the user has changed
+// from the stored origin, so an edited request stops carrying a stale duplicate of its own body
+// and export's rule degenerates correctly — with the member gone from origin, the `else` branch is
+// taken.
 func ShedOrigin(origin map[string]json.RawMessage, saved model.SavedRequest) map[string]json.RawMessage {
 	out := cloneOrigin(origin)
 	raw, ok := out["request"]

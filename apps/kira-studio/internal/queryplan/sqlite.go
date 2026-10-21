@@ -10,8 +10,8 @@ import (
 
 // sqlite.go ports planParsers/sqlite.ts verbatim: SQLite's `EXPLAIN QUERY PLAN` — N rows x 4
 // columns (id, parent, notused, detail), no cost and no row estimate whatsoever, so
-// EstimatedRowsRead/OverThreshold stay unset/false here (D14). sqlite.org/eqp.html: "The output
-// format may change between SQLite releases" — taken as binding (D16): detail is matched on a
+// EstimatedRowsRead/OverThreshold stay unset/false here. sqlite.org/eqp.html: "The output
+// format may change between SQLite releases" — taken as binding: detail is matched on a
 // small set of leading tokens for issue detection and otherwise shown verbatim, never re-parsed
 // more deeply.
 

@@ -97,17 +97,17 @@ func TestOutputCollector_TrailingUnterminatedLineFlushed(t *testing.T) {
 	}
 }
 
-// TestOutputCollector_UnterminatedStreamBufDoesNotGrowUnbounded is G31 round-2 architecture/
-// security review, finding #8: maxRetainedOutput/maxBatchBytes (proved by the two tests below this
-// one) only bound already-'\n'-split LINES; streamBuf[stream] itself — the raw, not-yet-terminated
-// tail write() accumulates while waiting for the next '\n' — had no bound of its own at all before
-// maxUnterminatedBuf. A single write() call carrying many megabytes with no '\n' anywhere in it (a
-// runaway process echoing a huge blob, or a script bug) used to grow that buffer by the whole
-// chunk's size in one shot, regardless of either cap above. This proves a single such write is
-// instead split into maxUnterminatedBuf-sized lines as it goes (each one still passing through the
-// exact same sanitize+cap pipeline every other line does — TestOutputCollector_RetainedBytesCapped
-// below is what caps its total contribution to the retained transcript), rather than the streaming
-// buffer itself absorbing the whole thing in memory unbounded.
+// TestOutputCollector_UnterminatedStreamBufDoesNotGrowUnbounded: maxRetainedOutput/maxBatchBytes
+// (proved by the two tests below this one) only bound already-'\n'-split LINES;
+// streamBuf[stream] itself — the raw, not-yet-terminated tail write() accumulates while waiting
+// for the next '\n' — had no bound of its own at all before maxUnterminatedBuf. A single write()
+// call carrying many megabytes with no '\n' anywhere in it (a runaway process echoing a huge blob,
+// or a script bug) used to grow that buffer by the whole chunk's size in one shot, regardless of
+// either cap above. This proves a single such write is instead split into maxUnterminatedBuf-sized
+// lines as it goes (each one still passing through the exact same sanitize+cap pipeline every
+// other line does — TestOutputCollector_RetainedBytesCapped below is what caps its total
+// contribution to the retained transcript), rather than the streaming buffer itself absorbing the
+// whole thing in memory unbounded.
 func TestOutputCollector_UnterminatedStreamBufDoesNotGrowUnbounded(t *testing.T) {
 	c := newOutputCollector(nil)
 	huge := strings.Repeat("x", maxUnterminatedBuf*3+1000) // no '\n' anywhere in it.
@@ -294,13 +294,13 @@ func TestOutputCollector_FlushDeliversPendingUnconditionally(t *testing.T) {
 	}
 }
 
-// TestOutputCollector_DeliveriesSerializeInFormationOrder is G31 round-2 architecture/security
-// review, finding #9: write/flush/tick all form a batch under mu, release mu, and only then call
+// TestOutputCollector_DeliveriesSerializeInFormationOrder: write/flush/tick all form a batch under
+// mu, release mu, and only then call
 // onBatch — a gap where two batches formed back-to-back under mu (batch1 strictly before batch2,
 // since mu itself serializes formation) could still have their onBatch calls run in the OPPOSITE
 // order if goroutine scheduling let the second caller reach deliver() first. onBatch's own contract
-// is an ordered stream of lines; a caller (an ADE log sink) has no way to detect or recover from a later batch's lines arriving before an earlier
-// one's.
+// is an ordered stream of lines; a caller (an ADE log sink) has no way to detect or recover from a
+// later batch's lines arriving before an earlier one's.
 //
 // This exercises reserveDelivery/finishDelivery directly (the exact pair write/flush/tick call)
 // rather than racing two goroutines through write() itself, since the whole point is a

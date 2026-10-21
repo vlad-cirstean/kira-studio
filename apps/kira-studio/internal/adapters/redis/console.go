@@ -155,17 +155,17 @@ func formatReplyItem(value any) string {
 	}
 }
 
-// hashReadCommands is resultToPage's own limited command-aware set (finding #3, M7): these three
+// hashReadCommands is resultToPage's own limited command-aware set: these three
 // reads carry a genuine per-value field name — HGET/HMGET's from the command's own arguments (the
 // caller-supplied field names), HGETALL's from the reply itself (server-returned field/value
 // pairs) — so their page is built with FieldsAreColumns=true and a real Field, letting a mask rule
-// on that hash's field name actually match. Every other command keeps the generic formatting below
+// on that hash's field name match. Every other command keeps the generic formatting below
 // with FieldsAreColumns=false: an array index or a bare command name is never a genuine field
 // identifier a rule could legitimately match, so dbmcp's renderKeyValuePage refuses to mask such a
 // page rather than silently pass a real value through under a Field nothing could ever match.
 var hashReadCommands = map[string]bool{"HGET": true, "HMGET": true, "HGETALL": true}
 
-// resultToPage is console.ts's own: any RESP reply is formatted generically (P9's D11) — no
+// resultToPage is console.ts's own: any RESP reply is formatted generically — no
 // per-command result shape, unlike Mongo's console — except for hashReadCommands above. A scalar's
 // field name is the upper-cased command; an array's are the indices. The page stops at limit and
 // reports Truncated when another entry existed.
@@ -266,7 +266,7 @@ func hashReadPage(upper string, args []string, reply any, limit page.ResultCap) 
 	}
 }
 
-// ClassifyStatement satisfies adapters.StatementClassifier (M2) over this package's own
+// ClassifyStatement satisfies adapters.StatementClassifier over this package's own
 // tokenize/isReadOnlyCommand — Redis has no DDL, and one run_query call is one command (tokenize
 // treats a newline as ordinary whitespace, so extra lines become arguments, never a second
 // command). The COMMAND table is server-wide, so the db index does not matter for classification.
@@ -293,7 +293,7 @@ func (a *Adapter) ClassifyStatement(ctx context.Context, statement string) (adap
 	return adapters.ClassWrite, nil
 }
 
-// deniedConsoleCommands is F1's denylist: every command go-redis's pooled *redis.Client cannot
+// deniedConsoleCommands is the denylist: every command go-redis's pooled *redis.Client cannot
 // safely run through a raw conn.Do — go-redis does not track connection/session state a raw command
 // changes, so any of these, issued on the shared per-db-index pooled connection, would silently
 // corrupt every later grid/tree/mutate/console call sharing it. SELECT repoints the connection at a
@@ -321,7 +321,7 @@ var deniedConsoleCommands = map[string]bool{
 	"QUIT":         true,
 }
 
-// rejectConnectionStateCommand is F1's guard, checked before every console command reaches
+// rejectConnectionStateCommand is the guard, checked before every console command reaches
 // conn.Do. CLIENT REPLY OFF/SKIP desyncs the reply stream for every later command on this same
 // pooled connection the exact same way the commands in deniedConsoleCommands do — matched as the
 // two-token command CLIENT REPLY specifically, so an ordinary CLIENT subcommand (GETNAME, INFO,
@@ -432,12 +432,12 @@ func runConsoleCommand(ctx context.Context, conn *goredis.Client, argv []any, ti
 	})
 }
 
-// execute is console.ts's execute — one op-log row for the whole batch (P5.5 D9's precedent).
+// execute is console.ts's execute — one op-log row for the whole batch.
 // A read-only connection is gated per-command via Redis's own COMMAND table (isReadOnlyCommand),
 // not a blanket refusal — SPEC.md's read-only contract disables "anything but a read", and a flat
 // console-execution ban would take reads away too.
 //
-// F11: every statement is tokenized, denylist-checked, and read-only-checked up front — before any
+// Every statement is tokenized, denylist-checked, and read-only-checked up front — before any
 // of them runs against the connection. The previous shape parsed statement N only after 1..N-1 had
 // already executed, so a typo further down a batch discarded the already-committed earlier writes
 // with no rollback path; re-running after fixing the typo then double-applied them.

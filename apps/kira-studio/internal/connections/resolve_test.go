@@ -6,9 +6,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// TestResolveFromInputPrefersURIEmbeddedPassword pins P2 R2's fix to the "Test connection" path:
+// TestResolveFromInputPrefersURIEmbeddedPassword pins the fix to the "Test connection" path:
 // a password typed directly into the URI (e.g. after retyping the whole URI for a different host)
-// must be what actually gets tested, not a stale in.Password left over from before the edit — the
+// must be what gets tested, not a stale in.Password left over from before the edit — the
 // old code unconditionally injected in.Password over whatever the URI already carried, silently
 // discarding a freshly typed password (and, since it travelled with a URI now pointing at a
 // different host, silently testing the *old* host's credentials against the new one instead).
@@ -51,8 +51,8 @@ func TestResolveFromInputFallsBackToInputPasswordWhenURIHasNone(t *testing.T) {
 	}
 }
 
-// TestResolveFromInputMintsAUniqueIDPerCall is the P21 round 2 architecture/security finding 9
-// regression: the id used to be the literal "test" every single call — with two workbench windows
+// TestResolveFromInputMintsAUniqueIDPerCall is the regression: the id used to be the literal
+// "test" every single call — with two workbench windows
 // open, two concurrent Test connection presses on two different drafts both used that same key,
 // and Preconnect.Supervisor.Start kills anything already tracked under a key it is given, so the
 // second Start SIGTERMed the first's still-settling pre-connect script (and the first Test's own

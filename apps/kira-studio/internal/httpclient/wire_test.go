@@ -16,9 +16,9 @@ import (
 	"unicode/utf8"
 )
 
-// buildTestRequest mirrors client.go's Send: the header loop (including F20a's Host special case),
-// the User-Agent default and D7's Content-Type precedence — the exact construction wire_test.go's
-// own exactness case (below) needs to hold still while it renders and then really sends the same
+// buildTestRequest mirrors client.go's Send: the header loop (including the Host special case),
+// the User-Agent default and the Content-Type precedence — the exact construction wire_test.go's
+// own exactness case (below) needs to hold still while it renders and then sends the same
 // *http.Request. Deliberately separate from body_test.go's own sendViaBuildBody, which sends
 // immediately and never needs the Host case or a chance to render first.
 func buildTestRequest(t *testing.T, rawURL, method string, headers []Header, b Body) (*http.Request, string) {
@@ -89,11 +89,10 @@ func (c *teeConn) Write(p []byte) (int, error) {
 	return c.Conn.Write(p)
 }
 
-// §6.2 case 1 — the single most valuable test in the phase (its own comment in the plan): a future
-// Go release changing Request.write is exactly what would break this feature silently, so this
-// pins F7/F14 as a regression test rather than a one-off measurement. One *http.Request is (a)
-// rendered via renderRequest, then (b) actually sent through a teed dialer to a real httptest
-// server — DumpRequestOut restores req.Body after dumping (net/http/httputil's own contract), so
+// A future Go release changing Request.write is exactly what would break this feature silently,
+// so this is a regression test rather than a one-off measurement. One *http.Request is (a)
+// rendered via renderRequest, then (b) sent through a teed dialer to a real httptest server —
+// DumpRequestOut restores req.Body after dumping (net/http/httputil's own contract), so
 // the same request object can be sent for real immediately after. The two captures must be
 // byte-identical.
 func TestRenderRequest_ExactnessAgainstTheWire(t *testing.T) {
@@ -156,9 +155,9 @@ func TestRenderRequest_ExactnessAgainstTheWire(t *testing.T) {
 	}
 }
 
-// §6.2 case 2: a two-text-part, one-file-part formdata body renders the exact boundary and part
+// A two-text-part, one-file-part formdata body renders the exact boundary and part
 // headers multipartLength counted, the file payload replaced by its marker (never read from disk),
-// and — critically — the head's own Content-Length is always the real dry-run count (D4), even
+// and — critically — the head's own Content-Length is always the real dry-run count, even
 // though the rendered body region is shorter than that because the marker stands in for the file.
 func TestRenderRequest_MultipartElision(t *testing.T) {
 	dir := t.TempDir()
@@ -285,9 +284,9 @@ func TestClassifyFidelity(t *testing.T) {
 	})
 }
 
-// §6.2 case 6: a base64 (binary) response body never leaks into WireExchange.ResponseHead — D5's
+// A base64 (binary) response body never leaks into WireExchange.ResponseHead — the
 // "it does not include the body" rule, checked against a real send rather than only asserted. The
-// marker RawExchangePane.vue shows for a binary body is the frontend's own concatenation (D5); Go's
+// marker RawExchangePane.vue shows for a binary body is the frontend's own concatenation; Go's
 // only obligation is to never carry the raw bytes here.
 func TestSend_WireResponseHeadNeverCarriesTheBinaryBody(t *testing.T) {
 	raw := []byte{0xff, 0xfe, 0x00, 0x01, 'h', 'i', 0x80}
@@ -318,7 +317,7 @@ func TestSend_WireResponseHeadNeverCarriesTheBinaryBody(t *testing.T) {
 	}
 }
 
-// TestCapWireText_MasksBeforeTruncating is P108 F12: a secret straddling the 128 KiB cut used to
+// TestCapWireText_MasksBeforeTruncating: a secret straddling the 128 KiB cut used to
 // leak its unmasked prefix, because masking (bridge/http.go's maskSecrets) ran on the already-cut
 // text — the replacer's full registered pattern no longer matched what survived the cut. mask now
 // runs inside capWireText itself, before the cut, so the whole secret is gone before truncation

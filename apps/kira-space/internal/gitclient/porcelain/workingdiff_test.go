@@ -12,8 +12,8 @@ import (
 
 // TestParseWorkingDiff_Mixed confirms ParseNameStatusRecords
 // — established against diff-tree output — parse plain `git diff`'s identical `-z` framing without
-// any change: a staged add and an unstaged modify against HEAD, both in one spawn (P7,
-// item 2's own "one diff HEAD covers both" design).
+// any change: a staged add and an unstaged modify against HEAD, both in one spawn (the "one diff
+// HEAD covers both" design).
 func TestParseWorkingDiff_Mixed(t *testing.T) {
 	t.Parallel()
 	combined, err := porcelain.ParseNameStatusRecords(readFixtureRecords(t, "workingDiff/mixed.nameStatus.bin"))
@@ -67,7 +67,7 @@ func TestParseWorkingDiff_UnbornHead(t *testing.T) {
 	}
 }
 
-// TestEmptyTreeHashArgs_MatchesRepositoryObjectFormat is F18's own regression guard: the old
+// TestEmptyTreeHashArgs_MatchesRepositoryObjectFormat is the regression guard: the old
 // design hardcoded the SHA-1-width empty-tree hash as a literal constant, silently wrong in a
 // SHA-256 repository (verified against real git --object-format=sha256: a completely different,
 // 64-hex value, never just a longer version of the SHA-1 one). EmptyTreeHashArgs derives it from

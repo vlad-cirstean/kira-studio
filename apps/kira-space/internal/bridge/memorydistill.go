@@ -57,9 +57,9 @@ type MemoryDistillArgs struct {
 }
 
 // MemoryDistillResult sizes count characters (runes) and tokens (runes/3) of the input and of the
-// output as Copy puts it on the clipboard (line texts joined by newlines). Unresolved lists facts the
-// input leaves open. In rewrite mode Rewrite holds the outcome, Lines and Unresolved are empty and
-// OutChars counts its text.
+// output as Copy puts it on the clipboard (line texts joined by newlines). Unresolved lists facts
+// the input leaves open. In rewrite mode Rewrite holds the outcome, Lines and Unresolved are empty
+// and OutChars counts its text.
 type MemoryDistillResult struct {
 	Mode       string                    `json:"mode"`
 	Rewrite    *importer.RewriteResult   `json:"rewrite"`

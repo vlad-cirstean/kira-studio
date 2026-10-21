@@ -16,7 +16,7 @@ import (
 )
 
 // ErrRepoTornDown is returned by whatever still reaches a RepoEntry after its own teardown() ran
-// (F2/F3) — Registry.Close() tears entries down regardless of refcount (D14), so a request still
+// — Registry.Close() tears entries down regardless of refcount, so a request still
 // in flight at process shutdown can observe this instead of a nil-map panic or a double-close.
 // gitrpc's mapGitError maps it to E_BAD_REQUEST, same as ErrRepoNotHeld; the response is
 // delivered nowhere anyway, since the socket is already closing.
@@ -26,7 +26,7 @@ var ErrRepoTornDown = errors.New("gitsession: repository entry has been torn dow
 // satisfies it structurally. Declared here (not imported as a concrete type) and exported so both
 // registry_test.go (same package) and the flow harness (a different package,
 // injecting a counting fake through Registry.NewWatcher) can drive refcount/linger logic with no
-// filesystem and no real git (§3.5/§3.9).
+// filesystem and no real git.
 type Watcher interface {
 	Signals() <-chan gitclient.Signal
 	Close() error
@@ -39,19 +39,17 @@ type Event struct {
 	Kind   string `json:"kind"` // "refsChanged" | "worktreeChanged"
 }
 
-// subscriptionID is Subscribe's own per-call token (F3, P108 Part 16 review) — unique for the
-// life of a RepoEntry (RepoEntry.nextSubID only ever increments, under mu, and is never reused),
-// unlike the ConnID it replaced as e.subs' key: two concurrent Subscribe calls for the very same
-// conn (a real race — conn.Open's own two-repo.open-requests case) must never collide on one map
-// slot.
+// subscriptionID is Subscribe's own per-call token — unique for the life of a RepoEntry
+// (RepoEntry.nextSubID only ever increments, under mu, and is never reused), unlike the ConnID it
+// replaced as e.subs' key: two concurrent Subscribe calls for the very same conn (a real race —
+// conn.Open's own two-repo.open-requests case) must never collide on one map slot.
 type subscriptionID uint64
 
 // RepoEntry is one repository's SHARED state — everything true of the repository rather than of
-// one viewer (SPEC §6's split rule). G2 gave it the identity, the reader/writer gate (unchanged
-// from gitclient, now shared across connections instead of within one), the watcher, and the
-// subscriber fan-out. G4 added the cat-file session and the two detail/diff caches. G5 adds the
-// live head, the refs cache and the per-repo undo slot (D7/D10/D16) — still to come: stash shapes
-// and active remote op (G7/G12).
+// one viewer. It has the identity, the reader/writer gate (unchanged from gitclient, now shared
+// across connections instead of within one), the watcher, and the subscriber fan-out. It has the
+// cat-file session and the two detail/diff caches. It has the live head, the refs cache and the
+// per-repo undo slot — still to come: stash shapes and active remote op.
 type RepoEntry struct {
 	Summary gitclient.RepoSummary
 	Repo    *gitclient.Repo
@@ -59,9 +57,9 @@ type RepoEntry struct {
 	watcher Watcher
 
 	mu sync.Mutex
-	// subs is keyed by subscriptionID, not ConnID (F3, P108 Part 16 review): two concurrent
+	// subs is keyed by subscriptionID, not ConnID: two concurrent
 	// Subscribe calls for the SAME conn (a real case — conn.Open's own two-repo.open-requests
-	// race, D-whatever in conn.go) used to collide on a shared ConnID key, so the second call's
+	// race in conn.go) used to collide on a shared ConnID key, so the second call's
 	// entry silently overwrote the first's, orphaning its goroutine; whichever call's own
 	// unsubscribe fired first then deleted-and-closed whatever currently occupied that slot —
 	// the OTHER call's subscriber — leaving the map with zero entries for this repo/conn pair
@@ -85,10 +83,9 @@ type RepoEntry struct {
 	// stack is G26 D3/D16's own stack.list cache — one value per repository, dropped on
 	// refsChanged and by invalidateAfterWrite exactly like refs.
 	stack *stackCache
-	// mergeBases is G30 round-1 performance review finding #8's own cache — RangeFiles's two
-	// callers (review.files, review.fileDiff) re-spawned merge-base uncached on every request;
-	// dropped on refsChanged and by invalidateAfterWrite exactly like refs/stack (cache.go's own
-	// doc comment on mergeBaseCache).
+	// mergeBases is the cache — RangeFiles's two callers (review.files, review.fileDiff) re-spawned
+	// merge-base uncached on every request; dropped on refsChanged and by invalidateAfterWrite
+	// exactly like refs/stack (cache.go's own doc comment on mergeBaseCache).
 	mergeBases *mergeBaseCache
 
 	// cacheGen is F10's own generation counter (P108 Part 16 review): bumped by invalidateAfterWrite
@@ -124,13 +121,13 @@ type RepoEntry struct {
 	askPassMu      sync.Mutex
 	askPassChecked bool
 	askPassValue   string
-	// settings is G7 D16's server-owned settings accessor (protected-branch patterns, auto-fetch
-	// minutes, and, since G18 D15, gitPath) — a plain func, not an interface, so this package
+	// settings is the server-owned settings accessor (protected-branch patterns, auto-fetch
+	// minutes, and gitPath) — a plain func, not an interface, so this package
 	// keeps importing only gitclient/gitaskpass/stdlib; threaded in by Registry.Acquire from its
 	// own Registry.Settings field.
 	settings func() (protectedBranches []string, autoFetchMinutes int, gitPath string)
 
-	// repoSettingsGet is G18 D8's own per-repo settings accessor (the seven keys D3 moved into
+	// repoSettingsGet is the per-repo settings accessor (the seven keys moved into
 	// their own table) — threaded in by Registry.Acquire from Registry.RepoSettingsGet, read
 	// through RepoSettings() below rather than directly, so a nil closure or a storage error both
 	// fall back to the schema's own defaults instead of every caller re-deriving that fallback.
@@ -146,7 +143,7 @@ type RepoEntry struct {
 	host  *hostState
 	hosts githost.Selector
 
-	// isOpen is G25 F7's own cross-window query, threaded in from Registry.IsOpen — a plain func,
+	// isOpen is the cross-window query, threaded in from Registry.IsOpen — a plain func,
 	// the same "this package imports only gitclient/gitreview/stdlib, so a cross-entry fact reaches
 	// here as a closure, never as a *Registry field" discipline settings/repoSettingsGet already
 	// follow. nil-safe: every call site checks for nil before calling (a RepoEntry built directly
@@ -163,11 +160,11 @@ type RepoEntry struct {
 	done chan struct{}
 }
 
-// skipInitialAutoFetch is C13-10's own construction-time opt-out: true only for
+// skipInitialAutoFetch is the construction-time opt-out: true only for
 // Registry.AcquireQuiet, whose one caller (Conn.Open, for a Conn with noAutoFetch set — the native
 // git-graph mount) must never be what arms a brand-new entry's auto-fetch timer. It affects ONLY
 // this first-construction moment: a later, ordinary Open of the SAME (already-existing) entry still
-// arms it normally through EnsureAutoFetch's own off→on path (F4/D5) — this parameter never
+// arms it normally through EnsureAutoFetch's own off→on path — this parameter never
 // suppresses that, since it is read exactly once, here, and never stored on the entry itself.
 func newRepoEntry(
 	summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher,
@@ -199,7 +196,7 @@ func newRepoEntry(
 		opLog:           opLog,
 		done:            make(chan struct{}),
 	}
-	// C14-3: seeds hasNonQuietAcquirer's own answer — a construction reached via Acquire starts
+	// Seeds hasNonQuietAcquirer's own answer — a construction reached via Acquire starts
 	// eligible for auto-fetch arming immediately; one reached via AcquireQuiet starts NOT eligible,
 	// until some later real acquirer calls markAcquiredNonQuiet (Registry.acquire's reuse branch).
 	// No lock needed here: e is not yet reachable from anywhere else.
@@ -211,7 +208,7 @@ func newRepoEntry(
 	return e
 }
 
-// RepoSettings is G18 D6's own resolution point: entry.go's callers (graph.go/review.go/remote.go)
+// RepoSettings is the resolution point: entry.go's callers (graph.go/review.go/remote.go)
 // use this instead of a hardcoded constant when a request's own optional field is empty. Falls
 // back to the schema's own defaults (never errors, never panics) when repoSettingsGet is nil (a
 // RepoEntry constructed directly by a test) or the storage read itself fails — the same "fail
@@ -271,11 +268,11 @@ func (e *RepoEntry) note(sig gitclient.Signal) {
 	}
 }
 
-// Subscribe registers deliver for every future signal on this entry, wrapped in D14's coalescing
+// Subscribe registers deliver for every future signal on this entry, wrapped in the coalescing
 // subscriber so a slow deliver can never stall another subscriber or the watcher itself. The
 // returned func unsubscribes and stops the subscriber's own goroutine; safe to call once. Returns
 // a no-op unsubscribe, constructing no subscriber, when this entry has already been torn down
-// (F2a: teardown may run concurrently with Open racing Registry.Close during app quit) — the
+// (teardown may run concurrently with Open racing Registry.Close during app quit) — the
 // caller (Conn.Open) then holds a ref on a dead entry for a moment and releases it normally.
 func (e *RepoEntry) Subscribe(_ ConnID, deliver func(Event)) func() {
 	e.mu.Lock()
@@ -293,10 +290,10 @@ func (e *RepoEntry) Subscribe(_ ConnID, deliver func(Event)) func() {
 	return func() {
 		once.Do(func() {
 			e.mu.Lock()
-			// F3 (P108 Part 16 review): subID is unique to this one Subscribe call — never shared
+			// subID is unique to this one Subscribe call — never shared
 			// with any other call, even a concurrent one for the same conn — so this identity check
 			// can only ever match this call's own entry, never one a colliding call raced in over
-			// it (the old ConnID-keyed bug) nor one teardown (F2b) already removed and closed.
+			// it (the old ConnID-keyed bug) nor one teardown already removed and closed.
 			present := e.subs[subID] == s
 			if present {
 				delete(e.subs, subID)
@@ -313,7 +310,7 @@ func (e *RepoEntry) Subscribe(_ ConnID, deliver func(Event)) func() {
 }
 
 // Head returns the entry's live head, re-resolving through gitclient.ResolveHead first if a
-// refsChanged signal marked it stale (D16) — a lazy refresh, never eager: the extra two spawns
+// refsChanged signal marked it stale — a lazy refresh, never eager: the extra two spawns
 // this costs only happen when a ref changed AND the next reader is refs.list rather than
 // status.get/RunOp, both of which set the head for free from their own spawn's output (setHead).
 func (e *RepoEntry) Head(ctx context.Context) (gitclient.HeadState, error) {
@@ -352,14 +349,14 @@ func (e *RepoEntry) setHead(h gitclient.HeadState) {
 }
 
 // invalidateAfterWrite drops exactly what a completed local write can have invalidated, without
-// waiting for the watcher's own debounced signal (F5/D7): the same four drops note() makes on
+// waiting for the watcher's own debounced signal: the same four drops note() makes on
 // refsChanged. It is a second line of defence for OUR OWN writes, for the case a watch was lost
-// (fsnotify's Add can fail with EMFILE, G2 D10 logs-and-skips; ErrEventOverflow is documented) — the
+// (fsnotify's Add can fail with EMFILE, logs-and-skips; ErrEventOverflow is documented) — the
 // watcher remains the ONLY thing that notices a write made outside this app, and the only thing
 // that fans repo.changed out to subscribers. This emits no event (a second emitter would double
 // every event a client sees) and marks no Walk stale (a Walk is per-connection; reaching from an
 // entry into every connection's walks would invert the dependency the subscriber already owns).
-// cacheGeneration returns the entry's current cache generation (F10) — see cacheGen's own doc
+// cacheGeneration returns the entry's current cache generation — see cacheGen's own doc
 // comment on the RepoEntry struct.
 func (e *RepoEntry) cacheGeneration() uint64 {
 	return e.cacheGen.Load()
@@ -436,10 +433,10 @@ func (e *RepoEntry) errIfTornDown() error {
 
 // teardown stops the watcher, waits for pump to drain, stops every remaining subscriber, and
 // closes the cat-file session if one was ever started — called by Registry once refcount and
-// linger both say the entry is really done, or unconditionally by Registry.Close() at shutdown
-// (D14) regardless of refcount. Idempotent (D4): Registry.Close no longer needs to be the only
-// caller, since a concurrent Subscribe/CatFile now sees tornDown rather than racing the map/session
-// this function clears.
+// linger both say the entry is done, or unconditionally by Registry.Close() at shutdown
+// regardless of refcount. Idempotent: Registry.Close no longer needs to be the only
+// caller, since a concurrent Subscribe/CatFile now sees tornDown rather than racing the
+// map/session this function clears.
 func (e *RepoEntry) teardown() {
 	e.mu.Lock()
 	if e.tornDown {

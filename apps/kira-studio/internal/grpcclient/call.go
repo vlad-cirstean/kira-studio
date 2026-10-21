@@ -35,11 +35,11 @@ const maxRecvMsgSize = 16 * 1024 * 1024
 // against, not the length of this already-capped slice.
 const maxStoredMessages = 100
 
-// CallRequest carries everything Unary/ServerStream need: the target and its TLS decision (D6),
-// the Source the method's descriptor resolves from (reusing Describe's own cache, D4), the fully
+// CallRequest carries everything Unary/ServerStream need: the target and its TLS decision,
+// the Source the method's descriptor resolves from (reusing Describe's own cache), the fully
 // qualified "/pkg.Service/Method" path, the request message JSON and the metadata — every field
-// here is already resolved (§0.3: this package is called only from inside the bridge's own
-// resolved-at-point-of-use closure, D9/D10).
+// here is already resolved (this package is called only from inside the bridge's own
+// resolved-at-point-of-use closure).
 type CallRequest struct {
 	Target     string
 	TLS        TLSConfig
@@ -77,7 +77,7 @@ func unmarshalRequestJSON(js string, msg *dynamicpb.Message) error {
 // message text — the one part of it that is always safe to keep (P108 F13).
 var protojsonSyntaxErrorPos = regexp.MustCompile(`\(line \d+:\d+\)`)
 
-// sanitizeUnmarshalError is P108 F13: protojson's own JSON *syntax* error — as opposed to a
+// sanitizeUnmarshalError: protojson's own JSON *syntax* error — as opposed to a
 // semantic one like "unknown field", which only ever quotes a field name the user typed — quotes
 // the offending token straight from the input (e.g. "proto: syntax error (line 1:15): invalid
 // value abc"). js is built by stage 2's own {{secret}} substitution (resolve.go); a secret whose
@@ -98,7 +98,7 @@ func sanitizeUnmarshalError(err error) string {
 }
 
 func marshalResponseJSON(msg *dynamicpb.Message) (string, error) {
-	// F4: DiscardUnknown is ON for the response (a server running a newer schema than the .proto
+	// DiscardUnknown is ON for the response (a server running a newer schema than the .proto
 	// the user supplied must not make its own answer unreadable) and EmitUnpopulated is ON
 	// (a proto3 scalar at its zero value is otherwise absent, and "the field is missing" vs. "the
 	// field is 0" is precisely the question this pane exists to answer).
@@ -119,12 +119,12 @@ func compactJSON(b []byte) (string, error) {
 	return out.String(), nil
 }
 
-// terminalOutcome is D16's own dispatch: nil for OK, a *Error for the two cases that mean "the
-// call could not be made" (a context-caused Canceled/DeadlineExceeded — F8 — or codes.Unavailable
-// — F10, which covers a refused connection, a TLS failure and a plaintext/TLS mismatch alike, so
-// it is never split further here; bridge/grpc.go's own mapGrpcError is what gives it D17's three
+// terminalOutcome is the dispatch: nil for OK, a *Error for the two cases that mean "the
+// call could not be made" (a context-caused Canceled/DeadlineExceeded or codes.Unavailable,
+// which covers a refused connection, a TLS failure and a plaintext/TLS mismatch alike, so it
+// is never split further here; bridge/grpc.go's own mapGrpcError is what gives it the three
 // separate sentences, keyed on the error text). Every other code — including a real
-// codes.ResourceExhausted from the message-size cap (F9) — is a result, not an error.
+// codes.ResourceExhausted from the message-size cap — is a result, not an error.
 func terminalOutcome(ctx context.Context, err error) (code codes.Code, message string, asError *Error) {
 	if err == nil {
 		return codes.OK, "", nil
@@ -217,11 +217,11 @@ func callDeadlineExpired(ctx context.Context) bool {
 	return ok && !time.Now().Before(d)
 }
 
-// ServerStream runs one server-streaming call (D8), delivering each message through onMessage as
-// it arrives (the arrival offset F5 measured is real, and is the single most informative thing
+// ServerStream runs one server-streaming call, delivering each message through onMessage as
+// it arrives (the arrival offset measured is real, and is the single most informative thing
 // about a stream) and returning the terminal result once the stream ends. Cancelling ctx mid-
 // stream (the Stop button, via Host.RunOp's derived context) ends the stream at the next RecvMsg
-// with codes.Canceled — the messages already delivered stay delivered (F8): they were already
+// with codes.Canceled — the messages already delivered stay delivered: they were already
 // handed to onMessage, and the returned *Error's Partial field carries the true counts so a caller
 // can still record a completed history entry.
 func ServerStream(ctx context.Context, req CallRequest, onMessage func(Message)) (CallResult, error) {
@@ -292,7 +292,7 @@ func openStream(ctx context.Context, req CallRequest, method protoreflect.Method
 
 // recvLoop is ServerStream's own receive loop: read one message at a time, deliver it via
 // onMessage, and accumulate Messages/count/bytes for the terminal result — on every return path,
-// including an error, so a caller can still see what actually arrived (F8: the messages already
+// including an error, so a caller can still see what arrived (the messages already
 // delivered to onMessage stay delivered, and either the returned *Error's Partial field or the
 // returned CallResult itself carries the true counts).
 func recvLoop(callCtx context.Context, stream grpc.ClientStream, method protoreflect.MethodDescriptor, onMessage func(Message)) (CallResult, error) {

@@ -82,13 +82,13 @@ func TestExecRunner_TimeoutKillsProcess(t *testing.T) {
 	}
 }
 
-// TestExecRunner_CancellationStopsEscalationTimerAfterCleanExit is G31 round-2 architecture/
-// security review, finding #11: cmd.Cancel's own SIGKILL-escalation timer (armed on SIGTERM, to
-// fire after gracefulStopDelay) used to never be stopped once the process actually exited — a
-// clean SIGTERM exit (the overwhelmingly common case, exactly what this test's script does) still
-// left the timer ticking toward a SIGKILL nothing needs. gracefulStopDelay and killGroup are both
-// package vars specifically so this test can shrink the window and observe the escalation
-// directly, rather than relying on an on-demand-unreproducible real pid reuse.
+// TestExecRunner_CancellationStopsEscalationTimerAfterCleanExit: cmd.Cancel's own
+// SIGKILL-escalation timer (armed on SIGTERM, to fire after gracefulStopDelay) used to never be
+// stopped once the process exited — a clean SIGTERM exit (the overwhelmingly common case, exactly
+// what this test's script does) still left the timer ticking toward a SIGKILL nothing needs.
+// gracefulStopDelay and killGroup are both package vars specifically so this test can shrink the
+// window and observe the escalation directly, rather than relying on an on-demand-unreproducible
+// real pid reuse.
 func TestExecRunner_CancellationStopsEscalationTimerAfterCleanExit(t *testing.T) {
 	script := writeScript(t, "#!/bin/sh\nsleep 30\n")
 

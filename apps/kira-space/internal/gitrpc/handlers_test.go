@@ -79,19 +79,17 @@ func TestHandleRepoOpen_UsesConfiguredGitPath(t *testing.T) {
 	}
 }
 
-// --- G27 D6: entryFor/repo.open round-trip across a non-ASCII repository path -------------------
+// --- entryFor/repo.open round-trip across a non-ASCII repository path -------------------
 //
-// Both cases below are the mirror pair the plan's exit criterion (§7.1 item 10) asks for, and both
-// use a FAKE runner (D12's own instruction for this exact test) rather than a real repository:
-// this container's own filesystem is byte-transparent (P1) and would make a REAL directory named
-// with decomposed bytes simply not exist under the composed spelling handleRepoOpen's own p.Path
-// normalization (D5d) produces — a limitation of this container, not of the fix, and exactly the
-// gap D12 exists to route around. A scripted runner's canned rev-parse/worktree-list output is
-// read regardless of Spec.Dir, so it exercises Identify's own composition (D5a) and entryFor's
-// (D6) without ever touching a disk.
+// Both cases below are the mirror pair, and both use a FAKE runner rather than a real repository:
+// this container's own filesystem is byte-transparent and would make a REAL directory named
+// with decomposed bytes not exist under the composed spelling handleRepoOpen's own p.Path
+// normalization produces — a limitation of this container, not of the fix. A scripted runner's
+// canned rev-parse/worktree-list output is read regardless of Spec.Dir, so it exercises Identify's
+// own composition and entryFor's without ever touching a disk.
 
 // handlersScriptedProcess is a canned-bytes gitclient.Process — Run(ctx, r, ...) drains it exactly
-// like a real spawn. Wait returns the full result (Stdout included, F5): the real buffered path
+// like a real spawn. Wait returns the full result (Stdout included): the real buffered path
 // (gitclient.bufferedExecProcess) carries Stdout on Wait rather than a separate Stdout() read, and
 // Run relies on that same contract for every Process it drives, fake or real.
 type handlersScriptedProcess struct{ result gitclient.Result }
@@ -109,7 +107,7 @@ func (p *handlersScriptedProcess) Close() error { return nil }
 // Args — Identify alone makes five distinct calls in sequence (is-bare-repository, the two
 // absolute-dir queries, show-toplevel, and ResolveHead's own symbolic-ref/rev-parse pair), each
 // needing different output; worktree.list needs a sixth. Spec.Dir is never consulted: exactly the
-// property that lets this test use non-ASCII bytes with no real directory behind them (D12).
+// property that lets this test use non-ASCII bytes with no real directory behind them.
 type handlersScriptedRunner struct {
 	byArgs map[string]gitclient.Result
 }
@@ -166,8 +164,8 @@ func newHandlersScriptedRouter(byArgs map[string]gitclient.Result) (*Router, *gi
 
 // TestRepoOpen_DecomposedIdentifyOutputThenComposedRepoIDResolves scripts Identify's own
 // rev-parse output as decomposed — exactly what an NFD-producing filesystem's readdir could hand
-// git before D3's core.precomposeunicode=true, or what git's own worktree registry could report —
-// and proves handleRepoOpen (D5a via Identify) hands back a composed RepoID, and that a follow-up
+// git before the core.precomposeunicode=true, or what git's own worktree registry could report —
+// and proves handleRepoOpen (via Identify) hands back a composed RepoID, and that a follow-up
 // request using exactly that composed RepoID resolves.
 func TestRepoOpen_DecomposedIdentifyOutputThenComposedRepoIDResolves(t *testing.T) {
 	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
@@ -205,7 +203,7 @@ func TestRepoOpen_DecomposedIdentifyOutputThenComposedRepoIDResolves(t *testing.
 
 // TestRepoOpen_ComposedIdentifyOutputThenDecomposedRepoIDStillResolves is the mirror: Identify's
 // own output is already composed (RepoID comes back composed, trivially), but a follow-up request
-// spells repoId with decomposed bytes — entryFor's own D6 normalization is what makes this
+// spells repoId with decomposed bytes — entryFor's own normalization is what makes this
 // resolve.
 func TestRepoOpen_ComposedIdentifyOutputThenDecomposedRepoIDStillResolves(t *testing.T) {
 	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
@@ -244,10 +242,10 @@ func TestRepoOpen_ComposedIdentifyOutputThenDecomposedRepoIDStillResolves(t *tes
 	}
 }
 
-// TestRepoClose_DecomposedRepoIDStillClosesTheComposedlyHeldEntry is G31 round-2 architecture/
-// security review, finding #4: handleRepoClose passed p.RepoID straight into c.CloseRepo without
+// TestRepoClose_DecomposedRepoIDStillClosesTheComposedlyHeldEntry: handleRepoClose passed p.RepoID
+// straight into c.CloseRepo without
 // entryFor's own gitpath.CleanNFC normalization. c.held is keyed by the COMPOSED spelling
-// (Identify's own D5a normalization at open time), so repo.close with a decomposed repoId used to
+// (Identify's own normalization at open time), so repo.close with a decomposed repoId used to
 // look up the wrong map key, find nothing, and silently no-op (CloseRepo answers {} either way,
 // so nothing ever errored) — leaking that connection's RepoEntry refcount and watcher
 // subscription for the connection's whole life. Proven by opening under a composed spelling, then
@@ -296,16 +294,16 @@ func TestRepoClose_DecomposedRepoIDStillClosesTheComposedlyHeldEntry(t *testing.
 	}
 }
 
-// TestGraphRefresh_DecomposedRepoIDStillFindsTheComposedlyOpenedWalk is G31 round-2 architecture/
-// security review, finding #4's own coverage for graph.go's own handlers (graph.status/loadMore/
-// refresh/stream): each passed p.RepoID straight into c.WalkFor/ReviewWalkFor/Walk without
-// normalization, even though resolveWalkRequest's OWN internal c.Entry lookup (used by the same
+// TestGraphRefresh_DecomposedRepoIDStillFindsTheComposedlyOpenedWalk is coverage for graph.go's own
+// handlers (graph.status/loadMore/refresh/stream): each passed p.RepoID straight into
+// c.WalkFor/ReviewWalkFor/Walk without normalization, even though resolveWalkRequest's OWN internal
+// c.Entry lookup (used by the same
 // handlers) already normalized. Conn's walk map is keyed by the composed spelling Identify itself
 // produces, so a decomposed repoId used to fail to find an already-open walk — graph.status/
 // graph.refresh answered as though no walk was open at all (their own documented "unopened walk"
 // zero-value answer, indistinguishable from a genuine miss), and graph.loadMore/stream opened a
 // SECOND, redundant walk instead of reusing the held one. Uses a real git repo (not the scripted
-// fixture above) so a real graph.loadMore can actually open a walk to look for afterward.
+// fixture above) so a real graph.loadMore can open a walk to look for afterward.
 func TestGraphRefresh_DecomposedRepoIDStillFindsTheComposedlyOpenedWalk(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")

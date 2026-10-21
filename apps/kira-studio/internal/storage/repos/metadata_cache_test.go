@@ -87,7 +87,7 @@ func TestMetadataCacheEvictionKeepsNewestAndIsolatesConnections(t *testing.T) {
 	}
 }
 
-// TestMetadataCachePerKindFetchedAtIsIndependent pins P24 D3/F13's hazard directly at the repo
+// TestMetadataCachePerKindFetchedAtIsIndependent pins the hazard directly at the repo
 // layer: a row-level fetched_at cannot express "this kind's payload is old, that kind's is new."
 // A 'children' payload written long ago and a 'columns' payload written just now, sharing one row,
 // must keep two independent fetchedAt entries — writing one must never move the other's.
@@ -154,10 +154,10 @@ func TestMetadataCachePerKindFetchedAtIsIndependent(t *testing.T) {
 	}
 }
 
-// TestMetadataCacheLegacyRowFetchedAtIsEmpty covers D2's upgrade path: a row written before P24
-// (payload_json with no reserved fetchedAt key at all) must read back with fetchedAt == "" rather
-// than erroring — the empty string is what internal/tree.Service's freshness comparison treats as
-// older than any real timestamp.
+// TestMetadataCacheLegacyRowFetchedAtIsEmpty covers the upgrade path: a row (payload_json with
+// no reserved fetchedAt key at all) must read back with fetchedAt == "" rather than erroring —
+// the empty string is what internal/tree.Service's freshness comparison treats as older than any
+// real timestamp.
 func TestMetadataCacheLegacyRowFetchedAtIsEmpty(t *testing.T) {
 	r := newMetadataCacheRepo(t)
 	seedConnection(t, r.DB, "c1")

@@ -1,14 +1,14 @@
-// Package mask implements M5's PII masking scheme (docs/HISTORY.md (v1.7 M5)
-// §2-§4): a partial redaction of one cell's text, plus an optional keyed correlation tag riding
-// alongside it. A leaf package — stdlib and github.com/rivo/uniseg only, no dependency on dbmcp,
-// page or storage/model — so packages/shared/domain/mask.ts's TypeScript port can mirror it
-// function for function and the two are pinned against one shared fixture set (§5).
+// Package mask implements the PII masking scheme: a partial redaction of one cell's text, plus an
+// optional keyed correlation tag riding alongside it. A leaf package — stdlib and
+// github.com/rivo/uniseg only, no dependency on dbmcp, page or storage/model — so
+// packages/shared/domain/mask.ts's TypeScript port can mirror it function for function and the two
+// are pinned against one shared fixture set.
 //
-// The design, restated briefly (the plan's §2 has the actual reasoning): masking is not hashing —
-// a redacted character is discarded, never transformed, so there is nothing for an attacker to
-// invert. The correlation tag is the one place a secret key is involved, and it never influences
-// which characters a redaction keeps (that would be a side channel, §2.6) — it only proves that two
-// equal real values produced the same masked output, for a join to survive.
+// The design, restated briefly: masking is not hashing — a redacted character is discarded, never
+// transformed, so there is nothing for an attacker to invert. The correlation tag is the one
+// place a secret key is involved, and it never influences which characters a redaction keeps (that
+// would be a side channel) — it only proves that two equal real values produced the same masked
+// output, for a join to survive.
 package mask
 
 import (
@@ -24,10 +24,9 @@ import (
 	"github.com/rivo/uniseg"
 )
 
-// Kind is one of the six PII classes this package masks. §2.3's plan draft also defined an `id`
-// kind (identifier columns, tag-only); it was dropped before implementation — internal ids are not
-// PII and no rule should apply to them at all, so a column meant to stay untouched simply carries
-// no rule, rather than one whose kind happens to be a no-op.
+// Kind is one of the six PII classes this package masks. Internal ids are not PII and no rule
+// should apply to them at all, so a column meant to stay untouched carries no rule, rather than
+// one whose kind happens to be a no-op.
 type Kind string
 
 const (
@@ -70,7 +69,7 @@ type Masker struct{ key []byte }
 func New(key []byte) *Masker { return &Masker{key: key} }
 
 // Apply masks one non-NULL cell. Total: every (Rule, value) pair produces an output, and no path
-// returns value unchanged except the universal empty-string identity (§2.3) — NULL itself never
+// returns value unchanged except the universal empty-string identity — NULL itself never
 // reaches Apply; the caller (dbmcp's renderTabularPage, the grid's preview transform) checks for it
 // first and leaves a NULL cell untouched.
 func (m *Masker) Apply(r Rule, value string) string {
@@ -88,7 +87,7 @@ func (m *Masker) Apply(r Rule, value string) string {
 }
 
 // MaskNullable applies Apply to value's own content when value is non-nil, and passes NULL through
-// unchanged otherwise (§2.3's "NULL is never masked" — masking a NULL would invent a value that is
+// unchanged otherwise ("NULL is never masked" — masking a NULL would invent a value that is
 // not there). The one function both consumption points (dbmcp's renderTabularPage, the grid's
 // preview transform) call, so the nil check lives in exactly one place per language rather than
 // being re-implemented at each call site — and so the parity fixture set's own NULL case exercises
@@ -124,7 +123,7 @@ func (m *Masker) maskVisible(r Rule, value string) string {
 }
 
 // maskName keeps each whitespace-separated word's first grapheme (when keepHint) plus its own
-// grapheme length, destroying every other character (§2.3 `name`). A value with no words at all
+// grapheme length, destroying every other character. A value with no words at all
 // (empty after trimming whitespace — not the empty-string case Apply already handled) has no shape
 // to preserve honestly, so it falls through to redactLiteral rather than echoing "".
 func maskName(value string, keepHint bool) string {
@@ -141,8 +140,8 @@ func maskName(value string, keepHint bool) string {
 
 // firstGraphemeAndCount walks value's own grapheme clusters exactly once via uniseg's own
 // incremental API, returning the first cluster (empty when value is empty) alongside the total
-// count. maskWord's own need — mirrors packages/shared/domain/mask.ts's own firstGraphemeAndCount
-// (M7 finding #16): the previous shape called uniseg.GraphemeClusterCount (a full pass) and then
+// count. maskWord's own need — mirrors packages/shared/domain/mask.ts's own firstGraphemeAndCount:
+// the previous shape called uniseg.GraphemeClusterCount (a full pass) and then
 // uniseg.FirstGraphemeClusterInString separately, re-deriving the first cluster it had already
 // walked past once inside the count.
 func firstGraphemeAndCount(value string) (first string, count int) {
@@ -175,7 +174,7 @@ func maskWord(w string, keepHint bool) string {
 	if !keepHint || n == 1 {
 		return strings.Repeat(bullet, n)
 	}
-	// M7 finding #16: `first + strings.Repeat(bullet, n-1)` allocated twice — Repeat's own buffer,
+	// `first + strings.Repeat(bullet, n-1)` allocated twice — Repeat's own buffer,
 	// then a second, bigger one for the `+` concatenation. bullet is a 3-byte rune (U+2022), so a
 	// masked word's output already runs up to 3x its input grapheme count in bytes; Grow pre-sizes
 	// the one allocation this needs to exactly that, once.
@@ -188,9 +187,9 @@ func maskWord(w string, keepHint bool) string {
 	return b.String()
 }
 
-// maskEmail keeps the domain (in full, when keepHint) and the local part's first grapheme + length
-// (§2.3 `email`). A value with no `@` is not an email — it falls through to maskName's own shape,
-// never emitting more than that would (§2.3's own stated fallback, an exception to the universal
+// maskEmail keeps the domain (in full, when keepHint) and the local part's first grapheme + length.
+// A value with no `@` is not an email — it falls through to maskName's own shape,
+// never emitting more than that would (the stated fallback, an exception to the universal
 // "falls through to redact" rule, made explicit here rather than left implicit).
 func maskEmail(value string, keepHint bool) string {
 	i := strings.LastIndexByte(value, '@')
@@ -199,7 +198,7 @@ func maskEmail(value string, keepHint bool) string {
 	}
 	local, domain := value[:i], value[i+1:]
 	if local == "" {
-		// M7 finding: an empty local part (value has no character before its last "@") reassembles
+		// An empty local part (value has no character before its last "@") reassembles
 		// as "" + "@" + domain — the input itself, verbatim, whenever keepHint is true. Apply's own
 		// contract is that no path echoes the original text; fall through to the universal
 		// redaction rather than a masked shape that happens to equal the input.
@@ -292,7 +291,7 @@ var plainDecimalRE = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?$`)
 // floats ("0x1p4") included — which a real DB driver never emits as a numeric column's text
 // representation, and which mask.ts's own regex-based gate never accepted either; without this
 // check a value shaped like a Go literal but not a plain number would bucket in Go while falling
-// through to redact in TS (finding #14, M6).
+// through to redact in TS.
 var numericAcceptRE = regexp.MustCompile(`^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$`)
 
 // decadeRange formats value's own fixed-power-of-ten bucket (§2.3/§2.4's own "boundaries are fixed
@@ -405,10 +404,10 @@ const crockfordAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
 var crockfordEncoding = base32.NewEncoding(crockfordAlphabet).WithPadding(base32.NoPadding)
 
-// tag computes "#" + crockfordBase32(HMAC-SHA256(key, value))[0:6] exactly per §2.4. The HMAC
-// message is value's raw UTF-8 bytes alone — no column name, no table name, no rule identity mixed
-// in, which is what lets `customers.id` and `orders.customer_id` tag identically for the same
-// customer (§2.4's own stated invariant, load-bearing for the join the whole design exists for).
+// tag computes "#" + crockfordBase32(HMAC-SHA256(key, value))[0:6]. The HMAC message is value's
+// raw UTF-8 bytes alone — no column name, no table name, no rule identity mixed in, which is what
+// lets `customers.id` and `orders.customer_id` tag identically for the same customer (load-bearing
+// for the join the whole design exists for).
 func (m *Masker) tag(value string) string {
 	h := hmac.New(sha256.New, m.key)
 	h.Write([]byte(value))
@@ -422,11 +421,11 @@ func (m *Masker) tag(value string) string {
 	return "#" + encoded[:6]
 }
 
-// kindStrictness ranks the six kinds from most to least redacting (§4.2's conflict-folding order):
+// kindStrictness ranks the six kinds from most to least redacting (the conflict-folding order):
 // redact > text > date > number > name > email. Lower rank wins a conflict, the same "lowest rank
 // is strictest" convention dbmcp/permissions.go's strictnessRank already uses.
 //
-// M6 finding #9: email and number previously sat the other way around (redact > text > date >
+// Email and number previously sat the other way around (redact > text > date >
 // email > name > number), which put two pairs backwards relative to their actual redaction
 // strength. email vs name: `email` leaves the domain fully visible (`b••@corp.example.com`) while
 // `name` bullets far more of the value, so `email` must not outrank `name`. name vs number:
@@ -443,14 +442,14 @@ var kindStrictness = map[Kind]int{
 	KindEmail:  5,
 }
 
-// Stricter returns whichever of a, b is the stricter rule (§4.2): the lower-ranked kind wins, and
+// Stricter returns whichever of a, b is the stricter rule: the lower-ranked kind wins, and
 // the two flags fold independently toward their own stricter (more redacting) value — KeepHint and
-// Correlate each false-wins — across any kind pair, not only when a and b share a kind (M6 finding
-// #9's second half: a stricter flag on the losing kind's own rule must not be silently discarded
-// just because its kind lost — e.g. a.Kind=text,KeepHint=true and b.Kind=name,KeepHint=false must
-// fold to Kind=text (text outranks name), KeepHint=false (b's own stricter flag), not KeepHint=true
-// merely because a's kind won). An ambiguity between two rules matching the same column name (under
-// different table_name values) must never resolve to the more permissive option on any axis.
+// Correlate each false-wins — across any kind pair, not only when a and b share a kind (a stricter
+// flag on the losing kind's own rule must not be silently discarded just because its kind lost —
+// e.g. a.Kind=text,KeepHint=true and b.Kind=name,KeepHint=false must fold to Kind=text (text
+// outranks name), KeepHint=false (b's own stricter flag), not KeepHint=true merely because a's kind
+// won). An ambiguity between two rules matching the same column name (under different table_name
+// values) must never resolve to the more permissive option on any axis.
 func Stricter(a, b Rule) Rule {
 	ra, ok := kindStrictness[a.Kind]
 	if !ok {
@@ -471,7 +470,7 @@ func Stricter(a, b Rule) Rule {
 	}
 }
 
-// Set is one connection's resolved masking state (§4.2/§4.6): the already-folded rule for every
+// Set is one connection's resolved masking state: the already-folded rule for every
 // masked column name (lowercased), and the Masker any of them that correlate need. A Set with no
 // Rules behaves as "no masking configured" — dbmcp's own render path treats a nil *Set exactly the
 // same way, before this type is ever constructed.
@@ -497,7 +496,7 @@ func (s Set) RuleFor(column string) (Rule, bool) {
 
 // ApplyColumn masks value for column if a rule matches it (matched=true), or returns value
 // unchanged (matched=false) when none does — dbmcp's per-cell entry point, resolved once per
-// column per page (§4.2's own cost rule), never per row. NULL passes straight through, via
+// column per page, never per row. NULL passes straight through, via
 // MaskNullable, without ever consulting a rule.
 func (s Set) ApplyColumn(column string, value *string) (out *string, matched bool) {
 	if value == nil {

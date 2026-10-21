@@ -1,7 +1,7 @@
-// Package httpclient is the whole outbound HTTP path for P2's request builder: one exported
+// Package httpclient is the whole outbound HTTP path for the request builder: one exported
 // Send(ctx, Request) (Response, error), self-contained and dependency-free (no adapters,
-// adapterhost, storage or Wails import — drivable from a plain httptest server, C2's own proof).
-// Every default it takes on the caller's behalf is named and explained below (D4); nothing here
+// adapterhost, storage or Wails import — drivable from a plain httptest server).
+// Every default it takes on the caller's behalf is named and explained below; nothing here
 // silently rewrites what the user asked for.
 package httpclient
 
@@ -38,8 +38,8 @@ type Header struct {
 }
 
 // Request is the wire shape control.ts's httpSend sends. Headers/body/method go out unmodified —
-// P2's one design requirement (D1): no client library sits between this struct and the wire.
-// P3 D5: Body was Body string/HasBody bool (P2's only two modes); it is now one tagged union
+// the one design requirement: no client library sits between this struct and the wire.
+// Body was Body string/HasBody bool (the only two modes); it is now one tagged union
 // (body.go) covering every mode Postman's own format exposes.
 type Request struct {
 	Method  string   `json:"method"`
@@ -79,7 +79,7 @@ type Response struct {
 	// D10) — always populated for a response Send actually returns; unlike Wire, it is small
 	// enough (F17) that repos/response_history.go keeps it rather than stripping it.
 	Timeline Timeline `json:"timeline"`
-	// SentCookies/ReceivedCookies are P90 item 2. Sent is what actually went out per hop, captured
+	// Sent is what went out per hop, captured
 	// from httptrace's WroteHeaderField (the jar injects Cookie inside net/http, after
 	// CheckRedirect, so there is nowhere else to read it). Received is every hop's Set-Cookie,
 	// parsed by the stdlib. Populated regardless of whether the cookie jar itself is on — these
@@ -152,8 +152,8 @@ func transportErrText(err error) string {
 	return ue.Op + ": " + inner.Error()
 }
 
-// isSchemeDowngrade reports whether dest drops from https to http on an otherwise same-host hop
-// (F3). net/http's own sensitive-header stripping (shouldCopyHeaderOnRedirect) compares hostnames
+// isSchemeDowngrade reports whether dest drops from https to http on an otherwise same-host hop.
+// net/http's own sensitive-header stripping (shouldCopyHeaderOnRedirect) compares hostnames
 // only, never scheme, so an https-to-http redirect keeps Authorization/Cookie on the wire in
 // clear even when checkRedirectFor's own host check says "same host" — callers must strip those
 // two explicitly on a downgrade rather than relying on net/http to have done it.
@@ -165,7 +165,7 @@ func isSchemeDowngrade(from, dest *url.URL) bool {
 // url.Parse's own Scheme field, which never populates for a bare "api.example.com/path" (no
 // "//") in the first place, so resolveURL has to know to prepend one before parsing at all. An
 // RFC 3986 scheme (leading letter, then letters/digits/+/-/., up to "://") — postman's own url.go
-// kept a second, near-identical copy of this (P107 T1-11).
+// kept a second, near-identical copy of this.
 func HasScheme(s string) bool {
 	i := strings.Index(s, "://")
 	if i <= 0 {
@@ -206,11 +206,11 @@ func resolveURL(raw string) (*url.URL, error) {
 	return u, nil
 }
 
-// classifySendErr distinguishes a timeout from a cancellation (F20/D8's own point: one is a
-// failure, the other is the user) by reading sendCtx.Err() rather than the wrapped error itself —
+// classifySendErr distinguishes a timeout from a cancellation (one is a failure, the other is the
+// user) by reading sendCtx.Err() rather than the wrapped error itself —
 // net/http wraps a context error inside a *url.Error, and this way there is exactly one place
-// that has to know that. tl carries P10 D15's own addition: what was measured before the send
-// died, closed by the caller (finishFailed) before this is called.
+// that has to know that. tl carries what was measured before the send died, closed by the caller
+// (finishFailed) before this is called.
 func classifySendErr(sendCtx context.Context, err error, tl Timeline) *Error {
 	var e *Error
 	switch {
@@ -284,12 +284,12 @@ func Send(ctx context.Context, req Request, opts Options) (Response, error) {
 		sendCtx, cancel = context.WithCancel(ctx)
 	}
 	defer cancel()
-	// P10 D2/D3: one trace, inherited across every redirect hop because net/http's redirect path
-	// builds each subsequent request with ctx: ireq.ctx (F1) — replaces the old bare
-	// *[]RedirectHop; Response.Redirects below is now a projection of tl (D3).
+	// One trace, inherited across every redirect hop because net/http's redirect path
+	// builds each subsequent request with ctx: ireq.ctx — replaces the old bare
+	// *[]RedirectHop; Response.Redirects below is now a projection of tl.
 	//
 	// The ClientTrace itself is deliberately NOT attached to sendCtx here — httputil.DumpRequestOut
-	// below (P9 D2/F7) clones httpReq and RoundTrips it through its own throwaway *http.Transport
+	// below clones httpReq and RoundTrips it through its own throwaway *http.Transport
 	// (a fake in-memory dumpConn) to capture the wire bytes, and that fake RoundTrip fires every
 	// hook on whatever ClientTrace the request's context carries. Attaching the trace only to
 	// httpReq's context right before the real sharedClient.Do call (below) is what keeps that fake
@@ -314,22 +314,21 @@ func Send(ctx context.Context, req Request, opts Options) (Response, error) {
 		return Response{}, err
 	}
 	applyHeaders(httpReq, req, formBoundary, defaultContentType)
-	// F20b: the transport auto-adds Accept-Encoding: gzip and transparently decompresses only
+	// The transport auto-adds Accept-Encoding: gzip and transparently decompresses only
 	// when the caller didn't set that header itself. We never set it here, so a user-supplied
 	// Accept-Encoding above is passed through untouched and the response is reported as-received
 	// — no explicit "detect and skip decoding" branch is needed on top of that default.
 
-	// P9 D2/F7: dumped from the request the transport is about to write, with body=false — F8
-	// measured that this is safe for a non-rewindable streaming body and that body=true would
-	// buffer an entire file upload through httputil.drainBody. The body is composed separately,
-	// under D4's cap, once Do returns.
+	// Dumped from the request the transport is about to write, with body=false — this is safe for
+	// a non-rewindable streaming body and body=true would buffer an entire file upload through
+	// httputil.drainBody. The body is composed separately, under the cap, once Do returns.
 	reqHead, dumpErr := httputil.DumpRequestOut(httpReq, false)
 
 	// P10 D2: the trace goes on httpReq's own context only now, after the dump above — see the
 	// comment where tl was created.
 	httpReq = httpReq.WithContext(httptrace.WithClientTrace(sendCtx, tl.trace()))
 
-	// P90: one *http.Client per send, over a cached *http.Transport (transportFor) — an
+	// One *http.Client per send, over a cached *http.Transport (transportFor) — an
 	// http.Client value is three fields, so building one per send costs nothing and is what lets
 	// CheckRedirect and Jar vary per-Options without a third context key; connection reuse across
 	// sends is what the cached transport itself is for.
@@ -392,11 +391,11 @@ func Send(ctx context.Context, req Request, opts Options) (Response, error) {
 }
 
 // prepareRequest resolves the multipart boundary (if any), builds the request body, and constructs
-// the *http.Request through F4/F5's own body/GetBody/ContentLength assignment. P3 D7: a formdata
-// body's boundary is resolved before buildBody runs, not after — a user-typed multipart/form-data
-// Content-Type carrying its own boundary parameter must drive the actual multipart framing, and
-// every other case mints one here. formBoundary and defaultContentType are returned for
-// applyHeaders (and, for formBoundary, buildWireExchange later) to reuse without recomputing them.
+// the *http.Request through the body/GetBody/ContentLength assignment. A formdata body's boundary
+// is resolved before buildBody runs, not after — a user-typed multipart/form-data Content-Type
+// carrying its own boundary parameter must drive the actual multipart framing, and every other
+// case mints one here. formBoundary and defaultContentType are returned for applyHeaders (and, for
+// formBoundary, buildWireExchange later) to reuse without recomputing them.
 func prepareRequest(sendCtx context.Context, req Request, u *url.URL) (httpReq *http.Request, formBoundary, defaultContentType string, err error) {
 	userContentType, hasUserContentType := headerValue(req.Headers, "Content-Type")
 	if req.Body.Mode == string(BodyFormData) {
@@ -492,9 +491,9 @@ func readResponseBody(resp *http.Response, maxResponseBytes int64) (data []byte,
 	return data, truncated, nil
 }
 
-// buildWireExchange assembles P9 D2's rendering from what Send already computed — never fatal
-// (D2's own rule: "a debugging view must never be the reason a send fails"), so any error along the
-// way (the head dump, the body rendering, the response-head dump) is logged and simply leaves the
+// buildWireExchange assembles the rendering from what Send already computed — never fatal
+// (the rule: "a debugging view must never be the reason a send fails"), so any error along the
+// way (the head dump, the body rendering, the response-head dump) is logged and leaves the
 // exchange nil rather than propagated.
 func buildWireExchange(
 	reqHead []byte, dumpErr error, httpReq *http.Request, resp *http.Response, body Body, formBoundary string,

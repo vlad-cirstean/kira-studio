@@ -18,8 +18,8 @@ const (
 	defaultWindowHeight = 800
 
 	// minWindowWidth and minWindowHeight are a considered floor for this app's UI — a tree
-	// sidebar + grid + two toolbars + a status bar — not Electron's old 900×600 (P22 D6(b)
-	// declines lowering them: the floor ratio is only 1.21×, first-launch-only like the rest of
+	// sidebar + grid + two toolbars + a status bar — not Electron's old 900×600 (lowering them is
+	// declined: the floor ratio is only 1.21×, first-launch-only like the rest of
 	// this avenue, against a real usability cost at the bottom end).
 	minWindowWidth  = 1024
 	minWindowHeight = 640
@@ -84,11 +84,11 @@ func Options(sec SecurityOptions, w WindowRecord, primaryWorkArea *application.R
 		// the custom title bar (TitleBar.vue) never asked for. Both `MacTitleBarHidden` and
 		// `MacTitleBarHiddenInset` keep AppKit's controls with `FullSizeContent: true` — the
 		// Electron `titleBarStyle: 'hidden'`/`'hiddenInset'` shape this design wants — but only
-		// `Hidden` has `UseToolbar: false`. `HiddenInset`'s `UseToolbar: true` was the actual
+		// `Hidden` has `UseToolbar: false`. `HiddenInset`'s `UseToolbar: true` was the
 		// source of this session's whole title-bar saga: it puts AppKit into its NSToolbar-based
 		// unified-title-bar layout, which reserves noticeably more vertical space for the
 		// traffic-light cluster than this app's own CSS bar assumed — no CSS height this app
-		// picked, 28px through 36px, ever actually matched it, because the mismatch was never a
+		// picked, 28px through 36px, ever matched it, because the mismatch was never a
 		// wrong number, it was the wrong layout mode entirely. Hidden's plain (non-toolbar) title
 		// bar uses the standard macOS title-bar height instead, which is what
 		// theme/tokens.css's `--kira-titlebar-h` is now sized to match.
@@ -112,9 +112,9 @@ func Options(sec SecurityOptions, w WindowRecord, primaryWorkArea *application.R
 // DefaultBounds is Options' first-launch size decision (used only when a window has no stored
 // rectangle — the `if w.Bounds != nil` branch above overrides it unconditionally otherwise), split
 // out and exported so the clamp arithmetic is unit-testable the same way CascadeFrom's own
-// cascadeRect is split out for testability (P22 D6(a)'s own citation of that precedent — though
-// cascadeRect itself has no dedicated test in this repo today, so this is the pattern's structure,
-// not a test it literally extends). It can only ever *shrink* the 1280×800 default to fit a
+// cascadeRect is split out for testability (though cascadeRect itself has no dedicated test in
+// this repo today, so this is the pattern's structure, not a test it literally extends). It can
+// only ever *shrink* the 1280×800 default to fit a
 // smaller primary screen — never grow it — and falls back to exactly 1280×800 when no usable work
 // area is given.
 //
@@ -148,11 +148,11 @@ func boundsFromRect(r application.Rect) WindowBounds {
 // Attach wires resize/move persistence (debounced 300ms, matching window.ts's
 // BOUNDS_DEBOUNCE_MS) for this one window's own `windows` row and the startup log line. The
 // returned detach unsubscribes all four window-event listeners and cancels any pending debounced
-// write; call it once per window, from beforeFlush (P2 R1: main.go used to discard it, so a
+// write; call it once per window, from beforeFlush (main.go used to discard it, so a
 // resize/move landing during the shutdown flush-wait — after beforeFlush but before teardown
 // closes the DB — could still fire persist() against a WindowsRepo whose *sql.DB teardown had
 // already closed, racing the shutdown sequence this listener has no other way to know is
-// underway) — and, per window, when that window closes (C3's WindowClosing listener).
+// underway) — and, per window, when that window closes (the WindowClosing listener).
 func Attach(win *application.WebviewWindow, d WindowDeps, key string) (detach func()) {
 	db := newDebouncer(boundsDebounce)
 
@@ -193,7 +193,7 @@ func Attach(win *application.WebviewWindow, d WindowDeps, key string) (detach fu
 // window, not a resize glitch on the first.
 const cascadeStep = 24
 
-// CascadeFrom computes a fresh window's rectangle from an existing one (D10: a new workbench
+// CascadeFrom computes a fresh window's rectangle from an existing one (a new workbench
 // with no stored rectangle of its own inherits the focused window's size, offset by one
 // title-bar step, wrapped back to the screen's work-area origin rather than left to drift off
 // it). Returns nil when there is no window to cascade from (the very first window, or a Linux

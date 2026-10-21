@@ -14,9 +14,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// downloadObject is transfer.ts's downloadObject — the phase's first real file transfer, and the
-// only code in P58 that writes to a user's filesystem. Every step is transfer.ts translated, in
-// the same order, for the same reasons (P58d §4.4):
+// downloadObject is transfer.ts's downloadObject — the only code that writes to a user's
+// filesystem. Every step is transfer.ts translated, in the same order, for the same reasons:
 //
 //  1. CheckNotStarted: an already-cancelled op never creates a file.
 //  2. op.SetCommand before any call (Adapter rule 3).
@@ -26,7 +25,7 @@ import (
 //  5. Create the temp file.
 //  6. GetObject.
 //  7. io.Copy streams the body in — ctx cancellation surfaces here, mid-stream, since the op's own
-//     ctx goes directly to the SDK call (P58d D3: never adapters.RunWithAbortRace, which would let
+//     ctx goes directly to the SDK call (never adapters.RunWithAbortRace, which would let
 //     a cancelled download keep writing after the caller's cleanup already ran).
 //  8. Sync and close.
 //  9. Rename — the last step, never retried; a cross-device rename is impossible by construction
@@ -34,7 +33,7 @@ import (
 //
 // On any error from steps 5-9, the temp file is unlinked (error ignored) before the mapped error
 // is returned — and that cleanup runs on the caller's own goroutine, which is only safe because
-// the copy itself never outlives this call (P58d D3 again).
+// the copy itself never outlives this call.
 func downloadObject(ctx context.Context, client *s3.Client, bucket, key, destPath string, op *adapters.OpCtx) (model.ObjectTransferResult, error) {
 	if err := adapters.CheckNotStarted(ctx); err != nil {
 		return model.ObjectTransferResult{}, err
@@ -96,7 +95,7 @@ func errNoBody(key string) error { return queryError(key + " has no body to down
 
 // openUploadBody is transfer.ts's openUploadBody — stat()s the file before any network call, so a
 // missing/unreadable source or an over-limit file fails before PutObject ever starts. The file is
-// seekable and its length known (P58d D6), which lets the SDK checksum by seeking rather than
+// seekable and its length known, which lets the SDK checksum by seeking rather than
 // falling into the aws-chunked path a non-seekable body would need. Closed by the caller with a
 // defer (mutate.go's applyInsert) — the TypeScript never closes its createReadStream because the
 // SDK consumes it and Node's GC finishes the job, but a leaked fd in Go is real.

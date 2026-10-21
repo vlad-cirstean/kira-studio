@@ -1,5 +1,5 @@
 // Package procgroup is gitclient/githost-github/gitprepare/toolexec's own shared process-group
-// termination shape (P113 G10): SIGTERM the whole group, then escalate to SIGKILL after a grace
+// termination shape: SIGTERM the whole group, then escalate to SIGKILL after a grace
 // window if it hasn't exited by then. Every one of those packages spawns via os/exec with its own
 // process group (Setsid or Setpgid) precisely so a group signal reaches whatever the direct child
 // itself forked (ssh, a credential helper, a hook, a build's own child) — not just the child.
@@ -26,7 +26,7 @@ func Kill(pid int, sig syscall.Signal) error {
 // returned stop is called first. kill is a caller-supplied seam (each package's own killGroup var)
 // rather than a direct call to Kill, so a test can observe or fake the signal.
 //
-// stop must be called only once cmd has actually exited (Wait returning, or Close's own explicit
+// stop must be called only once cmd has exited (Wait returning, or Close's own explicit
 // kill-and-wait) — cmd.Wait is documented to block until any goroutine running Cancel has
 // finished, which is exactly the happens-before this needs. Calling stop any earlier could race the
 // escalation goroutine reading cmd.Process.Pid after the process (and pid) has already been reaped

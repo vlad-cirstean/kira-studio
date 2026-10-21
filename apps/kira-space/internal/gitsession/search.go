@@ -7,16 +7,16 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsearch"
 )
 
-// Search is search.run's server half (G23 D12): gitsearch.Scan over THIS walk's own rev set —
-// w.spec, not a fresh default — so every hit is a row the graph can actually reveal, and probe
-// 11's ordering-identity property holds between a loaded page and a scan.
+// Search is search.run's server half: gitsearch.Scan over THIS walk's own rev set —
+// w.spec, not a fresh default — so every hit is a row the graph can reveal, and the
+// ordering-identity property holds between a loaded page and a scan.
 //
 // Runs inside entry.Repo.Read: a bounded one-shot read belongs in the four-slot reader pool like
 // every other read — NOT logsession's direct-spawn exception, which exists because a PAUSED
-// process would hold a slot forever; a scan terminates on its own (§10.7).
+// process would hold a slot forever; a scan terminates on its own.
 //
 // One in-flight scan per walk: a new call cancels the previous one before spawning its own, as
-// the host-side belt to the client's own abort-on-supersede brace (F8). searchGen (not a plain
+// the host-side belt to the client's own abort-on-supersede brace. searchGen (not a plain
 // nil-check on searchCancel) is what lets this call's own cleanup tell "I am still the current
 // scan" apart from "a newer call already superseded me and installed its own cancel" — without
 // it, an older call's deferred cleanup could nil out a NEWER call's still-live searchCancel,

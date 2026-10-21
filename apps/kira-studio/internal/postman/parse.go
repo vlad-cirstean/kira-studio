@@ -1,8 +1,8 @@
-// parse.go turns a Postman Collection v2.1 file into a Tree (P4 D3/D10). It is lenient on read
-// and strict on write (Postel, and D10): real Postman files fail their own published schema
+// parse.go turns a Postman Collection v2.1 file into a Tree. It is lenient on read
+// and strict on write (Postel): real Postman files fail their own published schema
 // routinely — `info` requires `schema`, which hand-written and SDK-generated collections omit;
 // `header` requires `value`, which a valueless header row violates — so this never validates
-// against the schema, it decodes the members it models and keeps every other byte (D5).
+// against the schema, it decodes the members it models and keeps every other byte.
 package postman
 
 import (
@@ -17,7 +17,7 @@ import (
 
 // builderMethods is the seven-member vocabulary this app's request builder can show
 // (HTTP_METHODS, packages/shared/domain/http.ts). Postman's own list is fifteen plus any custom
-// string (F4); a method outside this set is stored verbatim and merely *counted* here — the
+// string; a method outside this set is stored verbatim and merely *counted* here — the
 // coercion to GET happens at exactly one renderer boundary, and export restores the original from
 // origin.
 var builderMethods = map[string]bool{
@@ -25,12 +25,11 @@ var builderMethods = map[string]bool{
 	"HEAD": true, "OPTIONS": true,
 }
 
-// maxCollectionBytes bounds Parse's own io.ReadAll (P21 round 1 architecture/security finding 11):
-// P4 §8 OQ-5 flagged the *latency* a pathological collection could cost; the memory side — a
-// user-chosen file read whole into memory, then decoded into a map[string]json.RawMessage plus a
-// cloneOrigin copy per node — was never bounded. 64 MiB is generously above any real Postman
-// export and matches the control plane's own "if it's bigger than this, something is wrong"
-// ceiling used elsewhere in this app.
+// maxCollectionBytes bounds Parse's own io.ReadAll: The memory side — a user-chosen file read
+// whole into memory, then decoded into a map[string]json.RawMessage plus a cloneOrigin copy per
+// node — was never bounded. 64 MiB is generously above any real Postman export and matches the
+// control plane's own "if it's bigger than this, something is wrong" ceiling used elsewhere in
+// this app.
 const maxCollectionBytes = 64 << 20
 
 // Parse reads one collection. The only three refusals are "the file is implausibly large",
@@ -69,7 +68,7 @@ func Parse(r io.Reader) (*Tree, error) {
 	infoOrigin := cloneOrigin(info)
 	delete(infoOrigin, "name")
 	origin["info"] = mustRaw(infoOrigin)
-	// F8: a collection-level `auth` block (bearer token, API key, password) is inert — kept but
+	// A collection-level `auth` block (bearer token, API key, password) is inert — kept but
 	// never applied (countScriptsAndAuth below) — but "inert" must not mean "kept unencrypted in
 	// kira.sqlite's origin_json forever". Stripped here, not merely blanked on export, so the
 	// plaintext never reaches storage at all.
@@ -98,8 +97,8 @@ func Parse(r io.Reader) (*Tree, error) {
 	return tree, nil
 }
 
-// decodeVariables decodes a collection-level `variable[]` array (D15). `key` is the name (F2's
-// own decodeScalarString, since Postman's variable.value is untyped); `type == "secret"` marks an
+// decodeVariables decodes a collection-level `variable[]` array. `key` is the name (the
+// decodeScalarString, since Postman's variable.value is untyped); `type == "secret"` marks an
 // entry secret, and the original `type` string is preserved per entry so an unrecognised one
 // survives export unchanged.
 func decodeVariables(raw json.RawMessage) []Variable {
@@ -121,8 +120,8 @@ func decodeVariables(raw json.RawMessage) []Variable {
 	return out
 }
 
-// checkSchemaVersion is D10: v2.1 parses, an absent or unrecognised `info.schema` parses anyway
-// (refusing a file for a missing advisory URL is the validator mistake D1 declined), and a file
+// checkSchemaVersion: v2.1 parses, an absent or unrecognised `info.schema` parses anyway
+// (refusing a file for a missing advisory URL is a validator mistake), and a file
 // that explicitly names v2.0.0 or v1 is refused with the version in the message. v2.0's `url` is
 // string-only and it has no `options.raw.language` at all, so "supporting" it would mean a second
 // translation table that is half-tested by construction.
@@ -338,7 +337,7 @@ func countInertMembers(obj map[string]json.RawMessage, rep *Report) {
 	}
 }
 
-// stripSensitiveOrigin is F8's own strip, applied to a folder or item's own origin clone (never
+// stripSensitiveOrigin is the strip applied to a folder or item's own origin clone (never
 // the collection's — Parse does that one inline, ahead of the `item`/`info.name` split it is
 // already doing). Removes `auth` entirely (its shape differs by type — bearer/apikey/basic/…—
 // deleting the whole member is simpler and safer than a per-type partial blank) and blanks the
@@ -401,10 +400,10 @@ func stripResponseAuthOrigin(raw json.RawMessage) json.RawMessage {
 
 // blankSecretVariableValues decodes raw as a Postman `variable[]` array and blanks the `value` of
 // any entry whose `type` is `"secret"`, matching buildVariables' own export-time blank for a
-// promoted (collection-level) secret variable (D16) — a folder/item-level one is never promoted
-// (D15), so this is the only place its value is ever cleared. changed is false, and raw is
-// returned as-is, when nothing needed blanking (no entries, or none secret-typed) — a caller
-// keeps the exact original bytes rather than a re-encoded (but semantically identical) copy.
+// promoted (collection-level) secret variable — a folder/item-level one is never promoted, so this
+// is the only place its value is ever cleared. changed is false, and raw is returned as-is, when
+// nothing needed blanking (no entries, or none secret-typed) — a caller keeps the exact original
+// bytes rather than a re-encoded (but semantically identical) copy.
 func blankSecretVariableValues(raw json.RawMessage) (blanked json.RawMessage, changed bool) {
 	arr := decodeArray(raw)
 	if arr == nil {
@@ -475,7 +474,7 @@ func importRequest(raw json.RawMessage, rep *Report) model.SavedRequest {
 	out.ParamDescriptions = ImportParamDescriptions(obj["url"])
 	out.Headers = importHeaders(obj["header"])
 	importBody(obj["body"], rep).applyTo(&out)
-	// P28 D15(c): last, over the fully assembled request — one pass rather than one per importer.
+	// Last, over the fully assembled request — one pass rather than one per importer.
 	// ShedOrigin calls this same function to compare an origin against the saved request, so both
 	// sides of that comparison see the identical rewrite and an untouched import still exports
 	// byte-for-byte from its Origin.
@@ -503,9 +502,9 @@ func importHeaders(raw json.RawMessage) []model.SavedHeader {
 		}
 		return out
 	}
-	// `value` is required by the schema and routinely absent in real files (D10's own example) —
+	// `value` is required by the schema and routinely absent in real files —
 	// importKeyValueRows' decodeScalarString already imports a valueless row as an empty value,
-	// not a dropped row. P22b D6: its decodeDescription() call is the same one Variable import
+	// not a dropped row. Its decodeDescription() call is the same one Variable import
 	// uses — a header's own `description` is oneOf [string, Description-object], never
 	// round-tripped verbatim.
 	return append(out, importKeyValueRows(raw)...)

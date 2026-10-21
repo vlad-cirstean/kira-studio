@@ -141,7 +141,7 @@ func (c *updateCollector) count() int {
 // TestPruneRunsAtStartAndEvery500 pins the prune cadence's counter arithmetic: once at Start, then
 // on exactly the 500th completed op and not again until the 1000th. An off-by-one here either
 // prunes on every op (a full table scan per query) or never prunes at all after startup.
-// TestStartReconcilesInterruptedRunningRows is the review finding: consume's own finishInFlight
+// consume's own finishInFlight
 // (TestShutdownReconcilesInFlight, below) only ever runs on an orderly channel close — a hard kill
 // (SIGKILL, OOM, a panic outside Host.safeRun) skips it entirely, leaving a 'running' row seeded by
 // a *previous* process's Append with nothing in this process's own in-flight map to reconcile it.
@@ -193,8 +193,8 @@ func TestPruneRunsAtStartAndEvery500(t *testing.T) {
 // TestShutdownReconcilesInFlight covers this package's actual subject: everything still tracked as
 // running when the event channel closes must be finished with the shutdown error and dropped from
 // the in-flight map, while an op that already reached a terminal state is left alone. Closing the
-// channel is what Stop (main's before-quit, via fakeSource's unsubscribe) does in production too
-// (P58f D9) — there is no separate synthetic "engine died" event to send any more.
+// channel is what Stop (main's before-quit, via fakeSource's unsubscribe) does in production too —
+// there is no separate synthetic "engine died" event to send any more.
 func TestShutdownReconcilesInFlight(t *testing.T) {
 	h := newHarness(t, 30)
 	var updates updateCollector
@@ -238,10 +238,10 @@ func TestShutdownReconcilesInFlight(t *testing.T) {
 	}
 }
 
-// TestIncognitoOpSkipsPersistence is P71 §4.3's own guard on handleOpEnd's reordering: an op
+// TestIncognitoOpSkipsPersistence is the guard on handleOpEnd's reordering: an op
 // started with incognito must reach neither Append (handleOpStart) nor Finish (handleOpEnd) — the
 // live Operations-panel view (updates.Emit) still fires for both, so a running incognito op stays
-// visible while it runs and simply never existed in op_log once it completes.
+// visible while it runs and never existed in op_log once it completes.
 func TestIncognitoOpSkipsPersistence(t *testing.T) {
 	h := newHarness(t, 30)
 	var updates updateCollector
@@ -263,8 +263,8 @@ func TestIncognitoOpSkipsPersistence(t *testing.T) {
 	}
 }
 
-// TestStopWaitsForConsumerBeforeReturning is P21 round 3 finding 3: Stop() must not return until
-// the consumer goroutine has actually run finishInFlight, because main.go's teardown calls
+// TestStopWaitsForConsumerBeforeReturning: Stop() must not return until
+// the consumer goroutine has run finishInFlight, because main.go's teardown calls
 // repositories.Close()/db.Close() immediately after Stop() — if Stop only unsubscribed (closing
 // the channel) without waiting for consume to drain, finishInFlight's writes would race the very
 // next statements in teardown, and "app exited" rows for still-running ops would be lost (or hit

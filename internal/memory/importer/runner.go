@@ -71,9 +71,9 @@ type armedJob struct {
 }
 
 // Runner is the scheduler of bulk imports: scan, materialise, extract, finalize. Exactly one runs
-// per memory.db, held by an exclusive flock; it follows the job rows the control side (Engine) writes
-// by polling them, so a pause or cancel from another process takes effect within one tick. All state
-// lives in memory.db, so a halted runner resumes from disk.
+// per memory.db, held by an exclusive flock; it follows the job rows the control side (Engine)
+// writes by polling them, so a pause or cancel from another process takes effect within one tick.
+// All state lives in memory.db, so a halted runner resumes from disk.
 type Runner struct {
 	st       *store
 	ms       *memory.Store
@@ -137,9 +137,9 @@ func NewRunner(ms *memory.Store, opts RunnerOptions) (*Runner, error) {
 func lockPath(ms *memory.Store) string { return filepath.Join(filepath.Dir(ms.Path()), lockFileName) }
 
 // Run takes the store's runner lock and works until ctx ends or the store has been idle for
-// IdleExit. A runner taking the lock resets what a crashed predecessor left mid-flight (running jobs
-// become paused; scanning jobs rescan) and never resumes a job by itself. It returns ErrRunnerBusy
-// when another runner holds the lock.
+// IdleExit. A runner taking the lock resets what a crashed predecessor left mid-flight (running
+// jobs become paused; scanning jobs rescan) and never resumes a job by itself. It returns
+// ErrRunnerBusy when another runner holds the lock.
 func (r *Runner) Run(ctx context.Context) error {
 	lock, ok, err := filelock.TryLock(r.lockPath)
 	if err != nil {

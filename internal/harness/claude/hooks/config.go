@@ -6,10 +6,10 @@ import (
 	"strings"
 )
 
-// hookEvents is every event name §2.4 wires to the same shim, no matcher on any of them (match
+// hookEvents is every event name wired to the same shim, no matcher on any of them (match
 // everything) — hook_event_name inside the payload is what tells the listener which event fired,
 // so one identical command entry per event is enough. Read from the installed CLI's own schema,
-// not assumed. UserPromptSubmit (P129): the ade.Tracker's own reducer needs it to move a session
+// not assumed. UserPromptSubmit: the ade.Tracker's own reducer needs it to move a session
 // out of "waiting" the moment a person answers a monitor's prompt, before any tool runs.
 var hookEvents = []string{
 	"SessionStart", "SessionEnd", "PreToolUse", "PostToolUse", "Notification", "Stop",

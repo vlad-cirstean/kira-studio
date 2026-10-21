@@ -1,6 +1,6 @@
 // Package enginecache is the Go analogue of src/engine/cache/: L2 (result pages) and L3 (row
-// counts) only — L1 (metadata) lives in apps/kira-studio/internal/storage's SQLite repos so the tree renders
-// while disconnected, the same reason P1 D10 kept it out of the TypeScript engine.
+// counts) only — L1 (metadata) lives in apps/kira-studio/internal/storage's SQLite repos so the
+// tree renders while disconnected.
 //
 // Unlike cache/{pages,counts}.ts's process-global singletons, Cache is a value constructed once by
 // main.go and held by the router: a package-level singleton would be untestable in a `go test`
@@ -40,7 +40,7 @@ type LruEntry[V any] struct {
 
 // ByteLru is the Go analogue of lru.ts's ByteLru<V>: a byte-budgeted LRU. JS backs it with a Map,
 // whose insertion order gives LRU ordering for free; Go maps have no order, so this is the standard
-// map[string]*list.Element + container/list shape instead (P58 D9). Not internally synchronized —
+// map[string]*list.Element + container/list shape instead. Not internally synchronized —
 // same as the TypeScript, which never needed to be; Cache's own mutex is what makes the whole
 // enginecache package safe to share across goroutines.
 type ByteLru[V any] struct {

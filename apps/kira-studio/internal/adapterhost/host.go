@@ -1,7 +1,8 @@
-// Package adapterhost is the Go analogue of src/engine/{scheduler/ops.ts,control.ts,rpc.ts,data.ts}:
-// Router serves every connection kind in-process against apps/kira-studio/internal/adapters (the adapter
-// contract) — there is no more routing decision to make, since P58f deleted the Node engine child
-// this package used to forward non-native kinds to.
+// Package adapterhost is the Go analogue of
+// src/engine/{scheduler/ops.ts,control.ts,rpc.ts,data.ts}: Router serves every connection kind
+// in-process against apps/kira-studio/internal/adapters (the adapter contract) — there is no more
+// routing decision to make, since the Node engine child this package used to forward non-native
+// kinds to was deleted.
 package adapterhost
 
 import (
@@ -41,16 +42,16 @@ type runningOp struct {
 	connectionID *string
 }
 
-// eventSub is F5's own lossless delivery queue for exactly one Subscribe()r. Delivery used to be a
+// eventSub is the lossless delivery queue for exactly one Subscribe()r. Delivery used to be a
 // non-blocking send into a fixed 32-slot buffer, dropping an event outright once it filled — on
 // the stated reasoning that "dropping one event is better than blocking every other subscriber".
 // oplog is the only production subscriber (main.go's `oplog.New(router.Host(), ...)` is the only
 // Host.Subscribe call site; internal/bridge's http.go/grpc.go only ever call RunOp, never
 // Subscribe), and it does a synchronous SQLite write plus a Wails emit per event — up to 64
 // concurrent ops (plus tree/dbmcp/http/grpc ops) can easily outpace that, so the stated reasoning
-// does not actually hold: there is no *other* subscriber a drop is protecting. A dropped op:end
-// leaves an op_log row stuck "running" forever; a dropped op:start produces the same phantom
-// "test"-kind record F3 fixed the vocabulary side of.
+// does not hold: there is no *other* subscriber a drop is protecting. A dropped op:end
+// leaves an op_log row stuck "running" forever; a dropped op:start produces a phantom
+// "test"-kind record.
 //
 // deliver now only ever appends to an unbounded queue (guarded by mu) and wakes drain — it never
 // blocks and never drops. drain is the one dedicated goroutine that ever reads the queue or sends
@@ -149,9 +150,9 @@ const (
 )
 
 // NewHost constructs a Host. cache is used by the native Connect/Disconnect handlers
-// (disconnecting releases the connection's cached pages, §2.2 — see router.go).
+// (disconnecting releases the connection's cached pages — see router.go).
 //
-// P21 round 3 finding 8: deps.Log is a bare func field with no constructor enforcing it
+// deps.Log is a bare func field with no constructor enforcing it
 // (adapters.Deps has none), and this package treated it as optional in some call sites
 // (`if h.deps.Log != nil`, dataframe.go's panic recovery) and mandatory in others
 // (dataframe.go's response-path logging) — latent in production (main.go always sets one) but a
@@ -202,7 +203,7 @@ type opEndPayload struct {
 
 // RunOp is scheduler/ops.ts's runOp: mint or accept an op id, refuse a duplicate (a duplicate id
 // would corrupt the op log's primary key and let the stop button cancel the wrong query), derive a
-// cancellable context, emit op:start, run fn behind a recover() (P58 D16), emit op:end with a
+// cancellable context, emit op:start, run fn behind a recover(), emit op:end with a
 // status/duration/rows/command/error decided the same way runOp decides them, and remove the op
 // from the running map in a defer. ctx is the caller's own context (e.g. app shutdown); CancelOp is
 // the explicit, opID-addressed cancellation path — both cancel the same derived context.
@@ -234,7 +235,7 @@ func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, 
 		cancel()
 	}()
 
-	// P28 §5.5: the throttle gate sits here — after registration (so a queued op is cancellable
+	// The throttle gate sits here — after registration (so a queued op is cancellable
 	// via CancelOp/the deferred cancel() above) but before op:start (so startedAt/DurationMs stay
 	// the adapter's own numbers, never counting client-side queue time). connect/disconnect/test
 	// are never in throttledKinds, so a misconfigured throttle can never lock a user out of fixing
@@ -314,9 +315,9 @@ func (h *Host) Cancellable(ctx context.Context, opID string) (context.Context, f
 	}, nil
 }
 
-// safeRun is P58 D16's recover() boundary: a panic inside fn becomes a failed op instead of
-// crashing the app. E_INTERNAL deliberately is not one of adapters' eight closed error codes
-// (OQ-1) — the renderer's classify() already handles an unrecognized code correctly, and adding it
+// safeRun is the recover() boundary: a panic inside fn becomes a failed op instead of
+// crashing the app. E_INTERNAL deliberately is not one of adapters' eight closed error codes —
+// the renderer's classify() already handles an unrecognized code correctly, and adding it
 // to the closed set would be a claim that ordinary adapter code can produce it on purpose.
 func (h *Host) safeRun(ctx context.Context, op *adapters.OpCtx, fn func(context.Context, *adapters.OpCtx) (any, error)) (value any, err error) {
 	defer func() {
@@ -367,8 +368,8 @@ func (h *Host) rememberEarlyCancelLocked(opID string) {
 }
 
 // CancelOp is scheduler/ops.ts's cancelOp, in the same order and for the same reason: the local
-// abort unblocks the running RunOp call immediately; the adapter call is what actually kills the
-// server-side work (§5.1: cancellation is always forwarded). Both steps are best-effort — an
+// abort unblocks the running RunOp call immediately; the adapter call is what kills the
+// server-side work (cancellation is always forwarded). Both steps are best-effort — an
 // unknown op id (remembered briefly, so a Stop that beats its own Run still cancels it), or an
 // adapter that has already gone, is not an error, matching cancel()'s own
 // "never throws for already finished" contract.
@@ -396,7 +397,7 @@ func (h *Host) CancelOp(ctx context.Context, opID string) (bool, error) {
 }
 
 // CancelOpsForConnection locally cancels every currently-running op registered against
-// connectionID, except exceptOpID (pass "" when there is none to spare) — F1 (P108 Part 6). Used
+// connectionID, except exceptOpID (pass "" when there is none to spare). Used
 // before tearing an old adapter down (a reconnect's own teardown in Router.Connect, or an explicit
 // Router.Disconnect) so each cancelled op's own driver ctx watcher can unblock whatever the old
 // adapter's real Disconnect would otherwise wait on: QueryTracker.Drain's inFlight.Wait has no

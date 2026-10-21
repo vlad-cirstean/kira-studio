@@ -13,7 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )
 
-// P5 §6.2: four cases, each guarding arithmetic or an invariant rather than a CRUD round-trip —
+// Four cases, each guarding arithmetic or an invariant rather than a CRUD round-trip —
 // that CreateEnvironment then ListEnvironments returns it, that RenameEnvironment renames, that a
 // missing name is refused, that the cipher round-trips a string: each is CLAUDE.md's "everything
 // else gets nothing".
@@ -180,11 +180,11 @@ func TestVariableHistoryRecordsOnChangeDedupedAndTrimmed(t *testing.T) {
 
 // ---- 2b. flipping a variable from plain to secret purges its pre-secret plaintext history ----
 
-// TestUpsertToSecretPurgesPlaintextHistory is P21 round 3 finding 1 (architecture/security): a
-// variable that was edited a few times while still plain, then flipped to Secret, must not leave
-// its earlier plaintext values sitting in api_variable_history — that table has no reveal gate for
-// a row whose own is_secret is 0, so those rows are exactly as exposed as a plain variable's
-// current value, backups and all, once the variable itself is meant to be protected.
+// TestUpsertToSecretPurgesPlaintextHistory: a variable that was edited a few times while still
+// plain, then flipped to Secret, must not leave its earlier plaintext values sitting in
+// api_variable_history — that table has no reveal gate for a row whose own is_secret is 0, so
+// those rows are exactly as exposed as a plain variable's current value, backups and all, once the
+// variable itself is meant to be protected.
 func TestUpsertToSecretPurgesPlaintextHistory(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
@@ -234,8 +234,8 @@ func TestUpsertToSecretPurgesPlaintextHistory(t *testing.T) {
 	}
 }
 
-// TestUpsertWithNilValueLeavesASecretUntouched is F2 (P108 Part 3): List's own list projection
-// always returns "" for a secret (D4/D5), so the frontend seeds an unrevealed secret's draft from
+// TestUpsertWithNilValueLeavesASecretUntouched: List's own list projection
+// always returns "" for a secret, so the frontend seeds an unrevealed secret's draft from
 // that blank value — a nil value pointer must be Upsert's own "leave the stored value untouched"
 // signal for exactly this case, or renaming/describing a secret without ever revealing it silently
 // wipes it (the old value survives only in history; the next request sends an empty credential).
@@ -463,11 +463,11 @@ func TestImportVariablesThenExportRoundTripsWithSecretsValueless(t *testing.T) {
 	}
 }
 
-// TestSecretsForDuplicateNameResolvesFirstWinsBySortOrder is finding 2 of the round-1 review:
-// mergeSecrets used to have no ORDER BY at all, leaving a duplicate name's winner undefined
-// (whatever order SQLite happened to return rows in), where the documented rule (P5 D12) is
-// first-wins by sort_order — the same rule mergedValuesAndSecrets (frontend/src/api/state/
-// variables.ts) and findSecretVariableId (curl.ts) already implement.
+// TestSecretsForDuplicateNameResolvesFirstWinsBySortOrder: mergeSecrets used to have no ORDER BY
+// at all, leaving a duplicate name's winner undefined (whatever order SQLite happened to return
+// rows in), where the documented rule is first-wins by sort_order — the same rule
+// mergedValuesAndSecrets (frontend/src/api/state/variables.ts) and findSecretVariableId (curl.ts)
+// already implement.
 func TestSecretsForDuplicateNameResolvesFirstWinsBySortOrder(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
@@ -488,10 +488,10 @@ func TestSecretsForDuplicateNameResolvesFirstWinsBySortOrder(t *testing.T) {
 	}
 }
 
-// TestSecretsForEnvironmentStillOverridesCollectionDespiteFirstWins guards the interaction finding
-// 2's fix has to respect: first-wins applies *within* a scope, never across scopes — an
-// environment-scope variable must still override a same-named collection-scope one (D2), even
-// though mergeSecrets now skips a later same-named row within either individual scope's own query.
+// TestSecretsForEnvironmentStillOverridesCollectionDespiteFirstWins guards the interaction:
+// first-wins applies *within* a scope, never across scopes — an environment-scope variable must
+// still override a same-named collection-scope one, even though mergeSecrets now skips a later
+// same-named row within either individual scope's own query.
 func TestSecretsForEnvironmentStillOverridesCollectionDespiteFirstWins(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
@@ -516,8 +516,8 @@ func TestSecretsForEnvironmentStillOverridesCollectionDespiteFirstWins(t *testin
 	}
 }
 
-// TestSecretsForUndecryptableEnvSecretLeavesReferenceUnresolvedNotCollectionValue is P108 F5:
-// mergeSecrets used to set seen[name] only after a successful decrypt, so a NULL or
+// TestSecretsForUndecryptableEnvSecretLeavesReferenceUnresolvedNotCollectionValue: mergeSecrets
+// used to set seen[name] only after a successful decrypt, so a NULL or
 // undecryptable row `continue`d without ever marking the name seen. Since out already held the
 // collection-scope value from SecretsFor's earlier, lower-precedence mergeSecrets call, a broken
 // higher-precedence (environment) row silently left that stale collection value in place — Send
@@ -868,7 +868,7 @@ func TestDuplicateEnvironmentInheritsColor(t *testing.T) {
 	}
 }
 
-// TestListEnvironmentsCoercesAnUnrecognisedColorWithoutDroppingTheRow is D18's own deliberate
+// TestListEnvironmentsCoercesAnUnrecognisedColorWithoutDroppingTheRow is the deliberate
 // divergence from repos/connections.go:53 (which *drops* a connection row whose colour it does
 // not recognise): an environment owns variables, so losing one over a cosmetic column would be a
 // data-loss bug. A hand-edited or legacy row with a bogus colour must still list, with its colour

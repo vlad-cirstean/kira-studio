@@ -25,23 +25,23 @@ func pathExists(path string) bool {
 	return err == nil
 }
 
-// ReadInProgressStateFiles reads gitDir's per-worktree state files — NEVER commonDir (D9): every
+// ReadInProgressStateFiles reads gitDir's per-worktree state files — NEVER commonDir: every
 // one of these lives per-worktree, and in a linked worktree that is <commonDir>/worktrees/<name>/,
 // exactly what gitDir already is. A missing file is the zero value, never an error —
 // os.ReadFile's error is swallowed by design, since "not there" is the answer 99% of the time and
 // ClassifyInProgress has no use for the distinction. AUTO_MERGE is deliberately not read:
-// upstream's probe P4 found it left behind after an aborted cherry-pick, a stale artefact rather
+// upstream's probe found it left behind after an aborted cherry-pick, a stale artefact rather
 // than a state signal.
 //
-// The reads run sequentially, not concurrently (F18/D9): stat/read calls on files almost certainly
+// The reads run sequentially, not concurrently: stat/read calls on files almost certainly
 // in the page cache, and a goroutine fan-out here would be a JavaScript Promise.all idiom for an
 // I/O model Go does not have.
 func ReadInProgressStateFiles(gitDir string) gitpreflight.InProgressStateFiles {
-	// F3: head-name/onto live under rebase-merge/ for a merge-backend rebase, but under
+	// head-name/onto live under rebase-merge/ for a merge-backend rebase, but under
 	// rebase-apply/ for an apply-backend one (or a plain `git am`, which shares the same
 	// directory) — only one of the two directories is ever present at a time, so trying the
 	// rebase-merge/ path first and falling back to rebase-apply/ is exactly equivalent to reading
-	// whichever one actually exists.
+	// whichever one exists.
 	headName := readTrimmed(filepath.Join(gitDir, "rebase-merge", "head-name"))
 	onto := readTrimmed(filepath.Join(gitDir, "rebase-merge", "onto"))
 	if headName == nil {
@@ -66,7 +66,7 @@ func ReadInProgressStateFiles(gitDir string) gitpreflight.InProgressStateFiles {
 	}
 }
 
-// readSequencerTodoKind is F2's own read: sequencer/todo's first non-comment, non-blank line names
+// readSequencerTodoKind is the read: sequencer/todo's first non-comment, non-blank line names
 // the pending command for a multi-commit revert or cherry-pick — "revert"/"pick" (git never
 // abbreviates either token in this file, unlike interactive rebase's own todo). Mirrors git's own
 // wt-status.c, which reads exactly this to label a sequencer state once every *_HEAD file is
@@ -142,12 +142,12 @@ func AbortArgs(kind gitpreflight.InProgressKind) ([]string, bool) {
 		gitpreflight.InProgressRevert, gitpreflight.InProgressRebase)
 }
 
-// SkipArgs is probe P6's own sequencer remedy for an empty pick or revert, joined at G26 D12 by
-// rebase — probe P10's own hint line names it verbatim ("You can instead skip this commit: run
-// "git rebase --skip""), and an already-applied commit inside a stack (a branch reordered under
-// it, say) is exactly the case P15's automatic same-patch drop does not cover. (nil, false) for
-// every other kind, since InProgressOperation.CanSkip is the UI's own gate and this is only the
-// second line of defence, not the first.
+// SkipArgs is the sequencer remedy for an empty pick or revert, joined by rebase — the hint line
+// names it verbatim ("You can instead skip this commit: run "git rebase --skip""), and an
+// already-applied commit inside a stack (a branch reordered under it, say) is exactly the case
+// the automatic same-patch drop does not cover. (nil, false) for every other kind, since
+// InProgressOperation.CanSkip is the UI's own gate and this is only the second line of defence,
+// not the first.
 func SkipArgs(kind gitpreflight.InProgressKind) ([]string, bool) {
 	return sequencerArgs(kind, "--skip",
 		gitpreflight.InProgressCherryPick, gitpreflight.InProgressRevert, gitpreflight.InProgressRebase)

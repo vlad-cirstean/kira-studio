@@ -1,7 +1,7 @@
-// Package maskrules is M5's own rule-management service (docs/HISTORY.md (v1.7 M5)
-// §4.6): the layer between storage (repos.MaskRulesRepo/MaskKeysRepo) and this rule set's two
-// consumers — internal/dbmcp's render path (through the MaskSetFor seam it consumer-declares) and
-// internal/bridge's IPC surface for the connection dialog's Privacy tab and the grid's header menu.
+// Package maskrules is the rule-management service: the layer between storage
+// (repos.MaskRulesRepo/MaskKeysRepo) and this rule set's two consumers — internal/dbmcp's
+// render path (through the MaskSetFor seam it consumer-declares) and internal/bridge's IPC surface
+// for the connection dialog's Privacy tab and the grid's header menu.
 package maskrules
 
 import (
@@ -16,9 +16,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )
 
-// Service holds the two repos M5's rules span (the rule table, and the cipher-backed key column —
+// Service holds the two repos the rules span (the rule table, and the cipher-backed key column —
 // SecretsRepo's own split, mirrored here) plus a small per-connection read cache: MaskSetFor is on
-// dbmcp's own run_query hot path (§4.3), and re-querying + re-folding the rule set on every call
+// dbmcp's own run_query hot path, and re-querying + re-folding the rule set on every call
 // would cost a query per row rendered across a busy connection for no benefit, since a rule set
 // changes only through this same Service's own write methods.
 type Service struct {
@@ -46,7 +46,7 @@ func (s *Service) List(connectionID string) ([]model.MaskRule, error) {
 }
 
 // Upsert validates and writes one rule, forcing correlate=false for a `number` rule regardless of
-// what the caller passed (§2.3: "A number never carries a correlation tag" — a bucket is
+// what the caller passed ("A number never carries a correlation tag" — a bucket is
 // many-to-one, so tagging it would be dishonest; internal/mask.Apply enforces the same rule again,
 // defensively, so this is belt-and-suspenders, not the only place it holds). table_name defaults to
 // "*" (any table) when left blank — the header menu's own common case, marking a column PII without
@@ -105,7 +105,7 @@ func (s *Service) Counts() (map[string]int, error) {
 	return s.rules.CountByConnection()
 }
 
-// MaskSetFor resolves connectionID's own folded rule set and Masker (§4.2/§4.6) — what dbmcp's
+// MaskSetFor resolves connectionID's own folded rule set and Masker — what dbmcp's
 // render path consumes through the MaskRules interface it consumer-declares. A connection with no
 // rules returns a Set with an empty Rules map (never nil pointer confusion — dbmcp itself decides
 // whether an empty Set behaves as "no masking configured").
@@ -168,18 +168,17 @@ func (s *Service) MaskSetFor(connectionID string) (mask.Set, error) {
 }
 
 // CorrelationKeyHex returns connectionID's own correlation key, hex-encoded, minting one first
-// (§2.5's own lazy creation) if the connection has at least one correlating rule and none exists
-// yet. "" means the connection needs no key at all. This is NOT one of the plan's originally named
-// bridge methods (§4.6 lists List/Upsert/Remove/RegenerateKey/Counts) — it is added because §6.3's
-// own design (the grid preview computing tags locally via Web Crypto, to match MCP's output
-// byte-for-byte) is otherwise impossible: the renderer has no other way to obtain the raw key. Per
-// §6.1, the renderer is not the adversary the MCP path defends against — exposing the key to it
-// mirrors how a connection password already reaches the renderer for editing (connections.Reveal)
-// — but this is still the one seam that ever sends the key outside this process, so it must never
-// be reachable from anything but the grid preview's own local tag computation.
+// (the lazy creation) if the connection has at least one correlating rule and none exists yet.
+// "" means the connection needs no key at all. It is added because the design (the grid preview
+// computing tags locally via Web Crypto, to match MCP's output byte-for-byte) is otherwise
+// impossible: the renderer has no other way to obtain the raw key. The renderer is not the
+// adversary the MCP path defends against — exposing the key to it mirrors how a connection
+// password already reaches the renderer for editing (connections.Reveal) — but this is still the
+// one seam that ever sends the key outside this process, so it must never be reachable from
+// anything but the grid preview's own local tag computation.
 //
 // Folding is deliberately NOT applied before checking "does anything correlate": a raw rule with
-// correlate=true that later loses a §4.2 fold to a stricter, non-correlating rule on the same
+// correlate=true that later loses a fold to a stricter, non-correlating rule on the same
 // column still triggers a mint here. That mints a key that ends up unused for that particular
 // column — harmless (an unused key sitting in the store, never surfaced anywhere) rather than a
 // correctness bug, and far simpler than re-deriving the fold just to decide whether to mint.

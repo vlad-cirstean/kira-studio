@@ -9,7 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// P21 round 2 architecture/security finding 3: docs/ARCHITECTURE.md's own "sslmode semantics per
+// docs/ARCHITECTURE.md's own "sslmode semantics per
 // engine (P21 round 1)" section documents verify-none/insecure as Kafka's escape hatch alongside
 // redis and mongo — round 1 added it to the other two and missed kafka, whose default: branch
 // rejected it outright, leaving a broker with a self-signed or internal-CA certificate unable to

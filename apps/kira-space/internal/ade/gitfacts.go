@@ -19,7 +19,7 @@ import (
 // refs in a burst.
 const adeRepoChangedDebounce = 250 * time.Millisecond
 
-// branchFactsCacheCap/mergeTreeCacheCap are §4.2's own "512 entries per repo" cache bound, applied
+// branchFactsCacheCap/mergeTreeCacheCap are the "512 entries per repo" cache bound, applied
 // to two separate per-repo LRUs (ahead/behind/files/commits keyed by (tip(parent), tip(branch));
 // merge-tree conflicts keyed by the ordered pair of tips pairFacts already calls its callback with)
 // rather than one cache discriminated by a third "kind" field — tips are immutable object ids, so
@@ -147,7 +147,8 @@ func resolveBaseRow(inventory []porcelain.InventoryRef, short, defaultRemote str
 
 // mainDisplay is the short-form split of MainRef's full refname:
 // `refs/heads/X` -> name X, ref X (a local-only main); `refs/remotes/<r>/X` -> name X, ref
-// `<r>/X` (a remote-tracking main, the common case); only this display pair is shortened. A refname this doesn't recognize (never
+// `<r>/X` (a remote-tracking main, the common case); only this display pair is shortened. A refname
+// this doesn't recognize (never
 // produced by MainRef today) passes through unchanged in both fields, rather than panicking.
 func mainDisplay(full string) (name, ref string) {
 	if rest, ok := strings.CutPrefix(full, "refs/heads/"); ok {

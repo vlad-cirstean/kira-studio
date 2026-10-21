@@ -18,7 +18,7 @@ type WindowsRepo struct {
 }
 
 // shared is this repo's own row against repo-root internal/appstorage.WindowRepo, which owns
-// Exists/Create/EnsureExists/SetBounds/Delete (P107 T2-10, I2-3) — everything below that doesn't
+// Exists/Create/EnsureExists/SetBounds/Delete — everything below that doesn't
 // touch the `mode` column stays a thin delegate to it. List stays its own dedicated query (below)
 // since it alone needs the extra `mode` column in the same round trip.
 func (r *WindowsRepo) shared() *appstorage.WindowRepo { return &appstorage.WindowRepo{DB: r.DB} }
@@ -84,8 +84,8 @@ func (r *WindowsRepo) EnsureExists(key string) error {
 	return r.shared().EnsureExists(key)
 }
 
-// GetMode reads one window's stored mode (P22 D12), normalised the same way List does — a thin
-// delegate to appstorage.WindowRepo.GetMode (P128 §2.2), this app's own vocabulary supplied. Used
+// GetMode reads one window's stored mode, normalised the same way List does — a thin
+// delegate to appstorage.WindowRepo.GetMode, this app's own vocabulary supplied. Used
 // by windowsvc.Service's bound Ensure — the one call the renderer already makes before it asks for
 // anything window-scoped, so this is the boot-time seam that carries `mode` to the frontend without
 // a second round trip.

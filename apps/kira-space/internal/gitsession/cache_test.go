@@ -6,14 +6,13 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 )
 
-// G30 round-1 performance review, finding #9: diffCache's own `order` used to be a plain
-// `[]diffCacheKey`, scanned linearly (removeFromOrderLocked) on every touch-on-get and every
-// re-set of an already-cached key — O(n) per access against a cache with no entry-count cap, only
-// a byte budget a repository with many small patches can hold thousands of entries under. Rewired
-// onto a container/list.List (O(1) MoveToBack/Remove via the list's own element pointers) plus an
-// index from key to *list.Element. These tests are diffCache's first-ever coverage — they exist to
-// prove the list-based rewrite preserves the exact LRU behaviour the old slice-based one had, not
-// merely that it doesn't crash.
+// diffCache's own `order` used to be a plain `[]diffCacheKey`, scanned linearly
+// (removeFromOrderLocked) on every touch-on-get and every re-set of an already-cached key — O(n)
+// per access against a cache with no entry-count cap, only a byte budget a repository with many
+// small patches can hold thousands of entries under. Rewired onto a container/list.List (O(1)
+// MoveToBack/Remove via the list's own element pointers) plus an index from key to *list.Element.
+// These tests are diffCache's first-ever coverage — they exist to prove the list-based rewrite
+// preserves the exact LRU behaviour the old slice-based one had, not merely that it doesn't crash.
 
 func diffBody(tag string) porcelain.FileDiffBody {
 	return porcelain.FileDiffBody{Kind: porcelain.BodyText, Hunks: []porcelain.DiffHunk{{Heading: tag}}}
@@ -37,10 +36,9 @@ func TestDiffCache_GetSetRoundTrips(t *testing.T) {
 	}
 }
 
-// TestDiffCache_EvictsLeastRecentlyUsedFirst is the crux of the rewrite: a byte budget too small
-// for all three entries must evict the one that was neither set most recently NOR touched by a
-// get() since — proving `order`'s own front/back semantics (least- to most-recently-used) survived
-// the slice-to-list rewrite.
+// TestDiffCache_EvictsLeastRecentlyUsedFirst: a byte budget too small for all three entries must
+// evict the one that was neither set most recently NOR touched by a get() since — proving
+// `order`'s own front/back semantics (least- to most-recently-used).
 func TestDiffCache_EvictsLeastRecentlyUsedFirst(t *testing.T) {
 	t.Parallel()
 	c := newDiffCache(25) // room for exactly two 10-byte-ish entries plus slack, never three.

@@ -171,10 +171,10 @@ func TestOversizedBodyRejected(t *testing.T) {
 	}
 }
 
-// TestDroppedFieldsNeverReachEvent is §19.2 case 5: tool_input/tool_response/transcript_path in
-// the body never appear in the delivered Event — Event has no field for any of the three, so this
-// documents the guarantee encoding/json's own unknown-field skip already provides, over a payload
-// that actually carries all three.
+// TestDroppedFieldsNeverReachEvent: tool_input/tool_response/transcript_path in the body never
+// appear in the delivered Event — Event has no field for any of the three, so this documents the
+// guarantee encoding/json's own unknown-field skip already provides, over a payload that carries
+// all three.
 func TestDroppedFieldsNeverReachEvent(t *testing.T) {
 	rec := &recordingEvents{}
 	s := newTestServer(t, rec.record)

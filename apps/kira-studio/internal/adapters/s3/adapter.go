@@ -243,7 +243,7 @@ func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adap
 
 // Cancel is index.ts's cancel — a permanent no-op, for the identical reason sqs's own Cancel
 // names: no server-side kill mechanism exists, so the op's own context.Context, passed directly
-// to every SDK call in catalog.go/read.go/mutate.go/transfer.go (P58d D3, never
+// to every SDK call in catalog.go/read.go/mutate.go/transfer.go (never
 // adapters.RunWithAbortRace), is the entire cancellation story. Additionally load-bearing for
 // DownloadObject's temp-file cleanup ordering (transfer.go).
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {

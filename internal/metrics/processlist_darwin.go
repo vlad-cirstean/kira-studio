@@ -21,7 +21,7 @@ const pidPathBufSize = 4 * 1024
 // call, sized by its own documented convention (call once with a NULL buffer to learn the byte
 // count, then once for real), then one proc_pidpath per pid into a single reused buffer — 1+N
 // syscalls and one allocation total, replacing gopsutil's process.Processes()+Exe() (~5 syscalls
-// and a fresh allocation per process on the machine to find this app's own handful of pids, F8). A
+// and a fresh allocation per process on the machine to find this app's own handful of pids). A
 // pid whose path cannot be read is skipped, exactly as the gopsutil-based path does — proc_pidpath
 // failing *is* the liveness answer AppProcessSet needs, no separate existence check required.
 func listProcesses() ([]procEntry, error) {

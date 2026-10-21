@@ -11,7 +11,7 @@ import (
 )
 
 // smokeGit runs one git command against dir with a fixed committer identity — reset_test.go's,
-// search_test.go's and worktree_test.go's own shared shape (P107 I2-28). search_test.go's own
+// search_test.go's and worktree_test.go's own shared shape. search_test.go's own
 // version additionally isolates the process from any global/system git config
 // (GIT_CONFIG_GLOBAL/GIT_CONFIG_SYSTEM=/dev/null, extraEnv here); reset's and worktree's pass nil.
 func smokeGit(t *testing.T, dir string, extraEnv []string, args ...string) {
@@ -35,10 +35,10 @@ type smokeConnOpts struct {
 	discovery func(runner gitclient.Runner) *gitclient.Discovery
 }
 
-// smokeConn is resetSmokeConn's, searchSmokeConn's and worktreeSmokeConn's own shared shape (P107
-// I2-28): open dir through a fresh Router.ForConn dispatch, Discovery bypassed via dir's own raw
-// gitPath (D3, gitsession's own newQueriesTestEntry does the same) unless opts.discovery says
-// otherwise. connID stays each caller's own literal.
+// smokeConn is resetSmokeConn's, searchSmokeConn's and worktreeSmokeConn's own shared shape: open
+// dir through a fresh Router.ForConn dispatch, Discovery bypassed via dir's own raw gitPath
+// (gitsession's own newQueriesTestEntry does the same) unless opts.discovery says otherwise.
+// connID stays each caller's own literal.
 func smokeConn(t *testing.T, connID gitsession.ConnID, dir string, opts smokeConnOpts) (Handlers, string) {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {

@@ -14,11 +14,10 @@ import (
 
 var clickhouseServerVersion = regexp.MustCompile(`^ClickHouse 2\d\.`)
 
-// TestFixture_ClickHouse is P58f §4.5 step 2 (another fifth of it), against
-// tests/ipc/clickhouse/clickhouse.fixture.ts's own committed scenario: connect, tree (with a
-// frozen `.inner_id.<uuid>` materialized-view backing table and a frozen InnoDB-style row-count
-// estimate for the million-row table), a filter-by-value read, a definition (frozen generatedAt)
-// and a console/SQL-mode data:execute.
+// TestFixture_ClickHouse is against tests/ipc/clickhouse/clickhouse.fixture.ts's own committed
+// scenario: connect, tree (with a frozen `.inner_id.<uuid>` materialized-view backing table and a
+// frozen InnoDB-style row-count estimate for the million-row table), a filter-by-value read, a
+// definition (frozen generatedAt) and a console/SQL-mode data:execute.
 func TestFixture_ClickHouse(t *testing.T) {
 	fixture := testsupport.StartClickHouse(t)
 	app := NewApp(t)

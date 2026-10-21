@@ -26,9 +26,9 @@ func allMenuItems(m *application.Menu) []*application.MenuItem {
 }
 
 // acceleratorTemplate exercises every ItemKind BuildMenu understands, including the
-// "Control+Tab"-shaped trap (§1.4) a verbatim accelerator string would hit — Kira Studio's own
+// "Control+Tab"-shaped trap a verbatim accelerator string would hit — Kira Studio's own
 // BuildTemplate is app-specific (apps/kira-studio/internal/appshell) and out of reach for the
-// shared package (P103 Part 3), so this is a synthetic template covering the same accelerator
+// shared package, so this is a synthetic template covering the same accelerator
 // vocabulary rather than a real app's menu.
 func acceleratorTemplate() []shell.Section {
 	return []shell.Section{
@@ -58,7 +58,7 @@ func acceleratorTemplate() []shell.Section {
 // TestBuildMenuAcceleratorsAllParse walks the real built *application.Menu alongside the
 // Wails-free template that produced it (same item count and order — BuildMenu appends exactly one
 // built item per template item, separators included) and asserts that every template item
-// carrying a non-empty Accelerator actually parsed: this is the test that catches
+// carrying a non-empty Accelerator parsed: this is the test that catches
 // SetAccelerator's silent failure mode (menuitem.go:275-287); without it a mistranslation is
 // invisible.
 func TestBuildMenuAcceleratorsAllParse(t *testing.T) {

@@ -1,5 +1,5 @@
-// Package ade is Kira Space's ADE engine: the task board, the run engine and the Claude Code session
-// tracker, over the shared internal/terminal and internal/harness packages. No
+// Package ade is Kira Space's ADE engine: the task board, the run engine and the Claude Code
+// session tracker, over the shared internal/terminal and internal/harness packages. No
 // apps/kira-space/internal/bridge import (layering_test.go rule); bridge/adetask.go is the one
 // place that turns it into a Wails-bound surface.
 package ade
@@ -43,8 +43,8 @@ var (
 )
 
 // TrackerDeps is everything Tracker needs from the rest of the app — a plain struct of seams, the
-// same "declare small interfaces, pass funcs" discipline this app's bridge packages already use,
-// so a test can fake each one independently (tracker_test.go passes an in-memory LiveAgents/
+// same "declare small interfaces, pass funcs" discipline this app's bridge packages already
+// use, so a test can fake each one independently (tracker_test.go passes an in-memory LiveAgents/
 // WriteTerminal and a fixed Now).
 type TrackerDeps struct {
 	Store         *repos.AdeSessionsRepo
@@ -368,7 +368,7 @@ func (t *Tracker) hasPending(match func(pendingIntent) bool) bool {
 // Compose is BoundService.ComposeAgent's own target (wired in main.go) — internal/terminal.Open
 // calls it for every agent launch, composed or not. No intent for terminalID (an agent
 // launch not started through Prepare; this app has none today) means hooks-only composition, no
-// record — §4.4's own explicit fallback.
+// record — the explicit fallback.
 func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, error) {
 	t.mu.Lock()
 	intent, ok := t.pending[terminalID]

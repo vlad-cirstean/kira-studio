@@ -1,10 +1,10 @@
-// Ported from packages/db-fixtures/redis.spec.ts (§9.4), case by case where practical — the spec's own
-// numbering is kept in each test's name so the two can be diffed. §5.4 of
-// docs/HISTORY.md (v1 P58c) names the cases that carry the most weight: hash/set/zset
-// paging asserting "some rows, more to come" rather than an exact count where overshoot is
-// possible, the offset-cursor-restarts-the-scan contract, a vanished key being E_QUERY not
-// E_NOT_FOUND, truncated only when the round cap actually cut a scan short, children() of a key
-// leaf marshalling as [] not null, and cancel being a permanent, honest no-op.
+// Ported from packages/db-fixtures/redis.spec.ts, case by case where practical — the spec's own
+// numbering is kept in each test's name so the two can be diffed. docs/HISTORY.md names the cases
+// that carry the most weight: hash/set/zset paging asserting "some rows, more to come" rather
+// than an exact count where overshoot is possible, the offset-cursor-restarts-the-scan contract,
+// a vanished key being E_QUERY not E_NOT_FOUND, truncated only when the round cap cut a scan short,
+// children() of a key leaf marshalling as [] not null, and cancel being a permanent, honest
+// no-op.
 package redis_test
 
 import (
@@ -294,7 +294,7 @@ func TestRedis_Read_Set(t *testing.T) {
 	}
 }
 
-// P2 R1 regression: a set's per-row display index (its only "field" — a member has no natural
+// Regression: a set's per-row display index (its only "field" — a member has no natural
 // key) is a running total carried across pages, not reset to 0 each call. Without the fix, page 2
 // relabels its rows starting at "0" again, duplicating page 1's own labels instead of continuing
 // from where page 1 left off.
@@ -704,7 +704,7 @@ func TestRedis_Console_CollectionReadsStopAtResultCap(t *testing.T) {
 	}
 }
 
-// P26 §3.6(1): Redis is the only adapter whose read-only enforcement is per-command, resolved
+// Redis is the only adapter whose read-only enforcement is per-command, resolved
 // against the server's own COMMAND table (client.go's isReadOnlyCommand, console.go:132) — a
 // genuinely non-obvious mechanism with no container-backed test at all before this (console_test.go
 // is 70 lines of tokenizer unit tests only).

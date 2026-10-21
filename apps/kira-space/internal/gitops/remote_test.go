@@ -7,7 +7,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitops"
 )
 
-// TestPullConfigArgs_EscapesBranchName is P108 Part 15 F5's own regression proof: an unescaped
+// TestPullConfigArgs_EscapesBranchName is the regression proof: an unescaped
 // branch name spliced into the `--get-regexp` pattern either silently matched the wrong key (an
 // ERE metacharacter widens/narrows the match) or made `git config` exit 6 ("invalid key pattern")
 // on an unbalanced one — a legal git refname either way.

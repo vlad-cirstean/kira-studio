@@ -13,7 +13,7 @@ import (
 
 // dataFakeAdapter is a fuller test double than host_test.go's fakeAdapter: every method the
 // dispatcher can reach is overridable, so a test can assert both what was called and how many
-// times. readCalls is atomic (P2 R1: a concurrency test now calls Read() from many goroutines at
+// times. readCalls is atomic (a concurrency test now calls Read() from many goroutines at
 // once against one shared fake).
 type dataFakeAdapter struct {
 	adapters.Adapter
@@ -57,7 +57,7 @@ func readReq(pageSize int) ReadRequestWire {
 // A cache miss runs the op (adapter.Read called, op:start/op:end emitted) and stores the result; a
 // repeat of the exact same request is then a cache hit — server not touched again, and (the load-
 // bearing assertion) no new op:start/op:end pair is emitted, because "a cache hit is not a
-// database operation" (P1/P2's contract: it must not appear in the op log).
+// database operation" (the contract: it must not appear in the op log).
 func TestDispatcher_Read_CacheAsideDiscipline(t *testing.T) {
 	d, host := newDispatcher()
 	fake := &dataFakeAdapter{readFn: func() (page.Page, error) {
@@ -130,7 +130,7 @@ func TestDispatcher_Mutate_InvalidatesEvenOnFailure(t *testing.T) {
 	}
 }
 
-// F4 (P108 Part 6): a Read whose cache miss is still in flight when a concurrent mutation
+// A Read whose cache miss is still in flight when a concurrent mutation
 // invalidates its exact target must not cache its own now-stale, pre-invalidation result once it
 // finally returns. Genuinely concurrent (a real goroutine race, not a simulated ordering) —
 // confirmed hanging on nothing pre-fix but *failing* the final assertion pre-fix via a scoped

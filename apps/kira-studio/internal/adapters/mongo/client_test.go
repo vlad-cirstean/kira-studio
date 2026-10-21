@@ -2,10 +2,9 @@ package mongo
 
 import "testing"
 
-// P21 round 1 architecture/security finding 2: require/prefer used to map to
-// InsecureSkipVerify:true, with no native MongoDB convention to justify it — an open question
-// P32 raised but never closed. require/prefer/verify-full now all verify, matching the Kafka
-// adapter; verify-none/insecure is the new explicit opt-out.
+// require/prefer used to map to InsecureSkipVerify:true, with no native MongoDB convention to
+// justify it. require/prefer/verify-full now all verify, matching the Kafka adapter;
+// verify-none/insecure is the new explicit opt-out.
 func TestTLSConfigForSslmode(t *testing.T) {
 	for _, mode := range []string{"require", "prefer", "verify-full"} {
 		t.Run(mode+" verifies", func(t *testing.T) {

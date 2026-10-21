@@ -18,8 +18,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// CodeWorkspaceService is C5 §3.3's whole bound surface: repo import/rename/remove, the two read
-// primitives (ListFiles, ReadFile), and OpenWorkspace/CloseWorkspace/ReadDiff. §11's read-only
+// CodeWorkspaceService is the whole bound surface: repo import/rename/remove, the two read
+// primitives (ListFiles, ReadFile), and OpenWorkspace/CloseWorkspace/ReadDiff. The read-only
 // guarantee is unchanged — no method in this file writes into a repository's working tree, and
 // every git invocation below goes through internal/codeworkspace, which builds every Spec with
 // ReadOnly: true.
@@ -87,7 +87,7 @@ func (s *CodeWorkspaceService) gitPathSetting() string {
 
 // session resolves id's own code_repos row into an internal/codeworkspace.Session, ready for a
 // ListFiles/ReadFile/ReadDiff call — re-resolved on every request (Registry.Open now reuses a live
-// session when nothing that matters changed, §2/C6 §3.2) rather than trusting a cached session this
+// session when nothing that matters changed) rather than trusting a cached session this
 // method never re-checked against a stale git.path.
 func (s *CodeWorkspaceService) session(ctx context.Context, id string) (*codeworkspace.Session, *model.CodeRepo, error) {
 	repo, err := s.Deps.Repos.CodeRepos.Get(id)
@@ -129,8 +129,8 @@ type CodeRepoHead struct {
 // per-repository read-pool ceiling, applied here across repositories instead of within one.
 const repoHeadsConcurrency = 4
 
-// RepoHeads answers every imported repository's checked-out branch in one batched call (P83 plan
-// §12.2) — GitPanel.vue's own repo-row label, one round trip regardless of row count rather than
+// RepoHeads answers every imported repository's checked-out branch in one batched call —
+// GitPanel.vue's own repo-row label, one round trip regardless of row count rather than
 // one bound call per row. Reuses gitclient.ResolveHead (repo.go:251) unchanged; no new git-side
 // code. A row whose repository can no longer be read (removed from disk, permission denied)
 // resolves to {Head: nil, Error: …} rather than failing the whole call.
@@ -181,9 +181,9 @@ func (s *CodeWorkspaceService) RepoHeads(ctx context.Context, args CodeRepoHeads
 }
 
 // CodeRepoWorktreeLink is one repository row's place in the panel's own list: ParentID names the
-// row it nests under (P84 plan §3's anchor), empty when it is a top-level repository. Error names
-// why a row could not be read — a row whose worktree is gone from disk keeps ParentID empty and
-// stays top-level, the safe default.
+// row it nests under, empty when it is a top-level repository. Error names why a row could not be
+// read — a row whose worktree is gone from disk keeps ParentID empty and stays top-level, the safe
+// default.
 type CodeRepoWorktreeLink struct {
 	ID       string `json:"id"`
 	ParentID string `json:"parentId"`
@@ -191,7 +191,7 @@ type CodeRepoWorktreeLink struct {
 }
 
 // RepoWorktreeLinks groups every imported repository by its `--git-common-dir` and answers each
-// row's anchor (P84 plan §3/§4.2) — GitPanel.vue's dedup filter: a row with a non-empty ParentID
+// row's anchor — GitPanel.vue's dedup filter: a row with a non-empty ParentID
 // never renders at the top level, only nested under its anchor's twisty. No args: both callers
 // (the panel's onMounted and its records watcher) refresh the whole list, the same shape ListRepos
 // already uses.
@@ -251,7 +251,7 @@ func (s *CodeWorkspaceService) RepoWorktreeLinks(ctx context.Context) ([]CodeRep
 	}
 
 	// Group by commonDir, skipping errored or bare (commonDir == "") rows, then pick each group's
-	// anchor per §3: the row that is not a linked worktree if the group has one (there is at most
+	// anchor: the row that is not a linked worktree if the group has one (there is at most
 	// one, since only a main worktree's gitDir equals its own commonDir), otherwise the smallest
 	// (sortOrder, createdAt, id) — which repos' own sort above already put first in each group.
 	groups := make(map[string][]int)
@@ -280,8 +280,8 @@ func (s *CodeWorkspaceService) RepoWorktreeLinks(ctx context.Context) ([]CodeRep
 }
 
 // ImportRepo identifies path via gitclient.Identify and stores it as a code_repos row — a plain
-// E_BAD_REQUEST for a bare repository (no worktree to browse) or a path that isn't a git repository at
-// all, per §3.3's own contract; a friendlier E_ALREADY_IMPORTED than the UNIQUE index's own
+// E_BAD_REQUEST for a bare repository (no worktree to browse) or a path that isn't a git
+// repository at all; a friendlier E_ALREADY_IMPORTED than the UNIQUE index's own
 // constraint-violation text when repo_id is already stored.
 func (s *CodeWorkspaceService) ImportRepo(ctx context.Context, args CodeWorkspaceImportArgs) (model.CodeRepo, error) {
 	if args.Path == "" {
@@ -497,7 +497,7 @@ type CodeSearchEventErr struct {
 
 // CodeSearchEvent is ChannelCodeSearch's own payload (packages/shared/domain/repo.ts's
 // codeSearchEventSchema, field for field) — one coalesced batch of a repository-wide search's
-// file groups. seq is the index of the first file group in this batch (D11: the renderer merges
+// file groups. seq is the index of the first file group in this batch (the renderer merges
 // by path, not by seq, but the field stays for the same future-reviewer-detects-a-gap reason
 // GrpcCallEvent's own seq exists); stats/error are set only on the terminal event.
 type CodeSearchEvent struct {
@@ -516,7 +516,7 @@ type searchCoalescerFinal struct {
 }
 
 // searchCoalescer is grpcCoalescer's own rules (bridge/grpc.go), both now thin wrappers around
-// appevent.Coalescer (P107 T2-7), with one difference: it flushes on an accumulated *match* count
+// appevent.Coalescer, with one difference: it flushes on an accumulated *match* count
 // across possibly many file groups, not a message count, since one file group can itself carry up
 // to MaxMatchesPerFile matches — expressed here as the generic Coalescer's own sizeOf function. It
 // also tracks nextSeq itself, the same way grpcCoalescer does, since only these two need it.
@@ -610,7 +610,7 @@ func (s *CodeWorkspaceService) StartSearch(ctx context.Context, args CodeWorkspa
 
 	go func() {
 		stats, err := codeworkspace.Search(searchCtx, sess, req, coalescer.push)
-		// C14-7: CancelSearch (the panel's own Stop button) cancels searchCtx, which
+		// CancelSearch (the panel's own Stop button) cancels searchCtx, which
 		// codeworkspace.Search surfaces as ctx.Err() == context.Canceled -- a clean, user-requested
 		// stop, not a failure. Rendering it as an E_INTERNAL error banner hid the partial-results
 		// summary line and made stopping a search look like it had failed. Session.Close ends
@@ -626,7 +626,7 @@ func (s *CodeWorkspaceService) StartSearch(ctx context.Context, args CodeWorkspa
 	return CodeWorkspaceSearchHandle{SearchID: searchID}, nil
 }
 
-// CancelSearch stops args.ID's own in-flight search (D8: the workspace's one search, never a
+// CancelSearch stops args.ID's own in-flight search (the workspace's one search, never a
 // specific search id — the renderer always means "stop what this panel is running"). Uses
 // Registry.Peek rather than s.session(): a search can only be running for a workspace that
 // already opened a session (StartSearch itself resolved one), so this must not create a fresh one

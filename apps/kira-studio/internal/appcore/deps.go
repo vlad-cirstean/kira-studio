@@ -28,11 +28,11 @@ import (
 type Emitter = appevent.Emitter
 
 // Deps is embedded by value into every bound service struct, matching src/main/ipc/deps.ts's
-// IpcDeps shape as closely as each phase's scope allows. P52's deps.ts row also lists Secrets and
+// IpcDeps shape as closely as each phase's scope allows. The deps.ts row also lists Secrets and
 // Log; neither is added here: the cipher reaches the bridge through Connections.SecretsStatus()
-// exactly as ipc/connections.ts:44 does today, and logging is slog.Default() (P53's seam, backed
-// by internal/logging since P55 M0). internal/oplog and the metrics ticker have no bridge service
-// yet (P55 §6.1, §7) so they are wired directly in main.go, not carried here.
+// exactly as ipc/connections.ts:44 does today, and logging is slog.Default() (backed by
+// internal/logging). internal/oplog and the metrics ticker have no bridge service yet so they
+// are wired directly in main.go, not carried here.
 type Deps struct {
 	// Prompts resolves the editable LLM prompt texts.
 	Prompts llmprompts.Source
@@ -46,8 +46,8 @@ type Deps struct {
 	Tree        *tree.Service
 	Router      *adapterhost.Router // PushCacheConfig's Go-side half (bridge/settings.go); A17
 	Events      Emitter
-	// ApiVars (P12 D3: renamed from HttpVars — it resolves gRPC targets too) is P5 D19 — the
-	// gated variable/history reveal and stage 2 of the two-stage {{name}} substitution
+	// ApiVars (it resolves gRPC targets too) is the gated variable/history reveal and stage 2 of
+	// the two-stage {{name}} substitution
 	// (bridge/http.go's Send calls ResolveRequest directly; every other VariablesService method
 	// wraps Repos.Variables instead, the same split CollectionsService already has between
 	// Repos.Collections and nothing else).

@@ -8,14 +8,14 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpath"
 )
 
-// InventoryFormat is BranchInventory's own for-each-ref format (P129 Part 2 §3): refname, tip,
+// InventoryFormat is BranchInventory's own for-each-ref format: refname, tip,
 // committer date, author identity, worktree path (empty for a review branch that only exists on the
-// remote) and upstream tracking, %00-delimited — RefsFormat's own reasoning applies verbatim (NUL is
-// the one byte git guarantees never appears inside a field value). NUL-terminated per field and framed
-// by field count (splitNULRecords): %(worktreepath) can carry a raw newline.
+// remote) and upstream tracking, %00-delimited — RefsFormat's own reasoning applies verbatim
+// (NUL is the one byte git guarantees never appears inside a field value). NUL-terminated per
+// field and framed by field count (splitNULRecords): %(worktreepath) can carry a raw newline.
 // authoremail uses the :trim modifier -- %(authoremail) alone prints the raw "<addr>" envelope
 // (angle brackets included), which would never match a plain `git config user.email` read and so
-// would silently defeat every isMine comparison this format exists to feed (§0.11).
+// would silently defeat every isMine comparison this format exists to feed.
 const InventoryFormat = "%(refname)%00%(objectname)%00%(committerdate:unix)%00%(authorname)%00" +
 	"%(authoremail:trim)%00%(worktreepath)%00%(upstream)%00%(upstream:track)%00"
 
@@ -49,7 +49,7 @@ type InventoryRef struct {
 // splitInventoryRef mirrors classifyRef's own refs/heads-vs-refs/remotes split, but additionally
 // peels a remote-tracking ref's own leading remote name off its short name (classifyRef's
 // "remoteBranch" shortName keeps it on, the shape refs.list's own wire wants; BranchInventory's
-// callers want the same short name space local and remote-only branches ever key on, §0.14).
+// callers want the same short name space local and remote-only branches ever key on).
 func splitInventoryRef(refname string) (short, remote string) {
 	switch {
 	case strings.HasPrefix(refname, "refs/heads/"):

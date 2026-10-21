@@ -29,8 +29,8 @@ const (
 // buildConfig is client.ts's buildClientConfig.
 func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(level, message string)) (*pgx.ConnConfig, error) {
 	var connConfig *pgx.ConnConfig
-	// overrode tracks whether this function itself set Host/Port/TLSConfig on connConfig (finding
-	// F6): pgx.ParseConfig's own default sslmode=prefer builds a TLS-primary + plaintext-fallback
+	// overrode tracks whether this function itself set Host/Port/TLSConfig on connConfig:
+	// pgx.ParseConfig's own default sslmode=prefer builds a TLS-primary + plaintext-fallback
 	// pair, each carrying its own Host/Port pulled from PG* environment variables when parsing an
 	// empty connection string — an override below only ever touches the primary, never a Fallbacks
 	// entry, so without also clearing Fallbacks, pgconn.ConnectConfig's own retry-on-any-non-auth-
@@ -71,7 +71,7 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 	case cfg.Database != nil && *cfg.Database != "":
 		connConfig.Database = *cfg.Database
 	case connConfig.Database == "":
-		// P24: no explicit database anywhere (cfg.Database blank, and neither the URI's own path
+		// No explicit database anywhere (cfg.Database blank, and neither the URI's own path
 		// nor pgx.ParseConfig("")'s PGDATABASE fallback supplied one). Left alone, the Postgres
 		// wire protocol defaults an omitted "database" startup parameter to the connecting
 		// *user* name (pgconn's own SendStartupMessage — client.go's non-URI branch above never
@@ -79,7 +79,8 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 		// any real least-privilege role whose name doesn't happen to match an existing database.
 		// "postgres" is the maintenance database every real server ships with, and the sane
 		// bootstrap target anyway: this connection's whole point is to enumerate every database
-		// on the server (docs/ARCHITECTURE.md's PostgreSQL / MariaDB / MySQL section, database -> schema -> table), not
+		// on the server (docs/ARCHITECTURE.md's PostgreSQL / MariaDB / MySQL section, database ->
+		// schema -> table), not
 		// to land in one particular one.
 		connConfig.Database = "postgres"
 	}
@@ -105,7 +106,7 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 		case "verify-full":
 			connConfig.TLSConfig = &tls.Config{ServerName: connConfig.Host}
 			overrode = true
-		// P21 round 2 architecture/security finding 7: pgx.ParseConfig already resolves
+		// pgx.ParseConfig already resolves
 		// verify-ca correctly from a URI's own ?sslmode= (libpq's "verify the CA chain but not
 		// the hostname" — the standard case for an internal CA or an IP-addressed host), but this
 		// Options-driven override then re-read the same value and hit the default branch,
@@ -165,7 +166,7 @@ type trackedConn struct {
 // track registers one RunWithAbortRace background goroutine against this connection's own entry.
 // Call synchronously, at the same point a TrackQuery closure is called — before
 // adapters.RunWithAbortRace's own goroutine starts — and compose the returned done into whatever
-// release RunWithAbortRace already calls once that goroutine actually finishes (never only on the
+// release RunWithAbortRace already calls once that goroutine finishes (never only on the
 // caller's own ctx.Done()).
 func (c *trackedConn) track() (done func()) {
 	return c.entry.guard.Track()
@@ -177,9 +178,9 @@ func (c *trackedConn) running() RunningQuery {
 }
 
 // waitInFlight blocks until every RunWithAbortRace goroutine track() has registered against this
-// connection has actually finished touching it. A detached cleanup statement (mutate's own
+// connection has finished touching it. A detached cleanup statement (mutate's own
 // ROLLBACK, console's read-only-wrap COMMIT) calls this immediately before its own conn.Exec, so it
-// never races a just-aborted op's background goroutine still using the same *pgx.Conn (F2).
+// never races a just-aborted op's background goroutine still using the same *pgx.Conn.
 func (c *trackedConn) waitInFlight() {
 	c.entry.guard.WaitInFlight()
 }
@@ -208,10 +209,10 @@ func verifyChainSkipHostname(rawCerts [][]byte, roots *x509.CertPool) error {
 	return err
 }
 
-// ConnSet is client.ts's ClientSet — misleadingly-named "Pool" avoided on purpose (D14): one
+// ConnSet is client.ts's ClientSet — misleadingly-named "Pool" avoided on purpose: one
 // *pgx.Conn per (connection, database), never a pool, because pg_cancel_backend needs a known
 // backend pid and a pool does not reliably tell you which backend ran your query. The LRU pool
-// with single-flight dial (P21 round 2 performance finding 4) is adapters.ConnSet — only Dial and
+// with single-flight dial is adapters.ConnSet — only Dial and
 // the eviction Close stay dialect-specific here.
 type ConnSet struct {
 	cfg model.ResolvedConnectionConfig
@@ -234,9 +235,9 @@ func NewConnSet(cfg model.ResolvedConnectionConfig, log func(level, message stri
 			}
 			return s.dial(ctx, database)
 		},
-		// P2 R2: the victim's own per-connection lock (held for its entire in-flight op) is taken
+		// The victim's own per-connection lock (held for its entire in-flight op) is taken
 		// here, not inside adapters.ConnSet — the pool's own mu is already released by the time
-		// Close runs (see adapters.ConnSet.Get's own doc comment). F6: the wait is bounded; a
+		// Close runs (see adapters.ConnSet.Get's own doc comment). The wait is bounded; a
 		// holder stuck on a dead socket gets the socket closed under it instead.
 		Close: func(ctx context.Context, e *connEntry) {
 			e.guard.CloseWithin(ctx, closeGrace, func() { _ = e.conn.Close(ctx) }, func() { _ = e.conn.PgConn().Conn().Close() })
@@ -286,7 +287,7 @@ func (s *ConnSet) dial(ctx context.Context, database string) (*connEntry, error)
 // per-connection lock get's own doc comment describes, for the caller's own entire op, not just one
 // statement: a mutate's BEGIN…COMMIT or a console "run all" must keep any concurrent op off this
 // same conn for its whole duration, not just between individual statements, or a racing Read could
-// execute inside the open transaction (P2 R2).
+// execute inside the open transaction.
 func (s *ConnSet) Acquire(ctx context.Context, database string) (*trackedConn, func(), error) {
 	key := database
 	if key == "" {
@@ -300,7 +301,7 @@ func (s *ConnSet) Acquire(ctx context.Context, database string) (*trackedConn, f
 		if err := entry.guard.Lock(ctx); err != nil {
 			return nil, nil, err
 		}
-		// F3: an LRU eviction's own Close (adapters.ConnSet.Get's own doc comment) contends for this
+		// An LRU eviction's own Close (adapters.ConnSet.Get's own doc comment) contends for this
 		// same entry.mu, so it may already have closed entry.conn by the time this Lock succeeds.
 		// Re-check that entry is still the set's own live entry for key before trusting it — retry
 		// from the top (a fresh Get, dialing again if nothing else raced in first) rather than hand

@@ -8,7 +8,7 @@ import (
 )
 
 // White-box (package mongo) allocation benchmark for the id/body EJSON conversion in readPage's
-// row loop — task #96 (P2 R2). The old path decoded every returned document's wire bytes into a
+// row loop. The old path decoded every returned document's wire bytes into a
 // full bson.D tree (a reflection-driven per-field type dispatch) only to walk that tree again to
 // produce EJSON text; the fix (this package's read.go) keeps each document as bson.Raw — the
 // driver's own wire bytes — and lets bson.MarshalExtJSON's raw-value codec stream those bytes

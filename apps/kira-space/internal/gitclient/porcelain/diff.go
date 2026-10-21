@@ -7,9 +7,9 @@ import (
 	"strconv"
 )
 
-// FileDiffArgs is one file's unified patch, from a commit against a chosen parent (probe P2's own
-// pathspec rule: originalPath must be named alongside path for a rename to render as a rename
-// rather than a whole-file add). from == nil selects a root commit's diff against the empty tree.
+// FileDiffArgs is one file's unified patch, from a commit against a chosen parent (pathspec rule:
+// originalPath must be named alongside path for a rename to render as a rename rather than a
+// whole-file add). from == nil selects a root commit's diff against the empty tree.
 // No --no-optional-locks here — buildArgv already places it at git level for a ReadOnly spec.
 func FileDiffArgs(from *string, to, path string, originalPath *string) []string {
 	args := []string{
@@ -26,9 +26,9 @@ func FileDiffArgs(from *string, to, path string, originalPath *string) []string 
 	return args
 }
 
-// WorktreeDiffArgs is the drift re-map's own spawn (D4/D8): rev's version of path against the
+// WorktreeDiffArgs is the drift re-map's own spawn: rev's version of path against the
 // working tree, renames turned off (a re-map only ever tracks one path, never a rename it did not
-// ask about). Probe P6: no --no-optional-locks — after the subcommand it is git-level only and
+// ask about). No --no-optional-locks — after the subcommand it is git-level only and
 // exits 129; buildArgv already places it correctly ahead of "diff".
 func WorktreeDiffArgs(rev, path string) []string {
 	return []string{
@@ -66,8 +66,8 @@ type DiffHunk struct {
 	Lines    []DiffLine `json:"lines"`
 }
 
-// ParsedBodyKind is ParsedBody's own discriminant — a narrower set than the wire's FileDiffBody
-// (D5's §3.2 note): the binary arm here carries object ids, not byte sizes, and there is no
+// ParsedBodyKind is ParsedBody's own discriminant — a narrower set than the wire's FileDiffBody:
+// the binary arm here carries object ids, not byte sizes, and there is no
 // tooLarge arm at all — both are decisions only gitsession.FileDiff (which owns the cat-file round
 // trip and the size cap) can make.
 type ParsedBodyKind string
@@ -111,9 +111,9 @@ const (
 	BodyEmpty      FileDiffBodyKind = "empty"
 )
 
-// FileDiffBody mirrors @kira/git-ipc's own FileDiffBody union (D5): one Go struct with a Kind
+// FileDiffBody mirrors @kira/git-ipc's own FileDiffBody union: one Go struct with a Kind
 // discriminant and omitempty on every arm's own fields — the UI switches on kind and reads only
-// that arm. gitsession.RepoEntry.FileDiff is what actually produces one (the binary arm's byte
+// that arm. gitsession.RepoEntry.FileDiff is what produces one (the binary arm's byte
 // counts come from a cat-file round trip this package has no business doing, and the tooLarge arm
 // is a cap this package never enforces) — ParseFileDiffBody itself returns the narrower ParsedBody.
 type FileDiffBody struct {
@@ -297,7 +297,7 @@ func parseOneHunk(m [][]byte, rest [][]byte) (DiffHunk, int, error) {
 		if oldSeen >= oldLines && newSeen >= newLines {
 			break
 		}
-		// F4: diff.suppressBlankEmpty=true (verified against real git 2.43) makes git print a
+		// diff.suppressBlankEmpty=true (verified against real git 2.43) makes git print a
 		// bare empty line for a blank CONTEXT line instead of the usual " " prefix.
 		// configOverrides now forces this setting off explicitly for every spawn; tolerated here
 		// too, as defense in depth, in case a differently-configured git ever reaches this parser

@@ -6,7 +6,7 @@ import (
 )
 
 // Dialogs adapts repo-root internal/shell.Dialogs' plain-parameter OpenDirectory to this app's
-// own bound-service bridge.Dialogs interface (P103 Part 3, trimmed to the one method this app
+// own bound-service bridge.Dialogs interface (trimmed to the one method this app
 // calls) — bridge.OpenDirectoryRequest is a Wails-bound service parameter type, so it stays here,
 // destructured into shell.Dialogs' plain-parameter call, rather than moving into the shared
 // package.

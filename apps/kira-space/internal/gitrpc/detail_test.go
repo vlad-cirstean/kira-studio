@@ -14,7 +14,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 )
 
-// G30 round-1 architecture/security review, finding #2: `file.goToTarget`'s `rev` reached
+// `file.goToTarget`'s `rev` reached
 // `git diff <rev> -- <path>` (WorktreeDiffArgs) as a bare argv token in an option-consuming
 // position, unguarded beyond non-empty — a rev of "--output=<path>" makes `git diff` write
 // (truncate/overwrite) an arbitrary file rather than erroring. `file.read`'s `rev` has the same

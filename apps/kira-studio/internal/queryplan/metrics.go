@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// decodeRawObject decodes raw as a JSON object into a map of its own raw field values — §2.3's
+// decodeRawObject decodes raw as a JSON object into a map of its own raw field values — the
 // "once into map[string]json.RawMessage" half of each parser's double decode. A non-object (or
 // invalid JSON) yields an empty map rather than an error: a parser's caller has already committed
 // to parsing raw as this dialect's plan, and a malformed sub-object should cost that one node's
@@ -91,7 +91,7 @@ func formatJSNumber(n float64) string {
 }
 
 // collectMetrics ports every parser's own metricsFrom/tableMetrics loop: every key of raw not in
-// typedKeys becomes one Metric, sorted by label (§2.3 — the order Object.entries would have
+// typedKeys becomes one Metric, sorted by label (the order Object.entries would have
 // produced is not reproducible from a Go map, so this is the one difference the fixtures
 // deliberately do not pin).
 func collectMetrics(raw map[string]json.RawMessage, typedKeys map[string]bool) []Metric {

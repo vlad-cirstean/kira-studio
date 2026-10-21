@@ -7,8 +7,8 @@ import (
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
-// ErrorCode is httpclient's own closed error vocabulary — deliberately not adapters.ErrorCode
-// (P2 D8): that set's own comment forbids additions without a matching renderer change, and
+// ErrorCode is httpclient's own closed error vocabulary — deliberately not adapters.ErrorCode:
+// that set's own comment forbids additions without a matching renderer change, and
 // reusing e.g. E_CONNECT for a refused TCP connection would make views/shared/viewOp.ts's
 // DISCONNECTED_CODES classify an HTTP transport failure as "the database connection is gone" and
 // pop a Reconnect gate over a tab that has no connection to reconnect. bridge/http.go maps these
@@ -36,7 +36,7 @@ type Error struct {
 	Code    ErrorCode
 	Message string
 	Cause   error
-	// Timeline is P10 D15's own addition: what was measured before the send failed — non-nil only
+	// Timeline: what was measured before the send failed — non-nil only
 	// for a failure classifySendErr produces (a transport failure or a body-read failure), since
 	// only those run after newTimeline has installed a trace. Every other Error (a bad URL, an
 	// unsupported method) fails before a send is ever attempted, and leaves this nil.

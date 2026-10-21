@@ -39,9 +39,9 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// Ported from packages/db-fixtures/postgres.spec.ts (§9.1), case by case where practical — the spec's own
+// Ported from packages/db-fixtures/postgres.spec.ts, case by case where practical — the spec's own
 // numbering is kept in each test's name so the two can be diffed. Not every one of the 34 TS
-// cases has a Go twin; the ones ported are the load-bearing behaviours D12's own "adapter-first-
+// cases has a Go twin; the ones ported are the load-bearing behaviours the "adapter-first-
 // test-first" rule exists to protect: connect/disconnect lifecycle, the catalog->tree mapping,
 // quoting, describe, cancellation, all three pagination shapes, mutate's transactionality, and
 // execute's batch semantics.
@@ -129,7 +129,7 @@ func TestPostgres_AuthFailure(t *testing.T) {
 	}
 }
 
-// F1: a probe-query failure after a successful auth must not deadlock Connect. The probe runs
+// A probe-query failure after a successful auth must not deadlock Connect. The probe runs
 // while still holding connSet's primary connEntry lock (acquired by connSet.Primary); the
 // error-handling path used to call Disconnect synchronously from the same call frame, which
 // re-locks that same non-reentrant mutex via ConnSet.CloseAll and hangs forever. Reproduced here
@@ -203,15 +203,14 @@ func TestPostgres_ConnectProbeFailureDoesNotDeadlock(t *testing.T) {
 	}
 }
 
-// 2a. P24: a fields-mode connection with no `database` (Validate, input.go, never requires one for
+// A fields-mode connection with no `database` (Validate, input.go, never requires one for
 // a non-file kind) must still connect — before client.go's buildConfig defaulted the primary
 // connection's database, an empty `database` left the Postgres wire protocol's own "database"
 // startup parameter unset, which the server defaults to the connecting *user* name (not something
 // this app ever chose) — a real least-privilege role's own name essentially never matches an
 // existing database, so this failed every such connection with FATAL 3D000 "database \"<user>\"
 // does not exist", surfacing as a plain E_QUERY that read exactly like the user-reported "fails to
-// authenticate". Reproduced against a real container before the fix (a role granted CONNECT on
-// kira_test only, no same-named database) and confirmed fixed after.
+// authenticate".
 func TestPostgres_ConnectWithNoDatabaseDefaultsToMaintenanceDB(t *testing.T) {
 	fixture := testsupport.StartPostgres(t)
 	a := newAdapter(t)
@@ -608,10 +607,11 @@ func TestPostgres_ReadKeysetForwardBackward(t *testing.T) {
 		t.Errorf("page-before's first id = %v, want 1 (display order preserved)", backFirstID)
 	}
 
-	// P2 R1 regression: a "before" page is fetched in descending (fetch) order and reversed to
+	// A "before" page is fetched in descending (fetch) order and reversed to
 	// ascending (display) order — the streaming readPage must swap its tracked first/last raw rows
-	// along with builder.Reverse(), or this page's own NextToken (built from CellAt(rowCount-1,...),
-	// the last *displayed* row) would be built from the wrong row's keyset value entirely.
+	// along with builder.Reverse(), or this page's own NextToken (built from
+	// CellAt(rowCount-1,...), the last *displayed* row) would be built from the wrong row's keyset
+	// value entirely.
 	if backPage.Position.NextToken == nil {
 		t.Fatal("expected a NextToken on the page-before result")
 	}
@@ -690,11 +690,11 @@ func TestPostgres_ReadKeysetBinaryPrimaryKey(t *testing.T) {
 	}
 }
 
-// P2 R2 (task #89): sorting by a nullable column must never be granted keyset pagination, even
+// Sorting by a nullable column must never be granted keyset pagination, even
 // when a non-nullable tiebreaker (id) is available — customers.region_id has no NOT NULL
-// constraint (packages/db-fixtures/fixtures/0001_seed.sql), so a naive grant here would risk either dropping
-// any future NULL-region customer from every keyset page forever, or hard-failing a page whose
-// boundary row has a NULL region_id. Falling back to offset pagination sidesteps both failure
+// constraint (packages/db-fixtures/fixtures/0001_seed.sql), so a naive grant here would risk either
+// dropping any future NULL-region customer from every keyset page forever, or hard-failing a page
+// whose boundary row has a NULL region_id. Falling back to offset pagination sidesteps both failure
 // modes; RowCount must still see every customer, not just the ones with a non-NULL region_id.
 func TestPostgres_ReadSortByNullableColumnFallsBackToOffset(t *testing.T) {
 	fixture := testsupport.StartPostgres(t)
@@ -794,7 +794,7 @@ func TestPostgres_ReadOnlyConnectionCannotWrite(t *testing.T) {
 	}
 }
 
-// P2 R2: client.go's own SET default_transaction_read_only=on only governs the *next*
+// client.go's own SET default_transaction_read_only=on only governs the *next*
 // transaction, not the current one — a console statement can flip it back (or, on Postgres
 // specifically, use SET TRANSACTION READ WRITE to flip the current transaction's own mode) and
 // have a later statement in the same batch run writable. Confirmed against a real server before
@@ -812,7 +812,7 @@ func TestPostgres_ReadOnlyConnectionExecuteCannotEscapeReadOnlyTransaction(t *te
 
 	// Targets order_items rather than customers: customers is referenced by orders' own FK, so a
 	// DELETE against it fails with a foreign-key error regardless of read-only enforcement — a
-	// false pass that doesn't actually exercise the guard. order_items has no dependents, so a
+	// false pass that doesn't exercise the guard. order_items has no dependents, so a
 	// DELETE against it only fails if the read-only guard itself is doing its job.
 	before, err := a.Count(context.Background(), adapters.CountRequest{
 		Path: nodePath(fixture, seg("database", "kira_test"), seg("schema", "app"), seg("table", "order_items")),
@@ -831,7 +831,7 @@ func TestPostgres_ReadOnlyConnectionExecuteCannotEscapeReadOnlyTransaction(t *te
 		// Review finding, case 1: naming the GUC directly (no "READ WRITE" phrase anywhere) —
 		// confirmed against a real server before the fix that this deleted every row.
 		{"SET transaction_read_only = off", "DELETE FROM app.order_items"},
-		// Review finding, case 2: the batch's own COMMIT ends the wrapping read-only transaction,
+		// The batch's own COMMIT ends the wrapping read-only transaction,
 		// after which SET SESSION took effect immediately for the plain-autocommit write that
 		// followed — confirmed not to escape on postgres specifically (see errors.go's
 		// endsTransaction doc comment), but rejected unconditionally regardless of engine.
@@ -1111,13 +1111,12 @@ func TestPostgres_MutateDeleteRemovesTheRow(t *testing.T) {
 	}
 }
 
-// P2 R2: pgx.Conn is not safe for concurrent use, but nothing above the adapter serializes ops
+// pgx.Conn is not safe for concurrent use, but nothing above the adapter serializes ops
 // against the same connection — adapterhost dispatches every inbound frame on its own goroutine.
 // Two goroutines hammering one Adapter with real Reads and Mutates is exactly the scenario
 // ConnSet.Acquire's own per-connection lock exists to serialize; `go test -race` (this repo's own
-// bar for concurrency fixes, not plain `go test`) is what actually proves it, the same way P58d/P58e
-// prove their own concurrency fixes — a passing functional assertion alone wouldn't catch a data
-// race that merely got lucky this run.
+// bar for concurrency fixes, not plain `go test`) is what proves it — a passing functional
+// assertion alone wouldn't catch a data race that merely got lucky this run.
 func TestPostgres_ConcurrentOpsOnOneConnectionAreSerialized(t *testing.T) {
 	fixture := testsupport.StartPostgres(t)
 	a := connectedAdapter(t, fixture)
@@ -1247,14 +1246,14 @@ func (c flippingCtx) Err() error {
 }
 func (c flippingCtx) Done() <-chan struct{} { return nil }
 
-// P2 R2: a cancellation landing between BEGIN and COMMIT left neither COMMIT nor the compensating
+// A cancellation landing between BEGIN and COMMIT left neither COMMIT nor the compensating
 // ROLLBACK ever reaching the server — both are gated by the same CheckNotStarted check COMMIT
 // itself is, so an already-observed-as-cancelled ctx short-circuits ROLLBACK exactly like it does
 // COMMIT. Because this adapter's *pgx.Conn is pinned for its whole lifetime (not per-op), the
 // server session was then left "idle in transaction" indefinitely: the next Mutate's own BEGIN is a
 // no-op inside that still-open transaction, so its COMMIT silently committed the earlier cancelled
 // write too — worse than a hang. This sweeps every plausible cancellation point and, for whichever
-// ones actually trigger (an error from Mutate), proves the transaction was really rolled back: a
+// ones trigger (an error from Mutate), proves the transaction was rolled back: a
 // clean follow-up Mutate on a different row must succeed quickly and must not also commit the
 // earlier row's cancelled change.
 func TestPostgres_MutateCancelledMidTransactionDoesNotLeakOpenTransaction(t *testing.T) {
@@ -1367,7 +1366,7 @@ func TestPostgres_MutateNoPrimaryKey(t *testing.T) {
 	}
 }
 
-// P2 R1: a bytea column's edited value arrives from the grid still spelled in the app's own
+// A bytea column's edited value arrives from the grid still spelled in the app's own
 // "0x<hex>" display convention (read.go's own normalizeCellText) — Mutate must decode it back
 // into raw bytes before binding it as a parameter, not hand pgx that ASCII text as if it were the
 // new column content (byteain would then store it verbatim in Postgres's own escape format).
@@ -1413,7 +1412,7 @@ func TestPostgres_MutateBinaryColumnRoundTrips(t *testing.T) {
 		t.Errorf("stored bytes = %#v, want %#v (got the display text instead of decoded bytes?)", stored, want)
 	}
 
-	// P2 R1 regression: readPage's per-cell loop reuses the scanned *string directly for every
+	// readPage's per-cell loop reuses the scanned *string directly for every
 	// non-TypeClassBinary column and only allocates a fresh one for TypeClassBinary — get that
 	// column-typeclass check backwards and a bytea cell would render as pgx's raw `\x0405` text
 	// instead of the app's own `0x0405` convention.
@@ -1431,10 +1430,9 @@ func TestPostgres_MutateBinaryColumnRoundTrips(t *testing.T) {
 	}
 }
 
-// P15 C5: the fake-data generator's own batch scale (docs/HISTORY.md (v1.1 P15)) —
-// this belongs under CLAUDE.md's conformance-suite exemption, not the general unit-test bar,
-// because nothing else exercises a multi-row insert plan at anything beyond
-// TestPostgres_MutateRowCountConflictRollsBack's two-op scale.
+// The fake-data generator's own batch scale — this belongs under CLAUDE.md's conformance-suite
+// exemption, not the general unit-test bar, because nothing else exercises a multi-row insert plan
+// at anything beyond TestPostgres_MutateRowCountConflictRollsBack's two-op scale.
 func TestPostgres_MutateBulkInsertPlanCommitsAtomically(t *testing.T) {
 	fixture := testsupport.StartPostgres(t)
 	a := connectedAdapter(t, fixture)

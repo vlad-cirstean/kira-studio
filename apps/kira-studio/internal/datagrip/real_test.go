@@ -5,13 +5,12 @@ import (
 	"testing"
 )
 
-// TestRealDataGripProject is §4.4.3's opt-in check for a machine that actually has DataGrip
+// TestRealDataGripProject is the opt-in check for a machine that has DataGrip
 // installed and a real project to point at — never run in CI, never in this sandbox (no display,
 // DataGrip is commercial). Set KIRA_DATAGRIP_REAL_PROJECT to a real DataGrip project folder (one
-// containing .idea/dataSources.xml) to run it. This is the check that would upgrade §1.10's
+// containing .idea/dataSources.xml) to run it. This is the check that would upgrade the
 // "format read out of the source" into "verified against a real profile" — nothing else in this
-// package's test suite does that, and this phase's own handoff says so plainly rather than
-// implying the synthetic fixtures already covered it.
+// package's test suite does that.
 func TestRealDataGripProject(t *testing.T) {
 	dir := os.Getenv("KIRA_DATAGRIP_REAL_PROJECT")
 	if dir == "" {

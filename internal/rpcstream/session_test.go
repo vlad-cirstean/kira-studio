@@ -95,7 +95,7 @@ func recvFrame(t *testing.T, conn *internalPipeSession) []byte {
 	}
 }
 
-// TestSession_Stream_EmitsBlobAndJSONChunks is D5/§3.6's own proof: a stream handler emitting two
+// TestSession_Stream_EmitsBlobAndJSONChunks is the proof: a stream handler emitting two
 // chunks, one carrying an out-of-band blob and one not, and a fake Conn asserting the exact bytes
 // of both — including that the JSON-only chunk is byte-identical to what encodeBody(env, nil)
 // (and therefore every non-blob frame this package has always sent) produces.
@@ -198,9 +198,9 @@ func TestSession_Stream_EmitsBlobAndJSONChunks(t *testing.T) {
 	}
 }
 
-// TestSession_HandleRequest_OversizeResultAnswersFrameTooLarge is D2a's own proof: a handler
-// whose result encodes larger than MaxFrameBytes must never simply vanish (F8's bug, the response
-// path's own twin of what G3 D5 already fixed for stream chunks) — the client always gets a real
+// TestSession_HandleRequest_OversizeResultAnswersFrameTooLarge is the proof: a handler
+// whose result encodes larger than MaxFrameBytes must never vanish (the bug, the response
+// path's own twin of what was already fixed for stream chunks) — the client always gets a real
 // 'res' frame, carrying E_FRAME_TOO_LARGE instead of the oversize result.
 func TestSession_HandleRequest_OversizeResultAnswersFrameTooLarge(t *testing.T) {
 	conn := newInternalPipeSession()
@@ -240,8 +240,9 @@ func TestSession_HandleRequest_OversizeResultAnswersFrameTooLarge(t *testing.T) 
 }
 
 // sendFrame marshals and delivers one client->server frame through conn.in — the test-side half
-// of the same wire the real client uses, mirroring TestSession_HandleRequest_OversizeResultAnswersFrameTooLarge's
-// own inline construction rather than adding a new helper only these two tests would share.
+// of the same wire the real client uses, mirroring
+// TestSession_HandleRequest_OversizeResultAnswersFrameTooLarge's own inline construction rather
+// than adding a new helper only these two tests would share.
 func sendFrame(t *testing.T, conn *internalPipeSession, version int, f frame) {
 	t.Helper()
 	b, err := json.Marshal(envelope{Version: version, Body: f})
@@ -251,8 +252,8 @@ func sendFrame(t *testing.T, conn *internalPipeSession, version int, f frame) {
 	conn.in <- b
 }
 
-// TestSession_HandleRequest_RejectsReusedInFlightID is G30 round-1 architecture review finding
-// #10's own proof: a 'req' frame reusing an id that is still in flight used to silently overwrite
+// TestSession_HandleRequest_RejectsReusedInFlightID is the proof: a 'req' frame reusing an id that
+// is still in flight used to silently overwrite
 // activeWork[id], orphaning the first request's cancel func and dropping whichever of the two
 // responses lost the removeActiveWork race — the caller waiting on it would hang forever. The
 // second 'req' must now be refused immediately, by its own 'res' frame, without ever starting a

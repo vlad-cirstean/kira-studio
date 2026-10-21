@@ -7,11 +7,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// This file is data-ops.ts's eight request/response wire shapes, plus a Validate() per request
-// (P58 D17): a naive json.Unmarshal is not a substitute for zod's safeParse (P55 §1.6), so every
-// field zod actually constrains here gets its own explicit Go check rather than trusting the
-// decode alone. Field names and JSON keys match data-ops.ts's wire form exactly, byte for byte —
-// this is the payload shape a data-plane frame decodes into on both sides of the wire.
+// This file is data-ops.ts's eight request/response wire shapes, plus a Validate() per request:
+// a naive json.Unmarshal is not a substitute for zod's safeParse, so every field zod constrains
+// here gets its own explicit Go check rather than trusting the decode alone. Field names and JSON
+// keys match data-ops.ts's wire form exactly, byte for byte — this is the payload shape
+// a data-plane frame decodes into on both sides of the wire.
 
 const maxFilterChars = 4096
 

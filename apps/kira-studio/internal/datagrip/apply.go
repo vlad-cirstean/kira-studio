@@ -6,10 +6,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// CreatorInput mirrors connections.Input's exact shape (D3: this package never imports
-// internal/connections, so it cannot reference that type directly — the bridge service adapts
-// this struct into the real connections.Input when it wires the real *connections.Service in as
-// a Creator, a one-line, field-for-field conversion).
+// CreatorInput mirrors connections.Input's exact shape (this package never imports
+// internal/connections, so it cannot reference that type directly — the bridge service adapts this
+// struct into the real connections.Input when it wires the real *connections.Service in as a
+// Creator, a one-line, field-for-field conversion).
 type CreatorInput struct {
 	model.ConnectionFields
 	Password *string
@@ -37,11 +37,11 @@ type Report struct {
 	Rows []ReportRow `json:"rows"`
 }
 
-// Apply is D9's second step. It re-parses the project (Scan's own Preview is never trusted as
+// Apply is the second step. It re-parses the project (Scan's own Preview is never trusted as
 // still current — the files could have changed, and Preview never carried a password anyway),
 // then for each selected uuid resolves fields, resolves the password exactly once, and calls
 // creator.Create. The plaintext exists only inside this call's stack: it is never written into
-// Report, a log line, or any bridge payload (D9). Each row is independent (D8/OQ-5): a failure on
+// Report, a log line, or any bridge payload. Each row is independent: a failure on
 // one row never rolls back another, and the report says per row what happened.
 func Apply(projectDir string, selectedUUIDs []string, secretsAvailable bool, creator Creator) (Report, error) {
 	project, err := ParseProject(projectDir)
@@ -152,11 +152,11 @@ func applyOne(ds DataSource, projectDir string, cfg SecurityConfig, secretsAvail
 // review finding's "never invoked when secretsAvailable is false" regression test hangs off.
 var lookupPasswordFn = lookupPassword
 
-// lookupPassword is D4's (now single-backend) credential fetch for one data source, run once, at
-// Apply time (D9). cfg.Provider is checked directly rather than through LookupOrder, because
+// lookupPassword is the (now single-backend) credential fetch for one data source, run once, at
+// Apply time. cfg.Provider is checked directly rather than through LookupOrder, because
 // KEEPASS and MEMORY_ONLY/DO_NOT_STORE both resolve to "no backend to try" but need different
-// refusals: KEEPASS means a real store exists that this app cannot read (D1: file-based
-// PasswordSafe was scoped out after the keychain-only correction below), while MEMORY_ONLY/
+// refusals: KEEPASS means a real store exists that this app cannot read (file-based
+// PasswordSafe was scoped out), while MEMORY_ONLY/
 // DO_NOT_STORE means DataGrip itself never saved anything.
 func lookupPassword(ds DataSource, cfg SecurityConfig) (password, username string, err error) {
 	if cfg.Provider == "KEEPASS" {

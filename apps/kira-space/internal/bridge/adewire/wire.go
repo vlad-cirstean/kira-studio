@@ -1,5 +1,5 @@
 // Package adewire holds the ADE v2 wire contract: the JSON shapes of AdeTaskService results,
-// arguments and push payloads. Frozen at P143; the TS mirror is frontend/src/ade/v2/wire.ts.
+// arguments and push payloads. The TS mirror is frontend/src/ade/v2/wire.ts.
 // Every field is always present; nullable is a pointer; slices and maps are never nil.
 // Changing a key, type or value set is a contract change.
 package adewire

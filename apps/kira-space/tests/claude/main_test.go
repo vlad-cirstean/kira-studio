@@ -1,7 +1,7 @@
 // Package claude runs Kira Space's Claude Code integrations against the real `claude` CLI. Own Go
 // module, so no default command (`go test ./...`, lint, CI) compiles or runs it. Every test spends
-// real tokens (haiku, tiny prompts, a budget cap). See docs/DEV_ENVIRONMENT.md "Real `claude` tests"
-// for the area-to-command table.
+// real tokens (haiku, tiny prompts, a budget cap). See docs/DEV_ENVIRONMENT.md "Real `claude`
+// tests" for the area-to-command table.
 package claude
 
 import (

@@ -15,8 +15,8 @@ const IdleTTL = 14 * 24 * time.Hour
 const sweepPeriod = time.Hour
 
 // sweepDB deletes every session whose last_used_at is older than now-IdleTTL (the file/range rows
-// go with it through the FK cascade, D4) and, when anything was actually removed, runs an
-// incremental vacuum to make the reclaim real (D11: "_auto_vacuum=INCREMENTAL is what makes the
+// go with it through the FK cascade) and, when anything was removed, runs an
+// incremental vacuum to make the reclaim real ("_auto_vacuum=INCREMENTAL is what makes the
 // reclaim real"). A free function (not a Store method) so ensureOpen can call it directly against
 // the connection it just opened, without re-entering the store's own locking.
 func sweepDB(db *sql.DB, now time.Time) (removed int, err error) {
@@ -47,9 +47,10 @@ func (s *Store) sweep(now time.Time) (int, error) {
 	return sweepDB(db, now)
 }
 
-// Purge is G16's own seam (D20): removes every unpinned row for (repoID, branch) immediately, regardless of
-// idle time (a pinned session survives; SetPinned(false) first) — the eager purge on PR closed/merged, once G16 exists to call it. The sweep calls this
-// same statement in bulk; G16 calls it per (repoID, branch) from its own PR-closed handler.
+// Purge removes every unpinned row for (repoID, branch) immediately, regardless of idle time
+// (a pinned session survives; SetPinned(false) first) — the eager purge on PR closed/merged.
+// The sweep calls this same statement in bulk; the PR-closed handler calls it per (repoID,
+// branch).
 func (s *Store) Purge(ctx context.Context, repoID, branch string) error {
 	db, err := s.conn()
 	if err != nil {
@@ -71,9 +72,9 @@ func (s *Store) Purge(ctx context.Context, repoID, branch string) error {
 	return nil
 }
 
-// Branches is G24 D8's own READ-ONLY seam: every branch with a stored review_session row for
-// repoID — nothing more. This is the one addition G24's own plan permits here (F6, restating G11's
-// own rule at reaper.go: "a G16 that writes its own delete, or its own lifecycle, has gone wrong")
+// Branches is the READ-ONLY seam: every branch with a stored review_session row for repoID —
+// nothing more. This is the one addition permitted here (restating the rule at reaper.go:
+// "a G16 that writes its own delete, or its own lifecycle, has gone wrong")
 // — the eager post-fetch re-resolve pass reads this list to know which branches are even worth
 // re-checking, and then purges through the SAME Purge method above; no new DELETE statement exists
 // anywhere in this file because of this method.
@@ -103,7 +104,7 @@ func (s *Store) Branches(ctx context.Context, repoID string) ([]string, error) {
 }
 
 // startReaperLocked launches the hourly sweep ticker — one goroutine per store, stopped and joined
-// by Close. Not AfterFunc-per-session (D11): there is no per-session object to hang a timer on, and
+// by Close. Not AfterFunc-per-session: there is no per-session object to hang a timer on, and
 // a single ticker over one DELETE is cheaper than N timers regardless. Caller holds openMu (called
 // only from ensureOpen).
 func (s *Store) startReaperLocked() {

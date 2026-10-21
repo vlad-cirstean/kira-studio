@@ -27,10 +27,10 @@ type platformLocator struct {
 	stat     func(string) (os.FileInfo, error)
 }
 
-// NewPlatformLocator returns D3's own probe order: PATH, then /opt/homebrew/bin/gh, then
+// NewPlatformLocator returns the probe order: PATH, then /opt/homebrew/bin/gh, then
 // /usr/local/bin/gh — unlike gitclient's own NewPlatformLocator, this is not gated on
 // runtime.GOOS == "darwin": `gh` has no macOS-only distribution story the way this app's
-// git-discovery chapter does, and the two extra absolute-path candidates are simply skipped (via
+// git-discovery chapter does, and the two extra absolute-path candidates are skipped (via
 // isExecutable's own os.Stat miss) on a platform where they do not exist.
 func NewPlatformLocator() Locator {
 	return &platformLocator{lookPath: exec.LookPath, stat: os.Stat}
@@ -70,7 +70,7 @@ func (realClock) Now() time.Time { return time.Now() }
 // NewRealClock returns the real, time.Now()-backed Clock.
 func NewRealClock() Clock { return realClock{} }
 
-// okTTL/notOKTTL are D3's own asymmetric cache window, keyed per host: five minutes when the last
+// okTTL/notOKTTL are the asymmetric cache window, keyed per host: five minutes when the last
 // probe of that host came back "ok" (a healthy `gh` rarely needs re-checking), thirty seconds when
 // it did not (an unauthenticated or rate-limited state is exactly the kind of thing a user might
 // fix — `gh auth login` in another terminal — and expects this app to notice soon, not five minutes
@@ -121,9 +121,9 @@ func (d *Discovery) Status(ctx context.Context, host string) Status {
 
 	status := d.probe(ctx, host)
 
-	// G31 round-2 architecture/security review, finding #5 (mirror of gitclient's own discovery.go
-	// finding #1, apps/kira-space/internal/gitclient/discovery.go): a caller-cancelled ctx killed
-	// probe's own spawn mid-flight, which used to be indistinguishable from "gh is genuinely
+	// Mirror of gitclient's own discovery.go (apps/kira-space/internal/gitclient/discovery.go): a
+	// caller-cancelled ctx killed probe's own spawn mid-flight, which used to be indistinguishable
+	// from "gh is genuinely
 	// unavailable/unauthenticated" and got cached under notOKTTL — poisoning every OTHER caller's
 	// Status(host) for up to 30s over an event that says nothing about gh at all. Skip the cache
 	// write when the CALLER's own ctx (not either sub-probe's own versionProbeTimeout/
@@ -175,7 +175,7 @@ func (d *Discovery) probe(ctx context.Context, host string) Status {
 	// The caller's own ctx (not versionCtx's own sub-timeout above) was cancelled mid-probe — the
 	// killed process's own error below says nothing about whether gh works, so don't report it as
 	// though it did (Status's own caller-cancelled check is what keeps this out of the cache; this
-	// just keeps the immediate Reason honest for anyone who logs it).
+	// keeps the immediate Reason honest for anyone who logs it).
 	if errors.Is(ctx.Err(), context.Canceled) {
 		return Status{Kind: KindNotFound, Host: host, Path: path, Reason: "the request was cancelled"}
 	}

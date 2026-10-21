@@ -9,14 +9,14 @@ import (
 )
 
 // This file hoists the two path-depth error shapes postgres/mysqlfamily/sqlite's own Children each
-// spelled out verbatim (P107 I2-11). The depth-by-depth dispatch itself — segment-Kind checks
+// spelled out verbatim. The depth-by-depth dispatch itself — segment-Kind checks
 // interleaved with per-level listing calls — stays in each adapter: postgres acquires its
 // per-database *pgx.Conn once and reuses it through both its schema and relation listing (a depth
 // mysqlfamily/sqlite have no equivalent of), while sqlite wraps the whole call in runOnConn rather
 // than an explicit acquire/release pair. Folding that dispatch into one shared walker would have to
-// either invent a connection-acquisition step none of the three actually share, or silently add or
-// drop the "acquire a connection even for a leaf path" side effect each adapter's own dispatch order
-// currently gives it — a real behavioral risk for no length win, so it was declined.
+// either invent a connection-acquisition step none of the three share, or silently add or
+// drop the "acquire a connection even for a leaf path" side effect each adapter's own dispatch
+// order currently gives it — a real behavioral risk for no length win, so it was declined.
 
 // UnexpectedPathKind is Children's own "this segment's Kind doesn't match what this depth expects"
 // error, byte-identical text across all three relational adapters: depth 0 (the very first segment)
@@ -38,7 +38,7 @@ func LeafChildren(kind string, leafKinds map[string]bool) (TreeChildren, error) 
 	return TreeChildren{}, New(CodeNotFound, "unexpected object kind: "+kind, nil)
 }
 
-// PathPart names one path.Segments position RequirePath checks (P113 G2): Label is the descriptive
+// PathPart names one path.Segments position RequirePath checks: Label is the descriptive
 // word that position contributes to the error message; Kinds is the set of Kind values accepted
 // there — nil accepts any Kind, for a segment whose caller re-checks or dispatches on its own Kind
 // afterward (e.g. postgres's own Describe/Definition, which branch on the object segment's Kind
@@ -64,7 +64,7 @@ func AnySeg(label string) PathPart {
 }
 
 // RequirePath checks path has exactly len(parts) segments, each one's Kind within that position's
-// accepted set, and returns the segments (P113 G2). Unifies the ~15 adapter-side
+// accepted set, and returns the segments. Unifies the ~15 adapter-side
 // requireXSegmentPath/requireRelationPath/resolveXTarget helpers that each spelled out a
 // fixed-depth path check by hand, drifting on message format ("got depth N" vs "got: <path>") along
 // the way — this always reports "<op> requires a <label>/<label>/... path, got: <path>".

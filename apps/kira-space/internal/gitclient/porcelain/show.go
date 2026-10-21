@@ -90,7 +90,7 @@ func isFoldedContinuation(line string) bool {
 	return unicode.IsSpace(r)
 }
 
-// SplitTrailerBlock removes the trailer paragraph `%b` still contains verbatim (D9, porting
+// SplitTrailerBlock removes the trailer paragraph `%b` still contains verbatim (porting
 // @kira/git-core's own model/diff.ts rule so the field means the same thing on both hops of the
 // wire): take the final blank-line-separated paragraph of body; drop it iff at least one trailer
 // was returned *and* every line of that paragraph either looks like a trailer

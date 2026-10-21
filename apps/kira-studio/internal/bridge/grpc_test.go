@@ -17,13 +17,13 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )
 
-// TestMaskGrpcError_MasksMessageAndPartial is P11 D10's own unit-level assertion, mirroring
+// TestMaskGrpcError_MasksMessageAndPartial is the unit-level assertion, mirroring
 // bridge/http_test.go's TestMaskSendErrTimeline_MasksFailedSendHopURL: a *grpcclient.Error's own
 // Message — and, for a partial stream result, its StatusMessage/Header/Trailer values — must be
 // masked back to {{name}} form before mapGrpcError ever turns it into ipcerr.Error.Details, a
-// copyable surface (§0.3). The full persistence-round-trip case (through a real migrated SQLite
+// copyable surface. The full persistence-round-trip case (through a real migrated SQLite
 // database, mirroring TestMaskSecrets_RedirectURLsFinalURLAndTimelineHopsBeforePersisting) is
-// grpc_history_test.go (C7), once grpc_call_history exists to persist into.
+// grpc_history_test.go, once grpc_call_history exists to persist into.
 func TestMaskGrpcError_MasksMessageAndPartial(t *testing.T) {
 	const secret = "sk_live_super_secret_token"
 	const masked = "{{apiToken}}"
@@ -64,8 +64,8 @@ func TestMaskGrpcError_NoOpWithNothingUsed(t *testing.T) {
 	}
 }
 
-// TestMaskGrpcResult_MasksStatusMessageAndMetadata is maskGrpcError's own success-path sibling
-// (P21 round 2 architecture/security finding 4 / functional finding 8): a *successful* call's
+// TestMaskGrpcResult_MasksStatusMessageAndMetadata is maskGrpcError's own success-path sibling:
+// a *successful* call's
 // StatusMessage/Header/Trailer must be masked exactly as an error's own fields are — this test
 // fails against the pre-fix code, which called no masker at all on the success path, so a
 // substituted secret echoed back by the server (a gateway reflecting a header, a status message
@@ -165,14 +165,14 @@ func newGrpcServiceForTest(t *testing.T) (*GrpcService, *storage.DB, *repos.Vari
 }
 
 // TestRecordGrpcHistory_NeverPersistsResolvedSecrets is the masking checklist's own
-// persistence-round-trip case (D10), mirroring bridge/http_test.go's
+// persistence-round-trip case, mirroring bridge/http_test.go's
 // TestMaskSecrets_RedirectURLsFinalURLAndTimelineHopsBeforePersisting: a call's target, metadata
 // and message JSON can each carry a resolved secret at the point grpcclient.Unary/ServerStream
-// actually use them (§0.3's own "the reflection call... and the descriptor cache key" checklist
-// rows apply the identical discipline one call earlier, in-memory only, with nothing to persist to
-// round-trip in the first place) — but recordGrpcHistory is handed the UNRESOLVED args (D2's rule,
-// verbatim), so what reaches grpc_call_history, read back as a raw column straight out of a real
-// migrated SQLite database, must still be spelled {{name}}, never the live value.
+// use them (the "the reflection call... and the descriptor cache key" checklist rows apply the
+// identical discipline one call earlier, in-memory only, with nothing to persist to round-trip
+// in the first place) — but recordGrpcHistory is handed the UNRESOLVED args, so what reaches
+// grpc_call_history, read back as a raw column straight out of a real migrated SQLite database,
+// must still be spelled {{name}}, never the live value.
 func TestRecordGrpcHistory_NeverPersistsResolvedSecrets(t *testing.T) {
 	svc, db, variablesRepo, collections := newGrpcServiceForTest(t)
 	c, err := collections.CreateCollection("Probes")
@@ -238,7 +238,7 @@ func TestRecordGrpcHistory_NeverPersistsResolvedSecrets(t *testing.T) {
 	}
 }
 
-// TestResolveGrpcCallSource_ResolvesTargetAndMetadataInProtoDescriptorMode is finding 3: the old
+// TestResolveGrpcCallSource_ResolvesTargetAndMetadataInProtoDescriptorMode: the old
 // resolveGrpcSource (Describe's own stage 2) short-circuited on any non-reflection descriptor mode
 // — correct for Describe (a .proto file needs no target), wrong for Call, which reuses the exact
 // same function and always needs a real network target and its metadata resolved, .proto schema
@@ -342,8 +342,8 @@ service Echo {
 }
 `
 
-// TestRunServerStream_MasksDialTargetSecretBeforeEmittingErrorEvent is finding 4: a failed
-// streaming call used to emit its terminal error event (D8's push channel, the renderer's own
+// TestRunServerStream_MasksDialTargetSecretBeforeEmittingErrorEvent: a failed
+// streaming call used to emit its terminal error event (the push channel, the renderer's own
 // preferred error source over Call's return value — views/grpcrequest/state.ts) before Call's own
 // maskGrpcError ever ran, so a secret substituted into the dial target leaked straight to the
 // renderer unmasked. runServerStream now masks before emitting; this dials a real (unreachable)
@@ -394,9 +394,9 @@ func TestRunServerStream_MasksDialTargetSecretBeforeEmittingErrorEvent(t *testin
 	}
 }
 
-// raceCheckEmitter is fakeEmitter's own sibling for finding 6: its EmitTo runs synchronously on
+// raceCheckEmitter is fakeEmitter's own sibling: its EmitTo runs synchronously on
 // the same goroutine coalescer.finish calls it from (flushLocked's own EmitTo call, under
-// c.mu) — exactly mirroring the renderer's own D8 wake-up, which is likewise driven directly off
+// c.mu) — exactly mirroring the renderer's own wake-up, which is likewise driven directly off
 // this event with no delay of its own. On the terminal (Done) event it snapshots whether
 // GrpcHistory already has a row for this tab, the same query a History pane's own immediate
 // re-list (noteRecorded -> load) would run the instant it is woken by this same event.
@@ -423,9 +423,9 @@ func (r *raceCheckEmitter) EmitTo(windowKey string, name string, data any) {
 }
 func (r *raceCheckEmitter) EmitFocused(name string, data any) {}
 
-// TestRunServerStream_RecordsHistoryBeforeEmittingTerminalEvent is P21 round 2 functional finding
-// 6: a server-streaming call's renderer is woken by runServerStream's own terminal event (D8's
-// push channel), not by Call's return value the way a unary call's renderer is — so if the row is
+// TestRunServerStream_RecordsHistoryBeforeEmittingTerminalEvent: a server-streaming call's
+// renderer is woken by runServerStream's own terminal event, not by Call's return value the way a
+// unary call's renderer is — so if the row is
 // recorded only after that event goes out (the old code: Call's own recordGrpcHistory ran only
 // after runServerStream had already returned), a History pane already open for this tab can
 // immediately re-list in reaction to the event and be answered before the insert lands, dropping

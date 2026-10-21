@@ -1,10 +1,10 @@
-// g1measure is P52 gate G1's instrument (§3.3): sums RSS across the app's whole process set —
+// g1measure is gate G1's instrument: sums RSS across the app's whole process set —
 // this app's own executables plus, on darwin, only the native-webview helper processes macOS
 // itself attributes to one of them (see internal/metrics.AppProcessSet — a plain substring match
 // over "com.apple.WebKit" also matches every other running app's idle webview helpers, confirmed
 // on a real machine: it inflated a real 215 MB reading to a reported 300 MB) — over 10 samples 1s
-// apart, reporting the min, the same methodology the removed tests/e2e/memory.spec.ts used
-// (§2.2), so the numbers are directly comparable.
+// apart, reporting the min, the same methodology the removed tests/e2e/memory.spec.ts used,
+// so the numbers are directly comparable.
 //
 // Not part of the shipped app — a throwaway measurement tool, invoked manually against a running
 // kira-studio-shell process for the G1 report.

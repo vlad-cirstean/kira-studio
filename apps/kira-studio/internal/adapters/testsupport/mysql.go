@@ -86,7 +86,7 @@ func RootMysqlDSN(host string, port int, database string) string {
 }
 
 // seedMysqlExtras is support/mysql.ts's own root-connection block: the second database (mirroring
-// MariaDB's kira_analytics, §6d) and the big_rows bulk insert. P34 D28: MySQL has no SEQUENCE
+// MariaDB's kira_analytics) and the big_rows bulk insert. MySQL has no SEQUENCE
 // storage engine, so the 1,000,000-row insert uses the conventional numbers-table idiom instead —
 // a six-way cross join over a 10-row digits table, chunked into ten 100,000-row statements so any
 // single InnoDB transaction stays bounded.
@@ -124,7 +124,7 @@ func seedMysqlExtras(ctx context.Context, host string, port int) error {
 		return err
 	}
 	for outer := 0; outer < 10; outer++ {
-		// P16 §6 finding: MySQL 9.x removed the native MD5()/SHA1() functions outright (verified
+		// MySQL 9.x removed the native MD5()/SHA1() functions outright (verified
 		// against mysql:9.7 — "FUNCTION kira_test.MD5 does not exist", MySQL error 1305, the same
 		// message a missing stored routine gets). SHA2() has existed since MySQL 5.5.3 and is
 		// unaffected; LEFT(…, 32) keeps big_rows.payload at its existing CHAR(32) width rather than

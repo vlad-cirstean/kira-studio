@@ -1,9 +1,7 @@
 // Package migrations embeds the schema migration(s). The app has never shipped, so there is no
 // installed base with a partially-applied schema to preserve — what were five incremental steps
-// (0001_init through 0005_p28_tree_filters) are collapsed into the single 0001_init.sql that
-// produces the exact same final schema in one shot (verified table-by-table via
-// PRAGMA table_info/foreign_key_list/index_list against the old five-file sequence before they
-// were deleted).
+// are collapsed into the single 0001_init.sql that produces the exact same final schema in one
+// shot.
 package migrations
 
 import (

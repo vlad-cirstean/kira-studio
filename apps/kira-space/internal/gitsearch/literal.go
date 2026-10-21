@@ -35,12 +35,12 @@ func foldRune(r rune) rune {
 	return u
 }
 
-// boundaryOK is D3's byte-boundary post-check — (?<!\w) on the left, (?!\w) on the right. Each
+// boundaryOK is the byte-boundary post-check — (?<!\w) on the left, (?!\w) on the right. Each
 // side is a property of what is OUTSIDE the occurrence (the byte immediately before start, the
 // byte immediately after end, or the start/end of the string itself), never of the occurrence's
 // own edge characters — which is exactly what makes "#123" whole-word-match in "fix (#123)" (the
 // characters '(' before and ')' after are both non-word) even though '#' itself is not a \w
-// character (upstream probe 10).
+// character.
 func boundaryOK(s string, start, end int) bool {
 	if start > 0 && isWordByte(s[start-1]) {
 		return false
@@ -59,7 +59,7 @@ func boundaryOK(s string, start, end int) bool {
 // pattern matches s" is equivalent to "SOME occurrence of needle in s has a non-word character
 // (or nothing) on each side". Enumerating occurrences and post-checking their two edge bytes
 // computes that directly, with no dialect to reconcile — SPEC's own "a byte-boundary post-check
-// implementation in gitsearch rather than a direct pattern port" (docs/HISTORY.md (v1.3)).
+// implementation in gitsearch rather than a direct pattern port" (docs/HISTORY.md).
 type literalMatcher struct {
 	// text is the raw needle, used directly for the case-sensitive path (strings.Contains/
 	// strings.Index).

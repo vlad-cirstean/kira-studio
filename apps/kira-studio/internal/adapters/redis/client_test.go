@@ -6,7 +6,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// P21 round 1 architecture/security finding 2: require/prefer used to map to
+// require/prefer used to map to
 // InsecureSkipVerify:true — a connection accepting any certificate, including an attacker's, with
 // no indication anywhere in the UI, and with no native Redis convention (unlike libpq's "require")
 // to justify it. require/prefer/verify-full now all verify, matching the Kafka adapter; an
@@ -95,7 +95,7 @@ func TestResolveFields_PlainRedisSchemeStaysPlaintext(t *testing.T) {
 	}
 }
 
-// P12 round 2 finding #2: every other URI-parsing adapter (clickhouse, mysqlfamily, sqlite, kafka)
+// Every other URI-parsing adapter (clickhouse, mysqlfamily, sqlite, kafka)
 // returns a connect error when url.Parse fails; resolveFields used to silently fall through with
 // every field left at its zero value, which host/port then defaulted to localhost:6379 with no
 // password — a malformed URI silently connected to whatever Redis is running on the user's own

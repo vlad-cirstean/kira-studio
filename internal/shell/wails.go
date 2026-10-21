@@ -10,10 +10,9 @@ import (
 )
 
 // wails.go is the Wails adapters. Nothing else in this package's own callers below the app's own
-// composition root imports pkg/application (P56 D1). P103 Part 3: the pieces here were identical
-// in both apps — everything genuinely per-app (BuildTemplate, the bound-service Dialogs adapter,
-// the stream registration, Kira Studio's own AttachSystemWake) stays in each app's own
-// internal/appshell.
+// composition root imports pkg/application. The pieces here were identical in both apps —
+// everything genuinely per-app (BuildTemplate, the bound-service Dialogs adapter, the stream
+// registration, Kira Studio's own AttachSystemWake) stays in each app's own internal/appshell.
 
 // emitter satisfies appevent.Emitter. EventManager.Emit takes data ...any (event_manager.go:31); a
 // single argument is how a payload-free signal (nil, D6) or a real payload is expressed either
@@ -30,7 +29,7 @@ func (e *emitter) Emit(name string, data any) {
 	app.Event.Emit(name, data)
 }
 
-// EmitFocused delivers to whichever window is currently key/focused (P8 D6/C9) — the successor to
+// EmitFocused delivers to whichever window is currently key/focused — the successor to
 // Electron's own sendToFocusedWindow(channel) (18fe7bb^:src/main/menu.ts:5-8). Current() resolves
 // the real key window on darwin via [NSApp keyWindow] ?? [NSApp mainWindow]
 // (application_darwin.go); on a build with no window (or this sandbox's Linux fallback with
@@ -49,19 +48,19 @@ func (e *emitter) EmitFocused(name string, data any) {
 }
 
 // NewDeferredEmitter builds an appevent.Emitter usable before application.New has returned an
-// *App to emit through — §4.11's ordering knot: both appcore.Deps.Events (read by
+// *App to emit through — the ordering knot: both appcore.Deps.Events (read by
 // SettingsService.Set, built into the Services list passed to New) and the Quitter's own Signaller
 // (whose ShouldQuit method value must come from an already-allocated Quitter, itself needing
 // Events) are needed before New can be called, but New alone produces the App an emitter emits
 // through. attach must be called with the real *App immediately after New returns, before
-// anything has a chance to actually emit.
+// anything has a chance to emit.
 func NewDeferredEmitter() (e appevent.Emitter, attach func(*application.App)) {
 	em := &emitter{}
 	return em, func(app *application.App) { em.app.Store(app) }
 }
 
 // Dialogs is the Wails adapter behind every app's own bound-service Dialogs interface — plain
-// parameters, not a bound-service request struct (P103 Part 3): bridge.SaveFileRequest/
+// parameters, not a bound-service request struct: bridge.SaveFileRequest/
 // OpenFileRequest/OpenDirectoryRequest are Wails-bound service parameter types, so moving them
 // would move the generated @bindings/* model they produce. Each app's own internal/appshell holds
 // a tiny adapter destructuring its own request struct into these calls instead — the duplication
@@ -180,7 +179,7 @@ func NewDeferredBrowser() (b *browserOpener, attach func(*application.App)) {
 }
 
 // AttachReopen is src/main/index.ts:141-145's `activate` handler: on macOS, closing the last
-// window leaves the app running (P56 D10), and clicking the Dock icon brings a window back.
+// window leaves the app running, and clicking the Dock icon brings a window back.
 // Wails' own default reopen handler (events_common_darwin.go) only re-shows a hidden-but-extant
 // window; it does not create one when none exist at all, which is the Electron behaviour this
 // mirrors.

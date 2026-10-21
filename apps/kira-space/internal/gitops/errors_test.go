@@ -150,9 +150,9 @@ func TestClassifyOpError_NotFound(t *testing.T) {
 	}
 }
 
-// TestClassifyOpError_RebaseNoSuchBranchCommit is G26 D5/probe P14's own verbatim stderr — a
+// TestClassifyOpError_RebaseNoSuchBranchCommit is the verbatim stderr — a
 // restack's rebase with a nonexistent third (branch) argument, reused NotFound, added as its own
-// row rather than widening the existing NotFound pattern list (D5's stated reason: the probe
+// row rather than widening the existing NotFound pattern list (the stated reason: the probe
 // citation sits next to the exact string it came from).
 func TestClassifyOpError_RebaseNoSuchBranchCommit(t *testing.T) {
 	t.Parallel()
@@ -162,7 +162,7 @@ func TestClassifyOpError_RebaseNoSuchBranchCommit(t *testing.T) {
 	}
 }
 
-// TestClassifyOpError_RebaseConflictCombinedStream is P10's own finding: a rebase conflict's
+// TestClassifyOpError_RebaseConflictCombinedStream: a rebase conflict's
 // "CONFLICT (content): ..." is on STDOUT while "error: could not apply ..." is on stderr — the
 // existing Conflict row already matches "could not apply" and "conflict (", but only fires here
 // because the executor combines stdout+stderr before classifying, exactly as runPullOp already
@@ -277,11 +277,11 @@ func TestClassifyOpError_NetworkFailed(t *testing.T) {
 	}
 }
 
-// TestClassifyOpError_ConflictNotMisledBySubjectSubstring is P108 Part 15 F4's own regression
+// TestClassifyOpError_ConflictNotMisledBySubjectSubstring is the regression
 // proof: a commit SUBJECT is user-controlled text embedded in git's own conflict message, and
 // every row ahead of the (unanchored) Conflict row further down is a plain, whole-blob
 // strings.Contains — so a commit titled "Handle connection refused" was classified as
-// NetworkFailed instead of the real conflict it actually is.
+// NetworkFailed instead of the real conflict it is.
 func TestClassifyOpError_ConflictNotMisledBySubjectSubstring(t *testing.T) {
 	t.Parallel()
 	for _, stderr := range []string{

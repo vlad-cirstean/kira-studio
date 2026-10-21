@@ -1,10 +1,10 @@
 //go:build darwin && cgo
 
-// The macOS event source (G9). FSEvents watches a whole tree through one stream, so this backend
+// The macOS event source. FSEvents watches a whole tree through one stream, so this backend
 // holds no per-directory state and no file descriptor per ref — unlike the kqueue backend it
-// replaces, which opens one descriptor per file in every watched directory (G2 F10). It cannot be
+// replaces, which opens one descriptor per file in every watched directory. It cannot be
 // compiled or exercised outside a real macOS toolchain (the same wall internal/localauth hit):
-// read it for structure, and see G9 §7.2 for what a human must run on a Mac to confirm it.
+// read it for structure.
 package gitclient
 
 import (
@@ -19,15 +19,15 @@ const watcherBackend = "fsevents"
 
 // droppedFlags are the FSEvents flags that mean "something changed and we don't know what" —
 // coalesced beyond recognition, dropped in the kernel or in our own client buffer, or the watched
-// root itself moved or was deleted (G9 D9/F11). Mapped to rawEvent.Rescan, which the shared run
+// root itself moved or was deleted. Mapped to rawEvent.Rescan, which the shared run
 // loop (watcher.go) treats identically to the fsnotify backend's ErrEventOverflow: raise both
 // pending signals.
 const droppedFlags = fsevents.MustScanSubDirs | fsevents.KernelDropped | fsevents.UserDropped | fsevents.RootChanged
 
-// fseventsBackend adapts one fsevents.EventStream to the backend seam (D6). It holds no
+// fseventsBackend adapts one fsevents.EventStream to the backend seam. It holds no
 // repository knowledge at all — classification and the debounce live above the seam, in
 // watcher.go — so the only logic here is starting the stream, translating its events, and
-// tearing it down in the one order that cannot deadlock (D10).
+// tearing it down in the one order that cannot deadlock.
 type fseventsBackend struct {
 	es  *fsevents.EventStream
 	out chan rawEvent
@@ -39,10 +39,10 @@ type fseventsBackend struct {
 	closeOnce sync.Once
 }
 
-// newBackend starts one FSEvents stream over commonDir, plus gitDir only when it is genuinely
-// outside commonDir — a linked worktree's gitDir is always <commonDir>/worktrees/<name> (D8, F10),
+// newBackend starts one FSEvents stream over commonDir, plus gitDir only when it is outside
+// commonDir — a linked worktree's gitDir is always <commonDir>/worktrees/<name>,
 // already covered by a recursive watch on commonDir. commonDir and gitDir arrive already
-// symlink-resolved (D7).
+// symlink-resolved.
 func newBackend(commonDir, gitDir string) (backend, error) {
 	paths := []string{commonDir}
 	if gitDir != commonDir && !strings.HasPrefix(gitDir, commonDir+string(filepath.Separator)) {
@@ -89,10 +89,10 @@ func newBackend(commonDir, gitDir string) (backend, error) {
 func (b *fseventsBackend) Events() <-chan rawEvent { return b.out }
 
 // run is the sole reader of es.Events and the sole writer of b.out. es.Events is unbuffered and
-// the C callback blocks on its send (F12 trap 2), so this loop must do nothing per event but
+// the C callback blocks on its send, so this loop must do nothing per event but
 // translate and forward — and, once Close has begun tearing down (stopping closed), it must keep
 // receiving from es.Events and discard, never blocking on a send into b.out, so that a callback
-// parked mid-send can always complete (D10 step 1).
+// parked mid-send can always complete.
 func (b *fseventsBackend) run() {
 	defer close(b.joined)
 	for {
@@ -116,8 +116,8 @@ func (b *fseventsBackend) run() {
 				select {
 				case b.out <- re:
 				case <-b.stopping:
-					// F6: a stopping signal mid-batch must abandon this send, not block on it —
-					// Close's drain guarantee (D10 step 1) otherwise only covers a NEW batch
+					// A stopping signal mid-batch must abandon this send, not block on it —
+					// Close's drain guarantee otherwise only covers a NEW batch
 					// arriving after stopping closed, not one already being forwarded when it
 					// closes. Abandon and let the outer loop's own drain-and-discard handle
 					// whatever comes next (including b.done, already closed or not).
@@ -135,8 +135,8 @@ func (b *fseventsBackend) run() {
 	}
 }
 
-// Close runs D10's exact sequence — drain, then stop, then let run() exit, then join — because
-// fsevents.Stop() does not close Events (F12 trap 3) and the C callback can be parked mid-send on
+// Close runs the exact sequence — drain, then stop, then let run() exit, then join — because
+// fsevents.Stop() does not close Events and the C callback can be parked mid-send on
 // it while FSEventStreamStop/Invalidate want the very dispatch queue that callback runs on.
 // Stopping the stream before a live drainer is guaranteed can deadlock; this ordering guarantees
 // one is always live until Stop has nothing left to wait on. sync.Once-guarded: RepoWatcher.Close

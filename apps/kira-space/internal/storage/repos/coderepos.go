@@ -191,8 +191,8 @@ func (r *CodeReposRepo) Reorder(ids []string) ([]model.CodeRepo, error) {
 
 // Remove deletes the repo row. Kira Studio's own Remove also deletes every `tabs` row scoped to
 // the repo's workspace in the same transaction — Kira Space has no `tabs` table yet (this
-// package's own migrations/0001_init.sql header comment: deferred to Part 2, which is also where
-// this method picks that cascade back up once the table exists to cascade into).
+// package's own migrations/0001_init.sql header comment: deferred; this method picks that
+// cascade back up once the table exists to cascade into).
 func (r *CodeReposRepo) Remove(id string) error {
 	if _, err := r.DB.Exec(`DELETE FROM code_repos WHERE id = ?`, id); err != nil {
 		return fmt.Errorf("repos: remove code repo %s: %w", id, err)

@@ -1,5 +1,5 @@
-// Package mcpauth mints, persists and verifies the DB MCP server's static bearer token
-// (docs/HISTORY.md (v1.7 M1)). 32 crypto/rand bytes, base64url on the wire,
+// Package mcpauth mints, persists and verifies the DB MCP server's static bearer token.
+// 32 crypto/rand bytes, base64url on the wire,
 // sha256(salt‖token) at rest, one token per server instance, persisted as one small JSON file
 // rather than a database table: the caller supplies the file's own identifying name (the DB
 // server's fixed name), so this package stays storage-shape-agnostic and importable from both
@@ -27,12 +27,11 @@ import (
 // TTL is every token's fixed lifetime, applied uniformly to both servers (M1 §2.1).
 const TTL = 7 * 24 * time.Hour
 
-// Record is the at-rest shape: hash+salt only, the plaintext is never written to disk (D8) as
-// THIS record — HelperTokenPathNamed/SaveHelperToken below are a separate, deliberately scoped
-// exception (P108 Part 7 F2), a different file for a different purpose, never this one.
-// ExpiresAt's zero value means "no expiry recorded yet" — exactly what every pre-M1 file on disk
-// already means, so a stamp-on-load (LoadOrMintTTL) can apply the property retroactively with no
-// migration and no file-format version (M1 §2.1/§2.4).
+// Record is the at-rest shape: hash+salt only, the plaintext is never written to disk as THIS
+// record — HelperTokenPathNamed/SaveHelperToken below are a separate, deliberately scoped
+// exception, a different file for a different purpose, never this one.
+// ExpiresAt's zero value means "no expiry recorded yet", so a stamp-on-load (LoadOrMintTTL) can
+// apply the property retroactively with no migration and no file-format version.
 type Record struct {
 	Hash      []byte    `json:"hash"`
 	Salt      []byte    `json:"salt"`
@@ -116,21 +115,20 @@ func PathNamed(home, name string) string {
 }
 
 // HelperTokenPathNamed returns name's plaintext headersHelper mirror file location under home — a
-// deliberate, scoped exception to this package's own hash-only-at-rest rule above (D8), added for
-// P108 Part 7 F2: Claude Code's own `headersHelper` mechanism (verified against the installed CLI,
-// 2.1.280 — undocumented in `--help` but real: it runs a local command and parses its stdout as a
-// JSON object of header values) lets `mcpinstall` register this server without ever putting the
-// bearer token on that process's own argv, but the helper script it writes has to read the LIVE
-// plaintext from somewhere at connection time, including well after a restart mid-token-life, when
-// the hash-only Record above no longer carries a recoverable plaintext at all. This file exists
-// for that helper script to read — 0600 (SaveHelperToken) — and, since F8, is also read back by
-// this app itself (LoadHelperToken) to confirm the mirror still verifies against the live Record
-// before showing Command/Install, never for any other purpose — narrowing the exposure from D8's
-// original threat (nothing on disk, anywhere) to "readable by
-// this OS user account, same as every other local process already running as it", which is the
-// same posture internal/localsock's own 0700 socket directory already takes, and strictly better
-// than the argv exposure it replaces (readable by every local uid via /proc, and by exec-event EDR
-// logging).
+// deliberate, scoped exception to this package's own hash-only-at-rest rule above: Claude Code's
+// own `headersHelper` mechanism (verified against the installed CLI, 2.1.280 — undocumented in
+// `--help` but real: it runs a local command and parses its stdout as a JSON object of header
+// values) lets `mcpinstall` register this server without ever putting the bearer token on that
+// process's own argv, but the helper script it writes has to read the LIVE plaintext from somewhere
+// at connection time, including well after a restart mid-token-life, when the hash-only Record
+// above no longer carries a recoverable plaintext at all. This file exists for that helper script
+// to read — 0600 (SaveHelperToken) — and is also read back by this app itself (LoadHelperToken) to
+// confirm the mirror still verifies against the live Record before showing Command/Install, never
+// for any other purpose — narrowing the exposure from the original threat (nothing on disk,
+// anywhere) to "readable by this OS user account, same as every other local process already running
+// as it", which is the same posture internal/localsock's own 0700 socket directory already takes,
+// and strictly better than the argv exposure it replaces (readable by every local uid via /proc,
+// and by exec-event EDR logging).
 func HelperTokenPathNamed(home, name string) string {
 	return filepath.Join(home, name+"-header.token")
 }
@@ -152,11 +150,11 @@ func Load(path string) (Record, bool, error) {
 	return rec, true, nil
 }
 
-// Save writes rec to path, mode 0600 — hash+salt only, never the plaintext (D8). Creates path's
+// Save writes rec to path, mode 0600 — hash+salt only, never the plaintext. Creates path's
 // parent directory first (mode 0700) — a machine where KIRA_HOME does not exist yet otherwise
-// fails outright on the very first mint (M1 §2.6).
+// fails outright on the very first mint.
 //
-// Writes via a temp file + rename rather than truncating path in place (M7 finding): a crash or a
+// Writes via a temp file + rename rather than truncating path in place: a crash or a
 // full disk mid-write used to leave a truncated token file that Load then fails to parse, taking
 // the whole server down at next start with no path forward but deleting a file the user has no
 // reason to know about. Rename is atomic on both target platforms (POSIX same-filesystem rename;
@@ -179,7 +177,7 @@ func SaveHelperToken(path, plain string) error {
 	return writeFile(path, []byte(plain), 0o600)
 }
 
-// LoadHelperToken reads path's plaintext back (F8): the embedded server's own "can I show
+// LoadHelperToken reads path's plaintext back: the embedded server's own "can I show
 // Command/Install" gate needs to confirm the on-disk helper mirror still verifies against the
 // currently-held Record, not just that this process minted a token at some point this run. A
 // missing file returns ok=false with no error, same posture as Load.
@@ -220,14 +218,14 @@ func writeFile(path string, data []byte, perm os.FileMode) error {
 // if none exists yet or the stored one has lapsed — the headless instance's own startup path and
 // the embedded instance's app-boot-with-the-leaf-already-true path: neither is an explicit "toggle
 // turned on" event, so neither forces a fresh token over one that might already be authenticating
-// a previously-registered command, except when that token can no longer work at all (§2.3: remint
+// a previously-registered command, except when that token can no longer work at all (remint
 // only at a moment a human can read the new plaintext — server start is one of the two). minted
 // reports whether a fresh mint happened (plain is "" when it did not — a hash cannot be reversed).
 //
-// A loaded record whose ExpiresAt is zero (a pre-M1 file, minted before rotation existed) is
+// A loaded record whose ExpiresAt is zero (a file minted before rotation existed) is
 // stamped instead of reminted: ExpiresAt is set to now+ttl and re-saved with the same Hash/Salt,
 // reported as a load (minted=false, plain=""), so every existing registration gets exactly one
-// ordinary TTL window before rotation starts applying to it (M1 §2.4). Stamping happens once — the
+// ordinary TTL window before rotation starts applying to it. Stamping happens once — the
 // next load sees a non-zero ExpiresAt and leaves it alone, so the clock is not reset by restarts.
 func LoadOrMintTTL(path string, ttl time.Duration) (plain string, rec Record, minted bool, err error) {
 	rec, ok, err := Load(path)

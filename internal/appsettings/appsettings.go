@@ -1,8 +1,8 @@
-// Package appsettings is P103 Part 4 (§7.1)'s hoist of the settings sections that were
+// Package appsettings is the hoist of the settings sections that were
 // byte-identical, field for field and tag for tag, in both apps' own storage/model/settings.go:
 // AppearanceSettings. Each app's own Settings composes Appearance here alongside its own per-app
 // sections (Kira Studio's Data/Cache/Api/DbMcp/own advanced.logLevel key;
-// Kira Space's own GitSettings/InlineBlame/DateFormat/advanced.gitLogLevel key — P120: each app's
+// Kira Space's own GitSettings/InlineBlame/DateFormat/advanced.gitLogLevel key — each app's
 // own diagnostic-log leaf has its own name/key now, so ValidLogLevel is the one thing genuinely
 // shared between them, not a common AdvancedCore struct).
 package appsettings
@@ -48,9 +48,8 @@ func ValidRowDensity(v string) bool {
 }
 
 // ValidLogLevel mirrors settings.ts's logLevelSchema enum — genuinely shared, not merely parallel:
-// Kira Studio's own advanced.logLevel, Kira Space's own advanced.gitLogLevel (kiraSpace.log.level
-// before P100 Part 3's rename), and Kira Space's own per-repo GitRepoSettings.LogLevel leaf all
-// validate against this one enum.
+// Kira Studio's own advanced.logLevel, Kira Space's own advanced.gitLogLevel, and Kira Space's own
+// per-repo GitRepoSettings.LogLevel leaf all validate against this one enum.
 func ValidLogLevel(v string) bool {
 	switch v {
 	case "off", "error", "warn", "info", "debug":

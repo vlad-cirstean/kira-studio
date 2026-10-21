@@ -8,10 +8,10 @@ import (
 )
 
 // ErrorKind is gitclient's own closed error vocabulary — exit code + stderr classified into a
-// small set a caller can branch on, mirroring httpclient.ErrorCode's own reasoning (P1 D1
-// follows bridge/http.go's precedent, and httpclient/errors.go is the direct model). P2 grows
-// this set as real porcelain operations arrive (a merge conflict, a rejected push); P1 only ever
-// produces the kinds its own two commands (`--version`, `rev-parse`) can actually hit.
+// small set a caller can branch on, mirroring httpclient.ErrorCode's own reasoning (follows
+// bridge/http.go's precedent, and httpclient/errors.go is the direct model). This set grows
+// as real porcelain operations arrive (a merge conflict, a rejected push); it only ever
+// produces the kinds its own two commands (`--version`, `rev-parse`) can hit.
 type ErrorKind string
 
 const (
@@ -45,7 +45,7 @@ type Error struct {
 
 // Error returns a one-line summary — the argv, the classified kind, and the first non-empty line
 // of stderr (or the exit code, when stderr is empty) — never the whole of stderr, which stays on
-// the struct for a caller that wants it in full (D6: "raw stderr never crosses" the wire, matching
+// the struct for a caller that wants it in full ("raw stderr never crosses" the wire, matching
 // upstream's own errors.ts contract).
 func (e *Error) Error() string {
 	return "git " + strings.Join(e.Command, " ") + " failed (" + string(e.Kind) + "): " + e.summary()

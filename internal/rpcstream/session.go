@@ -35,9 +35,9 @@ type Handlers struct {
 	Request         func(ctx context.Context, method string, params json.RawMessage) (any, error)
 	// Stream serves one `open`ed stream, calling emit for each chunk it produces. emit acquires a
 	// credit before it does anything else (the transcription of rpc.ts's own emit — the credit
-	// gate's first real caller, G1 §11/G3 D5), encodes payload as the chunk's own JSON body, and
-	// queues it with blob (nil for a JSON-only chunk) as D4's own out-of-band bytes. An oversize
-	// encoded body is refused with an error rather than silently dropped (F21/D5) — the caller
+	// gate's first real caller), encodes payload as the chunk's own JSON body, and
+	// queues it with blob (nil for a JSON-only chunk) as the out-of-band bytes. An oversize
+	// encoded body is refused with an error rather than silently dropped — the caller
 	// should let that error end the stream with a real `end` frame, not swallow it.
 	Stream func(ctx context.Context, method string, params json.RawMessage, emit func(payload any, blob []byte) error) error
 	// MaxFrameBytes caps how large one encoded frame body (JSON header plus blob) may be before
@@ -51,7 +51,7 @@ type Handlers struct {
 // inbound req/open onto its own goroutine — bridge/stream.go's own engine-stream precedent,
 // "router gives this session its own single writer", is the same discipline applied here), plus
 // the active-work/credit-gate bookkeeping every cancel/credit frame needs to reach, and Emit — the
-// production handle gitsession's subscriber fan-out (G2 plan D17) calls to deliver repo.changed.
+// production handle gitsession's subscriber fan-out calls to deliver repo.changed.
 type Session struct {
 	h    Handlers
 	conn Conn
@@ -65,8 +65,8 @@ type Session struct {
 	creditGates map[int]*creditGate
 }
 
-// activeEntry is one in-flight request/stream's own identity, not just the id it is keyed by
-// (F8): handleRequest/handleOpen keep the exact *activeEntry handleRaw registered and compare it
+// activeEntry is one in-flight request/stream's own identity, not just the id it is keyed by:
+// handleRequest/handleOpen keep the exact *activeEntry handleRaw registered and compare it
 // back (removeActiveWork, below) before deleting activeWork[id] or creditGates[id] — so a request
 // finishing after its id slot was already reassigned can never delete a newer request's own entry
 // out from under it. handleRaw's own already-in-flight check refuses a client that reuses a live
@@ -135,8 +135,8 @@ func (s *Session) sendChunk(f frame, blob []byte) error {
 	return nil
 }
 
-// sendResult queues a successful 'res' frame — the response path's own twin of sendChunk's guard
-// (D2a/F8): an oversize encoded body is refused with an error res carrying E_FRAME_TOO_LARGE
+// sendResult queues a successful 'res' frame — the response path's own twin of sendChunk's guard:
+// an oversize encoded body is refused with an error res carrying E_FRAME_TOO_LARGE
 // instead of being silently dropped by writeFrame further down, which would
 // otherwise leave the client waiting on a response that never arrives, forever. Only the success
 // path needs the check — an error res is always small (a code plus a message).
@@ -169,7 +169,7 @@ func (s *Session) Emit(method string, payload any) {
 }
 
 // removeActiveWork deletes id from activeWork iff its current entry is exactly entry — identity,
-// not just the id key (F8) — and reports whether it did. Mirrors rpc.ts's own
+// not just the id key — and reports whether it did. Mirrors rpc.ts's own
 // `if (activeWork.delete(id))` idiom, extended: a completion that loses the race against an
 // incoming 'cancel' frame (which deletes the same entry first) must send nothing, since the client
 // already resolved locally the moment it sent 'cancel' and is not waiting on a reply — and a
@@ -287,7 +287,7 @@ func (s *Session) handleRaw(raw []byte) {
 	}
 	switch env.Body.T {
 	case "req":
-		// G30 round-1 architecture review, finding #10: activeWork[id] used to be overwritten
+		// activeWork[id] used to be overwritten
 		// unconditionally, which orphans whichever request held the id first — its own cancel
 		// func becomes unreachable (a 'cancel' frame for it now cancels the second request
 		// instead), and whichever of the two finishes first "wins" removeActiveWork's presence

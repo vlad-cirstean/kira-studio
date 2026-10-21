@@ -114,12 +114,12 @@ func TestDiscovery_ProbeOrder_VersionBeforeAuth(t *testing.T) {
 	}
 }
 
-// TestDiscovery_CancelledCallerContextIsNotCachedAsUnusable proves G31 round-2 architecture/
-// security review finding #5 — the github-package mirror of gitclient's own discovery.go finding #1
-// (apps/kira-space/internal/gitclient/discovery_test.go's own test of the same name): a caller
-// cancelling its own ctx (not probe's internal versionProbeTimeout/authProbeTimeout) while the
-// --version probe is in flight must not poison the 30s cache with a "not found" verdict for every
-// OTHER caller's Status(host). Without the fix, fakeRunner's blockOnCtx path returning ctx.Err()
+// TestDiscovery_CancelledCallerContextIsNotCachedAsUnusable proves the github-package mirror of
+// gitclient's own discovery.go (apps/kira-space/internal/gitclient/discovery_test.go's own test
+// of the same name): a caller cancelling its own ctx (not probe's internal
+// versionProbeTimeout/authProbeTimeout) while the --version probe is in flight must not poison the
+// 30s cache with a "not found" verdict for every OTHER caller's Status(host). Without the fix,
+// fakeRunner's blockOnCtx path returning ctx.Err()
 // (context.Canceled) landed in the generic `err != nil` branch, got cached under notOKTTL, and the
 // fresh, uncancelled caller below would be served that poisoned entry instead of triggering its
 // own probe.

@@ -1,6 +1,6 @@
-// Package gitrpc is the server half of the git wire contract (SPEC §2: "Port of rpcHandlers.ts,
-// minus the seven host-capability methods the extension now answers locally"). G1 serves exactly
-// three of them (D12) — app.init, repo.open, repo.close — with a uniform E_UNKNOWN_METHOD default
+// Package gitrpc is the server half of the git wire contract ("Port of rpcHandlers.ts,
+// minus the seven host-capability methods the extension now answers locally"). It serves exactly
+// three of them — app.init, repo.open, repo.close — with a uniform E_UNKNOWN_METHOD default
 // for everything else, rather than 30 placeholder entries later phases would each have to revisit.
 package gitrpc
 

@@ -7,11 +7,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 )
 
-// Cipher is implemented by internal/secrets (P55) — P52 §6's kira:v3: AES-256-GCM envelope. Note
+// Cipher is implemented by internal/secrets — the kira:v3: AES-256-GCM envelope. Note
 // what is absent from this interface versus the TS SecretCipher: no isEnveloped (its only caller,
-// upgradeLegacySecrets, is deleted, not ported — §6.4), and no status (the repo never reads it;
+// upgradeLegacySecrets, is deleted, not ported), and no status (the repo never reads it;
 // the cipher enforces availability inside Encrypt/Decrypt and returns E_SECRET_STORE itself). The
-// scope argument (P29) is the kind of column the ciphertext lives in — every reader and writer of
+// scope argument is the kind of column the ciphertext lives in — every reader and writer of
 // one column uses one scope.
 type Cipher interface {
 	Encrypt(scope secrets.Scope, plain string) (string, error)

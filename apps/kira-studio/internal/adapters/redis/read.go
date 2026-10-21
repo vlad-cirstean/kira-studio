@@ -47,7 +47,7 @@ func readMeta(ctx context.Context, conn *goredis.Client, key string) (keyMeta, e
 	// nanosecond Durations (time.Duration(-1), time.Duration(-2)), not millisecond-scaled ones —
 	// checking pttl itself (not pttl.Milliseconds()) for negativity is required, since integer
 	// division truncates both -1ns and -2ns to 0ms and would otherwise report a real TTL of zero
-	// for every non-expiring key (a P58f-port-time finding: read.ts's own PTTL check compared the
+	// for every non-expiring key (read.ts's own PTTL check compared the
 	// already-millisecond-scaled ioredis reply, which carries no such sub-millisecond sentinel).
 	var ttlMs *int64
 	if pttl >= 0 {
@@ -129,15 +129,15 @@ func scanFamilyRound(ctx context.Context, scanOnce scanRoundFn, cursor uint64, p
 	return nextCursor, pushed, nil
 }
 
-// readScanFamily is read.ts's own shared cursor-loop body for hash/set/zset (§8.8's per-type
-// renderers): accumulates whole SCAN rounds without slicing mid-round, so a round's remaining
-// elements are never dropped — the page can overshoot req.pageSize by up to one round. An offset
-// cursor on a cursor-paged key silently restarts the scan from 0 rather than seeking or erroring
-// (redis 24, views/keyvalue/state.ts's D40 depends on this).
+// readScanFamily is read.ts's own shared cursor-loop body for hash/set/zset: accumulates whole SCAN
+// rounds without slicing mid-round, so a round's remaining elements are never dropped — the page
+// can overshoot req.pageSize by up to one round. An offset cursor on a cursor-paged key silently
+// restarts the scan from 0 rather than seeking or erroring
+// (views/keyvalue/state.ts depends on this).
 //
 // pairSize==1 (set) has no natural per-row key, so it synthesizes one as a running display index
 // (readList's own strconv.Itoa(offset+i) pattern) — the running total is carried across pages in
-// the token itself (P2 R1), alongside the SSCAN cursor, since nothing else here is a page-spanning
+// the token itself, alongside the SSCAN cursor, since nothing else here is a page-spanning
 // counter: without it every page's index restarted at 0, relabelling page 2's rows over page 1's.
 func readScanFamily(ctx context.Context, scanOnce scanRoundFn, pairSize int, redisType string, meta keyMeta, req readReq, fingerprint string) (page.KeyValuePage, error) {
 	if req.Cursor.Mode == "before" {
@@ -251,7 +251,7 @@ type streamFieldValue struct {
 }
 
 // streamFields is a stream entry's field/value pairs, marshaled as a JSON object in the order
-// XADD received them (P2 R1): go-redis's own XMessage.Values is a map[string]interface{}, which
+// XADD received them: go-redis's own XMessage.Values is a map[string]interface{}, which
 // discards that order both on assignment and again were it re-marshaled through encoding/json
 // (map keys sort alphabetically) — so this type is built straight from XRANGE's own raw reply
 // (still an ordered array on the wire, RESP2 or RESP3 alike) rather than through XMessage at all.

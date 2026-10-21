@@ -32,11 +32,10 @@ type hold struct {
 	unsubscribe func()
 }
 
-// walkPair is SPEC §6's per-(connection, repository) walk box, read literally: "log session,
-// commit store, dictionary marks, scroll/paging state, the active review-range walk if any". Two
-// slots, never a map keyed by range — §6.8 is explicit that the review view holds exactly one
-// review session, and reviewing another branch replaces its contents rather than opening a second
-// view (D3).
+// walkPair is SPEC's per-(connection, repository) walk box, read literally: "log session, commit
+// store, dictionary marks, scroll/paging state, the active review-range walk if any". Two slots,
+// never a map keyed by range — SPEC is explicit that the review view holds exactly one review
+// session, and reviewing another branch replaces its contents rather than opening a second view.
 type walkPair struct {
 	graph  *Walk
 	review *Walk
@@ -53,7 +52,7 @@ type Conn struct {
 	// OTHER connection's reader (D7's SnapshotFor).
 	ClientLabel string
 
-	// emitMu guards emitFn (P108 Part 17 review F9): gitrpc.Router.ForConn's own
+	// emitMu guards emitFn: gitrpc.Router.ForConn's own
 	// repoSettings.changed forwarding goroutine starts as soon as ForConn is called — before
 	// bridge's ServeGitStream reaches its own "gconn.SetEmit(sess.Emit)" line
 	// — so a bare, unguarded field here was a genuine read/write data race under the Go memory
@@ -64,13 +63,15 @@ type Conn struct {
 	emitMu sync.RWMutex
 	emitFn func(method string, payload any)
 
-	// noAutoFetch is C13-10's own opt-out: the native git-graph mount's own Conn (bridge/
+	// noAutoFetch is the opt-out: the native git-graph mount's own Conn (bridge/
 	// gitstream.go's ServeGitStream) sets this before serving any request, so its own repo.open
 	// never arms a RepoEntry's background auto-fetch timer (autofetch.go) — restoring
-	// the read-only claim of docs/ARCHITECTURE.md's "Git graph in the native workspace (C10)" section for that surface specifically. Set once,
+	// the read-only claim of docs/ARCHITECTURE.md's "Git graph in the native workspace (C10)"
+	// section for that surface specifically. Set once,
 	// before this Conn is handed to anything that could call Open concurrently (a plain field, not
 	// mutex-guarded, on that basis) — see DisableAutoFetch's own doc comment. Every other Conn
-	// leaves this false and keeps today's behaviour unchanged: RepoEntry is shared per-repository across every connection regardless, so any
+	// leaves this false and keeps today's behaviour unchanged: RepoEntry is shared per-repository
+	// across every connection regardless, so any
 	// OTHER already-open connection on the same repository can still have armed its timer — this
 	// only stops the native mount's OWN repo.open from being what arms it.
 	noAutoFetch bool
@@ -129,7 +130,7 @@ func (c *Conn) Emit(method string, payload any) {
 func (c *Conn) Done() <-chan struct{} { return c.done }
 
 // DisableAutoFetch opts this Conn's own Open calls out of arming a RepoEntry's background
-// auto-fetch timer (C13-10). Call it once, right after NewConn, before this Conn is handed to
+// auto-fetch timer. Call it once, right after NewConn, before this Conn is handed to
 // anything that could start dispatching requests on it (ServeGitStream does so before
 // rpcstream.Session.Serve ever runs) — the resulting happens-before edge (the "go" statement that
 // starts each request-handling goroutine) is what makes this safe with no lock of its own.
@@ -163,7 +164,7 @@ func (c *Conn) AskCredential(ctx context.Context, req gitaskpass.Request) (strin
 
 // Open acquires path's repository and subscribes this connection to it — idempotent per (Conn,
 // RepoID): a second Open for a repo this connection already holds releases the ref it just took
-// and returns the existing hold's summary (D15, resolving F15). RepoID is only known after Identify
+// and returns the existing hold's summary. RepoID is only known after Identify
 // runs inside Acquire, so this is acquire-then-release rather than check-then-acquire — identifying
 // under this connection's own lock would serialise every Open this connection makes.
 func (c *Conn) Open(ctx context.Context, reg *Registry, gitPath, path string) (gitclient.RepoSummary, error) {
@@ -188,9 +189,9 @@ func (c *Conn) Open(ctx context.Context, reg *Registry, gitPath, path string) (g
 	}
 
 	unsubscribeRepo := entry.Subscribe(c.ID, func(ev Event) {
-		// Mark before emitting (D13): a client that reacts to repo.changed by re-opening its
+		// Mark before emitting: a client that reacts to repo.changed by re-opening its
 		// stream must never be able to observe a walk that has not yet been told refs moved.
-		// Marks BOTH the graph and review walk (D5) — a deliberate departure from upstream, whose
+		// Marks BOTH the graph and review walk — a deliberate departure from upstream, whose
 		// review walk dies on hide and so never needs this: ours persists across hide/show, and
 		// without this the client's own "the comparison has changed" banner would replay a stale
 		// store instead of re-walking.
@@ -210,11 +211,10 @@ func (c *Conn) Open(ctx context.Context, reg *Registry, gitPath, path string) (g
 	c.mu.Lock()
 	if c.closed {
 		// This connection's Close already ran (and swapped in the fresh maps below) while this
-		// Open was still identifying the repository or subscribing (F1). The repository really
-		// was identified — the caller gets a correct summary back — but nothing must be stored:
-		// rpcstream's own removeActiveWork already dropped this request's response, so storing a
-		// hold here would leak it forever (SPEC §6's "the result is simply not delivered
-		// anywhere", D3).
+		// Open was still identifying the repository or subscribing. The repository was identified —
+		// the caller gets a correct summary back — but nothing must be stored: rpcstream's own
+		// removeActiveWork already dropped this request's response, so storing a hold here would
+		// leak it forever.
 		c.mu.Unlock()
 		unsubscribe()
 		release()
@@ -231,12 +231,12 @@ func (c *Conn) Open(ctx context.Context, reg *Registry, gitPath, path string) (g
 	}
 	c.held[repoID] = &hold{entry: entry, release: release, unsubscribe: unsubscribe}
 	c.mu.Unlock()
-	// Arms auto-fetch for the off→on direction (F4/D5): newRepoEntry only ever sees the interval
+	// Arms auto-fetch for the off→on direction: newRepoEntry only ever sees the interval
 	// AT construction time, so a repository already open when the setting flips on would otherwise
 	// never get a timer. ensureAutoFetch is a no-op whenever one is already running or the entry is
 	// disabled, so N windows opening this repository arm exactly one.
 	//
-	// C13-10: skipped for a Conn that opted out (the native git-graph mount) — its own repo.open
+	// Skipped for a Conn that opted out (the native git-graph mount) — its own repo.open
 	// must never be what arms a timer. This is per-Conn only: RepoEntry itself is still shared
 	// across every connection on this repository, so another, ordinary connection opening the same
 	// repository can still arm it regardless of what this Conn does.
@@ -265,8 +265,8 @@ func (c *Conn) RecordFailure(repoID, kind, message string) {
 }
 
 // Entry returns the RepoEntry this connection holds for repoID — the seam every per-repo request
-// that is not a graph.* walk needs (D18/F7): a commit's detail, a file's patch and a blob's bytes
-// are facts about the repository (SPEC §6's split rule), not about one viewer's walk. Reports
+// that is not a graph.* walk needs: a commit's detail, a file's patch and a blob's bytes
+// are facts about the repository, not about one viewer's walk. Reports
 // false under the same condition ErrRepoNotHeld names — repo.open must precede this call, exactly
 // as it must for every other per-repo request.
 func (c *Conn) Entry(repoID string) (*RepoEntry, bool) {
@@ -275,7 +275,7 @@ func (c *Conn) Entry(repoID string) (*RepoEntry, bool) {
 
 // CloseRepo releases this connection's hold on repoID, if any, reporting whether one was present —
 // the RPC ignores the bool and answers {} either way, preserving repo.close's idempotency. Any
-// walk over repoID is disposed (its git log process killed) before the ref is released (D13), so
+// walk over repoID is disposed (its git log process killed) before the ref is released, so
 // the registry's refcount can never reach zero while a walk still holds a process against it.
 func (c *Conn) CloseRepo(repoID string) bool {
 	c.mu.Lock()
@@ -335,19 +335,19 @@ func disposePair(pair *walkPair) {
 
 // Walk returns this connection's Walk for repoID — created lazily on first call, rebuilt (the old
 // one disposed) whenever spec no longer matches what it was built with (a scope or range change,
-// D13/D3's own #ensureReviewWalk shape). Errors with ErrRepoNotHeld if this connection has not
+// the #ensureReviewWalk shape). Errors with ErrRepoNotHeld if this connection has not
 // opened repoID.
 //
-// spec.Range == nil selects the graph slot; spec.Range != nil selects the review slot (D3) — both
+// spec.Range == nil selects the graph slot; spec.Range != nil selects the review slot — both
 // slots live in one walkPair per repoID, so a ranged request can never disturb the graph's own
 // walk and vice versa. Reviewing a second branch replaces the first review walk; there is never
 // more than one per (connection, repository).
 //
-// pageSize (D6's own graph.pageSize) only takes effect on first construction of a given slot — the
+// pageSize (the graph.pageSize) only takes effect on first construction of a given slot — the
 // underlying log session's own page size is fixed at Open time and a later call with a different
 // value does not rebuild an otherwise-matching walk; it is not part of matchesSpec.
 //
-// precomputedTotal (D9) is threaded into a freshly-built walk only — an already-matching walk
+// precomputedTotal is threaded into a freshly-built walk only — an already-matching walk
 // reused here keeps whatever total it already has (a peeked count is a hint for the walk's own
 // FIRST open, never a value that overwrites a walk already under way).
 func (c *Conn) Walk(repoID string, gitPath string, spec porcelain.WalkSpec, pageSize int, precomputedTotal *int) (*Walk, error) {
@@ -380,7 +380,7 @@ func (c *Conn) Walk(repoID string, gitPath string, spec porcelain.WalkSpec, page
 		return w, nil
 	}
 
-	// F7 (P108 Part 16 review): swap the slot under c.mu, then dispose the OLD walk only after
+	// Swap the slot under c.mu, then dispose the OLD walk only after
 	// unlocking — the same shape CloseRepo/Close already use in this file. dispose() takes the
 	// walk's own lock, which a running Stream holds across a git page read and its own emit
 	// backpressure; disposing while still holding c.mu would stall every other c.mu user on this
@@ -423,11 +423,11 @@ func (c *Conn) ReviewWalkFor(repoID string) (*Walk, bool) {
 	return c.walkForSlot(repoID, func(p *walkPair) *Walk { return p.review })
 }
 
-// markWalksStale marks BOTH slots of repoID's walk pair stale (D5) — called by Open's own
+// markWalksStale marks BOTH slots of repoID's walk pair stale — called by Open's own
 // subscriber on refsChanged, in place of reaching into a single walk. Never takes a walk's own mu
 // (MarkStale's own doc): the subscriber's goroutine must not block behind a page read.
 //
-// G32 round-3 architecture/security review, finding #6: pair.graph/pair.review themselves — the
+// pair.graph/pair.review themselves — the
 // walkPair's own *Walk fields, not the walks it points to — are c.mu-protected state (Walk's own
 // `*slot = w` / `(*slot).dispose(); *slot = nil` above only ever runs under c.mu). This used to
 // read them AFTER releasing c.mu, racing against a concurrent Walk() call rebuilding either slot —

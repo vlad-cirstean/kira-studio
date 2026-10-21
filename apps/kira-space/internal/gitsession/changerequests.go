@@ -627,7 +627,7 @@ const maxEagerPurgeBranches = 8
 
 // eagerResolveClosedBranches is the eager purge, run in its own goroutine by the refsChanged
 // handler AFTER the cache drop: skipped when the setting is off, no host matches, or the breaker is
-// armed. It resolves at most maxEagerPurgeBranches branches that actually have a stored review
+// armed. It resolves at most maxEagerPurgeBranches branches that have a stored review
 // session (a read, never a second lifecycle), reusing the snapshot exactly like
 // ResolveBranchChangeRequest, and purges each closed or merged one through maybePurgeClosed. It is
 // a background best-effort pass, not a request with a caller waiting on it.

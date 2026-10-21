@@ -21,8 +21,8 @@ type mysqlFamilyFixture struct {
 	container testcontainers.Container
 }
 
-// mysqlFamilySpec is startMysql's and startMariadb's own shared container-run/wait/seed chain
-// (P107 T2-5), factored over what genuinely differs per engine: how the container itself is
+// mysqlFamilySpec is startMysql's and startMariadb's own shared container-run/wait/seed chain,
+// factored over what genuinely differs per engine: how the container itself is
 // built, the seed fixture file, the root-DSN builder, and the extras seed (mysqlfamily_seed.go
 // already shares the fixture-file seed runner — this is everything around it).
 type mysqlFamilySpec struct {

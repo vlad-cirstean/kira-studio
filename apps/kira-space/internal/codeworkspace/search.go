@@ -16,11 +16,10 @@ import (
 	"github.com/kirathecat/kira-studio/internal/pathsafe"
 )
 
-// C7: Go-native repository-wide text search — stdlib regexp (RE2) for matching, git ls-files
+// Go-native repository-wide text search — stdlib regexp (RE2) for matching, git ls-files
 // (EnumerateAll, enumerate.go) for enumeration, and a bounded worker pool (searchWorkers below)
-// for concurrency. No search library: see the phase plan's own D1 for the four-part breakdown and
-// why each of those three is already answered elsewhere in this repo, leaving only the scanner
-// (this file) to hand-roll.
+// for concurrency. No search library: each of those three is already answered elsewhere in this
+// repo, leaving only the scanner (this file) to hand-roll.
 
 // SearchRequest is the wire shape a repository-wide search runs against — Monaco's own find-widget
 // vocabulary (case/whole-word/regex), so the panel's options read the same as the in-file surface.
@@ -32,8 +31,8 @@ type SearchRequest struct {
 }
 
 // SearchMatch is one match within one file — Line/Column/EndColumn are Monaco's own 1-based line
-// and 1-based UTF-16 column (D6), Preview is the line's own text (EOL stripped, possibly windowed,
-// §3.5) with PreviewMatchStart/End as UTF-16 offsets *into Preview* so the renderer highlights
+// and 1-based UTF-16 column, Preview is the line's own text (EOL stripped, possibly windowed)
+// with PreviewMatchStart/End as UTF-16 offsets *into Preview* so the renderer highlights
 // without re-deriving anything.
 type SearchMatch struct {
 	Line              int    `json:"line"`
@@ -156,7 +155,7 @@ func matchesOnLine(m matcher, line []byte, max int) [][]int {
 	return locs
 }
 
-// newMatcher builds §3.3's matcher: a plain literal query goes through bytes.Index; whole-word or
+// newMatcher builds the matcher: a plain literal query goes through bytes.Index; whole-word or
 // case-insensitive or an explicit regex request goes through RE2, built by wrapping the (quoted or
 // raw) pattern in \b(?:…)\b for whole-word and prefixing (?i) for case-insensitivity. A bad regex
 // returns here, before any file is ever opened.
@@ -206,11 +205,11 @@ func searchWorkers() int {
 
 // Search runs req against every file EnumerateAll reports for s.Root, streaming each file's own
 // matches to onFile as they're found — callback-streamed, not slice-returning, so
-// the bridge layer can coalesce without codeworkspace ever importing an emitter (§4.1). onFile may
+// the bridge layer can coalesce without codeworkspace ever importing an emitter. onFile may
 // be called concurrently with itself from different worker goroutines; the one caller
 // (bridge's searchCoalescer) is documented to tolerate that with its own mutex.
 //
-// ctx should be the context returned by s.beginSearch() (D8) — Search itself derives an internal
+// ctx should be the context returned by s.beginSearch() — Search itself derives an internal
 // cancel from it so the whole-run cap (below) can stop outstanding work without cancelling the
 // caller's own context.
 func Search(ctx context.Context, s *Session, req SearchRequest, onFile func(FileMatches)) (SearchStats, error) {
@@ -303,10 +302,10 @@ func Search(ctx context.Context, s *Session, req SearchRequest, onFile func(File
 	return stats, ctx.Err()
 }
 
-// scanFile applies §3.4's five skip gates, in order, cheapest first, and §3.5's column/preview
-// rules to one file. skipped reports whether this file counts toward FilesSkipped (any gate
-// tripped, including gate 4's mid-scan NUL-on-a-match-line rule, which discards whatever matches
-// were already collected for this file). buf is this worker's own reusable scan buffer.
+// scanFile applies the five skip gates, in order, cheapest first, and the column/preview rules
+// to one file. skipped reports whether this file counts toward FilesSkipped (any gate tripped,
+// including gate 4's mid-scan NUL-on-a-match-line rule, which discards whatever matches were
+// already collected for this file). buf is this worker's own reusable scan buffer.
 func scanFile(root, relPath string, m matcher, buf []byte) (matches []SearchMatch, truncated bool, skipped bool) {
 	// Gate 1 (D3): a path resolving outside root — including through a committed symlink — is
 	// skipped, never read.
@@ -395,7 +394,7 @@ func scanFile(root, relPath string, m matcher, buf []byte) (matches []SearchMatc
 }
 
 // buildPreview returns the preview text for a line already known to contain a match at the given
-// byte span, plus that match's own UTF-16 offsets *into the preview* (§3.5). A line at or under
+// byte span, plus that match's own UTF-16 offsets *into the preview*. A line at or under
 // previewMaxBytes is shown whole; a longer one is windowed around the match, cut on rune
 // boundaries so a copied preview is always real, valid file text.
 func buildPreview(line []byte, start, end int) (preview string, matchStart, matchEnd int, truncStart, truncEnd bool) {

@@ -1,4 +1,4 @@
-// Package keepawake composes P87's two independent keep-awake reasons (the titlebar toggle and the
+// Package keepawake composes the two independent keep-awake reasons (the titlebar toggle and the
 // agent-aware Settings leaf) onto one OS-level power assertion. Pure Go, no build tags, no cgo —
 // internal/gitclient's own NewPlatformLocator is the house precedent for a runtime.GOOS switch that
 // still compiles, vets and tests on every platform (docs/DEV_ENVIRONMENT.md's "darwin && cgo file
@@ -9,10 +9,9 @@ package keepawake
 
 import "sync"
 
-// Reason names one of the two independent, level-shaped sources that can hold the assertion
-// (P87 §1.1) — never an edge: both are re-asserted freely by their own owner (a window re-toggling
-// the same state, a settings/session-count recompute), so Controller composes them as a set, not a
-// counter (§1.2).
+// Reason names one of the two independent, level-shaped sources that can hold the assertion — never
+// an edge: both are re-asserted freely by their own owner (a window re-toggling the same state, a
+// settings/session-count recompute), so Controller composes them as a set, not a counter.
 type Reason string
 
 const (
@@ -24,11 +23,11 @@ const (
 	ReasonAgent Reason = "agent"
 )
 
-// Controller composes N independent on/off reasons onto one OS-level assertion (§1): the driver's
+// Controller composes N independent on/off reasons onto one OS-level assertion: the driver's
 // Acquire is called only on the empty→non-empty transition of the reason set, and Release only on
 // non-empty→empty — every other Set call is a no-op by construction. A set, not a counter: a
 // counter is correct only if every source's on/off calls are perfectly paired forever, and neither
-// source here is (§1.2).
+// source here is.
 type Controller struct {
 	mu      sync.Mutex
 	driver  Driver
@@ -38,7 +37,7 @@ type Controller struct {
 }
 
 // lossReporter is an optional capability a Driver may implement when its assertion can be lost
-// outside a Release call (the darwin driver's own caffeinate exiting on its own, §2.3) — kept off
+// outside a Release call (the darwin driver's own caffeinate exiting on its own) — kept off
 // the public Driver interface since self-heal is Controller-internal machinery, not something every
 // OS driver needs to know about (a noopDriver's assertion can never be lost).
 type lossReporter interface {
@@ -59,7 +58,7 @@ func New(d Driver) *Controller {
 // assertion only if that changes want (len(reasons) > 0) relative to the controller's own record of
 // what is currently held — never merely whether this call changed the set's membership, so a
 // self-heal (reportLost flipping held to false while reasons stays non-empty) is picked up by the
-// very next Set for any reason, not only the one that changes (§1.4).
+// very next Set for any reason, not only the one that changes.
 func (c *Controller) Set(r Reason, on bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -92,7 +91,7 @@ func (c *Controller) Held() bool {
 }
 
 // Supported forwards the driver's own Supported() — internal/bridge's own boot-time and per-status
-// read of whether this OS/build can hold a keep-awake assertion at all (§3.1: the titlebar hides
+// read of whether this OS/build can hold a keep-awake assertion at all (the titlebar hides
 // its button outright when this is false, rather than offering a control that does nothing). The
 // driver never changes after New, so this needs no lock.
 func (c *Controller) Supported() bool {
@@ -140,7 +139,7 @@ func (c *Controller) reportLost(err error) {
 	c.lastErr = err
 }
 
-// acquireLocked/releaseLocked perform the driver call inside the lock (§1.3: no two transitions can
+// acquireLocked/releaseLocked perform the driver call inside the lock (no two transitions can
 // interleave, and no acquire can land after the release meant to follow it) — Acquire is a
 // fork/exec and Release a Process.Kill(), both bounded; the driver's own Wait() happens in its
 // reaper goroutine, never here, so the lock is never held across an unbounded wait.

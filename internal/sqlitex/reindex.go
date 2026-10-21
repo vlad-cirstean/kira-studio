@@ -7,7 +7,7 @@ import (
 
 // ReindexSortOrder rewrites a sibling set's sort_order dense, 0..n-1, in the order the rows
 // already have — the read-ids/loop-update shape three repos (Studio's collections and variables,
-// each with a different sibling scope) ran identically (P107 I2-31). selectSQL must return exactly
+// each with a different sibling scope) ran identically. selectSQL must return exactly
 // one string column (the row id) ordered the way the new sort_order should follow; updateSQL takes
 // (order, id) as its two placeholders, in that order.
 func ReindexSortOrder(tx *sql.Tx, selectSQL, updateSQL string, args ...any) error {

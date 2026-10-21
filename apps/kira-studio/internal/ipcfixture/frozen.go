@@ -65,13 +65,13 @@ const (
 	FrozenCoordinatorPort = 0
 )
 
-// FreezeCoordinator is kafka.backend.spec.ts's own freezeCoordinator, ported: a fresh Testcontainers
-// Docker-assigned hostname and host-mapped port every run, embedded both as a structured row (a
-// single "host:port" string) and as two separate fields inside the definition's own JSON statements
-// text (kafka/definition.go's own doc.Coordinator.Host/.Port) — each needs its own substitution.
-// Frozen at record time (not just at comparison time, unlike a run-to-run-*stable* value like
-// serverVersion) because a write-mode regeneration must capture a fixture that stays stable across
-// every future run, not just this one.
+// FreezeCoordinator is kafka.backend.spec.ts's own freezeCoordinator, ported: a fresh
+// Testcontainers Docker-assigned hostname and host-mapped port every run, embedded both as a
+// structured row (a single "host:port" string) and as two separate fields inside the definition's
+// own JSON statements text (kafka/definition.go's own doc.Coordinator.Host/.Port) — each needs its
+// own substitution. Frozen at record time (not just at comparison time, unlike a
+// run-to-run-*stable* value like serverVersion) because a write-mode regeneration must capture a
+// fixture that stays stable across every future run, not just this one.
 func FreezeCoordinator(d model.ObjectDefinition) model.ObjectDefinition {
 	sections := make([]model.DefinitionSection, len(d.Sections))
 	for i, sec := range d.Sections {
@@ -222,8 +222,7 @@ func FreezeConnectionState(s model.ConnectionState) model.ConnectionState {
 // continuationTokenPlaceholder is what MaskContinuationTokens substitutes for a keyset page's
 // nextToken/prevToken.
 //
-// This is a P58f-port-time finding, not carried over from any TypeScript spec (§4.3(d) is
-// otherwise a re-derivation of frozen fields the old specs already named): a keyset continuation
+// This is a port-time finding, not carried over from any TypeScript spec: a keyset continuation
 // token is adapters.EncodePageToken's base64(json({v, k, f})), where f is
 // adapters.RequestFingerprint — sha1 of a Go struct (mysqlfamily/read.go's own {Path
 // QualifiedName, Projection, Filter, Sort, PageSize}) marshaled by encoding/json. The deleted
@@ -237,17 +236,17 @@ func FreezeConnectionState(s model.ConnectionState) model.ConnectionState {
 const continuationTokenPlaceholder = "<token>"
 
 // serverVersionPlaceholder is what MaskContinuationTokens substitutes for a "serverVersion"
-// value. §4.3(d)'s own frozen list names this for every adapter: "any serverVersion matched by
+// value. The frozen list names this for every adapter: "any serverVersion matched by
 // pattern rather than compared — image tags move." mariadb's and mysql's own fixed :11.4/:8.4
-// image tags happened to resolve to the exact patch already cached in this sandbox when commits
-// 12-13 were captured, so their serverVersion strings matched byte for byte incidentally; masking
+// image tags happened to resolve to the exact patch already cached in this sandbox when captured,
+// so their serverVersion strings matched byte for byte incidentally; masking
 // it here rather than relying on that coincidence is the documented-correct behaviour for every
 // adapter, not just the one (clickhouse, :26.3) where the coincidence broke first.
 const serverVersionPlaceholder = "<serverVersion>"
 
 // endpointPlaceholder is what MaskContinuationTokens substitutes for an sqs connection's
 // options.endpoint value — LocalStack's own ephemeral host-mapped port, the same run-to-run
-// volatile data every other adapter's host/port carries, just embedded in Options (uri-mode
+// volatile data every other adapter's host/port carries, embedded in Options (uri-mode
 // connections have no top-level Host/Port for FreezeConnectionSummary to freeze) rather than a
 // top-level field.
 const endpointPlaceholder = "<endpoint>"
@@ -271,8 +270,7 @@ const protocolTypePlaceholder = "<protocolType>"
 // This exists because Go's encoding/json always marshals a map alphabetically by key, while the
 // TypeScript engines this port replaces preserved whatever order the SDK response (sqs's
 // GetQueueAttributes, kafka's own per-record partition/offset object) or JS object literal
-// happened to use — sqs/definition.go's own comment already names this exact divergence
-// ("P58d §4.2's recorded divergence... P58f's generator port will re-derive it"). Both
+// happened to use — sqs/definition.go's own comment already names this exact divergence. Both
 // encodings are semantically identical JSON that the frontend only ever JSON.parses, never
 // string-compares, so re-serializing both sides through the same canonical (sorted) encoder
 // before comparing is correct, not a loosened check — a genuinely different value (not just a
@@ -300,11 +298,12 @@ func canonicalizeJSONTextEntries(arr []any) {
 
 // MaskContinuationTokens walks a JSON value already decoded into any (map[string]any/[]any/
 // primitives, e.g. via json.Unmarshal) and, recursively and in place:
-//   - replaces every non-null "nextToken"/"prevToken" string value with continuationTokenPlaceholder
+//   - replaces every non-null "nextToken"/"prevToken" string value with
+//     continuationTokenPlaceholder
 //   - replaces every non-null "serverVersion" string value with serverVersionPlaceholder
 //   - sorts every "nodes" array by its "name" field
 //
-// The third bullet is a P58f-port-time finding distinct from the other two: system.tables' own
+// The third bullet is a finding distinct from the other two: system.tables' own
 // `ORDER BY name` runs server-side in ClickHouse, so it should be deterministic given identical
 // data — but it produced a different order for "Order Items" (byte order vs. a
 // locale/case-aware order) between the committed fixture's capture and this port's own run
@@ -343,10 +342,10 @@ func applyStructuralMasks(t map[string]any) {
 
 // dropGroupTypeFields drops kadm.DescribedGroup's own Type/PartitionAssignor fields — from a
 // statements doc's top-level keys and from a "Group" section's own structured rows alike — since
-// kafka/definition.go's Go port drops these two rows entirely (P58e E13, its own comment: "the
+// kafka/definition.go's Go port drops these two rows entirely (its own comment: "the
 // group section drops from seven rows to five") rather than reproducing the deleted TypeScript
 // engine's definition.ts one for one. That is a permanent adapter capability difference from a
-// much earlier phase, not a P58f-port non-determinism — it is reconciled here, at comparison
+// much earlier phase — it is reconciled here, at comparison
 // time, rather than papered over, so every committed fixture's own extra rows/JSON keys are
 // dropped from both sides identically before diffing (a real name/value divergence in what
 // remains still produces a diff).
@@ -374,10 +373,9 @@ func dropGroupTypeFields(t map[string]any) {
 }
 
 // maskGroupRowByName masks one DefinitionSectionRow by its own "name" field — three more names
-// from kafka's own Group section, first surfaced by this exact comparison (P58f-port-time
-// findings, not run-to-run non-determinism — franz-go's kadm client and the deleted TypeScript
-// engine's own kafkajs binding simply report this admin-created, never-joined consumer group's
-// own metadata differently):
+// from kafka's own Group section, first surfaced by this exact comparison (not run-to-run
+// non-determinism — franz-go's kadm client and the deleted TypeScript engine's own kafkajs
+// binding report this admin-created, never-joined consumer group's own metadata differently):
 //   - "coordinator": the same real, volatile broker address as the nested object below.
 //   - "state": kadm reports the Kafka wire protocol's own state name verbatim ("Empty"); the
 //     deleted engine's definition.ts translated a raw numeric state code through its own lookup
@@ -434,7 +432,7 @@ func maskWithPlaceholder(placeholder string) maskRule {
 // Built in init(), not as a var initializer directly, because several rules below call
 // MaskContinuationTokens itself — a direct initializer expression referencing it creates a
 // package-init dependency cycle (MaskContinuationTokens also reads keyMaskRules), even though
-// nothing here actually needs keyMaskRules populated until MaskContinuationTokens first runs,
+// nothing here needs keyMaskRules populated until MaskContinuationTokens first runs,
 // always after init() has finished.
 var keyMaskRules map[string]maskRule
 
@@ -447,12 +445,12 @@ func init() {
 		// The statements-doc counterpart of the "protocolType" row applyStructuralMasks handles above.
 		"protocolType": maskWithPlaceholder(protocolTypePlaceholder),
 		"refresh": func(t map[string]any, k string, val any) {
-			// P58f-port-time finding: the deleted TypeScript engine's ENGINE_OP.definition/describe
+			// The deleted TypeScript engine's ENGINE_OP.definition/describe
 			// wire shape never modeled a refresh flag at all (it was purely harness.ts's own local
 			// cache-bypass, never sent over the wire) — the committed clickhouse fixture's
 			// treeDefinition args reflect that, carrying no "refresh" key. The real
 			// bridge.TreeDescribeArgs this port drives does model it, correctly, since
-			// tree.Service.Definition genuinely takes a refresh argument today (P55's own redesign,
+			// tree.Service.Definition genuinely takes a refresh argument today (a redesign,
 			// unrelated to this port). Every committed scenario only ever passes refresh=false, so
 			// dropping a false-valued key from both sides before comparing can never hide a
 			// true-valued divergence.
@@ -490,11 +488,11 @@ func init() {
 				return
 			}
 			// kafka/definition.go's own groupOffsetDoc struct (unlike its groupMemberDoc sibling)
-			// carries only Name/Value, no Detail field — the deleted TypeScript engine's own JSON doc
-			// included a null "detail" alongside every offset entry. Structured DefinitionSectionRows
-			// on both sides already carry Detail:null; this normalizes the nested JSON doc's own
-			// shape to match before comparing, since an absent key and a null-valued key mean the
-			// same thing here.
+			// carries only Name/Value, no Detail field — the deleted TypeScript engine's own JSON
+			// doc included a null "detail" alongside every offset entry. Structured
+			// DefinitionSectionRows on both sides already carry Detail:null; this normalizes the
+			// nested JSON doc's own shape to match before comparing, since an absent key and a
+			// null-valued key mean the same thing here.
 			if arr, ok := val.([]any); ok {
 				for _, item := range arr {
 					if m, ok := item.(map[string]any); ok {

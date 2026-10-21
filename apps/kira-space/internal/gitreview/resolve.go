@@ -1,9 +1,8 @@
-// Package gitreview holds branch review's base-resolution policy (docs/HISTORY.md (v1.3 G6),
-// D7a): a pure classifier over a for-each-ref
-// snapshot, with no I/O — the caller (gitsession.RepoEntry.ResolveReviewBase) has already fetched
-// the ref snapshot (cached) and the origin/HEAD answer (one spawn, only when needed) before
-// calling ResolveBase. Imports gitclient/porcelain (for RefRow) and stdlib only, the same
-// one-directional leaf dependency gitpreflight has.
+// Package gitreview holds branch review's base-resolution policy: a pure classifier over a
+// for-each-ref snapshot, with no I/O — the caller (gitsession.RepoEntry.ResolveReviewBase) has
+// already fetched the ref snapshot (cached) and the origin/HEAD answer (one spawn, only when
+// needed) before calling ResolveBase. Imports gitclient/porcelain (for RefRow) and stdlib only, the
+// same one-directional leaf dependency gitpreflight has.
 package gitreview
 
 import "github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
@@ -75,8 +74,8 @@ type Core struct {
 var DefaultBaseCandidates = []string{"main", "master"}
 
 // bareUpstreamName strips every namespace prefix AND the remote name: "refs/heads/main" ->
-// "main"; "refs/remotes/origin/develop" -> "develop" — the COMPARISON name §6.8 step 1 checks
-// against branch.ShortName ("feature-x" tracking "refs/remotes/origin/feature-x" compares
+// "main"; "refs/remotes/origin/develop" -> "develop" — the COMPARISON name checked against
+// branch.ShortName ("feature-x" tracking "refs/remotes/origin/feature-x" compares
 // feature-x == feature-x, not origin/feature-x == feature-x).
 func bareUpstreamName(upstream string) string {
 	const headsPrefix = "refs/heads/"
@@ -125,7 +124,7 @@ func findRef(branches, remoteBranches []porcelain.RefRow, shortName string) (por
 	return porcelain.RefRow{}, false
 }
 
-// ResolveBase is §6.8's three-step order, ported rule for rule from upstream's core/src/model/
+// ResolveBase is the three-step order, ported rule for rule from upstream's core/src/model/
 // review.ts:
 //
 //  1. The branch's upstream, when it names a genuinely different branch AND still resolves to a
@@ -145,11 +144,10 @@ func ResolveBase(in Input) Core {
 	return Core{Base: base, Reason: reason, Candidates: candidates}
 }
 
-// resolveBaseRef is ResolveBase's own steps 1-3 (§6.8): the branch's upstream when it names a
+// resolveBaseRef is ResolveBase's own steps 1-3: the branch's upstream when it names a
 // genuinely different branch, else OriginHead, else the first existing Candidates member, else
 // ReasonNone. Also returns the resolved upstream ref (found or not) so collectCandidates can reuse
-// it without re-resolving — every Reason value below is produced at the exact same branch as
-// before this split.
+// it without re-resolving.
 func resolveBaseRef(in Input) (base *string, reason Reason, upstreamRef porcelain.RefRow, upstreamFound bool) {
 	var upstreamShort, upstreamBareName string
 	var hasUpstream bool

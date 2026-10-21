@@ -36,7 +36,7 @@ func jetBrainsConfigRoot() (string, error) {
 	return filepath.Join(home, ".config", "JetBrains"), nil
 }
 
-// DiscoverConfigDirs enumerates and ranks (D5) the JetBrains product config directories under
+// DiscoverConfigDirs enumerates and ranks the JetBrains product config directories under
 // root, given createdIn (dataSources.local.xml's own build-code hint, "" when unknown). A
 // directory counts as a candidate only when it looks like a real IDE config dir — contains
 // c.kdbx or options/security.xml — so an unrelated folder under the same JetBrains/ parent (a
@@ -98,11 +98,11 @@ func looksLikeIDEConfigDir(dir string) bool {
 	return false
 }
 
-// SecurityConfig is security.xml's PasswordSafe component (F5) — Provider is "" when the file is
-// missing or unparseable, which D5.4/D4 treat as "try the keychain" rather than an error. keepassDb
+// SecurityConfig is security.xml's PasswordSafe component — Provider is "" when the file is
+// missing or unparseable, which is treated as "try the keychain" rather than an error. keepassDb
 // (the file-store's own relocation option) is intentionally not carried here any more — this
-// package no longer reads a file-based store at all (see this follow-up's docs note), only
-// Provider itself, to tell a KEEPASS-configured project apart from one this app can actually help.
+// package no longer reads a file-based store at all, only
+// Provider itself, to tell a KEEPASS-configured project apart from one this app can help.
 type SecurityConfig struct {
 	Provider string
 }
@@ -143,11 +143,10 @@ func ReadSecurityXML(configDir string) SecurityConfig {
 	return cfg
 }
 
-// LookupOrder is D4, reduced by this follow-up (see docs/HISTORY.md (v1.2 P25)'s
-// correction note): the file-based PasswordSafe store (KEEPASS) was removed per explicit user
-// correction, so "keychain" is the only backend this package ever tries. A KEEPASS-configured
-// project is handled separately by its callers (apply.go's lookupPassword, scan.go's outlookFor),
-// which check cfg.Provider directly so they can report ReasonCredentialStoreUnsupported /
+// The file-based PasswordSafe store (KEEPASS) was removed per explicit user correction, so
+// "keychain" is the only backend this package ever tries. A KEEPASS-configured project is handled
+// separately by its callers (apply.go's lookupPassword, scan.go's outlookFor), which check
+// cfg.Provider directly so they can report ReasonCredentialStoreUnsupported /
 // OutlookStoreUnsupported rather than conflating it with "DataGrip never saved a password"
 // (MEMORY_ONLY/DO_NOT_STORE, which is what an empty return here means). provider is
 // SecurityConfig.Provider ("" for absent/unparseable, treated the same as "KEYCHAIN").

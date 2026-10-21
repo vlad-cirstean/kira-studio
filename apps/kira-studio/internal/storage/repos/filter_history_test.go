@@ -61,12 +61,12 @@ func TestFilterHistoryPerPathCapStillWorks(t *testing.T) {
 	}
 }
 
-// P23 §4.2 case 3: past the per-connection cap (D4, 4,000 = metadata_cache's 200 paths/connection
-// x filter_history's own 20 rows/path), the least-recently-used path's rows are evicted and the
-// most-recently-used path's are not — the property a flat per-path cap alone cannot give. 4,000
-// background rows are seeded directly (one bulk transaction, bypassing Record's own three
-// statements per call) so the boundary is exercised with a single real Record call rather than
-// 4,000 of them, which is both true to what the cap actually bounds and fast.
+// Past the per-connection cap (4,000 = metadata_cache's 200 paths/connection x filter_history's own
+// 20 rows/path), the least-recently-used path's rows are evicted and the most-recently-used path's
+// are not — the property a flat per-path cap alone cannot give. 4,000 background rows are seeded
+// directly (one bulk transaction, bypassing Record's own three statements per call) so the
+// boundary is exercised with a single real Record call rather than 4,000 of them, which is both
+// true to what the cap bounds and fast.
 func TestFilterHistoryPerConnectionCapEvictsLeastRecentlyUsedPath(t *testing.T) {
 	r := newFilterHistoryRepo(t)
 	seedConnection(t, r.DB, "c1")
@@ -158,11 +158,11 @@ func TestFilterHistoryWhereTextOverCapIsTruncated(t *testing.T) {
 	}
 }
 
-// TestFilterHistoryWhereTextOverCapTruncatesOnRuneBoundary is F9 (P108 Part 3): a raw byte cut can
+// TestFilterHistoryWhereTextOverCapTruncatesOnRuneBoundary: a raw byte cut can
 // land mid-rune for a where_text made of multi-byte UTF-8 characters, producing an invalid string
 // nothing can safely display. Built from a 2-byte rune ("é") repeated so its 4 KiB cut point falls
 // exactly mid-character under a naive byte truncation (4096 is even, so a 2-byte rune repeated
-// would actually land clean — 3-byte runes don't divide it evenly, which is the point).
+// would land clean — 3-byte runes don't divide it evenly, which is the point).
 func TestFilterHistoryWhereTextOverCapTruncatesOnRuneBoundary(t *testing.T) {
 	r := newFilterHistoryRepo(t)
 	seedConnection(t, r.DB, "c1")
@@ -192,7 +192,7 @@ func TestFilterHistoryWhereTextOverCapTruncatesOnRuneBoundary(t *testing.T) {
 	}
 }
 
-// TestFilterHistoryOversizedOrderByIsDroppedNotCorrupted is F9 (P108 Part 3): order_by_json is an
+// TestFilterHistoryOversizedOrderByIsDroppedNotCorrupted: order_by_json is an
 // *encoded JSON* string — truncating it at any byte offset, rune-boundary-safe or not, still
 // leaves invalid JSON, which List's own decode guard then drops the *whole row* over (including a
 // perfectly good where_text sitting right next to it). An oversized orderBy must be dropped

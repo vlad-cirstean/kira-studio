@@ -16,14 +16,14 @@ var (
 	normalizeComposedE   = string([]byte{0xc3, 0xa9})       // U+00E9, composed "é"
 )
 
-// TestNormalizeStoredPaths_RekeysRepoIDOnly is G32 round-3 functional-correctness review finding
-// #6's own regression proof: review_session.repo_id (a filesystem DIRECTORY path, which this
-// app's own ingestion sites can legitimately hand it in NFD) is still rekeyed to NFC, but
-// review_file.path/review_range.path/review_comment.path (repository-relative paths sourced from
-// git's own diff output, which echoes committed tree/index bytes verbatim regardless of
-// core.precomposeunicode) are now left exactly as stored — rewriting them used to silently break
-// incremental.go's own live-diff-path join for a genuinely NFD-committed file, making its review
-// state (and every comment on it) disappear on the very next review.db open.
+// TestNormalizeStoredPaths_RekeysRepoIDOnly is the regression proof: review_session.repo_id (a
+// filesystem DIRECTORY path, which this app's own ingestion sites can legitimately hand it in NFD)
+// is still rekeyed to NFC, but review_file.path/review_range.path/review_comment.path
+// (repository-relative paths sourced from git's own diff output, which echoes committed tree/index
+// bytes verbatim regardless of core.precomposeunicode) are now left exactly as stored — rewriting
+// them used to silently break incremental.go's own live-diff-path join for a genuinely
+// NFD-committed file, making its review state (and every comment on it) disappear on the very next
+// review.db open.
 func TestNormalizeStoredPaths_RekeysRepoIDOnly(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)

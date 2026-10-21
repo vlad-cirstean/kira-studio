@@ -47,9 +47,9 @@ type OpenFileRequest struct{ Title, FilterName, FilterPattern string }
 type OpenDirectoryRequest struct{ Title string }
 
 // Dialogs is the native-dialog seam. internal/appshell adapts it over repo-root
-// internal/shell.Dialogs (app.Dialog with the main window attached for modality, P103 Part 3);
+// internal/shell.Dialogs (app.Dialog with the main window attached for modality);
 // files_test.go implements it with a recorder. Every method returns "" for a cancelled dialog,
-// which is the only cancel signal Wails gives (P56 §1.2).
+// which is the only cancel signal Wails gives.
 type Dialogs interface {
 	SaveFile(req SaveFileRequest) (string, error)
 	OpenFile(req OpenFileRequest) (string, error)
@@ -118,7 +118,7 @@ type FilesChooseFolderResult struct {
 	Path     *string `json:"path"`
 }
 
-// ChooseFolder is P25 D13's picker for a DataGrip project directory. It also accepts a directly
+// ChooseFolder is the picker for a DataGrip project directory. It also accepts a directly
 // typed path (the dialog UI itself validates that path the same way, so this method stays a thin
 // wrapper with no directory-shape validation of its own — Scan's own error is what a bad path
 // surfaces as).
@@ -136,10 +136,10 @@ func (s *FilesService) ChooseFolder(args FilesChooseFolderArgs) (FilesChooseFold
 }
 
 // wailsFilter collapses Electron's per-group filter list into the single extension set Wails'
-// macOS open panel actually applies (dialogs_darwin.go's show() joins every filter's components
+// macOS open panel applies (dialogs_darwin.go's show() joins every filter's components
 // into one ';' string). Returns ok == false when any extension is "*": Wails has no wildcard —
 // panel:shouldEnableURL: matches on a literal ".<ext>" suffix (dialogs_darwin_delegate.m:29-37) —
-// and an empty allowed-extension list is what actually means "all files" there (P56 D8).
+// and an empty allowed-extension list is what means "all files" there.
 func wailsFilter(filters []FileFilter) (name, pattern string, ok bool) {
 	if len(filters) == 0 {
 		return "", "", false

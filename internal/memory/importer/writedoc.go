@@ -114,8 +114,9 @@ var errNoDocFacts = errors.New("no stored fact to write")
 
 // RenderDoc renders the kira-memory doc of a file's stored facts. A fact whose reason is the source
 // locator of its section takes that section as its heading and no reason line; any other reason is
-// written in full under the running section of its kind. left counts facts with another provenance, bad facts
-// whose text the format rejects; both are left out. Pure: the write-back and the eval harness share it.
+// written in full under the running section of its kind. left counts facts with another provenance,
+// bad facts whose text the format rejects; both are left out. Pure: the write-back and the eval
+// harness share it.
 func RenderDoc(in DocInput, mems []memory.Memory) (text string, left, bad int, err error) {
 	doc := memfmt.Doc{Group: in.GroupID, Title: docTitle(in.Title, in.FileName), Updated: in.Updated, Provenance: memfmt.Provenance{
 		Origin: in.Prov.Origin, Source: in.Prov.SourceTag, Scope: in.Prov.Scope, Project: in.Prov.Project}}

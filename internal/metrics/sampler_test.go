@@ -50,7 +50,7 @@ func TestCpuDeltaPercent_ZeroElapsed_ReturnsZero(t *testing.T) {
 	}
 }
 
-// P2 R1 regression: StatusBar.vue renders CPUPercent as a plain "N%" with no clamping and a
+// Regression: StatusBar.vue renders CPUPercent as a plain "N%" with no clamping and a
 // 4-character reserved width ("100%") — the raw per-core-sum a multi-process, multi-core-busy app
 // produces (e.g. 350 on a quad-core machine fully loaded) must be normalized to the machine's own
 // 0-100 range before it ever reaches that layer.
@@ -73,7 +73,7 @@ func TestCpuDeltaPercent_ZeroLogicalCPUs_ReturnsZero(t *testing.T) {
 	}
 }
 
-// C1's own clamp/monotonicity rules (P7 plan §6, C1) — the one test this phase's refactor earns
+// The clamp/monotonicity rules — the one test this phase's refactor earns
 // per CLAUDE.md's bar, since each subtest below guards a rule nothing else in the package checks:
 // a per-pid delta cannot go negative and drag down another pid's genuine usage, a pid recovering
 // from a probe failure cannot manufacture a lifetime-sized spike out of a stale baseline it no
@@ -94,9 +94,9 @@ func TestCpuDeltaPercent_ClampingRules(t *testing.T) {
 
 	t.Run("RecoveredAfterProbeFailureNoStaleBaselineSpike", func(t *testing.T) {
 		// A pid whose probe failed last tick is dropped from Sample's cpuNow entirely (see Sample's
-		// probe loop), so it is missing from prev here exactly like a brand-new pid — it must not be
-		// differenced against a stale cumulative reading from before the failure, which would read
-		// as that pid's entire lifetime CPU usage compressed into one sample window.
+		// probe loop), so it is missing from prev here exactly like a brand-new pid — it must not
+		// be differenced against a stale cumulative reading from before the failure, which would
+		// read as that pid's entire lifetime CPU usage compressed into one sample window.
 		prev := map[int32]cpuState{} // dropped last tick when its probe failed
 		cur := map[int32]cpuState{100: {time: 300.0, createTime: 7000}}
 		got := cpuDeltaPercent(prev, cur, 1.0, 1)
@@ -216,7 +216,7 @@ func containsPID(pids []int32, want int32) bool {
 	return false
 }
 
-// P21 round 2 performance finding 10(a): with RescanEvery == 1 (the production value), every
+// With RescanEvery == 1 (the production value), every
 // single tick used to probe each pid twice — once inside CachedPIDs.PIDs' own rescan (to read
 // createTime), and again inside Sampler.Sample (to read memory/CPU) — even though rescan's own
 // probe already read every field Sample needs. Sample now reuses whatever procSample its own

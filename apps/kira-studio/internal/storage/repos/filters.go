@@ -43,7 +43,7 @@ func (r *FiltersRepo) List(connectionID string) (model.TreeVisibility, error) {
 }
 
 // Replace is delete-all + insert, one transaction (filters.ts's replaceVisibility): the dialog
-// edits a whole set and saves it. INSERT OR IGNORE (D10) absorbs a duplicate value in the input —
+// edits a whole set and saves it. INSERT OR IGNORE absorbs a duplicate value in the input —
 // the primary key is (connection_id, scope, value) and the payload is a set, so a repeat is a
 // no-op rather than an error.
 func (r *FiltersRepo) Replace(connectionID string, v model.TreeVisibility) (model.TreeVisibility, error) {

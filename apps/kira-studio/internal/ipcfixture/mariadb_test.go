@@ -47,13 +47,13 @@ func nodeNamed(nodes []model.TreeNode, kind, name string) *model.TreeNode {
 func strp(s string) *string { return &s }
 func intp(i int) *int       { return &i }
 
-// TestFixture_MariaDB is P58f §4.5 step 1: the apparatus plus one pilot adapter, in read mode,
-// proven byte-for-byte against the fixture tests/ipc/mariadb/mariadb.fixture.ts already committed
-// by the TypeScript generator this package replaces. Nothing is written and nothing is deleted —
-// the strongest possible proof of the port, per the plan's own framing. The scenario mirrors
-// tests/ipc/mariadb/mariadb.backend.spec.ts exactly, one call site at a time; where a call is
-// deliberately not part of the committed fixture (the cache-hit probe calls, the in-flight cancel
-// target), it is made directly against the app stack rather than through the Recorder.
+// TestFixture_MariaDB is the apparatus plus one pilot adapter, in read mode, proven byte-for-byte
+// against the fixture tests/ipc/mariadb/mariadb.fixture.ts already committed by the TypeScript
+// generator this package replaces. Nothing is written and nothing is deleted — the strongest
+// possible proof of the port. The scenario mirrors tests/ipc/mariadb/mariadb.backend.spec.ts
+// exactly, one call site at a time; where a call is deliberately not part of the committed fixture
+// (the cache-hit probe calls, the in-flight cancel target), it is made directly against the app
+// stack rather than through the Recorder.
 func TestFixture_MariaDB(t *testing.T) {
 	fixture := testsupport.StartMariadb(t)
 	app := NewApp(t)

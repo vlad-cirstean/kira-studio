@@ -19,11 +19,11 @@ import (
 
 type listConnectionsArgs struct{}
 
-// listConnections returns every connection with mcp_enabled true — deny by default (§6.1): a
+// listConnections returns every connection with mcp_enabled true — deny by default: a
 // connection the user has not exposed is absent entirely, not listed-and-denied, since its
 // existence is not the AI client's business.
 //
-// M7 finding #8: deliberately not gated on read mode the way listChildren/describeTable/
+// Deliberately not gated on read mode the way listChildren/describeTable/
 // describeSchema now are. This tool's whole job is enumerating exposed connections *and their own
 // configured permissions* (the Permissions field below) so a caller can see, up front, that a
 // connection denies read/write/DDL before trying any of them — gating it on read mode would hide
@@ -62,11 +62,11 @@ func (s *Server) listConnections(_ context.Context, _ *mcp.CallToolRequest, _ li
 	return jsonResult(out)
 }
 
-// resolveReadGated is list_children/describe_table/describe_schema's shared preamble (I2-44):
+// resolveReadGated is list_children/describe_table/describe_schema's shared preamble:
 // resolve the connection, then refuse if read mode denies. done is true whenever the caller should
 // return (res, out, err) immediately, same convention as resolveVerdict/awaitApproval below.
 //
-// M7 finding #8: schema-browsing tools are gated at read-mode's own minimum bar — deny refuses,
+// Schema-browsing tools are gated at read-mode's own minimum bar — deny refuses,
 // same as every other read here. Not extended to prompt's own approval dialog: unlike run_query/
 // explain_query, none of these run caller-supplied SQL against the connection, so there is no
 // statement to show the human in an approval request.
@@ -83,9 +83,9 @@ func (s *Server) resolveReadGated(connectionID string) (summary model.Connection
 	return summary, nil, nil, nil, false
 }
 
-// --- list_children (§4.2) — replacing the fixed-name list_databases/list_schemas SPEC first named:
+// --- list_children — replacing the fixed-name list_databases/list_schemas SPEC first named:
 // the adapter layer's metadata primitive is one lazy level (Adapter.Children), and the levels
-// differ per kind (§1.5), so one tool that returns the node's own `kind` is strictly more
+// differ per kind, so one tool that returns the node's own `kind` is strictly more
 // information than a pair of fixed names could carry. ---
 
 type listChildrenArgs struct {
@@ -161,19 +161,19 @@ type runQueryArgs struct {
 }
 
 // runQuery builds an adapterhost.ExecuteRequestWire and calls Query.Execute — literally the method
-// case "data:execute" calls for the console (§4.5), so throttling, op-logging, cancellation, panic
+// case "data:execute" calls for the console, so throttling, op-logging, cancellation, panic
 // recovery and each adapter's own read-only wrap all apply with nothing re-implemented. Connects on
-// demand (§6.3): exposing a connection to MCP is the human's own explicit consent, and Connect is
+// demand: exposing a connection to MCP is the human's own explicit consent, and Connect is
 // the same deduplicated path the UI uses, so the connection visibly comes up in the app rather than
 // opening invisibly.
 //
-// M3 §5.2's gate order — a deliberate reorder from M2's own predicted seam, for two reasons: a
+// The gate order — a deliberate reorder from the predicted seam, for two reasons: a
 // statement the permission gate will deny must buy no EXPLAIN work, and one call must raise at
 // most one approval prompt. resolve (unchanged) → refuse before connecting if every mode denies
 // (unchanged) → clamp maxRows (unchanged) → connect (unchanged) → classify (unchanged) → verdict,
 // with deny refusing here, before any EXPLAIN (reordered) → forced EXPLAIN when McpAutoExplain is
 // on (new — a nil plan or any error degrades to "no plan", never blocks) → heavy check (new,
-// §6.1: overThreshold only) → at most one approval, for verdict=="prompt" or heavy (extended) →
+// overThreshold only) → at most one approval, for verdict=="prompt" or heavy (extended) →
 // execute (unchanged) → render, now carrying a plan summary when one exists (extended).
 func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQueryArgs) (*mcp.CallToolResult, any, error) {
 	rv, res, out, err, done := s.resolveVerdict(ctx, args)
@@ -206,7 +206,7 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		Cap:          page.ResultCap{Rows: rv.maxRows},
 	})
 	if err != nil {
-		// Finding #4, M6: a Postgres/MySQL driver error routinely embeds the offending value (a
+		// A Postgres/MySQL driver error routinely embeds the offending value (a
 		// failed type-cast error names the literal it couldn't parse) — on a connection with
 		// active mask rules, the adapter's raw message could leak a real, unmasked value one row
 		// at a time (SELECT email::int FROM customers LIMIT 1 OFFSET n). Scoped to masked
@@ -251,7 +251,7 @@ type queryResolution struct {
 	threshold int
 }
 
-// resolveVerdict is runQuery's own §5.2 resolve→refuse→clamp→connect→classify→verdict pipeline.
+// resolveVerdict is runQuery's own resolve→refuse→clamp→connect→classify→verdict pipeline.
 // done is true whenever runQuery should return (res, out, err) immediately — every gate here
 // short-circuits query execution, so no EXPLAIN work or approval prompt is ever spent on a
 // statement the gate would refuse anyway.
@@ -319,13 +319,12 @@ func (s *Server) resolveVerdict(ctx context.Context, args runQueryArgs) (rv quer
 	return rv, nil, nil, nil, false
 }
 
-// maybeExplain runs §5.2 step 7's auto-force-explain (a plan-only EXPLAIN, never ANALYZE) when the
-// connection has McpAutoExplain on — the minimum information needed to tell the human what they are
-// approving before a "prompt" verdict asks them. Any failure degrades to "no plan" (D19 rule 6's own
-// posture); a run_query call must not start failing because a plan could not be parsed. heavy is
-// §6.1's own flag, overThreshold only, never "any warn issue" — SQLite reports no row estimate at
-// all, so borrowing the console's isFlaggedPlan rule would raise a modal on nearly every SQLite
-// query.
+// maybeExplain runs auto-force-explain (a plan-only EXPLAIN, never ANALYZE) when the connection
+// has McpAutoExplain on — the minimum information needed to tell the human what they are approving
+// before a "prompt" verdict asks them. Any failure degrades to "no plan"; a run_query call
+// must not start failing because a plan could not be parsed. heavy is the flag,
+// overThreshold only, never "any warn issue" — SQLite reports no row estimate at all, so borrowing
+// the console's isFlaggedPlan rule would raise a modal on nearly every SQLite query.
 func (s *Server) maybeExplain(ctx context.Context, summary model.ConnectionSummary, args runQueryArgs) (plan *queryplan.Plan, heavy bool) {
 	if summary.McpAutoExplain {
 		p, planErr := s.planFor(ctx, summary, args.SQL, args.Path)
@@ -338,7 +337,7 @@ func (s *Server) maybeExplain(ctx context.Context, summary model.ConnectionSumma
 	return plan, plan != nil && plan.OverThreshold
 }
 
-// awaitApproval is §5.2/§6.2's own "at most one approval prompt per call" gate: when both a
+// awaitApproval is the "at most one approval prompt per call" gate: when both a
 // permission-prompt and a heavy plan apply, one request carries Reason: ApprovalReasonPermission
 // (the stricter reason — the user said "ask me about every write") with the plan evidence riding
 // along. A no-op (done false) when neither verdict == "prompt" nor heavy applies. done is true
@@ -359,7 +358,7 @@ func (s *Server) awaitApproval(ctx context.Context, args runQueryArgs, summary m
 	})
 	switch outcome {
 	case ApprovalApproved:
-		// M7 finding: summary/m/verdict above were resolved before this (up to 2-minute) wait.
+		// summary/m/verdict above were resolved before this (up to 2-minute) wait.
 		// If the user reacted to the prompt by revoking the connection's MCP exposure or
 		// tightening this class's mode to deny, an Approve landing after that must not run the
 		// statement under permissions that no longer hold — re-resolve both, the same posture
@@ -404,7 +403,7 @@ type explainQueryArgs struct {
 }
 
 // explainQueryResult embeds queryplan.Plan so its own fields inline directly into the result
-// object — the same shape planModel.ts's QueryPlan is, plus ThresholdRows (§4.2): an MCP client
+// object — the same shape planModel.ts's QueryPlan is, plus ThresholdRows: an MCP client
 // cannot otherwise interpret OverThreshold, since the threshold itself lives in this app's own
 // settings, never sent to the client any other way.
 type explainQueryResult struct {
@@ -412,10 +411,10 @@ type explainQueryResult struct {
 	ThresholdRows int `json:"thresholdRows"`
 }
 
-// explainQuery plans one SELECT/WITH statement without running it (§4.3's own gate order):
+// explainQuery plans one SELECT/WITH statement without running it (the gate order):
 // resolve → kind support → explainability → read-mode deny (before connecting) → connect →
-// classify-assert every composed statement as a read (§8.3) → verdict on the read mode (prompt
-// raises M2's approval, carrying the composed statement) → execute → parse → project, dropping Raw
+// classify-assert every composed statement as a read → verdict on the read mode (prompt
+// raises the approval, carrying the composed statement) → execute → parse → project, dropping Raw
 // unless IncludeRaw.
 func (s *Server) explainQuery(ctx context.Context, _ *mcp.CallToolRequest, args explainQueryArgs) (*mcp.CallToolResult, any, error) {
 	summary, err := s.resolveEnabled(args.ConnectionID)
@@ -534,7 +533,7 @@ func (s *Server) explainQuery(ctx context.Context, _ *mcp.CallToolRequest, args 
 		}
 		return errResult(fmt.Sprintf("could not parse the EXPLAIN result: %s", err.Error()))
 	}
-	// F5: on a masked connection, MySQL/MariaDB's attached_condition (Node.Detail) and
+	// On a masked connection, MySQL/MariaDB's attached_condition (Node.Detail) and
 	// ClickHouse's index condition metrics substitute real row values from const-evaluated tables
 	// into the plan text, and Raw is the server's own EXPLAIN output verbatim — none of that is
 	// column-name maskable, so all of it is stripped outright, IncludeRaw notwithstanding.

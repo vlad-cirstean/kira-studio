@@ -7,10 +7,10 @@ import "strings"
 // reproduces encodeURIComponent's own behaviour on non-ASCII text: each UTF-8 byte of the
 // character is escaped individually.
 //
-// This lives here, not in internal/connections (which needs the same encoding for URI userinfo,
-// P55 §2 D10) or internal/tree (which needs it for path segment names, P55 §4.6): tree.go's
-// DecodePath calling into connections would be an import cycle in the wrong direction, so both
-// callers share this one implementation instead.
+// This lives here, not in internal/connections (which needs the same encoding for URI userinfo)
+// or internal/tree (which needs it for path segment names): tree.go's DecodePath calling into
+// connections would be an import cycle in the wrong direction, so both callers share this one
+// implementation instead.
 func EncodeURIComponent(s string) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {

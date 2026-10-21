@@ -1,7 +1,7 @@
 // Package mysqlfamily is the Go analogue of src/engine/adapters/mysql-family/: database/sql plus
-// github.com/go-sql-driver/mysql (B1), one *sql.DB per (connection, database) with
-// SetMaxOpenConns(1) and one pinned *sql.Conn (B5). File-for-file with the TypeScript it replaces
-// (P58 D18, P58a A20): index.ts -> adapter.go, every other file keeps its TS name.
+// github.com/go-sql-driver/mysql, one *sql.DB per (connection, database) with
+// SetMaxOpenConns(1) and one pinned *sql.Conn. File-for-file with the TypeScript it replaces:
+// index.ts -> adapter.go, every other file keeps its TS name.
 package mysqlfamily
 
 import (
@@ -14,10 +14,10 @@ import (
 // the adapters package just for this one type.
 type LogFunc func(level, message string)
 
-// Profile is profile.ts's MysqlFamilyProfile. Three fields, deliberately — P34 D9's "a profile
-// field must change observable behaviour, or it does not exist" holds: after B22 MySQL's own
-// ApplyEngineOptions is empty (a real capability loss, not an oversight — see mysql/profile.go),
-// which is worth a comment rather than deleting the field.
+// Profile is profile.ts's MysqlFamilyProfile. Three fields, deliberately — "a profile field must
+// change observable behaviour, or it does not exist" holds: MySQL's own ApplyEngineOptions is empty
+// (a real capability loss, not an oversight — see mysql/profile.go), which is worth a comment
+// rather than deleting the field.
 type Profile struct {
 	// Kind is the adapter's own kind, surfaced as Adapter.Kind() and used in log lines.
 	Kind string

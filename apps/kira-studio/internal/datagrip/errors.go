@@ -1,15 +1,12 @@
 // Package datagrip imports connections (and their saved passwords) from a JetBrains DataGrip
 // project directory: parsing .idea/dataSources.xml and dataSources.local.xml, locating the
 // IntelliJ Platform PasswordSafe credential store, and reading a data source's password from the
-// macOS Keychain — the only backend this package supports, per an explicit user correction after
-// P25 shipped (docs/HISTORY.md (v1.2 P25)'s correction note). See that plan
-// for the research and decisions this package implements — every format claim below is cited
-// there, not re-derived here.
+// macOS Keychain — the only backend this package supports.
 package datagrip
 
-// D11's closed enum of skip/refusal reasons and report warnings — rendered by the UI, counted in
+// The closed enum of skip/refusal reasons and report warnings — rendered by the UI, counted in
 // the import report. Every one of these leaves the *connection* importable and only drops the
-// *password* (or, for the four Reason* codes above the line, drops the whole row) — D12: never a
+// *password* (or, for the four Reason* codes above the line, drops the whole row) — never a
 // silent wrong password, never an unexplained miss.
 const (
 	ReasonUnsupportedEngine          = "unsupported-engine"

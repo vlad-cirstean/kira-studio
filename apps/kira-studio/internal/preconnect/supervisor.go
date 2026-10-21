@@ -77,8 +77,8 @@ var (
 
 // killSignal is syscall.Kill, indirected through a var (postgres/client.go's pgxConnect-as-a-var
 // is this codebase's own precedent for the pattern) so a test can observe — without needing to
-// actually reach a recycled pid, which isn't reproducible on demand — whether killEntry attempted
-// to signal an entry it should have recognised as already dead (P21 round 3 finding 6).
+// reach a recycled pid, which isn't reproducible on demand — whether killEntry attempted
+// to signal an entry it should have recognised as already dead.
 var killSignal = syscall.Kill
 
 // outcome is the classified result of cmd.Wait().
@@ -495,13 +495,13 @@ func (s *Supervisor) StopAll() {
 // the group to empty (bounded), and removes the entry. Marking killing=true first keeps
 // awaitExit's own exit routing silent for this kill.
 //
-// P21 round 3 finding 6: once the leader is reaped its pid can be recycled as an unrelated group's
+// Once the leader is reaped its pid can be recycled as an unrelated group's
 // leader, so signalling -e.pid is only safe while a group member still lives. groupGone closes
 // the moment none does (checked right after the reap, then polled), and a closed groupGone skips
 // every signal. A surviving member of a reaped leader's group (a one-shot script's background
 // child) is still signalled, since its pgid stays reserved.
 //
-// F1 (P108 Part 3): -e.pid never reaches a descendant that left the group (setsid, daemon(3)), so
+// -e.pid never reaches a descendant that left the group (setsid, daemon(3)), so
 // give up killGrace after the SIGKILL escalation fires and log rather than block Disconnect,
 // Remove or quit forever. The entry is removed either way.
 func (s *Supervisor) killEntry(connectionID string, e *entry) {

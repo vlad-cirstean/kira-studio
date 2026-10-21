@@ -6,17 +6,17 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpath"
 )
 
-// WorktreeListArgs is worktree.list's own spawn (D1): `git worktree list --porcelain -z`
-// unconditionally — probe P2: `-z` shipped in git 2.36.0, below this app's 2.38 floor, so there is
-// no fallback branch to maintain. `--porcelain -v` is rejected outright (probe P3: "fatal: options
+// WorktreeListArgs is worktree.list's own spawn: `git worktree list --porcelain -z`
+// unconditionally — `-z` shipped in git 2.36.0, below this app's 2.38 floor, so there is
+// no fallback branch to maintain. `--porcelain -v` is rejected outright ("fatal: options
 // '--verbose' and '--porcelain' cannot be used together"), so this is the only flag combination
 // that exists.
 func WorktreeListArgs() []string {
 	return []string{"worktree", "list", "--porcelain", "-z"}
 }
 
-// WorktreeRecord is one `worktree list --porcelain -z` record — a direct read of D1's own
-// WorktreeEntry shape, minus the two fields (isCurrent, openElsewhere) that are not this package's
+// WorktreeRecord is one `worktree list --porcelain -z` record — a direct read of the WorktreeEntry
+// shape, minus the two fields (isCurrent, openElsewhere) that are not this package's
 // job to compute (gitsession cross-references those against, respectively, this entry's own repo
 // root and Registry.IsOpen).
 type WorktreeRecord struct {
@@ -31,14 +31,14 @@ type WorktreeRecord struct {
 	Prunable       bool
 }
 
-// ParseWorktreeList parses WorktreeListArgs' own raw stdout (probe P1): each attribute line is
+// ParseWorktreeList parses WorktreeListArgs' own raw stdout: each attribute line is
 // NUL-terminated (never LF — `-z` changes ALL of this subcommand's line terminators, not just the
 // record separator), and one extra NUL ends each record, so two consecutive NUL bytes mark a
 // record boundary. Splitting the whole byte stream on a single NUL delimiter therefore yields the
 // attribute lines directly, with an empty token appearing exactly at each record boundary (and a
 // final trailing empty token after the stream's own closing double-NUL) — no RecordSplitter/
 // allRecords framing here, since those assume exactly one NUL per record, not one per attribute.
-// An unrecognised attribute (a future git version's addition) is ignored, per D1's own doc comment
+// An unrecognised attribute (a future git version's addition) is ignored, per the doc comment
 // on WorktreeEntry — never an error.
 func ParseWorktreeList(raw []byte) ([]WorktreeRecord, error) {
 	tokens := bytes.Split(raw, []byte{0})

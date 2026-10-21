@@ -12,7 +12,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/procgroup"
 )
 
-// versionProbeTimeout/authProbeTimeout/apiTimeout are D2's three named timeouts — every spawn this
+// versionProbeTimeout/authProbeTimeout/apiTimeout are the three named timeouts — every spawn this
 // package makes uses exactly one of them, never an undeadlined caller ctx alone (the same reasoning
 // gitclient/discovery.go's own versionProbeTimeout documents: a wedged `gh` must not hang whatever
 // asked for a Status forever).
@@ -22,7 +22,7 @@ const (
 	apiTimeout          = 10 * time.Second
 )
 
-// maxStdoutBytes/maxStderrBytes bound how much of a child's output this package retains (D2).
+// maxStdoutBytes/maxStderrBytes bound how much of a child's output this package retains.
 // Stdout is a JSON body from GitHub itself: 64 MiB is derived from the OpenPulls worst case (a
 // 100-item page of ~450 KiB items), not a guess at "never this large". Vars, not consts: a test
 // lowers the stdout cap. Stderr is `gh`'s own diagnostic text, capped like gitclient's.
@@ -51,7 +51,7 @@ func (w *boundedWriter) Write(p []byte) (int, error) {
 	return n, nil
 }
 
-// ghHygieneEnv is D2's exact table, appended after os.Environ() (later entries win on a duplicate
+// ghHygieneEnv is the exact table, appended after os.Environ() (later entries win on a duplicate
 // key):
 //   - GH_PROMPT_DISABLED=1 — gh must never block on an interactive prompt.
 //   - GH_NO_UPDATE_NOTIFIER=1 — suppresses gh's own background release-check network call.
@@ -66,7 +66,7 @@ func (w *boundedWriter) Write(p []byte) (int, error) {
 // Deliberately NOT here, and never anywhere else in this package: GH_TOKEN, GITHUB_TOKEN. Both are
 // inherited exactly as the calling process's own environment already has them (os.Environ(), below)
 // — never read, overridden, cleared, or logged. This is the literal implementation of "own no
-// credentials of any kind" (SPEC §3.5).
+// credentials of any kind".
 var ghHygieneEnv = []string{
 	"GH_PROMPT_DISABLED=1",
 	"GH_NO_UPDATE_NOTIFIER=1",
@@ -104,8 +104,8 @@ type Result struct {
 
 // Runner is the spawn seam — one buffered method, unlike gitclient.Runner's own streaming
 // Start/Process split: every `gh` call this package makes is small (a version string, an auth
-// status line, a JSON body, bounded by maxStdoutBytes) and none is long-running, so there is no case here that
-// needs a streaming Process the way gitclient's `log`/`diff` walks do.
+// status line, a JSON body, bounded by maxStdoutBytes) and none is long-running, so there is no
+// case here that needs a streaming Process the way gitclient's `log`/`diff` walks do.
 type Runner interface {
 	Run(ctx context.Context, ghPath string, spec Spec) (Result, error)
 }
@@ -120,9 +120,9 @@ type execRunner struct{}
 // escalating to SIGKILL.
 //
 // A var, not a const (mirrors internal/preconnect/supervisor.go's own killGrace/settleWindow
-// precedent, P55 §2 D9, and gitclient/runner.go's own identical G31 round-2 fix): runner_test.go
-// lowers it so a regression test proving cmd.Cancel's SIGKILL escalation timer is actually stopped
-// once the process exits cleanly doesn't cost 2s of real wall-clock time.
+// precedent and gitclient/runner.go's own identical fix): runner_test.go lowers it so a regression
+// test proving cmd.Cancel's SIGKILL escalation timer is stopped once the process exits cleanly
+// doesn't cost 2s of real wall-clock time.
 var gracefulStopDelay = 2 * time.Second
 
 // A var, not a plain func (internal/preconnect/supervisor.go's own killSignal is this codebase's
@@ -142,13 +142,12 @@ func (execRunner) Run(ctx context.Context, ghPath string, spec Spec) (Result, er
 	// Own process group (F5's own discipline, mirroring gitclient/runner.go:230): a group signal
 	// reaches whatever `gh` itself forks, not just the direct child.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	// stopEscalate is read after cmd.Run() returns, below — G31 round-2 architecture/security
-	// review, finding #11: without stopping it there, a group that exits cleanly on SIGTERM left
-	// this timer armed for the full gracefulStopDelay regardless, and a SIGKILL fired at
-	// cmd.Process.Pid's process group after that delay could — narrowly, but really — land on an
-	// unrelated group that has since reused the same pid. No lock is needed: cmd.Run (Start+Wait)
-	// is documented to block until any goroutine running Cancel has finished, which is exactly the
-	// happens-before this needs.
+	// stopEscalate is read after cmd.Run() returns, below — without stopping it there, a group that
+	// exits cleanly on SIGTERM left this timer armed for the full gracefulStopDelay regardless,
+	// and a SIGKILL fired at cmd.Process.Pid's process group after that delay could — narrowly, but
+	// — land on an unrelated group that has since reused the same pid. No lock is needed: cmd.Run
+	// (Start+Wait) is documented to block until any goroutine running Cancel has finished, which is
+	// exactly the happens-before this needs.
 	stopEscalate := procgroup.GracefulCancel(cmd, gracefulStopDelay, killGroup)
 
 	stdout := &boundedWriter{max: maxStdoutBytes}
@@ -162,7 +161,7 @@ func (execRunner) Run(ctx context.Context, ghPath string, spec Spec) (Result, er
 	// runCtx's own deadline (spec.Timeout) or the caller's outer ctx being cancelled is reported as
 	// a genuine error — never folded into Result.ExitCode — exactly mirroring
 	// gitclient/discovery.go's own probeCtx.Err() check: the caller (discovery.go/api.go here) is
-	// what turns this into D5's own "did not respond within Ns" notFound classification.
+	// what turns this into the "did not respond within Ns" notFound classification.
 	if runCtx.Err() != nil {
 		return Result{}, runCtx.Err()
 	}

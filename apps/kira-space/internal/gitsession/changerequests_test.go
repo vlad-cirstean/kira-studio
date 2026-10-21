@@ -40,7 +40,7 @@ func (fakeGhLocator) Locate() (string, []string, bool) {
 // countingGhRunner answers `--version`/`auth status` as always-ok (so Discovery.Status is always
 // "ok"), and every `api` call with whatever apiResult is currently set to — swappable mid-test so a
 // scenario can flip from a normal response to a rate-limited one. calls counts every invocation
-// of ANY kind, exactly what D13's own zero-spawn assertion (gitrpc, next step) needs; this file
+// of ANY kind, exactly what the zero-spawn assertion (gitrpc, next step) needs; this file
 // only needs the "was the api call actually skipped" half of that same counter.
 type countingGhRunner struct {
 	calls     int32
@@ -225,12 +225,12 @@ func TestRefsChanged_StaleRefreshIsSingleFlight(t *testing.T) {
 
 // --- the eager purge pass is min-gap throttled -----------------------------------------------------
 
-// TestGhState_EagerPurgeAllowed_ThrottlesRapidCalls is G30 round-1 performance review, finding #2:
-// note()'s own refsChanged handler calls drop() (dropping the snapshot) immediately before
-// scheduling eagerResolveClosedBranches, on EVERY refsChanged — an interactive rebase's dozen-plus
-// signals, or a single `git fetch --prune`, used to re-trigger a fresh bulk gh fetch on every one,
-// with nothing anywhere in this path throttling it. eagerPurgeAllowed is the gate
-// eagerResolveClosedBranches now checks first, before any other work.
+// TestGhState_EagerPurgeAllowed_ThrottlesRapidCalls: note()'s own refsChanged handler calls drop()
+// (dropping the snapshot) immediately before scheduling eagerResolveClosedBranches, on EVERY
+// refsChanged — an interactive rebase's dozen-plus signals, or a single `git fetch --prune`, used
+// to re-trigger a fresh bulk gh fetch on every one, with nothing anywhere in this path
+// throttling it. eagerPurgeAllowed is the gate eagerResolveClosedBranches now checks first, before
+// any other work.
 func TestGhState_EagerPurgeAllowed_ThrottlesRapidCalls(t *testing.T) {
 	t.Parallel()
 	s := newHostState()
@@ -367,11 +367,11 @@ func TestResolveBranchPr_NeverPurgesOnOpen(t *testing.T) {
 	}
 }
 
-// G30 round-1 performance review, finding #1: ResolveBranchChangeRequest used to read the snapshot cache
-// (snapshotGet) but never called ensureSnapshot, the one thing that actually populates it —
+// ResolveBranchChangeRequest used to read the snapshot cache
+// (snapshotGet) but never called ensureSnapshot, the one thing that populates it —
 // ensureSnapshot had zero callers anywhere in the tree. So on a cold cache, resolving N different
 // branches cost N separate `gh api` calls (one full subprocess spawn each) instead of the ONE
-// bulk repo-wide fetch D6 was designed around. This proves the fix: the first resolve pays the
+// bulk repo-wide fetch. This proves the fix: the first resolve pays the
 // one-time Discovery probe plus the one bulk fetch (three gh runner invocations total, matching
 // TestOpenPulls_ArgvGoldenAndEarlyStop's own golden argv — page 1 alone, since three entries is
 // well under per_page); every OTHER branch resolved after that costs ZERO further gh runner
@@ -427,8 +427,8 @@ func (r *forkSnapshotGhRunner) Run(_ context.Context, _ string, spec github.Spec
 
 func (r *forkSnapshotGhRunner) count() int { return int(atomic.LoadInt32(&r.calls)) }
 
-// TestResolveBranchPr_SnapshotForkPrNotBadgedOntoSameNamedLocalBranch is F11's own regression proof
-// (P108 Part 16 review): the repo-wide open-PR snapshot loop used to match a fork's PR onto a
+// TestResolveBranchPr_SnapshotForkPrNotBadgedOntoSameNamedLocalBranch is the regression proof:
+// the repo-wide open-PR snapshot loop used to match a fork's PR onto a
 // local branch of the same name by HeadRef alone, with no owner check — a fork's own "main" PR
 // would badge onto this repo's local "main" branch even though they are unrelated. It must instead
 // fall through to the per-branch query (the one that already filters correctly, server-side) and
@@ -489,7 +489,7 @@ func TestResolveCommitPr_NonGitHubRemoteNeverSpawns(t *testing.T) {
 // call whose path is the repo-wide open-PR snapshot's own (`pulls?state=open`) is counted; the
 // FIRST one to arrive blocks on release until the test lets it through, so the test can reliably
 // get many goroutines racing ensureSnapshot's own cache-miss branch at once before any of them
-// actually finishes — a second (bug-reproducing) call to this same endpoint would simply return
+// finishes — a second (bug-reproducing) call to this same endpoint would return
 // immediately rather than blocking, so it shows up as an extra count rather than a deadlock.
 // Every other call (the discovery probes) answers immediately, unthrottled.
 type singleFlightGhRunner struct {

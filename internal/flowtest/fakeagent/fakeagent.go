@@ -1,11 +1,15 @@
 // Package fakeagent is the stand-in for the claude and gh CLIs in flow tests. A flow runs it as a
 // re-executed test binary (flowharness.Main) or as the cmd/fakeclaude binary; the behaviour comes
-// from scenario data in KIRA_FAKE_SCEN (JSON, or the path of a JSON file), so a stream extends it with testdata, not code.
+// from scenario data in KIRA_FAKE_SCEN (JSON, or the path of a JSON file), so a stream extends it
+// with testdata, not code.
 //
-// Every call writes its argv (last, atomically: it marks the call as fully recorded), cwd and stdin under KIRA_FAKE_DIR as <repo>-<n>.args/.cwd/.prompt
+// Every call writes its argv (last, atomically: it marks the call as fully recorded), cwd and stdin
+// under KIRA_FAKE_DIR as <repo>-<n>.args/.cwd/.prompt
 // (claude, where <repo> is the worktree's parent directory name) or gh-<n>.args. A claude call also
-// keeps its KIRA_* environment (one Go-quoted entry per line) as <repo>-<n>.env and a copy of each --mcp-config file as
-// <repo>-<n>.mcp<i>. Run as "fake-mcp" it is a stdio MCP server with tools echo and ping. A scripted Action.MCP
+// keeps its KIRA_* environment (one Go-quoted entry per line) as <repo>-<n>.env and a copy of each
+// --mcp-config file as
+// <repo>-<n>.mcp<i>. Run as "fake-mcp" it is a stdio MCP server with tools echo and ping. A
+// scripted Action.MCP
 // call also keeps its result as mcp-<tool>-<n>.json.
 package fakeagent
 
@@ -60,9 +64,10 @@ func (s Scenario) Encode() string {
 // Action is one claude attempt. A bare JSON string is shorthand for Action{Name: s}.
 //
 // Named behaviours: "done", "needs_input" and "failed" call finish_step with that status (done also
-// prints one tool_use); "result:<id>" calls it with the step result id <id>; "fail" exits 1 with a message on stderr; "nofinish" ends without
-// finish_step; "lost" exits 1 with the CLI's no-conversation error for the --resume id; "sleep" blocks for an hour. The generic fields run first, in the order below, and
-// compose with a name.
+// prints one tool_use); "result:<id>" calls it with the step result id <id>; "fail" exits 1 with a
+// message on stderr; "nofinish" ends without finish_step; "lost" exits 1 with the CLI's
+// no-conversation error for the --resume id; "sleep" blocks for an hour. The generic fields run
+// first, in the order below, and compose with a name.
 type Action struct {
 	Name string `json:"name,omitempty"`
 	// Sh runs a snippet through sh in the agent's cwd (an agent commit: git commit ...).
@@ -105,10 +110,12 @@ type MCPCall struct {
 }
 
 // PromptRule answers a headless call whose --system-prompt contains System. Doc narrows it to one
-// document: the basename of the first "path" (else "source") in the prompt, or of KIRA_DOC, which the fake exports to
+// document: the basename of the first "path" (else "source") in the prompt, or of KIRA_DOC, which
+// the fake exports to
 // the MCP servers it starts so a nested call (memory-mcp's gate) keeps the document it belongs to.
 // Fail makes the first N matching calls end with a budget error; the rule's calls are counted in
-// <KIRA_FAKE_DIR>/rule-<index>.count. WaitFile blocks until the path exists, then Emit prints the file.
+// <KIRA_FAKE_DIR>/rule-<index>.count. WaitFile blocks until the path exists,
+// then Emit prints the file.
 type PromptRule struct {
 	System   string `json:"system"`
 	Doc      string `json:"doc,omitempty"`

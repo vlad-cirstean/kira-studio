@@ -3,7 +3,7 @@ package keepawake
 import "sync"
 
 // State is one snapshot of the manual keep-awake toggle. Manual is the titlebar button's own
-// on/off state — app-wide, process-scoped, never persisted across relaunch (§3.2). Supported
+// on/off state — app-wide, process-scoped, never persisted across relaunch. Supported
 // forwards the driver's own Supported() — false hides the button outright rather than offering a
 // control that does nothing. Error names why an acquire failed ("" otherwise). Both apps' own
 // bound KeepAwakeService wire type mirrors this field for field.

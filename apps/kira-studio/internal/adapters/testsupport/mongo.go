@@ -69,13 +69,13 @@ func startMongo() (*MongoFixture, error) {
 			"MONGO_INITDB_ROOT_USERNAME": mongoRootUsername,
 			"MONGO_INITDB_ROOT_PASSWORD": mongoRootPassword,
 		},
-		// M7.0's own TC-3 finding: with MONGO_INITDB_ROOT_USERNAME set, the entrypoint boots a
+		// With MONGO_INITDB_ROOT_USERNAME set, the entrypoint boots a
 		// temporary auth-less instance to create the root user, shuts it down, then starts the
 		// real instance with --auth — waiting for only the first "Waiting for connections" gets a
 		// refused connection a moment later. The module's own default wait strategy resolves on
 		// that throwaway first boot; this is spelled out explicitly instead.
 		//
-		// P16 §6 finding: case-insensitive on purpose. 4.4+ logs structured JSON with
+		// Case-insensitive on purpose. 4.4+ logs structured JSON with
 		// "msg":"Waiting for connections" (capital W, verified against mongo:8.3); 4.2's plain-text
 		// logging spells the identical line lowercase — "waiting for connections on port 27017"
 		// (verified against mongo:4.2) — and the exact-case match above never saw it, timing out at

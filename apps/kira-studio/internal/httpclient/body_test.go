@@ -13,10 +13,10 @@ import (
 	"testing"
 )
 
-// sendViaBuildBody drives buildBody the same way client.go's Send will once C2 wires it in
-// (C1's own guard: client.go stays untouched here) — headers loop, D7's Content-Type precedence,
+// sendViaBuildBody drives buildBody the same way client.go's Send will once wired in
+// (the guard: client.go stays untouched here) — headers loop, the Content-Type precedence,
 // GetBody/ContentLength assigned explicitly onto the request, exactly what client_test.go
-// (post-C2) exercises through the real Send instead.
+// exercises through the real Send instead.
 func sendViaBuildBody(t *testing.T, url, method string, headers []Header, b Body) *http.Response {
 	t.Helper()
 	userContentType, hasUserCT := "", false

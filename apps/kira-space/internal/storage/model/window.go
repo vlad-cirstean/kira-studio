@@ -9,17 +9,16 @@ import (
 // JSON tags included).
 type WindowBounds = appstorage.WindowBounds
 
-// WindowRecord is one row of the `windows` table's identity/geometry columns (P8 D2/D4) — a
-// durable, shell-minted identity for one workbench. Bounds is nil until the window has been moved
-// or resized at least once (D10: a freshly minted window with no stored rectangle inherits its
-// cascade position instead).
+// WindowRecord is one row of the `windows` table's identity/geometry columns — a durable,
+// shell-minted identity for one workbench. Bounds is nil until the window has been moved or
+// resized at least once (a freshly minted window with no stored rectangle inherits its cascade
+// position instead).
 //
-// This app's own `windows` table gained a `mode` column at P128 §2.2 (migration
-// 0003_p128_window_mode.sql, the git/automations/ade module registry) — read and written through
-// WindowsRepo.GetMode/SetMode below, not through this struct, so WindowRecord itself stays
-// field-for-field identical to appstorage.WindowRecord and a plain alias of it (P107 I2-3),
-// Validate() included; internal/shell/window.go's own Options()/Attach() never read a mode, only
-// .Key/.Bounds.
+// This app's own `windows` table gained a `mode` column (migration 0003_p128_window_mode.sql,
+// the git/automations/ade module registry) — read and written through WindowsRepo.GetMode/SetMode
+// below, not through this struct, so WindowRecord itself stays field-for-field identical to
+// appstorage.WindowRecord and a plain alias of it, Validate() included; internal/shell/window.go's
+// own Options()/Attach() never read a mode, only .Key/.Bounds.
 type WindowRecord = appstorage.WindowRecord
 
 // WindowModes is this app's own mode vocabulary (workbench/modes.ts's SpaceMode) — an unrecognised

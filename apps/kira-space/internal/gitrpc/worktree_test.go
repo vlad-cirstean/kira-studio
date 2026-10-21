@@ -11,7 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 )
 
-// These tests exercise the real Router.ForConn dispatch (D16) — the same convention reset_test.go
+// These tests exercise the real Router.ForConn dispatch — the same convention reset_test.go
 // already established: JSON decode through wire.go's own param types, handlers.go's five new
 // switch cases, and gitsession's real orchestration underneath — the one layer gitsession's own
 // tests (which call RepoEntry methods directly) never touch.

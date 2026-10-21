@@ -118,8 +118,9 @@ func (d Distiller) rewrite(ctx context.Context, req DistillRequest) (DistillResu
 }
 
 // rewriteTwice makes up to two rewrite calls: the second only after unusable output or a draft that
-// still holds a hedge word. The last draft is returned; usable is false when none was usable. A retry
-// error after a usable first draft is dropped: that draft holds a hedge, so the caller keeps the input.
+// still holds a hedge word. The last draft is returned; usable is false when none was usable. A
+// retry error after a usable first draft is dropped: that draft holds a hedge, so the caller keeps
+// the input.
 func (a ModelAgent) rewriteTwice(ctx context.Context, run *distillRun, req DistillRequest) (draft rewriteDraft, usable bool, err error) {
 	for attempt := range 2 {
 		out, err := a.Rewrite(ctx, req.Text, req.Context)

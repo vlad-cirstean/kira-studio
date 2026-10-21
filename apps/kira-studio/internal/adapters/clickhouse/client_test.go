@@ -7,8 +7,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// P21 round 2 architecture/security finding 3: `prefer` is a valid, documented value for every
-// other engine (postgres/mysqlfamily/redis/mongo/kafka) — ClickHouse's own switch rejected it,
+// `prefer` is a valid, documented value for every other engine
+// (postgres/mysqlfamily/redis/mongo/kafka) — ClickHouse's own switch rejected it,
 // and since Options only ever comes from a connection string's own query parameters (there is no
 // fields-mode sslmode UI), a user carrying one connection-string style across engines hit this
 // immediately.

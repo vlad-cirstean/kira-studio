@@ -18,20 +18,19 @@ func init() {
 	})
 }
 
-// disconnectTimeout bounds Disconnect's own client.Disconnect call (F4a): a no-deadline ctx makes
+// disconnectTimeout bounds Disconnect's own client.Disconnect call: a no-deadline ctx makes
 // the driver wait until every in-use connection returns on its own (confirmed against
 // mongo-driver's own Client.Disconnect) — Router.Connect's reconnect path passes
-// context.Background() with no bound at all (adapterhost, Part 6's own file, out of scope here),
+// context.Background() with no bound at all (adapterhost, out of scope here),
 // and even Router.Disconnect's own ctx could be near its own deadline already. A fixed deadline
-// here is what actually force-closes a still-in-use connection regardless of what ctx this call was
+// here is what force-closes a still-in-use connection regardless of what ctx this call was
 // handed.
 const disconnectTimeout = 10 * time.Second
 
-// connState is every field Connect/Disconnect write concurrently with an in-flight op reading them
-// (F3): requireClient's own RequireConnected(a.state.Load().client), Execute's own
+// connState is every field Connect/Disconnect write concurrently with an in-flight op reading them:
+// requireClient's own RequireConnected(a.state.Load().client), Execute's own
 // a.state.Load().defaultDatabase, Read/Count/Mutate/Execute's own a.state.Load().readOnly — the
-// same class of data race Part 4's own F3 fixed for the SQL engines. Guarded via adapters.Guarded
-// (P113 G1).
+// same class of data race fixed for the SQL engines. Guarded via adapters.Guarded.
 type connState struct {
 	client          *mongodriver.Client
 	defaultDatabase *string
@@ -219,7 +218,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 }
 
 // requireTwoSegmentObjectPath is Describe/Definition/Read/Count/Mutate's shared database/collection
-// path check (P113 G2) — both positions are kind-exact here, unlike postgres/mysqlfamily's own
+// path check — both positions are kind-exact here, unlike postgres/mysqlfamily's own
 // unconstrained-object-segment variants, since mongo's Describe/Definition never branch on the
 // object segment's Kind the way those do.
 func requireTwoSegmentObjectPath(path model.NodePath, opName string) (databaseSegment, objectSegment model.PathSegment, err error) {
@@ -262,10 +261,10 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 	}, nil
 }
 
-// SchemaColumns — caps.SchemaColumns is false (P22c F11/D8); unreachable while that flag gates
+// SchemaColumns — caps.SchemaColumns is false; unreachable while that flag gates
 // every caller. A Mongo collection has no declared field set — adapter.go:191's own Describe
 // already reports Columns: []model.ColumnMeta{} for the identical reason. Mongo's completion
-// mechanism is a different one entirely: sampled from loaded documents (P22c D8), never cached
+// mechanism is a different one entirely: sampled from loaded documents, never cached
 // here.
 func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *adapters.OpCtx) ([]model.RelationColumns, error) {
 	return nil, adapters.Unsupported("mongodb", "schemaColumns")
@@ -373,8 +372,8 @@ type currentOpEntry struct {
 	OpID any `bson:"opid"`
 }
 
-// Cancel is index.ts's cancel. D7's fallback layer: the op's own detached-context race
-// (RunWithAbortRace, C6) is the primary cancel path from the caller's perspective; $currentOp +
+// Cancel is index.ts's cancel. The fallback layer: the op's own detached-context race
+// (RunWithAbortRace) is the primary cancel path from the caller's perspective; $currentOp +
 // killOp, matched by the comment: opId tag every op carries, covers a server-side op the
 // client-side abort has already stopped waiting on but that is still running. The $currentOp
 // aggregation stage with the default allUsers: false returns only this connection's own in-flight

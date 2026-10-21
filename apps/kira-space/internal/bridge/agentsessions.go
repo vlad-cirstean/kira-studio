@@ -53,7 +53,7 @@ func AgentSessionsChanged(e appevent.Emitter, reg *terminal.Registry) {
 // Tracker.HandleEvent) — emitted verbatim: harness.AgentEvent's JSON tags already match
 // ChannelAgentEvent's own payload shape field for field (packages/shared/domain/agent.ts's
 // AgentEvent), so no separate wire-projection type is needed, matching Kira Studio's own deleted
-// precedent (P127, d20bc970^).
+// precedent (d20bc970^).
 func EmitAgentEvent(e appevent.Emitter, ev harness.AgentEvent) {
 	e.Emit(ChannelAgentEvent, ev)
 }

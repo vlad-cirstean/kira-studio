@@ -14,10 +14,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )
 
-// TestAHistorySecretRoundTripsUnderItsOwnScope closes F6's coverage gap (RevealHistoryValue had no
-// test at all) and is D5's regression guard: it fails outright the moment recordHistory goes back
-// to copying the live api_variables ciphertext verbatim instead of re-sealing it under
-// ScopeVariableHistory.
+// TestAHistorySecretRoundTripsUnderItsOwnScope is the regression guard: it fails outright the
+// moment recordHistory goes back to copying the live api_variables ciphertext verbatim instead of
+// re-sealing it under ScopeVariableHistory.
 func TestAHistorySecretRoundTripsUnderItsOwnScope(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
@@ -47,7 +46,7 @@ func TestAHistorySecretRoundTripsUnderItsOwnScope(t *testing.T) {
 	}
 }
 
-// TestACiphertextMovedBetweenColumnsIsRefused is the SPEC row's own attack, executed against the
+// TestACiphertextMovedBetweenColumnsIsRefused is the attack, executed against the
 // app's real tables in both directions that matter: a connection password can no longer be read
 // through the lower-friction variables gate, and a live variable secret can no longer be laundered
 // into the history table and revealed there.
@@ -94,8 +93,8 @@ func TestACiphertextMovedBetweenColumnsIsRefused(t *testing.T) {
 		}
 
 		// Seed a history row directly and plant the live ciphertext into it — recordHistory would
-		// never actually produce this row (D5 makes it re-encrypt under ScopeVariableHistory), so
-		// the raw INSERT is what stands in for "an attacker who can write kira.db but not read the
+		// never produce this row (it re-encrypts under ScopeVariableHistory), so the raw INSERT is
+		// what stands in for "an attacker who can write kira.db but not read the
 		// Keychain moves a live variable's ciphertext into the history table by hand."
 		historyID := uuid.NewString()
 		if _, err := db.Exec(

@@ -14,7 +14,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 )
 
-// rebasecheck.go is D1: "would this branch conflict if rebased onto its latest base". git is the
+// rebasecheck.go is "would this branch conflict if rebased onto its latest base". git is the
 // only merge engine: gitsession.RepoEntry.MergeTreeConflicts runs `git merge-tree --write-tree`
 // (git >= 2.38), which never touches the worktree, index, HEAD or refs, so it is safe next to
 // running agents. Results are cached per repo by (baseTip, tip) object ids, so a moved base or tip

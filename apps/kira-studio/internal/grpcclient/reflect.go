@@ -28,8 +28,8 @@ const (
 
 // fetchWith runs one reflection request/response round trip — send, receive, then either the
 // error the server returned or the file descriptor bytes — the shape v1Transport.fetch and
-// v1AlphaTransport.fetch shared exactly except for their own generated Req/Resp package
-// (P107 I2-34). getError reports whether resp carries an ErrorResponse; getFiles extracts the
+// v1AlphaTransport.fetch shared exactly except for their own generated Req/Resp package.
+// getError reports whether resp carries an ErrorResponse; getFiles extracts the
 // FileDescriptorProto bytes, nil when the response carried neither.
 func fetchWith[Req, Resp any](
 	send func(Req) error, recv func() (Resp, error), req Req,
@@ -55,7 +55,7 @@ func fetchWith[Req, Resp any](
 
 // listServicesWith runs one reflection ListServices request/response round trip — the shape
 // v1Transport.listServices and v1AlphaTransport.listServices shared exactly except for their own
-// generated Req/Resp package and (v1alpha) an extra type conversion (P107 I2-34). getError reports
+// generated Req/Resp package and (v1alpha) an extra type conversion. getError reports
 // an ErrorResponse; getServices converts resp's own service list into v1's ServiceResponse shape,
 // nil when the response carried neither.
 func listServicesWith[Req, Resp any](
@@ -81,7 +81,7 @@ func listServicesWith[Req, Resp any](
 }
 
 // reflectionTransport is the one seam between the version-negotiation this file does (v1, falling
-// back to v1alpha on codes.Unimplemented, D4/F2) and the recursive dependency-linking algorithm
+// back to v1alpha on codes.Unimplemented) and the recursive dependency-linking algorithm
 // resolveViaTransport runs — v1 and v1alpha are structurally identical wire protocols with two
 // distinct generated Go packages, so this interface is what lets that algorithm be written once.
 type reflectionTransport interface {
@@ -229,7 +229,7 @@ func filterServiceNames(services []*grpc_reflection_v1.ServiceResponse) []string
 }
 
 // defaultReflectionTimeout bounds a whole reflection resolution (negotiate, ListServices, every
-// FileContainingSymbol/FileByFilename fetch and link) — P108 F4: Describe calls grpcclient.Describe
+// FileContainingSymbol/FileByFilename fetch and link) — Describe calls grpcclient.Describe
 // directly, not through the RunOp/Stop path, so nothing else in this package ever cancels a
 // reflection stream a server accepts and then never answers. Without this, that leaves the
 // goroutine and connection blocked forever and the UI spinner never ends. The connect and
@@ -238,10 +238,10 @@ func filterServiceNames(services []*grpc_reflection_v1.ServiceResponse) []string
 // real 30s wait.
 var defaultReflectionTimeout = 15 * time.Second
 
-// resolveReflection is D4's reflection source: one ServerReflectionInfo bidi stream, ListServices,
+// resolveReflection is the reflection source: one ServerReflectionInfo bidi stream, ListServices,
 // then FileContainingSymbol per service, linking every returned FileDescriptorProto into this
-// Source's own private registry (F14) — recursing through FileByFilename for any dependency the
-// server did not volunteer (F2: grpc-go volunteers them, the protocol does not require it).
+// Source's own private registry — recursing through FileByFilename for any dependency the
+// server did not volunteer (grpc-go volunteers them, the protocol does not require it).
 func resolveReflection(ctx context.Context, src Source) (*resolved, error) {
 	if src.Target == "" {
 		return nil, BadRequest("a target is required")
@@ -330,7 +330,7 @@ func (l *linker) link(path string) error {
 		return nil
 	}
 	if l.inProgress[path] {
-		// F1: a reflection server controls the descriptors it returns, so a cyclic import
+		// A reflection server controls the descriptors it returns, so a cyclic import
 		// (a.proto -> b.proto -> a.proto) is untrusted input, not a programming error. Reject
 		// it explicitly instead of recursing forever into a Go stack overflow, which is fatal
 		// and unrecoverable — it would kill the whole process, not just this request.
@@ -378,12 +378,12 @@ func (l *linker) link(path string) error {
 
 // negotiateAndListServices tries v1 first — opening the stream and sending ListServices — and
 // falls back to v1alpha on codes.Unimplemented from either step, the same negotiation
-// grpcreflect.NewClientAuto performs (F2), here in ~20 lines rather than a third-party dependency
-// (D1). The service list comes back alongside the chosen transport so the one ListServices round
+// grpcreflect.NewClientAuto performs, here in ~20 lines rather than a third-party dependency.
+// The service list comes back alongside the chosen transport so the one ListServices round
 // trip this negotiation needs is never repeated. Each round trip (v1's, and v1alpha's own retry on
-// v1's Unimplemented) goes through retryOnTransportGlitch — P96 §4's diagnosed defect is not
+// v1's Unimplemented) goes through retryOnTransportGlitch — the diagnosed defect is not
 // specific to whichever RPC happens to be literally first on the connection, so both get the same
-// protection (§4's own commit message states which one the repro actually caught failing).
+// protection.
 func negotiateAndListServices(ctx context.Context, conn *grpc.ClientConn) (reflectionTransport, string, []string, error) {
 	v1, services, err := retryOnTransportGlitch(ctx, func() (*v1Transport, []string, error) {
 		v1, err := newV1Transport(ctx, conn)
@@ -415,7 +415,7 @@ func negotiateAndListServices(ctx context.Context, conn *grpc.ClientConn) (refle
 }
 
 // firstRPCGlitchRetries bounds retryOnTransportGlitch's retries of an early reflection round trip
-// on a fresh connection (P96 §4). Measured in this container's own synthetic CPU-stress repro
+// on a fresh connection. Measured in this container's own synthetic CPU-stress repro
 // (stress-ng --cpu 4 --cpu-load 100, a fresh OS process per iteration): up to ~11% of runs failed
 // with a bare io.EOF before this fix. Direct instrumentation (not committed) pinned the failure to
 // the v1alpha round trip specifically — v1's own negotiation answered a well-formed Unimplemented
@@ -426,7 +426,7 @@ func negotiateAndListServices(ctx context.Context, conn *grpc.ClientConn) (refle
 const firstRPCGlitchRetries = 4
 
 // firstRPCGlitchDelay is the pause retryOnTransportGlitch takes before a retry — long enough to
-// let the connection's own transport goroutines actually get scheduled once under this container's
+// let the connection's own transport goroutines get scheduled once under this container's
 // own worst observed contention (a synthetic all-cores CPU stressor); an immediate (no-delay)
 // retry on the same connection, measured separately, did not lower the failure rate at all — the
 // glitch is tied to scheduler starvation, not a race an instant retry can win.
@@ -437,9 +437,9 @@ const firstRPCGlitchDelay = 50 * time.Millisecond
 // as codes.Unknown) rather than a well-formed gRPC status. This is a genuine product defect, not a
 // test artifact: grpc-go's HTTP/2 transport occasionally ends an early stream on a fresh
 // connection this way under scheduling pressure, even though the connection is otherwise READY and
-// fully serving — the residual P81's own waitEchoServerReady probe comment predicted ("any fresh
-// connection's first RPC, not only one made right after a listener opens"). dialConn builds one
-// *grpc.ClientConn per call (F16), so every resolveReflection call is exposed to this.
+// fully serving — the residual the waitEchoServerReady probe comment predicted (\"any fresh
+// connection's first RPC, not only one made right after a listener opens\"). dialConn builds one
+// *grpc.ClientConn per call, so every resolveReflection call is exposed to this.
 //
 // A real codes.Unimplemented (the server genuinely does not speak this reflection version) is
 // never retried — v1's Unimplemented is the normal v1alpha fallback trigger, handled by the
@@ -473,7 +473,7 @@ func isTransportGlitch(err error) bool {
 
 // absorb decodes every raw FileDescriptorProto byte blob a response carried and stores it by
 // path — a single FileContainingSymbol response commonly bundles the transitive dependencies too
-// (F2: "deps fetched=2" from one response), so this is what makes them available to link() without
+// ("deps fetched=2" from one response), so this is what makes them available to link() without
 // a second round trip.
 func absorb(known map[string]*descriptorpb.FileDescriptorProto, protos [][]byte) error {
 	for _, b := range protos {

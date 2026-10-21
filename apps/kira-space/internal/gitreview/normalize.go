@@ -7,7 +7,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpath"
 )
 
-// nonASCIIGlob is normalizeStoredPaths' own pre-filter (G27 D8): a GLOB matching any string
+// nonASCIIGlob is normalizeStoredPaths' own pre-filter: a GLOB matching any string
 // containing a byte outside printable ASCII (0x20-0x7E). It is deliberately broad — it matches an
 // already-correct NFC string just as readily as a stale NFD one — so the actual "does this need
 // rewriting" decision is the gitpath.NFC(x) != x check in Go below, once a candidate is in hand.
@@ -56,13 +56,13 @@ func normalizeStoredPaths(db *sql.DB) error {
 	return nil
 }
 
-// normalizeSessionRepoIDs re-keys review_session.repo_id (D2 tier 1 — an absolute repository
-// path, F5). review_file/review_range/review_comment reference a session by its surrogate integer
+// normalizeSessionRepoIDs re-keys review_session.repo_id (an absolute repository path).
+// review_file/review_range/review_comment reference a session by its surrogate integer
 // id, never by repo_id, so this rename touches no foreign key at all.
 //
 // A collision (an NFD-keyed session and an NFC-keyed session for the same (repo_id, branch))
 // keeps the NFC row, which the current build writes to, and deletes the NFD row (cascading away
-// its own children, D4's FK). The NFD row's pin carries over to the survivor.
+// its own children). The NFD row's pin carries over to the survivor.
 func normalizeSessionRepoIDs(tx *sql.Tx) error {
 	rows, err := tx.Query(`SELECT DISTINCT repo_id FROM review_session WHERE repo_id GLOB ?`, nonASCIIGlob)
 	if err != nil {

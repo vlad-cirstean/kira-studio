@@ -16,7 +16,7 @@ type fakeClock struct{ t time.Time }
 func (c *fakeClock) now() time.Time          { return c.t }
 func (c *fakeClock) advance(d time.Duration) { c.t = c.t.Add(d) }
 
-// TestAuthorizeDecisionTable pins P14 D6/D9's whole reveal gate: a small state machine over (OS
+// TestAuthorizeDecisionTable pins the whole reveal gate: a small state machine over (OS
 // availability, the grace deadline, the clock, the renderer's confirmed flag) whose wrong answers
 // are silent and security-relevant — a grace window that never expires, a cancelled prompt that
 // still records a grant, or a confirmed flag honoured while real OS authentication is available

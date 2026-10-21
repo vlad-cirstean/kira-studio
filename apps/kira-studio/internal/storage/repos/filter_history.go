@@ -15,13 +15,13 @@ import (
 // historyLimit mirrors filter-history.ts's HISTORY_LIMIT.
 const historyLimit = 20
 
-// P23 D4: filter_history was capped per (connection_id, path) but had no bound on the number of
+// filter_history was capped per (connection_id, path) but had no bound on the number of
 // paths a connection accumulates — every table/collection a person has ever filtered, on a
-// connection they have never deleted, with no liveness oracle to sweep a dropped one (F6). Not a
-// new number: metadata_cache's own 200-paths-per-connection cap (F7, the adjacent "how many
-// distinct paths is one connection's tree worth caching" question this app already answered) times
-// historyLimit's 20 rows per path. Eviction is by used_at across the whole connection, so a path
-// filtered once years ago falls off before one still in regular use.
+// connection they have never deleted, with no liveness oracle to sweep a dropped one. Not a
+// new number: metadata_cache's own 200-paths-per-connection cap (the adjacent "how many
+// distinct paths is one connection's tree worth caching" question this app already answered)
+// times historyLimit's 20 rows per path. Eviction is by used_at across the whole connection, so a
+// path filtered once years ago falls off before one still in regular use.
 const historyPerConnectionLimit = 200 * historyLimit
 
 // maxFilterTextBytes caps where_text and the encoded order_by_json — a filter predicate is a line
@@ -33,7 +33,7 @@ const historyPerConnectionLimit = 200 * historyLimit
 const maxFilterTextBytes = 4 * 1024
 
 // capFilterText applies maxFilterTextBytes to where_text — a value that may be absent (nil stays
-// nil). F9 (P108 Part 3): truncates on a UTF-8 rune boundary, never mid-sequence, so a truncated
+// nil). Truncates on a UTF-8 rune boundary, never mid-sequence, so a truncated
 // entry is still valid UTF-8 rather than a split rune the renderer would have to guess at.
 // order_by_json's own cap is capOrderByJSON below, not this function — an *encoded JSON* string
 // truncated at any byte offset, rune-boundary-safe or not, is still invalid JSON.
@@ -72,7 +72,7 @@ func capUTF8(s string, maxBytes int) string {
 	return string(truncateUTF8ToBoundary([]byte(s), maxBytes))
 }
 
-// capOrderByJSON is order_by_json's own cap (F9, P108 Part 3): unlike where_text, this value is
+// capOrderByJSON is order_by_json's own cap: unlike where_text, this value is
 // encoded JSON, and truncating it at any offset — even a valid UTF-8 rune boundary — still leaves
 // invalid JSON behind. List's own decode guard already drops a row whose order_by_json fails to
 // parse (silently, since a bad row must not make the whole history unreadable), so a truncated one
@@ -91,9 +91,8 @@ type FilterHistoryRepo struct {
 
 // Record mirrors filter-history.ts's recordFilterUse. "I cleared the filter" (both nil) is not
 // history and records nothing. The dedupe delete uses SQLite's IS operator (NULL-safe equality),
-// replacing the TS build's isNull-vs-eq conditional with one SQL string (P52 §5.4's no
-// per-call-shape rule) — re-recording an identical entry moves it to the top rather than
-// duplicating it.
+// replacing the TS build's isNull-vs-eq conditional with one SQL string — re-recording an
+// identical entry moves it to the top rather than duplicating it.
 func (r *FilterHistoryRepo) Record(connectionID, path string, where *string, orderBy *model.SortSpec) error {
 	if where == nil && orderBy == nil {
 		return nil
@@ -154,7 +153,7 @@ func (r *FilterHistoryRepo) Record(connectionID, path string, where *string, ord
 		return fmt.Errorf("repos/filter_history: cap: %w", err)
 	}
 
-	// D4: the bound a per-path cap alone cannot give — across every path a connection has ever
+	// The bound a per-path cap alone cannot give — across every path a connection has ever
 	// been filtered on, keeping the historyPerConnectionLimit most recently used rows regardless
 	// of which path they belong to, so a path filtered once long ago falls off before one still in
 	// regular use.

@@ -22,7 +22,7 @@ const (
 	waitTimeSeconds = 1  // short poll per call; looped rather than one long wait
 )
 
-// receiptHandleCap is P58d D9: a bound on the adapter-local receiptHandles map — a receipt handle
+// receiptHandleCap is a bound on the adapter-local receiptHandles map — a receipt handle
 // is only useful for as long as the message it names is still in flight, so unbounded growth
 // across many polls would be a slow leak of tokens nothing will ever look up again. FIFO eviction
 // (oldest first) approximates "least likely to still be wanted"; Go's own map has no insertion
@@ -30,11 +30,10 @@ const (
 // explicit eviction queue (see adapter.go's receiptHandles type).
 const receiptHandleCap = 5000
 
-// sqsMessageAttribute is P58d D8's hand-written encoder over types.MessageAttributeValue: fields
+// sqsMessageAttribute is the hand-written encoder over types.MessageAttributeValue: fields
 // are emitted only when non-nil/non-empty, in this fixed order, so the headers cell matches the
 // JavaScript adapter's JSON.stringify(message.MessageAttributes ?? {}) — which drops undefined
-// fields entirely — rather than json.Marshal's own all-fields-with-nulls struct shape (confirmed
-// as the divergence by M8.0's AWS-1(c)).
+// fields entirely — rather than json.Marshal's own all-fields-with-nulls struct shape.
 type sqsMessageAttribute struct {
 	DataType         string   `json:"DataType,omitempty"`
 	StringValue      *string  `json:"StringValue,omitempty"`
@@ -121,7 +120,7 @@ func (r *receiptHandles) set(messageID, handle string, visibilityTimeout time.Du
 	}
 }
 
-// forDelete is mutate.go's own lookup (F10): refuses a delete outright, with a clear message,
+// forDelete is mutate.go's own lookup: refuses a delete outright, with a clear message,
 // rather than letting AWS silently accept a stale receipt handle and report success while another
 // consumer holds the message — once past the visibility timeout the handle recorded at receive
 // time, AWS can accept a DeleteMessage call using it with no guarantee it still names the same
@@ -281,8 +280,8 @@ func parseStreamFilter(raw *string) (int, error) {
 // initiated poll. Loops ReceiveMessage (hard-capped at 10 messages per call) up to
 // ceil(pageSize/10) times, stopping early on any short/empty batch (the queue is plausibly
 // drained for this poll). One GetQueueAttributes call per poll feeds both this page's
-// visibilityTimeoutSeconds and countQueue's approximate count. Every SDK call takes ctx directly
-// (P58d D3): SQS has no server-side kill mechanism, so the op's own context is the entire
+// visibilityTimeoutSeconds and countQueue's approximate count. Every SDK call takes ctx directly:
+// SQS has no server-side kill mechanism, so the op's own context is the entire
 // cancellation story.
 func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req adapters.ReadRequest, op *adapters.OpCtx, handles *receiptHandles, readOnly bool, browseSeconds int) (page.StreamPage, error) {
 	attrs := fetchQueueAttributes(ctx, client, queueURL)

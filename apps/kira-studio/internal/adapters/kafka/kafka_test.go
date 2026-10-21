@@ -1,14 +1,13 @@
-// Ported from packages/db-fixtures/kafka.spec.ts, case by case where practical — the spec's own numbering is
-// kept in each test's name so the two can be diffed. docs/HISTORY.md (v1 P58e) names the
-// six cases that carry the most weight: scenario 17 (a browse joins no consumer group) and 18 (a
-// browse commits no offsets) are rewritten to check the broker directly rather than trusting the
-// adapter; scenario 21 (a transaction's commit marker still terminates the browse) is the single
-// most important test in the suite, since it pins the P43 iter2 F19/D26 regression; scenario 6's
-// Configuration half is inverted, not ported (P58e E11's capability recovery); scenario 1 gains a
-// cluster-id assertion (P58e E15); and the mid-browse cancellation case (new, alongside 15) is the
-// one P58e E3 exists to keep correct. §9 M9.1: this file lands failing — no "kafka" adapter is
-// registered yet (M9.2) — and every test below fails at CreateAdapter with E_UNSUPPORTED
-// "kafka connections are not supported yet", which is the right reason for this milestone.
+// Ported from packages/db-fixtures/kafka.spec.ts, case by case where practical — the spec's own
+// numbering is kept in each test's name so the two can be diffed. Six cases carry the most weight:
+// scenario 17 (a browse joins no consumer group) and 18 (a browse commits no offsets) are
+// rewritten to check the broker directly rather than trusting the adapter; scenario 21 (a
+// transaction's commit marker still terminates the browse) is the single most important test
+// in the suite, since it pins a regression; scenario 6's Configuration half is inverted,
+// not ported (the capability recovery); scenario 1 gains a cluster-id assertion; and the
+// mid-browse cancellation case (new, alongside 15) is the one to keep correct. This file lands
+// failing — no "kafka" adapter is registered yet — and every test below fails at CreateAdapter
+// with E_UNSUPPORTED "kafka connections are not supported yet", which is the right reason.
 package kafka_test
 
 import (
@@ -149,13 +148,13 @@ func TestKafka_Connect_AuthFailure(t *testing.T) {
 	}
 }
 
-// P25 §1.4/§2.1(5): the regression test — a non-empty username with an empty password must still
-// fail as a real, correctly-coded auth failure against a SASL-requiring broker, not report the
-// broker's transport-level refusal as E_QUERY. Round 1's finding-6 fix changed *how*: a half-filled
-// pair deliberately does NOT offer SASL/PLAIN any more (client.go dials anonymously, same as an
-// empty pair, since franz-go's own plain.Auth.AsMechanism() refuses locally on a half-filled pair
-// before ever contacting the broker) — the resulting transport-level refusal is then reclassified
-// as E_AUTH by client.go's own ErrFirstReadEOF heuristic instead.
+// The regression test — a non-empty username with an empty password must still fail as a real,
+// correctly-coded auth failure against a SASL-requiring broker, not report the broker's
+// transport-level refusal as E_QUERY. A half-filled pair deliberately does NOT offer SASL/PLAIN any
+// more (client.go dials anonymously, same as an empty pair, since franz-go's own
+// plain.Auth.AsMechanism() refuses locally on a half-filled pair before ever contacting the broker)
+// — the resulting transport-level refusal is then reclassified as E_AUTH by client.go's own
+// ErrFirstReadEOF heuristic instead.
 func TestKafka_Connect_UsernameWithoutPasswordIsAuthError(t *testing.T) {
 	sf := testsupport.StartKafkaSasl(t)
 	cfg := sf.Config
@@ -320,11 +319,11 @@ func TestKafka_Children_LeavesAreEmpty(t *testing.T) {
 }
 
 // 6. describe stays unsupported; definition shows a topic and a consumer group. The Configuration
-// half is INVERTED, not ported (P58e E11): kafka.spec.ts 6 asserts an empty Configuration section
-// plus a "DescribeConfigs" note, because the TypeScript client has no DescribeConfigs call at all.
-// kadm.DescribeTopicConfigs recovers that capability (confirmed against a real broker by KF-1 and
-// inventoried by KF-4(b): 32 real config rows, cleanup.policy and retention.ms both present and
-// stable), so this test asserts the opposite of its TypeScript ancestor.
+// half is INVERTED, not ported: kafka.spec.ts 6 asserts an empty Configuration section plus a
+// "DescribeConfigs" note, because the TypeScript client has no DescribeConfigs call at all.
+// kadm.DescribeTopicConfigs recovers that capability (confirmed against a real broker and
+// inventoried: 32 real config rows, cleanup.policy and retention.ms both present and stable), so
+// this test asserts the opposite of its TypeScript ancestor.
 func TestKafka_DescribeUnsupported_DefinitionConfigurationIsPopulated(t *testing.T) {
 	f := testsupport.StartKafka(t)
 	a := connectedAdapter(t, f)
@@ -571,10 +570,10 @@ func TestKafka_Read_BeforeCursorIsUnsupported(t *testing.T) {
 	}
 }
 
-// 11. read: a nonexistent topic is E_QUERY, not E_NOT_FOUND. Re-baselined (P58e E12): a missing
-// topic surfaces inside ListedOffsets' own per-partition Err, not as a returned error from
+// 11. read: a nonexistent topic is E_QUERY, not E_NOT_FOUND. A missing topic surfaces inside
+// ListedOffsets' own per-partition Err, not as a returned error from
 // ListStartOffsets/ListEndOffsets — a literal try/catch port would silently return an empty
-// window set and a blank page. KF-4(d) measured this at ~4ms against a real broker, nowhere near
+// window set and a blank page. This was measured at ~4ms against a real broker, nowhere near
 // kafka.spec.ts 11's 20s allowance for kafkajs's own metadata-retry budget, so no extended timeout
 // is needed here.
 func TestKafka_Read_NonexistentTopicIsQueryError(t *testing.T) {
@@ -764,8 +763,8 @@ func TestKafka_Read_BinaryPayloadsAreMarkedBase64(t *testing.T) {
 	}
 }
 
-// 15b. NEW (§5.3): a mid-browse cancellation — the case scenario 15 alone cannot reach, since an
-// already-cancelled context never reaches PollRecords. P58e E3: kgo.Client.PollRecords returns a
+// 15b. A mid-browse cancellation — the case scenario 15 alone cannot reach, since an
+// already-cancelled context never reaches PollRecords. kgo.Client.PollRecords returns a
 // Fetches, not an error, and injects a fake fetch carrying ctx.Err() on cancellation — a literal
 // port that inspects only returned errors would keep polling against a dead context.
 //
@@ -906,11 +905,10 @@ func TestKafka_Mutate_ProduceThenBrowse(t *testing.T) {
 	}
 }
 
-// 17. a browse joins no consumer group (D19/D30). Rewritten (§5.3) to the parent's own wording: a
-// browse never creates group state. Snapshots adm.ListGroups before and after paging the whole of
-// ORDERS_TOPIC at a small page size (several ephemeral consumers under the hood) and asserts the
-// two sets are equal — stronger than "the seeded group is still present", since it also catches a
-// browse that deletes or mutates group state.
+// A browse joins no consumer group. A browse never creates group state. Snapshots adm.ListGroups
+// before and after paging the whole of ORDERS_TOPIC at a small page size (several ephemeral
+// consumers under the hood) and asserts the two sets are equal — stronger than "the seeded group is
+// still present", since it also catches a browse that deletes or mutates group state.
 func TestKafka_Read_BrowseJoinsNoConsumerGroup(t *testing.T) {
 	f := testsupport.StartKafka(t)
 	a := connectedAdapter(t, f)
@@ -969,7 +967,7 @@ func TestKafka_Read_BrowseCommitsNoOffsets(t *testing.T) {
 	}
 }
 
-// 19. a timestamp filter still seeks (D20). Learns each seeded message's real timestamp rather
+// A timestamp filter still seeks. Learns each seeded message's real timestamp rather
 // than assuming a hand-picked value falls between two of them, and seeks via a hand-built
 // KafkaStreamFilter JSON string (packages/shared/domain/streamFilter.ts's own wire shape:
 // {"offset":null,"partitions":[],"timestampMs":N}) — the same field ReadRequest.Filter already
@@ -1033,13 +1031,13 @@ func TestKafka_Read_TimestampFilterSeeks(t *testing.T) {
 	}
 }
 
-// 20. an oversized start offset is refused, not truncated (D23). Re-baselined (P58e E6):
+// 20. an oversized start offset is refused, not truncated.
 // Number.MAX_SAFE_INTEGER+1 is an ordinary int64 in Go (toNativeOffset's guard is deleted, not
 // ported — Go's own int64 removes the hazard it existed for), so this hand-crafts a page token
 // whose window offset exceeds int64's own range (2^63) instead. NOTE: this constructs the
 // adapter's own internal per-partition window JSON by hand (field names "partition"/"next"/"end",
-// matching read.ts's own naming per P58e E17's diffability rule) — M9.2's read.go is the actual
-// source of truth for this shape and this test may need adjusting once it exists.
+// matching read.ts's own naming) — read.go is the actual source of truth for this shape and
+// this test may need adjusting once it exists.
 func TestKafka_Read_OversizedOffsetTokenIsRefused(t *testing.T) {
 	f := testsupport.StartKafka(t)
 	a := connectedAdapter(t, f)
@@ -1070,15 +1068,14 @@ func TestKafka_Read_OversizedOffsetTokenIsRefused(t *testing.T) {
 	}
 }
 
-// 21. read: a partition ending in a transaction's commit marker still terminates (D26). Re-
-// baselined against franz-go (P58e E9): a partition's high watermark counts a transaction's own
-// commit marker as an offset the consumer never receives as a delivered message, so `next` can
-// land one behind `end` forever unless the clamp fires on the provably-drained watermark
-// comparison (P43 iter2 F19/D26). This is the single most important test in the suite — the
-// assertion that fails against a naive port is the third one below, not the first. Drives the
-// driver under test's own franz-go client directly (kgo.TransactionalID +
-// BeginTransaction/ProduceSync/EndTransaction), the same way produce.ts drove node-rdkafka's
-// classic Producer, so gap-topic is dedicated and transaction-only.
+// 21. read: a partition ending in a transaction's commit marker still terminates. Re-baselined
+// against franz-go: a partition's high watermark counts a transaction's own commit marker as an
+// offset the consumer never receives as a delivered message, so `next` can land one behind `end`
+// forever unless the clamp fires on the provably-drained watermark comparison. This is the single
+// most important test in the suite — the assertion that fails against a naive port is the third
+// one below, not the first. Drives the driver under test's own franz-go client directly
+// (kgo.TransactionalID + BeginTransaction/ProduceSync/EndTransaction), the same way produce.ts
+// drove node-rdkafka's classic Producer, so gap-topic is dedicated and transaction-only.
 func TestKafka_Read_TransactionCommitMarkerGapStillTerminates(t *testing.T) {
 	f := testsupport.StartKafka(t)
 	ctx := context.Background()
@@ -1143,8 +1140,8 @@ func TestKafka_Read_TransactionCommitMarkerGapStillTerminates(t *testing.T) {
 	}
 }
 
-// TestKafka_Read_ExactlyPageCappedGapEventuallyTerminates is P21 round 3 functional finding 3: the
-// preceding test's page size (10) is larger than the topic's one real record, so the very first
+// TestKafka_Read_ExactlyPageCappedGapEventuallyTerminates: the preceding test's page size (10) is
+// larger than the topic's one real record, so the very first
 // round already delivers with room to spare (collected < req.PageSize) — advanceWindows' own clamp
 // fires immediately in that same, uncapped round. This test instead sets PageSize to exactly the
 // real record count, so the delivering round is *exactly* capped (collected == req.PageSize) and

@@ -57,7 +57,7 @@ func TestTokenize_EscapeOutsideQuotesNotHonoured(t *testing.T) {
 	}
 }
 
-// TestTokenize_NewlineEscapeInsideDoubleQuotes is F12's own regression: a `\n` inside a
+// TestTokenize_NewlineEscapeInsideDoubleQuotes is the regression: a `\n` inside a
 // double-quoted token must become a real newline byte, matching redis-cli's own sdssplitargs —
 // the previous tokenizer took the escaped rune literally (`\n` became the two-byte text "an"
 // glued to the quote, i.e. "n" itself, not a newline), so `SET k "a\nb"` stored the literal text
@@ -144,7 +144,7 @@ func kvEntry(t *testing.T, pg page.KeyValuePage, i int) (field, value string) {
 	return *f, *v
 }
 
-// TestResultToPage_HGETCarriesRealFieldName is finding #3 (M7): resultToPage previously named
+// TestResultToPage_HGETCarriesRealFieldName: resultToPage previously named
 // every scalar reply's Field after the upper-cased command ("HGET"), never the real hash field
 // requested — so a mask rule on that field could never match it through run_query, though
 // list_connections reported the connection as protected. HGET's own field name comes from the

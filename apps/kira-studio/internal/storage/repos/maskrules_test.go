@@ -90,10 +90,10 @@ func TestMaskRulesCascadeOnConnectionDelete(t *testing.T) {
 	}
 }
 
-// TestInsertDuplicateWithSecretDoesNotCopyMaskCorrelationKey is plan §3.2's own named property: a
-// copied key would silently break the "key is scoped to one connection" invariant §2.5 states,
-// making the duplicate's masked tags linkable back to the original's. Verified directly against
-// the real ConnectionsRepo/MaskKeysRepo pair, not just read from the INSERT statement's column list.
+// TestInsertDuplicateWithSecretDoesNotCopyMaskCorrelationKey: a copied key would silently break
+// the "key is scoped to one connection" invariant, making the duplicate's masked tags linkable
+// back to the original's. Verified directly against the real ConnectionsRepo/MaskKeysRepo pair,
+// not just read from the INSERT statement's column list.
 func TestInsertDuplicateWithSecretDoesNotCopyMaskCorrelationKey(t *testing.T) {
 	t.Setenv("KIRA_INSECURE_SECRETS", "1")
 	db := newRepos(t).DB
@@ -139,7 +139,7 @@ func TestInsertDuplicateWithSecretDoesNotCopyMaskCorrelationKey(t *testing.T) {
 	}
 }
 
-// TestInsertDuplicateWithSecretAlwaysStartsMcpDisabled is finding #4 (M7): the duplicate's row must
+// TestInsertDuplicateWithSecretAlwaysStartsMcpDisabled: the duplicate's row must
 // never be committed already MCP-live, whatever the source's own McpEnabled was — mask rules live
 // in a separate table this single INSERT cannot also write, so connections.Service.Duplicate flips
 // mcp_enabled on (via SetMcpEnabled) only after copying them succeeds. A duplicate inserted

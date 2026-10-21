@@ -1,5 +1,5 @@
-// P12 D15: the first test in this repo to exercise a migration against seeded data, because it is
-// the first migration that touches data rather than adding to it (D14's own reasoning: 0010 is a
+// The first test in this repo to exercise a migration against seeded data, because it is
+// the first migration that touches data rather than adding to it (0010 is a
 // real, irreversible rename of user data, not a fresh CREATE TABLE). CLAUDE.md's test bar admits
 // this by name — "an irreversible data migration" — as a one-time proof, not ongoing CRUD coverage.
 package migrations_test
@@ -69,7 +69,7 @@ func scalarInt(t *testing.T, db *sql.DB, query string, args ...any) int {
 // TestMigration10RenamesTablesAndPreservesData seeds a v9-shaped database — a collection, a
 // folder, an HTTP request item, a gRPC request item, a collection variable, an environment plus
 // its own variable, a variable-history row and a response-history row, plus a grpc_call_history
-// row (which is NOT renamed, D14) — applies migration 10, and checks every row survives under the
+// row (which is NOT renamed) — applies migration 10, and checks every row survives under the
 // new table names with identical values, that both generated scope_key columns still compute,
 // that grpc_call_history's own foreign key now names api_items, and that a collection delete
 // still cascades all the way down.

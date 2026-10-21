@@ -1,5 +1,5 @@
-// matrix.go is P25 §3's harness for the complete (Tier 2) permutation suite — auth/config cases,
-// plus the Scenario/Then seam P26 populated with real functional coverage per adapter.
+// matrix.go is the harness for the complete permutation suite — auth/config cases,
+// plus the Scenario/Then seam populated with real functional coverage per adapter.
 // Case/Outcome/RunMatrix live here, once, so a per-adapter authmatrix_test.go only ever declares
 // its own table.
 package testsupport
@@ -26,10 +26,9 @@ const matrixEnv = "KIRA_TEST_MATRIX"
 // text — the database names kira_test/kira_analytics/kira_admin, kafka's own "kira-studio" client
 // id and "kira-sasl-test-cluster" cluster id — so a passing case's incidental error text could
 // satisfy this file's own password-leak assertion below by accident, on a message that never
-// actually echoed the password. No case triggers that today (every failing case already overrides
-// the password to something else distinctive), but the hazard is real for future additions
-// (finding 7). A fixture's own password must never collide as a substring with any other fixture
-// identifier.
+// echoed the password. No case triggers that today (every failing case already overrides
+// the password to something else distinctive), but the hazard is real for future additions.
+// A fixture's own password must never collide as a substring with any other fixture identifier.
 const FixturePassword = "kira-fixture-pw"
 
 // RequireMatrix skips unless the complete suite was explicitly asked for. Call it before starting
@@ -43,7 +42,7 @@ func RequireMatrix(t *testing.T) {
 }
 
 // Principal is one server-side identity a case needs, created inside the adapter's already-running
-// shared container (P25 §2.3 — one container per adapter, roles created at runtime inside it) and
+// shared container (one container per adapter, roles created at runtime inside it) and
 // torn down with the test that asked for it. f is the adapter's own fixture pointer (e.g.
 // *RedisFixture) — untyped because each adapter's Setup closure is written against its own
 // concrete fixture type; RunMatrix never inspects it, only passes it through.
@@ -53,9 +52,9 @@ type Principal struct {
 }
 
 // ClearAwsEnv unsets AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_SESSION_TOKEN/AWS_PROFILE for one
-// subtest, auto-restored (P107 I2-28 — s3's and sqs's own authmatrix_test.go, byte-identical).
+// subtest, auto-restored (s3's and sqs's own authmatrix_test.go, byte-identical).
 // This sandbox's own outbound proxy injects placeholder AWS_* credentials (CLAUDE.md), which would
-// otherwise mask the "no credentials anywhere" case §1.5a's transcript needs.
+// otherwise mask the "no credentials anywhere" case the transcript needs.
 var ClearAwsEnv = &Principal{
 	Name: "clear ambient AWS env",
 	Setup: func(t *testing.T, _ any) {
@@ -72,7 +71,7 @@ var ClearAwsEnv = &Principal{
 	},
 }
 
-// SeedAmbientAwsEnv is ClearAwsEnv's mirror (P107 I2-28, same byte-identical pair): guarantees
+// SeedAmbientAwsEnv is ClearAwsEnv's mirror (same byte-identical pair): guarantees
 // AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY are ambiently present for one subtest (t.Setenv,
 // auto-restored). Some fields-mode cases need ambient credentials to exist somewhere in the
 // environment for LoadDefaultConfig to find (a lone URI key never becomes a static credential,
@@ -80,7 +79,7 @@ var ClearAwsEnv = &Principal{
 // placeholder AWS_* env, which is what let those cases pass in-sandbox, but a GitHub Actions
 // runner has no such proxy and fails with a real EC2-IMDS lookup error instead. Setting the env
 // directly makes the case pass on its own merits everywhere (LocalStack accepts any nonempty
-// static credentials unconditionally, P25 §2.3, measured, so the exact values don't matter).
+// static credentials unconditionally, measured, so the exact values don't matter).
 var SeedAmbientAwsEnv = &Principal{
 	Name: "seed ambient AWS env",
 	Setup: func(t *testing.T, _ any) {
@@ -92,8 +91,8 @@ var SeedAmbientAwsEnv = &Principal{
 
 // Outcome is what Connect must produce. Exactly one of Succeed and a Code assertion is meaningful:
 // when Succeed, FailWith/NotCode are ignored; when not, FailWith asserts the exact code and NotCode
-// asserts the failure is anything *but* that code (P25 §2.4 row 6's "a permission refusal must not
-// read as E_AUTH" shape, which recurs in nearly every adapter's own matrix).
+// asserts the failure is anything *but* that code (the "a permission refusal must not read as
+// E_AUTH" shape, which recurs in nearly every adapter's own matrix).
 type Outcome struct {
 	Succeed  bool
 	FailWith adapters.ErrorCode
@@ -121,11 +120,10 @@ type Scenario struct {
 
 // runMatrixCase runs one Case: Principal.Setup, build the config, Connect, assert Outcome, run
 // each Scenario whose Requires passes, Disconnect. Called once per case inside RunMatrix's own
-// t.Run. Deliberately does NOT call t.Helper(): verified empirically (P94 pass 2) that marking
+// t.Run. Deliberately does NOT call t.Helper(): verified empirically that marking
 // this function a helper collapses every one of its own assertions' reported line to the single
 // generic "runMatrixCase(...)" call site inside RunMatrix's loop, losing exactly which check
-// failed; leaving it unmarked keeps each t.Errorf/t.Fatalf attributed to its own line here, same
-// as before this function existed as a separate extraction.
+// failed; leaving it unmarked keeps each t.Errorf/t.Fatalf attributed to its own line here.
 func runMatrixCase(t *testing.T, kind string, fixture any, deps adapters.Deps, base model.ResolvedConnectionConfig, c Case) {
 	if c.Principal != nil {
 		c.Principal.Setup(t, fixture)
@@ -247,12 +245,12 @@ func secretsFromURI(uri *string) []string {
 	return out
 }
 
-// RunScenarios applies the same Requires gate RunMatrix does, outside a matrix table (P26 §2.1) —
-// the one addition this phase makes to the harness, so a scenario written once against a live
-// (already-connected) adapter backs both the general (Tier-1, ungated) suite and the complete
-// (Tier-2, KIRA_TEST_MATRIX-gated) one instead of being written twice. Unlike RunMatrix, this does
-// not call RequireMatrix itself — a Tier-1 caller must run unconditionally, and a Tier-2 caller
-// already ran it via RunMatrix/RequireMatrix before a is connected.
+// RunScenarios applies the same Requires gate RunMatrix does, outside a matrix table, so a
+// scenario written once against a live (already-connected) adapter backs both the general
+// (Tier-1, ungated) suite and the complete (Tier-2, KIRA_TEST_MATRIX-gated) one instead of being
+// written twice. Unlike RunMatrix, this does not call RequireMatrix itself — a Tier-1 caller must
+// run unconditionally, and a Tier-2 caller already ran it via RunMatrix/RequireMatrix before a
+// is connected.
 func RunScenarios(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig, scenarios ...Scenario) {
 	t.Helper()
 	for _, s := range scenarios {

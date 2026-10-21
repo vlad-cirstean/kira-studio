@@ -18,9 +18,9 @@ import (
 )
 
 // fakeStates is a Connected whose state a test sets directly, instead of driving a real connect.
-// since (P24) lets a test place a connect epoch on either side of a cached write — zero for a
+// since lets a test place a connect epoch on either side of a cached write — zero for a
 // connection a test never sets it on, which is the correct default (a floor of the Unix epoch,
-// leaving every real payload fresh) for every pre-P24 case in this file that never touches it.
+// leaving every real payload fresh) for every case in this file that never touches it.
 type fakeStates struct {
 	status map[string]string
 	since  map[string]int64
@@ -35,10 +35,10 @@ func (f *fakeStates) StateOf(connectionID string) model.ConnectionState {
 }
 
 // fakeBackend replaces the real adapterhost.Router (via a real Node engine fixture) these tests
-// used before P58f Phase 4 deleted the Node sidecar — every kind has been Go-native since P58e
-// M9.3, so there is no more Node-served path left to exercise here, only tree.Backend's own
-// contract. Children answers one leaf node, truncated whenever the requested path's last segment
-// name starts with "trunc-" — the same fixture convention these tests were written against.
+// used — every kind has been Go-native, so there is no more Node-served path left to exercise
+// here, only tree.Backend's own contract. Children answers one leaf node, truncated whenever the
+// requested path's last segment name starts with "trunc-" — the same fixture convention these
+// tests were written against.
 type fakeBackend struct {
 	childrenN      atomic.Int64
 	schemaColumnsN atomic.Int64
@@ -140,7 +140,7 @@ func (h *harness) seedConnection(t *testing.T, id, name string) {
 }
 
 // advanceSince marks id's connection as (re-)established right now — real wall-clock time, so
-// P24's freshness floor for it becomes "now": anything already cached is stale, and anything the
+// the freshness floor for it becomes "now": anything already cached is stale, and anything the
 // service writes from this point on is fresh. A 5ms sleep first guarantees a real, strictly-later
 // timestamp string even though jsISOFormat's precision is only milliseconds — otherwise a payload
 // written moments earlier in the same test could share the exact same millisecond and compare
@@ -334,7 +334,7 @@ func TestSchemaColumnsInvalidateClears(t *testing.T) {
 	}
 }
 
-// TestChildrenAndSchemaColumnsShareOneRow proves F8's zero-net-row property: a container's
+// TestChildrenAndSchemaColumnsShareOneRow proves the zero-net-row property: a container's
 // "children" and "columns" payloads are two kinds merged into ONE metadata_cache row (the
 // (connection_id, path) unique index), not two competing rows that would otherwise pressure each
 // other out of the 200-row-per-connection budget.
@@ -377,15 +377,14 @@ func TestChildrenAndSchemaColumnsShareOneRow(t *testing.T) {
 	}
 }
 
-// P24 §4.2: the staleness rules, and how they interact. seedConnection's default Since (0, the
-// Unix epoch) is left untouched by every test above this line — under D2 that is a floor no real
-// payload can ever be older than, which is exactly why every "cache hit" assertion already in this
-// file keeps passing unmodified. The tests below are the ones that actually move Since.
+// The staleness rules, and how they interact. seedConnection's default Since (0, the Unix epoch) is
+// left untouched by every test above this line — that is a floor no real payload can ever be older
+// than, which is exactly why every "cache hit" assertion already in this file keeps passing
+// unmodified. The tests below are the ones that move Since.
 
-// TestFreshCacheHitIsServedWhileConnected pins behaviour 2 (P24 §0.1): navigating a live
-// connection never re-fetches what it already has, regardless of the freshness rule this phase
-// adds — the payload is written after the connection's (zero, default) epoch, so it stays fresh
-// for the rest of the session.
+// TestFreshCacheHitIsServedWhileConnected pins that navigating a live connection never re-fetches
+// what it already has, regardless of the freshness rule — the payload is written after the
+// connection's (zero, default) epoch, so it stays fresh for the rest of the session.
 func TestFreshCacheHitIsServedWhileConnected(t *testing.T) {
 	h := newHarness(t)
 	h.seedConnection(t, "c1", "Conn One")
@@ -533,9 +532,9 @@ func TestStalePayloadIsNotDropped(t *testing.T) {
 	}
 }
 
-// TestRefreshingOneKindDoesNotFreshenAnother is F13's hazard, and the single most important case
-// in this file: it fails against a row-level fetched_at implementation (re-fetching 'children'
-// would stamp the whole row, wrongly freshening 'columns' too) and passes against D3's per-kind
+// TestRefreshingOneKindDoesNotFreshenAnother is the single most important case in this file: it
+// fails against a row-level fetched_at implementation (re-fetching 'children'
+// would stamp the whole row, wrongly freshening 'columns' too) and passes against the per-kind
 // fetchedAt map.
 func TestRefreshingOneKindDoesNotFreshenAnother(t *testing.T) {
 	h := newHarness(t)
@@ -730,7 +729,7 @@ func TestInvalidateConnectionDropsEveryPath(t *testing.T) {
 	}
 }
 
-// TestFetchRacingAReconnectIsNotCachedAsFresh is F7 (P108 Part 6): a fetch that captured the
+// TestFetchRacingAReconnectIsNotCachedAsFresh: a fetch that captured the
 // connection's epoch before calling the backend must not have its own result cached as fresh once
 // a reconnect moves that epoch forward before the fetch returns — the result would otherwise get
 // its metadata_cache row's fetchedAt stamped at Put time (after the new epoch), which reads as

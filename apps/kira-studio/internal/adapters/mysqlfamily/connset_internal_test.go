@@ -9,8 +9,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 )
 
-// White-box (package mysqlfamily) coverage for ConnSet.Acquire's per-connection lock — P21 round 2
-// performance finding 3. A real dial (BuildConfig -> mysql.NewConnector -> db.Conn) needs a live
+// White-box (package mysqlfamily) coverage for ConnSet.Acquire's per-connection lock.
+// A real dial (BuildConfig -> mysql.NewConnector -> db.Conn) needs a live
 // server, so these tests wire a fake Dial that hands back a pre-built connEntry instead, reaching
 // Acquire's cache-hit path the same way an already-open connection would, without ever touching the
 // network. *sql.Conn is never dereferenced by these tests (no query is ever run on it), so a nil
@@ -27,7 +27,7 @@ func connSetWithFakeEntries(entries map[string]*connEntry) *ConnSet {
 	})}
 }
 
-// TestAcquireSerializesTwoCallersOnTheSameConnection is the finding's own regression: before this
+// TestAcquireSerializesTwoCallersOnTheSameConnection is the regression: before this
 // fix, ConnSet.Get handed back a bare *sql.Conn with no lock at all — two concurrent callers (two
 // data tabs on the same database, or a Read racing a console Execute) could run statements on the
 // same pinned, non-shareable connection at the same time. Acquire must now serialize them: the

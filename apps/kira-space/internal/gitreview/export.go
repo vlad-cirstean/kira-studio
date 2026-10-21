@@ -31,7 +31,7 @@ type AnchoredComment struct {
 	Range  LineRange // projected onto the requested revision, or the stored range for removed/stale
 }
 
-// SortAnchored applies D13's total order in place: path (byte order), then the reported Range's
+// SortAnchored applies the total order in place: path (byte order), then the reported Range's
 // start and end (the narrower comment first), then CreatedAt, then ID as the final tiebreak — two
 // comments can share a millisecond, so ID is what makes the order total. review.comment.list and
 // the export share this one ordering rather than each computing their own.
@@ -54,9 +54,9 @@ func SortAnchored(cs []AnchoredComment) {
 	})
 }
 
-// FormatComments renders D12's exact AI-paste text: a header line naming branch and the comment
+// FormatComments renders the exact AI-paste text: a header line naming branch and the comment
 // count, then one entry per comment (an anchor line, the body, a blank line), ending in exactly
-// one trailing newline. "" for an empty session (rule 9: cs must already be SortAnchored'd — this
+// one trailing newline. "" for an empty session (cs must already be SortAnchored'd — this
 // function renders, it does not sort).
 func FormatComments(branch string, cs []AnchoredComment) string {
 	if len(cs) == 0 {

@@ -12,7 +12,7 @@ import (
 )
 
 // fakeGhAuthRunner answers `gh --version`/`gh auth status --hostname <host>` as always-ok for any
-// host — this file's own minimal stand-in for github.Runner (F13: no real `gh` in this
+// host — this file's own minimal stand-in for github.Runner (no real `gh` in this
 // container), mirroring gitsession's own countingGhRunner/fakeGhLocator without importing them
 // across the package boundary (they are unexported _test.go fakes of a different package).
 type fakeGhAuthRunner struct{}

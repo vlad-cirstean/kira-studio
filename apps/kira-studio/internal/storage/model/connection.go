@@ -1,7 +1,7 @@
 package model
 
 // ConnectionFields is the shape both ConnectionsRepo.Insert/Update accept and ConnectionSummary
-// embeds — packages/shared/domain/connection.ts's connectionFieldsSchema, minus `password` (D9: no
+// embeds — packages/shared/domain/connection.ts's connectionFieldsSchema, minus `password` (no
 // password field anywhere in this package, enforced by the type itself, same as the TS build's
 // `.omit({password: true})`).
 type ConnectionFields struct {
@@ -40,7 +40,7 @@ type ConnectionFields struct {
 	McpReadMode  string `json:"mcpReadMode"`
 	McpWriteMode string `json:"mcpWriteMode"`
 	McpDdlMode   string `json:"mcpDdlMode"`
-	// M3: runs this connection's own EXPLAIN before every explainable run_query on the DB MCP path,
+	// Runs this connection's own EXPLAIN before every explainable run_query on the DB MCP path,
 	// and pauses the query for a human decision when the plan crosses the expensive-query row
 	// threshold. Separate from AutoExplain, which governs this app's own console — see the
 	// migration's own comment for why one switch cannot mean both.
@@ -77,12 +77,10 @@ var connectionKinds = map[string]bool{
 }
 
 // paletteColors mirrors domain/color.ts's paletteColorSchema — the whole storable set, not
-// PALETTE_COLOR_CHOICES/CONNECTION_COLOR_CHOICES (the picker's offered subset). P42 F27: a row
-// saved with a retired colour must keep parsing, listing and painting its own rail, so trimming
-// this set to match the picker would silently corrupt existing rows. P18 D18: renamed from
-// connectionColors now that an environment's colour (this phase) draws from the same palette —
-// ValidConnectionColor below stays as a one-line alias so repos/connections.go and the connection
-// bridge are untouched.
+// PALETTE_COLOR_CHOICES/CONNECTION_COLOR_CHOICES (the picker's offered subset). A row saved with
+// a retired colour must keep parsing, listing and painting its own rail, so trimming this set to
+// match the picker would silently corrupt existing rows. ValidConnectionColor below stays as a
+// one-line alias so repos/connections.go and the connection bridge are untouched.
 var paletteColors = map[string]bool{
 	"none": true, "red": true, "orange": true, "amber": true, "olive": true, "green": true,
 	"teal": true, "cyan": true, "blue": true, "indigo": true, "violet": true, "magenta": true,

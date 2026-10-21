@@ -81,7 +81,7 @@ func runArrayQuery(ctx context.Context, conn *trackedConn, sql string, params []
 	})
 }
 
-// streamArrayQuery is runArrayQuery's single-pass twin (P2 R1): instead of materializing every
+// streamArrayQuery is runArrayQuery's single-pass twin: instead of materializing every
 // scanned row into a [][]*string only to be transposed into the page builder immediately after,
 // onRow is called once per row, in order, with a []*string the callback owns (safe to retain
 // beyond the call, unlike a slice into a shared backing array). Used by the read path's readPage;

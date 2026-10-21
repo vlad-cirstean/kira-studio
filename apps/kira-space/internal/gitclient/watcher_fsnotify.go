@@ -14,7 +14,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// watcherBackend names the OS event source this build uses (G9 D5), logged once per watcher
+// watcherBackend names the OS event source this build uses, logged once per watcher
 // (watcher.go's newRepoWatcherWith) so a darwin build that unexpectedly falls back to this
 // backend — CGO_ENABLED=0, which build/darwin/Taskfile.yml never sets — says so out loud, matching
 // internal/localauth/evaluate_other.go's own pattern.
@@ -22,9 +22,8 @@ const watcherBackend = "fsnotify"
 
 // fsnotifyBackend is the event source for every non-darwin build, and for a darwin build compiled
 // with CGO_ENABLED=0. fsnotify has no recursive watch, so this backend walks commonDir/refs once
-// and extends the walk as new directories appear (addRefsTree/maybeWatchNewRefsDir, G2 F9) —
-// machinery the FSEvents backend needs none of, because FSEvents is recursive by construction
-// (G9 D6/D10).
+// and extends the walk as new directories appear (addRefsTree/maybeWatchNewRefsDir) —
+// machinery the FSEvents backend needs none of, because FSEvents is recursive by construction.
 type fsnotifyBackend struct {
 	fsw *fsnotify.Watcher
 
@@ -54,7 +53,7 @@ func newBackend(commonDir, gitDir string) (backend, error) {
 		}
 	}
 	addRefsTree(fsw, filepath.Join(commonDir, "refs"))
-	// G25 D17/F9: commonDir/worktrees — a repository that has never had a linked worktree has no
+	// commonDir/worktrees — a repository that has never had a linked worktree has no
 	// such directory yet, which is not an error (mirrors addRefsTree's own "a missing root is not
 	// an error" for a repository mid-init); maybeWatchWorktreesDir below adds this watch reactively
 	// the first time the directory itself is created by a detached `worktree add`.
@@ -131,8 +130,8 @@ func (b *fsnotifyBackend) run(commonDir string) {
 }
 
 // addRefsTree walks root (commonDir/refs) and Adds every directory found to fsw — the walk this
-// backend must do itself (G2 F9): fsnotify has no recursive watch, so this is what stands in for
-// one. A missing root (a repository mid-init) is not an error, matching D10; an Add failure on
+// backend must do itself: fsnotify has no recursive watch, so this is what stands in for
+// one. A missing root (a repository mid-init) is not an error; an Add failure on
 // any one directory is logged and skipped rather than aborting the rest.
 func addRefsTree(fsw *fsnotify.Watcher, root string) {
 	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -160,15 +159,15 @@ func maybeWatchNewRefsDir(fsw *fsnotify.Watcher, commonDir, path string) {
 	}
 }
 
-// maybeWatchWorktreesDir is G25 D17/F9's own two-line addition: the FIRST detached `worktree add`
-// this repository has ever seen creates commonDir/worktrees itself, which this backend was not
-// watching at startup (it did not exist yet) — this extends the watch reactively, exactly once,
-// the moment that directory materialises, so every subsequent worktree's own <name> subdirectory
-// (whose creation/removal is a direct child event of THIS directory, not a deeper one this backend
-// would otherwise need to recurse into) is observed from then on. Unlike addRefsTree this never
-// recurses further than this one directory — a linked worktree's own per-worktree files (HEAD,
-// index, locked) are out of this phase's own watch scope (0.3: lock/unlock/prune are not served),
-// only its own top-level creation/removal under commonDir/worktrees is.
+// maybeWatchWorktreesDir: the FIRST detached `worktree add` this repository has ever seen creates
+// commonDir/worktrees itself, which this backend was not watching at startup (it did not exist
+// yet) — this extends the watch reactively, exactly once, the moment that directory materialises,
+// so every subsequent worktree's own <name> subdirectory (whose creation/removal is a direct child
+// event of THIS directory, not a deeper one this backend would otherwise need to recurse into) is
+// observed from then on. Unlike addRefsTree this never recurses further than this one directory —
+// a linked worktree's own per-worktree files (HEAD, index, locked) are out of the watch scope
+// (lock/unlock/prune are not served), only its own top-level creation/removal under
+// commonDir/worktrees is.
 func maybeWatchWorktreesDir(fsw *fsnotify.Watcher, commonDir, path string) {
 	worktreesRoot := filepath.Join(filepath.Clean(commonDir), "worktrees")
 	if filepath.Clean(path) != worktreesRoot {

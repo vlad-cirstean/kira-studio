@@ -109,9 +109,9 @@ func resolveFields(cfg model.ResolvedConnectionConfig, log func(level, message s
 }
 
 // dbConnectionSet mirrors client.ts's DbConnectionSet exactly, keyed by logical db index instead
-// of database name (P9's D9): one distinct *redis.Client per db index, each carrying its own DB
+// of database name: one distinct *redis.Client per db index, each carrying its own DB
 // option baked in at construction rather than sharing one connection and issuing a runtime
-// SELECT. The LRU pool with single-flight dial (P21 round 3 performance finding 5) is
+// SELECT. The LRU pool with single-flight dial is
 // adapters.ConnSet — only Dial and the eviction Close stay dialect-specific here.
 type dbConnectionSet struct {
 	fields         connectFields
@@ -202,7 +202,7 @@ func (s *dbConnectionSet) dial(ctx context.Context, dbIndex int) (*clientEntry, 
 		Username: s.fields.username,
 		Password: s.fields.password,
 		DB:       dbIndex,
-		// P25 §1.3: ClientName (CLIENT SETNAME, issued by go-redis on every new pooled connection)
+		// ClientName (CLIENT SETNAME, issued by go-redis on every new pooled connection)
 		// requires a privilege a least-privilege ACL user (~* +@read, or +@all -@dangerous before
 		// the fix above) may not have, and it only labels the connection in CLIENT LIST — go-redis
 		// offers no "tolerate a failed SETNAME" switch, so dropping the option entirely is the
@@ -255,7 +255,8 @@ func (s *dbConnectionSet) primary(ctx context.Context) (*goredis.Client, func(),
 
 // isReadOnlyCommand answers the read-only guard by asking Redis's own COMMAND table rather than
 // hand-maintaining a read/write command list — the server is authoritative, including for Lua
-// scripts (EVAL/EVALSHA/FCALL) and admin commands, which COMMAND INFO already flags as non-readonly.
+// scripts (EVAL/EVALSHA/FCALL) and admin commands, which COMMAND INFO already flags as
+// non-readonly.
 // The table is fetched once per connection set and cached; command flags don't change mid-session.
 // An unrecognized command name is treated as a write (deny by default) rather than assumed safe.
 func (s *dbConnectionSet) isReadOnlyCommand(ctx context.Context, client *goredis.Client, name string, args []string) bool {

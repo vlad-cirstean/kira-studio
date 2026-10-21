@@ -14,9 +14,9 @@ import (
 )
 
 // ErrorCode is the Go analogue of errors.ts's AdapterErrorCode — a closed set, verbatim from
-// errors.ts:4-12 (P58a A5). Nothing is ever added here without a matching renderer change:
-// apps/kira-studio/frontend/src/views/shared/viewOp.ts and state/tabs.ts both branch on these exact strings, and a
-// renamed or added code silently stops matching there.
+// errors.ts:4-12. Nothing is ever added here without a matching renderer change:
+// apps/kira-studio/frontend/src/views/shared/viewOp.ts and state/tabs.ts both branch on these exact
+// strings, and a renamed or added code silently stops matching there.
 type ErrorCode string
 
 const (
@@ -102,7 +102,7 @@ var (
 	// variables the postgres and mysqlfamily adapters rely on (default_transaction_read_only /
 	// transaction_read_only on postgres and mysql, tx_read_only on mariadb) and assigns it a falsy
 	// value — the non-SQL-standard way to ask for the same escalation "READ WRITE" asks for by
-	// phrase (review finding: `SET transaction_read_only = off` inside the wrapping transaction
+	// phrase (`SET transaction_read_only = off` inside the wrapping transaction
 	// confirmed, against a real Postgres server, to flip that transaction writable and let a
 	// following DELETE succeed, with no "READ WRITE" phrase anywhere in the statement for
 	// sqlReadWrite to catch).
@@ -113,7 +113,8 @@ var (
 )
 
 // endsTransaction reports whether stmt (already comment-stripped) is a bare statement that ends
-// the current transaction — COMMIT, END (postgres's alias for COMMIT), ABORT (its alias for ROLLBACK), or ROLLBACK — rather than
+// the current transaction — COMMIT, END (postgres's alias for COMMIT), ABORT (its alias for
+// ROLLBACK), or ROLLBACK — rather than
 // a statement that merely mentions one of those words. A real read-only console session has no
 // legitimate reason to end its own wrapping transaction mid-batch (postgres/mysqlfamily console.go
 // both wrap the whole Execute() batch in one read-only transaction specifically so no statement in
@@ -194,8 +195,9 @@ func scanQuote(r []rune, i int, escapeBackslash bool) int {
 }
 
 // isEStringOpen reports whether the quote at r[i] opens a Postgres E'...'/e'...' string — the one
-// case backslash unconditionally escapes regardless of standard_conforming_strings (finding F1).
-// Requires r[i] to be a single quote and the immediately preceding rune to be a standalone E/e: a word boundary
+// case backslash unconditionally escapes regardless of standard_conforming_strings.
+// Requires r[i] to be a single quote and the immediately preceding rune to be a standalone E/e:
+// a word boundary
 // before it (or start of input), so an identifier merely ending in e/E (`table`, `value`) is never
 // mistaken for the prefix.
 func isEStringOpen(r []rune, i int) bool {
@@ -218,7 +220,7 @@ func isSQLIdentRune(r rune) bool {
 
 // scanDollarQuote reports the end index (exclusive) of a Postgres dollar-quoted string opened by
 // r[i] == '$' (`$$...$$` or `$tag$...$tag$`, mirroring sql-lex.ts's own regexp), or -1 when r[i]
-// doesn't actually open one — a bare `$` used as an ordinary character (a `$1` placeholder, a
+// doesn't open one — a bare `$` used as an ordinary character (a `$1` placeholder, a
 // MySQL identifier) rather than a quote.
 func scanDollarQuote(r []rune, i int) int {
 	n := len(r)
@@ -507,14 +509,14 @@ func execCommentMarkerLen(r []rune, i int) int {
 	return j - i
 }
 
-// AssertNoTransactionEscalation is a console-Execute-only backstop for postgres/mysqlfamily (P2
-// R2, hardened per a later review round): both enforce a read-only connection by setting a
+// AssertNoTransactionEscalation is a console-Execute-only backstop for postgres/mysqlfamily:
+// both enforce a read-only connection by setting a
 // *session default* (default_transaction_read_only / SESSION TRANSACTION READ ONLY) at connect
 // time and wrapping each Execute() batch in an explicit read-only transaction, neither of which a
 // statement inside that same transaction can be trusted not to try to escape. Three angles are
 // rejected outright rather than run, each confirmed against a real server (see StripSQLComments,
-// sqlReadOnlyVarOff and endsTransaction's own doc comments for what was actually tried and what a
-// real server actually did): the SQL-standard `READ WRITE` phrase, naming a read-only GUC/session
+// sqlReadOnlyVarOff and endsTransaction's own doc comments for what was tried and what a
+// real server did): the SQL-standard `READ WRITE` phrase, naming a read-only GUC/session
 // variable and assigning it a falsy value, and a bare COMMIT/END/ROLLBACK that would end the
 // wrapping transaction itself. This function cannot be made complete against every possible
 // escalation a SQL dialect can express — it is a backstop on top of the real enforcement (the
@@ -532,11 +534,11 @@ func AssertNoTransactionEscalation(statements []string, d SQLDialect) error {
 	return nil
 }
 
-// AssertNoHiddenStatement is F1's fail-closed backstop for a read-only Postgres connection, over
+// AssertNoHiddenStatement is the fail-closed backstop for a read-only Postgres connection, over
 // any raw SQL fragment this app treats as one unit without ever fully parsing it: a console
 // statement (via AssertNoTransactionEscalation above), or a grid filter / text-sort clause
 // concatenated straight into a WHERE/ORDER BY and run over pgx's simple protocol with no wrapping
-// transaction or classification of its own — the second, lower-weight path finding F1 names.
+// transaction or classification of its own.
 // Postgres's simple protocol executes every statement found in a string it is handed, so either
 // input hiding a second top-level statement must be rejected outright rather than let the extra
 // statement run:
@@ -617,7 +619,7 @@ func RequireConnected[H any](handle *H) (*H, error) {
 }
 
 // NetError is ClassifyNetError's result — the independent facts six adapters' own mapError
-// functions each re-derived inline (P107 I2-37). A shared detection pass, not a shared decision:
+// functions each re-derived inline. A shared detection pass, not a shared decision:
 // the six route these facts to different ErrorCodes in different priority order (mysqlfamily and
 // postgres treat a timeout as CodeConnect; clickhouse treats it as CodeTimeout; redis matches any
 // net.Error unconditionally; kafka and awscfg match *net.OpError with no timeout distinction at

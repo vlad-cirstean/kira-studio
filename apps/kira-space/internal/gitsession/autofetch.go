@@ -89,20 +89,21 @@ func (e *RepoEntry) startAutoFetch(minutes int) {
 }
 
 // EnsureAutoFetch re-reads this entry's current settings and arms the timer if the interval is now
-// non-zero (F4/D5) — called from Conn.Open on the path that stores a new hold, and (G31 round-2
-// functional-correctness review, finding #8) from Registry.ReconcileAutoFetch, the OTHER off→on
-// path: a user flipping fetch.autoInterval from 0 back to a positive value while the repository is
-// already open, with no repo.open in between to reach this any other way (ReconcileAutoFetch's own
-// comment traces the rest of that call chain up to bridge/settings.go).
+// non-zero — called from Conn.Open on the path that stores a new hold, and from
+// Registry.ReconcileAutoFetch, the OTHER off→on path: a user flipping fetch.autoInterval from 0
+// back to a positive value while the repository is already open, with no repo.open in between to
+// reach this any other way (ReconcileAutoFetch's own comment traces the rest of that call chain up
+// to bridge/settings.go).
 // startAutoFetch already no-ops when a timer is already running, the entry is `disabled` (torn
 // down) or `stopped` (permanent failure, cleared only by rearmAutoFetch), so calling this
-// redundantly (both an open AND a settings change, or several windows) arms exactly one timer. Exported for registry.go's own cross-file call; unexported callers
-// within this package (conn.go) use it exactly the same way.
+// redundantly (both an open AND a settings change, or several windows) arms exactly one timer.
+// Exported for registry.go's own cross-file call; unexported callers within this package (conn.go)
+// use it exactly the same way.
 //
-// C14-3: also no-ops entirely when this entry has never had a non-quiet acquirer (see
+// Also no-ops entirely when this entry has never had a non-quiet acquirer (see
 // markAcquiredNonQuiet) — otherwise ReconcileAutoFetch, which arms every constructed entry with no
 // memory of how each was acquired, could arm a repository the native git-graph/review UI alone has
-// ever opened (AcquireQuiet, C13-10), defeating that surface's own "provably read-only" guarantee
+// ever opened (AcquireQuiet), defeating that surface's own "provably read-only" guarantee
 // the moment the user set a positive fetch interval in Settings.
 func (e *RepoEntry) EnsureAutoFetch() {
 	if !e.hasNonQuietAcquirer() {
@@ -171,7 +172,7 @@ func (e *RepoEntry) pauseAutoFetch() {
 // autoFetchTick re-reads the server-owned interval fresh (a setting change takes effect within one
 // interval) and, when nothing else is using the repository, runs one silent fetch through the SAME
 // RunRemote path an explicit fetch takes — with conn == nil, which makes it credential-free
-// structurally (D23): no askpass env, no progress emission, never the undo slot. Busy right now
+// structurally: no askpass env, no progress emission, never the undo slot. Busy right now
 // reschedules; settleAutoFetch decides what each failure kind means.
 func (e *RepoEntry) autoFetchTick() {
 	if e.autoFetchDisabled() {

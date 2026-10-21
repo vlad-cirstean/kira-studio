@@ -16,7 +16,7 @@ func validTabRecord(id string) model.TabRecord {
 	return model.TabRecord{ID: id, Path: "database:app/table:t", Kind: "data", State: json.RawMessage(`{}`)}
 }
 
-// P2 R2: Save previously wrote a record with no validation at all — an invalid row round-tripped
+// Save previously wrote a record with no validation at all — an invalid row round-tripped
 // silently (write succeeded, then List's own guards dropped it on the very next read, with
 // nothing at the write site to say why). Save must now reject the same shapes List already
 // refuses to return, and it must reject the whole batch rather than partially writing it.
@@ -85,9 +85,9 @@ func TestTabsRepoSaveAndListRoundTrip(t *testing.T) {
 	}
 }
 
-// P21 round 3 performance finding 9: Save moved from "DELETE every row for the window, then
+// Save moved from "DELETE every row for the window, then
 // re-INSERT every record" to an upsert (ON CONFLICT(id) DO UPDATE) plus a prune scoped to what
-// actually left the set. This is the regression risk that rewrite carries: the original F6 fix
+// left the set. This is the regression risk that rewrite carries: the original fix
 // scoped its DELETE by window_key specifically because an earlier version deleted every window's
 // tabs outright. This proves the rewrite still respects that scope, on both write paths (the
 // upsert and the prune) — saving one window's tabs must never touch another window's rows, and

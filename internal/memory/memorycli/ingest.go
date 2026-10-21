@@ -18,8 +18,8 @@ import (
 
 // RunIngest is the `memory-ingest` subcommand body: the detached import runner, one per memory.db.
 // It exits 0 at once when another runner holds the store's lock, and after the store has been idle.
-// promptsPath is the app's llm-prompts.json; agents picks the provider and models its model per call. Diagnostics go to stderr, which the launcher appends to
-// the runner log.
+// promptsPath is the app's llm-prompts.json; agents picks the provider and models its model per
+// call. Diagnostics go to stderr, which the launcher appends to the runner log.
 func RunIngest(args []string, promptsPath string, agents harness.Selector, models memory.ModelSource) int {
 	if len(args) > 0 {
 		fmt.Fprintln(os.Stderr, "memory-ingest takes no arguments")

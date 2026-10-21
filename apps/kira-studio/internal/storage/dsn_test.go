@@ -1,10 +1,9 @@
-// P23 §4.2 case 6: pins two DSN pragmas (D5(a)/D6) against the real, pinned modernc.org/sqlite
-// driver. What this actually guards is not a branch in this app's own code but a string parsed by
-// a third-party driver, whose failure mode for an unrecognised top-level key is silent (F17):
-// journal_size_limit has no _journal_size_limit shorthand in this driver, so the value only takes
-// effect because it goes through the generic _pragma list. A driver upgrade that reorders or
-// renames that handling would turn both fixes off with no error anywhere, and nothing else in the
-// repo would notice.
+// Pins two DSN pragmas against the real, pinned modernc.org/sqlite driver. What this guards is not
+// a branch in this app's own code but a string parsed by a third-party driver, whose failure mode
+// for an unrecognised top-level key is silent: journal_size_limit has no _journal_size_limit
+// shorthand in this driver, so the value only takes effect because it goes through the generic
+// _pragma list. A driver upgrade that reorders or renames that handling would turn both fixes off
+// with no error anywhere, and nothing else in the repo would notice.
 package storage_test
 
 import (

@@ -1,6 +1,6 @@
 // Package postgres is the Go analogue of src/engine/adapters/postgres/: pgx/v5's native interface
-// (*pgx.Conn, never database/sql, never pgxpool — P58 D20), one Conn per (connection, database) in
-// an 8-entry LRU (client.go's ConnSet). File-for-file with the TypeScript it replaces (A20):
+// (*pgx.Conn, never database/sql, never pgxpool), one Conn per (connection, database) in
+// an 8-entry LRU (client.go's ConnSet). File-for-file with the TypeScript it replaces:
 // index.ts -> adapter.go (Go has no "index" convention), every other file keeps its TS name.
 package postgres
 

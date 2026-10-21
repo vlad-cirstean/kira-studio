@@ -148,7 +148,7 @@ type atRiskResult struct {
 	Unmerged int
 }
 
-// atRisk implements §0.9's own deliberate deviation from the design: dirty paths count for ANY
+// atRisk implements the deliberate deviation from the design: dirty paths count for ANY
 // branch with a linked worktree, review included (removing a dirty worktree discards them
 // regardless of whose branch it is) — never for new work, which has no worktree of its own to lose
 // anything from. Unmerged commits ahead of main count only for mine/parked, and only while unmerged

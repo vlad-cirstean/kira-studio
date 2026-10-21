@@ -9,10 +9,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// buildConstraints is definition.ts's own — F19/D24: SQLite has no CHECK-constraint catalog at
+// buildConstraints is definition.ts's own — SQLite has no CHECK-constraint catalog at
 // all; a CHECK is visible only inside the CREATE statement's own text, which the Source pane
 // already shows verbatim. Listing PK/UNIQUE/FK here (composed from the same pragmas describe()
-// uses) and saying so for CHECK beats an empty Constraints section that looks like there simply
+// uses) and saying so for CHECK beats an empty Constraints section that looks like there
 // are none.
 func buildConstraints(exec QueryExecutor, schema, table string, target ReadTarget) ([]model.ConstraintMeta, error) {
 	var constraints []model.ConstraintMeta

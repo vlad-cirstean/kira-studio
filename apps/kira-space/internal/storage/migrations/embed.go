@@ -1,7 +1,7 @@
-// Package migrations embeds Kira Space's own schema migrations — the app shipped no installed base
-// before P100 Part 2, so 0001/0002 stayed one collapsed init pair the same shape Kira Studio's own
-// migrations package used (see that package's own doc comment); every migration since (P128's own
-// 0003) applies in the ordinary way against whatever schema is already on disk.
+// Package migrations embeds Kira Space's own schema migrations — the app shipped no installed base,
+// so 0001/0002 stayed one collapsed init pair the same shape Kira Studio's own
+// migrations package used (see that package's own doc comment); every later migration (0003)
+// applies in the ordinary way against whatever schema is already on disk.
 package migrations
 
 import (

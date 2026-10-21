@@ -8,8 +8,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// P11 D11: four caps, because a streamed call can grow in a way an HTTP response body cannot —
-// the first three are P8 D6's own three (grpc_call_history is a fourth application of the same
+// Four caps, because a streamed call can grow in a way an HTTP response body cannot —
+// the first three are the three (grpc_call_history is a fourth application of the same
 // insert-then-trim/global-sweep pattern, following a precedent rather than duplicating an
 // abstraction that exists), the fourth (maxGrpcStoredMessages) is genuinely new.
 const (
@@ -21,7 +21,7 @@ const (
 	grpcHistoryPerScopeCap = 30
 )
 
-// grpcHistoryByteBudget is D11's table-wide ceiling — a quarter of api_response_history's
+// grpcHistoryByteBudget is the table-wide ceiling — a quarter of api_response_history's
 // 128 MiB, since a gRPC call's stored payload is capped an order of magnitude lower (100 × 64 KiB
 // worst case ≈ 6.4 MiB per entry, against api_response_history's 256 KiB) and the two budgets are
 // independent. A var, not a const, only so SetGrpcHistoryByteBudgetForTest can shrink it for one
@@ -46,7 +46,7 @@ type storedGrpcSnapshot struct {
 	MessagesElided          bool                            `json:"messagesElided"`
 	Header                  []model.SavedGrpcMetaRow        `json:"header"`
 	Trailer                 []model.SavedGrpcMetaRow        `json:"trailer"`
-	// MetadataElided (F9/P21 round 1): Metadata/Header/Trailer cross the control plane uncapped
+	// MetadataElided: Metadata/Header/Trailer cross the control plane uncapped
 	// (up to 64 MiB — twice the gRPC budget), unlike Message/Messages, which are capped above.
 	// A single call carrying enough of them to push the marshaled snapshot past half the global
 	// byte budget on its own would break the sweep's own safety invariant ("no single row can
@@ -55,9 +55,9 @@ type storedGrpcSnapshot struct {
 	MetadataElided bool `json:"metadataElided,omitempty"`
 }
 
-// Record is the whole storage policy (D11): apply the four caps, then grpcHistoryTable.Record
-// (P107 I2-8) runs the shared transaction/environment-resolve/elide-once/insert/cap/sweep/commit
-// chain. The caps live here, not in bridge/grpc.go (§0.3) — Record is the only writer, so they
+// Record is the whole storage policy: apply the four caps, then grpcHistoryTable.Record
+// runs the shared transaction/environment-resolve/elide-once/insert/cap/sweep/commit
+// chain. The caps live here, not in bridge/grpc.go — Record is the only writer, so they
 // cannot be bypassed by a future caller. Only a COMPLETED call is ever recorded (any terminal
 // status, including non-OK and a cancellation that received messages) — an in-flight stream
 // writes nothing.
@@ -71,10 +71,10 @@ func (r *GrpcHistoryRepo) Record(rec model.GrpcCallHistoryRecord) error {
 		historyRecordInput{TabID: rec.TabID, ItemID: rec.ItemID, EnvironmentID: rec.EnvironmentID},
 		grpcHistoryPerScopeCap, grpcHistoryByteBudget,
 		func() ([]byte, error) {
-			// D7/F9a: the request message, capped at 256 KiB — response_history.go's own
+			// The request message, capped at 256 KiB — response_history.go's own
 			// maxHistoryBodyBytes (same package: "the request body a user typed" is one policy, not
 			// two). This was the one free-form string in either history table with no per-entry cap
-			// at all, which broke the global sweep's own safety invariant (F9a) — the sweep is safe
+			// at all, which broke the global sweep's own safety invariant — the sweep is safe
 			// only because no single row can exceed its budget, and an uncapped multi-MiB request
 			// message could make the running-sum window match zero rows, deleting the entire table
 			// including the row just inserted. maxGrpcMessageBytes (64 KiB) stays reserved for
@@ -99,7 +99,7 @@ func (r *GrpcHistoryRepo) Record(rec model.GrpcCallHistoryRecord) error {
 				}
 				messages = append(messages, m)
 			}
-			// Finding 8: compared against the call's own true MessageCount, not len(rec.Messages) —
+			// Compared against the call's own true MessageCount, not len(rec.Messages) —
 			// the caller (grpcclient.ServerStream) already bounds its own Messages slice at the
 			// identical cap to keep a long-running stream's in-memory footprint flat, so the
 			// slice's length alone can no longer tell an elided call apart from one that produced
@@ -115,7 +115,7 @@ func (r *GrpcHistoryRepo) Record(rec model.GrpcCallHistoryRecord) error {
 			return json.Marshal(snap)
 		},
 		func() ([]byte, error) {
-			// F9/P21 round 1: cap the snapshot as a whole, not just field by field — Message and
+			// Cap the snapshot as a whole, not just field by field — Message and
 			// Messages are already bounded (256 KiB / 100 × 64 KiB, well under half the budget), so
 			// a snapshot this large can only mean Metadata/Header/Trailer (still uncapped) grew
 			// unreasonably. Dropping them and re-marshalling makes the sweep's safety property

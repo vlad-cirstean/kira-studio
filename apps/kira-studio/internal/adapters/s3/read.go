@@ -149,7 +149,7 @@ func readObject(ctx context.Context, client *s3.Client, bucket, key string, op *
 			if err := adapters.CheckCancelled(ctx); err != nil {
 				return page.KeyValuePage{}, err
 			}
-			// P58d D12: lossy on purpose — a binary object opened for preview degrades to U+FFFD
+			// Lossy on purpose — a binary object opened for preview degrades to U+FFFD
 			// replacement characters rather than the whole read failing. Differs from JS's
 			// TextDecoder in one recorded way: strings.ToValidUTF8 emits one replacement char per
 			// maximal *run* of invalid bytes, TextDecoder emits one per invalid *sequence* — no
@@ -190,7 +190,7 @@ func countObject(ctx context.Context, client *s3.Client, bucket, key string, op 
 	}
 	// ContentType/ContentLength/LastModified/ETag are effectively always present on a real object;
 	// StorageClass is the only field readObject may skip. The Body row itself is pushed only when
-	// readObject would actually fetch and decode one — a known length at or under
+	// readObject would fetch and decode one — a known length at or under
 	// SingleRowMaxBytes — so Count and the visible row count never disagree.
 	value := int64(4 + len(res.Metadata))
 	if res.StorageClass != "" {

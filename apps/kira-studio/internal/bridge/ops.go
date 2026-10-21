@@ -8,10 +8,10 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// Canceller is the one thing OpsService.Cancel needs (A11's per-consumer-interface discipline —
+// Canceller is the one thing OpsService.Cancel needs (the per-consumer-interface discipline —
 // the same shape as connections.Backend and tree.Backend). *adapterhost.Router satisfies this
-// structurally: it asks its own in-process scheduler first (op ownership, not connection kind,
-// A13 — Cancel's payload is only {opId}, so there is no kind to route on) and forwards to the
+// structurally: it asks its own in-process scheduler first (op ownership, not connection kind —
+// Cancel's payload is only {opId}, so there is no kind to route on) and forwards to the
 // engine child only for an op it never started.
 type Canceller interface {
 	Cancel(ctx context.Context, opID string) (bool, error)

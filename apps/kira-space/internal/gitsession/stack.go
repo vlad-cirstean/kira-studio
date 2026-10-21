@@ -1,9 +1,9 @@
-// G26's own session-level orchestration: reads (stackConfig/Stacks/RestackPreflight, this file's
-// first half) and, once the write side lands, the dedicated stack.restack executor (D6) modelled on
+// The session-level orchestration: reads (stackConfig/Stacks/RestackPreflight, this file's
+// first half) and, once the write side lands, the dedicated stack.restack executor modelled on
 // remote.go's RunRemote. Every spawn here follows the same discipline the rest of this package
 // already uses: a display-only read (Stacks) may use the entry's own caches, but anything that
 // PRECEDES A WRITE (RestackPreflight, RunRestack itself) always re-reads config and refs fresh
-// (D10/F16's own rule, restated here rather than merely inherited).
+// (the rule, restated here rather than merely inherited).
 package gitsession
 
 import (
@@ -58,7 +58,7 @@ func stackedCandidates(config map[string]gitpreflight.StackConfigEntry, localNam
 // buildStacksFromSnapshot is Stacks/RestackPreflight's own shared assembly step: given a stack
 // config and a refs snapshot (either the cached one for a display read, or a freshly re-read one
 // for a preflight), spawn exactly one `rev-list --left-right --count` per candidate stacked branch
-// (bounded by gitpreflight.MaxStackedBranches, D3), then hand everything to the pure BuildStacks.
+// (bounded by gitpreflight.MaxStackedBranches), then hand everything to the pure BuildStacks.
 func (e *RepoEntry) buildStacksFromSnapshot(ctx context.Context, config map[string]gitpreflight.StackConfigEntry, snapshot RefsResult) (gitpreflight.StackListResult, error) {
 	if len(config) == 0 {
 		return gitpreflight.StackListResult{Stacks: []gitpreflight.StackSummary{}, Orphans: []gitpreflight.StackBranch{}}, nil
@@ -84,13 +84,13 @@ func (e *RepoEntry) buildStacksFromSnapshot(ctx context.Context, config map[stri
 		candidates = candidates[:gitpreflight.MaxStackedBranches]
 	}
 
-	// G31 round-2 performance review, finding #6: up to gitpreflight.MaxStackedBranches (64)
+	// Up to gitpreflight.MaxStackedBranches (64)
 	// `rev-list --left-right --count` processes used to spawn strictly serially, one full pipe
 	// round trip awaited before the next began — after every ref movement and every local write
 	// (the cache this feeds is dropped by both, entry.go), a stack-using repo paid up to 64
 	// sequential spawns. RangeFiles (incremental.go) already establishes the concurrent shape for
 	// exactly this situation — a small, fixed set of independent spawns under one sync.WaitGroup —
-	// generalized here to N candidates (D3 already bounds N at 64, so no separate concurrency cap
+	// generalized here to N candidates (N is already bounded at 64, so no separate concurrency cap
 	// is needed on top of it). Each candidate writes only its own slot, so no lock is needed around
 	// behindAhead's own build below — that map is populated single-threaded, after Wait.
 	type stackDiffSlot struct {
@@ -215,10 +215,9 @@ func (e *RepoEntry) commitResolves(ctx context.Context, sha string) (bool, error
 	return true, nil
 }
 
-// resolveBranchBase is D14/F4's own per-branch base resolution: the recorded base when it still
-// resolves as a commit (the correct value after a parent amend/rebase, F4/probe P6), the merge-base
-// fallback otherwise (gitops.MergeBaseArgs, D10) — an honest degrade for a branch that joined a
-// stack before this phase, or whose recorded base has since been gc'd.
+// resolveBranchBase is the per-branch base resolution: the recorded base when it still resolves as
+// a commit (the correct value after a parent amend/rebase), the merge-base fallback otherwise
+// (gitops.MergeBaseArgs) — an honest degrade for a branch whose recorded base has since been gc'd.
 func (e *RepoEntry) resolveBranchBase(ctx context.Context, parent, branch, recordedBase string) (gitpreflight.RestackBaseInfo, error) {
 	if recordedBase != "" {
 		ok, err := e.commitResolves(ctx, recordedBase)
@@ -312,8 +311,8 @@ func (e *RepoEntry) RestackPreflight(ctx context.Context, branch string) (gitpre
 }
 
 // stackChildrenOf returns the sorted list of branch names whose recorded parent (in config) is
-// exactly name — G26 §10.9/D-3.12's own "who points at the branch about to be renamed/deleted"
-// query, shared by prepareBranchRename's fix-up, prepareBranchDelete's re-parent step, and
+// exactly name — the "who points at the branch about to be renamed/deleted" query, shared by
+// prepareBranchRename's fix-up, prepareBranchDelete's re-parent step, and
 // captureBranchDeleteUndo's own widened capture.
 func stackChildrenOf(config map[string]gitpreflight.StackConfigEntry, name string) []string {
 	out := []string{}
@@ -358,8 +357,8 @@ func resolvesAsRef(snapshot RefsResult, name string) bool {
 }
 
 // ancestorChainFrom walks parent pointers up from start using the CURRENT (pre-write) config table
-// — D10 step 4's own cycle check: "walk parent pointers up from parent; reaching branch ⇒
-// StackCycle". Bounded by gitpreflight.MaxStackedBranches iterations (F3's own stated defence: a
+// — the cycle check: "walk parent pointers up from parent; reaching branch ⇒
+// StackCycle". Bounded by gitpreflight.MaxStackedBranches iterations (the stated defence: a
 // pre-existing cycle elsewhere in a hand-edited config cannot spin this walk either).
 func ancestorChainFrom(config map[string]gitpreflight.StackConfigEntry, start string) []string {
 	chain := []string{start}
@@ -380,10 +379,10 @@ func ancestorChainFrom(config map[string]gitpreflight.StackConfigEntry, start st
 	return chain
 }
 
-// prepareStackSet is stackSet's own opSpec.Prepare (D10), in the plan's own exact order: fresh
+// prepareStackSet is stackSet's own opSpec.Prepare: fresh
 // refs+config (never the caches — the same rule prepareCheckout's refsSnapshot already follows),
 // branch/parent existence, the cycle check, the join-time merge-base, undo capture, then exactly
-// two `git config --local` writes, always exit 0 (D2).
+// two `git config --local` writes, always exit 0.
 func prepareStackSet(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error) {
 	snapshot, err := e.refsSnapshot(ctx)
 	if err != nil {
@@ -444,10 +443,10 @@ func prepareStackSet(ctx context.Context, e *RepoEntry, conn ConnID, connLabel s
 	}, nil
 }
 
-// captureStackSetUndo is undo-capture for stackSet (D10): the branch's OWN CURRENT parent/base raw
-// config values (possibly both "", meaning it was not stacked before this write, D2), replayed back
+// captureStackSetUndo is undo-capture for stackSet: the branch's OWN CURRENT parent/base raw
+// config values (possibly both "", meaning it was not stacked before this write), replayed back
 // as the same two argv writes on undo — always exit 0, symmetric with the write itself. RecoverySha
-// is the branch's own tip (D10: "so UndoRun's existing cat-file existence check has something real
+// is the branch's own tip ("so UndoRun's existing cat-file existence check has something real
 // to validate") — a stackSet never moves any ref, so the tip before and after is identical, but the
 // check still guards against the branch itself having been deleted in the meantime.
 func (e *RepoEntry) captureStackSetUndo(ctx context.Context, conn ConnID, connLabel, branch, newParent string, config map[string]gitpreflight.StackConfigEntry, snapshot RefsResult) *gitpreflight.UndoRecord {
@@ -491,9 +490,9 @@ func dirtyPathStrings(status porcelain.StatusResult) []string {
 }
 
 // ---------------------------------------------------------------------------------------
-// stack.restack (D6/D8/D9/D11) — its own executor, modelled on remote.go's RunRemote, NOT an
-// opTable kind (F7: recording each child's new base needs the parent's post-rebase tip, which no
-// static argv list can express).
+// stack.restack — its own executor, modelled on remote.go's RunRemote, NOT an opTable kind
+// (recording each child's new base needs the parent's post-rebase tip, which no static argv
+// list can express).
 // ---------------------------------------------------------------------------------------
 
 // RestackResult mirrors @kira/git-ipc's own stack.restack result shape (D17).
@@ -520,9 +519,9 @@ type RestackProgress struct {
 	Total  int    `json:"total"`
 }
 
-// CancelRestack is stack.cancelRestack's own executor (D9) — false, never an error, when nothing
+// CancelRestack is stack.cancelRestack's own executor — false, never an error, when nothing
 // is running (a cancel racing a just-finished restack is ordinary, not a fault). No palette command
-// serves this directly (D13: cancel is a button on the surface that started the work, matching
+// serves this directly (cancel is a button on the surface that started the work, matching
 // the ADE run-cancel precedent).
 func (e *RepoEntry) CancelRestack() bool {
 	return e.restack.tryCancel()
@@ -530,7 +529,7 @@ func (e *RepoEntry) CancelRestack() bool {
 
 // restackResultNoSpawn answers a call that never reaches a write at all — a refused already-running
 // claim, a blocked preflight, or a genuine no-op (opErr nil) — still reading back head/in-progress
-// (G5's own rule, applied again: always, success or failure), and touching NEITHER e.undo nor
+// (always, success or failure), and touching NEITHER e.undo nor
 // e.stack: nothing happened, so whatever was already true of the repository (including any pending
 // undo) is still exactly as true as before this call (RunRemote's own no-spawn convention, not
 // RunOp's — RunOp's own kinds always supersede a prior undo even on an early error; a restack that
@@ -550,12 +549,12 @@ func (e *RepoEntry) restackResultNoSpawn(ctx context.Context, opErr *OpError) (R
 	}, nil
 }
 
-// restackBlockedError maps RestackPreflight's own six blocker kinds (D14) onto EXISTING OpErrorKind
-// values, except cycle, which is this phase's own StackCycle (D5: rebase itself adds zero new
-// kinds; this blocker never reaches a rebase spawn at all, so it costs nothing against that count).
-// A defensive server-side re-check: the dialog's own Restack button is disabled by the SAME
-// preflight before this is ever reachable in ordinary use (the same convention
-// worktreeAddBlockedError/worktreeRemoveBlockedError already established).
+// restackBlockedError maps RestackPreflight's own six blocker kinds onto EXISTING OpErrorKind
+// values, except cycle, which is StackCycle (rebase itself adds zero new kinds; this blocker never
+// reaches a rebase spawn at all, so it costs nothing against that count). A defensive server-side
+// re-check: the dialog's own Restack button is disabled by the SAME preflight before this is ever
+// reachable in ordinary use (the same convention worktreeAddBlockedError/worktreeRemoveBlockedError
+// already established).
 func restackBlockedError(pf gitpreflight.RestackPreflight) *OpError {
 	if len(pf.Blockers) == 0 {
 		return &OpError{Kind: "Unknown", Message: "This stack cannot be restacked."}
@@ -585,7 +584,7 @@ type restackPlannedState struct {
 	oldBase string
 }
 
-// buildRestackUndo is D11's own undo record, built EXACTLY as specified: Replay is
+// buildRestackUndo is the undo record, built EXACTLY as specified: Replay is
 // switch -> update-ref(s) -> config(s) -> reset --keep, in that order — never built when the
 // checked-out branch was not itself in the plan skips the switch/reset--keep pair entirely (there
 // is nothing to restore about HEAD's position in that case: the branch it sat on was never
@@ -624,10 +623,10 @@ func buildRestackUndo(conn ConnID, connLabel, base string, origBranch, origHeadS
 	}
 }
 
-// runRestackSpawn runs one `rebase --onto` under Repo.Write (D6 step 4): Setsid (G8 D6's reason — a
-// rebase can invoke a gpg pinentry or a merge driver) and GIT_SEQUENCE_EDITOR=true as
-// belt-and-braces (GIT_EDITOR=true is already in hygieneEnv, and probe M5/P11 both confirm
-// `rebase --onto` never invokes the sequence editor anyway, since this is never `-i`).
+// runRestackSpawn runs one `rebase --onto` under Repo.Write: Setsid (a rebase can invoke a gpg
+// pinentry or a merge driver) and GIT_SEQUENCE_EDITOR=true as belt-and-braces (GIT_EDITOR=true is
+// already in hygieneEnv, and `rebase --onto` never invokes the sequence editor anyway, since this
+// is never `-i`).
 func (e *RepoEntry) runRestackSpawn(ctx context.Context, argv []string) (gitclient.Result, error) {
 	var res gitclient.Result
 	err := e.Repo.Write(ctx, func(wctx context.Context) error {
@@ -661,9 +660,9 @@ func branchNames(entries []gitpreflight.RestackPlanEntry) []string {
 	return out
 }
 
-// RunRestack is stack.restack's own executor (D6), in EXACTLY this order:
+// RunRestack is stack.restack's own executor, in EXACTLY this order:
 //
-//  0. ctx is already detached from the request by gitrpc (G5 D8's rule, the same one remote.run
+//  0. ctx is already detached from the request by gitrpc (the rule, the same one remote.run
 //     follows) — wrapped here in the entry's own WithCancel, which is what CancelRestack and
 //     teardown's forceCancel act on.
 //  1. Claim the ≤1-per-repository slot; already claimed ⇒ {ok:false, OperationInProgress} with no
@@ -671,18 +670,18 @@ func branchNames(entries []gitpreflight.RestackPlanEntry) []string {
 //  2. Recompute the preflight FRESH (never the client's own copy) — any blocker ⇒ {ok:false, <that
 //     blocker's error>} with no write; a genuine noop (nothing to restack) ⇒ {ok:true} with no
 //     write and the undo slot left untouched (restackResultNoSpawn's own rule).
-//  3. Capture the undo record (D11) BEFORE anything moves, and defer e.invalidateAfterWrite() (D7's
+//  3. Capture the undo record BEFORE anything moves, and defer e.invalidateAfterWrite() (the
 //     rule: drop the shared caches synchronously the moment a write is about to be attempted).
-//  4. For each planned branch, in order (bottom-up, D3's own pre-order): emit stack.progress, then
+//  4. For each planned branch, in order (bottom-up, the pre-order): emit stack.progress, then
 //     `git rebase --onto <parent> <base> <branch>`. A non-zero exit classifies stdout+stderr
-//     COMBINED (P10: a rebase conflict's own "CONFLICT (content)" is on stdout, "could not apply" on
-//     stderr) and STOPS the loop, recording stoppedAt/remaining — no undo record is set (D8). A
+//     COMBINED (a rebase conflict's own "CONFLICT (content)" is on stdout, "could not apply" on
+//     stderr) and STOPS the loop, recording stoppedAt/remaining — no undo record is set. A
 //     clean exit re-resolves the parent's own new tip and writes it as the branch's new recorded
-//     base — D6's own "a failure here is a real error, not best-effort" rule: that write's own
+//     base — the "a failure here is a real error, not best-effort" rule: that write's own
 //     failure also stops the loop, same as a rebase conflict would.
-//  5. Restore HEAD (F5: rebase always moves HEAD, even on a no-op) — only when every branch
+//  5. Restore HEAD (rebase always moves HEAD, even on a no-op) — only when every branch
 //     succeeded.
-//  6. Set the undo slot ONLY on a fully successful restack, INCLUDING the head restore (D8/D11);
+//  6. Set the undo slot ONLY on a fully successful restack, INCLUDING the head restore;
 //     read back head + in-progress, ALWAYS, success or failure.
 //  7. Release the slot (deferred) and return.
 func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (result RestackResult, runErr error) {
@@ -715,7 +714,7 @@ func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (
 
 	defer e.invalidateAfterWrite()
 
-	// F9 (P108 Part 16 review), same precedent as runPullOp:576/ops.go's RunOp: clear the PRIOR
+	// Same precedent as runPullOp:576/ops.go's RunOp: clear the PRIOR
 	// undo record before the first write below, not only on this restack's own eventual success.
 	// Several of runRestackPlan's/restoreHead's own early-return branches already clear it
 	// themselves on a CLASSIFIED failure (a paused/cancelled restack) — this covers the ones that
@@ -821,7 +820,7 @@ func (e *RepoEntry) restackPrepare(ctx context.Context, conn *Conn, branch strin
 	return restackPrepared{pf: pf, origBranch: origBranch, origHeadSha: origHeadSha, undo: undo}, RestackResult{}, false, nil
 }
 
-// runRestackPlan is RunRestack's own per-entry rebase loop (D6 step 4): for each planned branch in
+// runRestackPlan is RunRestack's own per-entry rebase loop: for each planned branch in
 // order, emit stack.progress, rebase --onto, and on success re-resolve the parent's new tip and
 // record it as the branch's new base. done is true whenever RunRestack should return (res, err)
 // immediately without restoring HEAD — a cancellation, a rebase conflict, or a genuine error; only
@@ -842,7 +841,7 @@ func (e *RepoEntry) runRestackPlan(opCtx, ctx context.Context, conn *Conn, plan 
 		spawnRes, werr := e.runRestackSpawn(opCtx, gitops.RebaseOntoArgs(entry.Parent, entry.Base, entry.Branch))
 		if werr != nil {
 			if errors.Is(werr, gitclient.ErrCancelled) {
-				// F9 (P108 Part 16 review): CancelRestack can race Repo.Write's own gate wait —
+				// CancelRestack can race Repo.Write's own gate wait —
 				// opCtx cancelled before the write closure ever ran returns gitclient.ErrCancelled
 				// directly, bypassing gitclient.Classify's usual KindCancelled classification. Map
 				// it to the SAME documented Cancelled result every other cancellation branch in
@@ -886,10 +885,10 @@ func (e *RepoEntry) runRestackPlan(opCtx, ctx context.Context, conn *Conn, plan 
 	return restacked, RestackResult{}, nil, false
 }
 
-// restoreHead is D6 step 5: restore HEAD to where it started (F5: rebase always moves HEAD, even on
+// restoreHead is step 5: restore HEAD to where it started (rebase always moves HEAD, even on
 // a no-op) — only reached once every planned branch has succeeded. done is true whenever RunRestack
-// should return (res, err) immediately — a genuine write error, or the restore itself failing (D8:
-// no undo record is set for a partial restack either way).
+// should return (res, err) immediately — a genuine write error, or the restore itself failing (no
+// undo record is set for a partial restack either way).
 func (e *RepoEntry) restoreHead(ctx context.Context, origBranch, origHeadSha string, restacked []string) (res RestackResult, err error, done bool) {
 	var restoreArgv []string
 	if origBranch != "" {
