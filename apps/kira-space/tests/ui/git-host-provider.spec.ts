@@ -202,6 +202,12 @@ reviewTest('the sync button names the host and its merge requests', async ({ rel
   await expect(page.locator(t('ade-review-sync-skipped'))).toContainText('Not in the MR');
 });
 
+reviewTest('a missing host CLI is named in the sync button tooltip', async ({ relaunch }) => {
+  const page = await openSync(relaunch, forgePlan({ status: 'cliMissing', files: [] }));
+  await page.locator(t('ade-review-sync')).locator('..').hover();
+  await expect(page.getByRole('tooltip')).toContainText('Install the Forge CLI');
+});
+
 reviewTest('a host without file review sync hides the sync button', async ({ relaunch }) => {
   const page = await openSync(
     relaunch,

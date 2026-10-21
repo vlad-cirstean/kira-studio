@@ -50,6 +50,11 @@ func (b *TaskBoard) computeSyncPlan(ctx context.Context, sb model.AdeTaskBranch)
 		return out, err
 	}
 	out.entry = entry
+	info, hasHost := entry.HostInfo(ctx)
+	if hasHost {
+		out.wire.Host = &info
+		out.provider = info.ID
+	}
 	res := entry.ResolveBranchChangeRequest(ctx, sb.Name)
 	switch res.Kind {
 	case "disabled":
@@ -62,11 +67,6 @@ func (b *TaskBoard) computeSyncPlan(ctx context.Context, sb model.AdeTaskBranch)
 			out.wire.Message = res.Status.Reason
 		}
 		return out, nil
-	}
-	info, hasHost := entry.HostInfo(ctx)
-	if hasHost {
-		out.wire.Host = &info
-		out.provider = info.ID
 	}
 	if len(res.ChangeRequests) == 0 {
 		out.wire.Status, out.wire.Message = "noPr", fmt.Sprintf("No %s for this branch", info.ChangeRequestNoun)

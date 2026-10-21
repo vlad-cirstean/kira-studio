@@ -211,6 +211,9 @@ func TestGitHubWithoutGh(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ViewedSyncPlan returned an error, want a status: %v", err)
 	}
+	if plan.Host == nil || plan.Host.CLI == "" {
+		t.Fatalf("plan host = %+v, want the host naming the missing CLI", plan.Host)
+	}
 	if plan.Status != "cliMissing" || plan.ChangeRequest != nil || len(plan.Files) != 0 {
 		t.Fatalf("plan = %+v, want an unavailable state with no files", plan)
 	}
