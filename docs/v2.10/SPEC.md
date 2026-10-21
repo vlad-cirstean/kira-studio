@@ -14,5 +14,6 @@ First phase `P322` (highest in `docs/HISTORY.md` is `P321`). Branch `v2.10`. Pha
 | P329 | Kira Space notes module. Multiple notes grouped in collections. A note has no separate title and content inputs: one rich-text editor (the existing notes rich text), where the first line is the title and the rest is the content. | Todo |
 | P330 | Automations: the Runs panel takes only half of the available space. | Todo |
 | P331 | Code review, one round (Opus reviewer covering architecture, correctness, performance; then a Sonnet fixer) over everything changed since the last review session (v2.8 P319 close-out base `d61472b`, scope: P320 sweep and P322-P330). Runs last. | Todo |
+| P332 | Close chapter v2.10 (fold per `CLAUDE.md`). Hold until user says to close. | Todo |
 
 ## Results
