@@ -202,10 +202,10 @@ func (b *TaskBoard) teardownReview(ctx context.Context, tc *taskCtx) {
 			slog.Warn("ade: review teardown: windows", "scope", "ade", "task", tc.task.ID, "err", err)
 		}
 	}
-	if b.deps.GhSynced == nil {
+	if b.deps.ViewedSync == nil {
 		return
 	}
-	if err := b.deps.GhSynced.DeleteByTask(tc.task.ID); err != nil {
+	if err := b.deps.ViewedSync.DeleteByTask(tc.task.ID); err != nil {
 		slog.Warn("ade: review teardown: sync ledger", "scope", "ade", "task", tc.task.ID, "err", err)
 	}
 }

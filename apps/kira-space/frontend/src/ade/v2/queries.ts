@@ -18,8 +18,6 @@ import type {
   CreateTaskArgs,
   FinishReviewArgs,
   FocusSessionArgs,
-  GhSyncPlan,
-  GhSyncResult,
   ImportWorkflowArgs,
   LaunchStepArgs,
   MoveBacklogItemArgs,
@@ -51,13 +49,15 @@ import type {
   UpdateBacklogItemArgs,
   UpdateTaskArgs,
   ValidateWorkflowYamlArgs,
+  ViewedSyncPlan,
+  ViewedSyncResult,
 } from './wire';
 
 export {
   logKey,
   useBacklog,
   useBoard,
-  usePrs,
+  useChangeRequests,
   useSessions,
   useWorkflows,
 } from './readQueries';
@@ -69,7 +69,7 @@ export {
 
 export const workflowYamlKey = ['adetask', 'workflowYaml'] as const;
 const candidatesKey = ['adetask', 'candidates'] as const;
-export const ghSyncPlanPrefix = ['adetask', 'ghSyncPlan'] as const;
+export const viewedSyncPlanPrefix = ['adetask', 'viewedSyncPlan'] as const;
 export const reviewStepPrefix = ['adetask', 'reviewStep'] as const;
 export const reviewTargetKey = (windowKey: string) =>
   ['adetask', 'reviewTarget', windowKey] as const;
@@ -134,7 +134,7 @@ function withTaskPatch(board: Board, args: UpdateTaskArgs): Board {
       ...t,
       title: p.title ?? t.title,
       jira: p.clearJira ? null : (p.jira ?? t.jira),
-      githubUrl: p.githubUrl ?? t.githubUrl,
+      hostUrl: p.hostUrl ?? t.hostUrl,
       est: p.est ?? t.est,
       notes: p.notes ?? t.notes,
       color: p.color ?? t.color,
@@ -362,20 +362,21 @@ export function useLaunchReviewAgent() {
 }
 
 /** What a GitHub sync would do for the branch; re-asked on focus, mark and popover open, not on board pushes (each load pages the PR's files). */
-export function useGhSyncPlan(branchId: MaybeRefOrGetter<string>) {
+export function useViewedSyncPlan(branchId: MaybeRefOrGetter<string>) {
   return useQuery({
-    queryKey: ['adetask', 'ghSyncPlan', branchId] as const,
-    queryFn: (): Promise<GhSyncPlan> =>
-      control.adeTaskGitHubSyncPlan({ branchId: toValue(branchId) }),
+    queryKey: ['adetask', 'viewedSyncPlan', branchId] as const,
+    queryFn: (): Promise<ViewedSyncPlan> =>
+      control.adeTaskViewedSyncPlan({ branchId: toValue(branchId) }),
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
 }
 
-export function useGitHubSyncApply() {
+export function useViewedSyncApply() {
   return useMutation({
-    mutationFn: (args: BranchArgs): Promise<GhSyncResult> => control.adeTaskGitHubSyncApply(args),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ghSyncPlanPrefix }),
+    mutationFn: (args: BranchArgs): Promise<ViewedSyncResult> =>
+      control.adeTaskViewedSyncApply(args),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: viewedSyncPlanPrefix }),
   });
 }
 

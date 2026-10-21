@@ -18,6 +18,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
@@ -86,7 +87,7 @@ type TaskBoardDeps struct {
 	// review windows (Archive).
 	Windows            *repos.WindowsRepo
 	ReviewWindows      *repos.AdeReviewWindowsRepo
-	GhSynced           *repos.AdeGhSyncedRepo
+	ViewedSync         *repos.AdeViewedSyncRepo
 	CloseReviewWindows func(taskID string)
 	// ScriptRunsOf lists the script runs started for a task, newest first (run_outcome kind automation).
 	// CustomScripts and ScriptsHome resolve the smart script of a workflow step and its own folder.
@@ -159,9 +160,9 @@ type TaskBoard struct {
 	closeMu          sync.Mutex     // orders goTracked's wg.Add before Close's wg.Wait
 	closed           bool
 
-	ghMu      sync.Mutex             // guards ghLocks, ghPending
-	ghLocks   map[string]*sync.Mutex // branch id -> serializes its GitHub sync
-	ghPending map[string]bool        // branch id -> an unmark worker is queued
+	syncMu      sync.Mutex             // guards syncLocks, syncPending
+	syncLocks   map[string]*sync.Mutex // branch id -> serializes its GitHub sync
+	syncPending map[string]bool        // branch id -> an unmark worker is queued
 }
 
 // prompts is the source of every LLM prompt the board sends.
@@ -183,7 +184,7 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 		repoMus: map[string]*sync.Mutex{}, byGitRepoID: map[string]string{}, gitRepoIDOf: map[string]string{},
 		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, live: map[string]*liveRun{}, tuiGrants: map[string]tuiBinding{}, setupLive: map[string]*liveRun{},
 		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]agentmcp.Finish{}, claims: map[string]string{}, stepMsgs: map[string]string{},
-		ghLocks: map[string]*sync.Mutex{}, ghPending: map[string]bool{},
+		syncLocks: map[string]*sync.Mutex{}, syncPending: map[string]bool{},
 	}
 	b.agent = agentmcp.NewServer(agentmcp.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b, Review: b, SandboxGit: b, Prompts: b.prompts(), Render: func(s []harness.MCPServer) ([]byte, error) { return deps.Agent.Active().MCPConfig(s) }})
 	b.conn = gitsession.NewConn(boardConnID, "ade-board", boardConnLabel, b.handleEmit)
@@ -521,7 +522,7 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 
 func (b *TaskBoard) toWireTask(t model.AdeTask, branchIDs []string, runs []model.AdeRun, reviews map[string]model.AdeReview) adewire.Task {
 	out := adewire.Task{
-		ID: t.ID, Kind: t.Kind, Title: t.Title, Owner: t.Owner, GithubURL: t.GithubURL, HostLink: b.hostLink(t.GithubURL), WorkflowID: t.WorkflowID,
+		ID: t.ID, Kind: t.Kind, Title: t.Title, Owner: t.Owner, HostURL: t.HostURL, HostLink: b.hostLink(t.HostURL), WorkflowID: t.WorkflowID,
 		EntryStepID: t.EntryStepID, Since: map[string]int{}, Est: t.Est, Notes: t.Notes, Color: t.Color, CreatedAt: t.CreatedAt,
 		BranchIDs: make([]string, 0, len(branchIDs)), Runs: make([]adewire.Run, 0, len(runs)),
 	}
@@ -595,16 +596,16 @@ func toWireHistory(tasks []model.AdeTask, branches []model.AdeTaskBranch) []adew
 	return out
 }
 
-// Prs resolves each created branch's PR and each used repo's PR availability.
-func (b *TaskBoard) Prs(ctx context.Context) (adewire.PrsResult, error) {
+// ChangeRequests resolves each created branch's change request and each used repo's host availability.
+func (b *TaskBoard) ChangeRequests(ctx context.Context) (adewire.ChangeRequestsResult, error) {
 	branches, err := b.deps.Tasks.BranchesLive()
 	if err != nil {
-		return adewire.PrsResult{}, err
+		return adewire.ChangeRequestsResult{}, err
 	}
 	repoIDs, byRepo := branchesByRepo(branches)
-	out := adewire.PrsResult{Repos: make([]adewire.RepoPrs, 0, len(repoIDs)), Branches: map[string]adewire.PR{}, BranchURLs: map[string]string{}}
+	out := adewire.ChangeRequestsResult{Repos: make([]adewire.RepoHost, 0, len(repoIDs)), Branches: map[string]adewire.ChangeRequest{}, BranchURLs: map[string]string{}}
 	var mu sync.Mutex
-	rows := make(map[string]adewire.RepoPrs, len(repoIDs))
+	rows := make(map[string]adewire.RepoHost, len(repoIDs))
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(boardFanOut)
 	for _, id := range repoIDs {
@@ -613,30 +614,13 @@ func (b *TaskBoard) Prs(ctx context.Context) (adewire.PrsResult, error) {
 			if err != nil {
 				slog.Warn("ade board: prs open repo", "scope", "ade", "repo", id, "err", err)
 				mu.Lock()
-				rows[id] = adewire.RepoPrs{CodeRepoID: id, Kind: "unavailable"}
+				rows[id] = adewire.RepoHost{CodeRepoID: id, Kind: "unavailable"}
 				mu.Unlock()
 				return nil
 			}
-			kind := "ok"
-			found := map[string]adewire.PR{}
-			urls := map[string]string{}
-			for _, br := range byRepo[id] {
-				if br.Name == "" {
-					continue
-				}
-				if u, ok := entry.BranchURL(gctx, br.Name); ok {
-					urls[br.ID] = u
-				}
-				res := entry.ResolveBranchChangeRequest(gctx, br.Name)
-				if res.Kind != "ok" {
-					kind = res.Kind
-				} else if len(res.ChangeRequests) > 0 {
-					pr := res.ChangeRequests[0]
-					found[br.ID] = adewire.PR{Number: pr.Number, Title: pr.Title, State: pr.State, URL: pr.URL}
-				}
-			}
+			kind, host, found, urls := resolveRepoHost(gctx, entry, byRepo[id])
 			mu.Lock()
-			rows[id] = adewire.RepoPrs{CodeRepoID: id, Kind: kind}
+			rows[id] = adewire.RepoHost{CodeRepoID: id, Kind: kind, Host: host}
 			for k, v := range found {
 				out.Branches[k] = v
 			}
@@ -652,6 +636,32 @@ func (b *TaskBoard) Prs(ctx context.Context) (adewire.PrsResult, error) {
 		out.Repos = append(out.Repos, rows[id])
 	}
 	return out, nil
+}
+
+// resolveRepoHost resolves the repo's host and each branch's change request and web page. kind is
+// the first non-ok lookup kind, else "ok".
+func resolveRepoHost(ctx context.Context, entry *gitsession.RepoEntry, branches []model.AdeTaskBranch) (kind string, host *githost.Info, found map[string]adewire.ChangeRequest, urls map[string]string) {
+	kind = "ok"
+	if info, ok := entry.HostInfo(ctx); ok {
+		host = &info
+	}
+	found, urls = map[string]adewire.ChangeRequest{}, map[string]string{}
+	for _, br := range branches {
+		if br.Name == "" {
+			continue
+		}
+		if u, ok := entry.BranchURL(ctx, br.Name); ok {
+			urls[br.ID] = u
+		}
+		res := entry.ResolveBranchChangeRequest(ctx, br.Name)
+		if res.Kind != "ok" {
+			kind = res.Kind
+		} else if len(res.ChangeRequests) > 0 {
+			cr := res.ChangeRequests[0]
+			found[br.ID] = adewire.ChangeRequest{Number: cr.Number, Title: cr.Title, State: cr.State, URL: cr.URL}
+		}
+	}
+	return kind, host, found, urls
 }
 
 // Refresh fetches the given repos (none = every repo a live task uses; the UI sends the ids it shows), marks PR-merged branches,

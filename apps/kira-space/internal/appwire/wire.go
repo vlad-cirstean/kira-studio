@@ -212,7 +212,7 @@ func wireAdeTask(
 		Sandbox:         runs.Sandbox, RunSandbox: repositories.AdeRunSandbox,
 		Tracker:       tracker,
 		CloseTerminal: closeTerminal,
-		Windows:       repositories.Windows, ReviewWindows: repositories.AdeReview, GhSynced: repositories.AdeGhSynced,
+		Windows:       repositories.Windows, ReviewWindows: repositories.AdeReview, ViewedSync: repositories.AdeViewedSync,
 		CloseReviewWindows: closeReviewWindows,
 		OnRuns: func(ev adewire.RunsChangedEvent) {
 			bridge.AdeTaskRunsChanged(events, ev)

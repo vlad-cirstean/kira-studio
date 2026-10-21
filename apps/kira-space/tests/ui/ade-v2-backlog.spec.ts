@@ -85,7 +85,7 @@ test('inline edit saves the text on Enter', async ({ relaunch }) => {
       text: 'Ask Dana about onboarding copy',
       jira: null,
       clearJira: false,
-      githubUrl: null,
+      hostUrl: null,
       notes: null,
     },
   });

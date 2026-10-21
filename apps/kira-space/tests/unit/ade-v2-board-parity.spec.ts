@@ -11,8 +11,8 @@ import { buildTimeline, type TimelineView } from '../../frontend/src/ade/v2/boar
 import type {
   Board,
   Branch,
+  ChangeRequestsResult,
   Pair,
-  PrsResult,
   ReposResult,
   SessionsResult,
   Workflow,
@@ -293,7 +293,7 @@ describe('per branch', () => {
 
 describe('branch second line', () => {
   test('context, merged and deployed chips equal the mockup', () => {
-    const prs = loadFixture<PrsResult>('prs');
+    const prs = loadFixture<ChangeRequestsResult>('change-requests');
     for (const t of board.tasks) {
       for (const b of t.branchIds.flatMap((id) => board.branches.filter((x) => x.id === id))) {
         const box = boxOf(t.id);

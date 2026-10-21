@@ -8,7 +8,7 @@ import type { LogKind } from './wire';
 // staleTime is Infinity and the signals installed per app (`installAdeReadSignals`) invalidate.
 
 export const boardKey = ['adetask', 'board'] as const;
-export const prsKey = ['adetask', 'prs'] as const;
+export const changeRequestsKey = ['adetask', 'changeRequests'] as const;
 export const workflowsKey = ['adetask', 'workflows'] as const;
 export const logKey = (kind: LogKind, id: string) => ['adetask', 'log', kind, id] as const;
 export const backlogKey = ['adetask', 'backlog'] as const;
@@ -25,11 +25,11 @@ export function useBoard() {
   });
 }
 
-export function usePrs() {
+export function useChangeRequests() {
   const reader = useAdeReader();
   return useQuery({
-    queryKey: prsKey,
-    queryFn: () => reader.prs(),
+    queryKey: changeRequestsKey,
+    queryFn: () => reader.changeRequests(),
   });
 }
 

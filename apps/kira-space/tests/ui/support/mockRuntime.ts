@@ -146,7 +146,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
 
   // P145: the ade v2 board surface (AdeTaskService, bridge/index.ts `adeTask*`).
   adeTaskBoard: 'AdeTaskService.Board',
-  adeTaskPrs: 'AdeTaskService.Prs',
+  adeTaskChangeRequests: 'AdeTaskService.ChangeRequests',
   adeTaskRefresh: 'AdeTaskService.Refresh',
   adeTaskForcePush: 'AdeTaskService.ForcePush',
   adeTaskCreateTask: 'AdeTaskService.CreateTask',
@@ -198,8 +198,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeTaskReviewWindowTarget: 'AdeTaskService.ReviewWindowTarget',
   adeTaskReviewAgent: 'AdeTaskService.ReviewAgent',
   adeTaskLaunchReviewAgent: 'AdeTaskService.LaunchReviewAgent',
-  adeTaskGitHubSyncPlan: 'AdeTaskService.GitHubSyncPlan',
-  adeTaskGitHubSyncApply: 'AdeTaskService.GitHubSyncApply',
+  adeTaskViewedSyncPlan: 'AdeTaskService.ViewedSyncPlan',
+  adeTaskViewedSyncApply: 'AdeTaskService.ViewedSyncApply',
   adeTaskArchiveRisk: 'AdeTaskService.ArchiveRisk',
   adeTaskArchiveTask: 'AdeTaskService.ArchiveTask',
   adeTaskRecordMerge: 'AdeTaskService.RecordMerge',

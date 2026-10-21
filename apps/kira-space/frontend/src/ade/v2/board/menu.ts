@@ -311,11 +311,11 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
       cmd: { kind: 'link', url: c.task.jira.url },
     });
   }
-  if (c.task.githubUrl) {
+  if (c.task.hostUrl) {
     links.push({
       id: 'ade-task-github',
       label: t('space.ade.board.taskMenu.openGithub.label'),
-      cmd: { kind: 'link', url: c.task.githubUrl },
+      cmd: { kind: 'link', url: c.task.hostUrl },
     });
   }
   if (links.length)

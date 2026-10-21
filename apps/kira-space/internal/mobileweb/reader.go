@@ -12,7 +12,7 @@ import (
 // satisfies it; tests use a fake. No write method is listed, so none can be reached.
 type Reader interface {
 	Board(ctx context.Context) (adewire.Board, error)
-	Prs(ctx context.Context) (adewire.PrsResult, error)
+	ChangeRequests(ctx context.Context) (adewire.ChangeRequestsResult, error)
 	Sessions(ctx context.Context) (adewire.SessionsResult, error)
 	Workflows(ctx context.Context) (adewire.WorkflowsResult, error)
 	Backlog(ctx context.Context) (adewire.BacklogResult, error)

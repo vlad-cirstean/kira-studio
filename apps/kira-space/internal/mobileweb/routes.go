@@ -77,7 +77,7 @@ func (s *Server) routes() []route {
 		{method: http.MethodGet, path: "/api/events", access: accessDevice, kind: kindStream,
 			handle: func(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) { s.handleEvents(w, r, d) }},
 		read("/api/ade/board", readJSON(s, "board", true, s.cfg.Reader.Board)),
-		read("/api/ade/prs", readJSON(s, "prs", true, s.cfg.Reader.Prs)),
+		read("/api/ade/change-requests", readJSON(s, "change-requests", true, s.cfg.Reader.ChangeRequests)),
 		read("/api/ade/sessions", readJSON(s, "sessions", false, func(ctx context.Context) (any, error) {
 			v, err := s.cfg.Reader.Sessions(ctx)
 			if err != nil {

@@ -13,6 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/github"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 )
 
 type fakeGhLocator struct{}
@@ -145,7 +146,7 @@ func newGhSyncHarness(t *testing.T) *ghSyncHarness {
 	t.Cleanup(func() { _ = store.Close() })
 	reg.Review = store
 	reg.Hosts = githost.Selector{Registry: githost.NewRegistry(github.New(github.Options{Locator: fakeGhLocator{}, Runner: gh, Clock: fakeGhClock{}}))}
-	h.board.deps.GhSynced = h.repos.AdeGhSynced
+	h.board.deps.ViewedSync = h.repos.AdeViewedSync
 	h.addTask("T", "task", branchSpec{id: "b1", repo: "r", name: "a", kind: "mine"})
 	h.board.WatchReviews()
 
@@ -156,9 +157,9 @@ func newGhSyncHarness(t *testing.T) *ghSyncHarness {
 	return &ghSyncHarness{boardHarness: h, gh: gh, entry: entry}
 }
 
-func (h *ghSyncHarness) synced() map[string]int {
+func (h *ghSyncHarness) synced() map[string]repos.ViewedMark {
 	h.t.Helper()
-	m, err := h.repos.AdeGhSynced.Paths("b1")
+	m, err := h.repos.AdeViewedSync.Paths("b1")
 	if err != nil {
 		h.t.Fatal(err)
 	}
@@ -175,7 +176,7 @@ func (h *ghSyncHarness) review(path string, reviewed bool) {
 func (h *ghSyncHarness) syncA() {
 	h.t.Helper()
 	h.review("a.txt", true)
-	res, err := h.board.GitHubSyncApply(context.Background(), "b1")
+	res, err := h.board.ViewedSyncApply(context.Background(), "b1")
 	if err != nil || res.Status != "ok" || len(res.Marked) != 1 || res.Marked[0] != "a.txt" {
 		h.t.Fatalf("apply = %+v err=%v, want a.txt marked", res, err)
 	}
@@ -200,7 +201,7 @@ func TestGitHubSync_UnreviewUnmarksOnGitHub(t *testing.T) {
 func TestGitHubSync_ReReviewBeforeWorkerSendsNoUnmark(t *testing.T) {
 	h := newGhSyncHarness(t)
 	h.syncA()
-	lock := h.board.ghLock("b1")
+	lock := h.board.syncLock("b1")
 	lock.Lock()
 	h.review("a.txt", false)
 	h.review("a.txt", true)

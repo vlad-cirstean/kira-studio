@@ -94,7 +94,7 @@ async function addNew(): Promise<void> {
     const task = await createTask.mutateAsync({
       title: title.value.trim(),
       jira: j.key ? j : null,
-      githubUrl: '',
+      hostUrl: '',
       notes: notes.value,
       codeRepoIds: picked.value,
       workflowId: '',

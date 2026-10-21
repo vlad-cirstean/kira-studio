@@ -254,7 +254,8 @@ type Integration struct {
 	Recorded bool   `json:"recorded"`
 }
 
-type PR struct {
+// ChangeRequest is a pull or merge request; the repo's Info names it in the host's wording.
+type ChangeRequest struct {
 	Number int    `json:"number"`
 	Title  string `json:"title"`
 	State  string `json:"state"`
@@ -437,13 +438,13 @@ type ReviewEvent struct {
 }
 
 type Task struct {
-	ID        string `json:"id"`
-	Kind      string `json:"kind"` // 'task' | 'review' | 'parked'
-	Title     string `json:"title"`
-	Owner     string `json:"owner"`
-	Jira      *Jira  `json:"jira"`
-	GithubURL string `json:"githubUrl"`
-	// HostLink names GithubURL when a registered provider recognises it.
+	ID      string `json:"id"`
+	Kind    string `json:"kind"` // 'task' | 'review' | 'parked'
+	Title   string `json:"title"`
+	Owner   string `json:"owner"`
+	Jira    *Jira  `json:"jira"`
+	HostURL string `json:"hostUrl"`
+	// HostLink names HostURL when a registered provider recognises it.
 	HostLink   *githost.Link `json:"hostLink"`
 	WorkflowID string        `json:"workflowId"`
 	// EntryStepID is the step the task last entered; 'done' when finished, '' without a workflow.
@@ -495,26 +496,28 @@ type Board struct {
 	AutofetchMinutes int            `json:"autofetchMinutes"`
 }
 
-type RepoPrs struct {
+type RepoHost struct {
 	CodeRepoID string `json:"codeRepoId"`
 	Kind       string `json:"kind"` // 'ok' | 'disabled' | 'unavailable'
+	// Host is nil when no registered provider matches the repo's remote.
+	Host *githost.Info `json:"host"`
 }
 
-type PrsResult struct {
-	Repos    []RepoPrs     `json:"repos"`
-	Branches map[string]PR `json:"branches"`
+type ChangeRequestsResult struct {
+	Repos    []RepoHost               `json:"repos"`
+	Branches map[string]ChangeRequest `json:"branches"`
 	// BranchURLs maps a branch id to its web page, for branches whose repo has a host.
 	BranchURLs map[string]string `json:"branchUrls"`
 }
 
 type BacklogItem struct {
-	ID        string        `json:"id"`
-	Text      string        `json:"text"`
-	AddedAt   int64         `json:"addedAt"`
-	Jira      *Jira         `json:"jira"`
-	GithubURL string        `json:"githubUrl"`
-	HostLink  *githost.Link `json:"hostLink"`
-	Notes     string        `json:"notes"`
+	ID       string        `json:"id"`
+	Text     string        `json:"text"`
+	AddedAt  int64         `json:"addedAt"`
+	Jira     *Jira         `json:"jira"`
+	HostURL  string        `json:"hostUrl"`
+	HostLink *githost.Link `json:"hostLink"`
+	Notes    string        `json:"notes"`
 }
 
 type BacklogResult struct {
@@ -643,7 +646,7 @@ type OpenSessionEvent struct {
 type CreateTaskArgs struct {
 	Title       string   `json:"title"`
 	Jira        *Jira    `json:"jira"`
-	GithubURL   string   `json:"githubUrl"`
+	HostURL     string   `json:"hostUrl"`
 	Notes       string   `json:"notes"`
 	CodeRepoIDs []string `json:"codeRepoIds"`
 	WorkflowID  string   `json:"workflowId"`
@@ -655,7 +658,7 @@ type TaskPatch struct {
 	Title     *string `json:"title"`
 	Jira      *Jira   `json:"jira"`
 	ClearJira bool    `json:"clearJira"`
-	GithubURL *string `json:"githubUrl"`
+	HostURL   *string `json:"hostUrl"`
 	Est       *string `json:"est"`
 	Notes     *string `json:"notes"`
 	Color     *int    `json:"color"`
@@ -705,7 +708,7 @@ type BacklogPatch struct {
 	Text      *string `json:"text"`
 	Jira      *Jira   `json:"jira"`
 	ClearJira bool    `json:"clearJira"`
-	GithubURL *string `json:"githubUrl"`
+	HostURL   *string `json:"hostUrl"`
 	Notes     *string `json:"notes"`
 }
 
@@ -837,9 +840,9 @@ type ReviewAgentLaunch struct {
 	Note    string `json:"note"`
 }
 
-// GhSyncStatus: 'ok' | 'noPr' | 'prClosed' | 'disabled' | 'ghMissing' | 'unauthenticated' |
-// 'unavailable' | 'headNotFetched'.
-type GhSyncStatus string
+// ViewedSyncStatus: 'ok' | 'noPr' | 'prClosed' | 'disabled' | 'cliMissing' | 'unauthenticated' |
+// 'unavailable' | 'headNotFetched' | 'unsupported'.
+type ViewedSyncStatus string
 
 type ViewedSyncFile struct {
 	Path   string `json:"path"`
@@ -848,26 +851,27 @@ type ViewedSyncFile struct {
 }
 
 type ViewedSyncPlan struct {
-	Status   GhSyncStatus     `json:"status"`
-	Message  string           `json:"message"`
-	Account  string           `json:"account"`
-	Pr       *PR              `json:"pr"`
-	HeadSha  string           `json:"headSha"`
-	LocalTip string           `json:"localTip"`
-	Files    []ViewedSyncFile `json:"files"`
+	Status        ViewedSyncStatus `json:"status"`
+	Message       string           `json:"message"`
+	Account       string           `json:"account"`
+	ChangeRequest *ChangeRequest   `json:"changeRequest"`
+	Host          *githost.Info    `json:"host"`
+	HeadSha       string           `json:"headSha"`
+	LocalTip      string           `json:"localTip"`
+	Files         []ViewedSyncFile `json:"files"`
 }
 
-type GhSyncFailure struct {
+type ViewedSyncFailure struct {
 	Path  string `json:"path"`
 	Error string `json:"error"`
 }
 
-type GhSyncResult struct {
-	Status   GhSyncStatus    `json:"status"`
-	Message  string          `json:"message"`
-	Marked   []string        `json:"marked"`
-	Unmarked []string        `json:"unmarked"`
-	Failed   []GhSyncFailure `json:"failed"`
+type ViewedSyncResult struct {
+	Status   ViewedSyncStatus    `json:"status"`
+	Message  string              `json:"message"`
+	Marked   []string            `json:"marked"`
+	Unmarked []string            `json:"unmarked"`
+	Failed   []ViewedSyncFailure `json:"failed"`
 }
 
 type ReadLogArgs struct {

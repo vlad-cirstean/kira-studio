@@ -68,7 +68,7 @@ export function taskPatch(over: Partial<TaskPatch>): TaskPatch {
     title: null,
     jira: null,
     clearJira: false,
-    githubUrl: null,
+    hostUrl: null,
     est: null,
     notes: null,
     color: null,
@@ -78,5 +78,5 @@ export function taskPatch(over: Partial<TaskPatch>): TaskPatch {
 }
 
 export function backlogPatch(over: Partial<BacklogPatch>): BacklogPatch {
-  return { text: null, jira: null, clearJira: false, githubUrl: null, notes: null, ...over };
+  return { text: null, jira: null, clearJira: false, hostUrl: null, notes: null, ...over };
 }

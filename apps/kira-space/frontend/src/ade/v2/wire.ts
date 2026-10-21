@@ -175,7 +175,7 @@ export interface Integration {
   note: string;
   recorded: boolean /* D14: app's merge dialog recorded it */;
 }
-export interface PR {
+export interface ChangeRequest {
   number: number;
   title: string;
   state: string;
@@ -384,8 +384,8 @@ export interface Task {
   title: string /* '' = default title */;
   owner: string;
   jira: Jira | null;
-  githubUrl: string;
-  hostLink: HostLink | null /* githubUrl as a provider recognises it */;
+  hostUrl: string;
+  hostLink: HostLink | null /* hostUrl as a provider recognises it */;
   workflowId: string /* '' = none */;
   entryStepId: string /* the step the task last entered | 'done' | '' without a workflow */;
   since: Record<
@@ -430,13 +430,14 @@ export interface Board {
   worktreeBasePath: string;
   autofetchMinutes: number;
 }
-export interface RepoPrs {
+export interface RepoHost {
   codeRepoId: string;
   kind: 'ok' | 'disabled' | 'unavailable';
+  host: HostInfo | null;
 }
-export interface PrsResult {
-  repos: RepoPrs[];
-  branches: Record<string, PR> /* branchId */;
+export interface ChangeRequestsResult {
+  repos: RepoHost[];
+  branches: Record<string, ChangeRequest> /* branchId */;
   branchUrls: Record<string, string> /* branchId -> web page; absent without a host */;
 }
 
@@ -446,7 +447,7 @@ export interface BacklogItem {
   text: string;
   addedAt: number;
   jira: Jira | null;
-  githubUrl: string;
+  hostUrl: string;
   hostLink: HostLink | null;
   notes: string;
 }
@@ -574,39 +575,41 @@ export interface ReviewAgentLaunch {
   resumed: boolean;
   note: string /* '' or why a fresh one started */;
 }
-type GhSyncStatus =
+type ViewedSyncStatus =
   | 'ok'
   | 'noPr'
   | 'prClosed'
   | 'disabled'
-  | 'ghMissing'
+  | 'cliMissing'
   | 'unauthenticated'
   | 'unavailable'
-  | 'headNotFetched';
-interface GhSyncFile {
+  | 'headNotFetched'
+  | 'unsupported';
+interface ViewedSyncFile {
   path: string;
   action: 'mark' | 'unmark' | 'alreadyViewed' | 'skip';
   reason: '' | 'notReviewed' | 'partial' | 'changedSinceReview' | 'differsFromPrHead' | 'notInPr';
 }
-export interface GhSyncPlan {
-  status: GhSyncStatus;
+export interface ViewedSyncPlan {
+  status: ViewedSyncStatus;
   message: string;
   account: string;
-  pr: PR | null;
+  changeRequest: ChangeRequest | null;
+  host: HostInfo | null;
   headSha: string;
   localTip: string;
-  files: GhSyncFile[];
+  files: ViewedSyncFile[];
 }
-interface GhSyncFailure {
+interface ViewedSyncFailure {
   path: string;
   error: string;
 }
-export interface GhSyncResult {
-  status: GhSyncStatus;
+export interface ViewedSyncResult {
+  status: ViewedSyncStatus;
   message: string;
   marked: string[];
   unmarked: string[];
-  failed: GhSyncFailure[];
+  failed: ViewedSyncFailure[];
 }
 
 // ---- push payloads
@@ -634,7 +637,7 @@ export interface MobileOpenLaunchEvent {
 export interface CreateTaskArgs {
   title: string;
   jira: Jira | null;
-  githubUrl: string;
+  hostUrl: string;
   notes: string;
   codeRepoIds: string[];
   workflowId: string;
@@ -717,7 +720,7 @@ export interface TaskPatch {
   title: string | null;
   jira: Jira | null;
   clearJira: boolean;
-  githubUrl: string | null;
+  hostUrl: string | null;
   est: string | null;
   notes: string | null;
   color: number | null;
@@ -758,7 +761,7 @@ export interface BacklogPatch {
   text: string | null;
   jira: Jira | null;
   clearJira: boolean;
-  githubUrl: string | null;
+  hostUrl: string | null;
   notes: string | null;
 }
 export interface UpdateBacklogItemArgs {

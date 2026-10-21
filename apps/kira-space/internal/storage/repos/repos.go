@@ -29,7 +29,7 @@ type Repos struct {
 	Tabs            *TabsRepo
 	AdeSessions     *AdeSessionsRepo
 	AdeReview       *AdeReviewWindowsRepo
-	AdeGhSynced     *AdeGhSyncedRepo
+	AdeViewedSync   *AdeViewedSyncRepo
 	AdeTasks        *AdeTaskRepo
 	AdeBacklog      *AdeBacklogRepo
 	AdeRepoConfig   *AdeRepoConfigRepo
@@ -70,7 +70,7 @@ func New(db *sql.DB) (*Repos, error) {
 		Tabs:            &TabsRepo{DB: db, selectAll: tabsSelectAll},
 		AdeSessions:     &AdeSessionsRepo{DB: db},
 		AdeReview:       &AdeReviewWindowsRepo{DB: db},
-		AdeGhSynced:     &AdeGhSyncedRepo{DB: db},
+		AdeViewedSync:   &AdeViewedSyncRepo{DB: db},
 		AdeTasks:        &AdeTaskRepo{DB: db},
 		AdeBacklog:      &AdeBacklogRepo{DB: db},
 		AdeRepoConfig:   &AdeRepoConfigRepo{DB: db},

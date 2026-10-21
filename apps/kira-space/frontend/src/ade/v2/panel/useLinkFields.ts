@@ -6,7 +6,7 @@ import type { HostLink, Jira } from '../wire';
 export interface LinkPatch {
   jira?: Jira;
   clearJira?: boolean;
-  githubUrl?: string;
+  hostUrl?: string;
 }
 
 /** Validation and write wiring of the Jira and git host link fields, shared by the task panel and the
@@ -25,7 +25,7 @@ export function useLinkFields(
   }
 
   async function saveGithub(raw: string): Promise<void> {
-    githubError.value = (await write({ githubUrl: raw })) ?? '';
+    githubError.value = (await write({ hostUrl: raw })) ?? '';
   }
 
   return {
@@ -35,6 +35,6 @@ export function useLinkFields(
     saveJira,
     saveGithub,
     clearJira: () => write({ clearJira: true }),
-    clearGithub: () => write({ githubUrl: '' }),
+    clearGithub: () => write({ hostUrl: '' }),
   };
 }

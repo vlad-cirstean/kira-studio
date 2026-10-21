@@ -17,8 +17,8 @@ import { errorText } from '@workbench/bridge/codedError';
 import Identifier from '@workbench/components/Identifier.vue';
 import { computed, ref } from 'vue';
 import { remoteErrorText } from '../board/panelFacts';
-import { useGhSyncPlan, useGitHubSyncApply, useRefresh } from '../queries';
-import type { GhSyncResult, ReviewWindowTarget } from '../wire';
+import { useRefresh, useViewedSyncApply, useViewedSyncPlan } from '../queries';
+import type { ReviewWindowTarget, ViewedSyncResult } from '../wire';
 import { headDiffersParts } from './syncParts';
 
 // Marks this branch's fully reviewed files as viewed on its pull request, one way: nothing read from
@@ -26,12 +26,12 @@ import { headDiffersParts } from './syncParts';
 // a board push: each load lists the PR's files through GitHub.
 const props = defineProps<{ target: ReviewWindowTarget }>();
 
-const plan = useGhSyncPlan(() => props.target.branchId);
-const apply = useGitHubSyncApply();
+const plan = useViewedSyncPlan(() => props.target.branchId);
+const apply = useViewedSyncApply();
 const refresh = useRefresh();
 
 const open = ref(false);
-const result = ref<GhSyncResult | null>(null);
+const result = ref<ViewedSyncResult | null>(null);
 const error = ref('');
 
 const REASON = {
@@ -61,7 +61,7 @@ const marks = computed(() => data.value?.files.filter((f) => f.action === 'mark'
 const unmarks = computed(() => data.value?.files.filter((f) => f.action === 'unmark') ?? []);
 const skipped = computed(() => data.value?.files.filter((f) => f.action === 'skip') ?? []);
 const count = computed(() => marks.value.length + unmarks.value.length);
-const prNumber = computed(() => data.value?.pr?.number ?? 0);
+const prNumber = computed(() => data.value?.changeRequest?.number ?? 0);
 
 const blockedMessage = computed(() => {
   if (loadFailed.value) {
@@ -74,7 +74,7 @@ const blockedMessage = computed(() => {
         data.value?.message ??
         t('space.ade.review.sync.prClosed.tooltip', { number: String(prNumber.value) })
       );
-    case 'ghMissing':
+    case 'cliMissing':
       return t('space.ade.review.sync.ghMissing.tooltip');
     case 'unauthenticated':
     case 'unavailable':

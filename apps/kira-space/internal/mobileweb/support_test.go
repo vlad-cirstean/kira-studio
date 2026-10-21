@@ -103,7 +103,9 @@ func (f *fakeReader) Board(context.Context) (adewire.Board, error) {
 	}
 	return f.board, nil
 }
-func (f *fakeReader) Prs(context.Context) (adewire.PrsResult, error) { return adewire.PrsResult{}, nil }
+func (f *fakeReader) ChangeRequests(context.Context) (adewire.ChangeRequestsResult, error) {
+	return adewire.ChangeRequestsResult{}, nil
+}
 func (f *fakeReader) Sessions(context.Context) (adewire.SessionsResult, error) {
 	return adewire.SessionsResult{}, nil
 }

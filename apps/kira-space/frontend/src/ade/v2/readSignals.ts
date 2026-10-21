@@ -3,8 +3,8 @@ import { appendChunks, mergeRuns } from './pushMerge';
 import {
   backlogKey,
   boardKey,
+  changeRequestsKey,
   logKey,
-  prsKey,
   runSandboxKey,
   sessionsKey,
   workflowsKey,
@@ -28,7 +28,7 @@ export interface AdeSignalSource {
 export function installAdeReadSignals(queryClient: QueryClient, source: AdeSignalSource): void {
   source.onBoard(() => {
     void queryClient.invalidateQueries({ queryKey: boardKey, exact: true });
-    void queryClient.invalidateQueries({ queryKey: prsKey, exact: true });
+    void queryClient.invalidateQueries({ queryKey: changeRequestsKey, exact: true });
   });
   source.onBacklog(() => {
     void queryClient.invalidateQueries({ queryKey: backlogKey, exact: true });

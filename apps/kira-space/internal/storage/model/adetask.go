@@ -36,7 +36,7 @@ type AdeTask struct {
 	Owner        string
 	JiraKey      string
 	JiraURL      string
-	GithubURL    string
+	HostURL      string
 	WorkflowID   string
 	EntryStepID  string
 	SinceJSON    string
@@ -62,14 +62,14 @@ func (t AdeTask) Validate() error {
 
 // AdeTaskPatch holds only the leaves the caller changes; nil = unchanged.
 type AdeTaskPatch struct {
-	Title     *string
-	JiraKey   *string
-	JiraURL   *string
-	GithubURL *string
-	Est       *string
-	Notes     *string
-	Color     *int
-	Kind      *string
+	Title   *string
+	JiraKey *string
+	JiraURL *string
+	HostURL *string
+	Est     *string
+	Notes   *string
+	Color   *int
+	Kind    *string
 }
 
 // AdeTaskBranch is one row of ade_task_branches. Name "" = branch not created yet.
@@ -290,14 +290,14 @@ type AdeWorktreeSetup struct {
 
 // AdeBacklogItem is one row of ade_backlog.
 type AdeBacklogItem struct {
-	ID        string
-	Text      string
-	Position  int
-	JiraKey   string
-	JiraURL   string
-	GithubURL string
-	Notes     string
-	AddedAt   int64
+	ID       string
+	Text     string
+	Position int
+	JiraKey  string
+	JiraURL  string
+	HostURL  string
+	Notes    string
+	AddedAt  int64
 }
 
 // Validate asserts what the CHECK covers, earlier and with a message.
@@ -313,11 +313,11 @@ func (i AdeBacklogItem) Validate() error {
 
 // AdeBacklogPatch holds only the leaves the caller changes; nil = unchanged.
 type AdeBacklogPatch struct {
-	Text      *string
-	JiraKey   *string
-	JiraURL   *string
-	GithubURL *string
-	Notes     *string
+	Text    *string
+	JiraKey *string
+	JiraURL *string
+	HostURL *string
+	Notes   *string
 }
 
 // AdeRepoEnv is one row of ade_repo_envs.

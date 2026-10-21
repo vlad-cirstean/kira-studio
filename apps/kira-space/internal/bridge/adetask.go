@@ -173,7 +173,7 @@ func validateCreateTask(a adewire.CreateTaskArgs) error {
 	if err := validateAdeTaskJira(a.Jira); err != nil {
 		return err
 	}
-	if err := validateAdeURL(a.GithubURL, "githubUrl"); err != nil {
+	if err := validateAdeURL(a.HostURL, "hostUrl"); err != nil {
 		return err
 	}
 	if err := validateAdeNotes(a.Notes); err != nil {
@@ -240,8 +240,8 @@ func validateUpdateTask(a adewire.UpdateTaskArgs) error {
 	if err := validateAdeTaskJira(p.Jira); err != nil {
 		return err
 	}
-	if p.GithubURL != nil {
-		if err := validateAdeURL(*p.GithubURL, "githubUrl"); err != nil {
+	if p.HostURL != nil {
+		if err := validateAdeURL(*p.HostURL, "hostUrl"); err != nil {
 			return err
 		}
 	}
@@ -295,8 +295,8 @@ func validateBacklogPatch(p adewire.BacklogPatch) error {
 	if err := validateAdeTaskJira(p.Jira); err != nil {
 		return err
 	}
-	if p.GithubURL != nil {
-		if err := validateAdeURL(*p.GithubURL, "githubUrl"); err != nil {
+	if p.HostURL != nil {
+		if err := validateAdeURL(*p.HostURL, "hostUrl"); err != nil {
 			return err
 		}
 	}
@@ -313,8 +313,8 @@ func (s *AdeTaskService) Board(ctx context.Context) (adewire.Board, error) {
 	return b, adeTaskError(err)
 }
 
-func (s *AdeTaskService) Prs(ctx context.Context) (adewire.PrsResult, error) {
-	r, err := s.Engine.Prs(ctx)
+func (s *AdeTaskService) ChangeRequests(ctx context.Context) (adewire.ChangeRequestsResult, error) {
+	r, err := s.Engine.ChangeRequests(ctx)
 	return r, adeTaskError(err)
 }
 
@@ -377,7 +377,7 @@ func (s *AdeTaskService) CreateTask(ctx context.Context, args adewire.CreateTask
 	if err := validateCreateTask(args); err != nil {
 		return adewire.Task{}, err
 	}
-	if err := s.validateHostLink(args.GithubURL); err != nil {
+	if err := s.validateHostLink(args.HostURL); err != nil {
 		return adewire.Task{}, err
 	}
 	t, err := s.Engine.CreateTask(ctx, args)
@@ -388,8 +388,8 @@ func (s *AdeTaskService) UpdateTask(ctx context.Context, args adewire.UpdateTask
 	if err := validateUpdateTask(args); err != nil {
 		return adewire.Task{}, err
 	}
-	if args.Patch.GithubURL != nil {
-		if err := s.validateHostLink(*args.Patch.GithubURL); err != nil {
+	if args.Patch.HostURL != nil {
+		if err := s.validateHostLink(*args.Patch.HostURL); err != nil {
 			return adewire.Task{}, err
 		}
 	}
@@ -520,8 +520,8 @@ func (s *AdeTaskService) UpdateBacklogItem(ctx context.Context, args adewire.Upd
 	if err := validateBacklogPatch(args.Patch); err != nil {
 		return adewire.BacklogItem{}, err
 	}
-	if args.Patch.GithubURL != nil {
-		if err := s.validateHostLink(*args.Patch.GithubURL); err != nil {
+	if args.Patch.HostURL != nil {
+		if err := s.validateHostLink(*args.Patch.HostURL); err != nil {
 			return adewire.BacklogItem{}, err
 		}
 	}
@@ -1033,20 +1033,20 @@ func (s *AdeTaskService) LaunchReviewAgent(ctx context.Context, args adewire.Tas
 	return l, adeTaskError(err)
 }
 
-// GitHubSyncPlan reports what syncing the branch's reviewed files to its PR would do.
-func (s *AdeTaskService) GitHubSyncPlan(ctx context.Context, args adewire.BranchArgs) (adewire.ViewedSyncPlan, error) {
+// ViewedSyncPlan reports what syncing the branch's reviewed files to its PR would do.
+func (s *AdeTaskService) ViewedSyncPlan(ctx context.Context, args adewire.BranchArgs) (adewire.ViewedSyncPlan, error) {
 	if err := validateAdeTaskID(args.BranchID, "branchId"); err != nil {
 		return adewire.ViewedSyncPlan{}, err
 	}
-	p, err := s.Engine.GitHubSyncPlan(ctx, args.BranchID)
+	p, err := s.Engine.ViewedSyncPlan(ctx, args.BranchID)
 	return p, adeTaskError(err)
 }
 
-// GitHubSyncApply marks and unmarks the branch's files on its PR as planned.
-func (s *AdeTaskService) GitHubSyncApply(ctx context.Context, args adewire.BranchArgs) (adewire.GhSyncResult, error) {
+// ViewedSyncApply marks and unmarks the branch's files on its PR as planned.
+func (s *AdeTaskService) ViewedSyncApply(ctx context.Context, args adewire.BranchArgs) (adewire.ViewedSyncResult, error) {
 	if err := validateAdeTaskID(args.BranchID, "branchId"); err != nil {
-		return adewire.GhSyncResult{}, err
+		return adewire.ViewedSyncResult{}, err
 	}
-	r, err := s.Engine.GitHubSyncApply(ctx, args.BranchID)
+	r, err := s.Engine.ViewedSyncApply(ctx, args.BranchID)
 	return r, adeTaskError(err)
 }

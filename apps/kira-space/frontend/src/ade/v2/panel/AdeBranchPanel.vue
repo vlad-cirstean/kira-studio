@@ -23,13 +23,13 @@ import type { Tone } from '../board/actions';
 import { type RebaseAct, rebaseActs } from '../board/rebaseActions';
 import { baseNameOf } from '../board/reviewCode';
 import { type CardModel, type PlanModel, usePlanModel } from '../plan/usePlanModel';
-import { usePrs, useRetrySetup } from '../queries';
+import { useChangeRequests, useRetrySetup } from '../queries';
 import { useReviewCode } from '../review/useReviewCode';
 import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { ACTION_CLASS, TONE_SOLID_CLASS } from '../tones';
-import type { Deployment, Integration, PR, Run } from '../wire';
+import type { ChangeRequest, Deployment, Integration, Run } from '../wire';
 import AdeChangesTab from './AdeChangesTab.vue';
 import AdePanelFrame from './AdePanelFrame.vue';
 import AdeRunOutcome from './AdeRunOutcome.vue';
@@ -45,7 +45,7 @@ const { sessions } = usePlanModel();
 const sessionCount = computed(
   () => sessions.value.filter((x) => x.branchId === props.row.id && x.state === 'running').length,
 );
-const prs = usePrs();
+const changeRequests = useChangeRequests();
 const repos = useRepos();
 const retrySetup = useRetrySetup();
 const reviewCode = useReviewCode();
@@ -138,8 +138,10 @@ const shared = computed(() => {
 });
 
 // ---- Details rows
-const pr = computed((): PR | null => prs.data.value?.branches[branch.value.id] ?? null);
-const branchUrl = computed(() => prs.data.value?.branchUrls[branch.value.id] ?? '');
+const changeRequest = computed(
+  (): ChangeRequest | null => changeRequests.data.value?.branches[branch.value.id] ?? null,
+);
+const branchUrl = computed(() => changeRequests.data.value?.branchUrls[branch.value.id] ?? '');
 const PR_TONE: Record<string, Tone> = {
   open: 'green',
   merged: 'purple',
@@ -394,23 +396,23 @@ function deployNote(d: Deployment): string {
         <dt>{{ t('space.ade.branchPanel.pr.label') }}</dt>
         <dd class="flex min-h-row min-w-0 items-center gap-2" data-testid="ade-branch-pr">
           <AdeChip
-            :label="pr ? prStateLabel(pr.state) : t('common.state.none.option')"
-            :tone="pr ? (PR_TONE[pr.state] ?? 'grey') : 'grey'"
+            :label="changeRequest ? prStateLabel(changeRequest.state) : t('common.state.none.option')"
+            :tone="changeRequest ? (PR_TONE[changeRequest.state] ?? 'grey') : 'grey'"
             wide
           />
-          <template v-if="pr">
+          <template v-if="changeRequest">
             <a
-              :href="pr.url"
+              :href="changeRequest.url"
               class="max-w-1/2 shrink-0 truncate font-data text-kira-md text-info"
-              @click="(e) => open(pr!.url, e)"
-              >#{{ pr.number }}</a
+              @click="(e) => open(changeRequest!.url, e)"
+              >#{{ changeRequest.number }}</a
             >
-            <span class="min-w-0 flex-1 truncate text-kira-md">{{ pr.title }}</span>
+            <span class="min-w-0 flex-1 truncate text-kira-md">{{ changeRequest.title }}</span>
             <TooltipIconButton
               :icon="copied && copiedKey === 'pr' ? 'check' : 'copy'"
               :label="t('space.ade.branchPanel.copyPrLink.tooltip')"
               class="shrink-0"
-              @click="copyLink('pr', pr.url)"
+              @click="copyLink('pr', changeRequest.url)"
             />
           </template>
         </dd>

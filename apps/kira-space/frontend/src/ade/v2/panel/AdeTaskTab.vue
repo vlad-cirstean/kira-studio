@@ -155,7 +155,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
         :label="t('common.product.github.label')"
         :chip="github ? t(github.kind === 'changeRequest' ? 'space.ade.branchPanel.pr.label' : 'space.ade.taskTab.issue.label') : ''"
         :text="github?.ref ?? ''"
-        :url="github ? task.githubUrl : ''"
+        :url="github ? task.hostUrl : ''"
         :placeholder="t('space.ade.taskTab.githubPlaceholder.placeholder')"
         :error="links.githubError.value"
         @save="links.saveGithub"

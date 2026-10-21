@@ -32,7 +32,7 @@ import {
 } from '../board/timeline';
 import { localIso, localIsoOfMs } from '../localDay';
 import { taskColor } from '../palette';
-import { useBoard, usePrs, useSessions, useWorkflows } from '../queries';
+import { useBoard, useChangeRequests, useSessions, useWorkflows } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import type { Board, Branch, Session, Task, Workflow } from '../wire';
 
@@ -207,7 +207,7 @@ function buildCard(c: Ctx, id: string): CardModel | null {
 
 function buildPlanModel() {
   const board = useBoard();
-  const prs = usePrs();
+  const changeRequests = useChangeRequests();
   const sessionsQuery = useSessions();
   const agentStore = useAgentSessionsStore();
   const workflows = useWorkflows();
@@ -322,7 +322,7 @@ function buildPlanModel() {
       ripple: selectedId ? rippleOf(view, { kind: 'task', id: selectedId }) : null,
       selectedId,
       mainName: new Map(b.repos.map((r) => [r.codeRepoId, r.mainName])),
-      prTitle: (id) => prs.data.value?.branches[id]?.title ?? '',
+      prTitle: (id) => changeRequests.data.value?.branches[id]?.title ?? '',
       repoLabel,
       nowMs,
     };

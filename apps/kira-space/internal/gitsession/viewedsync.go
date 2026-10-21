@@ -23,7 +23,7 @@ type ViewedSyncFile struct {
 }
 
 // ViewedSyncPlanResult is ViewedSyncPlan's outcome. Status is "ok" | "disabled" | "unsupported" |
-// "ghMissing" | "unauthenticated" | "unavailable" | "prClosed" | "headNotFetched". Files,
+// "cliMissing" | "unauthenticated" | "unavailable" | "prClosed" | "headNotFetched". Files,
 // DropSynced and NodeID are set only for "ok". DropSynced lists ledger rows to delete without a
 // host call.
 type ViewedSyncPlanResult struct {
@@ -78,7 +78,7 @@ func viewedSyncDecision(f viewedSyncFacts) (action, reason string, dropSynced bo
 func ViewedSyncStatusKind(s githost.Status) string {
 	switch s.Kind {
 	case githost.KindNotFound:
-		return "ghMissing"
+		return "cliMissing"
 	case githost.KindUnauthenticated:
 		return "unauthenticated"
 	}

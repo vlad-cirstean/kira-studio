@@ -127,7 +127,7 @@ function saveNotes(_id: string, value: string): void {
           :label="t('common.product.github.label')"
           :chip="hostLink ? (hostLink.kind === 'changeRequest' ? 'PR' : 'issue') : ''"
           :text="hostLink?.ref ?? ''"
-          :url="hostLink ? item.githubUrl : ''"
+          :url="hostLink ? item.hostUrl : ''"
           :placeholder="t('space.ade.backlog.github.placeholder')"
           :error="links.githubError.value"
           @save="links.saveGithub"

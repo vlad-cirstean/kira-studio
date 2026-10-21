@@ -198,23 +198,23 @@ func TestGitHubWithoutGh(t *testing.T) {
 	claude(app, map[string][]fakeagent.Action{"*": {{Name: "done"}}})
 	br, repoID := githubClone(t, app)
 
-	var prs adewire.PrsResult
+	var prs adewire.ChangeRequestsResult
 	testx.WaitUntil(t, waitFor, func() bool {
 		var err error
-		prs, err = app.W.AdeTask.Prs(ctx)
+		prs, err = app.W.AdeTask.ChangeRequests(ctx)
 		return err == nil && len(prs.Repos) == 1 && prs.Repos[0].CodeRepoID == repoID && prs.Repos[0].Kind != "ok"
 	})
 	if prs.Repos[0].Kind != "unavailable" || len(prs.Branches) != 0 {
 		t.Fatalf("Prs = %+v, want unavailable and no PRs", prs)
 	}
-	plan, err := app.W.AdeTask.GitHubSyncPlan(ctx, adewire.BranchArgs{BranchID: br.ID})
+	plan, err := app.W.AdeTask.ViewedSyncPlan(ctx, adewire.BranchArgs{BranchID: br.ID})
 	if err != nil {
-		t.Fatalf("GitHubSyncPlan returned an error, want a status: %v", err)
+		t.Fatalf("ViewedSyncPlan returned an error, want a status: %v", err)
 	}
-	if plan.Status != "ghMissing" || plan.Pr != nil || len(plan.Files) != 0 {
+	if plan.Status != "cliMissing" || plan.ChangeRequest != nil || len(plan.Files) != 0 {
 		t.Fatalf("plan = %+v, want an unavailable state with no files", plan)
 	}
-	res, err := app.W.AdeTask.GitHubSyncApply(ctx, adewire.BranchArgs{BranchID: br.ID})
+	res, err := app.W.AdeTask.ViewedSyncApply(ctx, adewire.BranchArgs{BranchID: br.ID})
 	if err != nil || res.Status != plan.Status || len(res.Marked) != 0 {
 		t.Fatalf("apply = %+v, %v, want status %s and nothing marked", res, err, plan.Status)
 	}
@@ -252,7 +252,7 @@ func TestGitHubSyncWithFakeGh(t *testing.T) {
 	}
 	prFiles("UNVIEWED")
 
-	prs, err := app.W.AdeTask.Prs(ctx)
+	prs, err := app.W.AdeTask.ChangeRequests(ctx)
 	if err != nil || len(prs.Repos) != 1 || prs.Repos[0].CodeRepoID != repoID || prs.Repos[0].Kind != "ok" {
 		t.Fatalf("Prs = %+v, %v, want ok", prs, err)
 	}
@@ -260,11 +260,11 @@ func TestGitHubSyncWithFakeGh(t *testing.T) {
 		t.Fatalf("branch PR = %+v, want #7 open", pr)
 	}
 
-	plan, err := app.W.AdeTask.GitHubSyncPlan(ctx, adewire.BranchArgs{BranchID: br.ID})
+	plan, err := app.W.AdeTask.ViewedSyncPlan(ctx, adewire.BranchArgs{BranchID: br.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if plan.Status != "ok" || plan.Account != "octocat" || plan.HeadSha != tip || plan.Pr == nil || plan.Pr.Number != 7 ||
+	if plan.Status != "ok" || plan.Account != "octocat" || plan.HeadSha != tip || plan.ChangeRequest == nil || plan.ChangeRequest.Number != 7 ||
 		len(plan.Files) != 1 || plan.Files[0].Path != "a.txt" || plan.Files[0].Action != "skip" || plan.Files[0].Reason != "notReviewed" {
 		t.Fatalf("plan before review = %+v, want a.txt skipped as notReviewed", plan)
 	}
@@ -283,11 +283,11 @@ func TestGitHubSyncWithFakeGh(t *testing.T) {
 	}
 	mark(true)
 
-	plan, err = app.W.AdeTask.GitHubSyncPlan(ctx, adewire.BranchArgs{BranchID: br.ID})
+	plan, err = app.W.AdeTask.ViewedSyncPlan(ctx, adewire.BranchArgs{BranchID: br.ID})
 	if err != nil || plan.Status != "ok" || len(plan.Files) != 1 || plan.Files[0].Action != "mark" {
 		t.Fatalf("plan after review = %+v, %v, want a.txt marked", plan, err)
 	}
-	res, err := app.W.AdeTask.GitHubSyncApply(ctx, adewire.BranchArgs{BranchID: br.ID})
+	res, err := app.W.AdeTask.ViewedSyncApply(ctx, adewire.BranchArgs{BranchID: br.ID})
 	if err != nil || res.Status != "ok" || !slices.Equal(res.Marked, []string{"a.txt"}) || len(res.Failed) != 0 {
 		t.Fatalf("apply = %+v, %v, want a.txt marked", res, err)
 	}

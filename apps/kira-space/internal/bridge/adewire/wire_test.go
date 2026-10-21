@@ -18,7 +18,7 @@ const fixtureDir = "../../../tests/fixtures/ade-v2"
 func TestFixturesMatchWireTypes(t *testing.T) {
 	table := map[string]func() any{
 		"board.json":               func() any { return new(Board) },
-		"prs.json":                 func() any { return new(PrsResult) },
+		"change-requests.json":     func() any { return new(ChangeRequestsResult) },
 		"host-providers.json":      func() any { return new(githost.Providers) },
 		"backlog.json":             func() any { return new(BacklogResult) },
 		"workflows.json":           func() any { return new(WorkflowsResult) },
@@ -43,8 +43,8 @@ func TestFixturesMatchWireTypes(t *testing.T) {
 		"review-target.json":       func() any { return new(ReviewWindowTarget) },
 		"review-agent.json":        func() any { return new(ReviewAgentState) },
 		"review-agent-launch.json": func() any { return new(ReviewAgentLaunch) },
-		"gh-sync-plan.json":        func() any { return new(ViewedSyncPlan) },
-		"gh-sync-result.json":      func() any { return new(GhSyncResult) },
+		"viewed-sync-plan.json":    func() any { return new(ViewedSyncPlan) },
+		"viewed-sync-result.json":  func() any { return new(ViewedSyncResult) },
 	}
 
 	entries, err := os.ReadDir(fixtureDir)

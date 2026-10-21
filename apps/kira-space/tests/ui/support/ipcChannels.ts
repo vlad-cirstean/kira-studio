@@ -167,7 +167,7 @@ export const IPC = {
   // P145: the ade v2 board surface. `adeTaskBoard` names the bound call; its push counterpart is
   // `adeTaskBoardChanged`.
   adeTaskBoard: 'kira:adetask:board:call',
-  adeTaskPrs: 'kira:adetask:prs',
+  adeTaskChangeRequests: 'kira:adetask:changeRequests',
   adeTaskRefresh: 'kira:adetask:refresh',
   adeTaskForcePush: 'kira:adetask:forcePush',
   adeTaskCreateTask: 'kira:adetask:createTask',
@@ -219,8 +219,8 @@ export const IPC = {
   adeTaskLaunchReviewAgent: 'kira:adetask:launchReviewAgent',
   adeTaskOpenReviewWindow: 'kira:adetask:openReviewWindow',
   adeTaskReviewWindowTarget: 'kira:adetask:reviewWindowTarget',
-  adeTaskGitHubSyncPlan: 'kira:adetask:gitHubSyncPlan',
-  adeTaskGitHubSyncApply: 'kira:adetask:gitHubSyncApply',
+  adeTaskViewedSyncPlan: 'kira:adetask:viewedSyncPlan',
+  adeTaskViewedSyncApply: 'kira:adetask:viewedSyncApply',
   adeTaskArchiveRisk: 'kira:adetask:archiveRisk',
   adeTaskArchiveTask: 'kira:adetask:archiveTask',
   adeTaskRecordMerge: 'kira:adetask:recordMerge',

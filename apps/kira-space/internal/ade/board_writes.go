@@ -128,7 +128,7 @@ func (b *TaskBoard) CreateTask(ctx context.Context, args adewire.CreateTaskArgs)
 	}
 	task := model.AdeTask{
 		ID: b.newID(), Kind: model.AdeTaskKindTask, Title: title, JiraKey: jiraKey, JiraURL: jiraURL,
-		GithubURL: args.GithubURL, Notes: args.Notes, CreatedAt: b.deps.Now().UnixMilli(),
+		HostURL: args.HostURL, Notes: args.Notes, CreatedAt: b.deps.Now().UnixMilli(),
 	}
 	if args.WorkflowID != "" {
 		if b.deps.Workflows == nil {
@@ -170,7 +170,7 @@ func (b *TaskBoard) UpdateTask(_ context.Context, args adewire.UpdateTaskArgs) (
 	if p.Jira != nil && p.ClearJira {
 		return adewire.Task{}, invalid("jira and clearJira are mutually exclusive")
 	}
-	patch := model.AdeTaskPatch{Title: p.Title, GithubURL: p.GithubURL, Est: p.Est, Notes: p.Notes, Color: p.Color, Kind: p.Kind}
+	patch := model.AdeTaskPatch{Title: p.Title, HostURL: p.HostURL, Est: p.Est, Notes: p.Notes, Color: p.Color, Kind: p.Kind}
 	if p.Title != nil {
 		trimmed := strings.TrimSpace(*p.Title)
 		patch.Title = &trimmed
@@ -471,7 +471,7 @@ func (b *TaskBoard) SetQueuedAfter(_ context.Context, args adewire.SetQueuedAfte
 // --- backlog -----------------------------------------------------------------------------------
 
 func (b *TaskBoard) toWireBacklog(i model.AdeBacklogItem) adewire.BacklogItem {
-	out := adewire.BacklogItem{ID: i.ID, Text: i.Text, AddedAt: i.AddedAt, GithubURL: i.GithubURL, HostLink: b.hostLink(i.GithubURL), Notes: i.Notes}
+	out := adewire.BacklogItem{ID: i.ID, Text: i.Text, AddedAt: i.AddedAt, HostURL: i.HostURL, HostLink: b.hostLink(i.HostURL), Notes: i.Notes}
 	if i.JiraKey != "" || i.JiraURL != "" {
 		out.Jira = &adewire.Jira{Key: i.JiraKey, URL: i.JiraURL}
 	}
@@ -511,7 +511,7 @@ func (b *TaskBoard) UpdateBacklogItem(_ context.Context, args adewire.UpdateBack
 	if p.Jira != nil && p.ClearJira {
 		return adewire.BacklogItem{}, invalid("jira and clearJira are mutually exclusive")
 	}
-	patch := model.AdeBacklogPatch{Text: p.Text, GithubURL: p.GithubURL, Notes: p.Notes}
+	patch := model.AdeBacklogPatch{Text: p.Text, HostURL: p.HostURL, Notes: p.Notes}
 	if p.Text != nil {
 		trimmed := strings.TrimSpace(*p.Text)
 		if trimmed == "" {
@@ -570,7 +570,7 @@ func (b *TaskBoard) PromoteBacklogItem(_ context.Context, args adewire.BacklogIt
 	}
 	task, err := b.deps.Backlog.Promote(item.ID, model.AdeTask{
 		ID: b.newID(), Kind: model.AdeTaskKindTask, Title: item.Text, JiraKey: item.JiraKey, JiraURL: item.JiraURL,
-		GithubURL: item.GithubURL, Notes: item.Notes, CreatedAt: b.deps.Now().UnixMilli(),
+		HostURL: item.HostURL, Notes: item.Notes, CreatedAt: b.deps.Now().UnixMilli(),
 	})
 	if err != nil {
 		return adewire.Task{}, err

@@ -2,15 +2,34 @@
   "repos": [
     {
       "codeRepoId": "repo-web-app",
-      "kind": "ok"
+      "kind": "ok",
+      "host": {
+        "id": "github",
+        "label": "GitHub",
+        "changeRequest": "Pull request",
+        "changeRequestNoun": "pull request",
+        "changeRequestShort": "PR",
+        "cli": "GitHub CLI (gh)",
+        "fileReviewSync": true
+      }
     },
     {
       "codeRepoId": "repo-api",
-      "kind": "ok"
+      "kind": "ok",
+      "host": {
+        "id": "github",
+        "label": "GitHub",
+        "changeRequest": "Pull request",
+        "changeRequestNoun": "pull request",
+        "changeRequestShort": "PR",
+        "cli": "GitHub CLI (gh)",
+        "fileReviewSync": true
+      }
     },
     {
       "codeRepoId": "repo-mobile",
-      "kind": "disabled"
+      "kind": "disabled",
+      "host": null
     }
   ],
   "branches": {

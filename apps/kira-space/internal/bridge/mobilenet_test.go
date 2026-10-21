@@ -24,8 +24,10 @@ import (
 // idleReader answers every read empty: the supervisor test never serves a request.
 type idleReader struct{}
 
-func (idleReader) Board(context.Context) (adewire.Board, error)   { return adewire.Board{}, nil }
-func (idleReader) Prs(context.Context) (adewire.PrsResult, error) { return adewire.PrsResult{}, nil }
+func (idleReader) Board(context.Context) (adewire.Board, error) { return adewire.Board{}, nil }
+func (idleReader) ChangeRequests(context.Context) (adewire.ChangeRequestsResult, error) {
+	return adewire.ChangeRequestsResult{}, nil
+}
 func (idleReader) Sessions(context.Context) (adewire.SessionsResult, error) {
 	return adewire.SessionsResult{}, nil
 }

@@ -113,7 +113,7 @@ function writeReply(path: string, body: string): unknown {
       text: args.text,
       addedAt: 0,
       jira: null,
-      githubUrl: '',
+      hostUrl: '',
       hostLink: null,
       notes: '',
     };
@@ -161,7 +161,7 @@ export async function startMobileServer(): Promise<MobileServer> {
   ).repos.map(({ codeRepoId, name, nickname }) => ({ codeRepoId, name, nickname }));
   const reads: Record<string, unknown> = {
     '/api/ade/board': fixture('board'),
-    '/api/ade/prs': fixture('prs'),
+    '/api/ade/change-requests': fixture('change-requests'),
     '/api/ade/sessions': fixture('sessions'),
     '/api/ade/workflows': fixture('workflows'),
     '/api/ade/repos': { repos },

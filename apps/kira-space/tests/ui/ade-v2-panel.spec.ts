@@ -66,7 +66,7 @@ test('name, Jira, GitHub and Not merging write UpdateTask patches', async ({ rel
   await expect.poll(() => updates(control)).toHaveLength(1);
   expect(updates(control)[0]?.args).toMatchObject({
     taskId: 'T_notif',
-    patch: { title: 'Notify on mention', jira: null, githubUrl: null, est: null, kind: null },
+    patch: { title: 'Notify on mention', jira: null, hostUrl: null, est: null, kind: null },
   });
 
   await page.locator('[data-testid="ade-task-jira-input"]').fill('PAY-9');
@@ -82,7 +82,7 @@ test('name, Jira, GitHub and Not merging write UpdateTask patches', async ({ rel
   await page.locator('[data-testid="ade-task-github-save"]').click();
   await expect.poll(() => updates(control)).toHaveLength(3);
   expect(updates(control)[2]?.args).toMatchObject({
-    patch: { githubUrl: 'https://github.com/acme/web-app/issues/882' },
+    patch: { hostUrl: 'https://github.com/acme/web-app/issues/882' },
   });
 
   await page.locator('[data-testid="ade-task-parked"]').click();

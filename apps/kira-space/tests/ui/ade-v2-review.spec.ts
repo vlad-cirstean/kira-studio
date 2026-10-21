@@ -56,8 +56,8 @@ function reviewControl(extra: readonly ControlSnapshot[] = []): ControlSnapshot[
   const defaults: ControlSnapshot[] = [
     { channel: IPC.adeTaskReviewWindowTarget, response: target },
     { channel: IPC.adeTaskReviewAgent, response: { session: null, hostWindowKey: '' } },
-    { channel: IPC.adeTaskGitHubSyncPlan, response: adeFixture('gh-sync-plan') },
-    { channel: IPC.adeTaskGitHubSyncApply, response: adeFixture('gh-sync-result') },
+    { channel: IPC.adeTaskViewedSyncPlan, response: adeFixture('viewed-sync-plan') },
+    { channel: IPC.adeTaskViewedSyncApply, response: adeFixture('viewed-sync-result') },
   ];
   const overridden = new Set(extra.map((e) => e.channel));
   return adeV2Control([...defaults.filter((d) => !overridden.has(d.channel)), ...extra]);
@@ -160,13 +160,13 @@ reviewTest('a failed fetch from the sync popover shows its error', async ({ rela
     ],
   };
   const plan = {
-    ...adeFixture<object>('gh-sync-plan'),
+    ...adeFixture<object>('viewed-sync-plan'),
     status: 'headNotFetched',
     message: 'PR head not fetched',
   };
   const page = await openReview(relaunch, [
     { channel: IPC.adeTaskRefresh, response: failed },
-    { channel: IPC.adeTaskGitHubSyncPlan, response: plan },
+    { channel: IPC.adeTaskViewedSyncPlan, response: plan },
   ]);
   await page.locator(t('ade-review-sync')).click();
   await page.locator(t('ade-review-sync-refresh')).click();
@@ -174,8 +174,8 @@ reviewTest('a failed fetch from the sync popover shows its error', async ({ rela
 });
 
 reviewTest('the sync button is hidden when the branch has no PR', async ({ relaunch }) => {
-  const plan = { ...adeFixture<object>('gh-sync-plan'), status: 'noPr', pr: null, files: [] };
-  const page = await openReview(relaunch, [{ channel: IPC.adeTaskGitHubSyncPlan, response: plan }]);
+  const plan = { ...adeFixture<object>('viewed-sync-plan'), status: 'noPr', pr: null, files: [] };
+  const page = await openReview(relaunch, [{ channel: IPC.adeTaskViewedSyncPlan, response: plan }]);
   await expect(page.locator(t('ade-review-header'))).toBeVisible();
   await expect(page.locator(t('ade-review-sync'))).toHaveCount(0);
 });
@@ -218,7 +218,7 @@ reviewTest(
   'the sync button stays visible and disabled when its plan fails to load',
   async ({ relaunch }) => {
     const page = await openReview(relaunch, [
-      { channel: IPC.adeTaskGitHubSyncPlan, error: { code: 'invalid', message: 'gh exploded' } },
+      { channel: IPC.adeTaskViewedSyncPlan, error: { code: 'invalid', message: 'gh exploded' } },
     ]);
     const button = page.locator(t('ade-review-sync'));
     await expect(button).toBeDisabled();
