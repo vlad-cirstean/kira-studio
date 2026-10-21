@@ -6,7 +6,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
-import { type MessageKey, t } from '@theme/i18n';
+import { hostWords, type MessageKey, t } from '@theme/i18n';
 import { useCopy } from '@workbench/behaviour/clipboard';
 import { errorText } from '@workbench/bridge/codedError';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
@@ -140,6 +140,11 @@ const shared = computed(() => {
 // ---- Details rows
 const changeRequest = computed(
   (): ChangeRequest | null => changeRequests.data.value?.branches[branch.value.id] ?? null,
+);
+const words = computed(() =>
+  hostWords(
+    changeRequests.data.value?.repos.find((r) => r.codeRepoId === branch.value.codeRepoId)?.host,
+  ),
 );
 const branchUrl = computed(() => changeRequests.data.value?.branchUrls[branch.value.id] ?? '');
 const PR_TONE: Record<string, Tone> = {
@@ -393,7 +398,7 @@ function deployNote(d: Deployment): string {
             />
           </template>
         </dd>
-        <dt>{{ t('space.ade.branchPanel.pr.label') }}</dt>
+        <dt>{{ words.changeRequestShort }}</dt>
         <dd class="flex min-h-row min-w-0 items-center gap-2" data-testid="ade-branch-pr">
           <AdeChip
             :label="changeRequest ? prStateLabel(changeRequest.state) : t('common.state.none.option')"
@@ -410,7 +415,7 @@ function deployNote(d: Deployment): string {
             <span class="min-w-0 flex-1 truncate text-kira-md">{{ changeRequest.title }}</span>
             <TooltipIconButton
               :icon="copied && copiedKey === 'pr' ? 'check' : 'copy'"
-              :label="t('space.ade.branchPanel.copyPrLink.tooltip')"
+              :label="t('space.ade.link.copy.tooltip', { label: words.changeRequestShort })"
               class="shrink-0"
               @click="copyLink('pr', changeRequest.url)"
             />

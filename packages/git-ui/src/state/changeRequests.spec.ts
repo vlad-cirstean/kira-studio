@@ -638,10 +638,12 @@ describe('ChangeRequestState — F9: a stale resolveBranch across a same-repo re
     pr.setRepoId(REPO);
 
     const resolvers: Array<(v: unknown) => void> = [];
-    transport.onRequest = () =>
-      new Promise((resolve) => {
-        resolvers.push(resolve);
-      });
+    transport.onRequest = (method) =>
+      method === 'gitHost.info'
+        ? { host: null }
+        : new Promise((resolve) => {
+            resolvers.push(resolve);
+          });
 
     // A: the first (soon-to-be-stale) resolveBranch — left hanging.
     const requestA = pr.resolveBranch('feature');

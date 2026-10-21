@@ -90,7 +90,7 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.windowsEnsure, response: { mode: 'ade' } },
     { channel: IPC.codeWorkspaceListRepos, response: REPO_RECORDS },
     { channel: IPC.adeTaskBoard, response: adeFixture('board') },
-    { channel: IPC.adeTaskChangeRequests, response: adeFixture('prs') },
+    { channel: IPC.adeTaskChangeRequests, response: adeFixture('change-requests') },
     { channel: IPC.gitHostProviders, response: adeFixture('host-providers') },
     { channel: IPC.adeTaskWorkflows, response: adeFixture('workflows') },
     { channel: IPC.adeTaskRepos, response: adeFixture('repos') },

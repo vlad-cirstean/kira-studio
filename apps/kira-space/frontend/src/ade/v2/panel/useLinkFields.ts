@@ -16,7 +16,7 @@ export function useLinkFields(
   write: (patch: LinkPatch) => Promise<string | null>,
 ) {
   const jiraError = ref('');
-  const githubError = ref('');
+  const hostError = ref('');
 
   async function saveJira(raw: string): Promise<void> {
     const j = parseJira(raw);
@@ -24,17 +24,17 @@ export function useLinkFields(
     if (j.key) jiraError.value = (await write({ jira: j })) ?? '';
   }
 
-  async function saveGithub(raw: string): Promise<void> {
-    githubError.value = (await write({ hostUrl: raw })) ?? '';
+  async function saveHost(raw: string): Promise<void> {
+    hostError.value = (await write({ hostUrl: raw })) ?? '';
   }
 
   return {
     jiraError,
-    githubError,
+    hostError,
     hostLink,
     saveJira,
-    saveGithub,
+    saveHost,
     clearJira: () => write({ clearJira: true }),
-    clearGithub: () => write({ hostUrl: '' }),
+    clearHost: () => write({ hostUrl: '' }),
   };
 }

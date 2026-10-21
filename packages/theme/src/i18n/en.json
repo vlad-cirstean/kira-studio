@@ -2258,6 +2258,15 @@
     "forcePush": {
       "label": "Force push"
     },
+    "gitHost": {
+      "changeRequest": {
+        "label": "Change request"
+      },
+      "changeRequestShort": {
+        "label": "CR"
+      },
+      "label": "Code host"
+    },
     "goToFile": {
       "label": "Go to file"
     },
@@ -2412,9 +2421,6 @@
     "product": {
       "docker": {
         "label": "Docker"
-      },
-      "github": {
-        "label": "GitHub"
       },
       "jira": {
         "label": "Jira"
@@ -3361,9 +3367,9 @@
         "error": "Couldn’t load more history: {error}",
         "title": "Couldn’t load more history"
       },
-      "openPullRequest": {
-        "error": "Couldn’t open the pull request: {error}",
-        "title": "Couldn’t open the pull request"
+      "openChangeRequest": {
+        "error": "Couldn’t open the {changeRequestNoun}: {error}",
+        "title": "Couldn’t open the {changeRequestNoun}"
       },
       "refresh": {
         "error": "Couldn’t refresh: {error}",
@@ -3409,6 +3415,17 @@
         "example": "your package manager’s Git upgrade command"
       }
     },
+    "changeRequest": {
+      "noAnswer": {
+        "hint": "{label} did not answer."
+      },
+      "open": {
+        "aria": "Open {changeRequestNoun} #{number} on {label}"
+      },
+      "summary": {
+        "tooltip": "#{number} {title} — {state}"
+      }
+    },
     "commit": {
       "committer": {
         "label": "Committer"
@@ -3416,14 +3433,11 @@
       "copySha": {
         "tooltip": "Copy full SHA"
       },
-      "noPullRequest": {
-        "empty": "No pull request"
+      "noChangeRequest": {
+        "empty": "No {changeRequestNoun}"
       },
       "openAllChanges": {
         "tooltip": "Open all changes"
-      },
-      "pullRequest": {
-        "label": "Pull request"
       },
       "signature": {
         "label": "Signature"
@@ -3657,9 +3671,6 @@
         },
         "checkout": {
           "label": "Switching branches"
-        },
-        "host": {
-          "label": "Code host"
         },
         "hostAuto": {
           "option": "Detect from remote"
@@ -4679,17 +4690,6 @@
         "label": "{name} (unborn)"
       }
     },
-    "pr": {
-      "noAnswer": {
-        "hint": "GitHub did not answer."
-      },
-      "openOnGithub": {
-        "aria": "Open pull request #{number} on GitHub"
-      },
-      "summary": {
-        "tooltip": "#{number} {title} — {state}"
-      }
-    },
     "pullStrategy": {
       "auto": {
         "option": "Auto (follow Git configuration)"
@@ -4714,7 +4714,7 @@
       }
     },
     "refBadge": {
-      "prMore": {
+      "changeRequestMore": {
         "tooltip": "{title} — {state} (and {count} more)"
       }
     },
@@ -4947,14 +4947,14 @@
         "authorEmail": {
           "label": "Author email"
         },
+        "changeRequestNumber": {
+          "label": "{changeRequestShort} number"
+        },
+        "changeRequestTitle": {
+          "label": "{changeRequestShort} title"
+        },
         "committerEmail": {
           "label": "Committer email"
-        },
-        "prNumber": {
-          "label": "PR number"
-        },
-        "prTitle": {
-          "label": "PR title"
         },
         "sha": {
           "label": "SHA"
@@ -6847,9 +6847,6 @@
           "body": "Deletes “{text}” from the backlog. This can’t be undone.",
           "title": "Delete backlog item?"
         },
-        "github": {
-          "placeholder": "Paste a GitHub PR or issue link"
-        },
         "intro": {
           "hint": "Get it out of your head and order it later, most important first. Nothing here is on the plan yet."
         },
@@ -6858,6 +6855,9 @@
         },
         "jira": {
           "placeholder": "Paste a Jira link or key"
+        },
+        "link": {
+          "placeholder": "Paste a {labels} {shorts} or issue link"
         },
         "notPlanned": {
           "label": "Backlog · not planned"
@@ -7187,8 +7187,8 @@
           "moveToStep": {
             "label": "Move to step"
           },
-          "openGithub": {
-            "label": "Open on GitHub"
+          "openHost": {
+            "label": "Open on {label}"
           },
           "openJira": {
             "label": "Open Jira issue"
@@ -7232,9 +7232,6 @@
         "copyBranchLink": {
           "tooltip": "Copy branch link"
         },
-        "copyPrLink": {
-          "tooltip": "Copy PR link"
-        },
         "deployedTo": {
           "label": "Deployed to"
         },
@@ -7258,9 +7255,6 @@
         },
         "noIntegration": {
           "emptyHint": "This repository has no integration branches besides main."
-        },
-        "pr": {
-          "label": "PR"
         },
         "preparing": {
           "status": "Preparing"
@@ -7886,28 +7880,31 @@
             "label": "Syncing as {account}"
           },
           "button": {
-            "label": "Sync to GitHub"
+            "label": "Sync to {label}"
           },
           "buttonCount": {
-            "label": "Sync to GitHub · {count}"
+            "label": "Sync to {label} · {count}"
           },
           "changedSinceReview": {
             "status": "Changed since review"
           },
+          "cliMissing": {
+            "tooltip": "Install the {cli}"
+          },
+          "closed": {
+            "tooltip": "{changeRequestShort} #{number} is closed"
+          },
           "confirm": {
-            "label": "Mark {count} file viewed on PR #{pr} | Mark {count} files viewed on PR #{pr}"
+            "label": "Mark {count} file viewed on {changeRequestShort} #{number} | Mark {count} files viewed on {changeRequestShort} #{number}"
           },
           "confirmUnmark": {
-            "label": "Mark {count} file viewed on PR #{pr}, unmark {unmarked} | Mark {count} files viewed on PR #{pr}, unmark {unmarked}"
+            "label": "Mark {count} file viewed on {changeRequestShort} #{number}, unmark {unmarked} | Mark {count} files viewed on {changeRequestShort} #{number}, unmark {unmarked}"
           },
-          "differsFromPrHead": {
-            "status": "Differs from the PR head"
-          },
-          "ghMissing": {
-            "tooltip": "Install the GitHub CLI (gh)"
+          "differsFromHead": {
+            "status": "Differs from the {changeRequestShort} head"
           },
           "headDiffers": {
-            "label": "PR head {head} ≠ local {local}"
+            "label": "{changeRequestShort} head {head} ≠ local {local}"
           },
           "loadFailed": {
             "error": "Couldn’t load the sync plan: {error}"
@@ -7918,17 +7915,14 @@
           "nothing": {
             "empty": "Nothing to sync"
           },
-          "notInPr": {
-            "status": "Not in the PR"
+          "notInChangeRequest": {
+            "status": "Not in the {changeRequestShort}"
           },
           "notReviewed": {
             "status": "Not reviewed"
           },
           "partial": {
             "status": "Partly reviewed"
-          },
-          "prClosed": {
-            "tooltip": "PR #{number} is closed"
           },
           "refreshRepo": {
             "label": "Refresh repository"
@@ -8230,14 +8224,14 @@
           "option": "Add repository…",
           "tooltip": "Add a branch in this repository; created when work starts"
         },
-        "githubPlaceholder": {
-          "placeholder": "Paste GitHub issue or PR link"
-        },
         "issue": {
           "label": "Issue"
         },
         "jiraPlaceholder": {
           "placeholder": "Paste Jira link or key"
+        },
+        "linkPlaceholder": {
+          "placeholder": "Paste {labels} issue or {shorts} link"
         },
         "notMerging": {
           "hint": "Stays on the plan; never merged."
@@ -8638,17 +8632,14 @@
           "label": "Tomorrow"
         }
       },
-      "githubIssue": {
-        "label": "Issue {ref}"
-      },
-      "githubPr": {
-        "label": "PR {ref}"
-      },
       "hidden": {
         "status": "Hidden"
       },
       "hideLog": {
         "label": "Hide log"
+      },
+      "issue": {
+        "label": "Issue {ref}"
       },
       "move": {
         "label": "Move"

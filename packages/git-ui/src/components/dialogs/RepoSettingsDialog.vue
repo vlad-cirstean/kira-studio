@@ -309,7 +309,7 @@ async function save(): Promise<void> {
         </FieldSet>
 
         <FieldSet>
-          <FieldLegend>{{ t('git.dialog.repoSettings.host.label') }}</FieldLegend>
+          <FieldLegend>{{ t('common.gitHost.label') }}</FieldLegend>
           <Field>
             <FieldLabel :for="hostProviderId">{{
               t('git.dialog.repoSettings.hostProvider.label')

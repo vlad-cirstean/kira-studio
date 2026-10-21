@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import EmptyState from '@theme/components/EmptyState.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
-import { t } from '@theme/i18n';
+import { hostWords, type MessageParams, t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 /**
  * `docs/plans/P4.md` W11: the real shell. P0 sketched two empty regions and P3 hung a live-data
@@ -276,14 +276,14 @@ const { text: liveAnnouncement, announce } = useLiveRegion();
  *  below already drive. `transport-closed` (the one code `bridge.dispose()` itself produces, this
  *  file's own `onBeforeUnmount`) is ignored outright — this view is already gone by the time it
  *  lands, so there is nothing left to announce it to. */
-function reportAsyncError(err: unknown, failure: AsyncFailure): void {
+function reportAsyncError(err: unknown, failure: AsyncFailure, params: MessageParams = {}): void {
   if (err instanceof TransportError && err.code === 'transport-closed') return;
-  announce(t(failure.error, { error: errorText(err) }));
+  announce(t(failure.error, { ...params, error: errorText(err) }));
   // A cancel announces but never raises the banner; a graph stream failure already has its own
   // (with Retry) that this generic one would replace.
   if (err instanceof TransportError && err.code === 'cancelled') return;
   if (graphView.streamFailure.value !== undefined) return;
-  showFailure(composeAsyncFailureNotice(t(failure.title), err), 'async');
+  showFailure(composeAsyncFailureNotice(t(failure.title, params), err), 'async');
 }
 
 // P173: the visible banner. One notice, latest wins; history lives in Kira Space's Operations log.
@@ -664,9 +664,11 @@ function handleGridContextMenu(detail: { row: number; x: number; y: number }): v
 }
 
 function handleGridOpenChangeRequest(number: number): void {
-  actions.value
-    ?.openChangeRequest({ number })
-    .catch((err: unknown) => reportAsyncError(err, ASYNC_FAILURES.openChangeRequest));
+  actions.value?.openChangeRequest({ number }).catch((err: unknown) =>
+    reportAsyncError(err, ASYNC_FAILURES.openChangeRequest, {
+      changeRequestNoun: hostWords(changeRequestState.host.value).changeRequestNoun,
+    }),
+  );
 }
 
 // P108 F2: the commit captured when the menu opened, not re-resolved by row — see the doc comment

@@ -14,6 +14,7 @@ import {
 } from '../board/menu';
 import { taskPatch } from '../board/panelFacts';
 import { reviewChoices } from '../board/reviewCode';
+import { useHostLabels } from '../hostLabels';
 import { useSetPlan, useSetTaskStep, useStopRun, useUpdateTask } from '../queries';
 import { useReviewCode } from '../review/useReviewCode';
 import { useTaskAction } from '../run/useTaskAction';
@@ -43,6 +44,7 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
   const { copy } = useCopy();
   const reviewCode = useReviewCode();
   const automation = useRunAutomation();
+  const hostLabels = useHostLabels();
   let anchor: HTMLElement | null = null;
 
   function fail(taskId: string, err: unknown): void {
@@ -144,6 +146,8 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
       cal: m.cal,
       archivePending: dialogs.pending.has(`archive:${c.task.id}`),
       automations: automation.items(),
+      hostLabel:
+        hostLabels.infoOf(c.task.hostLink?.provider ?? '')?.label ?? hostLabels.labels.value,
       choices: reviewChoices(c, m.view.graph),
       baseChoices: changeBaseChoices(c, {
         graph: m.view.graph,

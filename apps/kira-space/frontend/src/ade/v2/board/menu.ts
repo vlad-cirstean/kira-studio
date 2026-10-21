@@ -63,6 +63,8 @@ export interface TaskMenuInput {
   baseChoices: readonly ChangeBaseChoice[];
   /** The Run automation submenu items. */
   automations: readonly TaskMenuItem[];
+  /** Name of the task link's code host, for "Open on …". */
+  hostLabel: string;
 }
 
 const DONE = 'done';
@@ -313,8 +315,8 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
   }
   if (c.task.hostUrl) {
     links.push({
-      id: 'ade-task-github',
-      label: t('space.ade.board.taskMenu.openGithub.label'),
+      id: 'ade-task-host',
+      label: t('space.ade.board.taskMenu.openHost.label', { label: i.hostLabel }),
       cmd: { kind: 'link', url: c.task.hostUrl },
     });
   }

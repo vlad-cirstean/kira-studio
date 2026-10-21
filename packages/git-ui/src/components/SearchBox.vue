@@ -305,6 +305,7 @@ defineExpose({ focusInput });
         :searching="search.searching.value"
         :tail-stale="search.tailStale.value"
         :show-body-search-affordance="showBodySearchAffordance"
+        :host="search.host.value"
         @select="selectOption"
         @hover="onHover"
         @run-body-search="search.runBodySearch()"

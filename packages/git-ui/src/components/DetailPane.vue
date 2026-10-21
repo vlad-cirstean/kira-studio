@@ -79,6 +79,7 @@ function onOpenFile(index: number, pinned: boolean): void {
         :detail="detail"
         :actions="actions"
         :change-request-result="changeRequests?.selected.value"
+        :host="changeRequests?.host.value"
         :change-request-for-commit="changeRequests?.changeRequestForCommit(detailState.sha.value ?? '')"
       />
       <FileTree

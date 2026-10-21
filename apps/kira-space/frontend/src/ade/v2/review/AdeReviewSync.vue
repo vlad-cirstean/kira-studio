@@ -12,18 +12,19 @@ import {
 } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import VarText from '@theme/components/VarText.vue';
-import { type MessageKey, t } from '@theme/i18n';
+import { hostWords, type MessageKey, t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import Identifier from '@workbench/components/Identifier.vue';
 import { computed, ref } from 'vue';
 import { remoteErrorText } from '../board/panelFacts';
+import { useHostLabels } from '../hostLabels';
 import { useRefresh, useViewedSyncApply, useViewedSyncPlan } from '../queries';
 import type { ReviewWindowTarget, ViewedSyncResult } from '../wire';
 import { headDiffersParts } from './syncParts';
 
 // Marks this branch's fully reviewed files as viewed on its pull request, one way: nothing read from
-// GitHub changes the app's review state. The plan reloads on window focus, mark, and popover open, never on
-// a board push: each load lists the PR's files through GitHub.
+// the host changes the app's review state. The plan reloads on window focus, mark, and popover open, never on
+// a board push: each load lists the change request's files through the host.
 const props = defineProps<{ target: ReviewWindowTarget }>();
 
 const plan = useViewedSyncPlan(() => props.target.branchId);
@@ -38,11 +39,15 @@ const REASON = {
   notReviewed: 'space.ade.review.sync.notReviewed.status',
   partial: 'space.ade.review.sync.partial.status',
   changedSinceReview: 'space.ade.review.sync.changedSinceReview.status',
-  differsFromPrHead: 'space.ade.review.sync.differsFromPrHead.status',
-  notInPr: 'space.ade.review.sync.notInPr.status',
+  differsFromPrHead: 'space.ade.review.sync.differsFromHead.status',
+  notInPr: 'space.ade.review.sync.notInChangeRequest.status',
 } as const satisfies Record<string, MessageKey>;
 const reasonText = (reason: string): string =>
-  reason in REASON ? t(REASON[reason as keyof typeof REASON]) : reason;
+  reason in REASON
+    ? t(REASON[reason as keyof typeof REASON], {
+        changeRequestShort: words.value.changeRequestShort,
+      })
+    : reason;
 const ACTION = {
   mark: 'space.ade.review.sync.mark.label',
   unmark: 'space.ade.review.sync.unmark.label',
@@ -51,11 +56,18 @@ const actionText = (action: string): string =>
   action in ACTION ? t(ACTION[action as keyof typeof ACTION]) : action;
 
 const data = computed(() => plan.data.value);
+const hostLabels = useHostLabels();
+const words = computed(() => hostWords(data.value?.host));
+const hostLabel = computed(() => data.value?.host?.label ?? hostLabels.labels.value);
 const status = computed(() => data.value?.status);
 const loadFailed = computed(() => plan.isError.value && !data.value);
 const visible = computed(
   () =>
-    loadFailed.value || (!!data.value && status.value !== 'disabled' && status.value !== 'noPr'),
+    loadFailed.value ||
+    (!!data.value &&
+      status.value !== 'disabled' &&
+      status.value !== 'noPr' &&
+      status.value !== 'unsupported'),
 );
 const marks = computed(() => data.value?.files.filter((f) => f.action === 'mark') ?? []);
 const unmarks = computed(() => data.value?.files.filter((f) => f.action === 'unmark') ?? []);
@@ -72,10 +84,13 @@ const blockedMessage = computed(() => {
     case 'prClosed':
       return (
         data.value?.message ??
-        t('space.ade.review.sync.prClosed.tooltip', { number: String(prNumber.value) })
+        t('space.ade.review.sync.closed.tooltip', {
+          changeRequestShort: words.value.changeRequestShort,
+          number: String(prNumber.value),
+        })
       );
     case 'cliMissing':
-      return t('space.ade.review.sync.ghMissing.tooltip');
+      return t('space.ade.review.sync.cliMissing.tooltip', { cli: data.value?.host?.cli ?? '' });
     case 'unauthenticated':
     case 'unavailable':
       return data.value?.message ?? '';
@@ -91,10 +106,16 @@ const headDiffers = computed(
 const confirmLabel = computed(() => {
   const m = marks.value.length;
   const u = unmarks.value.length;
-  const pr = String(prNumber.value);
+  const number = String(prNumber.value);
+  const { changeRequestShort } = words.value;
   return u > 0
-    ? t('space.ade.review.sync.confirmUnmark.label', { count: m, pr, unmarked: u })
-    : t('space.ade.review.sync.confirm.label', { count: m, pr });
+    ? t('space.ade.review.sync.confirmUnmark.label', {
+        count: m,
+        changeRequestShort,
+        number,
+        unmarked: u,
+      })
+    : t('space.ade.review.sync.confirm.label', { count: m, changeRequestShort, number });
 });
 
 async function confirm(): Promise<void> {
@@ -141,7 +162,7 @@ function onOpenChange(next: boolean): void {
                 data-testid="ade-review-sync"
               >
                 {{
-                  loadFailed ? t('space.ade.review.sync.button.label') : t('space.ade.review.sync.buttonCount.label', { count })
+                  loadFailed ? t('space.ade.review.sync.button.label', { label: hostLabel }) : t('space.ade.review.sync.buttonCount.label', { label: hostLabel, count })
                 }}
               </Button>
             </PopoverTrigger>
@@ -156,7 +177,9 @@ function onOpenChange(next: boolean): void {
           {{ t('space.ade.review.sync.account.label', { account: data.account }) }}
         </FieldDescription>
         <FieldDescription v-if="headDiffers && data" data-testid="ade-review-sync-head">
-          <VarText :parts="headDiffersParts(data.headSha, data.localTip)" />
+          <VarText
+            :parts="headDiffersParts(data.headSha, data.localTip, words.changeRequestShort)"
+          />
         </FieldDescription>
 
         <template v-if="result">

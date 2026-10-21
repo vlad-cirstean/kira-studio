@@ -20,7 +20,7 @@
  * facts row's SHA button covers the one copy path this pane itself offers.
  */
 import { shortSha } from '@kira/git-core';
-import type { ChangeRequestLookup, ChangeRequestRecord } from '@kira/git-ipc';
+import type { ChangeRequestLookup, ChangeRequestRecord, GitHostInfo } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import KeyValueList from '@theme/components/KeyValueList.vue';
@@ -29,7 +29,7 @@ import TruncatedText from '@theme/components/TruncatedText.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { type MessageKey, t } from '@theme/i18n';
+import { hostWords, type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { formatAbsoluteUtc, formatAgeCompact } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
@@ -56,7 +56,11 @@ const props = defineProps<{
    *  drives the facts-row icon, distinct from `changeRequestResult` (this exact commit's own "Pull request"
    *  row, only ever populated for the selected commit). `undefined` renders no icon. */
   changeRequestForCommit?: readonly ChangeRequestRecord[];
+  /** The repo's code host (`ChangeRequestState.host`); its words name change requests here. */
+  host?: GitHostInfo | null;
 }>();
+
+const words = computed(() => hostWords(props.host));
 
 const bodyEl = ref<HTMLParagraphElement | null>(null);
 const decorationEl = ref<HTMLSpanElement | null>(null);
@@ -190,7 +194,8 @@ const changeRequestDetail = computed<ChangeRequestDetailView | undefined>(() => 
     return {
       kind: 'unavailable',
       changeRequests: [],
-      reason: result.status.reason ?? t('git.pr.noAnswer.hint'),
+      reason:
+        result.status.reason ?? t('git.changeRequest.noAnswer.hint', { label: words.value.label }),
     };
   }
   if (result.changeRequests.length === 0) {
@@ -277,7 +282,12 @@ async function openChangeRequest(number: number): Promise<void> {
   try {
     await props.actions.openChangeRequest({ number });
   } catch (err) {
-    props.actions.announce(t('git.async.openPullRequest.error', { error: errorText(err) }));
+    props.actions.announce(
+      t('git.async.openChangeRequest.error', {
+        changeRequestNoun: words.value.changeRequestNoun,
+        error: errorText(err),
+      }),
+    );
   }
 }
 
@@ -323,15 +333,19 @@ const changeRequestIcon = computed(() => {
             variant="toolbar"
             size="inline"
             :class="cn('ml-auto leading-none', CHANGE_REQUEST_ICON_CLASS[changeRequestIcon!.state])"
-            :aria-label="t('git.pr.openOnGithub.aria', { number: String(changeRequestIcon!.number) })"
+            :aria-label="t('git.changeRequest.open.aria', {
+                changeRequestNoun: words.changeRequestNoun,
+                number: String(changeRequestIcon!.number),
+                label: words.label,
+              })"
             data-testid="commit-meta-change-request-icon"
             @click="openChangeRequest(changeRequestIcon!.number)"
           >
-            <CodiconIcon name="github" :size="13" />
+            <CodiconIcon name="git-pull-request" :size="13" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>{{
-          t('git.pr.summary.tooltip', {
+          t('git.changeRequest.summary.tooltip', {
             number: String(changeRequestIcon!.number),
             title: changeRequestIcon!.title,
             state: changeRequestIcon!.stateLabel,
@@ -386,7 +400,7 @@ const changeRequestIcon = computed(() => {
             <dd>{{ signatureText }}</dd>
           </template>
           <template v-if="changeRequestDetail">
-            <dt>{{ t('git.commit.pullRequest.label') }}</dt>
+            <dt>{{ words.changeRequest }}</dt>
             <dd v-if="changeRequestDetail.kind === 'changeRequests'" class="flex flex-col gap-0.5">
               <div
                 v-for="cr in changeRequestDetail.changeRequests"
@@ -407,7 +421,7 @@ const changeRequestIcon = computed(() => {
               </div>
             </dd>
             <dd v-else-if="changeRequestDetail.kind === 'none'">{{
-              t('git.commit.noPullRequest.empty')
+              t('git.commit.noChangeRequest.empty', { changeRequestNoun: words.changeRequestNoun })
             }}</dd>
             <dd v-else class="text-muted-foreground" data-testid="change-request-unavailable">
               {{ changeRequestDetail.reason }}

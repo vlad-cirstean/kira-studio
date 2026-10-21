@@ -1,6 +1,6 @@
 import type { CompiledQuery, LoadedScanResult, SearchField, SearchScope } from '@kira/git-core';
 import { compileQuery, matchRef, searchLoadedCommits } from '@kira/git-core';
-import type { RefRow, ResultOf } from '@kira/git-ipc';
+import type { GitHostInfo, RefRow, ResultOf } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
@@ -179,6 +179,8 @@ export class SearchState {
 
   /** Recompiled per keystroke, never throws (probe 4) — see `core`'s `compileQuery`. */
   readonly compiled: ComputedRef<CompiledQuery>;
+  /** The repo's code host, naming change-request fields in result labels. */
+  readonly host: ComputedRef<GitHostInfo | null>;
   /** `compiled.kind === "invalid"`'s own message, or `undefined` — `SearchBox.vue`'s inline error,
    *  wired to the input via `aria-describedby`. */
   readonly error: ComputedRef<string | undefined>;
@@ -227,7 +229,7 @@ export class SearchState {
   /** G24 D11: optional so a caller with nothing to match PRs against (every pre-G24 caller, and
    *  this class's own existing tests) keeps working with `matchRef`'s `pr` arg simply `undefined`
    *  — byte-identical to this seam's pre-G24 behaviour. */
-  readonly #pr: ChangeRequestState | undefined;
+  readonly #changeRequests: ChangeRequestState | undefined;
   #repoId: string | undefined;
   #tailController: AbortController | undefined;
   readonly #tailTimer = createCancellableTimer(() => this.#runTail(), TIMING.search);
@@ -242,12 +244,13 @@ export class SearchState {
     bridge: BridgeClient,
     refs: RefsState,
     graph: GraphViewState,
-    pr?: ChangeRequestState,
+    changeRequests?: ChangeRequestState,
   ) {
     this.#bridge = bridge;
     this.#refs = refs;
     this.#graph = graph;
-    this.#pr = pr;
+    this.#changeRequests = changeRequests;
+    this.host = computed(() => changeRequests?.host.value ?? null);
 
     this.compiled = computed(() =>
       compileQuery({
@@ -269,8 +272,8 @@ export class SearchState {
       const hits: RefHit[] = [];
       const collect = (rows: readonly RefRow[]): void => {
         for (const row of rows) {
-          const pr = this.#pr?.byBranch.value.get(row.shortName);
-          const fields = matchRef(row, ok, pr);
+          const changeRequest = this.#changeRequests?.byBranch.value.get(row.shortName);
+          const fields = matchRef(row, ok, changeRequest);
           if (fields.length > 0) hits.push(toRefHit(row, fields));
         }
       };
@@ -327,11 +330,11 @@ export class SearchState {
     // call. On a repo with very many branches this remains a real, if one-time-per-scope-entry,
     // cost — see ChangeRequestState's own class doc comment for what it actually costs a branch with no PR.
     watch(this.scope, (scope) => {
-      if (scope === 'commits' || this.#pr === undefined) return;
+      if (scope === 'commits' || this.#changeRequests === undefined) return;
       const names = [...this.#refs.branches.value, ...this.#refs.remoteBranches.value].map(
         (r) => r.shortName,
       );
-      void this.#pr.ensureSnapshot(names);
+      void this.#changeRequests.ensureSnapshot(names);
     });
     this.activeHit = computed(() => this.commitHits.value[this.activeIndex.value]);
     this.tailSkippedByExhaustion = computed(

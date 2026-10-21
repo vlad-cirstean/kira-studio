@@ -7,7 +7,7 @@
  */
 import type { SearchField, SearchScope } from '@kira/git-core';
 import type { RefRow } from '@kira/git-ipc';
-import { type MessageKey, t } from '@theme/i18n';
+import { type HostWordsSource, hostWords, type MessageKey, t } from '@theme/i18n';
 import type { CommitHit, RefHit, SearchRunResult } from '../state/search.ts';
 import { capItems, REF_LIST_SECTION_CAP } from './refListModel.ts';
 
@@ -72,14 +72,18 @@ const FIELD_LABEL_KEYS = {
   sha: 'git.search.field.sha.label',
   refName: 'common.field.name.label',
   tagAnnotation: 'git.search.field.tagMessage.label',
-  changeRequestNumber: 'git.search.field.prNumber.label',
-  changeRequestTitle: 'git.search.field.prTitle.label',
+  changeRequestNumber: 'git.search.field.changeRequestNumber.label',
+  changeRequestTitle: 'git.search.field.changeRequestTitle.label',
 } as const satisfies Record<SearchField, MessageKey>;
 
-export function fieldLabel(fields: readonly SearchField[]): string | undefined {
+export function fieldLabel(
+  fields: readonly SearchField[],
+  host?: HostWordsSource | null,
+): string | undefined {
   const other = fields.filter((f) => f !== 'subject' && f !== 'refName');
   if (other.length === 0) return undefined;
-  return other.map((f) => t(FIELD_LABEL_KEYS[f])).join(', ');
+  const { changeRequestShort } = hostWords(host);
+  return other.map((f) => t(FIELD_LABEL_KEYS[f], { changeRequestShort })).join(', ');
 }
 
 const SEARCH_SECTION_CAP = REF_LIST_SECTION_CAP;

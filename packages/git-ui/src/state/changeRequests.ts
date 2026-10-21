@@ -1,5 +1,10 @@
 import type { CommitStore } from '@kira/git-core';
-import type { ChangeRequestLookup, ChangeRequestRecord, HostStatus } from '@kira/git-ipc';
+import type {
+  ChangeRequestLookup,
+  ChangeRequestRecord,
+  GitHostInfo,
+  HostStatus,
+} from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { TIMING } from '@workbench/behaviour/timing';
 import { type ShallowRef, shallowRef } from 'vue';
@@ -85,6 +90,9 @@ export class ChangeRequestState {
    *  cannot answer on its own. `undefined` while nothing is selected or a request is still
    *  in-flight/debounced. */
   readonly selected: ShallowRef<ChangeRequestLookup | undefined> = shallowRef(undefined);
+  /** The host serving this repo (its wording for change requests); `null` with no remote on a
+   *  known host or with the host turned off. Labels read it, never a provider name. */
+  readonly host: ShallowRef<GitHostInfo | null> = shallowRef(null);
 
   readonly #bridge: BridgeClient;
   #repoId: string | undefined;
@@ -113,6 +121,7 @@ export class ChangeRequestState {
    *  rather than one debounced no-op per row. */
   #disabledForRepo = false;
   readonly #unsubscribe: () => void;
+  readonly #unsubscribeSettings: () => void;
   #headIndex: ReadonlyMap<string, readonly ChangeRequestRecord[]> = new Map();
   #headIndexGeneration = -1;
   /** Last-known facts of repos switched away from, oldest first. */
@@ -135,6 +144,9 @@ export class ChangeRequestState {
       if (event.kind !== 'refsChanged') return;
       this.#revalidate();
     });
+    this.#unsubscribeSettings = bridge.on('repoSettings.changed', (event) => {
+      if (this.#repoId === event.repoId) void this.#loadHost(event.repoId);
+    });
   }
 
   /** Called whenever the active repo changes — mirrors `RefsState`/`DetailState`'s own
@@ -145,6 +157,8 @@ export class ChangeRequestState {
     if (previous !== undefined) this.#stashFacts(previous);
     this.#repoId = repoId;
     this.#clear();
+    this.host.value = null;
+    if (repoId !== undefined) void this.#loadHost(repoId);
     const facts = repoId === undefined ? undefined : this.#repoFacts.get(repoId);
     if (facts === undefined) return;
     this.bySha.value = facts.bySha;
@@ -153,6 +167,15 @@ export class ChangeRequestState {
     for (const name of facts.noBranchChangeRequest) this.#noBranchChangeRequest.add(name);
     this.generation.value++;
     void this.#revalidateBranches();
+  }
+
+  async #loadHost(repoId: string): Promise<void> {
+    try {
+      const { host } = await this.#bridge.request('gitHost.info', { repoId });
+      if (this.#repoId === repoId) this.host.value = host;
+    } catch {
+      // Fail-open: labels fall back to their neutral wording until the next load.
+    }
   }
 
   #stashFacts(repoId: string): void {
@@ -195,6 +218,7 @@ export class ChangeRequestState {
     this.#cancelInFlight();
     this.#disabledForRepo = false;
     this.#noBranchChangeRequest.clear();
+    if (this.#repoId !== undefined) void this.#loadHost(this.#repoId);
     const sha = this.#sha;
     if (sha !== null) void this.#requestCommit(sha);
     void this.#revalidateBranches();
@@ -514,5 +538,6 @@ export class ChangeRequestState {
     this.#selectController?.abort();
     this.#selectTimer.stop();
     this.#unsubscribe();
+    this.#unsubscribeSettings();
   }
 }

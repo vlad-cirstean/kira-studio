@@ -47,6 +47,26 @@ export function t(key: MessageKey, params?: MessageParams): string {
     : g.t(key, formatted);
 }
 
+/** The display text a code host provider supplies (`GitHostInfo`). */
+export interface HostWordsSource {
+  readonly label: string;
+  readonly changeRequest: string;
+  readonly changeRequestNoun: string;
+  readonly changeRequestShort: string;
+}
+
+/** The host's words for change requests, or neutral ones while no host is known. */
+export function hostWords(host: HostWordsSource | null | undefined): HostWordsSource {
+  if (host) return host;
+  const changeRequest = t('common.gitHost.changeRequest.label');
+  return {
+    label: t('common.gitHost.label'),
+    changeRequest,
+    changeRequestNoun: changeRequest.toLowerCase(),
+    changeRequestShort: t('common.gitHost.changeRequestShort.label'),
+  };
+}
+
 export function installCopyTestHook(): void {
   let pseudoLoaded = false;
   window.__kiraSetLocale = (locale: CopyLocale) => {

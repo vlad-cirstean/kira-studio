@@ -77,9 +77,9 @@ test('name, Jira, GitHub and Not merging write UpdateTask patches', async ({ rel
   });
 
   await page
-    .locator('[data-testid="ade-task-github-input"]')
+    .locator('[data-testid="ade-task-host-input"]')
     .fill('https://github.com/acme/web-app/issues/882');
-  await page.locator('[data-testid="ade-task-github-save"]').click();
+  await page.locator('[data-testid="ade-task-host-save"]').click();
   await expect.poll(() => updates(control)).toHaveLength(3);
   expect(updates(control)[2]?.args).toMatchObject({
     patch: { hostUrl: 'https://github.com/acme/web-app/issues/882' },
@@ -121,9 +121,9 @@ test('a refused git host link shows the backend error', async ({ relaunch }) => 
     },
   ]);
   await openTask(page, 'T_notif');
-  await page.locator('[data-testid="ade-task-github-input"]').fill('not a link');
-  await page.locator('[data-testid="ade-task-github-save"]').click();
-  await expect(page.locator('[data-testid="ade-task-github-error"]')).toContainText(
+  await page.locator('[data-testid="ade-task-host-input"]').fill('not a link');
+  await page.locator('[data-testid="ade-task-host-save"]').click();
+  await expect(page.locator('[data-testid="ade-task-host-error"]')).toContainText(
     'Not a GitHub PR or issue link.',
   );
 });
