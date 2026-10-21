@@ -32,8 +32,8 @@ const canWrite = computed(() => permissions.value.write);
 const ids = computed(() => backlog.data.value?.items.map((i) => i.id) ?? []);
 
 function facts(item: BacklogItem): string {
-  const gh = item.hostLink;
-  return [item.jira?.key ?? '', gh ? hostLabels.factOf(gh) : ''].filter(Boolean).join(' · ');
+  const link = item.hostLink;
+  return [item.jira?.key ?? '', link ? hostLabels.factOf(link) : ''].filter(Boolean).join(' · ');
 }
 const message = (err: unknown) => errorText(err);
 

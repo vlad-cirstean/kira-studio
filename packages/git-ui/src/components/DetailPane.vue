@@ -42,7 +42,7 @@ const props = defineProps<{
   store: CommitStore;
   actions: DetailActions;
   /** G24 D12: optional so a caller with nothing to show yet (mirrors `CommitGrid.vue`'s own `pr`
-   *  prop) gets a detail pane with no "Pull request" row at all — `CommitMeta.vue`'s own
+   *  prop) gets a detail pane with no change request row at all — `CommitMeta.vue`'s own
    *  `prDetail` computed already treats `undefined` the same as `disabled`. */
   changeRequests?: ChangeRequestState;
 }>();

@@ -21,7 +21,7 @@ import { useUpdateBacklogItem } from '../queries';
 import { TONE_SOLID_CLASS } from '../tones';
 import type { BacklogItem } from '../wire';
 
-// Detail of one backlog item: title, Jira and GitHub links, notes, and the promote and delete actions.
+// Detail of one backlog item: title, Jira and host links, notes, and the promote and delete actions.
 const props = defineProps<{ item: BacklogItem }>();
 const emit = defineEmits<{ promote: []; remove: [] }>();
 

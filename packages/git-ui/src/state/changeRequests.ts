@@ -35,7 +35,7 @@ interface RepoFacts {
 }
 
 /**
- * G24 D10: the one client-side owner of every GitHub PR fact this app renders — the graph
+ * G24 D10: the one client-side owner of every change request fact this app renders — the graph
  * indicator's per-commit lookup, the branch-tip badges/search's per-branch lookup, and the single
  * `HostStatus` the commit-detail pane's failure line (D12) reads. Mirrors `DetailState.select`'s own
  * abort-and-recheck discipline for the per-commit half; the per-branch half is plain
@@ -50,9 +50,9 @@ interface RepoFacts {
  *
  * **Cost correction (G32 round-3 performance review, finding #3):** the paragraph this replaces
  * claimed `branch.resolveChangeRequest` answers every branch from `RepoEntry`'s own cached bulk snapshot at
- * zero extra GitHub cost — true only for a branch the snapshot already lists as having an open PR.
+ * zero extra host cost — true only for a branch the snapshot already lists as having an open PR.
  * One that doesn't falls through to the server's own per-branch `PullsForBranch` lookup, a real
- * `gh` spawn and REST call. `ensureSnapshot`'s caller is therefore NOT free to warm "every known
+ * host call. `ensureSnapshot`'s caller is therefore NOT free to warm "every known
  * branch" the way this class's own D10 name suggests — every call site is responsible for scoping
  * `branchNames` to what actually needs it (e.g. `BranchPicker.vue`'s own rendered/capped sections,
  * not its full branch list), not handed here as a blanket guarantee.
@@ -84,9 +84,9 @@ export class ChangeRequestState {
    *  what the grid renders (the grid only ever consults `bySha`/`byBranch`). */
   readonly status: ShallowRef<HostStatus | undefined> = shallowRef(undefined);
   /** The raw result of the most recently SETTLED `commit.resolveChangeRequests` for whichever sha is
-   *  currently selected — `CommitMeta.vue`'s own "Pull request" row (D12) needs the full
-   *  discriminated union (`disabled` ⇒ row absent; `unavailable` ⇒ `gh.reason`; `ok` with an empty
-   *  list ⇒ "No pull request"; `ok` with entries ⇒ one row each), which `bySha`'s collapsed shape
+   *  currently selected — `CommitMeta.vue`'s own change request row (D12) needs the full
+   *  discriminated union (`disabled` ⇒ row absent; `unavailable` ⇒ `status.reason`; `ok` with an empty
+   *  list ⇒ "No change request"; `ok` with entries ⇒ one row each), which `bySha`'s collapsed shape
    *  cannot answer on its own. `undefined` while nothing is selected or a request is still
    *  in-flight/debounced. */
   readonly selected: ShallowRef<ChangeRequestLookup | undefined> = shallowRef(undefined);
@@ -113,7 +113,7 @@ export class ChangeRequestState {
    *  with no signature change. */
   readonly #noBranchChangeRequest = new Set<string>();
   /** Set the first time EITHER lookup answers `"disabled"` for the current repo (gitHost.provider off
-   *  off, or no GitHub remote) — every later selection/branch resolve for this same repo then
+   *  off, or no host remote) — every later selection/branch resolve for this same repo then
    *  answers `"disabled"` synchronously, with no request at all, until the repo changes or
    *  refsChanged clears it (a remote could have been added since). Not required for correctness
    *  (a disabled repo already costs the server nothing beyond a settings/remote-cache read), but
@@ -213,7 +213,7 @@ export class ChangeRequestState {
 
   /** Same-repo refs change: keeps every fact on screen, re-asks for the selected commit and every
    *  branch with a PR, and applies each answer as it lands. PR-less branches drop to unknown
-   *  without a request (each would cost a GitHub call); the next render asks lazily. */
+   *  without a request (each would cost a host call); the next render asks lazily. */
   #revalidate(): void {
     this.#cancelInFlight();
     this.#disabledForRepo = false;
@@ -279,7 +279,7 @@ export class ChangeRequestState {
       this.#applyCommitResult(sha, result);
     } catch (error) {
       if (error instanceof TransportError && error.code === 'cancelled') return;
-      // Fail-open (D9/§0.4): a transport-level failure (the socket itself, not a GitHub-side
+      // Fail-open (D9/§0.4): a transport-level failure (the socket itself, not a host-side
       // classification — those always arrive as an ordinary `"unavailable"` result, never a
       // thrown error) simply leaves this selection unresolved. Nothing renders, nothing throws.
     } finally {
@@ -316,14 +316,14 @@ export class ChangeRequestState {
    *  G30 round-1 performance review, finding #1: this used to `Promise.all` every branch at once —
    *  a repo with hundreds of branches fired hundreds of concurrent `branch.resolveChangeRequest` requests,
    *  with nothing anywhere in the stack capping it. The server side of this same finding (one bulk
-   *  snapshot fetch instead of one GitHub call per branch) already answers "how much this costs
-   *  GitHub"; a small worker pool here bounds "how many requests are ever in flight at once",
+   *  snapshot fetch instead of one host call per branch) already answers "how much this costs the
+   *  host"; a small worker pool here bounds "how many requests are ever in flight at once",
    *  independent of how many branches the repo has. */
   async ensureSnapshot(branchNames: readonly string[]): Promise<void> {
     const repoId = this.#repoId;
     // F9: captured once, before the pool ever starts — a repo switch OR a same-repo `refsChanged`
     // clear landing mid-warm-up must stop every worker from issuing its NEXT request, not just
-    // stop this repo's answers from being applied (wasted `gh`/GitHub REST calls against a repo
+    // stop this repo's answers from being applied (wasted host calls against a repo
     // nobody is looking at any more otherwise keep firing for as long as `toFetch` has entries).
     const generation = this.#clearGeneration;
     const toFetch = branchNames.filter(
@@ -504,7 +504,7 @@ export class ChangeRequestState {
     this.changeRequestByAncestry.value = next;
   }
 
-  /** P74 §4.2's own lookup order: `bySha` first (an authoritative per-commit answer from GitHub),
+  /** P74 §4.2's own lookup order: `bySha` first (an authoritative per-commit answer from the host),
    *  `changeRequestByAncestry` second (a derivation, which must never override a real answer), `undefined`
    *  otherwise — every consumer already renders that as nothing. Returns the same
    *  `readonly ChangeRequestRecord[] | undefined` shape `bySha` itself does, so `CommitGrid.vue`'s `changeRequestsFor`

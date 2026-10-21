@@ -22,7 +22,7 @@ import { useRefresh, useViewedSyncApply, useViewedSyncPlan } from '../queries';
 import type { ReviewWindowTarget, ViewedSyncResult } from '../wire';
 import { headDiffersParts } from './syncParts';
 
-// Marks this branch's fully reviewed files as viewed on its pull request, one way: nothing read from
+// Marks this branch's fully reviewed files as viewed on its change request, one way: nothing read from
 // the host changes the app's review state. The plan reloads on window focus, mark, and popover open, never on
 // a board push: each load lists the change request's files through the host.
 const props = defineProps<{ target: ReviewWindowTarget }>();

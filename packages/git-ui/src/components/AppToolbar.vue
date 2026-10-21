@@ -123,7 +123,7 @@ function copy(text: string, message: string): void {
 }
 
 // P74 §3.3: BranchPicker.vue's own branch-row badge and StackList.vue's own row badge each open
-// a PR the same way CommitMeta.vue's facts-row icon/"Pull request" row do — one action, threaded
+// a PR the same way CommitMeta.vue's facts-row icon/change request row do — one action, threaded
 // down rather than reimplemented at either call site.
 function openChangeRequest(number: number): void {
   void props.actions?.openChangeRequest({ number });

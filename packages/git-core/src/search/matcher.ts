@@ -227,7 +227,7 @@ export function searchLoadedCommits(
  * `shortName` first (the common case), then an annotated tag's own message — `subject` and
  * `body` — never a lightweight tag's borrowed commit subject (`ref.annotation` is already
  * `undefined` there; see `parse/refs.ts`). `pr` is G24's own activation of P12's seam (§7.8's own
- * paragraph on the boundary): when the branch this ref names has an associated pull request
+ * paragraph on the boundary): when the branch this ref names has an associated change request
  * (`ChangeRequestState.byBranch`), its number and title are matched too — a `#123`-or-bare-`123` two-form
  * number test (upstream §7.8 verbatim) and a plain title match. `pr === undefined` (every P11
  * caller, and a branch with no resolved PR) is byte-identical to this seam's pre-G24 inert

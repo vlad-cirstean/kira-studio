@@ -38,7 +38,7 @@ function allBranchNames(
  * class calls `ChangeRequestState.ensureSnapshot` with the union of every branch name in the result — no new
  * RPC, no new cache, no new rate-limit exposure beyond the snapshot G24 already fetches lazily.
  * `pr` is optional (mirroring `SearchState`'s own constructor) so a test — or a future host with no
- * GitHub surface at all — can construct this class without one.
+ * change request surface at all — can construct this class without one.
  */
 export class StackState {
   readonly stacks: ShallowRef<readonly StackSummary[]> = shallowRef([]);

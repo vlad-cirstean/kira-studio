@@ -2032,7 +2032,7 @@ export type Contract = {
       params: { repoId: string; patch: RepoSettingsPatch };
       result: RepoSettingsSnapshot;
     };
-    // ---- G24: GitHub PR links (D9/D14) ------------------------------------------------------
+    // ---- G24: change request links (D9/D14) ------------------------------------------------------
     /** Per-commit PR lookup, driven by the graph indicator and the detail pane's own selection
      *  (D9): `ChangeRequestState.select`'s 300ms-debounced, abort-and-recheck request. Answered entirely by
      *  the Go server */
@@ -2050,7 +2050,7 @@ export type Contract = {
     // ---- P74 §3.3: opening a PR in the external browser, never in place -------------------
     /** Server-composed: the renderer names a PR by number, never a URL (the boundary
      *  `GitHostService.OpenChangeRequestURL`'s own host/path check already defends). `null` when
-     *  GitHub is disabled or there is no GitHub remote — the same "disabled collapses to nothing"
+     *  the host is off or no provider matches the remote — the same "disabled collapses to nothing"
      *  posture `ChangeRequestLookup` already takes. Go-served. */
     'changeRequest.browserUrl': {
       params: { repoId: string; number: number };

@@ -391,9 +391,9 @@ function closeForCheckout(): void {
 // all — warms every visible branch's own PR record in one go. G32 round-3 performance review,
 // finding #3: "visible" used to mean the repo's FULL branch list, not what `model` (above) actually
 // renders — `branch.resolveChangeRequest` answers a branch WITH an open PR from its already-cached bulk
-// snapshot at no extra cost (D6), but one WITHOUT falls through to its own per-branch `gh api`
-// call, so a repo with hundreds of branches fanned out hundreds of `gh` spawns from one picker
-// open, easily arming GitHub's rate-limit breaker. Scoped to the Branches tab's own visible rows
+// snapshot at no extra cost (D6), but one WITHOUT falls through to its own per-branch host
+// call, so a repo with hundreds of branches fanned out hundreds of host calls from one picker
+// open, easily arming the host rate-limit breaker. Scoped to the Branches tab's own visible rows
 // (each capped at `REF_LIST_SECTION_CAP`) and keyed off that computed itself, not just `isOpen`, so
 // typing a filter that surfaces a branch outside the initial page still gets it warmed. P77: a
 // picker opened on a non-Branches tab now warms nothing at all, since `model.branchesLocal`/

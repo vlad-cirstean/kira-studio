@@ -430,7 +430,7 @@ export interface Board {
   worktreeBasePath: string;
   autofetchMinutes: number;
 }
-export interface RepoHost {
+interface RepoHost {
   codeRepoId: string;
   kind: 'ok' | 'disabled' | 'unavailable';
   host: HostInfo | null;

@@ -361,7 +361,7 @@ export function useLaunchReviewAgent() {
   });
 }
 
-/** What a GitHub sync would do for the branch; re-asked on focus, mark and popover open, not on board pushes (each load pages the PR's files). */
+/** What a viewed sync would do for the branch; re-asked on focus, mark and popover open, not on board pushes (each load pages the change request's files). */
 export function useViewedSyncPlan(branchId: MaybeRefOrGetter<string>) {
   return useQuery({
     queryKey: ['adetask', 'viewedSyncPlan', branchId] as const,

@@ -28,10 +28,10 @@ const ago = useRelativeTime(() => props.item.addedAt);
 const edit = useInlineEdit({ source: () => props.item.text, commit: (text) => emit('edit', text) });
 
 const facts = computed(() => {
-  const gh = props.item.hostLink;
+  const link = props.item.hostLink;
   return [
     props.item.jira?.key ?? '',
-    gh ? hostLabels.factOf(gh) : '',
+    link ? hostLabels.factOf(link) : '',
     props.item.notes ? t('space.common.notes.label') : '',
   ]
     .filter(Boolean)

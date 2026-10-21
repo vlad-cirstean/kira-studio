@@ -2,7 +2,7 @@
 /**
  * `docs/plans/P5.md` W7: subject + files is `DetailPane.vue`'s whole job — this component renders
  * the subject/facts/actions header and, behind one "Show more" toggle, everything else about the
- * commit (body, author/committer identities, trailers, refs, signature, pull request).
+ * commit (body, author/committer identities, trailers, refs, signature, change request).
  *
  * Every DOM-touching bit (message linkification, ref badges) is built through `linkify.ts`'s
  * `appendLinkifiedText`/`refBadges.ts`'s `buildRefBadges` rather than a template `v-html` — a
@@ -11,7 +11,7 @@
  *
  * G-UX (items 6/7): `DetailPane.vue` used to mount this component twice — once for the message
  * (with the body/author/trailers behind "Show more"), once more, physically below the file tree,
- * for Refs/Signature/Pull request. That second, separately-scrolling instance is gone: this file
+ * for Refs/Signature/change request. That second, separately-scrolling instance is gone: this file
  * now mounts once and folds Refs/Signature/PR into the same "Show more" region as the body and
  * identities, so there is exactly one expandable region, not two disconnected ones. The collapsed
  * view is now title + a date/SHA facts row + "Open all changes" — no body preview at all (it used
@@ -53,7 +53,7 @@ const props = defineProps<{
    *  window, same as `detail` itself before it resolves. */
   changeRequestResult?: ChangeRequestLookup;
   /** P74 §4.3: any PR this commit is on (`ChangeRequestState.changeRequestForCommit`, threaded by `DetailPane.vue`) —
-   *  drives the facts-row icon, distinct from `changeRequestResult` (this exact commit's own "Pull request"
+   *  drives the facts-row icon, distinct from `changeRequestResult` (this exact commit's own change request
    *  row, only ever populated for the selected commit). `undefined` renders no icon. */
   changeRequestForCommit?: readonly ChangeRequestRecord[];
   /** The repo's code host (`ChangeRequestState.host`); its words name change requests here. */
@@ -158,9 +158,9 @@ const signatureText = computed<string | undefined>(() => {
     : text;
 });
 
-/** G24 D12: the one "Pull request" row — resolved with a PR (one line per associated PR),
- *  resolved with none ("No pull request"), or `unavailable` (`Status.Reason` — the ONLY place in
- *  the app that ever tells a user to run `gh auth login`, per upstream D32's "inert, never noisy"
+/** G24 D12: the one change request row — resolved with a PR (one line per associated PR),
+ *  resolved with none ("No change request"), or `unavailable` (`Status.Reason` — the ONLY place in
+ *  the app that ever tells a user to log in to the host CLI, per upstream D32's "inert, never noisy"
  *  rule applying everywhere else but here). `disabled` renders nothing at all — this computed is
  *  `undefined` for both `disabled` and "nothing resolved yet", collapsing them into the same
  *  "no row" template branch below. */
@@ -214,7 +214,7 @@ const changeRequestDetail = computed<ChangeRequestDetailView | undefined>(() => 
 });
 
 /** Whether the Refs/Signature/PR block has anything to show at all — the common case (no
- *  decoration on this commit, unsigned, GitHub disabled) renders none of it, not an empty padded
+ *  decoration on this commit, unsigned, host off) renders none of it, not an empty padded
  *  box. Reads `detail.decoration.length` directly rather than `decorationEl?.childNodes.length`
  *  (the individual Refs row's own check, unchanged below): this needs a value known synchronously
  *  from props, before `renderDecoration`'s own `nextTick` has populated anything, and before
@@ -276,7 +276,7 @@ async function openAllChanges(): Promise<void> {
   });
 }
 
-/** P74 §3.3: the "Pull request" row's own external-open action, and (§4.3) the facts-row icon's
+/** P74 §3.3: the change request row's own external-open action, and (§4.3) the facts-row icon's
  *  — one open path for both, never two. */
 async function openChangeRequest(number: number): Promise<void> {
   try {

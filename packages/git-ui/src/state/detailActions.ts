@@ -54,7 +54,7 @@ export interface DetailActions {
    *  torn out along with a contract method (`editor.goToFile`) this phase's own plan never asked
    *  to remove. */
   goToFile(params: { rev: string; path: string; line: number }): Promise<GoToFileOutcome>;
-  /** P74 §3.3: opens a pull request in the external browser, never in place — the renderer never
+  /** P74 §3.3: opens a change request in the external browser, never in place — the renderer never
    *  supplies a URL (`changeRequest.openExternal`'s own doc comment); it names the PR by number and the host
    *  composes/opens the URL itself. */
   openChangeRequest(params: { number: number }): Promise<void>;
