@@ -522,7 +522,7 @@ const statusLine = computed(() => {
            above in both directions (encode<->decode, see onDecodedInput). -->
       <template v-if="showDecodedPane">
         <div
-          class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm py-0.5 px-2"
+          class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm leading-4 py-0.5 px-2"
         >
           <CodiconIcon name="symbol-string" :size="13" />
           <span>{{ t('studio.cellEditor.decoded.label') }}</span>
@@ -557,7 +557,7 @@ const statusLine = computed(() => {
            field and calendar entirely — this file only decides whether to show it. -->
       <template v-else-if="isTimestampFormat">
         <div
-          class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm py-0.5 px-2"
+          class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm leading-4 py-0.5 px-2"
         >
           <CodiconIcon name="calendar" :size="13" />
           <span>{{ t('studio.cellEditor.timestamp.title') }}</span>
