@@ -120,6 +120,8 @@ export class ChangeRequestState {
    *  it means arrow-keying through a whole disabled repository's history issues zero requests
    *  rather than one debounced no-op per row. */
   #disabledForRepo = false;
+  /** The repo's last seen `kiraSpace.gitHost.provider`; a different value drops every fact. */
+  #hostSetting: string | undefined;
   readonly #unsubscribe: () => void;
   readonly #unsubscribeSettings: () => void;
   #headIndex: ReadonlyMap<string, readonly ChangeRequestRecord[]> = new Map();
@@ -145,7 +147,16 @@ export class ChangeRequestState {
       this.#revalidate();
     });
     this.#unsubscribeSettings = bridge.on('repoSettings.changed', (event) => {
-      if (this.#repoId === event.repoId) void this.#loadHost(event.repoId);
+      if (this.#repoId !== event.repoId) return;
+      const provider = event.settings['kiraSpace.gitHost.provider'];
+      const changed = provider !== this.#hostSetting;
+      this.#hostSetting = provider;
+      if (!changed) return;
+      // Facts and the disabled memo belong to the previous host choice.
+      const sha = this.#sha;
+      this.#clear();
+      this.#sha = sha;
+      this.#revalidate();
     });
   }
 
@@ -156,6 +167,7 @@ export class ChangeRequestState {
     const previous = this.#repoId;
     if (previous !== undefined) this.#stashFacts(previous);
     this.#repoId = repoId;
+    this.#hostSetting = undefined;
     this.#clear();
     this.host.value = null;
     if (repoId !== undefined) void this.#loadHost(repoId);
