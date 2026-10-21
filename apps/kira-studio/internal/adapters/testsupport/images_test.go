@@ -19,7 +19,7 @@ func TestServerMajor(t *testing.T) {
 		{"latest tag has no leading number", "localstack", "localstack/localstack:latest", ""},
 		{"bare name, no tag", "kafka", "confluentinc/cp-kafka", ""},
 		{"digest pin, no tag", "postgres", "postgres@sha256:deadbeefcafe", ""},
-		{"single-digit major", "mongo", "mongo:8.3", "8"},
+		{"dotted patch tag", "mongo", "mongo:7.0.45", "7"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

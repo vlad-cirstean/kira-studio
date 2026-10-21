@@ -45,7 +45,7 @@ MATRIX="
 postgres|./apps/kira-studio/internal/adapters/postgres/...|postgres:17-alpine
 mysqlfamily|./apps/kira-studio/internal/adapters/mysqlfamily/...|mariadb:11.4 mysql:8.4
 clickhouse|./apps/kira-studio/internal/adapters/clickhouse/...|clickhouse/clickhouse-server:26.3
-mongo|./apps/kira-studio/internal/adapters/mongo/...|mongo:8.3
+mongo|./apps/kira-studio/internal/adapters/mongo/...|mongo:7.0.45
 redis|./apps/kira-studio/internal/adapters/redis/...|redis:8.10
 kafka|./apps/kira-studio/internal/adapters/kafka/...|confluentinc/cp-kafka:8.0.7
 sqs|./apps/kira-studio/internal/adapters/sqs/...|localstack/localstack:4
