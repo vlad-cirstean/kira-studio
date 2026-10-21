@@ -72,6 +72,10 @@ type branchEntry struct {
 type hostState struct {
 	mu sync.Mutex
 
+	// gen counts resetCaches calls; a fetch captures it before calling the host and drops its cache
+	// write when it moved, so an answer from the previous host choice never lands in the new one.
+	gen uint64
+
 	// remoteChecked/setting/provider/repo/resolved cache the one-git-spawn host detection for this
 	// entry's life, keyed by the setting it was resolved under. A refsChanged drops it (a remote
 	// could have changed); a changed setting drops it and every cache below.
@@ -118,6 +122,8 @@ func newHostState() *hostState {
 
 // resetCaches empties every cached fact and the breaker. Caller holds s.mu, or owns s alone.
 func (s *hostState) resetCaches() {
+	s.gen++
+	s.snapshotFetch = nil
 	s.remoteChecked = false
 	s.setting = ""
 	s.provider = nil
@@ -263,9 +269,12 @@ func (s *hostState) commitCacheGet(sha string) ([]githost.ChangeRequest, cacheSt
 	return entry.crs, s.classify(entry.cachedAt, hostCommitTTL)
 }
 
-func (s *hostState) commitCachePut(sha string, crs []githost.ChangeRequest) {
+func (s *hostState) commitCachePut(gen uint64, sha string, crs []githost.ChangeRequest) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.gen != gen {
+		return
+	}
 	if _, exists := s.commit[sha]; !exists {
 		s.commitLRU = append(s.commitLRU, sha)
 		for len(s.commitLRU) > hostCommitCacheCap {
@@ -291,9 +300,12 @@ func (s *hostState) branchCacheGet(branch string) (*githost.ChangeRequest, cache
 	return entry.cr, s.classify(entry.cachedAt, hostBranchTTL)
 }
 
-func (s *hostState) branchCachePut(branch string, cr *githost.ChangeRequest) {
+func (s *hostState) branchCachePut(gen uint64, branch string, cr *githost.ChangeRequest) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.gen != gen {
+		return
+	}
 	s.branch[branch] = branchEntry{cr: cr, cachedAt: time.Now()}
 }
 
@@ -306,9 +318,18 @@ func (s *hostState) snapshotGet() ([]githost.ChangeRequest, cacheState) {
 	return s.snapshot, s.classify(s.snapshotAt, hostSnapshotTTL)
 }
 
-func (s *hostState) snapshotPut(crs []githost.ChangeRequest) {
+func (s *hostState) generation() uint64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.gen
+}
+
+func (s *hostState) snapshotPut(gen uint64, crs []githost.ChangeRequest) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.gen != gen {
+		return
+	}
 	s.snapshot = crs
 	s.snapshotAt = time.Now()
 	s.snapshotValid = true
@@ -342,6 +363,10 @@ func (e *RepoEntry) hostRepo(ctx context.Context) (githost.Provider, githost.Rep
 		res, err := e.runAllowingExit(ctx, gitops.RemoteGetURLArgs("origin"), 0, 128)
 		if err == nil && res.ExitCode == 0 {
 			remoteURL = strings.TrimSpace(string(res.Stdout))
+		}
+		if ctx.Err() != nil {
+			// A cancelled spawn says nothing about the remote; caching "no host" would stick.
+			return nil, githost.Repo{}, false
 		}
 	}
 	p, repo, ok := e.hosts.Resolve(ctx, setting, remoteURL)
@@ -399,6 +424,7 @@ func (e *RepoEntry) fetchSnapshot(ctx context.Context) ([]githost.ChangeRequest,
 		return nil, githost.Status{Kind: "disabled"}
 	}
 
+	gen := e.host.generation()
 	fetch, leader := e.host.claimSnapshotFetch()
 	if !leader {
 		<-fetch.done
@@ -407,7 +433,7 @@ func (e *RepoEntry) fetchSnapshot(ctx context.Context) ([]githost.ChangeRequest,
 
 	crs, status := p.Open(ctx, repo)
 	if status.OK() {
-		e.host.snapshotPut(crs)
+		e.host.snapshotPut(gen, crs)
 	} else if status.RateLimited {
 		e.host.armBreaker(status)
 	}
@@ -429,17 +455,18 @@ func (e *RepoEntry) ResolveCommitChangeRequests(ctx context.Context, sha string)
 		return disabledResult()
 	}
 	crs, state := e.host.commitCacheGet(sha)
+	gen := e.host.generation()
 	switch state {
 	case cacheFresh:
 		return okResult(crs)
 	case cacheStale:
-		e.refreshInBackground("commit:"+sha, func(ctx context.Context) { e.fetchCommitChangeRequests(ctx, p, repo, sha) })
+		e.refreshInBackground("commit:"+sha, func(ctx context.Context) { e.fetchCommitChangeRequests(ctx, p, repo, sha, gen) })
 		return okResult(crs)
 	}
-	return e.fetchCommitChangeRequests(ctx, p, repo, sha)
+	return e.fetchCommitChangeRequests(ctx, p, repo, sha, gen)
 }
 
-func (e *RepoEntry) fetchCommitChangeRequests(ctx context.Context, p githost.Provider, repo githost.Repo, sha string) ChangeRequestLookup {
+func (e *RepoEntry) fetchCommitChangeRequests(ctx context.Context, p githost.Provider, repo githost.Repo, sha string, gen uint64) ChangeRequestLookup {
 	if status, armed := e.host.breakerStatus(); armed {
 		return unavailableResult(status)
 	}
@@ -451,7 +478,7 @@ func (e *RepoEntry) fetchCommitChangeRequests(ctx context.Context, p githost.Pro
 		}
 		return unavailableResult(status)
 	}
-	e.host.commitCachePut(sha, crs)
+	e.host.commitCachePut(gen, sha, crs)
 	return okResult(crs)
 }
 
@@ -471,6 +498,7 @@ func (e *RepoEntry) resolveBranchChangeRequest(ctx context.Context, branch strin
 	if !ok {
 		return disabledResult()
 	}
+	gen := e.host.generation()
 
 	// Reading the snapshot cache alone never populates it; ensureSnapshot does. On a cold cache the
 	// first lookup pays one bulk Open call and warms the snapshot for every other branch with an
@@ -503,10 +531,10 @@ func (e *RepoEntry) resolveBranchChangeRequest(ctx context.Context, branch strin
 	case cacheFresh:
 		return branchResult(cached)
 	case cacheStale:
-		e.refreshInBackground("branch:"+branch, func(ctx context.Context) { e.fetchBranchChangeRequest(ctx, p, repo, branch) })
+		e.refreshInBackground("branch:"+branch, func(ctx context.Context) { e.fetchBranchChangeRequest(ctx, p, repo, branch, gen) })
 		return branchResult(cached)
 	}
-	return e.fetchBranchChangeRequest(ctx, p, repo, branch)
+	return e.fetchBranchChangeRequest(ctx, p, repo, branch, gen)
 }
 
 func branchResult(cr *githost.ChangeRequest) ChangeRequestLookup {
@@ -516,7 +544,7 @@ func branchResult(cr *githost.ChangeRequest) ChangeRequestLookup {
 	return okResult([]githost.ChangeRequest{*cr})
 }
 
-func (e *RepoEntry) fetchBranchChangeRequest(ctx context.Context, p githost.Provider, repo githost.Repo, branch string) ChangeRequestLookup {
+func (e *RepoEntry) fetchBranchChangeRequest(ctx context.Context, p githost.Provider, repo githost.Repo, branch string, gen uint64) ChangeRequestLookup {
 	if status, armed := e.host.breakerStatus(); armed {
 		return unavailableResult(status)
 	}
@@ -534,7 +562,7 @@ func (e *RepoEntry) fetchBranchChangeRequest(ctx context.Context, p githost.Prov
 		c := crs[0]
 		latest = &c
 	}
-	e.host.branchCachePut(branch, latest)
+	e.host.branchCachePut(gen, branch, latest)
 	e.maybePurgeClosed(ctx, branch, latest)
 	return branchResult(latest)
 }

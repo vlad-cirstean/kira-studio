@@ -609,3 +609,27 @@ func TestEnsureSnapshot_SingleFlightOnColdCache(t *testing.T) {
 		}
 	}
 }
+
+// A cache write that started before a host-setting reset must not land after it.
+func TestHostStateDropsPutsFromBeforeAReset(t *testing.T) {
+	t.Parallel()
+	s := newHostState()
+	gen := s.generation()
+	s.resetCaches()
+	s.snapshotPut(gen, []githost.ChangeRequest{{Number: 1}})
+	s.commitCachePut(gen, "sha", []githost.ChangeRequest{{Number: 1}})
+	s.branchCachePut(gen, "b", &githost.ChangeRequest{Number: 1})
+	if _, st := s.snapshotGet(); st != cacheMiss {
+		t.Error("snapshot cached from a previous generation")
+	}
+	if _, st := s.commitCacheGet("sha"); st != cacheMiss {
+		t.Error("commit cached from a previous generation")
+	}
+	if _, st := s.branchCacheGet("b"); st != cacheMiss {
+		t.Error("branch cached from a previous generation")
+	}
+	s.snapshotPut(s.generation(), nil)
+	if _, st := s.snapshotGet(); st != cacheFresh {
+		t.Error("a current-generation put was dropped")
+	}
+}
