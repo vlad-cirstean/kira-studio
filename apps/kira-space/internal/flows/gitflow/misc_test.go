@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
@@ -229,6 +230,13 @@ func TestNoRemoteAndPr(t *testing.T) {
 		if len(res.ChangeRequests) != 0 {
 			t.Fatalf("%s.resolveChangeRequests = %+v, want no PRs", name, res)
 		}
+	}
+
+	if info := call[gitrpc.GitHostInfoResult](t, r.gs, "gitHost.info", gitrpc.GitHostInfoParams{RepoID: id}); info.Host != nil {
+		t.Fatalf("gitHost.info without a remote = %+v, want null", info.Host)
+	}
+	if p := call[githost.Providers](t, r.gs, "gitHost.providers", struct{}{}); len(p.Providers) != 1 || p.Providers[0].ID != "github" {
+		t.Fatalf("gitHost.providers = %+v, want github", p)
 	}
 
 	repo.AddRemote("https://gitlab.example.com/team/proj.git")
