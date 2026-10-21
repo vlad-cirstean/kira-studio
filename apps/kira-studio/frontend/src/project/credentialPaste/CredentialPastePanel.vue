@@ -21,7 +21,8 @@ import {
 } from './parse';
 
 // The pasted text lives only in this component's refs: never in a store, localStorage, the op log
-// or the console. Clearing drops the references (JS strings are immutable, so memory is not zeroed).
+// or the console. Clearing drops the references (JS strings are immutable, so memory is not
+// zeroed).
 // `retain`: keep the text after Apply, for a caller whose apply can fail and be retried; the
 // caller then closes the panel, which clears it on unmount.
 const props = defineProps<{

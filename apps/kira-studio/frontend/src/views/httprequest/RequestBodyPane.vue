@@ -32,11 +32,10 @@ import BinaryBodyPicker from './BinaryBodyPicker.vue';
 import FormDataTable from './FormDataTable.vue';
 import UrlEncodedTable from './UrlEncodedTable.vue';
 
-// C5/D9: extracted from HttpRequestView.vue's own inline block (P2) — the mode selector, the code-
-// language select, the auto-Content-Type caption and the per-mode editor host all live here now so
-// HttpRequestView.vue stays a layout shell. `raw` is a plain-text buffer with no sub-selector;
-// `code` keeps the language selector raw used to carry, narrowed to its four syntax-highlighted
-// languages.
+// The mode selector, the code-language select, the auto-Content-Type caption and the per-mode
+// editor host all live here now so HttpRequestView.vue stays a layout shell. `raw` is a plain-text
+// buffer with no sub-selector; `code` keeps the language selector raw used to carry, narrowed to
+// its four syntax-highlighted languages.
 const props = defineProps<{
   tab: HttpRequestTabRecord;
   /** P15b D4: HttpRequestView.vue's own variableSupport(...) — rangeHighlights colours both
@@ -49,15 +48,15 @@ const props = defineProps<{
   /** P22b D7: HttpRequestView.vue's own persisted description-column toggle, forwarded the same
    *  way — a no-op for the raw/code/binary modes below. */
   showDescriptions?: boolean;
-  /** P28 D11: the hoisted find bar's own ranges for whichever of the two text editors is showing.
-   *  This pane's `rangeHighlights` compartment was already spoken for by P15b's {{variable}}
-   *  colouring (F12 in the response pane's own comment names that as the reason the find bar could
+  /** The hoisted find bar's own ranges for whichever of the two text editors is showing.
+   *  This pane's `rangeHighlights` compartment was already spoken for by the {{variable}}
+   *  colouring (the response pane's own comment names that as the reason the find bar could
    *  never reach the request body), so the two sources are merged below rather than one replacing
    *  the other. */
   findHighlights?: (doc: string) => readonly RangeHighlight[];
 }>();
 
-/** P28 D11: variable ranges first, find ranges second — a match's class wins on overlap, which is
+/** Variable ranges first, find ranges second — a match's class wins on overlap, which is
  *  what a user searching for text that happens to sit inside a {{reference}} expects to see.
  *  rangeHighlightPlugin sorts and validates whatever it is handed, so no ordering guarantee is
  *  required of this concatenation beyond that intent. Identity changes whenever either source

@@ -16,14 +16,14 @@ const emit = defineEmits<{ select: [mode: M] }>();
 </script>
 
 <template>
-  <!-- No app title (removed — HideTitle already drops AppKit's own, and a second wordmark read as
+  <!-- No app title (HideTitle already drops AppKit's own, and a second wordmark read as
        redundant next to the mode switcher). Centered on the bar's true full width via absolute
        positioning, deliberately NOT `justify-content: center` inside the flex row -- that would
        center within the *padded* box, not the window, and reads visibly off-centre. -->
   <div
     class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-0.5"
   >
-    <!-- P15 D9: px-3 (12px) -- the tab chip's own metrics (--kira-h-md/--kira-t-sm, 26px/11px)
+    <!-- px-3 (12px) -- the tab chip's own metrics (--kira-h-md/--kira-t-sm, 26px/11px)
          inside a 38px bar leaves 6px of clearance, the same --kira-s-3 the bar already uses as its
          own right padding. wails-no-drag: isDraggableEvent (drag.ts) reads the event target's
          computed style, so every interactive child of the shared, wails-drag-carrying TitleBar root

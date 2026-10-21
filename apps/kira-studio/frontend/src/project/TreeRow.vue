@@ -18,7 +18,7 @@ import { columnTypeIcon, nodeIcon } from '../theme/icons';
 import ErrorPopover from './ErrorPopover.vue';
 import { type TreeRowVm, useTreeStore } from './state/tree';
 
-// P28 D7: `sticky` is the only difference between a normal row and a band-pinned one — a
+// `sticky` is the only difference between a normal row and a band-pinned one — a
 // different testid (so it can never double-count a `tree-row` locator) and a forced -1 tabindex
 // (so the tree keeps its single roving tab stop). Every emit, every child element, the colour
 // rail and the twisty behave identically either way — a pinned row is a real row, not a decoration.
@@ -150,11 +150,11 @@ function onKeydown(e: KeyboardEvent): void {
       :class="cn('pointer-events-none absolute inset-x-0 h-0.5 bg-focus', dropEdge === 'top' ? 'top-0' : 'bottom-0')"
     />
 
-    <!-- P31 D25/F25: the twisty is the one control in the app whose entire meaning is already
+    <!-- The twisty is the one control in the app whose entire meaning is already
          drawn by the chevron direction, and it fires on the single most-hovered control in the
-         panel — no tooltip. :aria-label stays: P104 §6.2 made every icon-only control set its
-         own explicit aria-label by hand (no more directive mirroring it in automatically), so
-         dropping it here would leave this button nameless. -->
+         panel — no tooltip. :aria-label stays: every icon-only control sets its own explicit
+         aria-label by hand (no more directive mirroring it in automatically), so dropping it
+         here would leave this button nameless. -->
     <TreeTwisty :expanded="row.expanded" :has-children="row.hasChildren" @toggle="onTwistyClick">
       <Spinner v-if="row.loading" label="" data-testid="tree-row-spinner" />
       <CodiconIcon v-else :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />

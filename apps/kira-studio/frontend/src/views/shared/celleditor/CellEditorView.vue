@@ -115,7 +115,7 @@ const buffer = useEditBuffer({
 });
 const { doc, isDirty, formatted, beautifyFailure, writeDoc } = buffer;
 
-// What `detected` above actually reads — deliberately a separate ref from `doc`, not an alias for
+// What `detected` above reads — deliberately a separate ref from `doc`, not an alias for
 // it, and deliberately not updated on every keystroke either. `doc` also receives byte-level
 // round-trip writes from the decoded-text pane (onDecodedInput) and TimestampPane, each re-encoding
 // a pane-managed value that is *already* known to be that exact format; re-running detection
@@ -124,10 +124,9 @@ const { doc, isDirty, formatted, beautifyFailure, writeDoc } = buffer;
 // format mid-keystroke — base64's 20-char floor rejects plenty of genuinely valid short base64 —
 // which would hide the very pane the user is typing into. Once the effective format is one of
 // PINNED_FORMATS (hex/base64/the three timestamp encodings — every format with a translate pane),
-// it stays put for the rest of that cell's editing session, same as before this feature existed;
+// it stays put for the rest of that cell's editing session;
 // only the plain read-it-directly formats (text/json/xml/csv/sql, none of which own a pane) keep
-// re-detecting live, which is exactly the set item 1's ask cares about ("is my json broken").
-// Formats with a translate pane stay pinned for the cell's editing session.
+// re-detecting live.
 const PINNED_FORMATS = new Set<CellFormat>([
   'hex',
   'base64',
@@ -221,17 +220,17 @@ function saveEdit(): void {
 }
 
 // Auto-stages on blur, matching the deleted DataGrid.vue's own inline double-click edit (its
-// `commitEdit` fired on the same event) — no separate Save button needed since leaving the editor is already
+// `commitEdit` fired on the same event) — no separate Save button needed since leaving the editor
+// is already
 // the "I'm done with this value" signal, and the grid's own pending-edit row highlighting is the
 // feedback that it landed. `focusout` (not `blur`, which doesn't bubble) on the wrapping div.
 //
 // `focusout` fires (and bubbles) whenever the *previously* focused element loses focus, whether
 // the next focus target is outside this div or just another control inside it (the timestamp
 // field -> the encoded box, the zone toggle, the calendar) — it says nothing on its own about
-// whether focus actually left the panel. `relatedTarget` is the element gaining focus, so only
+// whether focus left the panel. `relatedTarget` is the element gaining focus, so only
 // treat this as "done editing" when that target is null (focus left the window/app entirely) or
 // sits outside the wrapping div; a same-panel transition must fall through and stage nothing.
-// Stage only when focus leaves the panel; `focusout` also fires for moves between inner controls.
 function onEditorBlur(e: FocusEvent): void {
   const next = e.relatedTarget as Node | null;
   const container = e.currentTarget as HTMLElement | null;

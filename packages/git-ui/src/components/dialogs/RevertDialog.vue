@@ -3,12 +3,12 @@ import { shortSha } from '@kira/git-core';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 /**
- * `docs/plans/P6.md` W15: §7.10's confirm step. `OpsState.runRevert` awaits this dialog whenever
+ * Confirm step. `OpsState.runRevert` awaits this dialog whenever
  * the preflight is not a clean, non-merge, single-sha revert (`verdict !== "clean"` or a mainline
  * is required) — see that method's own doc comment — so a plain revert of an ordinary commit
  * never opens it at all.
  *
- * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
+ * The modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
  * only supplies its own body/footer content.
  */
 import { Card } from '@theme/components/ui/card';

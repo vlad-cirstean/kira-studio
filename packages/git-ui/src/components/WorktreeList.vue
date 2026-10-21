@@ -1,20 +1,20 @@
 <script setup lang="ts">
 /**
- * G25 D1/D6/D8: `BranchPicker.vue`'s fourth section — mirrors `StashList.vue`'s own "one row per
+ * `BranchPicker.vue`'s fourth section — mirrors `StashList.vue`'s own "one row per
  * entry, row-level actions, no filter box" shape (a worktree list is rarely more than a handful of
- * entries). Switch reuses the existing `repo.open` flow (F6: each worktree is already its own
+ * entries). Switch reuses the existing `repo.open` flow (each worktree is already its own
  * `RepoEntry`/`RepoSummary` — "switch" needs no worktree-specific request at all), so this
  * component only EMITS the intent (`switch-worktree`) for `App.vue` to carry out, the same
  * "this component has nowhere of its own to do X" shape `StashList.vue`'s own `branchFromStash`
  * emit already uses. "Open in New Window" is the one action that needs the extension
- * (`worktree.openWindow`, D6) — also emitted up rather than called directly, since this component
+ * (`worktree.openWindow`) — also emitted up rather than called directly, since this component
  * has no `BridgeClient` of its own (only `ops`/`worktrees`, matching every other row component in
  * this file's own family). Remove is handled entirely locally: a plain `op.run`, no host
- * involvement, with its own small confirm dialog for D8's dirty route.
+ * involvement, with its own small confirm dialog for the dirty route.
  *
- * P77 §11: renders the already filtered/ordered/capped `section` prop `pickerModel.ts` hands it —
- * the same `TagList.vue` contract. This is also the first cap this list has ever had (§1.1: it
- * used to render `worktrees.entries.value` straight through, uncapped) — part of N1's fix.
+ * Renders the already filtered/ordered/capped `section` prop `pickerModel.ts` hands it —
+ * the same `TagList.vue` contract. This is also the first cap this list has ever had (it
+ * used to render `worktrees.entries.value` straight through, uncapped) — part of the fix.
  */
 import type { WorktreeEntry, WorktreeRemovePreflight } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
@@ -61,9 +61,9 @@ function switchTo(entry: WorktreeEntry): void {
 }
 
 // ---------------------------------------------------------------------------------------
-// Remove (D8) — a small, self-contained confirm dialog: blocked reasons are shown with no route
+// Remove — a small, self-contained confirm dialog: blocked reasons are shown with no route
 // forward; a dirty worktree requires typing the exact confirmation token the server's own fresh
-// preflight names (never a value this component invents), mirroring G22 D8's own typed-
+// preflight names (never a value this component invents), mirroring the typed-
 // confirmation pattern (`ResetDialog.vue`).
 // ---------------------------------------------------------------------------------------
 

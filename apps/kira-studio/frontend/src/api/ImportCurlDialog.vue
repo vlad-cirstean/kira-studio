@@ -28,12 +28,12 @@ const importCurlStore = useImportCurlStore();
 // "-k was ignored" is beside it, while it can still be edited.
 const text = ref('');
 
-// Finding 15: for a large pasted curl command (a big JSON body, say), re-lexing the whole text on
-// every single keystroke just to update a one-line summary has no business running that often —
+// For a large pasted curl command (a big JSON body, say), re-lexing the whole text on
+// every single keystroke to update a one-line summary has no business running that often —
 // the textarea itself (`text`) stays bound immediately so typing never stutters; the preview below
-// reads a debounced copy instead (TIMING.preview, shared with every other parse preview). Unlike EditRawRequestDialog.vue's
-// own copy, this one has no external-open reset to preserve, so refDebounced (P99 Part 3) is a
-// direct fit — no manual watch/setTimeout needed.
+// reads a debounced copy instead (TIMING.preview, shared with every other parse preview).
+// Unlike EditRawRequestDialog.vue's own copy, this one has no external-open reset to preserve, so
+// refDebounced is a direct fit — no manual watch/setTimeout needed.
 const debouncedText = refDebounced(text, TIMING.preview);
 
 const preview = computed(() => importCurlStore.previewCurl(debouncedText.value));

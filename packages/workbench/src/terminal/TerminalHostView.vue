@@ -1,11 +1,11 @@
 <script setup lang="ts">
-// P107 I2-19: TerminalView.vue (Kira Studio) and RepoTerminalView.vue (Kira Space) stayed
-// line-identical past T2-21's own useTerminalMount extraction — the rendererDeps object, the
+// TerminalView.vue (Kira Studio) and RepoTerminalView.vue (Kira Space) stayed
+// line-identical past the useTerminalMount extraction — the rendererDeps object, the
 // composable call, the container/footer template and its scoped style. This owns that remainder;
 // each app's own view is now a thin wrapper passing its stores as `deps` and, for Kira Studio's
 // Claude Code hooks banner (the one real difference — Kira Space's TerminalService has no
 // AgentHooks integration), a default slot rendered before the terminal host.
-// P128 §2.4: TerminalHostTabState/TerminalHostDeps moved to terminalHost.ts (a plain .ts file
+// TerminalHostTabState/TerminalHostDeps moved to terminalHost.ts (a plain .ts file
 // module.ts, also non-.vue, can import types from) — re-exported here so existing `.vue`
 // consumers of `./TerminalHostView.vue` keep working unchanged.
 import { FieldError } from '@theme/components/ui/field';

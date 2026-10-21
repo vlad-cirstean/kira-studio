@@ -48,7 +48,7 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
           data-testid="toggle-search"
           @click="toggleSearch"
         />
-        <!-- P28 D18: the DataGrip import moved to the menu bar (App → Import DataGrip
+        <!-- The DataGrip import moved to the menu bar (App → Import DataGrip
              Connections…). It is a once-per-machine action and did not earn a permanent slot in a
              four-button header. StudioStart.vue's own first-run button stays: an empty state is
              exactly when a menu-bar-only affordance is hardest to find. -->

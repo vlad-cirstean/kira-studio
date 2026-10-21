@@ -17,7 +17,7 @@ const lines = computed(() => {
   return documentRowsStore.visibleLines(props.tabId, props.row);
 });
 
-// P43 iter3 D42/F31: a long scalar value is revealed by scrolling this list sideways rather than
+// A long scalar value is revealed by scrolling this list sideways rather than
 // by wrapping it — rows.ts's rowHeight() is exact and measurement-free (one LINE_H per visible
 // node), so a wrapped line would break the VirtualList prefix sum that depends on it. Same
 // TabStrip.vue/ConsoleView.vue idiom: chrome-less scrolling (the CSS below) plus a wheel handler,

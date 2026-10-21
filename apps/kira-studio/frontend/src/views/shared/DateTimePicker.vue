@@ -6,9 +6,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { t } from '@theme/i18n';
 import { computed, ref, watch } from 'vue';
 
-// P24 D18: the app-owned month grid + clock steppers that replace the bare
-// <input type="datetime-local"> — the last piece of OS-drawn UI left in the renderer after P22
-// removed the native tooltip (F9). Pure content, no trigger and no PopoverPanel of its own:
+// The app-owned month grid + clock steppers that replace the bare
+// <input type="datetime-local"> — the last piece of OS-drawn UI left in the renderer.
+// Pure content, no trigger and no PopoverPanel of its own:
 // TimestampPane.vue owns the calendar button, the open/close state and the PopoverPanel wrapping
 // this — the same trigger/content split ColumnsMenu.vue's own consumer already uses.
 const props = defineProps<{ zone: 'local' | 'utc' }>();
@@ -56,15 +56,15 @@ function clamp(n: number, min: number, max: number): number {
 const selected = computed(() => partsOf(model.value));
 const today = computed(() => partsOf(new Date()));
 
-// P42 D33a: the label cycles three views of the same navigation, days -> months -> years,
-// so reaching a date years away no longer costs dozens of single-month clicks. D33b: picking a
+// The label cycles three views of the same navigation, days -> months -> years,
+// so reaching a date years away no longer costs dozens of single-month clicks. Picking a
 // month or a year moves only *this* view state, never `selected` — the same rule prevMonth/
 // nextMonth already follow below, just for a bigger jump.
 type CalendarMode = 'days' | 'months' | 'years';
 const mode = ref<CalendarMode>('days');
 
 // The visible month is its own state, independent of the selected day — paging doesn't move the
-// selection until a day cell is actually clicked. Reset to the value's own month (and back to the
+// selection until a day cell is clicked. Reset to the value's own month (and back to the
 // day grid) whenever the value moves to a different month from outside (e.g. typing a new date
 // into the pane's text field, or the cell selection itself changing).
 const viewYear = ref(selected.value.y);

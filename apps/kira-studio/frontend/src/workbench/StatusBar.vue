@@ -6,14 +6,14 @@ import UpdateAvailableItem from '@workbench/components/UpdateAvailableItem.vue';
 import { useAppMetricsStore } from '../state/appMetrics';
 import { useAppUpdateStore } from '../state/appUpdate';
 
-// P103 Part 2 (§5.4): Kira Studio's own StatusBar.vue, now a thin composition over the shared bar
+// Kira Studio's own StatusBar.vue, now a thin composition over the shared bar
 // chrome (packages/workbench/src/components/StatusBar.vue) — this file keeps exactly the per-app
-// right-side items: update/app-metrics. P116 H7: the app-metrics item's
-// own markup moved to AppMetricsItem.vue, shared with Kira Space's own copy. P119: the update item's
+// right-side items: update/app-metrics. The app-metrics item's
+// own markup moved to AppMetricsItem.vue, shared with Kira Space's own copy. The update item's
 // own markup moved to UpdateAvailableItem.vue the same way — its click now opens the in-app dialog
-// (appUpdateStore.openUpdateDialog) instead of the release page (§4.6). P127: the session-status
+// (appUpdateStore.openUpdateDialog) instead of the release page. The session-status
 // widget this file also carried moved out with the rest of agent-activity monitoring — no app shows
-// it as of this phase.
+// it.
 const appMetricsStore = useAppMetricsStore();
 const appUpdateStore = useAppUpdateStore();
 </script>

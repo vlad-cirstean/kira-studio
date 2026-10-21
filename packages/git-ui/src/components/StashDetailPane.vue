@@ -10,19 +10,19 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { t } from '@theme/i18n';
 import { formatAbsoluteUtc, formatAgeCompact } from '@workbench/behaviour/format';
 /**
- * `docs/plans/P9.md` W14 (OQ4): "selecting a stash node or list row loads `stash.show` into the
- * existing `FileTree.vue`". Mirrors `DetailPane.vue`'s own composition but keyed off `StashState`
+ * "selecting a stash node or list row loads `stash.show` into the existing `FileTree.vue`".
+ * Mirrors `DetailPane.vue`'s own composition but keyed off `StashState`
  * rather than `DetailState` — a stash entry has none of `CommitDetail`'s richer shape (body/
  * trailers/signature/multiple parents), so `CommitMeta.vue` is not reused here; this file's own
  * small header says the one thing worth saying about a stash (message, base commit, date, `-u`
  * marker) instead.
  *
- * G21 D12 (item 12): no longer also composes `DiffView.vue` — opens the host's native diff
- * editor now, exactly like `DetailPane.vue` since the same phase. The one real technical wrinkle
- * `StashState` used to handle itself (F12): a stash's `-u` untracked files live only in its third
- * parent (`entry.untrackedSha`), which has no `baseSha` of its own — `editor.openDiff`'s own
- * `fallbackSha` param (D12) carries that through to the host handler now, which retries the whole
- * composition against it when `path` is not among the primary sha's changed files.
+ * No longer also composes `DiffView.vue` — opens the host's native diff editor now, exactly like
+ * `DetailPane.vue`. The one real technical wrinkle `StashState` used to handle itself: a stash's
+ * `-u` untracked files live only in its third parent (`entry.untrackedSha`), which has no
+ * `baseSha` of its own — `editor.openDiff`'s own `fallbackSha` param carries that through to the
+ * host handler now, which retries the whole composition against it when `path` is not among the
+ * primary sha's changed files.
  */
 import Identifier from '@workbench/components/Identifier.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';

@@ -10,8 +10,8 @@ import CellEditorView from './CellEditorView.vue';
 const cellSelectionStore = useCellSelectionStore();
 const layoutStore = useLayoutStore();
 
-// Mounted by the view that owns the tab (P26 D1), so one dock <-> one tab, torn down with it.
-// `readOnly` (P40 D11): true when the mounting view has no write path for its cells at all (the
+// Mounted by the view that owns the tab, so one dock <-> one tab, torn down with it.
+// `readOnly`: true when the mounting view has no write path for its cells at all (the
 // query console) — a viewer, not an editor that happens to be refusing this particular cell.
 // Distinct from a cell being individually uneditable (a read-only connection, a truncated value),
 // which stays governed by CellEditorView's own readOnlyReasonFor regardless of this flag.

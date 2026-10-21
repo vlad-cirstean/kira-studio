@@ -28,13 +28,13 @@ const editRawStore = useEditRawStore();
 // numbers (no new primitive, no new dependency).
 const text = ref('');
 
-// Round-2 review finding 7 (the same class ImportCurlDialog.vue's own finding 15 fixed for curl
-// import, worse here since this buffer is always the full generated request, not something
-// typically hand-pasted small): re-parsing the whole buffer on every single keystroke just to
-// update a preview has no business running that often — the editor itself (`text`) stays bound
-// immediately so typing never stutters; the preview below reads a debounced copy instead
-// (TIMING.preview). P99 Part 3: useDebounceFn over refDebounced(text) — an external open must write debouncedText immediately (below), not
-// a debounce later, matching project/SchemaDialog.vue's own identical-shape precedent (P99 Part 2).
+// (the same class ImportCurlDialog.vue fixed for curl import, worse here since this buffer is
+// always the full generated request, not something typically hand-pasted small): re-parsing the
+// whole buffer on every single keystroke just to update a preview has no business running that
+// often — the editor itself (`text`) stays bound immediately so typing never stutters; the
+// preview below reads a debounced copy instead (TIMING.preview). useDebounceFn over
+// refDebounced(text) — an external open must write debouncedText immediately (below), not a
+// debounce later, matching project/SchemaDialog.vue's own identical-shape precedent.
 const debouncedText = ref('');
 const setDebouncedText = useDebounceFn((value: string) => {
   debouncedText.value = value;

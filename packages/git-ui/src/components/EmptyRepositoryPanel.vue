@@ -4,9 +4,9 @@ import { EmptyDescription } from '@theme/components/ui/empty';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 /**
- * §6.2's "repository with no commits" state — an unborn HEAD (P1 detects it; P2's store renders
- * it as zero rows). A one-line explanation, not an empty list with a scrollbar: showing the real
- * `CommitGrid.vue` here would just be a blank rectangle with nothing to explain why.
+ * The "repository with no commits" state — an unborn HEAD (the store renders it as zero rows).
+ * A one-line explanation, not an empty list with a scrollbar: showing the real
+ * `CommitGrid.vue` here would be a blank rectangle with nothing to explain why.
  *
  * Takes `head: HeadState` narrowed to the unborn variant rather than the whole `RepoSummary` —
  * this panel only ever needs the branch name unborn HEAD points at.

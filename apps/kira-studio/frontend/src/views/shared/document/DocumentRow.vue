@@ -8,13 +8,13 @@ import { formatBytes } from '@workbench/behaviour/format';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import type { DocumentRowView } from './rows';
 
-// P48 F10-F12: the Mongo document row's head — down to its five shared data-testids — duplicated
+// The Mongo document row's head — down to its five shared data-testids — duplicated
 // between DocumentView.vue and ConsoleResultGrid.vue's own read-only copy. The expansion *state*
-// behind `expanded` stays genuinely different per caller (documents: persisted, default-expanded,
-// P27 D2; console: runtime-only, default-collapsed, P42 D11) — this component only renders the
+// behind `expanded` stays genuinely different per caller (documents: persisted, default-expanded;
+// console: runtime-only, default-collapsed) — this component only renders the
 // row that reads it. `rowScope` names the tab id or console result key the caller resolved `view`
 // against (rows.ts's own registered-source key), for a caller that needs it alongside `view.id`.
-// P105 §13: named `rowScope`, not `scope` — the HTML global `scope` attribute name collides with
+// Named `rowScope`, not `scope` — the HTML global `scope` attribute name collides with
 // Biome's `noHeaderScope`, which reads the attribute name off every call site that binds it.
 defineProps<{
   navProps?: { 'data-nav-key': string; tabindex: number; onFocus: () => void };

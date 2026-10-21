@@ -78,7 +78,7 @@ const elapsedMs = computed(() =>
 const messageBytes = computed(() =>
   viewing.value ? viewing.value.snapshot.entry.messageBytes : (rt.value?.messageBytes ?? 0),
 );
-// P108 F18: a stored message cut at the 64 KiB per-message cap carries its own `truncated` flag
+// A stored message cut at the 64 KiB per-message cap carries its own `truncated` flag
 // (grpc-history.ts's own GrpcCallHistoryMessage) — this used to drop it, rendering the cut prefix
 // in Monaco as if it were the complete, valid JSON body. A live message is never truncated (the
 // cap only applies to what History stores), so it maps in as `false`.
@@ -93,19 +93,19 @@ const messages = computed(() =>
       }))
     : liveMessages.value.map((m) => ({ ...m, truncated: false })),
 );
-// P108 F18: the stored request message's own truncation flag (requestMessageTruncated) had zero
+// The stored request message's own truncation flag (requestMessageTruncated) had zero
 // frontend readers — surfaced here as a note next to the "viewing a history call" band, since this
-// pane does not render the stored request message body itself (D14's message list is the
+// pane does not render the stored request message body itself (the message list is the
 // response's own messages; showing the request body too is out of scope for this fix).
 const requestMessageTruncated = computed(
   () => viewing.value?.snapshot.requestMessageTruncated ?? false,
 );
 const metadataElided = computed(() => viewing.value?.snapshot.metadataElided ?? false);
-// Round-2 review finding 10: the summary line used to read messages.length — capped at
-// MAX_LIVE_MESSAGES for a live call (state.ts) and at maxGrpcStoredMessages for a stored entry
-// (finding 8) — right next to a separate elided-messages strip stating the true, uncapped total,
-// two contradictory counts on screen at once for the same response. Sourced from the true total
-// instead: rt.trueMessageCount for live, the stored entry's own true messageCount for history.
+// The summary line used to read messages.length — capped at MAX_LIVE_MESSAGES for a live call
+// (state.ts) and at maxGrpcStoredMessages for a stored entry — right next to a separate
+// elided-messages strip stating the true, uncapped total, two contradictory counts on screen at
+// once for the same response. Sourced from the true total instead: rt.trueMessageCount for live,
+// the stored entry's own true messageCount for history.
 const messageCount = computed(() =>
   viewing.value ? viewing.value.snapshot.entry.messageCount : (rt.value?.trueMessageCount ?? 0),
 );
@@ -165,7 +165,7 @@ function toggleExpanded(seq: number): void {
   expanded.value = next;
 }
 
-// Finding 11: the message list is virtualized (below), which needs one known height per row —
+// The message list is virtualized (below), which needs one known height per row —
 // the density row height for a collapsed header, or that plus MESSAGE_DETAIL_HEIGHT for an expanded
 // one (a fixed, internally-scrollable box, not an auto-growing one — the same "one resolved
 // height per row" contract OperationsPanel.vue's own expandable row already follows).
@@ -205,12 +205,12 @@ function onBackToLatest(): void {
   grpcCallHistoryStore.backToLatestGrpc(props.tab.id);
 }
 
-// P22b D14: find-in-message — HTTP's own ResponsePane.vue find bar (P16 D11), applied to the one
-// surface the row calls out as the real gap: the message list has no search at all. The message
-// list is a VirtualList (only visible rows are ever mounted), so unlike HTTP's single always-
-// mounted body this can only search whichever message is actually expanded and on screen right
-// now — the lowest-seq expanded one, deterministic when more than one is open. A unary call's own
-// auto-expand (above) makes this the common case land exactly right with no extra action.
+// Find-in-message — HTTP's own ResponsePane.vue find bar, applied to the one surface that is the
+// real gap: the message list has no search at all. The message list is a VirtualList (only visible
+// rows are ever mounted), so unlike HTTP's single always-mounted body this can only search
+// whichever message is expanded and on screen right now — the lowest-seq expanded one,
+// deterministic when more than one is open. A unary call's own auto-expand (above) makes this the
+// common case land exactly right with no extra action.
 const findOpen = ref(false);
 function toggleFind(): void {
   findOpen.value = !findOpen.value;
@@ -227,7 +227,7 @@ const targetMessage = computed(() => messages.value.find((m) => m.seq === target
 
 // Function refs, not a single ref — VirtualList only mounts the rows currently on screen, so the
 // host for `targetSeq` may not exist at all (scrolled out) even while its seq is in `expanded`.
-// `scrollRangeIntoView` on a null host is simply a no-op via optional chaining below, same as
+// `scrollRangeIntoView` on a null host is a no-op via optional chaining below, same as
 // HTTP's own bodyHostRef before its first render.
 const messageHosts = new Map<number, FindBarHost>();
 function setMessageHost(seq: number, el: unknown): void {

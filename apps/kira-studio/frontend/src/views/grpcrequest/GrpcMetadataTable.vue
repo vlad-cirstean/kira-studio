@@ -7,8 +7,8 @@ import { patchGrpcRequestTabState } from '../../api/tabs';
 import type { GrpcRequestTabRecord } from '../../state/tabDomain';
 import FieldRowsTable from '../shared/fields/FieldRowsTable.vue';
 
-// P107 T2-18: a thin wrapper over FieldRowsTable, same D15/C6 shape RequestHeadersTable.vue uses —
-// replaces this package's own former MetadataTable.vue copy (F18's trade only held while
+// A thin wrapper over FieldRowsTable, same shape RequestHeadersTable.vue uses —
+// replaces this package's own former MetadataTable.vue copy (the trade only held while
 // views/grpcrequest/** could not import views/httprequest/**; FieldRowsTable now lives in
 // views/shared/fields/, which both kinds may import).
 const props = defineProps<{

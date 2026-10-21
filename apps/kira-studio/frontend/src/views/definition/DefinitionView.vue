@@ -134,11 +134,11 @@ const constraintRows = computed(() =>
   definition.value && meta.value ? buildConstraintRows(definition.value, meta.value) : [],
 );
 
-// P22b D14: F21's own finding — a whole DDL document plus columns/indexes/constraints sections is
-// the single largest searchable document in Studio, and had no search at all. Structure's own
-// search is a plain substring filter over each section's *rows*, applied here (once, over the
-// arrays every section already receives as props) rather than teaching four section components
-// their own filtering — ColumnsSection/IndexesSection/ConstraintsSection stay unchanged.
+// A whole DDL document plus columns/indexes/constraints sections is the single largest searchable
+// document in Studio, and had no search at all. Structure's own search is a plain substring filter
+// over each section's *rows*, applied here (once, over the arrays every section already receives
+// as props) rather than teaching four section components their own filtering —
+// ColumnsSection/IndexesSection/ConstraintsSection stay unchanged.
 const searchOpen = ref(false);
 function toggleSearch(): void {
   searchOpen.value = !searchOpen.value;
@@ -200,10 +200,10 @@ const readOnlyLabel = computed(() =>
     : t('studio.definition.readOnlyComposed.status'),
 );
 
-// P23 D8: Open in console was unconditional before this phase, which only ever mattered because
-// every kind with a definition tab also had a console (Postgres/MariaDB/Mongo). Kafka and SQS
-// break that coincidence (caps.sql is false for both, P10's D13) — same gate project/menus.ts's
-// own consoleMenuItem() already uses for the tree's context-menu equivalent.
+// Open in console was unconditional, which only ever mattered because every kind with a definition
+// tab also had a console (Postgres/MariaDB/Mongo). Kafka and SQS break that coincidence (caps.sql
+// is false for both) — same gate project/menus.ts's own consoleMenuItem() already uses for the
+// tree's context-menu equivalent.
 const canOpenConsole = computed(
   () => connectionsStore.states[props.tab.connectionId ?? '']?.caps?.sql === true,
 );
@@ -356,9 +356,9 @@ const breadcrumb = computed(() => {
       data-testid="definition-structure-filter"
     />
 
-    <!-- Item 4: the reconnect gate used to replace this whole view chrome (header, toolbar and
+    <!-- The reconnect gate used to replace this whole view chrome (header, toolbar and
          all) — every other view but the grid's DataView.vue did the same, the one inconsistency
-         this fixes. The chrome above always renders; only the body — the part that actually needs
+         this fixes. The chrome above always renders; only the body — the part that needs
          a live connection — swaps for the gate. -->
     <EmptyState
       v-if="needsReconnect"
@@ -386,12 +386,11 @@ const breadcrumb = computed(() => {
           :range-highlights="docHighlights"
         />
       </div>
-      <!-- P23 D8: the Structure body no longer hard-requires `meta` — Kafka and SQS have no
-         describe() (F7), so a definition can arrive with meta still null. PropertiesSection
-         renders regardless; everything below it stays conditional on the data it needs, exactly
-         as before. P22b D14: Columns/Indexes/Constraints get the filtered arrays (computed
-         above) instead of meta's own raw ones — filtering lives here, once, not in each
-         section. -->
+      <!-- The Structure body no longer hard-requires `meta` — Kafka and SQS have no describe(), so
+         a definition can arrive with meta still null. PropertiesSection renders regardless;
+         everything below it stays conditional on the data it needs, exactly as before.
+         Columns/Indexes/Constraints get the filtered arrays (computed above) instead of meta's own
+         raw ones — filtering lives here, once, not in each section. -->
       <div v-else-if="definition" class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 p-3">
         <PropertiesSection
           v-for="section in definition.sections"

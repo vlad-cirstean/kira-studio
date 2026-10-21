@@ -1,25 +1,25 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P5.md` W11: composes `CommitMeta.vue` (twice — see its own doc comment on why) and
- * `FileTree.vue` over one `DetailState`, replacing `App.vue`'s P4 placeholder block.
+ * Composes `CommitMeta.vue` (twice — see its own doc comment on why) and `FileTree.vue` over one
+ * `DetailState`, replacing `App.vue`'s placeholder block.
  *
- * G21 D12 (item 12): no longer also composes `DiffView.vue` — the graph panel opens the host's
- * diff editor now, exactly like the review panel already did since G12 D12. A file row's
- * `openFile` emit (D13: a click/arrow-key move previews, a double click/`Enter` pins) is wired
- * straight to `actions.openInEditor`; `DetailState` no longer owns a `mode`/`diff` to drive, so
- * this component no longer needs the breakpoint-aware "diff takes over the pane" layout its own
- * doc comment used to describe, nor the focus-return dance a mode flip used to need.
+ * No longer also composes `DiffView.vue` — the graph panel opens the host's diff editor now,
+ * exactly like the review panel already did. A file row's `openFile` emit (a click/arrow-key move
+ * previews, a double click/`Enter` pins) is wired straight to `actions.openInEditor`;
+ * `DetailState` no longer owns a `mode`/`diff` to drive, so this component no longer needs the
+ * breakpoint-aware "diff takes over the pane" layout its own doc comment used to describe, nor the
+ * focus-return dance a mode flip used to need.
  *
- * G-UX (items 6/7): the pane is subject + files now — `CommitMeta.vue`'s own `selectParentCommit`
- * emit (and this component's own forwarding of it) is gone along with the Parent row itself; the
- * graph's own edges are how you reach a parent. `CommitMeta` used to mount twice here (message
- * above the tree, a second "details" instance for Refs/Signature/PR below it, each with its own
- * scroll cap) — it is a single instance now, folding all of that behind one "Show more" region, so
- * nothing renders stranded below the file tree any more. The collapsed-state proportion is
- * enforced the same way as before: `CommitMeta.vue`'s own root is `flex-none` with a `max-height`
- * cap (a bounded `%` of the pane's own height, not of the viewport — P110 A14 moved the cap and its
- * `expanded` variant fully into `CommitMeta.vue` itself, since only it knows that state), and
- * `<FileTree>` here is `flex-auto` and takes the remainder.
+ * The pane is subject + files now — `CommitMeta.vue`'s own `selectParentCommit` emit (and this
+ * component's own forwarding of it) is gone along with the Parent row itself; the graph's own
+ * edges are how you reach a parent. `CommitMeta` used to mount twice here (message above the tree,
+ * a second "details" instance for Refs/Signature/PR below it, each with its own scroll cap) — it
+ * is a single instance now, folding all of that behind one "Show more" region, so nothing renders
+ * stranded below the file tree any more. The collapsed-state proportion is enforced the same way
+ * as before: `CommitMeta.vue`'s own root is `flex-none` with a `max-height` cap (a bounded `%` of
+ * the pane's own height, not of the viewport — the cap and its `expanded` variant are fully in
+ * `CommitMeta.vue` itself, since only it knows that state), and `<FileTree>` here is `flex-auto`
+ * and takes the remainder.
  */
 import type { CommitStore } from '@kira/git-core';
 import EmptyState from '@theme/components/EmptyState.vue';

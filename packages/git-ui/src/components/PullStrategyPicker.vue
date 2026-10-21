@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P8.md` W17: the toolbar's Pull control — a split button, `[Pull] [▾]`, mirroring
+ * The toolbar's Pull control — a split button, `[Pull] [▾]`, mirroring
  * `BranchPicker.vue`'s own trigger/panel shape but at toolbar scale. The main button runs Pull
- * following the resolved default (§7.3's ladder, no override); the chevron opens a small popover
+ * following the resolved default (the ladder, no override); the chevron opens a small popover
  * offering the three explicit strategies plus that same default, each running Pull immediately
  * on selection rather than staging a separate confirm step — a second click to *run* what the
- * user just picked would be friction §7.3 never asked for (only "show it before it runs", which
+ * user just picked would be friction never asked for (only "show it before it runs", which
  * `OpsState.runPull` already guarantees by resolving-then-announcing before `remote.run`).
  *
  * The popover's own "Default" row previews the ladder's live resolution (`previewPullStrategy`)

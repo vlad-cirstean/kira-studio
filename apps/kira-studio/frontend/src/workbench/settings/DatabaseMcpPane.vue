@@ -111,10 +111,10 @@ const dbMcpEnabledId = useId();
 
 <template>
   <div class="contents" v-show="active">
-    <!-- M1 §6.2: this leaf (dbMcp.serverEnabled) both persists and starts/stops the embedded
+    <!-- This leaf (dbMcp.serverEnabled) both persists and starts/stops the embedded
          DB MCP server in one call, so it belongs on the action side of the draft/Save line,
          never mixed with it. Toggle, then command, then button, strictly in that DOM order
-         (§11.4/SPEC's own "enabling is never a silent action"). -->
+         ("enabling is never a silent action"). -->
     <Field orientation="horizontal" class="items-start">
       <Switch
         :id="dbMcpEnabledId"
@@ -133,9 +133,9 @@ const dbMcpEnabledId = useId();
       <Alert v-if="dbMcpStore.status.error" variant="error" data-testid="db-mcp-error">
         <AlertDescription>{{ dbMcpStore.status.error }}</AlertDescription>
       </Alert>
-      <!-- F9: Regenerate must render whenever the server is running, in both branches below —
+      <!-- Regenerate must render whenever the server is running, in both branches below —
            the expired-token message further down ("regenerate it above") has no remedy otherwise
-           once a command was shown (the common case post-F8: the command shows across ordinary
+           once a command was shown (the common case: the command shows across ordinary
            restarts now, so this is no longer the rare branch it used to be). -->
       <template v-else-if="dbMcpStore.status.running">
         <template v-if="dbMcpStore.status.command">

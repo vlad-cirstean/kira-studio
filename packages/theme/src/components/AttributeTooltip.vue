@@ -7,21 +7,21 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
-// P104 §6.4: the one attribute-driven tooltip residue. SlickGridHost.vue/ConsoleSlickGrid.vue put
+// The one attribute-driven tooltip residue. SlickGridHost.vue/ConsoleSlickGrid.vue put
 // `data-kira-tip`/`data-kira-tip-parts` into SlickGrid's own `headerCellAttrs` -- a static bag on
 // DOM SlickGrid creates, not Vue, so no `TooltipTrigger` can wrap a header cell. This drives the
 // same reka TooltipRoot context a real trigger would, by hand: a `pointermove` listener scoped to
 // the grid's own header row (never `document`) resolves the hovered `[data-kira-tip]` cell with
 // `closest()`, then calls the imperative `onTriggerEnter()`/`onTriggerLeave()` TooltipAnchorBridge
 // exposes. Delay/rearm timing still comes entirely from TooltipProvider -- only "which element is
-// hovered" is app code, and only because SlickGrid owns that DOM (§6.6: this bridge is the
+// hovered" is app code, and only because SlickGrid owns that DOM (this bridge is the
 // exception, not a general replacement for the real Tooltip/TooltipTrigger/TooltipContent trio
 // every other call site converts to).
 import { useEventListener } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import TooltipAnchorBridge from './TooltipAnchorBridge.vue';
 
-/** P42 D19: the structured half of a tooltip — carried in a second attribute (`data-kira-tip-
+/** The structured half of a tooltip — carried in a second attribute (`data-kira-tip-
  *  parts`, this file's own `PARTS_ATTR`) so `data-kira-tip` itself stays the exact newline-joined
  *  plain text it always was (the a11y mirror, and every existing Playwright assertion). A plain
  *  string tooltip never sets this at all. */
@@ -45,11 +45,11 @@ const PARTS_ATTR = 'data-kira-tip-parts';
 const props = defineProps<{
   /** The grid's own header row element(s). Scoping the listener to them (instead of `document`)
    *  keeps this mountable twice (SlickGridHost.vue and ConsoleSlickGrid.vue each own a grid) with
-   *  no cross-talk, and matches how little of `document`-level hit-testing state/tooltip.ts's D3
+   *  no cross-talk, and matches how little of `document`-level hit-testing state/tooltip.ts's
    *  comment needed in the first place -- SlickGrid's header row is the only DOM this ever hits.
    *  An array, not a single element: SlickGrid always splits the header row into two sibling DOM
    *  panes (frozen columns + the rest), with no narrower common ancestor than the whole grid --
-   *  `useEventListener` takes `Arrayable<HTMLElement>` natively, so the caller just passes both. */
+   *  `useEventListener` takes `Arrayable<HTMLElement>` natively, so the caller passes both. */
   container: HTMLElement[] | HTMLElement | null;
 }>();
 
@@ -119,7 +119,7 @@ useEventListener(containerRef, 'focusout', onFocusOut);
   <TooltipProvider>
     <Tooltip>
       <!-- reka's raw PopperAnchor (what a `reference` point normally anchors through, per
-           ContextMenu.vue's own §5.2 precedent) is not a public export -- TooltipTrigger's own
+           ContextMenu.vue's own precedent) is not a public export -- TooltipTrigger's own
            `reference` prop is the public seam that reaches the same PopperAnchor internally, so
            this inert 0x0 span only ever donates its `reference` override; nobody hovers it. -->
       <TooltipTrigger as-child :reference="hoveredEl ?? undefined">

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-// P104 §5: the point-anchored singleton menu, reopened on reka's own DropdownMenuRoot. One shared
+// The point-anchored singleton menu, reopened on reka's own DropdownMenuRoot. One shared
 // menu opened imperatively from useContextMenuStore() at an arbitrary (x, y) — a 0x0 fixed
 // DropdownMenuTrigger at that point is the same virtual-anchor shape reka's own ContextMenuTrigger
-// renders internally (MenuAnchor :reference), expressed with public components only (§5.2).
+// renders internally (MenuAnchor :reference), expressed with public components only.
 import {
   DropdownMenu,
   DropdownMenuContent,

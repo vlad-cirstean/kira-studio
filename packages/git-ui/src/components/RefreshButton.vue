@@ -1,21 +1,20 @@
 <script setup lang="ts">
 /**
- * §6.2's refresh action: the leftmost operation button, `F5`. Calls
+ * The refresh action: the leftmost operation button, `F5`. Calls
  * `GraphViewState.refresh()`, which already carries its own "second press while running is a
- * no-op" idempotency (§6.2) — the `disabled` attribute here is belt-and-braces, not the only
+ * no-op" idempotency — the `disabled` attribute here is belt-and-braces, not the only
  * guard. Spins only while `loading === "refreshing"`, not for an unrelated `loadMore`/`loadAll`
  * in flight, so the icon never implies a re-walk that is not happening.
  *
  * A `repo.changed` event with `kind: "refsChanged"` shows a small dot and changes the tooltip,
- * cleared again whenever `loading` leaves `"refreshing"` — manual or automatic. G-UX D10 made the
- * graph itself auto-refresh on this same signal, so this dot now exists purely as the *backup*
- * for whatever case genuinely did not auto-refresh, not as the primary mechanism P4 originally
- * shipped it as.
+ * cleared again whenever `loading` leaves `"refreshing"` — manual or automatic. The graph itself
+ * auto-refreshes on this same signal, so this dot now exists purely as the *backup* for whatever
+ * case genuinely did not auto-refresh, not as the primary mechanism.
  *
- * The `F5` keybinding itself is not attached here: `CommitGrid.vue` (W6) already owns a
+ * The `F5` keybinding itself is not attached here: `CommitGrid.vue` already owns a
  * keydown listener scoped to its own host element and emits a `refresh` event from it, which is
- * exactly "while the panel has focus" (§6.2) — precise focus scoping a second, independent
- * document-level listener here could not match without duplicating it. `App.vue` (W11) wires
+ * exactly "while the panel has focus" — precise focus scoping a second, independent
+ * document-level listener here could not match without duplicating it. `App.vue` wires
  * that emit to this component's exposed `refresh()`, so both paths share one implementation and
  * one `hasPendingChange` state.
  */

@@ -47,7 +47,7 @@ const props = defineProps<{
 
 /** Bubbled to `BranchPicker.vue` → `App.vue`, which owns `StashDialog.vue`'s branch-mode state —
  *  mirroring `createBranchHere`'s own App.vue-owned dialog state (this component has nowhere of
- *  its own to render a name-entry dialog into). `saveEntryToGlobalStash` (G28 D13) is the same
+ *  its own to render a name-entry dialog into). `saveEntryToGlobalStash` is the same
  *  shape for the save-mode's own pre-selected source. */
 const emit = defineEmits<{
   (e: 'branchFromStash', entry: StashEntry): void;

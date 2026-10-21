@@ -15,10 +15,10 @@ import { nextDocumentProjectionOnClose } from './projection';
 import { useDocumentViewStore } from './state';
 
 // Mirrors views/grid/ColumnsMenu.vue's UI pattern exactly (same header buttons, same list, same
-// footer line), but a document collection has no catalog to list fields from (§0 note: "Documents'
-// 'columns' are dynamic per-document fields") — so the candidate list is `fieldNamesOnPage()`, the
-// union of the loaded page's own top-level field names, shared with DocumentView.vue's toolbar
-// badge so the two can't drift on how a body is parsed into field names.
+// footer line), but a document collection has no catalog to list fields from — so the candidate
+// list is `fieldNamesOnPage()`, the union of the loaded page's own top-level field names, shared
+// with DocumentView.vue's toolbar badge so the two can't drift on how a body is parsed into field
+// names.
 const props = defineProps<{ tabId: string; caps: Caps | null }>();
 const documentViewStore = useDocumentViewStore();
 
@@ -32,7 +32,7 @@ function currentProjection(): string[] | null {
   return useTabsStore().findDocumentTab(props.tabId)?.state.projection ?? null;
 }
 
-// P108 Part 11 F6: the projection the menu opened with, kept apart from `selected` (which the
+// The projection the menu opened with, kept apart from `selected` (which the
 // checkboxes mutate) so an untouched close can tell "nothing changed" from "the user chose the
 // same fields All would" — see onUnmounted below. Note fieldNames is itself the *already
 // projected* page's own field set, so it can legitimately equal the active projection exactly
@@ -42,7 +42,7 @@ const initialProjection = currentProjection();
 const initialSelected = new Set(initialProjection ?? fieldNames);
 const selected = ref<Set<string>>(new Set(initialSelected));
 
-// F6: "everything" is only ever what an explicit All press means, never inferred from `selected`
+// "everything" is only ever what an explicit All press means, never inferred from `selected`
 // happening to match fieldNames.length by coincidence (the projected-page-equals-its-own-
 // projection case above). Toggling a single checkbox, or None, is never "everything" either, even
 // if a toggle-back-on later makes the set match fieldNames again.
@@ -62,7 +62,7 @@ function selectNone(): void {
   selected.value = new Set();
 }
 
-// P104 §3: PopoverPanel's own close-commits-selection contract, preserved by committing on
+// PopoverPanel's own close-commits-selection contract, preserved by committing on
 // unmount instead of on a `close` emit -- the caller's Popover (ui/popover) unmounts this
 // component's content on close for every reason (outside click, Escape, or the toolbar toggle
 // button), the same set PopoverPanel's own hand-rolled backdrop+Escape handling covered.

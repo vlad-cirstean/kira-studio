@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableRow } from '@theme/components/ui/tabl
 import { t } from '@theme/i18n';
 import { rowMeta } from '@theme/lib/rowVariants';
 
-// P23 D6/D5/D9: one `definition.sections[]` entry — a Kafka topic's Partitions/Configuration, a
+// One `definition.sections[]` entry — a Kafka topic's Partitions/Configuration, a
 // consumer group's Group/Members/Committed offsets, an SQS queue's Attributes. Same section chrome
 // and count badge IndexesSection.vue already uses, over a generic name/value/muted-detail row list
 // rather than a per-kind table, since the adapter (not this component) decides what belongs here.

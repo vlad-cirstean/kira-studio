@@ -1,27 +1,27 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P6.md` W15: §7's confirm step, "only when destructive or when pre-flight found a
- * hazard". `OpsState.runCheckout` only ever awaits this dialog for a `"blocked"` verdict (`clean`
- * and `cleanCarry` proceed with no prompt, §7.5 taken literally — see that method's own doc
- * comment) — so this file has nothing to render for either of those and never receives one.
+ * The confirm step, "only when destructive or when pre-flight found a hazard".
+ * `OpsState.runCheckout` only ever awaits this dialog for a `"blocked"` verdict (`clean` and
+ * `cleanCarry` proceed with no prompt — see that method's own doc comment) — so this file has
+ * nothing to render for either of those and never receives one.
  *
- * `docs/plans/P9.md`: a bare `blockedByTracked` (no untracked block alongside it) also offers
+ * A bare `blockedByTracked` (no untracked block alongside it) also offers
  * `"stashAndCarry"` in `preflight.routes` — the "Stash changes and check out" button below,
  * calling straight back into `resolveCheckoutDialog` exactly like Discard/Cancel do, since
  * `runCheckout`'s own inline handling of that route (not a second dialog) is the rest of the
  * confirm step.
  *
- * G28 D16: `OpsState.runCheckout` now resolves a blocked verdict AUTOMATICALLY — no dialog at all
+ * `OpsState.runCheckout` now resolves a blocked verdict AUTOMATICALLY — no dialog at all
  * — whenever `preflight.routes` offers `"detachHere"` (always) or `"autoStash"` (when
  * `kiraSpace.checkout.autoStash` is on), re-issuing the same op with `mode: 'detach'` and/or
  * `autoStash: true` instead. This dialog now only ever opens for what is LEFT after that: an
  * `inProgressOperation` blocker (routing is never offered for one), or a blocked verdict with
  * neither route available (a tracked-only or untracked-only block when `autoStash` itself is off,
  * or `StashAvailable` were ever false). Its own Discard/Stash-and-carry/Cancel buttons, and the
- * `#stashAndCarry` route they call into, are completely UNCHANGED — this file simply gets called
+ * `#stashAndCarry` route they call into, are completely UNCHANGED — this file gets called
  * less often than before.
  *
- * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now (reka-ui's own
+ * The modal shell is shadcn's `Dialog`/`DialogContent` now (reka-ui's own
  * `FocusScope`/Escape/outside-click replace `KuiDialog`'s hand-rolled equivalents) — this file
  * still only supplies its own body/footer content.
  */

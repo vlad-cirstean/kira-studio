@@ -15,7 +15,7 @@ import { useSettingsStore } from '../../state/settings';
 import { getPlan } from './explainResults';
 import type { PlanNode } from './planModel';
 
-// P18 (v1.1) C12/D17: the plan-result sibling of ConsoleResultGrid.vue, mounted instead of it when
+// The plan-result sibling of ConsoleResultGrid.vue, mounted instead of it when
 // the active result set's `kind` is 'plan' (ConsoleView.vue). Reads its own data from
 // explainResults.ts by `pageKey` — same "one prop, resolve everything else from a store" shape
 // ConsoleResultGrid.vue's own `pageKey` already uses.

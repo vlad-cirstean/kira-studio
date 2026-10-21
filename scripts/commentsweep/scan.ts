@@ -1,9 +1,9 @@
 // Comment extraction and code-identity helper for scripts/commentsweep (Go does everything else).
 //   bun scan.ts scan   stdin: one repo-relative path per line; stdout: one JSON line per file
 //                      {file, error?, ranges: [{start, end, kind}]} with UTF-8 byte offsets, end exclusive
-//   bun scan.ts check  stdin: JSON lines {file, before, after}; stdout: {file, ok, reason, ranges, rangesBefore}
+//   bun scan.ts check  stdin: JSON lines {file, before, after}; stdout: {file, ok, reason, ranges, rangesBefore}, ranges as "start,end,kind;..."
 //                      ok when the code is identical once comments are stripped; ranges and rangesBefore are the comment ranges of the after and before files
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import {
   compileTemplate,
@@ -198,6 +198,21 @@ export function codeDiff(name: string, before: string, after: string): string {
   return '';
 }
 
+/** Writes one JSON line synchronously; console.log into a pipe loses output past the 64 KiB pipe buffer. */
+function emit(v: unknown) {
+  const buf = Buffer.from(`${JSON.stringify(v)}\n`);
+  let off = 0;
+  while (off < buf.length) {
+    try {
+      off += writeSync(1, buf, off);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'EAGAIN') throw e;
+    }
+  }
+}
+
+const compact = (rs: Range[]) => rs.map((r) => `${r.start},${r.end},${r.kind[0]}`).join(';');
+
 async function main(mode: string) {
   const rl = createInterface({ input: process.stdin });
   for await (const line of rl) {
@@ -205,10 +220,9 @@ async function main(mode: string) {
     if (mode === 'scan') {
       const file = line.trim();
       try {
-        const text = readFileSync(file, 'utf8');
-        console.log(JSON.stringify({ file, ranges: comments(file, text) }));
+        emit({ file, ranges: comments(file, readFileSync(file, 'utf8')) });
       } catch (e) {
-        console.log(JSON.stringify({ file, error: String(e), ranges: [] }));
+        emit({ file, error: String(e), ranges: [] });
       }
     } else if (mode === 'check') {
       const { file, before, after } = JSON.parse(line) as {
@@ -218,17 +232,16 @@ async function main(mode: string) {
       };
       try {
         const reason = codeDiff(file, before, after);
-        console.log(
-          JSON.stringify({
-            file,
-            ok: reason === '',
-            reason,
-            ranges: reason === '' ? comments(file, after) : [],
-            rangesBefore: reason === '' ? comments(file, before) : [],
-          }),
-        );
+        const ok = reason === '';
+        emit({
+          file,
+          ok,
+          reason,
+          ranges: ok ? compact(comments(file, after)) : '',
+          rangesBefore: ok ? compact(comments(file, before)) : '',
+        });
       } catch (e) {
-        console.log(JSON.stringify({ file, ok: false, reason: String(e), ranges: [] }));
+        emit({ file, ok: false, reason: String(e), ranges: '', rangesBefore: '' });
       }
     }
   }

@@ -12,7 +12,7 @@ import { cn } from '@theme/lib/utils';
 import type { HTMLAttributes } from 'vue';
 import { ref, useAttrs } from 'vue';
 
-// P110 I2-22 (§3.10): today's InputGroup + InputGroupInput type="number" + two Tooltip-wrapped
+// Today's InputGroup + InputGroupInput type="number" + two Tooltip-wrapped
 // InputGroupButton steppers recipe, carried once instead of 14 times. Owns the container ref and
 // the stepUp/stepDown + synthetic input/change dispatch that used to live in the now-deleted
 // useNumberStepper.ts composable.

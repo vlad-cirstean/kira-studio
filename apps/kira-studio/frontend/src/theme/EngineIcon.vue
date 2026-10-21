@@ -12,7 +12,7 @@ import {
 } from 'simple-icons';
 import { computed } from 'vue';
 
-// P16 design system: the products' own marks, imported from simple-icons (see NOTICES.md) and
+// The products' own marks, imported from simple-icons (see NOTICES.md) and
 // drawn in each icon's real brand `hex`, not currentColor. Each mark is authored on a 24x24 grid;
 // `translate(2,2) scale(0.5)` maps that onto this component's 16x16 canvas. SQS and S3 have no
 // simple-icons entry (Amazon publishes no per-service marks there either, only a generic AWS
@@ -25,7 +25,7 @@ import { computed } from 'vue';
 // (MariaDB, SQLite, Kafka) are otherwise near-invisible on Kira's dark chrome, and a flat chip
 // (tried first, in rounded-square and various tint forms) covered too much of the small glyph and
 // read as a blocky sticker rather than the mark itself. #ececec was kept as the halo color (over
-// plain #fff, which read too bright/harsh) from that earlier iteration.
+// plain #fff, which read too bright/harsh).
 // Unlike Devicon, the 8 simple-icons imports are genuine ES imports (simple-icons
 // ships real named exports and "sideEffects": false), so only the 8 referenced consts should end
 // up in the bundle.

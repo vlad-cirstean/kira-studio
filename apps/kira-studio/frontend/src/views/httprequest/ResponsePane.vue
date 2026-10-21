@@ -55,10 +55,9 @@ function closeCompare(): void {
   compareIds.value = null;
 }
 
-// P8 D10: the source swap — a selected history entry's response, or the live one, or none. Every
+// The source swap — a selected history entry's response, or the live one, or none. Every
 // consumer below (the status chip, the hint, elapsed/bytes, the redirect caption, the truncation
-// strip, the headers list, the binary note, prettyFormat, bodyText) reads only this one object,
-// unchanged from before this phase.
+// strip, the headers list, the binary note, prettyFormat, bodyText) reads only this one object.
 const response = computed(() => viewing.value?.snapshot.response ?? rt.value?.response ?? null);
 
 const hasHistory = computed(() => historyEntries.value.length > 0);
@@ -146,10 +145,9 @@ function setResponseView(view: 'pretty' | 'raw'): void {
   patchHttpRequestTabState(props.tab.id, { responseView: view });
 }
 
-// P28 D1 reverses D11's "always shown inline, not tooltip-only": the standing caption under the
-// status row was reported as noise. The hint is now the status chip's tooltip, which is what the
-// four other consumers of `statusHint` in this app (ResponseHistoryList, ResponseDiffDialog,
-// TimelinePane) have always done with it.
+// The standing caption under the status row was reported as noise. The hint is now the status
+// chip's tooltip, which is what the four other consumers of `statusHint` in this app
+// (ResponseHistoryList, ResponseDiffDialog, TimelinePane) have always done with it.
 const hint = computed(() => (response.value ? statusHint(response.value.status) : ''));
 
 const redirectCaption = computed(() => {
@@ -179,11 +177,11 @@ function onBackToLatest(): void {
   httpHistoryStore.backToLatest(props.tab.id);
 }
 
-// P16 D12: the response headers pane's own filter — matches name OR value (unlike D14's
-// variables filter, a header's value is the thing being hunted, is server-provided, and §5 shows
-// it can never be a secret's plaintext). Component-local: a lens over what's on screen, not a
-// setting — P24 D7's "a closed toolbar must never leave rows hidden with no visible cause" is
-// satisfied trivially since the box is always visible while the pane is.
+// The response headers pane's own filter — matches name OR value (unlike the variables filter,
+// a header's value is the thing being hunted, is server-provided, and it can never be a secret's
+// plaintext). Component-local: a lens over what's on screen, not a setting —
+// "a closed toolbar must never leave rows hidden with no visible cause" is satisfied trivially
+// since the box is always visible while the pane is.
 const headerFilter = ref('');
 const filteredHeaders = computed(() => {
   const q = headerFilter.value;
@@ -236,7 +234,7 @@ const findTargets = computed<readonly FindBarTarget[]>(() => {
 });
 
 // Paints exactly the matches the bar itself counts and steps through, onto whichever editor(s)
-// are actually on screen. Reads `findBarRef`'s exposed `query`/`currentGlobal` (and `findTargets`)
+// are on screen. Reads `findBarRef`'s exposed `query`/`currentGlobal` (and `findTargets`)
 // synchronously in this computed's own evaluation — not inside the closures it returns — so this
 // recomputes, and so each editor's `rangeHighlights` prop reference changes (MonacoHost's own
 // watch on that prop is what triggers a repaint), exactly when the query or the current match does.
@@ -335,8 +333,8 @@ onUnmounted(() => {
       />
     </ViewToolbar>
 
-    <!-- Real-interaction fix (reported bug — the response search bar sat below/at the bottom of
-         the response content instead of above it): the app's own established placement for a
+    <!-- The response search bar sat below/at the bottom of the response content instead of
+         above it: the app's own established placement for a
          "search this content" bar — the SQL data view's SearchToolbar (DataView.vue's own
          `#strips` slot, docked "below the filter row, not floating over the grid it searches" —
          that same file's own comment records "the 'docks at the bottom of the result' placement
@@ -346,8 +344,7 @@ onUnmounted(() => {
          it belongs to and above the content it searches, never below the content. This file's own
          previous placement (after the response body, right before ResponseDiffDialog) and
          ResponseFindBar.vue's own comment both cited "LAW 03: docks below the pane it searches" —
-         backwards from what LAW 03 actually establishes everywhere else in this app, corrected
-         here to match. -->
+         backwards from what LAW 03 establishes everywhere else in this app. -->
     <ResponseFindBar
       v-if="findOpen && (tab.state.responsePane === 'body' || tab.state.responsePane === 'raw')"
       ref="findBarRef"
@@ -503,8 +500,8 @@ onUnmounted(() => {
 
     <ResponseDiffDialog v-if="compareIds" :ids="compareIds" @close="closeCompare" />
     <!-- `.response-status-row`/`.response-body` stay bare markers (test locators).
-         P110 I2-17: `.pane-jump-link:hover` moved onto each button's own `hover:text-fg` (a plain
-         button reset rather than AppButton's own chrome, so the status row's look is unchanged) --
-         no test locates by that class, so the marker drops. -->
+         `.pane-jump-link:hover` moved onto each button's own `hover:text-fg` (a plain button reset
+         rather than AppButton's own chrome, so the status row's look is unchanged) -- no test
+         locates by that class, so the marker drops. -->
   </div>
 </template>

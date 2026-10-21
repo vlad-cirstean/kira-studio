@@ -5,10 +5,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { t } from '@theme/i18n';
 import { computed } from 'vue';
 
-// P119: hoisted from Kira Studio's own StatusBar.vue (same data-testid, same markup) —
+// Hoisted from Kira Studio's own StatusBar.vue (same data-testid, same markup) —
 // AppMetricsItem.vue's own plain-props shape, shared with Kira Space's own status bar. The click
-// used to open GitHub's release page directly (OpenReleasePage); it now just tells the store to
-// open the in-app dialog (§4.6's deliberate behavior change).
+// used to open GitHub's release page directly (OpenReleasePage); it now tells the store to
+// open the in-app dialog (the deliberate behavior change).
 const props = defineProps<{ latestVersion: string; currentVersion: string }>();
 
 const emit = defineEmits<(e: 'open') => void>();

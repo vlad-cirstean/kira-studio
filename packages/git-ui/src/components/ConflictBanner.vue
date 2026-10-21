@@ -1,23 +1,22 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P6.md` W16: §7.11's "make it impossible to miss" — flagged in this phase's own plan
- * as needing extra care, so this file is deliberately conservative: it reads nothing but
- * `ops.statusSummary.value.inProgress` (the one place `classifyInProgress`'s precedence table
- * already lives, in `core`), and touches no state of its own beyond which of its three actions is
- * mid-request.
+ * "make it impossible to miss" — flagged as needing extra care, so this file is deliberately
+ * conservative: it reads nothing but `ops.statusSummary.value.inProgress` (the one place
+ * `classifyInProgress`'s precedence table already lives, in `core`), and touches no state of its
+ * own beyond which of its three actions is mid-request.
  *
  * Persistent, above the graph, present for exactly as long as `inProgress !== null` — reactive
- * through `OpsState.refreshStatus`'s own `repo.changed` subscription (W12), which is what makes
+ * through `OpsState.refreshStatus`'s own `repo.changed` subscription, which is what makes
  * "Continue re-enables without a manual refresh once the last conflict is staged" true: the
  * watcher already fires on an `index` touch (`git add` is exactly that), `refreshStatus` re-reads
  * `unmergedCount`, and this component is a plain `computed` over the result — there is nothing
  * here to explicitly "recheck".
  *
- * `role="status"`, not `role="alert"` (W20's own reasoning, restated here since it is easy to get
- * backwards): `alert` is for a message that appears and is gone: an assertive region that *stays
- * on screen* for the length of an entire git operation is a screen-reader trap, re-announcing
- * itself on every incidental change unless the AT's own heuristics happen to suppress it. `status`
- * still announces on appearance (the whole point) without demanding attention indefinitely.
+ * `role="status"`, not `role="alert"`: `alert` is for a message that appears and is gone: an
+ * assertive region that *stays on screen* for the length of an entire git operation is a
+ * screen-reader trap, re-announcing itself on every incidental change unless the AT's own
+ * heuristics happen to suppress it. `status` still announces on appearance (the whole point)
+ * without demanding attention indefinitely.
  */
 import { describeInProgress } from '@kira/git-core';
 import { Alert } from '@theme/components/ui/alert';

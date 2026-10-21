@@ -1,14 +1,14 @@
 <script setup lang="ts">
 /**
- * G26 D3/F13/F14: `BranchPicker.vue`'s Stacks tab — one sub-list per `StackSummary`, rows
- * pre-order bottom-to-top with `depth`-driven indent (D3), a PR badge and track text reused
- * verbatim from `ChangeRequestState.byBranch`/`RefRow` (F13/F14), a stale chip, and a header "Restack" button
+ * `BranchPicker.vue`'s Stacks tab — one sub-list per `StackSummary`, rows
+ * pre-order bottom-to-top with `depth`-driven indent, a PR badge and track text reused verbatim
+ * from `ChangeRequestState.byBranch`/`RefRow`, a stale chip, and a header "Restack" button
  * per stack. Row-level "Set stack parent…"/"Remove from stack" mirror `WorktreeList.vue`'s own
  * "this component has nowhere of its own to do X" shape: both EMIT the intent for `App.vue` to
  * open `StackDialog.vue` with, rather than this file owning a second dialog. The Restack button
- * does the same — `StackDialog.vue` is the one place the plan/blockers/progress actually render.
+ * does the same — `StackDialog.vue` is the one place the plan/blockers/progress render.
  *
- * P77 §11: `stacks`/`orphans` are already filtered/capped by `pickerModel.ts` (each stack group
+ * `stacks`/`orphans` are already filtered/capped by `pickerModel.ts` (each stack group
  * carries its own already-`StackSummary`, so the per-stack header's "Restack" target/`needsRestack`
  * gate reads `group.summary` directly rather than a second, unfiltered lookup) — this component no
  * longer reads `stack.stacks.value`/`stack.orphans.value` for rendering, and no longer needs the

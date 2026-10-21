@@ -4,19 +4,19 @@ import { TransportError } from '@kira/git-ipc';
 import EmptyState from '@theme/components/EmptyState.vue';
 import { Button } from '@theme/components/ui/button';
 /**
- * `docs/plans/P7.md` W11 — the sidebar view's whole root, mounted by `main.ts` in place of
- * `App.vue` when `view === "review"` (§6.8/D41: same bundle, a different root, selected from the
+ * The sidebar view's whole root, mounted by `main.ts` in place of
+ * `App.vue` when `view === "review"` (same bundle, a different root, selected from the
  * host's own injected initial state). Five real states, never a blank panel: no branch, ask for a
- * base, unrelated histories, nothing to review, and the list — plus two states the plan's own text
- * does not name but a real host can reach: `"resolving"` (a brief request in flight) and
- * `"error"` (`review.resolveBase` itself failed — a genuine transport/host error, not one of
- * §6.8's four *answers*, still needs a real rendering rather than nothing at all).
+ * base, unrelated histories, nothing to review, and the list — plus two states
+ * a real host can reach: `"resolving"` (a brief request in flight) and
+ * `"error"` (`review.resolveBase` itself failed — a genuine transport/host error, not one of the
+ * four *answers*, still needs a real rendering rather than nothing at all).
  *
- * `NullViewStateStore` (W9) is what the mount call site hands this component's `viewState` prop —
+ * `NullViewStateStore` is what the mount call site hands this component's `viewState` prop —
  * accepted here only because `AppRoot` and `ReviewView` share one `MountOptions` shape; this
- * component never reads or writes it (§6.8: "the view persists nothing at all").
+ * component never reads or writes it ("the view persists nothing at all").
  *
- * How the view learns which branch to review (D40's three arms, all handled here):
+ * How the view learns which branch to review (the three arms, all handled here):
  * 1. `props.target` — the cold-bootstrap arm, read once at mount from `html.ts`'s bootstrap
  *    island (a `review.open`/the palette command revealed a *new* webview with a target already
  *    pending).
@@ -80,18 +80,18 @@ watch(repoId, (id) => refsState.setRepoId(id));
 let unsubscribeTarget: (() => void) | undefined;
 let unsubscribeUiAction: (() => void) | undefined;
 
-// P108 F6: one target-sequence token, bumped by every `applyTarget` call — the one place every
+// One target-sequence token, bumped by every `applyTarget` call — the one place every
 // "which repoId/branch is this view now reviewing" transition funnels through (a `review.target`
 // push, a user's own branch/base pick, `recompare`, `resumeSession`, cold bootstrap). Each
 // caller that applies further state after its own additional awaits (`setBase`, `setPane`,
 // `listMode`/`filter`/`diffMode` restores) captures the token `applyTarget` returns and re-checks
 // it before every one of those later writes, skipping any whose token has gone stale — a newer
 // target already superseded it, so an older override base/pane/filter must not land on top of
-// the newer target's own state. Mirrors `GraphViewState`'s own `#loadGeneration` (Part 18 F1) /
-// `RepoState`'s own open-sequence token (P108 F4) for the identical shape.
+// the newer target's own state. Mirrors `GraphViewState`'s own `#loadGeneration` /
+// `RepoState`'s own open-sequence token for the identical shape.
 let targetSequence = 0;
 
-/** P108 F10: `main.ts` sets no `app.config.errorHandler`, so a `void`-called (or unawaited) async
+/** `main.ts` sets no `app.config.errorHandler`, so a `void`-called (or unawaited) async
  *  operation that rejects becomes a silent, unhandled rejection. Every fire-and-forget call in
  *  this file routes its own rejection through this, into the same live region this file's other
  *  `announce(...)` calls already drive. `transport-closed` (the one code
@@ -143,7 +143,7 @@ function retryCompare(): void {
 }
 
 async function bootstrap(): Promise<void> {
-  // P108 F7: a retry re-enters here after an earlier run already subscribed and constructed
+  // A retry re-enters here after an earlier run already subscribed and constructed
   // states — unsubscribe and dispose that run's own before replacing them, so a failed run never
   // leaves a `review.target`/`ui.action` handler firing twice, or a state object leaking
   // its own subscription forever.
@@ -176,7 +176,7 @@ async function bootstrap(): Promise<void> {
     return;
   }
   const list = await bridge.request('repo.list', {});
-  // P108 F6: a `review.target` push can land during this await (the `bridge.on('review.target',
+  // A `review.target` push can land during this await (the `bridge.on('review.target',
   // ...)` listener just above is already live) and already call `applyTarget`, setting `repoId`
   // itself — must not then clobber it with the workspace's own default active repo while
   // `review` still holds the pushed repo/branch.
@@ -190,7 +190,7 @@ async function bootstrap(): Promise<void> {
 }
 
 /**
- * G19 D11b: the read half of durable persistence — its own round trip, made once `bootstrap()`
+ * The read half of durable persistence — its own round trip, made once `bootstrap()`
  * has a real `repoId` in hand (right here, alongside `props.target`/`review.target`'s own
  * priority, both of which still win unchanged: `props.target` already returned above, and a
  * `review.target` push that races ahead of this call already set `review.branch.value`, checked
@@ -221,7 +221,7 @@ async function resumeSession(id: string): Promise<void> {
   reviewFiles.value?.setDiffMode(session.diffMode);
 }
 
-/** G19 D11b: the write half — one `watch()` over the same fields the snapshot lists, coalesced
+/** The write half — one `watch()` over the same fields the snapshot lists, coalesced
  *  with a trivial `queueMicrotask` (this is not a hot path). `persistSession` reads the *current*
  *  values itself rather than the watcher's own old/new arguments, so several fields changing in
  *  the same tick (e.g. `setTarget` resetting `pane` while also changing `branch`) still produce
@@ -316,8 +316,8 @@ function onUiAction(action: UiActionKind): void {
 
 // ---------------------------------------------------------------------------------------
 // The Files pane's own target: kept in step with the review session's resolved (branch, base)
-// rather than owned by ReviewSessionState itself (D16's "state/review.ts — one field: the pane
-// the view is showing" — the file list's own request lifecycle stays here).
+// rather than owned by ReviewSessionState itself (the file list's own request lifecycle stays
+// here).
 // ---------------------------------------------------------------------------------------
 watch(
   () => {
@@ -334,7 +334,7 @@ watch(
 );
 
 // ---------------------------------------------------------------------------------------
-// The Comments pane's own target (G13 D10) — repoId + branch only, no base: the session key
+// The Comments pane's own target — repoId + branch only, no base: the session key
 // review.comment.* is keyed on has none. setPane/setBase already reset the pane to 'commits', so
 // this never needs its own reset logic beyond ReviewCommentsState.setTarget's own.
 // ---------------------------------------------------------------------------------------
@@ -373,8 +373,8 @@ const filesActions = createReviewFilesActions(bridge, () => repoId.value, announ
 
 onMounted(() => {
   props.onReviewApi?.({ selectFile: (path) => reviewFiles.value?.selectFile(path) });
-  // Mirrors `App.vue`'s own first-paint mark (§5.1 — W18's review-view perf metric measures from
-  // this, not merely from `kira:page-parsed`). Unlike the graph panel there is no lane-layout
+  // Mirrors `App.vue`'s own first-paint mark (the review-view perf metric measures from this, not
+  // merely from `kira:page-parsed`). Unlike the graph panel there is no lane-layout
   // worker to wait a frame for, so this can mark right after mount rather than waiting on a
   // `CommitGrid.vue`-equivalent chunk-applied event.
   requestAnimationFrame(() => {
@@ -400,14 +400,14 @@ onBeforeUnmount(() => {
   bridge.dispose();
 });
 
-// G12 D13: one panel-level filter/list-mode toolbar, replacing what used to be a separate
-// FileTree toolbar per expanded row (and a third copy in ReviewFilesPane, G11). Owns the state;
+// One panel-level filter/list-mode toolbar, replacing what used to be a separate
+// FileTree toolbar per expanded row (and a third copy in ReviewFilesPane). Owns the state;
 // ReviewCommitRow/ReviewFilesPane's own FileTree instances render no toolbar of their own
 // (show-toolbar="false") and receive these as plain props.
 const listMode = ref<FileListMode>('tree');
 const filter = ref('');
 
-// G19 D11b: the write half of durable persistence — one watch() over the same fields the
+// The write half of durable persistence — one watch() over the same fields the
 // snapshot lists (listMode/filter live here; branch/resolution/pane/diffMode are read fresh
 // inside persistSession itself). A getter-source watch over an array literal fires on every
 // tracked-dependency change regardless of the array's own contents, which is exactly right here:

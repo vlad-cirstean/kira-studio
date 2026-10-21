@@ -12,7 +12,7 @@ import {
 } from '@theme/components/ui/tooltip';
 import { computed, useTemplateRef } from 'vue';
 
-// P113 F2: 152 call sites across 52 files repeated this exact
+// 152 call sites across 52 files repeated this exact
 // Tooltip > TooltipTrigger as-child > [TooltipDisabledTrigger] > Button > CodiconIcon shape, 13-16
 // lines of template each. `label` doubles as the tooltip text and the button's `aria-label` (the
 // overwhelming majority of sites use the same string for both); `ariaLabel` is an escape hatch for
@@ -51,7 +51,7 @@ withDefaults(
   },
 );
 
-// fix: a handful of call sites (TimestampPane.vue's calendar trigger, FilterToolbar.vue's history
+// A handful of call sites (TimestampPane.vue's calendar trigger, FilterToolbar.vue's history
 // trigger, StreamView.vue's ×3, DocumentView.vue's ×2) put `ref="x"` on this component expecting
 // `x.value.$el` to be the real button DOM node — the pre-extraction inline Button carried that ref
 // directly. This component's own root is `Tooltip`, which renders a second, teleported

@@ -22,12 +22,10 @@ import { useVirtualRows, VIRTUAL_ROW_CLASS } from '../behaviour/virtualRows';
 import { type OpLogColumn, type OpLogStatusFilter, opLogMenuItems } from '../lib/opLog';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 
-// P132 Part 1 (§2.3): hoisted from Kira Studio's own workbench/panels/OperationsPanel.vue —
-// store-agnostic (props/emits only, no Pinia import here), generic over each app's own record
-// shape so Kira Space's git op log (Part 2) reuses this unchanged. Markup, virtual-list wiring,
-// keyboard handling and every data-testid below are that file's own, byte-for-byte. `columns`
-// replaces its old hard-coded `grid-cols-[90px_140px_...]` arbitrary value (P110 B36's own note
-// there no longer applies — the shape is now data, not a class).
+// Store-agnostic (props/emits only, no Pinia import here), generic over each app's own record
+// shape so Kira Space's git op log reuses this unchanged. `columns` replaces its old
+// hard-coded `grid-cols-[90px_140px_...]` arbitrary value (the note there no longer applies —
+// the shape is now data, not a class).
 interface Props {
   records: readonly R[];
   runningCount: number;
@@ -114,7 +112,7 @@ const listItems = computed<OpsListItem[]>(() => {
   return out;
 });
 
-// P104 §3.4: VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
+// VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
 // useVirtualRows composable -- every row here is a fixed 18px (the same JS/CSS-numeric
 // requirement the component's own comment below states).
 // Fixed rows, numerically equal to --kira-h-xs; the CSS height (h-4.5) must match.
@@ -248,11 +246,11 @@ function elapsedText(record: R): string {
         @scroll="onScroll"
       >
         <!--
-          The expanded command/error detail rows embed a #detail slot (the host app's editor, D18/D19
-          P60a) inside a fixed virtual row rather than the list itself being variable-height (P2 §0
-          note 14 leaves it fixed on purpose). The row height below is JS, not CSS (P24 D34) — it
-          has to stay numerically equal to --kira-h-xs (18px), which every row below and any #detail
-          content's own fixed-height styling must match.
+          The expanded command/error detail rows embed a #detail slot (the host app's editor) inside
+          a fixed virtual row rather than the list itself being variable-height (fixed on purpose).
+          The row height below is JS, not CSS — it has to stay numerically equal to --kira-h-xs
+          (18px), which every row below and any #detail content's own fixed-height
+          styling must match.
         -->
         <ul
           :aria-label="t('common.module.operations.label')"

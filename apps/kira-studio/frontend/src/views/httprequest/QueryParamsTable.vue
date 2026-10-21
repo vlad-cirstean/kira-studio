@@ -13,7 +13,7 @@ import { patchHttpRequestTabState } from '../../api/tabs';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import FieldRowsTable from '../shared/fields/FieldRowsTable.vue';
 
-// D9/D15/C6: a derived two-way editor over the URL, never a stored `params` array (D6) — `pairs`
+// A derived two-way editor over the URL, never a stored `params` array — `pairs`
 // is a pure computed off `tab.state.url`, so typing in the URL field re-renders this table without
 // this component ever writing back; only an edit made *here* calls onUpdateRows, which rewrites
 // the URL.
@@ -28,10 +28,10 @@ const props = defineProps<{
   showDescriptions?: boolean;
 }>();
 
-// P22b D7: a query param row has nowhere of its own to carry a description (F10 — there is no
-// `params` array; the URL is the single source of truth for the query string, D9). `description`
-// is annotation merged in from the tab's own side-car map, keyed by name — never input to
-// buildQuery below, so the two can never disagree about what is actually sent.
+// A query param row has nowhere of its own to carry a description (there is no `params` array;
+// the URL is the single source of truth for the query string). `description` is annotation
+// merged in from the tab's own side-car map, keyed by name — never input to buildQuery below, so
+// the two can never disagree about what is sent.
 interface ParamRow extends QueryPair {
   description: string;
 }

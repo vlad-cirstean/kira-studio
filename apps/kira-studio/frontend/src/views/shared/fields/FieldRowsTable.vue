@@ -18,10 +18,10 @@ import { templateToken, wholeFieldToken } from '@workbench/editor/fieldCompletio
 import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../../api/state/variableCompletion';
 
-// P3 D15/C6: the one row table behind Params, Headers, urlencoded (C7) and form-data (C8) —
+// The one row table behind Params, Headers, urlencoded and form-data —
 // RequestHeadersTable.vue and QueryParamsTable.vue were the same file twice minus a checkbox
 // column. Each wrapper keeps its own write semantics (headers/urlencoded write their array
-// directly; Params writes back through the URL, P2 D9) and supplies only `rows` (the real,
+// directly; Params writes back through the URL) and supplies only `rows` (the real,
 // non-trailing rows) plus a blank-row factory; this component owns the trailing-blank-row UX, the
 // optional checkbox column, and the always-disabled-on-the-trailing-row remove button.
 const props = withDefaults(
@@ -39,17 +39,17 @@ const props = withDefaults(
     /** The outer container's own testid (e.g. `http-headers-table`) — kept at the wrapper's
      *  discretion since the two existing tables pluralize their prefix differently. */
     containerTestid?: string;
-    /** P15b D4: when present, the default value cell renders as an AutocompleteField wired for
+    /** When present, the default value cell renders as an AutocompleteField wired for
      *  `{{variable}}` colouring/hover/completion instead of a plain TextField — absent for any
-     *  caller that has not been wired (form-data's own slot wires this itself, D4's "form-data
-     *  value cells" too, since it overrides the `value` slot entirely). */
+     *  caller that has not been wired (form-data's own slot wires this itself, since it
+     *  overrides the `value` slot entirely). */
     valueVariableSupport?: VariableSupport;
-    /** P15b D7 (item 7): when present, the name cell renders as an AutocompleteField over this
-     *  list, using `wholeFieldToken` (F1: the default word-run tokenizer has no `-`, so typing
+    /** When present, the name cell renders as an AutocompleteField over this
+     *  list, using `wholeFieldToken` (the default word-run tokenizer has no `-`, so typing
      *  `Content-T` would tokenize as just `T` and accepting a suggestion would produce
      *  `Content-Content-Type`). Absent for every caller but the headers table. */
     nameCandidates?: readonly Completion[];
-    /** P22b D2: the value cell's own vocabulary as a function of this row's name — composed with,
+    /** The value cell's own vocabulary as a function of this row's name — composed with,
      *  not replacing, valueVariableSupport.candidates (a header value is very often
      *  `Bearer {{token}}`, which needs both lists live at once). Absent for every caller but the
      *  headers table. */
@@ -77,7 +77,7 @@ const rows = defineModel<T[]>('rows', { required: true });
 // literal per render would change `candidates`' identity on every patch.
 const EMPTY_CANDIDATES: readonly Completion[] = Object.freeze([]);
 
-// P22b D9: a CSS grid, not independent flex items — F13's own finding was that adjacent rows'
+// A CSS grid, not independent flex items — the finding was that adjacent rows'
 // columns never lined up (each field carried its own `flex` value, so a secret/file row with an
 // extra affordance shifted its neighbours). `showEnabled`/`showDescriptions` are fixed per table
 // instance (never vary row to row), so the column count below is a property of the *table*, not
@@ -89,7 +89,7 @@ const gridTemplateColumns = computed(() => {
   return `${checkbox}1.2fr 2fr ${description}auto auto`;
 });
 
-// P16 D13/F11: `index` is the row's position in `rows.value` — i.e. its real write-through index
+// `index` is the row's position in `rows.value` — i.e. its real write-through index
 // — carried alongside the row through filtering, never the position in `displayRows` (which a
 // filter can move). The trailing blank row is appended last and unconditionally, at
 // `index: rows.value.length`: it is the add affordance, not data, and hiding it under a filter
@@ -107,7 +107,7 @@ const displayRows = computed<DisplayEntry[]>(() => {
   return [...filtered, { row: props.blankRow(), index: rows.value.length }];
 });
 
-// P22b D2: composes with templateToken rather than replacing it — a bare position (outside any
+// Composes with templateToken rather than replacing it — a bare position (outside any
 // `{{…}}`) still needs to offer valueCandidatesFor's own vocabulary (`Bearer `, `application/
 // json`, …), which templateToken alone would never surface (it returns null there, closing the
 // popup). templateToken's own `from` is at least 2 inside a reference (it starts after a `{{`);
@@ -148,9 +148,9 @@ function removeRow(index: number): void {
   rows.value = rows.value.filter((_, i) => i !== index);
 }
 
-// P22b D16: the trailing blank row IS the add affordance (displayRows' own comment above), so the
+// The trailing blank row IS the add affordance (displayRows' own comment above), so the
 // row a user needs next is the one that appears BELOW the one they just filled in — off the fold
-// on any table long enough to scroll (F24). `block: 'nearest'` never moves the viewport when the
+// on any table long enough to scroll. `block: 'nearest'` never moves the viewport when the
 // row is already visible, which is the common case and must stay a no-op. Guarded on growth only —
 // a removal shrinking `rows.length` must leave the viewport alone.
 const containerRef = ref<HTMLElement | null>(null);
@@ -165,19 +165,19 @@ watch(
   },
 );
 
-// P15b D6 (item 12): arrow-key navigation across this table's rows, one container-level handler —
-// not a shared `theme/rowKeyNav.ts`-shaped module (OQ-4): `views/grpcrequest/**` may not import
+// Arrow-key navigation across this table's rows, one container-level handler —
+// not a shared `theme/rowKeyNav.ts`-shaped module: `views/grpcrequest/**` may not import
 // `views/httprequest/**` (biome.json), MetadataTable.vue is `views/grpcrequest`'s own literal copy
-// of this table (F18's own trade, accepted deliberately), and this handler is small enough that
+// of this table (the trade, accepted deliberately), and this handler is small enough that
 // duplicating it costs less than the coupling a shared module would create.
 //
 // Column identity is positional among a row's *text* inputs — `input:not([type=checkbox])`
 // excludes the enabled-checkbox column (a real checkbox input, Checkbox.vue) from the
 // count, so form-data's own extra content-type field in the trailing slot does not shift the
-// mapping for rows that lack it (it simply has no target there, and navigation into it does
-// nothing rather than landing on the wrong field). P71 §8.3: `, textarea` covers a `grow` cell's
-// own `<textarea>` — no cell value can contain a newline (§8), so a cell is still one logical
-// line, and this table's own row-stepping contract (P15b D6) is unaffected.
+// mapping for rows that lack it (it has no target there, and navigation into it does
+// nothing rather than landing on the wrong field). `, textarea` covers a `grow` cell's own
+// `<textarea>` — no cell value can contain a newline, so a cell is still one logical
+// line, and this table's own row-stepping contract is unaffected.
 function textInputsIn(row: Element): (HTMLInputElement | HTMLTextAreaElement)[] {
   return Array.from(
     row.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
@@ -200,10 +200,10 @@ function onContainerKeydown(e: KeyboardEvent): void {
     return;
   }
   const el = e.target;
-  // Only real text inputs participate — a native select (form-data's kind picker) or a <button> (Choose
-  // file, Remove) stays Tab-reachable and keeps its own native arrow behaviour untouched. `.type`
-  // exists on both element types (a textarea's own is always the constant 'textarea'), so this one
-  // check still excludes only the enabled-checkbox column.
+  // Only real text inputs participate — a native select (form-data's kind picker) or a <button>
+  // (Choose file, Remove) stays Tab-reachable and keeps its own native arrow behaviour untouched.
+  // `.type` exists on both element types (a textarea's own is always the constant 'textarea'),
+  // so this one check still excludes only the enabled-checkbox column.
   if (
     !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) ||
     el.type === 'checkbox'
@@ -288,7 +288,7 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
         <CodiconIcon name="check" :size="12" />
       </Checkbox>
       <div class="min-w-0">
-        <!-- P28 D10: a name is as legal a place for a {{reference}} as a value is
+        <!-- A name is as legal a place for a {{reference}} as a value is
              (`X-{{tenant}}-Id`), and until now it was the one editable Api surface that painted
              none and hovered none. The gate widens from `nameCandidates` alone to "either a name
              vocabulary or variable support", so a params/form-data name — which has no vocabulary
@@ -364,7 +364,7 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
           />
         </InputGroup>
       </div>
-      <!-- P22b D9: wrapped in its own single grid cell — FormDataTable's own trailing content
+      <!-- Wrapped in its own single grid cell — FormDataTable's own trailing content
            (kind select, plus a conditional Choose-file button/caption/remove) varies row to row,
            unlike showEnabled above, so it needs one stable cell to vary *inside* rather than
            shifting the grid's own column count. -->

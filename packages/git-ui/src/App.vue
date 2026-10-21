@@ -4,14 +4,12 @@ import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert
 import { hostWords, type MessageParams, t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 /**
- * `docs/plans/P4.md` W11: the real shell. P0 sketched two empty regions and P3 hung a live-data
- * strip on them "replaced by P4's real list and toolbar" (that comment's own words) — this file
- * is that replacement. `AppToolbar.vue`/`CommitGrid.vue`/`LoadMoreButton.vue` (W6-W10) are wired
- * together here for the first time; everything above this file in the dependency order was
- * deliberately dead code in the production bundle until now.
+ * The real shell. `AppToolbar.vue`/`CommitGrid.vue`/`LoadMoreButton.vue` are wired together here
+ * for the first time; everything above this file in the dependency order was deliberately dead
+ * code in the production bundle until now.
  *
  * The live-data strip and its `data-testid`s are deleted, not hidden, except one: `chunk-source`
- * stays on the list region, because it is a real field of the stream chunk (§5.4) with no other
+ * stays on the list region, because it is a real field of the stream chunk with no other
  * visible surface — everything else the strip showed now has a real UI equivalent (the repo
  * picker's own label, the rendered rows themselves).
  */
@@ -30,10 +28,10 @@ import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from './bridge/client.ts';
 // A .vue default export is a *value* — the component object the template instantiates. `import
-// type` erases it, and Vue then renders <CommitGrid> as an unknown element with no grid inside it
-// (G14 F1). The script's only reference is `InstanceType<typeof …>`, so biome's useImportType
-// cannot tell (it is off for `**/*.vue` in `biome.json` for exactly this class of false positive,
-// P96 §5.2); the template is the real caller.
+// type` erases it, and Vue then renders <CommitGrid> as an unknown element with no grid inside it.
+// The script's only reference is `InstanceType<typeof …>`, so biome's useImportType
+// cannot tell (it is off for `**/*.vue` in `biome.json` for exactly this class of false positive);
+// the template is the real caller.
 import AppToolbar from './components/AppToolbar.vue';
 import CommitGrid from './components/CommitGrid.vue';
 import ConflictBanner from './components/ConflictBanner.vue';
@@ -102,11 +100,10 @@ import { type WorktreeCreateSeed, WorktreeState } from './state/worktrees.ts';
 const props = defineProps<{
   transport: Transport;
   viewState: ViewStateStore;
-  /** G10 D19: a palette command that fired while this webview was cold — see `main.ts`'s own
-   *  `MountOptions.pendingUiAction` doc comment. `undefined`/`null` means none is pending. G14
-   *  D10: renamed from `pendingAction` and grown an optional `target`, mirroring `ui.action`'s own
-   *  shape — this is the extension's own cold-boot document, not the wire, so it is a rename
-   *  rather than a contract change. */
+  /** A palette command that fired while this webview was cold — see `main.ts`'s own
+   *  `MountOptions.pendingUiAction` doc comment. `undefined`/`null` means none is pending.
+   *  Mirrors `ui.action`'s own shape — this is the extension's own cold-boot document, not the
+   *  wire. */
   pendingUiAction?: { action: UiActionKind; target?: { repoId: string; sha: string } } | null;
   /** P72 §9.1: Kira Space's own app-wide `appearance.dateFormat`, read once at mount time — see
    *  `main.ts`'s own `MountOptions.dateFormat` doc comment (not reactive). Preferred over
@@ -129,11 +126,11 @@ const graphView = new GraphViewState(bridge, undefined, graphOrder);
 // it — a repo switch resets the same GraphViewState instance rather than replacing it, matching
 // CommitGrid.vue's own documented assumption), so this can be constructed once, directly.
 const selection = new SelectionState(graphView.store);
-// `docs/plans/P5.md` W7/W11: one `DetailState` for the life of this component, exactly like
+// One `DetailState` for the life of this component, exactly like
 // `graphView`/`selection` above — a repo switch resets it (via `setRepoId` below) rather than
 // replacing the instance. `actions` starts `undefined` and is built once, in `bootstrap()`, after
 // `app.init` resolves — every template site that reads it is inside the same
-// `v-if="repoState"`/`v-else` branches that only render once a repo has actually opened.
+// `v-if="repoState"`/`v-else` branches that only render once a repo has opened.
 const detailState = new DetailState(bridge);
 const actions = shallowRef<DetailActions | undefined>(undefined);
 
@@ -145,24 +142,23 @@ const { refsState, changeRequestState, stackState, repoSettingsState, opsState }
 // `docs/plans/P9.md` W13: one `StashState` for the life of this component, exactly like
 // `refsState`/`opsState` above — reset via `setRepoId` rather than replaced.
 const stashState = new StashState(bridge);
-// P7 (item 2): one `WorkingDetailState` for the life of this component, exactly like `stashState`
-// above — reset via `setRepoId` rather than replaced. Independent of `SelectionState` the same way
-// `stashState` conceptually is (a stash reuses `SelectionState` only because it is a real graph
-// row; the working tree is not one at all).
+// One `WorkingDetailState` for the life of this component, exactly like `stashState` above — reset
+// via `setRepoId` rather than replaced. Independent of `SelectionState` the same way `stashState`
+// conceptually is (a stash reuses `SelectionState` only because it is a real graph row; the working
+// tree is not one at all).
 const workingState = new WorkingDetailState(bridge);
 // G25 D1: one `WorktreeState` for the life of this component, exactly like `stashState` above —
 // reset via `setRepoId` rather than replaced.
 const worktreeState = new WorktreeState(bridge);
-// `docs/plans/P11.md` W10/W14: one `SearchState` for the life of this component, exactly like
+// One `SearchState` for the life of this component, exactly like
 // `refsState`/`opsState`/`stashState` above — reset via `setRepoId` rather than replaced. Threads
-// `refsState`/`graphView` in directly (both already exist above), matching the plan's own "threads
-// RefsState and GraphViewState into it".
+// `refsState`/`graphView` in directly (both already exist above).
 const searchState = new SearchState(bridge, refsState, graphView, changeRequestState);
 // G18 D13: `repoSettingsState` (from `createRepoStates`) backs `RepoSettingsDialog.vue`.
 
 const repoState = shallowRef<RepoState | undefined>(undefined);
-// G12 D6: a failed bootstrap() used to leave repoState undefined forever — the whole template is
-// v-if="repoState", so that rendered nothing at all (F7). Set in the catch below, outside that
+// A failed bootstrap() used to leave repoState undefined forever — the whole template is
+// v-if="repoState", so that rendered nothing at all. Set in the catch below, outside that
 // v-if, with a Retry that clears it and re-runs bootstrap() — the ordinary case this guards is a
 // panel opened before Kira Space's socket is even up, not a rare failure.
 const bootError = ref<string | undefined>(undefined);
@@ -177,7 +173,7 @@ const scrollRow = ref(0);
 /** G-UX D9: the graph search row's own open/closed state — closed by default, toggled by `/`/
  *  `Ctrl+F`/`Ctrl+Alt+F` (`toggleSearch` below) and persisted like `detailOpen`. */
 const searchOpen = ref(false);
-/** P93 §4.4: the collapse-by-default toggle (`AppToolbar.vue`'s own `graph-collapse-toggle`) —
+/** The collapse-by-default toggle (`AppToolbar.vue`'s own `graph-collapse-toggle`) —
  *  `true` by default (a fresh/discarded persisted blob), persisted like `searchOpen`. Reaches
  *  `graphOrder` (a plain, non-reactive class) through two explicit call sites below, never a
  *  reactive `watch`: the synchronous `graphOrder.setCollapseEnabled(...)` call right after
@@ -228,7 +224,7 @@ async function handleRepoOpened(repoId: string): Promise<void> {
   // worth re-resolving, unlike a refresh's re-walk of the *same* history.
   pendingSelectionSha.value = null;
   selection.clear();
-  // P108 F4: a reveal-in-graph paging through the *old* repo's history must not keep running (or
+  // A reveal-in-graph paging through the *old* repo's history must not keep running (or
   // land a stale `selection.select`/`scrollToRow`) once this repo switch has already reset the
   // store out from under it — `revealAndSelectSha`'s own cancel-and-restart shape, applied here
   // for the same reason.
@@ -242,13 +238,13 @@ async function handleRepoOpened(repoId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------------------
-// §6.2 / W5: re-resolving selection by sha once a reset's rows are loaded again — shared by
+// Re-resolving selection by sha once a reset's rows are loaded again — shared by
 // both the boot-time rehydration path (bootstrap(), below) and every later refresh
-// (GraphViewState.generation bumps on every re-walk reset, §6.2's own doc comment on `refresh`).
+// (GraphViewState.generation bumps on every re-walk reset, the doc comment on `refresh`).
 // A *speculative* SelectionState.selectBySha on every partial chunk would be wrong: on a miss it
 // clears selection immediately (by design — see SelectionState's own doc comment), so calling it
-// before the target's row has actually streamed back in would discard a selection that was
-// really still pending, not actually gone. `CommitStore.rowOfSha` is checked first, non-
+// before the target's row has streamed back in would discard a selection that was
+// still pending, not gone. `CommitStore.rowOfSha` is checked first, non-
 // destructively, and the real (clearing-on-miss) call only happens once the row is either found
 // or the stream is exhausted, at which point a miss is a real answer.
 // ---------------------------------------------------------------------------------------
@@ -269,7 +265,7 @@ const rowMenu = useSectionMenu();
 
 const { text: liveAnnouncement, announce } = useLiveRegion();
 
-/** P108 F10: `main.ts` sets no `app.config.errorHandler`, so a `void`-called (or unawaited)
+/** `main.ts` sets no `app.config.errorHandler`, so a `void`-called (or unawaited)
  *  async operation that rejects becomes a silent, unhandled rejection — no feedback ever reaches
  *  the user. Every fire-and-forget call in this file routes its own rejection through this, into
  *  the same live region `detailState.announcement`/`opsState.announcement`/`graphView.announcement`
@@ -399,7 +395,7 @@ watch(
   },
 );
 
-/** P93 §4.4/§7: the toolbar's collapse-branches toggle — the only place `collapseBranches` writes
+/** The toolbar's collapse-branches toggle — the only place `collapseBranches` writes
  *  through to `graphOrder` (a plain, non-reactive class) and asks for a relayout. `bootstrap()`'s
  *  own persisted-restore applies its value to `graphOrder` directly instead of through this
  *  function (see its own comment) — no relayout needed there, since the stream `graphView
@@ -415,20 +411,20 @@ function setCollapseBranches(on: boolean): void {
 graphOrder.setCollapseEnabled(collapseBranches.value);
 
 // ---------------------------------------------------------------------------------------
-// P5 W11's "selection wiring": `DetailState` does not watch `SelectionState` itself (it is kept
+// The "selection wiring": `DetailState` does not watch `SelectionState` itself (it is kept
 // decoupled from it, matching `SelectionState`'s own doc comment on staying decoupled from
 // `GraphViewState` — a component wires the two together, per that comment's own precedent), so
-// this is that wiring. `selection.sha` only actually *changes* value (Vue's ref setter is a
+// this is that wiring. `selection.sha` only *changes* value (Vue's ref setter is a
 // no-op on an unchanged primitive) on a genuine selection change — including to `null` on a
 // clear — which is exactly `DetailState.select`'s own precondition ("callers only invoke it on
 // an actual change"). A refresh that re-resolves the *same* sha via `selectBySha` above therefore
-// never re-triggers this watch at all, which is how W11's "a refresh must not flicker the pane"
-// requirement is satisfied — there is no special-case caching to write, the cache is simply never
-// invalidated because nothing here re-requests when nothing has actually changed.
+// never re-triggers this watch at all, which is how the "a refresh must not flicker the pane"
+// requirement is satisfied — there is no special-case caching to write, the cache is never
+// invalidated because nothing here re-requests when nothing has changed.
 // ---------------------------------------------------------------------------------------
-/** OQ4: a stash node is selectable like a commit, but shows its OWN changes
- *  (`StashDetailPane.vue`/`StashState`), not a commit diff — so this watch, unlike its P5
- *  original, first checks whether the newly selected sha's row carries a `"stash"` decoration and
+/** A stash node is selectable like a commit, but shows its OWN changes
+ *  (`StashDetailPane.vue`/`StashState`), not a commit diff — so this watch
+ *  first checks whether the newly selected sha's row carries a `"stash"` decoration and
  *  routes to `stashState.select` instead of `detailState.select` when it does, clearing whichever
  *  of the two panes did not win (mirroring `StashState`'s own doc comment: "the two selections are
  *  independent... `App.vue` decides which pane wins when both exist"). */
@@ -458,11 +454,11 @@ watch(
   },
 );
 
-/** F2: extracted so the reconnect handler below (`handleReconnect`) can re-run this fan-out
+/** Extracted so the reconnect handler below (`handleReconnect`) can re-run this fan-out
  *  explicitly — a reconnect almost always re-opens the *same* `repoId`, so the `watch` below
  *  (keyed on `repoId` identity) never re-fires on its own, even though every one of these states
  *  needs to drop whatever it cached against the old, now-dead connection and re-fetch fresh. */
-// P108 F2: `applyRepoIdToStates` below runs via `watch(..., { immediate: true })` — its very
+// `applyRepoIdToStates` below runs via `watch(..., { immediate: true })` — its very
 // first call fires synchronously during this component's own setup, before the menu/dialog refs
 // further down this file exist yet (a `<script setup>` block is one function body top to bottom;
 // referencing a later `const` from an immediately-invoked callback is a genuine TDZ error, not
@@ -485,7 +481,7 @@ function applyRepoIdToStates(repoId: string | undefined): void {
   // G26: after changeRequestState (StackState.reload calls changeRequestState.ensureSnapshot, F13).
   stackState.setRepoId(repoId);
   if (repoIdStatesAppliedOnce) {
-    // P108 F2: the commit/stash context menus resolved against the *old* repo — a genuinely
+    // The commit/stash context menus resolved against the *old* repo — a genuinely
     // different repo (or a reconnect that re-opens the same one against a fresh `Conn`) makes
     // a captured commit/stash entry stale; closing both here, at the one lifecycle point both a
     // repo switch and a reconnect always run through, catches a reconnect that never bumps
@@ -515,7 +511,7 @@ watch(detailState.announcement, announce, { deep: true });
 
 watch(opsState.announcement, announce, { deep: true });
 
-// P7 (item 2): re-fetches the open working-tree pane's own file list on the same signal the
+// Re-fetches the open working-tree pane's own file list on the same signal the
 // strip's own count already reacts to (`OpsState.statusSummary`, refreshed on every
 // `repo.changed`) — a no-op via `WorkingDetailState.refresh`'s own `selected` guard when the pane
 // is not the one currently open.
@@ -532,9 +528,9 @@ watch(graphView.announcement, announce, { deep: true });
 // ---------------------------------------------------------------------------------------
 let revealController: AbortController | undefined;
 
-/** §7.8's "selecting a ref scrolls to and highlights the commit it points at" / "selecting a
- *  commit selects it in the graph" — both funnel through the same `GraphViewState.revealSha`
- *  (W13), since a tail-only commit hit and every ref hit alike may point at a sha outside the
+/** "selecting a ref scrolls to and highlights the commit it points at" / "selecting a
+ *  commit selects it in the graph" — both funnel through the same `GraphViewState.revealSha`,
+ *  since a tail-only commit hit and every ref hit alike may point at a sha outside the
  *  currently loaded window. Supersedes any reveal already in flight — the same cancel-and-restart
  *  shape this file already uses elsewhere (`handleRepoOpened`'s own `pendingSelectionSha` reset,
  *  `GraphViewState`'s own controller swaps): revealing a second sha before the first one finished
@@ -542,7 +538,7 @@ let revealController: AbortController | undefined;
  *  outcome selects nothing — `revealSha`'s own doc comment covers why each is announced (or not)
  *  on its own. Shared by both `handleSearchSelect` (a dropdown pick) and the `activeHit` watcher
  *  below (`Enter`/`Shift+Enter` stepping through commit matches with no dropdown option
- *  highlighted) — the two ways §7.8 lets a search hit become "the" selected commit. */
+ *  highlighted). */
 async function revealAndSelectSha(sha: string): Promise<void> {
   revealController?.abort();
   const controller = new AbortController();
@@ -558,7 +554,7 @@ async function revealAndSelectSha(sha: string): Promise<void> {
   await commitGridRef.value?.scrollToRow(row);
 }
 
-/** G14 D10: "Open in graph" from the review diff toolbar. Opens the target repo first when it is
+/** "Open in graph" from the review diff toolbar. Opens the target repo first when it is
  *  not already the active one — the same repo.open + handleRepoOpened path the repo picker uses
  *  — then reveals and selects the commit through the existing revealAndSelectSha above (which
  *  already pages until the sha appears, already announces progress, and already scrolls to it on
@@ -585,7 +581,7 @@ async function handleSearchSelect(option: SearchOption): Promise<void> {
   await revealAndSelectSha(sha);
 }
 
-// `SearchState.next()`/`previous()` (`SearchBox.vue`'s `Enter`/`Shift+Enter`, judgment call 6)
+// `SearchState.next()`/`previous()` (`SearchBox.vue`'s `Enter`/`Shift+Enter`)
 // only move `activeIndex` over `commitHits` — this watcher is the "consumer" `search.ts`'s own
 // class doc comment describes ("a consumer watches `activeHit` and drives the reveal-and-select
 // side effect"), reusing the exact same helper `handleSearchSelect` uses above. `undefined` means
@@ -631,14 +627,14 @@ function toggleSearchRow(): void {
 }
 
 // ---------------------------------------------------------------------------------------
-// `docs/plans/P6.md` W14: the per-commit context menu. `CommitGrid.vue` only ever reports which
+// The per-commit context menu. `CommitGrid.vue` only ever reports which
 // row and where to open it (own doc comment on its `contextMenu` emit) — this is the one place
 // with both `opsState` and the commit store's own decorations at hand to build the menu itself.
 // ---------------------------------------------------------------------------------------
-// P108 F2: captures the commit itself, not the row — an auto-refresh (restart-at-zero), a repo
+// Captures the commit itself, not the row — an auto-refresh (restart-at-zero), a repo
 // switch or a reconnect can land while this menu is open, and a store row is only ever a claim
 // about "whichever commit sits there right now". `commit` is `CommitStore.commitAt`'s own plain,
-// immutable snapshot (P108 F2's own doc comment on `CommitRecord`), so `commitMenuSections`/
+// immutable snapshot (the doc comment on `CommitRecord`), so `commitMenuSections`/
 // `onCommitMenuSelect` below never re-resolve `state.row` against a store that may have moved on.
 const tagDialogState = ref<{ open: boolean; target: string }>({ open: false, target: '' });
 const branchDialogState = ref<{ open: boolean; startPoint: string }>({
@@ -714,16 +710,16 @@ async function onCommitMenuSelect(commit: CommitRecord, id: string): Promise<voi
 }
 
 // ---------------------------------------------------------------------------------------
-// `docs/plans/P9.md` W14: the stash-badge context menu — `CommitGrid.vue`'s own hit-test
+// The stash-badge context menu — `CommitGrid.vue`'s own hit-test
 // (`refBadges.ts`'s `refKind === "stash"`) reports only the row (own doc comment: "the row itself
 // IS the stash commit"), so the full `StashEntry` is resolved here by matching the row's sha
 // against `stashState.entries` (`commitAt`/`decorationAt` alone only give sha + stack index, not
 // `message`/`timestamp`/`baseSubject`/etc.).
 // ---------------------------------------------------------------------------------------
-// P108 F2: the entry is resolved once, here, at open time — not re-derived from `row` at select
+// The entry is resolved once, here, at open time — not re-derived from `row` at select
 // time. A stash drop/pop between open and select (auto-refresh, another action) must not let a
 // stale row resolve to whatever stash now sits there; capturing `entry` itself makes a vanished
-// stash simply not found by `onStashMenuSelect`; further re-checked against `stashState.entries` there.
+// stash not found by `onStashMenuSelect`; further re-checked against `stashState.entries` there.
 const stashBranchTarget = ref<StashEntry | undefined>(undefined);
 
 function handleStashContextMenu(detail: { row: number; x: number; y: number }): void {
@@ -778,10 +774,10 @@ function handleBranchFromStash(entry: StashEntry): void {
 
 const stashCreateOpen = ref(false);
 
-// G28 D13: the global stash section's own header button, the palette's `saveGlobalStash` action,
+// The global stash section's own header button, the palette's `saveGlobalStash` action,
 // and a STACK row's own "Save to global stash…" action all open the SAME dialog mode —
 // `globalStashSaveOpen` for the first two (no pre-selected source), `globalStashSaveSourceEntry`
-// for the third (opens pre-selected to promote that entry, D10 step 3). Same "App.vue owns the
+// for the third (opens pre-selected to promote that entry). Same "App.vue owns the
 // state, the dialog owns nothing of its own" shape `stashCreateOpen`/`stashBranchTarget` already
 // follow.
 const globalStashSaveOpen = ref(false);
@@ -795,7 +791,7 @@ function handleSaveEntryToGlobalStash(entry: StashEntry): void {
 // nothing of its own" shape stashCreateOpen/tagDialogState above already follow.
 const repoSettingsDialogOpen = ref(false);
 
-// G25/P76 §9.3: WorktreeDialog.vue's own create-phase seed — same "App.vue owns the state, the
+// WorktreeDialog.vue's own create-phase seed — same "App.vue owns the state, the
 // dialog owns nothing of its own" shape stackDialogTarget below already follows. Opened (and
 // re-seeded) by the toolbar/branch-picker button, the `createWorktree` palette action, and a
 // "Create worktree here…" row action; `undefined` closes it.
@@ -818,7 +814,7 @@ function handleOpenRestackDialog(branch: string): void {
 
 /** `WorktreeList.vue`'s own "Switch to this worktree" row action, bubbled through
  *  `BranchPicker.vue`/`AppToolbar.vue` — the same `repo.open` + `handleRepoOpened` path
- *  `revealCommitInGraph` above already uses (F6: each worktree is already its own `RepoEntry`, so
+ *  `revealCommitInGraph` above already uses (each worktree is already its own `RepoEntry`, so
  *  "switch" needs no worktree-specific request at all). */
 async function handleSwitchWorktree(path: string): Promise<void> {
   const repo = repoState.value;
@@ -884,10 +880,10 @@ const toolbarBindings = computed(() => ({
 }));
 
 // ---------------------------------------------------------------------------------------
-// `docs/plans/P7.md` W14: the ref-badge context menu — a right-click that lands on a
+// The ref-badge context menu — a right-click that lands on a
 // `refBadges.ts` badge (`CommitGrid.vue`'s own hit-test) instead of bare row space opens this,
 // the same `buildRefMenu` table `BranchPicker.vue`'s dropdown already renders, titled with the
-// branch name so it "cannot be misread" (§6.8). Renaming has no inline row to swap into here (a
+// branch name so it "cannot be misread". Renaming has no inline row to swap into here (a
 // badge is a DOM fragment inside a commit's message cell, not a list item), so it opens
 // `RenameRefDialog.vue` instead of `BranchPicker.vue`'s own inline field.
 // ---------------------------------------------------------------------------------------
@@ -986,7 +982,7 @@ async function confirmForceDeleteRef(): Promise<void> {
 // just the total the store now holds.
 // ---------------------------------------------------------------------------------------
 let loadedRowsBeforeLoad = 0;
-// G-UX D10: captured together, at the moment `loading` *enters* `'refreshing'` — synchronous with
+// Captured together, at the moment `loading` *enters* `'refreshing'` — synchronous with
 // `GraphViewState` setting `autoRefreshing` (no `await` between the two), so this is reliable in
 // a way re-reading `graphView.autoRefreshing.value` at the *exit* transition would not be (by
 // then it may already have been reset). Both the viewport restore and the announcement gate below
@@ -1026,8 +1022,8 @@ watch(graphView.loading, (state, previous) => {
 });
 
 // ---------------------------------------------------------------------------------------
-// G10 D19: the palette's own dispatcher — a switch over the same affordances the toolbar or a
-// context menu already drives (F16), never a second implementation of an operation. Reached two
+// The palette's own dispatcher — a switch over the same affordances the toolbar or a
+// context menu already drives, never a second implementation of an operation. Reached two
 // ways: `bridge.on('ui.action', ...)` below, for a command run while this webview is already
 // live, and `props.pendingUiAction` at mount (below), for one that fired while it was cold —
 // `panelView.ts`'s own two-arm pattern, mirrored from `review.target`'s.
@@ -1166,13 +1162,12 @@ onMounted(() => {
     performance.measure('kira:first-paint', undefined, 'kira:first-paint');
   });
 
-  // W15: `kira:layout-complete` used to be marked right here, in the same frame as
-  // `kira:first-paint` — correct only while this shell had no real grid to wait on (P0-P3, per
-  // this block's own git history). Now that one exists, marking it here would always measure
-  // ~0ms and hide the exact cost §5.1's budget separates out: `GraphViewState`'s own doc comment
-  // on `generation` names the reason first-paint and layout-complete are two different budgets
-  // at all — "text first, graph a frame later, never a blank list waiting on a worker". This
-  // mark now means what W15 needs it to mean: the *first* `LayoutChunk` has actually been
+  // `kira:layout-complete` used to be marked right here, in the same frame as
+  // `kira:first-paint` — correct only while this shell had no real grid to wait on. Now that one
+  // exists, marking it here would always measure ~0ms and hide the exact cost the budget separates
+  // out: `GraphViewState`'s own doc comment on `generation` names the reason first-paint and
+  // layout-complete are two different budgets at all — "text first, graph a frame later, never a
+  // blank list waiting on a worker". This mark now means: the *first* `LayoutChunk` has been
   // applied and the rows it covers re-rendered with their lanes, not merely that the shell
   // mounted. `CommitGrid.vue`'s own `handleChunkLayout` — the one place that event fires — marks
   // it, once, the first time that happens; nothing here needs to know when that is.
@@ -1183,11 +1178,11 @@ onMounted(() => {
     });
 });
 
-// G10 D19: the cold-bootstrap arm — a palette command that fired before this webview had a live
-// RpcServer (panelView.ts's own #pendingUiAction). P108 F7: shared between the initial mount and
-// every retry, so whichever attempt is the one that actually succeeds still runs it — a failed
-// first attempt followed by a successful Retry used to drop it silently. Still runs once: exactly
-// one bootstrap() call ever resolves (mount and retry are mutually exclusive — a retry only
+// The cold-bootstrap arm — a palette command that fired before this webview had a live
+// RpcServer (panelView.ts's own #pendingUiAction). Shared between the initial mount and every
+// retry, so whichever attempt is the one that succeeds still runs it — a failed first attempt
+// followed by a successful Retry used to drop it silently. Still runs once: exactly one
+// bootstrap() call ever resolves (mount and retry are mutually exclusive — a retry only
 // happens after a failure, and success hides the Retry button), and a later hide/reveal of the
 // same view starts with no pending action (panelView.ts clears it once consumed), so this never
 // replays.
@@ -1201,15 +1196,14 @@ function retryBootstrap(): void {
   sharedRetryBootstrap(bootError, bootstrap, onBootstrapSuccess);
 }
 
-// `docs/plans/P11.md` W7 / `docs/plans/G23-search.md` D12/F11: the four search toggles/scope
-// below round-trip through every write this file makes (the `watch` callback spreads
-// `...lastPersisted`, and a successful `viewState.read()` at boot replaces this whole literal
-// with the persisted one), AND are now reactively wired to `searchState` — read into it once
-// persisted state is available (`bootstrap()`'s own `if (persisted)` block) and fed back by the
-// same persistence `watch` every other field goes through, exactly like `fileListMode` and
-// `DetailPane` before it (P5 W11/W12). The query TEXT itself is deliberately never persisted
-// (judgment call 7) — a remembered term silently re-running against a repository that has moved
-// on is the same stale-state argument the diff/selected-file omission already made.
+// The four search toggles/scope below round-trip through every write this file makes (the `watch`
+// callback spreads `...lastPersisted`, and a successful `viewState.read()` at boot replaces this
+// whole literal with the persisted one), AND are now reactively wired to `searchState` — read into
+// it once persisted state is available (`bootstrap()`'s own `if (persisted)` block) and fed back by
+// the same persistence `watch` every other field goes through, exactly like `fileListMode` and
+// `DetailPane` before it. The query TEXT itself is deliberately never persisted — a remembered term
+// silently re-running against a repository that has moved on is the same stale-state argument the
+// diff/selected-file omission already made.
 let lastPersisted: PersistedViewState = {
   version: 8,
   repoId: null,
@@ -1322,30 +1316,29 @@ async function bootstrap(): Promise<void> {
       detailWidth.value = persisted.detailWidth;
       initialScrollRow.value = persisted.scrollRow;
       detailState.setListMode(persisted.fileListMode);
-      // G23 D12/F11: the four search toggles/scope are carried through unchanged since P11 W7
-      // (this file's own comment above `lastPersisted`'s literal), but nothing read them into
-      // `searchState` until now. The query TEXT itself is deliberately never persisted (judgment
-      // call 7) -- only the widget state, same as `dateFormat`.
+      // The four search toggles/scope are carried through unchanged (this file's own comment above
+      // `lastPersisted`'s literal), but nothing read them into `searchState` until now. The query
+      // TEXT itself is deliberately never persisted -- only the widget state, same as `dateFormat`.
       searchState.caseSensitive.value = persisted.searchCaseSensitive;
       searchState.wholeWord.value = persisted.searchWholeWord;
       searchState.regex.value = persisted.searchRegex;
       searchState.scope.value = persisted.searchScope;
       searchOpen.value = persisted.searchOpen;
-      // P93 §4.4: pushed straight to graphOrder, not through setCollapseBranches — that function
+      // Pushed straight to graphOrder, not through setCollapseBranches — that function
       // also asks for a relayout, and the graphView.openStream(...) call below already produces the
       // first one once the persisted repo's rows arrive; a relayout against the still-empty store
-      // here would just be redone.
+      // here would be redone.
       collapseBranches.value = persisted.collapseBranches;
       graphOrder.setCollapseEnabled(persisted.collapseBranches);
 
-      // §6.3's "collapsed by default" below `wide`: a persisted `detailOpen: true` from an earlier,
+      // The "collapsed by default" below `wide`: a persisted `detailOpen: true` from an earlier,
       // wider session must not reopen the pane/drawer over a mount that starts narrower — without
       // this, the line above would silently clobber the collapse the mount-time `breakpoint` watch
       // (below) already applied moments earlier, since that watch runs synchronously during mount
       // while this restore only lands later, after `bridge.init()`'s own await. Not gated on
       // `breakpoint`'s *previous* value the way that watch is (there is no real "previous" at boot,
       // only that watch's own initial-ref placeholder) — mounting directly into a narrow layout is
-      // exactly the case §6.3 describes, not merely a special case of resizing into one. A real
+      // not merely a special case of resizing into one. A real
       // selection still reopens it once `pendingSelectionSha` resolves, via the selection watch
       // below — nothing here treats a boot with a pending selection any differently.
       collapseIfNarrowWithNoSelection();
@@ -1363,14 +1356,14 @@ async function bootstrap(): Promise<void> {
       }
     }
 
-    // G12 D7/item 6: falls back to the workspace's own repository, multi-root aware, only when
-    // nothing persisted actually opened one — a persisted repo B must win over workspace folder A
+    // Falls back to the workspace's own repository, multi-root aware, only when
+    // nothing persisted opened one — a persisted repo B must win over workspace folder A
     // (the one ordering this must not get wrong), and NoRepositoryPanel still owns the case where
     // no candidate is a repository at all. Mirrors extension.ts's own palette-command default
     // rather than inventing a second policy.
     if (!openedFromPersisted) {
       await repo.refreshList();
-      // P108 F4: `NoRepositoryPanel.vue`'s own onMounted already calls `refreshList()` and can
+      // `NoRepositoryPanel.vue`'s own onMounted already calls `refreshList()` and can
       // render candidates a user clicks while this loop is still awaiting an earlier one —
       // `repo.activeRepo.value` is the one shared signal that a pick already won, checked before
       // every candidate `open()` this loop is about to make, not just relied on via the sequence
@@ -1393,7 +1386,7 @@ async function bootstrap(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------------------
-// §6.3's breakpoints — measured on the webview's own width via ResizeObserver on the root, not
+// The breakpoints — measured on the webview's own width via ResizeObserver on the root, not
 // `window.matchMedia` (which reports the *window's* width and would be wrong the moment the
 // panel is docked to the side or split with another editor group).
 // ---------------------------------------------------------------------------------------
@@ -1406,8 +1399,9 @@ function breakpointFor(width: number): Breakpoint {
 }
 
 const rootEl = ref<HTMLDivElement | null>(null);
-// P108 F12: `main.ts`'s own `mount()` provides this per instance only for a Kira Space graph tab
-// (a `KeepAlive`d sibling among possibly several) — always `true` everywhere else (this package's own tests), so `onDocumentKeydown` below behaves exactly as before
+// `main.ts`'s own `mount()` provides this per instance only for a Kira Space graph tab
+// (a `KeepAlive`d sibling among possibly several) — always `true` everywhere else
+// (this package's own tests), so `onDocumentKeydown` below behaves exactly as before
 // wherever only one instance ever exists.
 const graphVisible = useGraphVisible();
 const overlayDetailRegionEl = ref<HTMLElement | null>(null);
@@ -1421,9 +1415,9 @@ function collapseIfNarrowWithNoSelection(): void {
   if (breakpoint.value !== 'wide' && selection.row.value < 0) detailOpen.value = false;
 }
 
-// Entering a narrower breakpoint with nothing selected collapses the pane (§6.3's "collapsed by
+// Entering a narrower breakpoint with nothing selected collapses the pane (the "collapsed by
 // default"); entering it *with* a selection, or widening back past 900px, leaves `detailOpen` as
-// it is — there is nothing in §6.3 asking a widen to force it back open, and forcing it closed
+// it is — there is nothing asking a widen to force it back open, and forcing it closed
 // on every narrow-to-wide crossing would fight a user who just opened it deliberately.
 watch(breakpoint, (kind, previous) => {
   if (kind !== 'wide' && previous === 'wide') collapseIfNarrowWithNoSelection();
@@ -1481,7 +1475,7 @@ function closeDetail(): void {
   detailOpen.value = false;
 }
 
-/** P7 (item 2): the strip's own click handler — opens the pane (mirrors `openDetail`/a stash
+/** The strip's own click handler — opens the pane (mirrors `openDetail`/a stash
  *  row's click, both of which force `detailOpen` true rather than merely toggling it) and selects
  *  the working tree. `selection.clear()` deselects any highlighted grid row, which fires the
  *  `selection.sha` watch above and clears `detailState`/`stashState` via their own existing
@@ -1492,7 +1486,7 @@ function onSelectWorking(): void {
   detailOpen.value = true;
 }
 
-/** P7 (item 2): the working-tree pane's own file-open action — `editor.openWorkingDiff` never
+/** The working-tree pane's own file-open action — `editor.openWorkingDiff` never
  *  touches the Go server (answered entirely inside the extension), so this is a direct bridge
  *  request, not a `DetailActions` method (whose `openInEditor` is shaped for a commit's sha/
  *  parentIndex, neither of which the working tree has). */
@@ -1507,7 +1501,7 @@ async function openWorkingDiff(params: {
   await bridge.request('editor.openWorkingDiff', { repoId, ...params });
 }
 
-/** G-UX D9: `/`/`Ctrl/Cmd+F` (moved up from `SearchBox.vue`, which used to own this listener for
+/** `/`/`Ctrl/Cmd+F` (moved up from `SearchBox.vue`, which used to own this listener for
  *  its own whole lifetime — now that the search row is conditionally mounted, that lifetime is
  *  exactly when it must NOT fire). See `isEditableTarget`'s own doc comment for the exemption
  *  `/` needs and `Ctrl/Cmd+F`'s toggle-closed behaviour. */
@@ -1554,10 +1548,10 @@ useEventListener(
 );
 
 function onDocumentKeydown(event: KeyboardEvent): void {
-  // P108 F12: Kira Space mounts several git-ui apps into one document — one per graph tab
+  // Kira Space mounts several git-ui apps into one document — one per graph tab
   // (`KeepAlive`d while hidden) plus the review sidebar (`v-show`). Every instance's own
   // `document`-level listener otherwise fires for every keydown regardless of which one is
-  // actually visible or focused. Handle it here only when the key actually landed inside this
+  // visible or focused. Handle it here only when the key landed inside this
   // instance's own DOM, or — for a shortcut typed with focus elsewhere entirely (the host chrome,
   // no graph focused at all) — only the one instance Kira Space currently shows.
   const target = event.target;
@@ -1567,10 +1561,10 @@ function onDocumentKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape' && detailOpen.value && !escapeClosedMenu) closeDetail();
 }
 
-// The overlay drawer's own "dismissible... on a click outside" (§6.3) — only acted on while the
-// drawer is actually showing, and only at the overlay breakpoint (the docked pane at wide/narrow
+// The overlay drawer's own "dismissible... on a click outside" — only acted on while the
+// drawer is showing, and only at the overlay breakpoint (the docked pane at wide/narrow
 // has no such behaviour; clicking the grid to select a different row is normal use there, not a
-// dismissal). P108 F12: a template ref scoped to this instance's own overlay `<aside>` — the old
+// dismissal). A template ref scoped to this instance's own overlay `<aside>` — the old
 // `document.querySelector('[data-testid="detail-region"]')` resolved the first match in the whole
 // document, which could belong to a different graph tab's own mount.
 onClickOutside(
@@ -1578,7 +1572,7 @@ onClickOutside(
   () => {
     if (breakpoint.value === 'overlay' && detailOpen.value) closeDetail();
   },
-  // P131 Part 2 §5.5: a FileTree row menu (RowContextMenu, DropdownMenu) can open while the
+  // A FileTree row menu (RowContextMenu, DropdownMenu) can open while the
   // overlay drawer is showing — reka teleports its content to `document.body`, outside
   // `overlayDetailRegionEl`, so picking an item would otherwise read as an outside click and
   // close the drawer mid-action. `[data-reka-popper-content-wrapper]` is Radix parity's own
@@ -1595,7 +1589,7 @@ function scheduleBreakpointUpdate(): void {
 }
 
 // ---------------------------------------------------------------------------------------
-// The detail pane's own resize handle (≥900px only, §6.3's table) — the same drag-and-clamp
+// The detail pane's own resize handle (≥900px only) — the same drag-and-clamp
 // shape `CommitGrid.vue`'s column handles use, kept here rather than factored out: this is the
 // only other resizable edge in the app, and the two call sites differ enough (this one persists
 // through `viewState` directly, that one round-trips through a prop/emit pair) that a shared
@@ -1614,14 +1608,14 @@ const detailWidthPx = computed(() => `${detailWidth.value}px`);
 // `exactOptionalPropertyTypes` (tsconfig.base.json) treats an explicit `undefined` differently
 // from an omitted prop — `CommitGrid.vue`'s `initialScrollRow?: number` wants the latter on a
 // first-ever mount (nothing persisted to restore), so this only spreads the prop in once
-// `bootstrap()` has actually set one, rather than always binding a possibly-`undefined` value.
+// `bootstrap()` has set one, rather than always binding a possibly-`undefined` value.
 const initialScrollRowProp = computed(() =>
   initialScrollRow.value === undefined ? {} : { initialScrollRow: initialScrollRow.value },
 );
 
-// P7 (item 2): the strip's own selection has no row at all, so it must widen this check directly
+// The strip's own selection has no row at all, so it must widen this check directly
 // rather than through `selection.row` — mirrors `selectionIsWorking`'s own reasoning.
-// P77 §14 (N9): a stash row can never be a graph row either (`selectionIsStash` above widens the
+// A stash row can never be a graph row either (`selectionIsStash` above widens the
 // same way) — before this, selecting a stash from the picker left this `false`, so the detail
 // pane rendered "Select a commit to see its details." instead of the stash's own pane the
 // `v-else-if` chain below already knows how to show.
@@ -1696,7 +1690,7 @@ onBeforeUnmount(() => {
       </Button>
     </div>
     <template v-else-if="repoState">
-      <!-- P108 F8: bootstrap() keeps going after repoState is set — through persisted repo.open,
+      <!-- bootstrap() keeps going after repoState is set — through persisted repo.open,
            the auto-open candidate loop and openStream — so a rejection from any of those must
            surface here regardless of which sub-branch below ends up rendering (GitBlockedPanel,
            NoRepositoryPanel, the unborn-head empty state, or the full graph), not only the last of
@@ -1901,10 +1895,10 @@ onBeforeUnmount(() => {
           </aside>
         </div>
 
-        <!-- P131 Part 2 §5.5: Popover replaces the hand-rolled fixed-position panel + watch
-               (G20 D4) — reka's own flip/shift positioning, plus outside-click and Escape
+        <!-- Popover replaces the hand-rolled fixed-position panel + watch
+               — reka's own flip/shift positioning, plus outside-click and Escape
                dismissal it did not have before. Open auto-focus lands on Cancel, never on the
-               destructive button. Behaviour change, disclosed (plan §0 table). -->
+               destructive button. -->
         <Popover
           :open="!!forceDeleteRefCandidate"
           @update:open="(v) => !v && (forceDeleteRefCandidate = undefined)"

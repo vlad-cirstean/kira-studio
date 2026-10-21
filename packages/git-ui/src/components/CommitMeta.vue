@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P5.md` W7: subject + files is `DetailPane.vue`'s whole job — this component renders
+ * Subject + files is `DetailPane.vue`'s whole job — this component renders
  * the subject/facts/actions header and, behind one "Show more" toggle, everything else about the
  * commit (body, author/committer identities, trailers, refs, signature, change request).
  *
@@ -9,7 +9,7 @@
  * commit message is untrusted text and this repo's `enableHtmlRendering: false` discipline
  * (`columns.ts`'s own doc comment) applies here just as much as it does inside the grid.
  *
- * G-UX (items 6/7): `DetailPane.vue` used to mount this component twice — once for the message
+ * `DetailPane.vue` used to mount this component twice — once for the message
  * (with the body/author/trailers behind "Show more"), once more, physically below the file tree,
  * for Refs/Signature/change request. That second, separately-scrolling instance is gone: this file
  * now mounts once and folds Refs/Signature/PR into the same "Show more" region as the body and
@@ -52,9 +52,10 @@ const props = defineProps<{
    *  `DetailPane.vue`. `undefined` covers both "nothing selected yet" and the in-flight/debounce
    *  window, same as `detail` itself before it resolves. */
   changeRequestResult?: ChangeRequestLookup;
-  /** P74 §4.3: any PR this commit is on (`ChangeRequestState.changeRequestForCommit`, threaded by `DetailPane.vue`) —
-   *  drives the facts-row icon, distinct from `changeRequestResult` (this exact commit's own change request
-   *  row, only ever populated for the selected commit). `undefined` renders no icon. */
+  /** Any PR this commit is on (`ChangeRequestState.changeRequestForCommit`, threaded by
+   *  `DetailPane.vue`) — drives the facts-row icon, distinct from `changeRequestResult` (this exact
+   *  commit's own change request row, only ever populated for the selected commit). `undefined`
+   *  renders no icon. */
   changeRequestForCommit?: readonly ChangeRequestRecord[];
   /** The repo's code host (`ChangeRequestState.host`); its words name change requests here. */
   host?: GitHostInfo | null;
@@ -65,7 +66,7 @@ const words = computed(() => hostWords(props.host));
 const bodyEl = ref<HTMLParagraphElement | null>(null);
 const decorationEl = ref<HTMLSpanElement | null>(null);
 
-/** G-UX (items 6/7): the one "Show more" state for the whole pane now — gates the body, the
+/** The one "Show more" state for the whole pane now — gates the body, the
  *  identities, the trailers, and Refs/Signature/PR together. Reset to collapsed on every new
  *  commit — an expansion the user made for one commit is not a standing preference carried into
  *  the next. */
@@ -121,7 +122,7 @@ watch([() => props.detail?.decoration, decorationEl], () => void nextTick(render
   immediate: true,
 });
 
-/** §6.4: "author and committer with both timestamps when they differ" — read as: show one
+/** "author and committer with both timestamps when they differ" — read as: show one
  *  identity row when author and committer are the very same identity at the very same moment
  *  (the overwhelmingly common case), and both, each with its own timestamp, the moment any part
  *  differs (a rebase, a cherry-pick, an `--author` override) — never silently collapse two
@@ -158,9 +159,9 @@ const signatureText = computed<string | undefined>(() => {
     : text;
 });
 
-/** G24 D12: the one change request row — resolved with a PR (one line per associated PR),
+/** The one change request row — resolved with a PR (one line per associated PR),
  *  resolved with none ("No change request"), or `unavailable` (`Status.Reason` — the ONLY place in
- *  the app that ever tells a user to log in to the host CLI, per upstream D32's "inert, never noisy"
+ *  the app that ever tells a user to log in to the host CLI, per the "inert, never noisy"
  *  rule applying everywhere else but here). `disabled` renders nothing at all — this computed is
  *  `undefined` for both `disabled` and "nothing resolved yet", collapsing them into the same
  *  "no row" template branch below. */
@@ -238,7 +239,7 @@ interface TrailerRow {
   readonly raw: string;
 }
 
-/** `Co-authored-by`/`Signed-off-by` (§6.4's own two named trailers) parse their `Name <email>`
+/** `Co-authored-by`/`Signed-off-by` (the two named trailers) parse their `Name <email>`
  *  shape into separate name/email display so the email can be styled as secondary text; every
  *  other trailer renders its value verbatim — this repo does not try to out-guess git's own
  *  trailer syntax for tokens it has not been told carry an identity. */
@@ -263,7 +264,7 @@ function copySha(): void {
   props.actions.copy(sha, t('git.copy.fullSha.announce'));
 }
 
-/** G-UX (item 6): replaces the old copy-message header button — "Open all changes", the exact
+/** Replaces the old copy-message header button — "Open all changes", the exact
  *  pattern `ReviewCommitRow.vue`'s own row action already uses. Unlike that row, this pane's
  *  `detail` always already carries the full file list (no lazy per-row fetch to guard against
  *  here), so there is no "expand first" precondition to check. */
@@ -294,10 +295,10 @@ async function openChangeRequest(number: number): Promise<void> {
 /** The message body's own linkified URLs (`renderBody`, above). */
 const openLink = createOpenExternal((url) => props.actions.openExternalLink(url));
 
-/** P74 §4.3: the facts row's own icon — the first PR `changeRequestForCommit` names (ancestry's own
+/** The facts row's own icon — the first PR `changeRequestForCommit` names (ancestry's own
  *  first-writer-wins already resolved which branch wins when more than one claims a commit;
  *  `bySha`'s own array is realistically always length 1 in practice, never fanned out further
- *  here). `undefined` renders nothing, the same "render nothing" rule every other G24 surface
+ *  here). `undefined` renders nothing, the same "render nothing" rule every other surface
  *  follows. */
 const changeRequestIcon = computed(() => {
   const first = props.changeRequestForCommit?.[0];

@@ -100,7 +100,7 @@ interface DetectedBody {
   result: BeautifyResult | null;
 }
 
-// Round-2 review finding 8: beautifyJson/beautifyXml run the exact same parse scanJson/scanXml
+// beautifyJson/beautifyXml run the exact same parse scanJson/scanXml
 // would — detected once per body here (memoized by `computed` below) and reused by both
 // commonFormat's own detection and bodyTextA/B's rendering, instead of parsing each body twice.
 // The `<…>` bracket check mirrors ResponsePane.vue's own (and celleditor/detect.ts's own
@@ -124,9 +124,9 @@ const detectedB = computed<DetectedBody | null>(() =>
   snapB.value ? detectAndBeautify(snapB.value.response.body) : null,
 );
 
-// D12: both bodies are pretty-printed before diffing only when *both* are the same recognised
+// Both bodies are pretty-printed before diffing only when *both* are the same recognised
 // format — a minified-vs-minified diff of two 40 KB single lines tells the user nothing.
-// beautifyJson(text, 'indented') is lossless by construction (P2 F13), so this never
+// beautifyJson(text, 'indented') is lossless by construction, so this never
 // misrepresents what came back.
 const commonFormat = computed<'json' | 'xml' | null>(() => {
   const a = detectedA.value?.format ?? null;
@@ -147,12 +147,11 @@ const bodyTextB = computed(() => {
     : snapB.value.response.body;
 });
 
-// D12 level 2: the headers table. Reduced to added/removed/changed/unchanged by header *name*
+// Level 2: the headers table. Reduced to added/removed/changed/unchanged by header *name*
 // (case-insensitive) rather than by the diff editor's own text-diff — headers are a keyed
 // structure, not ordered prose, so a name-keyed comparison is the semantically correct model (it
 // stays right even when two servers emit the same headers in a different order) and needs no
-// diff algorithm of its own. Monaco's diff editor (P60a) is exactly what the body level below is
-// for.
+// diff algorithm of its own. Monaco's diff editor is exactly what the body level below is for.
 interface HeaderRow {
   name: string;
   a: string | null;
@@ -208,10 +207,10 @@ const unchangedHeaderRows = computed(() =>
   headerRows.value.filter((r) => r.status === 'unchanged'),
 );
 
-// D12 level 3 / P60a §6: the real payoff of Monaco's diff editor — a scroll-locked,
-// line-aligned, intra-line-highlighted side-by-side view. Both sides read-only (§6's own recipe,
-// the same second-layer guard RepoDiffView.vue's review diff already uses: readOnly alone blocks
-// edits, renderMarginRevertIcon/renderGutterMenu additionally hide the revert/apply affordances a
+// The real payoff of Monaco's diff editor — a scroll-locked,
+// line-aligned, intra-line-highlighted side-by-side view. Both sides read-only (the same
+// second-layer guard RepoDiffView.vue's review diff already uses: readOnly alone blocks edits,
+// renderMarginRevertIcon/renderGutterMenu additionally hide the revert/apply affordances a
 // read-write diff widget would otherwise offer).
 async function buildMergeView(): Promise<void> {
   if (!bothStored.value || !snapA.value || !snapB.value) return;
@@ -238,7 +237,7 @@ async function buildMergeView(): Promise<void> {
     scrollBeyondLastLine: false,
   });
   diffEditor.setModel({ original: originalModel, modified: modifiedModel });
-  // tests/ui's own text-reading seam (P60a §9.1/OQ-3) — both models are static once created (this
+  // tests/ui's own text-reading seam — both models are static once created (this
   // dialog never edits them), so a one-time attribute set here (rather than a change listener,
   // MonacoHost.vue's own approach) is enough. The diff editor's two sides are plain Monaco
   // sub-editors, not a MonacoHost mount, so they carry no `data-kira-editor-text` of their own.

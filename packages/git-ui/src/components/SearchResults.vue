@@ -59,12 +59,12 @@ const emit = defineEmits<{
 
 const isEmpty = computed(() => props.model.sections.length === 0);
 
-/** P110 A17: `search-option`'s own gap/px are already exactly `rowVariants()`'s own
- *  `gap-1`/`px-1.5` (P110 I2-29: the default spacing scale directly).
+/** `search-option`'s own gap/px are already exactly `rowVariants()`'s own
+ *  `gap-1`/`px-1.5` (the default spacing scale directly).
  *  Only the vertical padding and the "active" (keyboard-highlighted, not a real `:hover`)
  *  background need adding —
  *  through `cn()` since `px-2` below replaces the variant's own `px-1.5` (different value,
- *  same property; §1.3). */
+ *  same property). */
 function optionClass(option: SearchOption): string {
   return cn(
     rowVariants({ layout: 'tree', data: true, selected: option.id === props.highlightedId }),

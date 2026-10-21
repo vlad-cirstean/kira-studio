@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// P104 §6.4: a one-file bridge onto reka-ui's *public* injectTooltipRootContext() -- the one seam
+// A one-file bridge onto reka-ui's *public* injectTooltipRootContext() -- the one seam
 // AttributeTooltip.vue needs to drive a TooltipRoot by hand, for the one case with no real Vue
 // element to wrap in a TooltipTrigger (SlickGrid's own header-cell DOM). Mounted as a plain child
 // inside <TooltipRoot>'s default slot; renders nothing itself.

@@ -16,7 +16,7 @@ import { typeClassTextClass } from '../../theme/icons';
 import { type FkPreviewState, fetchReferencedRow, type PreviewSignal } from './fkPreview';
 import { type FkNavContext, foreignKeyValueFilter, qualifiedNameForPath } from './menu';
 
-// P67 §4.3: anchored to the click point through PointPopover, NOT the nav button element. §1.1: that
+// Anchored to the click point through PointPopover, NOT the nav button element. That
 // button is imperative DOM, destroyed by SlickGrid's own `invalidateRow` on the next scroll frame,
 // so a detached reference is exactly what this component would hold if it anchored to it instead.
 const props = defineProps<{

@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -144,10 +145,10 @@ func (h *tsHelper) diff(name string, before, after []byte) (string, error) {
 		return "", err
 	}
 	var r struct {
-		OK           bool       `json:"ok"`
-		Reason       string     `json:"reason"`
-		Ranges       []rawRange `json:"ranges"`
-		RangesBefore []rawRange `json:"rangesBefore"`
+		OK           bool   `json:"ok"`
+		Reason       string `json:"reason"`
+		Ranges       string `json:"ranges"`
+		RangesBefore string `json:"rangesBefore"`
 	}
 	if err := json.Unmarshal(line, &r); err != nil {
 		return "", err
@@ -155,7 +156,7 @@ func (h *tsHelper) diff(name string, before, after []byte) (string, error) {
 	if !r.OK {
 		return r.Reason, nil
 	}
-	ga, gb := tsGroups(before, r.RangesBefore), tsGroups(after, r.Ranges)
+	ga, gb := tsGroups(before, parseRanges(r.RangesBefore)), tsGroups(after, parseRanges(r.Ranges))
 	if len(ga) != len(gb) {
 		return fmt.Sprintf("comment groups %d != %d", len(ga), len(gb)), nil
 	}
@@ -443,6 +444,22 @@ func splitList(s string) []string {
 		if p = strings.TrimSpace(p); p != "" {
 			out = append(out, p)
 		}
+	}
+	return out
+}
+
+// parseRanges reads the helper's compact "start,end,kind;..." list; kind is l, b or t.
+func parseRanges(s string) []rawRange {
+	kinds := map[string]string{"l": "line", "b": "block", "t": "template"}
+	var out []rawRange
+	for _, part := range strings.Split(s, ";") {
+		f := strings.Split(part, ",")
+		if len(f) != 3 {
+			continue
+		}
+		start, _ := strconv.Atoi(f[0])
+		end, _ := strconv.Atoi(f[1])
+		out = append(out, rawRange{Start: start, End: end, Kind: kinds[f[2]]})
 	}
 	return out
 }

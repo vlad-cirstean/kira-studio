@@ -7,7 +7,7 @@ import type { EditBuffer } from './useEditBuffer';
 
 // The one visual form of the three features an edit buffer offers — the `modified` chip, the
 // byte badge, Beautify/Minify and Revert — rendered identically by the cell editor's header and
-// by the document row's edit-action row (P27 D27). `testidPrefix` keeps each mount's testids
+// by the document row's edit-action row. `testidPrefix` keeps each mount's testids
 // distinct without either caller inventing its own copy of this row.
 const props = withDefaults(
   defineProps<{

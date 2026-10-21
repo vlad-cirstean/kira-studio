@@ -9,11 +9,11 @@ import { FocusScope } from 'reka-ui';
 import { type ComponentPublicInstance, onBeforeUnmount, ref, useId, useTemplateRef } from 'vue';
 import { useFocusOnMount, useFocusReturn } from '../behaviour/focus';
 
-// P107 T2-19: deliberately NOT built on shadcn-vue's Dialog (declined, real requirement) — its
+// Deliberately NOT built on shadcn-vue's Dialog (declined, real requirement) — its
 // DialogContent wraps reka-ui's DialogPortal, which teleports to document.body. Two of this
 // composable's three original call sites (FilterHistoryMenu.vue, ConsoleSavedMenu.vue) raise this
-// prompt from inside a reka-ui Popover's own #footer slot; both carry a test-caught fix (P104,
-// data-view.spec.ts/console.spec.ts) requiring the prompt stay a DOM descendant of that
+// prompt from inside a reka-ui Popover's own #footer slot; both carry a test-caught fix
+// (data-view.spec.ts/console.spec.ts) requiring the prompt stay a DOM descendant of that
 // PopoverContent — a teleported node reads as an outside interaction to Popover's own dismiss
 // layer and closes the menu before the prompt is seen. A plain, non-portaled `<div v-if>` (this
 // file) is the one shape that works unchanged at both a popover-nested and a directly-raised
@@ -31,7 +31,7 @@ focusReturn.capture();
 useFocusOnMount(inputRef);
 onBeforeUnmount(() => focusReturn.restore());
 
-// P105 §5.2(b): the scrim is a pointer-event shield, not an interactive element — it absorbs a
+// The scrim is a pointer-event shield, not an interactive element — it absorbs a
 // click so it never reaches the ancestor Popover's own outside-click dismiss layer (see the
 // comment above). Not "click outside closes" (there is no close-on-backdrop behaviour here), so
 // this is a plain listener move, not an onClickOutside swap.
@@ -40,11 +40,9 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
 </script>
 
 <template>
-  <!-- P28 D17(c)'s own dialog rung, not a bare low z-index — strictly higher, so unifying every call site
+  <!-- The dialog rung, not a bare low z-index — strictly higher, so unifying every call site
        on it (including GitPanel.vue, raised directly from the panel with no popover backdrop of its
-       own to clear) is a safe superset, never a visible change at any of the three.
-       P110 B37/B39: z-index: var(--kira-z-dialog) -> z-(--kira-z-dialog), section 1.2's own
-       var-based z-index allowlist entry. -->
+       own to clear) is a safe superset, never a visible change at any of the three. -->
   <div
     ref="scrimEl"
     class="fixed inset-0 flex items-center justify-center bg-scrim z-(--kira-z-dialog)"

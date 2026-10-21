@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CommitStore, FileChangeKind } from '@kira/git-core';
 /**
- * P7 (item 2): the uncommitted-changes strip's own click-through target — `DetailPane.vue`'s
+ * The uncommitted-changes strip's own click-through target — `DetailPane.vue`'s
  * sibling for the one case that pane can never represent (the working tree is not a commit: no
  * sha, no author, no parents). Deliberately NOT a mode of `DetailPane.vue` itself — that pane's
  * other half, `CommitMeta.vue`, has nothing to show here (every field it renders is commit-only),

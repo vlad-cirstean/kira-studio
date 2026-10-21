@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P7.md` W14: "Rename branch…" from the graph's own ref-badge context menu
+ * "Rename branch…" from the graph's own ref-badge context menu
  * (`App.vue`'s ref menu). `BranchPicker.vue`'s own rename swaps its dropdown row
  * for an inline text field — there is no comparable row here (the badge is a DOM fragment inside
  * a commit's message cell, not a list item with room to become an input), so this is a small
@@ -9,7 +9,7 @@
  * a prefilled name field rather than an empty one, validated with the same `validateRefName`
  * prefilter `BranchDialog.vue`/`TagDialog.vue` already use.
  *
- * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
+ * The modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
  * only supplies its own body/footer content.
  */
 import { validateRefName } from '@kira/git-core';

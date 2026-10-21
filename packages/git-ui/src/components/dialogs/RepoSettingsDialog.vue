@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
- * G18 D13: "Repository settings" — the dialog `AppToolbar.vue`'s own gear (`⚙`, D13) opens.
+ * "Repository settings" — the dialog `AppToolbar.vue`'s own gear (`⚙`) opens.
  * Each field here is hand-written, not schema-driven (no loop over `repoSettingKeys()`) — a new
  * `source: 'repo'` leaf needs an explicit field/patch-diff line added here, same as every leaf
- * already present. `kiraSpace.worktree.prepareScript`/`.basePath` (G25) are the two `'repo'`
+ * already present. `kiraSpace.worktree.prepareScript`/`.basePath` are the two `'repo'`
  * leaves this dialog deliberately does NOT surface. The prepare script is read-only in git-ui and
- * set in Kira Space (P172); `WorktreeDialog.vue` only reads it. G28 D16 adds
+ * set in Kira Space; `WorktreeDialog.vue` only reads it. The dialog adds
  * `kiraSpace.checkout.autoStash`, its own new "Checkout" section.
  *
  * Mirrors `StashDialog.vue`'s own "one instance, `open` prop + `close` emit" convention — the
@@ -13,7 +13,7 @@
  * three modes do, so this is a second file in that shape, not a fourth mode grafted onto
  * `StashDialog.vue` itself (a settings dialog and a stash workflow share no state).
  *
- * P131 Part 1 §6.1/§6.2: the modal shell is shadcn's `Dialog`/`DialogContent` now. Every
+ * The modal shell is shadcn's `Dialog`/`DialogContent` now. Every
  * `KuiSelect` is `NativeSelect` (git-ui has no fancier dropdown primitive — same choice
  * `StackDialog.vue`'s own parent picker makes), each still driven by an explicit
  * `onXChange`-and-cast handler rather than a plain `v-model`, since `NativeSelect`'s own

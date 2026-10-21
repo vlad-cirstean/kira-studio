@@ -56,7 +56,7 @@ import { compactRowHeightPx, rowHeightPx, TokenReader } from '../theme/readToken
 
 const props = defineProps<{
   graphView: GraphViewState;
-  /** P93 §4.2/§7: the collapse/expand half of the branch-ordered layout — `handleClick`'s own
+  /** The collapse/expand half of the branch-ordered layout — `handleClick`'s own
    *  branch for a placeholder row, and `scrollToRow`'s auto-expand, both call `toggleGroup` on
    *  this then `graphView.rebuildOrder()`. Required, not optional (unlike `search`/`pr`/`stack`):
    *  every mount of this component threads the same `GraphOrderState` `App.vue` gives `graphView`
@@ -69,10 +69,9 @@ const props = defineProps<{
   /** A previously persisted scroll target (`viewState.scrollRow`) — applied once, right after
    *  the first paint. Absent on a first-ever mount, where there is nothing to restore. */
   initialScrollRow?: number;
-  /** P11 W13: the message column's own in-place highlight source — optional so a caller with
-   *  nothing to search yet (none, currently; W14 is the first to instantiate a real one from
-   *  `App.vue`) gets plain, unhighlighted subjects, mirroring `columns.ts`'s own
-   *  `MessageSearchContext` default. */
+  /** The message column's own in-place highlight source — optional so a caller with
+   *  nothing to search yet (none, currently) gets plain, unhighlighted subjects, mirroring
+   *  `columns.ts`'s own `MessageSearchContext` default. */
   search?: SearchState;
   /** G24 D9: the graph indicator's own PR source — optional so a caller with nothing to show yet
    *  gets a plain, badge-free message column, mirroring `search`'s own default. */
@@ -80,7 +79,7 @@ const props = defineProps<{
   /** G26 D-4.13: the message column's own stack-decoration source — optional so a caller with no
    *  stack view mounted gets plain, undecorated branch badges, mirroring `pr`'s own default. */
   stack?: StackState;
-  /** G-UX D1 (item 1a): the detail pane's own open/closed state, mirrored from `App.vue`'s
+  /** The detail pane's own open/closed state, mirrored from `App.vue`'s
    *  `detailOpen` ref. `true` drops `author`/`date` to `compact: true` (`columns.ts`) and reflows
    *  their width into `message` — everything they show already renders in the pane the click just
    *  opened, so keeping them is pure duplication that starves the one column that is not. */
@@ -104,12 +103,12 @@ const emit = defineEmits<{
   (e: 'closeDetail'): void;
   /** `F5` while this grid has focus. W10 owns the Refresh action itself. */
   (e: 'refresh'): void;
-  /** `docs/plans/P6.md` W14: a right-click, `Shift+F10`, or the Menu key on a row — `App.vue`
+  /** A right-click, `Shift+F10`, or the Menu key on a row — `App.vue`
    *  owns the actual menu (`useSectionMenu`) (it is the one place with both `ops` and the
    *  commit store's decorations at hand), so this only ever reports which row and where to open
    *  it, exactly as `scroll`/`toggleDetail` report rather than acting on them. */
   (e: 'contextMenu', detail: { row: number; x: number; y: number }): void;
-  /** `docs/plans/P7.md` W14: a right-click landed on a ref badge (`refBadges.ts`'s
+  /** A right-click landed on a ref badge (`refBadges.ts`'s
    *  `data-ref-kind`/`data-ref-name`), not merely the row underneath it — `App.vue` opens the
    *  branch-scoped menu instead of the commit menu. The row is still selected either way
    *  (`handleContextMenu`'s own doc comment says why); this fires *instead of* `contextMenu`,
@@ -118,14 +117,15 @@ const emit = defineEmits<{
     e: 'refContextMenu',
     detail: { kind: 'branch' | 'remoteBranch'; name: string; x: number; y: number },
   ): void;
-  /** `docs/plans/P9.md` W14: the stash counterpart of `refContextMenu` — a right-click landed on
+  /** The stash counterpart of `refContextMenu` — a right-click landed on
    *  a stash badge (`refBadges.ts`'s `refKind: "stash"`). Reported as a plain row index rather
    *  than a parsed `stash@{N}`/sha pair: the row IS the stash commit (its own decoration already
    *  carries the exact index, and its `sha` field the exact sha), so `App.vue` reads both back
    *  from the store instead of this component re-deriving them from badge text. */
   (e: 'stashContextMenu', detail: { row: number; x: number; y: number }): void;
-  /** P74 §3.3: a click landed on the inline PR badge (`refBadges.ts`'s `data-change-request-number`) —
-   *  reported as a plain PR number rather than this component calling `DetailActions.openChangeRequest`
+  /** A click landed on the inline PR badge (`refBadges.ts`'s `data-change-request-number`) —
+   *  reported as a plain PR number rather than this component calling
+   *  `DetailActions.openChangeRequest`
    *  itself, mirroring `refContextMenu`/`stashContextMenu`'s own "report, don't act" convention;
    *  `App.vue` is the one place with `actions` at hand. Never fires alongside `openDetail`/
    *  `toggleDetail` — `handleClick`'s own hit-test returns before either would run. */
@@ -149,20 +149,19 @@ const widths = ref<ColumnWidths>({
   ...props.columnWidths,
   graph: Math.max(MIN_COLUMN_WIDTH, props.columnWidths.graph),
 });
-// P228: grow-only high-water of the lanes' width for this mount (0 until the first lane-aware
+// Grow-only high-water of the lanes' width for this mount (0 until the first lane-aware
 // layout); a repo switch remounts, which resets it. The column never renders below it, in any
 // mode, so no drawn node clips. `graphAuto`: a first-ever mount tracks the floor, even below the
 // stored width, until the user drags the graph handle.
 const laneFloor = ref(0);
 let graphAuto = false;
 
-/** G21 D6b: the measured pixel width the absolute date format actually needs at the current
+/** The measured pixel width the absolute date format needs at the current
  *  font/zoom — `0` until the probe first resolves (always synchronous in practice; there is no
  *  SSR here) so a `Math.max(DEFAULT_COLUMN_WIDTHS.date, 0)` read before that never regresses the
  *  relative-format default. Used both as the first-ever-mount seed (`onMounted` below) and as
  *  the date column's own minimum drag width (`minWidthFor`), replacing the global
- *  `MIN_COLUMN_WIDTH` for that one column so it cannot be dragged back into the clipping state
- *  item 6 is about. */
+ *  `MIN_COLUMN_WIDTH` for that one column so it cannot be dragged back into the clipping state. */
 const measuredDateWidth = ref(0);
 
 function remeasureDateWidth(): void {
@@ -188,10 +187,10 @@ function graphWidth(): number {
   );
 }
 
-/** P93 §7: every translation site in this file's own coordinate conversion — SlickGrid's rows
+/** Every translation site in this file's own coordinate conversion — SlickGrid's rows
  *  (`instance.onClick`, `getViewport()`, `data-row`, …) are *display* rows, while
  *  `props.selection.row`/`viewState.scrollRow`/this component's own `scrollToRow`/`scrollToTopRow`
- *  contract stay *store* rows (§5.4's identity plan makes the two the same array position for
+ *  contract stay *store* rows (the identity plan makes the two the same array position for
  *  every caller that has not attached a `GraphOrderState`, so nothing changes for them). An
  *  accessor, not a captured value, so a plan rebuild never needs this component rebuilt — only
  *  the grid invalidated (the `plan` watcher below). */
@@ -199,11 +198,11 @@ function plan(): RowPlan {
   return props.graphView.plan.value;
 }
 
-// Built once per mounted grid (W8): closes over this instance's own LayoutStore/CommitStore
+// Built once per mounted grid: closes over this instance's own LayoutStore/CommitStore
 // (props.graphView is assumed stable for the life of one CommitGrid — a repo switch remounts
-// this component) and per-row height accessors (`grid.getRowHeight(row)`: decorated rows are taller;
-// the fallback only covers a call racing construction). The node sits `compactRowHeight / 2` above
-// the row bottom, on the subject line.
+// this component) and per-row height accessors (`grid.getRowHeight(row)`: decorated rows are
+// taller; the fallback only covers a call racing construction). The node sits
+// `compactRowHeight / 2` above the row bottom, on the subject line.
 const graphFormatter = createGraphFormatter(
   props.graphView.layout,
   props.graphView.store,
@@ -237,7 +236,7 @@ let previousSelectedRow = -1;
 // keep retrying forever. See `applyInitialScrollRow` below.
 let initialScrollApplied = false;
 
-// P79 review fix (Performance, LOW): `false` while a KeepAlive host has backgrounded this mount
+// `false` while a KeepAlive host has backgrounded this mount
 // (RepoGraphView.vue's own onDeactivated, via main.ts's `setVisible`) — the four generation
 // watchers below skip their own rebuild while hidden, marking one owed instead of doing it once
 // per missed bump against a grid nobody can see; the catch-up watch further down replays it once,
@@ -300,8 +299,8 @@ function fitInput(): ColumnFitInput {
 }
 
 /** `undefined` whenever there is nothing to highlight: no `search` prop at all, an empty/invalid
- *  query, or `scope: "refs"` (the message column has nothing to do with a ref-only search — §7.8's
- *  own field list for that scope never includes `subject`). Re-read on every render pass by
+ *  query, or `scope: "refs"` (the message column has nothing to do with a ref-only search — the
+ *  field list for that scope never includes `subject`). Re-read on every render pass by
  *  `columns.ts`'s `messageFormatter`, never captured once, so this component only ever needs to
  *  trigger a re-render (the `search.searchGeneration` watcher below), not a column rebuild, when
  *  the pattern changes. */
@@ -312,10 +311,10 @@ function searchPattern(): RegExp | undefined {
   return compiled.kind === 'ok' ? compiled.pattern : undefined;
 }
 
-/** G26 D-4.13: `columns.ts`'s own `StackContext.stackInfoFor` — a plain scan over the current
+/** `columns.ts`'s own `StackContext.stackInfoFor` — a plain scan over the current
  *  `stack.list` result (never a memoized `Map`: the branch count a stack view realistically holds
- *  is small, and this only runs for a row that actually carries a branch decoration, F12's own
- *  "re-read on every render pass" contract, not once per grid render). `undefined` for a branch
+ *  is small, and this only runs for a row that carries a branch decoration, the "re-read on every
+ *  render pass" contract, not once per grid render). `undefined` for a branch
  *  that is not a stack member at all — `refBadges.ts`'s own "render nothing" rule. */
 function stackInfoFor(branchName: string): { stacked: boolean; stale: boolean } | undefined {
   const stackState = props.stack;
@@ -330,7 +329,7 @@ function stackInfoFor(branchName: string): { stacked: boolean; stale: boolean } 
   return undefined;
 }
 
-/** P93 §4.2: turns a `RowPlanEntry.groupIndex` into the branch name a placeholder's own "N more
+/** Turns a `RowPlanEntry.groupIndex` into the branch name a placeholder's own "N more
  *  commits on X" text and `aria-label` both need — `RowPlan.groupKeyAt` only ever exposes the raw,
  *  unreadable key (`GraphOrderState.tips`'s own doc comment); `undefined` for the synthetic
  *  `other` group (index `order.tips.length`, no `TipRef` of its own), `collapsedMessageText`'s own
@@ -339,7 +338,7 @@ function groupLabelFor(groupIndex: number): string | undefined {
   return props.order.tips[groupIndex]?.label;
 }
 
-/** P92 item 2: the width the column model must sum to — SlickGrid's own viewport content box, not
+/** The width the column model must sum to — SlickGrid's own viewport content box, not
  *  the host's. `clientWidth` already excludes the vertical scrollbar's gutter; `host.clientWidth`
  *  does not, and the difference is a permanent horizontal scrollbar (SlickGrid's own
  *  `getCanvasWidth()` sums the column widths and writes that onto `.grid-canvas`, wider than the
@@ -387,21 +386,21 @@ function updateHandlePositions(): void {
   maxDate.value = maxDragWidth('date', fit, input);
 }
 
-// Regression fix (post-P79-merge): the width `rebuildColumns()` last actually ran against —
+// The width `rebuildColumns()` last ran against —
 // `-1` (never equals a real width) until the first call. `scheduleResize` below reads this
 // to skip a rebuild that would only repeat one some other caller (almost always the `detailOpen`
-// watcher, per this function's own "G-UX (item 9)" comment) already did against the same width a
+// watcher) already did against the same width a
 // moment earlier. Without it, closing the detail pane triggered TWO full `setColumns()` passes for
 // the one width change — the watcher's own synchronous one (`flush: 'post'`, already the true,
 // final width) and a second, purely redundant one a frame later when the same resize also reached
-// the ResizeObserver — each of which tears down and recreates every row's DOM (`setColumns()` ->
+// the ResizeObserver — each of which tears down and recreates every row's DOM (`setColumns()` -&gt;
 // `invalidateAllRows()`) before rebuilding it. Two teardown/rebuild cycles a frame apart, for
 // identical output, is wasted work on its own; under real load (contended CPU, several webview
 // tests' own Chromium instances running at once) it also widens the window in which anything
 // reading the grid's DOM — a test, `applyAccessibility`'s own focus restore — can catch a row
 // mid-teardown between the two passes and see a stale, zero-width cell. Deduplicating by width
 // closes that window by making the second pass a no-op instead of a second real rebuild.
-// P92 item 2: reads `availableWidth()` now, not `host.clientWidth` — same dedupe, correct box.
+// Reads `availableWidth()` now, not `host.clientWidth` — same dedupe, correct box.
 let lastRebuiltWidth = -1;
 /** The host height SlickGrid's canvas was last sized to: a height-only change (a toolbar row
  *  unmounting below the grid) needs `resizeCanvas()`, or rows past the old viewport never render. */
@@ -417,7 +416,7 @@ function emitGraphWidth(): void {
 }
 
 function rebuildColumns(): void {
-  // G-UX (item 9): resizeCanvas() BEFORE setColumns() — SlickGrid's own cached canvas width has
+  // resizeCanvas() BEFORE setColumns() — SlickGrid's own cached canvas width has
   // to already reflect the host's current size before the new column set (and its `left` offsets)
   // is written, or the columns are laid out against a stale width. Without this, the detailOpen
   // watcher below used to call setColumns() alone (stale, pane-open width) and a ResizeObserver
@@ -447,7 +446,7 @@ function setColumnWidth(column: keyof ColumnWidths, next: number): void {
   emit('update:columnWidths', widths.value);
 }
 
-/** P93 §4.2: a placeholder's own click/Enter/Space activation — expands its group, session-only
+/** A placeholder's own click/Enter/Space activation — expands its group, session-only
  *  (`GraphOrderState.toggleGroup`), and rebuilds the plan the identical way `App.vue`'s own tips
  *  watcher does (fire-and-forget: the grid's own `plan` watcher, already wired, picks up the
  *  result). `scrollToRow`'s auto-expand calls this too. */
@@ -456,13 +455,13 @@ function toggleGroup(displayRow: number): void {
   void props.graphView.rebuildOrder();
 }
 
-/** G-UX D2 (item 1b): a click on an unselected row opens the detail pane on the FIRST click —
+/** A click on an unselected row opens the detail pane on the FIRST click —
  *  clicking the already-selected row still toggles it closed (the only mouse-only way to close
- *  it, agreeing with `Esc` and the narrow-breakpoint drawer). G-UX D8 (item 8): the date cell no
+ *  it, agreeing with `Esc` and the narrow-breakpoint drawer). The date cell no
  *  longer has any click behaviour of its own — the relative/absolute toggle lives in the Display
  *  settings section now, so a click anywhere on the row means exactly one thing.
  *
- *  P93 §4.2: a collapsed placeholder is "never 'selected' in `SelectionState`'s sense — there is
+ *  A collapsed placeholder is "never 'selected' in `SelectionState`'s sense — there is
  *  no sha to select" — a click on one expands its group instead, never reaching `selection.select`
  *  or either detail-pane emit. */
 function handleClick(displayRow: number): void {
@@ -479,7 +478,7 @@ function handleClick(displayRow: number): void {
   else emit('openDetail');
 }
 
-/** P74 §3.3: a click landing on the inline PR badge (`refBadges.ts`'s `data-change-request-number`, always a
+/** A click landing on the inline PR badge (`refBadges.ts`'s `data-change-request-number`, always a
  *  real `<button>`) opens that PR instead of
  *  selecting the row — the same "hit-test ahead of the ordinary click" shape
  *  `handleContextMenu`'s own `data-ref-kind` check already uses for a right-click. Returns the PR
@@ -494,13 +493,13 @@ function changeRequestNumberFromClick(event: MouseEvent | undefined): number | u
   return raw !== undefined ? Number(raw) : undefined;
 }
 
-/** §6.4: "right-click selects the row [first]", then (P6 W14) opens the shared context menu at the
- *  click point — the browser's own native menu is suppressed now that there is a real one to
- *  show instead of P4's "nothing else". `docs/plans/P7.md` W14 adds one hit-test ahead of that:
- *  a click landing on a ref badge (`refBadges.ts`'s `data-ref-kind`) opens the branch-scoped menu
- *  instead — the row is still selected either way (this is about which menu opens, not whether
- *  the click also selects), and a click one pixel to the side of a badge (no `data-ref-kind`
- *  ancestor) falls straight through to the commit menu, unchanged. */
+/** "right-click selects the row [first]", then opens the shared context menu at the click point —
+ *  the browser's own native menu is suppressed now that there is a real one to
+ *  show instead of the "nothing else". A click landing on a ref badge (`refBadges.ts`'s
+ *  `data-ref-kind`) opens the branch-scoped menu instead — the row is still selected
+ *  either way (this is about which menu opens, not whether the click also selects), and a
+ *  click one pixel to the side of a badge (no `data-ref-kind` ancestor) falls straight through
+ *  to the commit menu, unchanged. */
 function handleContextMenu(event: MouseEvent): void {
   event.preventDefault();
   const cell = grid?.getCellFromEvent(event);
@@ -533,11 +532,11 @@ function handleContextMenu(event: MouseEvent): void {
   emit('contextMenu', { row, x: event.clientX, y: event.clientY });
 }
 
-/** `Shift+F10`/the Menu key (§6.6): opens the same menu `handleContextMenu` does, anchored to
+/** `Shift+F10`/the Menu key: opens the same menu `handleContextMenu` does, anchored to
  *  the selected row's own bounding rect rather than a click point that does not exist for a
  *  keyboard invocation. `row` (the parameter, and what this emits) is a *store* row, matching
- *  `contextMenu`'s own contract (§7: "the context menus ... speak store rows") — only the DOM
- *  lookup below needs the display row `data-row` is actually keyed by. */
+ *  `contextMenu`'s own contract ("the context menus ... speak store rows") — only the DOM
+ *  lookup below needs the display row `data-row` is keyed by. */
 function openMenuFromKeyboard(row: number): void {
   if (!grid) return;
   const container = grid.getContainerNode();
@@ -547,7 +546,7 @@ function openMenuFromKeyboard(row: number): void {
   emit('contextMenu', { row, x: rect?.left ?? 0, y: rect?.bottom ?? 0 });
 }
 
-/** P93 §6.2: "clicking a stub scrolls to its parent row" — `hitTest.ts`'s `laneAt` already answers
+/** "clicking a stub scrolls to its parent row" — `hitTest.ts`'s `laneAt` already answers
  *  which lane a click landed in; the stub is drawn in this row's own lane (`readSlice`'s own doc
  *  comment), so the test is "this row has an upward link, and the click landed in its lane".
  *  Reuses `moveSelection`'s own select-and-scroll shape (the same "jump to a row" semantics
@@ -556,9 +555,9 @@ function openMenuFromKeyboard(row: number): void {
  *  whether it claimed the click, so `onClick`'s own handler knows not to fall through to
  *  `handleClick`.
  *
- *  P93 §4.2: "click anywhere on the row" expands a collapsed placeholder — including its own
- *  graph cell, even one whose own contracted internal merges left it a fork stub of its own
- *  (§4.3) — so this bails out for one and lets `handleClick`'s toggle win instead of navigating. */
+ *  "click anywhere on the row" expands a collapsed placeholder — including its own
+ *  graph cell, even one whose own contracted internal merges left it a fork stub of its own —
+ *  so this bails out for one and lets `handleClick`'s toggle win instead of navigating. */
 function handleForkStubClick(
   displayRow: number,
   cell: number,
@@ -585,13 +584,13 @@ function pageSize(): number {
   return Math.max(1, bottom - top);
 }
 
-/** P93 §7: `displayRow` walks display rows (branch-ordered, §3) — arrow-key/Home/End/Page nav
+/** `displayRow` walks display rows (branch-ordered) — arrow-key/Home/End/Page nav
  *  moves by one row on screen, not by one store row, which after branch grouping are no longer
  *  the same thing.
  *
- *  P93 §4.2: a collapsed placeholder is never "selected" (there is no sha to select) — arrow/Home/
+ *  A collapsed placeholder is never "selected" (there is no sha to select) — arrow/Home/
  *  End/Page navigation still lands *focus* on it (a real, tabbable row a keyboard user must be
- *  able to reach to `Enter`/`Space`-activate it, §4.2's own "with it focused"), so `pendingFocusRow`
+ *  able to reach to `Enter`/`Space`-activate it), so `pendingFocusRow`
  *  and the scroll still happen; only `selection.select` is skipped, leaving whatever commit row
  *  was selected before still selected underneath it. */
 function moveSelection(displayRow: number): void {
@@ -612,7 +611,7 @@ function moveSelection(displayRow: number): void {
   props.selection.select(entry.storeRow);
 }
 
-// P94 pass 3 §4.3: everything handleKeyDown's own branches need, built once — plan/toggleGroup/
+// Everything handleKeyDown's own branches need, built once — plan/toggleGroup/
 // openMenuFromKeyboard/pageSize/moveSelection are stable function declarations (hoisted, so this
 // object can reference them regardless of where in the script they're each defined);
 // focusedRowIndex is a getter since it's a plain, non-reactive `let` that must be read fresh on
@@ -656,11 +655,11 @@ function handleKeyDown(event: KeyboardEvent): boolean {
 // re-rendered — see App.vue's own doc comment on why it moved here rather than firing at mount.
 let layoutCompleteMarked = false;
 
-// P79 fix (Performance MEDIUM + Functional MEDIUM): every ancestry-affecting signal —
+// Every ancestry-affecting signal —
 // `pr.generation` (a resolved branch) and the graph window growing/resetting
 // (`graphView.loadedRows`/`graphView.generation`) — used to either skip `rebuildAncestry`
 // entirely (the window-growth case, the desync bug) or run it once per signal with no
-// coalescing (the N-branches-in-one-burst case, the performance finding). Both watchers below
+// coalescing (the N-branches-in-one-burst case). Both watchers below
 // now only set this flag; `nextTick` (this file's own established pattern — see the `detailOpen`
 // watcher's `flush: 'post'`) drains it into exactly one `rebuildAncestry` + one grid
 // invalidate/render per tick, however many signals fired within it.
@@ -716,7 +715,7 @@ function scheduleResize(): void {
   if (resizeRaf !== 0) return;
   resizeRaf = requestAnimationFrame(() => {
     resizeRaf = 0;
-    // P79 review fix (Performance, LOW), corrected post-merge regression: a KeepAlive'd host
+    // A KeepAlive'd host
     // (RepoGraphView.vue) shrinks this grid's container to 0×0 on deactivate — the ResizeObserver
     // above fires for that transition too, and without a guard `resizeCanvas()`/`rebuildColumns()`
     // would do a full layout pass against a grid nobody can see. The original fix inferred "nobody
@@ -747,12 +746,11 @@ function scheduleResize(): void {
 }
 
 /**
- * `docs/plans/P4.md` W14, "the whole of the above is one function called from
- * `onRendered({startRow, endRow})`, applied to the rows in that range": counts, selection,
- * roving focus and each row's composed accessible name, all from state this component already
- * holds. Cheap by construction — it only ever touches rows SlickGrid just built (a handful of
- * `setAttribute` calls per row, the same order as the row's own construction), never the whole
- * loaded history.
+ * One function called from `onRendered({startRow, endRow})`, applied to the rows in that range:
+ * counts, selection, roving focus and each row's composed accessible name, all from state this
+ * component already holds. Cheap by construction — it only ever touches rows SlickGrid just built
+ * (a handful of `setAttribute` calls per row, the same order as the row's own construction),
+ * never the whole loaded history.
  *
  * `container`/rendered-row lookups go through `grid.getContainerNode()` rather than `host.value`
  * directly — they are the same element (SlickGrid's own `_container`, the constructor's first
@@ -802,10 +800,10 @@ function applyAccessibility(range: { startRow: number; endRow: number }): void {
     rowNode.setAttribute('aria-selected', isSelected ? 'true' : 'false');
     rowNode.tabIndex = row === tabbableRow ? 0 : -1;
 
-    // P93 §4.2: "`aria-expanded="false"` on the row, `aria-label` = the message text" — a
-    // placeholder has no single commit to read `composeRowLabel` from (`store.commitAt` below
-    // reads only its first contracted row, a shape for `getItem`, never a fact about the row,
-    // `columns.ts`'s own note on why formatters never read it either).
+    // "`aria-expanded="false"` on the row, `aria-label` = the message text" — a placeholder has no
+    // single commit to read `composeRowLabel` from (`store.commitAt` below reads only its first
+    // contracted row, a shape for `getItem`, never a fact about the row, `columns.ts`'s own note
+    // on why formatters never read it either).
     const entry = plan().entryAt(row);
     if (entry.kind === 'collapsed') {
       rowNode.setAttribute('aria-expanded', 'false');
@@ -862,7 +860,7 @@ function applyAccessibility(range: { startRow: number; endRow: number }): void {
   }
 }
 
-/** P108 F1: `initialScrollRow` is a persisted *store* row (`viewState.scrollRow`), applied once,
+/** `initialScrollRow` is a persisted *store* row (`viewState.scrollRow`), applied once,
  *  right after mount — but the plan this component reads from can lag behind it two ways: a cold
  *  boot mounts before the first chunk lands at all (`plan()` still `identityRowPlan(0)`), and a
  *  restart-at-zero refresh can leave a stale plan covering the *old*, larger history for a moment.
@@ -883,7 +881,7 @@ function applyInitialScrollRow(row: number): void {
   // Still streaming in: more rows may yet cover `row` exactly — keep waiting rather than clamping
   // early against a plan that is only partially loaded. Two separate "not done yet" signals, both
   // required: `loading` covers the network fetch, but `#applyChunk` (`graphView.ts`) folds a
-  // chunk into the store and returns WITHOUT awaiting its own relayout (F11's own coalescing
+  // chunk into the store and returns WITHOUT awaiting its own relayout (the coalescing
   // drain loop) — so `loading` can already read `'idle'` while the plan is still one or more
   // relayouts behind the store's real row count. Only `storeLength` catching up all the way to
   // `store.rowCount` means there is no relayout left in flight to still change the answer.
@@ -910,7 +908,7 @@ onMounted(() => {
   if (props.initialScrollRow === undefined) {
     // `initialScrollRow` is only ever passed when `App.vue` found real persisted state to
     // restore (its own prop doc comment) — absent means this is a genuine first-ever mount, the
-    // one case D6a/D6b's seed is for. A persisted width (even one that happens to equal
+    // one case the seed is for. A persisted width (even one that happens to equal
     // `DEFAULT_COLUMN_WIDTHS.date`, e.g. a user who explicitly chose it) is never overridden.
     const seeded = Math.max(DEFAULT_COLUMN_WIDTHS.date, measuredDateWidth.value);
     if (seeded !== widths.value.date) widths.value = { ...widths.value, date: seeded };
@@ -1005,14 +1003,14 @@ onMounted(() => {
       if (top !== undefined && top < plan().length) emit('scroll', plan().storeRowAt(top));
     });
   });
-  // `stopImmediatePropagation()` only for a key `handleKeyDown` actually claimed — see that
+  // `stopImmediatePropagation()` only for a key `handleKeyDown` claimed — see that
   // function's own doc comment. Claiming *every* key unconditionally (this project's own earlier
-  // approach, before W14) was safe for every key our own switch names, but not for `Tab`:
+  // approach) was safe for every key our own switch names, but not for `Tab`:
   // SlickGrid's `handleKeyDown` calls `e.preventDefault()` whenever `handled` ends up `true` by
   // the time it finishes, regardless of *which* code path set it there, so an unconditional
   // `stopImmediatePropagation()` here silently blocked the browser's own `Tab`-key focus
   // navigation the moment a row (rather than the inert `_focusSink`) could hold real DOM focus —
-  // exactly the "no keyboard trap" failure W14's own keyboard-only pass exists to catch.
+  // exactly the "no keyboard trap" failure the keyboard-only pass exists to catch.
   instance.onKeyDown.subscribe((event) => {
     const handled = handleKeyDown(event.getNativeEvent<KeyboardEvent>());
     if (handled) event.stopImmediatePropagation();
@@ -1026,7 +1024,7 @@ onMounted(() => {
   unsubscribeLayout = props.graphView.onPlanPublished(handlePlanPublished);
 
   unsubscribeTokens = tokenReader.onChange(() => {
-    // G21 D6b: a font-size/family change (now tracked alongside row-height, readTokens.ts) can
+    // A font-size/family change (now tracked alongside row-height, readTokens.ts) can
     // widen or narrow the absolute date format's own rendered width — re-measure so the date
     // column's minimum drag width stays honest, even though nothing here forces the column's
     // *current* width to follow (a user-narrowed relative-format column stays exactly as narrow
@@ -1043,7 +1041,7 @@ onMounted(() => {
   updateHandlePositions();
   emitGraphWidth();
   // `initialScrollRow` (`viewState.scrollRow`) is a persisted store row — translate to the
-  // display row this mount's plan currently resolves it to. `applyInitialScrollRow` (P108 F1)
+  // display row this mount's plan currently resolves it to. `applyInitialScrollRow`
   // handles a plan that does not cover it yet (cold boot, before the first chunk lands) by
   // deferring to the `plan`/`loading` watchers below rather than converting it here unguarded.
   if (props.initialScrollRow !== undefined) {
@@ -1056,7 +1054,7 @@ onMounted(() => {
 // `onMounted` above) rather than a `watch()` on its scalars — one obvious path for "new rows
 // landed" instead of two that could race. `SelectionState.row` is watched here because it can
 // change from *outside* this component too (`selectBySha` re-resolving a selection after a
-// refresh's re-walk, W11), not only from `handleClick`/keyboard nav, so it needs its own
+// refresh's re-walk), not only from `handleClick`/keyboard nav, so it needs its own
 // always-on two-row invalidation rather than being folded into those call sites.
 watch(
   () => props.selection.row.value,
@@ -1076,25 +1074,24 @@ watch(
 watch(
   () => props.graphView.loadedRows.value,
   () => {
-    // P92 item 2 follow-up: the row count crossing the "needs a vertical scrollbar" threshold is
-    // the ONE thing that can shrink `availableWidth()` with no host resize and no detailOpen
-    // toggle — the two triggers `scheduleResize`'s own ResizeObserver and the `detailOpen` watcher
-    // already cover. Without this, a history that streams past that threshold keeps the column
-    // widths computed at the pre-scrollbar width, permanently reproducing the bug §2 exists to
-    // fix. `scheduleResize` already dedupes against `lastRebuiltWidth`, so this is a no-op for
-    // every row load that does not actually cross the threshold.
+    // The row count crossing the "needs a vertical scrollbar" threshold is the ONE thing that can
+    // shrink `availableWidth()` with no host resize and no detailOpen toggle — the two triggers
+    // `scheduleResize`'s own ResizeObserver and the `detailOpen` watcher already cover. Without
+    // this, a history that streams past that threshold keeps the column widths computed at the
+    // pre-scrollbar width, permanently reproducing the bug. `scheduleResize` already dedupes
+    // against `lastRebuiltWidth`, so this is a no-op for every row load that does not cross
+    // the threshold.
     scheduleResize();
-    // P79 fix (Functional MEDIUM): newly-loaded rows (`graph.loadMore`) can be ancestors of an
-    // already-resolved PR tip — without this, they showed no badge until some unrelated PR
-    // resolution happened to bump `pr.generation` again (`changeRequestByAncestry` desyncing from the
-    // store's own, larger row set). A no-op via `scheduleAncestryRebuild`'s own guard when there
-    // is no `pr` source at all.
+    // Newly-loaded rows (`graph.loadMore`) can be ancestors of an already-resolved PR tip — without
+    // this, they showed no badge until some unrelated PR resolution happened to bump
+    // `pr.generation` again (`changeRequestByAncestry` desyncing from the store's own, larger row
+    // set). A no-op via `scheduleAncestryRebuild`'s own guard when there is no `pr` source at all.
     if (props.changeRequests) scheduleAncestryRebuild();
   },
 );
-// P108 F1: a plan rebuild does not necessarily accompany the LAST chunk of a load (`loading`
+// A plan rebuild does not necessarily accompany the LAST chunk of a load (`loading`
 // flips back to `'idle'` after it, with no further plan change) — this is what lets
-// `applyInitialScrollRow` clamp a genuinely-uncovered row once loading has actually settled,
+// `applyInitialScrollRow` clamp a genuinely-uncovered row once loading has settled,
 // instead of waiting on a plan change that may never come again.
 watch(
   () => props.graphView.loading.value,
@@ -1117,7 +1114,7 @@ watch(
     if (props.changeRequests) scheduleAncestryRebuild();
   },
 );
-// P11 W13: mirrors the `generation` watcher directly above — a new `searchGeneration` means the
+// Mirrors the `generation` watcher directly above — a new `searchGeneration` means the
 // message column's own highlight source (`searchPattern` above) may have changed, so every row's
 // formatter must re-run; `updateRowCount()` has no reason to run alongside it, since a search
 // never changes how many rows are loaded.
@@ -1163,11 +1160,11 @@ watch(
     grid?.render();
   },
 );
-// P79 review fix (Performance, LOW): replays whatever the four watchers above deferred while
+// Replays whatever the four watchers above deferred while
 // backgrounded, once, combined, rather than once per missed generation bump. Runs the union of
 // their own effects — safe as a superset since `invalidateAllRows`/`render` are idempotent, and
 // `rebuildAncestry`/`invalidateRowHeights` are the same "make everything current" calls each of
-// them already does independently. P92 item 1: no `rebuildColumns()` here any more — the generation
+// them already does independently. No `rebuildColumns()` here any more — the generation
 // watcher above stopped calling it too, now that the graph column's width no longer depends on
 // `laneCount`.
 watch(graphVisible, (visible) => {
@@ -1180,9 +1177,9 @@ watch(graphVisible, (visible) => {
   grid?.updateRowCount();
   grid?.render();
 });
-// G-UX D1: the detail pane opening/closing changes the column model itself (compact vs. full),
+// The detail pane opening/closing changes the column model itself (compact vs. full),
 // unlike every watcher above — a full `rebuildColumns()`, not just an invalidate/render.
-// G-UX (item 9): `flush: 'post'` — this must run AFTER Vue has applied the pane's own width
+// `flush: 'post'` — this must run AFTER Vue has applied the pane's own width
 // change to the DOM (App.vue's `detailWidthPx`/the pane unmounting), so `host.clientWidth` (read
 // inside `rebuildColumns()` -> `currentColumns()`/`resizeCanvas()`) already reflects the grid's
 // true final width instead of the pane-open one.
@@ -1210,20 +1207,20 @@ onBeforeUnmount(() => {
   grid = undefined;
 });
 
-/** `App.vue` (W11) calls this once a refresh's re-walk re-resolves a previously selected sha
+/** `App.vue` calls this once a refresh's re-walk re-resolves a previously selected sha
  *  back to a (possibly different) row — `initialScrollRow` only ever applies once, at mount
  *  (see its own doc comment above), so a refresh that happens later needs an imperative path
  *  back to the same underlying `scrollRowIntoView` call.
  *
- *  P93 §8.4: "a search reveal that lands inside a collapsed group expands it and scrolls to the
+ *  "a search reveal that lands inside a collapsed group expands it and scrolls to the
  *  commit" — when `row` is currently hidden (`displayRowOf` returns `-1`, `RowPlan`'s own
  *  contract for a contracted member), this expands its containing group first
  *  (`containingDisplayRow` finds the placeholder row, `groupKeyAt` its key) and awaits the rebuild
- *  before scrolling against the NEW plan's own `displayRowOf` — `async` now, unlike before P93;
+ *  before scrolling against the NEW plan's own `displayRowOf` — `async` now;
  *  both existing callers (`App.vue`) already discard the return value, so this is source-
  *  compatible for them either way.
  *
- *  P108 F1: `row` can also be one this plan does not cover at all yet (`row >= storeLength`, not
+ *  `row` can also be one this plan does not cover at all yet (`row >= storeLength`, not
  *  merely hidden) — e.g. a stale plan mid-rebuild after a restart-at-zero refresh. Guarded before
  *  ever calling `containingDisplayRow` (whose own contract, unlike `displayRowOf`, still asserts
  *  in range — it is never handed an uncovered row here), and re-checked after `rebuildOrder()`'s
@@ -1243,13 +1240,13 @@ async function scrollToRow(row: number): Promise<void> {
   grid?.scrollRowIntoView(displayRow);
 }
 
-/** G-UX item 2/D10: an auto-refresh's own viewport restore — `App.vue` captures
+/** An auto-refresh's own viewport restore — `App.vue` captures
  *  `getViewport().top` before a background refresh and calls this with it afterward, so the
  *  user's scroll position wins over the selection's own `scrollRowIntoView` (the concern
  *  `RefreshButton.vue` originally raised for why auto-refresh did not exist). Distinct from
  *  `scrollToRow`, which centers a target row rather than pinning it to the viewport's top.
  *
- *  P108 F1: `row` is the viewport-top row captured *before* the refresh that just reset/rebuilt
+ *  `row` is the viewport-top row captured *before* the refresh that just reset/rebuilt
  *  the plan — a smaller post-refresh history can leave it uncovered. Falls back to the nearest
  *  covered group's own display row (`containingDisplayRow`, safe once `row` is checked in range)
  *  rather than pinning to nothing at all; entirely uncovered bails, same as `scrollToRow`. */
@@ -1267,7 +1264,7 @@ function getViewportTop(): number | undefined {
   return top === undefined || top >= plan().length ? undefined : plan().storeRowAt(top);
 }
 
-/** `docs/plans/P11.md` W14: `SearchBox.vue`'s second-stage `Escape` (§6.6) asks to move real DOM
+/** `SearchBox.vue`'s second-stage `Escape` asks to move real DOM
  *  focus back onto the grid — the same row `applyAccessibility`'s own roving tabindex already
  *  made the one native tab stop (the selected row, or row 0 with nothing selected yet). Scrolled
  *  into view first, exactly as a real click/keyboard selection already does elsewhere in this
@@ -1276,10 +1273,10 @@ function getViewportTop(): number | undefined {
  *  what is already chosen", not "choose something new" — so `props.selection.select(row)` alone
  *  cannot be relied on to trigger the selection watcher's own invalidate/render (a same-value
  *  `select()` call is a no-op): `invalidateRows`/`render()` are called directly instead, which is
- *  what actually runs `onRendered` → `applyAccessibility` and lets `pendingFocusRow` take effect.
+ *  what runs `onRendered` → `applyAccessibility` and lets `pendingFocusRow` take effect.
  *  A no-op with nothing loaded yet (`plan().length === 0`) — there is no row to focus.
  *
- *  P108 F1: `selection.row` can momentarily hold a row a just-reset plan no longer covers (a
+ *  `selection.row` can momentarily hold a row a just-reset plan no longer covers (a
  *  restart-at-zero refresh's own pre-flush watcher order) — `displayRowOf` returning `-1` for
  *  that now falls back to row 0, same as no selection at all, rather than focusing row `-1`. */
 function focusGrid(): void {

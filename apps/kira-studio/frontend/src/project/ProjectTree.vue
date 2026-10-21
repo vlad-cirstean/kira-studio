@@ -37,10 +37,11 @@ const KEYVALUE_OPENABLE_KINDS = new Set(['key', 'object']);
 // browse-only leaves with nothing to open (onOpen's hasChildren guard makes double-click a no-op
 // on them, same as a column/index leaf).
 const STREAM_OPENABLE_KINDS = new Set(['topic', 'queue']);
-// P41 D17: a redis `database` / s3 `bucket` row, on a connection whose caps say its key space is
+// A redis `database` / s3 `bucket` row, on a connection whose caps say its key space is
 // unbounded — double-click/Enter opens a Browse tab instead of the ordinary expand/collapse
 // toggle. Gated on the capability, never the row kind alone (`database` is shared by six engines
-// that stay expand-only, F13) or the connection kind (Caps is the only thing the UI reads, ARCHITECTURE.md).
+// that stay expand-only) or the connection kind (Caps is the only thing the UI reads,
+// ARCHITECTURE.md).
 function isKeyBrowserRow(row: TreeRowVm): boolean {
   if (row.kind !== 'database' && row.kind !== 'bucket') return false;
   return connectionsStore.states[row.connectionId]?.caps?.keyBrowser === true;
@@ -77,7 +78,7 @@ function dragProps(row: TreeRowVm) {
   };
 }
 
-// F3 (P108 Part 12): initTreeSync/initSchemaSync/initSchemaColumnsSync used to be wired from here,
+// initTreeSync/initSchemaSync/initSchemaColumnsSync used to be wired from here,
 // on mount — moved to main.ts's bootstrap() so they're live whether or not this panel ever
 // mounts (a window in API/Terminal mode, or one with no connections at boot, used to get none of
 // them for the whole session). See bootstrap()'s own comment for the full reasoning.
@@ -100,10 +101,10 @@ function onSelect(row: TreeRowVm): void {
   treeStore.selectRow(row.key);
 }
 
-// The twisty always expands/collapses. A group row (P19) has no adapter path behind it — it's a
+// The twisty always expands/collapses. A group row has no adapter path behind it — it's a
 // pure view over its parent's already-fetched children — so it toggles treeStore.expanded
-// directly rather than going through treeStore.expand()/treeStore.collapse(), which would connect the connection and
-// issue an IPC call for a synthetic path no adapter has ever heard of.
+// directly rather than going through treeStore.expand()/treeStore.collapse(), which would connect
+// the connection and issue an IPC call for a synthetic path no adapter has ever heard of.
 function onToggle(row: TreeRowVm): void {
   if (row.kind === 'group') {
     treeStore.toggleGroup(row.connectionId, row.path);

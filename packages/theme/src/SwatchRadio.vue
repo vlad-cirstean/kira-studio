@@ -1,8 +1,8 @@
 <script setup lang="ts">
-// P110 I2-24 (§3.10): the 10-utility swatch label/input/span recipe, carried once instead of 4
-// times (ScriptDialog.vue x2, VariableSetView.vue, ConnectionDialog.vue). The outline fix from
-// I2-8 is already reflected here: peer-focus-visible:focus-ring stays always-on utility, the
-// selected-state outline is the only conditional class.
+// The 10-utility swatch label/input/span recipe, carried once instead of 4 times (ScriptDialog.vue
+// x2, VariableSetView.vue, ConnectionDialog.vue). The outline fix is already reflected here:
+// peer-focus-visible:focus-ring stays always-on utility, the selected-state outline is the only
+// conditional class.
 import { Label } from '@theme/components/ui/label';
 import { t } from '@theme/i18n';
 import { connBgClass } from './connColor';

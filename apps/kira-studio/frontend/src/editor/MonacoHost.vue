@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// P60a §3: a drop-in for `CodeMirrorHost.vue` — same prop names, same emits, same exposed
+// A drop-in for `CodeMirrorHost.vue` — same prop names, same emits, same exposed
 // methods, so every mount site changes only its import and its tag name. Two prop *types* change
-// (§3.1) because their old types were CodeMirror types; everything else here is deliberately the
+// because their old types were CodeMirror types; everything else here is deliberately the
 // same shape as `CodeMirrorHost.vue`, restated for Monaco's own API rather than redesigned.
 
 import type { EditorLanguageId } from '@shared/domain/editor';
@@ -112,8 +112,8 @@ function resolveWordWrap(): 'on' | 'off' {
   return settingsStore.appearance.wordWrap ? 'on' : 'off';
 }
 
-// §4.6: `wrapSelection.ts`'s own selection-wrap handler, ported to Monaco's `onKeyDown` rather
-// than relying on Monaco's own `autoSurround` (OQ-1) — `autoSurround` has no carve-out for a
+// `wrapSelection.ts`'s own selection-wrap handler, ported to Monaco's `onKeyDown` rather
+// than relying on Monaco's own `autoSurround` — `autoSurround` has no carve-out for a
 // whole-document selection, and this app's own `mongo.spec.ts` depends on Select-All-then-retype
 // staying a plain replace. A self-contained port guarantees the exact rule regardless of Monaco's
 // internal behaviour, so `autoSurround` itself stays 'never' below and this handler is the only
@@ -129,7 +129,7 @@ const WRAP_PAIRS: Record<string, string> = {
   '`': '`',
 };
 
-// §4.7/OQ-1: Select All, Undo and Redo are Monaco's only three core commands built on
+// Select All, Undo and Redo are Monaco's only three core commands built on
 // `EditorOrNativeTextInputCommand` (`coreCommands.js`, verified against the pinned 0.56.0) — its
 // "editor has focus" branch checks `codeEditorService.getFocusedCodeEditor()?.hasTextFocus()`,
 // which comes back false in WebKit even though the `.inputarea` textarea genuinely holds DOM
@@ -225,7 +225,7 @@ function wordBasedSuggestions(): 'off' | undefined {
 // leak one pane's completions into every other pane of the same language.
 function buildCompletionProvider(m: MonacoModule): CompletionItemProvider {
   return {
-    // §4.8 dogfooding finding (P60b): with no `triggerCharacters`, Monaco's own quickSuggestions
+    // With no `triggerCharacters`, Monaco's own quickSuggestions
     // only re-invokes a provider as an ordinary word continues — never right after `.`, `$` or
     // `{`, the exact three characters this app's own sources key a position off of (`table.`/
     // `alias.column`, `db.`/`$operator`, `{{variable`). Registering them here is what makes typing
@@ -238,10 +238,10 @@ function buildCompletionProvider(m: MonacoModule): CompletionItemProvider {
       }
       const doc = candidateModel.getValue();
       const offset = candidateModel.getOffsetAt(position);
-      // §4.8 dogfooding finding (P60b): a real Ctrl+Space request is
+      // A real Ctrl+Space request is
       // `CompletionTriggerKind.Invoke` — every source that gates an empty-word position on
       // `explicit` (the sql-language-service ones, mirroring `@codemirror/autocomplete`'s own
-      // `completeFromList` rule) needs this to actually tell a bare cursor apart from a real
+      // `completeFromList` rule) needs this to tell a bare cursor apart from a real
       // request, or an empty-context Ctrl+Space silently shows "No suggestions" instead.
       const explicit = context.triggerKind === m.languages.CompletionTriggerKind.Invoke;
       for (const source of props.completionSources) {
@@ -259,8 +259,8 @@ function buildCompletionProvider(m: MonacoModule): CompletionItemProvider {
             label: opt.label,
             kind: kindFor(m, opt.type),
             detail: opt.detail,
-            // §4.8: a source's own `snippet` (e.g. the six BSON constructors') already uses
-            // Monaco's `$0` placeholder syntax directly (P60b's own port of the console's
+            // A source's own `snippet` (e.g. the six BSON constructors') already uses
+            // Monaco's `$0` placeholder syntax directly (the port of the console's
             // completion sources) — passed straight through, only the `InsertAsSnippet` rule
             // below is this boundary's job.
             insertText: opt.snippet ?? opt.insert ?? opt.label,
@@ -296,7 +296,7 @@ function buildHoverProvider(): HoverProvider {
       if (info.value !== undefined) {
         contents.push({ value: fenceMarkdownValue(info.value) });
       }
-      // F8: `supportHtml: false` blocks raw HTML only — Markdown syntax inside `line` (a table/
+      // `supportHtml: false` blocks raw HTML only — Markdown syntax inside `line` (a table/
       // column name, a COMMENT ON COLUMN description, …) still rendered: a `[text](url)` comment
       // became a clickable link, `_x_`/`__init__` names rendered as italic/bold. Escaped so `line`
       // always renders as the literal text it is.
@@ -409,9 +409,9 @@ function applyBaseOptions(): ConstructionOptions {
     folding: false,
     glyphMargin: false,
     fixedOverflowWidgets: true,
-    // §4.4/dogfooding: `fixedOverflowWidgets` alone keeps a widget a DOM descendant of this host
+    // `fixedOverflowWidgets` alone keeps a widget a DOM descendant of this host
     // (only escaping ancestor `overflow: hidden` visually, via `position: fixed`) — this is what
-    // actually reparents it to `document.body`, matching capability 20's own requirement and
+    // reparents it to `document.body`, matching capability 20's own requirement and
     // `CodeMirrorHost.vue`'s old `tooltips({ parent: document.body })`.
     overflowWidgetsDomNode: overflowWidgetsContainer(),
     wordWrap: resolveWordWrap(),
@@ -712,19 +712,20 @@ watch(
   <!-- A single root, not the preview <pre> and this <div> as two siblings — a multi-root template
        gets no automatic $attrs fallthrough at all (Vue silently drops every data-testid/class a
        call site passes on the <MonacoHost> tag, e.g. RawExchangePane's own `data-testid="http-
-       wire-request-editor"`), which every mount site's own drop-in contract (§3) depends on.
+       wire-request-editor"`), which every mount site's own drop-in contract depends on.
        Monaco mounts into this same div (`rootRef`); the pending <pre> is a child of it, removed by
-       `v-if` the instant `previewShown` flips false, which is also the instant `editor.create()` has
-       already appended Monaco's own DOM into the same container — briefly (one microtask) both
+       `v-if` the instant `previewShown` flips false, which is also the instant `editor.create()`
+       has already appended Monaco's own DOM into the same container — briefly (one microtask) both
        are present, never observably so.
 
        No `data-testid` of its own on the root, deliberately: a static attribute set here would win
        Vue's own fallthrough merge over whatever `data-testid` a call site passes on `<MonacoHost>`
        (`class`/`style` concatenate on fallthrough; every other attribute, the child's own explicit
        value wins) — exactly the drop-in contract this host exists to keep
-       (`CodeMirrorHost.vue`'s own root carried no `data-testid` for the identical reason). `.monaco-host`
-       (the class, which DOES merge) is what `tests/ui/support/editorText.ts` and every UI spec use
-       instead to find "the Monaco host" generically inside a call site's own more specific one. -->
+       (`CodeMirrorHost.vue`'s own root carried no `data-testid` for the identical reason).
+       `.monaco-host` (the class, which DOES merge) is what `tests/ui/support/editorText.ts` and
+       every UI spec use instead to find "the Monaco host" generically inside a call site's own more
+       specific one. -->
   <div
     ref="rootRef"
     class="monaco-host h-full min-h-0 overflow-hidden"

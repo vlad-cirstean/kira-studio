@@ -10,7 +10,7 @@ import { useVariableSetStore } from './state/variables';
 
 const variableSetStore = useVariableSetStore();
 
-// P5 D13: the per-row history popover — a PopoverContent anchored to the row's own history button
+// The per-row history popover — a PopoverContent anchored to the row's own history button
 // via VariableRow.vue's own PopoverAnchor (a plain content component; VariableRow.vue's Popover
 // owns open state and the closeHistoryMenu() side effect for every dismissal). Each entry's
 // relative recorded time, its value (masked for a secret, with its own gated eye — a secret's old

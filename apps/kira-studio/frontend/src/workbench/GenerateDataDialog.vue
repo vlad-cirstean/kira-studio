@@ -49,10 +49,10 @@ import { getPage } from '../views/grid/page';
 import { useGridViewStore } from '../views/grid/state';
 import { sqlDialectFor } from '../views/shared/sqlIdent';
 
-// P15 D11: driven by state/fakeData.ts's own open/close state, mounted in App.vue beside
+// Driven by state/fakeData.ts's own open/close state, mounted in App.vue beside
 // UploadObjectDialog.vue — the established shape for a feature dialog reachable from the toolbar
 // and the command palette alike. App.vue mounts this fresh (v-if) on every open, so onMounted below
-// is the one and only place a run's fields get their starting values (D8).
+// is the one and only place a run's fields get their starting values.
 
 const fakeDataStore = useFakeDataStore();
 const connectionsStore = useConnectionsStore();
@@ -133,7 +133,7 @@ const { run: runGenerate, pending: running } = useAsyncAction(
 // D9: recomputed on every plan change, not baked into recipeFor's own one-time proposal.
 const warnings = computed(() => planWarnings(plans.value, meta.value));
 
-// P12 round 1 finding #2: with no plans at all (the tab's page hadn't loaded yet when the dialog
+// With no plans at all (the tab's page hadn't loaded yet when the dialog
 // opened, so `page?.columns ?? []` came back empty) or every plan set to Skip, a run has no column
 // left to write — generateBatch would emit `{kind:'insert', values:{}}` per row, which sqlmutate.go
 // turns into `INSERT INTO t () VALUES ()`: silently committed all-defaults rows on MySQL/MariaDB,

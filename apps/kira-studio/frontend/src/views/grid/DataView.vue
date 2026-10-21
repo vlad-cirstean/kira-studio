@@ -74,11 +74,11 @@ const targetIcon = computed(() => {
 // P48 F20: shared with DocumentView.vue's own identical breadcrumb prefix.
 const pathPrefix = computed(() => ancestorPathPrefix(props.tab.connectionId, props.tab.path));
 
-// P24 D37: the grid was the one view whose header carried no facts at all — every sibling view
+// The grid was the one view whose header carried no facts at all — every sibling view
 // (KeyValue has four badges, Definition two, Documents one) says more about what's on screen than
 // this one did. Kind + column count + read-only state are always known the moment a tab opens;
-// the row count is gated on rt.count existing at all (§7 forbids computing one automatically), so
-// this badge appears only once the user has actually pressed Σ, never before.
+// the row count is gated on rt.count existing at all (computing one automatically is forbidden), so
+// this badge appears only once the user has pressed Σ, never before.
 const columnCount = computed(() => rt.value?.meta?.columns.length ?? null);
 const isWritable = computed(() => !!caps.value?.writable && !connRecord.value?.readOnly);
 // M5 §6.4: the grid-writable-badge's own reason — masked reads as read-only, since it is (the
@@ -90,10 +90,9 @@ const primaryKeyLabel = computed(() => {
   return names.length ? t('studio.grid.primaryKey.status', { names: names.join(', ') }) : null;
 });
 
-// P48 step 14: the pending-changes group moved here from DataToolbar.vue so it can land in
-// ViewChrome's own #toolbar-end slot (after the chrome's automatic push and, since P22 D4,
-// RunState too) — a component mounted inside #toolbar cannot also render into a sibling named
-// slot of its parent.
+// The pending-changes group is here so it can land in ViewChrome's own #toolbar-end slot
+// (after the chrome's automatic push and RunState too) — a component mounted inside #toolbar
+// cannot also render into a sibling named slot of its parent.
 const caps = computed(() => {
   const connectionId = props.tab.connectionId;
   return connectionId ? (connectionsStore.states[connectionId]?.caps ?? null) : null;
@@ -109,7 +108,7 @@ const committing = computed(() => pendingChangesStore.isCommitting(props.tab.id)
 const previewOpen = ref(false);
 const previewAnchorRef = ref<HTMLElement | null>(null);
 
-// P43 F5/D7: commitPending's own rejection (a constraint violation, a type error, a read-only
+// commitPending's own rejection (a constraint violation, a type error, a read-only
 // refusal) used to be an unhandled promise rejection — no try/catch here and no async-aware
 // @click. The staged set already survives a failure (clearPending only runs on success); what was
 // missing was telling the user why.
@@ -169,9 +168,9 @@ onMounted(() => {
   // dispatcher — is what makes Find/Refresh always act on the currently visible data tab.
   unregisterCommands = [
     registerCommand('view.find', () => gridViewStore.toggleSearchOpen(props.tab.id)),
-    // Item 4 (regression pass, task batch P46-4): this used to call reload() directly, a doomed
+    // This used to call reload() directly, a doomed
     // no-op while the tab sits behind the reconnect gate (same bug the toolbar's own Refresh
-    // button had, item 4's first pass) — the keyboard-shortcut/command-palette path needs the
+    // button had) — the keyboard-shortcut/command-palette path needs the
     // same reconnect-or-refresh semantics as the visible button, not a second, unguarded one.
     registerCommand('view.refresh', () => onRefresh()),
     registerCommand('data.generate', onGenerateData),
@@ -340,9 +339,9 @@ function onCloseSearch(): void {
           </Button>
         </EmptyState>
         <template v-else>
-          <!-- P16 design system LAW: work-in-progress is the ring + elapsed time beside the button
-               that started it (RunState, above), never a bar across the top of the view — §8.5's
-               "never a spinner that replaces the previous page" still holds, it just no longer needs a
+          <!-- Work-in-progress is the ring + elapsed time beside the button
+               that started it (RunState, above), never a bar across the top of the view —
+               "never a spinner that replaces the previous page" still holds, it no longer needs a
                bar of its own to say so. -->
           <Alert
             strip
@@ -364,8 +363,8 @@ function onCloseSearch(): void {
           >
             <AlertDescription>{{ rt.actionError }}</AlertDescription>
           </Alert>
-          <!-- M5 §6.4: the one place this view states, in prose, that what's on screen is not the
-               stored data — a preview convenience (§6.1), not the security boundary, but a user
+          <!-- The one place this view states, in prose, that what's on screen is not the
+               stored data — a preview convenience, not the security boundary, but a user
                switching tabs or taking a screenshot must not mistake a bucket string for a literal
                value. -->
           <Alert
