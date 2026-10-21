@@ -60,8 +60,8 @@ func (b *TaskBoard) rebaseTimeout() time.Duration {
 	return defaultRebaseTimeout
 }
 
-func (b *TaskBoard) rebaseDef() stepDef {
-	return stepDef{ID: rebaseStepID, Name: "Rebase", AllowedTools: rebaseTools(b.deps.Agent.Active()), DisallowedTools: []string{"Bash"}, Timeout: formatTimeout(b.rebaseTimeout())}
+func (b *TaskBoard) rebaseDef(agent harness.Provider) stepDef {
+	return stepDef{ID: rebaseStepID, Name: "Rebase", AllowedTools: rebaseTools(agent), DisallowedTools: []string{"Bash"}, Timeout: formatTimeout(b.rebaseTimeout())}
 }
 
 func formatTimeout(d time.Duration) string {
@@ -545,7 +545,7 @@ func (b *TaskBoard) startRebase(run model.AdeRun, spec model.AdeRebaseSpec, prom
 		defer b.wg.Done()
 		defer endRun()
 		b.superviseAgent(runCtx, updated, agentLaunch{
-			def: b.rebaseDef(), agent: agent, sessionID: sessionID, path: root.Worktree, prompt: prompt, timeout: b.rebaseTimeout(),
+			def: b.rebaseDef(agent), agent: agent, sessionID: sessionID, path: root.Worktree, prompt: prompt, timeout: b.rebaseTimeout(),
 			git: &agentmcp.GitGrant{Worktrees: rebaseWorktrees(spec), Push: spec.Push},
 		})
 	}()

@@ -188,6 +188,11 @@ func TestSecondProviderRegistered(t *testing.T) {
 		t.Fatalf("fake headless calls = %+v, want one at model deep", head)
 	}
 
+	// A restart-interrupted run keeps its session as the resume point.
+	if _, err := app.DB().Exec(`UPDATE script_runs SET resume_id = session_id WHERE id = ?`, smart.ID); err != nil {
+		t.Fatal(err)
+	}
+
 	// 4. The ADE: a headless step run, then an interactive session, with no hooks to compose.
 	repo, _ := cloneWithMain(app, filepath.Join(app.Work, "api"))
 	repoRec, err := app.W.CodeWorkspace.ImportRepo(ctx, bridge.CodeWorkspaceImportArgs{Path: repo.Dir})
@@ -263,6 +268,19 @@ func TestSecondProviderRegistered(t *testing.T) {
 	cmd, err := app.W.ScriptRuns.ResumeCommand(scriptruns.ResumeCommandArgs{RunID: smart.ID})
 	if err != nil || cmd != fakeagent.Persona+" --resume "+smart.SessionID {
 		t.Fatalf("ResumeCommand = %q, %v, want the fake's", cmd, err)
+	}
+	// A resumed smart run keeps its provider: the grant config is rendered by the fake, not the active claude.
+	renders := fake.MCPConfigs()
+	resumed, err := app.W.ScriptRuns.Resume(scriptruns.IDArgs{ID: smart.ID})
+	if err != nil {
+		t.Fatalf("Resume: %v", err)
+	}
+	testx.WaitUntil(t, waitFor, func() bool {
+		r, _ := app.W.ScriptRuns.Get(scriptruns.IDArgs{ID: resumed.RunID})
+		return r.State == "done"
+	})
+	if h := fake.Headless(); h[len(h)-1].Resume != smart.SessionID || fake.MCPConfigs() != renders+1 {
+		t.Fatalf("headless = %+v, renders = %d (was %d), want the resume on the fake, rendered by it", h, fake.MCPConfigs(), renders)
 	}
 	structured := len(fake.Structured())
 	distill(t, app, "d2")

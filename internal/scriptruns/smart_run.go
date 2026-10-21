@@ -47,8 +47,7 @@ func (r *bgRun) endedBy() int {
 // mcpServer returns the loopback report server, started on first use.
 func (s *Service) mcpServer() *agentmcp.Server {
 	if s.server == nil {
-		opts := agentmcp.Options{Dir: filepath.Join(s.Home, "automations-mcp"), OnFinish: s.recordFinish, Prompts: s.llmPrompts(),
-			Render: func(sv []harness.MCPServer) ([]byte, error) { return s.Agent.Active().MCPConfig(sv) }}
+		opts := agentmcp.Options{Dir: filepath.Join(s.Home, "automations-mcp"), OnFinish: s.recordFinish, Prompts: s.llmPrompts()}
 		if s.ADE != nil {
 			opts.Space, opts.Outcomes = s.ADE.Tools()
 			opts.SandboxGit = s.ADE.SandboxGit()
@@ -129,7 +128,7 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 		abandon()
 		return Started{}, ipcerr.InternalErr(err)
 	}
-	grant := agentmcp.Grant{RunID: runID, TaskID: run.TaskID, Space: run.TaskID != ""}
+	grant := agentmcp.Grant{RunID: runID, TaskID: run.TaskID, Space: run.TaskID != "", Agent: p.agent}
 	releaseTarget := func() {}
 	if sbx != nil && p.preview.ADE != nil {
 		if rel, err := s.ADE.SandboxTarget(runID, p.preview.ADE.BranchID, p.dir.Path); err == nil {
@@ -146,7 +145,7 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 	var extra []string
 	releaseUser := func() {}
 	if len(p.mcp) > 0 {
-		path, rel, err := s.Agent.Active().WriteUserMCPConfig(s.getenv, filepath.Join(s.Home, "automations-mcp"), runID, p.mcp)
+		path, rel, err := p.agent.WriteUserMCPConfig(s.getenv, filepath.Join(s.Home, "automations-mcp"), runID, p.mcp)
 		if err != nil {
 			releaseGrant()
 			releaseTarget()
@@ -170,10 +169,7 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 	if s.SmartTimeout > 0 {
 		timeout, timeoutText = s.SmartTimeout, s.SmartTimeout.String()
 	}
-	agent := s.Agent.Active()
-	if pv, err := s.Agent.For(p.provider); p.provider != "" && err == nil {
-		agent = pv
-	}
+	agent := p.agent
 	env := agent.ScrubEnv(loginshell.ScrubGitEnv(os.Environ()))
 	env = append(env, "GIT_TERMINAL_PROMPT=0")
 	env = append(env, p.envList...)
@@ -182,7 +178,7 @@ func (s *Service) launchSmart(p *planned, run Run, existing bool) (Started, erro
 		Model: p.smart.Model, MaxBudgetUSD: p.smart.MaxBudgetUSD, Tools: pv.Tools, AllowedTools: pv.Allowed,
 		Isolated: true, Timeout: timeout, Env: env,
 	}
-	spec = s.applySandbox(spec, sbx)
+	spec = s.applySandbox(spec, sbx, agent)
 	go func() {
 		defer s.smartWait.Done()
 		sink := newLogSink(s, runID)

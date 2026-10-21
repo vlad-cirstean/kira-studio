@@ -43,7 +43,7 @@ func (s *Service) prepareSandbox(ctx context.Context, p *planned, runID string, 
 	if s.SandboxKeychain != nil {
 		in.Keychain = s.SandboxKeychain()
 	}
-	agent := s.Agent.Active()
+	agent := p.agent
 	rt := agentsandbox.DiscoverRuntime(ctx, agent, "")
 	pol, _, err := agentsandbox.ResolvePolicy(in, rt)
 	if err != nil {
@@ -65,7 +65,7 @@ func (sb *smartSandbox) cleanup() {
 }
 
 // applySandbox adds the sandbox to the process spec.
-func (s *Service) applySandbox(spec harness.HeadlessSpec, sb *smartSandbox) harness.HeadlessSpec {
+func (s *Service) applySandbox(spec harness.HeadlessSpec, sb *smartSandbox, agent harness.Provider) harness.HeadlessSpec {
 	if sb == nil {
 		return spec
 	}
@@ -78,7 +78,7 @@ func (s *Service) applySandbox(spec harness.HeadlessSpec, sb *smartSandbox) harn
 	}
 	spec.DisallowedTools = append(slices.Clone(spec.DisallowedTools), sb.prep.Disallowed...)
 	if sb.tools {
-		spec.AllowedTools = append(slices.Clone(spec.AllowedTools), harness.ToolNames(s.Agent.Active(), agentmcp.SandboxToolIDs...)...)
+		spec.AllowedTools = append(slices.Clone(spec.AllowedTools), harness.ToolNames(agent, agentmcp.SandboxToolIDs...)...)
 	}
 	note := llmprompts.HeadlessSandboxNote.Text(s.llmPrompts(), llmprompts.SandboxNoteVars{
 		Access: string(agentsandbox.AccessWrite), Worktree: sb.policy.RunDir, Network: true,

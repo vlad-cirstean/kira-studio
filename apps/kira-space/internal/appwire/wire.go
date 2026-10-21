@@ -413,6 +413,9 @@ func (w *Wired) describeAgent(terminalID, cwd string) agentnotify.Target {
 		t.RecordID = recordID
 		if rec, err := w.Tracker.Get(recordID); err == nil && rec != nil {
 			t.TaskID = rec.TaskID
+			if p, err := w.Agents.For(rec.Provider); err == nil {
+				t.Agent = p.Label()
+			}
 			if title := w.taskTitle(rec.TaskID); title != "" {
 				t.Name = title
 			}

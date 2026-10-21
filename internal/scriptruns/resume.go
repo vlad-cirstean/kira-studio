@@ -35,7 +35,7 @@ func (s *Service) Resume(id string) (Started, error) {
 		return Started{}, ipcerr.T(ipcerr.CodeNotFound, "automations.script.gone.error", nil)
 	}
 	args, names := resumeArgs(run, *rec)
-	p, err := s.plan(args, planOpts{})
+	p, err := s.plan(args, planOpts{provider: prov.ID()})
 	if err != nil {
 		return Started{}, err
 	}
@@ -61,7 +61,7 @@ func (s *Service) Resume(id string) (Started, error) {
 		}
 		return Started{}, notResumable
 	}
-	p.resume, p.resumedFrom, p.provider = sessionID, id, prov.ID()
+	p.resume, p.resumedFrom = sessionID, id
 	p.sent = llmprompts.RunResumeLine.Text(s.llmPrompts(), llmprompts.ResumeVars{App: s.App}) + "\n\n" + p.preview.Suffix
 	started, err := s.startSmart(p)
 	if err != nil {
@@ -123,4 +123,12 @@ func providerGone(err error) error {
 		return ipcerr.T(ipcerr.CodeConflict, "backend.core.agent.providerGone.body", nil)
 	}
 	return ipcerr.InternalErr(err)
+}
+
+// agentFor is the provider a plan runs under: the one named by id, else the active one.
+func (s *Service) agentFor(id string) (harness.Provider, error) {
+	if id == "" {
+		return s.Agent.Active(), nil
+	}
+	return s.Agent.For(id)
 }

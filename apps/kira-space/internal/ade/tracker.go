@@ -96,7 +96,7 @@ type PrepareArgs struct {
 	// Resume is "" for a new session, or an existing ade_sessions.id to resume.
 	Resume  string
 	Message string
-	// Provider is the provider of the conversation Resumes continues; empty means the active one.
+	// Provider is the provider of the conversation the launch continues; empty means the active one.
 	Provider string
 	// Resumes is the agent session id a new record continues. AddDirs, MCPConfig and AllowedTools
 	// extend the base command.

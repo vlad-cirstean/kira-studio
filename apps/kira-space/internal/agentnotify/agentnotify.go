@@ -4,6 +4,7 @@
 package agentnotify
 
 import (
+	"cmp"
 	"strings"
 	"sync"
 	"time"
@@ -63,7 +64,8 @@ type Prefs struct {
 
 // Target says what a hook event or run belongs to. Name is the task title, else the code
 // repository name, else the cwd's basename.
-type Target struct{ Name, WindowKey, RecordID, TaskID string }
+// Agent labels the session's own provider; empty falls back to Deps.AgentLabel.
+type Target struct{ Name, WindowKey, RecordID, TaskID, Agent string }
 
 // FocusState is what one window reports about what the user is looking at.
 type FocusState struct {
@@ -86,7 +88,7 @@ type Deps struct {
 	Focus  func(windowKey string) bool
 	Reveal func(n Note)
 	Now    func() time.Time
-	// AgentLabel names the active agent in titles; nil reads "Agent".
+	// AgentLabel names the active agent in titles when a target names none; nil reads "Agent".
 	AgentLabel func() string
 }
 
@@ -199,7 +201,7 @@ func (n *Notifier) notifyTerminal(kind Kind, ev harness.AgentEvent, message stri
 	}
 	t := n.d.Describe(ev.TerminalID, ev.Cwd)
 	fallback := i18n.T("backend.notify.agent.finished.body", nil)
-	agent := n.d.AgentLabel()
+	agent := cmp.Or(t.Agent, n.d.AgentLabel())
 	title := i18n.T("backend.notify.agent.finished.title", map[string]string{"agent": agent, "name": t.Name})
 	if kind == KindNeedsInput {
 		fallback = i18n.T("backend.notify.agent.needsInput.body", nil)

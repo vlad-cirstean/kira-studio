@@ -55,17 +55,17 @@ func connect(t *testing.T, cfgPath, tokenOverride string) (*mcp.ClientSession, e
 func TestFinishStepServer(t *testing.T) {
 	var mu sync.Mutex
 	var got []string
-	srv := NewServer(Options{Render: claude.New().MCPConfig, Dir: t.TempDir(), OnFinish: func(runID string, f Finish) {
+	srv := NewServer(Options{Dir: t.TempDir(), OnFinish: func(runID string, f Finish) {
 		mu.Lock()
 		got = append(got, runID+"|"+f.Status+"|"+f.Summary)
 		mu.Unlock()
 	}})
 	t.Cleanup(func() { _ = srv.Close() })
-	cfgA, releaseA, err := srv.Register(Grant{RunID: "run-a"})
+	cfgA, releaseA, err := srv.Register(Grant{Agent: claude.New(), RunID: "run-a"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfgB, releaseB, err := srv.Register(Grant{RunID: "run-b"})
+	cfgB, releaseB, err := srv.Register(Grant{Agent: claude.New(), RunID: "run-b"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,19 +167,19 @@ func toolNames(t *testing.T, s *mcp.ClientSession) map[string]bool {
 func TestGrantScopes(t *testing.T) {
 	space := &fakeSpace{}
 	var finished []string
-	srv := NewServer(Options{Render: claude.New().MCPConfig, Dir: t.TempDir(), OnFinish: func(runID string, f Finish) { finished = append(finished, runID+"|"+f.Status) }, Space: space})
+	srv := NewServer(Options{Dir: t.TempDir(), OnFinish: func(runID string, f Finish) { finished = append(finished, runID+"|"+f.Status) }, Space: space})
 	t.Cleanup(func() { _ = srv.Close() })
 
-	cfgRun, relRun, err := srv.Register(Grant{RunID: "run-1", TaskID: "task-1"})
+	cfgRun, relRun, err := srv.Register(Grant{Agent: claude.New(), RunID: "run-1", TaskID: "task-1"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer relRun()
-	cfgSpace, relSpace, err := srv.Register(Grant{TaskID: "task-1", Space: true})
+	cfgSpace, relSpace, err := srv.Register(Grant{Agent: claude.New(), TaskID: "task-1", Space: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfgBoth, relBoth, err := srv.Register(Grant{RunID: "run-2", TaskID: "task-2", Space: true})
+	cfgBoth, relBoth, err := srv.Register(Grant{Agent: claude.New(), RunID: "run-2", TaskID: "task-2", Space: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,16 +253,16 @@ func TestGrantScopes(t *testing.T) {
 }
 
 func TestRegisterRefusesUselessGrants(t *testing.T) {
-	srv := NewServer(Options{Render: claude.New().MCPConfig, Dir: t.TempDir(), OnFinish: func(string, Finish) {}, Space: &fakeSpace{}})
+	srv := NewServer(Options{Dir: t.TempDir(), OnFinish: func(string, Finish) {}, Space: &fakeSpace{}})
 	t.Cleanup(func() { _ = srv.Close() })
-	for _, g := range []Grant{{}, {Space: true}, {RunID: "r", Space: true}} {
+	for _, g := range []Grant{{Agent: claude.New()}, {Agent: claude.New(), Space: true}, {Agent: claude.New(), RunID: "r", Space: true}, {RunID: "r"}} {
 		if _, _, err := srv.Register(g); err == nil {
 			t.Errorf("Register(%+v) accepted", g)
 		}
 	}
-	noTools := NewServer(Options{Render: claude.New().MCPConfig, Dir: t.TempDir(), OnFinish: func(string, Finish) {}})
+	noTools := NewServer(Options{Dir: t.TempDir(), OnFinish: func(string, Finish) {}})
 	t.Cleanup(func() { _ = noTools.Close() })
-	if _, _, err := noTools.Register(Grant{TaskID: "t", Space: true}); err == nil {
+	if _, _, err := noTools.Register(Grant{Agent: claude.New(), TaskID: "t", Space: true}); err == nil {
 		t.Error("a Space grant without tools accepted")
 	}
 }
@@ -270,7 +270,7 @@ func TestRegisterRefusesUselessGrants(t *testing.T) {
 // A run grant's finish_step status enum is its step's result ids plus needs_input; any other id is refused.
 func TestFinishStepStatusEnum(t *testing.T) {
 	var got []string
-	srv := NewServer(Options{Render: claude.New().MCPConfig, Dir: t.TempDir(), OnFinish: func(_ string, f Finish) { got = append(got, f.Status) }})
+	srv := NewServer(Options{Dir: t.TempDir(), OnFinish: func(_ string, f Finish) { got = append(got, f.Status) }})
 	t.Cleanup(func() { _ = srv.Close() })
 	enum := func(cfg string) []any {
 		s, err := connect(t, cfg, "")
@@ -294,7 +294,7 @@ func TestFinishStepStatusEnum(t *testing.T) {
 		}
 		return parsed.Properties.Status.Enum
 	}
-	implicit, relI, err := srv.Register(Grant{RunID: "run-i"})
+	implicit, relI, err := srv.Register(Grant{Agent: claude.New(), RunID: "run-i"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +302,7 @@ func TestFinishStepStatusEnum(t *testing.T) {
 	if e := enum(implicit); !reflect.DeepEqual(e, []any{"done", "failed", "needs_input"}) {
 		t.Fatalf("implicit enum = %v", e)
 	}
-	cfg, rel, err := srv.Register(Grant{RunID: "run-r", Results: []ResultSpec{{ID: "approved", OK: true}, {ID: "changes"}}})
+	cfg, rel, err := srv.Register(Grant{Agent: claude.New(), RunID: "run-r", Results: []ResultSpec{{ID: "approved", OK: true}, {ID: "changes"}}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -67,6 +67,8 @@ type Grant struct {
 	// Sandbox, when set on a run grant, adds fetch_remote and push_branch: the git operations a
 	// sandboxed agent cannot do itself.
 	Sandbox *SandboxGrant
+	// Agent is the provider the run's CLI belongs to; it writes the grant's MCP config.
+	Agent harness.Provider
 }
 
 // ResultSpec is one result a step may report.
@@ -111,7 +113,6 @@ type Server struct {
 	review   ReviewReplier
 	sandbox  SandboxGit
 	prompts  llmprompts.Source
-	render   func([]harness.MCPServer) ([]byte, error)
 
 	mu     sync.Mutex
 	seq    uint64
@@ -137,8 +138,6 @@ type Options struct {
 	SandboxGit SandboxGit
 	// Prompts resolves tool and instruction texts; nil means the registry defaults.
 	Prompts llmprompts.Source
-	// Render writes the run's MCP config in the active provider's format; resolved per Register.
-	Render func([]harness.MCPServer) ([]byte, error)
 }
 
 // NewServer returns a stopped Server; config files go in o.Dir (created 0700).
@@ -146,7 +145,7 @@ func NewServer(o Options) *Server {
 	if o.Prompts == nil {
 		o.Prompts = llmprompts.Defaults()
 	}
-	return &Server{dir: o.Dir, onFinish: o.OnFinish, space: o.Space, outcomes: o.Outcomes, review: o.Review, sandbox: o.SandboxGit, prompts: o.Prompts, render: o.Render}
+	return &Server{dir: o.Dir, onFinish: o.OnFinish, space: o.Space, outcomes: o.Outcomes, review: o.Review, sandbox: o.SandboxGit, prompts: o.Prompts}
 }
 
 type finishArgs struct {
@@ -361,6 +360,9 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 	if g.Space && (g.TaskID == "" || s.space == nil) {
 		return "", nil, errors.New("agentmcp: space grant needs a task and space tools")
 	}
+	if g.Agent == nil {
+		return "", nil, errors.New("agentmcp: grant needs a provider")
+	}
 	if g.Git != nil {
 		wts := make([]string, len(g.Git.Worktrees))
 		for i, w := range g.Git.Worktrees {
@@ -402,12 +404,7 @@ func (s *Server) Register(g Grant) (configPath string, release func(), err error
 	s.tokens = append(s.tokens, registration{id: id, grant: g, hash: hash, salt: salt, server: perRun})
 	s.mu.Unlock()
 
-	var cfg []byte
-	if s.render == nil {
-		err = errors.New("no MCP config renderer")
-	} else {
-		cfg, err = s.render([]harness.MCPServer{{Name: ServerName, URL: url, Headers: map[string]string{"Authorization": "Bearer " + plain}}})
-	}
+	cfg, err := g.Agent.MCPConfig([]harness.MCPServer{{Name: ServerName, URL: url, Headers: map[string]string{"Authorization": "Bearer " + plain}}})
 	name := g.RunID
 	if name == "" {
 		name = "task-" + g.TaskID

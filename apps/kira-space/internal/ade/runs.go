@@ -728,9 +728,6 @@ func grantResults(implicit bool, def stepDef) []agentmcp.ResultSpec {
 
 func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agentLaunch) {
 	def, sessionID := l.def, l.sessionID
-	if l.agent == nil {
-		l.agent = b.deps.Agent.Active()
-	}
 	sink := b.newLogSink(repos.AdeLogRun, run.ID, run.TaskID)
 	rebase := run.Purpose == model.AdeRunPurposeRebase
 	round := run.Purpose == model.AdeRunPurposeReview
@@ -765,7 +762,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 	if sbx != nil {
 		grantSandbox = sbx.grant
 	}
-	cfg, release, err := b.agent.Register(agentmcp.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space, Git: l.git, Review: l.review, Sandbox: grantSandbox, Results: grantResults(rebase || round, def)})
+	cfg, release, err := b.agent.Register(agentmcp.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space, Git: l.git, Review: l.review, Sandbox: grantSandbox, Agent: l.agent, Results: grantResults(rebase || round, def)})
 	if err != nil {
 		fail(err)
 		return

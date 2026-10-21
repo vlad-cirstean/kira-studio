@@ -166,8 +166,9 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 	if rec.Mode == model.AdeSessionModeTUI && !moved {
 		pa.Resume = rec.ID
 	} else {
-		pa.Resumes, pa.Provider = rec.AgentSessionID, rec.Provider
+		pa.Resumes = rec.AgentSessionID
 	}
+	pa.Provider = rec.Provider
 	runID := ""
 	if rec.Mode == model.AdeSessionModeHeadless {
 		runID = b.finishableRun(tc, rec)
@@ -288,7 +289,11 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 	space := b.spaceEnabled(tc.task)
 	var release func()
 	if runID != "" || space {
-		grant := agentmcp.Grant{RunID: runID, TaskID: tc.task.ID, Space: space}
+		agent, err := b.agentFor(pa.Provider)
+		if err != nil {
+			return adewire.Launch{}, err
+		}
+		grant := agentmcp.Grant{RunID: runID, TaskID: tc.task.ID, Space: space, Agent: agent}
 		if runID != "" {
 			grant.Results = resultSpecs(stepResultsOf(tc, pa.StepID))
 		}
@@ -304,11 +309,6 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 		ids = append(ids, agentmcp.RunOutcome)
 		if space {
 			ids = append(ids, agentmcp.SpaceToolIDs...)
-		}
-		agent, err := b.agentFor(pa.Provider)
-		if err != nil {
-			release()
-			return adewire.Launch{}, err
 		}
 		tools := harness.ToolNames(agent, ids...)
 		pa.MCPConfig, pa.AllowedTools = cfg, tools

@@ -664,7 +664,7 @@ func (b *TaskBoard) startRound(_ context.Context, tc *taskCtx, run model.AdeRun,
 		defer b.wg.Done()
 		defer endRun()
 		b.superviseAgent(runCtx, updated, agentLaunch{
-			def: def, sessionID: sessionID, resume: launch.ResumeID, path: path, worktree: path, prompt: prompt,
+			def: def, agent: agent, sessionID: sessionID, resume: launch.ResumeID, path: path, worktree: path, prompt: prompt,
 			timeout: parseStepTimeout(def.Timeout), review: &agentmcp.ReviewGrant{CommentIDs: spec.CommentIDs},
 		})
 	}()

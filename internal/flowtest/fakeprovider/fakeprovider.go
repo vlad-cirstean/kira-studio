@@ -37,6 +37,7 @@ type Provider struct {
 	mu         sync.Mutex
 	structured []StructuredCall
 	headless   []HeadlessCall
+	renders    int
 }
 
 // New returns a fake whose structured calls are answered from answers.
@@ -56,6 +57,21 @@ func (p *Provider) Headless() []HeadlessCall {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return append([]HeadlessCall(nil), p.headless...)
+}
+
+// MCPConfigs is how many grant configs this provider rendered.
+func (p *Provider) MCPConfigs() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.renders
+}
+
+// MCPConfig renders as Claude does and counts the call: a run pinned to this provider renders here.
+func (p *Provider) MCPConfig(servers []harness.MCPServer) ([]byte, error) {
+	p.mu.Lock()
+	p.renders++
+	p.mu.Unlock()
+	return p.Provider.MCPConfig(servers)
 }
 
 func (p *Provider) ID() string            { return ID }
