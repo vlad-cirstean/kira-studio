@@ -15,6 +15,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 	"github.com/kirathecat/kira-studio/internal/textloss"
+	"github.com/kirathecat/kira-studio/scripts/internal/runledger"
 )
 
 const (
@@ -634,7 +635,7 @@ func (st standing) cmdDistill(o distillOpts, redo map[string]bool) error {
 		}
 		defer os.RemoveAll(filepath.Dir(bin))
 	}
-	led := &ledger{maxUSD: o.maxUSD, path: filepath.Join(o.runs, "spend.jsonl"), spent: totalCharged(o.runs)}
+	led := runledger.New(o.runs, o.maxUSD)
 	var todo []segment
 	for _, s := range proseSegs(segs) {
 		if len(o.only) > 0 && !o.only[s.Slug] {
@@ -646,13 +647,13 @@ func (st standing) cmdDistill(o distillOpts, redo map[string]bool) error {
 		}
 		todo = append(todo, s)
 	}
-	fmt.Printf("%s: %d prose units, %d to run, spent so far %.4f USD\n", st.path, len(proseSegs(segs)), len(todo), led.spent)
+	fmt.Printf("%s: %d prose units, %d to run, spent so far %.4f USD\n", st.path, len(proseSegs(segs)), len(todo), led.Total())
 	ctx := context.Background()
 	for _, s := range todo {
 		text := s.unitText(st.file)
 		est := estimate(len(text))
-		if !led.reserve(est) {
-			fmt.Fprintf(os.Stderr, "stopped: spend cap %.2f USD reached (charged %.4f)\n", o.maxUSD, led.spent)
+		if !led.Reserve(est) {
+			fmt.Fprintf(os.Stderr, "stopped: spend cap %.2f USD reached (charged %.4f)\n", o.maxUSD, led.Total())
 			break
 		}
 		u := Unit{Slug: s.Slug, ID: s.Slug, Title: s.Path, Text: text, Sha: sha(text)}
@@ -662,7 +663,7 @@ func (st standing) cmdDistill(o distillOpts, redo map[string]bool) error {
 		}
 		fmt.Printf("  %s %s in=%d lines=%d cost=%.4f %dms %s\n", s.Slug, rec.State, rec.InChars, len(rec.Lines), rec.CostUSD, rec.WallMs, rec.Reason)
 	}
-	fmt.Printf("charged total %.4f USD\n", led.spent)
+	fmt.Printf("charged total %.4f USD\n", led.Total())
 	return nil
 }
 
