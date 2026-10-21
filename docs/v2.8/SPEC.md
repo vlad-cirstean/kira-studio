@@ -20,7 +20,7 @@ First phase `P306` (highest in `docs/HISTORY.md` is `P305`). Branch `v2.8`. Phas
 | P318 | Git host abstraction. GitHub is the only supported git host today; introduce provider-neutral interfaces (auth and account, repository and remote identity, pull/merge requests, reviews and comments, CI status, URL building, API client) behind a registry and a provider setting, so another host such as GitLab can be added without touching callers. GitHub stays the only implementation and behavior is unchanged. Opus plan inventories every GitHub call site (Go, TS, Vue, scripts, docs) and decides the interface split and renames; no back-compat shims, data loss acceptable. Key test: a fake second host registered through a test option and used by the same flows without caller changes. | Done |
 | P319 | Code review, two rounds (each: Opus reviewer covering architecture, correctness, performance; then a Sonnet fixer; round 2 reviews the full diff since the same base, including round-1 fixes) over everything changed since the last review session, which includes P314-P318. Runs last before the comment sweep. | Done |
 | P320 | Comment cleanup across Go/TS/Vue. Build a comment-extraction tool (see Notes), rewrite via distill plumbing to shorter atomic comments in one consistent format per the `CLAUDE.md` comment rule. Must prove the rewrite is better: drop trivia and restated-code comments, keep every non-obvious why/constraint/workaround, never touch directives. Needs a quality gate: rule-based checks plus a sampled before/after report reviewed by an Opus judge; failures redo. Opus plan decides the format and gate. | Done |
-| P321 | Close chapter v2.8 (fold per `CLAUDE.md`). Over-length comments move to v2.10 (P322). | Todo |
+| P321 | Close chapter v2.8 (fold per `CLAUDE.md`). Over-length comments move to v2.10 (P322). | Done |
 
 ## Results
 
@@ -55,6 +55,7 @@ Filled per phase.
 
 **P320.** `scripts/commentsweep` (go/parser for Go; TS compiler API and `@vue/compiler-sfc` through a Bun helper for TS/Vue), one comment per `ingest_files` call, resumable `.commentsweep/` (gitignored), byte-splice apply with code-identical verification. Cutoff 300-2000 chars, one pass. Eligible 6169 (Go 2917, TS 2594, Vue 658; plan counted 5353, its counter missed script-block comments). Rewritten and applied: Go 2354, TS 2107, Vue 589. Unchanged 434/340/45. Kept by gate 129/147/24 (width, hedge, tokens, grew, form, directive). Over 2000 chars, never sent: 17/31/8. Real cost 110.27 USD (ledger 142.27: 120 rate-limit retries mischarged 0.25 USD, regex fixed). Spend ledger moved to shared `scripts/internal/runledger`. Opus judge, 120 samples per language: bare phase/tag ids dropped on purpose (strict reading: nearly all BAD). Substantive reading (facts, rules, numbers, negations, doc pointers kept): Go 3/120, Vue 2/120 pass; TS 5/120 over the bar of 3, all lost `docs/HISTORY.md` or `docs/PERF.md` pointers. Owner chose to leave as is. Not-applied list: `plans/P320-not-applied.md`, input to v2.10 P322.
 
+**P321.** Fold via `docshistory fold --jobs 1 --max-usd 10 v2.8`, then `repoint`, then `git rm` of `docs/v2.8/` and `docs/history-runs/`. Cap 10 USD. Real spend and verify report outcome in the `docs: fold v2.8` commit message. `docs/v2.10/` untouched.
 
 ## Notes
 
