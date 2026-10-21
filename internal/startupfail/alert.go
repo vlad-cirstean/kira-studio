@@ -18,14 +18,14 @@ const (
 	pbcopyFallbackPath    = "/usr/bin/pbcopy"
 
 	// buttonCopyDetails/buttonOK are the exact button labels `display alert` renders, and the
-	// exact strings report.go's present() compares osascript's stdout against (D10). AppleScript
+	// exact strings report.go's present() compares osascript's stdout against. AppleScript
 	// lays buttons out right-to-left, so listing Copy Details first puts the default OK on the
 	// right, where macOS expects it.
 	buttonCopyDetails = "Copy Details"
 	buttonOK          = "OK"
 )
 
-// alertArgv builds osascript's argument list for D3's exact five-statement script:
+// alertArgv builds osascript's argument list for the exact five-statement script:
 //
 //	-e "on run argv"
 //	-e "activate"
@@ -38,7 +38,7 @@ const (
 //	<body>
 //
 // Every one of the five "-e" statements is a compile-time string constant with no format verb and
-// no concatenation touching title or body (D4) — both travel purely as the final two argv
+// no concatenation touching title or body — both travel purely as the final two argv
 // elements, read back inside the script with `item 1 of argv` / `item 2 of argv`. This is the
 // security-critical property this package exists to guarantee: an error string containing `"`,
 // `\`, an embedded newline, or a leading `-` is data, never AppleScript source, by construction —

@@ -8,7 +8,7 @@ import (
 )
 
 // TermProgram and TermProgramVersion are process-constant, set once by each app's main.go before
-// the first Registry.Open (P103 Part 3: this package is now shared, and sessionEnv is called per-
+// the first Registry.Open (this package is now shared, and sessionEnv is called per-
 // spawn from deep inside newSession — a Config struct threaded through every OpenParams call site
 // would be needless plumbing for a value that never varies for the life of the process).
 var (

@@ -5,14 +5,14 @@ import (
 	"strings"
 )
 
-// RenderAlert composes the alert's title and body from a Message (D5). The title (item 1 of argv,
-// D3) is always the Headline, unmodified. The body is, in order: Advice, a blank line,
+// RenderAlert composes the alert's title and body from a Message. The title (item 1 of argv)
+// is always the Headline, unmodified. The body is, in order: Advice, a blank line,
 // "Details: <Detail>", a blank line, then a two-line footer naming this build's version and log
 // folder — so a user staring at the alert with no other context knows both "what version am I
 // running" and "where would a log record of this be, if one exists".
 //
-// Pure: no I/O beyond reading info.Version and info.LogsDir(), both plain, non-fallible reads
-// (F11) — safe to call from any of the nine boot-failure sites, including the two that run before
+// Pure: no I/O beyond reading info.Version and info.LogsDir(), both plain, non-fallible reads —
+// safe to call from any of the nine boot-failure sites, including the two that run before
 // EnsureLayout has ever succeeded.
 func RenderAlert(msg Message, info Info) (title, body string) {
 	var b strings.Builder
@@ -28,7 +28,7 @@ func RenderAlert(msg Message, info Info) (title, body string) {
 	return msg.Headline, b.String()
 }
 
-// RenderClipboard is the *Copy Details* payload (D10) — a superset of what the alert itself could
+// RenderClipboard is the *Copy Details* payload — a superset of what the alert itself could
 // show, since the alert's Detail is capped and the clipboard's is not. It carries the step
 // identifier, this build's version, the log folder, the database path, and the full, uncapped
 // error text (fullErr, not msg.Detail) — everything a bug report would need that the alert had to

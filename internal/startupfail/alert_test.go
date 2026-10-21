@@ -50,7 +50,7 @@ func TestAlertArgvDashPosition(t *testing.T) {
 	}
 }
 
-// TestAlertArgvHostileBody is D4's security-critical assertion: a title/body containing a double
+// TestAlertArgvHostileBody is the security-critical assertion: a title/body containing a double
 // quote, a backslash, an embedded newline, and a leading "-" (all four in one string) appears ONLY
 // as the final two argv elements — never fragmented into, or appended onto, any of the five "-e"
 // statements.

@@ -72,10 +72,10 @@ func escapeDSNPath(path string) string {
 }
 
 // Open opens (or creates) the sqlite database file at path, applies the six startup pragmas via
-// BuildDSN, forces the first real connection (database/sql's Open is lazy — Ping is what actually
+// BuildDSN, forces the first real connection (database/sql's Open is lazy — Ping is what
 // creates the file and applies the DSN pragmas), serializes every statement onto one connection
 // (SetMaxOpenConns(1) — a small, single-writer configuration store has no SQLITE_BUSY class of bug
-// to serialize away, P52 §5.2), and tightens the file to 0600 (unconditionally, not only on
+// to serialize away), and tightens the file to 0600 (unconditionally, not only on
 // create, so an existing loose file is tightened too). The caller's own home/logs directory must
 // already exist — Open does not create one, since "where the file lives" is each app's own
 // kirapaths-based concern, not this package's.
@@ -119,7 +119,7 @@ type Migration struct {
 }
 
 // SchemaTooNewError is Migrate's refusal when the database on disk was written by a build that
-// understands a newer schema than this binary does (G29 D1) — continuing would risk this older
+// understands a newer schema than this binary does — continuing would risk this older
 // binary writing to a database shape it does not fully understand. Found is the schema_version
 // row's value; Known is the highest version the migrations list passed to Migrate carries.
 type SchemaTooNewError struct{ Found, Known int }

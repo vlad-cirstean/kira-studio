@@ -9,9 +9,9 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// BoundService is the one Wails-bound terminal surface both apps embed (P128 §2.1). Each app's own
+// BoundService is the one Wails-bound terminal surface both apps embed. Each app's own
 // bridge.TerminalService is `struct{ *terminal.BoundService }` — Wails' binding generator builds a
-// call's FQN from the *registered* type's own package, promoted methods included (§1.7), so each
+// call's FQN from the *registered* type's own package, promoted methods included, so each
 // app keeps its own binding names while every method body here is shared. A separate type from
 // Service (not new methods on it): Service also exports OpenWithCoalescedOutput and positional
 // Write/Resize/Close, which embedding would bind too.
@@ -19,10 +19,10 @@ type BoundService struct {
 	Emit     appevent.Emitter
 	Registry *Registry
 	// ComposeAgent, when set, rewrites a agent launch's command and supplies extra env before
-	// spawn. Kira Space sets it (P129, its own session tracker's Compose method); Kira Studio leaves
+	// spawn. Kira Space sets it (its own session tracker's Compose method); Kira Studio leaves
 	// it nil, so its own Open is byte-identical to before this field existed. A func field, not a
-	// method: Wails' binding generator only ever sees exported *methods* on the registered type
-	// (§1.7's FQN rule), so adding this never grows either app's own bound-call surface.
+	// method: Wails' binding generator only ever sees exported *methods* on the registered type, so
+	// adding this never grows either app's own bound-call surface.
 	ComposeAgent func(terminalID, cwd, command string) (string, []string, error)
 	// AbortAgent undoes ComposeAgent's persisted side effects when Open fails after a successful
 	// compose. Set together with ComposeAgent; a no-op for a terminalID it composed nothing for.
@@ -134,9 +134,9 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 	if err := ValidateOpen(args); err != nil {
 		return OpenResult{}, err
 	}
-	// P127: agent-activity monitoring (the `--settings` flag, the hook env vars) left Kira Studio;
-	// Agent stays — it is P87's own keep-awake input (§2.5), read from this registry's own live-
-	// session count, no dependency on the hooks. P129: Kira Space sets ComposeAgent below, so its
+	// Agent-activity monitoring (the `--settings` flag, the hook env vars) left Kira Studio;
+	// Agent stays — it is the keep-awake input, read from this registry's own live-
+	// session count, no dependency on the hooks. Kira Space sets ComposeAgent below, so its
 	// own agent launches are composed and tracked; Kira Studio leaves it nil, so its Open is
 	// unchanged.
 	agent := args.LaunchKind == LaunchKindAgent

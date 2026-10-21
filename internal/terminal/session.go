@@ -1,4 +1,4 @@
-// Package terminal is P83's own PTY layer: one Session per live shell, held by a Registry keyed
+// Package terminal is the PTY layer: one Session per live shell, held by a Registry keyed
 // by a client-supplied id (the tab id) and, for teardown, by windowKey. It is a domain package —
 // it must not import internal/bridge (internal/layering_test.go's
 // TestDomainPackagesDoNotImportBridge picks this package up automatically from `go list`, not by
@@ -31,8 +31,8 @@ const readBufSize = 32 * 1024
 const closeGracePeriod = 2 * time.Second
 
 // closeKillWait bounds how long Close waits, after SIGKILL, for readLoop's blocked ptmx.Read to
-// actually return (F1/P108 Part 2). readLoop closes the master exitDrain after the shell exits
-// (both platforms share pollablePtmx since P180), so a surviving job no longer stalls Close; this
+// return. readLoop closes the master exitDrain after the shell exits
+// (both platforms share pollablePtmx), so a surviving job no longer stalls Close; this
 // bound remains for a shell that somehow survives SIGKILL regardless. Close's own callers —
 // Registry.CloseAll/CloseWindow, in turn ShutdownBound (on the app-quit
 // teardown path, before db.Close()) and shell.OpenWindow's own per-window close — must never hang
@@ -88,10 +88,10 @@ func (s *Session) ID() string { return s.id }
 // result field.
 func (s *Session) Shell() string { return s.shell }
 
-// newSession spawns shell as a login, interactive process (§2.3) at p.Cwd, with the given initial
+// newSession spawns shell as a login, interactive process at p.Cwd, with the given initial
 // size, and returns before the reader goroutine has started — Registry.Open starts it once the
 // session is registered, so onData/onExit can never fire on a session no lookup can find yet.
-// p.Command, when non-empty, runs as one extra `-c <command>` argv pair (P85 §2.1) — the shell
+// p.Command, when non-empty, runs as one extra `-c <command>` argv pair — the shell
 // stays login and interactive either way, so a launched command sees the same PATH a plain
 // terminal in this app sees.
 func newSession(p OpenParams) (*Session, error) {
@@ -104,15 +104,15 @@ func newSession(p OpenParams) (*Session, error) {
 	cmd := exec.Command(shellPath, args...)
 	cmd.Dir = p.Cwd
 	cmd.Env = append(os.Environ(), sessionEnv()...)
-	// p.Env is extra environment appended after sessionEnv() (P86 §5.4) — this package stays
+	// p.Env is extra environment appended after sessionEnv() — this package stays
 	// agnostic and only forwards the strings; internal/bridge/terminal.go decides what they are
 	// (KIRA_TERMINAL_ID/KIRA_AGENT_HOOK_SOCKET/KIRA_AGENT_HOOK_TOKEN for a Claude Code launch with
 	// hooks enabled, nothing for a plain terminal or a script).
 	cmd.Env = append(cmd.Env, p.Env...)
 	// Setsid: true makes this shell its own process-group leader — Close signals the whole group
 	// (syscall.Kill(-pid, …)), so a process the shell hangs up (an `npm run dev` under bash or zsh)
-	// dies with the tab. Jobs the shell does not hang up (dash, disown, nohup) outlive it. pty.StartWithSize already makes the pty this
-	// process's controlling terminal.
+	// dies with the tab. Jobs the shell does not hang up (dash, disown, nohup) outlive it.
+	// pty.StartWithSize already makes the pty this process's controlling terminal.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
 	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: p.Rows, Cols: p.Cols})
@@ -154,12 +154,12 @@ func handleIgnoredSighup() {
 	})
 }
 
-// readLoop is the one reader goroutine per session (§4 rule 1): an io.Reader loop over ptmx into
+// readLoop is the one reader goroutine per session: an io.Reader loop over ptmx into
 // a readBufSize buffer, calling onData for every chunk read. The read ends on a read error (EOF, or
 // EIO — what Linux returns when the slave side closes) or when a closer goroutine closes the master
 // exitDrain after the shell exits, whichever is first. It then marks the session closed, closes the
 // master fd, calls onExit exactly once, and unregisters — in that order, so onData never runs
-// after onExit (§4 rule 4) and a later explicit Close is a no-op (§4 rule 2's idempotency).
+// after onExit and a later explicit Close is a no-op.
 func (s *Session) readLoop() {
 	var (
 		code    int
@@ -257,16 +257,16 @@ func (s *Session) Resize(cols, rows uint16) error {
 	return setWinsize(s.ptmx, &pty.Winsize{Rows: rows, Cols: cols})
 }
 
-// Close is idempotent and ordered (§4 rule 2): mark closed under the mutex → SIGHUP the shell's
+// Close is idempotent and ordered: mark closed under the mutex → SIGHUP the shell's
 // process group (jobs outside it are deliberately not signalled — the shell forwards the hangup or
-// not, as in real terminals) → wait up to closeGracePeriod for the reader goroutine to observe the exit and
-// call Wait() (the `done` channel) → SIGKILL the process group if it hasn't → wait up to
-// closeKillWait more, then close the master fd ourselves and wait one more closeKillWait bound
-// before giving up and logging (F1) — never blocking forever. Closing the fd first (before either
-// signal) would race the reader into a use-after-close; signalling first lets the reader observe
-// EOF/EIO and exit on its own in the common case, with SIGKILL and then a forced ptmx.Close as the
-// bound on a shell that ignores SIGHUP or sits outside the signalled process group (job control,
-// §4's own edge case).
+// not, as in real terminals) → wait up to closeGracePeriod for the reader goroutine to observe
+// the exit and call Wait() (the `done` channel) → SIGKILL the process group if it hasn't
+// → wait up to closeKillWait more, then close the master fd ourselves and wait one more
+// closeKillWait bound before giving up and logging — never blocking forever. Closing the fd first
+// (before either signal) would race the reader into a use-after-close; signalling first lets the
+// reader observe EOF/EIO and exit on its own in the common case, with SIGKILL and then a forced
+// ptmx.Close as the bound on a shell that ignores SIGHUP or sits outside the signalled process
+// group (job control).
 func (s *Session) Close() { s.closeFor(CauseUser) }
 
 // closeFor is Close recording why; the first closer's cause stands.
@@ -298,7 +298,7 @@ func (s *Session) closeFor(cause CloseCause) {
 	}
 
 	// Still not done: the shell survived SIGKILL, or readLoop is stuck in a blocked read. The
-	// master is non-blocking and netpoller-registered (pollablePtmx, both platforms since P180),
+	// master is non-blocking and netpoller-registered (pollablePtmx, both platforms),
 	// so Close interrupts the pending Read; the wait below is the bound for the case it somehow
 	// doesn't: a logged, permanent leak of this one goroutine/process beats every caller of Close
 	// (app-quit teardown, a single window's own close) hanging forever on it.
@@ -372,8 +372,8 @@ type Registry struct {
 	spawn   func(OpenParams) (*Session, error)
 
 	// OnChange, when set, is called — outside the mutex, so it may safely call back into
-	// AgentSessions below — after Open registers a new agent session and after remove deletes one
-	// (P86 §8.2). readLoop calls onExit *before* unregister (remove), so emitting a "what changed"
+	// AgentSessions below — after Open registers a new agent session and after remove deletes one.
+	// readLoop calls onExit *before* unregister (remove), so emitting a "what changed"
 	// signal from OnExit would report a dying session as still live; OnChange fires from remove,
 	// after the map entry is already gone, which is the one place that ordering is correct.
 	OnChange func()
@@ -392,7 +392,7 @@ func NewRegistry() *Registry {
 // Open spawns a new session at p.Cwd with the given initial size and registers it under p.ID.
 // p.ID must not already be live — checked, and reserved, before the PTY is spawned, so a second
 // concurrent Open for the same id never races a spawn in flight and never starts a second process
-// (§17.1's TestRegistryRejectsDuplicateID).
+// (the TestRegistryRejectsDuplicateID).
 func (r *Registry) Open(p OpenParams) (*Session, error) {
 	r.mu.Lock()
 	if r.closed {
@@ -485,9 +485,9 @@ func (r *Registry) closeFor(id string, cause CloseCause) {
 }
 
 // remove is Session's own unregister callback — called from the reader goroutine once, whether
-// the exit was requested or spontaneous. **The ordering here is load-bearing** (P86 §8.2):
-// readLoop (above) calls onExit *before* this, so OnChange must fire from here, after the map
-// entry is gone, never from onExit — otherwise a dying session would still count as live.
+// the exit was requested or spontaneous. **The ordering here is load-bearing**: readLoop (above)
+// calls onExit *before* this, so OnChange must fire from here, after the map entry is gone, never
+// from onExit — otherwise a dying session would still count as live.
 func (r *Registry) remove(windowKey, id string) {
 	r.mu.Lock()
 	sess := r.sessions[id]
@@ -556,8 +556,8 @@ func (r *Registry) CloseWindow(key string) {
 	}
 }
 
-// CloseAll closes every live session — app teardown (§4's teardown table). Closes them
-// concurrently (F1): each Close can cost up to closeGracePeriod+2*closeKillWait now that Close
+// CloseAll closes every live session — app teardown. Closes them
+// concurrently: each Close can cost up to closeGracePeriod+2*closeKillWait now that Close
 // itself is bounded, and teardown runs this before db.Close(), so a sequential loop would pay that
 // cost once per open terminal instead of ~once total.
 func (r *Registry) CloseAll() {

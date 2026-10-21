@@ -1,4 +1,4 @@
-// Package startupfail is the whole of G29's logic: showing the user a native alert, and getting a
+// Package startupfail is the whole of the logic: showing the user a native alert, and getting a
 // log record written, for any of the boot-sequence failures apps/kira-studio/main.go hits before
 // any window (and, for five of the nine sites, before any *application.App at all) exists.
 //
@@ -8,14 +8,14 @@
 // (pkg/application/mainthread.go), and globalApplication is nil until application.New returns
 // (assigned inside New, pkg/application/application.go), while a.impl — also dereferenced along
 // that path — is assigned only inside Run(). Every boot-failure site in main.go runs before one or
-// both of those exist (G29 plan F4). So the mechanism here is a plain os/exec spawn of macOS's own
-// /usr/bin/osascript (D3), the same argv-only, no-shell discipline internal/toolexec already uses
+// both of those exist. So the mechanism here is a plain os/exec spawn of macOS's own
+// /usr/bin/osascript, the same argv-only, no-shell discipline internal/toolexec already uses
 // for its spawns: title and body always travel as argv items, never interpolated into any
-// AppleScript source string (D4) — the error text this package renders can be anything an
+// AppleScript source string — the error text this package renders can be anything an
 // underlying library chose to put in an error, including quotes, backslashes and newlines, and none
 // of it is trusted to be safe inside a script.
 //
-// Pure Go, no cgo: the whole point of (a) over a cgo NSAlert/CFUserNotification shim is that this
+// Pure Go, no cgo: the whole point over a cgo NSAlert/CFUserNotification shim is that this
 // package cross-compiles and unit-tests for darwin/arm64 in an ordinary Linux CI container
 // (verified: GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build succeeds), where a cgo darwin file
 // would be compiled by nobody until a human builds on a Mac.
@@ -53,7 +53,7 @@ const (
 	StepRun Step = "run"
 	// StepPlatform is Wails' own pre-window fatal path — application.New's transport-start
 	// failure, or webview_window_darwin.go's GetStartURL failure during first-window creation —
-	// caught via application.Options.ErrorHandler (D7), never reachable from any log.Fatal* site
-	// in main.go because Wails calls os.Exit itself without ever returning to main (F6).
+	// caught via application.Options.ErrorHandler, never reachable from any log.Fatal* site
+	// in main.go because Wails calls os.Exit itself without ever returning to main.
 	StepPlatform Step = "platform"
 )

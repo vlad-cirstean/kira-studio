@@ -231,12 +231,6 @@ func applyFile(c *checker, file, lang string, src []byte, us []Unit, text func(U
 	return cur, used, rejected, nil
 }
 
-func loadAppliedSha() (map[string]string, error) {
-	m := map[string]string{}
-	err := readLines("applied.jsonl", func(a Applied) { m[a.File] = a.AfterSha })
-	return m, err
-}
-
 func loadRestored() (map[string]bool, error) {
 	m := map[string]bool{}
 	err := readLines("restored.jsonl", func(r Restored) { m[r.ID] = true })
@@ -245,9 +239,8 @@ func loadRestored() (map[string]bool, error) {
 
 // applyState is what one apply run reads once: units to write per file and their results.
 type applyState struct {
-	byFile     map[string][]Unit
-	results    map[string]Result
-	appliedSha map[string]string
+	byFile  map[string][]Unit
+	results map[string]Result
 }
 
 func loadApplyState(o applyOpts) (*applyState, error) {
@@ -263,13 +256,17 @@ func loadApplyState(o applyOpts) (*applyState, error) {
 	if err != nil {
 		return nil, err
 	}
-	appliedSha, err := loadAppliedSha()
-	if err != nil {
+	done := map[string]bool{}
+	if err := readLines("applied.jsonl", func(a Applied) {
+		for _, id := range a.Units {
+			done[id] = true
+		}
+	}); err != nil {
 		return nil, err
 	}
-	st := &applyState{byFile: map[string][]Unit{}, results: results, appliedSha: appliedSha}
+	st := &applyState{byFile: map[string][]Unit{}, results: results}
 	for _, u := range unitsOfLang(units, o.lang) {
-		if r, ok := results[u.InputKey]; ok && r.Outcome == outRewritten && !restored[u.ID] && (len(o.prefixes) == 0 || hasPrefix(u.File, o.prefixes)) {
+		if r, ok := results[u.InputKey]; ok && r.Outcome == outRewritten && !restored[u.ID] && !done[u.ID] && (len(o.prefixes) == 0 || hasPrefix(u.File, o.prefixes)) {
 			st.byFile[u.File] = append(st.byFile[u.File], u)
 		}
 	}
@@ -286,11 +283,11 @@ func (st *applyState) applyOne(c *checker, o applyOpts, f string, tot *applyTota
 		return false, err
 	}
 	cur := sha(src)
-	if st.appliedSha[f] == cur {
-		return false, nil
-	}
 	if cur != us[0].FileSha {
-		return true, nil
+		var ok bool
+		if us, ok = relocate(src, us); !ok {
+			return true, nil
+		}
 	}
 	text := func(u Unit) string { return st.results[u.InputKey].Text }
 	out, used, rejected, err := applyFile(c, f, o.lang, src, us, text)
@@ -323,6 +320,21 @@ func (st *applyState) applyOne(c *checker, o applyOpts, f string, tot *applyTota
 		return false, nil
 	}
 	return false, writeApplied(f, o.lang, cur, out, used, tot)
+}
+
+// relocate finds each unit's text again in a file that changed since the scan (an earlier apply shifted
+// offsets). It succeeds only when every text occurs exactly once; the code check still gates the write.
+func relocate(src []byte, us []Unit) ([]Unit, bool) {
+	out := make([]Unit, len(us))
+	for i, u := range us {
+		if bytes.Count(src, []byte(u.Text)) != 1 {
+			return nil, false
+		}
+		u.Start = bytes.Index(src, []byte(u.Text))
+		u.End = u.Start + len(u.Text)
+		out[i] = u
+	}
+	return out, true
 }
 
 func writeApplied(f, lang, beforeSha string, out []byte, used []Unit, tot *applyTotals) error {

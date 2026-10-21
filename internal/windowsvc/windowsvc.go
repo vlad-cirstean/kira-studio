@@ -41,7 +41,7 @@ type EnsureResult struct {
 
 // Ensure registers this page's own windowKey with a `windows` row if it doesn't already have one —
 // always a no-op on the native shell (main.go's own window-creation paths already created it before
-// this page's URL ever loaded, D2), and the only thing that ever does on a `-tags server` build,
+// this page's URL ever loaded), and the only thing that ever does on a `-tags server` build,
 // which has no shell managing window creation at all.
 func (s *Service) Ensure(args EnsureArgs) (EnsureResult, error) {
 	if args.WindowKey == "" {

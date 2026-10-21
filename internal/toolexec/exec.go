@@ -1,5 +1,5 @@
 // Package toolexec is the argv-only, bounded-output local-tool runner mcpinstall's `claude mcp
-// add` spawn and the former editor-install spawns both carried verbatim (P107 T2-6): the
+// add` spawn and the former editor-install spawns both carried verbatim: the
 // SIGTERM-then-SIGKILL process-group cancellation, bounded stderr capture, and the PATH-then-
 // candidates executable probe every discovery package in this codebase repeats.
 package toolexec
@@ -99,11 +99,10 @@ var killGroup = procgroup.Kill
 // cmd.Cancel overrides exec.CommandContext's own default (an immediate, ungraceful
 // Process.Kill() of the direct child only) with a SIGTERM-then-SIGKILL escalation: without it, a
 // spawn that forked something long-lived left the grandchild running after the parent was
-// killed/timed out (G30 round-1 finding #7). The escalation timer is stopped once cmd.Run()
-// returns, whether that was a clean exit or the escalation itself firing (G31 round-2 finding
-// #11) — otherwise a group that exits cleanly on SIGTERM left the timer armed regardless, and a
-// SIGKILL fired after the full delay could land on an unrelated group that has since reused the
-// same pid.
+// killed/timed out. The escalation timer is stopped once cmd.Run()
+// returns, whether that was a clean exit or the escalation itself firing — otherwise a group that
+// exits cleanly on SIGTERM left the timer armed regardless, and a SIGKILL fired after the full
+// delay could land on an unrelated group that has since reused the same pid.
 func Run(ctx context.Context, path string, args []string) error {
 	_, err := spawn(ctx, spec{path: path, args: args, env: os.Environ()})
 	return err
