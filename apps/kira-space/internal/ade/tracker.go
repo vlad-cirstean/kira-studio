@@ -96,7 +96,8 @@ type PrepareArgs struct {
 	// Resume is "" for a new session, or an existing ade_sessions.id to resume.
 	Resume  string
 	Message string
-	// Provider is the provider of the conversation the launch continues; empty means the active one.
+	// Provider is the provider the launch runs under (the conversation it continues, or the one its
+	// grant was rendered for); empty means the active one. Ignored when Resume is set.
 	Provider string
 	// Resumes is the agent session id a new record continues. AddDirs, MCPConfig and AllowedTools
 	// extend the base command.
@@ -253,7 +254,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 			agentSessionID = args.Resumes
 		}
 		cwd = args.Cwd
-		if args.Resumes != "" && args.Provider != "" {
+		if args.Provider != "" {
 			var err error
 			if agent, err = t.deps.Agent.For(args.Provider); err != nil {
 				return PrepareResult{}, err

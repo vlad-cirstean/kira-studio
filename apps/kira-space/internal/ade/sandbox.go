@@ -467,6 +467,19 @@ func (b *TaskBoard) badgeTasks(tasks []adewire.Task) {
 	}
 }
 
+// runProvider is the provider a stored run ran under, from its session row; the active one when the
+// run has no session.
+func (b *TaskBoard) runProvider(runID string) harness.Provider {
+	if run, err := b.deps.Tasks.GetRun(runID); err == nil && run.SessionID != "" {
+		if rec, err := b.deps.Sessions.Get(run.SessionID); err == nil && rec != nil {
+			if p, err := b.deps.Agent.For(rec.Provider); err == nil {
+				return p
+			}
+		}
+	}
+	return b.deps.Agent.Active()
+}
+
 // RunSandbox returns the stored sandbox of a run: its policy, profile and denials.
 func (b *TaskBoard) RunSandbox(_ context.Context, runID string) (adewire.RunSandboxDetail, error) {
 	if b.deps.RunSandbox == nil {
@@ -484,7 +497,7 @@ func (b *TaskBoard) RunSandbox(_ context.Context, runID string) (adewire.RunSand
 		Write: []string{}, Read: []string{}, Allow: []string{}, Denials: []adewire.SandboxDenial{},
 	}
 	if row.Reason != "" {
-		out.Reason = agentsandbox.NotEnforcedText(b.deps.Agent.Active())
+		out.Reason = agentsandbox.NotEnforcedText(b.runProvider(runID))
 	}
 	var pol agentsandbox.Policy
 	if err := json.Unmarshal([]byte(row.PolicyJSON), &pol); err == nil {

@@ -293,6 +293,7 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 		if err != nil {
 			return adewire.Launch{}, err
 		}
+		pa.Provider = agent.ID()
 		grant := agentmcp.Grant{RunID: runID, TaskID: tc.task.ID, Space: space, Agent: agent}
 		if runID != "" {
 			grant.Results = resultSpecs(stepResultsOf(tc, pa.StepID))
