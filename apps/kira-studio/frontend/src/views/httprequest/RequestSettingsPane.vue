@@ -19,11 +19,11 @@ import {
 } from '../../state/settingsDomain';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
 
-// P90 §2.6: one row per api settings leaf, in SPEC's own order — a control bound to
+// One row per api settings leaf, in SPEC's own order — a control bound to
 // tab.state.settings.<leaf>, an "Inherit" checkbox (checked === the leaf is null), and helper text
 // naming the inherited value straight off settingsStore.api. No resolver function shared with Go —
 // the rule is one `??` per leaf, and writing it twice as a function would be the drift risk, not
-// the fix (§2.6's own reasoning).
+// the fix.
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 const settingsStore = useSettingsStore();
 

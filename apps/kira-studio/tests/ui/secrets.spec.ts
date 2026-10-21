@@ -4,22 +4,21 @@ import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 
-// Ported from tests/e2e/secrets.spec.ts (P57 D16), per P57-cutover.md §11's connections/secrets
-// finding — but only a small slice of it. Scenarios 2-4 there (7 of the file's 9 substantive
-// checks) read the app's own on-disk kira.sqlite directly and assert real encrypt-at-rest,
-// plaintext-upgrade-on-relaunch and idempotent-re-encryption behavior across 2-3 real relaunches
-// each. None of that has an equivalent here: there is no disk and no second process
+// Ported from tests/e2e/secrets.spec.ts — but only a small slice of it. Scenarios 2-4 there (7 of
+// the file's 9 substantive checks) read the app's own on-disk kira.sqlite directly and assert real
+// encrypt-at-rest, plaintext-upgrade-on-relaunch and idempotent-re-encryption behavior across 2-3
+// real relaunches each. None of that has an equivalent here: there is no disk and no second process
 // (tests/ui/fixtures.ts's own header comment), and the guarantee is now covered more precisely at
-// the layer that actually implements it — apps/kira-studio/internal/storage/repos/secrets_test.go's real
+// the layer that implements it — apps/kira-studio/internal/storage/repos/secrets_test.go's real
 // AES-256-GCM round trip and apps/kira-studio/internal/connections/service_test.go's
-// TestPasswordThreeStateConvention (CLAUDE.md's P57 finding).
+// TestPasswordThreeStateConvention.
 //
 // What *is* pure UI and ports here: connectionsSecretsStatus()'s three backend shapes and
 // ConnectionDialog.vue's `connection-credential-note` rendering for each, plus the failed/
 // succeeded-save behavior when secrets are unavailable (scenario 5's UI half, minus its own two
-// on-disk assertions). This is actually a strictly better test than the original: the original
+// on-disk assertions). This is a strictly better test than the original: the original
 // branches on `process.platform` and only ever exercises the one status shape the host OS
-// produces (P52 D16), so no sandbox has ever run more than one of these three branches in one
+// produces, so no sandbox has ever run more than one of these three branches in one
 // process. Mocking the status means all three run unconditionally, on any OS, in one file.
 
 const KEYCHAIN: SecretStorageStatus = {
@@ -79,6 +78,7 @@ test('the unavailable path fails loudly and safely', async ({ relaunch, consoleE
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    preconnectDelaySec: 0,
     autoExplain: false,
     throttlePerSec: 0,
     mcpEnabled: false,
@@ -106,6 +106,7 @@ test('the unavailable path fails loudly and safely', async ({ relaunch, consoleE
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    preconnectDelaySec: 0,
     autoExplain: false,
     throttlePerSec: 0,
     mcpEnabled: false,
@@ -162,12 +163,12 @@ test('the unavailable path fails loudly and safely', async ({ relaunch, consoleE
       .filter({ hasText: 'Secrets Unavailable' }),
   ).toBeVisible();
 
-  // D7's real point: no *unhandled* rejection reached the renderer console at any point above.
+  // The real point: no *unhandled* rejection reached the renderer console at any point above.
   // Under Wails, that no longer means zero console lines — the real bound-call transport answers
   // every handled business-rule error with a genuine HTTP 422 (`pkg/application/transport_http.go`
   // — confirmed in the module cache, not assumed), and Chromium/WebKit's own devtools log any
   // non-2xx fetch as "Failed to load resource" regardless of whether the page's JS handles it
-  // (CLAUDE.md's P57 finding; the same phenomenon `mockRuntime.ts`'s own `/wails/custom.js` comment
+  // (CLAUDE.md's finding; the same phenomenon `mockRuntime.ts`'s own `/wails/custom.js` comment
   // documents for a 404). So the real assertion is "no line *other than* that one expected,
   // already-handled 422" — the one thing this tier can still prove.
   expect(consoleErrors).toEqual([

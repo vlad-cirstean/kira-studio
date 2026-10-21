@@ -155,3 +155,49 @@ func (s *Service) Move(args MoveArgs) error {
 	s.broadcast()
 	return nil
 }
+
+type ReorderArgs struct {
+	CollectionID *string  `json:"collectionId"`
+	IDs          []string `json:"ids"`
+}
+
+// Reorder persists a drag order within one set: ungrouped (nil collectionId) or one collection.
+func (s *Service) Reorder(args ReorderArgs) error {
+	if err := checkOrderIDs(args.IDs); err != nil {
+		return err
+	}
+	if err := s.Repo.Reorder(args.CollectionID, args.IDs); err != nil {
+		return fail(err)
+	}
+	s.broadcast()
+	return nil
+}
+
+type ReorderCollectionsArgs struct {
+	IDs []string `json:"ids"`
+}
+
+func (s *Service) ReorderCollections(args ReorderCollectionsArgs) error {
+	if err := checkOrderIDs(args.IDs); err != nil {
+		return err
+	}
+	if err := s.Repo.ReorderCollections(args.IDs); err != nil {
+		return fail(err)
+	}
+	s.broadcast()
+	return nil
+}
+
+func checkOrderIDs(ids []string) error {
+	if len(ids) == 0 {
+		return ipcerr.Required("ids")
+	}
+	seen := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		if seen[id] {
+			return ipcerr.Contract("ids must be unique")
+		}
+		seen[id] = true
+	}
+	return nil
+}

@@ -9,23 +9,23 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// D6: three caps, because three independent things can grow (F6) — bytes per entry, count per
+// Three caps, because three independent things can grow — bytes per entry, count per
 // scope, and bytes across the whole table. maxHistoryBodyBytes applies once to the response body
-// and once to the request body (D5); historyPerScopeLimit mirrors filter_history.go's/
+// and once to the request body; historyPerScopeLimit mirrors filter_history.go's/
 // variables.go's own per-scope count cap.
 const (
 	maxHistoryBodyBytes = 256 * 1024
-	// historyPerScopeLimit is D4's raise from 20 to 30 — mirrored into TS as
-	// HISTORY_PER_SCOPE_LIMIT (packages/shared/domain/responseHistory.ts) and pinned equal by
-	// tests/unit/go-ts-vocabulary-parity.spec.ts (D4), so the two numbers cannot drift the way
+	// historyPerScopeLimit is mirrored into TS as HISTORY_PER_SCOPE_LIMIT
+	// (packages/shared/domain/responseHistory.ts) and pinned equal by
+	// tests/unit/go-ts-vocabulary-parity.spec.ts, so the two numbers cannot drift the way
 	// ResponseHistoryList.vue's own hand-written "20" already had.
 	historyPerScopeLimit = 30
 )
 
-// historyByteBudget is D6's table-wide ceiling — the same order of magnitude as
+// historyByteBudget is the table-wide ceiling — the same order of magnitude as
 // cache.l2BudgetMb's own budget, deliberately. A var, not a const, only so
 // SetHistoryByteBudgetForTest (response_history_internal_test.go) can shrink it for one test —
-// §6.2's cross-scope eviction case, which needs Record's own real sweep to fire without
+// the cross-scope eviction case, which needs Record's own real sweep to fire without
 // reproducing 128 MiB of real rows. Every real caller only ever reads it.
 var historyByteBudget = 128 * 1024 * 1024
 
@@ -42,7 +42,7 @@ type storedSnapshot struct {
 	BodyStored                  bool                         `json:"bodyStored"`
 	BodyStorageTruncated        bool                         `json:"bodyStorageTruncated"`
 	RequestBodyStorageTruncated bool                         `json:"requestBodyStorageTruncated"`
-	// RequestFieldsElided (F9/P21 round 1): capBody only caps 'raw'/'code' bodies — urlencoded and
+	// RequestFieldsElided: capBody only caps 'raw'/'code' bodies — urlencoded and
 	// formdata field values have no per-field cap at all, and only stay safe today because the
 	// control plane's 64 MiB ceiling happens to sit below the 128 MiB history budget, a coincidence
 	// of two unrelated numbers rather than an invariant. If a snapshot still ends up past half the
@@ -52,9 +52,9 @@ type storedSnapshot struct {
 	RequestFieldsElided bool `json:"requestFieldsElided,omitempty"`
 }
 
-// Record is the whole storage policy (D4/D5/D6): apply the two body rules, then
-// responseHistoryTable.Record (P107 I2-8) runs the shared transaction/environment-resolve/
-// elide-once/insert/cap/sweep/commit chain. The caps live here, not in bridge/http.go (§0.3) —
+// Record is the whole storage policy: apply the two body rules, then
+// responseHistoryTable.Record runs the shared transaction/environment-resolve/
+// elide-once/insert/cap/sweep/commit chain. The caps live here, not in bridge/http.go —
 // Record is the only writer, so they cannot be bypassed by a future caller.
 func (r *ResponseHistoryRepo) Record(rec model.ResponseHistoryRecord) error {
 	if err := rec.Validate(); err != nil {
@@ -68,9 +68,9 @@ func (r *ResponseHistoryRepo) Record(rec model.ResponseHistoryRecord) error {
 		func() ([]byte, error) {
 			reqBody, requestBodyStorageTruncated := capBody(rec.Body)
 			resp := rec.Response
-			// P9 D7/F12: the rendered exchange is live-only. It is the resolved request in text
-			// form, and even masked (P9 D6) it would double a snapshot's size for a pane that
-			// cannot be opened from a stored entry anyway (D7). Wire is a pointer with
+			// The rendered exchange is live-only. It is the resolved request in text
+			// form, and even masked it would double a snapshot's size for a pane that
+			// cannot be opened from a stored entry anyway. Wire is a pointer with
 			// json:"wire,omitempty" (httpclient.Response), so nil here means a stored snapshot's
 			// JSON carries no "wire" key at all, not just a null one.
 			resp.Wire = nil
@@ -102,7 +102,7 @@ func (r *ResponseHistoryRepo) Record(rec model.ResponseHistoryRecord) error {
 			return json.Marshal(snap)
 		},
 		func() ([]byte, error) {
-			// F9/P21 round 1: cap the snapshot as a whole, not just field by field. capBody only
+			// Cap the snapshot as a whole, not just field by field. capBody only
 			// bounds 'raw'/'code'; a urlencoded/formdata body's field values have no per-field cap
 			// at all and could otherwise push a single row's stored_bytes past the sweep's own
 			// safety margin (the sweep is safe only because no single row can exceed the budget by
@@ -141,7 +141,7 @@ func (r *ResponseHistoryRepo) Record(rec model.ResponseHistoryRecord) error {
 	return err
 }
 
-// capBody applies D5's per-entry byte cap to whichever member of Body actually carries free-form
+// capBody applies the per-entry byte cap to whichever member of Body carries free-form
 // text — 'raw' and 'code' are the only two modes whose single string can be arbitrarily long;
 // urlencoded/formdata are structured field lists (small in practice) and 'file' carries a local
 // path, never bytes, on the wire.
@@ -196,10 +196,9 @@ func (r *ResponseHistoryRepo) List(scopeKey string) ([]model.ResponseHistoryEntr
 }
 
 // Get decodes one row's snapshot_json and rebuilds Entry from the row's own summary columns
-// (D4) — a corrupt snapshot_json is reported, not silently blanked, since Get is a single-entry
+// — a corrupt snapshot_json is reported, not silently blanked, since Get is a single-entry
 // lookup rather than a list a bad row could otherwise blank entirely (repos/saved_queries.go's
-// posture is for List, not Get). GetHistory (P107 I2-8) runs the shared query, this closure does
-// the rest.
+// posture is for List, not Get). GetHistory runs the shared query, this closure does the rest.
 func (r *ResponseHistoryRepo) Get(id string) (model.ResponseHistorySnapshot, error) {
 	return GetHistory(r.DB, "api_response_history", responseHistoryEntryColumns, id, func(row rowScanner) (model.ResponseHistorySnapshot, error) {
 		var (

@@ -11,18 +11,18 @@ import { type ShallowRef, shallowRef } from 'vue';
 const FULL_SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 
 /**
- * P93 §7: the branch-grouped row plan as reactive UI state — `GraphViewState`'s own `order`
- * (optional; `GraphViewState` falls back to the identity plan when none is given, §5.4). Owns
+ * The branch-grouped row plan as reactive UI state — `GraphViewState`'s own `order`
+ * (optional; `GraphViewState` falls back to the identity plan when none is given). Owns
  * exactly the inputs `buildRowPlan` needs and nothing it computes from them: the tip list
  * (`App.vue` feeds it from `RefsState`/`StashState`, mirroring how `SelectionState` takes a
  * `CommitStore` and nothing else — this class never imports `RefsState`), the session-only
- * expanded-group set (P93 §4.4: never persisted, so every repo open starts fully collapsed
+ * expanded-group set (never persisted, so every repo open starts fully collapsed
  * again), and the persisted `collapseEnabled` flag (`App.vue` also owns the actual persistence,
  * through `PersistedViewState`; this class only holds the live value).
  *
- * `rebuild` is the one place a `RowPlan` is actually built — deliberately not run automatically
+ * `rebuild` is the one place a `RowPlan` is built — deliberately not run automatically
  * by `setTips`/`toggleGroup`/`setCollapseEnabled`, since building one needs the `CommitStore`
- * this class does not hold. `GraphViewState.#rebuildLayout` (P93 §5.3) is the only caller —
+ * this class does not hold. `GraphViewState.#rebuildLayout` is the only caller —
  * `App.vue` changes an input, then calls `GraphViewState.rebuildOrder()`, which calls `rebuild`
  * as its own first step. `revision` is `GraphViewState`'s own dirty flag more than a public API:
  * a strictly-increasing counter a caller can diff against to notice a rebuild landed, without
@@ -33,7 +33,7 @@ export class GraphOrderState {
   /** Bumped by every `rebuild()`/`reset()` call — `GraphViewState`'s own trigger for "the plan's
    *  inputs changed, lay it out again", kept separate from `RowPlan.revision` (which is only
    *  ever *read*, stamped at construction) so a watcher never has to reach into `plan.value`
-   *  itself just to know something moved. */
+   *  itself to know something moved. */
   readonly revision: ShallowRef<number> = shallowRef(0);
 
   #tips: readonly TipRef[] = [];
@@ -49,10 +49,10 @@ export class GraphOrderState {
     this.#tips = tips;
   }
 
-  /** P93 §4.2: `columns.ts`'s `messageFormatter` reads this to turn a placeholder's own
+  /** `columns.ts`'s `messageFormatter` reads this to turn a placeholder's own
    *  `groupIndex` into the human label (`TipRef.label`) its "N more commits on X" text needs —
-   *  `RowPlan.groupKeyAt` only ever exposes the raw key, deliberately (its shape is fixed, §7's
-   *  own note), so the label lookup lives here instead. Index `tips.length` is the synthetic
+   *  `RowPlan.groupKeyAt` only ever exposes the raw key, deliberately (its shape is fixed), so the
+   *  label lookup lives here instead. Index `tips.length` is the synthetic
    *  `other` group, which has no `TipRef` of its own — callers get `undefined` and fall back to
    *  branch-less wording. */
   get tips(): readonly TipRef[] {
@@ -74,7 +74,7 @@ export class GraphOrderState {
   }
 
   /** Builds a fresh `RowPlan` against `store`'s current rows and this class's current inputs,
-   *  and bumps `revision` — the one call that actually changes what `GraphViewState` lays out.
+   *  and bumps `revision` — the one call that changes what `GraphViewState` lays out.
    *  `generation` is `GraphViewState.generation.value` (`CommitStore`'s own reset counter); this
    *  class does not read it itself, but takes it in the signature so every call site is honest
    *  about which store generation the plan was built against (`GraphViewState`'s own doc comment
@@ -102,10 +102,10 @@ export class GraphOrderState {
     }
   }
 
-  /** Refs reload before the graph re-walks, so a requested tip can name a commit `store` lacks. Such a
-   *  tip would own no rows and collapse the rows it should keep: HEAD's group empties and every
-   *  other row falls into a contracted group. Keep the sha the group last used while the store
-   *  still holds it. */
+  /** Refs reload before the graph re-walks, so a requested tip can name a commit `store` lacks.
+   *  Such a tip would own no rows and collapse the rows it should keep: HEAD's group empties and
+   *  every other row falls into a contracted group. Keep the sha the group last used while the
+   *  store still holds it. */
   #effectiveTips(store: CommitStore): readonly TipRef[] {
     // A ref can carry no object id (unborn branch); `rowOfSha` throws on a malformed one.
     const holds = (sha: string) => FULL_SHA.test(sha) && store.rowOfSha(sha) >= 0;

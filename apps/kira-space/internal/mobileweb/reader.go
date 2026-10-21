@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 )
 
@@ -11,12 +12,13 @@ import (
 // satisfies it; tests use a fake. No write method is listed, so none can be reached.
 type Reader interface {
 	Board(ctx context.Context) (adewire.Board, error)
-	Prs(ctx context.Context) (adewire.PrsResult, error)
+	ChangeRequests(ctx context.Context) (adewire.ChangeRequestsResult, error)
 	Sessions(ctx context.Context) (adewire.SessionsResult, error)
 	Workflows(ctx context.Context) (adewire.WorkflowsResult, error)
 	Backlog(ctx context.Context) (adewire.BacklogResult, error)
 	Repos(ctx context.Context) (adewire.ReposResult, error)
 	ReadLog(ctx context.Context, args adewire.ReadLogArgs) (adewire.LogPage, error)
+	HostProviders(ctx context.Context) (githost.Providers, error)
 }
 
 // DeviceStore is the trust store for paired phones (storage/repos.MobileDevicesRepo).

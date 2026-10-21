@@ -43,11 +43,9 @@ function stashFixture(overrides: Partial<StashEntry> = {}): StashEntry {
 }
 
 /**
- * G26 D-4.14/4.15: `buildRefMenu`'s own new stack section — present only when the caller supplies
+ * `buildRefMenu`'s own new stack section — present only when the caller supplies
  * `ctx.stack` at all (a tag/remoteBranch row, or a host with no `StackState`, gets none, mirroring
- * `buildRowMenu`'s own "absent, not disabled" convention for a missing capability). No file
- * existed for `rowMenuModel.ts` before this phase; this one is new rather than edited, focused on
- * the addition this phase makes.
+ * `buildRowMenu`'s own "absent, not disabled" convention for a missing capability).
  */
 function branchCtx(overrides: Partial<RefMenuContext> = {}): RefMenuContext {
   return {
@@ -175,10 +173,10 @@ describe('buildGlobalStashMenu — D12/D13 never contains stashPop or stashDrop'
   });
 });
 
-// G32 round-3 functional-correctness review, finding #4: tagPush/tagDeleteRemote are the two
-// OpRequest kinds the server has never served (RunOp's write path has no askpass wiring) — the row
-// menu used to offer them enabled anyway, so a click always rejected silently (no toast, no
-// announcement). Disabled with a visible reason until the server-side move to remote.run lands.
+// tagPush/tagDeleteRemote are the two OpRequest kinds the server has never served (RunOp's write
+// path has no askpass wiring) — the row menu used to offer them enabled anyway, so a click always
+// rejected silently (no toast, no announcement). Disabled with a visible reason until the
+// server-side move to remote.run lands.
 describe('buildRefMenu — tag remote actions are disabled, not silently broken', () => {
   test('Push to <remote> and Delete on <remote> are disabled with a reason, for every known remote', () => {
     const sections = buildRefMenu(branchCtx({ kind: 'tag', knownRemotes: ['origin', 'upstream'] }));
@@ -202,10 +200,10 @@ describe('buildRefMenu — tag remote actions are disabled, not silently broken'
   });
 });
 
-// P76 §12.2: createWorktreeHere is un-gated (plainItem, not gatedItem) — present and enabled on
-// branch/remoteBranch rows and the commit row menu even mid-operation, absent for a tag (§10: a
+// createWorktreeHere is un-gated (plainItem, not gatedItem) — present and enabled on
+// branch/remoteBranch rows and the commit row menu even mid-operation, absent for a tag (a
 // tag is a point, its own commit row already offers the detached item), and absent from every
-// read-only builder (it is a write, same as every other row action C10 hides).
+// read-only builder (it is a write).
 describe('createWorktreeHere — un-gated, offered on branch/remoteBranch/commit rows only', () => {
   test('present and enabled on a branch row even with an operation in progress', () => {
     const sections = buildRefMenu(branchCtx({ inProgress: MERGE_IN_PROGRESS }));
@@ -243,10 +241,10 @@ describe('createWorktreeHere — un-gated, offered on branch/remoteBranch/commit
   });
 });
 
-// C10 §4.2/§4.3/§11 (S6): the three read-only builders must never emit an item whose id maps to
+// The three read-only builders must never emit an item whose id maps to
 // an OpRequest kind (or, for a ref, anything the picker/graph would otherwise wire to a write) —
-// UI layer 3 of the read-only boundary. The Go allowlist (gitstream_test.go) is what actually
-// enforces the boundary; these three cases just pin that this layer stays honest with it.
+// UI layer 3 of the read-only boundary. The Go allowlist (gitstream_test.go) is what
+// enforces the boundary; these three cases pin that this layer stays honest with it.
 const WRITE_CAPABLE_ROW_IDS = [
   'checkoutDetached',
   'createBranchHere',

@@ -2,7 +2,7 @@ package queryplan
 
 import "testing"
 
-// P108 Part 11 F2: Explainable's raw-semicolon guard, the Go twin of the TS test in
+// Explainable's raw-semicolon guard, the Go twin of the TS test in
 // console-explain-embedded-semicolon.spec.ts. A leading SELECT is not enough — the splitter that
 // decided this was "one statement" can itself be fooled, and wrapping a merged statement in
 // EXPLAIN would still execute whatever follows the `;` (Postgres's simple protocol runs every

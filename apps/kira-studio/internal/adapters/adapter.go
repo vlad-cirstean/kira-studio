@@ -7,7 +7,6 @@
 //  1. An adapter imports nothing from github.com/wailsapp/wails, nothing from internal/bridge and
 //     nothing from internal/shell. It is a plain Go package — this is what makes the per-engine
 //     tests able to drive it directly and what keeps the adapter layer shell-agnostic.
-//     (adapter.ts's rule 1 said "imports nothing from electron", against the shell of its day.)
 //  2. Every method that talks to the server takes a context.Context and honours cancellation. A
 //     method that ignores ctx.Done() is a bug even if the underlying driver "is fast".
 //  3. op.SetCommand() is called before the statement is issued, not after it returns — an op that
@@ -45,8 +44,8 @@ type Adapter interface {
 
 	// SchemaColumns returns every relation in one container (a database or schema node) together
 	// with its columns, in ONE round trip — Describe's schema-wide sibling, backing schema-aware
-	// SQL completion/diagnostics/hover over a whole container without a per-relation Describe loop
-	// (P22c D1). Returns the same ColumnMeta values Describe does for the same column, never a
+	// SQL completion/diagnostics/hover over a whole container without a per-relation Describe loop.
+	// Returns the same ColumnMeta values Describe does for the same column, never a
 	// second, parallel column shape. Indexes, foreign keys, referencedBy, row estimates and
 	// object-level comments are deliberately absent — fetching a schema's entire constraint graph
 	// to spell a column name is the cost this method exists to avoid; Describe stays the

@@ -15,7 +15,7 @@ type Pair struct {
 // MarshalOrderedObject marshals pairs as a JSON object in their given order. encoding/json's own
 // map-based Marshal sorts keys alphabetically, which loses a wire-ordered value's own order —
 // Kira Studio's own model.RowValues and the redis adapter's own streamFields both exist to
-// preserve one (P107 I2-35).
+// preserve one.
 func MarshalOrderedObject(pairs []Pair) ([]byte, error) {
 	var buf bytes.Buffer
 	buf.WriteByte('{')

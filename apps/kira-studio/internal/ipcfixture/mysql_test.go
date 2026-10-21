@@ -22,12 +22,12 @@ func nodeByName(nodes []model.TreeNode, name string) *model.TreeNode {
 	return nil
 }
 
-// TestFixture_MySQL is P58f §4.5 step 2 (one fifth of it): the same discipline as
-// TestFixture_MariaDB, against tests/ipc/mysql/mysql.fixture.ts's own committed scenario —
-// connect, tree (with a frozen InnoDB row-count estimate for the million-row table), a
-// filter-by-value read (mysql's own D17 backtick-quoting scenario) and a console/SQL-mode
-// data:execute, in place of mariadb's count-twice and cancel scenarios (mysql.backend.spec.ts
-// covers different load-bearing behaviour than mariadb.backend.spec.ts, per the plan's own split).
+// TestFixture_MySQL is the same discipline as TestFixture_MariaDB, against
+// tests/ipc/mysql/mysql.fixture.ts's own committed scenario — connect, tree (with a frozen
+// InnoDB row-count estimate for the million-row table), a filter-by-value read (mysql's own
+// backtick-quoting scenario) and a console/SQL-mode data:execute, in place of mariadb's
+// count-twice and cancel scenarios (mysql.backend.spec.ts covers different load-bearing behaviour
+// than mariadb.backend.spec.ts).
 func TestFixture_MySQL(t *testing.T) {
 	fixture := testsupport.StartMysql(t)
 	app := NewApp(t)

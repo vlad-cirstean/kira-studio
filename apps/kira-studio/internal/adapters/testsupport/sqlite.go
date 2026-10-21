@@ -61,7 +61,7 @@ func startSqlite() (*SqliteFixture, error) {
 
 	// Plain create-if-missing DSN, deliberately not the adapter's own mode=ro/mode=rw — this is the
 	// fixture creating the file for the first time, the one case in the whole codebase where SQLite
-	// creating a database on open is exactly what is wanted (D8's "Kira never creates a database"
+	// creating a database on open is exactly what is wanted (the "Kira never creates a database"
 	// rule is about the *adapter*, not this harness).
 	db, err := sql.Open("sqlite", "file:"+path)
 	if err != nil {

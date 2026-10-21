@@ -9,10 +9,9 @@ import { isCancelledTransport } from './isCancelled.ts';
 import { RepoScopedReload } from './repoScopedReload.ts';
 
 /**
- * `docs/plans/P9.md` W13: the stash stack as reactive state, mirroring `RefsState`'s own shape
- * (P6 W12) closely enough that `StashList.vue` (W14) needs nothing bespoke to consume it — a
- * repo's stash stack is exactly as ref-shaped as its branches/tags, just addressed by
- * `stash@{index}`/sha instead of a name.
+ * The stash stack as reactive state, mirroring `RefsState`'s own shape closely enough that
+ * `StashList.vue` needs nothing bespoke to consume it — a repo's stash stack is exactly as
+ * ref-shaped as its branches/tags, addressed by `stash@{index}`/sha instead of a name.
  *
  * **Refresh.** Reloaded on the same `repo.changed` signal `RefsState` already listens to
  * (`kind === "refsChanged"`), never a bespoke one: every stash mutation (push/apply/pop/drop/
@@ -20,17 +19,17 @@ import { RepoScopedReload } from './repoScopedReload.ts';
  * coverage already fires it — `ops.ts`'s stash methods do not additionally call `reload()`
  * themselves.
  *
- * **Selection.** OQ4: a stash IS selectable like a commit, so this class holds the same
- * "selected sha + its loaded file list" shape `DetailState` holds for a commit (P5 W7), not a
+ * **Selection.** A stash IS selectable like a commit, so this class holds the same
+ * "selected sha + its loaded file list" shape `DetailState` holds for a commit, not a
  * derivative of it — the two selections are independent (selecting a stash does not touch
- * `DetailState`, and vice versa; `App.vue`/W14 decides which pane wins when both exist).
+ * `DetailState`, and vice versa; `App.vue` decides which pane wins when both exist).
  */
 export class StashState {
   readonly entries: ShallowRef<readonly StashEntry[]> = shallowRef([]);
-  /** G28 D13: the global bucket's own list, reloaded on the same signal `entries` is (a
+  /** The global bucket's own list, reloaded on the same signal `entries` is (a
    *  `refs/kira/globalstash/**` write is a ref write like any other, already covered by
-   *  `watcher.ts`'s existing refs-dir coverage, M4). A separate ref rather than folding into
-   *  `entries` — `GlobalStashList.vue` is its own `BranchPicker` section (D13), and `selected`
+   *  `watcher.ts`'s existing refs-dir coverage). A separate ref rather than folding into
+   *  `entries` — `GlobalStashList.vue` is its own `BranchPicker` section, and `selected`
    *  below searches both without either list needing to know about the other's own shape. */
   readonly globalEntries: ShallowRef<readonly StashEntry[]> = shallowRef([]);
   /** `null` selects nothing. Otherwise the sha of the entry whose file list `changes` holds —
@@ -41,18 +40,17 @@ export class StashState {
   readonly changes: ShallowRef<readonly FileChange[] | undefined> = shallowRef(undefined);
   readonly error: ShallowRef<string | undefined> = shallowRef(undefined);
 
-  /** The selected entry itself, or `undefined` once it is no longer in EITHER list (G28 D13
-   *  widens the search to `globalEntries` too — a selection does not know, or need to know,
+  /** The selected entry itself, or `undefined` once it is no longer in EITHER list (the search
+   *  widens to `globalEntries` too — a selection does not know, or need to know,
    *  which bucket it came from) — `StashList.vue`/`GlobalStashList.vue`/`StashDetailPane.vue`
    *  read this, never re-derive it by scanning `entries` on their own. */
   readonly selected: ComputedRef<StashEntry | undefined>;
 
   // -------------------------------------------------------------------------------------
-  // W14's detail pane. G21 D12: no more `mode`/`diff`/`diffError` — `StashDetailPane.vue`'s tree
-  // opens the host's native diff editor now (`actions.openInEditor`, with `fallbackSha:
-  // entry.untrackedSha` for the untracked-file case `#requestFileDiff` used to retry, F12),
-  // exactly like `DetailState` since the same phase. `selectedFile` survives: it still drives the
-  // tree's own selected-row highlight and file cursor.
+  // The detail pane. No more `mode`/`diff`/`diffError` — `StashDetailPane.vue`'s tree opens the
+  // host's native diff editor now (`actions.openInEditor`, with `fallbackSha: entry.untrackedSha`
+  // for the untracked-file case `#requestFileDiff` used to retry), exactly like `DetailState`.
+  // `selectedFile` survives: it still drives the tree's own selected-row highlight and file cursor.
   // -------------------------------------------------------------------------------------
   readonly #fileList = new FileListCursor();
   readonly selectedFile = this.#fileList.selectedFile;
@@ -132,9 +130,9 @@ export class StashState {
   }
 
   /** `StashList.vue`/`GlobalStashList.vue`'s row click/Enter, and the graph's own stash-node
-   *  selection (OQ4) — `null` clears the selection without a round trip. Re-selecting the
+   *  selection — `null` clears the selection without a round trip. Re-selecting the
    *  already-selected sha is a no-op, matching `DetailState.select`'s sibling convention for a
-   *  commit row (P4). */
+   *  commit row. */
   select(sha: string | null): void {
     if (sha === this.selectedSha.value) return;
     this.#showController?.abort();
@@ -145,10 +143,10 @@ export class StashState {
     if (sha !== null) void this.#requestShow(sha, this.#scopeFor(sha));
   }
 
-  /** G28 D13: which bucket sha belongs to, derived by membership rather than trusting a caller-
+  /** Which bucket sha belongs to, derived by membership rather than trusting a caller-
    *  supplied scope — `entries` is checked first (the far more common case), falling back to
    *  `globalEntries`; `'stack'` when neither list (yet) contains it, matching `stash.show`'s own
-   *  "absent/'' means stack" default (D12) rather than sending an undefined scope. */
+   *  "absent/'' means stack" default rather than sending an undefined scope. */
   #scopeFor(sha: string): 'stack' | 'global' {
     if (this.globalEntries.value.some((entry) => entry.sha === sha)) return 'global';
     return 'stack';

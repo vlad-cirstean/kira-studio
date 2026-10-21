@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-// StatusArgs is status.get's own spawn (D11). --untracked-files=normal, never "all": with
+// StatusArgs is status.get's own spawn. --untracked-files=normal, never "all": with
 // "normal" an ignored file never appears in status, so it never enters the checkout-preflight
 // intersection, matching git's own checkout behaviour exactly (an "all" scan would drag every
 // build artefact into the dirty set and block checkouts a real terminal `git switch` would not).
@@ -29,9 +29,9 @@ type StatusBranchInfo struct {
 }
 
 // StatusEntry is one non-header status record — deliberately narrower than upstream's own
-// per-kind types (D11): only the fields something in this chapter reads (XY codes, path,
+// per-kind types: only the fields something in this chapter reads (XY codes, path,
 // original path, rename-vs-copy, similarity). Modes and object ids are framed and skipped, never
-// parsed — nothing in G5/G12/G13 reads them.
+// parsed.
 type StatusEntry struct {
 	Kind         string // "ordinary" | "renamed" | "unmerged" | "untracked" | "ignored"
 	Staged       byte   // XY[0], '.' when unchanged in that position.

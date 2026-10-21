@@ -1,8 +1,8 @@
-// P21 round 2 functional finding ("smaller, real, but narrow"): saveIfChanged (state/tabs.ts) used
-// to assign lastSavedSnapshot *before* awaiting control.tabsSave, so a rejected write (the FK case
+// saveIfChanged (state/tabs.ts) used to assign lastSavedSnapshot *before* awaiting
+// control.tabsSave, so a rejected write (the FK case
 // onConnectionsChanged exists to prevent, or any transient failure) was still recorded as
 // "already persisted". The next call to saveIfChanged, even for the byte-identical snapshot the
-// failed write never actually stored, would then see `snapshot === lastSavedSnapshot` and skip the
+// failed write never stored, would then see `snapshot === lastSavedSnapshot` and skip the
 // retry outright — the tab list silently never gets saved again until something changes it to a
 // genuinely different shape.
 //

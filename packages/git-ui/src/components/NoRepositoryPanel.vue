@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { RepoCandidate } from '@kira/git-ipc';
 /**
- * §6.2's "no repository open" state: "the repo picker, prompted, and nothing else." The main
+ * The "no repository open" state: "the repo picker, prompted, and nothing else." The main
  * content area itself when there is nothing else to show — renders the candidate list inline.
- * G-UX D4: the workspace's own folders are the only source of repositories — when none of them
+ * The workspace's own folders are the only source of repositories — when none of them
  * is a Git repository, this panel says so plainly instead of offering a folder-picking dialog.
- * P72: this is now the only repo-switch affordance git-ui ships (the toolbar dropdown, which
+ * This is now the only repo-switch affordance git-ui ships (the toolbar dropdown, which
  * duplicated this list behind a popup, was removed — redundant with Studio's own left sidebar and
  * the one-repo-per-workspace model).
  */
@@ -67,10 +67,10 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
       class="flex flex-col gap-0.5 m-0 p-0 list-none max-w-105 w-full"
     >
       <li v-for="candidate in repoState.candidates.value" :key="candidate.path">
-        <!-- P108 F4: disabled while any open (this candidate, another candidate, the bootstrap
+        <!-- Disabled while any open (this candidate, another candidate, the bootstrap
              loop, a worktree switch elsewhere) is in flight — `RepoState.open`'s own sequence
              token already discards whichever one loses the race, but a second click before that
-             is just wasted work and a confusing "which one did I pick" moment. -->
+             is wasted work and a confusing "which one did I pick" moment. -->
         <Button
           variant="toolbar"
           size="kira"

@@ -7,6 +7,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
 // Script kinds.
@@ -24,7 +26,6 @@ const (
 
 // Smart defaults (D1).
 const (
-	DefaultModel     = "sonnet"
 	DefaultBudgetUSD = 1.0
 	DefaultTimeout   = "15m"
 )
@@ -55,9 +56,6 @@ var DefaultTools = []string{"Read", "Grep", "Glob"}
 
 // BuiltinVars are the variables a workflow run has; reserved as param names in both apps.
 var BuiltinVars = []string{"task", "jira", "repo", "branch", "base", "worktree"}
-
-// Models a smart script may use.
-var Models = []string{"haiku", "sonnet", "opus"}
 
 // SecretMask is what a run records in place of a secret value.
 const SecretMask = "••••"
@@ -105,6 +103,14 @@ func (s Smart) TimeoutDuration() time.Duration {
 		return 15 * time.Minute
 	}
 	return d
+}
+
+// orList renders "a, b or c".
+func orList(items []string) string {
+	if len(items) < 2 {
+		return strings.Join(items, "")
+	}
+	return strings.Join(items[:len(items)-1], ", ") + " or " + items[len(items)-1]
 }
 
 func containsStr(list []string, v string) bool {
@@ -238,17 +244,17 @@ func containsVar(text, name string) bool {
 	return false
 }
 
-// validSmart fills defaults and bounds s.
-func validSmart(s *Smart) (*Smart, error) {
+// validSmart fills defaults and bounds s; models are the aliases a smart script may name.
+func validSmart(s *Smart, models harness.Catalog) (*Smart, error) {
 	if s == nil {
 		s = &Smart{}
 	}
 	out := *s
 	if out.Model == "" {
-		out.Model = DefaultModel
+		out.Model = models.Default
 	}
-	if !containsStr(Models, out.Model) {
-		return nil, invalid("scripts: model must be haiku, sonnet or opus")
+	if !models.Valid(out.Model) {
+		return nil, invalid("scripts: model must be %s", orList(models.Aliases))
 	}
 	if out.MaxBudgetUSD == 0 {
 		out.MaxBudgetUSD = DefaultBudgetUSD
@@ -484,36 +490,12 @@ func resolveParam(p Param, vs []string) ([]string, error) {
 	return vs, nil
 }
 
-// ToolArgs returns the --tools list (the ticked built-ins) and the exact --allowedTools list: the
-// built-ins with Bash narrowed to its patterns, the ticked MCP tools, then extra, deduplicated.
-func ToolArgs(s Smart, extra []string) (tools, allowed []string) {
-	tools = append([]string{}, s.Tools...)
-	seen := map[string]bool{}
-	add := func(t string) {
-		if !seen[t] {
-			seen[t] = true
-			allowed = append(allowed, t)
-		}
-	}
-	for _, t := range s.Tools {
-		if t == "Bash" && len(s.BashPatterns) > 0 {
-			for _, p := range s.BashPatterns {
-				add("Bash(" + p + ")")
-			}
-			continue
-		}
-		add(t)
-	}
+// ToolPolicy is the script's tools in the provider-neutral vocabulary; extra are already-rendered
+// names appended last.
+func (s Smart) ToolPolicy(extra []string) harness.ToolPolicy {
+	pol := harness.ToolPolicy{Builtins: s.Tools, BashPatterns: s.BashPatterns, Extra: extra}
 	for _, c := range s.MCP {
-		for _, t := range c.Tools {
-			add("mcp__" + c.Server + "__" + t)
-		}
+		pol.MCP = append(pol.MCP, harness.MCPTools{Server: c.Server, Tools: c.Tools})
 	}
-	for _, t := range extra {
-		add(t)
-	}
-	if allowed == nil {
-		allowed = []string{}
-	}
-	return tools, allowed
+	return pol
 }

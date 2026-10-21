@@ -1,12 +1,11 @@
 import type { Page } from '@playwright/test';
 
-// Ported from tests/e2e/support/measure.ts (P57 D16) — `percentile`/`measureClickToDom`/
+// Ported from tests/e2e/support/measure.ts — `percentile`/`measureClickToDom`/
 // `measureScrollResponses` are pure `page.evaluate()` DOM/MutationObserver timers with zero
 // Electron dependency (confirmed by reading the original: its only Electron-coupled export is
 // `uptimeMs`, which reads `ElectronApplication.evaluate(() => process.uptime())` for
-// `startup.spec.ts` — a spec with no analogue in this tier, per P57-cutover.md §7 ("startup.spec.ts
-// has no subject and no analogue"). `uptimeMs` is dropped here rather than ported; everything else
-// is byte-identical.
+// `startup.spec.ts` — a spec with no analogue in this tier). `uptimeMs` is dropped here rather than
+// ported; everything else is byte-identical.
 
 export function percentile(values: number[], p: number): number {
   if (values.length === 0) return 0;
@@ -28,8 +27,8 @@ export function percentileNearestRank(values: number[], p: number): number {
  * Clicks `click`, then resolves at the first MutationObserver callback under `observe` for which
  * `until` holds, returning ms since the synchronous click dispatch. MutationObserver callbacks are
  * microtasks, so resolution is sub-millisecond; a requestAnimationFrame poll would quantise every
- * result to a ~16.7 ms multiple and could never demonstrate a 50 ms budget, let alone 8 ms (D5).
- * Paint is deliberately outside the measurement (D5).
+ * result to a ~16.7 ms multiple and could never demonstrate a 50 ms budget, let alone 8 ms.
+ * Paint is deliberately outside the measurement.
  */
 export function measureClickToDom(
   page: Page,
@@ -196,25 +195,25 @@ export interface SustainedScrollResult {
 
 /**
  * Measures rendered-band coverage *during* sustained scrolling, velocity-parameterised in px/frame
- * — replaces P22 pass 1's `measureScrollCoverage` (P22 iter2 D7:
- * docs/HISTORY.md (v1.1 P22)/F1/F4). That instrument
+ * — replaces the `measureScrollCoverage`. That instrument
  * manufactured its own "many scroll events per frame" burst via `SUB_STEPS_PER_FRAME = 8` synthetic
  * `dispatchEvent(new Event('scroll'))` calls — a burst real browsers never produce (`scroll`
- * dispatches at most once per rendering update; docs/PERF.md §2.1 methodology note, f28b25a's own commit message)
+ * dispatches at most once per rendering update; docs/PERF.md methodology note, f28b25a's own
+ * commit message)
  * — so its "before: up to 8/frame" numbers measured the harness's own constant, not the app.
  *
  * This drives one *real* `scroll` event per rAF (`el.scrollTop = next`, no synthetic dispatch) and
- * reads `uncoveredPx` synchronously in the same callback, before Vue's scheduler has had a chance to
- * react to it — no `await nextFrame()` settle wait, which is what let pass 1's `uncoveredPx === 0`
+ * reads `uncoveredPx` synchronously in the same callback, before Vue's scheduler has had a chance
+ * to react to it — no `await nextFrame()` settle wait, which is what let the `uncoveredPx === 0`
  * read as reassuring when it was structurally guaranteed to.
  *
  * This is still not proof the real symptom is gone: this harness drives `scrollTop` from the main
- * thread, so the DOM's scroll offset and the main thread's own knowledge of it are the same value by
- * construction — the condition that produces the symptom on real hardware (the compositor showing a
- * position the main thread hasn't rendered yet, since WebKit's scrolling thread moves the composited
- * layer independently of the main thread during a momentum scroll) cannot occur here, at any
- * velocity (P22 iter2 F4). Logged, not gated, for exactly that reason — a real measurement needs
- * `window.__kiraScrollTrace` on real hardware (views/shared/slick/scrollTrace.ts, the plan's §7.3).
+ * thread, so the DOM's scroll offset and the main thread's own knowledge of it are the same value
+ * by construction — the condition that produces the symptom on real hardware (the compositor
+ * showing a position the main thread hasn't rendered yet, since WebKit's scrolling thread moves the
+ * composited layer independently of the main thread during a momentum scroll) cannot occur here,
+ * at any velocity. Logged, not gated, for exactly that reason — a real measurement needs
+ * `window.__kiraScrollTrace` on real hardware (views/shared/slick/scrollTrace.ts).
  */
 export function measureSustainedScroll(
   page: Page,
@@ -266,10 +265,9 @@ export function measureSustainedScroll(
 }
 
 // measureRowUpdatesDuringScroll and its own `window.__kiraGridRowUpdates` hook (GridRow.vue's own
-// onUpdated count) were P22 iter2 D4's sandbox-provable proof that a reference-stable RowVM made
-// Vue skip re-rendering a row whose props didn't change — a property of the pre-SlickGrid grid's own Vue-
-// reconciliation render path specifically. Deleted at P22 Pass B's cutover (C17) along with
-// the old DataGrid/GridRow/rowVm files: SlickGrid builds and updates its own DOM directly, never
-// through Vue's prop-diffing, so this hook was never called under the SlickGrid engine at all —
-// its own gate in budgets.spec.ts was vacuously true (`updates` always 0) the whole time this
+// onUpdated count) were the sandbox-provable proof that a reference-stable RowVM made Vue skip
+// re-rendering a row whose props didn't change — a property of the pre-SlickGrid grid's own Vue-
+// reconciliation render path specifically. SlickGrid builds and updates its own DOM directly,
+// never through Vue's prop-diffing, so this hook was never called under the SlickGrid engine at
+// all — its own gate in budgets.spec.ts was vacuously true (`updates` always 0) the whole time this
 // suite has run against SlickGrid exclusively, and had no SlickGrid-side equivalent to measure.

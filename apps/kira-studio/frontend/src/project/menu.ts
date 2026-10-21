@@ -26,7 +26,7 @@ import {
   useTreeStore,
 } from './state/tree';
 
-// P107 I2-15: relationMenu/collectionMenu/streamNodeMenu/consumerGroupMenu (menus.ts) and
+// relationMenu/collectionMenu/streamNodeMenu/consumerGroupMenu (menus.ts) and
 // keyRowMenu/objectRowMenu (views/browse/menu.ts) each hand-rolled the same open/open-in-new-tab
 // pair, the same caps-gated "Open definition" row, the same copy-name(-qualified) pair and the
 // same "open a tab, then count it" row — differing only in id/label/icon and which tab opener they
@@ -253,6 +253,33 @@ function canUpdateCredentials(record: ConnectionSummary | undefined): boolean {
   );
 }
 
+// Disabled at the ends and while a search filters the list: the visible order is then partial.
+function moveItems(connectionId: string): MenuItem[] {
+  const connections = useConnectionsStore();
+  const at = connections.records.findIndex((r) => r.id === connectionId);
+  const searching = useTreeStore().search.trim() !== '';
+  return [
+    {
+      type: 'item',
+      id: 'move-up',
+      label: t('common.moveUp.tooltip'),
+      icon: 'arrow-up',
+      shortcut: 'list.moveUp',
+      disabled: searching || at <= 0,
+      run: () => connections.moveConnection(connectionId, -1),
+    },
+    {
+      type: 'item',
+      id: 'move-down',
+      label: t('common.moveDown.tooltip'),
+      icon: 'arrow-down',
+      shortcut: 'list.moveDown',
+      disabled: searching || at < 0 || at >= connections.records.length - 1,
+      run: () => connections.moveConnection(connectionId, 1),
+    },
+  ];
+}
+
 function connectionMenu(row: TreeRowVm): MenuItem[] {
   const status = useConnectionsStore().states[row.connectionId]?.status ?? 'disconnected';
   const record = useConnectionsStore().connectionRecord(row.connectionId);
@@ -310,6 +337,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
         await useConnectionsStore().duplicateConnection(row.connectionId);
       },
     },
+    ...moveItems(row.connectionId),
     ...copyNameItems(row),
     {
       type: 'item',
@@ -484,9 +512,9 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
   ];
 }
 
-// P17's S3 bucket row: containerMenu (same as a SQL database/schema) plus P33's Upload — the
+// The S3 bucket row: containerMenu (same as a SQL database/schema) plus the Upload — the
 // empty-bucket case (no object row to open one from) needs a tree entry point of its own.
-// P41: uploadMenuItem now lives in state/objectStore.ts, shared with views/browse/menu.ts's own
+// uploadMenuItem now lives in state/objectStore.ts, shared with views/browse/menu.ts's own
 // container-row menu.
 function bucketMenu(row: TreeRowVm): MenuItem[] {
   return [
@@ -524,10 +552,9 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
   ];
 }
 
-// P8's collection row: near-copy of relationMenu, opening a 'document' tab instead of 'data' —
-// gains "Open definition" as of P19 D12 (Caps.definition === true for mongo). No saved-filters
-// submenu (§8.10 names one for "Table / view / collection" generally, but a saved query body is
-// a SQL WHERE/ORDER BY shape that has no Mongo-filter analog yet).
+// The collection row: near-copy of relationMenu, opening a 'document' tab instead of 'data' —
+// gains "Open definition" (Caps.definition === true for mongo). No saved-filters submenu (a saved
+// query body is a SQL WHERE/ORDER BY shape that has no Mongo-filter analog yet).
 function collectionMenu(row: TreeRowVm): MenuItem[] {
   return [
     ...openItems(row, {
@@ -550,8 +577,8 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
   ];
 }
 
-// P19 D2's synthetic folder row: nothing that needs a real node behind it — Refresh reloads the
-// *parent* (the folder is just a view over that listing, so this is the only way to refresh what
+// The synthetic folder row: nothing that needs a real node behind it — Refresh reloads the
+// *parent* (the folder is a view over that listing, so this is the only way to refresh what
 // it shows), Collapse all is the same global action every other row's menu omits but the tree
 // background menu offers, included here because a folder is the row most likely to be right-
 // clicked specifically to declutter a crowded schema.
@@ -574,16 +601,16 @@ function groupMenu(row: TreeRowVm): MenuItem[] {
   ];
 }
 
-// P41 D10: namespaceMenu/prefixMenu (redis 'namespace' / s3 'prefix' — a container row) and
+// namespaceMenu/prefixMenu (redis 'namespace' / s3 'prefix' — a container row) and
 // keyMenu/objectMenu (redis 'key' / s3 'object' — a leaf row) are gone: neither row exists in the
-// tree any more (D5) — both moved to views/browse/menu.ts's containerRowMenu/keyRowMenu/
+// tree any more — both moved to views/browse/menu.ts's containerRowMenu/keyRowMenu/
 // objectRowMenu, addressed by TreeNode instead of by tree row, with `refresh(parent)`'s tree-row
 // refresh replaced by the Browse panel's own local level reload.
 
-// P10's topic/queue leaf: minimal open/copy-name only (D13), same discipline as keyMenu — no
-// edit/delete rows anywhere, per the read-only scope decision. P23 D7 adds "Open definition",
-// gated on caps.definition the same way relationMenu/collectionMenu gate it — a topic's partitions
-// and config, a queue's attributes, live there now that the tree no longer expands either.
+// The topic/queue leaf: minimal open/copy-name only, same discipline as keyMenu — no
+// edit/delete rows anywhere, per the read-only scope decision. "Open definition" is gated on
+// caps.definition the same way relationMenu/collectionMenu gate it — a topic's partitions and
+// config, a queue's attributes, live there now that the tree no longer expands either.
 function streamNodeMenu(row: TreeRowVm): MenuItem[] {
   return [
     ...openItems(row, {
@@ -597,11 +624,10 @@ function streamNodeMenu(row: TreeRowVm): MenuItem[] {
   ];
 }
 
-// P23 D7: kept separate from the sequence/function case (menuForRow's own `copyNameItems(row,
-// true)`, P115 H9) rather than sharing definitionItem's gating — those rows' caps.definition is
-// true but the adapter still throws E_UNSUPPORTED for those paths (P19 §5), so gating on caps there
-// would offer a row that always errors. A consumer group had no definition at all before this phase
-// (F10).
+// Kept separate from the sequence/function case (menuForRow's own `copyNameItems(row,
+// true)`) rather than sharing definitionItem's gating — those rows' caps.definition is
+// true but the adapter still throws E_UNSUPPORTED for those paths, so gating on caps there
+// would offer a row that always errors.
 function consumerGroupMenu(row: TreeRowVm): MenuItem[] {
   return [...definitionItem(row), ...copyNameItems(row, true)];
 }

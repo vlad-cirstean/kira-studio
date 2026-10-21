@@ -37,7 +37,7 @@ function onGraphFontSizeInput(e: Event): void {
   props.draft.git.graphFontSize = raw === '' ? 0 : Number(raw);
 }
 
-// G7 D17: `*` matches any run of characters except `/` — the same rule server-side git preflight
+// `*` matches any run of characters except `/` — the same rule server-side git preflight
 // enforces; this dialog only edits the pattern list, never evaluates it. A plain ref, not a
 // computed bound straight to draft.git.protectedBranches: parsing on every keystroke and feeding
 // the result back into the textarea's own value would snap away a blank line the instant it's

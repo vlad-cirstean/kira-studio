@@ -18,7 +18,7 @@ type OpenArgs struct {
 	// Command, when non-empty, runs as `$SHELL -l -i -c Command` instead of a plain login shell
 	// (P85 §2.1) — the initial command a Claude Code or custom-script launch seeds the tab with.
 	Command string `json:"command"`
-	// LaunchKind is P86 §4's own discriminator — one of LaunchKindShell/ClaudeCode/Script, never
+	// LaunchKind is P86 §4's own discriminator — one of LaunchKindShell/Agent/Script, never
 	// inferred from Command (P85 OQ-3's "no heuristic" rule, carried forward). "" is accepted and
 	// treated as LaunchKindShell, so an older caller keeps working.
 	LaunchKind string `json:"launchKind"`
@@ -49,7 +49,7 @@ func ValidateOpen(args OpenArgs) error {
 		return ipcerr.Contract("cols/rows must be within [1, 1000]")
 	}
 	if !ValidLaunchKind(args.LaunchKind) {
-		return ipcerr.Contract("launchKind must be shell, claude-code or script")
+		return ipcerr.Contract("launchKind must be shell, agent or script")
 	}
 	if args.ScriptLaunchToken != "" && (args.ScriptID == "" || len(args.ScriptLaunchToken) > MaxLaunchTokenBytes) {
 		return ipcerr.Contract("scriptLaunchToken needs scriptId and at most 64 characters")

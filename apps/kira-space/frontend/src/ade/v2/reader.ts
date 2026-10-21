@@ -3,8 +3,9 @@ import { inject } from 'vue';
 import type {
   BacklogResult,
   Board,
+  ChangeRequestsResult,
+  HostProviders,
   LogPage,
-  PrsResult,
   ReadLogArgs,
   Repo,
   SessionsResult,
@@ -18,12 +19,13 @@ type RepoName = Pick<Repo, 'codeRepoId' | 'name' | 'nickname'>;
  *  phone. Read hooks go through it; writes stay on the desktop `control`. */
 export interface AdeReader {
   board(): Promise<Board>;
-  prs(): Promise<PrsResult>;
+  changeRequests(): Promise<ChangeRequestsResult>;
   sessions(): Promise<SessionsResult>;
   workflows(): Promise<WorkflowsResult>;
   backlog(): Promise<BacklogResult>;
   repos(): Promise<{ repos: RepoName[] }>;
   readLog(args: ReadLogArgs): Promise<LogPage>;
+  hostProviders(): Promise<HostProviders>;
 }
 
 export const adeReaderKey: InjectionKey<AdeReader> = Symbol('adeReader');

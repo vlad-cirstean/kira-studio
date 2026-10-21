@@ -28,7 +28,7 @@ func (a *hangingDisconnectAdapter) Disconnect(context.Context) error {
 }
 func (a *hangingDisconnectAdapter) Caps() adapters.Caps { return adapters.Caps{} }
 
-// F1 (P108 Part 6): a reconnect's own old-adapter Disconnect used to run outside RunOp, with no
+// A reconnect's own old-adapter Disconnect used to run outside RunOp, with no
 // local cancellation of whatever ops were still running against that old adapter first — so a
 // Disconnect shaped like QueryTracker.Drain's real inFlight.Wait() (no bound under
 // context.Background) hung the whole reconnect for as long as the longest still-running query.
@@ -78,12 +78,11 @@ func TestRouter_Reconnect_CancelsInFlightOpsBeforeOldDisconnectWaits(t *testing.
 	<-opDone
 }
 
-// F2 (P108 Part 6): takeLiveAdapterForTeardown is the compare-and-delete that replaces a bare
+// takeLiveAdapterForTeardown is the compare-and-delete that replaces a bare
 // GetLiveAdapter+DeleteLiveAdapter pair. Exactly one of several concurrent callers racing to tear
-// down the same registered adapter instance must win (and actually remove it); every other must
+// down the same registered adapter instance must win (and remove it); every other must
 // see there is nothing left for it to do, never delete a *different* adapter that has since
-// replaced it. New mechanism, no pre-fix equivalent — failing without the fix is definitional,
-// the same footing Part 5's F9 recorded for its own new-function regression tests.
+// replaced it. New mechanism, no pre-fix equivalent — failing without the fix is definitional.
 func TestRouter_TakeLiveAdapterForTeardown_ExactlyOneCallerWins(t *testing.T) {
 	const connID = "conn-f2-cas-race"
 	adapters.DeleteLiveAdapter(connID)
@@ -146,7 +145,7 @@ func (*reconnectStubAdapter) Connect(context.Context, model.ResolvedConnectionCo
 func (*reconnectStubAdapter) Disconnect(context.Context) error { return nil }
 func (*reconnectStubAdapter) Caps() adapters.Caps              { return adapters.Caps{} }
 
-// F2 (P108 Part 6), end to end: Router.Disconnect racing a concurrent reconnect for the same
+// End to end: Router.Disconnect racing a concurrent reconnect for the same
 // connection id must never have its own (possibly slow) teardown of the old adapter delete
 // whatever newer adapter the reconnect has since installed. Pre-fix, Disconnect captured the old
 // adapter, waited on its Disconnect, and only then deleted-by-bare-id — so a reconnect that

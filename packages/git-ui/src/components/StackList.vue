@@ -1,14 +1,14 @@
 <script setup lang="ts">
 /**
- * G26 D3/F13/F14: `BranchPicker.vue`'s Stacks tab — one sub-list per `StackSummary`, rows
- * pre-order bottom-to-top with `depth`-driven indent (D3), a PR badge and track text reused
- * verbatim from `PrState.byBranch`/`RefRow` (F13/F14), a stale chip, and a header "Restack" button
+ * `BranchPicker.vue`'s Stacks tab — one sub-list per `StackSummary`, rows
+ * pre-order bottom-to-top with `depth`-driven indent, a PR badge and track text reused verbatim
+ * from `ChangeRequestState.byBranch`/`RefRow`, a stale chip, and a header "Restack" button
  * per stack. Row-level "Set stack parent…"/"Remove from stack" mirror `WorktreeList.vue`'s own
  * "this component has nowhere of its own to do X" shape: both EMIT the intent for `App.vue` to
  * open `StackDialog.vue` with, rather than this file owning a second dialog. The Restack button
- * does the same — `StackDialog.vue` is the one place the plan/blockers/progress actually render.
+ * does the same — `StackDialog.vue` is the one place the plan/blockers/progress render.
  *
- * P77 §11: `stacks`/`orphans` are already filtered/capped by `pickerModel.ts` (each stack group
+ * `stacks`/`orphans` are already filtered/capped by `pickerModel.ts` (each stack group
  * carries its own already-`StackSummary`, so the per-stack header's "Restack" target/`needsRestack`
  * gate reads `group.summary` directly rather than a second, unfiltered lookup) — this component no
  * longer reads `stack.stacks.value`/`stack.orphans.value` for rendering, and no longer needs the
@@ -22,16 +22,16 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import { rowMeta } from '@theme/lib/rowVariants';
-import { prBadgeClass, refBadgeClass } from '../lib/badgeClass.ts';
+import { changeRequestBadgeClass, refBadgeClass } from '../lib/badgeClass.ts';
 import type { PickerList, PickerStackGroup } from '../lib/pickerModel.ts';
 import {
   buildOrphanRows,
   buildStackRows,
-  prBadgeLabel,
+  changeRequestBadgeLabel,
   type StackRow,
 } from '../lib/stackListModel.ts';
+import type { ChangeRequestState } from '../state/changeRequests.ts';
 import type { OpsState } from '../state/ops.ts';
-import type { PrState } from '../state/pr.ts';
 
 const props = defineProps<{
   stacks: PickerList<PickerStackGroup>;
@@ -39,10 +39,10 @@ const props = defineProps<{
   ops: OpsState;
   /** G24 D9's own branch-tip badge — optional so a caller with nothing to show yet gets a
    *  plain, badge-free list (mirrors `BranchPicker.vue`'s own `pr` prop). */
-  pr?: PrState;
+  changeRequests?: ChangeRequestState;
   /** P74 §3.3 — see `BranchPicker.vue`'s own doc comment, threaded straight through from
    *  `AppToolbar.vue`. */
-  openPullRequest: (number: number) => void;
+  openChangeRequest: (number: number) => void;
   /** P77 §7.3 — see `TagList.vue`'s own doc comment on this prop. */
   focusedRowId?: string;
 }>();
@@ -53,7 +53,7 @@ const emit = defineEmits<{
 }>();
 
 function byBranchMap() {
-  return props.pr?.byBranch.value ?? new Map();
+  return props.changeRequests?.byBranch.value ?? new Map();
 }
 
 function rowsFor(branches: readonly StackBranch[]): StackRow[] {
@@ -130,11 +130,11 @@ async function removeFromStack(branch: string): Promise<void> {
           <button
             v-if="row.pr"
             type="button"
-            :class="prBadgeClass(row.pr.state)"
+            :class="changeRequestBadgeClass(row.pr.state)"
             :data-kira-tip="row.pr.title"
-            @click="openPullRequest(row.pr.number)"
+            @click="openChangeRequest(row.pr.number)"
           >
-            {{ prBadgeLabel(row.pr) }}
+            {{ changeRequestBadgeLabel(row.pr) }}
           </button>
           <span v-if="row.trackText" :class="rowMeta">{{ row.trackText }}</span>
           <span

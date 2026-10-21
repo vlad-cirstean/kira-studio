@@ -27,10 +27,10 @@ import {
 const FILE_IDENTIFIER = 'KIG1';
 
 // ---------------------------------------------------------------------------------------
-// Drift guard 3 — every field PackedCommitChunk declares must have a same-named accessor on
-// the generated table class (flatc camel-cases sha_width_bytes -> shaWidthBytes, so the names
-// line up by construction). A field with no accessor makes its property's type `never` below,
-// and assigning `true` to it fails `tsc`.
+// Every field PackedCommitChunk declares must have a same-named accessor on the generated
+// table class (flatc camel-cases sha_width_bytes -> shaWidthBytes, so the names line up by
+// construction). A field with no accessor makes its property's type `never` below, and
+// assigning `true` to it fails `tsc`.
 // ---------------------------------------------------------------------------------------
 
 type AccessorBridge = {

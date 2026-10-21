@@ -6,8 +6,8 @@ import (
 	"unicode/utf8"
 )
 
-// jsWhitespaceClassMembers is ECMA-262's own \s, restated as RE2 character-class members (D4's
-// "explicit JS class"): WhiteSpace (Tab, VT, FF, SP, NBSP, ZWNBSP and the Unicode "space
+// jsWhitespaceClassMembers is ECMA-262's own \s, restated as RE2 character-class members:
+// WhiteSpace (Tab, VT, FF, SP, NBSP, ZWNBSP and the Unicode "space
 // separator" category's own code points) plus LineTerminator (LF, CR, LS, PS) — strictly wider
 // than RE2's native \s ([\t\n\f\r ]).
 const jsWhitespaceClassMembers = `\t\n\v\f\r \x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}`
@@ -21,10 +21,10 @@ const jsNonWhitespaceClassMembers = `\x{0}-\x{8}\x{e}-\x{1f}\x{21}-\x{9f}\x{a1}-
 // RegExp and in RE2, so translate copies them through unchanged rather than rewriting them.
 const passthroughEscapeChars = `dDwWnrtfv\.*+?()[]{}|^$/-`
 
-// translate is D4's single left-to-right JS -> RE2 source rewrite. It rejects (ErrUnsupported
+// translate is the single left-to-right JS -> RE2 source rewrite. It rejects (ErrUnsupported
 // Pattern) the two constructs RE2 cannot express at all — lookaround and a backreference — before
 // ever handing anything to regexp.Compile; every other JS construct in compileQuery's own surface
-// (no `u`, `m`, `g`, or `y` flag: F15's own derived inventory) is either identical in both
+// (no `u`, `m`, `g`, or `y` flag) is either identical in both
 // dialects already or rewritten here into an RE2-equivalent form.
 func translate(pattern string) (string, error) {
 	var out strings.Builder
@@ -125,7 +125,7 @@ func translateEscape(out *strings.Builder, pattern string, i int, inClass bool) 
 		out.WriteByte('c')
 		return i + 2, nil
 	case next == '0':
-		// \0 not followed by a digit -> \x{00} (D4 table). A \0 that IS followed by a
+		// \0 not followed by a digit -> \x{00}. A \0 that IS followed by a
 		// digit is JS's own legacy octal-escape corner (Annex B, essentially never typed
 		// into a search box) — folded into the same NUL rewrite here, documented as a
 		// deliberate simplification rather than a full octal-escape port.
@@ -279,7 +279,7 @@ func hasTopLevelAlternation(source string) bool {
 	return false
 }
 
-// wrapWholeWord is D5's consuming, anchor-aware whole-word rewrite. Existence-equivalent to
+// wrapWholeWord is the consuming, anchor-aware whole-word rewrite. Existence-equivalent to
 // (?<!\w)(?:P)(?!\w), expressed in RE2 as a form that CONSUMES its boundary delimiters rather than
 // merely asserting them (RE2 has no lookaround at all) — safe here because MatchFields only ever
 // asks a boolean "does this field match" question, never needs the exact matched span.

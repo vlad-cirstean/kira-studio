@@ -1,8 +1,8 @@
 /**
- * §5.5's first memory rule: "commits are stored column-wise in typed arrays, not row-wise as
+ * The first memory rule: "commits are stored column-wise in typed arrays, not row-wise as
  * objects ... a commit 'object' is materialized on demand for the <=60 rows on screen and the
  * one selected commit, then discarded." This is the store that rule describes, built on
- * `ShaTable` (W3) and `StringInterner`/`SubjectBuffer` (W2).
+ * `ShaTable` and `StringInterner`/`SubjectBuffer`.
  */
 import type { LayoutInput } from '../graph/types.ts';
 import { assert, assertDefined } from '../lib/assert.ts';
@@ -93,13 +93,12 @@ export interface AppendResult {
 }
 
 /**
- * The wire shape `packSlice`/`appendPacked` trade (P3 W3, §3's ipc→core boundary): every field
- * is a plain `ArrayBuffer` rather than a typed array so it survives a structural copy into
- * `packages/ipc`'s own declaration of the same shape (core and ipc may not import each other —
- * see `docs/plans/P3.md`'s "ipc → core boundary" section) without either side importing the
- * other's typed-array element type.
+ * The wire shape `packSlice`/`appendPacked` trade: every field is a plain `ArrayBuffer` rather than
+ * a typed array so it survives a structural copy into `packages/ipc`'s own declaration of the same
+ * shape (core and ipc may not import each other) without either side importing the other's
+ * typed-array element type.
  *
- * Parents travel as shas (`parentShas`), not row indices — see the plan's W3 for why. The
+ * Parents travel as shas (`parentShas`), not row indices. The
  * dictionary is a delta: `dictionary` holds only the strings interned since `dictionaryBase`,
  * and `appendPacked` throws if the receiver's interner isn't at exactly that size, since a
  * mismatch means a chunk arrived out of order or was dropped.
@@ -271,7 +270,7 @@ export class CommitStore {
   }
 
   // -------------------------------------------------------------------------------------
-  // Read-only column views — `docs/plans/P11.md` W2. Every one of these is a VIEW, not a copy,
+  // Read-only column views. Every one of these is a VIEW, not a copy,
   // and valid only until the next `append`/`appendPage`/`appendPacked` call grows the backing
   // array out from under it: `search/matcher.ts`'s `searchLoadedCommits` (the one caller) reads
   // them once at the top of a scan and never awaits inside it, which is the invariant to hold at
@@ -333,10 +332,10 @@ export class CommitStore {
   }
 
   /** The loaded row decorated as branch (or remote-tracking branch) `refName` — `git-ui`'s own
-   *  `rebuildAncestry` (P79 fix) uses this to find a PR's recorded base branch locally, with no
+   *  `rebuildAncestry` uses this to find a PR's recorded base branch locally, with no
    *  RPC of its own: decorations already arrived with the loaded chunk, so this is a query over
    *  data the store already holds, not a new fetch. A remote-tracking decoration matches by its
-   *  own unprefixed suffix (`origin/main` for `refName: "main"`) since a PR's `baseRef` (D14)
+   *  own unprefixed suffix (`origin/main` for `refName: "main"`) since a PR's `baseRef`
    *  never carries a remote prefix itself. `-1` when no loaded row carries a match — the base is
    *  outside the window, or was never fetched under that name. Scans `#decorations` directly
    *  (never `decorationAt` row-by-row): bounded by ref count, not by history length. */
@@ -396,8 +395,8 @@ export class CommitStore {
   }
 
   /**
-   * Packs rows `[from, to)` into the wire format (P3 W3): the dictionary carries only strings
-   * interned since `dictionaryBase`, so the caller (`RepoService`, W7) is responsible for
+   * Packs rows `[from, to)` into the wire format: the dictionary carries only strings
+   * interned since `dictionaryBase`, so the caller (`RepoService`) is responsible for
    * tracking what the receiver has already been sent and passing that boundary back in on the
    * next call.
    */
@@ -459,7 +458,7 @@ export class CommitStore {
     const subjectRange = this.#subjects.rangeBytes(from, to);
     const subjectBytes = new Uint8Array(subjectRange.bytes.length);
     subjectBytes.set(subjectRange.bytes);
-    // G31 round-2 performance review, finding #2: rangeBytes' own offsets may now be a VIEW into
+    // rangeBytes' own offsets may now be a VIEW into
     // the live #offsets buffer, not a fresh copy (see its own doc comment) — `.buffer` off a view
     // is the ENTIRE shared backing buffer, wrong-sized for the wire AND, if this ArrayBuffer is
     // ever used as a postMessage Transferable, would detach #offsets' own live storage out from

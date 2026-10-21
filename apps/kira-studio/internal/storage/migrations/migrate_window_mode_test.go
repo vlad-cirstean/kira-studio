@@ -1,4 +1,4 @@
-// P22 §4.2: a database seeded before migration 0014 (window mode) migrates with every existing
+// A database seeded before migration 0014 (window mode) migrates with every existing
 // window landing on 'studio' — the app's own default mode (state/mode.ts's defaultMode), applied
 // via the column's own DEFAULT rather than a hand-rolled backfill (0012's own precedent for
 // exactly this shape).

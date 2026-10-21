@@ -8,8 +8,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/scripts"
@@ -24,6 +25,9 @@ type smartSandbox struct {
 	tracker agentsandbox.Tracker
 	tools   bool
 	release func()
+	// authFailed reads a sign-in failure in the agent's output.
+	authFailed func(string) bool
+	agent      agentsandbox.Namer
 }
 
 // prepareSandbox returns nil when the run is not confined.
@@ -39,7 +43,8 @@ func (s *Service) prepareSandbox(ctx context.Context, p *planned, runID string, 
 	if s.SandboxKeychain != nil {
 		in.Keychain = s.SandboxKeychain()
 	}
-	rt := agentsandbox.DiscoverRuntime(ctx, "claude")
+	agent := p.agent
+	rt := agentsandbox.DiscoverRuntime(ctx, agent, "")
 	pol, _, err := agentsandbox.ResolvePolicy(in, rt)
 	if err != nil {
 		return nil, err
@@ -49,7 +54,7 @@ func (s *Service) prepareSandbox(ctx context.Context, p *planned, runID string, 
 		_ = os.RemoveAll(pol.Scratch)
 		return nil, err
 	}
-	return &smartSandbox{policy: pol, prep: prep, tools: p.preview.ADE != nil, release: func() { s.Sandbox.Release(runID) }}, nil
+	return &smartSandbox{policy: pol, prep: prep, tools: p.preview.ADE != nil, authFailed: agent.IsAuthFailure, agent: agent, release: func() { s.Sandbox.Release(runID) }}, nil
 }
 
 func (sb *smartSandbox) cleanup() {
@@ -60,7 +65,7 @@ func (sb *smartSandbox) cleanup() {
 }
 
 // applySandbox adds the sandbox to the process spec.
-func (s *Service) applySandbox(spec claudeheadless.Spec, sb *smartSandbox) claudeheadless.Spec {
+func (s *Service) applySandbox(spec harness.HeadlessSpec, sb *smartSandbox, agent harness.Provider) harness.HeadlessSpec {
 	if sb == nil {
 		return spec
 	}
@@ -73,7 +78,7 @@ func (s *Service) applySandbox(spec claudeheadless.Spec, sb *smartSandbox) claud
 	}
 	spec.DisallowedTools = append(slices.Clone(spec.DisallowedTools), sb.prep.Disallowed...)
 	if sb.tools {
-		spec.AllowedTools = append(slices.Clone(spec.AllowedTools), claudeheadless.SandboxToolNames...)
+		spec.AllowedTools = append(slices.Clone(spec.AllowedTools), harness.ToolNames(agent, agentmcp.SandboxToolIDs...)...)
 	}
 	note := llmprompts.HeadlessSandboxNote.Text(s.llmPrompts(), llmprompts.SandboxNoteVars{
 		Access: string(agentsandbox.AccessWrite), Worktree: sb.policy.RunDir, Network: true,
@@ -89,7 +94,7 @@ func (s *Service) noticeSandbox(sink *logSink, sb *smartSandbox) {
 		return
 	}
 	if sup := s.Sandbox.Support(); !sup.Enforced {
-		sink.add("stdout", agentsandbox.NotEnforcedText())
+		sink.add("stdout", agentsandbox.NotEnforcedText(sb.agent))
 	}
 }
 
@@ -110,8 +115,8 @@ func (sb *smartSandbox) outcome(out runoutcome.Outcome) runoutcome.Outcome {
 	if sb == nil || out.Status != runoutcome.StatusFailed {
 		return out
 	}
-	if !out.Reported && !sb.policy.Keychain && agentsandbox.IsAuthFailure(out.LastError) {
-		out.Reason = agentsandbox.AuthReason()
+	if !out.Reported && !sb.policy.Keychain && sb.authFailed(out.LastError) {
+		out.Reason = agentsandbox.AuthReason(sb.agent)
 		return out
 	}
 	out.Reason = sb.tracker.BlockedReason(out.Reason)

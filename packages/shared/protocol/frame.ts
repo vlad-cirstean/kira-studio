@@ -23,7 +23,7 @@ import type {
 import type { PingPayload, PortEvent, PortResponse } from './port';
 import * as wire from './wire';
 
-// The renderer<->engine data plane's TypeScript end (P11): the mirror of Go's internal/page/
+// The renderer<->engine data plane's TypeScript end: the mirror of Go's internal/page/
 // encode.go and internal/adapterhost/frame.go. Every response, error and event frame this process
 // receives comes through decodeFrame, which checks the "KIF1" file identifier and throws on
 // anything else — there is no JSON fallback (CLAUDE.md forbids a compatibility shim).
@@ -42,11 +42,11 @@ function decodeChunk(c: wire.Chunk): TextColumnChunk {
     : { data, offsets, nulls, truncated };
 }
 
-// P5 C7/F8: decodeChunk's four arrays are views over the *whole received frame's* ArrayBuffer
-// (P11 D4/D5's own zero-copy design) — holding one page's chunk therefore pins every byte of the
+// decodeChunk's four arrays are views over the *whole received frame's* ArrayBuffer
+// (the zero-copy design) — holding one page's chunk therefore pins every byte of the
 // frame it arrived in, siblings included. `.slice()` on a typed array copies into its own,
 // exactly-sized buffer. Used only by the ExecuteResponse branch below, only when a frame carried
-// more than one page — the case P11 OQ-1 named, where one page surviving console/state.ts's own
+// more than one page — the case where one page surviving console/state.ts's own
 // releaseResult/evictOldestResults keeps every other page's bytes alive too, invisibly to
 // totalRetainedBytes() (which sums page.byteSize, unaffected by sharing).
 function copyChunk(c: TextColumnChunk): TextColumnChunk {
@@ -79,7 +79,7 @@ function copyPageBuffers(page: Page): Page {
   }
 }
 
-// P107 I2-40: decodeDocumentPage/decodeKeyValuePage/decodeStreamPage each null-checked and
+// decodeDocumentPage/decodeKeyValuePage/decodeStreamPage each null-checked and
 // decodeChunk'd 2-5 fixed semantic columns the same way, differing only in field names. Keys stay
 // literal (K extends string, not string) so the return type is Record<'ids' | 'bodies', ...>, not
 // Record<string, Chunk> — Page's own field types stay exact, nothing widens.
@@ -451,12 +451,12 @@ export function decodeFrame(bytes: Uint8Array): PortResponse | PortEvent {
 
   const id = frame.id();
   if (frame.ok()) {
-    // F6 (P108 Part 6): the id above is already extracted — a decodePayload throw here (a data
+    // The id above is already extracted — a decodePayload throw here (a data
     // op's response frame failing to decode) used to propagate straight out of decodeFrame, and
     // port.ts's onmessage drops any frame it can't decode outright (it has no id to reject a
     // specific pending call with). But a data op carries no client-side timeout of its own
     // (port.ts's `request`: `timeoutMs: null` means no timeout, cancellation is the only escape
-    // hatch — §5.1), so a dropped res frame left that one pending call hanging forever. Since the
+    // hatch), so a dropped res frame left that one pending call hanging forever. Since the
     // id is already known here, resolve/reject it with an explicit {ok:false} error instead of
     // losing the whole frame.
     try {

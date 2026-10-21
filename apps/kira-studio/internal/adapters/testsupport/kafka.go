@@ -72,9 +72,9 @@ const (
 	kafkaReadyTimeout      = 60 * time.Second
 )
 
-// waitKafkaBrokerReady polls a real request until the broker actually serves it. The module's own
+// waitKafkaBrokerReady polls a real request until the broker serves it. The module's own
 // log-based readiness hook (tckafka.Run's PostStarts wait strategy) fires on a log line the broker
-// writes before its advertised listener is actually accepting client traffic — under load, the
+// writes before its advertised listener is accepting client traffic — under load, the
 // window between the two is wide enough that the first real request (seedKafka's CreateTopics) can
 // land mid-ApiVersions negotiation and see the connection closed. client.Ping issues a real
 // Metadata request through the same negotiation path a production caller would use, so it fails
@@ -104,11 +104,11 @@ func startKafka() (*KafkaFixture, error) {
 	startupCtx, cancel := context.WithTimeout(context.Background(), kafkaStartupTimeout)
 	defer cancel()
 
-	// KF-4(a): kafka.WithClusterID is not optional the way §1.15 originally read — Run fails
-	// outright with "CLUSTER_ID is required" without it. KAFKA_AUTO_CREATE_TOPICS_ENABLE=false is
-	// KF-4(d)'s finding: without it at the container level, a nonexistent-topic read auto-creates
-	// the topic broker-side (independent of any client-side AllowAutoTopicCreation setting) and
-	// pollutes every test that runs after it in the same container.
+	// kafka.WithClusterID is not optional — Run fails outright with "CLUSTER_ID is required"
+	// without it. KAFKA_AUTO_CREATE_TOPICS_ENABLE=false: without it at the container level, a
+	// nonexistent-topic read auto-creates the topic broker-side (independent of any client-side
+	// AllowAutoTopicCreation setting) and pollutes every test that runs after it in the same
+	// container.
 	c, err := tckafka.Run(startupCtx, ImageFor("kafka", kafkaImage),
 		tckafka.WithClusterID(kafkaClusterID),
 		testcontainers.WithEnv(map[string]string{"KAFKA_AUTO_CREATE_TOPICS_ENABLE": "false"}),
@@ -261,11 +261,11 @@ func createSeedTopic(ctx context.Context, admin *kadm.Client, partitions int32, 
 	return nil
 }
 
-// seedKafka is the Go re-expression of 0005_kafka_seed.ts (P58e E25), seeded from the host with
+// seedKafka is the Go re-expression of 0005_kafka_seed.ts, seeded from the host with
 // kadm + kgo rather than the broker's own CLI run inside the container. Neither of the
 // TypeScript's own two reasons for the in-container CLI survives translation: this test binary
-// already links a Kafka client, so there is no client to keep out of the process (F24's whole
-// point), and kadm.CommitOffsets commits a group's offsets "outside the context of a Kafka
+// already links a Kafka client, so there is no client to keep out of the process, and
+// kadm.CommitOffsets commits a group's offsets "outside the context of a Kafka
 // group" (kgo/config.go's own doc for ConsumePartitions points at exactly this use) — the same
 // committed-offsets-with-no-members state --reset-offsets --to-earliest --execute produced.
 func seedKafka(ctx context.Context, admin *kadm.Client, client *kgo.Client) error {

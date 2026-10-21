@@ -6,7 +6,7 @@ import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import type { KeepAwakeStatus } from '../bridge/createCoreControl';
 
-// P116 H7: the keep-awake toggle and "New window" button, hoisted verbatim from Kira Studio's own
+// The keep-awake toggle and "New window" button, hoisted verbatim from Kira Studio's own
 // TitleBar.vue (same data-testids, same DOM order — Kira Space's own copy, workbench.spec.ts's own
 // DOM-order assertion covers both apps' rightmost two title-bar buttons). The click/status logic
 // (the actual keepAwakeStore/control.windowsOpenNew calls) stays app-side: this component only

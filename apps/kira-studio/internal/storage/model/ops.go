@@ -19,6 +19,9 @@ type OpRecord struct {
 	// for every op kind that isn't a console execute() batch, and for a pre-P108-Part-11 row. Set
 	// by adapterhost.Dispatcher.Execute (op.SetPath), the one op kind that has a path at all.
 	Path *string `json:"path"`
+	// DelayMs (P307 Part 2): a preconnect op's configured wait, so the panel can count it down. Live
+	// only, never stored in op_log.
+	DelayMs *int `json:"delayMs,omitempty"`
 }
 
 // OpAppend is ops.ts's AppendOpInput.
@@ -50,13 +53,15 @@ var opKinds = map[string]bool{
 	"http": true,
 	// P11 D7: a gRPC unary or server-streaming call (internal/grpcclient via bridge/grpc.go).
 	"grpc": true,
-	// P108 Part 6 F3: Router.SchemaColumns/KeyTypes (router.go) were already passing these two
+	// Router.SchemaColumns/KeyTypes (router.go) were already passing these two
 	// kinds to RunOp, but neither was ever a recognized OpKind — oplog.handleOpStart rejected the
 	// op:start (never Appended), so the matching op:end fell through handleOpEnd's own
 	// no-matching-start fallback and emitted a phantom "test"-kind record with a null
 	// connectionId, which state/ops.ts then prepended as a bogus new row on every SQL-completion
 	// schema fetch and every Redis browse scroll window.
 	"schemaColumns": true, "keyTypes": true,
+	// P307: the pre-connect script's startup wait (Router.RunPreconnect).
+	"preconnect": true,
 }
 
 var opStatuses = map[string]bool{

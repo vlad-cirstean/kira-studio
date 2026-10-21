@@ -44,7 +44,7 @@ func (r *GitRepoSettingsRepo) Get(repoID string) (model.GitRepoSettings, error) 
 	appsettings.Leaf(stored, "stashIncludeUntracked", &result.StashIncludeUntracked)
 	appsettings.Leaf(stored, "reviewBaseCandidates", &result.ReviewBaseCandidates)
 	appsettings.LeafValid(stored, "pullStrategy", &result.PullStrategy, model.ValidPullStrategy)
-	appsettings.Leaf(stored, "githubEnabled", &result.GithubEnabled)
+	appsettings.LeafValid(stored, "gitHostProvider", &result.GitHostProvider, func(v string) bool { return v != "" })
 	appsettings.Leaf(stored, worktreePrepareScriptKey, &result.WorktreePrepareScript)
 	appsettings.LeafValid(stored, worktreePrepareTimeoutKey, &result.WorktreePrepareTimeout, func(v string) bool {
 		_, err := model.ParsePrepareTimeout(v)
@@ -104,7 +104,7 @@ func (r *GitRepoSettingsRepo) Set(repoID string, patch model.GitRepoSettingsPatc
 		{"stashIncludeUntracked", patch.StashIncludeUntracked != nil, derefAny(patch.StashIncludeUntracked)},
 		{"reviewBaseCandidates", patch.ReviewBaseCandidates != nil, derefAny(patch.ReviewBaseCandidates)},
 		{"pullStrategy", patch.PullStrategy != nil, derefAny(patch.PullStrategy)},
-		{"githubEnabled", patch.GithubEnabled != nil, derefAny(patch.GithubEnabled)},
+		{"gitHostProvider", patch.GitHostProvider != nil, derefAny(patch.GitHostProvider)},
 		{worktreePrepareScriptKey, patch.WorktreePrepareScript != nil, derefAny(patch.WorktreePrepareScript)},
 		{worktreePrepareTimeoutKey, patch.WorktreePrepareTimeout != nil, derefAny(patch.WorktreePrepareTimeout)},
 		{worktreeBasePathKey, patch.WorktreeBasePath != nil, derefAny(patch.WorktreeBasePath)},

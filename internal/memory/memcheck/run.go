@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/google/renameio/v2"
-	"github.com/kirathecat/kira-studio/internal/mcpinstall"
+	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
 )
 
@@ -19,18 +19,18 @@ const hookMarker = "# kira-memory-check"
 
 // InstallCommand is the shell command that installs the pre-commit hook; run it in the repo root.
 func InstallCommand(exe string) string {
-	return mcpinstall.ShellQuote(exe) + " memory-check --install-hook"
+	return loginshell.Quote(exe) + " memory-check --install-hook"
 }
 
 // HookLine is the line a hook manager (husky, lefthook) runs; it skips when the app is missing.
 func HookLine(exe string) string {
-	q := mcpinstall.ShellQuote(exe)
+	q := loginshell.Quote(exe)
 	return "if [ -x " + q + " ]; then " + q + " memory-check --staged; fi"
 }
 
 func hookScript(exe string) string {
 	return "#!/bin/sh\n" + hookMarker + ": installed by Kira Space\n" +
-		"exe=" + mcpinstall.ShellQuote(exe) + "\n" +
+		"exe=" + loginshell.Quote(exe) + "\n" +
 		`if [ ! -x "$exe" ]; then echo "kira-memory-check: $exe not found, skipped" >&2; exit 0; fi` + "\n" +
 		`exec "$exe" memory-check --staged` + "\n"
 }

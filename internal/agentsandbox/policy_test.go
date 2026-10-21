@@ -24,7 +24,7 @@ func TestResolvePolicy(t *testing.T) {
 	if err := os.Symlink(wt, link); err != nil {
 		t.Fatal(err)
 	}
-	rt := Runtime{Home: home}
+	rt := testRuntime(home)
 	p, notes, err := ResolvePolicy(Input{
 		RunID: "r", Access: AccessWrite, Worktrees: []string{link}, Read: []string{"~/specs", "~/nope"},
 		Scratch: filepath.Join(real, "scratch"), Cache: filepath.Join(real, "cache"), Branch: map[string]string{link: "b"},
@@ -60,7 +60,7 @@ func TestResolvePolicyRejectsProtectedPaths(t *testing.T) {
 	home := filepath.Join(real, "home")
 	wt := filepath.Join(real, "wt")
 	mustMkdir(t, filepath.Join(home, ".claude", "projects"), filepath.Join(home, "Library", "Keychains", "db"), filepath.Join(home, "src"), wt)
-	rt := Runtime{Home: home}
+	rt := testRuntime(home)
 	resolve := func(read, allow string) error {
 		in := Input{RunID: "r", Access: AccessWrite, Worktrees: []string{wt}, Scratch: filepath.Join(real, "s"), Cache: filepath.Join(real, "c")}
 		if read != "" {

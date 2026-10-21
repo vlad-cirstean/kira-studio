@@ -1,6 +1,6 @@
 // bridge/rpc.ts — the four bound-call primitives every service surface (Studio's own, in
 // bridge/index.ts, and the Api module's, in apiControl.ts) shares. Split out of what used to be
-// control.ts (round-1 review finding 19): apiControl.ts imported these from control.ts, which
+// control.ts: apiControl.ts imported these from control.ts, which
 // itself imported and composed apiControl.ts back in — a cycle that worked today only because
 // every use sat inside a method body rather than at module-body top level, and that structurally
 // inverted the intended dependency direction (the Api half should be removable without the
@@ -16,11 +16,12 @@ import { Events } from '/wails/runtime.js';
 import { windowKey as windowKeyValue } from '../lib/window';
 import { toCodedError } from './codedError';
 
-// P57 D5. Wails delivers a bound method's error as a RuntimeError whose .message is
+// Wails delivers a bound method's error as a RuntimeError whose .message is
 // ipcerr.Error's own JSON encoding and whose .cause is that same {code, message} as an object
-// (apps/kira-studio/internal/bridge's ipcerr package + Wails' bindings.go/transport_http.go). Unwrapped once,
-// here, so every consumer keeps reading `err.message` for display and `err.code` for branching.
-// P10 D15: `details` — ipcerr.Error's own optional `json.RawMessage` field — is carried through
+// (apps/kira-studio/internal/bridge's ipcerr package + Wails' bindings.go/transport_http.go).
+// Unwrapped once, here, so every consumer keeps reading `err.message` for display and `err.code`
+// for branching.
+// `details` — ipcerr.Error's own optional `json.RawMessage` field — is carried through
 // the same way, parsed once here rather than pushed onto every consumer; `undefined` for every
 // existing producer, which leaves the field unset (`omitempty`).
 export function unwrap<T>(p: Promise<T>): Promise<T> {
@@ -38,8 +39,8 @@ export function on<T>(name: string, cb: (payload: T) => void): () => void {
 
 // The generated bindings type array-returning methods as `T[] | null` (a Go nil slice marshals to
 // `null`), even though every backing repo/service in this codebase builds an explicit `[]T{}` or
-// `make([]T, 0, ...)` and never actually returns nil for these. Every `r ?? []` at each call site
-// keeps its own return type exactly as it was pre-P57 (plain arrays, never null) rather than
+// `make([]T, 0, ...)` and never returns nil for these. Every `r ?? []` at each call site
+// keeps its own return type (plain arrays, never null) rather than
 // pushing that generator conservatism onto every caller.
 //
 // The generated bindings also type every Go enum-like field (ConnectionSummary.kind,

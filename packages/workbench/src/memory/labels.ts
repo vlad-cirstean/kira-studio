@@ -26,7 +26,7 @@ export const SCOPE_LABEL = {
 } as const satisfies Record<MemoryScope, MessageKey>;
 
 export const GROUP_KIND_LABEL = {
-  session: 'space.settings.claudeUsage.session.label',
+  session: 'space.settings.agentUsage.session.label',
   request: 'studio.http.raw.requestPending.label',
   task: 'common.task.label',
   document: 'memory.common.groupKind.document.label',

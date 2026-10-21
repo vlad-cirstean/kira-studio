@@ -1,7 +1,7 @@
-// P18 D9's operator table, moved here in the addendum (D21) to gain a second consumer — the
-// console's own Mongo completion source — rather than a second copy that could drift from this
-// one. find()'s filter document is the only thing either surface reaches — aggregation-stage
-// operators ($group, $lookup, …) have no business in either.
+// The operator table has a second consumer — the console's own Mongo completion source — rather
+// than a second copy that could drift from this one. find()'s filter document is the only thing
+// either surface reaches — aggregation-stage operators ($group, $lookup, …) have no business in
+// either.
 export const MONGO_QUERY_OPERATORS: readonly string[] = [
   '$eq',
   '$ne',
@@ -24,9 +24,9 @@ export const MONGO_QUERY_OPERATORS: readonly string[] = [
   '$size',
 ];
 
-// P27 D17: the six BSON constructors engine/adapters/mongo/literal.ts's CONSTRUCTORS can build,
+// The six BSON constructors engine/adapters/mongo/literal.ts's CONSTRUCTORS can build,
 // surfaced in the filter bar and the Mongo console alike — the capability already existed
-// (`resolveEjsonWrappers`/`parseDocumentLiteral`, P27 D15) and nothing surfaced it, which reads
+// (`resolveEjsonWrappers`/`parseDocumentLiteral`) and nothing surfaced it, which reads
 // the same as it not existing. Each inserts a full call with an empty argument, caret positioned
 // inside it (`caretOffsetFromEnd`) rather than after the closing paren.
 export interface MongoValueConstructor {

@@ -39,21 +39,20 @@ type Handlers struct {
 	Stream func(ctx context.Context, method string, params json.RawMessage, emit func(payload any, blob []byte) error) error
 }
 
-// repoSettingsQueueCap bounds each connection's own repoSettings.changed mailbox (ForConn, G32
-// round-3 architecture/security review, finding #5) — generous for any realistic burst of
-// concurrent repoSettings.set calls while staying tiny; a full queue drops its oldest entry
-// rather than growing further, since every payload is a full snapshot anyway.
+// repoSettingsQueueCap bounds each connection's own repoSettings.changed mailbox (ForConn) —
+// generous for any realistic burst of concurrent repoSettings.set calls while staying tiny; a full
+// queue drops its oldest entry rather than growing further, since every payload is a full snapshot
+// anyway.
 const repoSettingsQueueCap = 8
 
-// Router builds a per-connection Handlers over one shared Deps — the piece D18 adds: every method
-// that touches a repository now needs to know which connection is asking, so it can route through
-// that connection's own gitsession.Conn (its holds, its Emit) rather than a single global registry
-// (F7).
+// Router builds a per-connection Handlers over one shared Deps: every method that touches a
+// repository now needs to know which connection is asking, so it can route through that
+// connection's own gitsession.Conn (its holds, its Emit) rather than a single global registry.
 type Router struct {
 	deps Deps
 
-	// repoSettingsChanged is G18 D4/D7's own fan-out: every currently connected client gets
-	// repoSettings.set's own result, not only the connection that made the change (§3.18's own
+	// repoSettingsChanged is the fan-out: every currently connected client gets
+	// repoSettings.set's own result, not only the connection that made the change (the
 	// cross-connection regression guard) — the same internal/notify.Emitter[T] mechanism
 	// dbmcp and gitcred use, one Router-wide instance rather than a new pub/sub of its own.
 	repoSettingsChanged notify.Emitter[RepoSettingsChangedPayload]
@@ -290,14 +289,20 @@ var requestHandlers = map[string]requestHandler{
 	"search.run": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleSearchRun(ctx, c, params)
 	},
-	"commit.resolvePr": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-		return r.handleCommitResolvePr(ctx, c, params)
+	"commit.resolveChangeRequests": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleCommitResolveChangeRequests(ctx, c, params)
 	},
-	"branch.resolvePr": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-		return r.handleBranchResolvePr(ctx, c, params)
+	"branch.resolveChangeRequest": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleBranchResolveChangeRequest(ctx, c, params)
 	},
-	"pr.browserUrl": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-		return r.handlePrBrowserUrl(ctx, c, params)
+	"gitHost.info": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleGitHostInfo(ctx, c, params)
+	},
+	"gitHost.providers": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleGitHostProviders(ctx, c, params)
+	},
+	"changeRequest.browserUrl": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleChangeRequestBrowserUrl(ctx, c, params)
 	},
 	"worktree.list": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleWorktreeList(ctx, c, params)
@@ -369,7 +374,7 @@ func (r *Router) handleRepoOpen(ctx context.Context, c *gitsession.Conn, params 
 		}
 		return nil, mapGitError(err)
 	}
-	// D16: compose the summary with the entry's own LIVE head rather than the value Identify froze
+	// Compose the summary with the entry's own LIVE head rather than the value Identify froze
 	// at whichever window opened this repo first — a second window opening an already-open
 	// repository must see HEAD as it stands now, not as it stood at that first open. Best-effort:
 	// a failure here falls back to the frozen value rather than failing repo.open outright.
@@ -389,17 +394,16 @@ func handleRepoClose(c *gitsession.Conn, params json.RawMessage) (any, error) {
 	if p.RepoID == "" {
 		return nil, ipcerr.Contract("gitrpc: repo.close: repoId is required")
 	}
-	// G31 round-2 architecture/security review, finding #4: CloseRepo's own map is keyed by
-	// entry.Summary.RepoID (NFC, since Identify normalizes) — a decomposed repoId for a non-ASCII
-	// repository path used to silently no-op here (CloseRepo already answers {} either way, so
-	// nothing errored), leaking that connection's RepoEntry refcount and its watcher subscription
-	// for the connection's whole life.
+	// CloseRepo's own map is keyed by entry.Summary.RepoID (NFC, since Identify normalizes) — a
+	// decomposed repoId for a non-ASCII repository path used to silently no-op here (CloseRepo
+	// already answers {} either way, so nothing errored), leaking that connection's RepoEntry
+	// refcount and its watcher subscription for the connection's whole life.
 	c.CloseRepo(gitpath.CleanNFC(p.RepoID)) // idempotent either way (D15) — repo.close always answers {}.
 	return struct{}{}, nil
 }
 
 // mapGitError turns gitclient's closed error vocabulary into ipcerr codes so the classification
-// survives the wire (D6, resolving F6). rpcstream folds anything that is not an *ipcerr.Error into
+// survives the wire. rpcstream folds anything that is not an *ipcerr.Error into
 // E_INTERNAL (bridge/rpcstream/frame.go), which is the whole reason this exists — a git failure
 // must cross as E_GIT_<KIND>, never as an anonymous internal error. Every code the server emits is
 // listed in packages/git-ipc/src/contract.ts WireErrorCode; add new ones there.

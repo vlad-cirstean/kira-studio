@@ -14,7 +14,7 @@ type Collection struct {
 
 // CollectionItem is one api_items row, minus request_json and origin_json. Method and URL are
 // denormalized out of the saved request so the tree renders a method chip and searches URLs
-// without reading potentially large bodies; both are "" for a folder. Protocol (P11 D12) is
+// without reading potentially large bodies; both are "" for a folder. Protocol is
 // structural sibling data, not a third Kind value — see the two protocol constants below.
 type CollectionItem struct {
 	ID           string  `json:"id"`
@@ -55,7 +55,7 @@ func IsCollectionItemKind(kind string) bool {
 	return kind == CollectionItemFolder || kind == CollectionItemRequest
 }
 
-// P4 D4: model.SavedRequest is what a saved collection request *is* — deliberately field-identical
+// model.SavedRequest is what a saved collection request *is* — deliberately field-identical
 // to the request half of packages/shared/domain/http.ts's httpRequestTabStateSchema, so the
 // renderer can spread it straight into tab state. It is NOT tabs.state_json (the four UI-only
 // pane fields stay out — saving them would make scrolling a pane mark a request dirty) and it is
@@ -63,7 +63,7 @@ func IsCollectionItemKind(kind string) bool {
 // must keep).
 //
 // Method is a plain string, not a closed enum: Postman's own method list is 15 values plus any
-// custom string (F4), and a value this app's builder cannot show is coerced at exactly one
+// custom string, and a value this app's builder cannot show is coerced at exactly one
 // renderer boundary, not silently rejected at the storage layer.
 type SavedRequest struct {
 	Method       string           `json:"method"`
@@ -76,16 +76,16 @@ type SavedRequest struct {
 	URLEncoded   []SavedField     `json:"urlEncoded"`
 	FormData     []SavedFormField `json:"formData"`
 	BinaryFile   *SavedFile       `json:"binaryFile"`
-	// ParamDescriptions is P22b D7 — a query param's own description, keyed by name. A side-car
+	// ParamDescriptions is a query param's own description, keyed by name. A side-car
 	// map rather than a row on a `params` array: there is no such array (the URL is the single
 	// source of truth for the query string), so this is annotation only, never input to what
-	// actually gets sent.
+	// gets sent.
 	ParamDescriptions map[string]string `json:"paramDescriptions"`
 }
 
 // SavedHeader is one header row. `enabled` has no wire counterpart — it exists so the builder can
 // keep an unchecked row instead of deleting it, which is the whole point of the checkbox.
-// Description is P22b D6 — app-local free text, no wire counterpart, the same shape
+// Description is app-local free text, no wire counterpart, the same shape
 // model/variables.go's own Description field already carries.
 type SavedHeader struct {
 	Name        string `json:"name"`

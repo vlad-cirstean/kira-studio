@@ -2,15 +2,15 @@ package gitops
 
 import "strings"
 
-// ClassifyOpError is D14's ordered pattern table over one op's stderr — order matters as much as
+// ClassifyOpError is the ordered pattern table over one op's stderr — order matters as much as
 // the patterns (a more specific rule must precede the general one it would be swallowed by).
-// Scoped to what G5's own ten operations can actually produce; every pattern is verbatim from a
-// real failure observed against real git in this chapter's own probes. G7/G12/G13 each prepend or
-// append rows to this same table for the error kinds their own operations introduce — never
-// widening gitclient.ErrorKind, which stays the five-member SPAWN vocabulary this is not (D14).
+// Scoped to what the ten operations can produce; every pattern is verbatim from a
+// real failure observed against real git in this chapter's own probes. Other operations each
+// prepend or append rows to this same table for the error kinds they introduce — never
+// widening gitclient.ErrorKind, which stays the five-member SPAWN vocabulary this is not.
 //
-// A classified operation failure is never an RPC error: op.run's handler does not try/catch (§7's
-// own W11) — a non-zero exit here becomes OpResult{ok:false, error:{kind,message}}, never a
+// A classified operation failure is never an RPC error: op.run's handler does not try/catch —
+// a non-zero exit here becomes OpResult{ok:false, error:{kind,message}}, never a
 // propagated error.
 // classifyRule is one classifyOpErrorRules row: a pattern test over the lower-cased stderr plus
 // the kind it maps to.
@@ -22,7 +22,7 @@ type classifyRule struct {
 // classifyOpErrorRules is ClassifyOpError's own ordered pattern table — order matters as much as
 // the patterns (a more specific rule must precede the general one it would be swallowed by). Kept
 // as a slice, not a map, for exactly that reason: a map has no order to preserve.
-// hasConflictLine is P108 Part 15 F4's own line-anchored check, run before every row below
+// hasConflictLine is the line-anchored check, run before every row below
 // (including this table's own unanchored Conflict row further down): a commit SUBJECT
 // (`could not apply <sha>... <subject>`, `could not revert <sha>... Revert "<subject>"`) or a
 // file PATH (`Auto-merging <path>`, `CONFLICT (...): Merge conflict in <path>`) is user-controlled
@@ -47,7 +47,7 @@ var classifyOpErrorRules = []classifyRule{
 	// F4: checked first, ahead of every row below — see hasConflictLine's own doc comment.
 	{kind: "Conflict", match: hasConflictLine},
 
-	// G7 D14/F18: eight rows prepended, in this exact order, ahead of every G5 row below — "not
+	// Eight rows prepended, in this exact order, ahead of every row below — "not
 	// found" would otherwise swallow RemoteNotFound, and a broad "! [rejected]" would swallow the
 	// two lease kinds. Every pattern here is verbatim from a real failure this chapter's own
 	// probes observed against real git and a real 401.
@@ -94,19 +94,18 @@ var classifyOpErrorRules = []classifyRule{
 		return strings.Contains(lower, "is a merge but no -m option was given")
 	}},
 	{kind: "StashIndexConflict", match: func(lower string) bool {
-		// G17 D7/probe 10: `apply --index`/`pop --index` onto an already-conflicted index —
+		// `apply --index`/`pop --index` onto an already-conflicted index —
 		// `error: conflicts in index. Try without --index.` Distinct from StashConflict: git names
 		// its own remedy exactly (retry the same op with restoreIndex: false). Ahead of the
 		// "untracked working tree file" row below, matching this table's own "more specific first"
-		// rule — not that the two patterns could collide, but D7 groups both stash-specific rows
-		// together at the point stash pop/apply's own stderr is classified.
+		// rule — not that the two patterns could collide.
 		return strings.Contains(lower, "conflicts in index")
 	}},
 	{kind: "UntrackedWouldBeOverwritten", match: func(lower string) bool {
-		// Probe P7: matches both the plural list header and --discard-changes' singular form. G17
-		// D7: for a stash pop/apply specifically, reclassifyStashPop (gitsession/ops.go) remaps this
+		// Matches both the plural list header and --discard-changes' singular form.
+		// For a stash pop/apply specifically, reclassifyStashPop (gitsession/ops.go) remaps this
 		// generic kind to StashUntrackedCollision — the identical stderr, but a stash-specific
-		// remedy story (probe 3) — since this table has no notion of which op kind is asking.
+		// remedy story — since this table has no notion of which op kind is asking.
 		return strings.Contains(lower, "untracked working tree file")
 	}},
 	{kind: "DirtyWorktree", match: func(lower string) bool {
@@ -121,10 +120,10 @@ var classifyOpErrorRules = []classifyRule{
 			strings.Contains(lower, "cannot rebase: your index contains uncommitted changes")
 	}},
 	{kind: "DirtyWorktree", match: func(lower string) bool {
-		// G25 D15/probe M4: `worktree remove` on a dirty worktree — "fatal: '<path>' contains
-		// modified or untracked files, use --force to delete it". A different stderr shape from the
-		// checkout row just above, but the same reused kind (DirtyWorktree): both name "there is
-		// uncommitted work in the way", and the client already renders one remedy story for it.
+		// `worktree remove` on a dirty worktree — "fatal: '<path>' contains modified or untracked
+		// files, use --force to delete it". A different stderr shape from the checkout row just
+		// above, but the same reused kind (DirtyWorktree): both name "there is uncommitted work in
+		// the way", and the client already renders one remedy story for it.
 		return strings.Contains(lower, "contains modified or untracked files")
 	}},
 	{kind: "DirtyWorktree", match: func(lower string) bool {
@@ -154,11 +153,10 @@ var classifyOpErrorRules = []classifyRule{
 			strings.Contains(lower, "not found") || strings.Contains(lower, "bad object") || strings.Contains(lower, "invalid reference")
 	}},
 	{kind: "NotFound", match: func(lower string) bool {
-		// G26 D5/probe P14: `git rebase --onto <onto> <base> <branch>` with a nonexistent <branch>
+		// Probe P14: `git rebase --onto <onto> <base> <branch>` with a nonexistent <branch>
 		// — "fatal: no such branch/commit '<x>'". Its own row rather than widening the existing
 		// NotFound pattern list above, so the probe citation sits next to the exact string it came
-		// from (D5's own stated reason). Reused NotFound, not a new kind — this phase's only new
-		// OpErrorKind is StackCycle, produced exclusively by stackSet.
+		// from. Reused NotFound, not a new kind.
 		return strings.Contains(lower, "no such branch/commit")
 	}},
 	{kind: "LockHeld", match: func(lower string) bool {
@@ -192,13 +190,12 @@ func ClassifyOpError(stderr string, exitCode int) (kind, message string) {
 	return "Unknown", message
 }
 
-// ClassifyRemoteError is D14's own entry point for a remote op's failure: porcelainReason (the
+// ClassifyRemoteError is the entry point for a remote op's failure: porcelainReason (the
 // parenthesised text from the first rejected line of a push's --porcelain block — "" for fetch, or
-// for a push whose block came back empty, probe P8) is matched FIRST, then stderr falls through to
+// for a push whose block came back empty) is matched FIRST, then stderr falls through to
 // ClassifyOpError's own table — whose eight prepended rows above cover exactly the cases
 // porcelainReason does not (AuthFailed/NetworkFailed/RemoteNotFound/RemoteRefMissing have no
-// porcelain shape at all; the plain, no-porcelain form of NonFastForward is stderr-only too,
-// probe P5).
+// porcelain shape at all; the plain, no-porcelain form of NonFastForward is stderr-only too).
 func ClassifyRemoteError(porcelainReason, stderr string, exitCode int) (kind, message string) {
 	lower := strings.ToLower(porcelainReason)
 	switch {
@@ -214,7 +211,7 @@ func ClassifyRemoteError(porcelainReason, stderr string, exitCode int) (kind, me
 	return ClassifyOpError(stderr, exitCode)
 }
 
-// ExtractRemoteMessage is RemoteOpResult.error.remoteMessage's own source (F17/P7): every stderr
+// ExtractRemoteMessage is RemoteOpResult.error.remoteMessage's own source: every stderr
 // line beginning "remote: ", prefix stripped and right-trimmed (git pads these lines with trailing
 // spaces), joined with "\n". "" when there are none — the caller decides whether to surface it at
 // all (only ever for a HookRejected, per the contract's own doc comment).

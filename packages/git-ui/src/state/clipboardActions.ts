@@ -10,10 +10,11 @@ export interface ClipboardOutcome {
 }
 
 /**
- * P5 W10's one path to the `Clipboard` port: every copy site calls this rather than
+ * The one path to the `Clipboard` port: every copy site calls this rather than
  * `bridge.request("clipboard.write", ...)` directly, so a rejection is never silently swallowed
- * (§6.4: "silence is the one unacceptable outcome") and every site's wording matches. `message` is the translated success text and doubles as `clipboard.write`'s
- * own `label` param — the host's log line only, never the copied text itself.
+ * ("silence is the one unacceptable outcome") and every site's wording matches. `message` is the
+ * translated success text and doubles as `clipboard.write`'s own `label` param — the host's log
+ * line only, never the copied text itself.
  */
 export async function copyToClipboard(
   bridge: BridgeClient,

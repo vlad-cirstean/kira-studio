@@ -65,11 +65,11 @@ import (
 )
 
 // machTimebase is macOS's own tick->nanosecond ratio (mach_timebase_info(3)): 1/1 on x86_64, ~125/3
-// on Apple silicon (the P7 plan's §2.4). Read once, since it is fixed for the life of a process,
+// on Apple silicon. Read once, since it is fixed for the life of a process,
 // and applied to ri_user_time/ri_system_time — Apple's own proc_info.h header documents no unit for
 // the equivalent pti_total_user/_system fields, but secondary sources agree they are mach absolute
-// time, which is exactly what this conversion assumes. C6's real-Mac calibration test (against
-// syscall.Getrusage) is what actually settles this rather than assumes it (P7 OQ-1) — if it turns
+// time, which is exactly what this conversion assumes. The real-Mac calibration test (against
+// syscall.Getrusage) is what settles this rather than assumes it — if it turns
 // out these fields are already nanoseconds, this conversion is the one line that changes.
 var machTimebase = sync.OnceValues(func() (numer, denom float64) {
 	var n, d C.uint32_t
@@ -90,12 +90,12 @@ func machTicksToSeconds(ticks uint64) float64 {
 var epermLogged sync.Map // map[int32]struct{}
 
 // defaultProbe is darwin's native probe: one proc_pid_rusage(RUSAGE_INFO_V2) syscall returns CPU
-// time, physical-footprint memory and process-start time together (P7 F7) — the same fields, from
-// the same API, Activity Monitor's own %CPU/Memory columns are built on (P7 §2.1/§2.2). A pid that
-// returns EPERM falls back to taskinfoFallback rather than to a silent zero, so a permission
-// failure degrades to today's RSS-based reading for that pid instead of a lifetime-CPU spike on the
-// tick it recovers (F2, D7). Any other failure (ESRCH — exited between discovery and sampling, most
-// commonly) drops the pid for this tick, same as every other probe failure.
+// time, physical-footprint memory and process-start time together — the same fields, from the
+// same API, Activity Monitor's own %CPU/Memory columns are built on. A pid that returns EPERM
+// falls back to taskinfoFallback rather than to a silent zero, so a permission failure degrades
+// to today's RSS-based reading for that pid instead of a lifetime-CPU spike on the tick it
+// recovers. Any other failure (ESRCH — exited between discovery and sampling, most commonly)
+// drops the pid for this tick, same as every other probe failure.
 func defaultProbe(pid int32) (procSample, bool) {
 	var userTime, systemTime, physFootprint, startAbstime C.uint64_t
 	errno := C.kira_probe_rusage(C.pid_t(pid), &userTime, &systemTime, &physFootprint, &startAbstime)

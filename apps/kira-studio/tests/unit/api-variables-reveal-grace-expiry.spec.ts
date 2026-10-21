@@ -1,10 +1,10 @@
-// P21 round 1 architecture/security finding 5: internal/localauth's reveal gate is deliberately
+// internal/localauth's reveal gate is deliberately
 // fixed rather than sliding ("so a long editing session can't hold one authentication open
 // indefinitely"), but nothing downstream ever acted on that expiry — a revealed variable's
 // plaintext stayed in revealedValues (and in VariableSetView.vue's own draft copy) for the life of
 // the tab, cleared only when the tab happened to close. This pins that a reveal now schedules its
 // own re-mask at the grace window, without waiting five real minutes: setTimeout is captured
-// rather than actually run, and invoked manually to simulate the window elapsing.
+// rather than run, and invoked manually to simulate the window elapsing.
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';

@@ -18,7 +18,7 @@ const LogRetentionDays = 30
 // logs directory, or a single file that fails to stat/remove, never blocks startup.
 //
 // dir is an explicit argument, not config.LogsDir() read directly, for the same repo-root
-// visibility reason Init above takes one (P100 Part 1).
+// visibility reason Init above takes one.
 func Sweep(dir string) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {

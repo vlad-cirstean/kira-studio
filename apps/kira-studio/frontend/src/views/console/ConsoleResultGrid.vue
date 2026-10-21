@@ -31,19 +31,18 @@ const parse = useParseWorker();
 const documentRowsStore = useDocumentRowsStore();
 const consoleViewStore = useConsoleViewStore();
 
-// A three-way switch over a console result's own kind (P8) — tabular results render through
-// ConsoleSlickGrid.vue (P30 §3, the same KiraSlickGrid/dataSource.ts/slickTheme.css layer
-// views/grid/SlickGridHost.vue uses); document and key-value results stay on VirtualList, since
-// their rows are Vue component trees (DocumentRow/DocumentTree) or two flex cells, not formatted
-// cells with a column axis to virtualize (P30 §3.4). The page cache itself is `./resultPages.ts`
-// (P8), a generic-`Page` sibling of `grid/page.ts` since a console result can be tabular (SQL),
+// A three-way switch over a console result's own kind — tabular results render through
+// ConsoleSlickGrid.vue (the same KiraSlickGrid/dataSource.ts/slickTheme.css layer
+// views/grid/SlickGridHost.vue uses); document and key-value results stay on VirtualList,
+// since their rows are Vue component trees (DocumentRow/DocumentTree) or two flex cells, not
+// formatted cells with a column axis to virtualize. The page cache itself is `./resultPages.ts`,
+// a generic-`Page` sibling of `grid/page.ts` since a console result can be tabular (SQL),
 // document (Mongo shell) or key-value (Redis) unlike a data tab.
 //
-// tabId/connectionId/path are only here to publish into cellSelection.ts's shared slot
-// (P8/P10's "publish into the same slot for their own views") — a console result has no
-// addressable row/table to write back to, so every SelectedCell published from here leaves
-// `onEdit` unset and the cell editor panel stays read-only for it, same as a page with no
-// primary key.
+// tabId/connectionId/path are only here to publish into cellSelection.ts's shared slot —
+// a console result has no addressable row/table to write back to, so every SelectedCell
+// published from here leaves `onEdit` unset and the cell editor panel stays read-only for it,
+// same as a page with no primary key.
 const props = defineProps<{
   pageKey: string;
   tabId: string;
@@ -73,10 +72,10 @@ const rowIndices = computed(() => {
   return Array.from({ length: page.value?.rowCount ?? 0 }, (_, i) => i);
 });
 
-// P42 D11: the same head-row/DocumentTree pair the Mongo data tab renders (rowView/rowHeight —
+// The same head-row/DocumentTree pair the Mongo data tab renders (rowView/rowHeight —
 // views/shared/document/rows.ts, registered onto this result's own key in console/state.ts's
 // run()) — collapsed by default, per-result expansion state in the console runtime rather than
-// persisted tab state (D11: a console result is runtime-only to begin with).
+// persisted tab state (a console result is runtime-only to begin with).
 const documentRows = computed<DocumentRowView[]>(() => {
   void pageVersion.n;
   const out: DocumentRowView[] = [];
@@ -104,7 +103,7 @@ function onToggleDocExpanded(id: string): void {
   consoleViewStore.toggleResultDocExpanded(props.tabId, props.pageKey, id);
 }
 
-// P104 §3.4: VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
+// VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
 // useVirtualRows composable — one instance per branch (document/key-value), since only one of
 // the two is ever mounted at a time (the template's v-else-if/v-else) but each needs its own
 // scroll element, count and row-height source.
@@ -162,10 +161,10 @@ const kvNav = useListNavigation<number>({
   rendered: () => kvVirtual.virtualItems.value,
 });
 
-// P42 D39: search state here is keyed by tabId (D9), same as every watcher below — the
+// Search state here is keyed by tabId, same as every watcher below — the
 // virtualizers report positions within `rowIndices`/`documentRows`, which are ascending but,
 // while filtering, non-contiguous page-row indices (same reasoning as DocumentView.vue's own
-// onVisibleRange). P43 F2/D3: the same bounds also prune resultPages.ts's decode cache — keyed by
+// onVisibleRange). The same bounds also prune resultPages.ts's decode cache — keyed by
 // pageKey (a decode cache is per result set), not tabId (search priority is per tab, resolved to
 // whichever result is active) — reusing this one report instead of resultPages.ts growing its own
 // watch.
@@ -187,14 +186,14 @@ watch(docVirtual.virtualItems, (items) => {
   if (from === undefined || to === undefined) return;
   setVisibleRows(props.tabId, from, to + 1);
   setVisibleWindow(props.pageKey, from, to + 1);
-  // A4/P21 round 1: rows.ts's own parseCache is pruned to the rendered window everywhere else
-  // (DocumentView.vue's own onVisibleRange) but had no call site here at all — a Mongo console
-  // result's parsed node trees stayed resident for the life of the result instead of the rendered
-  // window docs/ARCHITECTURE.md's Caching section already documents for this tier.
+  // rows.ts's own parseCache is pruned to the rendered window everywhere else (DocumentView.vue's
+  // own onVisibleRange) but had no call site here at all — a Mongo console result's parsed node
+  // trees stayed resident for the life of the result instead of the rendered window
+  // docs/ARCHITECTURE.md's Caching section already documents for this tier.
   documentRowsStore.pruneRows(props.pageKey, from, to + 1);
 });
 
-// Item (regression pass, task batch P46-4): DocumentView.vue's own expand-all/collapse-all pair,
+// DocumentView.vue's own expand-all/collapse-all pair,
 // exposed the same way goToMatch already is (ConsoleView.vue calls through this ref) — its
 // toolbar lives one level up since these two buttons only make sense while the active result is
 // document-shaped, a fact ConsoleView.vue's own getPage(activeKey) check decides, not this panel.
@@ -215,19 +214,19 @@ function kvRowAt(row: number) {
 }
 
 // Local to this one result panel (highlight only) — the actual cross-view selection lives in
-// cellSelectionState.current (cellSelection.ts), which this just publishes into. Two different
+// cellSelectionState.current (cellSelection.ts), which this publishes into. Two different
 // result panels can each show their own last-clicked cell highlighted at once; only whichever
-// published most recently is what the cell editor panel actually displays.
+// published most recently is what the cell editor panel displays.
 const selected = ref<{ row: number; col: number } | null>(null);
 
 function isSelected(row: number, col: number): boolean {
   return selected.value?.row === row && selected.value?.col === col;
 }
 
-// P43 iter2 F20/D27: unlike DataGrid.vue's rt.selection, this panel's "selection" is only ever
+// Unlike DataGrid.vue's rt.selection, this panel's "selection" is only ever
 // the last click, held in the local `selected` ref above — a row index into a page that has been
-// replaced (a new result chip swapping `pageKey` on this same mounted instance, F20's own
-// finding, or the same result reloading) identifies nothing. Clearing rather than republishing is
+// replaced (a new result chip swapping `pageKey` on this same mounted instance, or the same result
+// reloading) identifies nothing. Clearing rather than republishing is
 // the honest operation: there is no persistent selection concept here to republish against a new
 // page in the first place.
 // Page identity, not the counter every console tab's load/close bumps.
@@ -272,12 +271,11 @@ function publish(selectedCell: Omit<SelectedCell, 'tabId' | 'connectionId' | 'pa
   });
 }
 
-// Item (regression pass, task batch P46-4): a document row no longer publishes into the shared
-// cellSelection slot — the expanded DocumentTree right below it (P42 D11) already shows exactly
-// this same body, so the cell editor dock used to pop up and show it a second time for no reason
-// the real Mongo data tab's own DocumentView.vue doesn't (it has no cell editor at all). `selected`
-// still tracks the last-clicked row for its own highlight, the same convention DocumentView.vue's
-// rows use independent of any editor.
+// A document row no longer publishes into the shared cellSelection slot — the expanded
+// DocumentTree right below it already shows exactly this same body, so the cell editor dock used to
+// pop up and show it a second time for no reason the real Mongo data tab's own DocumentView.vue
+// doesn't (it has no cell editor at all). `selected` still tracks the last-clicked row for its own
+// highlight, the same convention DocumentView.vue's rows use independent of any editor.
 function selectDocumentRow(row: number): void {
   selected.value = { row, col: 0 };
 }
@@ -303,10 +301,10 @@ function selectKeyValueRow(row: number): void {
   });
 }
 
-// P2 R2 (task #98): same closure-per-render problem DataGrid.vue found first (P2 R1) — a template
+// Same closure-per-render problem DataGrid.vue found first — a template
 // handler that calls out with the v-for's row/column index can never be cached by Vue's compiler
 // (hasScopeRef), so every visible row got a fresh wrapper closure on every render, scroll
-// included. This recovers the row index from a data-* attribute on the element the event actually
+// included. This recovers the row index from a data-* attribute on the element the event
 // fired on instead, so the template can bind a stable, module-scope function. The document-row
 // branch below is left as-is: DocumentRow.vue's `toggle`/`select` emits carry no native Event
 // (defineEmits<{ toggle: []; select: [] }>()), so there is no currentTarget to read a data-*
@@ -325,19 +323,19 @@ function selectKeyValueRowFromKeydown(e: KeyboardEvent): void {
   if (r !== null) selectKeyValueRow(r);
 }
 
-// P19 D6/D11, P22b D11: the document and key-value branches' own row menu — the document branch
-// gets P22b D11's Shell/Canonical/Relaxed submenu pair (mongoDocumentRowMenu); key-value has no
+// The document and key-value branches' own row menu — the document branch
+// gets the Shell/Canonical/Relaxed submenu pair (mongoDocumentRowMenu); key-value has no
 // shell/EJSON format of its own and keeps the plain "Copy as JSON"/"Copy all as JSON" pair
 // (rowAsJsonMenu). Both cover every row currently displayed (i.e. rowIndices/documentRows — under
 // an active find-filter that's the filtered subset, same rule columnsToTsv's own callers already
-// follow). A copy failure lands here (component-local, P13 D9's strip precedent) since the
+// follow). A copy failure lands here (component-local) since the
 // console has no actionError field the way documents/menu.ts's copyOrReportError writes into.
 const copyError = ref<string | null>(null);
 function onCopyError(message: string): void {
   copyError.value = message;
 }
 
-// P21 round 2 performance finding 2: allJson used to be a materialized array, built eagerly at
+// allJson used to be a materialized array, built eagerly at
 // right-click time -- a whole-page decode (plus, for the key-value branch, a full
 // JSON.stringify(..., null, 2) per row) on a click that should cost ~0 ms, and one that re-
 // populates the decode/view caches for every row, undoing the visible-window pruning until the

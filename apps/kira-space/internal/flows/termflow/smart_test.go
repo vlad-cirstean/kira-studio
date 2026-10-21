@@ -10,7 +10,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
@@ -70,7 +70,7 @@ func TestSmartScriptSpace(t *testing.T) {
 	if o := run.Outcome; o == nil || !o.Reported || o.Source != "agent" {
 		t.Fatalf("outcome = %+v", o)
 	}
-	if want := scripts.PlainText(pv.Prompt) + "\n\n" + claudeheadless.ScriptReport(llmprompts.Defaults()); run.Prompt != want {
+	if want := scripts.PlainText(pv.Prompt) + "\n\n" + agentmcp.ScriptReport(llmprompts.Defaults()); run.Prompt != want {
 		t.Fatalf("prompt = %q, want %q", run.Prompt, want)
 	}
 	page, err := app.W.ScriptRuns.ReadLog(scriptruns.ReadLogArgs{ID: started.RunID})
@@ -111,4 +111,12 @@ func TestSmartScriptFailedSpace(t *testing.T) {
 	}
 	app.Contract(t, "smart", "CustomScriptsService.Create#failed", rec)
 	app.Contract(t, "smart", "ScriptRunsService.Get#failed", run, flowharness.Mask("createdAt", "startedAt", "finishedAt", "hash", "costUsd"))
+	cmd, err := app.W.ScriptRuns.ResumeCommand(scriptruns.ResumeCommandArgs{RunID: started.RunID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "claude --resume '" + run.SessionID + "'"; cmd != want {
+		t.Fatalf("ResumeCommand = %q, want %q", cmd, want)
+	}
+	app.Contract(t, "smart", "ScriptRunsService.ResumeCommand", strings.Replace(cmd, run.SessionID, "sess-1", 1))
 }

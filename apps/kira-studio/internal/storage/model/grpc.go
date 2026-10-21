@@ -2,7 +2,7 @@ package model
 
 import "fmt"
 
-// P11 D12: SavedGrpcRequest is what a saved gRPC collection request *is* — deliberately
+// SavedGrpcRequest is what a saved gRPC collection request *is* — deliberately
 // field-identical to the request half of packages/shared/domain/grpc.ts's
 // grpcRequestTabStateSchema, mirroring model.SavedRequest's own exact reasoning (collections.go).
 // Not the tab state (the four UI-only fields — itemId, name, requestPane/responsePane/

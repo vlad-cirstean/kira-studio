@@ -65,11 +65,11 @@ func toCommentEntries(acs []gitreview.AnchoredComment) []CommentEntry {
 	return out
 }
 
-// AddComment is review.comment.add's whole orchestration (D15/D16): readSnapshotSource(ctx, at,
-// path) is the identical call MarkFile makes (F11) — refuse non-text, bound the range by its line
+// AddComment is review.comment.add's whole orchestration: readSnapshotSource(ctx, at,
+// path) is the identical call MarkFile makes — refuse non-text, bound the range by its line
 // count at `at` — then blobOID(at, path) captures tier 0's own comparand and the row is written
-// anchored to `at` (D6). `at` is the revision the caller says it was reading; there is no default
-// (D15's own refusal to guess).
+// anchored to `at`. `at` is the revision the caller says it was reading; there is no default
+// (the refusal to guess).
 func (e *RepoEntry) AddComment(ctx context.Context, branch, path, at string, r gitreview.LineRange, body, kind string) (CommentEntry, error) {
 	// G31 round-2 performance review, finding #5 (same fix as MarkFile's): blobOID comes straight
 	// off readSnapshotSource's own return now, not a second blobOID(ctx, at, path) round trip for
@@ -98,10 +98,10 @@ func (e *RepoEntry) AddComment(ctx context.Context, branch, path, at string, r g
 	}), nil
 }
 
-// anchoredComments resolves `at` (branch tip when empty, D11), loads every stored comment, anchors
-// each against `at` (D7) and applies D13's total order — the one computation ListComments and
+// anchoredComments resolves `at` (branch tip when empty), loads every stored comment, anchors
+// each against `at` and applies the total order — the one computation ListComments and
 // ExportComments share, so the two can never disagree about what "ordered by file then line"
-// means. Touches the session (list/export are reads that keep it alive, never create one, D4).
+// means. Touches the session (list/export are reads that keep it alive, never create one).
 func (e *RepoEntry) anchoredComments(ctx context.Context, branch, at string) (string, []gitreview.AnchoredComment, error) {
 	if at == "" {
 		tip, err := e.branchTip(ctx, branch)
@@ -199,8 +199,8 @@ func (e *RepoEntry) lineCountAt(ctx context.Context, at, path string, cache map[
 	return n, nil
 }
 
-// anchorAll is D7's tier machine, run once per comment with two memos scoped to this one call
-// (D16): lineCounts keyed by path, patches keyed by "path\x00anchorSHA" — a file usually carries
+// anchorAll is the tier machine, run once per comment with two memos scoped to this one call:
+// lineCounts keyed by path, patches keyed by "path\x00anchorSHA" — a file usually carries
 // several comments and often a single anchor sha, so this turns N comments into ~1 diff per
 // (path, sha) pair rather than one per comment.
 func (e *RepoEntry) anchorAll(ctx context.Context, at string, cs []gitreview.Comment) ([]gitreview.AnchoredComment, error) {
@@ -218,13 +218,13 @@ func (e *RepoEntry) anchorAll(ctx context.Context, at string, cs []gitreview.Com
 	return out, nil
 }
 
-// anchorOne is D7's three-tier resolution for one comment, verbatim:
+// anchorOne is the three-tier resolution for one comment, verbatim:
 //
 //  0. blobOID(at, c.Path) == c.AnchorBlobOID — byte-identical content, no diff at all: exact.
 //  1. merge-base --is-ancestor c.AnchorSHA at, exit 0 — an ordinary git diff maps the range
-//     forward through gitreview.ProjectRanges, unchanged (no new arithmetic, D7/D18): a non-empty
+//     forward through gitreview.ProjectRanges, unchanged (no new arithmetic): a non-empty
 //     result is projected (unioned, since a projection can split a range across an insertion), an
-//     empty one is removed (the lines no longer exist — probe P2's own committed behaviour).
+//     empty one is removed (the lines no longer exist).
 //  2. exit 1 (unreachable but present, the common rewrite case) or exit 128 (genuinely pruned) —
 //     both take stale: there is no honest mapping to compute, so the original range and sha are
 //     reported rather than guessed. Any other exit is the classified error.

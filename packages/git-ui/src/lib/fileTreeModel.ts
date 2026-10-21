@@ -1,5 +1,5 @@
 /**
- * `docs/plans/P5.md` W8: the pure half of `FileTree.vue` — folding a flat `readonly FileChange[]`
+ * The pure half of `FileTree.vue` — folding a flat `readonly FileChange[]`
  * into a directory tree, aggregating counts, collapsing single-child directory chains, producing
  * the flat list, and applying the filter. No DOM, no Vue — everything here is exercised directly
  * by `tests/unit/ui/fileTreeModel.spec.ts`, matching this repo's own precedent for splitting a
@@ -192,10 +192,10 @@ export type FileTreeRow =
 
 /** Walks the tree respecting `isExpanded`, producing the flat row list both the renderer paints
  *  top-to-bottom and `↑`/`↓` file-cursor navigation moves through — a collapsed directory's
- *  descendants are simply absent from this list, which is what makes "directory rows are skipped
+ *  descendants are absent from this list, which is what makes "directory rows are skipped
  *  by arrow nav" true for free in flat mode (no directory rows exist there at all) and correct in
  *  tree mode (collapsing one hides its whole subtree from navigation, not just from view). */
-// G30 round-1 performance review, finding #7: `rows.push(...flattenTreeRows(...))` built a fresh
+// `rows.push(...flattenTreeRows(...))` built a fresh
 // sub-array per directory level and spread it into the parent — O(n·depth) work overall (every
 // row gets re-copied once per ancestor directory it sits under), and `push`'s own argument list is
 // V8's own call-stack-sized array (not the heap), so a single spread past roughly 65k elements
@@ -223,7 +223,7 @@ export function flattenTreeRows(
 /** §8's render cap page: 500 rows, then a "Show more" row, never a second virtualizer. */
 export const FILE_TREE_PAGE_SIZE = 500;
 
-/** `originalPath → path` with the common leading *directory* path truncated (§6.4: "a file
+/** `originalPath → path` with the common leading *directory* path truncated ("a file
  *  moved within a directory shows `old.ts → new.ts`, not two full paths") — compares directory
  *  segments only, so the filenames themselves are never folded away even when they happen to
  *  match. `undefined` for anything that is not a rename/copy. */

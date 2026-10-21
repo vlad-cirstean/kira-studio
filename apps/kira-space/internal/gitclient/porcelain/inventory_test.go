@@ -27,10 +27,10 @@ func byShort(rows []porcelain.InventoryRef, short string) *porcelain.InventoryRe
 	return nil
 }
 
-// TestParseInventory covers §3's own bullet list: upstream track variants (ahead/behind, [gone],
-// no upstream), an empty worktree path (a remote-only review branch), and a multi-record NUL-framed
-// stream — ParseInventory's own contract, not BranchInventory's (a thin git-backed pass-through with
-// no logic of its own to test here, §9.1's own "no test for wrappers").
+// TestParseInventory covers upstream track variants (ahead/behind, [gone], no upstream), an empty
+// worktree path (a remote-only review branch), and a multi-record NUL-framed stream —
+// ParseInventory's own contract, not BranchInventory's (a thin git-backed pass-through with no
+// logic of its own to test here).
 func TestParseInventory(t *testing.T) {
 	t.Parallel()
 

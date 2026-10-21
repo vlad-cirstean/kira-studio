@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// Deps are the seams a Reporter needs, Deps-shaped exactly like internal/toolexec's own (D8):
+// Deps are the seams a Reporter needs, Deps-shaped exactly like internal/toolexec's own:
 // zero-value fields fall back to the real OS (NewReporter, below), and a fake Run is what lets a
 // Linux test assert "the correct argv was built and the correct body was passed" with no macOS
 // present and no real subprocess spawned.
@@ -44,7 +44,7 @@ type Reporter struct {
 	now      func() time.Time
 	info     Info
 
-	// alertOnce guards D7's "at most one alert is ever shown per process" — logging and the
+	// alertOnce guards the "at most one alert is ever shown per process" — logging and the
 	// stderr write always happen on every call; only the actual osascript spawn is gated. Scoped
 	// to the Reporter (not a package-level var) so independent Reporters in tests never share
 	// state with each other or with the package-level defaultReporter.
@@ -83,10 +83,10 @@ func NewReporter(d Deps) *Reporter {
 	return r
 }
 
-// Report is D2's ordering, unconditionally, every time: (1) log via slog — degrading correctly to
-// the standard library's own stderr handler when logging.Init hasn't run yet (F2), and to the
+// Report is the ordering, unconditionally, every time: (1) log via slog — degrading correctly to
+// the standard library's own stderr handler when logging.Init hasn't run yet, and to the
 // file it installed when it has, with no branch either way; (2) write the full rendered text to
-// stderr — what a developer running `wails3 task dev`, and any future CI harness, actually reads,
+// stderr — what a developer running `wails3 task dev`, and any future CI harness, reads,
 // and the whole output on a platform where the alert cannot be shown at all; (3) attempt the
 // alert. Order matters: log first, so a crash or hang inside the presenter can never lose the
 // diagnosis.
@@ -138,10 +138,10 @@ func (r *Reporter) locateBinary(name, fallback string) (string, bool) {
 	return "", false
 }
 
-// showAlert spawns osascript (D3), bounded by alertTimeout (D8), and — if and only if its stdout
-// trims to exactly "Copy Details" — follows up with copyDetails (D10). Every other outcome
+// showAlert spawns osascript, bounded by alertTimeout, and — if and only if its stdout
+// trims to exactly "Copy Details" — follows up with copyDetails. Every other outcome
 // (osascript missing, a non-zero exit, a spawn failure, "OK" pressed, empty stdout) is treated as
-// "dismissed": return, with no error and no panic. D2's stderr write has already happened by the
+// "dismissed": return, with no error and no panic. The stderr write has already happened by the
 // time this runs, so an unshowable alert is never the whole story.
 func (r *Reporter) showAlert(msg Message, err error) {
 	path, ok := r.locateBinary("osascript", osascriptFallbackPath)
@@ -175,10 +175,10 @@ func (r *Reporter) copyDetails(msg Message, err error) {
 	_, _ = r.run(ctx, path, nil, []byte(payload))
 }
 
-// Fatal is D6's whole boot-failure posture: Report, then exit 1 — the same exit code every
+// Fatal is the whole boot-failure posture: Report, then exit 1 — the same exit code every
 // log.Fatalf call site it replaces already produced, preserved exactly. A *Reporter method rather
-// than a package-level function since P100 Part 1: each app constructs its own Reporter (carrying
-// its own Info) instead of this package holding a single process-wide defaultReporter — the
+// than a package-level function: each app constructs its own Reporter (carrying its own Info)
+// instead of this package holding a single process-wide defaultReporter — the
 // package can no longer default one itself, since it has no per-app config/buildinfo to build an
 // Info from.
 func (r *Reporter) Fatal(step Step, err error) {
@@ -186,7 +186,7 @@ func (r *Reporter) Fatal(step Step, err error) {
 	os.Exit(1)
 }
 
-// ReportPlatform is StepPlatform's own entry point (D7) — the one seam main.go's
+// ReportPlatform is StepPlatform's own entry point — the one seam main.go's
 // application.Options.ErrorHandler calls into, after doing its own *application.FatalError type
 // assertion (the only place in this package's contract that acknowledges pkg/application exists,
 // and it does so from the caller's side: this package imports nothing from pkg/application, per

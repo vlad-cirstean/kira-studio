@@ -1,9 +1,9 @@
-// P21 round 1 performance finding A1: rowMenu() used to eagerly run ctx.rows.map(ctx.snapshot)
+// rowMenu() used to eagerly run ctx.rows.map(ctx.snapshot)
 // while *building* the menu — decoding every selected row across every column whether or not any
 // of the four Copy row(s) items ever runs, including on every Delete keypress (which routes
-// through this same builder purely to dispatch, per P21 D5's own "printed shortcut and executed
+// through this same builder purely to dispatch, per the "printed shortcut and executed
 // action can't drift" rule, and never reads a snapshot at all). This pins that building the menu
-// no longer touches ctx.snapshot at all unless a Copy row(s) item's own run() actually executes,
+// no longer touches ctx.snapshot at all unless a Copy row(s) item's own run() executes,
 // and that running two of them only decodes once (the shared thunk is memoized).
 //
 // menu.ts transitively reaches bridge/control/bridge/data, so this has to be a dynamic import()

@@ -18,19 +18,21 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
-// board.go is the ADE v2 engine: tasks hold branches across repos; this type assembles the
+// board.go is the ADE engine: tasks hold branches across repos; this type assembles the
 // adewire.Board snapshot from the task store plus git facts. It returns wire types directly
 // (internal/bridge/adewire is a pure type leaf the layering test allows). Shared git fact helpers
 // live in gitfacts.go.
@@ -65,7 +67,7 @@ type TaskBoardDeps struct {
 	Sessions   *repos.AdeSessionsRepo
 	OnSessions func()
 	// OnRateLimits receives the rate-limit windows a headless run's stream reports (nil = ignored).
-	OnRateLimits func(claudeheadless.RateLimits)
+	OnRateLimits func(harness.RateLimits)
 	// OnRuns pushes changed runs on kira:adetask:runs.
 	OnRuns func(adewire.RunsChangedEvent)
 	// OnReview pushes a review step's change on kira:adetask:review.
@@ -74,8 +76,9 @@ type TaskBoardDeps struct {
 	AgentDir string
 	// Prompts resolves the editable LLM prompt texts; nil means the registry defaults.
 	Prompts llmprompts.Source
-	// ClaudeBin defaults to "claude" (a test points it at a fake).
-	ClaudeBin string
+	// Agent resolves the provider of a new run. AgentBin overrides its CLI (a test points it at a fake).
+	Agent    harness.Selector
+	AgentBin string
 	// Tracker records and launches interactive (TUI) task sessions.
 	Tracker *Tracker
 	// CloseTerminal closes a running terminal by id (Archive).
@@ -84,7 +87,7 @@ type TaskBoardDeps struct {
 	// review windows (Archive).
 	Windows            *repos.WindowsRepo
 	ReviewWindows      *repos.AdeReviewWindowsRepo
-	GhSynced           *repos.AdeGhSyncedRepo
+	ViewedSync         *repos.AdeViewedSyncRepo
 	CloseReviewWindows func(taskID string)
 	// ScriptRunsOf lists the script runs started for a task, newest first (run_outcome kind automation).
 	// CustomScripts and ScriptsHome resolve the smart script of a workflow step and its own folder.
@@ -142,24 +145,24 @@ type TaskBoard struct {
 	rebase         map[string]*rebaseCache
 	boardTimer     *time.Timer
 
-	runMu            sync.Mutex                       // guards live, setupLive, archiving, taskMus, finishes, stepMsgs
-	live             map[string]*liveRun              // run id -> its process
-	tuiGrants        map[string]tuiBinding            // TUI record id -> the agent MCP grant its launch registered
-	setupLive        map[string]*liveRun              // branch id -> its running prepare script
-	archiving        map[string]int                   // task id -> archives in progress; blocks launches
-	taskMus          map[string]*sync.Mutex           // task id -> serializes that task's run transitions
-	finishes         map[string]claudeheadless.Finish // run id -> last finish_step call
-	claims           map[string]string                // branch id -> the smart script working in its worktree
-	recoveredRebases []model.AdeRun                   // rebase runs Recover interrupted; Start re-reads git for them
-	stepMsgs         map[string]string                // task|step -> the Run dialog's edited message
-	agent            *claudeheadless.Server
+	runMu            sync.Mutex                 // guards live, setupLive, archiving, taskMus, finishes, stepMsgs
+	live             map[string]*liveRun        // run id -> its process
+	tuiGrants        map[string]tuiBinding      // TUI record id -> the agent MCP grant its launch registered
+	setupLive        map[string]*liveRun        // branch id -> its running prepare script
+	archiving        map[string]int             // task id -> archives in progress; blocks launches
+	taskMus          map[string]*sync.Mutex     // task id -> serializes that task's run transitions
+	finishes         map[string]agentmcp.Finish // run id -> last finish_step call
+	claims           map[string]string          // branch id -> the smart script working in its worktree
+	recoveredRebases []model.AdeRun             // rebase runs Recover interrupted; Start re-reads git for them
+	stepMsgs         map[string]string          // task|step -> the Run dialog's edited message
+	agent            *agentmcp.Server
 	wg               sync.WaitGroup // background setups and runs; Close waits
 	closeMu          sync.Mutex     // orders goTracked's wg.Add before Close's wg.Wait
 	closed           bool
 
-	ghMu      sync.Mutex             // guards ghLocks, ghPending
-	ghLocks   map[string]*sync.Mutex // branch id -> serializes its GitHub sync
-	ghPending map[string]bool        // branch id -> an unmark worker is queued
+	syncMu      sync.Mutex             // guards syncLocks, syncPending
+	syncLocks   map[string]*sync.Mutex // branch id -> serializes its GitHub sync
+	syncPending map[string]bool        // branch id -> an unmark worker is queued
 }
 
 // prompts is the source of every LLM prompt the board sends.
@@ -180,10 +183,10 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 		deps: deps, ctx: ctx, cancel: cancel, folderW: map[string]*folderWatcher{},
 		repoMus: map[string]*sync.Mutex{}, byGitRepoID: map[string]string{}, gitRepoIDOf: map[string]string{},
 		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, live: map[string]*liveRun{}, tuiGrants: map[string]tuiBinding{}, setupLive: map[string]*liveRun{},
-		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]claudeheadless.Finish{}, claims: map[string]string{}, stepMsgs: map[string]string{},
-		ghLocks: map[string]*sync.Mutex{}, ghPending: map[string]bool{},
+		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]agentmcp.Finish{}, claims: map[string]string{}, stepMsgs: map[string]string{},
+		syncLocks: map[string]*sync.Mutex{}, syncPending: map[string]bool{},
 	}
-	b.agent = claudeheadless.NewServer(claudeheadless.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b, Review: b, SandboxGit: b, Prompts: b.prompts()})
+	b.agent = agentmcp.NewServer(agentmcp.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b, Review: b, SandboxGit: b, Prompts: b.prompts()})
 	b.conn = gitsession.NewConn(boardConnID, "ade-board", boardConnLabel, b.handleEmit)
 	b.conn.RouteCredentials(func(ctx context.Context, req gitaskpass.Request) (string, bool) {
 		return deps.Credentials.Ask(ctx, boardConnLabel, req)
@@ -471,7 +474,7 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 	tasks := make([]adewire.Task, 0, len(d.tasks))
 	liveWf := b.liveWorkflows()
 	for _, t := range d.tasks {
-		wt := toWireTask(t, branchByTask[t.ID], d.runs[t.ID], d.reviews)
+		wt := b.toWireTask(t, branchByTask[t.ID], d.runs[t.ID], d.reviews)
 		decorateTask(&wt, t, liveWf)
 		tasks = append(tasks, wt)
 	}
@@ -517,9 +520,9 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 	}
 }
 
-func toWireTask(t model.AdeTask, branchIDs []string, runs []model.AdeRun, reviews map[string]model.AdeReview) adewire.Task {
+func (b *TaskBoard) toWireTask(t model.AdeTask, branchIDs []string, runs []model.AdeRun, reviews map[string]model.AdeReview) adewire.Task {
 	out := adewire.Task{
-		ID: t.ID, Kind: t.Kind, Title: t.Title, Owner: t.Owner, GithubURL: t.GithubURL, WorkflowID: t.WorkflowID,
+		ID: t.ID, Kind: t.Kind, Title: t.Title, Owner: t.Owner, HostURL: t.HostURL, HostLink: b.hostLink(t.HostURL), WorkflowID: t.WorkflowID,
 		EntryStepID: t.EntryStepID, Since: map[string]int{}, Est: t.Est, Notes: t.Notes, Color: t.Color, CreatedAt: t.CreatedAt,
 		BranchIDs: make([]string, 0, len(branchIDs)), Runs: make([]adewire.Run, 0, len(runs)),
 	}
@@ -593,16 +596,16 @@ func toWireHistory(tasks []model.AdeTask, branches []model.AdeTaskBranch) []adew
 	return out
 }
 
-// Prs resolves each created branch's PR and each used repo's PR availability.
-func (b *TaskBoard) Prs(ctx context.Context) (adewire.PrsResult, error) {
+// ChangeRequests resolves each created branch's change request and each used repo's host availability.
+func (b *TaskBoard) ChangeRequests(ctx context.Context) (adewire.ChangeRequestsResult, error) {
 	branches, err := b.deps.Tasks.BranchesLive()
 	if err != nil {
-		return adewire.PrsResult{}, err
+		return adewire.ChangeRequestsResult{}, err
 	}
 	repoIDs, byRepo := branchesByRepo(branches)
-	out := adewire.PrsResult{Repos: make([]adewire.RepoPrs, 0, len(repoIDs)), Branches: map[string]adewire.PR{}}
+	out := adewire.ChangeRequestsResult{Repos: make([]adewire.RepoHost, 0, len(repoIDs)), Branches: map[string]adewire.ChangeRequest{}, BranchURLs: map[string]string{}}
 	var mu sync.Mutex
-	rows := make(map[string]adewire.RepoPrs, len(repoIDs))
+	rows := make(map[string]adewire.RepoHost, len(repoIDs))
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(boardFanOut)
 	for _, id := range repoIDs {
@@ -611,29 +614,18 @@ func (b *TaskBoard) Prs(ctx context.Context) (adewire.PrsResult, error) {
 			if err != nil {
 				slog.Warn("ade board: prs open repo", "scope", "ade", "repo", id, "err", err)
 				mu.Lock()
-				rows[id] = adewire.RepoPrs{CodeRepoID: id, Kind: "unavailable"}
+				rows[id] = adewire.RepoHost{CodeRepoID: id, Kind: "unavailable"}
 				mu.Unlock()
 				return nil
 			}
-			webURL, _ := entry.RepoWebURL(gctx)
-			kind := "ok"
-			found := map[string]adewire.PR{}
-			for _, br := range byRepo[id] {
-				if br.Name == "" {
-					continue
-				}
-				res := entry.ResolveBranchPr(gctx, br.Name)
-				if res.Kind != "ok" {
-					kind = res.Kind
-				} else if len(res.PRs) > 0 {
-					pr := res.PRs[0]
-					found[br.ID] = adewire.PR{Number: pr.Number, Title: pr.Title, State: pr.State, URL: pr.URL}
-				}
-			}
+			kind, host, found, urls := resolveRepoHost(gctx, entry, byRepo[id])
 			mu.Lock()
-			rows[id] = adewire.RepoPrs{CodeRepoID: id, Kind: kind, WebURL: webURL}
+			rows[id] = adewire.RepoHost{CodeRepoID: id, Kind: kind, Host: host}
 			for k, v := range found {
 				out.Branches[k] = v
+			}
+			for k, v := range urls {
+				out.BranchURLs[k] = v
 			}
 			mu.Unlock()
 			return nil
@@ -644,6 +636,32 @@ func (b *TaskBoard) Prs(ctx context.Context) (adewire.PrsResult, error) {
 		out.Repos = append(out.Repos, rows[id])
 	}
 	return out, nil
+}
+
+// resolveRepoHost resolves the repo's host and each branch's change request and web page. kind is
+// the first non-ok lookup kind, else "ok".
+func resolveRepoHost(ctx context.Context, entry *gitsession.RepoEntry, branches []model.AdeTaskBranch) (kind string, host *githost.Info, found map[string]adewire.ChangeRequest, urls map[string]string) {
+	kind = "ok"
+	if info, ok := entry.HostInfo(ctx); ok {
+		host = &info
+	}
+	found, urls = map[string]adewire.ChangeRequest{}, map[string]string{}
+	for _, br := range branches {
+		if br.Name == "" {
+			continue
+		}
+		if u, ok := entry.BranchURL(ctx, br.Name); ok {
+			urls[br.ID] = u
+		}
+		res := entry.ResolveBranchChangeRequest(ctx, br.Name)
+		if res.Kind != "ok" {
+			kind = res.Kind
+		} else if len(res.ChangeRequests) > 0 {
+			cr := res.ChangeRequests[0]
+			found[br.ID] = adewire.ChangeRequest{Number: cr.Number, Title: cr.Title, State: cr.State, URL: cr.URL}
+		}
+	}
+	return kind, host, found, urls
 }
 
 // Refresh fetches the given repos (none = every repo a live task uses; the UI sends the ids it shows), marks PR-merged branches,
@@ -786,8 +804,8 @@ func (b *TaskBoard) checkPrMerges(ctx context.Context, entry *gitsession.RepoEnt
 			continue
 		}
 		g.Go(func() error {
-			r := entry.ResolveBranchPr(gctx, br.Name)
-			if r.Kind == "ok" && len(r.PRs) > 0 && r.PRs[0].State == "merged" {
+			r := entry.ResolveBranchChangeRequest(gctx, br.Name)
+			if r.Kind == "ok" && len(r.ChangeRequests) > 0 && r.ChangeRequests[0].State == "merged" {
 				mu.Lock()
 				merged[br.ID] = now
 				mu.Unlock()
@@ -795,7 +813,7 @@ func (b *TaskBoard) checkPrMerges(ctx context.Context, entry *gitsession.RepoEnt
 			return nil
 		})
 	}
-	_ = g.Wait() // ResolveBranchPr reports disabled/unavailable instead of erroring
+	_ = g.Wait() // ResolveBranchChangeRequest reports disabled/unavailable instead of erroring
 	return merged
 }
 

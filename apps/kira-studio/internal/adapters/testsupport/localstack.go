@@ -25,12 +25,12 @@ const (
 	LocalStackRegion          = "us-east-1"
 )
 
-// startLocalStack is P58d D22: a bare GenericContainer, never testcontainers-go/modules/localstack
+// startLocalStack is a bare GenericContainer, never testcontainers-go/modules/localstack
 // — that module's Run bind-mounts the Docker socket (a Lambda-only feature neither sqs nor s3
 // needs) behind a Must* that panics, and pulls in aws-sdk-go v1 alongside v2 for its own tests.
-// TC-4 confirmed a bare container starts here with no Docker socket bind at all. services is a
-// comma-separated SERVICES value (e.g. "s3,sqs"); TC-4 also found no measurable startup difference
-// in this sandbox, but restricting it is still the right default.
+// A bare container starts here with no Docker socket bind at all. services is a
+// comma-separated SERVICES value (e.g. "s3,sqs"); there is also no measurable startup
+// difference in this sandbox, but restricting it is still the right default.
 func startLocalStack(ctx context.Context, services string) (testcontainers.Container, string, error) {
 	req := testcontainers.ContainerRequest{
 		Image:        ImageFor("localstack", LocalStackImage),
@@ -56,9 +56,9 @@ func startLocalStack(ctx context.Context, services string) (testcontainers.Conta
 	return c, fmt.Sprintf("http://%s:%s", host, port.Port()), nil
 }
 
-// OperationCountingProxy is P58d D10: a reverse proxy in front of LocalStack that counts requests
-// carrying a given X-Amz-Target header value, keyed exactly (AWS-1(b) confirmed the header is
-// "AmazonSQS.<Operation>" on the wire). Go has no spyOn/prototype-patch equivalent to intercept an
+// OperationCountingProxy is a reverse proxy in front of LocalStack that counts requests carrying
+// a given X-Amz-Target header value, keyed exactly (the header is "AmazonSQS.<Operation>" on the
+// wire). Go has no spyOn/prototype-patch equivalent to intercept an
 // adapter's own SDK client, and adding a test hook to production code for two scenarios is worse
 // than a small proxy in testsupport — this is the only injection point an adapter's own
 // options.endpoint already exposes.

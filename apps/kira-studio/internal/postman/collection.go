@@ -1,14 +1,14 @@
-// Package postman reads and writes the Postman Collection Format v2.1 (P4 §2/§4). It is
+// Package postman reads and writes the Postman Collection Format v2.1. It is
 // self-contained by design — no storage, no adapters, no Wails, one Parse and one Write, drivable
 // from a plain `go test` with a testdata/ corpus — the shape internal/httpclient already has for a
 // second self-contained concern. It imports internal/storage/model only for SavedRequest, which
 // imports nothing but the standard library, so there is no cycle.
 //
-// The decision the whole package turns on is D5: every object it reads is kept **verbatim** as a
+// The decision the whole package turns on: every object it reads is kept **verbatim** as a
 // map[string]json.RawMessage minus only its recursive `item` array, so an export re-emits every
 // member this app does not model — auth, event[] scripts, variable[], saved response[],
 // protocolProfileBehavior, per-row descriptions, and every member a future revision adds —
-// unchanged. Fidelity here is a retention problem, not a parsing problem (F7): encoding/json drops
+// unchanged. Fidelity here is a retention problem, not a parsing problem: encoding/json drops
 // every member a struct does not declare, so no typed model, library or hand-written, can do it.
 package postman
 
@@ -181,7 +181,7 @@ func decodeScalarString(raw json.RawMessage) (string, bool) {
 	return "", false
 }
 
-// decodeDescription is P17 D14/F10's own leniency rule: Postman writes a `description` member
+// decodeDescription is the leniency rule: Postman writes a `description` member
 // either as a plain string or as an object carrying the text under its own "content" member — this
 // reads either shape and returns "" for anything else, rather than refusing to decode a variable
 // whose description arrived in the richer object form.

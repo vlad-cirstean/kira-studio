@@ -45,13 +45,12 @@ const PRE_EXISTING_STASH: StashEntry = {
   ref: '',
 };
 
-// G31 round-2 functional-correctness review, finding #1 (high): #stashAndCarry used to treat
-// stash.list's post-push entries[0] as "the entry stashAndCarry itself just pushed". When the
-// worktree is dirty ONLY with untracked files, stashPush (called with includeUntracked: false)
-// is a git no-op — "No local changes to save", exit 0 — so pushResult.ok is true but the stash
-// stack is unchanged. If the user already had a stash of their own, that PRE-EXISTING entry is
-// still entries[0], and the old code ran preflight.stashPop + op.run stashPop against it —
-// silently applying and deleting a stash this pull never created.
+// #stashAndCarry used to treat stash.list's post-push entries[0] as "the entry stashAndCarry itself
+// just pushed". When the worktree is dirty ONLY with untracked files, stashPush (called with
+// includeUntracked: false) is a git no-op — "No local changes to save", exit 0 — so pushResult.ok
+// is true but the stash stack is unchanged. If the user already had a stash of their own, that
+// PRE-EXISTING entry is still entries[0], and the old code ran preflight.stashPop + op.run stashPop
+// against it — silently applying and deleting a stash this pull never created.
 describe('OpsState — #stashAndCarry (via runPull) never touches a pre-existing, unrelated stash', () => {
   test('an untracked-only no-op stashPush leaves a pre-existing stash alone', async () => {
     const transport = new FakeTransport();
@@ -375,9 +374,9 @@ describe('OpsState — post-checkout pull prompt', () => {
   });
 });
 
-// G32 round-3 functional-correctness review, finding #7: every #confirm* dialog above (checkout,
+// Every #confirm* dialog above (checkout,
 // revert, reset, cherry-pick, stash apply/pop, pull, force push) opens a promise that only
-// resolves once the user actually clicks a button — arbitrarily long real-world wall-clock time,
+// resolves once the user clicks a button — arbitrarily long real-world wall-clock time,
 // during which App.vue's "Open in graph" can call OpsState.setRepoId() directly (it does not wait
 // on `busy`, since revealCommitInGraph is independent of whatever operation is mid-confirm). Before
 // this fix, resolving a stale dialog against the now-active repo would run op.run/#applyResult with

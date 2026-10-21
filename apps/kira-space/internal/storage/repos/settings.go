@@ -10,6 +10,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/appsettings"
 	"github.com/kirathecat/kira-studio/internal/appstorage"
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/providers"
 )
 
 // SettingsRepo reads and writes the `settings` table, one JSON-valued row per leaf
@@ -23,6 +25,17 @@ type SettingsRepo struct {
 	// selectAll is prepared once by repos.New. nil when a SettingsRepo is constructed directly
 	// (e.g. in tests), which falls back to an ad-hoc query with identical SQL.
 	selectAll *sql.Stmt
+
+	// Agents holds the providers whose model catalogs memory.models is checked against; nil means
+	// the built-in providers.
+	Agents *harness.Registry
+}
+
+func (r *SettingsRepo) agents() *harness.Registry {
+	if r.Agents == nil {
+		return providers.New()
+	}
+	return r.Agents
 }
 
 func (r *SettingsRepo) GetAll() (model.Settings, error) {
@@ -45,7 +58,9 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	result.Git = readGit(stored)
 	result.Ade = readAde(stored)
 	result.Mobile = readMobile(stored)
-	readClaudeCode(stored, &result.ClaudeCode)
+	readAgent(stored, &result.Agent)
+	appsettings.Leaf(stored, "memory.models", &result.Memory.Models)
+	result.Memory.Models = model.CleanMemoryModels(r.agents(), result.Memory.Models)
 	appsettings.LeafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
 	appsettings.Leaf(stored, "advanced.notifyPrompts", &result.Advanced.NotifyPrompts)
 	return result, nil
@@ -97,6 +112,13 @@ func readMobile(stored map[string]json.RawMessage) model.MobileSettings {
 	appsettings.LeafValid(stored, "mobile.port", &result.Port, model.ValidMobilePort)
 	appsettings.Leaf(stored, "mobile.agentInput", &result.AgentInput)
 	return result
+}
+
+func upsertMemory(tx *sql.Tx, m *model.MemoryPatch) error {
+	if m == nil {
+		return nil
+	}
+	return appsettings.UpsertOptional(tx, "memory.models", m.Models)
 }
 
 func upsertMobile(tx *sql.Tx, m *model.MobilePatch) error {
@@ -193,6 +215,9 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 	if err := patch.Validate(); err != nil {
 		return model.Settings{}, fmt.Errorf("repos: %w", err)
 	}
+	if err := patch.Memory.CheckModels(r.agents()); err != nil {
+		return model.Settings{}, fmt.Errorf("repos: %w", err)
+	}
 
 	err := appstorage.UpdateLeaves(r.DB, r.selectAll, settingsSelectAllSQL, func(tx *sql.Tx, _ map[string]json.RawMessage) error {
 		if err := upsertAppearance(tx, patch.Appearance); err != nil {
@@ -210,7 +235,10 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		if err := upsertMobile(tx, patch.Mobile); err != nil {
 			return err
 		}
-		return upsertClaudeCode(tx, patch.ClaudeCode)
+		if err := upsertMemory(tx, patch.Memory); err != nil {
+			return err
+		}
+		return upsertAgent(tx, patch.Agent)
 	})
 	if err != nil {
 		return model.Settings{}, err
@@ -218,15 +246,15 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 	return r.GetAll()
 }
 
-// claudeCodeLeaf pairs one claudeCode.<key> bool leaf with its read target and patch field.
-type claudeCodeLeaf struct {
+// agentLeaf pairs one agent.<key> bool leaf with its read target and patch field.
+type agentLeaf struct {
 	key string
 	dst *bool
 	set *bool
 }
 
-func claudeCodeLeaves(c *model.ClaudeCodeSettings, p model.ClaudeCodePatch) []claudeCodeLeaf {
-	return []claudeCodeLeaf{
+func agentLeaves(c *model.AgentSettings, p model.AgentPatch) []agentLeaf {
+	return []agentLeaf{
 		{"keepAwakeWithAgents", &c.KeepAwakeWithAgents, p.KeepAwakeWithAgents},
 		{"notifyEnabled", &c.NotifyEnabled, p.NotifyEnabled},
 		{"notifyOnFinished", &c.NotifyOnFinished, p.NotifyOnFinished},
@@ -237,19 +265,24 @@ func claudeCodeLeaves(c *model.ClaudeCodeSettings, p model.ClaudeCodePatch) []cl
 	}
 }
 
-func readClaudeCode(stored map[string]json.RawMessage, c *model.ClaudeCodeSettings) {
-	for _, l := range claudeCodeLeaves(c, model.ClaudeCodePatch{}) {
-		appsettings.Leaf(stored, "claudeCode."+l.key, l.dst)
+// readAgent reads the shared agent.provider leaf and this app's bool leaves on top of dst.
+func readAgent(stored map[string]json.RawMessage, dst *model.AgentSettings) {
+	dst.Agent = appsettings.ReadAgent(stored)
+	for _, l := range agentLeaves(dst, model.AgentPatch{}) {
+		appsettings.Leaf(stored, "agent."+l.key, l.dst)
 	}
 }
 
-func upsertClaudeCode(tx *sql.Tx, p *model.ClaudeCodePatch) error {
+func upsertAgent(tx *sql.Tx, p *model.AgentPatch) error {
 	if p == nil {
 		return nil
 	}
-	var unused model.ClaudeCodeSettings
-	for _, l := range claudeCodeLeaves(&unused, *p) {
-		if err := appsettings.UpsertOptional(tx, "claudeCode."+l.key, l.set); err != nil {
+	if err := appsettings.UpsertAgent(tx, &p.AgentPatch); err != nil {
+		return err
+	}
+	var unused model.AgentSettings
+	for _, l := range agentLeaves(&unused, *p) {
+		if err := appsettings.UpsertOptional(tx, "agent."+l.key, l.set); err != nil {
 			return err
 		}
 	}

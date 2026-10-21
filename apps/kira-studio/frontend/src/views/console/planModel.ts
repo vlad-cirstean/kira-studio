@@ -1,8 +1,8 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 
-// P18 (v1.1) D16: one normalized plan model every dialect's differing EXPLAIN output is parsed
+// One normalized plan model every dialect's differing EXPLAIN output is parsed
 // into (planParsers/*.ts) — every dialect's own fields survive it verbatim through `metrics`
-// rather than being discarded, and `raw` keeps the exact server text one toggle away (F14's own
+// rather than being discarded, and `raw` keeps the exact server text one toggle away (the
 // warning that SQLite's EXPLAIN QUERY PLAN format may change between releases is answered by never
 // claiming the parse is authoritative).
 
@@ -54,8 +54,8 @@ export interface QueryPlan {
 }
 
 /** Every scan/read-type PlanNode a dialect's own parser found, together with the row estimate
- *  D14's `estimatedRowsRead` is the max of. Threaded through planIssues.ts so the "wide scan"
- *  issue (D15) and the plan-level `estimatedRowsRead`/`overThreshold` fields are always derived
+ *  `estimatedRowsRead` is the max of. Threaded through planIssues.ts so the "wide scan"
+ *  issue and the plan-level `estimatedRowsRead`/`overThreshold` fields are always derived
  *  from the exact same node set — never two passes that could disagree. */
 export interface ScanEstimate {
   node: PlanNode;

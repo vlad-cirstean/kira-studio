@@ -7,14 +7,13 @@ import { markRaw } from 'vue';
 import { control } from '../../bridge/control';
 import { createPerRepoState } from './perRepo.ts';
 
-// C7 §7.2: the repository-wide search store — one entry per open repo workspace, the panel's
-// Files/Search switch (D9), the query/options, and the streamed result list. A search runs on
-// Enter or the Search button only (D10) — never on every keystroke, since each run reads every
+// The repository-wide search store — one entry per open repo workspace, the panel's
+// Files/Search switch, the query/options, and the streamed result list. A search runs on
+// Enter or the Search button only — never on every keystroke, since each run reads every
 // non-skipped file in the worktree.
 //
-// P99 §5.2: split from the flat "which of GitPanel's three top-level tabs is showing" concern,
-// which is not a search concept at all — that lives in useRepoPanelTabStore below, one store one
-// concern.
+// The flat "which of GitPanel's three top-level tabs is showing" concern, which is not a search
+// concept at all — that lives in useRepoPanelTabStore below, one store one concern.
 
 export interface RepoSearchOptions {
   regex: boolean;
@@ -59,7 +58,7 @@ function emptySearchState(): RepoSearchState {
   };
 }
 
-// D11: workers emit out of order; git ls-files' own output is already sorted, so inserting each
+// Workers emit out of order; git ls-files' own output is already sorted, so inserting each
 // incoming group at its sorted position gives a stable, alphabetical list that never reshuffles.
 // Replaces an existing group for the same path rather than duplicating it, so a repeated path never
 // shows twice.
@@ -240,9 +239,9 @@ export const useRepoSearchStore = defineStore('repoSearch', () => {
   function repoSearchRows(repoId: string): RepoSearchRowVm[] {
     const state = byRepo.get(repoId);
     if (!state) return [];
-    // `state.files` is markRaw'd (C14-1): reading it does not by itself see in-place
+    // `state.files` is markRaw'd: reading it does not by itself see in-place
     // splice/insert mutations, only reference replacement. `filesVersion` is the reactive
-    // dependency this computed actually needs to re-run as new groups stream in -- read it
+    // dependency this computed needs to re-run as new groups stream in -- read it
     // before touching `files`.
     void state.filesVersion;
     const rows: RepoSearchRowVm[] = [];
@@ -299,9 +298,9 @@ export const useRepoSearchStore = defineStore('repoSearch', () => {
   };
 });
 
-// P92 item 6: which of GitPanel.vue's three top-level tabs is showing. Flat, not per-repo: one
+// Which of GitPanel.vue's three top-level tabs is showing. Flat, not per-repo: one
 // persistent panel across every repo workspace. Own store so hostHandlers.ts's review.open can flip
-// the tab without depending on the search store. P220: persisted (`kira.git.panelTab`), default Repos.
+// the tab without depending on the search store. Persisted (`kira.git.panelTab`), default Repos.
 type RepoPanelTab = 'repos' | 'files' | 'review';
 const PANEL_TABS: readonly string[] = ['repos', 'files', 'review'];
 

@@ -1,0 +1,51 @@
+{
+  "AgentUsageService.Get#expired": {
+    "fiveHour": {
+      "resetsAt": 0,
+      "usedPercent": 30
+    },
+    "sevenDay": null,
+    "source": "session",
+    "state": "ok",
+    "updatedAt": 0
+  },
+  "AgentUsageService.Get#run": {
+    "fiveHour": {
+      "resetsAt": 0,
+      "usedPercent": 24
+    },
+    "sevenDay": {
+      "resetsAt": 0,
+      "usedPercent": 47
+    },
+    "source": "run",
+    "state": "ok",
+    "updatedAt": 0
+  },
+  "AgentUsageService.Get#session": {
+    "fiveHour": {
+      "resetsAt": 0,
+      "usedPercent": 23.5
+    },
+    "sevenDay": {
+      "resetsAt": 0,
+      "usedPercent": 41.2
+    },
+    "source": "session",
+    "state": "ok",
+    "updatedAt": 0
+  },
+  "event:kira:agent:usage": {
+    "fiveHour": {
+      "resetsAt": 0,
+      "usedPercent": 23.5
+    },
+    "sevenDay": {
+      "resetsAt": 0,
+      "usedPercent": 41.2
+    },
+    "source": "session",
+    "state": "ok",
+    "updatedAt": 0
+  }
+}

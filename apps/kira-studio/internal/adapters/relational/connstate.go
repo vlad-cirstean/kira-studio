@@ -1,7 +1,7 @@
 // Package relational holds the shape postgres and mysqlfamily's own adapter.go files are otherwise
-// byte-identical over (P113 G1): their connection state and the Disconnect body built around it.
-// Each engine's own ConnSet type differs (postgres.ConnSet vs mysqlfamily.ConnSet), so ConnState and
-// Disconnect stay generic over it rather than this package importing either engine.
+// byte-identical over: their connection state and the Disconnect body built around it.
+// Each engine's own ConnSet type differs (postgres.ConnSet vs mysqlfamily.ConnSet), so ConnState
+// and Disconnect stay generic over it rather than this package importing either engine.
 package relational
 
 import (

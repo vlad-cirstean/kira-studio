@@ -18,7 +18,7 @@ import {
 // (connectionId, DDL text) — see state/schemas.ts's memoisation — and never touches the network.
 export interface DdlColumn {
   name: string;
-  /** F5.2: taken as a raw source-text slice, never reconstructed from individual tokens —
+  /** Taken as a raw source-text slice, never reconstructed from individual tokens —
    *  `sql-tokens.ts`'s scanner has no dedicated `Type` node kind at all (a declared column type is
    *  an ordinary run of `Identifier`/`Keyword`/`Parens` tokens), so collecting only "type-shaped"
    *  nodes would require guessing at exactly the vocabulary this comment used to worry about
@@ -53,7 +53,7 @@ export interface DdlSchema {
 
 export const EMPTY_DDL_SCHEMA: DdlSchema = { tables: [] };
 
-// D9: everything that can start a *table-level* constraint clause, not a column — `PRIMARY KEY
+// Everything that can start a *table-level* constraint clause, not a column — `PRIMARY KEY
 // (a, b)`, `KEY idx (x)`, `UNIQUE (x)`, `CONSTRAINT fk FOREIGN KEY … REFERENCES …`, a bare
 // `FOREIGN KEY (…)`, `CHECK (…)`, MySQL's `INDEX`/`FULLTEXT`/`SPATIAL` — recognised by their
 // leading keyword and consumed whole, never emitted as a phantom column (e.g. one named
@@ -70,7 +70,7 @@ const TABLE_CONSTRAINT_LEADING = new Set([
   'spatial',
 ]);
 
-// F5.2: where a column's declared-type slice ends. Matched by lowercased text against ANY of
+// Where a column's declared-type slice ends. Matched by lowercased text against ANY of
 // Keyword/Identifier/Null (not just Keyword) because a dialect's own curated keyword list can
 // leave a constraint word un-classified — this repo's in-house ClickHouseDialect has no `default`
 // in its keyword string (languages.ts), so `DEFAULT` there tokenises as a plain Identifier.
@@ -383,7 +383,7 @@ export function parseDdl(dialect: SqlDialect, source: string): DdlSchema {
   return { tables };
 }
 
-// P60b §5.1: SchemaNamespace replaces lang-sql's own SQLNamespace — the same recursive
+// SchemaNamespace replaces lang-sql's own SQLNamespace — the same recursive
 // name -> (columns | nested namespace) object `toSqlNamespace` already built, typed for this app's
 // own EditorCompletion (`editor/completion.ts`) instead of `@codemirror/autocomplete`'s Completion.
 // `sqlSchemaCompletion.ts` is the one consumer.
@@ -399,7 +399,7 @@ function columnCompletions(table: DdlTable): readonly EditorCompletion[] {
   }));
 }
 
-/** D10: the SchemaNamespace `sqlSchemaCompletion.ts` consumes. A qualified table is emitted both
+/** The SchemaNamespace `sqlSchemaCompletion.ts` consumes. A qualified table is emitted both
  *  nested (`schema.table`) and flat (`table`) — SchemaNamespace is a plain object, so duplicating a
  *  reference costs nothing, and it's what makes a bare table name complete even when the DDL
  *  qualified it. */
@@ -454,7 +454,7 @@ export function namespaceFromCached(
   return ns;
 }
 
-/** D7/D8: looks a table up by (optional) qualifier + name, case-insensitively — preferring an
+/** Looks a table up by (optional) qualifier + name, case-insensitively — preferring an
  *  exact schema-qualified match, falling back to the first table with that bare name. Shared by
  *  the diagnostics and hover providers, which resolve a FROM-clause/alias reference against the
  *  same schema the completion source already offers. */

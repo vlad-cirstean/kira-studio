@@ -16,7 +16,7 @@ const PR_BADGE_VARIANT: Record<string, RefBadgeVariant> = {
 };
 
 /** `refBadges.ts` marks the graph PR badge with `data-testid`. */
-export function prBadgeClass(state: string): string {
+export function changeRequestBadgeClass(state: string): string {
   const base = 'no-underline cursor-pointer';
   if (state === 'merged') return refBadgeClass('chip', base, 'bg-conn-violet/16 text-conn-violet');
   return refBadgeClass(PR_BADGE_VARIANT[state] ?? 'default', base);

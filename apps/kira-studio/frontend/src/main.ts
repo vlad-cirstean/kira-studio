@@ -143,7 +143,7 @@ function frameBufferStats(allEntries: readonly { page: Parameters<typeof pageChu
 declare global {
   interface Window {
     /**
-     * Playwright-only hook (tests/e2e/perf.spec.ts) — the exact §2.2 retained-bytes figure, so
+     * Playwright-only hook (tests/e2e/perf.spec.ts) — the exact retained-bytes figure, so
      * "closing a tab frees its page immediately" can be asserted deterministically instead of
      * read off a flaky RSS sample. Grid-only, kept as-is so that assertion's meaning is unchanged.
      */
@@ -166,24 +166,23 @@ declare global {
      */
     __kiraGridScrollWorkStart?: (t: number) => void;
     /**
-     * Playwright-only hook (P5 C1, tests/ui/leaks.spec.ts) — the renderer-retention probe: the
+     * Playwright-only hook (tests/ui/leaks.spec.ts) — the renderer-retention probe: the
      * decode/view caches, the document parse cache, per-tab search matches and distinct retained
-     * frame buffers that `__kiraRetainedBytes` cannot see (F2's own finding — that hook sums
-     * `page.byteSize` only). Deterministic, engine-independent (no heap API) accounting for
-     * structures §2's findings (F4-F8) are about.
+     * frame buffers that `__kiraRetainedBytes` cannot see (that hook sums `page.byteSize` only).
+     * Deterministic, engine-independent (no heap API) accounting.
      */
     __kiraRetention?: () => KiraRetentionSnapshot;
     /**
-     * P22 iter2 D2: a real-fling scroll trace a human drives from DevTools on real hardware (a dev
+     * A real-fling scroll trace a human drives from DevTools on real hardware (a dev
      * build — View → Open DevTools, internal/shell/menutemplate.go) — NOT a Playwright hook, and
      * not gated in CI. See views/shared/slick/scrollTrace.ts's own header comment and
-     * docs/HISTORY.md (v1.1 P22) for the protocol.
+     * docs/HISTORY.md for the protocol.
      */
     __kiraScrollTrace?: { start: () => void; stop: () => ScrollTraceResult | null };
     /**
-     * P22 iter2 D3/D4: runtime tuning for DataGrid.vue's row overscan (D3) and per-row memoisation
-     * (D4) — read from the console so the real-Mac A/B in the plan's §7.3 step 6 needs one build,
-     * not a rebuild per variant. `undefined` on any field means "use the compiled default".
+     * Runtime tuning for DataGrid.vue's row overscan and per-row memoisation — read from the
+     * console so the real-Mac A/B needs one build, not a rebuild per variant. `undefined` on any
+     * field means "use the compiled default".
      */
     __kiraGridTuning?: {
       /** Overrides columns.ts's LEAD_FRAMES. */
@@ -193,30 +192,30 @@ declare global {
       /** P22 iter2-scroll-gaps D2: overrides columns.ts's MAX_NEW_CELLS_PER_RENDER — the SlickGrid
        *  engine's per-call new-cell batch cap, read fresh on every `getRenderedRange` call. */
       maxNewCellsPerRenderOverride?: number;
-      /** P22 iter2-scroll-gaps D3, real-hardware finding: `forceSyncScrolling: true` unconditionally
-       *  (SlickGridHost.vue, added `0865ef6`) coupled main-thread render work to every native
-       *  scroll-event tick during a fling, which read on real macOS hardware as visible stutter —
-       *  worse than the incumbent tanstack grid's own "content lags, motion stays smooth" gap
-       *  symptom. Default flipped to `false` (D2's batch cap alone) pending a real A/B on whether D3
-       *  is actually the cause; `true` restores the old unconditional-sync behaviour. Unlike the
-       *  runway overrides above (read fresh on every call), this is a SlickGrid construction-time
-       *  option — read once, at `new KiraSlickGrid(...)`, not live thereafter. */
+      /** Real-hardware finding: `forceSyncScrolling: true` unconditionally (SlickGridHost.vue)
+       *  coupled main-thread render work to every native scroll-event tick during a fling, which
+       *  read on real macOS hardware as visible stutter — worse than the incumbent tanstack grid's
+       *  own "content lags, motion stays smooth" gap symptom. Default flipped to `false`
+       *  (the batch cap alone) pending a real A/B on whether it is the cause; `true` restores the
+       *  old unconditional-sync behaviour. Unlike the runway overrides above
+       *  (read fresh on every call), this is a SlickGrid construction-time option — read once, at
+       *  `new KiraSlickGrid(...)`, not live thereafter. */
       forceSyncScrollingOverride?: boolean;
-      /** P22 iter2-pacing D1: how long (ms) the viewport must go without a native scroll event
+      /** How long (ms) the viewport must go without a native scroll event
        *  before a self-scheduled catch-up render is allowed to run — overrides columns.ts's
        *  CHASE_QUIET_MS. Read fresh on every chase callback, never cached. `0` restores the pre-fix
        *  "fire on the very next rAF, unconditionally" behaviour exactly, so the real-Mac A/B
-       *  (docs/PERF.md §2.1c) is a console line, not a rebuild. See kiraSlickGrid.ts's own
+       *  (docs/PERF.md) is a console line, not a rebuild. See kiraSlickGrid.ts's own
        *  `scheduleChase` for why the gate is scroll quiescence, not a same-frame-render token. */
       chaseQuietMsOverride?: number;
-      /** P22 iter2-pacing D2: a per-render cap on *runway* (beyond strictly-visible) growth,
+      /** A per-render cap on *runway* (beyond strictly-visible) growth,
        *  separate from maxNewCellsPerRenderOverride above (which stays the absolute per-pass
        *  ceiling and the floor short-circuit) — overrides columns.ts's
        *  MAX_NEW_LEAD_CELLS_PER_RENDER. Defaulted equal to MAX_NEW_CELLS_PER_RENDER (neutral, no
-       *  behaviour change) pending a real-hardware A/B (docs/PERF.md §2.1c step 4) on the
+       *  behaviour change) pending a real-hardware A/B (docs/PERF.md step 4) on the
        *  variance-vs-convergence trade lowering it makes. */
       maxNewLeadCellsPerRenderOverride?: number;
-      /** P22 iter2-onset D2: whether the catch-up render's *per-frame* gate is on — a chase may
+      /** Whether the catch-up render's *per-frame* gate is on — a chase may
        *  only run when no native `scroll` event arrived between the previous animation frame and
        *  this one. It joins `chaseQuietMsOverride`'s wall-clock gate because that one alone cannot
        *  survive a frame longer than its own threshold (24ms against a measured real-Mac p50 of
@@ -225,19 +224,19 @@ declare global {
        *  both at once and so keeps its documented "the pre-fix policy exactly" meaning. See
        *  kiraSlickGrid.ts's own `scheduleChase` for the measurement behind it. */
       chaseFrameGateOverride?: boolean;
-      /** P22 iter2-onset D1: whether a render pass samples the viewport's scroll offset itself, at
+      /** Whether a render pass samples the viewport's scroll offset itself, at
        *  the moment it needs the velocity, instead of relying on the host's own `scroll` listener —
        *  which SlickGrid's constructor-registered listener always beats to the same event, leaving
        *  every render one sample behind and the *first* render of every fresh gesture reading "at
        *  rest" outright. Defaults to `true` (the fix on); `false` restores the pre-fix behaviour
-       *  exactly, so the real-Mac A/B (docs/PERF.md §2.1c) is a console line, not a rebuild. Read
+       *  exactly, so the real-Mac A/B (docs/PERF.md) is a console line, not a rebuild. Read
        *  fresh on every sample, never cached. See SlickGridHost.vue's own `recordOffsetSample` for
        *  the source citations behind the ordering claim. */
       freshVelocitySampleOverride?: boolean;
     };
   }
 }
-// P29 F1: every window.__kira* assignment below is Playwright- or DevTools-only (see each
+// Every window.__kira* assignment below is Playwright- or DevTools-only (see each
 // field's own doc comment above) and must never reach a packaged build — __KIRA_DEBUG_HOOKS__ is
 // a vite.config.ts `define`, so a shipped build cannot be talked into enabling it at runtime the
 // way the deleted window.__kiraGridEngine once could. scripts/verify-packaging.sh's S6/S7 guard
@@ -311,7 +310,7 @@ async function mountShell(): Promise<void> {
   const treeStore = useTreeStore(pinia);
   const schemaColumnsStore = useSchemaColumnsStore(pinia);
 
-  // F3 (P108 Part 12): these three used to subscribe only from ProjectTree.vue's own onMounted —
+  // These three used to subscribe only from ProjectTree.vue's own onMounted —
   // a window booted with the project panel hidden (API/Terminal mode, or per-mode panel gating)
   // or with zero connections yet never got them for the whole session. onSchemaChanged and
   // onConnectionMetadataInvalidated then never arrived, so a restored console tab's completion,
@@ -329,9 +328,9 @@ async function mountShell(): Promise<void> {
 
   cacheStatsStore.initCacheStats();
   appMetricsStore.initAppMetrics();
-  // Must complete before anything window-scoped below (hydrateTabs, in particular) — P8 D2:
+  // Must complete before anything window-scoped below (hydrateTabs, in particular) —
   // always a no-op on the native shell, the only registration a `-tags server` browser tab ever
-  // gets otherwise. P22 D12: also this window's own persisted mode — set once before the first
+  // gets otherwise. Also this window's own persisted mode — set once before the first
   // render, the same way hydrateLayout/hydrateSettings below hydrate their own state.
   modeStore.hydrateMode(await control.windowsEnsure());
   await Promise.all([
@@ -361,8 +360,8 @@ async function mountShell(): Promise<void> {
   useAppUpdateStore().initAppUpdate();
 }
 
-// P108 Part 12 F13: mountShell's own hydrates (modeStore.hydrateMode's windowsEnsure call and every
-// entry in the Promise.all above) can reject — a DB error, or a busy DB. P113 F6: the catch-and-
+// mountShell's own hydrates (modeStore.hydrateMode's windowsEnsure call and every
+// entry in the Promise.all above) can reject — a DB error, or a busy DB. The catch-and-
 // retry wrapper itself moved to workbench/bootstrapShell.ts, shared with apps/kira-space's own
-// identical copy (P100 Part 2 F2).
+// identical copy.
 void bootstrapShell(mountShell, 'Kira Studio');

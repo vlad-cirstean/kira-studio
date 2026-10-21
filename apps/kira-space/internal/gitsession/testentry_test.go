@@ -9,7 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 )
 
-// testEntryOpts is newTestEntry's own optional extras (P107 I2-28) — incremental_test.go's,
+// testEntryOpts is newTestEntry's own optional extras — incremental_test.go's,
 // queries_test.go's, stack_test.go's and worktree_test.go's own newXTestEntry each set only the
 // one or two fields their own scenario needs; the zero value is the queries_test.go shape (a
 // plain ExecRunner, no review store).
@@ -20,9 +20,9 @@ type testEntryOpts struct {
 }
 
 // newTestEntry is incremental_test.go's, queries_test.go's, stack_test.go's and worktree_test.go's
-// own shared "open a fresh registry+conn against repoDir, return the held entry" shape (P107
-// I2-28). connID stays each caller's own literal — stack_test.go's own RunOp calls elsewhere in
-// that file re-pass "stack-test-conn" verbatim, so it cannot be genericized away.
+// own shared "open a fresh registry+conn against repoDir, return the held entry" shape. connID
+// stays each caller's own literal — stack_test.go's own RunOp calls elsewhere in that file re-pass
+// "stack-test-conn" verbatim, so it cannot be genericized away.
 func newTestEntry(t *testing.T, connID ConnID, repoDir string, opts testEntryOpts) (*Conn, *RepoEntry) {
 	t.Helper()
 	runner := opts.runner

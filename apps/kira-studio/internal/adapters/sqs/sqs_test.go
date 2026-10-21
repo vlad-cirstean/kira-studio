@@ -1,11 +1,11 @@
-// Ported from packages/db-fixtures/sqs.spec.ts, case by case where practical — the spec's own numbering is
-// kept in each test's name so the two can be diffed. §5.3 of docs/HISTORY.md (v1 P58d) names
-// the cases that carry the most weight: opening the definition must not receive a message
-// (scenario 6), the headers cell matches P58d D8's hand encoder byte-for-byte (new), a second read
-// and count issue no second GetQueueUrl (scenarios 15/16, rewritten around the counting proxy per
-// P58d D10), and repeated small polls eventually see every message (scenario 8). Every mutating
-// test creates its own queue (P58d D23) — a stricter rule than the TypeScript's own, since Go's
-// testing package gives no top-to-bottom single-process ordering guarantee.
+// Ported from packages/db-fixtures/sqs.spec.ts, case by case where practical — the spec's own
+// numbering is kept in each test's name so the two can be diffed. The cases that carry the most
+// weight: opening the definition must not receive a message (scenario 6), the headers cell matches
+// the hand encoder byte-for-byte (new), a second read and count issue no second GetQueueUrl
+// (scenarios 15/16, rewritten around the counting proxy), and repeated small polls eventually see
+// every message (scenario 8). Every mutating test creates its own queue — a stricter rule than the
+// TypeScript's own, since Go's testing package gives no top-to-bottom single-process ordering
+// guarantee.
 package sqs_test
 
 import (

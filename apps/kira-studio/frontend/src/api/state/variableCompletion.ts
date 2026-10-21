@@ -19,22 +19,20 @@ import type { EditorCompletionSource } from '../../editor/completion';
 import { type ConsoleHoverInfo, formatHoverValue } from '../../editor/hoverInfo';
 import { mergeVariableRows } from './variables';
 
-// P15b D4: the Api side supplies the data, in one module, from the call already being made — F5's
-// own finding that the merged values/secrets were already synchronous, already cached, and already
-// fired on mount/collection/environment change by HttpRequestView.vue (P112: now each request
-// view's own useVariableRows observers, passed straight into variableSupport below). This module
-// builds three
-// pure, DOM-free lookups over that same data for D2/D3's editor seams to call: colouring
+// The Api side supplies the data, in one module, from the call already being made — the finding
+// that the merged values/secrets were already synchronous, already cached, and already fired on
+// mount/collection/environment change by HttpRequestView.vue (now each request view's own
+// useVariableRows observers, passed straight into variableSupport below). This module builds three
+// pure, DOM-free lookups over that same data for the editor seams to call: colouring
 // (rangeHighlights), the hover panel's lines (hoverAt), and the `{{…}}` completion list
 // (candidates). May import @kira/api-core and api/state/variables.ts; may not import
 // `workbench/**` (biome.json).
 //
-// P18 D11: moved here from views/httprequest/ — biome.json's per-directory noRestrictedImports
-// bans views/grpcrequest/** from reaching into views/httprequest/**, and gRPC needs this module's
-// exports too (F15). api/state/ is the precedent P12 D12 already set for a module both protocol
-// views need: this file imports only @kira/api-core, api/state/variables.ts (a sibling, now) and
-// two type-only imports, none of which are views/**/project/**/workbench/**, so the move is legal
-// in the direction that matters. No re-export shim is left at the old path.
+// biome.json's per-directory noRestrictedImports bans views/grpcrequest/** from reaching into
+// views/httprequest/**, and gRPC needs this module's exports too. api/state/ is the precedent
+// already set for a module both protocol views need: this file imports only @kira/api-core,
+// api/state/variables.ts (a sibling, now) and two type-only imports, none of which are
+// views/**/project/**/workbench/**, so the move is legal in the direction that matters.
 
 const HOVER_VALUE_MAX_LENGTH = 200;
 
@@ -57,10 +55,10 @@ function classFor(name: string, kind: ReferenceKind): string {
   }
 }
 
-// D3 rule 4's own fallback, made legible: a name that contains `|` but never parsed as a pipeline
-// (`classifyReference` sees the whole `token | base46` string as the name) means at least one
-// segment after the first is not a recognised transform. Names the first offending one, or the
-// first segment itself when it was the empty-name case (`{{ | upper}}`).
+// A name that contains `|` but never parsed as a pipeline (`classifyReference` sees the whole
+// `token | base46` string as the name) means at least one segment after the first is not a
+// recognised transform. Names the first offending one, or the first segment itself when it was the
+// empty-name case (`{{ | upper}}`).
 function badTransformMessage(fullName: string): string {
   const segments = fullName.split('|').map((s) => s.trim());
   const rest = segments.slice(1);
@@ -71,7 +69,7 @@ function badTransformMessage(fullName: string): string {
   });
 }
 
-/** Which scope a resolved name came from, for the hover's second line (D4) — tests membership in
+/** Which scope a resolved name came from, for the hover's second line — tests membership in
  *  the caller's own environment rows directly rather than widening `mergeVariableRows` with a
  *  parallel `origin` map: the one call site that needs this is here, and widening a function
  *  `send()` also depends on for a tooltip caption is the wrong direction of dependency. */
@@ -88,15 +86,13 @@ export interface VariableSupport {
    *  which is scoped to the CodeMirror-native tooltip (editor/hover.ts) the request/message body
    *  editors use instead. */
   hoverAt: (text: string, offset: number) => string[] | null;
-  /** Real-interaction fix (reported bug — the {{variable}} hover tooltip's value and its
-   *  explanation ran together as one undifferentiated block, and a JSON-shaped value showed as a
-   *  single truncated line): the same lookup as `hoverAt`, but keeping a resolved reference's
-   *  actual value (`value`, pretty-printed with editor/hover.ts's own `formatHoverValue` when it
-   *  parses as JSON) separate from its explanation (`lines` — the caption `variableHoverSource`
-   *  renders underneath it). `value` is `undefined` for every other reference kind (deferred/
-   *  dynamic/unknown never had a value to show, only ever an explanation) — `hoverAt` above is a
-   *  thin wrapper over this (`value` prepended into `lines` when present) rather than a second
-   *  copy of the same per-kind switch, so the two can never drift apart on what a reference means. */
+  /** The same lookup as `hoverAt`, but keeping a resolved reference's actual value (`value`,
+   *  pretty-printed with editor/hover.ts's own `formatHoverValue` when it parses as JSON) separate
+   *  from its explanation (`lines` — the caption `variableHoverSource` renders underneath it).
+   *  `value` is `undefined` for every other reference kind (deferred/dynamic/unknown never had a
+   *  value to show, only ever an explanation) — `hoverAt` above is a thin wrapper over this
+   *  (`value` prepended into `lines` when present) rather than a second copy of the same per-kind
+   *  switch, so the two can never drift apart on what a reference means. */
   hoverInfo: (text: string, offset: number) => HoverInfo | null;
   /** P17 D13(b): a function of the token's own context, not a static array — the list depends on
    *  whether the caret is before or after a `|` inside the reference. */
@@ -146,8 +142,8 @@ export function variableSupport(
     if (!span) return null;
     const kind = classifyReference(span.name, values, secretNames);
     const pipeline = span.pipeline ?? [];
-    // D13(c): a reference with a pipeline gets one more line naming the chain in order — never
-    // shown for `unknown` (D3 rule 4's fallback has no pipeline by construction: the whole
+    // A reference with a pipeline gets one more line naming the chain in order — never
+    // shown for `unknown` (the fallback has no pipeline by construction: the whole
     // "token | base46" string became the name instead) or for `deferred` (folded into that
     // branch's own sentence below, rather than a bare arrow chain next to "secret").
     const chainLine = pipeline.length > 0 ? [`→ ${pipeline.join(' → ')}`] : [];
@@ -186,12 +182,12 @@ export function variableSupport(
               : [t('studio.api.hover.secret.hint')],
         };
       case 'dynamic': {
-        // D4's table also wants "the catalogue's own description" as a second line here — the
+        // The table also wants "the catalogue's own description" as a second line here — the
         // catalogue (api-core's dynamic/catalog.ts) deliberately carries no description strings
-        // (DynamicValuesDialog.vue's own D11: "the sample is the description", which needs an
+        // (DynamicValuesDialog.vue's own "the sample is the description", which needs an
         // async generator load this synchronous hover can't perform) — so only line 1 is shown,
         // a documented deviation rather than a second, drifting copy of that dialog's samples.
-        // D12: catalogued means either spelling.
+        // catalogued means either spelling.
         const catalogued = isDynamicName(span.name) || isFakeName(span.name);
         return {
           lines: catalogued
@@ -231,10 +227,10 @@ export function variableSupport(
       icon: 'symbol-variable',
     })),
   ].sort((a, b) => compareNatural(a.label, b.label));
-  // P28 D15(b): `fake.` is now the only dynamic vocabulary this app *offers*. D12/D13(b) used to
-  // list the 58 Postman `$name` spellings right after it, tagged 'postman alias'. An already-stored
+  // `fake.` is now the only dynamic vocabulary this app *offers*. The 58 Postman `$name` spellings
+  // used to be listed right after it, tagged 'postman alias'. An already-stored
   // `{{$randomEmail}}` keeps resolving, keeps painting as a catalogued reference (classFor, above)
-  // and keeps its hover — it simply stops being suggested, and a Postman import now rewrites it to
+  // and keeps its hover — it stops being suggested, and a Postman import now rewrites it to
   // its `fake.` equivalent up front (api/state/collections.ts).
   const fakeCandidates: Completion[] = FAKE_NAMES.map((name) => ({
     label: name,
@@ -270,14 +266,14 @@ export function variableSupport(
   };
 }
 
-// P22b D5: the request body editors (RequestBodyPane.vue's raw/code hosts, GrpcRequestView.vue's
+// The request body editors (RequestBodyPane.vue's raw/code hosts, GrpcRequestView.vue's
 // message editor) are the single largest place a user writes {{variables}}, and until now they
 // only got rangeHighlights (colouring) — hovering showed nothing, typing `{{` offered nothing.
 // These two adapters give MonacoHost's hoverSource/completionSources seams the same
 // VariableSupport data the plain AutocompleteField fields already use, so the behaviour matches
 // exactly rather than being reimplemented.
 
-// P60a §3.1: a pure `(doc, offset) => ConsoleHoverInfo | null` — simpler than the CodeMirror shape
+// A pure `(doc, offset) => ConsoleHoverInfo | null` — simpler than the CodeMirror shape
 // this replaced (`editor/hover.ts`'s own `buildHoverSource` existed only to turn a lookup like
 // this one into a CodeMirror `HoverTooltipSource`; that glue is gone, MonacoHost.vue plugs this
 // straight into its own hover provider).
@@ -291,7 +287,7 @@ export function variableHoverSource(
 ): (doc: string, offset: number) => ConsoleHoverInfo | null {
   return (doc, offset) => {
     const info = hoverInfo(doc, offset);
-    // hoverInfo has no notion of the reference's own span (F5/AutocompleteField.vue's own hover
+    // hoverInfo has no notion of the reference's own span (AutocompleteField.vue's own hover
     // panel gets away with the same simplification, its own comment: "without needing the
     // token's own span") — a point tooltip at `offset` re-triggers as the mouse moves, which is
     // harmless since the same info comes back for any offset still inside the reference.
@@ -312,13 +308,12 @@ function completionType(icon: string | undefined): 'variable' | 'method' | undef
   }
 }
 
-// P22b D5/OQ-6: fires only inside an unclosed `{{…}}` (templateToken's own null elsewhere is what
+// Fires only inside an unclosed `{{…}}` (templateToken's own null elsewhere is what
 // keeps this from popping up over ordinary body text) — the same tokenizer rule
 // AutocompleteField's own `{{variable}}` fields already use. Checked against
-// @codemirror/lang-json's own source (OQ-6 asks whether this fights the JSON language's own
-// completions): jsonLanguage's languageData carries no `autocomplete` entry at all, so there is no
-// JSON completion source to re-add here — the array is this source alone for every `code`
-// language, not just JSON, and for `raw`.
+// @codemirror/lang-json's own source: jsonLanguage's languageData carries no `autocomplete`
+// entry at all, so there is no JSON completion source to re-add here — the array is this source
+// alone for every `code` language, not just JSON, and for `raw`.
 export function variableCompletionSource(
   candidates: VariableSupport['candidates'],
 ): EditorCompletionSource {

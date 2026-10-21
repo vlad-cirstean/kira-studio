@@ -4,7 +4,7 @@
 // Run: bun scripts/demo-dbs/sqlite/seed.ts
 //
 // Unlike every other engine's demo (a container + init.sql/seed.sql pair applied through a
-// client), SQLite has no server and no compose service to give it one (D36) — the artefact a
+// client), SQLite has no server and no compose service to give it one — the artefact a
 // SQLite connection needs is a file on disk, so this script builds one directly with the same
 // module (`node:sqlite`) the app's own adapter uses. A port of ../mysql/init.sql +
 // ../mysql/seed.sql, not a copy: the same customers/customer_addresses/categories/products/

@@ -1,8 +1,8 @@
-// P12 round 2 finding #7: a CTE named after a real DDL table must resolve to the CTE, not the base
-// table it shadows — resolveAliasMap (sqlDiagnostics.ts) and resolveHover's qualifier resolution
-// (sqlHover.ts) both used to ignore cteNames and fall straight through to findTable, producing a
-// false-positive "unknown column" diagnostic (D7: "a false positive is worse than a missing
-// diagnostic") and a wrong hover card for entirely valid SQL.
+// A CTE named after a real DDL table must resolve to the CTE, not the base table it shadows —
+// resolveAliasMap (sqlDiagnostics.ts) and resolveHover's qualifier resolution (sqlHover.ts) both
+// used to ignore cteNames and fall straight through to findTable, producing a false-positive
+// "unknown column" diagnostic ("a false positive is worse than a missing diagnostic") and a wrong
+// hover card for entirely valid SQL.
 import { describe, expect, test } from 'bun:test';
 import type { DdlSchema } from '../../frontend/src/views/console/ddl';
 import { ddlDiagnostics } from '../../frontend/src/views/console/sqlDiagnostics';

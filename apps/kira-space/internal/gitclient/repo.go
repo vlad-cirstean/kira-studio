@@ -31,8 +31,7 @@ type RepoSummary struct {
 	Head             HeadState `json:"head"`
 }
 
-// maxConcurrentReads bounds a repo's own read pool (docs/HISTORY.md (v1.3)'s P1 row: "a per-repository
-// write queue with a bounded concurrent read pool"). Small on purpose: every real read this app
+// maxConcurrentReads bounds a repo's own read pool. Small on purpose: every real read this app
 // runs against one repository is a single `git` process, and git itself already serialises on its
 // own index/ref locks — this bound exists to cap how many such processes pile up concurrently
 // against one repository, not to maximise throughput.
@@ -42,9 +41,8 @@ const maxConcurrentReads = 4
 // against it goes through — a reader-writer gate, not two independent pools: Write needs the
 // repository entirely to itself (no concurrent Read, no concurrent Write), Read bounds itself to
 // maxConcurrentReads but never runs alongside a Write. A blocked Read or Write retries against a
-// closed-and-replaced `waitCh` rather than parking on a single channel's own token (F5/repo_test.go's
+// closed-and-replaced `waitCh` rather than parking on a single channel's own token (repo_test.go's
 // own reasoning: acquiring a *set* of N tokens for Write, from the same pool Read draws single
-// tokens from, is a classic deadlock shape — two Writers each holding some but not all of the N
 // tokens would wait on each other forever), which is the standard broadcast-and-recheck shape for
 // a condition variable that must also honour ctx cancellation (sync.Cond itself has no
 // context-aware Wait to build that on).
@@ -57,7 +55,7 @@ type Repo struct {
 	mu      sync.Mutex
 	writing bool
 	readers int
-	// pendingWriters (F17) is how many Write calls are currently waiting for their turn — not
+	// pendingWriters is how many Write calls are currently waiting for their turn — not
 	// whether one holds the gate (writing already tracks that). Read's own admission check refuses
 	// a NEW reader whenever this is non-zero, so continuous overlapping reads cannot starve a
 	// pending Write forever: once one is waiting, the reader pool only drains, it never refills,
@@ -111,7 +109,7 @@ func (r *Repo) notifyLocked() {
 // operation in P1 actually calls this yet (§0.2: no porcelain, no mutating command); it exists now
 // so a later phase's first real write has nowhere else to go.
 func (r *Repo) Write(ctx context.Context, fn func(ctx context.Context) error) error {
-	// F17: registered as pending for the whole wait, not just while actually holding the gate —
+	// Registered as pending for the whole wait, not just while holding the gate —
 	// this is the signal Read's own admission check refuses a new reader against. notifyLocked on
 	// the way out covers the ctx-cancellation exit below too: a reader parked on the OLD waitCh
 	// must be woken to recheck once this Write gives up and pendingWriters drops back to zero, or
@@ -151,7 +149,7 @@ func (r *Repo) Write(ctx context.Context, fn func(ctx context.Context) error) er
 }
 
 // Read runs fn with one of maxConcurrentReads slots — many can run at once, bounded, and never
-// alongside a Write. F17: also refuses admission whenever a Write is pending (Repo.pendingWriters),
+// alongside a Write. Also refuses admission whenever a Write is pending (Repo.pendingWriters),
 // even though !writing still holds — a Write waiting for the CURRENT readers to drain must not be
 // joined by new ones indefinitely; an already-admitted reader is unaffected and keeps running.
 func (r *Repo) Read(ctx context.Context, fn func(ctx context.Context) error) error {
@@ -191,10 +189,10 @@ func WorktreeIdentity(ctx context.Context, runner Runner, gitPath, dir string) (
 	if err != nil {
 		return "", "", err
 	}
-	// G27 D5a: gitDir/commonDir are canonicalized to NFC, not just Cleaned -- they are absolute
-	// directory paths (D2 tier 1), and RepoID derives from root/gitDir, so this one edit is what
+	// gitDir/commonDir are canonicalized to NFC, not just Cleaned -- they are absolute
+	// directory paths, and RepoID derives from root/gitDir, so this one edit is what
 	// keeps two on-disk spellings of the same repository from producing two RepoEntry's worth of
-	// registry keys, watchers, and cat-file processes (F5).
+	// registry keys, watchers, and cat-file processes.
 	gitDir = gitpath.CleanNFC(gitDir)
 	commonDir = gitpath.CleanNFC(commonDir)
 	return gitDir, commonDir, nil
@@ -230,14 +228,14 @@ func Identify(ctx context.Context, runner Runner, gitPath, path string) (RepoSum
 
 	// repoID is normalized for free by the gitpath.CleanNFC calls above -- root and gitDir are
 	// both already NFC by the time this reads them, which is what makes RepoID a stable registry/
-	// DB key across two on-disk spellings of one repository (G27 D5a/F5).
+	// DB key across two on-disk spellings of one repository.
 	//
-	// D7: RepoID is the worktree root for a non-bare repo, the git dir for a bare one. `repo.open`
+	// RepoID is the worktree root for a non-bare repo, the git dir for a bare one. `repo.open`
 	// is fed a repoId straight back as a path on rehydration (App.vue's own persisted-state path,
 	// and the KIRA_REPO dev seed) — Identify(root) works, Identify(gitDir) does not
 	// ("fatal: this operation must be run in a work tree"). A bare repo has no root at all
 	// (Root == ""), so it keeps keying on gitDir — collapsing every bare repo onto one key is
-	// exactly what G2's own choice of gitDir was protecting against, and staying on gitDir here
+	// exactly what the choice of gitDir was protecting against, and staying on gitDir here
 	// preserves that.
 	repoID := gitDir
 	if !isBare {
@@ -276,11 +274,11 @@ func revParseBool(ctx context.Context, runner Runner, gitPath, dir string, flag 
 
 // ResolveHead determines HeadState per RepoSummary.Head's own three-way union: a symbolic ref
 // that resolves is a branch, one that does not is an unborn branch (nothing committed yet), and no
-// symbolic ref at all is a detached HEAD at a bare sha. Exported (G5 D16) so gitsession.RepoEntry
+// symbolic ref at all is a detached HEAD at a bare sha. Exported so gitsession.RepoEntry
 // can re-run it after a ref change instead of trusting the value Identify froze at open — Identify
 // itself is unchanged, still the only caller inside this package.
 func ResolveHead(ctx context.Context, runner Runner, gitPath, dir string) (HeadState, error) {
-	// F7: plain `symbolic-ref -q HEAD` (the full "refs/heads/<b>"), --short's own ref-path
+	// Plain `symbolic-ref -q HEAD` (the full "refs/heads/<b>"), --short's own ref-path
 	// prefix stripped by hand below — `--short` shortens AMBIGUOUSLY: when a tag shares the
 	// branch's own name, it returns "heads/<b>" instead of "<b>" (verified against real git
 	// 2.43), which `status`/`refs.list` never do, desyncing every comparison against their own

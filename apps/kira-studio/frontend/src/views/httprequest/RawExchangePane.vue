@@ -22,7 +22,7 @@ import { useHttpRequestViewStore } from './state';
 // it is mounted from inside ResponsePane.vue and needs MonacoHost/theme/primitives.
 const props = defineProps<{
   tab: HttpRequestTabRecord;
-  /** P16 D11: ResponseFindBar's own painted matches for each of this pane's two documents — the
+  /** ResponseFindBar's own painted matches for each of this pane's two documents — the
    *  bar itself has no template access to these editors, since they're this component's own
    *  children. Absent (no find bar open) paints nothing, same as every other rangeHighlights
    *  caller when its prop is absent. */
@@ -41,12 +41,12 @@ const response = computed(
 );
 const wire = computed(() => response.value?.wire ?? null);
 
-// P18 D8: a stored entry never has a `wire` (P9 D7 nulls it before persisting), which is why the
-// Raw segment used to render nothing at all while viewing one — the stored request/response are
-// sitting right there in the snapshot with nothing rendering either. This reconstructs both
-// documents from the four fields the snapshot actually carries, generated in the renderer rather
-// than stored (P9 D7's own objection — storing rendered text would double a snapshot — does not
-// apply here: nothing new is stored, only computed from what already is).
+// A stored entry never has a `wire` (it is nulled before persisting), which is why the Raw segment
+// used to render nothing at all while viewing one — the stored request/response are sitting right
+// there in the snapshot with nothing rendering either. This reconstructs both documents from the
+// four fields the snapshot carries, generated in the renderer rather than stored (the objection —
+// storing rendered text would double a snapshot — does not apply here: nothing new is stored, only
+// computed from what already is).
 const showReconstructed = computed(() => !wire.value && !!viewingStored.value);
 
 const storedRequestText = computed(() => {
@@ -139,7 +139,7 @@ function onCopyResponse(): void {
   void copyText(responseText.value);
 }
 
-// P16 D11: the two hosts and their docs, exposed for ResponsePane.vue's own find-bar targets
+// The two hosts and their docs, exposed for ResponsePane.vue's own find-bar targets
 // (`targets: { doc, host }[]`) — `getDocs()` rather than exposed computed refs, since it's called
 // from inside ResponsePane's own reactive computed (any reactive state it reads there is tracked
 // exactly as if read directly, regardless of which component's function reads it).
@@ -218,9 +218,9 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
           <AlertDescription>{{ maskingNote }}</AlertDescription>
         </Alert>
       </template>
-      <!-- P18 D8: a stored entry's Raw pane, reconstructed from the four stage-1 fields the
-           snapshot carries rather than a live `wire` dump (which P9 D7 never stores). Not claimed
-           as one of P9 D3's three HttpWireFidelity values — a reconstruction is none of them — so
+      <!-- A stored entry's Raw pane, reconstructed from the four stage-1 fields the
+           snapshot carries rather than a live `wire` dump (which is never stored). Not claimed
+           as one of the three HttpWireFidelity values — a reconstruction is none of them — so
            this gets its own honest strip rather than a fourth, misleading fidelity value. -->
       <template v-else>
         <Alert variant="info" data-testid="http-raw-reconstructed">

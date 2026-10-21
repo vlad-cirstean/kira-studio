@@ -5,10 +5,9 @@ import { httpResponse as buildHttpResponse, openHttpModeAndNewRequest } from './
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
-// P10 §6.4: the real built bundle, real WebKit, both wire planes mocked — the waterfall (D12),
-// the SPEC's own "reused, not zero" requirement (D4/D6), the two jump affordances (D11), a stored
-// entry's real timeline vs. Raw's own empty state (D10/P9 D7), and a failed send's partial
-// timeline (D15/C5).
+// The real built bundle, real WebKit, both wire planes mocked — the waterfall,
+// the SPEC's own "reused, not zero" requirement, the two jump affordances, a stored
+// entry's real timeline vs. Raw's own empty state, and a failed send's partial timeline.
 
 // This file's own fixture defaults diverge from the shared canonical shape (below) — passed as
 // `base` rather than changed on the shared default (http-raw.spec.ts's own reasoning applies).
@@ -222,10 +221,10 @@ test('Http timeline — the elapsed figure and the redirect caption open the tim
   await expect(page.locator('[data-testid="http-timeline-pane"]')).toBeVisible();
 });
 
-// P18 D8: this test used to contrast Timeline (has real data for a stored entry) against Raw
-// (nothing at all, F8's own gap) — Raw now reconstructs its two documents from the same stored
+// This test used to contrast Timeline (has real data for a stored entry) against Raw
+// (nothing at all, the gap) — Raw now reconstructs its two documents from the same stored
 // snapshot, so the two panes are no longer "one works, one doesn't"; both do, from different
-// stored fields (D10's own timeline vs D8's own request/response reconstruction).
+// stored fields (the timeline vs the request/response reconstruction).
 test('Http timeline — a stored history entry has a real timeline, and Raw reconstructs its own view', async ({
   relaunch,
 }) => {

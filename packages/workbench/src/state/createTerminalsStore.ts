@@ -10,13 +10,13 @@ import { logError } from '../bridge/log';
 import { loadTerminalRenderer } from '../terminal/terminalRendererLoader';
 import { createOrderedWriter } from './orderedWrites';
 
-// P103 Part 2 (§5.3): hoisted from both apps' own state/terminals.ts — byte-identical (P83's
-// Kira Studio Automations module, P83's Kira Space repo-worktree terminal), once each app's own
-// `canonicalPath` resolved to the same packages/shared function (this phase found Kira Space's
-// state/coderepos.ts still defining a local duplicate — folded into @shared/domain/path, its
-// documented single-definition intent since P100 Part 2). Parameterized only over `control`
-// (the bound-call subset both apps' bridge/index.ts already expose with identical signatures) —
-// no other divergence exists between the two apps for this store.
+// Hoisted from both apps' own state/terminals.ts — byte-identical (the Kira Studio Automations
+// module, the Kira Space repo-worktree terminal), once each app's own `canonicalPath` resolved to
+// the same packages/shared function (this phase found Kira Space's state/coderepos.ts still
+// defining a local duplicate — folded into @shared/domain/path, its documented single-definition
+// intent). Parameterized only over `control` (the bound-call subset both apps' bridge/index.ts
+// already expose with identical signatures) — no other divergence exists between the two apps for
+// this store.
 
 export interface TerminalSession {
   readonly tabId: string;
@@ -29,7 +29,7 @@ export interface TerminalSession {
   shell: string;
 }
 
-// §5.2: output that arrives before a sink attaches is queued here: the window between
+// Output that arrives before a sink attaches is queued here: the window between
 // openTerminalSession and the xterm renderer chunk resolving (a headless session, see
 // attachHeadlessTerminal), never the long wait for a view — xterm itself buffers from then on.
 // Bounded per tab so a pathological case cannot grow without limit — oldest dropped past
@@ -77,11 +77,11 @@ export interface TerminalsStoreOptions {
 
 export function createTerminalsStore(control: TerminalsControl, options: TerminalsStoreOptions) {
   return defineStore(options.storeId ?? 'terminals', () => {
-    // P91 §7: the Automations module's own unscoped-launch default — the user's home directory,
+    // The Automations module's own unscoped-launch default — the user's home directory,
     // resolved in Go (bridge/terminal.go's DefaultCwd) and hydrated once at boot, beside
     // hydrateCustomScripts (main.ts). '' means "not yet hydrated, or $HOME could not be resolved" —
-    // every caller (TabStrip.vue's Terminal entry, AutomationsStart.vue's button) disables its launch on
-    // that value rather than falling back to some other path (§7.2).
+    // every caller (TabStrip.vue's Terminal entry, AutomationsStart.vue's button) disables its
+    // launch on that value rather than falling back to some other path.
     const terminalDefaults = reactive({ cwd: '' });
 
     async function hydrateTerminalDefaults(): Promise<void> {
@@ -111,8 +111,8 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
       }
     }
 
-    // Routes decoded output bytes to an attached sink, or the drain queue's own window (§5.2).
-    // F11: output arriving after closeTerminalSession has already deleted this tab's byTabId entry
+    // Routes decoded output bytes to an attached sink, or the drain queue's own window.
+    // Output arriving after closeTerminalSession has already deleted this tab's byTabId entry
     // (racing terminalClose) has nowhere left to drain to -- buffering it anyway just leaks up to
     // DRAIN_LIMIT_BYTES per stale tab id forever, so the drain branch checks byTabId first.
     function routeTerminalData(terminalId: string, bytes: Uint8Array): void {
@@ -172,7 +172,7 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
      *  race the subscription (§3.2/§5.2). cwd is canonicalized once here, so every other read in this
      *  module (terminalCountAtPath, the tab's own cwd) compares like with like. P86 §4: launchKind is
      *  forwarded to TerminalOpenArgs.LaunchKind as-is — Go, not this module, decides what a
-     *  'claude-code' launch gets (hooks, the agent count). */
+     *  'agent' launch gets (hooks, the agent count). */
     async function openTerminalSession(
       tabId: string,
       codeRepoId: string,
@@ -240,11 +240,15 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
     }
 
     /** dropResources' own target (state/tabKinds.ts) — kills the pty and drops every trace of this
-     *  tab's session, including anything still queued in the drain. `dropPageStoresForTab` blind-calls
-     *  every registered kind's own dropper on every tab close (state/tabs.ts), so a non-terminal tab
+     *  tab's session, including anything still queued in the drain. `dropPageStoresForTab`
+     *  blind-calls
+     *  every registered kind's own dropper on every tab close (state/tabs.ts), so a non-terminal
+     *  tab
      *  id reaches this too — the no-op-miss guard below is what makes that safe, the same contract
-     *  every other kind's dropResources (e.g. views/repo/editors.ts's dropRepoFileTab) already follows.
-     *  Without it, closing any tab of any kind fired a needless TerminalService.Close round trip. */
+     *  every other kind's dropResources (e.g. views/repo/editors.ts's dropRepoFileTab)
+     *  already follows.
+     *  Without it, closing any tab of any kind fired a needless TerminalService.Close round trip.
+     */
     function closeTerminalSession(tabId: string): void {
       if (!byTabId.has(tabId)) return;
       byTabId.delete(tabId);
@@ -258,10 +262,10 @@ export function createTerminalsStore(control: TerminalsControl, options: Termina
       return byTabId.get(tabId);
     }
 
-    /** §11's whole signal — the count of live (not yet exited/failed) sessions whose cwd matches
+    /** The whole signal — the count of live (not yet exited/failed) sessions whose cwd matches
      *  path, canonicalized the same way openTerminalSession's own cwd is. Excluding exited/failed
-     *  sessions is what makes a shell exiting on its own repaint the row (§11.2's "opening or
-     *  exiting"), even though the tab itself stays open (§7.4) and its entry stays in this map. */
+     *  sessions is what makes a shell exiting on its own repaint the row (the "opening or
+     *  exiting"), even though the tab itself stays open and its entry stays in this map. */
     function terminalCountAtPath(path: string): number {
       const target = canonicalPath(path);
       let count = 0;

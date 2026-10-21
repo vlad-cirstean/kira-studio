@@ -45,7 +45,7 @@ func validateAdeBranchName(value, field string) error {
 
 // validateAdeItemID checks a value naming a queue item (a branch, or a new-work id — "nw:<uuid>",
 // which itself carries a `:` — so this is deliberately looser than validateAdeBranchName's own
-// git-ref shape: item and after (§5.3's own "Items in SetPlan/SetQueuedAfter..." rule) name either
+// git-ref shape: item and after (the "Items in SetPlan/SetQueuedAfter..." rule) name either
 // kind of item, never only a branch).
 func validateAdeItemID(value, field string) error {
 	if value == "" {

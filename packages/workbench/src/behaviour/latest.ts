@@ -11,7 +11,7 @@ export type LatestRequestOutcome<T> =
  * (an abort racing a resolution can still resolve, and nothing here guarantees every state change
  * that should invalidate a request also calls `run()` again) — `isStillCurrent` re-checked right
  * before a response is committed is the caller's own identity check (e.g. "is this still the
- * selected sha, for this repo"), same as before consolidation. `abort()` is exposed separately
+ * selected sha, for this repo"). `abort()` is exposed separately
  * for the "cancel with nothing new to show" case (closing the pane, disposing the state) where no
  * replacement request follows.
  */
@@ -50,7 +50,7 @@ export function createLatestRequest<T>(isCancelled: (error: unknown) => boolean 
 export type LatestRequest<T> = ReturnType<typeof createLatestRequest<T>>;
 
 /**
- * P107 I2-22: `reviewFiles.ts`'s `#loadFiles`/`#loadDiff` and `reviewComments.ts`'s `#load` each
+ * `reviewFiles.ts`'s `#loadFiles`/`#loadDiff` and `reviewComments.ts`'s `#load` each
  * repeated the same frame around their own ad-hoc `AbortController` field — abort previous, new
  * controller, `loading = true`, request, apply-or-set-error, `finally` reset — instead of using
  * `latest` here. `setLoading` mirrors the original `finally` exactly: only the run that is still

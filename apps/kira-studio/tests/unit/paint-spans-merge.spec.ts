@@ -1,4 +1,4 @@
-// P60a §5/§9.2: mergeHighlightRanges is the one pure boundary-merge function this migration adds a
+// mergeHighlightRanges is the one pure boundary-merge function this migration adds a
 // dedicated unit test for — two sorted interval lists (syntax-colour "base" runs, which tile
 // [0, textLength) with no gaps, and possibly-overlapping {{variable}}/find-match "highlight"
 // ranges), including the degenerate inputs (zero-width, out-of-range) real callers can hand it a
@@ -85,7 +85,7 @@ describe('mergeHighlightRanges', () => {
   // chunk boundary). A highlight range spanning that boundary must come out as one run, not two
   // adjacent ones with identical classes — the caller renders one `<span>` per output run, and two
   // side-by-side `.kira-ed-var-unknown` spans instead of one is a real, user-visible difference to
-  // anything counting or measuring them (`api-ui-consistency.spec.ts`'s own D3 rule 4 test).
+  // anything counting or measuring them (`api-ui-consistency.spec.ts`'s own test).
   test('a highlight spanning a same-class base-run boundary coalesces into one run', () => {
     const base = [
       { from: 0, to: 6, classes: ['mtk1'] },

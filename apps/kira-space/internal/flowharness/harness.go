@@ -30,18 +30,22 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appwire"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/github"
+	githostproviders "github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/providers"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox/sandboxtest"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
+	"github.com/kirathecat/kira-studio/internal/harness/providers"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/testx"
-	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
 type options struct {
@@ -50,12 +54,14 @@ type options struct {
 	scheduleTimeout time.Duration
 	clock           scriptruns.Clock
 	noGh            bool
+	gitHosts        []githost.Provider
 	noClaude        bool
 	trackerGrace    time.Duration
 	rebaseTimeout   time.Duration
 	mobilePoll      time.Duration
 	seed            func(*App)
 	embedSpec       *embed.Spec
+	provider        harness.Provider
 }
 
 // Opt tweaks New.
@@ -63,6 +69,11 @@ type Opt func(*options)
 
 // WithoutGh leaves gh off PATH entirely, system installs included (claude stays the fake).
 func WithoutGh() Opt { return func(o *options) { o.noGh = true } }
+
+// WithGitHost registers an extra code-host provider after GitHub.
+func WithGitHost(p githost.Provider) Opt {
+	return func(o *options) { o.gitHosts = append(o.gitHosts, p) }
+}
 
 // WithoutClaude leaves claude off PATH entirely, system installs included.
 func WithoutClaude() Opt { return func(o *options) { o.noClaude = true } }
@@ -91,6 +102,9 @@ func WithRebaseTimeout(d time.Duration) Opt { return func(o *options) { o.rebase
 
 // WithEmbedSpec replaces the semantic-search model, so a test serves its files from a fake host.
 func WithEmbedSpec(s embed.Spec) Opt { return func(o *options) { o.embedSpec = &s } }
+
+// WithProvider registers a test-only agent provider next to claude.
+func WithProvider(p harness.Provider) Opt { return func(o *options) { o.provider = p } }
 
 // WithSeed runs seed on the isolated homes before the first boot. Startup work that runs in the
 // background (sweeps) would race a seed written after New.
@@ -140,7 +154,7 @@ func New(t *testing.T, opts ...Opt) *App {
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(root) })
 	if o.noClaude {
-		t.Cleanup(toolexec.SetSystemClaudePaths())
+		t.Cleanup(claude.SetSystemPaths())
 	}
 	a := &App{
 		t: t, Root: root,
@@ -199,7 +213,7 @@ func (a *App) writeBin(o options) {
 	if err != nil {
 		a.t.Fatal(err)
 	}
-	tools := []string{"fake-mcp"}
+	tools := []string{"fake-mcp", fakeagent.Persona}
 	if !o.noClaude {
 		tools = append(tools, "claude")
 	}
@@ -275,12 +289,17 @@ func (a *App) build() {
 		// Same on every OS: flows never depend on the host's real Seatbelt.
 		a.opts.sandbox = &sandboxtest.Fake{Dir: a.t.TempDir(), NotEnforced: true}
 	}
-	var ghLocator ghclient.Locator
+	var ghOptions github.Options
 	if a.opts.noGh {
-		ghLocator = noGhLocator{}
+		ghOptions.Locator = noGhLocator{}
+	}
+	var registry *harness.Registry
+	if a.opts.provider != nil {
+		registry = providers.New(a.opts.provider)
 	}
 	a.W = appwire.Build(appwire.Options{
-		GhLocator: ghLocator, TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, Sandbox: a.opts.sandbox, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll,
+		Providers: registry,
+		GitHosts:  githostproviders.New(ghOptions, a.opts.gitHosts...), TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, Sandbox: a.opts.sandbox, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll,
 		Repos: r, DB: db, Emitter: a.Events, Browser: a.Browser, Dialogs: a.Dialogs,
 		Locator: gitclient.NewHostLocator(), KeepAwakeDriver: a.KeepAwake,
 		MobileAssets: fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>phone</title>")}},
@@ -318,6 +337,9 @@ func (a *App) Restart() {
 	a.stop()
 	a.build()
 }
+
+// Unregister drops the test provider from the next boot (Restart), as an uninstalled provider is.
+func (a *App) Unregister() { a.opts.provider = nil }
 
 // DB is the live database, for tests that plant or inspect rows no bound call reaches.
 func (a *App) DB() *sql.DB { return a.db.DB }

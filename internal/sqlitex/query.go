@@ -14,7 +14,7 @@ type Queryer interface {
 
 // QueryAll drains rows (or reports queryErr) via scan into a []T, closing rows when done — the
 // query/loop/rows.Err/close skeleton nearly every repo's own List() (and List-shaped read)
-// repeated identically across both apps (P107 I2-2). scan's own keep result lets a caller drop a
+// repeated identically across both apps. scan's own keep result lets a caller drop a
 // row without erroring and without appending it (TabsRepo.List's own drop-and-log for a legacy
 // row that fails its envelope check); every other caller's own scan always returns keep true.
 func QueryAll[T any](rows *sql.Rows, queryErr error, scan func(*sql.Rows) (v T, keep bool, err error)) ([]T, error) {
@@ -40,7 +40,7 @@ func QueryAll[T any](rows *sql.Rows, queryErr error, scan func(*sql.Rows) (v T, 
 }
 
 // QueryOne runs query against q and hands the one resulting row to scan, mapping sql.ErrNoRows to
-// (nil, nil) — the by-id Get(id) shape repeated across both apps' repos (P113 G12): "no such row"
+// (nil, nil) — the by-id Get(id) shape repeated across both apps' repos: "no such row"
 // and, for a scan that does its own extra validation on top of Scan (connections.go's
 // scanConnectionRow), "this row exists but isn't usable" both already returned (nil, nil) before
 // this helper existed, so scan returning (nil, nil) with no error passes straight through
@@ -57,7 +57,7 @@ func QueryOne[T any](q Queryer, scan func(*sql.Row) (*T, error), query string, a
 	return v, nil
 }
 
-// NextSortOrder is Create/Insert's shared "append to the end" query (P113 G12), unifying the three
+// NextSortOrder is Create/Insert's shared "append to the end" query, unifying the three
 // spellings repeated across both apps' repos (some `COALESCE(MAX(sort_order) + 1, 0)`, one a
 // separate nullable-scan-then-+1-in-Go dance) — all equivalent: 0 for an empty (or empty-scope)
 // table, one past the current max otherwise. where, when non-empty, is appended as "WHERE <where>"

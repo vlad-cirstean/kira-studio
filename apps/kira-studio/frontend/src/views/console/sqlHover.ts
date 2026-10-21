@@ -66,10 +66,11 @@ function resolveHover(
   doc: string,
   pos: number,
 ): ConsoleHoverInfo | null {
-  // P12 round 1 finding #13: parsed once here, then handed to both statementsWithRefs() calls
+  // Parsed once here, then handed to both statementsWithRefs() calls
   // below (its own `root` param) — each one would otherwise re-parse this exact same string, a
   // provably redundant second parse of text already parsed one line above.
-  // P60b: `parseSql` calls `tokenizeSql` through `sql-tokens.ts`'s own D2 memo (keyed by
+  // `parseSql` calls `tokenizeSql` through `sql-tokens.ts`'s own memo setup
+  // (keyed by
   // (dialect, source) reference) — several calls over the same untouched document string in one
   // interaction burst (a hover, then the lint pass, then another hover) share one real tokenize,
   // restoring the property `editor/hover.ts`'s old `syntaxTree(view.state)` handoff existed for
@@ -139,9 +140,9 @@ function resolveHover(
   return columnHoverInfo(onlyTable, col, node.from, node.to);
 }
 
-/** undefined with no DDL document for this connection (D5) — no hover source at all rather than
- *  one that never resolves anything. P60b §4: a plain `(doc, offset) => ConsoleHoverInfo | null` —
- *  `MonacoHost.vue`'s own hover provider (P60a §4.4) plugs a lookup of this exact shape straight
+/** undefined with no DDL document for this connection — no hover source at all rather than
+ *  one that never resolves anything. A plain `(doc, offset) => ConsoleHoverInfo | null` —
+ *  `MonacoHost.vue`'s own hover provider plugs a lookup of this exact shape straight
  *  in, so the CodeMirror-only glue `editor/hover.ts`'s old `buildHoverSource` existed for has no
  *  equivalent to keep. */
 export function sqlHoverSource(

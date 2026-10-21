@@ -2,9 +2,9 @@ import type { GrpcSavedRequest, HttpSavedRequest } from '@shared/domain/collecti
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 
-// P108 F16: split out of useCollectionsStore (one-store-one-concern) — every sibling dialog
-// (useImportCurlStore, useCopyAsCurlStore, edit-raw, dynamic values) already owns its own state;
-// this was the one dialog still living inside the tree store. `submitSaveDialog` stays in
+// Every sibling dialog (useImportCurlStore, useCopyAsCurlStore, edit-raw, dynamic values)
+// already owns its own state; this was the one dialog still living inside the tree store.
+// `submitSaveDialog` stays in
 // useCollectionsStore (it reaches deep into the tree's own load/reveal/cache machinery), reading
 // tabId/payload from here and calling closeSaveDialog() here on completion.
 

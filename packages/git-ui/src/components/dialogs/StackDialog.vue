@@ -1,18 +1,18 @@
 <script setup lang="ts">
 /**
- * G26 D14/4.8: two modes, at most one active at a time (`props.target?.mode`), mirroring
+ * Two modes, at most one active at a time (`props.target?.mode`), mirroring
  * `WorktreeDialog.vue`'s own "App.vue owns the state, this component owns nothing of its own"
  * shape:
  * - **setParent** — `op.run`'s `stackSet` kind directly: pick an existing local branch as the new
- *   parent (or "None" to remove `target.branch` from its stack, D2/D10). No preflight endpoint of
- *   its own (D10's cycle check runs host-side, at write time) — this dialog is the confirm step,
+ *   parent (or "None" to remove `target.branch` from its stack). No preflight endpoint of
+ *   its own (the cycle check runs host-side, at write time) — this dialog is the confirm step,
  *   the same posture `BranchDialog.vue`'s rename mode already takes.
  * - **restack** — `preflight.restack`'s own live plan/blockers (re-fetched on open), a live
  *   progress list driven by `StackState.progress` while `StackState.restacking` is true, and a
  *   Cancel button that calls `ops.cancelRestack()`. A paused (conflicted) restack is surfaced
- *   here in words (D8) — resolving it is G5's own `ConflictBanner.vue`, not a second UI here.
+ *   here in words — resolving it is the `ConflictBanner.vue`, not a second UI here.
  *
- * P131 Part 1 §6.1/§6.2: the modal shell is shadcn's `Dialog`/`DialogContent` now, `title` feeds
+ * The modal shell is shadcn's `Dialog`/`DialogContent` now, `title` feeds
  * `DialogTitle`'s default slot, and the parent picker is `NativeSelect`.
  */
 import type { RestackPreflight } from '@kira/git-ipc';

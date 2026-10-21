@@ -2,16 +2,16 @@ import { t } from '@theme/i18n';
 import { rollupIssues } from '../planIssues';
 import type { PlanNode, QueryPlan } from '../planModel';
 
-// P18 (v1.1) D13/D14/D15/D16: SQLite's `EXPLAIN QUERY PLAN` — F14. N rows × 4 columns
+// SQLite's `EXPLAIN QUERY PLAN`. N rows × 4 columns
 // (id, parent, notused, detail), no cost and no row estimate whatsoever, so `estimatedRowsRead`
-// and `overThreshold` stay unset/false here (D14) — the settings panel says the threshold does
+// and `overThreshold` stay unset/false here — the settings panel says the threshold does
 // not apply on this dialect rather than showing a silent zero. `parent` is 0 for nearly every row
 // (nesting only appears for a subquery/compound query), so this builds a real id→children tree
 // rather than assuming a flat list.
 //
 // sqlite.org/eqp.html: "The output format may change between SQLite releases. Applications
-// should not depend on the output format of the EXPLAIN QUERY PLAN command." — taken as binding
-// (D16): `detail` is matched on a small set of leading tokens for issue detection and otherwise
+// should not depend on the output format of the EXPLAIN QUERY PLAN command." — taken as binding:
+// `detail` is matched on a small set of leading tokens for issue detection and otherwise
 // shown verbatim, never re-rendered from a deeper parse.
 export interface SqliteExplainRow {
   id: number;

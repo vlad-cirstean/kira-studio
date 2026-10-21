@@ -1,7 +1,7 @@
 package enginecache
 
 // generationTracker tracks a monotonically increasing generation per (connectionID, path) target,
-// one per connection, and one global — F4 (P108 Part 6). Guarded by Cache.mu, not a lock of its
+// one per connection, and one global. Guarded by Cache.mu, not a lock of its
 // own: every method here is only ever called from a Cache method that already holds it.
 //
 // Read/Count store their results unconditionally once the underlying op returns, with nothing
@@ -10,7 +10,7 @@ package enginecache
 // could still complete and cache its own now-stale, pre-invalidation result as if it were fresh
 // (Source: "cache" on the next read). Cache.CurrentGeneration captures a snapshot right after the
 // miss decision, before the underlying op is even issued; StorePageIfCurrent/StoreCountIfCurrent
-// only actually store the result if nothing has bumped the generation by the time it returns.
+// only store the result if nothing has bumped the generation by the time it returns.
 type generationTracker struct {
 	global int64
 	conn   map[string]int64

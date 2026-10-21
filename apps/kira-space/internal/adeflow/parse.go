@@ -16,6 +16,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/internal/harness/providers"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
@@ -451,18 +452,24 @@ func (v *validator) sandboxPaths(m map[string]*yaml.Node, sp, key string) []stri
 }
 
 // protectedSandboxPath reports whether p is the root, the home folder or an ancestor of it, a
-// folder holding Claude's config or the keychain directory, or inside the keychain directory.
+// folder holding an agent's config or the keychain directory, or inside the keychain directory.
 func protectedSandboxPath(p string) bool {
 	c := path.Clean(p)
 	switch c {
-	case "/", "~", "~/Library", "~/.claude", ".":
+	case "/", "~", "~/Library", ".":
+		return true
+	}
+	if slices.Contains(agentConfigDirs, strings.TrimPrefix(c, "~/")) && strings.HasPrefix(c, "~/") {
 		return true
 	}
 	return strings.HasPrefix(c, "..") || strings.HasPrefix(c+"/", "~/Library/Keychains/") || protectedAbsoluteHome(c)
 }
 
+// agentConfigDirs are the home config folders of the registered agents.
+var agentConfigDirs = providers.ConfigDirs()
+
 // protectedAbsoluteHome catches the absolute spelling of the protected paths: /Users or /home, a
-// home folder under it, its Library and .claude folders, and the keychain directory.
+// home folder under it, its Library and agent config folders, and the keychain directory.
 func protectedAbsoluteHome(c string) bool {
 	seg := strings.Split(strings.TrimPrefix(c, "/"), "/")
 	if !strings.HasPrefix(c, "/") || (seg[0] != "Users" && seg[0] != "home") {
@@ -472,7 +479,7 @@ func protectedAbsoluteHome(c string) bool {
 	case len(seg) <= 2:
 		return true
 	case len(seg) == 3:
-		return seg[2] == "Library" || seg[2] == ".claude"
+		return seg[2] == "Library" || slices.Contains(agentConfigDirs, seg[2])
 	}
 	return seg[2] == "Library" && seg[3] == "Keychains"
 }

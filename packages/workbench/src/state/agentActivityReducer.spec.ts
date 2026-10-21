@@ -1,13 +1,13 @@
-// P86 §13 — the one earned unit test for this phase's frontend half: reduceAgentActivity is a
+// The one earned unit test for the frontend half: reduceAgentActivity is a
 // decision structure fed by an out-of-order external producer (each hook is its own `curl`
 // process, so a PostToolUse can legitimately arrive before its own PreToolUse), with several
 // interacting rules — exactly what CLAUDE.md's narrow unit-test bar names. Pure: (prev, event,
-// now) => next; createAgentSessionsStore applies it, this spec calls it directly.
+// now) =&gt; next; createAgentSessionsStore applies it, this spec calls it directly.
 //
-// P127: moved here, colocated with the reducer (packages/git-core/src's own precedent) — a plain
+// Colocated with the reducer (packages/git-core/src's own precedent) — a plain
 // static import now, since agentActivity.ts reaches no bridge binding at all.
 //
-// P129 Part 1 §4.8: `now` is injected and every case below passes a fixed NOW, so `at` is
+// `now` is injected and every case below passes a fixed NOW, so `at` is
 // deterministic; new cases cover UserPromptSubmit, the wakeArmed/'waiting' rule, idle_prompt/
 // auth_success leaving phase unchanged, and PostToolUse clearing 'attention'.
 import { describe, expect, test } from 'bun:test';

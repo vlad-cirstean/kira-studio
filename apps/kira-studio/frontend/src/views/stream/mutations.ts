@@ -3,8 +3,8 @@ import { useTabsStore } from '../../state/tabs';
 import { createImmediateMutator } from '../shared/immediateMutation';
 import { useStreamViewStore } from './state';
 
-// Item 3/4: mutate immediately, no staging/preview step — documents/mutations.ts's precedent
-// (P8's ground rules), extended to streams. Each op uses the `$`-prefixed sentinel fields
+// Mutate immediately, no staging/preview step — documents/mutations.ts's precedent, extended to
+// streams. Each op uses the `$`-prefixed sentinel fields
 // kafka/produce.ts and sqs/mutate.ts's adapters agree on (mirrors mongo/mutate.ts's `$document`).
 // A thunk, not a direct `useTabsStore().findStreamTab` reference — see documents/mutations.ts's
 // own comment (this module evaluates before `app.use(pinia)` too).

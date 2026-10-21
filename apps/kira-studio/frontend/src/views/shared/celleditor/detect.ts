@@ -55,9 +55,9 @@ function detectJson(input: DetectInput): FormatGuess | null {
   const value = trimmed(input);
   if (value.length === 0) return null;
   // Gated on the opening character only, not a matching close: a value truncated at
-  // MAX_CELL_BYTES (§0 note 9) will almost never coincidentally end on the right bracket, and
-  // §6a's truncated-JSON case must still land in the 0.35 bucket below, not fall through to
-  // plain text. The scanner is what actually decides valid vs merely JSON-shaped.
+  // MAX_CELL_BYTES will almost never coincidentally end on the right bracket, and the
+  // truncated-JSON case must still land in the 0.35 bucket below, not fall through to
+  // plain text. The scanner is what decides valid vs merely JSON-shaped.
   const isObject = value[0] === '{';
   const isArray = value[0] === '[';
   if (!isObject && !isArray) return null;
@@ -150,7 +150,7 @@ function detectSql(input: DetectInput): FormatGuess | null {
     : { format: 'sql', score: 0.45, reason: t('studio.cellEditor.detect.sqlKeyword.status') };
 }
 
-// P42 D23/D24: uuid and url are gone as formats (F19 — both inert on selection), but this regex
+// uuid and url are gone as formats (both inert on selection), but this regex
 // survives as a guard: a dashed v4 UUID is 36 chars, 36 % 4 === 0, ≥ BASE64_MIN_LENGTH, matches
 // BASE64_URL_RE ('-' is in the URL-safe alphabet) and atob()-decodes — without this guard every
 // UUID column in the app would start detecting as base64 and open a decoded-text pane of
@@ -175,9 +175,9 @@ function detectHex(input: DetectInput): FormatGuess | null {
 
 export const BASE64_STD_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 export const BASE64_URL_RE = /^[A-Za-z0-9_-]+={0,2}$/;
-// §5b's own worked example (`SGVsbG8sIFdvcmxkIQ==`, the base64 of "Hello, World!") is 20
+// The worked example (`SGVsbG8sIFdvcmxkIQ==`, the base64 of "Hello, World!") is 20
 // characters — shorter than the ≥ 24 the prose states. The concrete, scored, tested example
-// (also asserted end-to-end in Step 7 against a real `app.formats` row) is treated as
+// (also asserted end-to-end against a real `app.formats` row) is treated as
 // authoritative over the prose figure; 20 is the reconciled floor.
 const BASE64_MIN_LENGTH = 20;
 

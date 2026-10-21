@@ -71,7 +71,7 @@ export interface CurlPreview {
   error: string | null;
 }
 
-// P7 D12: the Import-from-curl dialog's own store — mirrors http/state/dynamicValues.ts's shape
+// The Import-from-curl dialog's own store — mirrors http/state/dynamicValues.ts's shape
 // (one `open` flag, nothing tab-scoped). The pasted text itself is deliberately not stored here:
 // nothing outside ImportCurlDialog.vue needs to read it, so it stays a local ref there, the same
 // way SaveRequestDialog.vue keeps its own name/target refs local rather than in the save dialog
@@ -87,9 +87,9 @@ export const useImportCurlStore = defineStore('importCurl', () => {
     state.open = false;
   }
 
-  /** D12: parseCurl is pure and synchronous, so there is nothing to cache — but not free enough to
-   *  call on every keystroke unthrottled (finding 15): ImportCurlDialog.vue debounces its own calls
-   *  into this (400ms). An empty paste is neither an error nor a preview: the dialog just shows
+  /** parseCurl is pure and synchronous, so there is nothing to cache — but not free enough to
+   *  call on every keystroke unthrottled: ImportCurlDialog.vue debounces its own calls
+   *  into this (400ms). An empty paste is neither an error nor a preview: the dialog shows
    *  nothing yet. */
   function previewCurl(text: string): CurlPreview {
     if (text.trim() === '') return { summary: '', warnings: [], error: null };
@@ -119,10 +119,10 @@ export const useImportCurlStore = defineStore('importCurl', () => {
   };
 });
 
-/** P28 D12: the paste path's own sibling to submitImportCurl above. Same parser, different target:
+/** The paste path's own sibling to submitImportCurl above. Same parser, different target:
  *  this patches the tab the user pasted into, because that is what they aimed at — a paste into
  *  *this* request's URL bar is an explicit gesture at *this* request, unlike the dialog, which is
- *  reached from the panel with no tab in mind and so deliberately opens a fresh one (D12/F14).
+ *  reached from the panel with no tab in mind and so deliberately opens a fresh one.
  *
  *  Returns false on a parse error, which the caller treats as "not a curl command after all" and
  *  lets the ordinary paste proceed — so a string that survives looksLikeCurlCommand but that
@@ -135,11 +135,11 @@ export function applyCurlToTab(tabId: string, text: string): boolean {
   return true;
 }
 
-// ---- Copy as curl (D10) — masked by default, one gated reveal, nothing persisted ----
+// ---- Copy as curl — masked by default, one gated reveal, nothing persisted ----
 //
 // The caller (HttpRequestView.vue) computes the frozen resolution itself, exactly as send() does
 // (views/httprequest/state.ts's own resolveForExport — a views/ file may import http/, not the
-// reverse, §0.3), and hands the plain result to openCopyAsCurlDialog below. This module never
+// reverse), and hands the plain result to openCopyAsCurlDialog below. This module never
 // reaches into views/** to get it.
 //
 // A separate store from the import dialog above rather than folded together: the two dialogs share
@@ -222,7 +222,7 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
       delete state.revealedSecretValues[key];
     }
     revealedSecretValuesExpiry.clearAll();
-    // Finding 5: revealSecretValues below calls the *shared* revealVariable (state/variables.ts),
+    // revealSecretValues below calls the *shared* revealVariable (state/variables.ts),
     // which writes into variables.ts's own revealedValues map, not this dialog's own
     // revealedSecretValues — closing only the latter left a stale entry there for
     // VariablesDialog.vue's own "already revealed" check to silently trust later, with no re-auth
@@ -248,9 +248,9 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
     });
   }
 
-  /** D10 step 1's precedence, over the id a deferred *name* actually belongs to — environment wins
-   *  over collection, mirroring mergeVariableRows' own merge order (./variables.ts). P112: async
-   *  now — loadVariableRows is cache-first (queryClient.query), so this only actually awaits a
+  /** The precedence, over the id a deferred *name* belongs to — environment wins
+   *  over collection, mirroring mergeVariableRows' own merge order (./variables.ts). async
+   *  now — loadVariableRows is cache-first (queryClient.query), so this only awaits a
    *  fetch when a broadcast invalidated the cache since the dialog opened. */
   async function findSecretVariableId(
     name: string,
@@ -265,9 +265,9 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
     return col?.id ?? null;
   }
 
-  /** D10 step 3: one `revealVariable` call per deferred name — the existing function, the existing
-   *  four outcomes, the existing `confirmDialog` fallback and 5-minute grace. D10 step 5: a
-   *  cancelled, unavailable-and-declined, or errored reveal simply leaves that name out of
+  /** One `revealVariable` call per deferred name — the existing function, the existing
+   *  four outcomes, the existing `confirmDialog` fallback and 5-minute grace. A
+   *  cancelled, unavailable-and-declined, or errored reveal leaves that name out of
    *  `revealedSecretValues`, so its `{{name}}` span stays literal — nothing throws, nothing is
    *  refused. */
   async function revealSecretValues(): Promise<void> {

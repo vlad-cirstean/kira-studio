@@ -1,4 +1,4 @@
-// D9: pure, DOM-free URL helpers — no URLSearchParams. URLSearchParams.toString() encodes a
+// Pure, DOM-free URL helpers — no URLSearchParams. URLSearchParams.toString() encodes a
 // space as '+', so any round trip through the Params table would silently rewrite a user's %20;
 // these hand-written functions never do. The rule this file exists to make testable: typing in
 // the URL field updates the Params table and never rewrites the URL; editing the table rewrites
@@ -29,7 +29,7 @@ export function splitUrl(text: string): SplitUrl {
 export interface QueryPair {
   name: string;
   value: string;
-  /** P21 round 3 functional finding 11: true when the pair's own text had no `=` at all (a bare
+  /** true when the pair's own text had no `=` at all (a bare
    *  `?flag`, not `?flag=`). buildQuery uses this to rebuild a bare flag as `flag` rather than
    *  always appending `=` — without it, any *other* row changing in the same table rewrote the
    *  whole query string (HttpRequestView.vue does this on every edit) and silently turned a
@@ -41,7 +41,7 @@ export interface QueryPair {
   bare?: boolean;
 }
 
-// P21 round 3 functional finding 11: `+` used to be asymmetric — left untouched here on decode
+// `+` used to be asymmetric — left untouched here on decode
 // (deliberately, per this file's own header: a space must round-trip as %20, never silently become
 // `+`), but encoded to `%2B` by encodeQueryComponent below (plain encodeURIComponent's own
 // behaviour). Any *other* row changing in the same Params table rewrites the whole query string
@@ -76,12 +76,12 @@ export function parseQuery(query: string): QueryPair[] {
 }
 
 /** encodeURIComponent each half — never URLSearchParams.toString(), which encodes a space as
- *  '+' instead of '%20' and would silently rewrite what the user typed. Finding 16: a `{{name}}`
+ *  '+' instead of '%20' and would silently rewrite what the user typed. A `{{name}}`
  *  reference living inside a name or value is left untouched rather than being encoded into
  *  `%7B%7Bname%7D%7D`, a form neither substitution engine (this package's own `resolve`, nor
- *  internal/apivars/resolve.go) recognises any more. Finding 11 (round 3): `%2B` is un-encoded
- *  back to a literal `+` afterward — the only percent sequence encodeURIComponent can produce for
- *  it, so this is exact and never touches a `+` produced by encoding some other original byte. */
+ *  internal/apivars/resolve.go) recognises any more. `%2B` is un-encoded back to a literal `+`
+ *  afterward — the only percent sequence encodeURIComponent can produce for it, so this is exact
+ *  and never touches a `+` produced by encoding some other original byte. */
 function encodeQueryComponent(s: string): string {
   return splitTemplateSpans(s)
     .map((span) =>
@@ -93,10 +93,10 @@ function encodeQueryComponent(s: string): string {
 export function buildQuery(pairs: readonly QueryPair[]): string {
   return pairs
     .map((p) =>
-      // Finding 11 (round 3): a bare `?flag` (no `=` at all) must rebuild bare — always appending
+      // A bare `?flag` (no `=` at all) must rebuild bare — always appending
       // `=` turned a valueless flag into `flag=` the moment any other row's edit rewrote the query
       // string, a different request for a server that distinguishes the two. Once the user has
-      // actually typed a value, the pair is no longer bare regardless of how it started.
+      // typed a value, the pair is no longer bare regardless of how it started.
       p.bare && p.value === ''
         ? encodeQueryComponent(p.name)
         : `${encodeQueryComponent(p.name)}=${encodeQueryComponent(p.value)}`,
@@ -104,7 +104,7 @@ export function buildQuery(pairs: readonly QueryPair[]): string {
     .join('&');
 }
 
-/** P22b D7: rebuilds the query params' own description side-car map fresh from the rows just
+/** Rebuilds the query params' own description side-car map fresh from the rows just
  *  written, rather than patching one key in place — a rename moves the description with the row
  *  it belongs to (same row object, new name) and a deleted/renamed-away param's old key is never
  *  carried forward, pruning the orphan for free. A duplicate name (`?a=1&a=2`) shares one
@@ -124,8 +124,8 @@ function withScheme(base: string): string {
   return /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(base) ? base : `https://${base}`;
 }
 
-/** D2: the URL's path, else its host, else the raw text, else 'New request' — TabKindDef.title
- *  and the view header both call this. P4 D14: a saved request's own name wins over all of it, so
+/** The URL's path, else its host, else the raw text, else 'New request' — TabKindDef.title
+ *  and the view header both call this. A saved request's own name wins over all of it, so
  *  "Create order" stops rendering as /v2/orders — one line here keeps the function pure and keeps
  *  both consumers unchanged, rather than teaching either about collections. */
 export function httpRequestTitle(state: { url: string; name?: string }): string {

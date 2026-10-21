@@ -4,14 +4,15 @@
 package agentnotify
 
 import (
+	"cmp"
 	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
-	"github.com/kirathecat/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/internal/desknotify"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
@@ -56,14 +57,15 @@ func (s deskSink) Send(n Note) error {
 	})
 }
 
-// Prefs are the claudeCode.notify* settings.
+// Prefs are the agent.notify* settings.
 type Prefs struct {
 	Enabled, OnFinished, OnNeedsInput, OnRunEnded, IncludeMessage bool
 }
 
 // Target says what a hook event or run belongs to. Name is the task title, else the code
 // repository name, else the cwd's basename.
-type Target struct{ Name, WindowKey, RecordID, TaskID string }
+// Agent labels the session's own provider; empty falls back to Deps.AgentLabel.
+type Target struct{ Name, WindowKey, RecordID, TaskID, Agent string }
 
 // FocusState is what one window reports about what the user is looking at.
 type FocusState struct {
@@ -86,6 +88,8 @@ type Deps struct {
 	Focus  func(windowKey string) bool
 	Reveal func(n Note)
 	Now    func() time.Time
+	// AgentLabel names the active agent in titles when a target names none; nil reads "Agent".
+	AgentLabel func() string
 }
 
 // Cooldown is the minimum gap between two notes of one kind for one terminal or run. A var so a
@@ -119,6 +123,9 @@ func New(d Deps) *Notifier {
 	if d.Now == nil {
 		d.Now = time.Now
 	}
+	if d.AgentLabel == nil {
+		d.AgentLabel = func() string { return "Agent" }
+	}
 	return &Notifier{
 		d: d, focus: map[string]FocusState{}, wake: map[string]bool{},
 		runs: map[string]adewire.RunState{}, smart: map[string]bool{}, last: map[string]time.Time{},
@@ -140,7 +147,7 @@ func (n *Notifier) ReportFocus(f FocusState) {
 }
 
 // HandleEvent reacts to one hook event.
-func (n *Notifier) HandleEvent(ev agenthooks.Event) {
+func (n *Notifier) HandleEvent(ev harness.AgentEvent) {
 	n.mu.Lock()
 	armed := n.wake[ev.TerminalID]
 	switch ev.Event {
@@ -177,7 +184,7 @@ func (n *Notifier) HandleEvent(ev agenthooks.Event) {
 }
 
 // needsInput: a permission or elicitation prompt, or an untyped message from an older CLI.
-func needsInput(ev agenthooks.Event) bool {
+func needsInput(ev harness.AgentEvent) bool {
 	switch ev.NotificationType {
 	case "permission_prompt", "elicitation_dialog":
 		return true
@@ -187,17 +194,18 @@ func needsInput(ev agenthooks.Event) bool {
 	return false
 }
 
-func (n *Notifier) notifyTerminal(kind Kind, ev agenthooks.Event, message string) {
+func (n *Notifier) notifyTerminal(kind Kind, ev harness.AgentEvent, message string) {
 	p := n.d.Prefs()
 	if !p.Enabled || (kind == KindFinished && !p.OnFinished) || (kind == KindNeedsInput && !p.OnNeedsInput) {
 		return
 	}
 	t := n.d.Describe(ev.TerminalID, ev.Cwd)
 	fallback := i18n.T("backend.notify.agent.finished.body", nil)
-	title := i18n.T("backend.notify.agent.finished.title", map[string]string{"name": t.Name})
+	agent := cmp.Or(t.Agent, n.d.AgentLabel())
+	title := i18n.T("backend.notify.agent.finished.title", map[string]string{"agent": agent, "name": t.Name})
 	if kind == KindNeedsInput {
 		fallback = i18n.T("backend.notify.agent.needsInput.body", nil)
-		title = i18n.T("backend.notify.agent.needsInput.title", map[string]string{"name": t.Name})
+		title = i18n.T("backend.notify.agent.needsInput.title", map[string]string{"agent": agent, "name": t.Name})
 	}
 	note := Note{
 		ID: string(kind) + ":" + ev.TerminalID, Kind: kind, Title: title,

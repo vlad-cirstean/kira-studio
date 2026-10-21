@@ -16,7 +16,8 @@ import (
 // TestMemoryMcpFollowsDocs has the real claude use the kira-memory server from goal-only prompts,
 // so the server instructions and tool docs alone must steer it: each stored item carries a reason,
 // origin and scope, a docs folder goes by path with no read of its content, and a request to
-// condense a file goes to ingest_files with distill true and the path, again with no read of the file. A code comment stays a
+// condense a file goes to ingest_files with distill true and the path, again with no read of the
+// file. A code comment stays a
 // plain comment that cites the stored fact by id, with no asComment call.
 func TestMemoryMcpFollowsDocs(t *testing.T) {
 	app := newRealApp(t)

@@ -67,7 +67,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	a.setConnected(set, defaultDbIndex, cfg.ReadOnly)
 
 	version := "unknown"
-	// P25 §1.3: INFO is in Redis's own @dangerous ACL category, so a perfectly ordinary
+	// INFO is in Redis's own @dangerous ACL category, so a perfectly ordinary
 	// least-privilege user (~* +@all -@dangerous) cannot run it. The server version it yields is a
 	// tooltip detail — refusing the whole connection over it reported NOPERM as E_AUTH and read as
 	// a wrong password.
@@ -269,7 +269,7 @@ func (a *Adapter) DownloadObject(ctx context.Context, req model.ObjectDownloadRe
 	return model.ObjectTransferResult{}, adapters.Unsupported("redis", "file transfer")
 }
 
-// KeyTypes is P63 §4.3: each path's TYPE, in the order given, one TYPE pipeline per distinct db
+// KeyTypes is each path's TYPE, in the order given, one TYPE pipeline per distinct db
 // index (BrowseView.vue's own window is capped at 200 paths, well under one round trip's worth,
 // but a level can still mix keys from different db indices in principle — grouping keeps this
 // correct rather than assuming every path shares one).
@@ -316,10 +316,10 @@ func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adap
 	return out, nil
 }
 
-// Cancel is index.ts's cancel (D7/D8): browse ops are bounded SCAN-family loops that
+// Cancel is index.ts's cancel: browse ops are bounded SCAN-family loops that
 // CheckCancelled between rounds, and the console races Stop (runConsoleCommand), so this stays a
 // permanent no-op rather than attempting a CLIENT KILL that would be unsafe under
-// dbConnectionSet's one-client-per-db-index sharing (C9).
+// dbConnectionSet's one-client-per-db-index sharing.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 	return false, nil
 }

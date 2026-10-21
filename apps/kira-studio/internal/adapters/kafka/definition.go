@@ -38,7 +38,7 @@ type topicConfigDoc struct {
 	Default bool   `json:"default"`
 }
 
-// buildTopicDefinition is definition.ts's buildTopicDefinition (:35-97). P58e E11: the
+// buildTopicDefinition is definition.ts's buildTopicDefinition (:35-97). The
 // Configuration section is populated via kadm.DescribeTopicConfigs — the capability the
 // TypeScript adapter's own comment recorded as permanently lost, because "this binding simply
 // does not wrap [DescribeConfigs]" — replacing the permanent "not available" note entirely.
@@ -125,7 +125,7 @@ type groupOffsetDoc struct {
 	Value string `json:"value"`
 }
 
-// buildGroupDefinition is definition.ts's buildGroupDefinition (:99-195). P58e E13:
+// buildGroupDefinition is definition.ts's buildGroupDefinition (:99-195).
 // kadm.DescribedGroup has no Type field and no PartitionAssignor field — the group definition
 // drops its `type` row entirely (there is nothing in kadm to reverse-lookup a numeric enum from,
 // unlike definition.ts:12-33's whole apparatus) and merges `partitionAssignor` into `protocol`,

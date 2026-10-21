@@ -1,12 +1,11 @@
-// P44 F45: views/shared/page/scan.ts's runChunkedScan is a two-phase, frame-driven scheduler
-// (P42 D37's priority window, then an ascending main pass) whose every interesting behaviour is
-// defined *by animation-frame boundary* — three separate P43 findings (F30, F36, F36a, F40) reason
+// views/shared/page/scan.ts's runChunkedScan is a two-phase, frame-driven scheduler
+// (the priority window, then an ascending main pass) whose every interesting behaviour is
+// defined *by animation-frame boundary* — three separate findings reason
 // about exactly this scheduling and none of them got a deterministic assertion, because a
 // Playwright test cannot pause between two frames: it can only wait for a settled end state, by
 // which point the priority tick, the chunk boundary and the cancel point have all already happened.
-// P43 iteration 3's own plan said as much twice about the same surface (its commit 6/commit 4 rows:
-// the SQLite seed "completes in one frame, so there is no in-flight scan to navigate"; the stale-
-// failure half "has no DOM assertion the suite can make deterministically"). A fake
+// The SQLite seed "completes in one frame, so there is no in-flight scan to navigate"; the
+// stale-failure half "has no DOM assertion the suite can make deterministically". A fake
 // requestAnimationFrame that hands frames out one at a time turns every one of these into an
 // ordinary assertion. scan.ts imports nothing, so — unlike every other spec here — no window stub
 // is needed, only the global requestAnimationFrame it calls by name.
@@ -202,10 +201,9 @@ describe('runChunkedScan — frame semantics (P44 F45)', () => {
   });
 });
 
-// P5 C4/F6: runChunkedScan's own cap (opts.cap here, MAX_SCAN_MATCHES in production) — the one
-// change in this phase that clears CLAUDE.md's "genuinely complex logic" bar (a cap interacting
+// runChunkedScan's own cap (opts.cap here, MAX_SCAN_MATCHES in production) — a cap interacting
 // with a two-pass scanner whose second pass rebuilds from row 0 and whose contract is that the
-// final array is strictly ascending).
+// final array is strictly ascending.
 describe('runChunkedScan — the match cap (P5 C4/F6)', () => {
   test('11. cap reached inside the priority window: the window keeps counting past it, but its own soFar stays capped', () => {
     const ticks: { found: number; soFar: readonly RowMatch[] }[] = [];

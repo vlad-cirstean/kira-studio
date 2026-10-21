@@ -9,7 +9,7 @@ import { useSettingsStore } from './settings';
 const DEFAULT_STATUS: DbMcpStatus = {
   running: false,
   command: '',
-  claudeAvailable: false,
+  agentAvailable: false,
   probed: [],
   expiresAt: '',
   error: '',
@@ -44,7 +44,7 @@ export const useDbMcpStore = defineStore('dbMcp', () => {
     unsubscribeApproval = control.onDbMcpApprovalChanged(applyApprovalSnapshot);
   }
 
-  // P108 Part 12 F2 (minor, same file family): approveQuery/denyQuery used to apply the RPC's own
+  // approveQuery/denyQuery used to apply the RPC's own
   // returned snapshot directly, so the clicking window updated without waiting for its own
   // onDbMcpApprovalChanged broadcast to arrive. But the broker emits that broadcast synchronously
   // inside Approve/Deny (internal/dbmcp/approval.go), before the RPC handler even returns its own
@@ -62,13 +62,13 @@ export const useDbMcpStore = defineStore('dbMcp', () => {
     await control.dbMcpDenyQuery(requestId);
   }
 
-  // C3 §7.1/D7: the toggle applies immediately, bypassing the dialog's draft/Save flow entirely,
+  // The toggle applies immediately, bypassing the dialog's draft/Save flow entirely,
   // since SetEnabled both persists the leaf and starts/stops the embedded instance in one call.
   // settingsStore.dbMcp.serverEnabled is set directly from the
   // confirmed `enabled` argument rather than waited-for through the separate kira:settings:changed
   // broadcast SetEnabled also emits server-side — this window's own toggle must never lag its own
-  // click, and a later broadcast arrival (this window's own echo, or another window's) reapplies the
-  // identical value, a harmless no-op.
+  // click, and a later broadcast arrival (this window's own echo, or another window's) reapplies
+  // the identical value, a harmless no-op.
   async function setDbMcpEnabled(enabled: boolean): Promise<void> {
     state.status = await control.dbMcpSetEnabled(enabled);
     useSettingsStore().dbMcp.serverEnabled = enabled;
@@ -82,8 +82,8 @@ export const useDbMcpStore = defineStore('dbMcp', () => {
     state.status = await control.dbMcpRegenerate();
   }
 
-  async function installDbMcpClaudeCode(): Promise<void> {
-    state.installResult = await control.dbMcpInstallClaudeCode();
+  async function installDbMcpAgent(): Promise<void> {
+    state.installResult = await control.dbMcpInstallAgent();
   }
 
   return {
@@ -94,6 +94,6 @@ export const useDbMcpStore = defineStore('dbMcp', () => {
     denyQuery,
     setDbMcpEnabled,
     regenerateDbMcpToken,
-    installDbMcpClaudeCode,
+    installDbMcpAgent,
   };
 });

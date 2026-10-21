@@ -1,9 +1,9 @@
 import { expect, test } from '../ui/fixtures';
 
-// v1.4 P6 (docs/HISTORY.md (v1.4 P6)): the full workbench shell at rest, no
-// connections/tabs open — the exact empty-boot state smoke.spec.ts already proves stable (P57 D16),
+// The full workbench shell at rest, no
+// connections/tabs open — the exact empty-boot state smoke.spec.ts already proves stable,
 // and the same class of failure (a visually-collapsed region whose DOM/aria state still reports
-// healthy) G16 found in the webview tier's own layout tests, which this tier has no equivalent
+// healthy) found in the webview tier's own layout tests, which this tier has no equivalent
 // guard for at all.
 test('workbench shell at rest (P6)', async ({ kira }) => {
   const { window } = kira;

@@ -7,16 +7,16 @@ import { connectionRow, expandRow, findRow, openRowMenu } from './tree';
 
 // Real capture of a real Redis 7 container's connect() response — via
 // `bun scripts/capture-tree.ts redis --recipe-file ...` (scripts/capture-tree.ts), not
-// hand-written (P50 D5). Confirmed here, a real environment finding: unlike Postgres (CLAUDE.md's
+// hand-written. Confirmed here, a real environment finding: unlike Postgres (CLAUDE.md's
 // Docker section), Redis's container starts and this capture completes fine under plain
 // `bun run` too — no esbuild/vendored-Node workaround needed for this adapter.
 //
 // Nothing beyond `connect` is needed: autocomplete.spec.ts's two Redis scenarios (command-name
 // completion, lint diagnostics) exercise `console/completion.ts`'s `redisCompletionSource()` and
 // `console/lint.ts`'s redis tokenizer, both pure client-side vocabulary/grammar with no backend
-// round trip at all (see apps/kira-studio/frontend/src/views/console/completion.ts's own `REDIS_COMMANDS` — a
-// curated constant, not fetched) — and neither scenario ever expands the tree (both open the
-// console straight from the connection root).
+// round trip at all (see apps/kira-studio/frontend/src/views/console/completion.ts's own
+// `REDIS_COMMANDS` — a curated constant, not fetched) — and neither scenario ever expands the
+// tree (both open the console straight from the connection root).
 
 const SERVER_VERSION = 'Redis 7.4.11';
 
@@ -82,6 +82,7 @@ export function redisConnectionSummary(
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    preconnectDelaySec: 0,
     autoExplain: false,
     throttlePerSec: 0,
     mcpEnabled: false,

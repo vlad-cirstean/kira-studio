@@ -60,10 +60,10 @@ interface EncodedFrameJSON {
   idOffset: number;
 }
 
-/** What the injected browser script actually needs per snapshot: the request-matching key
+/** What the injected browser script needs per snapshot: the request-matching key
  *  (`op`/`payload`) plus an already-encoded frame, so the browser has nothing left to build
- *  (P11 C2/C3 — moved here from `mockStreamBrowser.js` so page construction and wire encoding go
- *  through the real `@shared/protocol/page` builders and the generated FlatBuffers code, P50 D6). */
+ *  (page construction and wire encoding go through the real `@shared/protocol/page` builders
+ *  and the generated FlatBuffers code). */
 interface PreparedPortSnapshot {
   op: string;
   payload: unknown;
@@ -126,8 +126,7 @@ function buildPage(logical: LogicalPage): WirePage {
       timestamp: logical.timestamps[i],
       // No `?? ''`, unlike headers/attrs above: body is `string | null` (a Kafka tombstone is a
       // real null, distinct from empty string), same as timestamp just above — coalescing it here
-      // silently turned every mocked tombstone into an empty body (P180, found adding the first
-      // one ever captured).
+      // silently turned every mocked tombstone into an empty body.
       body: logical.bodies[i],
     });
   }
@@ -191,7 +190,7 @@ const PING_FRAME = toJSON(
 
 // One E_FIXTURE_MISS frame per DATA_OP value, so a miss still names its op — mirrors the plain
 // object mockStreamBrowser.js used to build inline before FlatBuffers replaced the JSON wire
-// format (P11 C3): that file has no encoding knowledge left, so every frame it can send must
+// format: that file has no encoding knowledge left, so every frame it can send must
 // already exist.
 const MISS_FRAMES: Record<string, EncodedFrameJSON> = Object.fromEntries(
   Object.values(DATA_OP).map((op) => [
@@ -218,7 +217,7 @@ const BROWSER_SCRIPT = readFileSync(resolve(__dirname, 'mockStreamBrowser.js'), 
   .replace(/;$/, '');
 
 /**
- * Replaces the bulk-data transport from the renderer side (P57 D14) by installing
+ * Replaces the bulk-data transport from the renderer side by installing
  * `window._wails.streamFactory` — `@wailsio/runtime`'s `stream.js` calls this synchronously
  * inside `Stream(name)` if it exists, in preference to opening a real connection
  * (`stream.js`: *"Server builds install a factory returning a real WebSocket… both objects present

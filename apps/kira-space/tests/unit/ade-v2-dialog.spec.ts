@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'bun:test';
+import { beforeAll, describe, expect, test } from 'bun:test';
+import { useClaudeAgentText } from '@workbench/testing/unit/claudeAgentText';
 import { buildBranchGraph } from '../../frontend/src/ade/v2/board/branchGraph';
 import {
   archiveSpec,
@@ -17,8 +18,10 @@ import { runMockupV2 } from './support/mockupV2Oracle';
 
 // The dialog templates against the mockup run unmodified (rebase with a restack chain, queue onto a
 // review branch, merge), then the rules the mockup has no oracle for: busy and headless blocks,
-// target resolution, archive lines and the session and start mirrors of the server defaults. The turn
-// watcher's submit / stop / ended / live-seen rules close the file.
+// target resolution, archive lines and the session and start mirrors of the server defaults. The
+// turn watcher's submit / stop / ended / live-seen rules close the file.
+
+beforeAll(useClaudeAgentText);
 
 const board = loadFixture<Board>('board');
 const repos = loadFixture<ReposResult>('repos').repos;
@@ -107,7 +110,8 @@ describe('merge path', () => {
 describe('busy and headless blocks', () => {
   const tui = (over: Partial<Session>): Session => ({
     id: 'aaaa1111',
-    claudeSessionId: 'c',
+    agentSessionId: 'c',
+    provider: 'claude',
     mode: 'tui',
     state: 'running',
     activity: 'working',
@@ -162,7 +166,8 @@ describe('busy and headless blocks', () => {
 describe('targets', () => {
   const running = (id: string, branchId: string): Session => ({
     id,
-    claudeSessionId: id,
+    agentSessionId: id,
+    provider: 'claude',
     mode: 'tui',
     state: 'running',
     activity: 'idle',

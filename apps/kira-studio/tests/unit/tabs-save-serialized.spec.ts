@@ -1,10 +1,10 @@
-// P108 Part 12 F12: createTabsStore's saveIfChanged/saveNow/flushPendingTabState used to fire an
+// createTabsStore's saveIfChanged/saveNow/flushPendingTabState used to fire an
 // independent tabsSave call every time (guarded only against re-sending an exact snapshot already
 // in flight), with no ordering guarantee between two overlapping calls at all — Wails v3 dispatches
 // each bound call on its own goroutine, so whichever HTTP round trip happened to land last in the
 // DB won, not whichever was issued last client-side. enqueueSave's saveChain now serialises every
 // save behind whatever is already queued, and nextSnapshot coalesces any burst of intervening
-// changes down to just the latest one by the time each queued link actually runs.
+// changes down to just the latest one by the time each queued link runs.
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';

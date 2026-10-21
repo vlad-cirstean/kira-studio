@@ -69,7 +69,7 @@ func checkEstExtends(old, next string) error {
 	return nil
 }
 
-const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, github_url, workflow_id, entry_step_id, since_json, workflow_json, workflow_hash, est, notes, color, created_at, archived_at`
+const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, host_url, workflow_id, entry_step_id, since_json, workflow_json, workflow_hash, est, notes, color, created_at, archived_at`
 const adeTaskBranchColumns = `id, task_id, code_repo_id, name, kind, base, base_branch_id, base_pending_from, queued_after, position, had_commits, added_at, merged_at, archived_at, origin`
 const adeRunColumns = `id, task_id, step_id, branch_id, attempt, state, loops, note, summary, session_id, exit_code, started_at, finished_at, outcome_json, purpose, spec_json, launch_note, launch_resume_id, launch_prompt, launch_extra`
 
@@ -99,7 +99,7 @@ func scanAdeTask(row rowScanner) (model.AdeTask, error) {
 	var t model.AdeTask
 	var since, workflow sql.NullString
 	var archived sql.NullInt64
-	if err := row.Scan(&t.ID, &t.Kind, &t.Title, &t.Owner, &t.JiraKey, &t.JiraURL, &t.GithubURL, &t.WorkflowID,
+	if err := row.Scan(&t.ID, &t.Kind, &t.Title, &t.Owner, &t.JiraKey, &t.JiraURL, &t.HostURL, &t.WorkflowID,
 		&t.EntryStepID, &since, &workflow, &t.WorkflowHash, &t.Est, &t.Notes, &t.Color, &t.CreatedAt, &archived); err != nil {
 		return model.AdeTask{}, err
 	}
@@ -145,7 +145,7 @@ func (r *AdeTaskRepo) queryTasks(query string, args ...any) ([]model.AdeTask, er
 
 // ListLive returns non-archived tasks in plan order (a task with no plan row sorts last).
 func (r *AdeTaskRepo) ListLive() ([]model.AdeTask, error) {
-	return r.queryTasks(`SELECT t.id, t.kind, t.title, t.owner, t.jira_key, t.jira_url, t.github_url, t.workflow_id,
+	return r.queryTasks(`SELECT t.id, t.kind, t.title, t.owner, t.jira_key, t.jira_url, t.host_url, t.workflow_id,
 		t.entry_step_id, t.since_json, t.workflow_json, t.workflow_hash, t.est, t.notes, t.color, t.created_at, t.archived_at
 		FROM ade_tasks t LEFT JOIN ade_task_plan p ON p.task_id = t.id
 		WHERE t.archived_at IS NULL ORDER BY p.position IS NULL, p.position, t.created_at, t.id`)
@@ -203,8 +203,8 @@ func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch) (mo
 	if t.SinceJSON != "" {
 		since = t.SinceJSON
 	}
-	if _, err := tx.Exec(`INSERT INTO ade_tasks (id, kind, title, owner, jira_key, jira_url, github_url, workflow_id, entry_step_id, since_json, est, notes, color, created_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-		t.ID, t.Kind, t.Title, t.Owner, t.JiraKey, t.JiraURL, t.GithubURL, t.WorkflowID, t.EntryStepID, since, t.Est,
+	if _, err := tx.Exec(`INSERT INTO ade_tasks (id, kind, title, owner, jira_key, jira_url, host_url, workflow_id, entry_step_id, since_json, est, notes, color, created_at, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		t.ID, t.Kind, t.Title, t.Owner, t.JiraKey, t.JiraURL, t.HostURL, t.WorkflowID, t.EntryStepID, since, t.Est,
 		t.Notes, t.Color, t.CreatedAt); err != nil {
 		return model.AdeTask{}, fmt.Errorf("repos: insert ade task %s: %w", t.ID, err)
 	}
@@ -308,8 +308,8 @@ func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask
 	if p.JiraURL != nil {
 		cur.JiraURL = *p.JiraURL
 	}
-	if p.GithubURL != nil {
-		cur.GithubURL = *p.GithubURL
+	if p.HostURL != nil {
+		cur.HostURL = *p.HostURL
 	}
 	if p.Notes != nil {
 		cur.Notes = *p.Notes
@@ -329,8 +329,8 @@ func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask
 			return model.AdeTask{}, fmt.Errorf("repos: move ade task branches to %s: %w", to, err)
 		}
 	}
-	if _, err := tx.Exec(`UPDATE ade_tasks SET kind = ?, title = ?, jira_key = ?, jira_url = ?, github_url = ?, est = ?, notes = ?, color = ? WHERE id = ?`,
-		cur.Kind, cur.Title, cur.JiraKey, cur.JiraURL, cur.GithubURL, cur.Est, cur.Notes, cur.Color, id); err != nil {
+	if _, err := tx.Exec(`UPDATE ade_tasks SET kind = ?, title = ?, jira_key = ?, jira_url = ?, host_url = ?, est = ?, notes = ?, color = ? WHERE id = ?`,
+		cur.Kind, cur.Title, cur.JiraKey, cur.JiraURL, cur.HostURL, cur.Est, cur.Notes, cur.Color, id); err != nil {
 		return model.AdeTask{}, fmt.Errorf("repos: update ade task %s: %w", id, err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -1037,7 +1037,7 @@ func (r *AdeTaskRepo) RecoverRunning(now int64, out model.AdeRunOutcome) ([]mode
 	rows, err := r.DB.Query(`UPDATE ade_runs SET state = ?, note = ?, finished_at = ?, outcome_json = ?,
 		launch_note = '', launch_prompt = '', launch_extra = '',
 		launch_resume_id = CASE WHEN purpose IN ('', 'review') AND session_id <> '' THEN
-			COALESCE((SELECT claude_session_id FROM ade_sessions s WHERE s.id = ade_runs.session_id), '') ELSE '' END
+			COALESCE((SELECT agent_session_id FROM ade_sessions s WHERE s.id = ade_runs.session_id), '') ELSE '' END
 		WHERE state = 'running' RETURNING `+adeRunColumns,
 		model.AdeRunStuck, out.Reason, now, outcome)
 	runs, err := sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeRun, bool, error) {

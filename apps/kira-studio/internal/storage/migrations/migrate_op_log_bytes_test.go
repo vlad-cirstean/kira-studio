@@ -1,4 +1,4 @@
-// P23 §4.2 case 5: migrate_rename_test.go's own precedent (the one test in this package that
+// migrate_rename_test.go's own precedent (the one test in this package that
 // seeds data rather than migrating an empty schema) applied to 0015_p23_op_log_bytes.sql — a
 // migration that backfills a byte count from existing rows, which SQLite's plain length() would
 // get wrong for non-ASCII text (it counts characters, not bytes), and that purges rows a

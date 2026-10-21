@@ -1,22 +1,17 @@
-// P60a §2.1/D2: the engine-generic half of what `views/repo/monaco.ts` (C5/C6) built —
-// `loadMonaco`/`MonacoModule`/the theme definition — moved here so every editor surface in Kira
-// Studio (not only the repo workspace) shared the one memoised bootstrap. `views/repo/monaco.ts`
-// used to re-export everything below unchanged, so RepoFileView.vue/RepoDiffView.vue/navigation.ts
-// needed no edit; P100 Part 2 moved the repo workspace itself to apps/kira-space, taking its own
-// duplicate of this file with it (`monacoEntry.ts` moved alongside, since Kira Studio keeps its own
-// non-git Monaco bootstrap too).
+// The engine-generic half of what `views/repo/monaco.ts` built — `loadMonaco`/`MonacoModule`/the
+// theme definition — moved here so every editor surface in Kira Studio
+// (not only the repo workspace) shared the one memoised bootstrap. `views/repo/monaco.ts` used to
+// re-export everything below unchanged, so RepoFileView.vue/RepoDiffView.vue/navigation.ts needed
+// no edit.
 //
-// P103 Part 1: `monacoEntry.ts`/`monacoTheme.ts` (and the monarch grammars beneath them) hoisted to
+// `monacoEntry.ts`/`monacoTheme.ts` (and the monarch grammars beneath them) hoisted to
 // `@workbench/editor/*`, byte-identical between both apps — this file's own dynamic imports below
 // point there. `MonacoModule`/`KIRA_EDITOR_THEME` moved with `monacoTheme.ts` — re-exported here
 // unchanged so every consumer keeps importing them from here. `cssVar` moved too but had no
 // consumer outside monacoTheme.ts itself in either app, so it isn't re-exported here.
 //
-// P103 Part 4 (closing audit, §10): this file itself had stayed a per-app duplicate through Parts
-// 1-3 — code-identical, comment-only diff — because it was never named in either part's own scope
-// (§4.3 deferred it to Part 2 "if either is a candidate", Part 2 never revisited it). No app-local
-// coupling of its own (only `@workbench/editor/*` imports), so it hoists here unchanged, closing
-// the last real gap the audit's comment-blind sweep found.
+// No app-local coupling of its own (only `@workbench/editor/*` imports),
+// so it hoists here unchanged.
 export type { MonacoModule } from './monacoTheme';
 export { KIRA_EDITOR_THEME } from './monacoTheme';
 
@@ -27,7 +22,7 @@ import type { MonacoModule } from './monacoTheme';
 // this chunk at all.
 let monacoModule: Promise<MonacoModule> | undefined;
 
-// D7's own "one worker" guard: label 'editorWorkerService' gets the real worker (it backs
+// The "one worker" guard: label 'editorWorkerService' gets the real worker (it backs
 // IEditorWorkerService — the diff editor widget computes its diff there); anything else throws
 // loudly at first use rather than silently shipping a second worker, in case a future import ever
 // pulls a language service back in.

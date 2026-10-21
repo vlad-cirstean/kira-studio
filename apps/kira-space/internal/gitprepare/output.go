@@ -8,7 +8,7 @@ import (
 	"unicode/utf8"
 )
 
-// maxRetainedOutput/maxRetainedLines are D12's own caps on the FINAL result's own retained
+// maxRetainedOutput/maxRetainedLines are the caps on the FINAL result's own retained
 // transcript (Result.Output) — independent of the streaming batch caps below, enforced by total
 // bytes AND total line count, whichever is hit first. Once either cap is hit, every further line is
 // still delivered to a live streaming subscriber (below) but is no longer added to the retained
@@ -18,11 +18,11 @@ const (
 	maxRetainedLines  = 500
 )
 
-// maxBatchBytes/maxBatchLines/batchInterval are D12's own streaming cadence: a batch is delivered
+// maxBatchBytes/maxBatchLines/batchInterval are the streaming cadence: a batch is delivered
 // to the caller's OnBatch as soon as either cap is reached, or after batchInterval has elapsed
 // since the last delivery, whichever comes first — the same "coalesce, but never withhold past a
 // bound" shape gitops.Throttle already uses for remote progress, reimplemented here with stdlib
-// only (D18: this package imports nothing else).
+// only (this package imports nothing else).
 const (
 	maxBatchBytes = 8 << 10
 	maxBatchLines = 64
@@ -31,9 +31,9 @@ const (
 
 // maxUnterminatedBuf bounds how many bytes of a stream's not-yet-'\n'-terminated tail write will
 // accumulate before giving up on waiting for the newline and flushing what it has as a line of its
-// own. G31 round-2 architecture/security review, finding #8: maxRetainedOutput/maxBatchBytes above
+// own. maxRetainedOutput/maxBatchBytes above
 // only bound the OUTPUT of this buffer — lines already split on '\n' — never this buffer's own
-// unsplit input. A still-running process that simply never emits a '\n' (a runaway loop echoing a
+// unsplit input. A still-running process that never emits a '\n' (a runaway loop echoing a
 // huge binary blob, or an ordinary script bug) would otherwise grow streamBuf[stream] for the
 // entire 15-minute spawn timeout with neither cap able to help at all, since neither one has
 // anything to act on until a newline finally shows up.
@@ -45,7 +45,7 @@ type Line struct {
 	Text   string
 }
 
-// sanitizeLine is D12's own output sanitizer, applied to one already-newline-split line (never
+// sanitizeLine is the output sanitizer, applied to one already-newline-split line (never
 // applied across a line boundary, so a multi-byte UTF-8 sequence or an ANSI escape sequence split
 // across two Write calls is always whole by the time this runs, since the caller only calls this
 // once a full '\n'-terminated line — or the final unterminated remainder at EOF — has been

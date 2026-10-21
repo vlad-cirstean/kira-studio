@@ -1,4 +1,4 @@
-// Finding 14 of the v1.2 P14 round-1 review: collectionsStore.search had no debounce, and
+// collectionsStore.search had no debounce, and
 // childrenOf re-filtered+sorted the entire flat `items` array on every single call — called
 // repeatedly per row per level by both visibleRows and subtreeMatches, an O(N²)-ish walk on every
 // keystroke. This pins both fixes at the state level: the search itself stays immediate (so the

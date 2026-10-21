@@ -13,7 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 )
 
-// G30 round-1 architecture/security finding #1: `remote.run`'s `remote` field reached `git
+// `remote.run`'s `remote` field reached `git
 // fetch`/`push` argv as a bare, unguarded token — a remote beginning with "-" is read as an
 // option rather than a remote name, and `git fetch --upload-pack=<cmd> <local-path-remote>`
 // executes `<cmd>` through a shell. This test proves the same exploit the review verified against

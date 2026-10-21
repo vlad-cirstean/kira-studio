@@ -21,11 +21,11 @@ func TestProxyRefusals(t *testing.T) {
 	h := newHub()
 	var denied []Denial
 	h.add("run-1", func(d Denial) { denied = append(denied, d) })
-	p, err := StartProxy(h, func(host string) bool { return host == "api.anthropic.com" })
+	p, err := StartProxy(h)
 	if err != nil {
 		t.Fatal(err)
 	}
-	proxyURL, _ := url.Parse(p.Register("run-1"))
+	proxyURL, _ := url.Parse(p.Register("run-1", func(host string) bool { return host == "api.anthropic.com" }))
 
 	client := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
 	resp, err := client.Get(srv.URL)

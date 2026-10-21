@@ -9,13 +9,13 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// G26 — stack.list/preflight.restack are reads and stay on the request ctx, matching refs.go/
-// worktree.go's own shape for this category of handler. stack.restack detaches (D6/G5 D8's
-// precedent, applied again exactly as remote.run already does): a restack already
-// running must never be killed by a client disconnect or a bare `cancel` frame —
-// stack.cancelRestack is the one deliberate, in-band way to end it early. stack.cancelRestack is a
-// fast, synchronous state mutation and needs no detaching of its own. stackSet itself needs no
-// handler here at all — it is an ordinary opTable kind (D10), already served by op.run/undo.run.
+// stack.list/preflight.restack are reads and stay on the request ctx, matching refs.go/
+// worktree.go's own shape for this category of handler. stack.restack detaches exactly as
+// remote.run already does: a restack already running must never be killed by a client
+// disconnect or a bare `cancel` frame — stack.cancelRestack is the one deliberate, in-band way
+// to end it early. stack.cancelRestack is a fast, synchronous state mutation and needs no
+// detaching of its own. stackSet itself needs no handler here at all — it is an ordinary opTable
+// kind, already served by op.run/undo.run.
 
 func (r *Router) handleStackList(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	return handleRepoCall(ctx, c, "stack.list", params,
@@ -53,9 +53,9 @@ func (r *Router) handlePreflightRestack(ctx context.Context, c *gitsession.Conn,
 	)
 }
 
-// handleStackRestack detaches ctx (D6/G5 D8's precedent) — the per-branch rebase spawns themselves
-// are bound to RunRestack's OWN internally-derived, killable-between-branches context (opCtx), never
-// to this request's; stack.cancelRestack is what ends that one early. RunRestack also needs c
+// handleStackRestack detaches ctx — the per-branch rebase spawns themselves
+// are bound to RunRestack's OWN internally-derived, killable-between-branches context (opCtx),
+// never to this request's; stack.cancelRestack is what ends that one early. RunRestack also needs c
 // itself (not just the entry it resolves through), so the call closure captures it directly rather
 // than handleRepoCall threading it through — the one handler here that isn't pure entry+params.
 func (r *Router) handleStackRestack(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {

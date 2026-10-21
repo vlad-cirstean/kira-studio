@@ -11,11 +11,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )
 
-// P23 §4.2 case 1: op_log's caps now interact four ways (age cut, row cap, byte budget, per-row
-// truncation), and the sweep (D2) is only *safe* because the truncation (D1) holds — "cache
-// eviction/invalidation with interacting rules", CLAUDE.md's own named category, not CRUD round
-// trips. There was no ops_test.go before this phase; Prune's two pre-existing passes are pinned
-// here too, as regression cases, since Prune is being restructured for the first time.
+// op_log's caps now interact four ways (age cut, row cap, byte budget, per-row truncation), and
+// the sweep is only *safe* because the truncation holds — "cache eviction/invalidation with
+// interacting rules", CLAUDE.md's own named category, not CRUD round trips. Prune's two
+// pre-existing passes are pinned here too, as regression cases, since Prune is being
+// restructured for the first time.
 
 func appendAndFinish(t *testing.T, ops *repos.OpsRepo, id, startedAt string, patch model.OpFinish) {
 	t.Helper()
@@ -272,7 +272,7 @@ func TestOpsPruneHardCapRowsStillWorks(t *testing.T) {
 	}
 }
 
-// TestReconcileInterruptedFlipsRunningRowsToError is the review finding: a hard kill (SIGKILL, OOM,
+// TestReconcileInterruptedFlipsRunningRowsToError: a hard kill (SIGKILL, OOM,
 // a panic outside Host.safeRun) skips oplog.Wiring's own finishInFlight entirely — it only runs on
 // an orderly channel close — leaving 'running' op_log rows that would otherwise persist forever.
 // ReconcileInterrupted, called at the next startup, must flip every one of them to 'error' with a

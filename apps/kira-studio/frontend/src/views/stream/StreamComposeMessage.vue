@@ -13,10 +13,10 @@ import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref } from 'vue';
 import { produceKafkaMessage, sendSqsMessage } from './mutations';
 
-// Item 3/4's "Add message" panel — Kafka gets key/body/headers (kafka/produce.ts's three
+// The "Add message" panel — Kafka gets key/body/headers (kafka/produce.ts's three
 // sentinel fields); SQS gets body/headers but no key (SendMessage has no key concept on this
-// app's model — see sqs/mutate.ts's own scoping note; task #61 added SQS's MessageAttributes
-// support, so headers is now shared by both kinds). One popover, one shape switch, rather than
+// app's model — see sqs/mutate.ts's own scoping note; SQS has MessageAttributes support, so
+// headers is now shared by both kinds). One popover, one shape switch, rather than
 // two near-identical components.
 const props = defineProps<{
   tabId: string;

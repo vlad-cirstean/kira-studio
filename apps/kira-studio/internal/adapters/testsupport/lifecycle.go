@@ -12,8 +12,8 @@ import (
 
 // ConnectionLifecycleScenarios runs the pinned-connection scenarios shared by the engines that keep
 // one connection per database (postgres, mysqlfamily) against a live server reached through a
-// PausableProxy: cancel-then-reuse (P168 Part 3 F5), cancelling an op queued behind a long one and
-// teardown while an op hangs (F6). newAdapter returns an unconnected adapter; cfg is the fixture's
+// PausableProxy: cancel-then-reuse, cancelling an op queued behind a long one and
+// teardown while an op hangs. newAdapter returns an unconnected adapter; cfg is the fixture's
 // config. Every scenario holds the primary connection with a catalog query whose response the
 // proxy withholds.
 func ConnectionLifecycleScenarios(t *testing.T, cfg model.ResolvedConnectionConfig, newAdapter func(t *testing.T) adapters.Adapter) {

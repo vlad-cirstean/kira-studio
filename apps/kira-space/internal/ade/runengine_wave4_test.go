@@ -11,7 +11,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
@@ -44,7 +44,7 @@ func (e *engine) claudeID(r model.AdeRun) string {
 	if err != nil || rec == nil {
 		e.t.Fatalf("session of run %s: %v, %v", r.ID, rec, err)
 	}
-	return rec.ClaudeSessionID
+	return rec.AgentSessionID
 }
 
 func TestRunEngine_sendBack(t *testing.T) {
@@ -82,7 +82,7 @@ func TestRunEngine_sendBack(t *testing.T) {
 		}
 		prompt := e.fakeFile("api-3.prompt")
 		if !strings.Contains(prompt, "tests failed on feat/fix-login: summary-failed. Fix the implementation.") ||
-			!strings.Contains(prompt, claudeheadless.FinishInstruction(llmprompts.Defaults(), nil)) || strings.Contains(prompt, "Step 1/2") {
+			!strings.Contains(prompt, agentmcp.FinishInstruction(llmprompts.Defaults(), nil)) || strings.Contains(prompt, "Step 1/2") {
 			t.Fatalf("fix prompt = %q", prompt)
 		}
 		rec, _ := e.repos.AdeSessions.Get(fix.SessionID)
@@ -216,12 +216,12 @@ func TestRunEngine_recover(t *testing.T) {
 	}
 	if err := e.repos.AdeSessions.InsertHeadless(model.AdeSession{
 		ID: "s-head", Mode: model.AdeSessionModeHeadless, TaskID: id, BranchID: branch, StepID: "first",
-		RunID: "r-running", ClaudeSessionID: "c1", Cwd: "/x", State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
+		RunID: "r-running", AgentSessionID: "c1", Cwd: "/x", State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := e.repos.AdeSessions.InsertTUI(model.AdeSession{
-		ID: "s-tui", Mode: model.AdeSessionModeTUI, TaskID: id, BranchID: branch, ClaudeSessionID: "c2", Cwd: "/x",
+		ID: "s-tui", Mode: model.AdeSessionModeTUI, TaskID: id, BranchID: branch, AgentSessionID: "c2", Cwd: "/x",
 		State: model.AdeSessionStateRunning, TerminalID: "term-1", StartedAt: now, LastActiveAt: now,
 	}); err != nil {
 		t.Fatal(err)
@@ -310,7 +310,7 @@ func TestRunEngine_recoverHeldFixRun(t *testing.T) {
 		t.Fatalf("fix run argv = %s", args)
 	}
 	if prompt := e.fakeFile("api-2.prompt"); !strings.Contains(prompt, spec.Prompt) ||
-		!strings.Contains(prompt, claudeheadless.FinishInstruction(llmprompts.Defaults(), nil)) || strings.Contains(prompt, "Step 1/2") {
+		!strings.Contains(prompt, agentmcp.FinishInstruction(llmprompts.Defaults(), nil)) || strings.Contains(prompt, "Step 1/2") {
 		t.Fatalf("fix prompt = %q", prompt)
 	}
 	if rec, _ := e.repos.AdeSessions.Get(fix.SessionID); rec == nil || rec.Resumes != claudeID {
@@ -370,12 +370,12 @@ func TestRunEngine_takeOver(t *testing.T) {
 		t.Fatalf("cwd = %s, want the run's worktree %s", l.Cwd, head.Cwd)
 	}
 	composed := e.spawn(l)
-	if !strings.HasPrefix(composed, e.tracker.deps.ClaudeBin+" --resume '"+head.ClaudeSessionID+"' ") ||
-		!strings.Contains(composed, "'--allowedTools' '"+claudeheadless.FinishStepTool+"'") {
+	if !strings.HasPrefix(composed, e.tracker.deps.AgentBin+" --resume '"+head.AgentSessionID+"' ") ||
+		!strings.Contains(composed, "'--allowedTools' '"+toolName(agentmcp.FinishStep)+"'") {
 		t.Fatalf("command = %s", composed)
 	}
 	rec, _ := e.repos.AdeSessions.Get(l.SessionID)
-	if rec == nil || rec.Mode != model.AdeSessionModeTUI || rec.Resumes != head.ClaudeSessionID || rec.ClaudeSessionID != head.ClaudeSessionID ||
+	if rec == nil || rec.Mode != model.AdeSessionModeTUI || rec.Resumes != head.AgentSessionID || rec.AgentSessionID != head.AgentSessionID ||
 		rec.RunID != "" || rec.TaskID != id || rec.BranchID != head.BranchID || rec.StepID != "first" {
 		t.Fatalf("tui record = %+v", rec)
 	}

@@ -1,16 +1,17 @@
 /**
- * G15 D5/D6 — pure interval algebra plus the two coordinate mappings the editor-side marking
+ * Pure interval algebra plus the two coordinate mappings the editor-side marking
  * controller needs (`selectionToRange`, `hunkChangeBlock`). Imports only `./diff.ts` and
- * `./review.ts`, nothing from `@kira/git-ipc` or an editor API, which is what lets this run under plain `bun test` (D10).
+ * `./review.ts`, nothing from `@kira/git-ipc` or an editor API, which is what lets this run under
+ * plain `bun test`.
  *
- * This algebra is presentation-only (F9): it decides which icon a hunk gets, which of the two
- * toolbar buttons shows, and what a hover says. G11 D10's server-side union/subtract is what
- * actually computes the stored state — the client never predicts it and never writes
+ * This algebra is presentation-only: it decides which icon a hunk gets, which of the two
+ * toolbar buttons shows, and what a hover says. The server-side union/subtract is what
+ * computes the stored state — the client never predicts it and never writes
  * `reviewedRanges` from this module's output.
  *
  * `DiffHunk`/`LineRange` are this
  * package's own model types (structural copies of `@kira/git-ipc`'s wire shapes) rather than an
- * import of the wire package itself — no behaviour change.
+ * import of the wire package itself.
  */
 import type { DiffHunk } from './diff.ts';
 import type { LineRange } from './review.ts';
@@ -61,7 +62,7 @@ export function clampRanges(ranges: readonly LineRange[], lineCount: number): re
  *  **`ranges` must already be normalized** (sorted, non-overlapping, non-adjacent — exactly what
  *  `normalizeRanges` produces). Call `normalizeRanges` yourself first if `ranges` might not be.
  *
- *  G31 round-2 performance review, finding #4: this used to call `normalizeRanges(ranges)` on
+ *  This used to call `normalizeRanges(ranges)` on
  *  every invocation, but its one real caller (`reviewMarking.ts`, both directly and through
  *  `aggregateCoverage`) always passes `state.reviewedRanges` — wire data whose every server-side
  *  origin (`gitreview.ProjectRanges`, `Union`, `Subtract`) already ends in `Normalize`, so the
@@ -98,11 +99,11 @@ export function selectionToRange(sel: SelectionShape): LineRange {
   return { start: startLine0 + 1, end: Math.max(endLine0, startLine0) + 1 };
 }
 
-/** D6: the changed-line span of a hunk, not its context. The span runs from the first to the last
+/** The changed-line span of a hunk, not its context. The span runs from the first to the last
  *  line that both changed (not `context`) and has a new-side image — a `del` line's `newLine` is
  *  `undefined` (`contract.ts:110-118`), so a pure-deletion hunk (only `del` lines) yields
  *  `undefined`: there is no branch-tip line left to hang review state on, which is correct rather
- *  than a gap (G11 D10's own projection already drops ranges whose lines were deleted). */
+ *  than a gap (the projection already drops ranges whose lines were deleted). */
 export function hunkChangeBlock(hunk: DiffHunk): LineRange | undefined {
   let start: number | undefined;
   let end: number | undefined;

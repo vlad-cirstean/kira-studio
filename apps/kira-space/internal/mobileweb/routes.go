@@ -77,7 +77,7 @@ func (s *Server) routes() []route {
 		{method: http.MethodGet, path: "/api/events", access: accessDevice, kind: kindStream,
 			handle: func(w http.ResponseWriter, r *http.Request, d repos.MobileDeviceRow) { s.handleEvents(w, r, d) }},
 		read("/api/ade/board", readJSON(s, "board", true, s.cfg.Reader.Board)),
-		read("/api/ade/prs", readJSON(s, "prs", true, s.cfg.Reader.Prs)),
+		read("/api/ade/change-requests", readJSON(s, "change-requests", true, s.cfg.Reader.ChangeRequests)),
 		read("/api/ade/sessions", readJSON(s, "sessions", false, func(ctx context.Context) (any, error) {
 			v, err := s.cfg.Reader.Sessions(ctx)
 			if err != nil {
@@ -88,6 +88,7 @@ func (s *Server) routes() []route {
 		read("/api/ade/workflows", readJSON(s, "workflows", false, s.cfg.Reader.Workflows)),
 		read("/api/ade/backlog", readJSON(s, "backlog", false, s.cfg.Reader.Backlog)),
 		read("/api/ade/repos", readJSON(s, "repos", false, s.repoNames)),
+		read("/api/ade/hosts", readJSON(s, "hosts", false, s.cfg.Reader.HostProviders)),
 		read("/api/ade/log", s.handleLog),
 		read("/api/agent/sessions", func(w http.ResponseWriter, _ *http.Request, _ repos.MobileDeviceRow) {
 			v, err := withoutCwd(s.cfg.AgentSessions())
@@ -96,6 +97,13 @@ func (s *Server) routes() []route {
 				return
 			}
 			writeJSON(w, http.StatusOK, v)
+		}),
+		read("/api/agent/info", func(w http.ResponseWriter, _ *http.Request, _ repos.MobileDeviceRow) {
+			if s.cfg.AgentInfo == nil {
+				writeJSON(w, http.StatusOK, map[string]any{})
+				return
+			}
+			writeJSON(w, http.StatusOK, s.cfg.AgentInfo())
 		}),
 		write("/api/ade/backlog/items", "backlog.add", permWrite, s.handleBacklogAdd),
 		write("/api/ade/backlog/move", "backlog.move", permWrite, s.handleBacklogMove),

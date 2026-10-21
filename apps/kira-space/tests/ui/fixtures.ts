@@ -18,7 +18,7 @@ export type KiraApp = { window: Page } & KiraAppExtra;
 
 export interface RelaunchOptions extends UiFixturesOptions {
   control?: readonly ControlSnapshot[];
-  /** P114 §3.2: set only when boot itself opens the git transport (a restored, active repo-file
+  /** Set only when boot itself opens the git transport (a restored, active repo-file
    *  tab) — installed via `installGitStreamMockOnInit`, before `relaunch()`'s one navigation. See
    *  `support/gitStreamMock.ts`'s own doc comment for why that's a different install path than the
    *  per-spec `installGitStreamMock` default. */

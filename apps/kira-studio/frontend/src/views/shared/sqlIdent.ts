@@ -1,9 +1,9 @@
-// D7 (P18): quoteIdent moves here from grid/menu.ts to gain a second consumer
+// quoteIdent moves here from grid/menu.ts to gain a second consumer
 // (grid/filterCompletion.ts) — one shared definition beats two that can drift on the
 // backtick/double-quote split. Same trust boundary grid/menu.ts's own comment already states:
 // generated as literal SQL text once, never validated against the column's type.
 //
-// P34 D17: a quoting-and-grammar *family*, not a product — MariaDB and MySQL share one dialect
+// A quoting-and-grammar *family*, not a product — MariaDB and MySQL share one dialect
 // ('mysql', since languages.ts already maps MariaDB to CodeMirror's own `MySQL` lang-sql dialect;
 // the family is the concept the code was already reaching for). Before this, the twelve call
 // sites across the renderer each hand-wrote
@@ -11,16 +11,16 @@
 // kind missing from that inline check silently fell to `undefined` — which quoteIdent below reads
 // as "double-quote it", not "this isn't SQL". A MySQL connection that wasn't added to every one
 // of those twelve sites would emit invalid double-quoted identifiers into `grid/menu.ts`'s
-// generated *Filter by this value* and FK-navigation predicates (P34 F22). sqlDialectFor is the
+// generated *Filter by this value* and FK-navigation predicates. sqlDialectFor is the
 // one place that decision is made now.
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { SqlLexOptions } from '@shared/domain/sqlLex';
 
-// P35 D28: SQLite is its own member, not folded into 'mysql' — it double-quotes identifiers
+// SQLite is its own member, not folded into 'mysql' — it double-quotes identifiers
 // (already quoteIdent's own default branch below) but is a genuinely different grammar with its
 // own CodeMirror lang-sql dialect (languages.ts), so mapping it to 'postgres' would be a lie the
 // next reader has to decode.
-// P36 D29: ClickHouse is a fourth member for the same reason SQLite is — it backtick-quotes like
+// ClickHouse is a fourth member for the same reason SQLite is — it backtick-quotes like
 // mysql (BACKTICK_DIALECTS below) but is its own grammar, with its own languages.ts dialect.
 export type SqlDialect = 'postgres' | 'mysql' | 'sqlite' | 'clickhouse';
 
@@ -40,7 +40,7 @@ const BACKTICK_DIALECTS = new Set<SqlDialect>(['mysql', 'clickhouse']);
 
 export function quoteIdent(dialect: SqlDialect | undefined, name: string): string {
   if (dialect && BACKTICK_DIALECTS.has(dialect)) {
-    // F11 (P108 Part 10): ClickHouse's lexer reads a backtick-quoted identifier with the same
+    // ClickHouse's lexer reads a backtick-quoted identifier with the same
     // backslash-escape rules as a string literal (clickhouse/read.go's own quoteIdent) — MySQL
     // does not, so doubling backticks alone (the pre-fix behaviour, still correct for MySQL) left
     // a ClickHouse name containing `\` able to escape its own closing backtick, corrupting the
@@ -54,22 +54,22 @@ export function quoteIdent(dialect: SqlDialect | undefined, name: string): strin
   return `"${name.replace(/"/g, '""')}"`;
 }
 
-// P2 R2: a backslash inside a standard SQL single-quoted string literal is just an ordinary
-// character — only MySQL/MariaDB (and ClickHouse, F27) treat it as an escape character by
-// default. sql-split.ts/sqlLint.ts's shared quote-scanning loop needs to know which regime it's
+// A backslash inside a standard SQL single-quoted string literal is an ordinary
+// character — only MySQL/MariaDB (and ClickHouse) treat it as an escape character by default.
+// sql-split.ts/sqlLint.ts's shared quote-scanning loop needs to know which regime it's
 // in, or a Postgres/SQLite literal ending in a literal backslash (e.g. `'foo\'`) gets its closing
 // quote mistaken for an escaped character and the scan runs on past the literal's real end.
 const BACKSLASH_ESCAPE_DIALECTS = new Set<SqlDialect>(['mysql', 'clickhouse']);
 
 /** true when `dialect`'s string literals treat a backslash as an escape character — undefined
- *  (no SQL dialect, e.g. a Mongo/Redis console) keeps the pre-P2-R2 default of `true` since
+ *  (no SQL dialect, e.g. a Mongo/Redis console) keeps the default of `true` since
  *  nothing about that case was in scope for this fix.
- *  P115 H5/P118 cleanup: module-private since lexOptionsFor below became the only caller. */
+ *  Module-private since lexOptionsFor below became the only caller. */
 function backslashEscapesFor(dialect: SqlDialect | undefined): boolean {
   return dialect === undefined || BACKSLASH_ESCAPE_DIALECTS.has(dialect);
 }
 
-// F10/P21 round 1: sql-split.ts/sqlLint.ts's own dollar-quote scanning ($$.../$tag$...$tag$) used
+// sql-split.ts/sqlLint.ts's own dollar-quote scanning ($$.../$tag$...$tag$) used
 // to run unconditionally, a Postgres-only convention applied to every dialect. A MySQL identifier
 // containing two `$` (legal there — `$` is a valid, if unusual, identifier character) reads as a
 // dollar-quote open tag with no closing match, and the scanner then swallows the rest of the
@@ -80,7 +80,7 @@ function dollarQuotingFor(dialect: SqlDialect | undefined): boolean {
   return dialect === undefined || dialect === 'postgres';
 }
 
-// P108 Part 11 F4: the four new sql-lex.ts options, one helper each, same shape as
+// The four new sql-lex.ts options, one helper each, same shape as
 // backslashEscapesFor/dollarQuotingFor above. Unlike those two, none of these four has a pre-fix
 // universal behaviour to preserve — they are new lexical forms, previously unrecognised by every
 // dialect — so an unknown dialect (undefined) defaults to false/off for each, not true.
@@ -106,7 +106,7 @@ function postgresEscapeStringsFor(dialect: SqlDialect | undefined): boolean {
   return dialect === 'postgres';
 }
 
-/** P115 H5: the six lookups above, gathered into the one per-dialect lexical-options literal
+/** The six lookups above, gathered into the one per-dialect lexical-options literal
  *  every split/lint/format/tokenize call site here used to build by hand. Every field here is a
  *  real, resolved boolean (never `undefined`) — `SqlLexOptions`, not the all-optional
  *  `SqlScanOptions` `resolveLexOptions` fills defaults into. A caller whose own console adds a
@@ -123,12 +123,12 @@ export function lexOptionsFor(dialect: SqlDialect | undefined): SqlLexOptions {
   };
 }
 
-// F3/P21 round 1: every generated string literal (Filter by this value, FK navigation, Copy as
+// Every generated string literal (Filter by this value, FK navigation, Copy as
 // INSERT) used to escape only `'`, never consulting backslashEscapesFor even though that helper
 // already exists and is already used for sql-split.ts/sqlLint.ts's own quote scanning. On
 // MySQL/MariaDB/ClickHouse a value containing a backslash either silently fails to match (`\n`
 // read as a newline) or produces an unterminated literal (a value ending in `\`) — the exact class
-// P34 F22 already fixed for *identifiers*; this is the literal half of the same fix.
+// already fixed for *identifiers*; this is the literal half of the same fix.
 export function quoteLiteral(dialect: SqlDialect | undefined, value: string): string {
   const escaped = backslashEscapesFor(dialect) ? value.replace(/\\/g, '\\\\') : value;
   return `'${escaped.replace(/'/g, "''")}'`;
@@ -136,8 +136,8 @@ export function quoteLiteral(dialect: SqlDialect | undefined, value: string): st
 
 // A short, curated set of the reserved words most likely to collide with a real column name —
 // not exhaustive (a full per-dialect reserved-word list runs to hundreds of entries and shifts
-// with engine version); the same "curated, not exhaustive" call P18's own WHERE/ORDER BY
-// vocabularies make (docs/HISTORY.md (v1 P18)).
+// with engine version); the same "curated, not exhaustive" call the WHERE/ORDER BY
+// vocabularies make.
 const COMMON_RESERVED = new Set([
   'select',
   'from',

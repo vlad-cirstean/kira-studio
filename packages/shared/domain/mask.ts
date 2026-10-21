@@ -1,14 +1,13 @@
 import { z } from 'zod';
 
-// M5 §3.2/§5: zod schemas mirroring internal/storage/model/maskrule.go, and a pure-function port
+// zod schemas mirroring internal/storage/model/maskrule.go, and a pure-function port
 // of internal/mask/mask.go — "function for function", pinned against the same shared fixture set
 // (apps/kira-studio/tests/fixtures/mask/*.{input,expected}.json) both apps/kira-studio/internal/
-// mask/parity_test.go and tests/unit/mask-parity.spec.ts read, M3's own explain-plan pattern.
+// mask/parity_test.go and tests/unit/mask-parity.spec.ts read, the explain-plan pattern.
 //
-// Six kinds, not seven: an `id` kind (identifier columns, tag-only) was in the plan's original
-// draft and dropped before implementation — internal ids are not PII, so no rule should apply to
-// them at all; a column meant to stay untouched carries no rule, rather than one whose kind is a
-// no-op.
+// Six kinds, not seven: an `id` kind (identifier columns, tag-only) was dropped before
+// implementation — internal ids are not PII, so no rule should apply to them at all; a column
+// meant to stay untouched carries no rule, rather than one whose kind is a no-op.
 export const maskKindSchema = /*#__PURE__*/ z.enum([
   'name',
   'email',
@@ -57,7 +56,7 @@ const BULLET = '•'; // U+2022 — not `*`, which reads as SQL/shell syntax.
 // graphemeSegmenter is UAX #29 grapheme-cluster segmentation via Intl.Segmenter, the same standard
 // github.com/rivo/uniseg implements on the Go side — length hints count graphemes, not UTF-16 code
 // units, so a masked CJK or emoji-bearing value does not lie about its size. Hoisted to module
-// scope (finding #16, M6): constructing one per call — as every cell in a masked grid column did,
+// scope: constructing one per call — as every cell in a masked grid column did,
 // once per render — is real, avoidable setup cost Intl.Segmenter's own construction carries; the
 // segmenter itself holds no per-string state, so one shared instance is safe to reuse.
 const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
@@ -294,15 +293,15 @@ export function applyVisible(rule: MaskingRule, value: string): string {
 }
 
 // CROCKFORD_ALPHABET excludes I, L, O, U so a tag never reads as a word and never confuses 0/O
-// when a human retypes it — the same alphabet internal/mask's crockfordEncoding uses. Exported
-// (P115 H9): celleditor/generate.ts's ULID generator used to carry an identical copy for its own
+// when a human retypes it — the same alphabet internal/mask's crockfordEncoding uses. Exported:
+// celleditor/generate.ts's ULID generator used to carry an identical copy for its own
 // timestamp-half encoder.
 export const CROCKFORD_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 // crockfordBase32 mirrors Go's encoding/base32 standard bit-packing (5 bits per character, MSB
 // first across the byte stream, no padding) — verified byte-for-byte against
-// internal/mask.tag's own output via the parity fixtures' fixed-key-tag-vector case. Exported
-// (P115 H9): celleditor/generate.ts's own ULID random-half encoder was a duplicate of this exact
+// internal/mask.tag's own output via the parity fixtures' fixed-key-tag-vector case. Exported:
+// celleditor/generate.ts's own ULID random-half encoder was a duplicate of this exact
 // bit-packing (the only difference was an unreachable trailing-pad branch there had already been
 // stripped — see this function's own trailing `if (bitCount > 0)` below, which only fires for a
 // non-multiple-of-5 bit length; the ULID caller always feeds it 80 bits, so it never fires there
@@ -325,8 +324,8 @@ export function crockfordBase32(bytes: Uint8Array): string {
   return out;
 }
 
-// importedHmacKeys caches each key's imported CryptoKey, keyed by the Uint8Array object itself
-// (finding #18, M6): buildMaskTagCache (maskPreview.ts) calls tag() once per distinct value on a
+// importedHmacKeys caches each key's imported CryptoKey, keyed by the Uint8Array object itself:
+// buildMaskTagCache (maskPreview.ts) calls tag() once per distinct value on a
 // page — all sharing the same key — and importKey is as async and non-trivial as sign() itself, so
 // without this every one of those calls re-imported an identical key from scratch. A WeakMap, not
 // a plain Map: the cache entry disappears on its own once the key bytes it was built from do,
@@ -388,11 +387,11 @@ export async function maskNullable(
   return apply(rule, key, value);
 }
 
-// KIND_STRICTNESS ranks the six kinds from most to least redacting (§4.2's conflict-folding
+// KIND_STRICTNESS ranks the six kinds from most to least redacting (the conflict-folding
 // order): redact > text > date > number > name > email. Lower rank wins a conflict.
 //
-// M6 finding #9: email and number previously sat the other way around (redact > text > date >
-// email > name > number), backwards for two pairs relative to actual redaction strength. email vs
+// email and number previously sat the other way around (redact > text > date > email > name >
+// number), backwards for two pairs relative to actual redaction strength. email vs
 // name: `email` leaves the domain fully visible while `name` bullets far more of the value, so
 // `email` must not outrank `name`. name vs number: `number` fully brackets a value (no digits at
 // all) while `name` keeps a leading character and reveals the exact length, so `number` must
@@ -409,8 +408,8 @@ const KIND_STRICTNESS: Record<MaskKind, number> = {
 
 // stricter returns whichever of a, b is the stricter rule: the lower-ranked kind wins, and the two
 // flags fold independently toward their own stricter (more redacting) value — keepHint and
-// correlate each false-wins — across any kind pair, not only when a and b share a kind (M6 finding
-// #9's second half: a stricter flag on the losing kind's own rule must not be silently discarded
+// correlate each false-wins — across any kind pair, not only when a and b share a kind (a stricter
+// flag on the losing kind's own rule must not be silently discarded
 // just because its kind lost). An ambiguity between two rules matching the same column name (under
 // different table names) must never resolve to the more permissive option on any axis. Used by the
 // grid preview to fold its own copy of a connection's rules by column name, the same way

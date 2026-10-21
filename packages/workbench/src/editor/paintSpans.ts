@@ -1,7 +1,7 @@
 import type { MonacoModule } from './monaco';
 
-// P60a §5/D3: `AutocompleteField.vue`'s overlay is paint-only — a full editor per filter field is
-// the wrong shape (§5's own OQ-2 recommendation). `monaco.editor.colorize()` already does the
+// `AutocompleteField.vue`'s overlay is paint-only — a full editor per filter field is the wrong
+// shape. `monaco.editor.colorize()` already does the
 // language -> CSS class mapping this needs (it is what backs the app-wide "kira-editor" theme's
 // `mtk*` colours), but its HTML is one flat run per token with no offsets — this module re-derives
 // offsets by walking that HTML once, then merges in `{{variable}}`/range-highlight boundaries as a
@@ -33,7 +33,7 @@ interface HighlightRange {
  *  covering base run's classes plus every range's class that covers it — a run with no classes at
  *  all (plain text, no highlight) is dropped, since the caller renders it as bare text.
  *
- *  Degenerate inputs are the point of this function's own unit test (P60a §5/§9.2): a zero-width or
+ *  Degenerate inputs are the point of this function's own unit test: a zero-width or
  *  out-of-range `range` (`from >= to`, `from < 0`, `to > textLength`) is clamped or dropped rather
  *  than thrown — the same "one keystroke of missing colour, never a crash" rule
  *  `variableHighlight.ts`'s own `buildDecorations` already keeps for CodeMirror. */
@@ -103,7 +103,7 @@ function sameClasses(a: readonly string[], b: readonly string[]): boolean {
 // `<br/>`. AutocompleteField's overlay is always single-line (`singleLine` was CodeMirrorHost's own
 // contract for this component; there is exactly one line to parse.
 //
-// P60a dogfooding finding (mcp-repo-map-issues.md): the same renderer also rewrites every plain
+// The same renderer also rewrites every plain
 // U+0020 space into U+00A0 (NBSP) unconditionally, not just inside a 2+-space run — verified
 // against a real `colorize()` call, a single space either side of `|` in `{{base_url | base64}}`
 // came back as NBSP. Not an HTML entity (`&nbsp;` never appears in the string), so it isn't caught
@@ -159,9 +159,9 @@ export async function paintOverlayHtml(
   // `parsedText` mismatches (`''` vs. the real text). That is expected, not a shape change to
   // degrade from: fall back to one classless base run spanning the whole text so `ranges`
   // (`{{variable}}` colouring, find-match highlights) still paints over plain text. Only an
-  // actual mismatch with a non-trivial `runs` list (colorize() produced spans, but the concatenated
-  // text does not match) means the HTML shape changed under us — that one degrades to plain escaped
-  // text rather than risk mis-painting.
+  // actual mismatch with a non-trivial `runs` list (colorize() produced spans, but the
+  // concatenated text does not match) means the HTML shape changed under us — that one degrades to
+  // plain escaped text rather than risk mis-painting.
   const baseRuns =
     parsedText === text
       ? runs
@@ -183,8 +183,8 @@ export async function paintOverlayHtml(
 
 /** `document.caretPositionFromPoint`/`caretRangeFromPoint` (WebKit ships the latter only, as of
  *  this pin) walked back to a document character offset — DOM-native, exact, and font-agnostic,
- *  the two properties §5's own comment says CodeMirror's coordinate hit-testing was chosen *for*
- *  originally. `null` when the point falls outside the overlay entirely, matching
+ *  the two properties CodeMirror's coordinate hit-testing was chosen *for* originally.
+ *  `null` when the point falls outside the overlay entirely, matching
  *  `MonacoHost.posAtCoords`'s own contract. */
 export function overlayOffsetAtPoint(overlayEl: HTMLElement, x: number, y: number): number | null {
   const doc = overlayEl.ownerDocument;

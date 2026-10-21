@@ -9,6 +9,7 @@ import { colorMarkClass } from '@theme/connColor';
 import { rowIndent, rowMeta, rowVariants } from '@theme/lib/rowVariants';
 import { cn } from '@theme/lib/utils';
 import { splitMatches } from '@workbench/behaviour/match';
+import { SORTABLE_GHOST_CLASS } from '@workbench/behaviour/sortableReorder';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, type HTMLAttributes } from 'vue';
 import { useConnectionsStore } from '../state/connections';
@@ -17,7 +18,7 @@ import { columnTypeIcon, nodeIcon } from '../theme/icons';
 import ErrorPopover from './ErrorPopover.vue';
 import { type TreeRowVm, useTreeStore } from './state/tree';
 
-// P28 D7: `sticky` is the only difference between a normal row and a band-pinned one — a
+// `sticky` is the only difference between a normal row and a band-pinned one — a
 // different testid (so it can never double-count a `tree-row` locator) and a forced -1 tabindex
 // (so the tree keeps its single roving tab stop). Every emit, every child element, the colour
 // rail and the twisty behave identically either way — a pinned row is a real row, not a decoration.
@@ -26,9 +27,13 @@ const props = withDefaults(
     row: TreeRowVm;
     selected: boolean;
     sticky?: boolean;
+    /** This connection row is the one being dragged. */
+    dragging?: boolean;
+    /** A connection drag would drop on this row's top or bottom edge. */
+    dropEdge?: 'top' | 'bottom' | null;
     class?: HTMLAttributes['class'];
   }>(),
-  { sticky: false },
+  { sticky: false, dragging: false, dropEdge: null },
 );
 
 // A pinned band row needs an opaque background; selected still wins (rowVariants selected).
@@ -61,7 +66,7 @@ const statusTitle = computed(() => {
   return props.row.statusDetail ?? undefined;
 });
 
-// P16 design system LAW: the connection colour is a 2px rail running the length
+// P16 design system LAW: the connection colour is a 4px rail running the length
 // of the connection's whole group in the tree, not a badge on one row — so it
 // is looked up per-row from the connection record (row.color is only ever set
 // on the connection row itself) and drawn at every depth.
@@ -117,12 +122,13 @@ function onKeydown(e: KeyboardEvent): void {
 <template>
   <div
     :class="
-      cn(rowVariants({ layout: 'tree', selected }), 'h-row', stickyClass, props.class)
+      cn(rowVariants({ layout: 'tree', selected }), 'h-row', stickyClass, dragging && SORTABLE_GHOST_CLASS, props.class)
     "
     :style="rowIndent(row.depth)"
     :data-testid="sticky ? 'tree-sticky-row' : 'tree-row'"
     :data-path="row.path"
     :data-kind="row.kind"
+    :data-connection-id="row.kind === 'connection' ? row.connectionId : undefined"
     :data-status="row.kind === 'connection' ? row.status : undefined"
     :data-depth="sticky ? row.depth : undefined"
     role="treeitem"
@@ -137,12 +143,18 @@ function onKeydown(e: KeyboardEvent): void {
     @contextmenu.prevent.stop="onContextMenu"
   >
     <div :class="colorMarkClass('rail', railColor)" data-testid="tree-rail" />
+    <div
+      v-if="dropEdge"
+      aria-hidden="true"
+      data-testid="tree-drop-indicator"
+      :class="cn('pointer-events-none absolute inset-x-0 h-0.5 bg-focus', dropEdge === 'top' ? 'top-0' : 'bottom-0')"
+    />
 
-    <!-- P31 D25/F25: the twisty is the one control in the app whose entire meaning is already
+    <!-- The twisty is the one control in the app whose entire meaning is already
          drawn by the chevron direction, and it fires on the single most-hovered control in the
-         panel — no tooltip. :aria-label stays: P104 §6.2 made every icon-only control set its
-         own explicit aria-label by hand (no more directive mirroring it in automatically), so
-         dropping it here would leave this button nameless. -->
+         panel — no tooltip. :aria-label stays: every icon-only control sets its own explicit
+         aria-label by hand (no more directive mirroring it in automatically), so dropping it
+         here would leave this button nameless. -->
     <TreeTwisty :expanded="row.expanded" :has-children="row.hasChildren" @toggle="onTwistyClick">
       <Spinner v-if="row.loading" label="" data-testid="tree-row-spinner" />
       <CodiconIcon v-else :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />

@@ -1,14 +1,14 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P9.md` W14 (§3.1's normative tree names exactly one `StashDialog.vue`, unlike
- * `BranchDialog.vue`/`TagDialog.vue`/`RevertDialog.vue`'s one-dialog-per-file precedent — see this
- * plan's own Findings for why all three of its "collect input" moments live in this one file
- * rather than being split further to match that precedent):
+ * The normative tree names exactly one `StashDialog.vue`, unlike
+ * `BranchDialog.vue`/`TagDialog.vue`/`RevertDialog.vue`'s one-dialog-per-file precedent (all three
+ * of its "collect input" moments live in this one file rather than being split further to match
+ * that precedent):
  *
  * - **create** — `runStashPush`'s own confirm step (no pre-flight endpoint exists for it).
  * - **branch** — name entry plus `previewStashBranch`'s live pre-flight, re-run on every keystroke
  *   exactly like `RevertDialog.vue`'s own mainline picker re-runs `previewRevertMainline`.
- * - **popConfirm** — the shared apply/pop confirmation (OQ7), driven directly by
+ * - **popConfirm** — the shared apply/pop confirmation, driven directly by
  *   `ops.pendingStashPop` with no props of its own, exactly like `RevertDialog.vue`/
  *   `CheckoutDialog.vue` are driven by their own `ops.pending*` fields.
  *
@@ -17,7 +17,7 @@
  * order still matters if a caller opened `createOpen`/`branchTarget` while a pop confirmation from
  * an unrelated row happened to already be pending).
  *
- * P131 Part 1 §6.1/§6.2: the modal shell is shadcn's `Dialog`/`DialogContent` now, `title` feeds
+ * The modal shell is shadcn's `Dialog`/`DialogContent` now, `title` feeds
  * `DialogTitle`'s default slot, and the four modes' own controls are Input/Checkbox/RadioGroup —
  * `mode`/`onClose`'s own dispatch is otherwise unchanged.
  */
@@ -68,8 +68,8 @@ const props = defineProps<{
    *  `saveGlobalStash` action, via `App.vue` — opens save mode with NO pre-selected source
    *  (defaults to "this working tree"). */
   saveOpen: boolean;
-  /** G28 D13: set by a STACK row's own "Save to global stash…" action — opens save mode
-   *  pre-selected to promote THIS entry (D10 step 3); `undefined` when that row action was not
+  /** Set by a STACK row's own "Save to global stash…" action — opens save mode
+   *  pre-selected to promote THIS entry; `undefined` when that row action was not
    *  the trigger (the header button/palette route sets `saveOpen` instead, leaving this
    *  `undefined`, and the source radio then defaults to "this working tree"). */
   saveSourceEntry: StashEntry | undefined;
@@ -99,7 +99,7 @@ const keepIndex = ref(false);
 const messageId = useId();
 const untrackedId = useId();
 const keepIndexId = useId();
-/** OQ9: wired from the caller's current changed-files selection when non-empty (`App.vue` passes
+/** Wired from the caller's current changed-files selection when non-empty (`App.vue` passes
  *  it through `createOpen`'s own open call — see that wiring's own comment); empty means "whole
  *  worktree", never a half-wired guess. Shown here as a read-only summary, not an editable field —
  *  there is no staging UI in this app to pick a *different* subset from. */
@@ -185,9 +185,9 @@ const form = useFormErrors({
 });
 
 /** Only a genuinely invalid/taken name (or nothing typed yet) blocks the button — a `blocked`
- *  checkout half (OQ6) still lets the user create the branch; §7.6/probe 11's own point is that
- *  the branch creation always succeeds, only the pop half can fail, and OQ6's recommendation is to
- *  say so plainly afterward rather than refuse the attempt up front. */
+ *  checkout half still lets the user create the branch; the point is that the branch creation
+ *  always succeeds, only the pop half can fail, and the recommendation is to say so plainly
+ *  afterward rather than refuse the attempt up front. */
 const canSubmitBranch = computed(
   () =>
     branchName.value.trim() !== '' &&
@@ -209,10 +209,10 @@ async function submitBranch(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------------------
-// save mode (G28 D13/D10): two sources, the dialog is the confirm step (no pre-flight endpoint
-// exists for globalStashSave, same reason create mode has none), and the one thing worth showing
-// up front is F14's own limitation — `git stash create` cannot include untracked files, so the
-// working-tree source is spelled out as tracked-only rather than hiding the gap.
+// save mode: two sources, the dialog is the confirm step (no pre-flight endpoint exists for
+// globalStashSave, same reason create mode has none), and the one thing worth showing up front is
+// the limitation — `git stash create` cannot include untracked files, so the working-tree source is
+// spelled out as tracked-only rather than hiding the gap.
 // ---------------------------------------------------------------------------------------
 
 type SaveSource = 'workingTree' | 'entry';

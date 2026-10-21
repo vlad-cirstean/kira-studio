@@ -1,0 +1,66 @@
+package claude
+
+import (
+	"encoding/json"
+
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/claude/mcpinstall"
+)
+
+// MCPToolName is the name claude lists in --allowedTools for an MCP tool.
+func (*Provider) MCPToolName(t harness.MCPTool) string {
+	return "mcp__" + t.Server + "__" + t.Tool
+}
+
+// MCPConfig is the --mcp-config document: http servers carry type, url and headers; stdio servers
+// carry command, args and env.
+func (*Provider) MCPConfig(servers []harness.MCPServer) ([]byte, error) {
+	m := make(map[string]any, len(servers))
+	for _, s := range servers {
+		if s.URL != "" {
+			m[s.Name] = map[string]any{"type": "http", "url": s.URL, "headers": s.Headers}
+			continue
+		}
+		m[s.Name] = map[string]any{"command": s.Command, "args": s.Args, "env": s.Env}
+	}
+	return json.Marshal(map[string]any{"mcpServers": m})
+}
+
+// ToolArgs returns the --tools list (the ticked built-ins) and the exact --allowedTools list: the
+// built-ins with Bash narrowed to its patterns, the ticked MCP tools, then extra, deduplicated.
+func (p *Provider) ToolArgs(pol harness.ToolPolicy) (tools, allowed []string) {
+	tools = append([]string{}, pol.Builtins...)
+	seen := map[string]bool{}
+	add := func(t string) {
+		if !seen[t] {
+			seen[t] = true
+			allowed = append(allowed, t)
+		}
+	}
+	for _, t := range pol.Builtins {
+		if t == "Bash" && len(pol.BashPatterns) > 0 {
+			for _, bp := range pol.BashPatterns {
+				add("Bash(" + bp + ")")
+			}
+			continue
+		}
+		add(t)
+	}
+	for _, c := range pol.MCP {
+		for _, t := range c.Tools {
+			add(p.MCPToolName(harness.MCPTool{Server: c.Server, Tool: t}))
+		}
+	}
+	for _, t := range pol.Extra {
+		add(t)
+	}
+	if allowed == nil {
+		allowed = []string{}
+	}
+	return tools, allowed
+}
+
+// MCPInstaller registers servers through `claude mcp add-json`.
+func (p *Provider) MCPInstaller() harness.MCPInstaller {
+	return mcpinstall.New(mcpinstall.Deps{LookPath: p.lookPath, Stat: p.stat, Candidates: Candidates})
+}

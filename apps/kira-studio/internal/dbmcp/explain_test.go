@@ -7,7 +7,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/queryplan"
 )
 
-// TestMaskPlanForMaskedConnectionStripsRealValues guards F5: MySQL/MariaDB's attached_condition
+// TestMaskPlanForMaskedConnectionStripsRealValues: MySQL/MariaDB's attached_condition
 // (Node.Detail) and ClickHouse's index condition metrics substitute real row values evaluated from
 // a const table, and Raw is the server's own EXPLAIN text verbatim — none of it is column-name
 // maskable, so a masked connection's plan must come back with all of it stripped, at every depth.

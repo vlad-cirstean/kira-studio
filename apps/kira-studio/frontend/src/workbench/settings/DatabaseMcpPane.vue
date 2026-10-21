@@ -41,7 +41,7 @@ function tokenExpired(expiresAt: string): boolean {
 // snaps back is not the only trace of the failure. One error line serves all three actions.
 const toggle = useAsyncAction((enabled: boolean) => dbMcpStore.setDbMcpEnabled(enabled));
 const regenerate = useAsyncAction(() => dbMcpStore.regenerateDbMcpToken());
-const install = useAsyncAction(() => dbMcpStore.installDbMcpClaudeCode());
+const install = useAsyncAction(() => dbMcpStore.installDbMcpAgent());
 const connectionToggle = useAsyncAction((id: string, enabled: boolean) =>
   connectionsStore.setConnectionMcpEnabled(id, enabled),
 );
@@ -69,7 +69,7 @@ async function onRegenerateDbMcpToken(): Promise<void> {
   clearActionErrors();
   await regenerate.run();
 }
-async function onInstallDbMcpClaudeCode(): Promise<void> {
+async function onInstallDbMcpAgent(): Promise<void> {
   clearActionErrors();
   await install.run();
 }
@@ -79,11 +79,11 @@ const dbMcpInstallMessage = computed(() => {
   if (!result) return null;
   switch (result.outcome) {
     case 'installed':
-      return t('common.claudeCodeRegistered.description');
+      return t('common.agentRegistered.description');
     case 'notFound':
-      return t('common.claudeCliNotFound.error');
+      return t('common.agentCliNotFound.error');
     case 'installFailed':
-      return t('common.claudeRegistrationRefused.error', { detail: result.detail });
+      return t('common.agentRegistrationRefused.error', { detail: result.detail });
     default:
       return null;
   }
@@ -111,10 +111,10 @@ const dbMcpEnabledId = useId();
 
 <template>
   <div class="contents" v-show="active">
-    <!-- M1 §6.2: this leaf (dbMcp.serverEnabled) both persists and starts/stops the embedded
+    <!-- This leaf (dbMcp.serverEnabled) both persists and starts/stops the embedded
          DB MCP server in one call, so it belongs on the action side of the draft/Save line,
          never mixed with it. Toggle, then command, then button, strictly in that DOM order
-         (§11.4/SPEC's own "enabling is never a silent action"). -->
+         ("enabling is never a silent action"). -->
     <Field orientation="horizontal" class="items-start">
       <Switch
         :id="dbMcpEnabledId"
@@ -133,9 +133,9 @@ const dbMcpEnabledId = useId();
       <Alert v-if="dbMcpStore.status.error" variant="error" data-testid="db-mcp-error">
         <AlertDescription>{{ dbMcpStore.status.error }}</AlertDescription>
       </Alert>
-      <!-- F9: Regenerate must render whenever the server is running, in both branches below —
+      <!-- Regenerate must render whenever the server is running, in both branches below —
            the expired-token message further down ("regenerate it above") has no remedy otherwise
-           once a command was shown (the common case post-F8: the command shows across ordinary
+           once a command was shown (the common case: the command shows across ordinary
            restarts now, so this is no longer the rare branch it used to be). -->
       <template v-else-if="dbMcpStore.status.running">
         <template v-if="dbMcpStore.status.command">
@@ -148,10 +148,10 @@ const dbMcpEnabledId = useId();
             class="self-start"
             :pending="dbMcpInstalling"
             data-testid="db-mcp-install-button"
-            @click="onInstallDbMcpClaudeCode"
+            @click="onInstallDbMcpAgent"
             >{{
-              dbMcpStore.status.claudeAvailable
-                ? t('common.registerWithClaudeCode.label')
+              dbMcpStore.status.agentAvailable
+                ? t('common.registerWithAgent.label')
                 : t('studio.settings.dbMcp.copyCommandAbove.label')
             }}
           </Button>

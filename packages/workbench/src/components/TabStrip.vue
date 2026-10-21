@@ -256,7 +256,7 @@ if (moveTab) {
       data-testid="tab-strip-row"
       @wheel="onWheel"
     >
-      <!-- P105 §11: a focusable close control nested inside the tab's own <button> is invalid
+      <!-- A focusable close control nested inside the tab's own <button> is invalid
            HTML and unreachable by keyboard — the close button is this tab's sibling now, not its
            child. The whole chip is the drag handle (vue-draggable-plus, on the row);
            click/dblclick/auxclick/contextmenu live on the tab's own inner button. -->
@@ -330,19 +330,20 @@ if (moveTab) {
         </Button>
       </div>
     </div>
-    <!-- P83 §9.1/P91 §8: a third fixed child, after the scrolling tab row, mirroring the pinned
-         tab's own leading-edge fix at the other end. Per-app "new tab" affordance — the whole
+    <!-- A third fixed child, after the scrolling tab row, mirroring the pinned tab's own
+         leading-edge fix at the other end. Per-app "new tab" affordance — the whole
          `data-testid="tab-strip-actions"` wrapper is slot content (not a wrapper this component
          owns), so each app keeps its own `v-if="showNewTab"` gating the element's very presence in
-         the DOM. P110 B13: the wrapper and button are now plain Tailwind utility classes inlined in
-         each app's own WorkbenchShell.vue, not a tab strip actions/tab new class published
-         from workbench.css — the data-testid is what's shared now. -->
+         the DOM. The wrapper and button are now plain Tailwind utility classes inlined in each
+         app's own WorkbenchShell.vue, not a tab strip actions/tab new class published from
+         workbench.css — the data-testid is what's shared now. -->
     <slot name="new-tab" />
-    <!-- P110 I2-20: `.tab-chip`'s hover/attention/close-reveal rules moved into `:class` ternaries
+    <!-- `.tab-chip`'s hover/attention/close-reveal rules moved into `:class` ternaries
          above -- `group` on each chip replaces `.tab-chip:hover .tab-close`/`.tab-chip.is-active
          .tab-close` (`group-hover/tab:opacity-100`, plus the active branch's own `opacity-100`).
-         `.tab-chip` was marker-only (no CSS-class test locator); `.is-active`/`.tab-file-icon`/`.tab-title`/
-         `.tab-close` stay real classes (slick-grid.spec.ts, budgets.spec.ts,
-         repo-workspace.spec.ts, font-roles.spec.ts, multiwindow-real.spec.ts, definition.spec.ts). -->
+         `.tab-chip` was marker-only (no CSS-class test locator); `.is-active`/`.tab-file-icon`/
+         `.tab-title`/`.tab-close` stay real classes (slick-grid.spec.ts, budgets.spec.ts,
+         repo-workspace.spec.ts, font-roles.spec.ts, multiwindow-real.spec.ts,
+         definition.spec.ts). -->
   </div>
 </template>

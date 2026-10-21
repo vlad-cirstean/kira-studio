@@ -1,14 +1,14 @@
 import type { Locator, Page } from '@playwright/test';
 
-// P22 Pass B — the grid locator helpers every grid-touching spec used to redefine locally,
+// The grid locator helpers every grid-touching spec used to redefine locally,
 // resolved once for the SlickGrid DOM shape (the only grid engine this app has — the user's own
 // call, "no turning back": no incumbent survives to A/B against, so no engine branch here either).
 //
-// SlickGrid's own `appendRowHtml` clones the row div per frozen pane (F4) — with `frozenColumn: 0`
+// SlickGrid's own `appendRowHtml` clones the row div per frozen pane — with `frozenColumn: 0`
 // a row's `.slick-row` exists TWICE (the gutter's left-pane clone and the data cells' right-pane
 // clone), both carrying the same `data-row`, while `.slick-cell` exists once. `data-testid=
-// "grid-row"` is written onto the right pane only (`SlickGridHost.vue`'s own `onRendered` pass,
-// D10), so a plain `[data-testid="grid-row"][data-row="N"]` already resolves to exactly one
+// "grid-row"` is written onto the right pane only (`SlickGridHost.vue`'s own `onRendered` pass),
+// so a plain `[data-testid="grid-row"][data-row="N"]` already resolves to exactly one
 // element — only the cell/gutter selectors, which must additionally scope into the correct pane,
 // need the pane prefix below.
 
@@ -17,8 +17,9 @@ const RIGHT_PANE = '.grid-canvas-top.grid-canvas-right';
 /** The raw CSS string behind `gridCell()` below — exported separately for the handful of call
  *  sites (`measureClickToDom`'s own `click`/`until.selector` options, budgets.spec.ts) that need a
  *  selector *string*, not a `Locator`. `[data-testid="grid-cell"][data-row="N"]` alone is never
- *  valid for SlickGrid's DOM shape: `data-row` is written on the `.slick-row` (`SlickGridHost.vue`'s
- *  own `tagRenderedRows`), never on the cell itself, so it has to be the row's own ancestor scope,
+ *  valid for SlickGrid's DOM shape: `data-row` is written on the `.slick-row`
+ *  (`SlickGridHost.vue`'s own `tagRenderedRows`), never on the cell itself, so it has to be the
+ *  row's own ancestor scope,
  *  same as `gridCell()`. */
 export function gridCellSelector(row: number, column: string): string {
   return `[data-testid="data-grid"] ${RIGHT_PANE} [data-testid="grid-row"][data-row="${row}"] [data-testid="grid-cell"][data-column="${column}"]`;
@@ -35,7 +36,7 @@ export async function cellText(page: Page, row: number, column: string): Promise
 }
 
 /** The gutter (row-number) cell for one page row. The gutter lives in the frozen left pane, which
- *  carries no `data-testid="grid-row"` of its own (F4/D10) — `data-row` is still written on both
+ *  carries no `data-testid="grid-row"` of its own — `data-row` is still written on both
  *  panes, and only the left pane has a `[data-testid="grid-gutter-cell"]` descendant, so the
  *  combination is unambiguous without a right/left-pane prefix. */
 export function gutterCell(page: Page, row: number): Locator {
@@ -98,17 +99,17 @@ export function sortIndicators(page: Page): Locator {
 }
 
 /** A NULL cell's own `.cell-null` marker. SlickGrid folds the class onto the cell node itself (the
- *  formatter's own `addClasses`, F10 — `-iter2-pacing` D5's "text, never DOM" rule, same reason
+ *  formatter's own `addClasses`, the "text, never DOM" rule, same reason
  *  `.cell-truncated` is a class + CSS `::after` rather than a child span). `:scope` in a chained
  *  locator selector refers to the parent locator's own matched element(s). */
 export function nullMarker(cell: Locator): Locator {
   return cell.locator(':scope.cell-null, :scope .cell-null');
 }
 
-/** P81 §7.2. `viewport.scrollTop += deltaPx`, then count the DOM mutations (`childList` +
+/** `viewport.scrollTop += deltaPx`, then count the DOM mutations (`childList` +
  *  `subtree` + `attributes`) that follow. Waits for actual quiescence first — no MutationObserver
  *  records across `quietFrames` consecutive animation frames (default 6, `slick-grid.spec.ts`'s
- *  own §3a convergence horizon) — rather than a fixed sleep, since a scroll into never-rendered
+ *  own convergence horizon) — rather than a fixed sleep, since a scroll into never-rendered
  *  territory converges over several self-scheduled catch-up renders (`kiraSlickGrid.ts`'s re-arming
  *  chase loop), not instantly. The quiet wait and the measurement live in one `page.evaluate`, so
  *  no round trip between them can let a catch-up render slip in unobserved.

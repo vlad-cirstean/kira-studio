@@ -4,11 +4,10 @@ import TabStripNewButton from '@workbench/components/TabStripNewButton.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { useAutomationsModule } from './module';
 
-// P91 §8/§9: the tab strip's own "+" for the Automations module — one plain, unscoped session at the
-// resolved home directory. Hoisted to the shared automations module at P128 §2.4 — TabStripNewButton
-// carries the wrapper/Tooltip/button markup both apps' own "+" already shared; this file keeps
-// exactly the automations module's own menu content, verbatim from Kira Studio's own
-// WorkbenchShell.vue.
+// The tab strip's own "+" for the Automations module — one plain, unscoped session at the
+// resolved home directory. TabStripNewButton carries the wrapper/Tooltip/button markup both apps'
+// own "+" already shared; this file keeps exactly the automations module's own menu content,
+// verbatim from Kira Studio's own WorkbenchShell.vue.
 const ctx = useAutomationsModule();
 const contextMenuStore = useContextMenuStore();
 

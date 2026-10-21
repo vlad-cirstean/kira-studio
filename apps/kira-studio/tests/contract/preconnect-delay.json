@@ -1,0 +1,17 @@
+{
+  "event:preconnect-delay-running": {
+    "command": null,
+    "commandTruncated": false,
+    "connectionId": "<id:1>",
+    "delayMs": 1000,
+    "durationMs": null,
+    "error": null,
+    "id": "<masked>",
+    "kind": "preconnect",
+    "path": null,
+    "rows": null,
+    "startedAt": "<time>",
+    "status": "running",
+    "tabId": null
+  }
+}

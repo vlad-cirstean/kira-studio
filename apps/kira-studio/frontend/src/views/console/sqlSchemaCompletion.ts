@@ -1,4 +1,4 @@
-// P60b §5.1: the successor to `@codemirror/lang-sql`'s `schemaCompletionSource` — what the library
+// The successor to `@codemirror/lang-sql`'s `schemaCompletionSource` — what the library
 // gave, as this app configured it: table names at an identifier position, `table.`/`alias.` column
 // completion, alias resolution within the current statement, qualified `schema.table.column`
 // paths, and a `defaultSchema` that flattens one level.
@@ -72,11 +72,11 @@ function aliasColumns(
   return columnsAt(namespace, ref.name);
 }
 
-/** P60b §5.1: `schemaCompletionSource` + `keywordCompletionSource(dialect, true)`, merged into one
+/** `schemaCompletionSource` + `keywordCompletionSource(dialect, true)`, merged into one
  *  source. Positions, in order: `<qualifier>.` resolved via an alias/table reference in the
  *  current statement; `<schema>.` for a known schema qualifier; a bare word, which offers table
  *  names **and** keyword/type completions — merged here, not left to a separately-composed
- *  keyword source, since `MonacoHost.vue`'s own completion provider (P60a §4.8) returns the first
+ *  keyword source, since `MonacoHost.vue`'s own completion provider returns the first
  *  source in `completionSources` whose result is non-null rather than merging every source's
  *  options together the way `@codemirror/autocomplete`'s `override` array did.
  *

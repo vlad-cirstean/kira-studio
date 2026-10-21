@@ -5,14 +5,15 @@ import { getStream } from '@workbench/testing/unit/wailsRuntime';
 import * as flatbuffers from 'flatbuffers';
 import { encodeFrame, type FrameSpec } from '../support/encodeFrame';
 
-// port.ts calls Stream('engine') once at module scope (P57 §4.1), so every test in this file
+// port.ts calls Stream('engine') once at module scope, so every test in this file
 // drives the one resulting connection through the same fake — matching how the real module
-// actually uses the runtime, rather than one fresh socket per test. The dynamic import below is
+// uses the runtime, rather than one fresh socket per test. The dynamic import below is
 // what triggers that module-scope Stream('engine') call *if* no earlier spec in this run already
 // has (Bun's module registry caches port.ts itself for the whole test process) — either way,
-// `getStream('engine')` after the import hands back whichever socket port.ts actually ended up
+// `getStream('engine')` after the import hands back whichever socket port.ts ended up
 // holding, so this file's own assertions never depend on winning a load-order race against
-// whatever other spec's import chain also reaches port.ts (see @workbench/testing/unit/wailsRuntime).
+// whatever other spec's import chain also reaches port.ts
+// (see @workbench/testing/unit/wailsRuntime).
 const { ready, request, onPortEvent } = await import('../../frontend/src/bridge/port');
 const socket: FakeSocket = getStream('engine');
 
@@ -53,7 +54,7 @@ function corruptIdentifier(bytes: Uint8Array): ArrayBuffer {
   return copy.buffer as ArrayBuffer;
 }
 
-// F6 (P108 Part 6): a res frame whose envelope (kind/id/ok) decodes fine but whose own payload
+// A res frame whose envelope (kind/id/ok) decodes fine but whose own payload
 // table fails to — hand-built, not through encodeFrame's own FramePayload union (which is typed
 // precisely to prevent this mismatch): payloadType is tagged ReadResponse but no payload table is
 // ever written, so decodeFrame's own `frame.payload(...)` returns null and decodePayload throws
@@ -180,13 +181,13 @@ describe('apps/kira-studio/frontend/src/bridge/port.ts — the Stream transport 
     offB();
   });
 
-  // P11: a chunk buffer can no longer be malformed independently of the rest of the frame the way
-  // base64 JSON allowed (§6.2) — the one throw decodeFrame has left with no fallback is a mismatched
-  // "KIF1" file identifier (D1/D5), which can't be tied back to a specific pending request (the id
-  // itself lives inside the very envelope that failed to parse). The fix is the same shape as
-  // P2 R2's original one: port.ts's onmessage wraps `decodeFrame` in a try/catch so a synchronous
-  // throw during DOM event dispatch can't go uncaught — the corrupt frame is dropped instead, and
-  // a later, valid frame for the same id still settles the promise normally.
+  // A chunk buffer can no longer be malformed independently of the rest of the frame the way
+  // base64 JSON allowed — the one throw decodeFrame has left with no fallback is a mismatched
+  // "KIF1" file identifier, which can't be tied back to a specific pending request (the id
+  // itself lives inside the very envelope that failed to parse). port.ts's onmessage wraps
+  // `decodeFrame` in a try/catch so a synchronous throw during DOM event dispatch can't go
+  // uncaught — the corrupt frame is dropped instead, and a later, valid frame for the same id
+  // still settles the promise normally.
   test('8. a response frame with a corrupt file identifier is dropped, not left hanging forever', async () => {
     const p = request('read', null, { timeoutMs: null });
     await flush();
@@ -233,12 +234,12 @@ describe('apps/kira-studio/frontend/src/bridge/port.ts — the Stream transport 
     off();
   });
 
-  // F6 (P108 Part 6): a data op carries no client-side timeout of its own (test 4's own
-  // `timeoutMs: null`) — cancellation is the only escape hatch (§5.1). Before this fix, decodeFrame
-  // threw on a payload-decode failure the same as it does on a structurally corrupt frame (test 8),
-  // and port.ts's onmessage drops any frame it can't decode, so this pending call would otherwise
-  // hang forever with nothing left to reject it. The id is already known by the time the payload
-  // decode fails, so decodeFrame itself now settles this as an ordinary {ok:false} response.
+  // A data op carries no client-side timeout of its own (test 4's own `timeoutMs: null`) —
+  // cancellation is the only escape hatch. Before this fix, decodeFrame threw on a payload-decode
+  // failure the same as it does on a structurally corrupt frame (test 8), and port.ts's onmessage
+  // drops any frame it can't decode, so this pending call would otherwise hang forever with
+  // nothing left to reject it. The id is already known by the time the payload decode fails, so
+  // decodeFrame itself now settles this as an ordinary {ok:false} response.
   test('10. a response frame whose own payload fails to decode rejects its pending call, not left hanging', async () => {
     const p = request('read', null, { timeoutMs: null });
     await flush();

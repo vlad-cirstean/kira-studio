@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
- * Duplication candidates from CodeGraph's SQLite index. Recreates P107/P113's ad-hoc sweeps
- * (`git show bd0c224688d9:docs/v1.9/plans/P107-duplication-findings*.md` §0, P113 §0) as a runnable script. Read-only.
+ * Duplication candidates from CodeGraph's SQLite index. Recreates the ad-hoc sweeps as a runnable
+ * script. Read-only.
  * Usage and caveats: docs/DEV_ENVIRONMENT.md, "CodeGraph duplicate finder".
  *
  * Sweeps (function/method nodes only; source read from disk by file + line span):

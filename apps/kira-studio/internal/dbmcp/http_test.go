@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// TestBindHTTPRefusesFallbackOnPortConflict guards F11: a DefaultPort conflict must refuse to
+// TestBindHTTPRefusesFallbackOnPortConflict guards: a DefaultPort conflict must refuse to
 // start, never silently fall back to an OS-assigned ephemeral port — every existing registration
 // names DefaultPort, and a fallback would leave it pointing at whatever else is now listening
 // there, with the live bearer token going to it on the next connection attempt.

@@ -7,7 +7,7 @@ import AdeActivityIcon from '../AdeActivityIcon.vue';
 import { ACTION_CLASS } from '../tones';
 import type { SessionView } from './sessionView';
 
-// Tab strip of the running sessions in scope (mockup `termTabs`): activity glyph, TUI / claude -p
+// Tab strip of the running sessions in scope (mockup `termTabs`): activity glyph, TUI / headless
 // badge, name.
 defineProps<{ views: SessionView[]; selectedId: string | null }>();
 const emit = defineEmits<{ select: [id: string] }>();
@@ -34,7 +34,7 @@ const phones = useMobileTerminalsStore();
       <AdeActivityIcon :kind="v.kind" />
       <span
         class="shrink-0 rounded-kira-xs px-1 text-kira-sm"
-        :class="v.headless ? 'border border-dashed border-border-strong text-muted-foreground' : ACTION_CLASS.claude"
+        :class="v.headless ? 'border border-dashed border-border-strong text-muted-foreground' : ACTION_CLASS.agent"
         data-testid="ade-session-badge"
         >{{
           v.badge

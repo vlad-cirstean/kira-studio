@@ -2,14 +2,14 @@
 import type { BaseCandidate, BaseResolution, BaseResolutionReason } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 /**
- * `docs/plans/P7.md` W12 — §6.8: "shown in the view's header as a picker — never as static text —
+ * "shown in the view's header as a picker — never as static text —
  * naming the base and how it was resolved ('upstream', 'default branch')." The trigger names the
  * current base (or "Choose a base…" while `reason: "none"`) plus a quiet reason label; the
  * dropdown has two sections — Suggested (`resolution.candidates`, each carrying its own reason)
  * and All branches (`refsState`'s own branches/remote-tracking branches, through the same
  * `refListModel.ts` fold `BranchPicker.vue` uses, so the two lists sort/filter/cap identically).
- * Tags are never offered here — `<base>..<branch>` is a question about two branches (§6.8),
- * mirroring W14's "not offered for tags" rule on the row menu's own entry.
+ * Tags are never offered here — `<base>..<branch>` is a question about two branches,
+ * mirroring the "not offered for tags" rule on the row menu's own entry.
  */
 import InlineState from '@theme/components/InlineState.vue';
 import PickerTrigger from '@theme/components/PickerTrigger.vue';

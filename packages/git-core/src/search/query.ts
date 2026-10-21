@@ -1,9 +1,9 @@
 /**
- * §7.8's search box, compiled once: three toggles and a scope, folded into a single `RegExp`
+ * The search box, compiled once: three toggles and a scope, folded into a single `RegExp`
  * that `matcher.ts` runs against every field the loaded store and the streamed tail can offer.
- * `docs/plans/P11.md`'s hard part 2 is the reason there is exactly one compilation site: git
- * never sees this pattern (`--grep`/`--author`/`--committer` are ANDed across categories, not
- * ORed — probe 1), so there is nothing for a second engine to agree or disagree with.
+ * There is exactly one compilation site: git never sees this pattern (`--grep`/`--author`/
+ * `--committer` are ANDed across categories, not ORed), so there is nothing for a second engine
+ * to agree or disagree with.
  */
 
 export type SearchScope = 'commits' | 'refs' | 'both';
@@ -53,12 +53,12 @@ const INVALID_PREFIX = 'Invalid regular expression: ';
 const WORD_EDGE = /\w/;
 
 /**
- * Never throws: `new RegExp` is the only fallible call here and it is inside a `try` (probe 4).
+ * Never throws: `new RegExp` is the only fallible call here and it is inside a `try`.
  *
  * Whole-word wraps the pattern in `\b…\b` only when the edge character is a word character;
  * otherwise it uses a lookaround (`(?<!\w)`/`(?!\w)`), since `\b` asserts a boundary that is not
  * there when the edge is not `\w` — searching `#123` with whole-word on would otherwise match
- * nothing (probe 10). The lookaround form is correct in strictly more cases than `\b`, so it is
+ * nothing. The lookaround form is correct in strictly more cases than `\b`, so it is
  * the fallback rather than the exception; in `regex` mode the edge test is skipped and the
  * lookaround form is always used, since the pattern's own first/last character is not
  * necessarily the *matched* text's edge (`(foo|bar)`).

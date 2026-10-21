@@ -51,10 +51,10 @@ func stringSlicesEqual(a, b []string) bool {
 	return true
 }
 
-// sortKeyValueFields is redis.backend.spec.ts's own sortKeyValueFields, ported: HSCAN's cursor-round
-// order is not guaranteed stable across separate scans of a hashtable-encoded hash, so a hash's
-// field/value rows are sorted by field name before ever reaching the fixture, exactly as the deleted
-// TypeScript harness did — the UI never depends on HSCAN's own order either.
+// sortKeyValueFields is redis.backend.spec.ts's own sortKeyValueFields, ported: HSCAN's
+// cursor-round order is not guaranteed stable across separate scans of a hashtable-encoded hash,
+// so a hash's field/value rows are sorted by field name before ever reaching the fixture, exactly
+// as the deleted TypeScript harness did — the UI never depends on HSCAN's own order either.
 func sortKeyValueFields(p LogicalKeyValuePage) LogicalKeyValuePage {
 	order := make([]int, len(p.Fields))
 	for i := range order {
@@ -78,11 +78,12 @@ func sortKeyValueFields(p LogicalKeyValuePage) LogicalKeyValuePage {
 }
 
 // syntheticHashPage is redis.backend.spec.ts's own syntheticHashPage: a large (hashtable-encoded)
-// hash's HSCAN boundary is not stable across separate captures even sorted (confirmed empirically by
-// the TypeScript harness this replaces) — real backend behaviour (a page of rows, a working next
-// cursor, a non-empty second page) is asserted against the real HSCAN result at each call site below;
-// only the *fixture* — which the frontend half never inspects beyond a DOM row count — is replaced
-// with this deterministic stand-in, so the committed file stops churning on every regeneration.
+// hash's HSCAN boundary is not stable across separate captures even sorted (confirmed empirically
+// by the TypeScript harness this replaces) — real backend behaviour (a page of rows, a working next
+// cursor, a non-empty second page) is asserted against the real HSCAN result at each call site
+// below; only the *fixture* — which the frontend half never inspects beyond a DOM row count — is
+// replaced with this deterministic stand-in, so the committed file stops churning on every
+// regeneration.
 func syntheticHashPage(startIndex, count int, nextToken, prevToken *string, hasMore bool) LogicalKeyValuePage {
 	fields := make([]*string, count)
 	values := make([]*string, count)
@@ -105,7 +106,7 @@ func syntheticHashPage(startIndex, count int, nextToken, prevToken *string, hasM
 // recordDataRead appends a DATA_OP.read port snapshot with payload/logical values the caller has
 // already computed (sorted, frozen, or wholly synthetic) — used in place of the Recorder.DataRead
 // convenience wrapper wherever the recorded entry must diverge from the real dispatch call's own
-// decoded response (§4.4's hash-sort and big-hash-synthesis findings, both carried over verbatim
+// decoded response (the hash-sort and big-hash-synthesis findings, both carried over verbatim
 // from redis.backend.spec.ts).
 func recordDataRead(rec *Recorder, payload any, logical any, source string) {
 	response := struct {
@@ -116,14 +117,14 @@ func recordDataRead(rec *Recorder, payload any, logical any, source string) {
 	rec.recordPort(dataOpRead, payload, response, nil)
 }
 
-// TestFixture_Redis is P58f §4.5 step 2 (the last fifth of it): the same discipline as the other
-// four adapters, against tests/ipc/redis/redis.fixture.ts's own committed scenario — connect, tree
-// traversal through db0/db1 and the namespace levels under db0, a small-hash read (sorted for
-// determinism), a big (hashtable-encoded) hash's cursor pagination (its fixture entries replaced
-// with a deterministic synthetic stand-in, its real dispatch calls still asserted for the real
-// invariants), two data:invalidate calls, a list read, a TTL-key read (its volatile ttlMs/
-// memoryBytes frozen after being validated live), a delete mutation, a before/after-delete pair of
-// tree listings captured out of natural call order, and a console DBSIZE.
+// TestFixture_Redis is the same discipline as the other four adapters, against
+// tests/ipc/redis/redis.fixture.ts's own committed scenario — connect, tree traversal through
+// db0/db1 and the namespace levels under db0, a small-hash read (sorted for determinism), a big
+// (hashtable-encoded) hash's cursor pagination (its fixture entries replaced with a deterministic
+// synthetic stand-in, its real dispatch calls still asserted for the real invariants), two
+// data:invalidate calls, a list read, a TTL-key read (its volatile ttlMs/memoryBytes frozen after
+// being validated live), a delete mutation, a before/after-delete pair of tree listings captured
+// out of natural call order, and a console DBSIZE.
 func TestFixture_Redis(t *testing.T) {
 	fixture := testsupport.StartRedis(t)
 	app := NewApp(t)

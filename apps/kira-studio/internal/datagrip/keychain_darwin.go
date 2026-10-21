@@ -21,10 +21,10 @@ func serviceNameForDataSource(uuid string) string {
 }
 
 // readKeychainPassword queries the macOS Keychain for uuid's data source password — the same
-// query shape internal/secrets/keyring_darwin.go already uses (F10), by service only with no
-// account constraint, since DataGrip's own item may or may not carry one. F11: this always raises
+// query shape internal/secrets/keyring_darwin.go already uses, by service only with no
+// account constraint, since DataGrip's own item may or may not carry one. This always raises
 // the system's "…wants to access…" authorization panel the first time Kira Studio asks for a
-// given item, so the scan step (D9) must never call this — only Apply does, once per selected row.
+// given item, so the scan step must never call this — only Apply does, once per selected row.
 func readKeychainPassword(uuid string) (password, username string, err error) {
 	service := serviceNameForDataSource(uuid)
 

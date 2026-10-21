@@ -15,10 +15,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 )
 
-// §8.1(e)'s own TestIntegration_AutoFetchNeverPrompts, at the package that can actually drive it
-// without waiting out a real one-minute timer (D23's own interval unit): autoFetchTick is called
-// directly against a REAL git repository and a REAL HTTP 401 stand-in (D24) — the tick's own conn is always nil, so "never prompts" is checked by
-// the tick simply completing at all (a nil Conn's Prompter would have nothing to relay to) rather
+// TestIntegration_AutoFetchNeverPrompts, at the package that can drive it without waiting out a
+// real one-minute timer: autoFetchTick is called directly against a REAL git repository and a REAL
+// HTTP 401 stand-in — the tick's own conn is always nil, so "never prompts" is checked by the tick
+// completing at all (a nil Conn's Prompter would have nothing to relay to) rather
 // than by asserting the absence of an event on a connection that was never given one.
 
 func newDenyingHTTPServerForAutoFetch(t *testing.T) string {
@@ -182,8 +182,8 @@ func TestAutoFetchOutcome(t *testing.T) {
 	}
 }
 
-// TestAutoFetch_ZeroIntervalPausesWithoutPermanentlyDisabling is G30 round-1 functional-
-// correctness review finding #8's own proof: before this fix, autoFetchTick treated a user-set
+// TestAutoFetch_ZeroIntervalPausesWithoutPermanentlyDisabling is the proof: before this fix,
+// autoFetchTick treated a user-set
 // interval of zero identically to a genuine fetch failure — both called disableAutoFetch, whose
 // `disabled` flag is meant as a PERMANENT, for-the-entry's-whole-life kill switch reserved for a
 // real failure (TestAutoFetch_NeverPromptsAndStopsAfterAuthFailure above). That conflation
@@ -254,14 +254,13 @@ func TestAutoFetch_ZeroIntervalPausesWithoutPermanentlyDisabling(t *testing.T) {
 	}
 }
 
-// TestRegistry_ReconcileAutoFetch_RearmsEveryPausedEntry is G31 round-2 functional-correctness
-// review, finding #8: EnsureAutoFetch's own off→on re-arm (proven per-entry above) had exactly
-// one caller, Conn.Open — nothing called it when fetch.autoInterval changed for a repository
-// that was already open, since that instance-wide setting is written from Kira Space's own
-// settings pane (bridge/settings.go), a path gitsession cannot see. ReconcileAutoFetch is the
-// seam that lets bridge/settings.go's SettingsService.Set reach every already-open entry after
-// such a write, without either package needing to know about a specific repository. This proves
-// it fans out to ALL currently held entries, not just one.
+// TestRegistry_ReconcileAutoFetch_RearmsEveryPausedEntry: EnsureAutoFetch's own off→on re-arm
+// (proven per-entry above) had exactly one caller, Conn.Open — nothing called it when
+// fetch.autoInterval changed for a repository that was already open, since that instance-wide
+// setting is written from Kira Space's own settings pane (bridge/settings.go), a path gitsession
+// cannot see. ReconcileAutoFetch is the seam that lets bridge/settings.go's SettingsService.Set
+// reach every already-open entry after such a write, without either package needing to know about
+// a specific repository. This proves it fans out to ALL currently held entries, not just one.
 func TestRegistry_ReconcileAutoFetch_RearmsEveryPausedEntry(t *testing.T) {
 	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {

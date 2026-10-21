@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
@@ -89,16 +90,16 @@ func (s *Service) runGate(ctx context.Context, req StoreRequest) ([]gateVerdict,
 		Items []gateVerdict `json:"items"`
 	}
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil, fmt.Errorf("%w: gate: %v", ErrClaudeOutput, err)
+		return nil, fmt.Errorf("%w: gate: %v", s.runner.Fail(harness.ErrOutput), err)
 	}
-	return validateGate(len(req.Items), out.Items)
+	return s.validateGate(len(req.Items), out.Items)
 }
 
 // validateGate enforces the contract in Go rather than trusting the model: every index answered
 // exactly once, challenges carry questions, accepts carry in-limit facts. An empty kind means fact.
-func validateGate(n int, items []gateVerdict) ([]gateVerdict, error) {
+func (s *Service) validateGate(n int, items []gateVerdict) ([]gateVerdict, error) {
 	bad := func(format string, a ...any) error {
-		return fmt.Errorf("%w: gate: %s", ErrClaudeOutput, fmt.Sprintf(format, a...))
+		return fmt.Errorf("%w: gate: %s", s.runner.Fail(harness.ErrOutput), fmt.Sprintf(format, a...))
 	}
 	byIndex := make([]*gateVerdict, n)
 	for i := range items {

@@ -1,4 +1,4 @@
-// P28 D12: "is this pasted text a curl command?" — the guard in front of parseCurl on the request
+// "is this pasted text a curl command?" — the guard in front of parseCurl on the request
 // bar's own paste path.
 //
 // It gets its own module, and its own test, for a reason the parser's existing coverage does not

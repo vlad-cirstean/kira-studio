@@ -12,7 +12,7 @@ import {
 import { tabLocator } from './support/tabs';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
-// M5 §8's own UI spec: mark a column PII from the grid header menu, verify the preview masks it
+// UI spec: mark a column PII from the grid header menu, verify the preview masks it
 // and locks editing everywhere a write could otherwise happen, then turn it off and verify the
 // real value and normal editing both return.
 //
@@ -303,7 +303,7 @@ test('grid mask preview — mark a column PII, preview masks and locks editing, 
   await expect(page.locator('[data-testid="grid-writable-badge"]')).toHaveText('Read-only');
 });
 
-// M7 finding #11: correlationKeyFor's own IPC call can reject (an unwrapped business-rule failure,
+// correlationKeyFor's own IPC call can reject (an unwrapped business-rule failure,
 // tests/ipc's own `error` snapshot shape) — before the fix this "failed open": the preview stayed
 // on (toggle active, badge "read-only") while the grid's own dataSource was never updated to apply
 // any transform at all, since the render tail after the failed await never ran. The fix turns the

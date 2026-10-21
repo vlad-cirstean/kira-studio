@@ -17,26 +17,26 @@ type Signaller interface {
 	SignalTo(windowKey, channel string)
 }
 
-// WindowBounds is a plain screen rectangle — the two fields window.go actually reads off each
-// app's own storage/model.WindowRecord. A plain alias of appstorage.WindowBounds (P107 I2-3;
-// field-for-field identical to begin with), so this package still never imports a per-app storage
+// WindowBounds is a plain screen rectangle — the two fields window.go reads off each
+// app's own storage/model.WindowRecord. A plain alias of appstorage.WindowBounds (field-for-field
+// identical to begin with), so this package still never imports a per-app storage
 // package, and every WindowBounds value crosses this boundary with no conversion at all.
 type WindowBounds = appstorage.WindowBounds
 
 // WindowRecord is window.go's own Options/Attach fields (Key/Bounds) plus Order — openwindow.go's
 // own OpenNewWindow/ReopenWindows need Order to pick a cascade position / the highest-order stored
 // window; Kira Studio's own storage/model.WindowRecord alone also carries a Mode, which stays out
-// of this package the same way it always has. A plain alias of appstorage.WindowRecord (P107
-// I2-3), same reasoning as WindowBounds above.
+// of this package the same way it always has. A plain alias of appstorage.WindowRecord, same
+// reasoning as WindowBounds above.
 type WindowRecord = appstorage.WindowRecord
 
 // WindowStore is exactly the method window.go's Attach calls on each app's own
 // *repos.WindowsRepo — SetBounds, the one write Attach's debounced persist() makes. WindowRepo
 // (openwindow.go) widens this to the full set OpenWindow/OpenNewWindow/ReopenWindows need. Since
-// WindowBounds/WindowRecord above are now plain aliases of appstorage's own (P107 I2-3), Kira
+// WindowBounds/WindowRecord above are now plain aliases of appstorage's own, Kira
 // Space's own *repos.WindowsRepo — whose WindowRecord has no Mode column to convert — satisfies
 // both interfaces directly, so its main.go passes one straight through with no adapter. Kira
-// Studio's own model.WindowRecord still carries Mode (P22 D12), so its *repos.WindowsRepo does
+// Studio's own model.WindowRecord still carries Mode, so its *repos.WindowsRepo does
 // not satisfy WindowRepo directly; its main.go keeps a one-line windowStore adapter for that.
 type WindowStore interface {
 	SetBounds(key string, b WindowBounds) error

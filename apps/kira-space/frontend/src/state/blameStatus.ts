@@ -1,10 +1,10 @@
 /**
- * P76 §5.1 — the status bar's git-blame readout. Cross-view state: written by `RepoFileView.vue`,
+ * The status bar's git-blame readout. Cross-view state: written by `RepoFileView.vue`,
  * read by `workbench/StatusBar.vue`, neither importing the other (the same direction
  * `state/tabs.ts:68`-`70` already documents for cross-view state).
  *
  * Owner token: `MainView.vue`'s active-view switch mounts an incoming file tab's view around the
- * outgoing one's teardown (P72 §3), so without a token the departing tab's `releaseBlameStatus`
+ * outgoing one's teardown, so without a token the departing tab's `releaseBlameStatus`
  * could blank a readout the arriving tab had already published. One owner at a time, last claim
  * wins.
  */

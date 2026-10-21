@@ -1,7 +1,7 @@
 /**
- * `docs/plans/P6.md` W14: the row context menus' pure half. What is present, what is absent, and
- * what is present-but-disabled-with-a-reason is exactly the thing a later phase edits (§10's
- * exit table grows this same menu at P9/P10), so it lives as one testable table
+ * The row context menus' pure half. What is present, what is absent, and what is
+ * present-but-disabled-with-a-reason is exactly the thing a later phase edits (the exit table
+ * grows this same menu), so it lives as one testable table
  * (`buildRowMenu`/`buildRefMenu`) rather than template `v-if` conditionals.
  */
 import { canRunOp, describeInProgress } from '@kira/git-core';
@@ -55,12 +55,11 @@ export interface CommitMenuContext {
 }
 
 /**
- * §6.4's per-commit menu, against the phase's own table: checkout (detached, gated same as the
- * picker's own checkout — §7.11 is scoped to the op kind, not to where it was invoked from),
- * create branch/tag here (never gated — git does not refuse either mid-op), revert this commit
- * (gated). `docs/plans/P10.md` W15 fills in the two items P6's own comment here used to call
- * "open question 2/absent-by-plan": reset and cherry-pick, both gated the same way, placed after
- * revert. Copy sha/copy message reuse P5's `clipboardActions.ts`.
+ * The per-commit menu: checkout (detached, gated same as the picker's own checkout — gating is
+ * scoped to the op kind, not to where it was invoked from), create branch/tag here (never gated
+ * — git does not refuse either mid-op), revert this commit (gated). Reset and cherry-pick, both
+ * gated the same way, are placed after revert. Copy sha/copy message reuse the
+ * `clipboardActions.ts`.
  */
 export function buildRowMenu(ctx: CommitMenuContext): MenuSection[] {
   const mutating: MenuItem[] = [
@@ -73,7 +72,7 @@ export function buildRowMenu(ctx: CommitMenuContext): MenuSection[] {
     ),
     plainItem('createBranchHere', t('git.menu.newBranch.label'), 'git-branch'),
     plainItem('createTagHere', t('git.menu.newTag.label'), 'tag'),
-    // P76 §8: worktreeAdd is not in GATED_OP_KINDS (git-core/src/model/operation.ts) — canRunOp
+    // worktreeAdd is not in GATED_OP_KINDS (git-core/src/model/operation.ts) — canRunOp
     // returns true for it unconditionally, so plainItem (not gatedItem, which would gate nothing)
     // is the honest call. Creating a worktree during a merge/rebase touches neither the sequencer
     // state nor the current worktree.
@@ -135,13 +134,13 @@ export function buildReadOnlyRowMenu(): MenuSection[] {
 }
 
 /**
- * `docs/plans/G19.md` D7: `FileTree.vue`'s right-click "Copy path" menu — one item, deliberately
- * not the two-affordance duplication `ReviewCommitRow.vue` used to carry (removed by this same
- * decision) — built directly against this package's own `lib/menuModel.ts`'s `MenuItem` type from the start,
- * matching every other menu-building function in this file. G21 D11: this is now the one copy-
+ * `FileTree.vue`'s right-click "Copy path" menu — one item, deliberately
+ * not the two-affordance duplication `ReviewCommitRow.vue` used to carry, built directly against
+ * this package's own `lib/menuModel.ts`'s `MenuItem` type from the start,
+ * matching every other menu-building function in this file. This is now the one copy-
  * path affordance in every tree, not only the review-styled ones it started out scoped to.
  *
- * P74 §7.4: `goToFileEnabled` adds "Go to file" — absent (not disabled) for a caller with no
+ * `goToFileEnabled` adds "Go to file" — absent (not disabled) for a caller with no
  * commit sha to resolve (`FileTree.vue`'s own `sha` prop is optional).
  */
 export function buildFileRowMenu(goToFileEnabled: boolean): MenuSection[] {
@@ -160,9 +159,9 @@ export interface RefMenuContext {
    *  worded differently depending on whether this is even reachable for this tag. */
   readonly knownRemotes: readonly string[];
   readonly inProgress: InProgressOperation | null;
-  /** G26 D-4.14: this branch's own stack membership — `undefined` when the caller has no stack
+  /** This branch's own stack membership — `undefined` when the caller has no stack
    *  view mounted at all (a tag/remoteBranch row, or a host with no `StackState`), matching
-   *  `buildRowMenu`'s own "absent, not disabled" convention for a capability that simply is not
+   *  `buildRowMenu`'s own "absent, not disabled" convention for a capability that is not
    *  there. Meaningless for `kind !== 'branch'` (a tag/remote-tracking ref is never a stack
    *  member) and ignored for those. */
   readonly stack?: {
@@ -175,11 +174,11 @@ export interface RefMenuContext {
 }
 
 /**
- * §6.6's "every mutating action is available from a context menu on the row it applies to", read
+ * "every mutating action is available from a context menu on the row it applies to", read
  * literally for a ref: the row a branch/tag operation applies to is the ref itself (the picker's
  * own row, or — once wired — the graph's own ref badge), not the commit it happens to point at.
  * Branch: checkout/rename/delete. Tag: checkout/delete/push/delete-on-remote (the last two only
- * where a remote is actually known — P6 has no `remotes.list` endpoint of its own, so
+ * where a remote is known — there is no `remotes.list` endpoint of its own, so
  * `knownRemotes` is derived from the already-loaded `remoteBranches` list rather than a second
  * round trip; see `remoteNamesFrom` below).
  */
@@ -202,12 +201,12 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
         true,
       ),
     ];
-    // G32 round-3 functional-correctness review, finding #4: tagPush/tagDeleteRemote are the two
+    // tagPush/tagDeleteRemote are the two
     // OpRequest kinds opTable has never served (RunOp's write path has no askpass wiring — see
     // commands.ts's own MutatingEntry doc comment for the tracked "move both to remote.run"
     // fix) — these two items were offered enabled anyway, so a click always rejected with
     // E_UNKNOWN_METHOD and the rejection was discarded, a silent no-op with no toast, no error, no
-    // announcement. Disabled with a reason until that server-side move actually lands, rather than
+    // announcement. Disabled with a reason until that server-side move lands, rather than
     // offering an action that can never succeed.
     const TAG_REMOTE_OPS_UNSUPPORTED = t('git.menu.notSupported.hint');
     for (const remote of ctx.knownRemotes) {
@@ -231,10 +230,9 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
   }
   // branch or remoteBranch — a remote-tracking ref itself is read-only here (its only action is
   // the checkout the picker's row already offers); rename/delete apply to a local branch only.
-  // `docs/plans/P7.md` W14: "Review branch changes" is offered for both — it is a read, never
-  // gated on `canRunOp` (§7.11's in-progress gate is about operations git would refuse), and is
-  // absent for a tag entirely (a tag is a point, not a line of development — `<base>..<tag>` is
-  // not the question §6.8 answers).
+  // "Review branch changes" is offered for both — it is a read, never
+  // gated on `canRunOp` (the in-progress gate is about operations git would refuse), and is
+  // absent for a tag entirely (a tag is a point, not a line of development).
   if (ctx.kind === 'remoteBranch') {
     return [
       {
@@ -287,9 +285,9 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
         ),
   );
   const sections: MenuSection[] = [{ items }];
-  // G26 D-4.14: a second section, present only when the caller actually has a stack view mounted
+  // A second section, present only when the caller has a stack view mounted
   // (`ctx.stack !== undefined`) — never gated on `canRunOp` (stackSet/restack are config/rebase
-  // writes, not one of §7.11's in-progress-blocked kinds), matching "Review branch changes"'
+  // writes, not one of the in-progress-blocked kinds), matching "Review branch changes"'
   // own un-gated posture just above.
   if (ctx.stack !== undefined) {
     const stackItems: MenuItem[] = [
@@ -378,11 +376,11 @@ export function buildStashMenu(
 }
 
 /**
- * G28 D12/D13: the global bucket's own row menu — Apply here, Create branch from this…, Show
- * changes, Remove from global stash. NO Pop, NO Drop: both are position-addressed by necessity
- * (probe 8) and a global entry has no stack position at all — Apply-plus-Remove is the honest pair
- * for a keep-forever entry. `stashApply`/`stashBranch` reuse the SAME `OpRequest['kind']` gates
- * `buildStashMenu` uses (the op kinds themselves are unchanged for a global entry, D12 — only how
+ * The global bucket's own row menu — Apply here, Create branch from this…, Show changes, Remove
+ * from global stash. NO Pop, NO Drop: both are position-addressed by necessity and a global entry
+ * has no stack position at all — Apply-plus-Remove is the honest pair for a keep-forever entry.
+ * `stashApply`/`stashBranch` reuse the SAME `OpRequest['kind']` gates
+ * `buildStashMenu` uses (the op kinds themselves are unchanged for a global entry — only how
  * the server resolves the source sha differs); `globalStashRemove` is its own gate.
  */
 export function buildGlobalStashMenu(

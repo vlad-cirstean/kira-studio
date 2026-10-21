@@ -1,21 +1,21 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P8.md` W17: the confirm step for `OpsState.runForcePush` — mirrors
+ * The confirm step for `OpsState.runForcePush` — mirrors
  * `CheckoutDialog.vue`/`RevertDialog.vue`'s own "a hazard pre-flight sets a pending ref, this
  * dialog renders while it is set, resolving it settles the promise the caller is awaiting"
  * shape, `pendingForcePush`/`resolveForcePushDialog` playing the same roles as
  * `pendingCheckout`/`resolveCheckoutDialog`.
  *
- * Two escalating confirmations, per §7.4/D48/D52:
+ * Two escalating confirmations:
  *  - The default path is the lease (`--force-with-lease --force-if-includes`) — safe against
  *    anything pushed since `remoteTip` was read, whether or not this session ever fetched it.
  *    On a protected branch (`preflight.protectedBy` non-null) it additionally requires typing
- *    the branch name back, D52's own friction for the common protected case.
+ *    the branch name back, the friction for the common protected case.
  *  - Plain `--force` bypasses the lease entirely and is behind its own, separately-worded
  *    confirmation (a `Disclosure`, collapsed by default) — needed on top of, not
  *    instead of, the typed branch name when the branch is also protected.
  *
- * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
+ * The modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
  * only supplies its own body/footer content. The plain-`--force` confirm button stays inside the
  * `Disclosure` body (in the default slot) rather than moving to `DialogFooter`, since it belongs
  * beside its own disclosure and acknowledgement checkbox, not beside the lease/Cancel pair.
@@ -62,7 +62,7 @@ watch(pending, () => {
 
 const protectedBy = computed(() => pending.value?.preflight.protectedBy ?? null);
 const isProtected = computed(() => protectedBy.value !== null);
-// F2 (P108 Part 16 review): the backend's ConfirmToken check (gitsession.RunRemote) gates on the
+// The backend's ConfirmToken check (gitsession.RunRemote) gates on the
 // resolved UPSTREAM branch name, not pending.branch's LOCAL one — a stacked/renamed branch can
 // track a differently-named protected upstream. Comparing/sending the local name here made the
 // gate impossible to ever satisfy in that case.

@@ -12,13 +12,13 @@ import {
 } from './support/postgresFixture';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
-// P15 §6.1: follows tests/ui/mutations.spec.ts end to end — same fixture, same relaunch shape,
-// same grid-cell assertions. F13 governs the whole design here: mockStreamBrowser.js's own
-// matchKey is the exact request payload, so every scenario that asserts a payload (3, 4, 5) sets
-// every column's recipe to `sequence`/`constant`, whose output is fixed by the app and not by
-// faker's RNG — faker-backed *content* is covered by tests/unit/fake-data-recipes.spec.ts instead,
-// this tier covers the *wiring* (P19's own dependency bump would otherwise break an exact-payload
-// assertion on faker output on purpose, OQ-6).
+// Follows tests/ui/mutations.spec.ts end to end — same fixture, same relaunch shape,
+// same grid-cell assertions. mockStreamBrowser.js's own matchKey is the exact request payload, so
+// every scenario that asserts a payload (3, 4, 5) sets every column's recipe to
+// `sequence`/`constant`, whose output is fixed by the app and not by faker's RNG — faker-backed
+// *content* is covered by tests/unit/fake-data-recipes.spec.ts instead, this tier covers the
+// *wiring* (the dependency bump would otherwise break an exact-payload assertion on faker output
+// on purpose).
 
 const CONNECTION_ID = 'conn-fakedata';
 const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Fake Data DB', 'green');
@@ -73,6 +73,7 @@ const CONTROL: ControlSnapshot[] = [
       options: {},
       preconnect: null,
       preconnectSidecar: false,
+      preconnectDelaySec: 0,
       autoExplain: false,
       throttlePerSec: 0,
       mcpEnabled: false,
@@ -102,6 +103,7 @@ const CONTROL: ControlSnapshot[] = [
       options: {},
       preconnect: null,
       preconnectSidecar: false,
+      preconnectDelaySec: 0,
       autoExplain: false,
       throttlePerSec: 0,
       mcpEnabled: false,
@@ -237,7 +239,7 @@ test('fake data generator — gate, defaults, preview, generate, failure', async
   const nameRecipe = await page.locator('[data-testid="generate-data-recipe-name"]').inputValue();
   expect(nameRecipe).not.toBe('skip'); // a nullable text column always proposes something real
   // This is the assertion most likely to be deleted later by someone who thinks the strip is
-  // noise — it guards F11: a fresh sequence starting at 1 can still collide with rows already in
+  // noise — it guards: a fresh sequence starting at 1 can still collide with rows already in
   // the table (composite_pk's own seed data proves it), so both PK columns are named here even
   // though their proposed recipe is already unique-by-construction.
   const warningsText = await page.locator('[data-testid="generate-data-warnings"]').innerText();
@@ -250,10 +252,10 @@ test('fake data generator — gate, defaults, preview, generate, failure', async
   await page.selectOption('[data-testid="generate-data-recipe-name"]', 'constant');
   await page.fill('[data-testid="generate-data-constant-name"]', 'generated row');
 
-  // P16 D6: the recipe <select> now matches the h-control ui/input beside it in the same
+  // The recipe <select> now matches the h-control ui/input beside it in the same
   // .recipe-row — the reported mismatch (26px vs 22px), fixed by the height flip's default
   // rather than a local override, since this call site gets no `.p-select.md` opt-in.
-  // P104: `Input` (`ui/input`) renders the `<input>` directly, no `.p-input` wrapper div — the
+  // `Input` (`ui/input`) renders the `<input>` directly, no `.p-input` wrapper div — the
   // testid'd element itself is now the one whose box height is compared.
   const recipeSelectHeight = await page
     .locator('[data-testid="generate-data-recipe-name"]')

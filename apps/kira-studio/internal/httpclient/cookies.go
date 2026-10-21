@@ -55,7 +55,7 @@ func currentJar() *cookiejar.Jar {
 	return sharedJar
 }
 
-// jarFor picks the jar one send actually uses — sharedJar (P90 item 1): one app-wide, in-memory
+// jarFor picks the jar one send uses — sharedJar: one app-wide, in-memory
 // jar for the process's lifetime, host-keyed by the stdlib, so two environments pointing at
 // different hosts can never share a session cookie; two environments pointing at the *same* host
 // deliberately do, which is what a cookie jar means. Not persisted to SQLite, not per-tab, not

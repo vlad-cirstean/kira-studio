@@ -7,7 +7,7 @@ import { useCodeReposStore } from '../../state/coderepos';
 export const useRepoLinksStore = defineStore('repoLinks', () => {
   const codeReposStore = useCodeReposStore();
 
-  // P84 plan §4.4: every imported repository's worktree anchor, session-scoped and module-level —
+  // Every imported repository's worktree anchor, session-scoped and module-level —
   // the same shape repoHeads.ts's byRepoId already establishes for this panel. '' (the default
   // for an unknown id, via Map.get's own undefined) means top-level; a non-empty value names the
   // code_repos id of the row it nests under.
@@ -33,7 +33,7 @@ export const useRepoLinksStore = defineStore('repoLinks', () => {
     for (const row of rows) byRepoId.set(row.id, row.parentId);
   }
 
-  /** P84 §4.5: the click-time hint. Between openRepoAtPath's import resolving and the next
+  /** The click-time hint. Between openRepoAtPath's import resolving and the next
    *  refreshRepoWorktreeLinks answering, a freshly-imported worktree has no parentId yet — this
    *  writes the answer switchToWorktree already knows, so the duplicate top-level row never
    *  flashes. The next batched call overwrites it either way; this is never the sole source of

@@ -1,9 +1,8 @@
-// scenarios.go is P26 §2.2's shared scenario library: the functional assertions genuinely common
+// scenarios.go is the shared scenario library: the functional assertions genuinely common
 // across adapters, once the not-shareable half (a plan's own sentinel vocabulary, dialect SQL, the
-// expected code for a permission refusal, read-back after a write) is kept out — see the plan's own
-// table for which is which. Every constructor here returns a Scenario whose Run drives an
-// already-connected adapters.Adapter; RunMatrix (Tier 2) and RunScenarios (Tier 1) are its only two
-// callers.
+// expected code for a permission refusal, read-back after a write) is kept out. Every constructor
+// here returns a Scenario whose Run drives an already-connected adapters.Adapter; RunMatrix
+// (Tier 2) and RunScenarios (Tier 1) are its only two callers.
 package testsupport
 
 import (
@@ -119,7 +118,7 @@ func FilterNarrowsResult(path model.NodePath, filter string, wantRows int) Scena
 
 // ProjectionLimitsColumns asserts a column projection is honoured — gated on c.Projection, same
 // skip set as FilterNarrowsResult. TabularPage only: every adapter that declares Projection true
-// today is SQL-shaped (§2.2's own not-shareable note keeps document/key-value read-back out of this
+// today is SQL-shaped (the not-shareable note keeps document/key-value read-back out of this
 // library).
 func ProjectionLimitsColumns(path model.NodePath, cols []string) Scenario {
 	return Scenario{
@@ -169,10 +168,9 @@ func MutateSucceeds(plan model.MutationPlan, wantAffected int) Scenario {
 	}
 }
 
-// MutateIsRefused asserts Mutate fails with exactly wantCode — gated on c.Writable. The phase's
-// most valuable scenario (§1.4): every permission-refusal pin in the plan is this constructor
-// attached to a least-privilege matrix row, with a comment at the call site naming what the code
-// means today.
+// MutateIsRefused asserts Mutate fails with exactly wantCode — gated on c.Writable. Every
+// permission-refusal pin is this constructor attached to a least-privilege matrix row, with a
+// comment at the call site naming what the code means today.
 func MutateIsRefused(plan model.MutationPlan, wantCode adapters.ErrorCode) Scenario {
 	return Scenario{
 		Name:     "mutate: refused with " + string(wantCode),

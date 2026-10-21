@@ -7,7 +7,8 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
-	"github.com/kirathecat/kira-studio/internal/mcpinstall"
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
 )
 
 // Browser records OpenURL calls.
@@ -128,13 +129,25 @@ type McpInstaller struct {
 // McpInstall is one Install call.
 type McpInstall struct{ Name, URL, Token string }
 
-func (m *McpInstaller) Status() mcpinstall.Status { return mcpinstall.Status{} }
+func (m *McpInstaller) Status() harness.InstallStatus { return harness.InstallStatus{} }
 
-func (m *McpInstaller) Install(_ context.Context, name, url, token string) mcpinstall.Result {
+func (m *McpInstaller) Install(_ context.Context, name, url, token string) harness.InstallResult {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.Installs = append(m.Installs, McpInstall{name, url, token})
-	return mcpinstall.Result{}
+	return harness.InstallResult{}
+}
+
+func (m *McpInstaller) InstallStdio(context.Context, string, string, []string) harness.InstallResult {
+	return harness.InstallResult{}
+}
+
+func (m *McpInstaller) Command(name, url, helperPath string) string {
+	return claude.New().MCPInstaller().Command(name, url, helperPath)
+}
+
+func (m *McpInstaller) StdioCommand(name, command string, args []string) string {
+	return claude.New().MCPInstaller().StdioCommand(name, command, args)
 }
 
 // OSAuth scripts the OS authentication prompt. By default it is unavailable, so a reveal needs the

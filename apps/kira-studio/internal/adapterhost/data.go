@@ -148,7 +148,7 @@ func (d *Dispatcher) Preview(req PreviewRequestWire) (PreviewResponse, error) {
 }
 
 // Mutate is data.ts's handleMutate. cache.InvalidateAfterMutation runs unconditionally, mirroring
-// the TS's `finally` (P43 F12/D17): six of the eleven adapters mutate without a transaction, so a
+// the TS's `finally`: six of the eleven adapters mutate without a transaction, so a
 // plan that fails part-way through has still changed the server, and leaving its pre-mutation page
 // cached as a hit would be silently wrong until the user happened to press Refresh.
 func (d *Dispatcher) Mutate(ctx context.Context, req MutateRequestWire) (MutateResponse, error) {

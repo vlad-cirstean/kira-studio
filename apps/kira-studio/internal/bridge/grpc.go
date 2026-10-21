@@ -18,8 +18,8 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// GrpcService is P11 D3/D7/D8's bound service: schema discovery and a call, both run through the
-// *existing* op scheduler HttpService already uses (D7) — no new scheduler, no new op log, no new
+// GrpcService is the bound service: schema discovery and a call, both run through the
+// *existing* op scheduler HttpService already uses — no new scheduler, no new op log, no new
 // cancel path. It is dependency-free of grpcclient's own internals beyond its public surface
 // (Describe/Unary/ServerStream/Source/CallRequest), exactly as HttpService is of httpclient's.
 type GrpcService struct {
@@ -49,13 +49,13 @@ func validDescriptorMode(mode string) bool {
 
 // resolveGrpcSource is Describe's own stage 2 for a descriptor source: target and metadata are the
 // two substitutable fields — protoPath/importPaths/caFile are picker-supplied local paths, never
-// substituted (P5 D7's own rule for a form-data file row's path, re-handed rather than reopened).
+// substituted (the rule for a form-data file row's path, re-handed rather than reopened).
 // A .proto descriptor source resolves nothing, because Describe needs no target to reach one — a
 // .proto file is read straight off disk. This short-circuit is correct only for Describe: Call
 // dials a real network target regardless of which descriptor source supplies its schema, so it
 // uses resolveGrpcCallSource below instead, which never skips target/metadata resolution.
 // used accumulates into whatever slice the caller points at, so a single resolver's masking
-// replacer covers a whole bridge method (P17 D9: each entry is a distinct (Name, Placeholder)
+// replacer covers a whole bridge method (each entry is a distinct (Name, Placeholder)
 // pair now, not a name→value map — a resolver's own Used() already dedupes within itself, and this
 // function's only caller ever calls it once per resolver, so no further dedupe is needed here).
 func (s *GrpcService) resolveGrpcSource(args GrpcDescribeArgs, used *[]apivars.UsedSecret) (grpcclient.Source, error) {
@@ -178,13 +178,12 @@ func (s *GrpcService) Describe(ctx context.Context, args GrpcDescribeArgs) (grpc
 }
 
 // GrpcCallArgs carries HttpSendArgs' own op-log addressing (OpID/TabID/CollectionID/
-// EnvironmentID/ItemID — P2 D3/P5 D6/P8 D2's own reasoning, applied verbatim) plus a gRPC call's
-// own fields. WindowKey is D8's own addition — EmitTo needs it to aim a streaming call's message
-// batches at the one window that opened it, exactly as TabsService.List/Save and
+// EnvironmentID/ItemID) plus a gRPC call's own fields. EmitTo needs WindowKey to aim a streaming
+// call's message batches at the one window that opened it, exactly as TabsService.List/Save and
 // WindowsService.Ensure already carry it (control.ts:334-340). Streaming names which of
 // Unary/ServerStream this call is — the renderer already knows from the schema it resolved via
-// Describe (D14's method picker), so the bridge is told rather than re-resolving the schema a
-// second time just to answer its own question.
+// Describe (the method picker), so the bridge is told rather than re-resolving the schema a
+// second time to answer its own question.
 type GrpcCallArgs struct {
 	OpID           string                `json:"opId"`
 	TabID          string                `json:"tabId"`
@@ -273,8 +272,7 @@ func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.C
 				if callErr != nil {
 					maskGrpcError(callErr, used)
 				} else {
-					// P21 round 2 architecture/security finding 4/functional finding 8: a
-					// *successful* call's own Header/Trailer/StatusMessage can echo a
+					// A *successful* call's own Header/Trailer/StatusMessage can echo a
 					// substituted secret (a gateway reflecting x-request-id, an echo service, a
 					// status message quoting the credential it rejected on a transport-level-OK
 					// call) exactly as an error's can — maskGrpcError already covers the error
@@ -317,18 +315,18 @@ func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.C
 	return result, nil
 }
 
-// recordGrpcHistory is P8 D2's rule verbatim, applied to gRPC: recorded from args (stage 1 —
+// recordGrpcHistory is the rule verbatim, applied to gRPC: recorded from args (stage 1 —
 // the target/method/metadata/message as the user typed them, a secret still spelled {{name}}),
 // never from the resolved values — best-effort, exactly as bridge/http.go's own Record call is: a
 // failed insert logs and the call still returns its result. Only a completed call is ever recorded
-// — D11 states a cancellation that received messages is still a completed call, which is why
+// — a cancellation that received messages is still a completed call, which is why
 // streaming.go's coalescer's `finish` always carries the true partial count for that path too.
 //
-// P21 round 2 functional finding 6: a unary call is recorded here, from Call's own RunOp closure,
+// A unary call is recorded here, from Call's own RunOp closure,
 // once grpcclient.Unary has returned — the renderer can only learn the outcome by awaiting Call's
 // own promise, so by construction it never observes a state where the call finished but its
 // history row does not exist yet. A *streaming* call is recorded from inside runServerStream
-// instead, before its own terminal event goes out over the D8 push channel: the renderer there is
+// instead, before its own terminal event goes out over the push channel: the renderer there is
 // woken by that event rather than by Call's return, so recording after runServerStream returns
 // (i.e. from here) would leave the same window open recordGrpcHistory's very existence is meant to
 // close. Call itself skips recording for a streaming call (`if !args.Streaming`) precisely because
@@ -402,8 +400,8 @@ type grpcCoalescerFinal struct {
 	errInfo *GrpcCallEventErr
 }
 
-// grpcCoalescer is D8's own buffer: wraps appevent.Coalescer[grpcclient.Message, grpcCoalescerFinal]
-// (P107 T2-7), accumulating messages from the goroutine RecvMsg-ing the stream and flushing on
+// grpcCoalescer is the buffer: wraps appevent.Coalescer[grpcclient.Message, grpcCoalescerFinal]
+// accumulating messages from the goroutine RecvMsg-ing the stream and flushing on
 // whichever comes first — 60 ms elapsed, 64 messages, or a terminal event (flushed immediately,
 // unconditionally, even with zero pending messages, so the renderer always sees a done:true
 // event). It also tracks nextSeq — the running index of the first message in each batch — which
@@ -502,9 +500,9 @@ func (s *GrpcService) runServerStream(ctx context.Context, args GrpcCallArgs, re
 		return grpcclient.CallResult{}, err
 	}
 	// Same reasoning as Call's own unary success branch: a successful stream's terminal
-	// Header/Trailer/StatusMessage must be masked before coalescer.finish emits it over the D8
-	// push channel — after finish returns is too late, the same "too-late-to-mask-afterwards"
-	// problem finding 4 of round 1 already identified for the error case.
+	// Header/Trailer/StatusMessage must be masked before coalescer.finish emits it over the push
+	// channel — after finish returns is too late, the same "too-late-to-mask-afterwards" problem
+	// already identified for the error case.
 	maskGrpcResult(&result, used)
 	s.recordGrpcHistory(args, result)
 	coalescer.finish(&result, nil)
@@ -516,8 +514,8 @@ func (s *GrpcService) runServerStream(ctx context.Context, args GrpcCallArgs, re
 // maskGrpcError masks a *grpcclient.Error's own Message (and, for a partial stream result, its
 // StatusMessage/Header/Trailer values) back to {{name}} form before it ever reaches mapGrpcError —
 // the same strings.Replacer shape bridge/http.go's secretReplacer builds, a second consumer of the
-// one unexported helper this package already has (D10's own last row). A no-op for any error that
-// is not a *grpcclient.Error, or when nothing was actually substituted.
+// one unexported helper this package already has. A no-op for any error that
+// is not a *grpcclient.Error, or when nothing was substituted.
 func maskGrpcError(err error, used []apivars.UsedSecret) {
 	var gerr *grpcclient.Error
 	if !errors.As(err, &gerr) {
@@ -539,13 +537,13 @@ func maskGrpcError(err error, used []apivars.UsedSecret) {
 	}
 }
 
-// maskGrpcResult is maskGrpcError's own success-path sibling (P21 round 2 architecture/security
-// finding 4 / functional finding 8): a *grpcclient.CallResult's StatusMessage/Header/Trailer come
-// straight from the server on a call that returned no error, and can echo a substituted secret
-// exactly as an error's own fields can (a gateway reflecting a metadata value, a status message
-// quoting the credential it rejected on an otherwise-OK transport). bridge/http.go's own
-// maskSecrets already does this for HTTP's successful response; gRPC's success path had no
-// equivalent. A no-op when nothing was substituted, same as maskGrpcError.
+// maskGrpcResult is maskGrpcError's own success-path sibling: a *grpcclient.CallResult's
+// StatusMessage/Header/Trailer come straight from the server on a call that returned no error, and
+// can echo a substituted secret exactly as an error's own fields can (a gateway reflecting a
+// metadata value, a status message quoting the credential it rejected on an otherwise-OK
+// transport). bridge/http.go's own maskSecrets already does this for HTTP's successful response;
+// gRPC's success path had no equivalent. A no-op when nothing was substituted,
+// same as maskGrpcError.
 func maskGrpcResult(result *grpcclient.CallResult, used []apivars.UsedSecret) {
 	replacer := secretReplacer(used)
 	if replacer == nil {
@@ -560,10 +558,10 @@ func maskGrpcResult(result *grpcclient.CallResult, used []apivars.UsedSecret) {
 	}
 }
 
-// mapGrpcError joins grpcclient's own four-code vocabulary into the ipcerr family (D16) — mirrors
+// mapGrpcError joins grpcclient's own four-code vocabulary into the ipcerr family — mirrors
 // mapHttpError (bridge/http.go): when the failure carries a Partial CallResult (a stream that
-// delivered some messages before failing or being cancelled, F8), it is marshalled into Details
-// for a renderer that knows how to read it, the same P10 D15 channel mapHttpError already uses.
+// delivered some messages before failing or being cancelled), it is marshalled into Details
+// for a renderer that knows how to read it, the same channel mapHttpError already uses.
 func mapGrpcError(err error) error {
 	var gerr *grpcclient.Error
 	if errors.As(err, &gerr) {

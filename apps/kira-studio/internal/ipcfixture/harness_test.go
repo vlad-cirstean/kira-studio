@@ -19,7 +19,7 @@ func (a *fakeTrackedAdapter) Disconnect(context.Context) error {
 	return nil
 }
 
-// F9 (P108 Part 6): all six *_test.go files in this package call Recorder.ConnectionsConnect and
+// All six *_test.go files in this package call Recorder.ConnectionsConnect and
 // never the matching disconnect — real adapters accumulate in the process-global registry
 // (adapters.live) across test runs, well after the test DB and everything else NewApp's own
 // t.Cleanup calls have already torn down. This drives trackConnected/disconnectTracked directly

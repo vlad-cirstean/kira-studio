@@ -1,8 +1,8 @@
-// P83 §6.2: the sole contact point with `@xterm/xterm`, reached only through a dynamic `import()`
+// The sole contact point with `@xterm/xterm`, reached only through a dynamic `import()`
 // (RepoTerminalView.vue's own mount) — never a static import at the top of a module Vite includes
 // in the boot bundle. Static re-exports here would be pointless (nothing outside this module
 // needs the xterm types), but the shape mirrors monacoEntry.ts's own recorded reasoning: everyone
-// this codebase's Terminal instance actually touches lives in this one file.
+// this codebase's Terminal instance touches lives in this one file.
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
@@ -16,11 +16,11 @@ interface Attached {
   off: () => void;
 }
 
-// P103 Part 1: `useSettingsStore`/`useTerminalsStore` used to be imported directly (each app's own
+// `useSettingsStore`/`useTerminalsStore` used to be imported directly (each app's own
 // `state/settings.ts`/`state/terminals.ts`, neither hoisted here — both are real per-app stores,
 // `settings.ts` genuinely diverges in section count and `terminals.ts` needs the workspace-key
-// parameterization P103 Part 2 does). This module has no package-boundary way to reach either
-// app's own store directly, so the two values/methods it actually touches are passed in instead —
+// parameterization). This module has no package-boundary way to reach either
+// app's own store directly, so the two values/methods it touches are passed in instead —
 // a real parameterization, not a plain move, forced by that boundary. Each app's own TerminalView
 // component (which already holds both stores for its own use) passes them through unchanged. */
 export interface TerminalRendererDeps {
@@ -31,17 +31,17 @@ export interface TerminalRendererDeps {
   writeTerminal(tabId: string, bytes: Uint8Array): void;
 }
 
-// Module-level, not held by the Vue component (§5.2/§6.2): a tab switch unmounts
+// Module-level, not held by the Vue component: a tab switch unmounts
 // RepoTerminalView.vue (MainView.vue keeps only RepoGraphView alive), and the whole point of this
 // map is that the live Terminal survives that — the sink stays attached, output keeps landing,
 // and remounting re-inserts the same DOM node rather than recreating it.
 const byTabId = new Map<string, Attached>();
 
-// §4/§7.4's own close path never reaches this module (state/tabKinds.ts's dropResources only
+// The close path never reaches this module (state/tabKinds.ts's dropResources only
 // calls closeTerminalSession, which never imports this file — importing it there would pull
 // @xterm/xterm into the boot bundle, the exact cost this file's own lazy boundary exists to
 // avoid). registerTabRuntimeCleanup is the seam built for exactly this: registered once this
-// module is actually loaded (i.e. once a terminal was actually opened), called for every tab that
+// module is loaded (i.e. once a terminal was opened), called for every tab that
 // closes for real, a no-op for a tabId with no entry here — tabRuntime.ts's own documented shape
 // ("a view kind whose module was never loaded has nothing registered here").
 registerTabRuntimeCleanup((tabId) => {
@@ -75,7 +75,7 @@ const encoder = new TextEncoder();
 
 /** Returns tabId's own attached Terminal, creating and wiring it on first call. `host` is a
  *  detached `<div>` — RepoTerminalView.vue appends it to its container on mount and never calls
- *  `term.open()` a second time (§6.2: the one mechanically safe way to reattach an xterm across
+ *  `term.open()` a second time (the one mechanically safe way to reattach an xterm across
  *  unmounts, since whether `open()` itself is re-entrant is never relied on). */
 export function getOrCreateTerminal(tabId: string, deps: TerminalRendererDeps): Attached {
   const existing = byTabId.get(tabId);

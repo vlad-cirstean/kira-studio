@@ -10,7 +10,7 @@ import (
 )
 
 // handleRepoCall is the thin-dispatch shape refs.go, stack.go and detail.go's own read handlers
-// each rebuilt per op (T2-12): decode params, resolve c's held RepoEntry, call one RepoEntry
+// each rebuilt per op: decode params, resolve c's held RepoEntry, call one RepoEntry
 // method, return the result. Each op differs in more than param/method/result type — required-
 // field rules vary (a bare repoId check vs. preflight.checkout's target+mode, commit.detail's
 // sha+validRefArg) and so does the error mapper (mapGitError vs. detail.go's own mapDetailError,
@@ -65,7 +65,7 @@ func handleCall[P, R any](
 }
 
 // requireNonEmpty replaces 43 handlers' own hand-rolled "if a == \"\" || b == \"\" { return
-// ipcerr.Contract(...) }" check (P107 I2-13). namesAndValues
+// ipcerr.Contract(...) }" check. namesAndValues
 // alternates a field's wire name and its value ("repoId", p.RepoID, "sha", p.SHA, ...) — every
 // call site here is a fixed literal, so there is no real risk of mispairing. The doc's own stated
 // `fields map[string]string` does not fit: every existing message lists its fields in a fixed,

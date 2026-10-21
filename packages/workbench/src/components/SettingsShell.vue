@@ -82,7 +82,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ close: [] }>();
 
-// P17 D1 (both apps, identical reasoning): everything the user touches lives in this draft until
+// Everything the user touches lives in this draft until
 // Save — the store (and therefore every other window and the app's own rendering) sees nothing
 // until then. This component is created on open and destroyed on close, which is the draft's whole
 // lifetime — no reset logic needed. JSON round-trip rather than structuredClone(): a Pinia store's
@@ -96,12 +96,16 @@ const cloneSections = (s: T): T => JSON.parse(JSON.stringify(s));
 const baseline = Object.freeze(cloneSections(props.current)) as T;
 const draft = reactive(cloneSections(props.current)) as T;
 
-// G7 D16: an array-valued leaf (Kira Space's git.protectedBranches) gets its own array object from
+// An array-valued leaf (Kira Space's git.protectedBranches) gets its own array object from
 // cloneSections even when unedited, so a bare `!==`/`===` would report it changed/non-default on
-// every open. Compared by value instead; every primitive leaf still takes the cheap `===` path.
+// every open; a record leaf (memory.models) likewise. Compared by value instead; every primitive
+// leaf still takes the cheap `===` path.
 function valuesEqual(a: unknown, b: unknown): boolean {
   if (Array.isArray(a) && Array.isArray(b)) {
     return a.length === b.length && a.every((v, i) => v === b[i]);
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    return JSON.stringify(a) === JSON.stringify(b);
   }
   return a === b;
 }

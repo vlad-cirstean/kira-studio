@@ -10,8 +10,8 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// validRefArg is D8's own guard, applied at the one entrance a client-supplied ref name reaches an
-// argv: non-empty, no leading "-". Resolves F6 — `merge-base` (unlike log/rev-list's own two-dot
+// validRefArg is the guard, applied at the one entrance a client-supplied ref name reaches an
+// argv: non-empty, no leading "-". `merge-base` (unlike log/rev-list's own two-dot
 // token) takes its two revisions as separate argv tokens, so a base beginning with "-" would be
 // read as a merge-base flag of its own rather than a revision (`--independent` exits 0 with a sha,
 // which this resolver would misread as "shares history"). Does not duplicate validateRefName's

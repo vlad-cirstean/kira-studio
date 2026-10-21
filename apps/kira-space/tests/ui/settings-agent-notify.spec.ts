@@ -11,11 +11,11 @@ const LEAVES = ['finished', 'needs-input', 'run-ended', 'include-message'] as co
 
 async function openClaudeCodePane(page: Page): Promise<void> {
   await emitWailsEvent(page, IPC.openSettings, undefined);
-  await page.locator('[data-testid="settings-section-Claude Code"]').click();
+  await page.locator('[data-testid="settings-section-Agent"]').click();
 }
 
 const sw = (page: Page, suffix = '') =>
-  page.locator(`[data-testid="settings-claude-code-notify${suffix}"]`);
+  page.locator(`[data-testid="settings-agent-notify${suffix}"]`);
 
 test('every notification switch starts on and the master switch gates the four others', async ({
   relaunch,
@@ -37,7 +37,7 @@ test('Save writes the changed notify leaves and reset restores a default', async
   await openClaudeCodePane(page);
   await sw(page, '-finished').click();
   await sw(page, '-include-message').click();
-  const reset = page.locator('[data-testid="settings-reset-claudeCode-notifyIncludeMessage"]');
+  const reset = page.locator('[data-testid="settings-reset-agent-notifyIncludeMessage"]');
   await expect(reset).toBeEnabled();
   await reset.click();
   await expect(sw(page, '-include-message')).toHaveAttribute('aria-checked', 'true');
@@ -45,7 +45,7 @@ test('Save writes the changed notify leaves and reset restores a default', async
   await page.locator('[data-testid="settings-save"]').click();
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.settingsSet)?.args)
-    .toEqual({ patch: { claudeCode: { notifyOnFinished: false } } });
+    .toEqual({ patch: { agent: { notifyOnFinished: false } } });
 });
 
 test('the test button calls AgentNotifyService.SendTest', async ({ relaunch }) => {

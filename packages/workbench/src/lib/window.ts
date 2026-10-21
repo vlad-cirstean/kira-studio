@@ -1,8 +1,8 @@
-// windowKey identifies which workbench this page is (P8 D2): the shell mints a UUID per window
+// windowKey identifies which workbench this page is: the shell mints a UUID per window
 // and hands it over as `/?window=<key>`, since it must be readable synchronously at module load —
 // before hydrateTabs() ever runs — and an async round trip (Window.Name() from
 // `@wailsio/runtime`) can't give that guarantee (it isn't even reliable across build modes; see
-// docs/HISTORY.md (v1.1 P8)).
+// docs/HISTORY.md).
 //
 // Absent or unrecognised falls back to "main": tests/ui (a plain static file server, no
 // `?window=`) and tests/e2e-real's plain Chromium tab both see this fallback and keep working

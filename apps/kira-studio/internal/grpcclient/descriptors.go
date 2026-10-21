@@ -83,15 +83,15 @@ type Method struct {
 	InputType       string `json:"inputType"`
 	OutputType      string `json:"outputType"`
 	// RequestTemplate is the empty-instance JSON of the input message — EmitUnpopulated +
-	// Multiline (D4) — the "fill this in" template the message editor seeds with. Deliberately not
+	// Multiline — the "fill this in" template the message editor seeds with. Deliberately not
 	// recursive into nested message fields (a self-referential message would not terminate); a
 	// nested message field renders as {} and the user fills it in.
 	RequestTemplate string `json:"requestTemplate"`
 }
 
-// CallResult is the terminal outcome of a call (call.go's Unary/ServerStream) — D16: a non-OK
+// CallResult is the terminal outcome of a call (call.go's Unary/ServerStream) — a non-OK
 // gRPC status lives HERE, not in the returned error. Messages carries every message this call
-// produced, up to maxStoredMessages: exactly one for Unary (D14: "a unary call is the same pane
+// produced, up to maxStoredMessages: exactly one for Unary ("a unary call is the same pane
 // with exactly one entry"), up to that cap for ServerStream (which also streams each one to its
 // own onMessage callback as it arrives, uncapped — this field exists for recordGrpcHistory's own
 // persistence input and a caller that missed live events, not as the live view's own source).
@@ -109,10 +109,9 @@ type CallResult struct {
 	Messages      []Message  `json:"messages,omitempty"`
 }
 
-// Message is one message of a call — a wire size (F7's WireLength, approximated here by the
-// encoded message length since this package installs no stats.Handler, D8) and an arrival offset
-// from the call's own start (F5: these are real and are the single most informative thing about a
-// stream).
+// Message is one message of a call — a wire size (the WireLength, approximated here by the encoded
+// message length since this package installs no stats.Handler) and an arrival offset from the
+// call's own start (these are real and are the single most informative thing about a stream).
 type Message struct {
 	Seq       int    `json:"seq"`
 	JSON      string `json:"json"`
@@ -120,9 +119,9 @@ type Message struct {
 	OffsetMs  int64  `json:"offsetMs"`
 }
 
-// resolved is one Source's linked descriptors, cached for the life of the process (D4). files is
+// resolved is one Source's linked descriptors, cached for the life of the process. files is
 // this Source's OWN private *protoregistry.Files — never protoregistry.GlobalFiles anywhere in
-// this package (F14: a duplicate file path there PANICS; two users' .proto files both declaring
+// this package (a duplicate file path there PANICS; two users' .proto files both declaring
 // the same package is an ordinary situation for this feature, and a private registry returns an
 // error instead).
 type resolved struct {
@@ -131,28 +130,27 @@ type resolved struct {
 	warnings []string
 }
 
-// maxCachedDescriptors bounds descriptorCache by entry count (finding 12) — a plain LRU, evicting
+// maxCachedDescriptors bounds descriptorCache by entry count — a plain LRU, evicting
 // the least-recently-used Source's descriptors once the cache holds more than this many. Each
 // entry can be a multi-megabyte descriptor registry (a large .proto, or a server with a big API
 // surface), so an unbounded map here was a real, unbounded leak, compounded by every dynamic
-// metadata value (e.g. {{$guid}}, an ordinary P6 feature) previously minting its own cache key —
+// metadata value (e.g. {{$guid}}, an ordinary feature) previously minting its own cache key —
 // see cacheKey's own comment below.
 //
-// Round-2 review finding 9: a plain entry count doesn't actually cap the resource (memory) the
-// original finding was about — 32 entries of a large API surface's registry could still retain
-// hundreds of MB for the life of the process. Rebounded here by an approximate byte budget
-// instead (maxCachedDescriptorBytes below), tracked via each entry's own descriptor-set size at
-// insert time (approxDescriptorBytes) — chosen over simply lowering the count because a fixed
-// count can never adapt to how large any one Source's descriptor set actually is: a byte budget
-// evicts exactly when it should, whether that is one huge registry or many small ones.
+// A plain entry count doesn't cap the resource (memory) — 32 entries of a large API surface's
+// registry could still retain hundreds of MB for the life of the process. Rebounded here by an
+// approximate byte budget instead (maxCachedDescriptorBytes below), tracked via each entry's own
+// descriptor-set size at insert time (approxDescriptorBytes) — chosen over lowering the count
+// because a fixed count can never adapt to how large any one Source's descriptor set is: a
+// byte budget evicts exactly when it should, whether that is one huge registry or many small ones.
 //
 // A var, not a const: descriptor_cache_test.go temporarily lowers it to exercise eviction against
 // a real, small compiled descriptor set rather than needing to allocate 64+ MiB of registries in a
 // test to cross the production default.
 var maxCachedDescriptorBytes int64 = 64 * 1024 * 1024 // 64 MiB
 
-// descriptorCache is D4's in-memory-only cache, keyed by the Source's own fields — which for
-// reflection includes the resolved target (§0.3/D10). The key is a SHA-256 digest, never the
+// descriptorCache is the in-memory-only cache, keyed by the Source's own fields — which for
+// reflection includes the resolved target. The key is a SHA-256 digest, never the
 // fields themselves: this map is unexported, has no accessor that returns a key, is never
 // serialised and never logged, which is what keeps a secret out of it even though the fields it
 // is derived from can contain one. map[string]*list.Element + container/list is this codebase's
@@ -165,7 +163,7 @@ var descriptorCache = struct {
 	byKey      map[string]*list.Element // Value is *descriptorCacheEntry
 	order      *list.List               // front = least recently used, back = most recently used
 	totalBytes int64
-	// generation is F11's own staleness guard, keyed the same as byKey but never pruned when an
+	// generation is the staleness guard, keyed the same as byKey but never pruned when an
 	// entry is evicted or invalidated — a key's counter only ever goes up. InvalidateCache bumps a
 	// key's counter; resolveSource captures it right before starting a resolution and passes it to
 	// descriptorCachePut, which skips the Put outright when the counter has since moved. Without
@@ -199,7 +197,7 @@ func approxDescriptorBytes(files *protoregistry.Files) int64 {
 	return total
 }
 
-// cacheKey excludes metadata *values* on purpose (finding 12): reflection's own resolved metadata
+// cacheKey excludes metadata *values* on purpose: reflection's own resolved metadata
 // used to be hashed in full, so a dynamic value substituted fresh per call (e.g. {{$guid}} in an
 // auth header) minted a brand-new key on every single call, guaranteeing a cache miss — defeating
 // the documented "a Call following a Describe on the same Source costs no second reflection round
@@ -207,15 +205,15 @@ func approxDescriptorBytes(files *protoregistry.Files) int64 {
 // signal that two calls address genuinely different schemas, e.g. a tenant-routing header), only
 // the value each name resolved to is dropped.
 //
-// Round-2 review finding 2: mode-aware, hashing only the fields the Source doc above says are
+// Mode-aware, hashing only the fields the Source doc above says are
 // meaningful for that mode. Target/TLS/Metadata are reflection-only, ProtoPath/ImportPaths are
 // proto-only — hashing both regardless of mode meant Describe (bridge/grpc.go's
 // resolveGrpcSource, which sends proto mode's target unresolved and metadata as nil) and Call
 // (resolveGrpcCallSource, which sends the real resolved target and metadata rows) landed on
 // different keys for the very same proto Source whenever the target has a {{ref}} or there is any
 // metadata row — the normal case. InvalidateCache is only ever called from Describe, so Call's
-// entry was never actually invalidated by Reload in proto mode. Restricting the hash to the
-// fields that mode actually uses makes Describe's and Call's keys identical by construction.
+// entry was never invalidated by Reload in proto mode. Restricting the hash to the
+// fields that mode uses makes Describe's and Call's keys identical by construction.
 func cacheKey(src Source) string {
 	h := sha256.New()
 	fmt.Fprintf(h, "%s\x00", src.Mode)
@@ -297,7 +295,7 @@ func resolveSource(ctx context.Context, src Source) (*resolved, error) {
 		return r, nil
 	}
 
-	// F11: singleflight collapses concurrent resolveSource calls sharing key into the one call
+	// singleflight collapses concurrent resolveSource calls sharing key into the one call
 	// below, so two Calls (or a Call racing a Describe) against the same not-yet-cached Source
 	// only ever pay for one reflection round trip or .proto parse.
 	//
@@ -373,8 +371,8 @@ func Describe(ctx context.Context, src Source) (Schema, error) {
 }
 
 // registerTransitive registers fd and every file it (transitively) imports into reg — never
-// protoregistry.GlobalFiles (F14) — skipping a file already registered under this path. This is
-// what makes the recursive reflection fallback (F2) and a .proto's well-known-type imports (F1)
+// protoregistry.GlobalFiles — skipping a file already registered under this path. This is
+// what makes the recursive reflection fallback and a .proto's well-known-type imports
 // both land in the one registry a Source's Schema is projected from.
 func registerTransitive(reg *protoregistry.Files, fd protoreflect.FileDescriptor) error {
 	if _, err := reg.FindFileByPath(fd.Path()); err == nil {

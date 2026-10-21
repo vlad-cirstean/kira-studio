@@ -58,7 +58,7 @@ const emit = defineEmits<{
 
 /** Cheap: the checked-out branch's own HEAD decoration is essentially always within the first
  *  page of history (the newest commits) — a bounded scan, never a search over the whole loaded
- *  store. If HEAD has not loaded yet (a very deep, unusual case), the strip simply shows no node
+ *  store. If HEAD has not loaded yet (a very deep, unusual case), the strip shows no node
  *  glyph until it does — see `headRow` below. */
 const HEAD_SCAN_LIMIT = 200;
 

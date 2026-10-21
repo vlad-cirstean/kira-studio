@@ -2,16 +2,16 @@ import { split } from 'shlex';
 import type { TextRef } from '../../lib/textRef';
 import { isCurlCommandName } from './detect';
 
-// P7 D1/D3: the shell-quoting half of curl parsing is `shlex@3.0.0` (F8's measurement) — this
+// The shell-quoting half of curl parsing is `shlex@3.0.0` — this
 // module is the whole of that half. `split()` is called with no options, so ANSI-C (`$'…'`) and
-// locale (`$"…"`) quoting stay on and no environment substitution ever happens (F8's contract):
+// locale (`$"…"`) quoting stay on and no environment substitution ever happens:
 // `$TOKEN` and `{{token}}` both survive a paste untouched.
 //
-// D4: the warning vocabulary is a closed union (mirrors internal/postman's own warning kinds,
-// P4 D12) — defined here rather than in parse.ts because D18 pins tokenize.ts to "shlex only" as
-// its one dependency, and this module's own TokenizeResult already needs the type. index.ts
-// re-exports CurlWarning/CurlWarningKind for the package's public API (P94 pass 3 §5.2: the array
-// itself has no consumer outside this file, only the derived type does).
+// The warning vocabulary is a closed union (mirrors internal/postman's own warning kinds) —
+// defined here rather than in parse.ts because tokenize.ts is pinned to "shlex only" as its one
+// dependency, and this module's own TokenizeResult already needs the type. index.ts
+// re-exports CurlWarning/CurlWarningKind for the package's public API (the array itself has no
+// consumer outside this file, only the derived type does).
 const CURL_WARNING_KINDS = [
   'shell-operator',
   'unknown-flag',
@@ -37,15 +37,15 @@ export type TokenizeResult =
   | { ok: true; argv: string[]; warnings: CurlWarning[] }
   | { ok: false; error: string };
 
-// F9/D3: nothing here is ever executed — this app never runs a shell — but a bare `;`, `|`, `&`,
+// Nothing here is ever executed — this app never runs a shell — but a bare `;`, `|`, `&`,
 // `&&`, `||`, `>`, `>>`, `<` or `#` is where a naive walk would start mistaking the rest of the
 // line (an `rm -rf /` after a `;`) for more curl arguments. shlex has no notion of shell syntax
-// above the word level (F9), so these only ever appear as their own token when they were bare in
+// above the word level, so these only ever appear as their own token when they were bare in
 // the source — a quoted `;` comes back as part of its own argument, never as this exact string.
 const SHELL_OPERATORS = new Set(['|', '||', '&', '&&', ';', '>', '>>', '<', '#']);
 
 /**
- * Turns pasted curl text into `argv`. D3, in full:
+ * Turns pasted curl text into `argv`.
  *
  * 1. `shlex.split` does the real lexing (quotes, escapes, ANSI-C `$'…'`); an unterminated quote or
  *    a trailing escape throws, caught here and returned as `{ok:false, error}` — a legible parse
@@ -53,9 +53,9 @@ const SHELL_OPERATORS = new Set(['|', '||', '&', '&&', ';', '>', '>>', '<', '#']
  * 2. A leading token equal to `curl` or ending `/curl` is dropped silently — the common case of a
  *    full paste including the command name. Anything else is left exactly where it was: the flag
  *    table (parse.ts) is what decides meaning, so a fragment starting at `-X POST` parses with no
- *    special-casing, and a genuinely unexpected leading word simply becomes a non-flag argument
- *    for D5's own URL-pick / multiple-urls rule to account for — no separate warning kind exists
- *    for it (D4's union is closed).
+ *    special-casing, and a genuinely unexpected leading word becomes a non-flag argument
+ *    for the URL-pick / multiple-urls rule to account for — no separate warning kind exists
+ *    for it (the union is closed).
  * 3. The walk stops at the first bare shell operator, keeping every token before it and emitting a
  *    `shell-operator` warning naming what was dropped.
  */

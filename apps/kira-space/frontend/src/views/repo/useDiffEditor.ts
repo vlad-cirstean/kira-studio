@@ -1,10 +1,10 @@
-// P92 item 5: RepoDiffView.vue's own content-resolution + editor-construction body, extracted so
+// RepoDiffView.vue's own content-resolution + editor-construction body, extracted so
 // RepoMultiDiffView.vue's own per-file sections can share one implementation instead of a second
 // copy — CLAUDE.md's "one term per concept" rule. Registered under `editorKey` (editors.ts's own
 // registry key, an opaque string) rather than a plain tabId: a single-file diff (RepoDiffView.vue)
-// passes its tab id unchanged, byte-identical to before this phase; one section of a multi-diff
+// passes its tab id unchanged; one section of a multi-diff
 // tab (RepoMultiDiffView.vue) passes `${tabId}:${path}`, since one multi-diff tab registers
-// several model pairs under the one tab id (§7.3's own note).
+// several model pairs under the one tab id.
 //
 // Deliberately NOT here: `view.find`/`repo.goToFileFromDiff` command registration and review-
 // decorations wiring (attachReviewDecorations) — both are single-active-view concerns RepoDiffView
@@ -54,7 +54,7 @@ interface DiffSidesLoaded {
   gitRepoId: string | undefined;
 }
 
-// P94 pass 3 §4.3: mount()'s own two-branch content read (worktree HEAD-vs-worktree vs a
+// mount()'s own two-branch content read (worktree HEAD-vs-worktree vs a
 // revision-pinned commit diff), each with its own try/catch/error-message plumbing — lifted out
 // so mount() itself only branches on the result. `error` is a string, not thrown: mount()'s own
 // contract is to set `state`/`errorMessage` and return, never to unwind past this call.
@@ -103,9 +103,9 @@ async function loadDiffSides(
   }
 }
 
-// P74 §7.4 item 1 / P92 item 7: the diff editor's own "go to file" — a revision-backed diff
-// resolves the target through the git transport; C6's plain worktree-vs-HEAD comparison already
-// shows the live file on disk (right === null), so the modified pane *is* that file — open it
+// The diff editor's own "go to file" — a revision-backed diff resolves the target through the git
+// transport; the plain worktree-vs-HEAD comparison already shows the live file on disk
+// (right === null), so the modified pane *is* that file — open it
 // directly, no round trip.
 function wireGoToFile(
   modifiedEditor: import('monaco-editor').editor.IStandaloneCodeEditor,
@@ -180,10 +180,10 @@ export interface DiffEditorHandle {
   goToFile(): void;
 }
 
-// §11: read-only, unchanged from the file viewer — readOnly/domReadOnly block the keyboard and
+// Read-only, unchanged from the file viewer — readOnly/domReadOnly block the keyboard and
 // paste; renderMarginRevertIcon/renderGutterMenu are the second layer, hiding the revert/apply
 // affordances that would otherwise let a user trigger a write from a widget built for the
-// extension's read-write use (C6 §8.1, not cosmetic).
+// extension's read-write use (not cosmetic).
 export function useDiffEditor(
   container: Ref<HTMLElement | null>,
   params: DiffEditorParams,

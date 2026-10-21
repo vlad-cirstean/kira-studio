@@ -1,12 +1,12 @@
-// Lexical-only SQL diagnostics (P18 addendum D24) — no grammar, no server round trip, and no
+// Lexical-only SQL diagnostics — no grammar, no server round trip, and no
 // dependency on anything renderer-only (this file is shared/domain, imported by main and engine
 // too). Sibling of sql-split.ts: same lexical states (quotes, dollar-quotes, comments), reused
 // here to find exactly the two defects a broken statement can have before it ever reaches the
 // adapter — an unterminated quote/comment, and unbalanced parentheses. Deliberately not a real
 // SQL grammar's error nodes: one lexer serves every dialect, so it never flags valid
-// dialect-specific syntax a narrower grammar wouldn't model (D24's own rationale).
+// dialect-specific syntax a narrower grammar wouldn't model.
 //
-// P60b §3.1: the quote/comment/dollar-quote scanning itself is `sql-lex.ts`'s `scanSqlSpan` —
+// The quote/comment/dollar-quote scanning itself is `sql-lex.ts`'s `scanSqlSpan` —
 // hoisted out of here (and `sql-split.ts`) into one shared scanner both now call. No behaviour
 // change: this file keeps its own paren-balance/issue-reporting logic exactly.
 import { t } from '@theme/i18n';

@@ -122,7 +122,7 @@ func TestClassifySQL(t *testing.T) {
 		{"whitespace-only statement is unknown", "   \n\t  ", adapters.ClassUnknown},
 		{"comment-only statement is unknown", "-- just a comment", adapters.ClassUnknown},
 
-		// Finding F1 (HIGH, security): a Postgres E'...' string's backslash-escaped quote was never
+		// A Postgres E'...' string's backslash-escaped quote was never
 		// recognized as an escape, so the scanner read the string as closing right after it —
 		// exposing the genuine trailing `-- '` as if it opened a real line comment, which then
 		// swallowed the real `;` and the smuggled DELETE along with it. Pre-fix this classified

@@ -1,5 +1,5 @@
 import type { MessageKey } from '@theme/i18n';
-// P107 I2-17: beautify.ts's JSON scanner and ejson.ts's Mongo-shell-literal scanner each hand-
+// beautify.ts's JSON scanner and ejson.ts's Mongo-shell-literal scanner each hand-
 // rolled the same object/array node shape, the same object/array parse loop (open bracket,
 // empty-container check, key/value/comma loop, close bracket) and the same indented/compact
 // renderer. Shell differs only in tolerating a trailing comma and normalizing an unquoted/
@@ -193,10 +193,9 @@ function renderCompact(node: RawNode, keyText: (raw: string) => string): string 
 }
 
 // ---------------------------------------------------------------------------------------------
-// P115 H9: beautify.ts's tryParseJson/beautifyJson and ejson.ts's tryParseShellText/
+// beautify.ts's tryParseJson/beautifyJson and ejson.ts's tryParseShellText/
 // beautifyShellText were the same two functions with a different grammar/error-class/keyText
-// slotted in — moved here, generalized over those three, next to the RawNode/parseContainer/
-// render pair they already shared (P107 I2-17's own precedent for this file).
+// slotted in.
 // ---------------------------------------------------------------------------------------------
 
 export type ParseResult = { ok: true; node: RawNode } | { ok: false; offset: number };
@@ -204,8 +203,8 @@ export type ParseResult = { ok: true; node: RawNode } | { ok: false; offset: num
 /** Parses `text` in full: one value via `parseValue`, trailing whitespace via `skipWs`, then
  *  requires every remaining character consumed — anything left over is `new ErrorClass(offset)` at
  *  that final position, the same "trailing content" error `parseValue`'s own grammar throws for a
- *  mid-parse defect. Catches `ErrorClass` and stack-overflow `RangeError` only (never a stray bug in
- *  `parseValue`, which still throws through). */
+ *  mid-parse defect. Catches `ErrorClass` and stack-overflow `RangeError` only (never a stray bug
+ *  in `parseValue`, which still throws through). */
 export function tryParse<C extends Cursor, E extends Error & { offset: number }>(
   text: string,
   parseValue: (c: C) => RawNode,

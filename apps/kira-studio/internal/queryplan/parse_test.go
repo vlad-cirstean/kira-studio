@@ -12,10 +12,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 )
 
-// M3 §2.4/§10: the five-dialect plan port, against the shared parity fixtures
-// tests/fixtures/explain-plans/*.{input,expected}.json — generated from the TypeScript side first
-// (§11.1 step 2), so this test is what gets pinned to them, never the reverse. A drift in either
-// language's own parser fails a test in that language, on the same bytes.
+// The five-dialect plan port, against the shared parity fixtures
+// tests/fixtures/explain-plans/*.{input,expected}.json — generated from the TypeScript side first,
+// so this test is what gets pinned to them, never the reverse. A drift in either language's own
+// parser fails a test in that language, on the same bytes.
 
 const fixturesDir = "../../tests/fixtures/explain-plans"
 
@@ -72,9 +72,9 @@ func loadExpectedRaw(t *testing.T, caseName string) []byte {
 }
 
 // buildPages builds real page.Page values out of a fixture's own pages spec, via the same
-// TabularPageBuilder the real adapter path uses — §2.4's own point: the parity test exercises the
-// real page-parsing glue (page.IsNull/page.CellText/page.IsTruncated), not a shortcut straight to
-// a dialect parser function.
+// TabularPageBuilder the real adapter path uses — the parity test exercises the real page-parsing
+// glue (page.IsNull/page.CellText/page.IsTruncated), not a shortcut straight to a dialect parser
+// function.
 func buildPages(t *testing.T, spec []pageSpec) []page.Page {
 	t.Helper()
 	out := make([]page.Page, 0, len(spec))
@@ -119,7 +119,7 @@ func buildTruncatedPage(t *testing.T) []page.Page {
 	return []page.Page{b.Finish(page.UnpagedPosition(1))}
 }
 
-// sortMetricsByLabel is already this package's own §2.3 rule for what parsers emit; normalize
+// sortMetricsByLabel is already this package's own rule for what parsers emit; normalize
 // applies it recursively so a Plan built here (which — like the TypeScript port's own parser
 // output — is already sorted by construction) is compared against expected.json's own sorted form
 // consistently regardless of which side happens to change first.

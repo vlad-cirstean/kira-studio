@@ -6,8 +6,8 @@ import (
 	"github.com/kirathecat/kira-studio/internal/metrics"
 )
 
-// ChannelCodeSearch is C7 D7's own push channel — a repository-wide search's coalesced file
-// groups, delivered with EmitTo (one window only). P103 Part 3: byte-identical to Kira Studio's
+// ChannelCodeSearch is the push channel — a repository-wide search's coalesced file
+// groups, delivered with EmitTo (one window only). Byte-identical to Kira Studio's
 // own channel of the same name, hoisted to repo-root internal/appevent and re-exported here so no
 // call site in this package has to change.
 const ChannelCodeSearch = appevent.ChannelCodeSearch
@@ -98,8 +98,8 @@ const (
 // Events is the Go->renderer push wrapper every bridge service that emits goes through — Kira
 // Studio's own bridge.Events (internal/bridge/events.go), trimmed: this app has no
 // Connections/Oplog/DbMcp producers to Attach. Signal/SignalTo/Broadcast come entirely from the
-// embedded *appevent.Events core (P103 Part 3); emit is kept alongside it for AttachMetrics below
-// (P116 G7), the one raw-Emit producer this app has.
+// embedded *appevent.Events core; emit is kept alongside it for AttachMetrics below, the one
+// raw-Emit producer this app has.
 type Events struct {
 	*appevent.Events
 	emit appevent.Emitter

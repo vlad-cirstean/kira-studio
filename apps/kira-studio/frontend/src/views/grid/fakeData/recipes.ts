@@ -144,10 +144,10 @@ interface NameHeuristic {
   generatorId: GeneratorId;
 }
 
-// D4 rule 6, in the order the plan states it — the first match wins. Every entry's generator is
-// applied only when `RecipeOption.typeClasses` (above) agrees with the column's own `typeClass`
-// (recipeFor's own check), so a `varchar` column named `amount` still gets a number-shaped string
-// and an `int` column named `name` does not get a person's name.
+// The first match wins. Every entry's generator is applied only when `RecipeOption.typeClasses`
+// (above) agrees with the column's own `typeClass` (recipeFor's own check), so a `varchar` column
+// named `amount` still gets a number-shaped string and an `int` column named `name` does not get a
+// person's name.
 const NAME_HEURISTICS: NameHeuristic[] = [
   { test: (n) => n === 'email' || n.endsWith('email'), generatorId: 'internet.email' },
   { test: (n) => n === 'firstname', generatorId: 'person.firstName' },

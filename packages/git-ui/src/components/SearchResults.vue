@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { shortSha } from '@kira/git-core';
 /**
  * `docs/plans/P11.md` W12: the grouped dropdown `SearchBox.vue` renders inside its own `Popover`
  * (the same nesting `BranchPicker.vue` uses for `TagList.vue`/`StashList.vue`) — refs first
@@ -18,7 +19,7 @@
  * classes, `w-105`/`max-h-90`/`overflow-y-auto`/`py-0.5`, moved onto `PopoverContent` there too),
  * rendering only the inner listbox content.
  */
-import { shortSha } from '@kira/git-core';
+import type { GitHostInfo } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import InlineState from '@theme/components/InlineState.vue';
 import SectionHeading from '@theme/components/SectionHeading.vue';
@@ -47,6 +48,7 @@ const props = defineProps<{
   searching: boolean;
   tailStale: boolean;
   showBodySearchAffordance: boolean;
+  host: GitHostInfo | null;
 }>();
 
 const emit = defineEmits<{
@@ -57,12 +59,12 @@ const emit = defineEmits<{
 
 const isEmpty = computed(() => props.model.sections.length === 0);
 
-/** P110 A17: `search-option`'s own gap/px are already exactly `rowVariants()`'s own
- *  `gap-1`/`px-1.5` (P110 I2-29: the default spacing scale directly).
+/** `search-option`'s own gap/px are already exactly `rowVariants()`'s own
+ *  `gap-1`/`px-1.5` (the default spacing scale directly).
  *  Only the vertical padding and the "active" (keyboard-highlighted, not a real `:hover`)
  *  background need adding —
  *  through `cn()` since `px-2` below replaces the variant's own `px-1.5` (different value,
- *  same property; §1.3). */
+ *  same property). */
 function optionClass(option: SearchOption): string {
   return cn(
     rowVariants({ layout: 'tree', data: true, selected: option.id === props.highlightedId }),
@@ -98,8 +100,8 @@ function optionClass(option: SearchOption): string {
             <template v-if="option.kind === 'ref'">
               <CodiconIcon :name="REF_ICON[option.hit.ref.kind]" :size="13" />
               <span class="flex-1 min-w-0 truncate">{{ option.hit.ref.shortName }}</span>
-              <Badge v-if="fieldLabel(option.hit.fields)">{{
-                fieldLabel(option.hit.fields)
+              <Badge v-if="fieldLabel(option.hit.fields, host)">{{
+                fieldLabel(option.hit.fields, host)
               }}</Badge>
             </template>
             <template v-else>
@@ -107,8 +109,8 @@ function optionClass(option: SearchOption): string {
               <span class="flex-1 min-w-0 truncate">{{ option.hit.subject }}</span>
               <span :class="rowMeta">{{ option.hit.authorName }}</span>
               <span :class="rowMeta">{{ formatAgeCompact(option.hit.authorTime) }}</span>
-              <Badge v-if="fieldLabel(option.hit.fields)">{{
-                fieldLabel(option.hit.fields)
+              <Badge v-if="fieldLabel(option.hit.fields, host)">{{
+                fieldLabel(option.hit.fields, host)
               }}</Badge>
             </template>
           </div>

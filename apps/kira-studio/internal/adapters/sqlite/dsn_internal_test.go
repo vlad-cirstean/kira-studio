@@ -1,4 +1,4 @@
-// dsn_internal_test.go is P21 round 3 architecture/security finding 11: buildDSN builds the
+// dsn_internal_test.go: buildDSN builds the
 // SQLite URI filename by plain string concatenation ("file:" + path + "?" + query). SQLite's own
 // URI parser splits on the *first* `?` (and treats `#` as starting a fragment), so a path
 // containing either character truncates the filename and lets the remainder be read as query

@@ -3,7 +3,7 @@ package mysqlfamily
 import "testing"
 
 // White-box (package mysqlfamily) coverage for groupForeignKeys — kept separate from the
-// black-box mysqlfamily_test.go suite because the bug it guards against (P2 R2, task #91) is
+// black-box mysqlfamily_test.go suite because the bug it guards against is
 // hard to reach deterministically over a real connection: MySQL sees it fine, but MariaDB's own
 // information_schema.REFERENTIAL_CONSTRAINTS view does not surface a row for a database the
 // connected user only holds a db-level wildcard GRANT SELECT on (a separate, pre-existing MariaDB
@@ -57,8 +57,8 @@ func TestGroupForeignKeys_SameNameSameSchemaCompositeKeyStillMerges(t *testing.T
 	}
 }
 
-// P21 round 2 architecture/security finding 8: parseHost used to split "host:port" with a
-// hand-rolled strings.LastIndex — for a URI-mode IPv6 address (net/url.Parse's own Host field,
+// parseHost used to split "host:port" with a hand-rolled strings.LastIndex — for a URI-mode IPv6
+// address (net/url.Parse's own Host field,
 // e.g. "[::1]:3306"), that returned "[::1]", brackets included, which cannot match any
 // certificate's real hostname ("::1"). net.SplitHostPort strips the brackets correctly.
 func TestParseHost(t *testing.T) {

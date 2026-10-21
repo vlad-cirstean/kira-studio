@@ -9,7 +9,7 @@ import (
 
 // mysql.go ports planParsers/mysql.ts verbatim: MySQL's `EXPLAIN FORMAT=JSON` — one row, one
 // column, a query_block whose real content sits under `table` (single-table), `nested_loop` (a
-// join — same key MariaDB's own JSON uses, but a genuinely different schema underneath, F13), or a
+// join — same key MariaDB's own JSON uses, but a genuinely different schema underneath), or a
 // wrapping grouping_operation/ordering_operation/duplicates_removal block around either.
 
 type mysqlRawTable struct {

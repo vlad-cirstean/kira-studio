@@ -1,16 +1,20 @@
+import en from '../../../../packages/theme/src/i18n/en.json';
 import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
 import { contract } from './support/contract';
 import {
+  container,
   ENDPOINT,
   IMAGES,
   OK_STATUS,
   openContainer,
   openDocker,
+  seedContainers,
   setupDocker,
 } from './support/dockerFixture';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
+import { assertTooltipShows } from './support/tooltip';
 
 const DOWN_STATUS = {
   state: 'unavailable',
@@ -456,4 +460,36 @@ test('start is green, stop is red, and a selected row has no bar', async ({ rela
   await running.click();
   await expect(running).toHaveAttribute('aria-selected', 'true');
   expect(await running.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none');
+});
+
+test('row tooltips come from one shared tooltip', async ({ relaunch }) => {
+  const { page } = await setupDocker(relaunch, {
+    handlers: {
+      Containers: () => [
+        ...seedContainers(),
+        container('c-dev', 'dev-box', 'running', { origin: 'devcontainer', originName: 'x' }),
+      ],
+    },
+  });
+  await openDocker(page);
+
+  const list = page.locator('[data-testid="docker-container-list"]');
+  await expect(list.locator('[data-slot="tooltip-trigger"]')).toHaveCount(0);
+
+  const { common, docker } = en;
+  await assertTooltipShows(
+    page,
+    list.locator('[data-name="solo"] [data-testid="docker-row-stop"]'),
+    common.action.stop.label,
+  );
+  await assertTooltipShows(
+    page,
+    list.locator('[data-project="shop"] [data-testid="docker-group-start"]'),
+    common.action.startAll.label,
+  );
+  await assertTooltipShows(
+    page,
+    list.locator('[data-name="dev-box"] [data-testid="docker-origin-icon"]'),
+    docker.origin.devcontainerNamed.tooltip.replace('{name}', 'x'),
+  );
 });

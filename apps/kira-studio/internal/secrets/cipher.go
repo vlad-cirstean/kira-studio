@@ -15,19 +15,18 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// envelopePrefix bumps to kira:v2: (P52 §6.4): the cipher genuinely changes (AES-256-GCM under
-// our own key, vs Chromium safeStorage's AES-128-CBC), so reusing kira:v1: would let a v1 value
-// reach a v2 decrypt and fail confusingly.
+// envelopePrefix bumps to kira:v2: the cipher genuinely changes (AES-256-GCM under our own key,
+// vs Chromium safeStorage's AES-128-CBC), so reusing kira:v1: would let a v1 value reach a v2
+// decrypt and fail confusingly.
 //
-// P29 bumps it again, to kira:v3:: Encrypt/Decrypt now take a Scope, and that scope becomes
-// AES-GCM's additional authenticated data (P21 round 2 architecture/security finding 10) — a
-// kira:v2: blob would fail to authenticate under the new AAD regardless, so the prefix bump exists
-// to turn that failure into a clear "re-enter it" message instead of a generic tag mismatch. There
-// is no dual-read path: every kira:v2: (and kira:v1:) value is refused, by design — see
-// docs/HISTORY.md (v1.2 P29).
+// It bumps again, to kira:v3:: Encrypt/Decrypt now take a Scope, and that scope becomes AES-GCM's
+// additional authenticated data — a kira:v2: blob would fail to authenticate under the new AAD
+// regardless, so the prefix bump exists to turn that failure into a clear "re-enter it" message
+// instead of a generic tag mismatch. There is no dual-read path: every kira:v2: (and kira:v1:)
+// value is refused, by design — see docs/HISTORY.md.
 const envelopePrefix = "kira:v3:"
 
-// insecureKeyMaterial is a hardcoded compile-time constant, deliberately (P52 §6.5): the Linux
+// insecureKeyMaterial is a hardcoded compile-time constant, deliberately: the Linux
 // development fallback has the same threat model and the same honesty as Chromium's
 // basic_text — obfuscation under a key anyone can read, not encryption. A file-backed keyring
 // would look more secure than it is and would need a passphrase prompt in a headless container.
@@ -78,7 +77,7 @@ func (c *Cipher) Status() Status { return c.status }
 
 // Encrypt satisfies repos.Cipher.
 //
-// P29 closes P21 round 2 architecture/security finding 10: scope becomes AES-GCM's additional
+// Scope becomes AES-GCM's additional
 // authenticated data (Scope.aad), so a ciphertext sealed for one kind of secret refuses to
 // authenticate anywhere but a column holding that same kind — an attacker who can write
 // ~/.kira-studio/kira.db but cannot read the Keychain item can no longer move a
@@ -96,7 +95,7 @@ func (c *Cipher) Status() Status { return c.status }
 // genuinely cross-kind.
 //
 // kira:v2: (and kira:v1:) values are refused with no migration, by explicit decision — see
-// docs/HISTORY.md (v1.2 P29).
+// docs/HISTORY.md.
 func (c *Cipher) Encrypt(scope Scope, plain string) (string, error) {
 	if !scope.valid() {
 		return "", ipcerr.Contract("%q is not a known secret scope", scope)

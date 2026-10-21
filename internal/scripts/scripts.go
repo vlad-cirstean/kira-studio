@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/palette"
 )
 
@@ -107,7 +108,7 @@ type CustomScriptFields struct {
 // Validate is the complete rule set: the Go check is the authority, the mirrored zod schema is
 // only the dialog's affordance. A pointer receiver: name and command are trimmed in
 // place (leading/trailing only) so Create/Update persist the trimmed values.
-func (f *CustomScriptFields) Validate() error {
+func (f *CustomScriptFields) Validate(models harness.Catalog) error {
 	f.Name = strings.TrimSpace(f.Name)
 	f.Command = strings.TrimSpace(f.Command)
 	if f.Name == "" {
@@ -131,7 +132,7 @@ func (f *CustomScriptFields) Validate() error {
 		if utf8.RuneCountInString(f.Command) > MaxPrompt {
 			return invalid("scripts: prompt is longer than %d characters", MaxPrompt)
 		}
-		smart, err := validSmart(f.Smart)
+		smart, err := validSmart(f.Smart, models)
 		if err != nil {
 			return err
 		}

@@ -7,7 +7,7 @@ import { useTabsStore } from '../state/tabs';
 import { visibleWorkspace, type WorkspaceKey } from '../state/workspace';
 import { TAB_VIEWS } from './tabViews';
 
-// P116 G4: re-exported so App.vue's own onMounted (Next/Previous/Close Tab) reaches the tabs store
+// Re-exported so App.vue's own onMounted (Next/Previous/Close Tab) reaches the tabs store
 // through this module rather than importing '../state/tabs' directly — state/tabs.ts, state/
 // workspace.ts and state/repoTabs.ts form a three-way import cycle (state/tabs.ts's own header
 // comment), and this file already resolves it safely in the order above. A second, separately-
@@ -32,7 +32,7 @@ export function createWorkbenchHost(): WorkbenchHost<WorkspaceKey, TabRecord> {
     views: TAB_VIEWS,
     // A tab kind's icon() returns either a codicon name or a `{ filePath }` marker (only
     // 'repo-file', state/tabKinds.ts's own doc comment) — resolved here into the two disjoint
-    // render shapes the shared TabStrip.vue actually needs, the same split RepoTreeRow.vue's own
+    // render shapes the shared TabStrip.vue needs, the same split RepoTreeRow.vue's own
     // fileIconStyle call site uses for the identical marker.
     iconFor(tab): TabIconRender {
       const icon = TAB_KINDS[tab.kind].icon(tab);

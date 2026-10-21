@@ -23,7 +23,7 @@ import { getPage, setPage } from './page';
 // memory (still no nesting to remember — a redis key's rows are always flat). `searchOpen`
 // mirrors grid/state.ts's own field — search toggles a per-tab UI flag, not session state.
 //
-// P63: keyed by `viewKey`, not `tabId` — a real KeyValue tab's own id, or BrowseView.vue's
+// Keyed by `viewKey`, not `tabId` — a real KeyValue tab's own id, or BrowseView.vue's
 // `${tab.id}::preview` for the split's preview pane (host.ts's own seam).
 interface KeyValueViewRuntime extends PagedViewRuntime {
   rowCount: number;
@@ -50,7 +50,7 @@ export const useKeyValueViewStore = defineStore('keyValueView', () => {
     delete runtime[`${tabId}::preview`];
   });
 
-  // P2 R2 (task #93): mirrors views/grid/state.ts's own `load()` — `revertPageIndexOnFailure`, when
+  // Mirrors views/grid/state.ts's own `load()` — `revertPageIndexOnFailure`, when
   // given, is the pageIndex this tab was showing before its caller optimistically advanced it. A
   // failed or cancelled load never calls setPage, so without this the pager would show the new page
   // number while the grid still renders the old page's rows.
@@ -66,7 +66,7 @@ export const useKeyValueViewStore = defineStore('keyValueView', () => {
     if (cursor) {
       effectiveCursor = cursor;
     } else {
-      // P43 iter3 D40/F37: a hash/set/zset/stream key's page is cursor-paged (redis/read.ts's
+      // A hash/set/zset/stream key's page is cursor-paged (redis/read.ts's
       // readScanFamily/readStream), and an `offset` cursor is neither honoured nor rejected by
       // either — it falls through and silently restarts the scan from the beginning. So a
       // no-cursor load (Refresh, a sibling tab's mutation, a post-Save reload) on any page but the
@@ -83,10 +83,11 @@ export const useKeyValueViewStore = defineStore('keyValueView', () => {
         effectiveCursor = { mode: 'offset', offset: host.pageIndex * host.pageSize };
       }
     }
-    // 7b (P68 review): a load still in flight for this viewKey (the row this preview/tab was
+    // A load still in flight for this viewKey (the row this preview/tab was
     // previously showing) must be CANCELLED, not just superseded client-side — beginOp below only
     // stamps a fresh opId, so the stale response gets dropped here (the `rt.opId !== opId` checks),
-    // but the backend read it belongs to (a real Redis/S3 call) kept running to completion regardless.
+    // but the backend read it belongs to (a real Redis/S3 call) kept running to completion
+    // regardless.
     // Rapidly clicking through N keys used to leave N-1 real backend reads running and discarded.
     // Mirrors FkPreviewPopover.vue's own opsCancel-on-supersede pattern.
     if (rt.opId) stopOp(rt);
@@ -140,7 +141,7 @@ export const useKeyValueViewStore = defineStore('keyValueView', () => {
     );
   }
 
-  // I2-14: stop/goNext/goPrev mirror views/grid/state.ts's own set exactly, modulo the tab
+  // stop/goNext/goPrev mirror views/grid/state.ts's own set exactly, modulo the tab
   // accessor pair below — hash/set/zset/stream's cursor strategy is preferred when available,
   // falling back to `pageIndex`-tracked offset paging (a list key's LRANGE offset strategy has no
   // token to advance by). Only stop/goNext/goPrev are exposed — this view has no goFirst/goLast/
@@ -173,8 +174,8 @@ export const useKeyValueViewStore = defineStore('keyValueView', () => {
     goNext,
     goPrev,
     setPageSize,
-    // P43 F6/D7: written by KeyValueView.vue's own catch around onDeleteKey — the popover-local
-    // editError/objectSaveError/addError refs already cover the edit/add surfaces (F6's own table),
+    // Written by KeyValueView.vue's own catch around onDeleteKey — the popover-local
+    // editError/objectSaveError/addError refs already cover the edit/add surfaces,
     // this is what was missing: delete has no popover to hold a local ref, so it gets the shared
     // per-tab field every other immediate-mutation view uses.
     setActionError,
@@ -183,7 +184,7 @@ export const useKeyValueViewStore = defineStore('keyValueView', () => {
   };
 });
 
-// D5/D6: project/ no longer imports this module directly — it reaches reload through
+// project/ no longer imports this module directly — it reaches reload through
 // state/viewCommands.ts's registry instead. Registered eagerly here (module scope, explicit pinia
 // singleton) since this module is reached via the static import chain before app.use(pinia) runs
 // (state/viewCommands.ts's own comment: an unregistered kind throws here, it does not no-op).

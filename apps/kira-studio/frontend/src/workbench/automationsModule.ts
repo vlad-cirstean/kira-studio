@@ -46,6 +46,7 @@ export function createAutomationsModule(): AutomationsModuleContext {
       preview: (args) => control.scriptRunsPreview(args),
       start: (args, hash) => control.scriptRunsStart(args, hash),
       resume: (id) => control.scriptRunsResume(id),
+      resumeCommand: (runId) => control.scriptRunsResumeCommand(runId),
       readLog: (id, afterSeq) => control.scriptRunsReadLog(id, afterSeq),
       onLog: (cb) => control.onScriptRunLog(cb),
       nextFires: (cron, timezone, count) => control.scriptRunsNextFires(cron, timezone, count),
@@ -74,6 +75,8 @@ export function createAutomationsModule(): AutomationsModuleContext {
       renameCollection: (id, name) => customScriptsStore.renameCollection(id, name),
       removeCollection: (id) => customScriptsStore.removeCollection(id),
       move: (id, collectionId) => customScriptsStore.moveScript(id, collectionId),
+      reorder: (collectionId, ids) => customScriptsStore.reorderScripts(collectionId, ids),
+      reorderCollections: (ids) => customScriptsStore.reorderCollections(ids),
     },
   };
 }

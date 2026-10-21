@@ -1,8 +1,7 @@
-// Ported from packages/db-fixtures/mongo.spec.ts (§9.3), case by case where practical — the spec's own
-// numbering is kept in each test's name so the two can be diffed. §5.3 of
-// docs/HISTORY.md (v1 P58c) names the four cases that carry the most weight: the _id
-// text/parser closure round-trip (C3), byte-stable EJSON rendering (C2), field order surviving a
-// read (C2), and cancel asserted server-side via killOp — all four are here, none softened.
+// Ported from packages/db-fixtures/mongo.spec.ts, case by case where practical — the spec's own
+// numbering is kept in each test's name so the two can be diffed. The four cases that carry the
+// most weight: the _id text/parser closure round-trip, byte-stable EJSON rendering, field order
+// surviving a read, and cancel asserted server-side via killOp — all four are here, none softened.
 package mongo_test
 
 import (
@@ -430,7 +429,7 @@ func TestMongo_Read_Filter(t *testing.T) {
 	}
 }
 
-// P2 R2 (task #94): a scalar _id filter (a single-document lookup) combined with a keyset
+// A scalar _id filter (a single-document lookup) combined with a keyset
 // pagination token used to be silently dropped — read.go's old merge only recognized an existing
 // _id value shaped as an operator document, so a bare scalar failed that type assertion and the
 // keyset boundary condition overwrote it outright. A hand-minted token (matching the fingerprint
@@ -540,8 +539,8 @@ func TestMongo_IDText_RoundTrips(t *testing.T) {
 		t.Fatalf("FindOne probe: %v", err)
 	}
 
-	// Two real consumers of IDText's own output exist, and both must accept it (§1.5's four-way
-	// closure requirement): mutate.go's parseIdKey treats the text as a bare *value* (exactly
+	// Two real consumers of IDText's own output exist, and both must accept it: mutate.go's
+	// parseIdKey treats the text as a bare *value* (exactly
 	// mutate.ts's own "an _id is a value, not a document" comment — this is what "Copy _id" then
 	// "paste into the mutation key box" round-trips through); a filter box instead wraps it as
 	// {_id: <text>}, a genuine document, which is what "Copy _id" then "paste into the filter box"
@@ -778,12 +777,13 @@ func TestMongo_Mutate_DeleteZeroRowsIsError(t *testing.T) {
 	}
 }
 
-// P26 §3.5(1): mongo/adapter.go:60 sets a.readOnly from the config and nothing anywhere asserted
+// mongo/adapter.go:60 sets a.readOnly from the config and nothing anywhere asserted
 // it — mongo and redis are the two writable adapters with no such test (every other writable
 // adapter has one: postgres, mysqlfamily, clickhouse, sqlite, s3). Preview is deliberately not
 // asserted here: unlike Mutate, no adapter's Preview ever consults readOnly — it is pure local text
-// generation that "never executes and never touches the network" by design (adapter.go's own Adapter
-// interface doc), so there is nothing for a read-only connection to change about its output.
+// generation that "never executes and never touches the network" by design (adapter.go's own
+// Adapter interface doc), so there is nothing for a read-only connection to change about its
+// output.
 func TestMongo_ReadOnlyConnectionCannotWrite(t *testing.T) {
 	fixture := testsupport.StartMongo(t)
 	ro := fixture.Config
@@ -829,10 +829,10 @@ func TestMongo_ReadOnlyConnectionCannotWrite(t *testing.T) {
 	}
 }
 
-// P26 §3.5(2): Mongo's whole DDL analogue (§1.2) — Mutate an insert into a collection name that
-// does not exist yet, then Children(database) lists it, then Read returns the document, then Mutate
-// deletes it. The closest thing Mongo has to "does DDL reach the catalog", exercising
-// catalog.go's ListCollectionSpecifications against an object created in the same test.
+// Mongo's whole DDL analogue — Mutate an insert into a collection name that does not exist yet,
+// then Children(database) lists it, then Read returns the document, then Mutate deletes it. The
+// closest thing Mongo has to "does DDL reach the catalog", exercising catalog.go's
+// ListCollectionSpecifications against an object created in the same test.
 func TestMongo_Mutate_InsertCreatesTheCollectionAndItAppearsInTheTree(t *testing.T) {
 	fixture := testsupport.StartMongo(t)
 	a := connectedAdapter(t, fixture)
@@ -1019,10 +1019,10 @@ func TestMongo_Read_AlreadyCancelledRejectsBeforeRunning(t *testing.T) {
 	}
 }
 
-// cancel, asserted server-side via killOp (spec 22, ported, must not be softened): a slow
-// operation is started, the test polls $currentOp through a separate root client until it
-// appears, Cancel is called, Cancel returns true, and the op rejects with E_QUERY (the server
-// killed it — not E_CANCELLED, which would mean the local abort won).
+// cancel, asserted server-side via killOp (must not be softened): a slow operation is started, the
+// test polls $currentOp through a separate root client until it appears, Cancel is called, Cancel
+// returns true, and the op rejects with E_QUERY (the server killed it — not E_CANCELLED, which
+// would mean the local abort won).
 func TestMongo_Cancel_KillsServerSideOp(t *testing.T) {
 	fixture := testsupport.StartMongo(t)
 	a := connectedAdapter(t, fixture)

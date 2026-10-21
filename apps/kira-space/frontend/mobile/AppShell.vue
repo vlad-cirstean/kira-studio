@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import { useOnline } from '@vueuse/core';
+import { useAgentMessageDefaults } from '@workbench/agent/agentInfo';
 import { onMounted } from 'vue';
 import { useServerEvents } from './api/events';
 import { useAgentSessionsStore } from './state/agentSessions';
@@ -14,6 +15,7 @@ import TabBar from './TabBar.vue';
 const queryClient = useQueryClient();
 const agentSessions = useAgentSessionsStore();
 const online = useOnline();
+useAgentMessageDefaults(() => undefined);
 
 function refresh(): void {
   void queryClient.invalidateQueries({ queryKey: ['adetask'] });

@@ -4,11 +4,11 @@ import "github.com/kirathecat/kira-studio/internal/shell"
 
 // Flusher is the quit-handshake ack seam. *shell.Quitter satisfies it — its own quit_test.go
 // covers the ordering and cancellation rules this seam exists for (there is no lifecycle_test.go
-// in this package; the comment that used to claim one was stale prose left behind after P56's own
+// in this package; the comment that used to claim one was stale prose left behind after the
 // test-bar pruning, corrected here rather than resurrecting the file).
 type Flusher interface{ Flushed(windowKey string) }
 
-// WindowFlusher is the per-window close-flush ack seam (P8 C6, F8's fix) — a separate handshake
+// WindowFlusher is the per-window close-flush ack seam — a separate handshake
 // from the quit one above: at most one window is ever waiting on it at a time, keyed by which
 // window is currently closing, rather than every window at once. *shell.CloseFlushCoordinator
 // satisfies it.

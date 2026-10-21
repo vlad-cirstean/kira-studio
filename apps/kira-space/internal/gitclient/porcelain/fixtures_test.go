@@ -13,7 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 )
 
-// The golden corpus (D15): committed raw-byte recordings of real `git log`/`for-each-ref` output,
+// The golden corpus: committed raw-byte recordings of real `git log`/`for-each-ref` output,
 // regenerated only under KIRA_GIT_FIXTURES=write (mirroring KIRA_IPC_FIXTURES=write, CLAUDE.md).
 // Deterministic fixed identity + fixed dates + fixed tree content make every commit's own sha
 // reproducible run to run, which is what makes a regenerated .bin byte-identical to the committed
@@ -48,7 +48,7 @@ func (b *repoBuilder) commitTime() time.Time {
 	return when
 }
 
-// fixtureEnv is D15's own fix (F13): every spawn this builder makes gets its identity/config
+// fixtureEnv is the fix: every spawn this builder makes gets its identity/config
 // entirely from its own argv/env, never the machine's — GIT_CONFIG_GLOBAL/GIT_CONFIG_SYSTEM point
 // at /dev/null so this container's own commit.gpgsign=true/gpg.format=ssh global config (which
 // silently signed every fixture commit, making the corpus reproducible only on this machine) can
@@ -188,7 +188,7 @@ func (b *repoBuilder) commitStaged(message string) string {
 }
 
 // commitSigned adds name/content and commits it SSH-signed against testdata/keys/
-// fixtureSigningKey — a fixed, checked-in, throwaway key (never the machine's own, per D15/
+// fixtureSigningKey — a fixed, checked-in, throwaway key (never the machine's own, per
 // CLAUDE.md), so the resulting signature bytes, and therefore the commit's own sha, are
 // reproducible across machines and reruns. The key is copied to a fresh 0600 temp file first:
 // ssh-keygen (which `git`'s own gpg.format=ssh shells out to for the actual signing) refuses a
@@ -602,7 +602,7 @@ func TestFixtures_Regenerate(t *testing.T) {
 		writeFixture(t, "diff/lfsPointer.bin", captureFileDiff(t, b.dir, &parent, head, "asset.bin", nil))
 	}
 	{
-		// --- diff/blankContextSuppressed.bin (F4): a blank CONTEXT line under a user's own
+		// --- diff/blankContextSuppressed.bin: a blank CONTEXT line under a user's own
 		// diff.suppressBlankEmpty=true, captured with -c diff.suppressBlankEmpty=true spliced in
 		// AHEAD of gitclient's own configOverrides — deliberately bypassing the runner-level fix
 		// (a later `-c` wins) to exercise parseOneHunk's own defense-in-depth against a bare
@@ -770,7 +770,7 @@ func TestFixtures_Regenerate(t *testing.T) {
 	}
 
 	// --- stash/twoEntry: a two-entry stack, one pushed with -u (an untracked file alongside a
-	// tracked change), one without — G17 D3/probe 12's own two-numstat-block-plus-zero-block shape
+	// tracked change), one without — the two-numstat-block-plus-zero-block shape
 	// (a pure-untracked entry would produce zero numstat records at all; this scenario's own
 	// first-pushed entry instead carries one tracked file so the numstat parse path is exercised
 	// too, with the untracked half read separately, never from --numstat). ---
@@ -842,7 +842,7 @@ func TestFixtures_Regenerate(t *testing.T) {
 		writeFixture(t, "blame/uncommitted.bin", captureRaw(t, b.dir, porcelain.BlameLineArgs("f.txt", 1)))
 	}
 
-	// --- workingDiff/mixed.{numstat,nameStatus}.bin (P7, item 2): a staged add plus an unstaged
+	// --- workingDiff/mixed.{numstat,nameStatus}.bin: a staged add plus an unstaged
 	// modify against HEAD — plain `git diff`, not `diff-tree`, confirming ParseNumstatRecords/
 	// ParseNameStatusRecords' own `-z` framing (established against diff-tree output) is identical
 	// against plain diff's, since both use the same underlying diff machinery. Untracked files are

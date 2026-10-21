@@ -11,11 +11,11 @@ import { t } from '@theme/i18n';
 import ModuleStart from '../components/ModuleStart.vue';
 import { useNewTerminal } from './module';
 
-// P91 §12: MainView.vue's own fallback when the Automations module has no active tab — the state a
+// MainView.vue's own fallback when the Automations module has no active tab — the state a
 // fresh install always opens in. StudioStart.vue verbatim in shape: an EmptyState with one primary
-// action, disabled while the resolved home directory (§7.2) isn't known yet. P128 §2.4: moved to
-// the shared automations module — `useNewTerminal` (module.ts) holds the one cwd-unavailable guard,
-// shared with the tab strip's own "+" menu (AutomationsNewTab.vue).
+// action, disabled while the resolved home directory isn't known yet. `useNewTerminal` (module.ts)
+// holds the one cwd-unavailable guard, shared with the tab strip's own "+" menu
+// (AutomationsNewTab.vue).
 const { canOpen, open } = useNewTerminal();
 </script>
 

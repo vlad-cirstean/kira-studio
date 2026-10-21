@@ -43,7 +43,7 @@ test('New task creates a branchless task in chosen repos and selects it', async 
   expect(control.log().find((e) => e.channel === IPC.adeTaskCreateTask)?.args).toEqual({
     title: 'Export CSV',
     jira: { key: 'PAY-77', url: '' },
-    githubUrl: '',
+    hostUrl: '',
     notes: '',
     codeRepoIds: ['repo-web-app', 'repo-api'],
     workflowId: '',

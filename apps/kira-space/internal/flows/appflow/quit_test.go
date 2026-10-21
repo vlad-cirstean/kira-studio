@@ -59,7 +59,7 @@ func TestQuitConfirm(t *testing.T) {
 	})
 	if _, err := app.W.Terminal.Open(terminal.OpenArgs{
 		TerminalID: "agent-1", WindowKey: "main", Cwd: app.Home, Cols: 100, Rows: 30,
-		Command: "claude", LaunchKind: terminal.LaunchKindClaudeCode,
+		Command: "claude", LaunchKind: terminal.LaunchKindAgent,
 	}); err != nil {
 		t.Fatal(err)
 	}

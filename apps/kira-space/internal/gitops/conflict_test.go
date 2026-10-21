@@ -20,8 +20,8 @@ func mustWriteFile(t *testing.T, path, content string) {
 	}
 }
 
-// TestReadInProgressStateFiles_AmMarker is P108 Part 15 F3's own regression proof at the I/O
-// boundary: rebase-apply/applying's presence must be read into RebaseApplyApplying, and
+// TestReadInProgressStateFiles_AmMarker is the regression proof at the I/O boundary:
+// rebase-apply/applying's presence must be read into RebaseApplyApplying, and
 // head-name/onto must be read from rebase-apply/ (not only rebase-merge/, which a plain `git am`
 // or an apply-backend rebase never creates).
 func TestReadInProgressStateFiles_AmMarker(t *testing.T) {
@@ -60,8 +60,8 @@ func TestReadInProgressStateFiles_ApplyBackendRebaseNoAmMarker(t *testing.T) {
 	}
 }
 
-// TestReadInProgressStateFiles_SequencerTodoKind is P108 Part 15 F2's own regression proof at the
-// I/O boundary: sequencer/todo's first non-comment, non-blank line must be read into
+// TestReadInProgressStateFiles_SequencerTodoKind is the regression proof at the I/O boundary:
+// sequencer/todo's first non-comment, non-blank line must be read into
 // SequencerTodoKind so ClassifyInProgress can re-derive a paused revert/cherry-pick once every
 // *_HEAD file is already gone.
 func TestReadInProgressStateFiles_SequencerTodoKind(t *testing.T) {

@@ -10,10 +10,10 @@ import type { DdlSchema } from './ddl';
 import { findMatchingParen, MONGO_STATEMENT_RE, splitTopLevelArgs } from './mongoStatement';
 import { ddlDiagnostics } from './sqlDiagnostics';
 
-// D7: lintSql's own lexical checks first, then — only while a non-empty DdlSchema exists (D5) —
+// lintSql's own lexical checks first, then — only while a non-empty DdlSchema exists —
 // the DDL-driven warnings layered on top. Both read the same document; a lexically broken
 // statement (an unterminated quote) still gets its own DDL diagnostics for whatever the parser
-// managed to make sense of, since Lezer's own error recovery (F4) never throws.
+// managed to make sense of, since Lezer's own error recovery never throws.
 function lintSqlConsole(
   dialect: SqlDialect | undefined,
   schema: DdlSchema | undefined,

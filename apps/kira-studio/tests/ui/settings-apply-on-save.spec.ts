@@ -4,8 +4,8 @@ import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 import { openSettings } from './support/settings';
 
-// P17: the settings dialog stages every control into a local draft and only reaches
-// SettingsService.Set on Save — see docs/HISTORY.md (v1.1 P17) for the
+// The settings dialog stages every control into a local draft and only reaches
+// SettingsService.Set on Save — see docs/HISTORY.md for the
 // five scenarios below. A settings change is observable without opening a grid via the CSS
 // custom property applyAppearance() writes (state/settings.ts): --kira-row-height reads 28px at
 // the comfortable default and 22px for compact.
@@ -130,10 +130,10 @@ test('a leaf reset button is disabled once the draft matches the default', async
   await expect(densityButton(page, 'comfortable')).toHaveAttribute('aria-pressed', 'true');
 });
 
-// P12 round 1 finding #9: patchSettings used to apply the patch to settingsState (and re-render
-// --kira-row-height) *before* awaiting control.settingsSet — a rejected Save left the change live
-// in this window with no broadcast to any other window or the database, correctly showing an
-// error and staying open, but silently divergent from the truth until relaunch.
+// patchSettings used to apply the patch to settingsState (and re-render --kira-row-height) *before*
+// awaiting control.settingsSet — a rejected Save left the change live in this window with no
+// broadcast to any other window or the database, correctly showing an error and staying open, but
+// silently divergent from the truth until relaunch.
 test('a rejected Save leaves the live value alone and shows the error', async ({ relaunch }) => {
   const { window: page, control } = await relaunch({
     control: [

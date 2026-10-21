@@ -121,8 +121,8 @@ func TestLineIndexByteOffsetAndPosition(t *testing.T) {
 	}
 }
 
-// TestLineIndexRoundTrip is the case that actually catches an off-by-one in either direction that
-// a one-directional table would miss (C6 §10): for every rune-boundary column on every fixture
+// TestLineIndexRoundTrip is the case that catches an off-by-one in either direction that
+// a one-directional table would miss: for every rune-boundary column on every fixture
 // line (ASCII, tab, CRLF, multi-byte runes, a surrogate pair, an invalid byte, the empty last
 // line), Position(ByteOffset(line, column)) must return exactly (line, column) back.
 func TestLineIndexRoundTrip(t *testing.T) {

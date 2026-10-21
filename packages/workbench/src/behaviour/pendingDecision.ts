@@ -7,11 +7,9 @@ export interface PendingDecisionSource {
   expiresAtMs: () => number | undefined;
 }
 
-// P113 F5: extracted from GitPairingDialog.vue / DbMcpApprovalDialog.vue's identical countdown
-// ticker plus focus-Deny-on-open watch. Keys on the request id, not a `pending !== null` boolean
-// — P108 Part 12 F2's fix for DbMcpApprovalDialog, generalized here so GitPairingDialog picks up
-// the same fix: a boolean source never re-fires when the queue advances from request A straight
-// to request B (no null in between), so Deny focus and the countdown reset silently stayed on A.
+// Keys on the request id, not a `pending !== null` boolean: a boolean source never re-fires when
+// the queue advances from request A straight to request B (no null in between), so Deny focus and
+// the countdown reset silently stayed on A.
 //
 // Owns the "denyButton" template ref itself (useTemplateRef works from inside a composable, same
 // as a plain script-setup call, as long as it runs during the owning component's own setup) rather

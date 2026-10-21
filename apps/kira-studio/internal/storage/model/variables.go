@@ -12,11 +12,10 @@ const (
 	VariableScopeEnvironment VariableScope = "environment"
 )
 
-// Environment is one api_environments row (P5 D3/D4). IsActive is the app-global selection — the
-// repo guarantees at most one row carries it. Description is P17 D14 — app-local free text, no
-// Postman round-trip question at all (unlike a variable's, F10). Color is P18 D16/D19 — a
-// user-assigned value from the same palette Studio's connections use (ValidPaletteColor), never
-// derived; 'none' is the default.
+// Environment is one api_environments row. IsActive is the app-global selection — the repo
+// guarantees at most one row carries it. Description is app-local free text, no Postman round-trip
+// question at all (unlike a variable's). Color is a user-assigned value from the same palette
+// Studio's connections use (ValidPaletteColor), never derived; 'none' is the default.
 type Environment struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -26,10 +25,10 @@ type Environment struct {
 	Color       string `json:"color"`
 }
 
-// Variable is one api_variables row's **list projection** — P5 D4/D5. Value is the empty string whenever
+// Variable is one api_variables row's **list projection**. Value is the empty string whenever
 // IsSecret, and the row's own encrypted-secret column is not a field of this struct at all, so
 // "the list never returns a secret's plaintext or ciphertext" is a property of this type, not of a
-// per-row branch somewhere that could later be forgotten. Description is P17 D14 — not a secret,
+// per-row branch somewhere that could later be forgotten. Description is not a secret,
 // so it does not weaken that property.
 type Variable struct {
 	ID          string        `json:"id"`

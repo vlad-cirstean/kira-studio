@@ -59,12 +59,18 @@ An agent calls `ingest_files` with `distill` set to true and either `text` or on
 
 Nothing is stored, so the memory check does not run. Input is limited to 120,000 characters, split into at most 16 parts, and a call stops at 2 USD. It runs on your Claude subscription. See [MCP tools](../../reference/mcp-tools/).
 
+For one short text such as a code comment, add `mode` set to `rewrite`. One call returns the same text in its own form. Trivia is dropped: tracking labels, history, filler and sentences that restate the code. Every fact stays. Comment markers, indentation, backticked names, numbers and negations stay as written. A text that is already clean comes back unchanged.
+
+The text must be at most 2,000 characters and `text` only. Optional `context` is the code around it, read only, up to 6,000 characters. A rewrite is rejected when it breaks a rule. Rules: not longer than the input, same markers and indentation, no line over 100 columns, no lost name or number. The original then returns with `kept: <reason>`.
+
 ### Distill in the app
 
 The Memory module runs the same pipeline. Click **Distill text** in the panel header. **Back to memories** returns to the memory view.
 
 1. Choose **Text** and paste, or choose **File** and pick a document. In a file view, select text, open the context menu or command palette and run **Distill selection**. The selection arrives as text, with its path and line range shown.
 2. Click **Run distill**.
+
+For one short text, choose **Rewrite** beside **Text** and **File**. The result is the text in its own form. It shows what was left out, or says the text is already concise, or says why the original was kept. **Copy** puts the text on the clipboard. Rewrite results cannot be stored or imported. The limit is 2,000 characters.
 
 The size line shows characters and about how many tokens the input holds (one token per three characters). While the run goes, the view shows the stage (reading parts, checking against the source, merging lines), the steps done and the cost so far. **Cancel** stops it. Work that already finished is charged.
 
@@ -75,6 +81,10 @@ The result shows characters and tokens before and after, the cost and the number
 - **Import as document…** saves the lines as a document and opens the normal import confirmation. The document stays under `distilled/` in the memory folder as the import's source.
 
 Distill alone writes nothing to the store. Only one distill runs at a time. The input limits above apply.
+
+## Choose the Claude model
+
+**Settings > Memory > Claude model** sets the model for memory checks, import and distill. The default is `sonnet`. The choice applies from the next Claude call, including a running import.
 
 ## Search
 

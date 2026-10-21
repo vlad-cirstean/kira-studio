@@ -16,6 +16,7 @@ const STAGE_STATUS = {
   extract: 'memory.distill.progress.extract.status',
   verify: 'memory.distill.progress.verify.status',
   merge: 'memory.distill.progress.merge.status',
+  rewrite: 'memory.distill.progress.rewrite.status',
 } as const satisfies Record<DistillStage, MessageKey>;
 </script>
 

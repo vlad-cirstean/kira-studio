@@ -1,4 +1,4 @@
-// P12 round 2 finding #3: run() captured its runtime record (`rt`) locally and only re-checked
+// run() captured its runtime record (`rt`) locally and only re-checked
 // `rt.opId`/`rt.status` after the await — never whether the tab itself still existed. Closing a
 // tab mid-run deletes `runtime[tabId]` (state/tabRuntime.ts's cleanup), but `rt` is still a live
 // reference to that now-detached object, so the continuation ran anyway: dropResults() was a
@@ -53,7 +53,7 @@ describe('console run() after the tab closes mid-run (P12 round 2 finding #3)', 
   });
 });
 
-// P108 Part 11 F1: closing a tab while its auto-explain pre-run EXPLAIN batch is in flight used to
+// Closing a tab while its auto-explain pre-run EXPLAIN batch is in flight used to
 // leave the real statement free to fire once that batch settled — cleanup deleted runtime[tabId]
 // but never touched the detached `rt` object run()'s own post-await guard reads, so `rt.status`
 // still read 'running' forever and the guard passed. Drives the same auto-explain race

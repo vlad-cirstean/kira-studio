@@ -52,10 +52,10 @@ const emptyDescription = computed(() => {
   const hint = t('studio.http.history.recordHint.description');
   return isScratch.value ? `${hint} ${t('studio.http.history.scratchHint.description')}` : hint;
 });
-// P18 D6: the list is ≤ HISTORY_PER_SCOPE_LIMIT by construction (Record's own trim), so "the list
-// is full" is exactly this predicate — not a stored eviction count (rejected in the plan: List can
-// never say more than "the list is full" without a new column and write path). Not suppressed by
-// the filter (§6 OQ-5): the note describes what is *stored*, not what is currently shown.
+// The list is ≤ HISTORY_PER_SCOPE_LIMIT by construction (Record's own trim), so "the list is full"
+// is exactly this predicate — not a stored eviction count (List can never say more than "the list
+// is full" without a new column and write path). Not suppressed by the filter: the note describes
+// what is *stored*, not what is currently shown.
 const atCap = computed(() => entries.value.length >= HISTORY_PER_SCOPE_LIMIT);
 
 // P16 D15: matches method, URL, status text, or environment name — the fields already on screen
@@ -74,7 +74,7 @@ const filteredEntries = computed<ResponseHistoryEntry[]>(() => {
   );
 });
 
-/** D15: the URL is shown on a second line only when it differs from the row above it — within
+/** The URL is shown on a second line only when it differs from the row above it — within
  *  one request's history the URL is usually identical, and repeating it twenty times is noise.
  *  Indexes into `filteredEntries` (the rendered list), not `entries` — the row "above" is the
  *  row visibly above it, under a filter too. */

@@ -1,9 +1,9 @@
 /**
- * P5's diff model (§4.4, §6.4, D14a) — the shapes that carry a unified diff across the wire and
+ * The diff model — the shapes that carry a unified diff across the wire and
  * the one genuinely algorithmic thing this phase does: mapping a diff-view cursor row onto a
  * line number in some revision (`mapDiffLineToRevision`), and re-mapping that line across a
  * second diff, commit → working tree (`mapLineAcrossDiff`, the drift re-map "Go to file" needs on
- * its live-file branch — see `docs/plans/P5.md`'s "The second map"). Both are pure, synchronous,
+ * its live-file branch). Both are pure, synchronous,
  * framework-free — `packages/core`'s standing rule — and are exhaustively unit tested rather than
  * left to integration tests, per `CLAUDE.md`'s "cursor/page arithmetic with real boundary cases"
  * clause.
@@ -71,7 +71,7 @@ function clamp1(n: number): number {
 
 /**
  * One flattened, renderable row of a parsed diff — a hunk header, or one of a hunk's content
- * lines. `DiffView.vue` (W9) renders from exactly this list, and `mapDiffLineToRevision`'s
+ * lines. `DiffView.vue` renders from exactly this list, and `mapDiffLineToRevision`'s
  * `rowIndex` is an index into it — the two are never allowed to disagree about what "row 7"
  * means because both are built from the same function.
  */
@@ -91,8 +91,7 @@ export function flattenDiffRows(hunks: readonly DiffHunk[]): DiffRow[] {
 }
 
 /**
- * Maps a diff row to a line number in `side`'s revision. `docs/plans/P5.md`'s "The line map"
- * spells out the table this implements — restated here only as code, not re-derived:
+ * Maps a diff row to a line number in `side`'s revision:
  *
  *   - a row that carries a number on `side` → that number (context always does; `add` on
  *     `"new"`; `del` on `"old"`);
@@ -137,13 +136,12 @@ export function mapDiffLineToRevision(
 }
 
 /**
- * The drift re-map (`docs/plans/P5.md`'s "The second map"): re-maps `line`, known on the `from`
- * side of `hunks`, to the corresponding line on the other side. A thin wrapper, not a second
- * algorithm — it either delegates to `mapDiffLineToRevision` (when some row actually carries
- * `line` on the `from` side) or falls back to the closed form `line + Δ`, where `Δ` is the
- * cumulative net insertion (new lines minus old lines) of every hunk ending at or before `line`
- * on the `from` side (`0` before the first hunk) — see "The line map"'s "general form" for why
- * this is the same arithmetic the per-row table already computes. `Δ` is signed old→new; mapping
+ * The drift re-map: re-maps `line`, known on the `from` side of `hunks`, to the corresponding line
+ * on the other side. A thin wrapper, not a second algorithm — it either delegates to
+ * `mapDiffLineToRevision` (when some row carries `line` on the `from` side) or falls back to the
+ * closed form `line + Δ`, where `Δ` is the cumulative net insertion (new lines minus old lines)
+ * of every hunk ending at or before `line` on the `from` side (`0` before the first hunk) — this
+ * is the same arithmetic the per-row table already computes. `Δ` is signed old→new; mapping
  * new→old negates it, since the same per-hunk cumulative value describes both directions. `hunks`
  * empty → `line` unchanged. Result clamped to `≥ 1`.
  */

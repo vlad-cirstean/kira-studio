@@ -1,4 +1,4 @@
-// P21 round 2 functional finding 7: load() encodes the partition/offset/timestamp filter a Kafka
+// load() encodes the partition/offset/timestamp filter a Kafka
 // stream tab is browsing under and sends it with every data.read, but runCount used to hard-code
 // `filter: null` — the toolbar's own "<N> total" therefore answered the high/low watermark summed
 // across *every* partition, a different question than the "<n> rows on this page" printed beside
@@ -19,7 +19,7 @@ setActivePinia(pinia);
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
 const { control } = await import('../../frontend/src/bridge/control');
-// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — a real (never-settling in this harness) control.tabsSave triggered
 // incidentally by opening a tab below would otherwise wedge every later spec's own tabsSave
 // assertions for the rest of the process. This spec doesn't test persistence, so give it a

@@ -67,15 +67,15 @@ const rowColoringId = useId();
       <FieldDescription>{{
         t('studio.settings.appearance.rowDensity.description')
       }}</FieldDescription>
-      <!-- P110 B36: every cell below carries the full computed style of the old shared
+      <!-- Every cell below carries the full computed style of the old shared
            .row-preview-cell/.row-preview-gutter/.row-preview-grow/.row-preview-head rules, resolved
-           per-instance rather than stacking conflicting same-property utilities (§1.3) -- the head
+           per-instance rather than stacking conflicting same-property utilities -- the head
            row's `.row-preview-head .row-preview-cell` descendant selector outranked the gutter/grow
            siblings' own color/font-size on specificity alone, and .row-preview-grow's flex-1 always
            beat .row-preview-cell's own flex-basis by source order. That descendant selector's own
            `font-family: inherit` is dropped rather than ported: none of these 3 header cells carry
            font-data (unlike their data-row counterparts below), so they already inherit naturally
-           -- porting `inherit` as a class would just re-state the default. -->
+           -- porting `inherit` as a class would re-state the default. -->
       <div class="overflow-hidden rounded-kira-sm border border-border">
         <div class="flex bg-elevated border-b border-border-strong">
           <span

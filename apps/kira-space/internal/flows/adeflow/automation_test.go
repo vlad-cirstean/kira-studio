@@ -12,8 +12,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/appevent"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
@@ -229,12 +229,12 @@ func TestAutomationRun(t *testing.T) {
 			t.Fatalf("env = %v", env)
 		}
 		allowed := strings.Join(pv.Allowed, " ")
-		for _, want := range append([]string{claudeheadless.FinishStepTool, claudeheadless.RunOutcomeTool}, claudeheadless.SpaceToolNames...) {
+		for _, want := range append([]string{toolName(agentmcp.FinishStep), toolName(agentmcp.RunOutcome)}, spaceToolNames()...) {
 			if !strings.Contains(allowed, want) {
 				t.Errorf("allowed tools lack %q: %s", want, allowed)
 			}
 		}
-		if !strings.HasPrefix(pv.Suffix, claudeheadless.SpaceNote(llmprompts.Defaults())) {
+		if !strings.HasPrefix(pv.Suffix, agentmcp.SpaceNote(llmprompts.Defaults())) {
 			t.Errorf("suffix = %q, want it to start with the Space suffix", pv.Suffix)
 		}
 		if pv.Dir.Mode != scripts.DirModeWorktree || pv.Dir.Path != f.apiBr.Worktree || pv.Dir.Pending {
@@ -477,11 +477,11 @@ func TestAutomationStep(t *testing.T) {
 		if r.State != "done" {
 			t.Fatalf("run = %+v", r)
 		}
-		if got, want := fakeFile(t, f.app, "api-1.prompt"), "Lint feat/api-lint at high for Fix login\n\n"+claudeheadless.FinishInstruction(llmprompts.Defaults(), nil); !strings.HasPrefix(got, want) {
+		if got, want := fakeFile(t, f.app, "api-1.prompt"), "Lint feat/api-lint at high for Fix login\n\n"+agentmcp.FinishInstruction(llmprompts.Defaults(), nil); !strings.HasPrefix(got, want) {
 			t.Fatalf("prompt = %q, want it to start with %q", got, want)
 		}
 		args := fakeFile(t, f.app, "api-1.args")
-		for _, want := range []string{"--model\nopus", "--max-budget-usd\n0.5", "--tools\nRead,Grep", "--strict-mcp-config", claudeheadless.FinishStepTool, claudeheadless.RunOutcomeTool} {
+		for _, want := range []string{"--model\nopus", "--max-budget-usd\n0.5", "--tools\nRead,Grep", "--strict-mcp-config", toolName(agentmcp.FinishStep), toolName(agentmcp.RunOutcome)} {
 			if !strings.Contains(args, want) {
 				t.Errorf("argv lacks %q:\n%s", want, args)
 			}
@@ -544,7 +544,7 @@ func TestAutomationStep(t *testing.T) {
 func TestRunOutcomeAutomation(t *testing.T) {
 	f := newAutoFixture(t, agentStep("two", "    before: approval\n"), false)
 	call := func(kind string) fakeagent.MCPCall {
-		return fakeagent.MCPCall{Server: claudeheadless.ServerName, Tool: "run_outcome", Args: map[string]any{"kind": kind}}
+		return fakeagent.MCPCall{Server: agentmcp.ServerName, Tool: "run_outcome", Args: map[string]any{"kind": kind}}
 	}
 	// Attempt 1 of api was step one; 2 is the failing script; 3 is step two asking for outcomes.
 	f.app.Scenario(fakeagent.Scenario{Claude: map[string][]fakeagent.Action{

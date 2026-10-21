@@ -78,8 +78,8 @@ test('kafka (frontend, mocked IPC) — tree, partition filter, stream tab (offse
   const firstRow = view.locator('[data-testid="stream-row"]').first();
   // toHaveText with a RegExp matches raw textContent, unlike a string (no whitespace
   // normalization) — the cell's conditional Badge (v-if, hidden here) still leaves Vue's own
-  // inter-element whitespace before the key text, confirmed pre-existing (P180, unrelated to this
-  // phase's own tombstone addition below).
+  // inter-element whitespace before the key text, confirmed pre-existing (unrelated to the
+  // tombstone addition below).
   await expect(firstRow.locator('[data-testid="stream-key"]')).toHaveText(/^\s*key-\d\s*$/);
   await expect(firstRow.locator('[data-testid="stream-headers"]')).toContainText('seed');
   await expect(firstRow.locator('[data-testid="stream-body"]')).toContainText('seq');

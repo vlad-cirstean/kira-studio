@@ -4,9 +4,9 @@ import {
   aheadText,
   buildOrphanRows,
   buildStackRows,
+  changeRequestBadgeLabel,
   childOf,
   parentOf,
-  prBadgeLabel,
   rowNeedsForcePush,
   staleChipText,
 } from './stackListModel.ts';
@@ -104,11 +104,11 @@ describe('buildOrphanRows — the orphans section', () => {
   });
 });
 
-describe('prBadgeLabel', () => {
+describe('changeRequestBadgeLabel', () => {
   test('undefined with no PR, "#N" with one', () => {
-    expect(prBadgeLabel(undefined)).toBeUndefined();
+    expect(changeRequestBadgeLabel(undefined)).toBeUndefined();
     expect(
-      prBadgeLabel({
+      changeRequestBadgeLabel({
         number: 42,
         title: 't',
         url: 'u',
@@ -169,7 +169,7 @@ describe('parentOf / childOf — navigation', () => {
   });
 
   // "Wrap-around at the ends": this implementation's chosen behaviour (no cyclic wrap) is that
-  // navigation simply STOPS at either end — going up from a root returns the base name itself
+  // navigation STOPS at either end — going up from a root returns the base name itself
   // (still a real, navigable ref), and going up from there, or down from a leaf, answers
   // undefined rather than looping back to the opposite end of the stack.
   test('parentOf at the very top of a walk (the base itself) answers undefined — the base is not a stack member', () => {

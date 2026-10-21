@@ -30,7 +30,7 @@ export type TokenChangeListener = (tokens: TokenMap) => void;
 
 /** Which real CSS property a length token's probe is measured through — `height` for the two row
  *  tokens (read via `getBoundingClientRect`, since a box's rendered height is what SlickGrid's
- *  `rowHeight` option actually needs), `font-size` for the type-scale token (read via
+ *  `rowHeight` option needs), `font-size` for the type-scale token (read via
  *  `getComputedStyle`, which resolves a standard property's own `calc()` with no layout needed). */
 const PROBE_PROPERTY: Readonly<Record<LengthToken, 'height' | 'fontSize'>> = {
   '--kira-graph-row-h': 'height',
@@ -43,7 +43,8 @@ interface LengthProbe {
   read(): string;
 }
 
-/** Tokens are all `:root`-scoped (`theme/git.css`; no component overrides one locally), so a probe resolves correctly wherever it is mounted — `document.body`
+/** Tokens are all `:root`-scoped (`theme/git.css`; no component overrides one locally), so a probe
+ *  resolves correctly wherever it is mounted — `document.body`
  *  is used rather than a reader's own `#target` so this never depends on `#target` being a
  *  connected, renderable node (a test double passed to the constructor is not required to be
  *  one). `undefined` outside a real browser (bun's own test environment has no `document` —
@@ -114,7 +115,7 @@ export class TokenReader {
 
   /**
    * Watches for a live token change. Only notifies listeners when a tracked token's *value*
-   * actually moved (P4 W13's own discovery): `CommitGrid.vue`'s one listener does a full
+   * moved: `CommitGrid.vue`'s one listener does a full
    * `invalidateAllRows()` + `render()`, correct when `--kira-graph-row-h` genuinely changed but
    * wasted work on every other class/style mutation a theme switch also makes. A colour-only theme
    * switch re-renders nothing in JavaScript: the SVGs recolour through the CSS cascade.

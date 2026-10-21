@@ -65,10 +65,10 @@ interface SearchStats {
   incomplete: boolean;
 }
 
-// P41: `sets` (the checkbox filter, P28) and `keyBrowser` (whether database/bucket rows are leaves
-// here, D7) are both per-connection facts computed once in searchResult below and threaded through
-// unchanged — bundled together rather than as a further positional parameter, since buildRows/
-// buildNodeRow already took six/seven of those each.
+// `sets` (the checkbox filter) and `keyBrowser` (whether database/bucket rows are leaves here) are
+// both per-connection facts computed once in searchResult below and threaded through unchanged —
+// bundled together rather than as a further positional parameter, since buildRows/buildNodeRow
+// already took six/seven of those each.
 interface ConnectionView {
   sets: VisibilitySets;
   keyBrowser: boolean;
@@ -104,16 +104,16 @@ export const useFiltersDialogStore = defineStore('filtersDialog', () => {
 export const useTreeStore = defineStore('tree', () => {
   // key: `${connectionId}|${encodedPath}` — '' encodes the connection's own root.
   //
-  // P2 R1: `children` is nested as its own shallowReactive rather than the plain object literal it
+  // `children` is nested as its own shallowReactive rather than the plain object literal it
   // used to be. treeState as a whole stays a deep reactive() — expanded/loading are Sets mutated in
   // place (.add()/.delete()/.clear()), which only stay tracked under deep reactivity — but the only
   // two writers of `children` (loadChildren below, dropConnectionState) always replace or delete a
   // whole rowKey entry, never mutate a cached TreeNode's own fields. A big schema or a Redis
   // namespace can cache thousands of TreeNode objects (and their badges arrays) here; deep-wrapping
-  // every one of them in a reactivity Proxy bought nothing no writer ever used. Vue's reactive() get
-  // trap recognizes an already-reactive nested value (via its RAW flag) and returns it as-is instead
-  // of re-wrapping it, so nesting a shallowReactive object inside this outer reactive() works without
-  // double-proxying.
+  // every one of them in a reactivity Proxy bought nothing no writer ever used. Vue's reactive()
+  // get trap recognizes an already-reactive nested value (via its RAW flag) and returns it as-is
+  // instead of re-wrapping it, so nesting a shallowReactive object inside this outer reactive()
+  // works without double-proxying.
   const treeState = reactive({
     children: shallowReactive({} as Record<string, TreeNode[]>),
     expanded: new Set<string>(),
@@ -141,8 +141,8 @@ export const useTreeStore = defineStore('tree', () => {
     );
   }
 
-  // P108 Part 12 F9: bumped by dropConnectionState — a connection-scoped epoch, not a per-key
-  // request token (F11 owns that, separately). A load in flight when the connection is dropped
+  // Bumped by dropConnectionState — a connection-scoped epoch, not a per-key request token.
+  // A load in flight when the connection is dropped
   // (disconnect, delete) must not write its result back afterward: the drop already cleared
   // `children`/`errors` for this connection, and a late write undoes that with nothing left to
   // correct it (a later expand()'s own `if (treeState.children[k]) return` guard would then treat
@@ -152,8 +152,8 @@ export const useTreeStore = defineStore('tree', () => {
     return connectionEpoch.get(connectionId) ?? 0;
   }
 
-  // P108 Part 12 F11: a per-key request token — overlapping loadChildren calls for the same row
-  // (e.g. a Refresh fired while an earlier load for the same path is still in flight) used to have
+  // A per-key request token — overlapping loadChildren calls for the same row (e.g. a Refresh
+  // fired while an earlier load for the same path is still in flight) used to have
   // no sequencing at all: whichever response arrived LAST won, not whichever was issued last, and
   // the FIRST call's own `finally` cleared `loading` the moment it settled even if a later call was
   // still running. Bumped on every call for a key; only the call still holding the latest token may
@@ -177,9 +177,9 @@ export const useTreeStore = defineStore('tree', () => {
     try {
       const result = await control.treeChildren(connectionId, path, refresh);
       if (connectionEpochFor(connectionId) !== epoch || !isLatestLoadToken(k, token)) return;
-      // P43 iter2 D23: `result.truncated` is deliberately unread here — no level the project tree
+      // `result.truncated` is deliberately unread here — no level the project tree
       // ever renders can truncate (every SQL/Mongo/Kafka/SQS catalog enumerates a bounded
-      // set in one round trip, and Redis/S3 stop expanding at the database/bucket, P41 D5). Only
+      // set in one round trip, and Redis/S3 stop expanding at the database/bucket). Only
       // views/browse/state.ts's own levels can, and it's the only place that shows the strip.
       treeState.children[k] = result.nodes;
     } catch (err) {
@@ -190,11 +190,11 @@ export const useTreeStore = defineStore('tree', () => {
     }
   }
 
-  // P108 Part 12 F11: single-flight (a plain presence check let two concurrent expand()s for
-  // different paths under the same not-yet-loaded connection both issue filtersList) and generation-
-  // guarded — saveVisibility bumps `visibilityGeneration` on every explicit save, so a filtersList
-  // read already in flight when the user saves new visibility settings discards its now-stale
-  // result on resolve instead of overwriting the save.
+  // Single-flight (a plain presence check let two concurrent expand()s for
+  // different paths under the same not-yet-loaded connection both issue filtersList) and
+  // generation-guarded — saveVisibility bumps `visibilityGeneration` on every explicit save, so a
+  // filtersList read already in flight when the user saves new visibility settings discards its
+  // now-stale result on resolve instead of overwriting the save.
   const pendingVisibilityLoads = new Map<string, Promise<void>>();
   const visibilityGeneration = new Map<string, number>();
   function visibilityGenerationFor(connectionId: string): number {
@@ -226,15 +226,15 @@ export const useTreeStore = defineStore('tree', () => {
     treeState.visibility[connectionId] = await control.filtersReplace(connectionId, visibility);
   }
 
-  // D25: skips the round trip when treeState.children[k] is already populated. This is not the
+  // Skips the round trip when treeState.children[k] is already populated. This is not the
   // "being clever about whether main's L1 cache would be a hit" the comment used to warn against —
   // it decides nothing of the sort. It returns data the renderer already holds and is already
   // rendering. The tree's copy has exactly two real invalidation sources and both still run:
   // onConnectionMetadataInvalidated -> refreshExpanded (`initTreeSync` below, which passes
   // refresh: true and so bypasses this early return) and an explicit context-menu refresh. A
-  // collapse never discards treeState.children[k], so re-expanding it was already a pure re-render
-  // — this just makes that true in code, which is what the §2.1 tree-expand budget assumes.
-  // P108 Part 12 F10: bumped by collapse() for the same row key — expand()'s own connect/
+  // collapse never discards treeState.children[k], so re-expanding it was already a pure
+  // re-render — this makes that true in code.
+  // Bumped by collapse() for the same row key — expand()'s own connect/
   // loadVisibility awaits capture this before either, and re-check it right before
   // `expanded.add(k)`. A collapse that lands while a connect triggered by this same expand() is
   // still pending must stick: without the check, expand() re-added the row to `expanded` (and
@@ -284,7 +284,7 @@ export const useTreeStore = defineStore('tree', () => {
     treeState.expanded.delete(k);
   }
 
-  // P19 D4: a group row is a pure view over its parent's already-fetched children — there is no
+  // A group row is a pure view over its parent's already-fetched children — there is no
   // adapter path for it, so toggling flips treeState.expanded directly rather than going through
   // expand()/collapse(), which would connect the connection and issue an IPC call for a synthetic
   // path no adapter has ever heard of.
@@ -294,11 +294,11 @@ export const useTreeStore = defineStore('tree', () => {
     else treeState.expanded.add(k);
   }
 
-  // refresh means "drop this row's whole cached entry, then read again" (P24 D7) — a container's
+  // refresh means "drop this row's whole cached entry, then read again" — a container's
   // Refresh, a connection root's Refresh, and a group's own Refresh (which targets its *parent*
-  // path, P19 D2). treeInvalidate drops all four kinds sharing the row (F8: a plain refresh:true
+  // path). treeInvalidate drops all four kinds sharing the row (a plain refresh:true
   // only ever replaced 'children', leaving describe/definition/columns for the same path stale);
-  // dropSchemaColumns clears the console-facing copy of 'columns' (F11); loadChildren's own
+  // dropSchemaColumns clears the console-facing copy of 'columns'; loadChildren's own
   // refresh:false is now a guaranteed miss, since the row was just dropped.
   // A disconnect that lands during the invalidate await drops the connection's state and bumps the
   // epoch; loadChildren would then capture the new epoch and write children for a dropped
@@ -313,7 +313,7 @@ export const useTreeStore = defineStore('tree', () => {
   }
 
   // A connection row's own Refresh, and *Refresh all* (via refreshAllConnections below): drops
-  // every row for the whole connection (P24 D7's `path` omitted), then re-reads exactly the
+  // every row for the whole connection (the `path` omitted), then re-reads exactly the
   // expanded set — the same lazy, per-path re-fetch a reconnect's invalidation push already
   // produces, so this and a reconnect never disagree about what "refreshed" means.
   async function refreshConnection(connectionId: string): Promise<void> {
@@ -324,13 +324,13 @@ export const useTreeStore = defineStore('tree', () => {
     await refreshExpanded(connectionId);
   }
 
-  // D11's handler: re-fetches every currently-expanded path for the reconnected connection,
+  // The handler: re-fetches every currently-expanded path for the reconnected connection,
   // breadth-first, sequentially — never fans out N parallel engine calls on one client. An
-  // expanded group's synthetic '#'-path is skipped (P19 D2/D4): it has no adapter path of its own,
+  // expanded group's synthetic '#'-path is skipped: it has no adapter path of its own,
   // and its members are already covered by re-fetching its real parent — issuing a `treeChildren`
   // call for it would decode as a bogus node name and error for nothing.
   //
-  // P24 D9: passes refresh:false, not true — every row this walks is already either freshly
+  // Passes refresh:false, not true — every row this walks is already either freshly
   // invalidated (refreshConnection, just above) or stale under the new connection epoch
   // (tree.Service's own freshness rule, reached via the reconnect push), so refresh:false already
   // reaches the server; refresh:true on top would force a re-fetch of a path a *sibling window* may
@@ -347,9 +347,9 @@ export const useTreeStore = defineStore('tree', () => {
     }
   }
 
-  // A leaf's own Refresh (a relation, a Mongo collection — P24 D8): drops the object's whole row
+  // A leaf's own Refresh (a relation, a Mongo collection): drops the object's whole row
   // (describe/definition/the junk `children` a leaf never has) and reloads any open tab on it,
-  // rather than calling Children on a path every adapter answers with an empty list for (F10). No
+  // rather than calling Children on a path every adapter answers with an empty list. No
   // tree call for the leaf itself — the next data/definition tab open re-runs describe/definition,
   // and no op-log row is written for work that would only ever return [].
   async function refreshObject(connectionId: string, path: string): Promise<void> {
@@ -401,7 +401,7 @@ export const useTreeStore = defineStore('tree', () => {
     }
   }
 
-  // D6: purges every collection this module keys by connection identity. Driven off
+  // Purges every collection this module keys by connection identity. Driven off
   // onConnectionsChanged (below) rather than off deleteConnection() directly, so every deletion
   // path is covered — the context menu, a direct IPC call, a future bulk delete — the same
   // reasoning state/connections.ts:44-50 records for that channel.
@@ -464,7 +464,7 @@ export const useTreeStore = defineStore('tree', () => {
       }
     });
 
-    // P5 D6/F9: a disconnected connection's tree copy is neither authoritative nor reused — L1
+    // A disconnected connection's tree copy is neither authoritative nor reused — L1
     // metadata is persisted server-side and refreshed on every reconnect regardless
     // (docs/ARCHITECTURE.md's Caching section) — so it is released the same way a deleted
     // connection's is (dropConnectionState, unchanged), just on a different signal. Reached through
@@ -541,7 +541,7 @@ export const useTreeStore = defineStore('tree', () => {
       error: treeState.errors[k],
       matched: query ? selfMatches : undefined,
     });
-    // A10/P21 round 1: Array.prototype.push(...arr) spreads into the argument list — engines cap
+    // Array.prototype.push(...arr) spreads into the argument list — engines cap
     // that in the ~65k-125k range and throw RangeError past it. searchResult accumulates across
     // every connection and expanded level, so this is a hard failure on a large enough expansion,
     // not a slow path.
@@ -549,8 +549,8 @@ export const useTreeStore = defineStore('tree', () => {
     return selfMatches || descendantMatch;
   }
 
-  // Split out of buildRows (P99: nesting one level deeper inside the store body pushed biome's
-  // cognitive-complexity score over the ceiling with zero logic change) — one P19 D2 group folder's
+  // Split out of buildRows (nesting one level deeper inside the store body pushed biome's
+  // cognitive-complexity score over the ceiling with zero logic change) — one group folder's
   // own row plus its members, appended to `out` when it (or a member) matches. Returns whether this
   // group matched, the same contract buildRows' own inlined loop body had.
   function buildGroupRow(
@@ -638,13 +638,13 @@ export const useTreeStore = defineStore('tree', () => {
   // why a row is even showing as matched.
   const activeSearchQuery = computed(() => debouncedQuery.value.trim().toLowerCase());
 
-  // P94 pass 3 §4.3/§6 item 3: one connection's own row plus its (possibly search-filtered)
-  // expanded children — moved out of searchResult's own computed body, but every reactive read
-  // inside it (useConnectionsStore().states, treeState.expanded/children/visibility/loading/errors)
-  // still runs inside searchResult's dependency tracking, because searchResult calls this
-  // SYNCHRONOUSLY, from inside its own computed callback (below) — never hoisted out or memoized
-  // separately. `null` means this connection is filtered out entirely (a search query matched
-  // neither its own name nor anything under it).
+  // One connection's own row plus its (possibly search-filtered) expanded children — every reactive
+  // read inside it (useConnectionsStore().states,
+  // treeState.expanded/children/visibility/loading/errors) still runs inside searchResult's
+  // dependency tracking, because searchResult calls this SYNCHRONOUSLY, from inside its own
+  // computed callback (below) — never hoisted out or memoized separately. `null` means this
+  // connection is filtered out entirely (a search query matched neither its own name nor anything
+  // under it).
   function connectionRow(
     conn: ConnectionSummary,
     query: string,

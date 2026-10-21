@@ -1,0 +1,46 @@
+{
+  "AgentService.Info": {
+    "command": "claude",
+    "defaultModel": "sonnet",
+    "headlessLabel": "claude -p",
+    "hooks": true,
+    "id": "claude",
+    "label": "Claude",
+    "models": [
+      {
+        "id": "haiku",
+        "label": "Haiku"
+      },
+      {
+        "id": "sonnet",
+        "label": "Sonnet"
+      },
+      {
+        "id": "opus",
+        "label": "Opus"
+      }
+    ],
+    "productLabel": "Claude Code",
+    "usage": true
+  },
+  "AgentService.Info#fake": {
+    "command": "kira-fake-agent",
+    "defaultModel": "fast",
+    "headlessLabel": "kira-fake-agent headless",
+    "hooks": false,
+    "id": "fake",
+    "label": "Fake agent",
+    "models": [
+      {
+        "id": "fast",
+        "label": "fast"
+      },
+      {
+        "id": "deep",
+        "label": "deep"
+      }
+    ],
+    "productLabel": "Fake agent",
+    "usage": false
+  }
+}

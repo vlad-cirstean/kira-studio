@@ -11,14 +11,15 @@ export async function bootstrapConsole(opts: { control?: boolean } = {}) {
   const { data } = await import('../../../frontend/src/bridge/data');
   restoreAfterEach(data);
 
-  // P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+  // createTabsStore's saveIfChanged now serialises every save through one
   // persistent chain (enqueueSave) instead of firing an independent, uninspected promise per call —
   // correct for real IPC, which always eventually settles, but every console-*.spec.ts here shares
   // ONE tabsStore singleton across the whole tests/unit run (Pinia + this module's own shared
-  // `pinia`), and opening a console tab below fires a real, un-mocked control.tabsSave whose generic
-  // Call() stub (wailsRuntime.ts) deliberately never settles for a call nobody here awaits. Before
-  // this fix, that was harmless — an independent, forgotten promise. Now it would permanently wedge
-  // the shared chain, starving every later spec's own tabsSave assertions for the rest of the run.
+  // `pinia`), and opening a console tab below fires a real, un-mocked control.tabsSave whose
+  // generic Call() stub (wailsRuntime.ts) deliberately never settles for a call nobody here awaits.
+  // Before this fix, that was harmless — an independent, forgotten promise. Now it would
+  // permanently wedge the shared chain, starving every later spec's own tabsSave assertions for the
+  // rest of the run.
   // The benign override is set *before* restoreAfterEach snapshots control, not in beforeEach: the
   // enqueued save this triggers can settle on a tick past this file's own afterEach (confirmed via
   // stream-count-honors-filter.spec.ts's identical hazard — only reproduces with ~90+ other spec

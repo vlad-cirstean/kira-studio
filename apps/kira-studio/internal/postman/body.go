@@ -1,4 +1,4 @@
-// body.go is P4 D7's translation table, both directions. It exists because this app's body-mode
+// body.go is the translation table, both directions. It exists because this app's body-mode
 // vocabulary is not Postman's: Postman has one `raw` mode with an `options.raw.language` sub-field
 // covering Text/JavaScript/JSON/HTML/XML plus a `graphql` mode; this app has
 // none|raw|code|urlencoded|formdata|file where `raw` is plain text only, `code` owns the other
@@ -13,7 +13,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// P4 D17: a map[string]bool literal, read as plain text by
+// A map[string]bool literal, read as plain text by
 // tests/unit/go-ts-vocabulary-parity.spec.ts against CODE_LANGUAGES (http.ts) — do not turn this
 // into a switch or derive it from another table. If a fifth language is ever added on the
 // TypeScript side, the importer would otherwise silently stop recognising it (importing that
@@ -99,11 +99,11 @@ func importBody(raw json.RawMessage, rep *Report) savedBody {
 		out.BinaryFile = importFileBody(obj["file"], rep)
 		return out
 	case "graphql":
-		// D7's GraphQL decision: import as code·json carrying the GraphQL-over-HTTP envelope this
-		// app would actually have sent, so the imported request stays runnable. The round trip
-		// stays lossless while it is untouched (D6 re-emits mode:'graphql' verbatim); the moment
-		// the user edits that body it stops being a GraphQL body and exports as raw + json, which
-		// is honest — an app with no GraphQL mode cannot claim to have edited a GraphQL body.
+		// Import as code·json carrying the GraphQL-over-HTTP envelope this app would have sent, so
+		// the imported request stays runnable. The round trip stays lossless while it is untouched
+		// (re-emits mode:'graphql' verbatim); the moment the user edits that body it stops being a
+		// GraphQL body and exports as raw + json, which is honest — an app with no GraphQL mode
+		// cannot claim to have edited a GraphQL body.
 		out.BodyMode, out.CodeLanguage = "code", "json"
 		out.Code = graphqlEnvelope(obj["graphql"])
 		if rep != nil {
@@ -130,8 +130,8 @@ func rawLanguage(raw json.RawMessage) string {
 }
 
 // importKeyValueRows decodes a Postman key/value array — the shared row shape a url-encoded body
-// row and a header row both use (name/value/disabled/description) — into SavedHeader values (P113
-// G13). SavedHeader and SavedField have identical fields, so a caller wanting SavedField converts
+// row and a header row both use (name/value/disabled/description) — into SavedHeader values.
+// SavedHeader and SavedField have identical fields, so a caller wanting SavedField converts
 // each row with a plain Go struct conversion.
 func importKeyValueRows(raw json.RawMessage) []model.SavedHeader {
 	out := []model.SavedHeader{}
@@ -186,7 +186,7 @@ func importFormData(raw json.RawMessage, rep *Report) []model.SavedFormField {
 			paths = []string{""}
 		}
 		for _, path := range paths {
-			// F5/P21 round 1 finding 3: an imported src is attacker-controlled input, not a path
+			// An imported src is attacker-controlled input, not a path
 			// this app resolved itself — a collection can be shared or handed over by anyone, and
 			// the schema itself calls src a *name*, not a path. Carrying it straight into a live,
 			// sendable Path would let a crafted collection name an arbitrary local file (an SSH
@@ -228,7 +228,7 @@ func fileSources(raw json.RawMessage) []string {
 	return out
 }
 
-// importFileBody handles the `file` mode. F5: the schema calls `src` a *name, not a path*, so
+// importFileBody handles the `file` mode. The schema calls `src` a *name, not a path*, so
 // treating it as one is optimistic by design and reported. A null src with only inline `content`
 // writes no temp file — that would put an app-created file on disk with no owner, no lifetime and
 // no cleanup story — the content is preserved in origin and reported as unresolvable.
@@ -257,7 +257,7 @@ func importFileBody(raw json.RawMessage, rep *Report) *model.SavedFile {
 // graphqlEnvelope builds `{"query":…,"variables":…,"operationName":…}` — byte-for-byte what this
 // app's own GraphQL serializer built before GraphQL was removed, and what Content-Type:
 // application/json plus a GraphQL-over-HTTP endpoint expects. The schema types `graphql` as a bare
-// object and nothing more (F3), so `variables` is handled in both the shapes anyone has described:
+// object and nothing more, so `variables` is handled in both the shapes anyone has described:
 // an object is carried through, a string is parsed as JSON when valid and carried as a JSON string
 // otherwise.
 func graphqlEnvelope(raw json.RawMessage) string {
@@ -351,7 +351,7 @@ func buildBody(b savedBody) json.RawMessage {
 			row := map[string]any{"key": f.Name}
 			if f.Kind == "file" {
 				row["type"] = "file"
-				// P21 round 3 finding 9: f.Path is a real absolute local filesystem path this app
+				// f.Path is a real absolute local filesystem path this app
 				// resolved (FilesService.ChooseOpen) — export is a share artefact, and writing it
 				// out verbatim disclosed the OS username, directory layout and often a client or
 				// project name to whoever received the file. Import already refuses to trust a

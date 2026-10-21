@@ -17,12 +17,12 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 )
 
-// TestOpTable_EveryEntryStatesAnUndoPolicy is D6's own Go stand-in for upstream's TypeScript
+// TestOpTable_EveryEntryStatesAnUndoPolicy is the Go stand-in for upstream's TypeScript
 // mapped type (UNDO_POLICY: {[K in OpRequest["kind"]]: UndoPolicy}), which fails tsc when a new
 // operation kind is added without a corresponding undo policy. Go has no such compiler check, so
 // this test is what stands in its place: every opTable entry's Undo.Kind must be one of the two
 // legal values, and every notUndoable entry must carry a real, non-empty reason (never a
-// placeholder — §7.12's "we never present an undo we cannot honour").
+// placeholder — "we never present an undo we cannot honour").
 func TestOpTable_EveryEntryStatesAnUndoPolicy(t *testing.T) {
 	t.Parallel()
 	if len(opTable) != 22 {
@@ -128,7 +128,7 @@ func initStashConflictRepo(t *testing.T) (dir string) {
 	return dir
 }
 
-// TestRunOp_StashPopConflict_Reclassifies is §3.9/D11's own new test: a real conflicting `stash
+// TestRunOp_StashPopConflict_Reclassifies is the new test: a real conflicting `stash
 // pop` — exit code non-zero, stderr EMPTY (probe 5) — must reclassify to StashConflict, never fall
 // through to ClassifyOpError's generic "Unknown" default. The stash entry must still exist
 // afterward (the stash is ALWAYS kept on a conflicting pop/apply).
@@ -196,10 +196,10 @@ func initAutoStashRepo(t *testing.T) (dir string) {
 	return dir
 }
 
-// TestPrepareCheckout_AutoStash_DirtyProducesStashThenSwitch is D3's own central proof: a tracked
+// TestPrepareCheckout_AutoStash_DirtyProducesStashThenSwitch is the central proof: a tracked
 // dirty file that the target checkout would rewrite produces EXACTLY [stash push, switch] in that
 // order — the argv sequence that lets RunOp's single e.Repo.Write chain never leave a window where
-// the tree is stashed and the switch never happened (F6).
+// the tree is stashed and the switch never happened.
 func TestPrepareCheckout_AutoStash_DirtyProducesStashThenSwitch(t *testing.T) {
 	t.Parallel()
 	skipWithoutGitQueries(t)
@@ -330,9 +330,9 @@ func TestPrepareCheckout_AutoStash_BothFlagsRefusedWithZeroSpawns(t *testing.T) 
 	}
 }
 
-// TestPrepareCheckout_AutoStash_InProgressRefusesWithNoArgv is D3 step 2/F15's own proof: an
+// TestPrepareCheckout_AutoStash_InProgressRefusesWithNoArgv is the proof: an
 // in-progress operation refuses (host-side, re-checked fresh) before any WRITE argv is built —
-// probe P17's own reason: `stash push` mid-conflict fails with EMPTY stderr, which
+// the reason: `stash push` mid-conflict fails with EMPTY stderr, which
 // ClassifyOpError could only ever call Unknown.
 func TestPrepareCheckout_AutoStash_InProgressRefusesWithNoArgv(t *testing.T) {
 	t.Parallel()
@@ -355,8 +355,8 @@ func TestPrepareCheckout_AutoStash_InProgressRefusesWithNoArgv(t *testing.T) {
 	}
 }
 
-// TestRunOp_AutoStash_DoesNotPopBack is D1's own end-to-end proof, the single most important
-// semantic decision in this phase: after an auto-stashed switch, the stash entry is STILL in the
+// TestRunOp_AutoStash_DoesNotPopBack is the end-to-end proof, the single most important
+// semantic decision: after an auto-stashed switch, the stash entry is STILL in the
 // list (never popped), tagged with the ORIGIN branch (main), and the working tree is clean on the
 // new branch.
 func TestRunOp_AutoStash_DoesNotPopBack(t *testing.T) {
@@ -608,7 +608,7 @@ func TestRunOp_GlobalStashRemove_UndoReplaysExactlyOneUpdateRef(t *testing.T) {
 	}
 }
 
-// TestUndoRun_InvalidatesRefsCache is G30 round-1 functional-correctness review, finding #5:
+// TestUndoRun_InvalidatesRefsCache:
 // UndoRun had no equivalent of RunOp's own `defer e.invalidateAfterWrite()`, so a real write
 // UndoRun makes (here, branchDelete's own undo — an update-ref recreating the branch) left the
 // shared refs cache stale. Warms the cache to a DEFINITE "branch absent" value after the delete
@@ -676,8 +676,8 @@ func TestUndoRun_InvalidatesRefsCache(t *testing.T) {
 	}
 }
 
-// TestCaptureBranchDeleteUndo_PipeInBranchNameDoesNotOverCaptureUnrelatedConfig is G32 round-3
-// architecture/security review, finding #3's own regression proof. gitops.BranchConfigRegexpArgs
+// TestCaptureBranchDeleteUndo_PipeInBranchNameDoesNotOverCaptureUnrelatedConfig is the regression
+// proof. gitops.BranchConfigRegexpArgs
 // used to splice the branch name straight into a POSIX ERE unescaped; "|" is a legal git branch-
 // name character (check-ref-format forbids space/~/^/:/?/*/[/\/".."/"@{", but not "|"), and ERE
 // gives "|" the LOWEST precedence of any operator — `^branch\.x|y\.` parses as "starts with
@@ -723,7 +723,7 @@ func TestCaptureBranchDeleteUndo_PipeInBranchNameDoesNotOverCaptureUnrelatedConf
 	}
 }
 
-// TestRunOp_GlobalStashSave_PromoteExistingStackEntry_PreservesOriginBranch is D10 step 3's own
+// TestRunOp_GlobalStashSave_PromoteExistingStackEntry_PreservesOriginBranch is the
 // proof: promoting an existing STACK entry into the bucket keeps the source in the stack
 // (copy-never-drop) and preserves its own origin-branch tag under the NEW label, rather than
 // re-stamping it with whatever branch is checked out now.
@@ -786,13 +786,13 @@ func TestRunOp_GlobalStashSave_PromoteExistingStackEntry_PreservesOriginBranch(t
 }
 
 // resetLabelPattern mirrors packages/git-ui/src/state/liveAnnouncements.ts's own
-// RESET_UNDO_LABEL_PATTERN verbatim (F9) — a wire contract in disguise: composeUndoTooltip
+// RESET_UNDO_LABEL_PATTERN verbatim — a wire contract in disguise: composeUndoTooltip
 // pattern-matches the undo slot's own label to pick a mode-specific tooltip, so the Go label must
 // be byte-identical to this shape.
 var resetLabelPattern = regexp.MustCompile(`^Reset \((soft|mixed|hard)\) to `)
 
-// TestPrepareReset_LabelMatchesTheWebviewPattern is §3.9/F9's own guard: composeUndoTooltip's
-// RESET_UNDO_LABEL_PATTERN is unguarded on both sides today (F9's own finding) — this test is the
+// TestPrepareReset_LabelMatchesTheWebviewPattern is the guard: composeUndoTooltip's
+// RESET_UNDO_LABEL_PATTERN is unguarded on both sides today — this test is the
 // Go-side half. Calls prepareReset directly (this file is `package gitsession`, not `_test`) for
 // each of the three modes, resetting to an ancestor of a clean HEAD so no mode ever needs a
 // confirmToken.
@@ -877,11 +877,11 @@ func initMidMergeRepo(t *testing.T) (dir string) {
 	return dir
 }
 
-// TestRunOp_ResetMidMerge_IsRefused is §3.10/D8's own proof: P10 probe 3 found git itself does NOT
-// refuse a --mixed/--hard reset mid-merge — it silently succeeds and abandons MERGE_HEAD — so
-// prepareReset's own host-side gate is the ONLY thing standing between a user and that data loss.
-// Asserting MERGE_HEAD survives the refusal is the proof the gate actually works, not merely that
-// an error came back.
+// TestRunOp_ResetMidMerge_IsRefused is the proof: git itself does NOT refuse a --mixed/--hard
+// reset mid-merge — it silently succeeds and abandons MERGE_HEAD — so prepareReset's own
+// host-side gate is the ONLY thing standing between a user and that data loss. Asserting
+// MERGE_HEAD survives the refusal is the proof the gate works, not merely that an error came
+// back.
 func TestRunOp_ResetMidMerge_IsRefused(t *testing.T) {
 	t.Parallel()
 	skipWithoutGitQueries(t)
@@ -912,7 +912,7 @@ func TestRunOp_ResetMidMerge_IsRefused(t *testing.T) {
 
 // initEmptyCherryPickRepo builds a repo where cherry-picking "topic"'s own commit onto "main"
 // produces literally no change: both branches apply the identical edit to the same base,
-// independently. Probe 6: this exits non-zero, leaves CHERRY_PICK_HEAD set, a clean worktree and
+// independently. This exits non-zero, leaves CHERRY_PICK_HEAD set, a clean worktree and
 // zero unmerged paths — the exact state reclassifyCherryPick must recognise.
 func initEmptyCherryPickRepo(t *testing.T) (dir, topicSha string) {
 	t.Helper()
@@ -941,8 +941,8 @@ func initEmptyCherryPickRepo(t *testing.T) (dir, topicSha string) {
 	return dir, topicSha
 }
 
-// TestRunOp_EmptyCherryPick_Reclassifies is §3.10/F6's own proof: an empty pick's stderr-only
-// classification could only ever say Unknown (probe 6: the real message goes to a stream
+// TestRunOp_EmptyCherryPick_Reclassifies is the proof: an empty pick's stderr-only
+// classification could only ever say Unknown (the real message goes to a stream
 // ClassifyOpError's table has no row for), so reclassifyCherryPick's exit-code-plus-read-back
 // detection is what turns it into a real EmptyCherryPick — with CHERRY_PICK_HEAD still set
 // afterward, exactly as the banner's own Continue/Skip choice needs.
@@ -972,7 +972,7 @@ func TestRunOp_EmptyCherryPick_Reclassifies(t *testing.T) {
 
 // failOnArgsRunner wraps a real Runner, injecting a spawn failure for the first argv whose own
 // args[0] matches failOn — every other command (including the OTHER argv in a multi-argv op)
-// reaches the real runner untouched. F9's own regression proof needs exactly one argv in a
+// reaches the real runner untouched. The regression proof needs exactly one argv in a
 // multi-write op to fail with a genuine Go-level error (not a classified non-zero exit), after an
 // earlier argv in the same op already wrote for real.
 type failOnArgsRunner struct {
@@ -987,7 +987,7 @@ func (r failOnArgsRunner) Start(ctx context.Context, gitPath string, spec gitcli
 	return r.Runner.Start(ctx, gitPath, spec)
 }
 
-// TestRunOp_UndoClearedBeforeSecondArgvFails is F9's own regression proof (P108 Part 16 review):
+// TestRunOp_UndoClearedBeforeSecondArgvFails is the regression proof:
 // a stale undo record (from an EARLIER, unrelated successful op) used to survive a LATER op whose
 // own second argv fails with a genuine Go-level error after its first argv already wrote for
 // real — RunOp returned early on that werr, skipping the end-of-function e.undo.Set(record) call

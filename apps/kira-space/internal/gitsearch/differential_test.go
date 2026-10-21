@@ -12,24 +12,23 @@ import (
 	"testing"
 )
 
-// G23 D10: an opt-in differential fuzz test guarding what the hand-written conformance corpus
-// (D9) cannot -- that the Go and JS regex-mode matchers agree over a wide, randomly generated
-// surface, not just the specific rows this phase's own author thought to write down. Gated on
-// KIRA_GIT_DIFFERENTIAL=1 and skipped under testing.Short() (G3 D22's own posture): CI does not
-// need `bun` on every run, but a phase touching gitsearch's dialect must run this once, green,
-// before it ships (§7.1 item 3).
+// An opt-in differential fuzz test guarding what the hand-written conformance corpus cannot --
+// that the Go and JS regex-mode matchers agree over a wide, randomly generated surface, not just
+// the specific rows this phase's own author thought to write down. Gated on
+// KIRA_GIT_DIFFERENTIAL=1 and skipped under testing.Short(): CI does not need `bun` on every run,
+// but a phase touching gitsearch's dialect must run this once, green, before it ships.
 
 const diffPatternCount = 500
 const diffSubjectCount = 200
 
-// diffAtoms is the small grammar D10 asks for: plain words and punctuation (literal-shaped
+// diffAtoms is the small grammar: plain words and punctuation (literal-shaped
 // fragments), simple regex atoms (classes, quantifiers, alternation groups) and, deliberately,
 // every construct dialect.go's own rewrite table names (., \s, \S, \p, \P, \uXXXX, \u{H+}, \cA,
 // \0, an unknown identity escape \q) plus the four ASCII classes and anchors. Every atom is a
 // self-contained, independently valid regex fragment (no orphan quantifier, no unbalanced group
 // or class), so concatenating any sequence of them is always syntactically valid in both
 // dialects -- and, deliberately, NONE of them can ever form a lookaround or a backreference
-// (Compile's own ErrUnsupportedPattern path is covered by the hand-written corpus, D9, not this
+// (Compile's own ErrUnsupportedPattern path is covered by the hand-written corpus, not this
 // fuzz test).
 var diffAtoms = []string{
 	"foo", "bar", "widget", "Zebra", "node", "modules", "v1", "tag", "test123", "#42",
@@ -48,7 +47,7 @@ var diffWords = []string{
 // diffSeparators deliberately includes the exact characters the dialect rewrite table treats
 // specially -- NBSP (JS \s, not RE2's native \s), the two JS-only line terminators (U+2028/2029,
 // which JS's `.` excludes and RE2's does not natively), a CR, a tab -- so the generated subjects
-// actually exercise the rewritten classes rather than staying plain ASCII throughout.
+// exercise the rewritten classes rather than staying plain ASCII throughout.
 var diffSeparators = []string{" ", "\t", "\n", "\r", " ", " ", " ", "-", "_", ".", "#", ""}
 
 func generateDifferentialPattern(r *rand.Rand) string {
@@ -100,7 +99,7 @@ func hasField(fields []Field, want Field) bool {
 // differentialRunnerPath resolves packages/git-core/src/search/differentialRunner.ts relative to
 // this source file. It lives there, not beside this test, so it can import compileQuery via a
 // plain relative path (`./query.ts`) rather than the `@kira/git-core` package name — a workspace
-// package's own name only resolves from inside a package that actually declares it as a
+// package's own name only resolves from inside a package that declares it as a
 // dependency (its own node_modules/@kira/* symlink), which a Go test's working directory never
 // is.
 func differentialRunnerPath(t *testing.T) string {

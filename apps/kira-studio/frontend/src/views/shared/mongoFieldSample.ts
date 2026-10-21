@@ -1,5 +1,5 @@
-// P18 D9 (candidate lists for DocumentView.vue's filter/SORT boxes), promoted to views/shared/ by
-// P22c D8 alongside a second job: sampling field names for the Mongo *console* too. Both jobs read
+// Candidate lists for DocumentView.vue's filter/SORT boxes, alongside a second job: sampling field
+// names for the Mongo *console* too. Both jobs read
 // the same idea — "field names sampled from documents actually loaded" — but through two different
 // doors: the filter/sort box functions below take an explicit `fieldNames` list a caller already
 // has (DocumentView.vue's own fieldNamesOnPage(tabId), a per-tab read); the console has no page of
@@ -7,10 +7,10 @@
 // store DocumentView.vue pushes into whenever its own page changes, keyed by
 // (connectionId, collectionPath) — never by tabId, so a console opened on the same collection from
 // a different tab still sees it. Mandatory promotion: biome.json forbids views/console/**
-// importing views/documents/** (the same rule P19 D7 promoted clipboardFormats.ts for), and the
+// importing views/documents/** (the same rule clipboardFormats.ts was promoted for), and the
 // console needs exactly this.
 //
-// This is a SAMPLE, not a schema — stated plainly here and in P22c D8: it offers what has been
+// This is a SAMPLE, not a schema — stated plainly here: it offers what has been
 // seen, degrades to nothing when nothing has been loaded, and is never cached server-side (a Mongo
 // collection has no declared field set to cache, adapters/mongo/adapter.go's own Columns: [] for
 // the identical reason).
@@ -40,10 +40,10 @@ function fieldCompletions(fieldNames: readonly string[]): Completion[] {
   }));
 }
 
-/** `fieldNames` deliberately excludes/includes `_id` at the caller's discretion — DocumentView.vue's
- *  own filterCandidates prepends it ("it is always returned regardless of projection ... so it is
- *  never a real projection choice" — correct for the projection picker fieldNamesOnPage was written
- *  for, wrong for a filter box). */
+/** `fieldNames` deliberately excludes/includes `_id` at the caller's discretion —
+ *  DocumentView.vue's own filterCandidates prepends it ("it is always returned regardless of
+ *  projection ... so it is never a real projection choice" — correct for the projection picker
+ *  fieldNamesOnPage was written for, wrong for a filter box). */
 export function mongoFilterCandidates(fieldNames: readonly string[]): Completion[] {
   const operators = MONGO_QUERY_OPERATORS.map((label) => ({
     label,
@@ -69,7 +69,7 @@ export function mongoSortCandidates(fieldNames: readonly string[]): Completion[]
 }
 
 export const useMongoFieldSampleStore = defineStore('mongoFieldSample', () => {
-  // P22c D8: connectionId + the collection's own tree path (e.g. "database:db/collection:widgets")
+  // connectionId + the collection's own tree path (e.g. "database:db/collection:widgets")
   // -> every field name any document tab for that collection has loaded, unioned across tabs.
   // rowKey (project/state/tree.ts) is reused verbatim for the key shape, not because this is tree
   // state, but so the two can never disagree about what "this collection" means. Returned as a

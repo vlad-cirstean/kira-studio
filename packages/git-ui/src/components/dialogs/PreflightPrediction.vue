@@ -1,12 +1,11 @@
 <script setup lang="ts">
 /**
- * P113 F9: the "predicted outcome" block `RevertDialog.vue`/`CherryPickDialog.vue` each render
+ * The "predicted outcome" block `RevertDialog.vue`/`CherryPickDialog.vue` each render
  * identically — clean/conflicts/unknown, plus the `--no-commit` checkbox that only makes sense
  * once a conflict is predicted. Each dialog's own outer `v-if` (whether a blocker or an unpicked
- * mainline choice gates reaching this point at all) stays with the caller — only the prediction
- * fork itself moved here.
+ * mainline choice gates reaching this point at all) stays with the caller.
  *
- * P131 Part 1 §6.2: the raw checkbox is shadcn's Checkbox + Label now.
+ * The raw checkbox is shadcn's Checkbox + Label now.
  */
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Checkbox } from '@theme/components/ui/checkbox';

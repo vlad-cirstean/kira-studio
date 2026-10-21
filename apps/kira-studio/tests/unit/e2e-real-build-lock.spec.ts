@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { acquireBuildLock, isLockStale } from '@workbench/testing/e2eReal';
 
-// F10 (P108 Part 6): acquireBuildLock used to loop forever on EEXIST with no stale-lock recovery
+// acquireBuildLock used to loop forever on EEXIST with no stale-lock recovery
 // — a killed test run left `.e2e-real-build.lock` behind, and the next run hung silently waiting
 // on a lock nobody holds. These exercise isLockStale/acquireBuildLock directly against a throwaway
 // path (both take an optional lockPath, defaulting to the real cross-process lock file) rather
@@ -36,7 +36,7 @@ describe('testing/e2eReal.ts — build lock stale recovery (F10)', () => {
   test('a lock naming a dead pid is stale, even if fresh', async () => {
     await withTempLockDir(async (lockPath) => {
       // PID 1 is init/PID namespace root and never a plain child this test could have spawned;
-      // a genuinely-unused, very high PID is what actually simulates "dead" portably — use a
+      // a genuinely-unused, very high PID is what simulates "dead" portably — use a
       // fixed, implausibly large PID instead, which process.kill(pid, 0) reports ESRCH for on any
       // real machine.
       await writeFile(lockPath, '999999999');

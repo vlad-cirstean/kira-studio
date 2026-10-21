@@ -9,7 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -20,26 +20,11 @@ import (
 // Allowlist says whether a CONNECT target host may be reached.
 type Allowlist func(host string) bool
 
-// ProxyAllowlist is the Claude API host set: anthropic.com, claude.ai and claude.com with their
-// subdomains, the hosts of the base-URL variables, and the cloud providers' suffixes when the
-// matching CLAUDE_CODE_USE_* switch is on.
-func ProxyAllowlist(getenv func(string) string) Allowlist {
-	exact := map[string]bool{}
-	for _, k := range []string{"ANTHROPIC_BASE_URL", "ANTHROPIC_BEDROCK_BASE_URL", "ANTHROPIC_VERTEX_BASE_URL"} {
-		if u, err := url.Parse(getenv(k)); err == nil && u.Hostname() != "" {
-			exact[strings.ToLower(u.Hostname())] = true
-		}
-	}
-	suffixes := []string{"anthropic.com", "claude.ai", "claude.com"}
-	if getenv("CLAUDE_CODE_USE_BEDROCK") == "1" {
-		suffixes = append(suffixes, "amazonaws.com")
-	}
-	if getenv("CLAUDE_CODE_USE_VERTEX") == "1" {
-		suffixes = append(suffixes, "googleapis.com")
-	}
+// HostAllowlist allows the exact hosts and every domain suffix with its subdomains.
+func HostAllowlist(exact, suffixes []string) Allowlist {
 	return func(host string) bool {
 		host = strings.ToLower(host)
-		if exact[host] {
+		if slices.Contains(exact, host) {
 			return true
 		}
 		for _, s := range suffixes {
@@ -56,16 +41,22 @@ type Proxy struct {
 	addr   string
 	srv    *http.Server
 	mu     sync.Mutex
-	tokens map[string]string // token -> run id
+	tokens map[string]proxyRun // token -> run
 }
 
-// StartProxy listens on a loopback port. Upstream is Kira's own HTTPS_PROXY when set.
-func StartProxy(h *hub, allow Allowlist) (*Proxy, error) {
+type proxyRun struct {
+	id    string
+	allow Allowlist
+}
+
+// StartProxy listens on a loopback port. Upstream is Kira's own HTTPS_PROXY when set. Each run
+// registers its own allowlist.
+func StartProxy(h *hub) (*Proxy, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, err
 	}
-	p := &Proxy{addr: ln.Addr().String(), tokens: map[string]string{}}
+	p := &Proxy{addr: ln.Addr().String(), tokens: map[string]proxyRun{}}
 	gp := goproxy.NewProxyHttpServer()
 	gp.Logger = log.New(io.Discard, "", 0)
 	for _, k := range []string{"HTTPS_PROXY", "https_proxy"} {
@@ -79,21 +70,21 @@ func StartProxy(h *hub, allow Allowlist) (*Proxy, error) {
 			ctx.Resp = goproxy.NewResponse(ctx.Req, goproxy.ContentTypeText, http.StatusForbidden, "blocked by the Kira sandbox") //nolint:bodyclose // goproxy writes and closes it
 			return goproxy.RejectConnect, host
 		}
-		runID, ok := p.runFor(ctx.Req.Header.Get("Proxy-Authorization"))
+		run, ok := p.runFor(ctx.Req.Header.Get("Proxy-Authorization"))
 		if !ok {
 			return reject()
 		}
 		name, port, err := net.SplitHostPort(host)
-		if err != nil || port != "443" || !allow(name) {
-			h.emit(runID, Denial{At: time.Now(), Op: "network", Target: host, Process: "proxy"})
+		if err != nil || port != "443" || !run.allow(name) {
+			h.emit(run.id, Denial{At: time.Now(), Op: "network", Target: host, Process: "proxy"})
 			return reject()
 		}
 		return goproxy.OkConnect, host
 	})
 	// Plain HTTP carries no CONNECT, so the allowlist never sees it: refuse every such request.
 	gp.OnRequest().DoFunc(func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-		if runID, ok := p.runFor(req.Header.Get("Proxy-Authorization")); ok {
-			h.emit(runID, Denial{At: time.Now(), Op: "network", Target: req.URL.Host, Process: "proxy"})
+		if run, ok := p.runFor(req.Header.Get("Proxy-Authorization")); ok {
+			h.emit(run.id, Denial{At: time.Now(), Op: "network", Target: req.URL.Host, Process: "proxy"})
 		}
 		return req, goproxy.NewResponse(req, goproxy.ContentTypeText, http.StatusForbidden, "blocked by the Kira sandbox")
 	})
@@ -113,28 +104,28 @@ func (p *Proxy) Port() int {
 }
 
 // Register gives a run its own proxy URL; the token attributes refusals to the run.
-func (p *Proxy) Register(runID string) string {
+func (p *Proxy) Register(runID string, allow Allowlist) string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)
 	tok := hex.EncodeToString(b)
 	p.mu.Lock()
-	p.tokens[tok] = runID
+	p.tokens[tok] = proxyRun{id: runID, allow: allow}
 	p.mu.Unlock()
 	return "http://kira:" + tok + "@" + p.addr
 }
 
-func (p *Proxy) runFor(header string) (string, bool) {
+func (p *Proxy) runFor(header string) (proxyRun, bool) {
 	raw, found := strings.CutPrefix(header, "Basic ")
 	if !found {
-		return "", false
+		return proxyRun{}, false
 	}
 	dec, err := base64.StdEncoding.DecodeString(raw)
 	if err != nil {
-		return "", false
+		return proxyRun{}, false
 	}
 	_, tok, found := strings.Cut(string(dec), ":")
 	if !found {
-		return "", false
+		return proxyRun{}, false
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -143,14 +134,14 @@ func (p *Proxy) runFor(header string) (string, bool) {
 			return run, true
 		}
 	}
-	return "", false
+	return proxyRun{}, false
 }
 
 func (p *Proxy) release(runID string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for t, run := range p.tokens {
-		if run == runID {
+		if run.id == runID {
 			delete(p.tokens, t)
 		}
 	}

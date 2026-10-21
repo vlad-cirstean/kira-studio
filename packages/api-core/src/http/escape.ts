@@ -1,4 +1,4 @@
-// P12 D7/P9 F16: F13/body.go's `url.QueryEscape`, matched byte-for-byte — encodeURIComponent's own
+// body.go's `url.QueryEscape`, matched byte-for-byte — encodeURIComponent's own
 // leftover set (`! * ' ( )`) is smaller than Go's unreserved set, so those five are escaped on top
 // of it; a space becomes '+', matching buildURLEncoded's own both-halves encoding. curl/generate.ts
 // and raw/generate.ts each hand-rolled this identically as a private `goQueryEscape` — living in
@@ -15,7 +15,7 @@ export function goQueryEscapeLiteral(s: string): string {
     .replace(/%20/g, '+');
 }
 
-// Finding 16: url.ts's buildQuery own twin bug — a urlencoded field's name/value can still carry a
+// url.ts's buildQuery own twin bug — a urlencoded field's name/value can still carry a
 // literal `{{name}}` reference (a deferred secret in a Copy-as-curl/Raw export, say), which this
 // used to escape whole into a form neither substitution engine recognises any more. A reference
 // span is left untouched; only the literal spans around it are escaped.

@@ -13,7 +13,7 @@ import (
 )
 
 // StreamChunk is one packed slice of commits plus the envelope metadata graph.stream needs to
-// answer with — gitrpc wraps this directly into the wire's chunk shape (D14). Declared here
+// answer with — gitrpc wraps this directly into the wire's chunk shape. Declared here
 // (not in gitrpc) so gitsession stays free of any wire-format opinion; gitrpc is the layer that
 // knows what JSON this becomes.
 type StreamChunk struct {
@@ -35,11 +35,11 @@ type Walk struct {
 	keepRows int // rows to restore on the next first Stream after a reset
 	pageSize int // the underlying log session's own page size — fixed at construction (D6)
 
-	// precomputedTotal is G6 D9's own seam: a rev-list --count already known for this exact range
+	// precomputedTotal is a rev-list --count already known for this exact range
 	// (from RepoEntry's own range-count slot), threaded into the next resetLocked's
 	// logsession.Options and then consumed (nilled) — only the walk's first open (or the open right
 	// after a reset) benefits; a later reset recounts rather than reusing a stale number. nil for
-	// every graph walk (G3 never sets it).
+	// every graph walk.
 	precomputedTotal *int
 
 	mu    sync.Mutex // serialises every operation on this walk, including Stream's own emit
@@ -58,15 +58,15 @@ type Walk struct {
 	staleRefs    atomic.Bool
 	staleRefresh atomic.Bool
 
-	// searchCancel (G23 D12) cancels this walk's own in-flight search.run scan, if any — the
-	// host-side belt to the client's own abort-on-supersede brace (F8). searchGen distinguishes
+	// searchCancel cancels this walk's own in-flight search.run scan, if any — the
+	// host-side belt to the client's own abort-on-supersede brace. searchGen distinguishes
 	// "my own scan finished, clear the slot" from "a NEWER scan already installed its own cancel
 	// here, leave it alone" — see (*Walk).Search's own doc comment for why a plain nil-check is
 	// not enough.
 	searchCancel context.CancelFunc
 	searchGen    uint64
 
-	// disposed is set once, permanently, by dispose() (F8, P108 Part 16 review): a handler that
+	// disposed is set once, permanently, by dispose(): a handler that
 	// grabbed this *Walk before CloseRepo/a spec-change rebuild disposed it could otherwise still
 	// call ReadPage/Stream/Status/Search after the fact, reopening a fresh logsession and spawning
 	// a brand-new `git log` nothing then closes until the 5-minute idle reclaim — well after the
@@ -238,11 +238,10 @@ func (w *Walk) ReadPage(ctx context.Context, pages int) (started bool, err error
 
 // readPageLocked reads exactly one page from the log session into the store, retrying once
 // (against a freshly reset session) if the reclaimed session's own resume found refs had moved —
-// D10's own "the caller resets and retries" contract. Caller holds mu.
+// the "the caller resets and retries" contract. Caller holds mu.
 //
-// G16 D5: narrowed from (appended int, exhausted bool, err error) — neither caller needs
-// outcome.Exhausted once Stream's emit site reads w.log.Exhausted() directly (see emitRange
-// below), and leaving an ignored return in place invited exactly the bug this phase fixes:
+// Neither caller needs outcome.Exhausted once Stream's emit site reads w.log.Exhausted() directly
+// (see emitRange below), and leaving an ignored return in place invited exactly the bug:
 // trusting a caller-supplied exhaustion flag instead of the walk's own truth.
 func (w *Walk) readPageLocked(ctx context.Context) (appended int, err error) {
 	for attempt := 0; attempt < 2; attempt++ {
@@ -285,13 +284,13 @@ func (w *Walk) readFirstPagesLocked(ctx context.Context, keepRows int) error {
 	return nil
 }
 
-// Stream is D14's own streamGraph transcribed: ensureFresh, clamp resumeThroughRow to the store's
+// Stream is the streamGraph transcribed: ensureFresh, clamp resumeThroughRow to the store's
 // row count, resolve the dictionary base from marks (falling back to row 0/base 0 when the
-// clamped row has no mark — a mark only exists for a row a previous Stream call actually packed
+// clamped row has no mark — a mark only exists for a row a previous Stream call packed
 // up to; a row the store grew past purely via ReadPage/loadMore has none), replay [cursor,
 // cachedThrough) as source:"cache" in chunkRows-sized pieces, read one page from git only when
 // nothing is cached beyond the cursor, then emit the newly-read rows as source:"git". emit runs
-// synchronously while mu is held for the whole call (D13) — a stalled emit blocks every other
+// synchronously while mu is held for the whole call — a stalled emit blocks every other
 // graph.* call this connection makes against this repository until it returns or ctx is done.
 func (w *Walk) Stream(ctx context.Context, resumeThroughRow *int, chunkRows int, emit func(StreamChunk) error) error {
 	w.mu.Lock()
@@ -324,10 +323,10 @@ func (w *Walk) Stream(ctx context.Context, resumeThroughRow *int, chunkRows int,
 		dictBase = 0
 	}
 
-	// G16 D5: emitRange's fourth parameter is `last` — a fact about this chunk's position in the
-	// stream, not a value the caller invents — and the wire's Exhausted flag is derived from the
-	// walk's own truth (w.log.Exhausted()) once, here, at the single point every chunk is built.
-	// F4's bug was exactly a caller (the replay loop, below) inventing a literal `false`.
+	// emitRange's fourth parameter is `last` — a fact about this chunk's position in the stream,
+	// not a value the caller invents — and the wire's Exhausted flag is derived from the walk's
+	// own truth (w.log.Exhausted()) once, here, at the single point every chunk is built.
+	// The bug was exactly a caller (the replay loop, below) inventing a literal `false`.
 	emitRange := func(from, to int, source string, last bool) error {
 		packed := w.store.PackSlice(from, to, dictBase)
 		remaining, err := w.log.Remaining(ctx)
@@ -355,7 +354,7 @@ func (w *Walk) Stream(ctx context.Context, resumeThroughRow *int, chunkRows int,
 		}
 		// A non-empty replay is never followed by a git read in the same call — line ~285's
 		// `cachedThrough > 0` guard sees to it, since a page is read here only on a walk's very
-		// first stream. So the last replayed chunk (to == cachedThrough) really is the stream's
+		// first stream. So the last replayed chunk (to == cachedThrough) is the stream's
 		// terminal chunk whenever this loop runs at all, and w.log.Exhausted() here is the same
 		// answer the git loop below would give.
 		if err := emitRange(cursor, to, "cache", to == cachedThrough); err != nil {
@@ -368,8 +367,8 @@ func (w *Walk) Stream(ctx context.Context, resumeThroughRow *int, chunkRows int,
 		return nil
 	}
 
-	// Upstream's own guard (repoService.ts:1080-1084) and §5.1.1's rule: a page is read here only
-	// on the very first stream for this walk — cachedThrough == 0, nothing cached at all. Every
+	// Upstream's own guard (repoService.ts:1080-1084): a page is read here only on the very first
+	// stream for this walk — cachedThrough == 0, nothing cached at all. Every
 	// later page is an explicit loadMore; without this a re-open of a non-exhausted walk would
 	// silently read a page the caller did not ask for, on top of whatever it already had cached.
 	if cachedThrough > 0 {
@@ -390,7 +389,7 @@ func (w *Walk) Stream(ctx context.Context, resumeThroughRow *int, chunkRows int,
 			cursor = to
 		}
 	}
-	// G16 D5/F7: a zero-chunk re-stream (cursor == cachedThrough and the walk already exhausted,
+	// A zero-chunk re-stream (cursor == cachedThrough and the walk already exhausted,
 	// or a first stream whose page read yields zero records) emits nothing here — no chunk exists
 	// to carry a terminal flag. That hole is closed client-side (graph.status, packages/git-ui's
 	// GraphViewState#runLoad) rather than by inventing an empty terminal chunk, which would collide

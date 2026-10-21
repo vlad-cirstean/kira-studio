@@ -11,25 +11,24 @@ import { type DdlSchema, EMPTY_DDL_SCHEMA, parseDdl } from '../views/console/ddl
 import { sqlKeywordCompletionSource } from '../views/console/sqlKeywordCompletion';
 import { type SqlDialect, sqlDialectFor } from '../views/shared/sqlIdent';
 
-// P18 (v1.1) D2/D4: each connection's own pasted DDL document — app-wide like
+// Each connection's own pasted DDL document — app-wide like
 // connections/settings/layout (docs/ARCHITECTURE.md's UI architecture section), keyed by
-// connectionId. A connection with no saved document simply has no entry, matching D2's "absent
+// connectionId. A connection with no saved document has no entry, matching the "absent
 // until the user writes one" (never an error, never a placeholder row).
 //
-// P99 §5.5: the text itself lives in TanStack Query's cache under this key, not in a reactive —
+// The text itself lives in TanStack Query's cache under this key, not in a reactive —
 // ensureQueryData's own in-flight dedupe replaces the old hand-written pendingLoads map, and its
 // cache replaces the old byConnection. A rejection is not cached, matching the old `finally` evict.
 export function schemaQueryKey(connectionId: string): readonly ['schema', string] {
   return ['schema', connectionId] as const;
 }
 
-// F1: per-connection counter bumped by every authoritative write straight into the schema query
+// Per-connection counter bumped by every authoritative write straight into the schema query
 // cache (saveDdl and applyRemote below, both through commitDdl) — lets schemaQueryOptions's
 // queryFn tell a stale in-flight fetch apart from a fresh one, without falling back to "prefer
-// whatever's cached" (P12 round 2 finding #14's original fix), which made a genuine remote push
-// permanently invisible: applyRemote's invalidateQueries always triggered a refetch, and that
-// refetch's queryFn always re-returned the old cached value, so the cache could never actually
-// move on a remote write.
+// whatever's cached", which made a genuine remote push permanently invisible: applyRemote's
+// invalidateQueries always triggered a refetch, and that refetch's queryFn always re-returned the
+// old cached value, so the cache could never move on a remote write.
 const writeGeneration = new Map<string, number>();
 
 /** Writes `ddl` into the query cache for `connectionId` and bumps its write generation, so a
@@ -105,13 +104,13 @@ export const useSchemaDialogStore = defineStore('schemaDialog', () => {
   return { ...toRefs(dialog), openSchemaDialog, closeSchemaDialog };
 });
 
-// C3's plan comment: memoised per (connectionId, textHash) so a keystroke in the console never
+// Memoised per (connectionId, textHash) so a keystroke in the console never
 // re-parses the DDL — keyed here by the raw text itself rather than a hash, since the whole point
 // is a cheap `===` check against the one string per connection the caller already holds (its own
 // `useQuery`/`ensureDdl` result).
 const parsedCache = new Map<string, { text: string; schema: DdlSchema }>();
 
-/** The parsed DdlSchema for `connectionId`'s current DDL `text`, empty when there is none (D5) or
+/** The parsed DdlSchema for `connectionId`'s current DDL `text`, empty when there is none or
  *  when `dialect` is undefined (a non-SQL console never calls this). Takes `text` directly (the
  *  caller's own query cache read) rather than looking it up itself, so this stays a plain
  *  memoised parse with no TanStack Query dependency of its own. */
@@ -128,7 +127,7 @@ export function ddlSchemaFor(
   return schema;
 }
 
-// SPEC §11: project/ (SchemaDialog.vue, menus.ts) must not import views/ directly — these four
+// project/ (SchemaDialog.vue, menus.ts) must not import views/ directly — these four
 // wrappers are its one dispatch point into the SQL surface (views/shared/sqlIdent.ts,
 // views/console/ddl.ts, views/console/sqlKeywordCompletion.ts), mirroring state/viewCommands.ts's
 // own role for other project/ callers.
@@ -139,7 +138,7 @@ export function schemaDialectFor(kind: ConnectionKind | undefined): SqlDialect |
   return sqlDialectFor(kind);
 }
 
-/** P60b §6.2: SchemaDialog.vue passes `:autocomplete="true"` with no `completionSources` and used
+/** SchemaDialog.vue passes `:autocomplete="true"` with no `completionSources` and used
  *  to rely on lang-sql's own implicit language-data keyword source (its own now-stale comment at
  *  the mount site said so). `MonacoHost.vue`'s `override`-shaped `completionSources` prop has no
  *  such implicit fallback, so this is that keyword/type source, made explicit — undefined for a
@@ -167,13 +166,13 @@ export function ddlParseSummary(kind: ConnectionKind | undefined, text: string):
 }
 
 function applyRemote(ddl: ConnectionDdl): void {
-  // F1: the push already carries the fresh DDL, so write it straight into the cache (via
-  // commitDdl) rather than invalidating and refetching — an invalidate-driven refetch always ran
-  // into schemaQueryOptions's own "prefer cache" guard (P12 round 2 finding #14) and could never
-  // actually move the cache forward. An active observer (an open SchemaDialog or console on this
-  // connection) picks this up the same way any other queryClient.setQueryData does: reactively,
-  // with no refetch. commitDdl's generation bump also protects this write from a fetch that was
-  // already in flight when this push landed.
+  // The push already carries the fresh DDL, so write it straight into the cache (via commitDdl)
+  // rather than invalidating and refetching — an invalidate-driven refetch always ran into
+  // schemaQueryOptions's own "prefer cache" guard and could never move the cache forward. An active
+  // observer (an open SchemaDialog or console on this connection) picks this up the same way any
+  // other queryClient.setQueryData does: reactively, with no refetch.
+  // commitDdl's generation bump also protects this write from a fetch that was already in flight
+  // when this push landed.
   commitDdl(ddl.connectionId, ddl.ddl);
 }
 

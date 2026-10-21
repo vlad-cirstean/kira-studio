@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/agentusage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/claudeusage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/internal/flowtest"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
@@ -23,8 +23,8 @@ func TestStatusLineFeed(t *testing.T) {
 	if out != "" {
 		t.Fatalf("wrapper printed %q with no user statusline, want nothing", out)
 	}
-	snap := waitState(t, app, func(s claudeusage.Snapshot) bool { return s.State == claudeusage.StateOK })
-	if snap.Source != claudeusage.SourceSession || snap.FiveHour == nil || snap.SevenDay == nil {
+	snap := waitState(t, app, func(s agentusage.Snapshot) bool { return s.State == agentusage.StateOK })
+	if snap.Source != agentusage.SourceSession || snap.FiveHour == nil || snap.SevenDay == nil {
 		t.Fatalf("snapshot = %+v, want session source and both windows", snap)
 	}
 	if snap.FiveHour.UsedPercent != 23.5 || snap.FiveHour.ResetsAt != fiveReset*1000 {
@@ -33,9 +33,9 @@ func TestStatusLineFeed(t *testing.T) {
 	if snap.SevenDay.UsedPercent != 41.2 || snap.SevenDay.ResetsAt != sevenReset*1000 {
 		t.Fatalf("seven_day = %+v", snap.SevenDay)
 	}
-	pushed := app.Events.WaitAfter(t, mark, bridge.ChannelClaudeUsage, func(flowtest.Event) bool { return true }, waitFor)
-	app.Contract(t, "claude-usage", "ClaudeUsageService.Get#session", snap, usageMask)
-	app.ContractEvent(t, "claude-usage", pushed, usageMask)
+	pushed := app.Events.WaitAfter(t, mark, bridge.ChannelAgentUsage, func(flowtest.Event) bool { return true }, waitFor)
+	app.Contract(t, "agent-usage", "AgentUsageService.Get#session", snap, usageMask)
+	app.ContractEvent(t, "agent-usage", pushed, usageMask)
 }
 
 var usageMask = flowharness.Mask("resetsAt", "updatedAt")
@@ -77,7 +77,7 @@ func TestStatusLineThrottle(t *testing.T) {
 	doc, _, env := launch(t, app, "tab-1", "")
 	reset := in(time.Hour)
 	runStatusLine(t, doc, env, payload(10, reset, 20, reset))
-	waitState(t, app, func(s claudeusage.Snapshot) bool { return s.State == claudeusage.StateOK })
+	waitState(t, app, func(s agentusage.Snapshot) bool { return s.State == agentusage.StateOK })
 	runStatusLine(t, doc, env, payload(55, reset, 60, reset))
 	time.Sleep(700 * time.Millisecond)
 	if snap := usage(t, app); snap.FiveHour.UsedPercent != 10 {
@@ -88,15 +88,15 @@ func TestStatusLineThrottle(t *testing.T) {
 func TestUsageOffNoInjection(t *testing.T) {
 	app := newApp(t)
 	setUsage(t, app, false)
-	command, env := app.W.AgentHooks.ComposeLaunch("tab-1", "", "claude")
-	if len(env) == 0 || !strings.Contains(command, app.W.AgentHooks.Status().SettingsPath) {
+	command, env := app.W.AgentHooks.Compose("claude", "tab-1", "", "claude")
+	if len(env) == 0 || !strings.Contains(command, app.W.AgentHooks.Status("claude").SettingsPath) {
 		t.Fatalf("command = %q, want the plain hooks file", command)
 	}
-	raw, err := os.ReadFile(app.W.AgentHooks.Status().SettingsPath)
+	raw, err := os.ReadFile(app.W.AgentHooks.Status("claude").SettingsPath)
 	if err != nil || strings.Contains(string(raw), "statusLine") {
 		t.Fatalf("hooks file has a statusLine (%v): %s", err, raw)
 	}
-	if snap := usage(t, app); snap.State != claudeusage.StateOff {
+	if snap := usage(t, app); snap.State != agentusage.StateOff {
 		t.Fatalf("state = %q, want off", snap.State)
 	}
 }
@@ -105,28 +105,28 @@ func TestExpiredWindowDropped(t *testing.T) {
 	app := newApp(t)
 	doc, _, env := launch(t, app, "tab-1", "")
 	runStatusLine(t, doc, env, payload(30, in(time.Hour), 90, in(-time.Minute)))
-	snap := waitState(t, app, func(s claudeusage.Snapshot) bool { return s.State == claudeusage.StateOK })
+	snap := waitState(t, app, func(s agentusage.Snapshot) bool { return s.State == agentusage.StateOK })
 	if snap.FiveHour == nil || snap.SevenDay != nil {
 		t.Fatalf("snapshot = %+v, want only the five_hour window", snap)
 	}
-	app.Contract(t, "claude-usage", "ClaudeUsageService.Get#expired", snap, usageMask)
+	app.Contract(t, "agent-usage", "AgentUsageService.Get#expired", snap, usageMask)
 }
 
 func TestSnapshotSurvivesRestart(t *testing.T) {
 	app := newApp(t)
 	doc, _, env := launch(t, app, "tab-1", "")
 	runStatusLine(t, doc, env, payload(23.5, in(time.Hour), 41.2, in(48*time.Hour)))
-	before := waitState(t, app, func(s claudeusage.Snapshot) bool { return s.State == claudeusage.StateOK })
+	before := waitState(t, app, func(s agentusage.Snapshot) bool { return s.State == agentusage.StateOK })
 	app.Restart()
 	after := usage(t, app)
-	if after.State != claudeusage.StateOK || after.FiveHour == nil || *after.FiveHour != *before.FiveHour {
+	if after.State != agentusage.StateOK || after.FiveHour == nil || *after.FiveHour != *before.FiveHour {
 		t.Fatalf("after restart = %+v, want %+v", after, before)
 	}
-	raw, err := os.ReadFile(filepath.Join(app.SpaceHome, "claude-usage.json"))
+	raw, err := os.ReadFile(filepath.Join(app.SpaceHome, "agent-usage.json"))
 	if err != nil || strings.Contains(string(raw), "rate_limits") {
 		t.Fatalf("persisted file = %q (%v), want numbers only", raw, err)
 	}
-	if st, _ := os.Stat(filepath.Join(app.SpaceHome, "claude-usage.json")); st.Mode().Perm() != 0o600 {
+	if st, _ := os.Stat(filepath.Join(app.SpaceHome, "agent-usage.json")); st.Mode().Perm() != 0o600 {
 		t.Fatalf("mode = %v, want 0600", st.Mode().Perm())
 	}
 }
@@ -140,12 +140,12 @@ func TestRunStreamFeed(t *testing.T) {
 	app.Scenario(fakeagent.Scenario{Claude: map[string][]fakeagent.Action{"*": {{Name: "done", Emit: stream}}}})
 	task, repo := adeTask(t, app)
 	startRun(t, app, task, repo.ID)
-	snap := waitState(t, app, func(s claudeusage.Snapshot) bool { return s.State == claudeusage.StateOK })
-	if snap.Source != claudeusage.SourceRun || snap.FiveHour.UsedPercent != 24 || snap.SevenDay.UsedPercent != 47 {
+	snap := waitState(t, app, func(s agentusage.Snapshot) bool { return s.State == agentusage.StateOK })
+	if snap.Source != agentusage.SourceRun || snap.FiveHour.UsedPercent != 24 || snap.SevenDay.UsedPercent != 47 {
 		t.Fatalf("snapshot = %+v, want the run's 24%% and 47%%", snap)
 	}
 	if snap.FiveHour.ResetsAt != resetFive*1000 {
 		t.Fatalf("five_hour reset = %d, want %d", snap.FiveHour.ResetsAt, resetFive*1000)
 	}
-	app.Contract(t, "claude-usage", "ClaudeUsageService.Get#run", snap, usageMask)
+	app.Contract(t, "agent-usage", "AgentUsageService.Get#run", snap, usageMask)
 }

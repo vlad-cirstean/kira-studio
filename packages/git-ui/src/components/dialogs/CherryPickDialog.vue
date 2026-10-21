@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P10.md` W12: §7.13's confirm step — a near-sibling of `RevertDialog.vue`, opened by
+ * The confirm step — a near-sibling of `RevertDialog.vue`, opened by
  * `OpsState.runCherryPick` whenever the pre-flight is not a clean, non-merge, not-already-applied
  * single pick (that method's own doc comment). One addition revert has no need of: the non-
  * blocking `alreadyApplied` advisory (probe 6) — it never sets a blocker or changes `verdict`, so
  * it is rendered as its own note rather than folded into the blocker list below.
  *
- * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
+ * The modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
  * only supplies its own body/footer content.
  */
 import { shortSha } from '@kira/git-core';
@@ -56,7 +56,7 @@ watch(selectedMainline, (mainline) => {
 
 const needsMainline = computed(() => (preflight.value?.mainlineRequired.length ?? 0) > 0);
 // `classifyCherryPick` files `mainlineRequired` as a `CherryPickBlocker` alongside the real,
-// nothing-else-to-do refusals (probe 7's set-intersection blockers, plus the in-progress gate) —
+// nothing-else-to-do refusals (the set-intersection blockers, plus the in-progress gate) —
 // but unlike those, it has its own dedicated, non-blocking resolution right here (the radio group
 // below), the same way `RevertDialog.vue`'s own `needsMainline` never waits on a generic blocker
 // list at all. Filtered out here so picking a mainline stays reachable on its own: left in,

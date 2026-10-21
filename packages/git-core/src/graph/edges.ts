@@ -1,6 +1,6 @@
 /**
  * Edge emission, packing, and the patch mechanism that lets a later chunk fix up a dangling
- * edge left by an earlier one — driven by `lanes.ts`'s forward pass (W6), but a separate
+ * edge left by an earlier one — driven by `lanes.ts`'s forward pass, but a separate
  * concern: the sort invariant, the CSR index and the global-numbering-across-chunks scheme
  * belong here, not in lane bookkeeping.
  */
@@ -100,12 +100,12 @@ export class EdgeBuffer {
     this.#patches.push(globalEdgeIndex, toRow, PATCH_UNCHANGED);
   }
 
-  /** G21 D3b: the counterpart `patchTarget` never had — a lane discovered, at its *target* row's
+  /** The counterpart `patchTarget` never had — a lane discovered, at its *target* row's
    *  own processing (`lanes.ts` step 2), to converge into `toLane` rather than run straight or
    *  branch out. Sets `EDGE_TO_LANE` on the edge that was
    *  pointing at this row (`EDGE_RUN_LANE` is untouched: the run lane survives, which keeps a
-   *  branch-out edge in its own lane until its last row), in place if it belongs to this buffer, or as a cross-chunk
-   *  `(globalEdgeIndex, PATCH_UNCHANGED, toLane)` record otherwise — the
+   *  branch-out edge in its own lane until its last row), in place if it belongs to this buffer, or
+   *  as a cross-chunk `(globalEdgeIndex, PATCH_UNCHANGED, toLane)` record otherwise — the
    *  exact same route `patchTarget`'s own cross-chunk case already travels, so a `toRow`
    *  resolution and a `toLane` convergence for the same edge (a pending parent that resolves and
    *  is then discovered to converge, both patched from a *later* chunk) become two independent

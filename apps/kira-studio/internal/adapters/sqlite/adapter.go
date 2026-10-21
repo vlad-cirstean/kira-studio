@@ -17,11 +17,10 @@ func init() {
 	})
 }
 
-// connState is db/file/readOnly (F3): Connect/Disconnect wrote them with no lock despite an
-// earlier version of this comment's own claim, racing runOnConn's own reads (a.db == nil,
-// a.db.Conn(ctx)) and Mutate's a.readOnly read — a real data race, same class as
-// postgres/mysqlfamily/clickhouse's own adapter.go. Guarded together via adapters.Guarded (P113
-// G1), separately from runningByOp below (its own mutex, an unrelated concern: op-cancellation
+// connState is db/file/readOnly: Connect/Disconnect wrote them with no lock, racing runOnConn's own
+// reads (a.db == nil, a.db.Conn(ctx)) and Mutate's a.readOnly read — a real data race, same class
+// as postgres/mysqlfamily/clickhouse's own adapter.go. Guarded together via adapters.Guarded,
+// separately from runningByOp below (its own mutex, an unrelated concern: op-cancellation
 // bookkeeping, not connection state, and every access to it was already its own atomic
 // lock/unlock, never combined with a connState field in one critical section).
 type connState struct {
@@ -213,7 +212,7 @@ func runOnConn[T any](ctx context.Context, a *Adapter, opID string, fn func(cont
 	conn, err := db.Conn(ctx)
 	if err != nil {
 		a.inFlight.Done()
-		// P2 R1: SetMaxOpenConns(1) means a second op can genuinely queue here waiting for the
+		// SetMaxOpenConns(1) means a second op can genuinely queue here waiting for the
 		// sole connection — database/sql's own db.conn() returns exactly ctx.Err() when the wait
 		// is cut short by cancellation, and only then, so this can't misfire on a real connect
 		// failure. Without this check that op:end reported E_QUERY instead of E_CANCELLED — a

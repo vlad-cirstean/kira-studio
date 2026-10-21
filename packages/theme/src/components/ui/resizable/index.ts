@@ -4,7 +4,7 @@ import { cva } from 'class-variance-authority';
 export { RESIZE_KEY_STEP } from '@theme/components/ui/resizable/paneResizeMath';
 export { default as ResizeHandle } from '@theme/components/ui/resizable/ResizeHandle.vue';
 
-// P263 §2.9: the one pane-resize-handle look, bound by ResizeHandle. A 2px bar, hit area +-4px
+// The one pane-resize-handle look, bound by ResizeHandle. A 2px bar, hit area +-4px
 // (+-8px coarse), `bg-focus` on hover, keyboard focus and drag (`data-[state=drag]`; the bar is the
 // focus ring). `axis` x is a vertical bar (ew-resize), y a horizontal one (ns-resize). `line` draws
 // the 1px divider between flat panes.

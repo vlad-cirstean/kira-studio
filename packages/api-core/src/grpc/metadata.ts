@@ -1,4 +1,4 @@
-// P18 D12 (P15b #7's gRPC sibling): a metadata-name vocabulary for GrpcRequestView's Metadata
+// A metadata-name vocabulary for GrpcRequestView's Metadata
 // table, in WELL_KNOWN_REQUEST_HEADERS' own shape (http/headers.ts) — a structural
 // HeaderCompletion, no app import, so it slots into MetadataTable.vue's AutocompleteField exactly
 // like the HTTP header list does.
@@ -11,7 +11,7 @@ function metadataKey(label: string, detail: string): HeaderCompletion {
   return { label, detail, icon: 'symbol-field' };
 }
 
-/** gRPC request metadata keys a person actually types — genuinely different from
+/** gRPC request metadata keys a person types — genuinely different from
  *  WELL_KNOWN_REQUEST_HEADERS, not a re-export of it: gRPC metadata keys are lowercase by wire
  *  rule (MetadataTable.vue's own placeholder already says so), and the two vocabularies barely
  *  overlap. Deliberately excludes the HTTP/2 pseudo-headers (`:authority`, `:path`, `:method`,

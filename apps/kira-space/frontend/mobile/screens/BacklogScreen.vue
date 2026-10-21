@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { parseGithub } from '@ade/board/panelFacts';
+import { useHostLabels } from '@ade/hostLabels';
 import { useBacklog } from '@ade/readQueries';
 import type { BacklogItem } from '@ade/wire';
 import CodiconIcon from '@theme/CodiconIcon.vue';
@@ -21,6 +21,7 @@ import { newIntentKey, useAdeWrites } from '../state/useAdeWrites';
 // Backlog in priority order: add an item, drag a row by its handle to reorder, tap a row for its
 // notes.
 const backlog = useBacklog();
+const hostLabels = useHostLabels();
 const { permissions } = storeToRefs(useAuthStore());
 const writes = useAdeWrites();
 const open = ref<string | null>(null);
@@ -31,17 +32,8 @@ const canWrite = computed(() => permissions.value.write);
 const ids = computed(() => backlog.data.value?.items.map((i) => i.id) ?? []);
 
 function facts(item: BacklogItem): string {
-  const gh = parseGithub(item.githubUrl);
-  return [
-    item.jira?.key ?? '',
-    gh
-      ? t(gh.kind === 'PR' ? 'space.common.githubPr.label' : 'space.common.githubIssue.label', {
-          ref: gh.ref,
-        })
-      : '',
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const link = item.hostLink;
+  return [item.jira?.key ?? '', link ? hostLabels.factOf(link) : ''].filter(Boolean).join(' · ');
 }
 const message = (err: unknown) => errorText(err);
 

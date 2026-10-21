@@ -11,15 +11,16 @@ import { MODES } from './modes';
 import OperationsPanel from './panels/OperationsPanel.vue';
 import StatusBar from './StatusBar.vue';
 
-// P103 Part 2 (§5.4): Kira Studio's own WorkbenchShell.vue, now a thin composition over the shared
+// Kira Studio's own WorkbenchShell.vue, now a thin composition over the shared
 // grid/splitters/TabStrip/MainView package components — this file keeps exactly the per-app
-// content those components' slots need: the mode-scoped left-panel lookup (D6/C6) and the
-// Operations dock. P128 §2.3/§2.4: the Automations module's own "+" menu (`terminalModuleMenuItems`/
-// `onNewTab`) moved into the module itself (packages/workbench/src/terminal/AutomationsNewTab.vue) —
+// content those components' slots need: the mode-scoped left-panel lookup and the Operations dock.
+// The Automations module's own "+" menu (`terminalModuleMenuItems`/`onNewTab`) moved into the
+// module itself (packages/workbench/src/terminal/AutomationsNewTab.vue) —
 // `#new-tab` now renders whichever mode's own `ModeDef.newTab` is set, with no per-module branch
 // here at all.
 const modeStore = useModeStore();
 const layoutStore = useLayoutStore();
+const sizes = computed(() => layoutStore.sizesFor(modeStore.active));
 
 // P1 D6/C6: the left panel mounts whichever mode is active's own self-contained panel component.
 const activeModePanel = computed(() => MODES[modeStore.active].panel);
@@ -32,12 +33,12 @@ const modeNewTab = computed(() => MODES[modeStore.active].newTab);
 <template>
   <WorkbenchShellBase
     :project-visible="layoutStore.panel.project.visible"
-    :project-width="layoutStore.panel.project.width"
+    :project-width="sizes.project.width"
     :tab-strip-visible="MODES[modeStore.active].tabStrip !== false"
     :ops-visible="layoutStore.panel.operations.visible"
-    :ops-height="layoutStore.panel.operations.height"
-    @resize-project="layoutStore.setProjectWidth"
-    @resize-ops="layoutStore.setOperationsHeight"
+    :ops-height="sizes.operations.height"
+    @resize-project="(width: number) => layoutStore.setProjectWidth(modeStore.active, width)"
+    @resize-ops="(height: number) => layoutStore.setOperationsHeight(modeStore.active, height)"
   >
     <template #panel>
       <component :is="activeModePanel" />

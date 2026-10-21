@@ -10,7 +10,7 @@ import { nodeKindFor } from './palette.ts';
 import { buildRowSvg, isHeadDecoration, isStashRow, type RowSlice } from './rowSvg.ts';
 
 /**
- * W15's `rowBuildMs` (median + p99, recorded not gated) is defined as "sampled inside the graph
+ * The `rowBuildMs` (median + p99, recorded not gated) is defined as "sampled inside the graph
  * column's formatter" — this is that sample point. Opt-in: `tests/perf/graphUi.ts` sets
  * `window.__kiraRowBuildSamplesMs` to an empty array before scrolling and reads it back
  * afterwards; every other caller (production, every other test) never sets it, so the formatter's
@@ -22,12 +22,12 @@ declare global {
   }
 }
 
-/** A row past `layout.rowCount` has text but no lanes yet (W5: text lands before lanes do) — a
+/** A row past `layout.rowCount` has text but no lanes yet (text lands before lanes do) — a
  *  `lane: undefined` slice, which `rowSvg.ts`'s `planNode`/`buildRowSvg` already know draws
  *  nothing rather than guessing. `layout.laneCount` (the store's current high-water mark, not a
  *  per-row value) still sizes the cell correctly so nothing jumps once layout does arrive.
  *
- *  P93 §7: `row` is the *display* row (SlickGrid's own indexing, and what `layout` is now keyed
+ *  `row` is the *display* row (SlickGrid's own indexing, and what `layout` is now keyed
  *  by — `projectLayoutInput`'s output is already in display-row coordinates). `store`, whose rows
  *  are arrival-order, is read through `plan.storeRowAt(row)` instead. */
 export function readSlice(
@@ -94,20 +94,19 @@ export function readSlice(
 
 /**
  * Builds the graph column's formatter. `reusable` is allocated once, here, and refilled by
- * `LayoutStore.segmentsInRow` on every call — W3 made that query allocation-free precisely so
- * this line could be written; a fresh array per row, at up to tens of thousands of rendered rows
- * across a scroll session, is exactly the allocation churn `segmentsInRow`'s own contract exists
- * to avoid.
+ * `LayoutStore.segmentsInRow` on every call; a fresh array per row, at up to tens of thousands of
+ * rendered rows across a scroll session, is exactly the allocation churn `segmentsInRow`'s own
+ * contract exists to avoid.
  *
  * `rowHeight` is per row (`grid.getRowHeight(row)`; decorated rows are taller). `compactRowHeight`
  * anchors the node on the subject line, `compactRowHeight / 2` above the row bottom.
  *
- * P92 item 1: `columnWidth` is likewise an accessor, not a value — `CommitGrid.vue` passes
+ * `columnWidth` is likewise an accessor, not a value — `CommitGrid.vue` passes
  * `() => widths.value.graph`, so a column drag never rebuilds this formatter (matching
  * `DateFormatterContext`/`MessageSearchContext`'s own convention), and every row still draws into
  * the column's *current* width even though this closure is only built once per grid instance.
  *
- * P93 §7: `plan` is likewise an accessor (`() => graphView.plan.value`), re-read on every row
+ * `plan` is likewise an accessor (`() => graphView.plan.value`), re-read on every row
  * rather than captured once — a plan rebuild (a page landing, tips changing) never needs this
  * formatter rebuilt, only the grid invalidated (`CommitGrid.vue`'s own `plan` watcher).
  * `layoutCurrent` (`GraphViewState.layoutCurrent`) is an accessor for the same reason: while it is

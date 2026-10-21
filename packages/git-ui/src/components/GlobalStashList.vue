@@ -1,17 +1,17 @@
 <script setup lang="ts">
 /**
- * G28 D13: the global stash bucket's own section — `StashList.vue`'s structure, with
+ * The global stash bucket's own section — `StashList.vue`'s structure, with
  * `stash@{N}` replaced by the origin-branch chip and the label (`globalRowModel`), and a header
  * "Save to global stash…" button that opens `StashDialog.vue`'s fourth mode (bubbled to
  * `App.vue`, mirroring `branchFromStash`'s own "this component owns no dialog of its own" shape).
  * Row menu: Apply here, Create branch from this…, Show changes, Remove from global stash — no
- * Pop, no Drop (`buildGlobalStashMenu`, D12: both are position-addressed by necessity and a
+ * Pop, no Drop (`buildGlobalStashMenu`, both are position-addressed by necessity and a
  * global entry has no stack position at all).
  *
- * P77 §11: renders the already filtered/ordered/capped `section` prop `pickerModel.ts` hands it —
+ * Renders the already filtered/ordered/capped `section` prop `pickerModel.ts` hands it —
  * the same `TagList.vue`/`StashList.vue` contract, this component owns no fold of its own.
  *
- * I2-21: the row list itself moved to `StashRows.vue`, shared with `StashList.vue` — see that
+ * The row list itself lives in `StashRows.vue`, shared with `StashList.vue` — see that
  * file's own doc comment.
  */
 import type { InProgressOperation, StashEntry } from '@kira/git-ipc';

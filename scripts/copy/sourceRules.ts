@@ -252,6 +252,9 @@ class Collector {
   }
 }
 
+// Placeholders every message gets from the app root (the active agent's names): a call site omits them.
+const AMBIENT_PLACEHOLDERS = new Set(['agent', 'product', 'headless', 'command']);
+
 function checkCatalogCall(c: Collector, call: Node, offset: number): void {
   const args = call.arguments as Node[];
   const first = args[0];
@@ -278,7 +281,9 @@ function checkCatalogCall(c: Collector, call: Node, offset: number): void {
     c.add('U71', line, `t('${key}') is a plural message and needs a count param`);
     return;
   }
-  const missing = [...shape.placeholders].filter((p) => !provided.has(p));
+  const missing = [...shape.placeholders].filter(
+    (p) => !provided.has(p) && !AMBIENT_PLACEHOLDERS.has(p),
+  );
   const extra = [...provided].filter((p) => !shape.placeholders.has(p));
   if (missing.length > 0 || extra.length > 0) {
     const parts = [

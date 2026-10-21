@@ -13,10 +13,11 @@ import (
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
-// route.go routes a finished step run on its result (R4, R5): forward, to the end of the workflow, to a
-// stop, or back to this step or an earlier one. A return (a loop) is bounded by the step's ReturnLimit,
-// counted per (task, step, branch) from its `back` rows and never reset. A loop to an earlier step resumes that step's
-// Claude session with a fix line; the chain then runs again (steps.go chainRerun).
+// route.go routes a finished step run on its result: forward, to the end of the workflow, to a
+// stop, or back to this step or an earlier one. A return (a loop) is bounded by the step's
+// ReturnLimit, counted per (task, step, branch) from its `back` rows and never reset. A loop to an
+// earlier step resumes that step's agent session with a fix line; the chain then runs again
+// (steps.go chainRerun).
 
 // runOpts are the per-run extras queueRun carries to launch. Launch lives on the run row until the
 // run launches, so a run held behind a setup resumes the same way after a restart.
@@ -36,10 +37,10 @@ type pendingLoop struct {
 	opts    runOpts
 }
 
-// resultFor picks the result a run's outcome stands for: the reported id, else (no report: a crash, a
-// timeout, an exit code) the step's `failed` result when the process failed, `done` when it
-// succeeded; a step without that name falls back to the first result of the right kind, and a failure
-// to a stop (D7).
+// resultFor picks the result a run's outcome stands for: the reported id, else (no report: a crash,
+// a timeout, an exit code) the step's `failed` result when the process failed, `done` when it
+// succeeded; a step without that name falls back to the first result of the right kind, and a
+// failure to a stop.
 func resultFor(def stepDef, out outcome) adewire.StepResult {
 	if r, ok := def.resultOf(out.out.Result); ok && out.out.Result != "" {
 		return r
@@ -155,7 +156,7 @@ func (b *TaskBoard) decideLoop(tc *taskCtx, plan []stepView, run model.AdeRun, o
 	}
 	loop.opts.Launch = model.AdeRunLaunch{Note: fmt.Sprintf("sent back by %s: %s", from.Name, reason)}
 	line := llmprompts.AdeSendBackLine.Text(b.prompts(), llmprompts.SendBackVars{From: from.Name, Branch: branchName, Reason: reason})
-	if id := b.claudeIDOfSession(prev.SessionID); id != "" {
+	if id := b.agentIDOfSession(prev.SessionID); id != "" {
 		loop.opts.Launch.ResumeID, loop.opts.Launch.Prompt = id, line
 	} else {
 		loop.opts.Launch.Extra = line
@@ -216,8 +217,8 @@ func countReturns(runs []model.AdeRun, step, branch string, upTo int) int {
 	return n
 }
 
-// claudeIDOfSession is the Claude session id behind an ade_sessions record id, "" when unknown.
-func (b *TaskBoard) claudeIDOfSession(sessionID string) string {
+// agentIDOfSession is the agent session id behind an ade_sessions record id, "" when unknown.
+func (b *TaskBoard) agentIDOfSession(sessionID string) string {
 	if sessionID == "" {
 		return ""
 	}
@@ -225,7 +226,7 @@ func (b *TaskBoard) claudeIDOfSession(sessionID string) string {
 	if err != nil || rec == nil {
 		return ""
 	}
-	return rec.ClaudeSessionID
+	return rec.AgentSessionID
 }
 
 // queue starts the loop's run; the task mutex is held.

@@ -25,7 +25,7 @@ func (f *fakeConnsReader) Connect(string) (model.ConnectionState, error) {
 	return f.connectState, f.connectErr
 }
 
-// TestConnectForQuerySkipsReconnectWhenAlreadyConnected guards the bug found in review: Connect
+// TestConnectForQuerySkipsReconnectWhenAlreadyConnected guards the bug: Connect
 // tears a live connection down and reconnects it unconditionally, so run_query calling it on
 // every already-open connection churns the adapter, drops cached metadata and re-runs the
 // pre-connect script on every call. connectForQuery must check StateOf first and only dial

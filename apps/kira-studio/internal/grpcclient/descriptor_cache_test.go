@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-// TestCacheKey_IgnoresMetadataValues is finding 12: reflection's own resolved metadata used to be
+// TestCacheKey_IgnoresMetadataValues: reflection's own resolved metadata used to be
 // hashed in full (name AND value), so a dynamic value substituted fresh per call (e.g. {{$guid}}
-// in an auth header, an ordinary P6 feature) minted a brand-new cache key on every single call,
+// in an auth header, an ordinary feature) minted a brand-new cache key on every single call,
 // guaranteeing a miss — defeating the documented "a Call following a Describe on the same Source
 // costs no second reflection round trip" property. Metadata names still distinguish two Sources;
 // only the value each name resolved to no longer does.
@@ -35,7 +35,7 @@ func TestCacheKey_IgnoresMetadataValues(t *testing.T) {
 	}
 }
 
-// TestCacheKey_ProtoModeIgnoresTargetAndMetadata is round-2 review finding 2: cacheKey used to
+// TestCacheKey_ProtoModeIgnoresTargetAndMetadata: cacheKey used to
 // hash Target/TLS/Metadata for both modes even though Source's own doc says those fields are
 // meaningful only for SourceReflection. In proto mode, Describe (bridge/grpc.go's
 // resolveGrpcSource) sends the target unresolved and no metadata, while Call
@@ -66,7 +66,7 @@ func TestCacheKey_ProtoModeIgnoresTargetAndMetadata(t *testing.T) {
 
 // TestInvalidateCache_ProtoModeEvictsEntryCallWouldUse pins the consequence of the mismatch above:
 // InvalidateCache is only ever called from Describe (grpc.go's Reload handler), so if Describe's
-// and Call's keys differ, Reload never evicts the entry Call actually resolves against — a stale
+// and Call's keys differ, Reload never evicts the entry Call resolves against — a stale
 // schema survives Reload until process restart or LRU eviction.
 func TestInvalidateCache_ProtoModeEvictsEntryCallWouldUse(t *testing.T) {
 	descriptorCache.mu.Lock()
@@ -94,12 +94,10 @@ func TestInvalidateCache_ProtoModeEvictsEntryCallWouldUse(t *testing.T) {
 	}
 }
 
-// TestDescriptorCache_EvictsLeastRecentlyUsedPastByteBudget is finding 12's other half, refined by
-// round-2 review finding 9: the cache used to be an unbounded map (finding 12), then bounded by a
-// plain entry count — but 32 entries of a large API surface's registry could still retain hundreds
-// of MB for the life of the process, which doesn't actually cap the resource (memory) the original
-// finding was about. Rebounded by an approximate byte budget instead, tracked via
-// approxDescriptorBytes at Put time.
+// The cache used to be an unbounded map, then bounded by a plain entry count — but 32 entries of a
+// large API surface's registry could still retain hundreds of MB for the life of the process,
+// which doesn't cap the resource (memory). Rebounded by an approximate byte budget instead,
+// tracked via approxDescriptorBytes at Put time.
 //
 // Driven by a real compiled descriptor set (echo.proto, same fixture descriptors_test.go's own
 // TestDescribe_Proto_WellKnownImport uses) reused across every synthetic key — every entry is

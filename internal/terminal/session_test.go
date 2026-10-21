@@ -1,4 +1,4 @@
-// §17.1's own earned unit test: concurrency (a reader goroutine, an ordered signal-then-wait-then
+// The earned unit test: concurrency (a reader goroutine, an ordered signal-then-wait-then
 // -kill Close racing an exiting process) plus cleanup with interacting rules (idempotent Close,
 // write-after-close, exactly-once exit). Every case drives a real PTY — on a host with no
 // /dev/ptmx these fail loudly rather than skip (a skipped test that silently never runs is worse

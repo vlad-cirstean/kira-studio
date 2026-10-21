@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -24,6 +25,25 @@ const (
 	KindOneShot = "oneshot"
 	KindSidecar = "sidecar"
 )
+
+// ReadyCheck makes Start wait for a real readiness signal instead of guessing with settleWindow:
+// Check returns nil once Addr accepts connections. Addr only names the target in the timeout error.
+type ReadyCheck struct {
+	Addr  string
+	Check func(context.Context) error
+}
+
+// DialReady returns a ReadyCheck that succeeds once a TCP dial to addr connects.
+func DialReady(addr string) *ReadyCheck {
+	return &ReadyCheck{Addr: addr, Check: func(ctx context.Context) error {
+		d := net.Dialer{Timeout: 300 * time.Millisecond}
+		conn, err := d.DialContext(ctx, "tcp", addr)
+		if err != nil {
+			return err
+		}
+		return conn.Close()
+	}}
+}
 
 // Start is resolved once the script is judged ready.
 type Start struct {
@@ -50,12 +70,15 @@ var (
 	stderrDrain = 200 * time.Millisecond
 	// groupPoll is how often a reaped leader's process group is probed for surviving members.
 	groupPoll = 50 * time.Millisecond
+	// readyTimeout bounds the wait for a ReadyCheck; probeInterval spaces its attempts.
+	readyTimeout  = 60 * time.Second
+	probeInterval = 100 * time.Millisecond
 )
 
 // killSignal is syscall.Kill, indirected through a var (postgres/client.go's pgxConnect-as-a-var
 // is this codebase's own precedent for the pattern) so a test can observe — without needing to
-// actually reach a recycled pid, which isn't reproducible on demand — whether killEntry attempted
-// to signal an entry it should have recognised as already dead (P21 round 3 finding 6).
+// reach a recycled pid, which isn't reproducible on demand — whether killEntry attempted
+// to signal an entry it should have recognised as already dead.
 var killSignal = syscall.Kill
 
 // outcome is the classified result of cmd.Wait().
@@ -137,7 +160,13 @@ func (s *Supervisor) OnExit(fn func(Exit)) (unsubscribe func()) {
 // against an in-flight Connect) abort a script still inside the settle window, when it is not yet
 // tracked in s.entries at all — an external Stop(connectionID) call arriving in that window would
 // otherwise find nothing to do and silently leave the script running.
-func (s *Supervisor) Start(ctx context.Context, connectionID, command string) (Start, error) {
+//
+// ready, when non-nil, replaces the settle window: the script counts as a sidecar once ready.Check
+// succeeds while it is alive, and fails after readyTimeout. A nil ready keeps the settle-window rule.
+//
+// delay is a floor: Start returns no earlier than delay after spawn, even for a script that exits 0
+// or is ready sooner. A failing script or ctx cancel still ends it at once.
+func (s *Supervisor) Start(ctx context.Context, connectionID, command string, ready *ReadyCheck, delay time.Duration) (Start, error) {
 	s.mu.Lock()
 	existing := s.entries[connectionID]
 	s.mu.Unlock()
@@ -145,9 +174,140 @@ func (s *Supervisor) Start(ctx context.Context, connectionID, command string) (S
 		s.killEntry(connectionID, existing)
 	}
 
+	e, outcomeCh, err := spawn(connectionID, command)
+	if err != nil {
+		return Start{}, err
+	}
+
+	w := &startWait{delayDone: delay <= 0}
+	defer w.stop()
+	var settleC <-chan time.Time
+	var readyCh chan struct{}
+	if !w.delayDone {
+		w.delayTimer = time.NewTimer(delay)
+	}
+	if ready == nil {
+		w.settleTimer = time.NewTimer(settleWindow)
+		settleC = w.settleTimer.C
+	} else {
+		readyCh = make(chan struct{}, 1)
+		probeCtx, stopProbe := context.WithCancel(ctx)
+		defer stopProbe()
+		go probeLoop(probeCtx, ready, readyCh)
+		if w.delayDone {
+			w.armTimeout()
+		}
+	}
+	var delayC <-chan time.Time
+	if w.delayTimer != nil {
+		delayC = w.delayTimer.C
+	}
+
+	sidecar := func() (Start, error) {
+		s.mu.Lock()
+		s.entries[connectionID] = e
+		s.mu.Unlock()
+		go s.awaitExit(connectionID, e, outcomeCh)
+		return Start{Kind: KindSidecar}, nil
+	}
+	// readyNow runs once the script counts as ready and the delay is over. A script that exited just
+	// as readiness hit is classified by its exit, not as a sidecar.
+	readyNow := func() (Start, error) {
+		select {
+		case out := <-outcomeCh:
+			return s.finishExit(connectionID, e, out)
+		default:
+		}
+		return sidecar()
+	}
+
+	outC := (<-chan outcome)(outcomeCh)
+	for {
+		select {
+		case <-ctx.Done():
+			// Not yet tracked in s.entries (only the sidecar branches add it) — killEntry operates on
+			// e directly regardless, and F1's own bound on it means this returns promptly rather than
+			// blocking for however long the script would otherwise have run.
+			s.killEntry(connectionID, e)
+			return Start{}, fmt.Errorf("Pre-connect script cancelled: %w", ctx.Err())
+
+		case out := <-outC:
+			if w.delayDone || out.signal != "" || out.code == nil || *out.code != 0 {
+				return s.finishExit(connectionID, e, out)
+			}
+			// Exit 0 inside the delay: the script may have backgrounded a tunnel still starting, so
+			// wait the delay out, then classify it.
+			w.held = &out
+			outC = nil
+
+		case <-delayC:
+			w.delayDone = true
+			switch {
+			case w.held != nil:
+				return s.finishExit(connectionID, e, *w.held)
+			case ready == nil && w.settled:
+				return sidecar()
+			case ready != nil && w.probed:
+				return readyNow()
+			case ready != nil:
+				w.armTimeout()
+			}
+
+		case <-settleC:
+			w.settled = true
+			if w.delayDone {
+				return sidecar()
+			}
+
+		case <-readyCh:
+			w.probed = true
+			if w.delayDone {
+				return readyNow()
+			}
+
+		case <-w.timeoutC():
+			e.drainStderr()
+			s.killEntry(connectionID, e)
+			return Start{}, fmt.Errorf("Pre-connect script not ready after %s: nothing accepting connections on %s%s",
+				readyTimeout, ready.Addr, stderrSuffix(e.lastStderr()))
+		}
+	}
+}
+
+// startWait is Start's wait state: which of the delay floor, settle window and readiness probe
+// have fired, plus an exit-0 outcome held until the delay ends.
+type startWait struct {
+	delayDone, settled, probed bool
+	held                       *outcome
+	delayTimer, settleTimer    *time.Timer
+	timeoutTimer               *time.Timer
+}
+
+// armTimeout starts the readiness timeout; it counts from delay end so a long delay never trips it.
+func (w *startWait) armTimeout() { w.timeoutTimer = time.NewTimer(readyTimeout) }
+
+// timeoutC is nil (blocks forever in a select) until armTimeout runs.
+func (w *startWait) timeoutC() <-chan time.Time {
+	if w.timeoutTimer == nil {
+		return nil
+	}
+	return w.timeoutTimer.C
+}
+
+func (w *startWait) stop() {
+	for _, t := range []*time.Timer{w.delayTimer, w.settleTimer, w.timeoutTimer} {
+		if t != nil {
+			t.Stop()
+		}
+	}
+}
+
+// spawn starts command in its own process group and returns its entry plus the channel that
+// delivers its exit outcome.
+func spawn(connectionID, command string) (*entry, chan outcome, error) {
 	dir, err := os.UserHomeDir()
 	if err != nil {
-		return Start{}, fmt.Errorf("Pre-connect script could not start: %w", err)
+		return nil, nil, fmt.Errorf("Pre-connect script could not start: %w", err)
 	}
 
 	e := &entry{exited: make(chan struct{}), groupGone: make(chan struct{}), readerDone: make(chan struct{})}
@@ -157,7 +317,7 @@ func (s *Supervisor) Start(ctx context.Context, connectionID, command string) (S
 	// background child that inherited the pipe).
 	stderrR, stderrW, err := os.Pipe()
 	if err != nil {
-		return Start{}, fmt.Errorf("Pre-connect script could not start: %w", err)
+		return nil, nil, fmt.Errorf("Pre-connect script could not start: %w", err)
 	}
 
 	cmd := exec.Command("/bin/sh", "-c", command)
@@ -171,7 +331,7 @@ func (s *Supervisor) Start(ctx context.Context, connectionID, command string) (S
 		_ = stderrW.Close()
 		_ = stderrR.Close()
 		slog.Error("preconnect failed to spawn", "scope", "preconnect", "connectionId", connectionID, "err", err)
-		return Start{}, fmt.Errorf("Pre-connect script could not start: %s", err)
+		return nil, nil, fmt.Errorf("Pre-connect script could not start: %s", err)
 	}
 	_ = stderrW.Close()
 	e.pid = cmd.Process.Pid
@@ -194,41 +354,47 @@ func (s *Supervisor) Start(ctx context.Context, connectionID, command string) (S
 		outcomeCh <- out
 		close(e.exited)
 	}()
+	return e, outcomeCh, nil
+}
 
-	timer := time.NewTimer(settleWindow)
-	defer timer.Stop()
-
-	select {
-	case <-ctx.Done():
-		// Not yet tracked in s.entries (only the timer/sidecar branch below adds it) — killEntry
-		// operates on e directly regardless, and F1's own bound on it means this returns promptly
-		// rather than blocking for however long the script would otherwise have run.
-		s.killEntry(connectionID, e)
-		return Start{}, ctx.Err()
-
-	case <-timer.C:
-		s.mu.Lock()
-		s.entries[connectionID] = e
-		s.mu.Unlock()
-		go s.awaitExit(connectionID, e, outcomeCh)
-		return Start{Kind: KindSidecar}, nil
-
-	case out := <-outcomeCh:
-		if out.signal == "" && out.code != nil && *out.code == 0 {
-			slog.Info("preconnect one-shot exited 0", "scope", "preconnect", "connectionId", connectionID)
-			// A background child left in the group (`kubectl port-forward ... & sleep 1`) stays
-			// tracked so Stop/StopAll still reach it.
-			if !e.groupDead() {
-				s.mu.Lock()
-				s.entries[connectionID] = e
-				s.mu.Unlock()
-			}
-			return Start{Kind: KindOneShot}, nil
+// finishExit classifies a script that exited before it was judged ready.
+func (s *Supervisor) finishExit(connectionID string, e *entry, out outcome) (Start, error) {
+	if out.signal == "" && out.code != nil && *out.code == 0 {
+		slog.Info("preconnect one-shot exited 0", "scope", "preconnect", "connectionId", connectionID)
+		// A background child left in the group (`kubectl port-forward ... & sleep 1`) stays
+		// tracked so Stop/StopAll still reach it.
+		if !e.groupDead() {
+			s.mu.Lock()
+			s.entries[connectionID] = e
+			s.mu.Unlock()
 		}
-		e.drainStderr()
-		s.killEntry(connectionID, e)
-		return Start{}, fmt.Errorf("Pre-connect script failed %s", exitDetail(out, e.lastStderr()))
+		return Start{Kind: KindOneShot}, nil
 	}
+	e.drainStderr()
+	s.killEntry(connectionID, e)
+	return Start{}, fmt.Errorf("Pre-connect script failed %s", exitDetail(out, e.lastStderr()))
+}
+
+// probeLoop signals ch once Check succeeds, retrying every probeInterval until ctx ends.
+func probeLoop(ctx context.Context, ready *ReadyCheck, ch chan<- struct{}) {
+	for {
+		if ready.Check(ctx) == nil {
+			ch <- struct{}{}
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(probeInterval):
+		}
+	}
+}
+
+func stderrSuffix(tail *string) string {
+	if tail == nil || *tail == "" {
+		return ""
+	}
+	return ": " + *tail
 }
 
 // awaitExit runs for the lifetime of a settled sidecar entry: it blocks for the process's real
@@ -329,13 +495,13 @@ func (s *Supervisor) StopAll() {
 // the group to empty (bounded), and removes the entry. Marking killing=true first keeps
 // awaitExit's own exit routing silent for this kill.
 //
-// P21 round 3 finding 6: once the leader is reaped its pid can be recycled as an unrelated group's
+// Once the leader is reaped its pid can be recycled as an unrelated group's
 // leader, so signalling -e.pid is only safe while a group member still lives. groupGone closes
 // the moment none does (checked right after the reap, then polled), and a closed groupGone skips
 // every signal. A surviving member of a reaped leader's group (a one-shot script's background
 // child) is still signalled, since its pgid stays reserved.
 //
-// F1 (P108 Part 3): -e.pid never reaches a descendant that left the group (setsid, daemon(3)), so
+// -e.pid never reaches a descendant that left the group (setsid, daemon(3)), so
 // give up killGrace after the SIGKILL escalation fires and log rather than block Disconnect,
 // Remove or quit forever. The entry is removed either way.
 func (s *Supervisor) killEntry(connectionID string, e *entry) {

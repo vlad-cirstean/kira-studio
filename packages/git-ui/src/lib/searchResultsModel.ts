@@ -1,13 +1,12 @@
 /**
- * `docs/plans/P11.md` W12: the pure half of `SearchResults.vue` — grouping (local branches /
- * remote branches / tags / commits), per-section caps and the two honesty footers, kept out of
- * the template exactly as `refListModel.ts` keeps `BranchPicker.vue`'s own fold out of *its*
- * template. Nothing here is Vue-reactive: every input is already-unwrapped data, so this is
- * ordinary data-in, data-out logic W16 can assert against with no component mount at all.
+ * The pure half of `SearchResults.vue` — grouping (local branches / remote branches / tags /
+ * commits), per-section caps and the two honesty footers, kept out of the template exactly as
+ * `refListModel.ts` keeps `BranchPicker.vue`'s own fold out of *its* template. Nothing here is
+ * Vue-reactive: every input is already-unwrapped data.
  */
 import type { SearchField, SearchScope } from '@kira/git-core';
 import type { RefRow } from '@kira/git-ipc';
-import { type MessageKey, t } from '@theme/i18n';
+import { type HostWordsSource, hostWords, type MessageKey, t } from '@theme/i18n';
 import type { CommitHit, RefHit, SearchRunResult } from '../state/search.ts';
 import { capItems, REF_LIST_SECTION_CAP } from './refListModel.ts';
 
@@ -15,7 +14,7 @@ import { capItems, REF_LIST_SECTION_CAP } from './refListModel.ts';
  *  `SearchResults.vue`'s click/keyboard-select handler switches on to decide whether a hit is a
  *  `RefHit` or a `CommitHit` without a second lookup. `id` is a stable DOM id: what `:id` renders
  *  on the option and what `aria-activedescendant` (on `SearchBox.vue`'s own input — the element
- *  that actually holds focus, per the ARIA combobox pattern this dropdown follows) points at. */
+ *  that holds focus, per the ARIA combobox pattern this dropdown follows) points at. */
 export type SearchOption =
   | { readonly kind: 'ref'; readonly id: string; readonly hit: RefHit }
   | { readonly kind: 'commit'; readonly id: string; readonly hit: CommitHit };
@@ -45,12 +44,12 @@ export interface SearchResultsModel {
   /** "Searched N of M loaded commits" — set only when the client-side time box (hard part 4)
    *  actually fired; a scan that reached every loaded row has nothing to disclose. */
   readonly loadedFooter: string | undefined;
-  /** "N more matches in history" — set only when the tail's own result cap (OQ3) truncated a
+  /** "N more matches in history" — set only when the tail's own result cap truncated a
    *  larger total. There is no wire support for paging past it (`search.run` takes a `limit`, not
    *  a cursor), so this is disclosure, not an invitation to load more — narrowing the query is
    *  the only way to see a hit past the cap. */
   readonly tailFooter: string | undefined;
-  /** G23 D6: set for `tail?.kind === 'unsupportedPattern'` — a tail outcome that is neither
+  /** Set for `tail?.kind === 'unsupportedPattern'` — a tail outcome that is neither
    *  silence nor a smaller `ok` — and when the tail request itself failed (`tailError`). The
    *  loaded-commit half is unaffected and still complete; this notice is what tells a user why a
    *  `regex`-mode pattern's tail (and therefore any body-only match) is missing. */
@@ -58,8 +57,7 @@ export interface SearchResultsModel {
 }
 
 /** A hit's own field list, rendered as one short label — "matched: body", "matched: sha" — for
- *  a hit that matched somewhere other than the subject/ref-name (the plan's own "a field label
- *  for a hit that matched somewhere other than the subject"). `undefined` when `subject`/
+ *  a hit that matched somewhere other than the subject/ref-name. `undefined` when `subject`/
  *  `refName` is present, since that is the row's own visible text and needs no label pointing at
  *  it. */
 const FIELD_LABEL_KEYS = {
@@ -72,14 +70,18 @@ const FIELD_LABEL_KEYS = {
   sha: 'git.search.field.sha.label',
   refName: 'common.field.name.label',
   tagAnnotation: 'git.search.field.tagMessage.label',
-  prNumber: 'git.search.field.prNumber.label',
-  prTitle: 'git.search.field.prTitle.label',
+  changeRequestNumber: 'git.search.field.changeRequestNumber.label',
+  changeRequestTitle: 'git.search.field.changeRequestTitle.label',
 } as const satisfies Record<SearchField, MessageKey>;
 
-export function fieldLabel(fields: readonly SearchField[]): string | undefined {
+export function fieldLabel(
+  fields: readonly SearchField[],
+  host?: HostWordsSource | null,
+): string | undefined {
   const other = fields.filter((f) => f !== 'subject' && f !== 'refName');
   if (other.length === 0) return undefined;
-  return other.map((f) => t(FIELD_LABEL_KEYS[f])).join(', ');
+  const { changeRequestShort } = hostWords(host);
+  return other.map((f) => t(FIELD_LABEL_KEYS[f], { changeRequestShort })).join(', ');
 }
 
 const SEARCH_SECTION_CAP = REF_LIST_SECTION_CAP;

@@ -7,6 +7,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
 )
@@ -36,9 +37,9 @@ type extractWire struct {
 	Text     string       `json:"text"`
 }
 
-// ClaudeAgent drives both steps through Claude Code (memory.CLIRunner).
-type ClaudeAgent struct {
-	Runner *memory.CLIRunner
+// ModelAgent drives both steps through the active agent provider (memory.ResultRunner).
+type ModelAgent struct {
+	Runner memory.ResultRunner
 	// Executable and Home start the kira-memory MCP server the finalize step uses.
 	Executable string
 	Home       string
@@ -48,16 +49,16 @@ type ClaudeAgent struct {
 	Prompts llmprompts.Source
 }
 
-func (a ClaudeAgent) prompts() llmprompts.Source {
+func (a ModelAgent) prompts() llmprompts.Source {
 	if a.Prompts == nil {
 		return llmprompts.Defaults()
 	}
 	return a.Prompts
 }
 
-func (a ClaudeAgent) Available() error { return a.Runner.Available() }
+func (a ModelAgent) Available() error { return a.Runner.Available() }
 
-func (a ClaudeAgent) Extract(ctx context.Context, in ExtractInput) (ExtractOutput, error) {
+func (a ModelAgent) Extract(ctx context.Context, in ExtractInput) (ExtractOutput, error) {
 	input, err := json.Marshal(extractWire{
 		Document: extractDoc{Path: in.Path, Title: in.Title},
 		Chunk:    extractChunk{Index: in.Index + 1, Count: in.Count, HeadingPath: in.HeadingPath},
@@ -76,7 +77,7 @@ func (a ClaudeAgent) Extract(ctx context.Context, in ExtractInput) (ExtractOutpu
 	}
 	var parsed struct{ Facts []Fact }
 	if err := json.Unmarshal(res.Output, &parsed); err != nil {
-		return out, memory.ErrClaudeOutput
+		return out, a.Runner.Fail(harness.ErrOutput)
 	}
 	out.Facts = cleanFacts(parsed.Facts)
 	return out, nil

@@ -1,7 +1,7 @@
-// Package migrations embeds Kira Space's own schema migrations — the app shipped no installed base
-// before P100 Part 2, so 0001/0002 stayed one collapsed init pair the same shape Kira Studio's own
-// migrations package used (see that package's own doc comment); every migration since (P128's own
-// 0003) applies in the ordinary way against whatever schema is already on disk.
+// Package migrations embeds Kira Space's own schema migrations — the app shipped no installed base,
+// so 0001/0002 stayed one collapsed init pair the same shape Kira Studio's own
+// migrations package used (see that package's own doc comment); every later migration (0003)
+// applies in the ordinary way against whatever schema is already on disk.
 package migrations
 
 import (
@@ -54,6 +54,12 @@ var names = []sqlitex.MigrationSource{
 	{Version: 36, Name: "p286_review_step", File: "0036_p286_review_step.sql"},
 	{Version: 37, Name: "p287_run_sandbox", File: "0037_p287_run_sandbox.sql"},
 	{Version: 38, Name: "p293_flat_steps", File: "0038_p293_flat_steps.sql"},
+	{Version: 39, Name: "p312_layout_per_mode", File: "0039_p312_layout_per_mode.sql"},
+	{Version: 40, Name: "p316_agent_sessions", File: "0040_p316_agent_sessions.sql"},
+	{Version: 41, Name: "p316_agent_settings", File: "0041_p316_agent_settings.sql"},
+	{Version: 42, Name: "p316_agent_launch_kind", File: "0042_p316_agent_launch_kind.sql"},
+	{Version: 43, Name: "p318_git_host_setting", File: "0043_p318_git_host_setting.sql"},
+	{Version: 44, Name: "p318_git_host_names", File: "0044_p318_git_host_names.sql"},
 }
 
 // All returns every migration in ascending version order.

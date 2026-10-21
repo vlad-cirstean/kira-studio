@@ -206,7 +206,7 @@ func TestAdeManualSession(t *testing.T) {
 	mark := f.Events.Mark()
 	if _, err := f.W.Terminal.Open(terminal.OpenArgs{
 		TerminalID: launch.TerminalID, WindowKey: window, Cwd: launch.Cwd, Cols: 120, Rows: 40,
-		Command: launch.Command, LaunchKind: terminal.LaunchKindClaudeCode,
+		Command: launch.Command, LaunchKind: terminal.LaunchKindAgent,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -227,8 +227,8 @@ func TestAdeManualSession(t *testing.T) {
 	}
 	start := f.waitAgentEvent(t, mark, launch.TerminalID, "SessionStart", 60*time.Second)
 	rec := session()
-	if rec.ClaudeSessionID == "" || rec.ClaudeSessionID != start.SessionID {
-		t.Fatalf("recorded claude session %q, SessionStart session %q, want equal", rec.ClaudeSessionID, start.SessionID)
+	if rec.AgentSessionID == "" || rec.AgentSessionID != start.SessionID {
+		t.Fatalf("recorded claude session %q, SessionStart session %q, want equal", rec.AgentSessionID, start.SessionID)
 	}
 
 	stops := func() int {

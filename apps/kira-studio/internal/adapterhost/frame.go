@@ -92,7 +92,7 @@ func encodePayload(b *flatbuffers.Builder, payload any) (flatbuffers.UOffsetT, w
 
 // estimateFrameSize returns a starting buffer size for payload, close enough to the final wire
 // size that flatbuffers.NewBuilder rarely has to grow-and-copy its backing buffer before the frame
-// is done. docs/PERF.md §2.7 traced a meaningful share of the Go-side encode regression to
+// is done. docs/PERF.md traced a meaningful share of the Go-side encode regression to
 // NewBuilder(0) starting from empty and doubling repeatedly up to the final size, paying a full
 // copy of the buffer on every doubling. Page payloads dominate frame size, so only those get a
 // size-aware estimate (page.Page.Size() is the same measured ByteSize the byteSize-preservation
@@ -115,8 +115,8 @@ func estimateFrameSize(payload any) int {
 
 // pageSizeEstimate pads a page's own measured byte size with room for the FlatBuffers table/
 // vtable overhead around it — a few hundred fixed bytes plus a small fraction of the payload,
-// converging toward zero at real page sizes (docs/PERF.md §2.7's own wire-overhead numbers).
-// Deliberately approximate: an undershoot just costs one grow-and-copy pass, same as before this
+// converging toward zero at real page sizes (docs/PERF.md's wire-overhead numbers).
+// Deliberately approximate: an undershoot costs one grow-and-copy pass, same as before this
 // existed; this only needs to land close enough to skip most of them, not be exact.
 func pageSizeEstimate(rawBytes int) int {
 	return rawBytes + rawBytes/16 + 512

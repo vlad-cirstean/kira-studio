@@ -25,7 +25,7 @@ import {
   toEditableText,
 } from './timestamp';
 
-// P24 D14/D15/D19: the translate pane for the three timestamp formats — the sibling of the
+// The translate pane for the three timestamp formats — the sibling of the
 // hex/base64 decoded pane (CellEditorView.vue hosts both under the same head/body/staging
 // shape). Bidirectional and live: every keystroke here re-encodes into `doc`, and every change to
 // `doc` (hand-typed in the main editor, Reset, a fresh cell) re-renders this pane — never a
@@ -65,7 +65,7 @@ function shapeOrDefault() {
 // The editable field's own text — a plain ref, not a computed off `doc`, so a keystroke that
 // doesn't yet parse (mid-typing "2024-01-1") is never clobbered before the user finishes it.
 // Re-synced from `doc`/`zone` whenever either changes from *outside* this field (the encoded pane,
-// Reset, a fresh cell, the zone switch) — and only when the recomputed text actually differs, so
+// Reset, a fresh cell, the zone switch) — and only when the recomputed text differs, so
 // a round-tripped edit (parse this field's own text -> encode -> doc -> reparse -> re-render)
 // never touches the ref, and so never disturbs the caret, when it lands back on the same text.
 const fieldText = ref('');
@@ -93,7 +93,7 @@ const calendarAnchorRef = ref<HTMLElement | null>(null);
 const calendarTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 const pickerDate = computed(() => parsed.value?.date ?? new Date());
 
-// P104: the day cell that stages a pick lives inside PopoverContent, which reka teleports to
+// The day cell that stages a pick lives inside PopoverContent, which reka teleports to
 // document.body — outside `.editor-body`'s own DOM subtree. Its own onEditorBlur only stages when
 // focus crosses that subtree's boundary (`container.contains(next)`), so once the day cell (never
 // itself inside `.editor-body`) is removed from the DOM on close, the browser drops focus with no
@@ -108,7 +108,7 @@ watch(calendarOpen, (open) => {
 </script>
 
 <template>
-  <div class="flex flex-col h-full min-h-0" data-testid="cell-editor-timestamp-pane">
+  <div class="flex flex-col" data-testid="cell-editor-timestamp-pane">
     <Alert class="shrink-0" variant="info" icon="clock" data-testid="cell-editor-timestamp">
       <AlertDescription>
         <div class="flex items-center gap-1">
@@ -136,7 +136,7 @@ watch(calendarOpen, (open) => {
       </AlertDescription>
     </Alert>
 
-    <div class="flex-1 min-h-0 flex items-start gap-1 py-1.5 px-2">
+    <div class="flex items-center gap-1 py-1.5 px-2">
       <SecondaryTabs
         variant="segmented"
         :model-value="zone"

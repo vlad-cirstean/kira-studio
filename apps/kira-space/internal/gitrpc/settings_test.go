@@ -107,13 +107,13 @@ func TestRepoSettings_GetSetRoundTrip(t *testing.T) {
 	}
 }
 
-// TestRepoSettings_DecomposedRepoIDReadsBackTheComposedlyWrittenRow is P108 Part 17 review F8's
-// own regression guard: every other repo-keyed handler normalizes repoId to NFC before use
-// (G27 D6/G31 #4), but repoSettings.get/set didn't — RepoEntry.RepoSettings() reads by
-// Summary.RepoID, which IS NFC-normalized internally, so a client writing under a decomposed
-// spelling and reading back under the composed one (or vice versa) used to see two entirely
-// different storage rows. The emitted repoSettings.changed event must also echo the normalized
-// spelling, matching repo.changed's own always-NFC convention elsewhere.
+// TestRepoSettings_DecomposedRepoIDReadsBackTheComposedlyWrittenRow is a regression guard:
+// every other repo-keyed handler normalizes repoId to NFC before use, but repoSettings.get/set
+// didn't — RepoEntry.RepoSettings() reads by Summary.RepoID, which IS NFC-normalized
+// internally, so a client writing under a decomposed spelling and reading back under the composed
+// one (or vice versa) used to see two entirely different storage rows. The emitted
+// repoSettings.changed event must also echo the normalized spelling, matching repo.changed's own
+// always-NFC convention elsewhere.
 func TestRepoSettings_DecomposedRepoIDReadsBackTheComposedlyWrittenRow(t *testing.T) {
 	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
 	composedE := string([]byte{0xc3, 0xa9})         // U+00E9, composed "é"
@@ -204,11 +204,11 @@ func TestRepoSettings_GraphScopeIsScopedAcrossRepos(t *testing.T) {
 	}
 }
 
-// changedEventCollector is a mutex-guarded stand-in for the plain slice this test used before G32
-// round-3 architecture/security review, finding #5: ForConn's repoSettings.changed delivery now
-// runs on each connection's own dedicated forwarding goroutine (handlers.go), never synchronously
-// on the repoSettings.set caller's own goroutine — so a plain, unguarded slice appended to from
-// that goroutine and read back from the test's own goroutine would be a genuine data race.
+// changedEventCollector is a mutex-guarded stand-in for the plain slice this test used: ForConn's
+// repoSettings.changed delivery now runs on each connection's own dedicated forwarding goroutine
+// (handlers.go), never synchronously on the repoSettings.set caller's own goroutine — so a plain,
+// unguarded slice appended to from that goroutine and read back from the test's own goroutine
+// would be a genuine data race.
 type changedEventCollector struct {
 	mu  sync.Mutex
 	got []RepoSettingsChangedPayload
@@ -232,9 +232,9 @@ func (c *changedEventCollector) reset() {
 	c.got = nil
 }
 
-// TestRepoSettings_ChangedEventReachesEveryConnection is G18 §3.18's own event-fan-out guard: two
+// TestRepoSettings_ChangedEventReachesEveryConnection is the event-fan-out guard: two
 // different Conns — even ones that have never opened the repo the write happened on — both
-// receive repoSettings.changed, proving D7's live-propagation mechanism fans every change out to
+// receive repoSettings.changed, proving the live-propagation mechanism fans every change out to
 // every open connection, not just the one that made the request, regardless of which key changed.
 func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 	router, _ := newTestRouter()
@@ -312,8 +312,8 @@ func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 	}
 }
 
-// TestRepoSettings_WedgedConnectionDoesNotBlockOthers is G32 round-3 architecture/security review,
-// finding #5's own regression proof: before the fix, notify.Emitter.Emit called every
+// TestRepoSettings_WedgedConnectionDoesNotBlockOthers is the regression proof: before the fix,
+// notify.Emitter.Emit called every
 // repoSettings.changed subscriber SEQUENTIALLY on the repoSettings.set caller's own goroutine, and
 // each subscriber's own c.Emit could block indefinitely on a slow-reading or wedged connection's
 // socket. A permanently-blocked connection ("wedged") must never delay repoSettings.set's own RPC

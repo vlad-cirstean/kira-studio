@@ -9,7 +9,7 @@ export interface ColumnDescriptor {
   typeClass: TypeClass;
   nullable: boolean;
   isPrimaryKey: boolean;
-  /** P36 D28: a GENERATED/computed column (SQLite VIRTUAL/STORED, ClickHouse
+  /** A GENERATED/computed column (SQLite VIRTUAL/STORED, ClickHouse
    *  MATERIALIZED/ALIAS) — the server fills it in, an explicit value is refused. The renderer's
    *  own insert paths (add row, duplicate-as-insert, paste) skip it; `false` where an adapter
    *  never detects the concept (console results, or an adapter that hasn't wired detection yet). */
@@ -17,11 +17,11 @@ export interface ColumnDescriptor {
 }
 
 /**
- * One column of one page. Three exactly-sized buffers (D4) and no per-row object:
+ * One column of one page. Three exactly-sized buffers and no per-row object:
  *   text of row i = utf8.decode(data.subarray(offsets[i], offsets[i + 1]))
  *   row i is NULL  = (nulls[i >> 3] & (1 << (i & 7))) !== 0
  * A NULL row has offsets[i] === offsets[i+1]; an empty string does too, which is why the
- * bitset is the only thing that distinguishes them (§8.5 requires they render differently).
+ * bitset is the only thing that distinguishes them (they must render differently).
  */
 export interface TextColumnChunk {
   data: Uint8Array; // packed UTF-8, exactly-sized ArrayBuffer
@@ -36,9 +36,9 @@ export interface TextColumnChunk {
 export interface PagePosition {
   /** Absolute row offset when the page came from an offset query; null for a keyset page. */
   offset: number | null;
-  /** P43 iter3 F28/D47: informational and unread — a repo-wide grep (`grep -rn "position\.pageSize"
+  /** Informational and unread — a repo-wide grep (`grep -rn "position\.pageSize"
    *  src/ tests/`) finds no consumer. Every adapter writes it (some as the size requested, some as
-   *  the size actually served — the two disagree by design where an adapter overshoots or clamps,
+   *  the size served — the two disagree by design where an adapter overshoots or clamps,
    *  e.g. redis/read.ts's SCAN-family round overshoot), but nothing downstream reads it back, so
    *  "requested or served?" has no observable answer. Not removed: it is on the wire
    *  and on every page every adapter builds, so deleting it would be an eleven-adapter
@@ -52,7 +52,7 @@ export interface PagePosition {
   truncated?: boolean;
 }
 
-// P48 F23: a page that is the whole result — no offset, no continuation, nothing more to fetch.
+// A page that is the whole result — no offset, no continuation, nothing more to fetch.
 // Ten adapters' console/read paths wrote this six-field literal out by hand, its only variable
 // being pageSize; the wire shape lives here, not under engine/adapters/,
 // since callers span SQL and non-SQL adapters alike.
@@ -100,14 +100,14 @@ export interface DocumentPage {
  * same TextColumnChunk codec as DocumentPage's `ids`/`bodies`. TTL/memory/type are whole-key
  * metadata, not per-row.
  *
- * P17 reuses this exact shape for a single s3 object (`redisType: 'object'`): `fields`/`values`
+ * Reuses this exact shape for a single s3 object (`redisType: 'object'`): `fields`/`values`
  * carry the object's metadata (ContentType, ContentLength, LastModified, ETag, StorageClass, ...)
- * plus, for an object at or under `SINGLE_ROW_MAX_BYTES` (P33 D4), a synthetic `Body` row for
+ * plus, for an object at or under `SINGLE_ROW_MAX_BYTES`, a synthetic `Body` row for
  * its (possibly truncated) text content — a flat field/value listing is exactly what a hash-like
  * key already renders, and s3's own tree (bucket → prefix → object, '/'-delimited) already mirrors
  * redis's own namespace tree (db → namespace, ':'-delimited) closely enough that browsing one
  * object's contents needs no new page kind. `ttlMs` is always null for an s3 object (no such
- * concept there); `memoryBytes` (P33 D5) carries the object's real `ContentLength` instead —
+ * concept there); `memoryBytes` carries the object's real `ContentLength` instead —
  * `KeyValueView.vue`'s existing size badge and its edit-size gate both read it from here.
  */
 export interface KeyValuePage {
@@ -127,7 +127,7 @@ export interface KeyValuePage {
  * One row per message/record. `keys`/`headers`/`attrs`/`timestamps`/`bodies` are fixed semantic
  * columns reusing the exact same TextColumnChunk codec as DocumentPage's `ids`/`bodies` — `attrs`
  * is the one column whose meaning differs per engine (partition/offset JSON for Kafka, system
- * attributes JSON for SQS, per §8.9). `visibilityTimeoutSeconds` is SQS-only whole-page metadata
+ * attributes JSON for SQS). `visibilityTimeoutSeconds` is SQS-only whole-page metadata
  * (null for Kafka), mirroring KeyValuePage's ttlMs/memoryBytes precedent.
  */
 export interface StreamPage {
@@ -151,13 +151,13 @@ export type Page = TabularPage | DocumentPage | KeyValuePage | StreamPage;
 export const MAX_CELL_BYTES = 64 * 1024;
 export const MAX_PAGE_SIZE = 10_000;
 /** Per-value budget for a page that is one explicitly requested row (`singleRow`): a document
- *  body ("show all", P8 D1) or an s3 object's Body (P33). Also the ceiling on an object body the
+ *  body ("show all") or an s3 object's Body. Also the ceiling on an object body the
  *  app fetches, decodes and renders **at all**: a body that could only be shown truncated is a
  *  body whose remainder was transferred for nothing, now that Download hands over the whole file.
  *  Above this, nothing is fetched and no Body row exists. */
 export const SINGLE_ROW_MAX_BYTES = MAX_CELL_BYTES * 64; // 4 MB
 
-/** P33: the ceiling on an object body the app will let the user edit and write back. Lower than
+/** The ceiling on an object body the app will let the user edit and write back. Lower than
  *  the render ceiling because editing is a different cost class — a mutable CodeMirror buffer,
  *  a full re-encode and a PutObject of the result — and because a bad write is not undoable in
  *  an unversioned bucket. Sixteen cell budgets: far above a DB cell (a 200 KB JSON export is a
@@ -208,7 +208,7 @@ export function cellText(chunk: TextColumnChunk, row: number, decoder: TextDecod
   return decoder.decode(chunk.data.subarray(chunk.offsets[row], chunk.offsets[row + 1]));
 }
 
-// P2 R2 (task #99): the raw UTF-8 byte length of row i's value, straight from the offsets this
+// The raw UTF-8 byte length of row i's value, straight from the offsets this
 // chunk already carries — for a caller that only wants a byte count (a "1.2 KB" badge), not the
 // decoded text. Equal to `new TextEncoder().encode(cellText(chunk, row, decoder)).length` for any
 // valid UTF-8 payload (decode-then-reencode round-trips exact byte length), without the decode and
@@ -269,7 +269,7 @@ export function pageChunks(page: Page): TextColumnChunk[] {
 
 /**
  * Accumulates one column's rows into growable scratch and only copies into exactly-sized
- * buffers at `finish()` (D4's corollary: a view over an oversized buffer clones the slack).
+ * buffers at `finish()` (a view over an oversized buffer clones the slack).
  * `reverse()` is honoured entirely inside `finish()` by choosing which row order to copy in —
  * every row's byte range is already addressable via `rowStart`, so no extra buffer is needed.
  */
@@ -387,10 +387,10 @@ export function createTabularPageBuilder(columns: ColumnDescriptor[]): TabularPa
 }
 
 /**
- * P107 I2-40: DocumentPageBuilder/KeyValuePageBuilder/StreamPageBuilder each accumulated 2-5 fixed
- * semantic columns into their own named ColumnScratch instances, differing only in field count,
- * per-field maxBytes and (Stream) push()'s own row-object field names. `keys` stays a literal
- * tuple (K extends string, not string) so `finishColumns()` returns `Record<'ids' | 'bodies',
+ * DocumentPageBuilder/KeyValuePageBuilder/StreamPageBuilder each accumulated 2-5 fixed semantic
+ * columns into their own named ColumnScratch instances, differing only in field count, per-field
+ * maxBytes and (Stream) push()'s own row-object field names. `keys` stays a literal tuple (K
+ * extends string, not string) so `finishColumns()` returns `Record<'ids' | 'bodies',
  * TextColumnChunk>`, not `Record<string, Chunk>` — no Page field's type widens, and each builder's
  * own `push(id, body)` / `push(field, value)` / `push(row)` public shape is unchanged below.
  */
@@ -465,7 +465,7 @@ export function createKeyValuePageBuilder(opts: {
   memoryBytes: number | null;
   // Mirrors createDocumentPageBuilder's own singleRow — SINGLE_ROW_MAX_BYTES's "a
   // bigger budget when this is the one thing being fetched directly" reasoning applies just as
-  // well to an s3 object's Body field (P17) as it does to a document; every redis type keeps the
+  // well to an s3 object's Body field as it does to a document; every redis type keeps the
   // plain MAX_CELL_BYTES default since none of them have a single dominant large-value field.
   singleRow?: boolean;
 }): KeyValuePageBuilder {

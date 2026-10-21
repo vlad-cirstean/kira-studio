@@ -4,11 +4,10 @@ import { createHistoryQueries } from '../../api/state/history';
 import { findHttpRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
 
-// P8 D11/P12 D12, P175 D4: the HTTP history's per-tab UI state — the entry being viewed, the last
-// action error and the compare selection (D12). Never persisted (P2 D6's rule: the response is
-// runtime-only, and a pointer at a stored response is not either); what persists is
-// tab.state.responsePane === 'history'. The list and snapshots are server state, in the queries
-// api/state/history.ts's createHistoryQueries owns.
+// The HTTP history's per-tab UI state — the entry being viewed, the last action error and the
+// compare selection. Never persisted (the response is runtime-only, and a pointer at a stored
+// response is not either); what persists is tab.state.responsePane === 'history'. The list and
+// snapshots are server state, in the queries api/state/history.ts's createHistoryQueries owns.
 interface Extra {
   /** Compare selection (D12), at most two. */
   selected: string[];

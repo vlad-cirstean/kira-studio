@@ -66,7 +66,7 @@ test('name, Jira, GitHub and Not merging write UpdateTask patches', async ({ rel
   await expect.poll(() => updates(control)).toHaveLength(1);
   expect(updates(control)[0]?.args).toMatchObject({
     taskId: 'T_notif',
-    patch: { title: 'Notify on mention', jira: null, githubUrl: null, est: null, kind: null },
+    patch: { title: 'Notify on mention', jira: null, hostUrl: null, est: null, kind: null },
   });
 
   await page.locator('[data-testid="ade-task-jira-input"]').fill('PAY-9');
@@ -76,17 +76,13 @@ test('name, Jira, GitHub and Not merging write UpdateTask patches', async ({ rel
     patch: { jira: { key: 'PAY-9', url: '' } },
   });
 
-  await page.locator('[data-testid="ade-task-github-input"]').fill('not a link');
-  await page.locator('[data-testid="ade-task-github-save"]').click();
-  await expect(page.locator('[data-testid="ade-task-github-error"]')).toBeVisible();
-  expect(updates(control)).toHaveLength(2);
   await page
-    .locator('[data-testid="ade-task-github-input"]')
+    .locator('[data-testid="ade-task-host-input"]')
     .fill('https://github.com/acme/web-app/issues/882');
-  await page.locator('[data-testid="ade-task-github-save"]').click();
+  await page.locator('[data-testid="ade-task-host-save"]').click();
   await expect.poll(() => updates(control)).toHaveLength(3);
   expect(updates(control)[2]?.args).toMatchObject({
-    patch: { githubUrl: 'https://github.com/acme/web-app/issues/882' },
+    patch: { hostUrl: 'https://github.com/acme/web-app/issues/882' },
   });
 
   await page.locator('[data-testid="ade-task-parked"]').click();
@@ -115,6 +111,21 @@ test('estimate: unset takes number and unit, set only extends, a backend refusal
   await page.locator('[data-testid="ade-estimate-extend-submit"]').click();
   await expect.poll(() => updates(control)).toHaveLength(2);
   expect(updates(control)[1]?.args).toMatchObject({ taskId: 'T_bill', patch: { est: '3d' } });
+});
+
+test('a refused git host link shows the backend error', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch, [
+    {
+      channel: IPC.adeTaskUpdateTask,
+      error: { code: 'invalid', message: 'Not a GitHub PR or issue link.' },
+    },
+  ]);
+  await openTask(page, 'T_notif');
+  await page.locator('[data-testid="ade-task-host-input"]').fill('not a link');
+  await page.locator('[data-testid="ade-task-host-save"]').click();
+  await expect(page.locator('[data-testid="ade-task-host-error"]')).toContainText(
+    'Not a GitHub PR or issue link.',
+  );
 });
 
 test('a refused estimate shows the backend error', async ({ relaunch }) => {

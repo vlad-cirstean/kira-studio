@@ -26,16 +26,18 @@ export const opKindSchema = /*#__PURE__*/ z.enum([
   // kinds well before this schema recognized them.
   'schemaColumns',
   'keyTypes',
+  // P307: the pre-connect script's startup wait, shown so its progress and timer are visible.
+  'preconnect',
 ]);
 export type OpKind = z.infer<typeof opKindSchema>;
 
 export const opStatusSchema = /*#__PURE__*/ z.enum(['running', 'ok', 'error', 'cancelled']);
 export type OpStatus = z.infer<typeof opStatusSchema>;
 
-// P132 Part 1 (§0.2/§2.1): the app-agnostic op-log fields, shared by Kira Studio's DB op log and
-// Kira Space's git op log (Part 2) — `kind` stays a bare string here since each app has its own
-// closed vocabulary (opKindSchema below is Studio's). packages/workbench's OpLogPanel.vue and
-// createOpLogStore are generic over this base; each app extends it with its own fields.
+// The app-agnostic op-log fields, shared by Kira Studio's DB op log and Kira Space's git op log
+// — `kind` stays a bare string here since each app has its own closed vocabulary (opKindSchema
+// below is Studio's). packages/workbench's OpLogPanel.vue and createOpLogStore are generic over
+// this base; each app extends it with its own fields.
 export const opLogRecordSchema = /*#__PURE__*/ z.object({
   id: z.string(),
   startedAt: z.string(),
@@ -52,7 +54,7 @@ export const opRecordSchema = /*#__PURE__*/ opLogRecordSchema.extend({
   tabId: z.string().nullable(),
   kind: opKindSchema,
   rows: z.number().nullable(),
-  // P23 D1(c): set when command was truncated at storage time (op_log's own 64 KiB per-row cap)
+  // Set when command was truncated at storage time (op_log's own 64 KiB per-row cap)
   // — no longer the whole script that ran, so Re-run must refuse rather than replay a prefix.
   // Optional: a record built before this field existed (or a hand-written test fixture) has no
   // opinion, which OperationsPanel.vue treats as "not truncated" via plain falsy access.
@@ -62,5 +64,7 @@ export const opRecordSchema = /*#__PURE__*/ opLogRecordSchema.extend({
   // (Go's *string always marshals the key) and optional (a hand-written test fixture predating this
   // field has no opinion) — OperationsPanel.vue's re-run treats either as "no recorded path".
   path: z.string().nullable().optional(),
+  // P307 Part 2: a preconnect op's configured wait in ms (live only, absent otherwise).
+  delayMs: z.number().optional(),
 });
 export type OpRecord = z.infer<typeof opRecordSchema>;

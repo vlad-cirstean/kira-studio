@@ -2,10 +2,10 @@
 // and its explanation ran together, all in one undifferentiated block of monospace lines, and a
 // JSON-shaped value rendered as a single truncated line rather than something readable).
 //
-// P60b: this file used to also unit-test `editor/hover.ts`'s own `buildHoverSource` — the
+// This file used to also unit-test `editor/hover.ts`'s own `buildHoverSource` — the
 // CodeMirror-specific glue that turned a `ConsoleHoverInfo` into a `Tooltip`'s DOM. That glue is
 // gone (`MonacoHost.vue`'s own hover provider does the equivalent mapping straight into Monaco's
-// `MarkdownString[]` contents, P60a §4.4) — a thin, mechanical transform inside a Vue component,
+// `MarkdownString[]` contents) — a thin, mechanical transform inside a Vue component,
 // which this app's own convention doesn't unit-test (no `.vue` file in this repo has a dedicated
 // spec; UI specs cover that layer instead — `tests/ui/api-ui-consistency.spec.ts`'s own "shows its
 // value" hover check already exercises the value/caption split at the UI level). `formatHoverValue`

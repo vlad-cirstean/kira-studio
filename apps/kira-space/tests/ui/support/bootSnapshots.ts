@@ -6,7 +6,8 @@ import type { ControlSnapshot } from './types';
 /**
  * The `Promise.all` `apps/kira-space/frontend/src/main.ts`'s `bootstrap()` fires before `mount()`
  * — `layoutGetAll`/`settingsGetAll`/`codeWorkspaceListRepos`/`tabsList` —
- * answered with an empty, healthy app: defaults, no repositories imported, no tabs. This is what every `tests/ui/` spec's `relaunch()` starts from — Kira Studio's own
+ * answered with an empty, healthy app: defaults, no repositories imported, no tabs. This is what
+ * every `tests/ui/` spec's `relaunch()` starts from — Kira Studio's own
  * EMPTY_BOOT_SNAPSHOTS, trimmed to this app's own bootstrap() (no connections/masked
  * columns/ops — none of that exists here).
  *
@@ -14,7 +15,7 @@ import type { ControlSnapshot } from './types';
  * absent — every one of them already has a `WILDCARD_DEFAULTS` entry in mockRuntime.ts (nothing
  * here ever needs to override them per-spec the way `tabsList` regularly does), the same "boot
  * call with no committed fixture will ever snapshot it" reasoning as Kira Studio's own array.
- * P128 §2.6: a spec that DOES care which mode boot lands in (modules.spec.ts) still wins by
+ * A spec that DOES care which mode boot lands in (modules.spec.ts) still wins by
  * providing its own `windowsEnsure` snapshot straight to `relaunch()`, same as any other channel.
  */
 export const EMPTY_BOOT_SNAPSHOTS: readonly ControlSnapshot[] = [

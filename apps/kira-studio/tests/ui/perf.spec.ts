@@ -84,6 +84,7 @@ const CONTROL: ControlSnapshot[] = [
       options: {},
       preconnect: null,
       preconnectSidecar: false,
+      preconnectDelaySec: 0,
       autoExplain: false,
       throttlePerSec: 0,
     },
@@ -140,7 +141,7 @@ test('perf tripwires — scroll frame time, DOM cell bound, retained bytes', asy
     })
     .toBeGreaterThan(0);
 
-  // P22 Pass B: the actual scrollable element is SlickGrid's own right/data viewport
+  // The actual scrollable element is SlickGrid's own right/data viewport
   // (support/grid.ts's own GRID_SCROLLER_SELECTOR), not the outer `[data-testid="data-grid"]` host
   // div — that div never scrolls itself, so driving `scrollTop` on `grid` moved nothing and this
   // whole block silently measured idle rAF cadence over a static, unscrolled DOM (`total` was
@@ -179,12 +180,12 @@ test('perf tripwires — scroll frame time, DOM cell bound, retained bytes', asy
   // and this reasoning is unaffected by tier: it catches "someone made the grid re-render every
   // row per frame", it does not certify the real budget.
   //
-  // P57 M5 finding: raw rAF-to-rAF deltas (unlike budgets.spec.ts's own scroll assertion, which
+  // Raw rAF-to-rAF deltas (unlike budgets.spec.ts's own scroll assertion, which
   // measures isolated app work via `__kiraGridScrollWorkStart`) also carry this environment's own
   // frame-pump cadence — and this sandbox's headless WebKit consistently paces at ~35 ms/frame
   // (p50) even at idle (load average 0.1-0.3, no other containers running), not the ~60 fps a 24 ms
   // budget assumes. Confirmed non-flaky across 3 repeated runs (p95 37-39 ms every time, not a
-  // one-off spike) — this is the same "frame-scheduling artifact, not app work" class §2.1's own
+  // one-off spike) — this is the same "frame-scheduling artifact, not app work" class the
   // L-H scroll-response caveat already documents for the p95 axis specifically. Raised to 80 ms:
   // still tight enough to fail hard on an actual regression (an unvirtualized full-table render
   // would blow well past it), loose enough to not chase this sandbox's own baseline cadence.

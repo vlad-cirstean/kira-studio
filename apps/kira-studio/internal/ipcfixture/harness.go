@@ -26,7 +26,7 @@ import (
 // under test here (internal/enginecache has its own suite for that).
 const cacheBudgetBytes = 64 << 20
 
-// App wires the real app stack a fixture generator needs (P58f §4.2): storage through the real
+// App wires the real app stack a fixture generator needs: storage through the real
 // migrations, a real (Linux-fallback) cipher, connections.Service and tree.Service over a real
 // adapterhost.Router/Dispatcher, and the three bridge services every committed fixture's channels
 // route through. It is the Go analogue of tests/ipc/support/harness.ts, built with strictly higher
@@ -46,7 +46,7 @@ type App struct {
 	OpsSvc         *bridge.OpsService
 	MaskRulesSvc   *bridge.MaskRulesService
 
-	// connectedMu guards connectedIDs — F9 (P108 Part 6): every real adapter this harness connects
+	// connectedMu guards connectedIDs — every real adapter this harness connects
 	// (Recorder.ConnectionsConnect), tracked so NewApp's own t.Cleanup can disconnect all of them
 	// automatically. A mutex, not a bare slice, since nothing here assumes a single caller
 	// goroutine for the lifetime of one App.
@@ -132,21 +132,22 @@ func NewApp(t *testing.T) *App {
 		OpsSvc:         &bridge.OpsService{Deps: appDeps, Canceller: router},
 		MaskRulesSvc:   &bridge.MaskRulesService{Deps: appDeps},
 	}
-	// F9 (P108 Part 6): every *_test.go file using this harness calls Recorder.ConnectionsConnect
+	// Every *_test.go file using this harness calls Recorder.ConnectionsConnect
 	// and none of them call the matching disconnect — real adapters otherwise accumulate in the
 	// process-global registry (adapters.live) across test runs, well after the test DB and
 	// everything else this func's own t.Cleanup calls above have already gone. Registered last, so
-	// it runs first (t.Cleanup is LIFO): live adapters are disconnected before connectionsSvc.Shutdown
-	// tears down preconnect sidecars, and well before db.Close()/r.Close() above.
+	// it runs first (t.Cleanup is LIFO): live adapters are disconnected before
+	// connectionsSvc.Shutdown tears down preconnect sidecars, and well before db.Close()/r.Close()
+	// above.
 	t.Cleanup(app.disconnectTracked)
 	return app
 }
 
 // SeedConnection inserts a connection row through the real repo (bypassing only
-// connections.Service.Create's own random uuid.NewString() assignment, so the fixture's connection id is
-// the fixed literal every committed fixture already carries — a harness-only deviation, the same
-// one internal/tree's and internal/connections' own fake-backend tests already make) and stores its
-// password through the real secrets repo and its URI sealed under ScopeConnectionURI (P181).
+// connections.Service.Create's own random uuid.NewString() assignment, so the fixture's connection
+// id is the fixed literal every committed fixture already carries — a harness-only deviation, the
+// same one internal/tree's and internal/connections' own fake-backend tests already make) and
+// stores its password through the real secrets repo and its URI sealed under ScopeConnectionURI.
 func (a *App) SeedConnection(t *testing.T, id string, fields model.ConnectionFields, password *string) model.ConnectionSummary {
 	t.Helper()
 	var uriEnc *string
@@ -285,7 +286,7 @@ func (r *Recorder) TreeDefinition(t *testing.T, connectionID, path string, refre
 // OpsCancel is IPC.opsCancel: bridge.OpsService.Cancel. Every committed fixture captures this
 // channel with no args and no response (the TypeScript spec pushed `{channel: IPC.opsCancel}`
 // literally, never the real opId or the void result) — matched here rather than "improved", so a
-// regenerated fixture does not gratuitously diff commit 12 read-mode's own committed file.
+// regenerated fixture does not gratuitously diff read-mode's own committed file.
 func (r *Recorder) OpsCancel(t *testing.T, opID string) bool {
 	t.Helper()
 	cancelled, err := r.App.Router.Cancel(context.Background(), opID)

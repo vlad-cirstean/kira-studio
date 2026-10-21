@@ -1,9 +1,7 @@
 // Package migrations embeds the schema migration(s). The app has never shipped, so there is no
 // installed base with a partially-applied schema to preserve — what were five incremental steps
-// (0001_init through 0005_p28_tree_filters) are collapsed into the single 0001_init.sql that
-// produces the exact same final schema in one shot (verified table-by-table via
-// PRAGMA table_info/foreign_key_list/index_list against the old five-file sequence before they
-// were deleted).
+// are collapsed into the single 0001_init.sql that produces the exact same final schema in one
+// shot.
 package migrations
 
 import (
@@ -56,6 +54,10 @@ var names = []sqlitex.MigrationSource{
 	{Version: 36, Name: "p242_scripts_in_ade", File: "0036_p242_scripts_in_ade.sql"},
 	{Version: 37, Name: "p242_recurring_scripts", File: "0037_p242_recurring_scripts.sql"},
 	{Version: 38, Name: "p279_script_run_resume", File: "0038_p279_script_run_resume.sql"},
+	{Version: 39, Name: "p312_layout_per_mode", File: "0039_p312_layout_per_mode.sql"},
+	{Version: 40, Name: "p307_preconnect_delay", File: "0040_p307_preconnect_delay.sql"},
+	{Version: 41, Name: "p316_script_run_provider", File: "0041_p316_script_run_provider.sql"},
+	{Version: 42, Name: "p316_agent_launch_kind", File: "0042_p316_agent_launch_kind.sql"},
 }
 
 // All returns every migration in ascending version order.

@@ -121,8 +121,8 @@ func TestParseNameStatusRecords_UnknownLetter(t *testing.T) {
 }
 
 // TestParseNumstatRecords_PathStaysDecomposed and TestParseNameStatusRecords_PathStaysDecomposed
-// are G27 D2/D12's tier-2 negatives for diff-tree: Path/OriginalPath are repository-relative
-// (probe P7 — handed straight back to git as a <rev>:<path> operand or a pathspec), so they must
+// are the tier-2 negatives for diff-tree: Path/OriginalPath are repository-relative
+// (handed straight back to git as a <rev>:<path> operand or a pathspec), so they must
 // stay byte-exact even when git's own tree-sourced bytes are decomposed.
 func TestParseNumstatRecords_PathStaysDecomposed(t *testing.T) {
 	t.Parallel()

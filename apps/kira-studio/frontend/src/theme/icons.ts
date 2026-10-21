@@ -41,9 +41,10 @@ export type ColumnTypeCategory =
   | 'string'
   | 'other';
 
-// Item (regression pass, task batch P46-7): this is a *fallback* guesser only — every one of
+// This is a *fallback* guesser only — every one of
 // each Go adapter's typeClassFor() (internal/adapters/*) is authoritative, used for real
-// (cell-format eligibility) and exercised by internal/adapters/*/*_test.go against a live server; wherever a ColumnDescriptor carrying that verdict is
+// (cell-format eligibility) and exercised by internal/adapters/*/*_test.go against a live server;
+// wherever a ColumnDescriptor carrying that verdict is
 // already in hand (the grid, its header tooltip, the cell editor, a console result), typeClassFor
 // below reads it directly instead of re-deriving one from the raw type string here. The one
 // caller left without a ColumnDescriptor — ColumnsSection.vue's Structure tab, which only ever
@@ -96,8 +97,8 @@ function columnTypeCategory(dataType: string): ColumnTypeCategory {
     return 'binary';
   // Every unambiguously textual spelling, MySQL's sized text family included — `longtext`/
   // `mediumtext`/`tinytext` don't *start* with "text" the way `tinyblob`/`longblob` above do
-  // start with "blob", so anchoring on `^text` alone missed all three of them (the second
-  // reported gap: "longtext not being text"). `enum`/`set` are deliberately included too: neither
+  // start with "blob", so anchoring on `^text` alone missed all three of them.
+  // `enum`/`set` are deliberately included too: neither
   // postgres nor MySQL's own typeClassFor carries a bucket for them, so both engines' real,
   // tested answer is exactly the same catch-all 'text' this returns — and ClickHouse's own
   // typeClassFor puts its own `Enum8`/`Enum16` in its TEXT_TYPES set outright, which needs the
@@ -162,10 +163,10 @@ export function columnTypeIcon(dataType: string): string {
   return CATEGORY_ICON[columnTypeCategory(dataType)];
 }
 
-// P63 §4.2: a per-type glyph for a Browse row's icon slot, matching columnTypeIcon's own shape —
+// A per-type glyph for a Browse row's icon slot, matching columnTypeIcon's own shape —
 // the six real redis types (RedisInsight's own vocabulary, minus ReJSON: this app has no
-// JSON-module support). No colour: §4.2's own reasoning is that these are container/structure
-// classes, the exact family P9/P46-7's own CATEGORY_COLOR already paints plain (json/array/binary/
+// JSON-module support). No colour: the reasoning is that these are container/structure
+// classes, the exact family the CATEGORY_COLOR already paints plain (json/array/binary/
 // string/other), and there is no categorical palette in the app to spend on a seventh bucket that
 // has no grammar-token counterpart the way number/boolean/datetime do.
 const REDIS_TYPE_ICON: Record<string, string> = {
@@ -187,12 +188,12 @@ export function redisTypeIcon(type: string | null | undefined): string {
 /** The text a Browse row's own type badge shows — `undefined` for the same two cases
  *  redisTypeIcon falls back on (not arrived yet, or `none`), so a badge only ever names one of
  *  the six real vocabulary entries, never the string "none". The same lowercase spelling
- *  KeyValuePane.vue's own `keyvalue-type` badge renders (§4.2's "one term per concept" rule). */
+ *  KeyValuePane.vue's own `keyvalue-type` badge renders (the "one term per concept" rule). */
 export function redisTypeLabel(type: string | null | undefined): string | undefined {
   return type && REDIS_TYPE_ICON[type] ? type : undefined;
 }
 
-// Item 3 (regression pass, task batch P46-5): numeric/boolean/datetime reuse the VS
+// Numeric/boolean/datetime reuse the VS
 // Code Dark Modern syntax colours (theme/tokens.css's --kira-syntax-*, the exact hex values VS
 // Code's own Dark Modern theme ships) instead of the connection-colour picker's palette — the user
 // asked for these to be "the exact same hues used in vscode", and tokens.css already carries that
@@ -203,9 +204,9 @@ export function redisTypeLabel(type: string | null | undefined): string | undefi
 // the two indistinguishable. json/array/binary/other stay the plain foreground colour, per the
 // user's own scoping: a badge only earns a colour when it is unambiguously one of the everyday
 // scalar classes.
-// Item (P9): string and uuid dropped their distinct colour and now render plain like every other
+// String and uuid dropped their distinct colour and now render plain like every other
 // non-scalar class — the user asked that string-typed values no longer stand out by colour, and
-// uuid shares this exact token (P46-7's own fix, above) precisely so a plain-string change and a
+// uuid shares this exact token precisely so a plain-string change and a
 // still-tinted uuid never diverge again.
 const CATEGORY_COLOR: Record<ColumnTypeCategory, string> = {
   numeric: 'var(--kira-syntax-number)',

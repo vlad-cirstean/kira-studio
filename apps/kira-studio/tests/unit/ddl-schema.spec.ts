@@ -1,6 +1,6 @@
-// D21: the DDL extractor (ddl.ts) earns a unit test — a tree walk over four dialects' grammars
+// The DDL extractor (ddl.ts) earns a unit test — a tree walk over four dialects' grammars
 // with interacting rules: qualified vs. unqualified names, quoted vs. bare vs. keyword-shaped
-// column names (F5.1's `id`), nested type-argument parens, table constraints that are not
+// column names (the `id`), nested type-argument parens, table constraints that are not
 // columns, `IF NOT EXISTS`, and statements it must skip silently.
 
 import { describe, expect, test } from 'bun:test';
@@ -136,8 +136,8 @@ describe('parseDdl — ALTER TABLE ADD COLUMN and COMMENT ON COLUMN', () => {
 
   test('COMMENT ON COLUMN sets the description used by the hover', () => {
     // Deliberately no embedded apostrophe: this Lezer grammar tokenises `''` as two adjacent
-    // String literals rather than one escaped quote — a real grammar limitation (F4's own
-    // "tokeniser, not a structural parser" — P13's OQ-5 answer), not something this extractor
+    // String literals rather than one escaped quote — a real grammar limitation (the
+    // "tokeniser, not a structural parser"), not something this extractor
     // can fix, so the description this rule captures is best-effort for that case.
     const schema = parseDdl(
       'postgres',
@@ -181,7 +181,7 @@ describe('toSqlNamespace — D10: a qualified table is emitted both nested and f
   });
 });
 
-// P22c D4/§4.3: namespaceFromCached is the metadata-cache analogue of toSqlNamespace above — a
+// namespaceFromCached is the metadata-cache analogue of toSqlNamespace above — a
 // shape transform with the same interacting rules (a view and a table must not cross-contaminate
 // each other's columns; an empty relation list or an empty column list must produce a namespace
 // entry sqlSchemaCompletion.ts can still consume; PK-first ordering) feeding the same completion
@@ -249,8 +249,8 @@ describe('namespaceFromCached — P22c D4: RelationColumns[] -> SchemaNamespace'
     expect(byLabel.total).toBe(0);
   });
 
-  // P4: a column needing quotes (a reserved word, here) gets `insert` set to its quoted form
-  // (EditorCompletion's own field, P60b's replacement for lang-sql's `Completion.apply`) — label
+  // A column needing quotes (a reserved word, here) gets `insert` set to its quoted form
+  // (EditorCompletion's own field, the replacement for lang-sql's `Completion.apply`) — label
   // stays bare so matching/highlighting still works — the same identNeedsQuoting/quoteIdent rule
   // views/grid/filterCompletion.ts's own column completions already follow.
   test('a column needing quotes gets a quoted `insert`, mysql backtick vs. postgres double-quote', () => {
@@ -274,10 +274,10 @@ describe('namespaceFromCached — P22c D4: RelationColumns[] -> SchemaNamespace'
   });
 });
 
-// D6's old block ("dialect identifierQuotes vs. sqlIdent.ts quoteIdent") tested whether
+// The old block ("dialect identifierQuotes vs. sqlIdent.ts quoteIdent") tested whether
 // lang-sql's own per-dialect `identifierQuotes` spec agreed with this app's own quoteIdent
 // (sqlIdent.ts) — a real risk when a third-party library's quoting and this app's own could drift.
-// P60b removed the library: `sqlSchemaCompletion.ts`'s completion accept now calls quoteIdent
+// The library was removed: `sqlSchemaCompletion.ts`'s completion accept now calls quoteIdent
 // directly (sqlIdent.ts's BACKTICK_DIALECTS), the only quoting authority left, so there is no
 // second opinion left to disagree with. Deleted, not ported — the property it guarded no longer
 // exists to break.

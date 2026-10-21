@@ -51,8 +51,9 @@ function migrateLegacyKey(key: string, legacyKey: string): void {
 /**
  * Per-device UI state in `localStorage` under `kira.<module>.<name>` (each app and the phone UI is
  * its own origin, so no app segment). A stored value that fails `schema` reads as the default.
- * `migrateFrom` moves a value stored under an older key, once. Geometry that follows the user across
- * windows belongs in the Go layout store and per-tab view state in the tab's `state_json`, not here.
+ * `migrateFrom` moves a value stored under an older key, once. Geometry that follows the user
+ * across windows belongs in the Go layout store and per-tab view state in the tab's `state_json`,
+ * not here.
  */
 export function usePersistedState<T>(
   key: string,

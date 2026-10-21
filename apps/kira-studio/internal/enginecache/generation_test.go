@@ -2,7 +2,7 @@ package enginecache
 
 import "testing"
 
-// F4 (P108 Part 6): Read/Count store their results unconditionally once the underlying op
+// Read/Count store their results unconditionally once the underlying op
 // returns — a cache miss that races InvalidateAfterMutation/DropTarget/DropConnection/Clear (or a
 // reconnect's own DropConnection) while still in flight could still complete and cache its own
 // now-stale, pre-invalidation result as fresh. These exercise the guard directly at the Cache

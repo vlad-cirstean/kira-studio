@@ -24,7 +24,7 @@ type connState struct {
 	client *kgo.Client
 	admin  *kadm.Client
 	// opts is the resolved seed/security options connect() built the long-lived client from —
-	// reused to build each browse's own ephemeral kgo.Client (P58e E5) without re-resolving the
+	// reused to build each browse's own ephemeral kgo.Client without re-resolving the
 	// connection config on every read(). Reassigned wholesale by setConnected/clearConnected, never
 	// mutated in place, so Load's own copy is safe for it.
 	opts     []kgo.Opt
@@ -101,9 +101,8 @@ func (a *Adapter) requireAdmin() (*kadm.Client, error) {
 
 // Children is index.ts's children. Root is topics ∪ consumer groups (catalog.go's listRoot); a
 // consumerGroup root returns [] (Adapter rule 5 — a leaf, never an error); a topic root one level
-// down enumerates partitions (P23 D4: still needed even though the tree no longer expands a topic
-// — StreamView.vue's partition filter popover is a second, live caller); anything deeper is a
-// leaf.
+// down enumerates partitions (still needed even though the tree no longer expands a topic —
+// StreamView.vue's partition filter popover is a second, live caller); anything deeper is a leaf.
 func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (adapters.TreeChildren, error) {
 	adm, err := a.requireAdmin()
 	if err != nil {
@@ -247,11 +246,11 @@ func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adap
 	return nil, adapters.Unsupported("kafka", "key types")
 }
 
-// Cancel is index.ts's cancel — a permanent no-op (P10's D6/D14, P32 D22). Unlike a sibling that
+// Cancel is index.ts's cancel — a permanent no-op. Unlike a sibling that
 // carries adapters.RunWithAbortRace, Kafka has no server-side kill mechanism at all — a fetch is a
 // request the broker answers or times out, there is no equivalent of pg_cancel_backend or KILL
-// QUERY. The op's own context.Context, passed directly to every kadm/kgo call (P58e E3), is the
-// entire cancellation story; KF-2 confirmed it aborts an in-flight PollRecords promptly.
+// QUERY. The op's own context.Context, passed directly to every kadm/kgo call, is the
+// entire cancellation story; it is confirmed to abort an in-flight PollRecords promptly.
 // caps.Cancel stays true because that mechanism is real, even though this RPC itself reports
 // nothing to forward.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {

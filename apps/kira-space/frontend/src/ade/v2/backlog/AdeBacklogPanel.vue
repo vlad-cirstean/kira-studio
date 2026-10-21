@@ -12,7 +12,8 @@ import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
-import { backlogPatch, parseGithub } from '../board/panelFacts';
+import { backlogPatch } from '../board/panelFacts';
+import { useHostLabels } from '../hostLabels';
 import AdeNotesEditor from '../notes/AdeNotesEditor.vue';
 import AdeLinkRow from '../panel/AdeLinkRow.vue';
 import { type LinkPatch, useLinkFields } from '../panel/useLinkFields';
@@ -20,7 +21,7 @@ import { useUpdateBacklogItem } from '../queries';
 import { TONE_SOLID_CLASS } from '../tones';
 import type { BacklogItem } from '../wire';
 
-// Detail of one backlog item: title, Jira and GitHub links, notes, and the promote and delete actions.
+// Detail of one backlog item: title, Jira and host links, notes, and the promote and delete actions.
 const props = defineProps<{ item: BacklogItem }>();
 const emit = defineEmits<{ promote: []; remove: [] }>();
 
@@ -47,10 +48,12 @@ const titleEdit = useInlineEdit({
 });
 
 const links = useLinkFields(
-  () => props.item.githubUrl,
+  () => props.item.hostLink,
   async (patch: LinkPatch) => ((await write(patch)) ? null : error.value),
 );
 const jira = computed(() => props.item.jira);
+const hostLink = computed(() => props.item.hostLink);
+const hostLabels = useHostLabels();
 
 function saveNotes(_id: string, value: string): void {
   void write({ notes: value });
@@ -122,15 +125,18 @@ function saveNotes(_id: string, value: string): void {
           @clear="links.clearJira"
         />
         <AdeLinkRow
-          id="ade-backlog-github"
-          :label="t('common.product.github.label')"
-          :chip="links.github.value?.kind ?? ''"
-          :text="links.github.value?.ref ?? ''"
-          :url="parseGithub(item.githubUrl) ? item.githubUrl : ''"
-          :placeholder="t('space.ade.backlog.github.placeholder')"
-          :error="links.githubError.value"
-          @save="links.saveGithub"
-          @clear="links.clearGithub"
+          id="ade-backlog-host"
+          :label="hostLabels.labels.value"
+          :chip="hostLink ? (hostLink.kind === 'changeRequest' ? hostLabels.shortOf(hostLink) : 'issue') : ''"
+          :text="hostLink?.ref ?? ''"
+          :url="hostLink ? item.hostUrl : ''"
+          :placeholder="t('space.ade.backlog.link.placeholder', {
+            labels: hostLabels.labels.value,
+            shorts: hostLabels.shorts.value,
+          })"
+          :error="links.hostError.value"
+          @save="links.saveHost"
+          @clear="links.clearHost"
         />
       </KeyValueList>
       <Alert v-if="error" variant="error" data-testid="ade-backlog-error"

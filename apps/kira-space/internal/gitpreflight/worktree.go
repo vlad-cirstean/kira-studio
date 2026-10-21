@@ -1,7 +1,7 @@
-// G25 D4/D8's two worktree classifiers — pure functions over already-gathered facts, exactly like
+// The two worktree classifiers — pure functions over already-gathered facts, exactly like
 // every other classifier in this package (ClassifyCheckout/ClassifyReset): no I/O here at all.
-// gitsession/worktree.go gathers the facts (a fresh `worktree list`, the refs snapshot's own
-// %(worktreepath) crossing G5 already computes, a plain os.Stat, Registry.IsOpen) and calls these.
+// gitsession/worktree.go gathers the facts (a fresh `worktree list`, a plain os.Stat,
+// Registry.IsOpen) and calls these.
 package gitpreflight
 
 import "path/filepath"
@@ -16,12 +16,11 @@ type WorktreeAddBlocker struct {
 	StartPoint   string `json:"startPoint,omitempty"`
 }
 
-// WorktreeAddNote mirrors the wire's own WorktreeAddPreflight note union (D4): informational only,
-// never gates Verdict. pathInsideRepo is D4's own named example (git allows nesting a worktree
+// WorktreeAddNote mirrors the wire's own WorktreeAddPreflight note union: informational only,
+// never gates Verdict. pathInsideRepo is the named example (git allows nesting a worktree
 // inside the repository it belongs to — refusing a legal action would be this app deciding for the
 // user, not git); the other two are this implementer's own reasonable extension of the same
-// "surface something true and possibly-surprising, block nothing" principle, since the plan names
-// three notes without enumerating all of them.
+// "surface something true and possibly-surprising, block nothing" principle.
 type WorktreeAddNote struct {
 	Kind string `json:"kind"` // "pathInsideRepo"|"parentDirectoryMissing"|"detachedHead"
 	Path string `json:"path,omitempty"`
@@ -35,11 +34,11 @@ type WorktreeAddPreflight struct {
 	Blockers []WorktreeAddBlocker `json:"blockers"`
 	Notes    []WorktreeAddNote    `json:"notes"`
 	Verdict  string               `json:"verdict"` // "clean" | "blocked"
-	// Routes is G28 D7's own addition, closing G25 §9's own named hand-forward: "detachHere" is
-	// offered iff branchCheckedOutElsewhere is the SOLE blocker — unlike checkout's own automatic
-	// detach (D6), this one is OFFERED via a dialog button, never taken automatically, since
-	// `worktree add` is an explicit creation act with a dialog already open and carries no "never
-	// blocks" promise to keep. Never nil (an empty slice, this package's own convention elsewhere).
+	// "detachHere" is offered iff branchCheckedOutElsewhere is the SOLE blocker — unlike
+	// checkout's own automatic detach, this one is OFFERED via a dialog button, never taken
+	// automatically, since `worktree add` is an explicit creation act with a dialog already open
+	// and carries no "never blocks" promise to keep. Never nil (an empty slice, this package's own
+	// convention elsewhere).
 	Routes []string `json:"routes"`
 }
 
@@ -69,14 +68,14 @@ type ClassifyWorktreeAddInput struct {
 	// same refs snapshot, no new spawn.
 	BranchExists bool
 
-	// StartPointResolves: does the commit-ish that will actually be passed to `worktree add`
+	// StartPointResolves: does the commit-ish that will be passed to `worktree add`
 	// resolve to a real commit — StartPoint for newBranch/detach, Branch itself for
 	// existingBranch. false only when the caller supplied garbage; the dialog always offers a
 	// real branch/commit picker, so this is a defensive re-check, not the primary UX.
 	StartPointResolves bool
 }
 
-// ClassifyWorktreeAdd is D4's own classifier: five blockers in this exact order (invalidPath,
+// ClassifyWorktreeAdd is the classifier: five blockers in this exact order (invalidPath,
 // pathExists, branchCheckedOutElsewhere, branchExists, unknownStartPoint — earlier blockers do not
 // suppress later ones; every applicable blocker is reported so the dialog can name all of them at
 // once), three notes, no field ever left nil (an empty slice, never null, matching this package's
@@ -122,11 +121,11 @@ func ClassifyWorktreeAdd(in ClassifyWorktreeAddInput) WorktreeAddPreflight {
 		verdict = "blocked"
 	}
 
-	// G28 D7: offered iff branchCheckedOutElsewhere is the ONLY blocker present — unlike checkout's
-	// own detachHere route (D2/D6), which composes freely with a simultaneous dirty-tree block,
+	// Offered iff branchCheckedOutElsewhere is the ONLY blocker present — unlike checkout's
+	// own detachHere route, which composes freely with a simultaneous dirty-tree block,
 	// worktree add's own blockers (invalidPath, pathExists, branchExists, unknownStartPoint) name
 	// problems detaching cannot fix at all, so offering the route alongside any of them would be
-	// offering a button that cannot actually succeed.
+	// offering a button that cannot succeed.
 	routes := []string{}
 	if len(blockers) == 1 && blockers[0].Kind == "branchCheckedOutElsewhere" {
 		routes = append(routes, "detachHere")
@@ -162,8 +161,8 @@ type WorktreeRemovePreflight struct {
 type ClassifyWorktreeRemoveInput struct {
 	Path string
 	// IsWorktree: Path matched one of `worktree list`'s own entries exactly (by absolute path).
-	// false is F8's own security check: the app must never run a destructive command against a
-	// caller-supplied arbitrary path, worktree or not (D8) — this is what refuses that,
+	// false is the security check: the app must never run a destructive command against a
+	// caller-supplied arbitrary path, worktree or not — this is what refuses that,
 	// unconditionally, before any of the other four checks are even meaningful.
 	IsWorktree          bool
 	IsMainWorktree      bool
@@ -173,15 +172,14 @@ type ClassifyWorktreeRemoveInput struct {
 	Dirty               bool
 }
 
-// ClassifyWorktreeRemove is D8's own classifier: notAWorktree first (the security gate — every
+// ClassifyWorktreeRemove is the classifier: notAWorktree first (the security gate — every
 // other field is meaningless for a path that is not a real worktree at all), then
 // mainWorktree/currentWorktree/openInAnotherWindow/locked, each unconditional (no force route
 // unlocks any of the five — WorktreeRemoveArgs' own force flag is a single `--force`, which git
-// itself only honours for the dirty case, probe M5's own hint text ("use 'remove -f -f'...")
+// itself only honours for the dirty case, the hint text ("use 'remove -f -f'...")
 // confirms a lock needs a second, undelivered flag this app never sends). Only once ALL FIVE are
 // clear does Dirty get to turn the verdict into "dirty" with a force route and a typed
-// confirmation — fail-safe over fail-open, per this phase's own stated principle for the
-// destructive path.
+// confirmation — fail-safe over fail-open.
 func ClassifyWorktreeRemove(in ClassifyWorktreeRemoveInput) WorktreeRemovePreflight {
 	blockers := []WorktreeRemoveBlocker{}
 	if !in.IsWorktree {

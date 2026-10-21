@@ -16,7 +16,7 @@ export function initialColorState(paletteSize: number = DEFAULT_PALETTE_SIZE): C
  * through the palette, skipping any colour already in use by an immediately adjacent open
  * lane when a free one is available. Deterministic — the same state and neighbours always
  * choose the same colour, which is what keeps two layout runs over the same topology
- * byte-identical and is why the P4 visual-regression suite can screenshot it at all.
+ * byte-identical and is why the visual-regression suite can screenshot it at all.
  *
  * Bounded by `paletteSize` iterations regardless of how many neighbours are passed, so a
  * palette of size 1 (or a neighbour set covering every colour) degrades to "everything colour

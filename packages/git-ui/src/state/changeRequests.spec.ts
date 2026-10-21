@@ -1,0 +1,708 @@
+import { describe, expect, test } from 'bun:test';
+import type { CommitRecord } from '@kira/git-core';
+import { CommitStore } from '@kira/git-core';
+import type { HostStatus } from '@kira/git-ipc';
+import { sleep } from '@workbench/testing/unit/async';
+import { BridgeClient } from '../bridge/client.ts';
+import { FakeTransport } from '../testing/fakeTransport.ts';
+import { ChangeRequestState } from './changeRequests.ts';
+
+const REPO = '/repos/a';
+
+/** A deterministic 40-hex-char sha (`ShaTable`'s own width auto-detect needs a consistent
+ *  length across every append) — `n` distinguishes rows, never meant to look like a real hash.
+ *  `n` sits in the leading hex digits, not the trailing ones: `ShaTable`'s own index hashes each
+ *  sha's first 4 bytes (`hashFirstFourBytes`), so padding `n` on the right would give every row
+ *  in a large chain the same all-zero hash and turn every lookup into an O(n) linear probe. */
+function sha(n: number): string {
+  return n.toString(16).padStart(8, '0') + '0'.repeat(32);
+}
+
+function record(shaHex: string, parents: readonly string[]): CommitRecord {
+  return {
+    sha: shaHex,
+    parents,
+    author: { name: 'a', email: 'a@x.test', timestamp: 0 },
+    committer: { name: 'a', email: 'a@x.test', timestamp: 0 },
+    subject: 'c',
+    decoration: [],
+  };
+}
+
+/** A linear chain, tip first: `shas[0]` is the branch tip, `shas[i]`'s parent is `shas[i + 1]`,
+ *  the last entry a root commit. Appended tip-first (the real loading order) so every parent but
+ *  the last starts out unresolved — `CommitStore`'s own pending-parent resolution, exercised for
+ *  free rather than assumed away by appending in some other order. */
+function buildChain(length: number): { store: CommitStore; shas: string[] } {
+  const store = new CommitStore();
+  const shas = Array.from({ length }, (_, i) => sha(i));
+  for (let i = 0; i < length; i++) {
+    store.append(record(shas[i] as string, i + 1 < length ? [shas[i + 1] as string] : []));
+  }
+  return { store, shas };
+}
+
+describe('ChangeRequestState — per-commit selection debounce', () => {
+  test('selecting several shas within the debounce window issues exactly one request, for the last one', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+    transport.calls.length = 0; // setRepoId itself issues no request; keep the assertion focused.
+
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [] });
+    pr.select('sha1');
+    pr.select('sha2');
+    pr.select('sha3');
+    await sleep(350);
+
+    const resolveCalls = transport.calls.filter((c) => c.method === 'commit.resolveChangeRequests');
+    expect(resolveCalls.length).toBe(1);
+    expect(resolveCalls[0]?.params).toEqual({ repoId: REPO, sha: 'sha3' });
+    pr.dispose();
+  });
+});
+
+describe('ChangeRequestState — stale-response drop', () => {
+  test('an older selection’s response landing after a newer one is selected is dropped', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+
+    let resolveFirst: ((v: unknown) => void) | undefined;
+    transport.onRequest = (_method, params) => {
+      const sha = (params as { sha: string }).sha;
+      if (sha === 'sha-old') {
+        return new Promise((resolve) => {
+          resolveFirst = resolve;
+        });
+      }
+      return Promise.resolve({
+        kind: 'ok',
+        changeRequests: [
+          {
+            number: 2,
+            title: 'new',
+            url: 'u',
+            state: 'open',
+            headRef: 'b',
+            headSha: sha,
+            baseRef: 'main',
+            updatedAt: 0,
+          },
+        ],
+      });
+    };
+
+    pr.select('sha-old');
+    await sleep(350); // let the debounce fire and the request actually start (and hang).
+
+    pr.select('sha-new');
+    await sleep(350); // sha-new's own request resolves immediately (a plain Promise.resolve).
+
+    expect(pr.selected.value?.kind).toBe('ok');
+    if (pr.selected.value?.kind === 'ok') {
+      expect(pr.selected.value.changeRequests[0]?.headSha).toBe('sha-new');
+    }
+
+    // Now let the stale sha-old response land — it must NOT overwrite sha-new's own result.
+    resolveFirst?.({
+      kind: 'ok',
+      changeRequests: [
+        {
+          number: 1,
+          title: 'old',
+          url: 'u',
+          state: 'open',
+          headRef: 'b',
+          headSha: 'sha-old',
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+    await sleep(10);
+
+    expect(pr.selected.value?.kind).toBe('ok');
+    if (pr.selected.value?.kind === 'ok') {
+      expect(pr.selected.value.changeRequests[0]?.headSha).toBe('sha-new');
+    }
+    pr.dispose();
+  });
+});
+
+const PR_ONE = {
+  number: 1,
+  title: 't',
+  url: 'u',
+  state: 'open',
+  headRef: 'b',
+  headSha: 'sha1',
+  baseRef: 'main',
+  updatedAt: 0,
+};
+
+describe('ChangeRequestState — refsChanged keeps facts and revalidates', () => {
+  test('facts stay while the re-request runs, then the answer swaps in', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [PR_ONE] });
+    pr.select('sha1');
+    await sleep(350);
+    await pr.resolveBranch('b');
+    expect(pr.bySha.value.size).toBe(1);
+    expect(pr.byBranch.value.size).toBe(1);
+
+    let release: ((v: unknown) => void) | undefined;
+    transport.onRequest = () =>
+      new Promise((resolve) => {
+        release = resolve;
+      });
+    const genBefore = pr.generation.value;
+    transport.emit('repo.changed', { repoId: REPO, kind: 'refsChanged' });
+    await sleep();
+
+    expect(pr.bySha.value.size).toBe(1);
+    expect(pr.byBranch.value.get('b')?.number).toBe(1);
+    expect(pr.selected.value?.kind).toBe('ok');
+
+    release?.({ kind: 'ok', changeRequests: [{ ...PR_ONE, number: 2 }] });
+    await sleep();
+    expect(pr.byBranch.value.get('b')?.number).toBe(2);
+    expect(pr.generation.value).toBeGreaterThan(genBefore);
+    pr.dispose();
+  });
+
+  test('a revalidated branch that lost its PR leaves byBranch', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [PR_ONE] });
+    await pr.resolveBranch('b');
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [] });
+    transport.emit('repo.changed', { repoId: REPO, kind: 'refsChanged' });
+    await sleep();
+    expect(pr.byBranch.value.has('b')).toBe(false);
+    pr.dispose();
+  });
+
+  test('switching back to a repo shows its last-known facts at once', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [PR_ONE] });
+    await pr.resolveBranch('b');
+
+    pr.setRepoId('/repos/b');
+    expect(pr.byBranch.value.size).toBe(0);
+    pr.setRepoId(REPO);
+    expect(pr.byBranch.value.get('b')?.number).toBe(1);
+    pr.dispose();
+  });
+});
+
+describe('ChangeRequestState — changeRequestsHeadedAt badges only a PR head', () => {
+  test('a selected non-head commit gets no badge; the head does', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [PR_ONE] });
+    pr.select('other');
+    await sleep(350);
+    expect(pr.changeRequestForCommit('other')?.[0]?.number).toBe(1);
+    expect(pr.changeRequestsHeadedAt('other')).toBeUndefined();
+    expect(pr.changeRequestsHeadedAt('sha1')?.[0]?.number).toBe(1);
+    pr.dispose();
+  });
+});
+
+describe('ChangeRequestState — a disabled repo never re-requests', () => {
+  test('once a lookup answers "disabled", every later selection/branch resolve skips the network entirely', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+
+    transport.onRequest = () => ({ kind: 'disabled' });
+    pr.select('sha1');
+    await sleep(350);
+    expect(pr.selected.value?.kind).toBe('disabled');
+    const callsAfterFirst = transport.calls.length;
+
+    pr.select('sha2');
+    await sleep(350);
+    expect(pr.selected.value?.kind).toBe('disabled');
+    // No new request at all — the synchronous disabled short-circuit in select() fired instead.
+    expect(transport.calls.length).toBe(callsAfterFirst);
+
+    await pr.resolveBranch('feature');
+    expect(transport.calls.length).toBe(callsAfterFirst);
+    expect(pr.byBranch.value.has('feature')).toBe(false);
+    pr.dispose();
+  });
+
+  test('a repo change clears the disabled memo', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({ kind: 'disabled' });
+    pr.select('sha1');
+    await sleep(350);
+    expect(pr.selected.value?.kind).toBe('disabled');
+
+    pr.setRepoId('/repos/b');
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [] });
+    pr.select('sha1');
+    await sleep(350);
+    expect(pr.selected.value?.kind).toBe('ok');
+    pr.dispose();
+  });
+});
+
+describe('ChangeRequestState — unavailable surfaces HostStatus', () => {
+  test('an unavailable resolve sets status but not bySha', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+    const status: HostStatus = { kind: 'unauthenticated', reason: 'run `gh auth login`' };
+    transport.onRequest = () => ({ kind: 'unavailable', status });
+
+    pr.select('sha1');
+    await sleep(350);
+
+    expect(pr.selected.value).toEqual({ kind: 'unavailable', status });
+    expect(pr.status.value).toEqual(status);
+    expect(pr.bySha.value.has('sha1')).toBe(false);
+    pr.dispose();
+  });
+});
+
+describe('ChangeRequestState — ensureSnapshot warms only uncached branches', () => {
+  test('a branch already in byBranch is not re-requested', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = (_method, params) => ({
+      kind: 'ok',
+      changeRequests: [
+        {
+          number: 1,
+          title: 't',
+          url: 'u',
+          state: 'open',
+          headRef: (params as { branch: string }).branch,
+          headSha: 's',
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+
+    await pr.ensureSnapshot(['main', 'feature']);
+    expect(transport.calls.filter((c) => c.method === 'branch.resolveChangeRequest').length).toBe(
+      2,
+    );
+
+    await pr.ensureSnapshot(['main', 'feature', 'third']);
+    const resolveCalls = transport.calls.filter((c) => c.method === 'branch.resolveChangeRequest');
+    expect(resolveCalls.length).toBe(3); // only "third" is new.
+    pr.dispose();
+  });
+});
+
+// A branch whose resolvePr answer came back "ok" with no PR at all never landed in byBranch (only a
+// real ChangeRequestRecord goes in there), so ensureSnapshot's own dedup filter
+// (!byBranch.has(name) && !#branchRequests.has(name)) failed forever and every PR-less branch was
+// re-requested on every ensureSnapshot call, indefinitely.
+describe('ChangeRequestState — resolveBranch caches a "no PR" answer', () => {
+  test('a branch that resolves to no PR is not re-requested by a later ensureSnapshot', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [] });
+
+    await pr.ensureSnapshot(['no-pr-branch']);
+    expect(transport.calls.filter((c) => c.method === 'branch.resolveChangeRequest').length).toBe(
+      1,
+    );
+    expect(pr.byBranch.value.has('no-pr-branch')).toBe(false);
+
+    await pr.ensureSnapshot(['no-pr-branch']);
+    await pr.resolveBranch('no-pr-branch');
+    expect(transport.calls.filter((c) => c.method === 'branch.resolveChangeRequest').length).toBe(
+      1,
+    );
+    pr.dispose();
+  });
+});
+
+// ensureSnapshot used to Promise.all every branch at once — a repo with hundreds of branches fired
+// hundreds of concurrent branch.resolveChangeRequest requests with nothing capping it anywhere in
+// the stack. Proves the worker-pool bound: with 20 branches to warm and every request left hanging,
+// no more than 6 are ever in flight at once.
+describe('ChangeRequestState — ensureSnapshot bounds its own fan-out', () => {
+  test('never more than 6 branch.resolveChangeRequest requests are in flight at once', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+
+    const resolvers: Array<(v: unknown) => void> = [];
+    transport.onRequest = () =>
+      new Promise((resolve) => {
+        resolvers.push(resolve);
+      });
+
+    const branches = Array.from({ length: 20 }, (_, i) => `branch-${i}`);
+    const done = pr.ensureSnapshot(branches);
+
+    // Draining the whole queue in batches proves the cap holds throughout (not just at the very
+    // first tick) — each resolved worker immediately picks up the next branch, so a broken cap
+    // would show up as a batch bigger than 6 on a later iteration too.
+    let resolvedCount = 0;
+    while (resolvedCount < branches.length) {
+      await sleep(10); // let every worker that's going to start this round actually start.
+      expect(resolvers.length).toBeGreaterThan(0);
+      expect(resolvers.length).toBeLessThanOrEqual(6);
+      const batch = resolvers.splice(0, resolvers.length);
+      for (const resolve of batch) resolve({ kind: 'ok', changeRequests: [] });
+      resolvedCount += batch.length;
+    }
+    await done;
+
+    expect(transport.calls.filter((c) => c.method === 'branch.resolveChangeRequest').length).toBe(
+      20,
+    );
+    pr.dispose();
+  });
+});
+
+// P74 §4.2/§10: rebuildAncestry's own bounded breadth-first walk — several interacting rules
+// (first-writer-wins, a budget cut-off, a tip the loaded window never reached) whose wrong
+// answers are invisible in a screenshot, CLAUDE.md's own bar for a dedicated test here.
+describe('ChangeRequestState — rebuildAncestry: bounded ancestry walk', () => {
+  test('walks every ancestor from a PR branch tip', async () => {
+    const { store, shas } = buildChain(3);
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({
+      kind: 'ok',
+      changeRequests: [
+        {
+          number: 1,
+          title: 't',
+          url: 'u',
+          state: 'open',
+          headRef: 'main',
+          headSha: shas[0],
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+    await pr.resolveBranch('main');
+
+    pr.rebuildAncestry(store);
+
+    expect(pr.changeRequestByAncestry.value.size).toBe(3);
+    for (const s of shas) expect(pr.changeRequestForCommit(s)?.[0]?.number).toBe(1);
+    pr.dispose();
+  });
+
+  test('first-writer-wins when two PR branches reach the same ancestor', async () => {
+    const shared = sha(0);
+    const a = sha(1);
+    const b = sha(2);
+    const store = new CommitStore();
+    store.append(record(a, [shared]));
+    store.append(record(b, [shared]));
+    store.append(record(shared, []));
+
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = (_method, params) => {
+      const branch = (params as { branch: string }).branch;
+      const headSha = branch === 'branchA' ? a : b;
+      const number = branch === 'branchA' ? 1 : 2;
+      return {
+        kind: 'ok',
+        changeRequests: [
+          {
+            number,
+            title: 't',
+            url: 'u',
+            state: 'open',
+            headRef: branch,
+            headSha,
+            baseRef: 'main',
+            updatedAt: 0,
+          },
+        ],
+      };
+    };
+    // Sequential, not Promise.all — byBranch's own insertion order (and so the queue's seed
+    // order, "byBranch's own iteration order") depends on which resolveBranch settles first.
+    await pr.resolveBranch('branchA');
+    await pr.resolveBranch('branchB');
+
+    pr.rebuildAncestry(store);
+
+    // branchA resolved first, so its own PR wins the ancestor both tips share.
+    expect(pr.changeRequestForCommit(shared)?.[0]?.number).toBe(1);
+    expect(pr.changeRequestForCommit(a)?.[0]?.number).toBe(1);
+    expect(pr.changeRequestForCommit(b)?.[0]?.number).toBe(2);
+    pr.dispose();
+  });
+
+  test('a tip outside the loaded window contributes nothing', async () => {
+    const { store, shas } = buildChain(2);
+    const outsideSha = sha(999); // never appended to this store.
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = (_method, params) => {
+      const branch = (params as { branch: string }).branch;
+      const headSha = branch === 'loaded' ? shas[0] : outsideSha;
+      const number = branch === 'loaded' ? 1 : 2;
+      return {
+        kind: 'ok',
+        changeRequests: [
+          {
+            number,
+            title: 't',
+            url: 'u',
+            state: 'open',
+            headRef: branch,
+            headSha,
+            baseRef: 'main',
+            updatedAt: 0,
+          },
+        ],
+      };
+    };
+    await pr.resolveBranch('loaded');
+    await pr.resolveBranch('missing');
+
+    pr.rebuildAncestry(store);
+
+    expect(pr.changeRequestByAncestry.value.size).toBe(2); // only the loaded branch's own two rows.
+    expect(pr.changeRequestForCommit(shas[0] as string)?.[0]?.number).toBe(1);
+    expect(pr.changeRequestForCommit(outsideSha)).toBeUndefined();
+    pr.dispose();
+  });
+
+  test('a budget cutoff stops the walk mid-history', async () => {
+    // `rebuildAncestry`'s own `budget` param (defaulted to CHANGE_REQUEST_ANCESTRY_WALK_BUDGET everywhere
+    // except here) lets this prove the cutoff itself on a 5-row chain instead of building the
+    // real 50,000-row fixture the production default would need to exercise the same branch.
+    const { store, shas } = buildChain(5);
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({
+      kind: 'ok',
+      changeRequests: [
+        {
+          number: 1,
+          title: 't',
+          url: 'u',
+          state: 'open',
+          headRef: 'main',
+          headSha: shas[0],
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+    await pr.resolveBranch('main');
+
+    pr.rebuildAncestry(store, 3);
+
+    expect(pr.changeRequestByAncestry.value.size).toBe(3);
+    expect(pr.changeRequestForCommit(shas[2] as string)?.[0]?.number).toBe(1); // the last row the budget reaches.
+    expect(pr.changeRequestForCommit(shas[3] as string)).toBeUndefined(); // one row past the cutoff.
+    pr.dispose();
+  });
+
+  // The walk used to have no stopping point at the PR's own base, tagging every ancestor of the tip
+  // including the base branch's own history behind the branch point. `main`'s tip is decorated here
+  // (the only fixture in this file that is) so `rowOfBranchTip` can resolve `baseRef` locally —
+  // every other test's chain has no decorations at all, which is exactly the "base not resolvable
+  // locally" fallback path those tests already cover by continuing to walk the whole chain.
+  test('stops the walk at the PR base — commits behind it are never tagged', async () => {
+    const mainTip = sha(3);
+    const m1 = sha(4);
+    const m2 = sha(5);
+    const f1 = sha(2);
+    const f2 = sha(1);
+    const fTip = sha(0);
+    const store = new CommitStore();
+    store.append(record(fTip, [f2]));
+    store.append(record(f2, [f1]));
+    store.append(record(f1, [mainTip]));
+    store.append({
+      ...record(mainTip, [m1]),
+      decoration: [{ kind: 'branch', name: 'main', isHead: false }],
+    });
+    store.append(record(m1, [m2]));
+    store.append(record(m2, []));
+
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({
+      kind: 'ok',
+      changeRequests: [
+        {
+          number: 1,
+          title: 't',
+          url: 'u',
+          state: 'open',
+          headRef: 'feature',
+          headSha: fTip,
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+    await pr.resolveBranch('feature');
+
+    pr.rebuildAncestry(store);
+
+    // Only the three commits the branch actually adds — mainTip and everything behind it belongs
+    // to main, not to this PR.
+    expect(pr.changeRequestByAncestry.value.size).toBe(3);
+    for (const s of [fTip, f2, f1]) expect(pr.changeRequestForCommit(s)?.[0]?.number).toBe(1);
+    for (const s of [mainTip, m1, m2]) expect(pr.changeRequestForCommit(s)).toBeUndefined();
+    pr.dispose();
+  });
+
+  test('a repo switch clears changeRequestByAncestry', async () => {
+    const { store, shas } = buildChain(2);
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({
+      kind: 'ok',
+      changeRequests: [
+        {
+          number: 1,
+          title: 't',
+          url: 'u',
+          state: 'open',
+          headRef: 'main',
+          headSha: shas[0],
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+    await pr.resolveBranch('main');
+    pr.rebuildAncestry(store);
+    expect(pr.changeRequestByAncestry.value.size).toBe(2);
+
+    pr.setRepoId('/repos/b');
+    expect(pr.changeRequestByAncestry.value.size).toBe(0);
+    pr.dispose();
+  });
+});
+
+// F9: resolveBranch used to read `this.#repoId` fresh but never guard against a SAME-repo
+// refsChanged clear, and its own `finally` deleted `#branchRequests`' marker unconditionally —
+// even when a newer request for the same branch name (started after the clear) already owned it.
+describe('ChangeRequestState — F9: a stale resolveBranch across a same-repo refsChanged clear', () => {
+  test('the stale request neither overwrites the fresh answer nor lets a duplicate concurrent fetch start', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new ChangeRequestState(bridge);
+    pr.setRepoId(REPO);
+
+    const resolvers: Array<(v: unknown) => void> = [];
+    transport.onRequest = (method) =>
+      method === 'gitHost.info'
+        ? { host: null }
+        : new Promise((resolve) => {
+            resolvers.push(resolve);
+          });
+
+    // A: the first (soon-to-be-stale) resolveBranch — left hanging.
+    const requestA = pr.resolveBranch('feature');
+    await sleep();
+    expect(resolvers).toHaveLength(1);
+
+    // A same-repo refsChanged clear lands while A is still in flight — repoId itself never
+    // changes, only #clearGeneration, so a guard keyed on repoId alone would miss this entirely.
+    transport.emit('repo.changed', { repoId: REPO, kind: 'refsChanged' });
+
+    // B: a fresh resolveBranch for the SAME branch, issued after the clear (e.g. BranchPicker
+    // reopening) — #branchRequests was cleared, so this is a real new request, not a no-op.
+    const requestB = pr.resolveBranch('feature');
+    await sleep();
+    expect(resolvers).toHaveLength(2);
+
+    // A settles FIRST, with a now-stale answer.
+    resolvers[0]?.({
+      kind: 'ok',
+      changeRequests: [
+        {
+          number: 1,
+          title: 'stale',
+          url: 'u',
+          state: 'open',
+          headRef: 'feature',
+          headSha: sha(1),
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+    await requestA;
+
+    // A's own reply must never have applied (dropped as stale) NOR removed B's still-in-flight
+    // #branchRequests marker — a THIRD concurrent fetch for the same branch must not start.
+    expect(pr.byBranch.value.has('feature')).toBe(false);
+    void pr.resolveBranch('feature');
+    await sleep();
+    expect(resolvers).toHaveLength(2); // still just A and B — no duplicate fetch.
+
+    // B settles — its own answer is the one that actually applies.
+    resolvers[1]?.({
+      kind: 'ok',
+      changeRequests: [
+        {
+          number: 2,
+          title: 'fresh',
+          url: 'u',
+          state: 'open',
+          headRef: 'feature',
+          headSha: sha(2),
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+    await requestB;
+
+    expect(pr.byBranch.value.get('feature')?.number).toBe(2);
+    pr.dispose();
+  });
+});

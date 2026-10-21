@@ -13,7 +13,7 @@ const LayoutSelectAllSQL = `SELECT key, value FROM ui_layout`
 
 // ScanLeafRows drains rows (or reports queryErr) into a key -> raw-JSON map. Both apps' layout and
 // settings tables share this exact shape (one JSON-valued row per leaf key) and this scan loop was
-// byte-for-byte identical across all four (P107 I2-1); the leaf vocabulary and per-key defaults
+// byte-for-byte identical across all four; the leaf vocabulary and per-key defaults
 // stay per-repo, built from this map.
 func ScanLeafRows(rows *sql.Rows, queryErr error) (map[string]json.RawMessage, error) {
 	if queryErr != nil {
@@ -79,12 +79,12 @@ func UpsertLeafList(tx *sql.Tx, table string, leaves []Leaf) error {
 }
 
 // UpdateLeaves runs the tx/read/apply/commit frame every leaf-table Set repeats (both apps' own
-// layout and settings repos, P107 I2-1): begin a transaction, scan the leaves currently stored
+// layout and settings repos): begin a transaction, scan the leaves currently stored
 // (via selectAll when the caller prepared one, an ad-hoc query against fallbackSQL otherwise
 // inside the same tx), hand tx and the scanned map to apply — which merges the patch and upserts
 // whatever leaves it decides to write — then commit. apply's own merge/upsert logic stays
 // per-repo: a layout Set rewrites every leaf from a full merged model, a settings Set upserts only
-// the leaves its patch actually touched and re-reads via its own GetAll afterwards — both fit this
+// the leaves its patch touched and re-reads via its own GetAll afterwards — both fit this
 // one frame.
 func UpdateLeaves(db *sql.DB, selectAll *sql.Stmt, fallbackSQL string, apply func(tx *sql.Tx, stored map[string]json.RawMessage) error) error {
 	tx, err := db.Begin()

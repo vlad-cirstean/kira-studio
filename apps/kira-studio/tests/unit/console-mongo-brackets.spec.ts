@@ -1,6 +1,6 @@
-// P94 pass 3 §6 item 1: lintMongoBrackets (views/console/lint.ts) had zero coverage before this
+// lintMongoBrackets (views/console/lint.ts) had zero coverage before this
 // refactor pass, direct or indirect — the "before you touch it" bar CLAUDE.md's own adapter-
-// conformance exemption doesn't cover, so this pins its behaviour first, ahead of commit 8's
+// conformance exemption doesn't cover, so this pins its behaviour first, ahead of the
 // extraction of skipLineComment/scanStringLiteral out of it.
 import { describe, expect, test } from 'bun:test';
 import { consoleLintSource, lintMongoBrackets } from '../../frontend/src/views/console/lint';

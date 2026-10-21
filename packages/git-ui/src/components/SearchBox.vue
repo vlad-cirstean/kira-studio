@@ -87,7 +87,7 @@ const searchInputEl = useTemplateRef<{ $el: Element }>('searchInputEl');
 const ERROR_ID = 'git-search-error';
 
 /** The inline `n of N` indicator mirrors exactly what `Enter`/`Shift+Enter` step through —
- *  commit matches (judgment call 6) — so it is hidden entirely in `Refs` scope, where there is
+ *  commit matches — so it is hidden entirely in `Refs` scope, where there is
  *  nothing to page through at all; `SearchResults.vue`'s own group counts are what show a
  *  ref-hit count, in both `Refs` and `Both` scope alike. */
 const countLabel = computed(() => {
@@ -101,7 +101,7 @@ const countLabel = computed(() => {
 
 // ---------------------------------------------------------------------------------------
 // The dropdown: visible whenever the query compiles to something real, dismissible without
-// touching the query (OQ5), reopened by the next keystroke.
+// touching the query, reopened by the next keystroke.
 // ---------------------------------------------------------------------------------------
 const dropdownDismissed = ref(false);
 
@@ -305,6 +305,7 @@ defineExpose({ focusInput });
         :searching="search.searching.value"
         :tail-stale="search.tailStale.value"
         :show-body-search-affordance="showBodySearchAffordance"
+        :host="search.host.value"
         @select="selectOption"
         @hover="onHover"
         @run-body-search="search.runBodySearch()"

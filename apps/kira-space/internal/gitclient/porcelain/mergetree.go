@@ -7,12 +7,12 @@ import (
 )
 
 // MergeTreeArgs builds `merge-tree --write-tree --messages --name-only -z [--merge-base=<sha>]
-// <base> <other>` — the option before the two revisions (D13). mergeBase == "" omits
-// --merge-base, letting git pick its own; the revert prediction always supplies one (probe P4:
-// without it, git picks a base that reports a genuinely conflicting revert as clean). -z (F15,
-// available since git 2.38) is load-bearing: without it, a conflicted path containing a quote,
-// backslash, tab or LF comes back C-quoted (verified against real git 2.43), which
-// ParseMergeTreeOutput's own NUL-framed parse never has to unquote at all.
+// <base> <other>` — the option before the two revisions. mergeBase == "" omits
+// --merge-base, letting git pick its own; the revert prediction always supplies one (without it,
+// git picks a base that reports a genuinely conflicting revert as clean). -z (available since git
+// 2.38) is load-bearing: without it, a conflicted path containing a quote, backslash, tab or LF
+// comes back C-quoted (verified against real git 2.43), which ParseMergeTreeOutput's own
+// NUL-framed parse never has to unquote at all.
 func MergeTreeArgs(base, other, mergeBase string) []string {
 	args := []string{"merge-tree", "--write-tree", "--messages", "--name-only", "-z"}
 	if mergeBase != "" {
@@ -22,7 +22,7 @@ func MergeTreeArgs(base, other, mergeBase string) []string {
 }
 
 // MergePrediction is merge-tree's own parsed outcome — Kind "clean" (TreeID/Messages populated,
-// Paths empty) or "conflicts" (Paths/Messages populated). D14: exit 0 is clean, exit 1 is
+// Paths empty) or "conflicts" (Paths/Messages populated). Exit 0 is clean, exit 1 is
 // conflicts — both real, non-error outcomes; only exitCode > 1 is a spawn failure, classified by
 // the caller through gitclient.Classify, never here.
 type MergePrediction struct {
@@ -43,9 +43,9 @@ func splitNULTerminated(raw []byte) []string {
 	return parts
 }
 
-// ParseMergeTreeOutput parses MergeTreeArgs' own NUL-framed stdout (F15: -z, not the default LF
-// framing a conflicted path can come back C-quoted under), gated on exitCode exactly as D14
-// requires: 0 or 1 only, anything else is the caller's own error to classify, never this parser's.
+// ParseMergeTreeOutput parses MergeTreeArgs' own NUL-framed stdout (-z, not the default LF
+// framing a conflicted path can come back C-quoted under), gated on exitCode: 0 or 1 only,
+// anything else is the caller's own error to classify, never this parser's.
 //
 // The stream (probed against real git 2.43.0, git 2.38+'s own -z shape): <treeID>\0, then the
 // CONFLICTED paths only (never every changed path — confirmed: a clean auto-merge's own paths

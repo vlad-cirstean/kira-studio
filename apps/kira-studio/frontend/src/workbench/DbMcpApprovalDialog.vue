@@ -21,14 +21,14 @@ import { useDbMcpStore } from '../state/dbmcp';
 const props = defineProps<{ entry: RoutedPrompt; more: number }>();
 const dbMcpStore = useDbMcpStore();
 
-// M2 §5.4/§7.4: a dialog gating run_query in prompt mode. An AI client is blocked while the human decides on the one pending approval the
+// A dialog gating run_query in prompt mode. An AI client is blocked while the human decides on the
+// one pending approval the
 // FIFO queue presents at a time, with a timeout — a dock or a notification queue would let more
 // than one sit unresolved. Renders nothing unless the pending request is this entry's.
 //
-// P108 Part 12 F2 fixed this to key on requestId, not a `pending !== null` boolean — a queue
+// Keys on requestId, not a `pending !== null` boolean — a queue
 // advance (A approved/denied while B is already queued) swaps pending from A straight to B with no
-// null in between, and the old boolean source never re-fired for that swap. P113 F5 extracts that
-// fix into usePendingDecision.
+// null in between, and the old boolean source never re-fired for that swap.
 const { remainingSeconds } = usePendingDecision({
   pendingId: () => dbMcpStore.approval.pending?.requestId,
   expiresAtMs: () => dbMcpStore.approval.pending?.expiresAtMs,
@@ -49,9 +49,9 @@ const classBody = computed(() => {
   return t(key, { connection: pending.connectionName, kind: pending.kind });
 });
 
-// M3 §6.2/§6.3: the same dialog, one more reason to raise it — title and lede vary by reason,
+// The same dialog, one more reason to raise it — title and lede vary by reason,
 // everything else (Deny focused on mount, Escape denies, the countdown, the queue count, the
-// statement <pre>) stays exactly as M2 shipped it. A heavy query and a write are the same keyboard
+// statement <pre>) stays exactly as shipped. A heavy query and a write are the same keyboard
 // interaction.
 const dialogTitle = computed(() =>
   dbMcpStore.approval.pending?.reason === 'heavy'
@@ -71,7 +71,7 @@ const heavyLede = computed(() => {
   });
 });
 
-// P108 Part 12 F2: takes the request id as an explicit argument, bound in the template from the
+// Takes the request id as an explicit argument, bound in the template from the
 // currently-rendered request (below), rather than re-reading dbMcpStore.approval.pending fresh at
 // click time — combined with the Dialog's own :key (below), a queue swap mid-click destroys and
 // recreates the buttons, so a click that started on request A's button can no longer complete as a

@@ -69,7 +69,7 @@ function open(): void {
       size="kira-lg"
       variant="dialog"
       class="w-23 shrink-0 "
-      :class="opens ? undefined : ACTION_CLASS.claude"
+      :class="opens ? undefined : ACTION_CLASS.agent"
       :pending="takeOver.pending.has(view.session.id)"
       data-testid="ade-all-action"
       @click.stop="opens ? open() : takeOver.request(view.session.id)"

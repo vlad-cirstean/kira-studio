@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,46 +8,18 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/kirathecat/kira-studio/scripts/internal/runledger"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 const (
-	failCharge  = 0.25
 	callTimeout = 15 * time.Minute
 	retryDelay  = 30 * time.Second
 )
-
-type spendLine struct {
-	Slug    string  `json:"slug"`
-	Try     int     `json:"try"`
-	OK      bool    `json:"ok"`
-	CostUSD float64 `json:"costUsd"`
-	Charged float64 `json:"charged"`
-	WallMs  int64   `json:"wallMs"`
-}
-
-func totalCharged(runs string) float64 {
-	f, err := os.Open(filepath.Join(runs, "spend.jsonl"))
-	if err != nil {
-		return 0
-	}
-	defer f.Close()
-	var sum float64
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		var s spendLine
-		if json.Unmarshal(sc.Bytes(), &s) == nil {
-			sum += s.Charged
-		}
-	}
-	return sum
-}
 
 type distilled struct {
 	Lines      []string
@@ -110,24 +81,6 @@ func distillOne(ctx context.Context, bin, text string) (distilled, error) {
 	return d, nil
 }
 
-var refusalRe = regexp.MustCompile(`the limit is|splits into|too many facts|spend cap|invalid`)
-var capSpentRe = regexp.MustCompile(`([0-9.]+) USD spent`)
-
-var rateLimitRe = regexp.MustCompile(`(?i)rate.?limit|usage limit|\b429\b|overloaded|too many requests|limit reached`)
-
-func isRateLimit(err error) bool { return rateLimitRe.MatchString(err.Error()) }
-
-func isRefusal(err error) bool { return refusalRe.MatchString(err.Error()) }
-
-func failedCharge(err error) float64 {
-	if m := capSpentRe.FindStringSubmatch(err.Error()); m != nil {
-		if v, e := strconv.ParseFloat(m[1], 64); e == nil {
-			return v
-		}
-	}
-	return failCharge
-}
-
 // estimate is the worst-case envelope from the pilot: 0.06 USD fixed plus 0.012 per 1,000 chars.
 func estimate(chars int) float64 { return 0.06 + 0.012*float64(chars)/1000 }
 
@@ -137,34 +90,6 @@ type distillOpts struct {
 	maxUSD       float64
 	retryFall    bool
 	only         map[string]bool
-}
-
-type ledger struct {
-	mu       sync.Mutex
-	spent    float64
-	inflight float64
-	stopped  bool
-	maxUSD   float64
-	path     string
-}
-
-func (l *ledger) reserve(est float64) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if l.stopped || (l.maxUSD > 0 && l.spent+l.inflight+est > l.maxUSD) {
-		l.stopped = true
-		return false
-	}
-	l.inflight += est
-	return true
-}
-
-func (l *ledger) settle(est float64, s spendLine) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.inflight -= est
-	l.spent += s.Charged
-	_ = appendLine(l.path, s)
 }
 
 func runDistill(ctx context.Context, o distillOpts, chapters []string) error {
@@ -185,21 +110,21 @@ func runDistill(ctx context.Context, o distillOpts, chapters []string) error {
 			return fmt.Errorf("build kira-space: %w", err)
 		}
 	}
-	led := &ledger{maxUSD: o.maxUSD, path: filepath.Join(o.runs, "spend.jsonl"), spent: totalCharged(o.runs)}
+	led := runledger.New(o.runs, o.maxUSD)
 	for _, ch := range sortChapters(chapters, true) {
 		if err := distillChapter(ctx, o, led, bin, ch); err != nil {
 			return err
 		}
-		if led.stopped {
-			fmt.Fprintf(os.Stderr, "stopped: spend cap %.2f USD reached (charged %.4f)\n", o.maxUSD, led.spent)
+		if led.Stopped() {
+			fmt.Fprintf(os.Stderr, "stopped: spend cap %.2f USD reached (charged %.4f)\n", o.maxUSD, led.Total())
 			break
 		}
 	}
-	fmt.Printf("charged total %.4f USD\n", led.spent)
+	fmt.Printf("charged total %.4f USD\n", led.Total())
 	return nil
 }
 
-func distillChapter(ctx context.Context, o distillOpts, led *ledger, bin, ch string) error {
+func distillChapter(ctx context.Context, o distillOpts, led *runledger.Ledger, bin, ch string) error {
 	if err := checkClean(ch); err != nil {
 		return err
 	}
@@ -242,7 +167,7 @@ func distillChapter(ctx context.Context, o distillOpts, led *ledger, bin, ch str
 	)
 	for _, u := range todo {
 		est := estimate(len(u.Text))
-		if !led.reserve(est) {
+		if !led.Reserve(est) {
 			break
 		}
 		sem <- struct{}{}
@@ -263,7 +188,7 @@ func distillChapter(ctx context.Context, o distillOpts, led *ledger, bin, ch str
 	return fail
 }
 
-func distillUnit(ctx context.Context, bin string, u Unit, commit string, led *ledger, est float64) Record {
+func distillUnit(ctx context.Context, bin string, u Unit, commit string, led *runledger.Ledger, est float64) Record {
 	rec := Record{Slug: u.Slug, ID: u.ID, Title: u.Title, Status: u.Status, InputSha256: u.Sha, InChars: len([]rune(u.Text)), SourceCommit: commit}
 	var total time.Duration
 	var lastErr error
@@ -273,11 +198,9 @@ func distillUnit(ctx context.Context, bin string, u Unit, commit string, led *le
 		d, err := distillOne(ctx, bin, u.Text)
 		wall := time.Since(start)
 		total += wall
-		if err != nil && isRateLimit(err) && ctx.Err() == nil {
+		if err != nil && runledger.IsRateLimit(err) && ctx.Err() == nil {
 			// rate limit is not a unit failure: wait, retry same try, charge nothing
-			led.mu.Lock()
-			_ = appendLine(led.path, spendLine{Slug: u.Slug, Try: try, WallMs: wall.Milliseconds()})
-			led.mu.Unlock()
+			led.Note(runledger.SpendLine{Slug: u.Slug, Try: try, WallMs: wall.Milliseconds()})
 			fmt.Fprintf(os.Stderr, "  %s rate limited, waiting %s\n", u.Slug, backoff)
 			select {
 			case <-time.After(backoff):
@@ -287,19 +210,16 @@ func distillUnit(ctx context.Context, bin string, u Unit, commit string, led *le
 			try--
 			continue
 		}
-		s := spendLine{Slug: u.Slug, Try: try, OK: err == nil, WallMs: wall.Milliseconds()}
+		s := runledger.SpendLine{Slug: u.Slug, Try: try, OK: err == nil, WallMs: wall.Milliseconds()}
 		if err == nil {
 			s.CostUSD, s.Charged = d.CostUSD, d.CostUSD
 		} else {
-			s.Charged = failedCharge(err)
+			s.Charged = runledger.FailedCharge(err)
 		}
-		if try == 2 || err == nil || isRefusal(err) {
-			led.settle(est, s)
+		if try == 2 || err == nil || runledger.IsRefusal(err) {
+			led.Settle(est, s)
 		} else {
-			led.mu.Lock()
-			led.spent += s.Charged
-			_ = appendLine(led.path, s)
-			led.mu.Unlock()
+			led.Book(s)
 		}
 		if err == nil {
 			rec.State, rec.Lines, rec.Unresolved, rec.CostUSD = stateOK, d.Lines, d.Unresolved, d.CostUSD
@@ -307,7 +227,7 @@ func distillUnit(ctx context.Context, bin string, u Unit, commit string, led *le
 			return rec
 		}
 		lastErr = err
-		if isRefusal(err) {
+		if runledger.IsRefusal(err) {
 			break
 		}
 		if try == 1 {

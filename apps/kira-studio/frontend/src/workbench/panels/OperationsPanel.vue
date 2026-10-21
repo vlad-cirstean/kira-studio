@@ -4,7 +4,7 @@ import { splitSqlStatements } from '@shared/domain/sqlSplit';
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
-import { displayValue } from '@workbench/behaviour/format';
+import { displayValue, formatElapsed } from '@workbench/behaviour/format';
 import { logError } from '@workbench/bridge/log';
 import OpLogPanel from '@workbench/components/OpLogPanel.vue';
 import { type OpLogColumn, opLogMenuItems } from '@workbench/lib/opLog';
@@ -140,11 +140,22 @@ function menuFor(record: OpRecord): MenuItem[] {
       icon: ICON.run,
       // P23 D1(c): a truncated command is only a 64 KiB prefix of what actually ran — Copy
       // command stays enabled (copying a prefix is honest and useful), but Re-run must not.
-      disabled: !record.command || !canSql || record.commandTruncated,
+      disabled:
+        !record.command || !canSql || record.commandTruncated || record.kind === 'preconnect',
       run: () => void onRerun(record),
     },
     cancel,
   ];
+}
+
+// Counts the preconnect delay down in the command cell; falls back to the command once it elapses.
+function preconnectNote(record: OpRecord, now: number): string | null {
+  if (record.kind !== 'preconnect' || !record.delayMs) return null;
+  const left = Date.parse(record.startedAt) + record.delayMs - now;
+  if (left <= 0) return null;
+  return t('studio.operations.preconnectDelay.status', {
+    remaining: formatElapsed(Math.ceil(left / 1000) * 1000),
+  });
 }
 </script>
 
@@ -157,6 +168,7 @@ function menuFor(record: OpRecord): MenuItem[] {
     :columns="columns"
     :clear-hint="t('studio.operations.clear.hint')"
     :menu-for="menuFor"
+    :running-note="preconnectNote"
     @clear="opsStore.clearOps"
     @cancel="(record) => opsStore.cancelOp(record.id)"
   >
@@ -182,7 +194,7 @@ function menuFor(record: OpRecord): MenuItem[] {
               ? t('studio.operations.commandTruncated.status', { command: record.command ?? '' })
               : t('common.command.label', { value: record.command ?? '' })
           "
-          :language="record.kind === 'http' ? 'plain' : 'sql'"
+          :language="record.kind === 'http' || record.kind === 'preconnect' ? 'plain' : 'sql'"
           :sql-dialect="opSqlDialect(record)"
           readonly
           :single-line="true"

@@ -1,4 +1,4 @@
-// P21 round 3 functional finding 5: sortSpecToText always emitted bare, unquoted keys, while
+// sortSpecToText always emitted bare, unquoted keys, while
 // parseSortText's bare-key alternative only matches [A-Za-z0-9_.$]+ — the file's own header
 // comment states the two "must round-trip each other exactly", but a field name outside that set
 // (a hyphen, a space, `@`, non-ASCII) survived parsing only in its quoted form and was then

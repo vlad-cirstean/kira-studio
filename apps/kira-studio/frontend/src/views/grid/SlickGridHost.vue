@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { foldRulesByColumn, type MaskingRule } from '@shared/domain/mask';
-import type { ForeignKeyMeta, ObjectMeta } from '@shared/domain/tree';
+import type { ColumnMeta, ForeignKeyMeta, ObjectMeta } from '@shared/domain/tree';
 import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { useQuery } from '@tanstack/vue-query';
@@ -135,16 +135,11 @@ const tabsStore = useTabsStore();
 const settingsStore = useSettingsStore();
 const gridViewStore = useGridViewStore();
 
-// P22 spike (§6 D3) — a from-scratch Vue host for SlickGrid, on editor/CodeMirrorHost.vue's own
+// A from-scratch Vue host for SlickGrid, on editor/CodeMirrorHost.vue's own
 // established shape for wrapping an imperative library: one ref root div, the instance held in a
 // plain `let` (never a ref/shallowRef/reactive — see that file's own comment for why: Vue must not
 // see the grid, its rowsCache or its DOM, or every internal object SlickGrid touches on every
 // render gets proxied), constructed in onMounted, destroyed in onUnmounted.
-//
-// Pass A shipped this file scoped to decode/bridge/gutter/colour/theme/runway only (§7.0); Pass B
-// (P22-slickgrid-pass-b.md) is building it out to full parity, feature by feature, each landing as
-// its own commit per that plan's §9 — this file's own comments cite the commit/decision each piece
-// belongs to as they land.
 const props = defineProps<{ tabId: string }>();
 
 // See kiraSlickGrid.ts's own comment: Column<T>'s `field` type is a recursive
@@ -160,11 +155,10 @@ function tab() {
 
 const { single: rowHeight } = useRowHeight();
 
-// Same P24 D3/D4 split DataGrid.vue's own displayRows/displayRowCount use — kept as a plain,
-// non-reactive read at mount and on an explicit page reload (below), not a live `watch` on the
-// search state: Pass A's own thick-spike list (§7.0) is decode/bridge/gutter/colour/theme/runway,
-// not live search-filter wiring, which stays Pass B scope. The un-filtered common case (the vast
-// majority of a session) is unaffected either way.
+// Same split DataGrid.vue's own displayRows/displayRowCount use — kept as a plain, non-reactive
+// read at mount and on an explicit page reload (below), not a live `watch` on the search state:
+// the scope is decode/bridge/gutter/colour/theme/runway, not live search-filter wiring. The
+// un-filtered common case (the vast majority of a session) is unaffected either way.
 function currentDisplayRows(): number[] | null {
   return matchedRows(props.tabId);
 }
@@ -187,8 +181,8 @@ function gutterFormatter(
   return String(formatterCtx.rowNumberBase + dataContext.row + 1);
 }
 
-// §6 D6 point 2 — structure is per-cell: a plain string for the common case (-> textContent, F6).
-// P22 iter2-pacing D5: NULL and truncated no longer build a DocumentFragment — SlickGrid's own
+// Structure is per-cell: a plain string for the common case (-> textContent).
+// NULL and truncated no longer build a DocumentFragment — SlickGrid's own
 // FormatterResultWithText.addClasses folds straight into the cell's own className
 // (appendCellHtml, dist/esm/index.js:9962), so `.cell-null`/`.cell-truncated` land on the
 // `.slick-cell` itself, and `.toolTip` becomes a `title` on the cell (:9969) — the truncation
@@ -204,12 +198,12 @@ function cellFormatter(
   dataContext: RowHandle,
 ): string | FormatterResultWithText | HTMLElement {
   const view = value as { text: string; isNull: boolean; truncated: boolean; masked?: boolean };
-  // C9/§5 D9 — the one place a formatter returns DOM, against `-iter2-pacing` D5's measured
+  // The one place a formatter returns DOM, against `-iter2-pacing` the measured
   // "text, never DOM" rule: bounded to the insert region alone (typically 1-5 rows), and the
   // normal path just above/below is untouched. Self-contained once built: every keystroke stages
   // straight into pendingChanges via the grid root's own delegated `input` listener (onMounted,
   // below), never back through this formatter, so a value survives even if this cell is later
-  // invalidated and this branch simply rebuilds a fresh element from the same staged state.
+  // invalidated and this branch rebuilds a fresh element from the same staged state.
   if (dataContext.insertId !== undefined) {
     const input = document.createElement('input');
     input.className = 'cell-input';
@@ -223,17 +217,17 @@ function cellFormatter(
     }
     return input;
   }
-  // C11/§5 D11c — the *cheap* precheck only (a Set lookup, not the full `cellNavEntry` a click on
+  // The *cheap* precheck only (a Set lookup, not the full `cellNavEntry` a click on
   // this column's own nav button computes lazily — navEntryAt, below): whether this column is
   // fk-or-pk and this cell isn't NULL. `placeNavButtonsForRenderedCells` rides on `.has-nav`
-  // (below) to know which rendered cells get a button at all (item 12's always-visible redesign);
-  // `.fk` no longer carries a colour of its own (item 13), only which icon glyph the button gets.
+  // (below) to know which rendered cells get a button at all;
+  // `.fk` no longer carries a colour of its own, only which icon glyph the button gets.
   const name = String(columnDef.field);
   const isFk = !view.isNull && navColumns.fk.has(name);
   const hasNav = isFk || (!view.isNull && navColumns.pk.has(name));
   const navClasses = hasNav ? (isFk ? 'fk has-nav' : 'has-nav') : '';
   if (view.isNull) return { text: nullCellText(), addClasses: 'cell-null' };
-  // M5 §6.2: the one visual affordance keeping a user from misreading the preview as real data —
+  // The one visual affordance keeping a user from misreading the preview as real data —
   // `.cell-masked` (slickTheme.css) styles the `#TAG` suffix muted. `view.masked` is only ever
   // true from maskPreview.ts's own transform, never from the plain decode path, so this is a no-op
   // (`addClasses` stays exactly what it was) whenever the preview is off.
@@ -253,10 +247,9 @@ function rt() {
   return gridViewStore.runtime[props.tabId];
 }
 
-// P22 Pass B, C3 — the row-shortcut/copy/paste plumbing needs the same writability/identity
-// predicates DataGrid.vue's own computeds provide; plain functions here (not `computed`s) since
-// nothing below reads them from inside the render path (D0 is about that path specifically, not
-// about app logic in general) and every call site is already an event handler.
+// The row-shortcut/copy/paste plumbing needs the same writability/identity predicates
+// DataGrid.vue's own computeds provide; plain functions here (not `computed`s) since nothing below
+// reads them from inside the render path and every call site is already an event handler.
 function hasPrimaryKey(): boolean {
   return pendingChangesStore.pageHasFullPrimaryKey(props.tabId);
 }
@@ -279,10 +272,10 @@ function maskPreviewOn(): boolean {
   return !!rt()?.maskPreview;
 }
 
-// Gates whether double-click/Enter starts an inline edit (D8/C8) — the toolbar's own add/preview/
+// Gates whether double-click/Enter starts an inline edit — the toolbar's own add/preview/
 // commit/discard buttons are gated on writability alone, never on hasPrimaryKey.
 //
-// M5 §6.4: `&& !maskPreviewOn()` is the whole edit lockout — the worst bug this feature could ship
+// `&& !maskPreviewOn()` is the whole edit lockout — the worst bug this feature could ship
 // is a user committing a masked value into their database, and every write path already routes
 // through this one predicate: the `editable` grid option (the `canEditTableReactive` watch,
 // below), `SelectedCell.onEdit`/`onRevert` (the publication watch further down, which reads
@@ -292,21 +285,20 @@ function maskPreviewOn(): boolean {
 function canEditTable(): boolean {
   return isWritable() && hasPrimaryKey() && !!caps()?.canUpdate && !maskPreviewOn();
 }
-// P36 D26: deliberately not folded into canEditTable — an engine could offer one of
+// Deliberately not folded into canEditTable — an engine could offer one of
 // canUpdate/canDelete without the other.
 //
-// M5 §6.4: `&& !maskPreviewOn()` added defensively, beyond the plan's own explicit list (which
-// names canEditTable and DataToolbar.vue's isWritable, not this) — a row delete is still a write
-// path against rows the user cannot currently read clearly, and the same lockout principle
-// applies: never let masked-preview state reach a real mutation.
+// `&& !maskPreviewOn()` added defensively — a row delete is still a write path against rows the
+// user cannot currently read clearly, and the same lockout principle applies: never let
+// masked-preview state reach a real mutation.
 function canDeleteRows(): boolean {
   return isWritable() && hasPrimaryKey() && !!caps()?.canDelete && !maskPreviewOn();
 }
 
-// §5 D8 — a `computed` purely to trigger the `editable`-sync watch below via `grid.setOptions`
+// A `computed` purely to trigger the `editable`-sync watch below via `grid.setOptions`
 // (rowHeight's own computed+watch pair, just below, is the identical precedent); canEditTable()
 // itself deliberately stays a plain function, not a computed, since every other call site is an
-// event handler outside SlickGrid's synchronous render path (D0 is about that path specifically).
+// event handler outside SlickGrid's synchronous render path.
 // `pageVersion.n` is read explicitly (not just through hasPrimaryKey()'s own getPage() call)
 // because `page/store.ts`'s `pages` map is a plain `Map`, not `reactive()` — `pageVersion.n` is
 // that store's own dedicated reactive signal for "a page was set/dropped", the same one the
@@ -318,12 +310,12 @@ const canEditTableReactive = computed(() => {
   return canEditTable();
 });
 
-// C13/§5 D13 — the two empty states, overlaid as absolutely-positioned siblings over the always-
+// The two empty states, overlaid as absolutely-positioned siblings over the always-
 // mounted grid root (template, below) rather than swapping it out: this host's own root div IS
 // what SlickGrid holds references to, and `v-if`-ing it away would unmount the element mid-life.
 // Reactive `computed`s are fine here, unlike `currentDisplayRows()`'s own deliberately-plain twin
-// above — the template is outside SlickGrid's synchronous render path entirely (D0 is about that
-// path specifically), the same reasoning the row-coloring class binding already relies on.
+// above — the template is outside SlickGrid's synchronous render path entirely, the same reasoning
+// the row-coloring class binding already relies on.
 // `pageVersion.n` is read explicitly for the identical reason `canEditTableReactive` reads it,
 // just above: `getPage()` itself is not reactive (`page/store.ts`'s own plain `Map`).
 const showNoRows = computed(() => {
@@ -331,10 +323,9 @@ const showNoRows = computed(() => {
   const p = getPage(props.tabId);
   return !!p && p.rowCount === 0;
 });
-// P24 D8: filtering to zero matches is a distinct empty state from "the table is empty" (LAW 15
-// names both by name) — but a pending insert row is work in progress, not a search result, so its
-// presence keeps the grid itself on screen even with zero real matches (DataGrid.vue's own
-// identical guard, ported verbatim).
+// Filtering to zero matches is a distinct empty state from "the table is empty" — but a pending
+// insert row is work in progress, not a search result, so its presence keeps the grid itself on
+// screen even with zero real matches (DataGrid.vue's own identical guard, ported verbatim).
 const showNoMatchingRows = computed(() => {
   void pageVersion.n;
   const p = getPage(props.tabId);
@@ -359,10 +350,10 @@ function qualifiedName(): string {
     .join('.');
 }
 
-// C7/§5 D7 — the current display column order, read fresh (not a computed: nothing here may
-// create a Vue reactive dependency this file's own imperative calls could re-enter, D0). Every
-// menu/clipboard/nav function below takes it as a plain parameter, matching rowValues.ts's own
-// signatures (content, no SlickGrid API, §1).
+// The current display column order, read fresh (not a computed: nothing here may create a Vue
+// reactive dependency this file's own imperative calls could re-enter). Every menu/clipboard/nav
+// function below takes it as a plain parameter, matching rowValues.ts's own signatures (content,
+// no SlickGrid API).
 function currentOrder(): string[] {
   const p = getPage(props.tabId);
   return p ? resolveColumnOrder(p, tab()?.state.columnOrder ?? null) : [];
@@ -372,9 +363,9 @@ function currentOrder(): string[] {
 // in this file already has props.tabId and currentOrder() on hand, so binding them here once
 // keeps those call sites reading exactly like DataGrid.vue's own did.
 //
-// M5 §6.5/§6.6: the ONE place this file's own `displayCell` masks — every call site (the
+// The ONE place this file's own `displayCell` masks — every call site (the
 // SelectedCell publish watch below, so the cell editor panel shows the masked text; the context
-// menus' own `text`/copy paths, so "copy follows display" per §6.6) reads through here, so a
+// menus' own `text`/copy paths, so "copy follows display") reads through here, so a
 // future call site inherits the masking rule for free rather than needing its own opt-in. A
 // staged edit (`view.staged`) is never masked — moot in practice (the toggle is disabled while
 // `hasPending`, so nothing can be staged while masked), kept as an explicit early return rather
@@ -387,12 +378,12 @@ function displayCell(row: number, displayCol: number): DisplayCellView {
   const masked = maskTransform(view, field);
   return { ...view, text: masked.text, isNull: masked.isNull, truncated: masked.truncated };
 }
-// M5 §6.6: "copy follows display" — row copy must not paste real values while the preview is
-// showing masked ones. Post-processes rvRowSnapshot's own values through the same transform
-// `displayCell` above uses. (Duplicate row is a write path, not a read one — `duplicateAsInsert`,
-// menu.ts's own `run`, reads `cell()` directly rather than through this wrapper at all, but it
-// never runs while masked regardless: menu.ts's own `disabled: !ctx.canEdit` already blocks it,
-// since `canEditTable()` folds in `!maskPreviewOn()`.)
+// "copy follows display" — row copy must not paste real values while the preview is showing masked
+// ones. Post-processes rvRowSnapshot's own values through the same transform `displayCell` above
+// uses. (Duplicate row is a write path, not a read one — `duplicateAsInsert`, menu.ts's own `run`,
+// reads `cell()` directly rather than through this wrapper at all, but it never runs while masked
+// regardless: menu.ts's own `disabled: !ctx.canEdit` already blocks it, since `canEditTable()`
+// folds in `!maskPreviewOn()`.)
 function rowSnapshot(row: number): RowSnapshot {
   const snap = rvRowSnapshot(props.tabId, getPage(props.tabId), currentOrder(), row);
   if (!maskPreviewOn() || maskRulesByColumn.size === 0) return snap;
@@ -465,9 +456,8 @@ function keyLabelFor(
   return null;
 }
 
-// P42 D19/D20 — headerCellAttrs is a plain static attribute bag (F3), so tooltipAttrs (views/
-// shared/page/columns.ts, P107 T2-17) writes the same shape AttributeTooltip.vue's own bridge
-// (packages/theme/src/components/, hoisted from packages/workbench/ at P131 Part 2) reads by
+// headerCellAttrs is a plain static attribute bag, so tooltipAttrs (views/shared/page/columns.ts)
+// writes the same shape AttributeTooltip.vue's own bridge (packages/theme/src/components/) reads by
 // hand: data-kira-tip (the plain, newline-joined a11y text) and data-kira-tip-parts (the
 // structured JSON a real TooltipContent would render) plus aria-label — since no Vue component
 // tree mounts over SlickGrid-owned DOM.
@@ -478,14 +468,14 @@ function keyLabelFor(
 function dataTypeFor(
   name: string,
   descriptor: ColumnDescriptor | undefined,
-  metaByName: Map<string, { dataType: string; comment: string | null }>,
+  metaByName: Map<string, ColumnMeta>,
 ): string {
   return metaByName.get(name)?.dataType ?? descriptor?.dataType ?? '';
 }
 
-/** §6 D6 point 1 — colour and alignment are per-column and static: a `tc-<category>` class plus
+/** Colour and alignment are per-column and static: a `tc-<category>` class plus
  *  `kira-align-right` where the column's own descriptor says numeric. Nine categories collapse to
- *  the five `categoryForTypeClass` can actually return; slickTheme.css carries all five anyway
+ *  the five `categoryForTypeClass` can return; slickTheme.css carries all five anyway
  *  (that file's own comment says why). */
 function buildColumns(
   page: ReturnType<typeof getPage>,
@@ -518,12 +508,19 @@ function buildColumns(
     const descriptor = byName.get(name);
     const classes = [`tc-${descriptor ? categoryForTypeClass(descriptor.typeClass) : 'other'}`];
     if (descriptor && alignmentFor(descriptor) === 'right') classes.push('kira-align-right');
+    const keyLabel = keyLabelFor(descriptor, name, fkNames);
+    const m = metaByName.get(name);
     const tooltip = columnHeaderTooltip(
       descriptor ?? { name, typeClass: 'other' },
       dataTypeFor(name, descriptor, metaByName),
-      metaByName.get(name)?.comment,
+      {
+        comment: m?.comment,
+        key: keyLabel,
+        nullable: m?.nullable ?? null,
+        generated: descriptor?.generated ?? false,
+      },
     );
-    // P16 D4: a per-column floor that knows what the header actually renders — padding, the sort
+    // A per-column floor that knows what the header renders — padding, the sort
     // indicator (every column here is sortable, below) and the PK/FK badge (keyLabelFor is the
     // same call onHeaderCellRendered makes for the badge itself, so a column widens for its badge
     // at the same moment the badge appears). Fed into both `width` and `minWidth` below: fixing
@@ -531,16 +528,16 @@ function buildColumns(
     const floor = headerAwareMinWidth(name, {
       padding: 16,
       sortControl: 16, // P28 D4 — was 22; see HeaderChrome.sortControl's own comment.
-      keyBadge: keyLabelFor(descriptor, name, fkNames) ? 20 : 0,
+      keyBadge: keyLabel ? 20 : 0,
     });
     cols.push({
       id: name,
       field: name,
       name,
-      // Clamped to `floor` even for a stored width (found against the real app: a width read
-      // back from a prior resize/session was never re-clamped, only an interactive drag was, so
-      // a column persisted at a pre-floor width — as narrow as one character for something as
-      // short as "id" — forever, across every reload, until manually widened again).
+      // Clamped to `floor` even for a stored width (a width read back from a prior resize/session
+      // was never re-clamped, only an interactive drag was, so a column persisted at a pre-floor
+      // width — as narrow as one character for something as short as "id" — forever, across every
+      // reload, until manually widened again).
       width: Math.max(floor, storedWidths[name] ?? settledWidths[name] ?? DEFAULT_COLUMN_WIDTH),
       // F9 — the app's own resize floor; onColumnsResized persists the drag (below). Header-aware
       // (D4) rather than the flat columns.ts MIN_WIDTH — the mismatch between a flat floor and a
@@ -581,27 +578,27 @@ function insertRowColumns(order: readonly string[]): NonNullable<ItemMetadata['c
   return columns;
 }
 
-// M5 §6.2/§6.3: this tab's own folded mask rules (by lowercased column name) and precomputed tag
-// cache. Plain module-scope-shaped `let`s, not `ref`/`reactive` — the same D0 rule everything else
+// This tab's own folded mask rules (by lowercased column name) and precomputed tag
+// cache. Plain module-scope-shaped `let`s, not `ref`/`reactive` — the same rule everything else
 // on this synchronous render path follows (`formatterCtx`, `editorCtx`): `dataSourceState` reads
 // them synchronously, and the two refresh functions below (async, since resolving the correlation
 // key and computing HMAC tags both are) are the only writers, always followed by a `setState` +
-// `invalidateAllRows` + `render` to actually show the result — never awaited inline from
+// `invalidateAllRows` + `render` to show the result — never awaited inline from
 // `dataSourceState` itself, which must stay synchronous.
 let maskRulesByColumn = new Map<string, MaskingRule>();
 let maskTagCache = new Map<string, string>();
-// Perf (finding #16, M6): one shared transform instance per (maskRulesByColumn, maskTagCache)
-// pair — rebuilt only here and in refreshMaskTagCache below, whenever either actually changes —
+// Perf: one shared transform instance per (maskRulesByColumn, maskTagCache)
+// pair — rebuilt only here and in refreshMaskTagCache below, whenever either changes —
 // instead of every displayCell/rowSnapshot/columnValuesFor/dataSourceState call constructing (and
 // memoizing nothing in) its own. displayCell alone runs once per visible cell on every render.
 let maskTransform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
 
-// P99 §5.5: the sole reactive trigger for a refold — proactively enabled (not deferred to the
+// The sole reactive trigger for a refold — proactively enabled (not deferred to the
 // first preview toggle) so `refreshMaskFolding()` has real data the instant the user turns preview
-// on, and TanStack Query's own cache means a tab that's simply reactivating (remounting on
+// on, and TanStack Query's own cache means a tab that's reactivating (remounting on
 // tab-switch, not a genuinely new table) does not re-fetch rules already cached for this
 // connection. `foldMaskRulesOnly` below still reads via the plain, non-reactive `maskRulesFor` —
-// only the watch below (M6 finding #7) needs this ref's reactivity, the D0 render path never does.
+// only the watch below needs this ref's reactivity, the render path never does.
 const maskRulesQuery = useQuery(() => ({
   queryKey: maskRulesQueryKey(tab()?.connectionId ?? ''),
   queryFn: () => loadMaskRules(tab()?.connectionId ?? ''),
@@ -622,7 +619,7 @@ function refreshMaskFolding(): void {
   maskTransform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
 }
 
-// Rebuilds the tag cache for the CURRENT page against the CURRENT folding — §6.3's own "precompute
+// Rebuilds the tag cache for the CURRENT page against the CURRENT folding — "precompute
 // tags per page, not per render". Async (resolving the key and signing each distinct value both
 // are); callers re-render once this resolves. A page with nothing to correlate (no key yet, or no
 // correlating rule) clears the cache rather than leaving a prior page's tags behind.
@@ -644,14 +641,14 @@ async function refreshMaskTagCache(): Promise<void> {
   maskTransform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
 }
 
-// M7 finding #11: refreshMaskTagCache's own correlationKeyFor call can reject (an IPC failure) —
+// refreshMaskTagCache's own correlationKeyFor call can reject (an IPC failure) —
 // every call site below used to leave that unhandled, which "fails open": the preview stays on
 // (toggle active, grid-writable-badge still "read-only") but the grid's own dataSource is never
 // updated to apply the mask transform, since the render tail after the await never runs. Turn the
 // preview back off on failure (setMaskPreview, not a direct write to rt.maskPreview — its own
 // pending-changes guard is irrelevant here since this only ever turns preview OFF) and surface the
 // failure the same way every other async grid action in this file does (setActionError), then still
-// re-render so the toggle-off state actually reaches the grid rather than leaving the last, already-
+// re-render so the toggle-off state reaches the grid rather than leaving the last, already-
 // stale render in place.
 function refreshMaskTagsAndRerender(): void {
   void refreshMaskTagCache().then(
@@ -672,11 +669,11 @@ function refreshMaskTagsAndRerender(): void {
   );
 }
 
-// C9 — the `GridDataSourceState` builder itself, factored out once this stopped being the single
-// mount-time-only object it was through C8: the pageVersion watch already rebuilt it wholesale on
-// every reload, and now an insert-count change (below) needs the identical shape for a narrower
-// reason. `p`/`order` are passed in rather than re-derived, since every call site has already
-// resolved them for its own other purposes (formatterCtx, buildColumns, ...).
+// The `GridDataSourceState` builder itself, factored out once this stopped being the single
+// mount-time-only object: the pageVersion watch already rebuilt it wholesale on every reload, and
+// now an insert-count change (below) needs the identical shape for a narrower reason. `p`/`order`
+// are passed in rather than re-derived, since every call site has already resolved them for its
+// own other purposes (formatterCtx, buildColumns, ...).
 function dataSourceState(p: ReturnType<typeof getPage>, order: string[]): GridDataSourceState {
   const inserts = pendingChangesStore.pendingFor(props.tabId)?.inserts ?? [];
   const insertColumns = inserts.length > 0 ? insertRowColumns(order) : undefined;
@@ -719,14 +716,14 @@ let grid: KiraSlickGrid | null = null;
 let eventHandler: SlickEventHandler | null = null;
 let dataSource: ReturnType<typeof createGridDataSource> | null = null;
 let viewportEl: HTMLElement | null = null;
-// C9 — the grid root, set at mount for the insert region's own delegated listeners' teardown
+// The grid root, set at mount for the insert region's own delegated listeners' teardown
 // (below); `rootRef.value` is not used there since a template ref is not guaranteed to still
 // point at the mounted element by the time `onUnmounted` runs (`viewportEl`'s own identical
 // mount-time-capture pattern, just above, is why this follows it rather than `rootRef.value`).
 let gridRootEl: HTMLElement | null = null;
 // C4/§5 D0 rule 2 — never a ref/shallowRef/reactive, same as `grid` itself.
 let selectionModel: SlickHybridSelectionModel | null = null;
-// P104 §6.4 — AttributeTooltip.vue's own `container` prop: a ref (not a plain let) since
+// AttributeTooltip.vue's own `container` prop: a ref (not a plain let) since
 // AttributeTooltip's `useEventListener(computed(() => props.container), ...)` re-binds reactively
 // once this is set, after init()'s synchronous header build below. An ARRAY, not a
 // single element: SlickGrid always splits the header row into two sibling DOM panes — `_headerL`
@@ -734,7 +731,7 @@ let selectionModel: SlickHybridSelectionModel | null = null;
 // with no narrower common ancestor than `el` itself wrapping both (confirmed reading
 // initialize() in slick.grid.js). A single `querySelector('.slick-header-columns')` only ever
 // grabs `_headerL` (first DOM match), so a table with any frozen column silently lost header
-// tooltips for every OTHER column — found live, this session, hovering `tenant_id` on a
+// tooltips for every OTHER column — hovering `tenant_id` on a
 // composite-PK table produced zero pointermove events on the bound container even though the
 // browser's own `:hover` state was set (confirmed via CDP trace), because the pointer was over
 // `_headerR`, never bound. `useEventListener` accepts `Arrayable<HTMLElement>` natively, so both
@@ -769,26 +766,24 @@ let colAnchor: number | null = null;
 // only where `rt()?.meta`'s own watch already rebuilds columns (rebuildAndSetColumns's own call
 // site, below), never per cell or per hover.
 let navColumns: NavColumns = navColumnsFor(null);
-// C11/§5 D11b originally kept a single host-owned FK/PK nav button here (moved on hover) plus a
-// `hoveredCell` tracker; superseded by item 12 (a later coordinator round) — see
-// `placeNavButtonsForRenderedCells`' own comment — with a real button per nav-eligible rendered
+// See `placeNavButtonsForRenderedCells`' own comment: a real button per nav-eligible rendered
 // cell, always visible, no hover tracking left to own.
 
-// P22 iter2-onset D2 — incremented by every native `scroll` event on the viewport, and read by
+// Incremented by every native `scroll` event on the viewport, and read by
 // KiraSlickGrid's own per-frame chase gate (see `scheduleChase` there). A counter, not a
 // timestamp: the wall-clock gate it joins cannot tell "no scroll is driving this frame" from
 // "the scroll that is driving this frame arrived in the previous, long, frame".
 let scrollEventSeq = 0;
-// P107 T2-17: the gesture-onset fix (P22 iter2-onset D1) and its dedupe/seed/lastScrollEventAt
-// plumbing moved into views/shared/slick/scrollVelocity.ts, byte-identical to
-// ConsoleSlickGrid.vue's own copy — see that module's own comments for why the fix is needed and
-// why the dedupe makes pulling from velocity() itself safe.
+// The gesture-onset fix and its dedupe/seed/lastScrollEventAt plumbing moved into
+// views/shared/slick/scrollVelocity.ts, byte-identical to ConsoleSlickGrid.vue's own copy — see
+// that module's own comments for why the fix is needed and why the dedupe makes pulling from
+// velocity() itself safe.
 const scrollVelocityTracker = createScrollVelocityTracker(() => viewportEl);
 
-// §6 D9 — the host's own viewport scroll listener. The test-only scroll-work mark
+// The host's own viewport scroll listener. The test-only scroll-work mark
 // lives in KiraSlickGrid's `render()` override, not here: SlickGrid's
 // `scrollRenderThrottling` defers a far-jump render past this listener, so a mark here times the
-// throttle wait, not render work. P22 iter2-scroll-gaps D1: render timing is reported by
+// throttle wait, not render work. Render timing is reported by
 // scrollTrace.noteRenderMs() from that same override — not from getRenderedRange, which only
 // computes the range and runs *before* the work that override times has happened.
 function onViewportScroll(): void {
@@ -819,15 +814,15 @@ function onViewportScrollPersist(): void {
   void persistScroll();
 }
 
-// §6 D2 — the visible-window report drives P5 C1's pruning. KiraSlickGrid.lastRenderedRowBounds is
+// The visible-window report drives the pruning. KiraSlickGrid.lastRenderedRowBounds is
 // the *rendered* (overscanned) range, not the strictly-visible one grid.onRendered's own
 // {startRow, endRow} carries (see kiraSlickGrid.ts's own comment on why the difference matters) —
 // this reads the wider one so a row still inside the runway keeps its decode cache alive.
-// P22 Pass B, C1/§5 D10 — the one per-render DOM pass this migration still needs: a row's own
+// The one per-render DOM pass this migration still needs: a row's own
 // `data-row` (SlickGrid writes the *display position* there, `src/slick.grid.ts`'s own
 // `appendRowHtml`) has to be corrected to the *page* row every other subsystem (selection,
 // pending changes, search, the gutter number) addresses a row by. The two differ only while a
-// search filter is hiding non-matching rows — a trap commented at both ends (D10's own note).
+// search filter is hiding non-matching rows — a trap commented at both ends.
 //
 // Idempotent by construction, not by re-deriving "did the rendered range change": a `.slick-row`
 // already carrying `data-kira-row-tagged` is skipped outright, so a sub-row scroll (no new row
@@ -878,10 +873,10 @@ function refreshSelEdges(selOverride?: Selection | null): void {
   if (!grid || !dataSource) return;
   const sel = selOverride !== undefined ? selOverride : (rt()?.selection ?? null);
   // Display row count, not the page's own row count (same fix as onSelectAll/
-  // onHeaderSelectClick's own `displayRowCount`, C12) — `pos` (a display position) is compared
+  // onHeaderSelectClick's own `displayRowCount`) — `pos` (a display position) is compared
   // against the display-row bounds, correct with or without an active filter; comparing the
   // underlying *page* row against `pageRowCount - 1` was not — under a filter the last row
-  // actually rendered can have a page-row index far short of `pageRowCount - 1` (or the filter
+  // rendered can have a page-row index far short of `pageRowCount - 1` (or the filter
   // can even exclude the true first/last page row), so the bottom (and top) selection-perimeter
   // line would fail to draw at all. Only consulted for a 'column' selection's own top/bottom test.
   const displayRowCount = currentDisplayRows()?.length ?? getPage(props.tabId)?.rowCount ?? 0;
@@ -961,14 +956,13 @@ function refreshStagedLayer(): void {
   grid?.setCellCssStyles('kira-staged', computeStagedHash());
 }
 
-// C12/§5 D5 — `kira-search`'s own row: "every match", not clipped to the rendered range the way
+// `kira-search`'s own row: "every match", not clipped to the rendered range the way
 // `kira-sel-edges`/`kira-staged` are (a rectangle's perimeter, or a handful of staged rows, are
 // cheap to re-walk on every render-band change; a search result is neither bounded that way, so
-// this only recomputes when D5's own table says to — the result or current match changing, plus
-// a live filter shifting every match's own display position, both watched below). T7 (§9.2) is
-// this decision's own named gate: with 10 000 matches active, a selection change must still land
-// inside the same 150ms sandbox bound this file's other cost gates use; D5 already names the
-// fallback (a rendered-range ± hysteresis band) if it doesn't.
+// this only recomputes on the result or current match changing, plus a live filter shifting every
+// match's own display position, both watched below). With 10 000 matches active, a selection
+// change must still land inside the same 150ms sandbox bound this file's other cost gates use;
+// the fallback if it doesn't is a rendered-range ± hysteresis band.
 function computeSearchHashes(): [EdgeHash, EdgeHash] {
   if (!grid || !dataSource) return [{}, {}];
   const entry = searchState[props.tabId];
@@ -996,8 +990,8 @@ function refreshSearchLayer(): void {
 }
 
 // The rendered row *band* (not every render — a sub-row scroll re-renders nothing new, and the
-// edges/staged layers only ever depend on what's actually mounted) leaving the previous one is
-// the other trigger D5 names for the edges layer, beside a selection change; folded into
+// edges/staged layers only ever depend on what's mounted) leaving the previous one is
+// the other trigger for the edges layer, beside a selection change; folded into
 // onGridRendered since it already runs on every grid.onRendered and already reads
 // lastRenderedRowBounds.
 let lastCssLayerBand = { start: 0, end: -1 };
@@ -1016,11 +1010,10 @@ function onGridRendered(): void {
     refreshSelEdges();
     refreshStagedLayer();
   }
-  // D11b originally re-placed a single hover-tracked button here; superseded (item 12, a later
-  // coordinator round — see placeNavButtonsForRenderedCells' own comment) by an always-visible
-  // button per nav-eligible rendered cell. Still called on every render for the identical reason
-  // D11b's own comment gave: a render can rebuild the very cell node a button lives in
-  // (`invalidateRow`), silently dropping it, so this has to re-scan rather than run once.
+  // Places an always-visible button per nav-eligible rendered cell (see
+  // placeNavButtonsForRenderedCells' own comment). Still called on every render: a render can
+  // rebuild the very cell node a button lives in (`invalidateRow`), silently dropping it, so this
+  // has to re-scan rather than run once.
   placeNavButtonsForRenderedCells();
 }
 
@@ -1107,19 +1100,18 @@ const NAV_BTN_CLASS = `cell-nav-btn absolute left-1 top-1/2 z-1 size-4 -translat
 const HEADER_KEY_CLASS = 'header-key ml-1 shrink-0 font-data text-warn';
 const HEADER_KEY_FK_CLASS = 'header-key is-fk ml-1 shrink-0 font-data text-info';
 
-// F13 — a click on a `.cell-nav-btn` (a real child of whichever `.slick-cell` it lives in, one
-// per nav-eligible rendered cell since item 12's redesign — placeNavButtonsForRenderedCells'
-// own comment) resolves through SlickGrid's own `getCellFromEvent` exactly like any other cell
-// click, so `args.row`/`args.cell` already name the right cell without this file tracking
-// anything of its own; `stopImmediatePropagation` (checked by `handleClick` right after
-// triggering `onClick`, `slick.grid.ts:4611-4614`) is what stops the click from *also* moving the
-// active cell there.
-// P67 §3 (D2): an FK-kind click ('fk' — an outbound edge) now opens the preview popover instead of
-// navigating straight there; a PK-kind click ('pk' — "Referenced by") is untouched (§9: it names
+// A click on a `.cell-nav-btn` (a real child of whichever `.slick-cell` it lives in, one
+// per nav-eligible rendered cell — placeNavButtonsForRenderedCells' own comment) resolves through
+// SlickGrid's own `getCellFromEvent` exactly like any other cell click, so `args.row`/`args.cell`
+// already name the right cell without this file tracking anything of its own;
+// `stopImmediatePropagation` (checked by `handleClick` right after triggering `onClick`,
+// `slick.grid.ts:4611-4614`) is what stops the click from *also* moving the active cell there.
+// An FK-kind click ('fk' — an outbound edge) now opens the preview popover instead of
+// navigating straight there; a PK-kind click ('pk' — "Referenced by") is untouched (it names
 // *tables*, plural, with no single record to preview). `entry.items` is already the enabled-edges-
 // only list `cellNavEntry` built (disabled edges filtered out); `fkEdgesFor` re-derives the same
 // `meta.foreignKeys` filter `foreignKeyNavItems` uses so each item can be matched back to its raw
-// `ForeignKeyMeta` by id (`go-to-referenced-<fk.name>`, P7 D9's own stable convention) — the popover
+// `ForeignKeyMeta` by id (`go-to-referenced-<fk.name>`, the stable convention) — the popover
 // needs the raw edge (referencedPath/columns), not just the resolved MenuItem.
 function fkEdgesFor(meta: ObjectMeta | null, columnName: string): ForeignKeyMeta[] {
   return meta?.foreignKeys.filter((fk) => fk.columns.includes(columnName)) ?? [];
@@ -1152,9 +1144,9 @@ function onGridClick(e: SlickEventData, args: OnClickEventArgs): void {
     const openPreview = (fk: ForeignKeyMeta, openInNewTab: () => void): void => {
       fkPreview.value = { x: native.clientX, y: native.clientY, entry: fk, ctx, openInNewTab };
     };
-    // D6/§3: exactly one candidate opens the preview directly; more than one opens the same
+    // Exactly one candidate opens the preview directly; more than one opens the same
     // ContextMenu popup the right-click cell menu uses, but each item now opens the preview for
-    // its own edge rather than navigating (§3's own "no capability lost" — the popover's own
+    // its own edge rather than navigating (the "no capability lost" — the popover's own
     // "Open in new tab" is that item's original navigateForeignKey run, one click further in).
     if (entry.items.length === 1) {
       const item = entry.items[0];
@@ -1208,7 +1200,7 @@ function rebuildAndSetColumns(): void {
   syncSortIndicators();
 }
 
-// §4 item 7, §5 D2 — the PK/FK badge and the header select zone are the two pieces of header DOM
+// The PK/FK badge and the header select zone are the two pieces of header DOM
 // SlickGrid's own Column shape can't express (a static `name` string, no child markup), so they're
 // appended imperatively once per header cell BUILD. `onHeaderCellRendered` fires once per column
 // per `setColumns` call (never per scroll frame — headers aren't virtualized), matching the
@@ -1216,9 +1208,9 @@ function rebuildAndSetColumns(): void {
 function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs): void {
   const name = String(args.column.field ?? '');
   if (name === GUTTER_FIELD) return;
-  // D10 — the fresh-render half of the `data-sort` mirror; `syncSortIndicators`'s own direct
+  // The fresh-render half of the `data-sort` mirror; `syncSortIndicators`'s own direct
   // write (below) covers a plain sort change, which never rebuilds this header cell at all
-  // (D2's own point: `setSortColumns` toggles SlickGrid's own indicator classes without a
+  // (`setSortColumns` toggles SlickGrid's own indicator classes without a
   // `setColumns` rebuild) — this half only fires when a rebuild (a page reload, a meta/appearance
   // change) discards whatever this node already had and needs it set fresh.
   const sortTerm = currentSortTerms().find((t) => t.column === name);
@@ -1232,20 +1224,20 @@ function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs):
     badge.textContent = label;
     args.node.appendChild(badge);
   }
-  // Deliberate redesign, not the original port (items 9-11, a later coordinator round): "left-
+  // Deliberate redesign, not the original port: "left-
   // click on a header's body selects that column instead of sorting", "right-click also selects
   // the column" (already true — onHeaderContextMenuHandler, below), and "sorting only happens via
-  // a dedicated arrow control" on the right. §5 D4's own zone used to be a narrow 10px strip at
-  // the cell's left edge, leaving the rest of the header body to SlickGrid's own native
+  // a dedicated arrow control" on the right. The zone used to be a narrow 10px strip at the
+  // cell's left edge, leaving the rest of the header body to SlickGrid's own native
   // handleHeaderClick/setupColumnSort (slick.grid.ts) — that native click-to-sort binding is
   // UNCHANGED (still reads `column.sortable`, still fires `grid.onSort`), but now it never
-  // actually runs from a header-body click: the zone below covers the ENTIRE header cell
+  // runs from a header-body click: the zone below covers the ENTIRE header cell
   // (`inset: 0`, not just a strip) and stops propagation before a body click can ever bubble up
   // to that delegated listener. The one thing still allowed to sort is the dedicated arrow button
   // built further down, whose own listener stops propagation before THIS zone's listener runs
   // (DOM order: the zone is a lower sibling in paint order via z-index, not later in the
   // listener chain, so both need their own stopPropagation independently).
-  // P99 §9.3: not useEventListener — `zone` (and `sortIndicator` below) is a node SlickGrid itself
+  // Not useEventListener — `zone` (and `sortIndicator` below) is a node SlickGrid itself
   // creates and destroys per header-cell render (onHeaderCellRendered fires repeatedly, well after
   // setup()'s effect scope is captured), not a stable Vue-tracked ref; its own destruction is what
   // tears the listener down (onBeforeHeaderCellDestroy's own comment). Declined, named exception.
@@ -1263,8 +1255,8 @@ function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs):
   });
   args.node.appendChild(zone);
 
-  // Item 11's own dedicated sort control — SlickGrid always builds a `.slick-sort-indicator` div
-  // per column regardless of sort state (F8's own comment, above), so this reuses that existing
+  // Dedicated sort control — SlickGrid always builds a `.slick-sort-indicator` div
+  // per column regardless of sort state (the comment, above), so this reuses that existing
   // node as the click target rather than adding a second element: it already sits at the header
   // cell's right edge (slickTheme.css's own margin/positioning, unchanged) and `setSortColumns`
   // already drives its `-asc`/`-desc` glyph classes on every sort change (syncSortIndicators) —
@@ -1290,9 +1282,9 @@ function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs):
 // *outside* this node) has an obvious place to land, per §5 D2's own header-cell lifecycle pair.
 function onBeforeHeaderCellDestroy(_e: unknown, _args: OnBeforeHeaderCellDestroyEventArgs): void {}
 
-// F8 — the app's own asc -> desc -> none cycle, mirrored from `sortTerms`/tab.state.sort (D6's own
+// The app's own asc -> desc -> none cycle, mirrored from `sortTerms`/tab.state.sort (the
 // text-sort parse included) into SlickGrid's own indicator DOM via setSortColumns, which redraws
-// only the header — no row touched, no setColumns rebuild. Called from a watch callback (D0), not
+// only the header — no row touched, no setColumns rebuild. Called from a watch callback, not
 // a computed: this makes an imperative call into the grid.
 function currentSortTerms(): { column: string; direction: 'asc' | 'desc' }[] {
   const t = tab();
@@ -1309,7 +1301,7 @@ function syncSortIndicators(): void {
   grid.setSortColumns(
     terms.map((term) => ({ columnId: term.column, sortAsc: term.direction === 'asc' })),
   );
-  // D10 — the direct-write half of the `data-sort` mirror (`onHeaderCellRendered`'s own comment
+  // The direct-write half of the `data-sort` mirror (`onHeaderCellRendered`'s own comment
   // explains the split): `setSortColumns` only toggles the chevron's own CSS classes, never
   // rebuilds the header cell, so a plain sort change (no page reload) needs this file to write
   // the attribute itself rather than waiting for a render that isn't coming.
@@ -1323,8 +1315,8 @@ function syncSortIndicators(): void {
   }
 }
 
-// Deliberate redesign, not the original port (items 9-11, a later coordinator round) — supersedes
-// F8's own `onSort`/`grid.onSort` wiring. That handler translated SlickGrid's own NATIVE
+// Deliberate redesign, not the original port — supersedes the `onSort`/`grid.onSort` wiring. That
+// handler translated SlickGrid's own NATIVE
 // click-to-sort event (`tristateMultiColumnSort` + `multiColumnSort: false`'s own asc -> desc ->
 // none cycle, fired from `setupColumnSort`'s delegated header-click listener, slick.grid.ts) into
 // `setSort` — but a header body click no longer reaches that native listener at all
@@ -1353,18 +1345,18 @@ function cycleSortFor(name: string): void {
   }
 }
 
-// §4 item 6, §5 D6 — the corner cell selects everything, as a single `range` (never a `row`
-// selection, which `isSelected` would resolve with `Array.includes`, F14a's own O(rows) cost).
-// P139: D6's bypass, built. Pushing the full range through the selection model cost 80-130 ms on
-// spike_grid (1 000 × 61) — SlickGrid's O(rows × cols) `kira-cell-selected` hash (F2) — against
-// T6's own 150 ms gate. So the model holds no range: `rt().selection` owns the meaning and
-// `.kira-select-all` on the host root paints every cell.
+// The corner cell selects everything, as a single `range` (never a `row` selection, which
+// `isSelected` would resolve with `Array.includes`, the O(rows) cost). Pushing the full range
+// through the selection model cost 80-130 ms on spike_grid (1 000 × 61) — SlickGrid's
+// O(rows × cols) `kira-cell-selected` hash — against the 150 ms gate. So the model holds no
+// range: `rt().selection` owns the meaning and `.kira-select-all` on the host root paints
+// every cell.
 function onSelectAll(): void {
   if (!grid || !selectionModel) return;
   // Display row count, not the page's own row count — `SlickRange` below is position-space, and
   // the two only coincide when nothing is filtered (same fix as onHeaderSelectClick/
-  // onHeaderContextMenuHandler's own `displayRowCount`, C12): under an active search filter this
-  // used to run the range past the last actually-displayed row into the pending-insert-row
+  // onHeaderContextMenuHandler's own `displayRowCount`): under an active search filter this
+  // used to run the range past the last displayed row into the pending-insert-row
   // address space (`rowAtDisplayPosition` in dataSource.ts maps an out-of-range position to
   // `pageRowCount + (pos - count)`), producing spurious extra lines on copy.
   const displayRowCount = currentDisplayRows()?.length ?? getPage(props.tabId)?.rowCount ?? 0;
@@ -1388,8 +1380,8 @@ function onHeaderClick(_e: unknown, args: OnHeaderClickEventArgs): void {
   if (args.column.id === GUTTER_FIELD) onSelectAll();
 }
 
-// D3 — SlickGrid drags the handle and persists nothing on its own; this app reads the resulting
-// widths straight off getColumns() and patches them into tab state (F9). The echo guard is the
+// SlickGrid drags the handle and persists nothing on its own; this app reads the resulting
+// widths straight off getColumns() and patches them into tab state. The echo guard is the
 // same shape DataGrid.vue's own dragProducedRange uses: without it, the columnWidths watch below
 // would call setColumns and rebuild every header (and every rendered row) mid-drag.
 let suppressWidthEcho = false;
@@ -1407,10 +1399,10 @@ function onColumnsResized(): void {
   suppressWidthEcho = false;
 }
 
-// C4/§5 D4 — `selectionFromRanges`/`rangesFromSelection` (shared/slick/selection.ts) are deliberately
+// `selectionFromRanges`/`rangesFromSelection` (shared/slick/selection.ts) are deliberately
 // row-space-agnostic; these two glue functions are the one place that translates between a
 // `SlickRange`'s own display-position rows and `Selection`'s page rows, via dataSource.ts's own
-// rowAtDisplayPosition/displayPositionOf (identity today, real once C12 wires a live filter).
+// rowAtDisplayPosition/displayPositionOf (identity today).
 function toPageRowSelection(sel: Selection): Selection {
   if (!dataSource) return sel;
   const idx = {
@@ -1447,7 +1439,7 @@ function toPositionSelection(sel: Selection): Selection {
   }
 }
 
-// Finding 1 (round 2) — `selectedCellCssClass: 'kira-cell-selected'` makes SlickGrid itself paint
+// `selectedCellCssClass: 'kira-cell-selected'` makes SlickGrid itself paint
 // the highlight straight off `selectionModel`'s own `SlickRange[]`, which lives in DISPLAY-POSITION
 // space and is only recomputed inside `setSelectedRanges` (slick.grid.ts). The filter-toggle watch
 // below swaps the data source and re-renders, but a display-position range built under the OLD
@@ -1455,7 +1447,7 @@ function toPositionSelection(sel: Selection): Selection {
 // NEW one — the highlight can visibly land on the wrong row while `rt().selection` (page-row space,
 // unaffected) still correctly targets the original one, so a subsequent Ctrl+C/Delete hits the
 // right data while the highlight lies about it. Same defect class as ConsoleSlickGrid.vue's own
-// finding-6 fix (its `refreshSelectionLayer`) — here the model owns the geometry, so the fix is to
+// fix (its `refreshSelectionLayer`) — here the model owns the geometry, so the fix is to
 // re-push freshly-translated ranges rather than repaint a CSS layer by hand.
 //
 // A row/corner that fell out of the new filter (`isRowVisible` — never `displayPositionOf`'s own
@@ -1504,9 +1496,9 @@ function refreshSelectionForFilterChange(): void {
   );
 }
 
-// D4 — the selection model owns the geometry, `rt().selection` owns the meaning. Fires on every
-// `setSelectedRanges` call: a click, a drag frame (cell mode: only on drag END — F1's own
-// `handleCellRangeSelected` returns early for `caller === 'onCellRangeSelecting'` — §4.1 item 3),
+// The selection model owns the geometry, `rt().selection` owns the meaning. Fires on every
+// `setSelectedRanges` call: a click, a drag frame (cell mode: only on drag END —
+// `handleCellRangeSelected` returns early for `caller === 'onCellRangeSelecting'`),
 // shift/ctrl accumulation, keyboard extension, and this host's own header-select-zone push below.
 function onSelectedRangesChanged(_e: unknown, ranges: SlickRange[]): void {
   const runtimeEntry = rt();
@@ -1521,11 +1513,11 @@ function onSelectedRangesChanged(_e: unknown, ranges: SlickRange[]): void {
   refreshSelEdges();
 }
 
-// D4 — the header select zone's own click semantics (DataGrid.vue's onHeaderSelectClick,
-// content — mirrored verbatim): shift extends a contiguous range from the last anchor, ctrl/cmd
-// toggles one column into a disjoint set, a plain click replaces the selection with just that
-// column. Pushes the resulting range(s) into the selection model (via the pendingKind flag) so
-// the model and rt().selection can never disagree about what's painted.
+// The header select zone's own click semantics (DataGrid.vue's onHeaderSelectClick, content —
+// mirrored verbatim): shift extends a contiguous range from the last anchor, ctrl/cmd toggles one
+// column into a disjoint set, a plain click replaces the selection with just that column. Pushes
+// the resulting range(s) into the selection model (via the pendingKind flag) so the model and
+// rt().selection can never disagree about what's painted.
 function onHeaderSelectClick(displayCol: number, e: MouseEvent): void {
   if (!grid || !selectionModel) return;
   const sel = rt()?.selection;
@@ -1567,7 +1559,7 @@ function startEditCell(row: number, displayCol: number): void {
   grid.editActiveCell();
 }
 
-// P67 §5.3: this tab's own `focusRequest.ts` registry entry — registered in onMounted, called
+// This tab's own `focusRequest.ts` registry entry — registered in onMounted, called
 // either immediately by `requestCellFocus` (a host already mounted with a matching page) or from
 // the `pageVersion` watch below once a fresh, filtered page lands. Deliberately NOT `startEditCell`
 // above: that helper's own `setActiveCell` call suppresses `onActiveCellChanged`, which is fine for
@@ -1576,7 +1568,7 @@ function startEditCell(row: number, displayCol: number): void {
 // gets, so the event must fire for `SlickHybridSelectionModel.handleActiveCellChange` to populate
 // `rt().selection` at all (the publish watch below reads only that; with it suppressed, the cell
 // editor dock never appears). `onBeforeEditCell`'s own veto still gates `editActiveCell` below — no
-// second editability rule is introduced here (§9's own non-goal).
+// second editability rule is introduced here.
 function applyCellFocusRequest(req: CellFocusRequest): boolean {
   const p = getPage(props.tabId);
   if (!grid || !p || req.row >= p.rowCount) return false;
@@ -1596,9 +1588,9 @@ function applyCellFocusRequest(req: CellFocusRequest): boolean {
   return true;
 }
 
-// §5 D8 — exactly `startEdit`'s own guards (DataGrid.vue:810-818 mirror: not writable, row
-// deleted, value truncated) plus the two new predicates (the gutter column; a pending-insert row,
-// whose own inputs D9/C9 owns) — one function, so this veto and the cell menu's `Edit` item
+// Exactly `startEdit`'s own guards (DataGrid.vue:810-818 mirror: not writable, row
+// deleted, value truncated) plus the two new predicates (the gutter column; a pending-insert row) —
+// one function, so this veto and the cell menu's `Edit` item
 // (`disabled: editDisabled`, menu.ts) can never drift apart on what's editable.
 function onBeforeEditCell(_e: SlickEventData, args: OnBeforeEditCellEventArgs): boolean {
   if (args.column.id === GUTTER_FIELD) return false;
@@ -1621,10 +1613,9 @@ function onBeforeEditCell(_e: SlickEventData, args: OnBeforeEditCellEventArgs): 
   return true;
 }
 
-// C9/§5 D9 — one delegated listener each on the grid root for the insert region's own `<input>`s
-// (`cellFormatter`'s insert branch, above), rather than a per-element listener: the same
-// delegation discipline `-iter2-pacing` established for everything else, applied to the one place
-// this pass adds DOM. `data-column` already exists on the cell (`cellAttrs`, D2 — a per-column
+// One delegated listener each on the grid root for the insert region's own `<input>`s
+// (`cellFormatter`'s insert branch, above), rather than a per-element listener.
+// `data-column` already exists on the cell (`cellAttrs` — a per-column
 // constant, unrelated to this row being an insert) and `data-insert-id` on the row
 // (`tagRenderedRows`), so no extra data attribute needs baking onto the input itself beyond the
 // testid this scopes the delegation to.
@@ -1662,13 +1653,13 @@ function onInsertGridKeydown(e: KeyboardEvent): void {
   wrapSelectionOnType(e);
 }
 
-// D3: right-clicking a row already in the selection acts on the whole selection; right-clicking
+// Right-clicking a row already in the selection acts on the whole selection; right-clicking
 // outside it replaces the selection with just that row first (the "replace the selection first"
-// rule, §5 D7). Cell/header menus have no multi-target actions, so those two always collapse to a
+// rule). Cell/header menus have no multi-target actions, so those two always collapse to a
 // single-item selection. Pushed via `grid.setActiveCell` on the gutter column, not a direct
 // `rangesFromSelection`/`setSelectedRanges` call — landing the active cell on a
 // `rowSelectColumnIds` column is what makes `SlickHybridSelectionModel` itself compute and notify
-// the single-row range (`handleActiveCellChange`, F1's own `selectActiveRow` branch), which is
+// the single-row range (`handleActiveCellChange`, the `selectActiveRow` branch), which is
 // also what keeps `_activeSelectionIsRow` (and so `onSelectedRangesChanged`'s own `rowMode` read)
 // correct — calling `setSelectedRanges` directly here, before anything told the model this is a
 // *row* push, would leave it reading whatever mode the *previous* selection left behind.
@@ -1696,7 +1687,7 @@ function onGutterContextMenu(row: number, e: MouseEvent): void {
   );
 }
 
-// `selectionCovers` now lives in shared/slick/selection.ts (real-interaction fix, §4a/§4d) — moved
+// `selectionCovers` now lives in shared/slick/selection.ts — moved
 // so it can be unit-tested directly and shared verbatim rather than redefined; `setActiveCell`
 // below is not cosmetic — SlickHybridSelectionModel.handleActiveCellChange turns *any* active-cell
 // change into `setSelectedRanges([one cell])`, wiping whatever was selected, which then leaves the
@@ -1772,14 +1763,13 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
   );
 }
 
-// Real-interaction fix (reported bug — right-clicking a column header was selecting/highlighting
-// it as a side effect of opening the menu): unlike a body-cell/gutter right-click, which follows
-// the deliberate D3/D8 "replace the selection first" rule, a header right-click has never been
-// specified to do that — headerMenu()'s own items (sort/hide/copy) all close over `displayCol`
-// directly and read no live selection state, so there was never a functional reason for this to
-// push a range through the selection model at all. It used to do so unconditionally on every
-// right-click, wiping out whatever the user had selected (rows, a range, other columns) just to
-// paint a highlight nobody asked for. Right-click here now only opens the menu.
+// Unlike a body-cell/gutter right-click, which follows the deliberate
+// "replace the selection first" rule, a header right-click has never been specified to do that —
+// headerMenu()'s own items (sort/hide/copy) all close over `displayCol` directly and read no live
+// selection state, so there was never a functional reason for this to push a range through the
+// selection model at all. It used to do so unconditionally on every right-click, wiping out
+// whatever the user had selected (rows, a range, other columns) just to paint a highlight
+// nobody asked for. Right-click here now only opens the menu.
 function onHeaderContextMenuHandler(displayCol: number, e: MouseEvent): void {
   const order = currentOrder();
   const name = order[displayCol] ?? '';
@@ -1834,10 +1824,10 @@ function onCopy(): void {
     return;
   }
   if (sel.kind === 'range') {
-    // F14/§4.1 item 1: anchorRow/anchorCol is always the top-left corner now (SlickRange
+    // anchorRow/anchorCol is always the top-left corner now (SlickRange
     // normalises), so this needs no min/max sort the way the incumbent's own drag-anchor did.
-    // Finding 3 (round 2): only the rows actually visible under the current filter within the
-    // span, same rule P24 D10 already applies to the column-selection branch below — a range
+    // Only the rows visible under the current filter within the
+    // span, same rule already applies to the column-selection branch below — a range
     // used to copy every page row between its two corners even while the filter hid some of them.
     const cols = Array.from({ length: sel.col - sel.anchorCol + 1 }, (_, i) => sel.anchorCol + i);
     void copyText(
@@ -1882,10 +1872,10 @@ async function onPaste(): Promise<void> {
   const target = resolvePasteTarget(sel, p, currentDisplayRows(), parsed.length);
   const insertRows = applyPastedCells(props.tabId, p, columns, target, parsed);
 
-  // C9/§5 D9 rule 1 — a paste landing on an *existing* staged insert row updates its `values` in
+  // A paste landing on an *existing* staged insert row updates its `values` in
   // place via `stageInsertValue`, which never changes `inserts.length` and so never reaches the
   // insert-count watch below; that row's own `<input>` would otherwise keep showing its
-  // pre-paste text forever. This is exactly D9's own "the change came from outside the grid"
+  // pre-paste text forever. This is exactly the "the change came from outside the grid"
   // case (a paste, not a keystroke into that row's own input), so invalidating it here is safe —
   // nothing about a paste could be holding focus inside the very input being overwritten.
   // `dataSource.setState` covers the one edge case rebuilding wouldn't otherwise reach until the
@@ -1901,9 +1891,9 @@ async function onPaste(): Promise<void> {
   }
 }
 
-// F6 — `handleKeyDown` triggers `onKeyDown` first and honours `stopImmediatePropagation`
+// `handleKeyDown` triggers `onKeyDown` first and honours `stopImmediatePropagation`
 // (`isImmediatePropagationStopped()`, checked right after this fires): the app's own handler runs
-// before SlickGrid's own default key handling and wins simply by calling it on the branches it
+// before SlickGrid's own default key handling and wins by calling it on the branches it
 // owns. `enableCellNavigation: true` (above) is what gives the arrow-key/Enter-to-edit path for
 // free — DataGrid.vue's own onKeydown arrow block (:1762-1779) has no counterpart here.
 function onKeydown(e: SlickEventData): void {
@@ -1943,8 +1933,8 @@ function onKeydown(e: SlickEventData): void {
   // wraps, `.code` included.
   const nativeLike = e.getNativeEvent<KeyboardEvent>();
 
-  // P21 D5: dispatched through rowMenu() itself (the same builder the row/gutter context menu
-  // will call, C7) so the printed shortcut and the executed action can't drift, and
+  // Dispatched through rowMenu() itself (the same builder the row/gutter context menu
+  // will call) so the printed shortcut and the executed action can't drift, and
   // `disabled: !canEdit` is honoured for free — inert on a read-only table without restating that
   // guard here. Duplicate stays row-selection-only (there is no sensible "duplicate this column"
   // or "duplicate this range" — a row is what gets duplicated, and only a gutter/row selection
@@ -1971,14 +1961,13 @@ function onKeydown(e: SlickEventData): void {
     return;
   }
 
-  // Real-interaction fix (reported bug family, §4d's own "all interactions ... should work the
-  // same ... for the selected row all the time"): Delete/Cmd+Backspace used to only recognise a
-  // 'cell' or 'range' selection here — a 'row' selection was handled by the block above (fine),
-  // but a 'column' selection (click a header) reached neither block, so the shortcut silently did
-  // nothing. `rowsForSelection` (slick/rowValues.ts) is the same conversion onGridContextMenu's
-  // right-click routing now uses (below) — every Selection kind that exists is covered in exactly
-  // one place, so the keyboard shortcut and a right-click Delete on the identical selection can
-  // never again disagree about which rows are acted on.
+  // Delete/Cmd+Backspace used to only recognise a 'cell' or 'range' selection here —
+  // a 'row' selection was handled by the block above (fine), but a 'column' selection
+  // (click a header) reached neither block, so the shortcut silently did nothing.
+  // `rowsForSelection` (slick/rowValues.ts) is the same conversion onGridContextMenu's right-click
+  // routing now uses (below) — every Selection kind that exists is covered in exactly one place,
+  // so the keyboard shortcut and a right-click Delete on the identical selection can never again
+  // disagree about which rows are acted on.
   const deleteShortcut = shortcutFor(nativeLike, ['grid.deleteRows']);
   const sel = runtimeEntry.selection;
   if (deleteShortcut && sel) {
@@ -2021,7 +2010,7 @@ onMounted(() => {
   // watch (below) only fires on a *change*, so the first value needs setting here too.
   navColumns = navColumnsFor(rt()?.meta ?? null);
 
-  // M7 finding #5: this component remounts on every tab switch (`:key="activeTab.id"` in
+  // This component remounts on every tab switch (`:key="activeTab.id"` in
   // MainView.vue), which resets maskRulesByColumn/maskTagCache/maskTransform — all component-
   // scoped `let`s above — back to empty. Without this call, the dataSourceState() built just below
   // would silently bake in `undefined` for activeMaskTransform even when mask preview is already
@@ -2032,8 +2021,7 @@ onMounted(() => {
 
   dataSource = createGridDataSource(dataSourceState(p, order));
 
-  // Real-interaction fix (§5 D8's own header-height gap, found chasing the header interaction
-  // issues, not the original port): slickTheme.css's own `.slick-header-column` rule reads this
+  // slickTheme.css's own `.slick-header-column` rule reads this
   // custom property for its `height`/`line-height` — set here (mount) and in the `rowHeight` watch
   // below (density changing later) so the header row tracks the same 28px/22px toggle the body
   // rows do, matching the incumbent's own `.header-row`'s `:style="{height: rowHeight+'px'}"`.
@@ -2042,7 +2030,7 @@ onMounted(() => {
   // up.
   el.style.setProperty('--kira-header-row-height', `${rowHeight.value}px`);
 
-  // §5 D8 — editor.ts's own `formatterCtx`-style reassigned plain object (its own file-level
+  // editor.ts's own `formatterCtx`-style reassigned plain object (its own file-level
   // comment says why: a grid-constructed `KiraCellEditor` cannot close over tabId/displayCell
   // itself). Both callbacks re-resolve the display column / read state fresh on every call, so —
   // unlike `dataItemColumnValueExtractor`'s own captured-closure trap noted just above — this
@@ -2051,7 +2039,7 @@ onMounted(() => {
   editorCtx.commit = (row, name, value) =>
     pendingChangesStore.stageEdit(props.tabId, row, name, value);
 
-  // getCellValue's return type is a compatibility shim only (F1's own insurance, never the real
+  // getCellValue's return type is a compatibility shim only (the insurance, never the real
   // render path — dataItemColumnValueExtractor, below, is) so it deliberately returns `unknown`
   // rather than CustomDataView<RowHandle>'s own narrower `T[keyof T]`; the cast reflects that.
   // dataItemColumnValueExtractor is bound to `dataSource.extractValue`, not a locally captured
@@ -2065,7 +2053,7 @@ onMounted(() => {
     buildColumns(p, order, currentWidths(), settledWidthsFor(p), rt()?.meta ?? null),
     {
       rowHeight: rowHeight.value,
-      // F8 — tristateMultiColumnSort + multiColumnSort: false is exactly this app's own header
+      // tristateMultiColumnSort + multiColumnSort: false is exactly this app's own header
       // click cycle (asc -> desc -> none), replacing DataGrid.vue's own onHeaderClick entirely;
       // numberedMultiColumnSort + sortColNumberInSeparateSpan renders the order badge for the
       // ORDER BY box's own multi-term sort even though a header click alone never produces one.
@@ -2092,39 +2080,38 @@ onMounted(() => {
       // KiraSlickGrid re-homes into the scroll viewport as one sticky column (P182) rather than one
       // position:sticky box per mounted row (the per-frame cost P22-…-iter2-rendering.md F12 flagged).
       frozenColumn: 0,
-      // F3 addendum (real-Mac finding) — SlickGrid's own wheel handler quantizes every
-      // wheel/trackpad tick to `deltaY * rowHeight` in JS, discarding WebKit's native momentum
-      // physics; that's what read on macOS as the fluid trackpad scroll going away. The viewport's
-      // already-native `overflow:auto` plus the already-bound native `scroll` listener (F3) are
-      // sufficient on their own — frozen-pane sync and this host's own velocity/runway logic both
-      // already run off native scroll, never off this handler.
+      // SlickGrid's own wheel handler quantizes every wheel/trackpad tick to `deltaY * rowHeight`
+      // in JS, discarding WebKit's native momentum physics; that's what read on macOS as the fluid
+      // trackpad scroll going away. The viewport's already-native `overflow:auto` plus the
+      // already-bound native `scroll` listener are sufficient on their own — frozen-pane sync and
+      // this host's own velocity/runway logic both already run off native scroll,
+      // never off this handler.
       enableMouseWheelScrollHandler: false,
-      // P22 iter2-scroll-gaps D3 — safe, and only safe, now that D2 (kiraSlickGrid.ts's
-      // getRenderedRange) bounds a single render() call's own synchronous cost independent of fling
-      // distance. Without D2 this would be a regression: SlickGrid's default `_handleScroll` defers
-      // to a 10ms-windowed `scrollThrottle.enqueue()` whenever a single frame's delta exceeds one
-      // full viewport height (`dy >= this.viewportH`), which at least caps how *often* the old
-      // unbounded batch ran; forcing every large-delta scroll to call render() immediately, before
-      // D2 existed, would have run that same unbounded batch on every such frame instead. Landed as
-      // its own commit, after D2, specifically so it stays bisectable from the batch cap.
+      // Safe, and only safe, now that kiraSlickGrid.ts's getRenderedRange bounds a single
+      // render() call's own synchronous cost independent of fling distance. Without the batch cap
+      // this would be a regression: SlickGrid's default `_handleScroll` defers to a 10ms-windowed
+      // `scrollThrottle.enqueue()` whenever a single frame's delta exceeds one full viewport
+      // height (`dy >= this.viewportH`), which at least caps how *often* the old unbounded batch
+      // ran; forcing every large-delta scroll to call render() immediately, before the batch cap
+      // existed, would have run that same unbounded batch on every such frame instead.
       //
-      // Real-hardware update: unconditional `true` (this commit's original value, `0865ef6`) coupled
-      // main-thread render work to *every* native scroll-event tick during a fling, which real-macOS
-      // testing found produces visible stutter (the motion itself hitching) — a less forgivable
-      // failure than the incumbent tanstack grid's own "content lags, motion stays smooth" gap
-      // symptom. Defaulted back to `false` (D2's batch cap alone) pending a real A/B on whether D3 is
-      // actually the cause; kept overridable from the console (see main.ts's own doc comment on
-      // `forceSyncScrollingOverride`) so both variants can be compared without a rebuild per variant.
-      // Read once here, at construction — this option is construction-time only, same as
-      // `frozenColumn`/`enableColumnReorder`/etc. above.
+      // Real-hardware update: unconditional `true` coupled main-thread render work to *every*
+      // native scroll-event tick during a fling, which real-macOS testing found produces visible
+      // stutter (the motion itself hitching) — a less forgivable failure than the incumbent
+      // tanstack grid's own "content lags, motion stays smooth" gap symptom.
+      // Defaulted back to `false` (the batch cap alone) pending a real A/B on whether
+      // forceSyncScrolling is the cause; kept overridable from the console (see main.ts's own doc
+      // comment on `forceSyncScrollingOverride`) so both variants can be compared without a rebuild
+      // per variant. Read once here, at construction — this option is construction-time only,
+      // same as `frozenColumn`/`enableColumnReorder`/etc. above.
       forceSyncScrolling: window.__kiraGridTuning?.forceSyncScrollingOverride ?? false,
-      // C3/F6 — display-position-correct arrows for free (F6): the app's own onKeydown no longer
-      // needs to juggle displayPositionOf/rowAtDisplayPosition (DataGrid.vue:1762-1779) because the
-      // data source already indexes display positions; navigateUp/Down/Left/Right and the Enter ->
-      // edit path (D8) come from this option, unported.
+      // Display-position-correct arrows for free: the app's own onKeydown no longer needs to juggle
+      // displayPositionOf/rowAtDisplayPosition (DataGrid.vue:1762-1779) because the data source
+      // already indexes display positions; navigateUp/Down/Left/Right and the Enter -> edit path
+      // come from this option, unported.
       enableCellNavigation: true,
       enableAddRow: false,
-      // §5 D8 — bound to canEditTable() at construction; the `editable` watch below (after
+      // Bound to canEditTable() at construction; the `editable` watch below (after
       // writability-affecting reactive state can change post-mount, e.g. a caps probe resolving)
       // keeps it live via `grid.setOptions`, the same pattern `rowHeight`'s own watch already uses.
       // `isCellPotentiallyEditable`/`makeActiveCellEditable` both read `this._options.editable`
@@ -2154,7 +2141,7 @@ onMounted(() => {
   eventHandler.subscribe(grid.onHeaderCellRendered, onHeaderCellRendered);
   eventHandler.subscribe(grid.onBeforeHeaderCellDestroy, onBeforeHeaderCellDestroy);
   // No grid.onSort subscription any more — see cycleSortFor's own comment: a header body click
-  // can no longer reach SlickGrid's native click-to-sort handler at all (items 9-11), so that
+  // can no longer reach SlickGrid's native click-to-sort handler at all, so that
   // event never fires from a click, and the header context menu's own sort items already call
   // `setSort` directly without going through it either.
   eventHandler.subscribe(grid.onHeaderClick, onHeaderClick);
@@ -2181,7 +2168,7 @@ onMounted(() => {
     viewportEl.scrollLeft = t.state.scrollLeft;
   }
   if (viewportEl) {
-    // P22 iter2-onset D1 — seed the sampler's baseline at mount (after the restored scroll position
+    // Seed the sampler's baseline at mount (after the restored scroll position
     // is applied, before the first render), so the *first* gesture in a tab's life has a `prev`
     // sample to diff against. Without it `prevOffsetT` is still 0 when that gesture's first render
     // pulls, velocity() takes its own `!prevOffsetT` branch, and the exact defect this fix exists
@@ -2191,7 +2178,7 @@ onMounted(() => {
   }
   grid.render();
   syncSortIndicators();
-  // C12 — a tab switch (not a fresh connect) can remount this host onto a tab that already has a
+  // A tab switch (not a fresh connect) can remount this host onto a tab that already has a
   // completed search from before it was last hidden; searchState isn't cleared until the tab
   // itself closes (registerTabRuntimeCleanup), so this needs the same initial sync `onMounted`
   // already gives every other CSS layer via its own grid.render() call, above.
@@ -2208,30 +2195,31 @@ onMounted(() => {
     viewportEl.addEventListener('scroll', onViewportScrollPersist, { passive: true });
   }
 
-  // C9/§5 D9 — the insert region's own delegated listeners, on the grid root rather than the
+  // The insert region's own delegated listeners, on the grid root rather than the
   // viewport (an insert row's `<input>` needs `keydown` regardless of scroll position, and `el`
   // is stable across a reload the way `viewportEl` — reassigned from `grid.getViewports()` — is
   // not).
-  // P99 §9.3: not useEventListener — the removal two lines into onUnmounted's own "Order matters
-  // (§6 D3)" sequence (between the viewportEl scroll cleanup and eventHandler.unsubscribeAll())
-  // is the same hand-ordered teardown the viewportEl listeners above are declined for. Declined,
-  // named per CLAUDE.md's library rule.
+  // Not useEventListener — the removal two lines into onUnmounted's own "Order matters" sequence
+  // (between the viewportEl scroll cleanup and eventHandler.unsubscribeAll()) is the same
+  // hand-ordered teardown the viewportEl listeners above are declined for. Declined, named per
+  // CLAUDE.md's library rule.
   el.addEventListener('input', onInsertGridInput);
   el.addEventListener('keydown', onInsertGridKeydown);
 
   // See `resizeObserver`'s own declaration for why this exists. `el` (`.slick-grid-mount`) is
-  // exactly the container SlickGrid measures itself against (`getViewportHeight`/`getViewportWidth`,
-  // `resizeCanvas` — slick.grid.ts), so observing it directly, rather than `.grid-area` a level up,
-  // needs no extra plumbing to find the right element. `resizeCanvas()` itself is cheap to call
-  // unconditionally (a real height/width remeasure plus one render pass) and is guarded by SlickGrid
-  // itself (`!this.initialized` returns immediately) — no debounce needed for a ResizeObserver
-  // callback, which already coalesces synchronous layout thrash into one notification per frame.
+  // exactly the container SlickGrid measures itself against
+  // (`getViewportHeight`/`getViewportWidth`, `resizeCanvas` — slick.grid.ts), so observing it
+  // directly, rather than `.grid-area` a level up, needs no extra plumbing to find the right
+  // element. `resizeCanvas()` itself is cheap to call unconditionally (a real height/width
+  // remeasure plus one render pass) and is guarded by SlickGrid itself (`!this.initialized`
+  // returns immediately) — no debounce needed for a ResizeObserver callback, which already
+  // coalesces synchronous layout thrash into one notification per frame.
   resizeObserver = new ResizeObserver(() => {
     grid?.resizeCanvas();
   });
   resizeObserver.observe(el);
 
-  // P67 §5.2/§5.3: registers this tab's own focus-request apply — a pending
+  // Registers this tab's own focus-request apply — a pending
   // editReferencedRow()-driven request (menu.ts) may already be waiting for this exact tab. A
   // brand-new tab's *first* load is the one `editReferencedRow`'s own `setFilter` call triggers —
   // DataView.vue's own mount-time `load()` is skipped, since `ensureRuntime` (called synchronously
@@ -2240,7 +2228,7 @@ onMounted(() => {
   // fire the `pageVersion` watch below for a request that was already pending by the time this
   // component mounts — `requestCellFocus` ran before `registerGridHost` could, found no host, and
   // left the request pending. Consuming it here, right after this mount's own synchronous
-  // `grid.render()` above, is what actually closes that gap: the page this mount just rendered is
+  // `grid.render()` above, is what closes that gap: the page this mount just rendered is
   // very likely the filtered one the request was waiting for. If it genuinely isn't loaded yet (a
   // real backend slower than this mount), `applyCellFocusRequest` returns false and the request is
   // put right back pending — the `pageVersion` watch then has a real future bump to catch it on.
@@ -2281,26 +2269,25 @@ onUnmounted(() => {
   headerRowEls.value = [];
   eventHandler?.unsubscribeAll();
   eventHandler = null;
-  // C4 — `grid.destroy()` never calls `this.selectionModel?.destroy()` itself (only its own
+  // `grid.destroy()` never calls `this.selectionModel?.destroy()` itself (only its own
   // registered `_selector` plugin, via the plugins-unregister loop it does run) — its own
   // `_eventHandler.unsubscribeAll()` (grid.onActiveCellChanged/onClick/onKeyDown) needs this
   // explicit call, before the grid it's subscribed against goes away.
   selectionModel?.destroy();
   selectionModel = null;
-  // F8 — `true` also nulls SlickGrid's own ~60 internal element references; its own destroy()
+  // `true` also nulls SlickGrid's own ~60 internal element references; its own destroy()
   // unbinds every listener it registered, unregisters every plugin and cancels any in-flight edit.
   // Column rules live in kiraSlickGrid.ts's shared append-only sheet, so there is no per-grid
-  // <style> to leak. The only real risk was ever this app forgetting to call it (F8's own finding) —
-  // this call is the named, gated acceptance item (§9.1).
+  // <style> to leak. The only real risk was ever this app forgetting to call it —
+  // this call is the named, gated acceptance item.
   grid?.destroy(true);
   grid = null;
   dataSource = null;
   viewportEl = null;
-  // Finding 7 (round 2) — `editorCtx` (editor.ts) is a module-level singleton; this mount's own
-  // closures (§5 D8, above) stay assigned to it after teardown otherwise, retained for nothing —
-  // bounded (the next grid to mount overwrites both before a `KiraCellEditor` it constructs could
-  // ever call either), but reset explicitly rather than leave a stale closure hanging off a
-  // singleton once the last data tab closes.
+  // `editorCtx` (editor.ts) is a module-level singleton; this mount's own closures stay assigned to
+  // it after teardown otherwise, retained for nothing — bounded (the next grid to mount overwrites
+  // both before a `KiraCellEditor` it constructs could ever call either), but reset explicitly
+  // rather than leave a stale closure hanging off a singleton once the last data tab closes.
   editorCtx.readValue = () => ({ text: '', isNull: true });
   editorCtx.commit = () => {};
 });
@@ -2351,7 +2338,7 @@ watch(
   },
 );
 
-// C12/§5 D12 — the filter *is* the data source: `matchedRows(tabId)` (via `currentDisplayRows()`,
+// The filter *is* the data source: `matchedRows(tabId)` (via `currentDisplayRows()`,
 // already what `dataSourceState()`'s own `index.displayRows` reads) tracks both the search
 // toolbar's own scan result and its "filter to matches" toggle reactively (both read a reactive
 // `searchState`/`searchFilterState` entry internally), so this watch's getter needs nothing of
@@ -2380,7 +2367,7 @@ watch(
   },
 );
 
-// C12/§5 D5 — `kira-search`'s own trigger: a scan publishing a new/updated result, or goNext/
+// `kira-search`'s own trigger: a scan publishing a new/updated result, or goNext/
 // goPrev moving the current match. The signature is result identity + current index + pending,
 // not the matches themselves — rebuilding the whole hash is `computeSearchHashes`' own job once
 // this fires, not this getter's.
@@ -2392,13 +2379,13 @@ watch(
   () => refreshSearchLayer(),
 );
 
-// C9/§5 D9 — an insert row's own count changes independent of `pageVersion` (Add Row, a discard,
+// An insert row's own count changes independent of `pageVersion` (Add Row, a discard,
 // a bulk paste past the loaded page's end, `duplicateAsInsert`), so this needs its own trigger.
 // Safe to fully invalidate the touched region unconditionally: `stageInsertValue` (every keystroke
 // into an insert's own input) mutates only that insert's `values` in place, never `p.inserts`
 // itself, so this watch never fires mid-typing — the only thing that CAN change `inserts.length`
 // is a user action outside any insert row's own input (a toolbar click, a menu item), so the
-// "never invalidate a focused insert row" rule (D9) has nothing to protect against on this path.
+// "never invalidate a focused insert row" rule has nothing to protect against on this path.
 let lastInsertCount = 0;
 watch(
   () => pendingChangesStore.pendingFor(props.tabId)?.inserts.length ?? 0,
@@ -2413,12 +2400,12 @@ watch(
     lastInsertCount = count;
     for (let pos = base; pos <= end; pos++) grid.invalidateRow(pos);
     grid.render();
-    // P22b D17: the insert is staged at the end of the virtual list, past the loaded page — on
+    // The insert is staged at the end of the virtual list, past the loaded page — on
     // any page taller than the viewport, "Add a row" previously staged a row nobody could see.
     // Safe on this path specifically, for the reason this watcher's own comment above already
     // gives: inserts.length can only change from a deliberate user action (a toolbar click, a
     // menu item), never from a keystroke inside an insert row, so this can never yank the
-    // viewport away from someone who is typing. Guarded on growth only, same as D16's watchers —
+    // viewport away from someone who is typing. Guarded on growth only, same as the watchers —
     // a discard shrinks the count and must not scroll.
     if (count > lastInsertCountBefore) grid.scrollRowIntoView(end);
   },
@@ -2426,7 +2413,7 @@ watch(
 
 subscribeRowHeight(rowHeight, () => grid, rootRef);
 
-// §5 D8 — keeps the grid's own `editable` option live across a writability change that happens
+// Keeps the grid's own `editable` option live across a writability change that happens
 // after mount (a caps probe resolving, a connection flipping read-only). No invalidate/render
 // needed alongside it: `isCellPotentiallyEditable`/`makeActiveCellEditable` both read
 // `this._options.editable` fresh on every edit attempt, never a cached value.
@@ -2446,14 +2433,14 @@ watch(
   },
 );
 
-// M5 §6.2/§6.3: the mask preview toggle itself — `runtime` is a real `reactive()` map (D0's own
+// The mask preview toggle itself — `runtime` is a real `reactive()` map (the
 // note on `canEditTableReactive`, above, restated: `rt()?.maskPreview` needs no `pageVersion.n`
 // read the way plain-`Map`-backed page state does), so this getter re-fires on every toggle.
 // `dataSource.setState` swaps the extractor closure; `invalidateAllRows` + `render` are what
 // `shared/slick/dataSource.ts:174-183`'s own header comment says `setState` exists to be followed
 // by — the page store itself is never touched (a mask preview is a display-layer transform only).
 //
-// M6 finding #7: also watches `maskRulesQuery.data` (this tab's own connection entry in the
+// Also watches `maskRulesQuery.data` (this tab's own connection entry in the
 // `['maskRules', connectionId]` cache) — `refreshMaskFolding` was previously only ever re-run from
 // this same watch, so marking (or un-marking) a column PII via the header menu while preview was
 // already on left `maskRulesByColumn` stale: a newly-masked column kept showing real values, a
@@ -2466,9 +2453,9 @@ watch([() => rt()?.maskPreview, () => maskRulesQuery.data.value], async () => {
   try {
     await refreshMaskTagCache();
   } catch (err) {
-    // M7 finding #11: a correlation-key fetch failure must not leave the preview claiming "on"
+    // A correlation-key fetch failure must not leave the preview claiming "on"
     // while the grid quietly never applied it (a fail-open) — turn it back off and surface why,
-    // then still fall through to the render below so that toggle-off state actually reaches the
+    // then still fall through to the render below so that toggle-off state reaches the
     // grid. setMaskPreview(false) is a no-op guard-wise (its pending-changes guard only blocks
     // turning preview ON), and reassigning this watch's own `rt().maskPreview` dependency to the
     // same false-vs-already-false value it may already hold means this fires at most once more.
@@ -2482,12 +2469,12 @@ watch([() => rt()?.maskPreview, () => maskRulesQuery.data.value], async () => {
   grid.render();
 });
 
-// P22 Pass B, C14 — DataGrid.vue's own `selectionTarget()`/publish watch (its own comment: "the
-// cell editor's target"), ported: `onSelectedRangesChanged`/`onGridActiveCellChanged` above already
+// DataGrid.vue's own `selectionTarget()`/publish watch (its own comment: "the cell editor's
+// target"), ported: `onSelectedRangesChanged`/`onGridActiveCellChanged` above already
 // keep `rt().selection` current for the grid's own visual selection layer, but never told the cell
 // editor dock (`state/cellSelection.ts`) what's selected — a gap this migration left open, not a
-// deliberate omission (nothing DataGrid.vue-specific in the logic below; it was simply never
-// carried over when this host's own selection wiring was built at C4). `selectionTarget()` reads
+// deliberate omission (nothing DataGrid.vue-specific in the logic below; it was never
+// carried over when this host's own selection wiring was built). `selectionTarget()` reads
 // only `rt()?.selection`, which both engines populate identically, so it ports unchanged.
 function selectionTarget(): { row: number; col: number } | null {
   const sel = rt()?.selection;
@@ -2499,9 +2486,9 @@ function selectionTarget(): { row: number; col: number } | null {
   return null;
 }
 watch(
-  // M5 §6.5: `rt()?.maskPreview` added so toggling the preview republishes the current selection
+  // `rt()?.maskPreview` added so toggling the preview republishes the current selection
   // (and its `masked` flag/`value`) even when the selection itself hasn't changed.
-  // F3 (P108 Part 10): the pending-delete source below republishes the same way when a row already
+  // The pending-delete source below republishes the same way when a row already
   // selected gets marked (or unmarked) for delete without the selection itself moving — the row
   // menu's/toolbar's own stageDelete/discardRowChange never touch `selection` or `pageVersion`, so
   // without this the dock kept offering Save against a row the grid would already refuse it for.
@@ -2557,13 +2544,13 @@ watch(
       // way onBeforeEditCell below blocks the grid's own inline edit.
       generated: column.generated,
       pendingDelete: isDeleted(targetRow),
-      // Same eligibility as the grid's own inline (double-click) edit (D8/C8): writable connection,
+      // Same eligibility as the grid's own inline (double-click) edit: writable connection,
       // a primary key to identify the row, and the row isn't already staged for delete. Stages into
       // the exact same pending-change set the inline editor already feeds, so the panel's save and
       // the grid's own inline edit can never disagree about a cell's value. `canEditTable()`
-      // already folds in `!maskPreviewOn()` (M5 §6.4), so onEdit/onRevert are undefined for free
+      // already folds in `!maskPreviewOn()`, so onEdit/onRevert are undefined for free
       // whenever `masked` above is true — the panel's own read-only lockout and this cell's own
-      // masked-ness can never disagree. F3: `!column.generated` too, matching onBeforeEditCell —
+      // masked-ness can never disagree. `!column.generated` too, matching onBeforeEditCell —
       // `isEditable` already blocks this via `readOnlyReasonFor` above, this is defense in depth.
       onEdit:
         canEditTable() && !isDeleted(targetRow) && !column.generated
@@ -2594,7 +2581,7 @@ watch(
   },
 );
 
-// D2(c)/D3 — a columnWidths change that did NOT originate from this host's own resize drag
+// A columnWidths change that did NOT originate from this host's own resize drag
 // (onColumnsResized's echo guard) rebuilds the header/cell width bag; loadMeta (state.ts) resolves
 // after the page itself, so the header tooltip/PK-FK badges need their own watch too, independent
 // of pageVersion.
@@ -2618,7 +2605,7 @@ watch(
 watch(
   () => rt()?.meta,
   () => {
-    // C11/§5 D11c — the cheap precheck's own Set membership, recomputed exactly on a meta change
+    // The cheap precheck's own Set membership, recomputed exactly on a meta change
     // and nowhere else (not per cell, not per hover): `navColumnsFor` is a plain function, so this
     // is the one place that needs to call it, not `rebuildAndSetColumns` itself (also called by
     // the appearance/columnWidths watches below, neither of which changes what's navigable).
@@ -2628,24 +2615,23 @@ watch(
   },
 );
 
-// C8/§5 D8 addendum, extended at C10 for `p.deletes`: every row this watch has ever seen staged
-// (edited OR marked for delete), so a discard (which clears `p.edits`/`p.deletes` entirely,
-// outside any SlickGrid commit path) knows which *previously* staged rows must be invalidated
-// back to their real page value/rails, not only the newly-staged ones a plain diff against the
-// current map/set would catch.
+// Every row this watch has ever seen staged (edited OR marked for delete), so a discard (which
+// clears `p.edits`/`p.deletes` entirely, outside any SlickGrid commit path) knows which
+// *previously* staged rows must be invalidated back to their real page value/rails, not only the
+// newly-staged ones a plain diff against the current map/set would catch.
 let lastPendingRows = new Set<number>();
 
-// C5/§5 D5 — the `kira-staged` layer's own trigger: a cell staged or un-staged. C10 extends the
-// same watch to `p.deletes` too (§4 item 18's own "the pending-changes watch's invalidateRows
-// set"), since `pendingRowClasses`' rail/strike-through classes need the same re-render a staged
-// edit already gets — one watch, not two, since both `p.edits` and `p.deletes` land on the same
-// row-invalidation need and `stageDelete` already keeps them mutually exclusive per row.
+// The `kira-staged` layer's own trigger: a cell staged or un-staged. This extends the same watch
+// to `p.deletes` too, since `pendingRowClasses`' rail/strike-through classes need the same
+// re-render a staged edit already gets — one watch, not two, since both `p.edits` and `p.deletes`
+// land on the same row-invalidation need and `stageDelete` already keeps them mutually exclusive
+// per row.
 // `pendingFor(tabId)?.edits`/`.deletes` are a reactive Map/Set (pendingChanges.ts's own
 // `pendingState`, a Vue `reactive()`), so both track reactively without a reference-identity trap
 // the way the TabPending object itself would be (created once per tab, mutated in place, never
 // reassigned). The signature must be value-aware, not just row -> staged column count: this same
 // watch also drives the `grid.invalidateRow()`/`grid.render()` call below, which repaints the
-// cell's *text* (via `dataItemColumnValueExtractor`, C8's own comment), not only the
+// cell's *text* (via `dataItemColumnValueExtractor`), not only the
 // `kira-staged` CSS layer. Re-editing an already-staged cell with a new value (same column, so
 // the key count is unchanged) is a Map `.set()` on an existing key — Vue still re-runs this
 // getter, but a count-only signature comes back byte-identical, so `watch()`'s equality check
@@ -2662,7 +2648,7 @@ watch(
   },
   () => {
     refreshStagedLayer();
-    // C8 — `dataItemColumnValueExtractor` already merges `stagedValue` over the page (D1), so a
+    // `dataItemColumnValueExtractor` already merges `stagedValue` over the page, so a
     // committed *edit* renders correctly for free (SlickGrid's own `commitCurrentEdit` calls
     // `updateRow` after `applyValue`, `slick.grid.ts:4136`). Nothing calls that for a *discard*,
     // a delete toggle, or a commit's own reload-free path, though — those all change
@@ -2689,10 +2675,9 @@ defineExpose({
   // DataView.vue's own contract (matching DataGrid.vue's identical export): `row` is a *page* row
   // index, `col` a *display* column index. SlickGrid's own scrollCellIntoView wants its own
   // display *position* and a column index that accounts for the frozen gutter occupying slot 0.
-  // C12/§5 D12 — the real translation Pass A's own comment here said a live filter would need:
-  // `displayPositionOf` collapses to identity while nothing is filtered (unchanged behaviour for
-  // the common case) and only actually shifts anything once C12's own filter watch can make
-  // page row and display position diverge.
+  // The real translation a live filter would need: `displayPositionOf` collapses to identity while
+  // nothing is filtered (unchanged behaviour for the common case) and only shifts anything once the
+  // filter watch can make page row and display position diverge.
   scrollCellIntoView(row: number, col: number): void {
     if (!grid) return;
     const idx = {
@@ -2705,11 +2690,11 @@ defineExpose({
 </script>
 
 <template>
-  <!-- C13/§5 D13 — the outer div is now the empty-states' own positioning context
+  <!-- The outer div is now the empty-states' own positioning context
        (`.no-rows { position: absolute; inset: 0 }`, slickTheme.css) and `data-testid="data-grid"`'s
        new home; `rootRef` moves to the inner `.slick-grid-mount`, the one div SlickGrid itself ever
        touches, so an empty state overlaying it can never be wiped out by SlickGrid's own DOM writes
-       the way a *child* of `rootRef` would be. §6 D6 point 1: the P9 rowColoring setting is one
+       the way a *child* of `rootRef` would be. The rowColoring setting is one
        class toggle on the host root — Vue's own reactivity on this binding (not a watch) is what
        keeps it live, since settingsStore is a reactive store and this is the template's own
        ordinary :class binding. -->

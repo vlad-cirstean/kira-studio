@@ -5,10 +5,10 @@ import type { CompiledQuery, SearchQuery } from './query.ts';
 import { compileQuery } from './query.ts';
 
 /**
- * `docs/plans/P11.md` W16 — exit criterion 1: the semantics table, driven as data rather than
- * prose, over the one matcher every half of search shares (`compileQuery` + `matchCommitFields` +
- * `matchRef`). Table numbers below (row 1, row 2, …) are the plan's own numbering, so a failure
- * here points straight back at the row it broke.
+ * The semantics table, driven as data rather than prose, over the one matcher every half of
+ * search shares (`compileQuery` + `matchCommitFields` + `matchRef`). Table numbers below (row 1,
+ * row 2, …) are the table's own numbering, so a failure here points straight back at the row it
+ * broke.
  */
 
 function query(partial: Partial<SearchQuery>): SearchQuery {
@@ -222,7 +222,7 @@ describe('matchRef — the pr seam, activated (G24 D11)', () => {
     const compiled = compileOk({ text: '123' });
     const branch = ref({ shortName: 'feature' });
     expect(matchRef(branch, compiled, { number: 123, title: 'does not matter' })).toEqual([
-      'prNumber',
+      'changeRequestNumber',
     ]);
   });
 
@@ -230,22 +230,24 @@ describe('matchRef — the pr seam, activated (G24 D11)', () => {
     const compiled = compileOk({ text: '#123' });
     const branch = ref({ shortName: 'feature' });
     expect(matchRef(branch, compiled, { number: 123, title: 'does not matter' })).toEqual([
-      'prNumber',
+      'changeRequestNumber',
     ]);
   });
 
   test('a title term hits prTitle', () => {
     const compiled = compileOk({ text: 'widget' });
     const branch = ref({ shortName: 'feature' });
-    expect(matchRef(branch, compiled, { number: 1, title: 'Fix the widget' })).toEqual(['prTitle']);
+    expect(matchRef(branch, compiled, { number: 1, title: 'Fix the widget' })).toEqual([
+      'changeRequestTitle',
+    ]);
   });
 
   test('a query matching both the number and the title hits both fields', () => {
     const compiled = compileOk({ text: '42' });
     const branch = ref({ shortName: 'unrelated-name' });
     expect(matchRef(branch, compiled, { number: 42, title: 'issue 42 follow-up' })).toEqual([
-      'prNumber',
-      'prTitle',
+      'changeRequestNumber',
+      'changeRequestTitle',
     ]);
   });
 

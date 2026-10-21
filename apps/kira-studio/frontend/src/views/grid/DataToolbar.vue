@@ -24,7 +24,7 @@ import { matchedRows } from './search';
 import { rowsForSelection } from './slick/rowValues';
 import { useGridViewStore } from './state';
 
-// P48 D10: takes `tab` as a prop like every other view's toolbar, rather than reading the
+// Takes `tab` as a prop like every other view's toolbar, rather than reading the
 // nullable, globally-computed activeDataTab — this component only ever renders while its tab is
 // the active one (DataView.vue's own v-else-if chain), so the two agreed in practice, but the
 // nullable-tab plumbing this used to need (fourteen `if (!tab.value) return` guards) existed only
@@ -53,11 +53,11 @@ const caps = computed(() => {
 
 // Add is gated on writability alone — never on whether the table has a primary key. A no-PK table
 // still rejects at the per-cell edit level (readOnlyReasonFor) and at the server
-// (assertKeyIsPrimaryKey); gating that button too would just be a second, redundant guard.
-// Delete is different, and P28 D8 separates the two: it has no per-cell rejection path to fall
+// (assertKeyIsPrimaryKey); gating that button too would be a second, redundant guard.
+// Delete is different: it has no per-cell rejection path to fall
 // through to — it stages straight into pendingChanges — so an unactionable click there is silent.
 //
-// M5 §6.4: `&& !rt.value?.maskPreview` is the edit lockout's own toolbar half — SlickGridHost.vue's
+// `&& !rt.value?.maskPreview` is the edit lockout's own toolbar half — SlickGridHost.vue's
 // canEditTable() closes the grid's own inline paths, this one closes Add/Generate/Delete, all of
 // which derive from this single computed.
 const isWritable = computed(
@@ -68,10 +68,10 @@ const isWritable = computed(
     !pendingChangesStore.isCommitting(props.tab.id),
 );
 
-// M5 §6.2: rendered only when this tab's connection has at least one masked column — a
+// Rendered only when this tab's connection has at least one masked column — a
 // permanently inert toggle is worse than no toggle (deleteRowTooltip's own standing rule, just
 // below: name the condition, never a silently-disabled control with nothing to explain it).
-// P99 §5.5: reactive useQuery over the counts TanStack Query already warms at bootstrap
+// Reactive useQuery over the counts TanStack Query already warms at bootstrap
 // (main.ts's loadMaskRuleCounts) and keeps in lockstep on every loadMaskRules write, so this still
 // updates in the same tick menu.ts's markColumnMaskKind also calls setMaskPreview(tabId, true).
 const maskRuleCountsQuery = useQuery({
@@ -127,10 +127,10 @@ function onToggleMaskPreview(): void {
   gridViewStore.toggleMaskPreview(props.tab.id);
 }
 
-// P36 D26: the − row button's own gate — ClickHouse is writable (canInsert: true) but has no
+// The − row button's own gate — ClickHouse is writable (canInsert: true) but has no
 // addressable row to DELETE (a MergeTree PRIMARY KEY is a sparse index, not a unique key), so
 // isWritable alone is no longer enough to offer this button.
-// P28 D8: also gated on a selection and a primary key. onDeleteRow below opens with
+// Also gated on a selection and a primary key. onDeleteRow below opens with
 // `if (!sel) return`, and stageDelete stages an op that can never resolve without a primary key
 // — so before this the button was enabled and silently inert in both cases, which is the reported
 // "deleting selected rows doesn't work at all". SlickGridHost's own canDeleteRows() has always
@@ -146,7 +146,7 @@ const hasPrimaryKey = computed(() => {
 const canDeleteRows = computed(
   () => isWritable.value && !!caps.value?.canDelete && hasPrimaryKey.value && hasSelection.value,
 );
-// P28 D8: a disabled control names the actual condition rather than just going grey —
+// A disabled control names the actual condition rather than going grey —
 // KeyValueView.vue's own standing rule ("the actual number or the actual condition, never a
 // silently-disabled control with no explanation"). Ordered most-fundamental first: a read-only
 // connection or an engine that cannot delete is a property of the connection, a missing primary
@@ -220,9 +220,9 @@ const columnCount = computed(() => {
   return { shown: projection ? projection.length : total, total };
 });
 
-// P31 D38/F35: the Columns button's own corner mark — shown only when the tab's column set
+// The Columns button's own corner mark — shown only when the tab's column set
 // deviates from default (some columns hidden, or the order was dragged), so the icon stays clean
-// until there's actually something to flag. A plain dot, not a count: "5 / 5" (every column still
+// until there's something to flag. A plain dot, not a count: "5 / 5" (every column still
 // shown, only the order changed) reads as a count that says nothing, and a four-character label
 // in a 22px button's corner was never going to fit regardless of which deviation triggered it —
 // the exact numbers already live in the tooltip below (columnCount), which is where every
@@ -247,7 +247,7 @@ function onAddRow(): void {
 // pending-insert row (DataGrid.vue's synthetic row indices) — deleting one of those discards it
 // outright rather than staging a delete op that could never resolve to a real primary key.
 //
-// Real-interaction fix (§4b/§4d): this used to hand-roll its own row/cell/range switch — a third
+// This used to hand-roll its own row/cell/range switch — a third
 // copy of the same conversion SlickGridHost.vue's onKeydown and onGridContextMenu each used to
 // hand-roll too — and, like both of those, never grew a `column` branch, so this button did
 // nothing for a column selection. Routed through `rowsForSelection` (slick/rowValues.ts) now, the
@@ -278,12 +278,11 @@ function onDeleteRow(): void {
        DocumentView.vue) rather than assuming its own hand-rolled equivalent (F1/F3). -->
   <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
-  <!-- P28 D7 reverts P16 D1 (commit d2892f49, which moved this to DataView.vue's #toolbar-end)
-       by user report: navigation belongs beside the page-size picker it pages through, at the
+  <!-- By user report: navigation belongs beside the page-size picker it pages through, at the
        toolbar's reading edge, not alone at the far right. The pager is a jump-to-page input rather
-       than a "row 1-200 of N" readout — D7's cursor/offset paging has no notion of that until the
-       count query has run. Deliberately not applied to DocumentView.vue, whose pager d2892f49
-       never touched and whose placement was not reported. -->
+       than a "row 1-200 of N" readout — the cursor/offset paging has no notion of that until the
+       count query has run. Deliberately not applied to DocumentView.vue, whose placement was not
+       reported. -->
   <PagerControls
     :page-index="tab.state.pageIndex"
     :page-size="tab.state.pageSize"

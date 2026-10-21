@@ -13,11 +13,11 @@ var leadingCommentRE = regexp.MustCompile(`(?s)^\s*(?:--[^\n]*\n|/\*.*?\*/\s*)*`
 var explainableRE = regexp.MustCompile(`(?i)^(SELECT|WITH)\b`)
 var trailingSemicolonRE = regexp.MustCompile(`;\s*$`)
 
-// Explainable ports explain.ts's isExplainable verbatim (P18 D12, M3 §8.1; P108 Part 11 F2):
+// Explainable ports explain.ts's isExplainable verbatim:
 // strips leading comments, then requires a leading SELECT/WITH. Reused, not re-decided — see
-// explain_query's own refusal of anything else (M3 §4.3/§8).
+// explain_query's own refusal of anything else.
 //
-// F2: a leading SELECT/WITH says nothing about a second statement smuggled behind it — the
+// A leading SELECT/WITH says nothing about a second statement smuggled behind it — the
 // splitter that decided this was "one statement" can itself be fooled, and Postgres's simple
 // protocol runs every command in one Query message, so a merged statement would execute past the
 // EXPLAIN wrapper. Checked against the RAW text, after stripping at most one trailing `;` — never
@@ -33,11 +33,10 @@ func Explainable(sql string) bool {
 	return !strings.Contains(raw, ";")
 }
 
-// StatementsFor ports explain.ts's explainStatementsFor verbatim (P18 D13), keyed on kind exactly
+// StatementsFor ports explain.ts's explainStatementsFor verbatim, keyed on kind exactly
 // as the TypeScript side is — MariaDB and MySQL share the 'mysql' dialect elsewhere in this app,
-// but report two genuinely different EXPLAIN FORMAT=JSON schemas (F13), so the finer-grained kind
-// is required here too. Never composes ANALYZE on any dialect (§1.1/§8.3's own load-bearing
-// property).
+// but report two genuinely different EXPLAIN FORMAT=JSON schemas, so the finer-grained kind
+// is required here too. Never composes ANALYZE on any dialect.
 func StatementsFor(kind, sql string) []string {
 	switch kind {
 	case "postgres":

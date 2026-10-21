@@ -107,9 +107,9 @@ test('Http raw — the inspector, http2 and masked', async ({ relaunch }) => {
   expect(requestText).not.toContain('sk_live_');
 });
 
-// P18 D8: this test used to be named "no raw view for a stored entry" and asserted the empty
-// state F8 found — the Raw pane could show nothing at all for a stored entry, since a stored
-// entry never has a `wire` (P9 D7 nulls it before persisting) and nothing reconstructed one from
+// This test used to be named "no raw view for a stored entry" and asserted the empty
+// state — the Raw pane could show nothing at all for a stored entry, since a stored
+// entry never has a `wire` (nulled before persisting) and nothing reconstructed one from
 // what *is* stored. It now reconstructs both documents from the snapshot's own stage-1 request/
 // response fields, so this asserts that reconstruction instead of an empty state.
 test('Http raw — a stored entry reconstructs its raw view (P18 D8)', async ({ relaunch }) => {

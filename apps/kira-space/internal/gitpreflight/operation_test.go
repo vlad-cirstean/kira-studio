@@ -46,12 +46,11 @@ func TestClassifyInProgress_Revert(t *testing.T) {
 	}
 }
 
-// TestClassifyInProgress_RebaseOffersContinueAndSkip_G26 inverts G5's original
-// TestClassifyInProgress_Rebase, which asserted canContinue/canSkip both false under "§9's
-// report-only posture". G26 D12 retires that posture: G26's own restack executor is the first
-// thing in this app that can START a rebase, so a paused restack needs Continue (and Skip, for an
-// already-applied commit) to have any exit besides a terminal. Renamed, not deleted, per plan §6
-// step 3/D12's own instruction.
+// TestClassifyInProgress_RebaseOffersContinueAndSkip_G26 inverts the original
+// TestClassifyInProgress_Rebase, which asserted canContinue/canSkip both false under "report-only
+// posture". That posture is retired: the restack executor is the first thing in this app that can
+// START a rebase, so a paused restack needs Continue (and Skip, for an already-applied commit) to
+// have any exit besides a terminal.
 func TestClassifyInProgress_RebaseOffersContinueAndSkip_G26(t *testing.T) {
 	t.Parallel()
 	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{
@@ -90,8 +89,8 @@ func TestClassifyInProgress_RebaseShadowsSequencerFiles(t *testing.T) {
 	}
 }
 
-// TestClassifyInProgress_RebaseApplyDirAmMarker_ReportOnly is P108 Part 15 F3's own regression
-// proof: a plain `git am` shares rebase-apply/ with an apply-backend rebase, distinguished only by
+// TestClassifyInProgress_RebaseApplyDirAmMarker_ReportOnly is the regression proof: a plain
+// `git am` shares rebase-apply/ with an apply-backend rebase, distinguished only by
 // the "applying" marker file. Before the fix this was classified as an ordinary rebase, every
 // Can* flag true — but `rebase --continue`/`--abort`/`--skip` all refuse outright against a real
 // `git am` ("It looks like 'git am' is in progress. Cannot rebase.").
@@ -128,7 +127,7 @@ func TestClassifyInProgress_RebaseApplyDirWithoutAmMarker_StillRebase(t *testing
 	}
 }
 
-// TestClassifyInProgress_SequencerTodoKind_Revert is P108 Part 15 F2's own regression proof: a
+// TestClassifyInProgress_SequencerTodoKind_Revert is the regression proof: a
 // paused multi-commit revert whose current commit was finished with a plain `git commit` (instead
 // of `--continue`) clears REVERT_HEAD but leaves sequencer/ (and its todo) behind — git's own
 // state machine is still mid-run, so this must not fall through to unmergedOnly or nil.

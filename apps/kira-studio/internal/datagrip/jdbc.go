@@ -99,9 +99,9 @@ func mapEngine(ds DataSource) (kind string, ok bool, label string) {
 		return "", false, ds.DBMS
 	default:
 		// ds.JDBCURL is the one label case that can itself carry a "user:password@host" userinfo
-		// credential (D7's configured-by-url exception embeds the password directly in the URL) —
-		// review finding: this label crosses the bridge verbatim as PreviewRow.SkipDetail/
-		// ReportRow.Error, which must never carry a password (D9's own guarantee).
+		// credential (the configured-by-url exception embeds the password directly in the URL) —
+		// this label crosses the bridge verbatim as PreviewRow.SkipDetail/
+		// ReportRow.Error, which must never carry a password (the guarantee).
 		return "", false, redactURLCredentials(ds.JDBCURL)
 	}
 }
@@ -169,37 +169,37 @@ func resolveFields(ds DataSource, projectDir string) (fields ResolvedFields, ok 
 	rest := expanded
 	rest = stripAnyJDBCPrefix(rest)
 	if strings.Contains(rest, "mongodb+srv://") {
-		// expanded can itself carry a "user:password@host" userinfo credential (D7's
-		// configured-by-url exception, or any URL DataGrip otherwise embedded one into) — review
-		// finding: this crosses the bridge verbatim as PreviewRow.SkipDetail/ReportRow.Error, which
-		// must never carry a password (D9's own guarantee).
+		// expanded can itself carry a "user:password@host" userinfo credential (the
+		// configured-by-url exception, or any URL DataGrip otherwise embedded one into) —
+		// this crosses the bridge verbatim as PreviewRow.SkipDetail/ReportRow.Error, which
+		// must never carry a password (the guarantee).
 		return ResolvedFields{}, false, ReasonUnrepresentableURL, redactURLCredentials(expanded)
 	}
 
 	u, err := url.Parse(rest)
 	if err != nil || u.Host == "" {
-		// expanded can itself carry a "user:password@host" userinfo credential (D7's
-		// configured-by-url exception, or any URL DataGrip otherwise embedded one into) — review
-		// finding: this crosses the bridge verbatim as PreviewRow.SkipDetail/ReportRow.Error, which
-		// must never carry a password (D9's own guarantee).
+		// expanded can itself carry a "user:password@host" userinfo credential (the
+		// configured-by-url exception, or any URL DataGrip otherwise embedded one into) — this
+		// crosses the bridge verbatim as PreviewRow.SkipDetail/ReportRow.Error, which must never
+		// carry a password.
 		return ResolvedFields{}, false, ReasonUnrepresentableURL, redactURLCredentials(expanded)
 	}
 	if strings.Contains(u.Host, ",") {
-		// A comma-separated multi-host URL (Postgres/MongoDB replica-set style) — D7:
+		// A comma-separated multi-host URL (Postgres/MongoDB replica-set style):
 		// canRoundTripToFields only ever represents a single host.
-		// expanded can itself carry a "user:password@host" userinfo credential (D7's
-		// configured-by-url exception, or any URL DataGrip otherwise embedded one into) — review
-		// finding: this crosses the bridge verbatim as PreviewRow.SkipDetail/ReportRow.Error, which
-		// must never carry a password (D9's own guarantee).
+		// expanded can itself carry a "user:password@host" userinfo credential (the
+		// configured-by-url exception, or any URL DataGrip otherwise embedded one into):
+		// this crosses the bridge verbatim as PreviewRow.SkipDetail/ReportRow.Error, which must
+		// never carry a password (the guarantee).
 		return ResolvedFields{}, false, ReasonUnrepresentableURL, redactURLCredentials(expanded)
 	}
 
 	host := u.Hostname()
 	if host == "" {
-		// expanded can itself carry a "user:password@host" userinfo credential (D7's
-		// configured-by-url exception, or any URL DataGrip otherwise embedded one into) — review
-		// finding: this crosses the bridge verbatim as PreviewRow.SkipDetail/ReportRow.Error, which
-		// must never carry a password (D9's own guarantee).
+		// expanded can itself carry a "user:password@host" userinfo credential
+		// (the configured-by-url exception, or any URL DataGrip otherwise embedded one into) — this
+		// crosses the bridge verbatim as PreviewRow.SkipDetail/ReportRow.Error, which must never
+		// carry a password (the guarantee).
 		return ResolvedFields{}, false, ReasonUnrepresentableURL, redactURLCredentials(expanded)
 	}
 	fields.Host = &host
@@ -213,9 +213,9 @@ func resolveFields(ds DataSource, projectDir string) (fields ResolvedFields, ok 
 		if p, hasDefault := defaultPort[kind]; hasDefault {
 			fields.Port = &p
 		} else {
-			// D7: "a kind with no default and no port in the URL is a skip" — none of the kinds
-			// D6 can currently map to lacks a default (see defaultPort above), so this is
-			// unreached today; kept as a named guard rather than a silent nil port reaching
+			// "a kind with no default and no port in the URL is a skip" — none of the kinds can
+			// currently map to lacks a default (see defaultPort above), so this is unreached today;
+			// kept as a named guard rather than a silent nil port reaching
 			// connections.Input.Validate's own "Port is required" rejection.
 			return ResolvedFields{}, false, ReasonNoJDBCURL, expanded
 		}
@@ -257,7 +257,7 @@ func applyConfiguredByURLPassword(fields *ResolvedFields, ds DataSource, expande
 
 // redactURLCredentials returns raw with any embedded "user:password@" (or bare "user@") userinfo,
 // and any query parameter that looks like a credential, replaced by a fixed placeholder — the one
-// thing standing between a configured-by-url source's JDBC URL and D9's "a password never crosses
+// thing standing between a configured-by-url source's JDBC URL and the "a password never crosses
 // the bridge" guarantee once that URL is quoted back in a user-facing skip/error string
 // (PreviewRow.SkipDetail, ReportRow.Error). A real net/url round-trip is deliberately not used
 // here: every caller of this function is on a path where the URL is, by definition, one net/url
@@ -265,7 +265,7 @@ func applyConfiguredByURLPassword(fields *ResolvedFields, ds DataSource, expande
 // unmapped/unsupported scheme) — a plain scan-and-mask over the raw text works uniformly across
 // all of them, parseable or not.
 //
-// F6 (P108 Part 3): once a real "://" scheme boundary is found, the last '@' after it used to be
+// Once a real "://" scheme boundary is found, the last '@' after it used to be
 // treated as a userinfo delimiter only when nothing between the scheme and it looked like a raw
 // '/', '?' or '#' — a password containing one of those (e.g.
 // "jdbc:postgresql://u:pa/ss@h1,h2/db") fell through that guard and returned raw *unredacted*,

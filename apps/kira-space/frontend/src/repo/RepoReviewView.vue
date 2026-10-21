@@ -1,11 +1,10 @@
 <script setup lang="ts">
-// C11 §8.4 (S13) — the review sidebar's real mount, modelled on views/repo/RepoGraphView.vue's own
-// mount lifecycle (view: 'graph' there, 'review' here) with two differences that follow directly
-// from §5.3's call: this is not a tab (GitPanel.vue, S14, keeps it mounted with v-show while the
-// segment is hidden rather than unmounting it on every switch away, so an in-flight review survives
-// a trip to Files and back) and `viewState` is `NullViewStateStore` — `ReviewView.vue` never reads
-// it (§5.3's own corroborating fact), so there is no per-mount state to persist through a
-// TabViewStateStore the way the graph needs one.
+// The review sidebar's real mount, modelled on views/repo/RepoGraphView.vue's own mount lifecycle
+// (view: 'graph' there, 'review' here) with two differences: this is not a tab (GitPanel.vue keeps
+// it mounted with v-show while the segment is hidden rather than unmounting it on every switch
+// away, so an in-flight review survives a trip to Files and back) and `viewState` is
+// `NullViewStateStore` — `ReviewView.vue` never reads it, so there is no per-mount state to persist
+// through a TabViewStateStore the way the graph needs one.
 import type { MountHandle } from '@kira/git-ui';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { t } from '@theme/i18n';
@@ -49,9 +48,9 @@ async function mountReview(): Promise<void> {
 onMounted(() => void mountReview());
 
 // Only fires on workspace close (GitPanel.vue keeps this component alive with v-show for a mere
-// segment switch, §8.4) — the transport itself is cached per repo workspace and outlives this
-// regardless (gitTransportFor, disposed by state/workspace.ts's own close path, C10 S17). This
-// view's own transport is a lease (P67b §2.1): its dispose() on unmount releases only this
+// segment switch) — the transport itself is cached per repo workspace and outlives this
+// regardless (gitTransportFor, disposed by state/workspace.ts's own close path). This
+// view's own transport is a lease: its dispose() on unmount releases only this
 // mount's subscriptions, so it can no longer take the graph tab's transport down with it.
 onUnmounted(() => {
   handle?.unmount();

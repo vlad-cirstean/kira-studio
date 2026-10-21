@@ -11,7 +11,7 @@ import { dataQueryCommands } from '../../state/viewCommands';
 // tree's former column rows required.
 function targetTabForTable(connectionId: string, tablePath: string): string | null {
   const active = useModeStore().activeTab;
-  // D9: this menu lives only in the Definition view's Columns section, so `active` here is
+  // This menu lives only in the Definition view's Columns section, so `active` here is
   // always that table's *definition* tab, never its data tab — matching on connectionId/path
   // alone would reuse the definition tab itself and silently no-op the projection/sort patch
   // (patchDataTabState only writes to a 'data'-kind record).
@@ -26,7 +26,7 @@ function targetTabForTable(connectionId: string, tablePath: string): string | nu
   return useTabsStore().openDataTab(connectionId, tablePath)?.id ?? null;
 }
 
-// F1/P21 round 1: the pure half of "Add to projection". `currentProjection === null` means "every
+// The pure half of "Add to projection". `currentProjection === null` means "every
 // column shown" (ResolveProjection's own meaning for it) — the named column is already in it, so
 // there is nothing to do; a `null` return here means exactly that ("no update needed"), never "set
 // the projection to null" — the caller below never forwards it to setProjection. The old

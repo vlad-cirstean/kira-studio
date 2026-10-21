@@ -54,10 +54,10 @@ func TestRepo_WriteSerialises(t *testing.T) {
 }
 
 // TestRepo_WriteQueuesWithoutLossOrOverlap: N concurrent Writes queued behind one already in
-// flight all eventually run, exactly once each, never overlapping — the "write queue" half of
-// docs/HISTORY.md (v1.3)'s P1 row. Strict FIFO order is deliberately not asserted (Repo's own doc
-// comment on why: a broadcast-and-recheck gate, not a single ordered channel, is what avoids the
-// N-token deadlock a naive "Write grabs every Read slot" design would have).
+// flight all eventually run, exactly once each, never overlapping. Strict FIFO order is
+// deliberately not asserted (Repo's own doc comment on why: a broadcast-and-recheck gate, not a
+// single ordered channel, is what avoids the N-token deadlock a naive "Write grabs every Read slot"
+// design would have).
 func TestRepo_WriteQueuesWithoutLossOrOverlap(t *testing.T) {
 	r := newTestRepo()
 	const n = 20
@@ -125,7 +125,7 @@ func TestRepo_ReadBoundsConcurrency(t *testing.T) {
 	}
 }
 
-// TestRepo_PendingWriteBlocksNewReadAdmission is F17's own regression guard: before it, Read's own
+// TestRepo_PendingWriteBlocksNewReadAdmission is the regression guard: before it, Read's own
 // admission check was only !writing && readers < maxConcurrentReads, so a steady stream of new,
 // overlapping Reads — one finishing and another starting continuously, never letting readers hit
 // zero all at once — could keep a Write waiting forever. Tested at the state level (deterministic,
@@ -366,7 +366,7 @@ func TestIdentify_DetachedHead(t *testing.T) {
 	}
 }
 
-// TestIdentify_BranchNameSharedWithATag is F7's own regression guard: `symbolic-ref --short`
+// TestIdentify_BranchNameSharedWithATag is the regression guard: `symbolic-ref --short`
 // shortens AMBIGUOUSLY when a tag shares the current branch's own name, returning "heads/<b>"
 // instead of "<b>" (verified against real git 2.43) — desyncing every later comparison against
 // status/refs.list's own plain "<b>" answer (gitsession's own pull and restack-undo lookups among

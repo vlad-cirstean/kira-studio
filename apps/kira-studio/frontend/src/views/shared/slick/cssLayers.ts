@@ -1,9 +1,7 @@
-// P30 §3.6 C4 — the search-match/current-match `setCellCssStyles` hash arithmetic, split out of
-// SlickGridHost.vue's own `computeSearchHashes` (a mechanical move: same steps, same order, no
-// behaviour change) so views/console/ConsoleSlickGrid.vue's own search wiring can share it rather
-// than re-deriving it. Pure — no reference to `grid`, `getRenderedRange`, the render band or the
-// theme; every caller decides its own column-name/visibility/display-position mapping and hands
-// it in as a callback.
+// The search-match/current-match `setCellCssStyles` hash arithmetic, so
+// views/console/ConsoleSlickGrid.vue's own search wiring can share it rather than re-deriving it.
+// Pure — no reference to `grid`, `getRenderedRange`, the render band or the theme; every caller
+// decides its own column-name/visibility/display-position mapping and hands it in as a callback.
 export type EdgeHash = Record<number, Record<string, string>>;
 
 /**

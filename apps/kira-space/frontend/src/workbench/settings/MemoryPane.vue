@@ -1,17 +1,58 @@
 <script setup lang="ts">
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Field, FieldDescription } from '@theme/components/ui/field';
+import { Label } from '@theme/components/ui/label';
+import { NativeSelect } from '@theme/components/ui/native-select';
+import { t } from '@theme/i18n';
+import { useAgentInfo } from '@workbench/agent/agentInfo';
+import AgentMcpSection from '@workbench/memory/settings/AgentMcpSection.vue';
 import CheckHookSection from '@workbench/memory/settings/CheckHookSection.vue';
-import ClaudeCodeMcpSection from '@workbench/memory/settings/ClaudeCodeMcpSection.vue';
 import SemanticModelSection from '@workbench/memory/settings/SemanticModelSection.vue';
+import { computed, useId } from 'vue';
 import type { SettingsPaneProps } from './types';
 
-// P221: memory setup actions. Bypasses draft/Save like ConnectedEditorsPane: a registration or a
-// model download is an action, not a settings leaf.
-defineProps<SettingsPaneProps>();
+// P221: memory setup actions bypass draft/Save like ConnectedEditorsPane: a registration or a
+// model download is an action, not a settings leaf. P314: the model per provider is a leaf and saves with
+// the dialog.
+const props = defineProps<SettingsPaneProps>();
+const { info } = useAgentInfo();
+
+const model = computed(() => props.draft.memory.models[info.value.id] ?? info.value.defaultModel);
+
+function onModelChange(value: unknown): void {
+  props.draft.memory.models = { ...props.draft.memory.models, [info.value.id]: String(value) };
+}
+
+const modelId = useId();
 </script>
 
 <template>
   <div class="contents" v-show="active">
-    <ClaudeCodeMcpSection />
+    <Field>
+      <div class="flex items-center justify-between gap-1">
+        <Label :for="modelId">{{ t('space.settings.memory.agentModel.label') }}</Label>
+        <TooltipIconButton
+          icon="discard"
+          :label="t('common.action.resetToDefault.label')"
+          data-testid="settings-reset-memory-agentModel"
+          :disabled-trigger="isAtDefault('memory', 'models')"
+          :disabled="isAtDefault('memory', 'models')"
+          @click="resetLeaf('memory', 'models')"
+        />
+      </div>
+      <NativeSelect
+        :id="modelId"
+        variant="bordered"
+        size="kira-lg"
+        data-testid="settings-memory-agent-model"
+        :model-value="model"
+        @update:model-value="onModelChange"
+      >
+        <option v-for="m in info.models" :key="m.id" :value="m.id">{{ m.label }}</option>
+      </NativeSelect>
+      <FieldDescription>{{ t('space.settings.memory.agentModel.description') }}</FieldDescription>
+    </Field>
+    <AgentMcpSection />
     <CheckHookSection />
     <SemanticModelSection />
   </div>

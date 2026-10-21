@@ -1,15 +1,17 @@
 import {
+  agentSettingsSchema,
   appearanceSettingsSchema,
+  DEFAULT_AGENT_PROVIDER,
   HTTP_VERSIONS,
   httpVersionSchema,
   logLevelSchema,
 } from '@shared/domain/settings';
 import { z } from 'zod';
 
-// P103 Part 4 (§7.3): this app's own six-section settingsSchema/settingsPatchSchema/
+// This app's own six-section settingsSchema/settingsPatchSchema/
 // defaultSettings, split out of the former one shared `@shared/domain/settings` (which Kira Space's
 // own three-section store carried five dead sections of — data/cache/api/dbMcp — the
-// same "tab-kind vocabulary" defect P103 Part 2 already fixed for tabs). appearance/logLevel
+// same "tab-kind vocabulary" defect). appearance/logLevel
 // stay genuinely shared; this file imports `appearanceSettingsSchema`/`logLevelSchema`/
 // `HTTP_VERSIONS`/`httpVersionSchema` unexported, purely to build the composed schema below —
 // nothing outside this file references those specific names directly (`HTTP_VERSIONS` is the one
@@ -17,7 +19,7 @@ import { z } from 'zod';
 // import-only, domain/http.ts's own dependency on it goes straight to `@shared/domain/settings`,
 // never through here). `FONT_SIZE_RANGE`/`AppearanceSettings`/`LogLevel`/`RowDensity` used to
 // re-export here for AppearancePane/AdvancedPane; both now read them straight from
-// `@shared/domain/settings` via I2-18's shared field components (`FontSizeField.vue` etc.).
+// `@shared/domain/settings` via the shared field components (`FontSizeField.vue` etc.).
 export { HTTP_VERSIONS };
 
 // P17 D6: the two numeric bounds a control can actually violate, as exported constants so the
@@ -25,9 +27,9 @@ export { HTTP_VERSIONS };
 // validity check read one number each, not three hard-coded copies.
 export const CACHE_L2_BUDGET_MB_RANGE = { min: 8, max: 1024 } as const;
 export const OP_LOG_RETENTION_DAYS_RANGE = { min: 1, max: 365 } as const;
-// P18 (v1.1) D14/D20: the "expensive query" threshold is an estimated-*rows-read* number, never a
+// The "expensive query" threshold is an estimated-*rows-read* number, never a
 // cost unit — the two dialects that report a same-named `cost` field disagree by three orders of
-// magnitude for a comparable scan (see the plan's F17), so no cost-based number could be shared
+// magnitude for a comparable scan, so no cost-based number could be shared
 // across engines. 1,000 floor keeps the field meaningful; 1e9 ceiling is generous headroom above
 // any real table this app's own fixture corpus uses.
 export const EXPENSIVE_QUERY_ROWS_RANGE = { min: 1_000, max: 1_000_000_000 } as const;
@@ -71,20 +73,20 @@ const advancedSettingsSchema = /*#__PURE__*/ z.object({
     .default(100_000),
   // Studio's own diagnostic log verbosity (internal/logging, applied immediately by
   // bridge/settings.go's Set on every patch). `.default('info')` matches that leaf's own
-  // pre-existing default. logLevelSchema is the shared enum (P103 Part 4 §7.1/§7.3, P120) — Kira
-  // Space validates the same leaf against it under its own settings key.
+  // pre-existing default. logLevelSchema is the shared enum — Kira Space validates the same leaf
+  // against it under its own settings key.
   logLevel: logLevelSchema.default('info'),
   // P246: system notification when a popup waits in a window that is not in front.
   notifyPrompts: z.boolean().default(true),
 });
 
-// P90 §2.1: the seven request-settings leaves that used to be internal/httpclient package
+// The seven request-settings leaves that used to be internal/httpclient package
 // constants (options.go states the coupling back at this file: its normalize() defaults must
 // equal this section's own defaults, field for field, since neither package may import the
-// other). Three deliberate default changes from pre-P90 httpclient behaviour: timeout 30s -> none,
-// max response 10 MiB -> 50 MB (P160: -> 5 MB), max redirects unchanged at 10. HTTP_VERSIONS/httpVersionSchema
-// come from @shared/domain/settings (re-exported above) — domain/http.ts's own dependency, not
-// this section's.
+// other). Three deliberate default changes from httpclient behaviour: timeout 30s -> none,
+// max response 10 MiB -> 50 MB (-> 5 MB), max redirects unchanged at 10.
+// HTTP_VERSIONS/httpVersionSchema come from @shared/domain/settings (re-exported above) —
+// domain/http.ts's own dependency, not this section's.
 
 // 0 = no timeout. Ceiling is one hour — past that a request is a subscription, not a request.
 export const REQUEST_TIMEOUT_MS_RANGE = { min: 0, max: 3_600_000 } as const;
@@ -150,6 +152,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
     disableCookieJar: true,
   }),
   dbMcp: dbMcpSettingsSchema.default({ serverEnabled: false }),
+  agent: agentSettingsSchema.default({ provider: DEFAULT_AGENT_PROVIDER }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -160,6 +163,7 @@ const settingsPatchSchema = /*#__PURE__*/ z.object({
   advanced: advancedSettingsSchema.partial().optional(),
   api: apiSettingsSchema.partial().optional(),
   dbMcp: dbMcpSettingsSchema.partial().optional(),
+  agent: agentSettingsSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -194,5 +198,8 @@ export const defaultSettings: Settings = {
   },
   dbMcp: {
     serverEnabled: false,
+  },
+  agent: {
+    provider: DEFAULT_AGENT_PROVIDER,
   },
 };

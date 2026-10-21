@@ -1,18 +1,20 @@
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 import {
   POSTGRES_CAPS,
   postgresConnectionSummary,
   SERVER_VERSION,
 } from './support/postgresFixture';
 
-// P22b D14: the op log (workbench/panels/OperationsPanel.vue) is the fifth of the five search
-// gaps F21 found. Its own always-visible filter (a TextField with icon="filter", opsState.ts's
-// own filterText) already existed at b52fd72 — F21's grep for icon="search"/PanelSearchBox missed
-// it — and already matched command/kind/error. The one real gap this phase closes is the
-// connection's own name, which the row asks for explicitly ("the op label and its connection
-// name") and which the pre-existing filter did not match.
+// The op log (workbench/panels/OperationsPanel.vue) is the fifth of the five search gaps found.
+// Its own always-visible filter (a TextField with icon="filter", opsState.ts's own filterText)
+// already existed — the grep for icon="search"/PanelSearchBox missed it — and already matched
+// command/kind/error. The one real gap is the connection's own name, which the row asks for
+// explicitly ("the op label and its connection name") and which the pre-existing filter
+// did not match.
 
 const NOW = '2026-01-01T00:00:00.000Z';
 
@@ -62,8 +64,8 @@ test('Operations panel — the filter matches the connection name, not only the 
   await expect(rows).toHaveCount(2);
 });
 
-// P23 D1(c)/§4.4: commandTruncated disables Re-run but not Copy command — the one product surface
-// this phase's op_log byte cap adds. Both rows share a connected connection (caps.sql: true) and a
+// commandTruncated disables Re-run but not Copy command — the one product surface the op_log byte
+// cap adds. Both rows share a connected connection (caps.sql: true) and a
 // non-empty command, so a plain rows-not-connected/no-command guard cannot explain the difference
 // — only commandTruncated can.
 test('Operations panel — a truncated command cannot be re-run, but can still be copied', async ({
@@ -125,10 +127,10 @@ test('Operations panel — a truncated command cannot be re-run, but can still b
   );
 });
 
-// P132 Part 1 (§4.1): the row's own acceptance for the full-width dock fix (§0.1/§2.4) — the dock
-// no longer sits in a nested SplitterGroup under just the main panel, so it spans project's left
-// edge to main's right edge, and project's own bottom now moves with main's (no more blank strip
-// below a shorter project panel, no margin hack to produce it).
+// The row's own acceptance for the full-width dock fix — the dock no longer sits in a nested
+// SplitterGroup under just the main panel, so it spans project's left edge to main's right edge,
+// and project's own bottom now moves with main's (no more blank strip below a shorter project
+// panel, no margin hack to produce it).
 test('Operations panel — the dock spans the full shell width, flush under project and main (P132 Part 1)', async ({
   kira,
 }) => {
@@ -247,4 +249,104 @@ test('Operations panel — arrows, Home/End, Enter and Space toggle detail, Shif
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
   await expect(rows.first()).toBeFocused();
+});
+
+// P307: a pre-connect script is an op of its own. The Go flow test (TestSQLitePreconnectOp) stores
+// its running/ok updates; this spec pushes them and checks the live timer and the Re-run gate.
+test('contract: a pre-connect script row ticks a live timer and cannot be re-run', async ({
+  relaunch,
+}) => {
+  const CONN = postgresConnectionSummary('conn-pre-1', 'Tunnel DB', 'blue');
+  const running = contract<Record<string, unknown>>('preconnect-op', 'event:preconnect-running');
+  const ok = contract<Record<string, unknown>>('preconnect-op', 'event:preconnect-ok');
+  const base = { id: 'op-pre', connectionId: 'conn-pre-1', command: 'sleep 0.3' };
+
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.connectionsList, response: [CONN] },
+      {
+        channel: IPC.connectionsStates,
+        response: [
+          {
+            connectionId: 'conn-pre-1',
+            status: 'connected',
+            serverVersion: SERVER_VERSION,
+            error: null,
+            since: 1735689600000,
+            caps: POSTGRES_CAPS,
+          },
+        ],
+      },
+      { channel: IPC.opsRecent, response: [] },
+    ],
+  });
+  const t0 = Date.now();
+  await page.clock.install({ time: t0 });
+  await page.clock.pauseAt(t0 + 1000);
+  await page.click('[data-testid="toggle-operations-panel"]');
+
+  await emitWailsEvent(page, IPC.opUpdate, {
+    ...running,
+    ...base,
+    startedAt: new Date(t0 + 1000).toISOString(),
+  });
+  const row = page.locator('[data-testid="op-row"]');
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText('preconnect');
+  await expect(row).toContainText('Tunnel DB');
+  const elapsed = row.locator('[data-testid="op-elapsed"]');
+  await expect(elapsed).toHaveText('0:00');
+  await page.clock.runFor(2000);
+  await expect(elapsed).toHaveText('0:02');
+
+  await emitWailsEvent(page, IPC.opUpdate, { ...ok, ...base, durationMs: 2300 });
+  await expect(elapsed).toHaveCount(0);
+  await expect(row).toContainText('2.3');
+
+  await row.click({ button: 'right' });
+  await expect(page.locator('[data-testid="menu-item-re-run"]')).toHaveAttribute(
+    'data-disabled',
+    '',
+  );
+  await expect(page.locator('[data-testid="menu-item-copy-command"]')).not.toHaveAttribute(
+    'data-disabled',
+  );
+});
+
+// P307 Part 2: a delayed pre-connect counts the wait down in the command cell. Backend half:
+// TestSQLitePreconnectDelay.
+test('contract: a delayed pre-connect row counts down before the connect', async ({ relaunch }) => {
+  const CONN = postgresConnectionSummary('conn-pre-2', 'Slow Tunnel DB', 'blue');
+  const running = contract<Record<string, unknown>>(
+    'preconnect-delay',
+    'event:preconnect-delay-running',
+  );
+
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.connectionsList, response: [CONN] },
+      { channel: IPC.opsRecent, response: [] },
+    ],
+  });
+  const t0 = Date.now();
+  await page.clock.install({ time: t0 });
+  await page.clock.pauseAt(t0 + 1000);
+  await page.click('[data-testid="toggle-operations-panel"]');
+
+  await emitWailsEvent(page, IPC.opUpdate, {
+    ...running,
+    id: 'op-pre-delay',
+    connectionId: 'conn-pre-2',
+    startedAt: new Date(t0 + 1000).toISOString(),
+  });
+  const row = page.locator('[data-testid="op-row"]');
+  await expect(row).toHaveCount(1);
+  const note = row.locator('[data-testid="op-running-note"]');
+  const elapsed = row.locator('[data-testid="op-elapsed"]');
+  await expect(note).toHaveText('Connecting in 0:01');
+  await expect(elapsed).toHaveText('0:00');
+
+  await page.clock.runFor(1000);
+  await expect(note).toHaveCount(0);
+  await expect(elapsed).toHaveText('0:01');
 });

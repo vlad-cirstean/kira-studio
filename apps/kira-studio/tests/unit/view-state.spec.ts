@@ -1,6 +1,5 @@
-// P44 F47: P43 iteration 3 fixed two ordering bugs in the renderer's view-state modules —
-// views/browse/state.ts's load() supersession guard (D39/F35) and views/shared/keyvalue/state.ts's
-// cursor-strategy reload fallback (D40/F37) — and both are pinned today only by Docker-gated
+// views/browse/state.ts's load() supersession guard and views/shared/keyvalue/state.ts's
+// cursor-strategy reload fallback are both pinned today only by Docker-gated
 // Playwright steps that cannot deterministically force the race they exist to guard against. The
 // browse guard's own coverage (tests/e2e/s3.spec.ts's "descend then press Up immediately" step)
 // only exercises the guard if the slow load happens to still be in flight when
@@ -24,7 +23,7 @@ import { seedConnectionRecord } from './support/connectionRecord.ts';
 setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
-// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — a real (never-settling in this harness) control.tabsSave triggered
 // incidentally by opening a tab below would otherwise wedge every later spec's own tabsSave
 // assertions for the rest of the process. This spec doesn't test persistence, so give it a
@@ -167,7 +166,7 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
     expect(browseViewStore.runtime[id]?.nodes).toEqual([]);
   });
 
-  // P21 round 3 performance finding 8: `runtime` (viewOp.ts's createRuntimeStore) is a deep
+  // `runtime` (viewOp.ts's createRuntimeStore) is a deep
   // reactive() — assigning a plain array to `rt.nodes` used to wrap it, and every TreeNode inside
   // it, in its own reactivity Proxy the moment BrowseView.vue's filteredNodes read them. A Redis/S3
   // level can hold up to 200 000 nodes (redis/catalog.go's scanCount x maxScanRounds); nothing here
@@ -252,10 +251,10 @@ describe('views/shared/keyvalue/state.ts — cursor-strategy reload fallback (P4
   });
 });
 
-// P2 R2 (task #93): goNext/goPrev/etc. patch pageIndex to the new page *before* the load that
+// goNext/goPrev/etc. patch pageIndex to the new page *before* the load that
 // fetches it settles — a failed or cancelled load never calls setPage, so the grid keeps
 // rendering the old page's rows while the pager, left un-reverted, claimed a page that was never
-// actually fetched.
+// fetched.
 describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled load (P2 R2, task #93)', () => {
   test('6. goNext reverts pageIndex to the previous page when the load fails', async () => {
     seedConnectionRecord(connectionsStore, 'conn6');
@@ -298,12 +297,12 @@ describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled loa
     expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(3);
   });
 
-  // F7 (P108 Part 10): this test used to lock in the exact bug F7 fixed — a second goNext firing
-  // before the first's load resolved stacked a second optimistic pageIndex advance on top of the
-  // first, so a failure could only ever revert to one or the other guess, never to the page that
-  // had actually last loaded. goNext/goPrev now no-op while a load is already in flight, so that
-  // stacking can no longer happen at all — rewritten to assert the guard, not the old two-in-
-  // flight scenario it made impossible.
+  // This test used to lock in the exact bug fixed — a second goNext firing before the first's load
+  // resolved stacked a second optimistic pageIndex advance on top of the first, so a failure could
+  // only ever revert to one or the other guess, never to the page that had last loaded.
+  // goNext/goPrev now no-op while a load is already in flight, so that stacking can no longer
+  // happen at all — rewritten to assert the guard, not the old two-in-flight scenario it made
+  // impossible.
   test('9. a second goNext call while a load is in flight is a no-op, not a second optimistic advance', async () => {
     seedConnectionRecord(connectionsStore, 'conn9');
     const { id } = tabsStore.openDataTab('conn9', 'public.orders', { newTab: true })!;

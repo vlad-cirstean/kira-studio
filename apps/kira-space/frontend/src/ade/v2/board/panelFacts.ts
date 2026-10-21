@@ -10,22 +10,6 @@ import type {
 import type { TaskProgress } from './progress';
 import type { DerivedStatus } from './status';
 
-export interface GithubLink {
-  /** `PR` or `issue`. */
-  kind: 'PR' | 'issue';
-  /** `repo#<n>`. */
-  ref: string;
-}
-
-const GITHUB_RE = /^https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/(issues|pull)\/(\d+)/;
-
-/** `null` when the text is not a GitHub issue or PR link. */
-export function parseGithub(url: string): GithubLink | null {
-  const m = url.trim().match(GITHUB_RE);
-  if (!m) return null;
-  return { kind: m[3] === 'pull' ? 'PR' : 'issue', ref: `${m[2]}#${m[4]}` };
-}
-
 /** Why the status chip reads as it does (D10: status follows the workflow). */
 export function statusWhy(task: Task, status: DerivedStatus, progress: TaskProgress): string {
   if (task.kind === 'review') return t('space.ade.board.branchTag.review.tooltip');
@@ -84,7 +68,7 @@ export function taskPatch(over: Partial<TaskPatch>): TaskPatch {
     title: null,
     jira: null,
     clearJira: false,
-    githubUrl: null,
+    hostUrl: null,
     est: null,
     notes: null,
     color: null,
@@ -94,5 +78,5 @@ export function taskPatch(over: Partial<TaskPatch>): TaskPatch {
 }
 
 export function backlogPatch(over: Partial<BacklogPatch>): BacklogPatch {
-  return { text: null, jira: null, clearJira: false, githubUrl: null, notes: null, ...over };
+  return { text: null, jira: null, clearJira: false, hostUrl: null, notes: null, ...over };
 }

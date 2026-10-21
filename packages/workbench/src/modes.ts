@@ -1,14 +1,13 @@
 import type { Component } from 'vue';
 
-// P1 D6/C6: mode content comes from a registry, mirroring D4's tab-kind registry — hoisted here at
-// P128 §2.3 so both apps' own module registries (each app's own `workbench/modes.ts`) share one
-// shape instead of two hand-kept-identical ones. `newTab` is optional: a module with nothing to
-// open (Studio's own Studio/Api modules) simply leaves the tab strip's own "+" slot empty
-// (WorkbenchShellBase's own #new-tab), rather than every shell branching on
-// `modeStore.active === '<id>'` to decide whether to show one (P128 §0's own "per-module branches"
-// resolution).
+// Mode content comes from a registry, mirroring the tab-kind registry — hoisted here so both apps'
+// own module registries (each app's own `workbench/modes.ts`) share one shape instead of two
+// hand-kept-identical ones. `newTab` is optional: a module with nothing to open (Studio's own
+// Studio/Api modules) leaves the tab strip's own "+" slot empty (WorkbenchShellBase's own
+// #new-tab), rather than every shell branching on `modeStore.active === '<id>'` to decide whether
+// to show one.
 //
-// P129 Part 3 §0.12: a discriminated union, not one shape with an optional `layout` — a module
+// A discriminated union, not one shape with an optional `layout` — a module
 // that fills the whole content area (Kira Space's own `ade`) has no panel/start/newTab at all, so a
 // single interface would leave those three either wrongly required or wrongly optional for every
 // module. `PanelModeDef` is the only variant Kira Studio's own `MODES` can hold today (its
@@ -32,9 +31,9 @@ export interface PanelModeDef {
 }
 
 /** A module that owns the whole content area itself — no left panel, no tab strip, no tabs of its
- *  own (§0.13's `tabStripVisible`/`project-visible` gating on the shell side is what actually hides
- *  those rows; this variant just has nothing to hand them). Kira Space's own `ade` mode (P129 Part
- *  3) is the first of these. */
+ *  own (the `tabStripVisible`/`project-visible` gating on the shell side is what hides
+ *  those rows; this variant has nothing to hand them). Kira Space's own `ade` mode is the first
+ *  of these. */
 interface FullModeDef {
   label: string;
   icon: string;

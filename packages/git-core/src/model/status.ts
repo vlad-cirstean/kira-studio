@@ -1,16 +1,16 @@
 /**
- * `git status --porcelain=v2 --branch -z` (§4.4), as a discriminated union of its five record
+ * `git status --porcelain=v2 --branch -z`, as a discriminated union of its five record
  * kinds plus the `#` branch header. `UnmergedEntry` — the `u` record — is defined in
- * `conflict.ts` instead of here, since it is exactly the shape §7.5/§7.6's conflict handling
+ * `conflict.ts` instead of here, since it is exactly the shape the conflict handling
  * needs and this avoids a second, divergent definition later.
  *
- * `summarizeStatus` (P6/W8) is the pure fold from one `StatusResult` (plus the in-progress
+ * `summarizeStatus` is the pure fold from one `StatusResult` (plus the in-progress
  * record `git/src/ops/conflict.ts` reads separately) into the wire-shaped `StatusSummary` —
  * counts, an uncapped dirty-path list, and `head` derived from the branch header rather than a
  * third rev-parse/symbolic-ref spawn (`status --branch` already carries everything
  * `resolveHeadState` in `discovery.ts` would otherwise re-derive). `dirtyPathsFrom` is the
  * sibling fold used for pre-flight (`internal/gitpreflight/checkout.go`'s `dirty` input —
- * server-side since G5, SPEC §2), kept separate because pre-flight needs `tracked`/`untracked`
+ * server-side), kept separate because pre-flight needs `tracked`/`untracked`
  * discrimination per path and
  * `StatusSummary` needs only a flat display list — two different shapes over the same entries,
  * not one shape serving both badly.
@@ -84,7 +84,7 @@ export interface StatusResult {
 }
 
 // ---------------------------------------------------------------------------------------
-// P6/W8 — the wire-shaped fold. `RepoService.statusSummary` caps `dirtyPaths` to 200 and sets
+// The wire-shaped fold. `RepoService.statusSummary` caps `dirtyPaths` to 200 and sets
 // `dirtyTruncated` accordingly (a service-layer display concern, not a classification one); the
 // value returned here is always the full, uncapped list, since `dirtyPathsFrom` below — not this
 // list — is what pre-flight's set intersection must see in full (capping the input would produce
@@ -166,12 +166,11 @@ export function summarizeStatus(
   };
 }
 
-/** The sibling fold `internal/gitpreflight/checkout.go`'s `dirty` input needs (server-side since
- *  G5, SPEC §2): every path git considers not-clean, discriminated tracked/untracked — the split
- *  §7.5's two blocker kinds
- *  (`blockedByTracked`/`blockedByUntracked`) are built from. An unmerged path counts as tracked:
- *  it has index stages, and `blockedByTracked`'s remedy (discard) is the one that actually
- *  applies to it. */
+/** The sibling fold `internal/gitpreflight/checkout.go`'s `dirty` input needs (server-side):
+ *  every path git considers not-clean, discriminated tracked/untracked — the split the two
+ *  blocker kinds (`blockedByTracked`/`blockedByUntracked`) are built from. An unmerged path
+ *  counts as tracked: it has index stages, and `blockedByTracked`'s remedy (discard) is the one
+ *  that applies to it. */
 export function dirtyPathsFrom(status: StatusResult): { path: string; tracked: boolean }[] {
   const out: { path: string; tracked: boolean }[] = [];
   for (const entry of status.entries) {

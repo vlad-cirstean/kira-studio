@@ -25,10 +25,10 @@ import { useConnectionsStore } from '../state/connections';
 import { looksAlreadyImported, useDatagripImportStore } from '../state/datagripImport';
 import EngineIcon from '../theme/EngineIcon.vue';
 
-// P25 D10: a real review step. Nothing is written until "Import N connections" is pressed —
+// A real review step. Nothing is written until "Import N connections" is pressed —
 // every row here is either checkable (it maps to a supported engine and has enough of a JDBC URL
-// to build fields from) or greyed with the specific D11 reason it cannot be. The password itself
-// is never fetched or shown here (D9/OQ-3): only an outlook badge, resolved from file reads,
+// to build fields from) or greyed with the specific reason it cannot be. The password itself
+// is never fetched or shown here: only an outlook badge, resolved from file reads,
 // says what Import is expected to do.
 
 const KIND_ACCENT_CLASS: Record<ConnectionKind, string> = {

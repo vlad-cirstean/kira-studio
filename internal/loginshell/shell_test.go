@@ -1,13 +1,14 @@
 package loginshell_test
 
 import (
+	"os/exec"
 	"reflect"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/internal/loginshell"
 )
 
-// TestBuildArgv_Golden is the exit-criteria's own golden test: the argv is EXACTLY
+// TestBuildArgv_Golden is the golden test: the argv is EXACTLY
 // [shell, "-l", "-c", script] in the login-shell branch, and EXACTLY [shell, "-c", script] in the
 // /bin/sh fallback branch — scriptText is the literal, unmodified last element in both cases,
 // asserted with a script text containing shell metacharacters, quotes, newlines and a NUL-adjacent
@@ -80,5 +81,31 @@ func TestResolveShell_FallsBackWhenNotExecutable(t *testing.T) {
 	shell, login := loginshell.ResolveShell(getenv, isExecutable)
 	if shell != loginshell.DefaultShell || login {
 		t.Fatalf("got shell=%q login=%v", shell, login)
+	}
+}
+
+// TestQuote_RoundTrip proves Quote survives a real POSIX shell parse.
+func TestQuote_RoundTrip(t *testing.T) {
+	cases := []string{
+		"",
+		"plain",
+		"has space",
+		"it's a test",
+		"''double single''",
+		"back\\slash",
+		"dollar $HOME sign",
+		"line1\nline2",
+		"trailing'",
+		"'leading",
+	}
+	for _, s := range cases {
+		quoted := loginshell.Quote(s)
+		out, err := exec.Command("sh", "-c", "printf %s "+quoted).Output()
+		if err != nil {
+			t.Fatalf("Quote(%q) = %q: sh -c failed: %v", s, quoted, err)
+		}
+		if string(out) != s {
+			t.Fatalf("Quote(%q) = %q: round trip = %q, want %q", s, quoted, string(out), s)
+		}
 	}
 }

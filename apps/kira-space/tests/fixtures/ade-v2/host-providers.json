@@ -1,0 +1,13 @@
+{
+  "providers": [
+    {
+      "id": "github",
+      "label": "GitHub",
+      "changeRequest": "Pull request",
+      "changeRequestNoun": "pull request",
+      "changeRequestShort": "PR",
+      "cli": "GitHub CLI (gh)",
+      "fileReviewSync": true
+    }
+  ]
+}

@@ -3,12 +3,12 @@ import { expect, test } from './fixtures';
 import { modeTab, openHttpRequestView } from './support/apiMode';
 import { IPC } from './support/ipcChannels';
 
-// P6 §6.3: `tests/ui` drives the real built bundle in real WebKit with both wire planes mocked, so
-// it exercises the real lazy chunk load through a real dynamic import() — the one tier that proves
-// D5/D7's split actually works at runtime rather than only at build time. Own file, per §0.3
-// (nothing appended to http-variables.spec.ts or the mixed parity spec).
+// `tests/ui` drives the real built bundle in real WebKit with both wire planes mocked, so it
+// exercises the real lazy chunk load through a real dynamic import() — the one tier that proves
+// the split works at runtime rather than only at build time. Own file (nothing appended to
+// http-variables.spec.ts or the mixed parity spec).
 //
-// No mockRuntime.ts/ipcChannels.ts change is needed (F10): the boot path's collectionsList/
+// No mockRuntime.ts/ipcChannels.ts change is needed: the boot path's collectionsList/
 // variablesList/variablesListEnvironments wildcards already cover a tab opened with no fixture at
 // all, and httpSend is an existing channel.
 

@@ -15,7 +15,28 @@ export const distillUnresolvedSchema = /*#__PURE__*/ z.object({
   questions: z.array(z.string()),
 });
 
+export const distillModeSchema = /*#__PURE__*/ z.enum(['facts', 'rewrite']);
+export type DistillMode = z.infer<typeof distillModeSchema>;
+
+// Rewrite mode: gate is the check that rejected the draft ('' when none did); unchanged is
+// changed false with gate ''. The wire also carries draft for audit; the UI never reads it.
+export const distillRewriteSchema = /*#__PURE__*/ z.object({
+  text: z.string(),
+  changed: z.boolean(),
+  gate: z.enum(['', 'grew', 'form', 'indent', 'width', 'directive', 'tokens', 'output', 'hedge']),
+  reason: z.string(),
+  dropped: z.array(
+    z.object({
+      text: z.string(),
+      why: z.enum(['tag', 'history', 'restatesCode', 'trivia']),
+    }),
+  ),
+});
+export type DistillRewrite = z.infer<typeof distillRewriteSchema>;
+
 export const distillResultSchema = /*#__PURE__*/ z.object({
+  mode: distillModeSchema,
+  rewrite: distillRewriteSchema.nullable(),
   lines: z.array(distillLineSchema),
   unresolved: z.array(distillUnresolvedSchema),
   costUsd: z.number(),
@@ -32,6 +53,7 @@ export const distillLimitsSchema = /*#__PURE__*/ z.object({
   maxParts: z.number().int(),
   spendCapUsd: z.number(),
   storeMaxLines: z.number().int(),
+  rewriteMaxChars: z.number().int(),
 });
 export type DistillLimits = z.infer<typeof distillLimitsSchema>;
 
@@ -41,8 +63,9 @@ export const distillChoiceSchema = /*#__PURE__*/ z.object({
 });
 export type DistillChoice = z.infer<typeof distillChoiceSchema>;
 
-// Stage: extract counts parts, verify counts cross-check batches, merge is the one merge call.
-export const distillStageSchema = /*#__PURE__*/ z.enum(['extract', 'verify', 'merge']);
+// Stage: extract counts parts, verify counts cross-check batches, merge is the one merge call;
+// rewrite is the one call of rewrite mode.
+export const distillStageSchema = /*#__PURE__*/ z.enum(['extract', 'verify', 'merge', 'rewrite']);
 export type DistillStage = z.infer<typeof distillStageSchema>;
 
 export const distillProgressSchema = /*#__PURE__*/ z.object({
@@ -59,4 +82,5 @@ export interface DistillArgs {
   requestId: string;
   text?: string;
   path?: string;
+  mode?: DistillMode;
 }

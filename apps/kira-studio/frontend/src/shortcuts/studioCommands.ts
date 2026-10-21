@@ -15,10 +15,9 @@ export function studioPaletteCommands(): () => PaletteCommand[] {
   const tabsStore = useTabsStore();
   const settingsStore = useSettingsStore();
 
-  // D12: deliberately small and 1:1 with already-reachable actions — every global shortcut this
+  // Deliberately small and 1:1 with already-reachable actions — every global shortcut this
   // phase adds (the palette's own toggle excluded), plus the handful of other one-click actions
-  // worth a name in the palette. No fuzzy scoring, no "go to anything" navigation (§8.15 calls
-  // for "minimal").
+  // worth a name in the palette. No fuzzy scoring, no "go to anything" navigation.
   return () => [
     {
       id: 'new-connection',
@@ -39,9 +38,9 @@ export function studioPaletteCommands(): () => PaletteCommand[] {
       label: t('shared.grpc.newRequest.title'),
       run: () => void openGrpcRequestTab(),
     },
-    // P4 D15: the discoverability answer for Save, at the same bar this list's own comment states.
+    // The discoverability answer for Save, at the same bar this list's own comment states.
     // No ⌘S and no accelerator — shared/domain/shortcuts.ts is a closed map and a menu accelerator
-    // needs the seven-file path P1 OQ-3 / P2 OQ-7 deferred as one deliberate pass. View-scoped like
+    // needs the seven-file path deferred as one deliberate pass. View-scoped like
     // view.run below, so it is a no-op when no request tab is mounted.
     { id: 'api.save', label: t('studio.api.saveRequest.title'), run: () => runCommand('api.save') },
     // P7 D10: view-scoped exactly like api.save above — a no-op with no request tab mounted.

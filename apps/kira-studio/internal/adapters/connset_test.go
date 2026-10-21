@@ -8,11 +8,9 @@ import (
 	"time"
 )
 
-// White-box coverage for ConnSet.Get/detachLRULocked, ported once (P107 T2-2) from the three
-// near-identical connset_internal_test.go files postgres/mysqlfamily/redis each carried — the
-// concurrency behaviour under test now lives here, not per adapter; each adapter's own Dial/Close
-// wiring keeps whatever adapter-specific locking test it still needs (e.g. mysqlfamily's own
-// per-entry Acquire serialization).
+// White-box coverage for ConnSet.Get/detachLRULocked — the concurrency behaviour under test now
+// lives here, not per adapter; each adapter's own Dial/Close wiring keeps whatever adapter-specific
+// locking test it still needs (e.g. mysqlfamily's own per-entry Acquire serialization).
 
 type fakeEntry struct{ id int }
 
@@ -57,7 +55,7 @@ func TestConnSetDetachLRULocked_NoOpWhenOnlyPrimaryIsOpen(t *testing.T) {
 	}
 }
 
-// TestConnSetDetachLRULocked_NeverTouchesVictimClose is finding 4(a)'s own regression: eviction must
+// TestConnSetDetachLRULocked_NeverTouchesVictimClose is a regression: eviction must
 // only ever touch the map/lru under mu, never call Close (a potential network round trip) while mu
 // is held — this locks a channel Close would need to reach before calling detachLRULocked directly
 // and asserts it still returns immediately.
@@ -90,7 +88,7 @@ func TestConnSetDetachLRULocked_NeverTouchesVictimClose(t *testing.T) {
 	}
 }
 
-// TestConnSetGet_SingleFlightPerKey is finding 4(b)'s own regression: Get used to dial with no lock
+// TestConnSetGet_SingleFlightPerKey is a regression test: Get used to dial with no lock
 // held at all, so two concurrent Get calls for the same not-yet-open key both dialed, the second
 // overwriting the first in conns — a leaked entry (and whatever live resource it held) for the life
 // of the app. This fires many concurrent Get calls for the *same* key against a fake Dial that

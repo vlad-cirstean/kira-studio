@@ -22,7 +22,7 @@ var ErrMissing = errors.New("catfile: object missing")
 
 // readHeader reads one response's header line (up to LF) and reports whether the object was
 // found. Non-found is recognised by the line's own suffix, not by counting fields: git echoes the
-// *input* verbatim ahead of it (`<input> missing`, and F10's own addition, `<input> ambiguous` —
+// *input* verbatim ahead of it (`<input> missing`, and `<input> ambiguous` —
 // a short OID matching more than one object, verified against real git 2.43), and the input for a
 // `<rev>:<path>` request can itself contain spaces, so a naive field-count/split heuristic cannot
 // tell a found line from a non-found one reliably. The suffix can: a found line's third field is

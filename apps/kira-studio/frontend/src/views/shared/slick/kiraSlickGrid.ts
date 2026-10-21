@@ -16,11 +16,9 @@ import {
 import type { RowHandle } from './dataSource';
 import * as scrollTrace from './scrollTrace';
 
-// P30 §3 prerequisite: relocated here (with dataSource.ts's generic core and slickTheme.css) from
-// views/grid/slick/ — SPEC §11 forbids a views/<kind>/* file importing another views/<kind>/*, and
-// this class (plus the scroll mechanism it carries) is exactly what views/console/ConsoleSlickGrid.vue
-// needs to inherit unmodified (P30 §3.5 rule 1). views/grid/SlickGridHost.vue's own import of it
-// moved with it, mechanically — nothing about this file's own logic changed.
+// SPEC forbids a views/<kind>/* file importing another views/<kind>/*, and
+// this class (plus the scroll mechanism it carries) is exactly what
+// views/console/ConsoleSlickGrid.vue needs to inherit unmodified.
 
 // main.ts's own `declare global` (the real source of truth for this shape, D9) lives in a
 // different TS program from tests/unit/tsconfig.json's — mirrors tests/ui/global.d.ts's own
@@ -37,14 +35,14 @@ declare global {
        *  — declared here too only because this program's declaration merging requires an identical
        *  shape to main.ts's own. See main.ts's own doc comment for what it does. */
       forceSyncScrollingOverride?: boolean;
-      /** P22 iter2-pacing D1: overrides columns.ts's CHASE_QUIET_MS. Read fresh on every chase
+      /** Overrides columns.ts's CHASE_QUIET_MS. Read fresh on every chase
        *  callback, never cached — 0 restores the pre-fix "fire on the very next rAF,
-       *  unconditionally" behaviour exactly, so the real-Mac A/B (docs/PERF.md §2.1c) is a console
+       *  unconditionally" behaviour exactly, so the real-Mac A/B (docs/PERF.md) is a console
        *  line, not a rebuild. */
       chaseQuietMsOverride?: number;
       /** P22 iter2-pacing D2: overrides columns.ts's MAX_NEW_LEAD_CELLS_PER_RENDER. */
       maxNewLeadCellsPerRenderOverride?: number;
-      /** P22 iter2-onset D2: `false` drops the chase's per-frame gate, leaving only the
+      /** `false` drops the chase's per-frame gate, leaving only the
        *  CHASE_QUIET_MS wall-clock one. See `scheduleChase` below for why the ms gate alone is not
        *  sufficient. `chaseQuietMsOverride = 0` still disables both at once, so that override keeps
        *  its documented "the pre-fix policy exactly" meaning. */
@@ -76,10 +74,10 @@ function runwayConfig(): RowRangeExtractorConfig {
   };
 }
 
-/** P22 iter2-scroll-gaps D2 step 4/7 — how many rows in `[start, end]` fall outside
+/** How many rows in `[start, end]` fall outside
  *  `[prevStart, prevEnd]`, i.e. how many of them are *not* already in SlickGrid's own `rowsCache`
- *  (`prev` is `lastRenderedRowBounds`, a reliable proxy for `rowsCache` membership — that plan's own
- *  D2 comment: `cleanupRows` keeps exactly the previously-returned range). A pure function, split out
+ *  (`prev` is `lastRenderedRowBounds`, a reliable proxy for `rowsCache` membership —
+ *  `cleanupRows` keeps exactly the previously-returned range). A pure function, split out
  *  so the batch-cap arithmetic is testable without constructing a real `SlickGrid`. */
 export function countNewRows(
   start: number,
@@ -113,7 +111,7 @@ export function clampColumnOverscan(
 // WebKit rebuilds every element's style when a <style> is removed or a CSSOM rule is mutated
 // (~55 ms on the test page); a sheet appended with its text already set, or a custom property on
 // the grid root, restyles only what it touches. So column rules live in one append-only sheet and
-// per-grid values live on the grid root. P139 Part 2.
+// per-grid values live on the grid root.
 const COLUMN_RULE_CHUNK = 256;
 let columnRuleCapacity = 0;
 
@@ -176,35 +174,36 @@ function ensureColumnRules(columnCount: number): void {
 // matching slickgrid's own escape hatch for exactly this case.
 // biome-ignore lint/suspicious/noExplicitAny: see comment above.
 export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
-  /** Supplied by the host on every scroll sample (the deleted DataGrid.vue's own `rowVelocity()` analogue) —
+  /** Supplied by the host on every scroll sample (the deleted DataGrid.vue's own `rowVelocity()`
+   *  analogue) —
    *  read fresh on every call below, never memoised (this runs *during* SlickGrid's own render).
    *  Defaults to "at rest" so a grid that hasn't wired a sampler yet still renders the baseline
-   *  runway — D3(a)'s own "byte-identical to today at rest" guarantee. */
+   *  runway — the "byte-identical to today at rest" guarantee. */
   velocity: () => KiraSlickVelocity = () => ({ pxPerFrame: 0, direction: 0 });
 
-  /** The row axis's own budget divisor (D4's third bullet) — a plain variable the host updates
-   *  from `onRendered`, mirroring the deleted DataGrid.vue's own `mountedColumnCount` (columns.ts's own
-   *  comment: calling into the column virtualizer from *inside* the row-range computation itself
-   *  measurably regressed the scroll budget; the same hazard applies here). */
+  /** The row axis's own budget divisor — a plain variable the host updates
+   *  from `onRendered`, mirroring the deleted DataGrid.vue's own `mountedColumnCount` (columns.ts's
+   *  own comment: calling into the column virtualizer from *inside* the row-range computation
+   *  itself measurably regressed the scroll budget; the same hazard applies here). */
   mountedColumnCount = 1;
 
   /** The last `{start, end}` *rendered* row bounds this override computed — read by the host's
-   *  `onRendered` handler to compute the page-row window it hands `setVisibleWindow` (P5 C1).
+   *  `onRendered` handler to compute the page-row window it hands `setVisibleWindow`.
    *  SlickGrid's own `onRendered` event reports the strictly *visible* range (`visible.top/bottom`
-   *  in `render()`), not the wider *rendered* range this override actually mounts — using the
+   *  in `render()`), not the wider *rendered* range this override mounts — using the
    *  narrower one would prune the decode cache back to the visible slice on every render, defeating
    *  memoisation for the whole overscan band. */
   lastRenderedRowBounds: { start: number; end: number } = { start: 0, end: -1 };
 
   /** Supplied by the host: performance.now() at the last native `scroll` event on the viewport.
-   *  P22 iter2-pacing D1's own gate — a catch-up render never fires while this is recent. Defaults
+   *  The gate — a catch-up render never fires while this is recent. Defaults
    *  to "never scrolled" so a grid that hasn't wired a sampler still chases immediately — and, like
    *  `velocity`/`mountedColumnCount`/`chaseWanted` above/below, every read below tolerates this
    *  field being `undefined` on the base constructor's own pre-field-init call. */
   lastScrollEventAt: () => number = () => Number.NEGATIVE_INFINITY;
 
   /** Supplied by the host: a counter incremented by every native `scroll` event on the viewport.
-   *  P22 iter2-onset D2 — the chase's *per-frame* gate reads this rather than a wall clock; see
+   *  The chase's *per-frame* gate reads this rather than a wall clock; see
    *  `scheduleChase` below. Defaults to a constant so a grid that hasn't wired a sampler still
    *  chases, and like every other host-supplied field here every read tolerates it being
    *  `undefined` on the base constructor's own pre-field-init call. */
@@ -237,7 +236,7 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
    *  alongside `chaseHandle`/`chaseWanted` above, same reasoning. */
   declare private chaseSeenSeq: number;
 
-  /** A7/P21 round 1 — `getRenderedRange`'s own average-column-width divisor, below, used to be an
+  /** `getRenderedRange`'s own average-column-width divisor, below, used to be an
    *  O(cols) `reduce` on *every* render call; cached here and only recomputed when the columns
    *  array itself is a new reference (`setColumns`) or `onColumnsResized` fires (a resize drag
    *  mutates each `Column.width` in place, so the array reference alone doesn't change — the
@@ -318,7 +317,7 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
       const seenSeq = this.chaseSeenSeq ?? -1;
       this.chaseSeenSeq = seq;
       // `chaseQuietMsOverride = 0` disables the gate *whole*, both halves — that override's
-      // documented contract (main.ts, docs/PERF.md §2.1c) is "restores the pre-fix fire-on-the-very-
+      // documented contract (main.ts, docs/PERF.md) is "restores the pre-fix fire-on-the-very-
       // next-rAF behaviour exactly", and it has to keep meaning that for the real-Mac A/B and for
       // slick-grid.spec.ts's own T3 to stay honest.
       if (quietMs > 0) {
@@ -514,7 +513,7 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     }
   }
 
-  /** P22 iter2-pacing D4 — SlickGrid's own `destroy()` never clears `this.initialized` and nulls
+  /** SlickGrid's own `destroy()` never clears `this.initialized` and nulls
    *  ~60 internal element references (dist/esm/index.js:7674-7700, :7723-7725), so a catch-up
    *  render armed by `getRenderedRange` and still pending when the host unmounts would re-enter
    *  `render()` against a torn-down grid, passing the `!this.initialized` guard because that flag
@@ -547,8 +546,8 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     // that first, base-constructor-triggered call; every read of a subclass field here has to
     // tolerate that, not just default it once at the field declaration (confirmed empirically —
     // `TypeError: this.velocity is not a function` from inside the `super(...)` call otherwise).
-    // `this.chaseWanted`/`this.lastRenderedRowBounds` (P22 iter2-scroll-gaps D2, P22 iter2-pacing
-    // D1) are read the same defensive way below, for the identical reason.
+    // `this.chaseWanted`/`this.lastRenderedRowBounds` are read the same defensive way below, for
+    // the identical reason.
     const range = super.getVisibleRange(viewportTop, viewportLeft);
     const { pxPerFrame, direction } = this.velocity
       ? this.velocity()
@@ -563,8 +562,8 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     const dataLength = this.getDataLength();
     const rowHeight = this.getOptions().rowHeight ?? 28;
 
-    // P22 iter2-scroll-gaps D2 — the plan's own 9-step algorithm (§5 D2), restructured from the
-    // single `rowRangeBounds` call this override used to make directly.
+    // The 9-step algorithm, restructured from the single `rowRangeBounds` call this override used
+    // to make directly.
     //
     // Step 1: the strictly-visible range, always returned in full — nothing currently on screen is
     // ever deferred to a later frame.
@@ -611,17 +610,18 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
       end = mustEnd;
     } else {
       // Step 7: expand outward from `must` toward `target`, lead side first (today's existing
-      // direction bias — rowRangeBounds' own [trailRows, leadRows]/[leadRows, trailRows] asymmetry),
-      // until either `target` is reached or the remaining budget is exhausted. A row already inside
-      // `prev` costs nothing to add (SlickGrid skips it — it's already in rowsCache); only a genuinely
-      // new row spends budget, so growth only stalls when it actually reaches un-cached territory.
+      // direction bias — rowRangeBounds' own [trailRows, leadRows]/[leadRows, trailRows]
+      // asymmetry), until either `target` is reached or the remaining budget is exhausted. A row
+      // already inside `prev` costs nothing to add (SlickGrid skips it — it's already in
+      // rowsCache); only a genuinely new row spends budget, so growth only stalls when it reaches
+      // un-cached territory.
       //
-      // P22 iter2-pacing D2: the *runway* portion of this budget is additionally capped by
+      // The *runway* portion of this budget is additionally capped by
       // MAX_NEW_LEAD_CELLS_PER_RENDER (or its override), separately from budgetRows above (which
       // stays the absolute per-pass ceiling and step 6's own floor short-circuit). Defaulted equal
       // to MAX_NEW_CELLS_PER_RENDER, so `leadBudgetRows` never binds tighter than `budgetRows -
-      // mustNewRows` unless a real-hardware A/B (docs/PERF.md §2.1c step 4) overrides it — this
-      // `min` is then a no-op and `remaining` is byte-identical to iter2-scroll-gaps' own value.
+      // mustNewRows` unless a real-hardware A/B (docs/PERF.md) overrides it — this
+      // `min` is then a no-op.
       const maxLeadCells =
         tuning?.maxNewLeadCellsPerRenderOverride ?? MAX_NEW_LEAD_CELLS_PER_RENDER;
       const leadBudgetRows = Math.floor(maxLeadCells / Math.max(1, this.mountedColumnCount || 1));
@@ -663,16 +663,16 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     // Step 8: if the returned range is narrower than `target` on either side, want a catch-up
     // render — every call (real-scroll- or catch-up-driven) recomputes `must`/`target` fresh from
     // the grid's *current* scroll position, so there is no queue of stale ranges to reconcile, only
-    // "how far is `prev` from `target`, right now." P22 iter2-pacing D1: `chaseWanted` is
-    // recomputed on every call (not just latched true once), so a call that lands after the deficit
-    // has already closed clears it again; `scheduleChase()` is the gate that decides *when* a
-    // wanted chase is actually allowed to render (see its own comment).
+    // "how far is `prev` from `target`, right now." `chaseWanted` is recomputed on every call (not
+    // just latched true once), so a call that lands after the deficit has already closed clears it
+    // again; `scheduleChase()` is the gate that decides *when* a wanted chase is allowed to render
+    // (see its own comment).
     this.chaseWanted = end >= start && (start > target.start || end < target.end);
     if (this.chaseWanted) this.scheduleChase();
 
     // Step 9: the range actually returned this call — read by step 3 on the *next* call.
     this.lastRenderedRowBounds = { start, end };
-    // getCanvasNode() with no args resolves column 0 — this app's frozen gutter (D4/§5 item 5),
+    // getCanvasNode() with no args resolves column 0 — this app's frozen gutter,
     // whose own pane is a fixed GUTTER_WIDTH wide, not the scrollable data pane whose width this
     // clamp needs. Column index 1 (the first data column) is always > frozenColumn (0), so it
     // resolves the right/scrollable canvas instead — see `_getContainerElement`'s own
@@ -685,8 +685,8 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
       OVERSCAN_PX,
       canvasWidth,
     );
-    // The row axis's own budget divisor (D4's third bullet), self-maintained rather than supplied
-    // by the host: the deleted DataGrid.vue's own mountedColumnCount was read from a *separate* column
+    // The row axis's own budget divisor, self-maintained rather than supplied by the host:
+    // the deleted DataGrid.vue's own mountedColumnCount was read from a *separate* column
     // virtualizer, and its own comment warned that calling into it from inside the row-range
     // computation regressed the scroll budget. SlickGrid has no separate column virtualizer to call
     // into — this approximates the mounted column count from this same render's own column window
@@ -704,13 +704,13 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     return { top: start, bottom: end, leftPx, rightPx };
   }
 
-  /** P22 iter2-scroll-gaps D1 — `render()` is fully synchronous (§1.1 of that plan: no `await`, no
-   *  `setTimeout`, no `requestIdleCallback` anywhere between `_handleScroll` and `onRendered`
-   *  firing), so the caller already has the duration in hand; report it straight to
-   *  `scrollTrace.noteRenderMs` instead of approximating it through a Vue `nextTick` (meaningless
-   *  here — there is no Vue patch on this render path at all). This is also D2's own seam: the batch-
-   *  capping/chase logic lives in `getRenderedRange`, called from inside `super.render()` below, so
-   *  timing wraps the whole call, chase-scheduled catch-ups included. */
+  /** `render()` is fully synchronous (no `await`, no `setTimeout`, no `requestIdleCallback`
+   *  anywhere between `_handleScroll` and `onRendered` firing), so the caller already has the
+   *  duration in hand; report it straight to `scrollTrace.noteRenderMs` instead of approximating
+   *  it through a Vue `nextTick` (meaningless here — there is no Vue patch on this render path at
+   *  all). This is also the seam: the batch-capping/chase logic lives in `getRenderedRange`,
+   *  called from inside `super.render()` below, so timing wraps the whole call, chase-scheduled
+   *  catch-ups included. */
   override render(): void {
     const start = performance.now();
     window.__kiraGridScrollWorkStart?.(start);

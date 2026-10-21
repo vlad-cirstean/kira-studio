@@ -8,7 +8,7 @@ import (
 )
 
 // mariadb.go ports planParsers/mariadb.ts verbatim: MariaDB's `EXPLAIN FORMAT=JSON` — same
-// statement spelling as MySQL's, a genuinely different response schema (F13): every table sits
+// statement spelling as MySQL's, a genuinely different response schema: every table sits
 // inside a nested_loop array (even a single-table query), wrapped in read_sorted_file/filesort for
 // a sort. The scalar cost field is named `cost` (≈ seconds under MariaDB 11.x's model) rather than
 // MySQL's cost_info.query_cost, and `filtered` is a plain number, not MySQL's string.

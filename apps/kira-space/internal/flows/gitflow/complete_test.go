@@ -127,7 +127,7 @@ func TestCredentialPrompt(t *testing.T) {
 			_ = r.gs.Request("remote.run", gitrpc.RemoteRunParams{RepoID: id, RemoteOpParams: gitsession.RemoteOpParams{Kind: "fetch", Remote: "origin"}}, &res)
 			done <- res
 		}()
-		req := answer(t, r.app, secret)
+		req := answerLogin(t, r.app, "alice", secret)
 		if !req.Masked || !strings.Contains(req.Prompt, "Password") || req.RepoLabel != "x" {
 			t.Fatalf("credential prompt = %+v, want a masked password prompt for repo x", req)
 		}

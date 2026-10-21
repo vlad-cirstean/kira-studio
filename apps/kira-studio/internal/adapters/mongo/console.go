@@ -83,8 +83,8 @@ func isWriteStatement(stmt parsedStatement) bool {
 	return writeConsoleMethods[stmt.method]
 }
 
-// ClassifyStatement satisfies adapters.StatementClassifier (M2) over this package's own
-// parseStatement/isWriteStatement — Mongo's grammar admits no schema statement (M2's model.
+// ClassifyStatement satisfies adapters.StatementClassifier over this package's own
+// parseStatement/isWriteStatement — Mongo's grammar admits no schema statement (the model.
 // MongoConsoleMethods is ten find/write/aggregate methods, no DDL), so DDL is unreachable here. A
 // parse error returns ClassUnknown with the error rather than failing the classification silently.
 func (a *Adapter) ClassifyStatement(_ context.Context, statement string) (adapters.OpClass, error) {
@@ -185,12 +185,12 @@ func parseStatement(text string) (parsedStatement, error) {
 		if err != nil {
 			return parsedStatement{}, err
 		}
-		// F8: every argument goes through ResolveEJSONWrappers, exactly like ParseDocumentLiteral's
-		// own doc comment ("the one grammar every Mongo text surface... parses with") — without it, a
-		// {$oid:"…"}/{$date:…}/{$numberLong:…} value copied straight from the grid either fails as an
-		// unknown filter operator, or (in insertOne/updateOne bodies, since MongoDB 5.0+ accepts
-		// $-prefixed nested field names) gets silently stored as a literal wrapper object instead of
-		// the Date/ObjectId it denotes.
+		// Every argument goes through ResolveEJSONWrappers, exactly like ParseDocumentLiteral's own
+		// doc comment ("the one grammar every Mongo text surface... parses with") — without it, a
+		// {$oid:"…"}/{$date:…}/{$numberLong:…} value copied straight from the grid either fails as
+		// an unknown filter operator, or (in insertOne/updateOne bodies, since MongoDB 5.0+ accepts
+		// $-prefixed nested field names) gets silently stored as a literal wrapper object instead
+		// of the Date/ObjectId it denotes.
 		args = append(args, ResolveEJSONWrappers(v))
 		for parser.PeekPunct(",") {
 			_ = parser.ExpectPunct(",")
@@ -571,10 +571,10 @@ func runStatement(ctx context.Context, db *mongodriver.Database, stmt parsedStat
 	return runner(ctx, db.Collection(stmt.collection), stmt, op, track)
 }
 
-// execute ports console.ts's execute — one op-log row for the whole batch (P5.5 D9), CheckCancelled
+// execute ports console.ts's execute — one op-log row for the whole batch, CheckCancelled
 // between statements, one page per statement.
 //
-// F11: every statement is parsed, and the read-only guard checked, up front — before any of them
+// Every statement is parsed, and the read-only guard checked, up front — before any of them
 // runs. The previous shape parsed statement N only after 1..N-1 had already executed, so a typo
 // further down a batch discarded the already-committed earlier writes with no rollback path;
 // re-running after fixing the typo then double-applied them.

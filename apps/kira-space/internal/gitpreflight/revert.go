@@ -51,7 +51,7 @@ type ClassifyRevertInput struct {
 	Prediction RevertPrediction
 }
 
-// ClassifyRevert is §7.10's revert classifier, ported verbatim from preflight/revert.ts: every
+// ClassifyRevert is the revert classifier, ported verbatim from preflight/revert.ts: every
 // merge among Shas needs an explicit mainline before the op is offered; the dirty tree and any
 // in-progress operation block; a detached HEAD is a note, not a blocker; the prediction is scoped
 // to Shas[0] and PredictedFor says so.

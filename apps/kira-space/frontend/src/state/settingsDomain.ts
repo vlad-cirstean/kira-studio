@@ -1,26 +1,31 @@
-import { appearanceSettingsSchema, FONT_SIZE_RANGE, logLevelSchema } from '@shared/domain/settings';
+import {
+  agentSettingsSchema,
+  appearanceSettingsSchema,
+  DEFAULT_AGENT_PROVIDER,
+  FONT_SIZE_RANGE,
+  logLevelSchema,
+} from '@shared/domain/settings';
 import { z } from 'zod';
 
-// P103 Part 4 (§7.3): this app's own three-section settingsSchema/settingsPatchSchema/
-// defaultSettings, split out of the former one shared `@shared/domain/settings` — this store used
-// to carry Kira Studio's own data/cache/api/dbMcp/claudeCode sections dead (never populated by this
+// This app's own three-section settingsSchema/settingsPatchSchema/defaultSettings — this store used
+// to carry Kira Studio's own data/cache/api/dbMcp sections dead (never populated by this
 // app's own Go backend, apps/kira-space/internal/storage/model/settings.go), the same "tab-kind
-// vocabulary" defect P103 Part 2 already fixed for tabs. appearance/logLevel enum stay genuinely
-// shared (this app's own leaf name stays `advanced.gitLogLevel`, P120); FONT_SIZE_RANGE is the one
-// this app's own GitPane reads directly, so it re-exports; git is this app's own (P120: Kira Space
+// vocabulary" defect already fixed for tabs. appearance/logLevel enum stay genuinely
+// shared (this app's own leaf name stays `advanced.gitLogLevel`); FONT_SIZE_RANGE is the one
+// this app's own GitPane reads directly, so it re-exports; git is this app's own (Kira Space
 // is the only app with a git module) — its schema and `FETCH_AUTO_INTERVAL_MINUTES_RANGE` are
 // defined below, not imported. The raw schema objects
 // (appearanceSettingsSchema/logLevelSchema/rowDensitySchema) stay import-only: nothing outside
 // this file references them directly, every real consumer reads through the composed
 // `Settings`/`SettingsPatch`/`defaultSettings` below. `AppearanceSettings`/`LogLevel`/
 // `RowDensity` used to re-export here too; every pane now reads them straight from
-// `@shared/domain/settings` via I2-18's shared field components (`FontSizeField.vue` etc.).
+// `@shared/domain/settings` via the shared field components (`FontSizeField.vue` etc.).
 export { FONT_SIZE_RANGE };
 
 // G7 D16: minutes between automatic background fetches; 0 disables it.
 export const FETCH_AUTO_INTERVAL_MINUTES_RANGE = { min: 0, max: 1440 } as const;
 
-// G7 D16: server-owned — two windows disagreeing about either is a correctness/safety issue (a
+// Server-owned — two windows disagreeing about either is a correctness/safety issue (a
 // force-push confirmation only one window enforces, an auto-fetch cadence that differs per
 // viewer), edited only in this dialog, never as a per-window setting. Not exported —
 // nothing outside this file references the raw schema object; `Settings['git']` covers real
@@ -33,9 +38,9 @@ const gitSettingsSchema = /*#__PURE__*/ z.object({
     .min(FETCH_AUTO_INTERVAL_MINUTES_RANGE.min)
     .max(FETCH_AUTO_INTERVAL_MINUTES_RANGE.max)
     .default(0),
-  // G18 D15: git.path was already classified server-owned (it answers "where is the git binary
-  // on this machine", not a per-repo or per-window preference) but its wiring was dead until that
-  // phase — a third leaf of this same trio, fixed the same way, not a redesign. Empty means "auto-
+  // git.path was already classified server-owned (it answers "where is the git binary
+  // on this machine", not a per-repo or per-window preference) but its wiring was dead
+  // — a third leaf of this same trio, fixed the same way, not a redesign. Empty means "auto-
   // discover" (PATH lookup) — gitclient.Discovery's own existing contract.
   gitPath: z.string().default(''),
   // P92 item 9: 0 = follow appearance.fontSize. Reaches every embedded git-ui surface (graph,
@@ -45,7 +50,7 @@ const gitSettingsSchema = /*#__PURE__*/ z.object({
 
 // advanced carries just gitLogLevel here — this app's own diagnostic log verbosity, its entire
 // `advanced` section (apps/kira-space/internal/storage/model/settings.go's own AdvancedSettings
-// embeds appsettings.AdvancedCore for the same one leaf, P103 Part 4 §7.1). Not exported — nothing
+// embeds appsettings.AdvancedCore for the same one leaf). Not exported — nothing
 // outside this file references the raw schema object or its own inferred type; AdvancedPane.vue
 // reads the leaf's type through the shared `LogLevel` above instead.
 const advancedSettingsSchema = /*#__PURE__*/ z.object({
@@ -70,10 +75,10 @@ const appSpaceAppearanceSettingsSchema = /*#__PURE__*/ appearanceSettingsSchema.
   dateFormat: z.enum(['relative', 'absolute']).default('relative'),
 });
 
-// P129 Part 2 §7: Part 3's own queue-board UI prefs (panel width, planning-horizon window, calendar
-// overrides), persisted as settings leaves rather than component state so they survive a relaunch.
-// No UI reads these yet — Part 3 wires the queue board to them. Not exported — nothing outside this
-// file references the raw schema object; `Settings['ade']` covers real consumers.
+// The queue-board UI prefs (panel width, planning-horizon window, calendar overrides), persisted as
+// settings leaves rather than component state so they survive a relaunch. No UI reads these yet.
+// Not exported — nothing outside this file references the raw schema object; `Settings['ade']`
+// covers real consumers.
 const ADE_HORIZON_DAYS_RANGE = { min: 1, max: 365 } as const;
 const ADE_HISTORY_DAYS_RANGE = { min: 1, max: 365 } as const;
 const ADE_WORKDAY_HOURS_RANGE = { min: 1, max: 24 } as const;
@@ -117,10 +122,10 @@ const adeSettingsSchema = /*#__PURE__*/ z.object({
   sandboxKeychain: z.boolean().default(false),
 });
 
-// P188: keep this Mac awake while any Claude Code session runs, independent of the title bar's own
-// keep-awake toggle. Off by default — an OS power assertion is opt-in. Not exported, like the
-// other raw section schemas.
-const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
+// The shared agent.provider leaf plus this app's agent leaves. P188: keep this Mac awake while any
+// agent session runs, independent of the title bar's own keep-awake toggle. Off by default — an OS
+// power assertion is opt-in. Not exported, like the other raw section schemas.
+const appAgentSettingsSchema = /*#__PURE__*/ agentSettingsSchema.extend({
   keepAwakeWithAgents: z.boolean().default(false),
   // P238: desktop notifications. All on by default; notifyEnabled is the master switch.
   notifyEnabled: z.boolean().default(true),
@@ -128,7 +133,7 @@ const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
   notifyOnNeedsInput: z.boolean().default(true),
   notifyOnRunEnded: z.boolean().default(true),
   notifyIncludeMessage: z.boolean().default(true),
-  // P239: Claude Code usage limits in the ADE status bar.
+  // P239: agent usage limits in the ADE status bar.
   usageEnabled: z.boolean().default(true),
 });
 
@@ -141,8 +146,14 @@ const mobileSettingsSchema = /*#__PURE__*/ z.object({
   agentInput: z.boolean().default(false),
 });
 
+// P314: the model alias per provider id for every memory call (gate, reconcile, import, distill).
+// A provider without an entry uses its default.
+const memorySettingsSchema = /*#__PURE__*/ z.object({
+  models: z.record(z.string(), z.string()).default({}),
+});
+
 // `.default(...)` on every section is load-bearing: an older kira-space.sqlite has a settings row
-// with no `advanced`/`git`/`ade`/`claudeCode` keys, and that row must still parse on next launch.
+// with no `advanced`/`git`/`ade`/`agent` keys, and that row must still parse on next launch.
 const settingsSchema = /*#__PURE__*/ z.object({
   appearance: appSpaceAppearanceSettingsSchema,
   advanced: advancedSettingsSchema.default({ gitLogLevel: 'info', notifyPrompts: true }),
@@ -163,7 +174,8 @@ const settingsSchema = /*#__PURE__*/ z.object({
     headlessSettingSources: 'all',
     sandboxKeychain: false,
   }),
-  claudeCode: claudeCodeSettingsSchema.default({
+  agent: appAgentSettingsSchema.default({
+    provider: DEFAULT_AGENT_PROVIDER,
     keepAwakeWithAgents: false,
     notifyEnabled: true,
     notifyOnFinished: true,
@@ -177,6 +189,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
     port: 7790,
     agentInput: false,
   }),
+  memory: memorySettingsSchema.default({ models: {} }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -185,8 +198,9 @@ const settingsPatchSchema = /*#__PURE__*/ z.object({
   advanced: advancedSettingsSchema.partial().optional(),
   git: gitSettingsSchema.partial().optional(),
   ade: adeSettingsSchema.partial().optional(),
-  claudeCode: claudeCodeSettingsSchema.partial().optional(),
   mobile: mobileSettingsSchema.partial().optional(),
+  memory: memorySettingsSchema.partial().optional(),
+  agent: appAgentSettingsSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -221,7 +235,8 @@ export const defaultSettings: Settings = {
     headlessSettingSources: 'all',
     sandboxKeychain: false,
   },
-  claudeCode: {
+  agent: {
+    provider: DEFAULT_AGENT_PROVIDER,
     keepAwakeWithAgents: false,
     notifyEnabled: true,
     notifyOnFinished: true,
@@ -234,5 +249,8 @@ export const defaultSettings: Settings = {
     enabled: false,
     port: 7790,
     agentInput: false,
+  },
+  memory: {
+    models: {},
   },
 };

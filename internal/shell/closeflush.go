@@ -15,11 +15,11 @@ import (
 const closeFlushTimeout = 2 * time.Second
 
 // CloseFlushCoordinator routes one window's "flush before close" ack
-// (LifecycleService.WindowFlushed) back to whichever WindowClosing hook is waiting for it (C6).
-// Unlike the quit handshake (C8's Quitter, which waits for every window at once), at most one
+// (LifecycleService.WindowFlushed) back to whichever WindowClosing hook is waiting for it.
+// Unlike the quit handshake (the Quitter, which waits for every window at once), at most one
 // waiter exists per key at a time — a window can only be in the middle of closing once, since
 // AttachCloseFlush's own `flushing` guard makes the hook one-shot per window. sig is the
-// Signaller (P103 Part 3) AttachCloseFlush signals the renderer through — the coordinator's own
+// Signaller AttachCloseFlush signals the renderer through — the coordinator's own
 // job is routing the ack back, so it is the natural owner of the one Signaller it needs to ask
 // for one in the first place.
 type CloseFlushCoordinator struct {
@@ -147,14 +147,14 @@ func AttachCloseFlush(
 			}
 			done()
 			if last {
-				// Real-interaction fix: reused, not destroyed — see this function's own doc
-				// comment. Deliberately does NOT navigate to about:blank first (unlike the Close
+				// Reused, not destroyed — see this function's own doc comment.
+				// Deliberately does NOT navigate to about:blank first (unlike the Close
 				// path below): the whole point of keeping this window alive is instant resume —
 				// every open tab, the query text mid-edit, scroll position — on the next
 				// Dock-click, which a page unload would throw away for no benefit (nothing here
-				// is actually being reclaimed; the process stays up either way).
+				// is being reclaimed; the process stays up either way).
 				win.Hide()
-				// F2: reset flushing so a later Dock-reshow -> close cycle on this same window
+				// Reset flushing so a later Dock-reshow -> close cycle on this same window
 				// re-enters this hook instead of finding it stuck true forever. Safe exactly
 				// because Hide() never emits WindowClosing (this function's own doc comment,
 				// above) — nothing can re-enter this closure between win.Hide() and this store, so
@@ -163,9 +163,9 @@ func AttachCloseFlush(
 				flushing.Store(false)
 				return
 			}
-			// P28 D20: drop this window's page before the native close — this app's own
+			// Drop this window's page before the native close — this app's own
 			// mitigation for the leak described above, on the one path (not the last window)
-			// where the process really is being permanently orphaned and there is nothing
+			// where the process is being permanently orphaned and there is nothing
 			// stronger available. By here the flush ack has arrived or timed out, so nothing in
 			// the page still has work to do; navigating away tears down the Vue tree, every
 			// SlickGrid and CodeMirror instance, the data-plane stream reader and every timer, so

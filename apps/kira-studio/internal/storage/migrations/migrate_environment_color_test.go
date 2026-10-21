@@ -1,7 +1,7 @@
-// P18 §4.2 case 7: a database seeded before migration 0012 (environment color) migrates with
-// every existing environment landing at 'none' — the deliberate default (D16: "no colour is the
-// default"), not an empty string or NULL, so every pre-existing row is already a valid palette
-// value with no backfill needed beyond the column's own DEFAULT.
+// A database seeded before migration 0012 (environment color) migrates with every existing
+// environment landing at 'none' — the deliberate default ("no colour is the default"), not an
+// empty string or NULL, so every pre-existing row is already a valid palette value with no
+// backfill needed beyond the column's own DEFAULT.
 package migrations_test
 
 import (

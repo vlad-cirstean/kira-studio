@@ -126,7 +126,7 @@ func TestHandleDataFrame_NoLiveAdapter_RespondsWithError(t *testing.T) {
 	}
 }
 
-// P2 R2: Dispatcher.Preview deliberately never goes through Host.RunOp (it must not appear in the
+// Dispatcher.Preview deliberately never goes through Host.RunOp (it must not appear in the
 // op log), so it never gets RunOp's own safeRun recover() boundary — and neither does Invalidate,
 // the cache fast paths, or a wrong type assertion on a RunOp result, all of which also run on this
 // frame's own goroutine outside RunOp. HandleDataFrame's own recover (dataframe.go) is what has to
@@ -254,10 +254,10 @@ func TestAttachStream_PushesCacheStatsOnChange(t *testing.T) {
 	assertNothingSent(t, conn)
 }
 
-// P2 R1: a response payload too large to ever fit in a data frame must still settle its pending
+// A response payload too large to ever fit in a data frame must still settle its pending
 // request — respond() replaces it with a small error response rather than trying (and failing) to
 // enqueue the oversized frame, which a renderer-side pending request (no client-side timeout of
-// its own, §5.1/D25) would then wait on forever.
+// its own) would then wait on forever.
 func TestRespond_OversizedPayloadBecomesErrorResponse(t *testing.T) {
 	r := newTestRouter()
 	conn := newFakeConn()
@@ -273,7 +273,7 @@ func TestRespond_OversizedPayloadBecomesErrorResponse(t *testing.T) {
 	}
 }
 
-// TestRespond_OversizedPayloadDoesNotPanicWithNilLog is P21 round 3 finding 8: adapters.Deps.Log
+// TestRespond_OversizedPayloadDoesNotPanicWithNilLog: adapters.Deps.Log
 // is a bare func field with no constructor enforcing it, and this package used to nil-check it in
 // some call sites (safeRun's panic recovery) but not others (respond's own error-path logging,
 // right here) — production always supplies one (main.go), so this was latent, but exactly the kind
@@ -296,10 +296,10 @@ func TestRespond_OversizedPayloadDoesNotPanicWithNilLog(t *testing.T) {
 	}
 }
 
-// A9/P21 round 1: respond() used to always call encodeResponse (allocating and copying the whole
-// FlatBuffers frame, ~1.06x the page's own byte size per docs/PERF.md §2.8) before ever checking
+// respond() used to always call encodeResponse (allocating and copying the whole
+// FlatBuffers frame, ~1.06x the page's own byte size per docs/PERF.md) before ever checking
 // whether the result would be too large to send — for a ReadResponse/ExecuteResponse, the page's
-// own Size() already answers that question. This proves the pre-check actually runs before
+// own Size() already answers that question. This proves the pre-check runs before
 // encoding, not just that an oversized *encoded* frame is rejected (TestRespond_
 // OversizedPayloadBecomesErrorResponse, above, already covers that): a page reporting a huge
 // ByteSize but genuinely empty Chunks/Columns would encode to a tiny frame if encodeResponse ran

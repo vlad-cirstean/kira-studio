@@ -11,8 +11,7 @@ import (
 // TestMain is this package's own — none of the other testsupport fixtures need one, since
 // localstack_test.go terminates its container inline rather than through the fixture[T] memo.
 // KafkaFixture is the first testsupport fixture whose own package test exercises the memo
-// directly, so this is where StopKafka's call site lands (P58b B15: after m.Run(), never
-// t.Cleanup).
+// directly, so this is where StopKafka's call site lands (after m.Run(), never t.Cleanup).
 func TestMain(m *testing.M) {
 	code := m.Run()
 	StopKafka()

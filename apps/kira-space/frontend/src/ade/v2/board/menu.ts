@@ -63,6 +63,8 @@ export interface TaskMenuInput {
   baseChoices: readonly ChangeBaseChoice[];
   /** The Run automation submenu items. */
   automations: readonly TaskMenuItem[];
+  /** Name of the task link's code host, for "Open on …". */
+  hostLabel: string;
 }
 
 const DONE = 'done';
@@ -99,13 +101,13 @@ function copyItems(c: CardModel, sessions: readonly Session[]): TaskMenuItem[] {
     });
   }
   const latest = sessions
-    .filter((s) => s.claudeSessionId)
+    .filter((s) => s.agentSessionId)
     .sort((a, b) => b.lastActiveAt - a.lastActiveAt)[0];
   if (latest) {
     items.push({
       id: 'ade-task-copy-session',
       label: t('space.ade.board.taskMenu.latestSessionId.label'),
-      cmd: { kind: 'copy', text: latest.claudeSessionId },
+      cmd: { kind: 'copy', text: latest.agentSessionId },
     });
   }
   return items;
@@ -311,11 +313,11 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
       cmd: { kind: 'link', url: c.task.jira.url },
     });
   }
-  if (c.task.githubUrl) {
+  if (c.task.hostUrl) {
     links.push({
-      id: 'ade-task-github',
-      label: t('space.ade.board.taskMenu.openGithub.label'),
-      cmd: { kind: 'link', url: c.task.githubUrl },
+      id: 'ade-task-host',
+      label: t('space.ade.board.taskMenu.openHost.label', { label: i.hostLabel }),
+      cmd: { kind: 'link', url: c.task.hostUrl },
     });
   }
   if (links.length)

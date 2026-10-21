@@ -1,5 +1,5 @@
 import type { AgentActivity } from '@shared/domain/agent';
-import { type MessageKey, t } from '@theme/i18n';
+import { type MessageKey, messageDefaults, t } from '@theme/i18n';
 import type { Session } from './wire';
 
 export type ActivityKind = 'input' | 'working' | 'waiting' | 'idle' | 'stopped';
@@ -24,6 +24,10 @@ export const ACTIVITY_RANK: Record<ActivityKind, number> = {
 };
 
 /** First four characters of the record id: the `claude 9ab0` / `TUI · 9ab0` label. */
+/** `Claude 9ab0`: the agent's name and a short session id. */
+export const agentSessionName = (shortSessionId: string): string =>
+  `${messageDefaults().agent} ${shortSessionId}`;
+
 export function shortId(id: string): string {
   return id.slice(0, 4);
 }

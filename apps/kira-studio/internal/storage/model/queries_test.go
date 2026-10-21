@@ -28,7 +28,7 @@ func TestSortSpecAcceptsAnEmptyTermList(t *testing.T) {
 	}
 }
 
-// TestSortSpecUnmarshalRejectsInvalid is the reject half, and the reason the decoder cannot just
+// TestSortSpecUnmarshalRejectsInvalid is the reject half, and the reason the decoder cannot
 // unmarshal into the struct: a missing `terms`/`text` key and an empty one both land as a nil Go
 // slice, so only probing the raw JSON can tell "structured with no terms key" (invalid) from
 // "structured with an empty term list" (valid). A bare null must be rejected too.

@@ -14,8 +14,8 @@ import {
   type WorkspaceKey,
 } from './workspace';
 
-// P103 Part 2 (§5.2): the shared skeleton (persistableTabs/saveIfChanged/openTab/closeTab/…, see
-// that file's own header) now lives in packages/workbench/src/state/createTabsStore.ts. This file
+// The shared skeleton (persistableTabs/saveIfChanged/openTab/closeTab/…, see that file's own
+// header) now lives in packages/workbench/src/state/createTabsStore.ts. This file
 // is what's left: the workspace-key mapping, this app's own persistence rule (a terminal tab is
 // never saved — the factory's own default, so no `persistable` override is needed), the
 // post-hydrate `openRepos` derivation, and the extras no other app has
@@ -105,9 +105,9 @@ export const useTabsStore = createTabsStore({
       actions.patchTabState(id, 'repo-graph', patch, { skipUnchanged: true });
     }
 
-    // P116 G4: Next/Previous/Close Tab (the Window menu's own three items) — Kira Studio's own
+    // Next/Previous/Close Tab (the Window menu's own three items) — Kira Studio's own
     // tabs.ts activateNextTab/activatePrevTab/closeActiveTab, scoped to whichever workspace's own
-    // tab strip is on screen right now. P128 §2.6: that's `visibleWorkspace()` — the open repo (or
+    // tab strip is on screen right now. That's `visibleWorkspace()` — the open repo (or
     // GENERAL_WORKSPACE) while `git` mode is active, else the active module's own id — not
     // `useWorkspaceStore().active` directly, which stays git-only and would keep stepping the
     // Git module's own tabs even while, say, the Automations module is on screen.

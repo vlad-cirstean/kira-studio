@@ -52,10 +52,9 @@ describe('apps/kira-studio/frontend/src/bridge/control.ts — unwrap (P57 D5)', 
       }),
     );
 
-    // Event subscriptions (on*) and appFlushed/windowFlushed (void, fire-and-forget — P8 C6 added
-    // the second one, the close-handshake analogue of the quit one) call no bound method and
-    // return no promise — everything else in `control` is a request/response call unwrap must
-    // guard (§4.2 rule 1). Four placeholder arguments cover every method's arity; none of
+    // Event subscriptions (on*) and appFlushed/windowFlushed (void, fire-and-forget) call no bound
+    // method and return no promise — everything else in `control` is a request/response call
+    // unwrap must guard. Four placeholder arguments cover every method's arity; none of
     // control.ts's own wrapper bodies inspect argument shape before handing them to the binding.
     //
     // This list is every control method some other spec file in tests/unit directly overrides

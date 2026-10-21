@@ -1,4 +1,4 @@
-// P108 F8: closing an HTTP tab mid-send leaked both the in-flight op and a history runtime entry.
+// Closing an HTTP tab mid-send leaked both the in-flight op and a history runtime entry.
 // Unlike gRPC's own cleanup (views/grpcrequest/state.ts, stopOp before delete), HTTP's cleanup was
 // only `delete runtime[tabId]` — the send kept running in Go and recording history, and on
 // completion `rt.opId !== opId` still passed (rt is a captured reference cleanup never mutates),
@@ -18,7 +18,7 @@ setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 const { queryClient } = await import('@workbench/state/queryClient');
-// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — a real (never-settling in this harness) control.tabsSave triggered
 // incidentally by opening a tab below would otherwise wedge every later spec's own tabsSave
 // assertions for the rest of the process. This spec doesn't test persistence, so give it a

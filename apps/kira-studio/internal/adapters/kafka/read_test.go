@@ -2,13 +2,13 @@ package kafka
 
 import "testing"
 
-// TestAdvanceWindows pins P43 iter2 F19/D26's end-of-log clamp (P58e E9/E26) and its F2 refinement:
+// TestAdvanceWindows pins the end-of-log clamp and its refinement:
 // the arithmetic that decides, from one poll round's own observations, whether a partition's
 // remaining [Next, End) gap is provably nothing but non-data offsets. This is the one function in
 // the package reachable without a broker, and its history includes two real regressions (hasMore
-// stuck true forever, and — F2 — a partition silently clamped mid-data because a round capped by
-// franz-go's own per-partition byte limit looked identical to "the round wasn't page-capped"), so it
-// gets the phase's one dedicated Go unit test rather than relying on the acceptance suite's single
+// stuck true forever, and a partition silently clamped mid-data because a round capped by
+// franz-go's own per-partition byte limit looked identical to "the round wasn't page-capped"), so
+// it gets a dedicated Go unit test rather than relying on the acceptance suite's single
 // transactional-gap scenario alone.
 func TestAdvanceWindows(t *testing.T) {
 	cases := []struct {

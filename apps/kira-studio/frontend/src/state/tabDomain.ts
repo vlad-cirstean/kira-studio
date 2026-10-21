@@ -16,7 +16,7 @@ import {
 } from '@shared/domain/tabs';
 import { z } from 'zod';
 
-// P103 Part 2 (§5.1): Kira Studio's own tab-kind vocabulary, split out of the old shared
+// Kira Studio's own tab-kind vocabulary, split out of the old shared
 // `packages/shared/domain/tabs.ts` — 12 kinds, `terminal` the one genuinely shared with Kira
 // Space (its schema stays in the shared file). See that file's own header for why this split
 // happened.
@@ -48,10 +48,9 @@ const studioTabKindSchema = /*#__PURE__*/ z.enum([
 ]);
 export type StudioTabKind = z.infer<typeof studioTabKindSchema>;
 
-// 'data' and 'definition' (P19, was 'ddl') are renderable as of P4 (D18); 'console' joins them in
-// P5.5, 'document' in P8, 'keyvalue' in P9, 'stream' in P10, 'browse' in P41, 'http-request' in
-// P2, 'grpc-request' in P11. The restore path drops rows of any other kind with a `warn` — a
-// closed vocabulary decided once, same discipline as P1's Caps/connectionKind.
+// 'data' and 'definition' are renderable; 'console' joins them, 'document', 'keyvalue', 'stream',
+// 'browse', 'http-request', 'grpc-request'. The restore path drops rows of any other kind with
+// a `warn` — a closed vocabulary decided once, same discipline as the Caps/connectionKind.
 export const STUDIO_RENDERABLE_TAB_KINDS: readonly StudioTabKind[] = [
   'data',
   'definition',
@@ -86,7 +85,7 @@ export const STUDIO_TAB_KIND_MODE: Record<StudioTabKind, TabScope> = {
   'script-run': 'repo',
 };
 
-// P108 Part 12 F14: every field defaulted, matching defaultDataTabState's own values below and
+// Every field defaulted, matching defaultDataTabState's own values below and
 // the convention documentTabStateSchema/streamTabStateSchema/browseTabStateSchema already use — a
 // row saved before a field existed used to fail safeParse outright on that one missing field,
 // falling back to raw, unvalidated state (createTabsStore.ts's own hydrateTabs).

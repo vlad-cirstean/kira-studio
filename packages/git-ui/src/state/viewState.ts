@@ -84,16 +84,15 @@ export interface ColumnWidths {
 
 export type DateFormat = 'relative' | 'absolute';
 
-/** W6/W9's own defaults — sized for the columns' typical content (an author name, a relative
- *  date string) at the density §6.1 targets. Exported so every writer of a fresh
+/** The defaults — sized for the columns' typical content (an author name, a relative date string).
+ *  Exported so every writer of a fresh
  *  `PersistedViewState` (a first-ever mount, a host's dev-seed hook) uses the same numbers rather
  *  than each inventing its own. */
-// G19 D2: date 120 -> 152 — F2 found the absolute date format ("2024-03-14 09:41", 16 chars)
-// silently clipped at 120px with no overflow affordance. G21 D5/D6: `sha` is gone (the SHA column
-// itself is deleted); `date`'s own 152 is now only the *floor* CommitGrid.vue's measured seed
-// (`dateFormat.ts`'s `measureAbsoluteDateWidth`) clamps up from — see that component's own
-// `computeDateWidthSeed`.
-// P92 item 1: 95 = graphColumnWidth(6) — a six-lane default, not `maxLanes`' twelve (173px);
+// The absolute date format ("2024-03-14 09:41", 16 chars) was silently clipped at 120px with no
+// overflow affordance. `sha` is gone (the SHA column itself is deleted); `date`'s own 152 is now
+// only the *floor* CommitGrid.vue's measured seed (`dateFormat.ts`'s `measureAbsoluteDateWidth`)
+// clamps up from — see that component's own `computeDateWidthSeed`.
+// 95 = graphColumnWidth(6) — a six-lane default, not `maxLanes`' twelve (173px);
 // narrower panels start narrower, a user drag is free to go wider.
 export const DEFAULT_COLUMN_WIDTHS: ColumnWidths = {
   author: 140,
@@ -145,8 +144,8 @@ function isPersistedViewStateShape(value: unknown): value is PersistedViewState 
 /**
  * Validates a raw value read back from platform storage against `PersistedViewState`'s
  * current shape. **A `version` that is not the current one is discarded whole, never
- * partially applied** — a v1 state (P3's shape, no scroll/selection/column fields) and a v3
- * state (P5's shape, no search fields) are both exactly such a mismatch, and a half-applied
+ * partially applied** — a v1 state (no scroll/selection/column fields) and a v3
+ * state (no search fields) are both exactly such a mismatch, and a half-applied
  * older state is a bug that reproduces once per upgrade. Every concrete `ViewStateStore` (VS
  * Code's `getState`, this file's in-memory one) calls this rather than trusting its raw source.
  */
@@ -177,8 +176,8 @@ export class InMemoryViewStateStore implements ViewStateStore {
 }
 
 /**
- * The review view's own `ViewStateStore` (P7 W9, §6.8/D41): `read()` always answers `null`,
- * `write()` discards whatever it is handed. §6.8's lifecycle is explicit that the review view
+ * The review view's own `ViewStateStore`: `read()` always answers `null`,
+ * `write()` discards whatever it is handed. The lifecycle is explicit that the review view
  * "persists no view state through `setState`, is not rehydrated from the host cache on reveal"
  * — a named class rather than an inline `{ read: () => null, write: () => {} }` literal at each
  * of its two call sites (`webview/main.ts`, `apps/harness/src/main.ts`) because "this view

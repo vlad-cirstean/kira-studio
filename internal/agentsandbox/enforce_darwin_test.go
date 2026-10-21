@@ -49,7 +49,8 @@ func newEnforceEnv(t *testing.T) *enforceEnv {
 		RunID: "r1", Access: AccessWrite, Worktrees: []string{e.wt}, Read: []string{filepath.Join(e.home, "specs")}, Network: true,
 		Scratch: filepath.Join(root, "scratch"), Cache: filepath.Join(root, "cache"), Branch: map[string]string{e.wt: "task/a"},
 	}
-	e.rt = Runtime{Home: e.home, UserTemp: filepath.Join(root, "usertemp")}
+	e.rt = testRuntime(e.home)
+	e.rt.UserTemp = filepath.Join(root, "usertemp")
 	mustMkdir(t, e.rt.UserTemp)
 	e.pol, _, err = ResolvePolicy(in, e.rt)
 	if err != nil {
@@ -65,7 +66,7 @@ func (e *enforceEnv) sh(t *testing.T, script string) (string, error) {
 	mustWrite(t, profile, Profile(e.pol, e.rt))
 	cmd := exec.Command("/usr/bin/sandbox-exec", "-f", profile, "/bin/sh", "-c", script)
 	cmd.Dir = e.pol.RunDir
-	cmd.Env = append(MergeEnv(os.Environ(), Env(e.pol, "")), "HOME="+e.home)
+	cmd.Env = append(MergeEnv(os.Environ(), Env(e.pol, e.rt, "")), "HOME="+e.home)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
@@ -151,7 +152,7 @@ func TestEnforceWatcher(t *testing.T) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "/usr/bin/sandbox-exec", "-f", profile, "/bin/sh", "-c", "sleep 2; git branch x; sleep 1")
 	cmd.Dir = e.pol.RunDir
-	cmd.Env = append(MergeEnv(os.Environ(), Env(e.pol, "")), "HOME="+e.home)
+	cmd.Env = append(MergeEnv(os.Environ(), Env(e.pol, e.rt, "")), "HOME="+e.home)
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}

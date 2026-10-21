@@ -1,14 +1,15 @@
 import type { SettingsPaneProps as GenericSettingsPaneProps } from '@workbench/lib/settingsPaneProps';
 import type { Settings } from '../../state/settingsDomain';
 
-// P103 Part 2 (§5.5): the one prop contract every one of this app's seven settings panes takes,
+// The one prop contract every one of this app's seven settings panes takes,
 // factored out once rather than repeated seven times (CLAUDE.md's "code never duplicates") — the
 // exact shape SettingsShell.vue's own `#pane` scoped slot hands each pane, plus `active` (this
-// app's own `workbench/SettingsDialog.vue` wrapper binds it per pane, `activeSection === '<Section>'`).
+// app's own `workbench/SettingsDialog.vue` wrapper binds it per pane, `activeSection ===
+// '<Section>'`).
 //
 // `SettingsSections` — this dialog's own five sections of the full shared `Settings` (everything
 // except `dbMcp`, which this dialog edits through its own instant-action controls,
-// never through the draft) — is what SettingsShell.vue's own `T` generic is actually instantiated
+// never through the draft) — is what SettingsShell.vue's own `T` generic is instantiated
 // with at this app's `<SettingsShell>` call site (`workbench/SettingsDialog.vue`'s own `:current`/
 // `:defaults`), so every pane's prop types must match that same narrowed shape, not the full
 // `Settings` type, or Vue's generic prop inference rejects the binding.

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
- * G18 D13: "Repository settings" — the dialog `AppToolbar.vue`'s own gear (`⚙`, D13) opens.
+ * "Repository settings" — the dialog `AppToolbar.vue`'s own gear (`⚙`) opens.
  * Each field here is hand-written, not schema-driven (no loop over `repoSettingKeys()`) — a new
  * `source: 'repo'` leaf needs an explicit field/patch-diff line added here, same as every leaf
- * already present. `kiraSpace.worktree.prepareScript`/`.basePath` (G25) are the two `'repo'`
+ * already present. `kiraSpace.worktree.prepareScript`/`.basePath` are the two `'repo'`
  * leaves this dialog deliberately does NOT surface. The prepare script is read-only in git-ui and
- * set in Kira Space (P172); `WorktreeDialog.vue` only reads it. G28 D16 adds
+ * set in Kira Space; `WorktreeDialog.vue` only reads it. The dialog adds
  * `kiraSpace.checkout.autoStash`, its own new "Checkout" section.
  *
  * Mirrors `StashDialog.vue`'s own "one instance, `open` prop + `close` emit" convention — the
@@ -13,7 +13,7 @@
  * three modes do, so this is a second file in that shape, not a fourth mode grafted onto
  * `StashDialog.vue` itself (a settings dialog and a stash workflow share no state).
  *
- * P131 Part 1 §6.1/§6.2: the modal shell is shadcn's `Dialog`/`DialogContent` now. Every
+ * The modal shell is shadcn's `Dialog`/`DialogContent` now. Every
  * `KuiSelect` is `NativeSelect` (git-ui has no fancier dropdown primitive — same choice
  * `StackDialog.vue`'s own parent picker makes), each still driven by an explicit
  * `onXChange`-and-cast handler rather than a plain `v-model`, since `NativeSelect`'s own
@@ -49,6 +49,7 @@ import { type MessageKey, t } from '@theme/i18n';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { useFormErrors } from '@workbench/behaviour/formErrors';
 import { errorText } from '@workbench/bridge/codedError';
+import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { computed, nextTick, reactive, ref, useId, watch } from 'vue';
 import type { RepoSettingsState } from '../../state/repoSettings.ts';
 
@@ -85,6 +86,7 @@ watch(
     draftBase = props.repoSettingsState.settings.value;
     Object.assign(draft, draftBase);
     saveError.value = undefined;
+    fireAndForget(props.repoSettingsState.loadProviders(), 'repoSettings.providers');
     void nextTick(form.reset);
   },
 );
@@ -110,6 +112,15 @@ const pullStrategyOptions: readonly SelectOption[] = [
   { value: 'merge', label: 'common.merge.label' },
   { value: 'rebase', label: 'common.rebase.label' },
 ];
+
+const hostProviderOptions = computed(() => [
+  { value: 'auto', text: t('git.dialog.repoSettings.hostAuto.option') },
+  { value: 'off', text: t('common.off.status') },
+  ...props.repoSettingsState.providers.value.map((p) => ({
+    value: p.id,
+    text: p.label,
+  })),
+]);
 
 function onGraphScopeChange(value: string): void {
   draft['kiraSpace.graph.scope'] = value as RepoSettingsSnapshot['kiraSpace.graph.scope'];
@@ -160,7 +171,7 @@ const pageSizeId = useId();
 const autoStashId = useId();
 const showInGraphId = useId();
 const includeUntrackedId = useId();
-const githubId = useId();
+const hostProviderId = useId();
 const graphScopeId = useId();
 const baseCandidatesId = useId();
 const pullStrategyId = useId();
@@ -197,8 +208,8 @@ async function save(): Promise<void> {
   if (draft['kiraSpace.pull.strategy'] !== current['kiraSpace.pull.strategy']) {
     patch['kiraSpace.pull.strategy'] = draft['kiraSpace.pull.strategy'];
   }
-  if (draft['kiraSpace.github.enabled'] !== current['kiraSpace.github.enabled']) {
-    patch['kiraSpace.github.enabled'] = draft['kiraSpace.github.enabled'];
+  if (draft['kiraSpace.gitHost.provider'] !== current['kiraSpace.gitHost.provider']) {
+    patch['kiraSpace.gitHost.provider'] = draft['kiraSpace.gitHost.provider'];
   }
   if (Object.keys(patch).length > 0) {
     try {
@@ -298,12 +309,23 @@ async function save(): Promise<void> {
         </FieldSet>
 
         <FieldSet>
-          <FieldLegend>{{ t('common.product.github.label') }}</FieldLegend>
-          <Field orientation="horizontal">
-            <Checkbox :id="githubId" v-model="draft['kiraSpace.github.enabled']" />
-            <FieldLabel :for="githubId">{{
-              t('git.dialog.repoSettings.githubEnabled.label')
+          <FieldLegend>{{ t('common.gitHost.label') }}</FieldLegend>
+          <Field>
+            <FieldLabel :for="hostProviderId">{{
+              t('git.dialog.repoSettings.hostProvider.label')
             }}</FieldLabel>
+            <NativeSelect
+              :id="hostProviderId"
+              :model-value="draft['kiraSpace.gitHost.provider']"
+              variant="bordered"
+              size="kira-lg"
+              class="w-full"
+              @update:model-value="(v) => (draft['kiraSpace.gitHost.provider'] = v as string)"
+            >
+              <option v-for="opt in hostProviderOptions" :key="opt.value" :value="opt.value">
+                {{ opt.text }}
+              </option>
+            </NativeSelect>
           </Field>
         </FieldSet>
 

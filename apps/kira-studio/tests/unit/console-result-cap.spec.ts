@@ -1,4 +1,4 @@
-// P2 R1: console/state.ts's `run()` used to push every run's result set(s) onto `rt.results`
+// console/state.ts's `run()` used to push every run's result set(s) onto `rt.results`
 // unconditionally, with nothing ever evicting an old one short of the user's own close/close-others
 // action or closing the tab — a tab left open for a long session of many small queries in append
 // mode (the default, consoleTabStateSchema's own `newResultSet: true`) retained every one of their
@@ -20,7 +20,7 @@ setActivePinia(pinia);
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
 const { control } = await import('../../frontend/src/bridge/control');
-// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — a real (never-settling in this harness) control.tabsSave triggered
 // incidentally by opening a tab below would otherwise wedge every later spec's own tabsSave
 // assertions for the rest of the process. This spec doesn't test persistence, so give it a

@@ -7,7 +7,7 @@ import { TIMING } from './timing';
 
 // Extracted from what used to be three separate copy-paste-identical definitions
 // (project/menus.ts, TabStrip.vue) — a fourth and fifth (grid, ops panel) made a shared module
-// worth having (P6 realities #3).
+// worth having.
 //
 // Returns the underlying promise (most call sites still fire-and-forget it, unchanged) so a
 // caller that already surfaces action errors — documents/menu.ts's copy-document/copy-id, mirroring

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// P12 D9/F19: the module's own front door for the host — App.vue used to import all seven of
+// The module's own front door for the host — App.vue used to import all seven of
 // these dialogs and their five store bindings individually (eleven import lines); this is that
 // list, once, so App.vue's own knowledge of the module shrinks to one component. Each dialog still
 // guards itself on its own store's `open` flag exactly as before — this is a template-only

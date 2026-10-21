@@ -49,7 +49,7 @@ type NumstatEntry struct {
 	OriginalPath string // set for a rename/copy row (probe P1's empty-third-field framing)
 }
 
-// ParseNumstatRecords parses records (already NUL-split by RecordSplitter) per probe P1: a normal
+// ParseNumstatRecords parses records (already NUL-split by RecordSplitter): a normal
 // row is one record, tab-limited to 3 fields; a binary row's counts are the literal string "-";
 // a rename/copy row's own third (path) field is empty, which consumes the next two records as
 // originalPath then path — the record set ending mid-rename is reported as an error, not a panic.

@@ -38,6 +38,7 @@ import CatalogText from '@theme/i18n/CatalogText.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import type { TextPart } from '@theme/varText';
 import { useFocus } from '@vueuse/core';
+import { useAgentInfo } from '@workbench/agent/agentInfo';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { useFormErrors } from '@workbench/behaviour/formErrors';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -85,11 +86,14 @@ const title = computed(() => {
   return t(isSmart ? 'automations.script.newSmart.label' : 'automations.script.new.label');
 });
 
+const { info: agentInfo } = useAgentInfo();
 const kind: ScriptKind = props.script?.kind ?? props.kind ?? 'script';
 const isSmart = kind === 'smart';
 const name = ref(props.script?.name ?? '');
 const params = ref<ScriptParam[]>(structuredClone(toRaw(props.script?.params ?? [])));
-const smart = ref<SmartSettings>(structuredClone(toRaw(props.script?.smart ?? defaultSmart())));
+const smart = ref<SmartSettings>(
+  structuredClone(toRaw(props.script?.smart ?? defaultSmart(agentInfo.value.defaultModel))),
+);
 // null: not recurring. Turning the switch off keeps the edits until Save.
 const schedule = ref<ScriptSchedule | null>(structuredClone(toRaw(props.script?.schedule ?? null)));
 const scheduleOk = ref(true);

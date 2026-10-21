@@ -14,6 +14,6 @@ defineProps<{ view: SessionView; needsYou: boolean }>();
   >
     <AdeActivityIcon :kind="view.kind" :size="14" />
     <slot />
-    <AdeSessionId class="ml-auto" :id="view.session.claudeSessionId" />
+    <AdeSessionId class="ml-auto" :id="view.session.agentSessionId" />
   </div>
 </template>

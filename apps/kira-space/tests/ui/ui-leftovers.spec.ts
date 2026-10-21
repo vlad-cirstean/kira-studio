@@ -87,12 +87,11 @@ test('the Claude usage status item is one control-sm row high', async ({ relaunc
     fiveHour: { usedPercent: 23, resetsAt: FIXED_NOW + 2 * HOUR },
     sevenDay: { usedPercent: 41, resetsAt: FIXED_NOW + 50 * HOUR },
     updatedAt: FIXED_NOW - 5 * 60_000,
-    detail: '',
   };
   const { window: page } = await openPlan(relaunch, [
-    { channel: IPC.claudeUsageGet, response: snap },
+    { channel: IPC.agentUsageGet, response: snap },
   ]);
-  const box = await page.locator(t('claude-usage-status')).boundingBox();
+  const box = await page.locator(t('agent-usage-status')).boundingBox();
   expect(Math.round(box?.height ?? 0)).toBe(18);
 });
 

@@ -1,12 +1,12 @@
-// C14-1 (severe performance): insertByPath's splice into state.files used to run against a DEEP
-// reactive() array -- C13-5's markRaw only covered each streamed group, not the containing array,
+// insertByPath's splice into state.files used to run against a DEEP
+// reactive() array -- the markRaw only covered each streamed group, not the containing array,
 // so every element to the right of a mid-array insert still walked Vue's get/set proxy traps.
 // Measured through this exact module on a capped 10,000-match streaming search: 41,550ms cumulative
 // main-thread cost (worst single flush 2,100ms) vs 2ms for the identical insert sequence into a
 // plain array. This pins two things: (1) a large streamed search completes with a generous but
 // regression-catching wall-clock bound -- a return to O(F^2) reactive proxying would blow well past
 // it -- and (2) the result rows are still correct and the view still re-renders incrementally
-// (repoSearchRows reflects each flush), so the `filesVersion` reactivity workaround actually works.
+// (repoSearchRows reflects each flush), so the `filesVersion` reactivity workaround works.
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
@@ -57,8 +57,8 @@ describe('C14-1: state.files insertion stays off Vue deep reactivity at scale', 
     repoSearchStore.setRepoSearchQuery(repoId, 'needle');
     await repoSearchStore.startRepoSearch(repoId);
 
-    // D11: workers emit out of order, so insertByPath's own binary search lands mid-array, not just
-    // at the tail -- that's what actually pays the reactive-proxy element-shift cost the fix targets
+    // Workers emit out of order, so insertByPath's own binary search lands mid-array, not just
+    // at the tail -- that's what pays the reactive-proxy element-shift cost the fix targets
     // (a purely tail-appending stream never shifts an existing element, so it can't reproduce the
     // regression). Build 10,000 sorted paths, then deliver them shuffled across ~40 flush batches,
     // matching the real out-of-order streaming shape.

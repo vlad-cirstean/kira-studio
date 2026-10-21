@@ -1,9 +1,9 @@
-// authmatrix_test.go is the complete (Tier 2) suite's own table for sqs — P25 §2.8. Client-config
-// permutations only, per §2.3's declined auth rows: LocalStack does not enforce credentials at any
-// configuration this fixture can drive, verified directly (a bogus access key connects
-// successfully even with ENFORCE_IAM=1), so there is no way to exercise a genuine SigV4 rejection
-// or IAM permission boundary here. sqs and s3 share awscfg, so this table's shape mirrors s3's own
-// (§2.8's rows 1-7) rather than a shared driver — per-adapter tables are the point (§3.1).
+// authmatrix_test.go is the complete suite's own table for sqs. Client-config permutations only:
+// LocalStack does not enforce credentials at any configuration this fixture can drive, verified
+// directly (a bogus access key connects successfully even with ENFORCE_IAM=1), so there is no way
+// to exercise a genuine SigV4 rejection or IAM permission boundary here. sqs and s3 share awscfg,
+// so this table's shape mirrors s3's own rather than a shared driver — per-adapter tables are the
+// point.
 package sqs_test
 
 import (
@@ -80,8 +80,8 @@ func TestSqs_AuthMatrix(t *testing.T) {
 		{
 			// Every functional SQS test today runs URI mode (testsupport/sqs.go's own config is
 			// URI-only), so awscfg's fields branch had never served a data-plane request for this
-			// adapter either. Kept to one scenario deliberately (§3.9): LocalStack does not enforce
-			// IAM at any configuration this fixture can drive (P25 §2.3, measured twice), so there is
+			// adapter either. Kept to one scenario deliberately: LocalStack does not enforce
+			// IAM at any configuration this fixture can drive (measured twice), so there is
 			// no least-privilege principal to cross this with — the same reason this table has no
 			// auth-posture rows at all.
 			Name:      "fields mode, region set, ambient credentials",
@@ -145,10 +145,9 @@ func TestSqs_AuthMatrix(t *testing.T) {
 		},
 	})
 
-	// §2.8 row 7, declined: "options.endpoint absent" sends the request to real AWS, which this
+	// "options.endpoint absent" sends the request to real AWS, which this
 	// sandbox's outbound network cannot reach unassisted (a bare TCP route to AWS's own endpoints,
-	// not proxied). The plan leaves this row to the implementer's judgment when it depends on
-	// outbound network; declined here, named explicitly rather than silently dropped.
+	// not proxied).
 	t.Run("uri mode, valid credentials, options.endpoint absent (declined: needs real AWS network access)", func(t *testing.T) {
 		testsupport.RequireMatrix(t)
 		t.Skip("declined: reaching real AWS with no endpoint override depends on outbound network this sandbox does not have")

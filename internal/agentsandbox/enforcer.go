@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
@@ -14,7 +14,16 @@ import (
 const NotEnforcedKey = "backend.space.ade.sandbox.notEnforced.body"
 
 // NotEnforcedText is the not-enforced notice in the user's language.
-func NotEnforcedText() string { return i18n.T("backend.space.ade.sandbox.notEnforced.body", nil) }
+func NotEnforcedText(a Namer) string {
+	return i18n.T("backend.space.ade.sandbox.notEnforced.body", map[string]string{"agent": a.Label()})
+}
+
+// Namer names the agent in sandbox texts; a harness provider satisfies it.
+type Namer interface {
+	Label() string
+	ProductLabel() string
+	Command() string
+}
 
 // Support says whether profiles are enforced on this OS.
 type Support struct {
@@ -23,14 +32,14 @@ type Support struct {
 	Reason string
 }
 
-// Prepared is a run's sandbox, ready to apply to a claudeheadless.Spec.
+// Prepared is a run's sandbox, ready to apply to a harness.HeadlessSpec.
 type Prepared struct {
 	Profile, ProfilePath string
 	// Exec is nil when the OS does not enforce the profile.
-	Exec *claudeheadless.SandboxExec
+	Exec *harness.SandboxExec
 	// Env are overrides for the child environment, on every OS.
 	Env []string
-	// AddDirs and Disallowed are the claude permission flags (second layer).
+	// AddDirs and Disallowed are the agent permission flags (second layer).
 	AddDirs, Disallowed []string
 }
 
@@ -91,16 +100,20 @@ func (s *system) Watch(pid int, runID string, on func(Denial)) func() {
 
 func (s *system) Release(runID string) { s.proxy.release(runID) }
 
-func (s *system) proxyURL(runID string) (string, error) {
+func (s *system) proxyURL(runID string, agent harness.Sandboxed) (string, error) {
 	s.proxy.once.Do(func() {
-		p, err := StartProxy(s.hub, ProxyAllowlist(osGetenv))
+		p, err := StartProxy(s.hub)
 		s.proxy.p.Store(p)
 		s.proxy.err = err
 	})
 	if s.proxy.err != nil {
 		return "", fmt.Errorf("agentsandbox: proxy: %w", s.proxy.err)
 	}
-	return s.proxy.p.Load().Register(runID), nil
+	var allow Allowlist = func(string) bool { return false }
+	if agent != nil {
+		allow = HostAllowlist(agent.APIHosts(osGetenv))
+	}
+	return s.proxy.p.Load().Register(runID, allow), nil
 }
 
 // hub routes denials to the run that owns them.

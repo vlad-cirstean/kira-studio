@@ -214,7 +214,7 @@ func TestTagDeterministicAndDistinguishing(t *testing.T) {
 		t.Fatalf("different values under the same key collided: both %q", t1)
 	}
 
-	// Invariant (§2.4): the HMAC message is the raw value alone — no column identity, no kind, no
+	// Invariant: the HMAC message is the raw value alone — no column identity, no kind, no
 	// other rule flag mixed in — so the same value tags identically no matter which differently
 	// configured rule it is read through, which is what lets two columns holding the same real
 	// value (e.g. a foreign key relationship) join on their masked form.
@@ -252,7 +252,7 @@ func TestApplyNilKeyDegradesToNoTag(t *testing.T) {
 
 // --- conflict folding (§4.2, "the same shape as M2's own strictestOf") ---
 
-// TestStricterKindOrder pins the corrected M6 finding #9 ordering — redact > text > date > number
+// TestStricterKindOrder pins the corrected ordering — redact > text > date > number
 // > name > email — rather than the original plan's redact > text > date > email > name > number,
 // which had two pairs backwards relative to actual redaction strength (email left the domain fully
 // visible while name bulleted far more of the value; number fully bracketed a value with no digits
@@ -284,10 +284,9 @@ func TestStricterFlagsWithinOneKind(t *testing.T) {
 	}
 }
 
-// TestStricterFlagsFoldAcrossDifferentKinds is finding #9's second half (M6): before this fix, a
-// mismatched-kind pair returned one whole rule verbatim, discarding a stricter flag on the losing
-// kind's own rule just because its kind lost. text outranks name, but b's own KeepHint=false must
-// still survive into the folded result.
+// Before this fix, a mismatched-kind pair returned one whole rule verbatim, discarding a stricter
+// flag on the losing kind's own rule because its kind lost. text outranks name, but b's own
+// KeepHint=false must still survive into the folded result.
 func TestStricterFlagsFoldAcrossDifferentKinds(t *testing.T) {
 	a := Rule{Kind: KindText, KeepHint: true, Correlate: true}
 	b := Rule{Kind: KindName, KeepHint: false, Correlate: true}
@@ -409,7 +408,7 @@ func TestMaskWordSingleGraphemeNeverEchoes(t *testing.T) {
 // generator (uniform over an alphabet including "@") does not reliably hit: a value with an empty
 // local part — "@corp.example.com", "@x", or bare "@" — reassembles as "" + "@" + domain, the
 // input itself, whenever keepHint is true. maskEmail must fall through to the universal redaction
-// instead (M7 finding).
+// instead.
 func TestMaskEmailEmptyLocalPartNeverEchoes(t *testing.T) {
 	cases := []string{"@corp.example.com", "@x", "@"}
 	for _, value := range cases {

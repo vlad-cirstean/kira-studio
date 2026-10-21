@@ -11,8 +11,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
-	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 )
 
 // dbMcpServerName is the one name every Install call registers under — internal/dbmcp's own
@@ -24,20 +24,13 @@ const dbMcpServerName = "kira-db"
 // by.
 const dbMcpTokenName = "mcp-db"
 
-// McpInstaller is mcpinstall.Installer's own seam, declared where it is consumed rather than where
-// it is implemented — the caller states only the methods it actually calls.
-type McpInstaller interface {
-	Status() mcpinstall.Status
-	Install(ctx context.Context, name, url, token string) mcpinstall.Result
-}
-
-// DbMcpService is the Database MCP section's whole surface (M1 §6.2): Status, SetEnabled,
-// Regenerate, InstallClaudeCode — it owns the embedded *dbmcp.Server's actual lifecycle,
+// DbMcpService is the Database MCP section's whole surface: Status, SetEnabled,
+// Regenerate, InstallAgent — it owns the embedded *dbmcp.Server's actual lifecycle,
 // constructed and started when the setting turns on (or already is, at boot), stopped when it
 // turns off or the app quits.
 type DbMcpService struct {
 	Deps      appcore.Deps
-	Installer McpInstaller
+	Installer harness.MCPInstaller
 	// Approvals is M2's prompt-mode broker — constructed once in main.go and outliving this
 	// service's own server start/stop, so the event subscription wired at boot (Events.Attach)
 	// stays valid across a restart of the embedded server.
@@ -49,7 +42,7 @@ type DbMcpService struct {
 // NewDbMcpService wires the embedded lifecycle's own start/stop/status closures once, here, so
 // every other method can assume s.embedded is ready — a plain struct literal (main.go's own shape
 // before T2-13) would leave them nil.
-func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp.ApprovalBroker) *DbMcpService {
+func NewDbMcpService(deps appcore.Deps, installer harness.MCPInstaller, approvals *dbmcp.ApprovalBroker) *DbMcpService {
 	s := &DbMcpService{Deps: deps, Installer: installer, Approvals: approvals}
 	s.embedded = embedded.Service[*dbmcp.Server, DbMcpStatus]{
 		StartFn: func(mint bool) (*dbmcp.Server, error) {
@@ -82,8 +75,8 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 			return srv, nil
 		},
 		// Approvals stays usable — a later re-enable within the same app run constructs a fresh
-		// server against it. AbandonAll runs before Close, not after (finding #17, M6): a run_query
-		// handler mid-flight can be parked in ApprovalBroker.Request (M2 §5.3) waiting on a human
+		// server against it. AbandonAll runs before Close, not after: a run_query
+		// handler mid-flight can be parked in ApprovalBroker.Request waiting on a human
 		// who will never answer once the server is going away. Close's own closeHTTP calls
 		// http.Server.Shutdown, which waits for every in-flight handler to return — closing before
 		// abandoning would have that handler, and Shutdown itself, both wait on each other with
@@ -96,7 +89,7 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 		},
 		StatusFn: func(srv *dbmcp.Server, startErr error) DbMcpStatus {
 			inst := s.Installer.Status()
-			st := DbMcpStatus{ClaudeAvailable: inst.ClaudePath != "", Probed: inst.Probed}
+			st := DbMcpStatus{AgentAvailable: inst.Path != "", Probed: inst.Probed}
 			if srv == nil {
 				if startErr != nil {
 					st.Error = startErr.Error()
@@ -104,14 +97,14 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 				return st
 			}
 			st.Running = true
-			// F8: Command is "" whenever the on-disk helper token mirror is missing or does not
+			// Command is "" whenever the on-disk helper token mirror is missing or does not
 			// verify against the currently-held record — never gated on whether *this run* minted
 			// the token, which stayed false across every ordinary restart within the token's own
 			// TTL even though the helper file (and the record it matches) both survive restarts
 			// and stay valid.
 			if helperTokenValid(srv) {
 				helperPath := mcpauth.HeaderHelperScriptPath(config.KiraHome())
-				st.Command = mcpinstall.Command(dbMcpServerName, srv.URL(), helperPath)
+				st.Command = s.Installer.Command(dbMcpServerName, srv.URL(), helperPath)
 			}
 			if exp := srv.TokenExpiry(); !exp.IsZero() {
 				st.ExpiresAt = exp.Format(time.RFC3339)
@@ -124,10 +117,10 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 
 // DbMcpStatus is the wire projection every method below returns.
 type DbMcpStatus struct {
-	Running         bool     `json:"running"`
-	Command         string   `json:"command"`
-	ClaudeAvailable bool     `json:"claudeAvailable"`
-	Probed          []string `json:"probed"`
+	Running        bool     `json:"running"`
+	Command        string   `json:"command"`
+	AgentAvailable bool     `json:"agentAvailable"`
+	Probed         []string `json:"probed"`
 	// ExpiresAt is the current token's own expiry, RFC 3339, "" when nothing is running or the
 	// record has not yet been stamped.
 	ExpiresAt string `json:"expiresAt"`
@@ -165,7 +158,7 @@ func dbMcpTokenProviderFor(home string, mint bool) dbmcp.TokenProvider {
 			}
 			return rec, plain, minted, nil
 		}
-		// F8: a loaded (not minted) record must still have a helper mirror whose plaintext
+		// A loaded (not minted) record must still have a helper mirror whose plaintext
 		// verifies against it. A missing file (never written on some older run), or a mismatch
 		// (Save succeeded then SaveHelperToken failed on a previous run, or a stale copy left
 		// over some other way), would otherwise leave every client silently 401ing forever — this
@@ -219,7 +212,7 @@ func helperTokenValid(srv *dbmcp.Server) bool {
 
 // explainThreshold is dbmcp.Config.ExplainThreshold's real backend: settingsState.advanced.
 // expensiveQueryRows's own Go leaf, read fresh on every call — never cached, since a stale
-// threshold would silently mis-flag every query after the user changes it (M3 §3.3). A settings
+// threshold would silently mis-flag every query after the user changes it. A settings
 // read failure must not break a query; it falls back to the documented default and logs once.
 func (s *DbMcpService) explainThreshold() int {
 	settings, err := s.Deps.Repos.Settings.GetAll()
@@ -311,7 +304,7 @@ func (s *DbMcpService) Regenerate() DbMcpStatus {
 	return s.embedded.StatusLocked()
 }
 
-// DbMcpInstallResult is mcpinstall.Result's wire projection — a domain package's plain Go struct
+// DbMcpInstallResult is harness.InstallResult's wire projection — a domain package's plain Go struct
 // never crosses the wire directly, only this tagged copy of it.
 type DbMcpInstallResult struct {
 	Outcome string   `json:"outcome"`
@@ -319,14 +312,14 @@ type DbMcpInstallResult struct {
 	Probed  []string `json:"probed"`
 }
 
-func toWireDbMcpInstallResult(r mcpinstall.Result) DbMcpInstallResult {
+func toWireDbMcpInstallResult(r harness.InstallResult) DbMcpInstallResult {
 	return DbMcpInstallResult{Outcome: r.Outcome, Detail: r.Detail, Probed: r.Probed}
 }
 
-// InstallClaudeCode never returns a Go error — mcpinstall.Install's own contract, following
+// InstallAgent never returns a Go error — MCPInstaller.Install's own contract, following
 // connections.Service.Reveal's own precedent. A no-op result (outcome notFound) when nothing is
 // running: there is nothing to register yet.
-func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult {
+func (s *DbMcpService) InstallAgent(ctx context.Context) DbMcpInstallResult {
 	// The lock covers only the state check: the spawn below can take up to 30 s and names a fixed
 	// URL and helper path, so holding mu would block Status, the toggle and app quit behind it.
 	s.embedded.Mu.Lock()
@@ -335,7 +328,7 @@ func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult
 	// live record, not just "this run minted a fresh token".
 	if srv == nil || !helperTokenValid(srv) {
 		s.embedded.Mu.Unlock()
-		return DbMcpInstallResult{Outcome: mcpinstall.OutcomeNotFound}
+		return DbMcpInstallResult{Outcome: harness.OutcomeNotFound}
 	}
 	url := srv.URL()
 	s.embedded.Mu.Unlock()
@@ -344,7 +337,7 @@ func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult
 }
 
 // dbMcpApprovalPlanIssuesCap bounds DbMcpApprovalPlan.Issues on the wire — the dbmcp package's own
-// approvalPlanFrom already caps at this same figure (M3 §6.2), so this is a defense-in-depth
+// approvalPlanFrom already caps at this same figure, so this is a defense-in-depth
 // re-application at the wire boundary. Unlike the statement text below it, eliding some of these
 // issues never hides part of the statement itself from the human approving it.
 const dbMcpApprovalPlanIssuesCap = 10
@@ -413,10 +406,10 @@ func toWireApprovalSnapshot(snap dbmcp.ApprovalSnapshot) DbMcpApprovalSnapshot {
 		out.Pending = &DbMcpApprovalRequest{
 			RequestID: snap.Pending.RequestID, ConnectionID: snap.Pending.ConnectionID,
 			ConnectionName: snap.Pending.ConnectionName, Kind: snap.Pending.Kind,
-			// Statement carries the full text, uncapped (M7 finding — a byte cap that elided the
-			// middle let a hidden clause sit entirely inside the omitted span; the dialog's own
-			// `.statement` is a fixed-height scroll container (DbMcpApprovalDialog.vue), so nothing
-			// here bounds the DOM by hiding text a human is being asked to approve).
+			// Statement carries the full text, uncapped (a byte cap that elided the middle let a
+			// hidden clause sit entirely inside the omitted span; the dialog's own `.statement` is
+			// a fixed-height scroll container (DbMcpApprovalDialog.vue), so nothing here bounds the
+			// DOM by hiding text a human is being asked to approve).
 			Class: string(snap.Pending.Class), Statement: snap.Pending.Statement,
 			ExpiresAtMs: snap.Pending.ExpiresAt.UnixMilli(),
 			Reason:      string(snap.Pending.Reason),

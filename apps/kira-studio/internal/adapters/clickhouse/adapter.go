@@ -17,11 +17,11 @@ func init() {
 
 var relationKinds = map[string]bool{"table": true, "view": true, "matview": true}
 
-// connState is handle/readOnly (F3): Connect/Disconnect write them from whatever goroutine
+// connState is handle/readOnly: Connect/Disconnect write them from whatever goroutine
 // adapterhost dispatches them on, concurrently with any in-flight op reading them — Cancel already
 // locked its own read (below); Mutate/Execute/requireHandle did not, a real data race same class as
-// postgres/adapter.go's own. Guarded via adapters.Guarded (P113 G1). The running-query bookkeeping
-// lives in tracker's own lock (P107 T2-3), unrelated to this state.
+// postgres/adapter.go's own. Guarded via adapters.Guarded. The running-query bookkeeping
+// lives in tracker's own lock, unrelated to this state.
 type connState struct {
 	handle   *Handle
 	readOnly bool
@@ -99,7 +99,7 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 	return nil
 }
 
-// nextQueryID is index.ts's opRuntime's own per-call closure (D8's own refinement) — this
+// nextQueryID is index.ts's opRuntime's own per-call closure — this
 // exported-package-level helper is only ever called with a fresh seq per top-level call, matching
 // index.ts's own instance-per-call closure rather than an instance-level map, since every top-level
 // Adapter method call already gets a fresh, unique op.OpID.

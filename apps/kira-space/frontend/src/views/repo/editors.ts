@@ -1,14 +1,14 @@
-// C5 §9.3/§12: the tabId -> editor registry. Two jobs: (1) this phase's own model-lifecycle
+// The tabId -> editor registry. Two jobs: (1) model-lifecycle
 // bookkeeping — a tab switch away unmounts the Vue component (MainView's `v-if`, the same as every
 // other tab view in this app) but must not lose the loaded buffer, so the editor *widget* disposes
-// on unmount while the model stays cached (monaco.ts's own modelCache) until the tab actually
-// closes; (2) C6/C10's own reserved seam — the live IStandaloneCodeEditor instances,
+// on unmount while the model stays cached (monaco.ts's own modelCache) until the tab closes;
+// (2) the reserved seam — the live IStandaloneCodeEditor instances,
 // definition/hover providers and gutter decorations attach to.
 //
-// C6 §8.3: widened to one entry shape covering both a repo-file tab's single model/editor and a
+// Widened to one entry shape covering both a repo-file tab's single model/editor and a
 // repo-diff tab's pair — one map, one lifecycle, rather than a second parallel map that would give
 // closeTab's single dropResources call two places to forget. editorForTab keeps returning a
-// standalone code editor only (its one caller, C10's future gutter work, means that one).
+// standalone code editor only (its one caller, the future gutter work, means that one).
 import { disposeModel } from './monaco';
 
 type StandaloneEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
@@ -21,9 +21,9 @@ interface RepoEditorEntry {
 
 const entries = new Map<string, RepoEditorEntry>();
 
-// C14-5: openRepoCommitDiffTab/openRepoReviewDiffTab deliberately keep separate tabs open for what
+// openRepoCommitDiffTab/openRepoReviewDiffTab deliberately keep separate tabs open for what
 // can be an identical (path, left, right) revision pair (e.g. a commit-diff tab and a review-diff
-// tab over the same range, or two branches sharing a tip/base per C13-1) — monaco.ts's
+// tab over the same range, or two branches sharing a tip/base) — monaco.ts's
 // repoRevisionDiffUris keys the underlying models by revision alone, so two such tabs share the
 // exact same cached model objects. That sharing is harmless while both stay open (the content is
 // immutable, read-only, identical either way) but disposeModel used to run unconditionally on
@@ -118,7 +118,7 @@ export function dropRepoDiffTab(tabId: string): void {
   dropRepoFileTab(tabId);
 }
 
-/** repo-multi-diff's own dropResources (P92 item 5) — a multi-diff tab registers several diff
+/** repo-multi-diff's own dropResources — a multi-diff tab registers several diff
  *  editors under one tab id, each keyed `${tabId}:${path}` (useDiffEditor.ts's own editorKey,
  *  set once per expanded section), never the plain tabId itself. Every entry whose key belongs to
  *  this tab is found and dropped, not a single exact-key lookup like dropRepoFileTab's. */

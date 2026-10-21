@@ -10,7 +10,8 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
+	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
 // launches.go starts interactive Claude Code sessions for a task: Take over a run's session,
@@ -165,8 +166,9 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 	if rec.Mode == model.AdeSessionModeTUI && !moved {
 		pa.Resume = rec.ID
 	} else {
-		pa.Resumes = rec.ClaudeSessionID
+		pa.Resumes = rec.AgentSessionID
 	}
+	pa.Provider = rec.Provider
 	runID := ""
 	if rec.Mode == model.AdeSessionModeHeadless {
 		runID = b.finishableRun(tc, rec)
@@ -180,14 +182,14 @@ func (b *TaskBoard) ensureNotOpen(tr *Tracker, rec *model.AdeSession) error {
 	if rec.Mode == model.AdeSessionModeTUI && rec.State == model.AdeSessionStateRunning {
 		return invalid("the session is already open")
 	}
-	open, err := b.runningTUI(func(s model.AdeSession) bool { return s.ClaudeSessionID == rec.ClaudeSessionID })
+	open, err := b.runningTUI(func(s model.AdeSession) bool { return s.AgentSessionID == rec.AgentSessionID })
 	if err != nil {
 		return err
 	}
 	if open != nil {
 		return invalid("the conversation is already open")
 	}
-	if tr.hasPending(func(p pendingIntent) bool { return p.ClaudeSessionID == rec.ClaudeSessionID }) {
+	if tr.hasPending(func(p pendingIntent) bool { return p.AgentSessionID == rec.AgentSessionID }) {
 		return invalid("a launch of the conversation is already starting")
 	}
 	return nil
@@ -245,7 +247,11 @@ func (b *TaskBoard) stopForTakeOver(rec *model.AdeSession, stop bool) error {
 	if !stop {
 		return invalid("the run is still running; stop it first")
 	}
-	done := b.cancelLive(b.live, run.ID, errTakenOver)
+	agent, err := b.agentFor(rec.Provider)
+	if err != nil {
+		return err
+	}
+	done := b.cancelLive(b.live, run.ID, takenOver{product: agent.ProductLabel()})
 	return b.awaitEnd(done)
 }
 
@@ -283,7 +289,12 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 	space := b.spaceEnabled(tc.task)
 	var release func()
 	if runID != "" || space {
-		grant := claudeheadless.Grant{RunID: runID, TaskID: tc.task.ID, Space: space}
+		agent, err := b.agentFor(pa.Provider)
+		if err != nil {
+			return adewire.Launch{}, err
+		}
+		pa.Provider = agent.ID()
+		grant := agentmcp.Grant{RunID: runID, TaskID: tc.task.ID, Space: space, Agent: agent}
 		if runID != "" {
 			grant.Results = resultSpecs(stepResultsOf(tc, pa.StepID))
 		}
@@ -292,16 +303,16 @@ func (b *TaskBoard) prepareWithGrant(tr *Tracker, tc *taskCtx, pa PrepareArgs, r
 			return adewire.Launch{}, err
 		}
 		release = rel
-		var tools []string
+		var ids []harness.MCPTool
 		if runID != "" {
-			tools = append(tools, claudeheadless.FinishStepTool)
+			ids = append(ids, agentmcp.FinishStep)
 		}
-		tools = append(tools, claudeheadless.RunOutcomeTool)
+		ids = append(ids, agentmcp.RunOutcome)
 		if space {
-			tools = append(tools, claudeheadless.SpaceToolNames...)
+			ids = append(ids, agentmcp.SpaceToolIDs...)
 		}
-		pa.ExtraArgs = append(pa.ExtraArgs, "--mcp-config", cfg, "--allowedTools")
-		pa.ExtraArgs = append(pa.ExtraArgs, tools...)
+		tools := harness.ToolNames(agent, ids...)
+		pa.MCPConfig, pa.AllowedTools = cfg, tools
 	}
 	res, err := tr.Prepare(pa)
 	if err != nil {
@@ -378,7 +389,7 @@ func (b *TaskBoard) tuiBound(runID string) bool {
 }
 
 // applyTUIFinish applies a finish_step call of a taken-over run at call time (R14).
-func (b *TaskBoard) applyTUIFinish(runID string, f claudeheadless.Finish) {
+func (b *TaskBoard) applyTUIFinish(runID string, f agentmcp.Finish) {
 	if b.ctx.Err() != nil {
 		return
 	}
@@ -473,7 +484,7 @@ func (b *TaskBoard) LaunchStep(ctx context.Context, args adewire.LaunchStepArgs)
 	}
 	pa := PrepareArgs{TaskID: tc.task.ID, StepID: step.ID, Cwd: cwd, Message: message}
 	if len(extra) > 0 {
-		pa.ExtraArgs = append([]string{"--add-dir"}, extra...)
+		pa.AddDirs = extra
 	}
 	return b.prepareWithGrant(tr, tc, pa, "")
 }

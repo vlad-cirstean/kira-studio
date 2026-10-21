@@ -20,8 +20,8 @@ import type { QueryPlan } from './planModel';
 import { bumpPageVersion, documentRow, drop as dropPage, getPage, setPage } from './resultPages';
 
 /** One result set of a run. `key` is identity and never changes while the result is open — the
- *  "Result N" label the strip prints (P40) is its *position*, which renumbers when a sibling
- *  closes, so it is deliberately not stored here. P18 D17: `kind` distinguishes an ordinary
+ *  "Result N" label the strip prints is its *position*, which renumbers when a sibling
+ *  closes, so it is deliberately not stored here. `kind` distinguishes an ordinary
  *  query-result page (resultPages.ts) from a plan result (explainResults.ts) — both share every
  *  other piece of this record's own lifecycle (close/close-others/close-to-the-right/eviction). */
 interface ConsoleResult {
@@ -30,12 +30,12 @@ interface ConsoleResult {
   kind: 'page' | 'plan';
 }
 
-/** D19: the outcome of the pre-run EXPLAIN batch auto-explain issues for every qualifying
+/** The outcome of the pre-run EXPLAIN batch auto-explain issues for every qualifying
  *  statement in the run that just fired. `kind: 'plans'` is the ordinary case — `worstIndex` names
  *  the one whose own overThreshold or warn-severity issue triggered the strip; the whole array is
  *  kept (not just the worst plan) so a future "show every plan" affordance costs nothing to add,
  *  today only `plans[worstIndex]` is read (the strip's own Show plan action). `kind: 'truncated'`
- *  (P12 round 1 finding #8) is a distinct outcome from "nothing to warn about" (null, no strip at
+ *  is a distinct outcome from "nothing to warn about" (null, no strip at
  *  all): at least one qualifying statement's own plan was too large to parse (page/chunk.go's 64
  *  KiB MaxCellBytes), so whether it would have warned is genuinely unknown — the strip says so
  *  rather than silently claiming there was nothing to check. */
@@ -56,8 +56,8 @@ interface ConsoleViewRuntime {
   activeKey: string | null; // which result set the single mounted grid shows (P40 D2)
   searchOpen: boolean; // mirrors views/{grid,documents,keyvalue}/state.ts's own flag (P40 D8)
   nextSeq: number; // per-tab monotonic result-set counter (P40 D1) — never reused
-  // P42 D11: `${resultKey}:${docId}`, present = expanded. Unlike a Mongo data tab's own
-  // documents/state.ts (persisted, default-expanded, P27 D2), a console result set is
+  // `${resultKey}:${docId}`, present = expanded. Unlike a Mongo data tab's own
+  // documents/state.ts (persisted, default-expanded), a console result set is
   // runtime-only and starts collapsed — a find() result is usually skimmed for shape, and
   // expanding a couple hundred documents by default is a very tall list nobody asked for.
   expandedDocIds: Set<string>;
@@ -67,7 +67,7 @@ interface ConsoleViewRuntime {
   autoExplain: AutoExplainState | null;
   // Real-interaction fix (reported bug — column widths reset on every subsequent query in the
   // same session): ConsoleSlickGrid.vue's own header used to state "no persisted column widths —
-  // always the measured/default width, reset on every remount" as a deliberate §3.4 design
+  // always the measured/default width, reset on every remount" as a deliberate design
   // decision, because a console result set has no addressable table/tab state the way
   // SlickGridHost.vue's own DataTabState.columnWidths does (grid/SlickGridHost.vue's `buildColumns`
   // already prefers `tab().state.columnWidths` over a fresh measurement, so that surface was
@@ -76,10 +76,10 @@ interface ConsoleViewRuntime {
   // ConsoleResultGrid.vue's `:key="pageKey"` and re-measures from scratch — losing both the
   // first run's auto-sized widths and any manual resize the very next time a statement runs.
   // Keyed by column name, living on this per-tab runtime record (not per-result) so it survives
-  // every subsequent run in the same still-open tab — the "session" §4.2's own bug report names —
+  // every subsequent run in the same still-open tab — the "session" the bug report names —
   // and is discarded only when the runtime itself is (a genuinely new session: the tab closes,
   // `registerTabRuntimeCleanup` below deletes the whole record). Never touched by `dropResults`
-  // (replace-mode's own per-run reset, D6) — a width choice is not a query result.
+  // (replace-mode's own per-run reset) — a width choice is not a query result.
   columnWidths: Record<string, number>;
 }
 
@@ -129,7 +129,7 @@ function releaseResult(rt: ConsoleViewRuntime, result: ConsoleResult): void {
   pruneExpandedDocIds(rt, result.key);
 }
 
-// P2 R1: append mode (the default, D6 below) never otherwise frees an old result's page — nothing
+// Append mode (the default) never otherwise frees an old result's page — nothing
 // short of the user's own close/close-others action or closing the tab did before this. A session
 // of many small runs in one left-open tab would retain every one of their full decoded pages
 // forever. `protectedCount` is always the run that just completed: only *earlier* runs' results are
@@ -159,12 +159,12 @@ function isFlaggedPlan(plan: QueryPlan): boolean {
   return plan.overThreshold || plan.issues.some((issue) => issue.severity === 'warn');
 }
 
-// P12 round 2 finding #13: on a multi-statement Run-all, the strip's "Show plan" action should
+// On a multi-statement Run-all, the strip's "Show plan" action should
 // point at the *worst* offender, not just the first one flagged — an early statement tripping a
 // mild warning must not eclipse a much more expensive one later in the same run. Picks the
 // flagged plan with the highest estimatedRowsRead, falling back to the first flagged index when
 // none of them carries a row estimate at all (e.g. every statement is SQLite, which never reports
-// one — D14).
+// one).
 function worstFlaggedIndex(plans: AutoExplainPlans): number {
   let best = -1;
   let bestRows = -1;
@@ -181,12 +181,12 @@ function worstFlaggedIndex(plans: AutoExplainPlans): number {
   return best;
 }
 
-// D19 rules 1-4/6: filters to explainable statements, composes every one of their own EXPLAIN
-// statements (D13: one for most dialects, two for ClickHouse) into a *single* data:execute call,
+// Filters to explainable statements, composes every one of their own EXPLAIN
+// statements (one for most dialects, two for ClickHouse) into a *single* data:execute call,
 // then re-slices the returned pages back per originating statement to parse each one. Returns
 // null whenever there is nothing to warn about — no qualifying statement, too many of them, or
-// the EXPLAIN call itself failed (rule 6: swallowed, never surfaced for this path) — or
-// `{kind: 'truncated'}` when a plan was too large to parse at all (finding #8): genuinely unknown
+// the EXPLAIN call itself failed (swallowed, never surfaced for this path) — or
+// `{kind: 'truncated'}` when a plan was too large to parse at all: genuinely unknown
 // whether it would have warned, so this is deliberately not folded into the null case.
 async function autoExplainCheck(
   tab: ConsoleTabRecord,
@@ -224,25 +224,24 @@ async function autoExplainCheck(
     const worstIndex = worstFlaggedIndex(plans);
     return worstIndex === -1 ? null : { kind: 'plans', plans, worstIndex };
   } catch (err) {
-    // D19 rule 6: an EXPLAIN-call failure never blocks the real run — except a cancellation. That
+    // An EXPLAIN-call failure never blocks the real run — except a cancellation. That
     // is the user pressing Stop while this pre-run batch is in flight, not the batch itself
     // failing, and must stop the real run too rather than let it fire the moment this batch
-    // settles (P12 round 1 finding #5) — rethrown so run()'s own catch can react.
+    // settles — rethrown so run()'s own catch can react.
     if (classifyLoadError(err).kind === 'cancelled') throw err;
-    // P12 round 1 finding #8: distinct from "nothing to warn about" — whether this statement
-    // would have warned is genuinely unknown, not "no issue found", so the strip must say so
-    // rather than silently showing nothing (the previous behavior every other parse failure here
-    // still gets, per D19 rule 6, since those are genuine EXPLAIN-call failures, not this).
+    // Distinct from "nothing to warn about" — whether this statement would have warned is genuinely
+    // unknown, not "no issue found", so the strip must say so rather than silently showing nothing
+    // (the previous behavior every other parse failure here still gets, since those are genuine
+    // EXPLAIN-call failures, not this).
     if (err instanceof ExplainTruncatedError) return { kind: 'truncated' };
     return null;
   }
 }
 
-// D19 rules 1-5's own pre-run gate, split out of run() (below) to keep its cognitive complexity in
-// bounds — P108 Part 11 F1 added one more branch there. Returns 'stop' when run() must return
-// without ever issuing the real statement: the EXPLAIN batch was cancelled, or the tab closed or
-// was superseded by a newer run while it was in flight. 'proceed' otherwise, with `rt.autoExplain`
-// already set to whatever the batch found.
+// The pre-run gate, split out of run() (below) to keep its cognitive complexity in bounds.
+// Returns 'stop' when run() must return without ever issuing the real statement: the EXPLAIN batch
+// was cancelled, or the tab closed or was superseded by a newer run while it was in flight.
+// 'proceed' otherwise, with `rt.autoExplain` already set to whatever the batch found.
 async function runAutoExplainGate(
   tab: ConsoleTabRecord,
   kind: ConnectionKind,
@@ -260,7 +259,7 @@ async function runAutoExplainGate(
     // Only a cancellation reaches here (autoExplainCheck's own catch swallows everything else) —
     // Stop was pressed while this batch was the only op registered on the backend, so the real run
     // must not fire at all, not just lose its warning.
-    // P12 round 2 finding #4: guarded by identity, not a bare clear — a second, overlapping run
+    // Guarded by identity, not a bare clear — a second, overlapping run
     // (runStatement/runAll have no `running` guard against each other) may have already stamped
     // its own explainOpId here by the time this catch runs; clearing unconditionally would discard
     // *that* run's id, leaving Stop with nothing registered on the backend to cancel.
@@ -293,11 +292,11 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
   const { runtime, ensureRuntime, toggleSearchOpen, setSearchOpen } =
     createRuntimeStore<ConsoleViewRuntime>(defaultRuntime);
 
-  // D4/D5: closeTab has no way to import this leaf module directly (reality 18) — registers here.
+  // closeTab has no way to import this leaf module directly — registers here.
   // state/tabs.ts's dropAllPagesForTab already frees this tab's entries in resultPages.ts's own
-  // `pages` map directly (P40 D1: rt.results holds only { key, rowCount } now, never a Page, so
+  // `pages` map directly (rt.results holds only { key, rowCount } now, never a Page, so
   // there is no second reference here left to release before the record itself is dropped).
-  // P43 iter2 F23/D32: dropRows(result.key) is the same release for views/shared/document/rows.ts's
+  // dropRows(result.key) is the same release for views/shared/document/rows.ts's
   // own per-result parse cache — unregisterDocumentRows alone only drops the *source* pointer
   // (rows.ts:25-27's own `rowSources.delete`), leaving every already-parsed document tree for that
   // result retained under a key `nextSeq` guarantees is never reused, for the life of the process.
@@ -311,7 +310,7 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
       // entries — QueryPlan.raw alone tens of KB each, nextSeq never reused — were retained in their
       // module-level maps for the life of the process.
       for (const result of rt.results) releaseResult(rt, result);
-      // P108 Part 11 F1: deleting the entry below detaches `rt` — it stays exactly as it is, so an
+      // Deleting the entry below detaches `rt` — it stays exactly as it is, so an
       // in-flight run() or explain() awaiting on this same object still reads status 'running' and
       // its own opId unchanged forever. Their post-await guards only check identity against that
       // detached object, never `runtime[tabId]`'s own presence, so without this the real statement
@@ -330,7 +329,7 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
     return runtime[tabId]?.expandedDocIds.has(`${resultKey}:${id}`) ?? false;
   }
 
-  // Real-interaction fix — ConsoleSlickGrid.vue's own onMounted/onColumnsResized read and write
+  // ConsoleSlickGrid.vue's own onMounted/onColumnsResized read and write
   // through these two rather than reaching into `runtime[tabId]` directly, mirroring
   // grid/SlickGridHost.vue's own `currentWidths()`/`onColumnsResized` pair (tab.state.columnWidths)
   // as closely as a runtime-only, no-tab-state console result can.
@@ -437,8 +436,8 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
     return getPage(rt.activeKey);
   }
 
-  /** D17: pushes one plan result the same way `run()` pushes a page result — same append/replace
-   *  toggle, same eviction, same close/close-others machinery. Reused by D19's auto-explain
+  /** Pushes one plan result the same way `run()` pushes a page result — same append/replace
+   *  toggle, same eviction, same close/close-others machinery. Reused by the auto-explain
    *  "Show plan" action (below, same file) so it can push a plan it already parsed without a second
    *  round trip. */
   function pushPlanResult(tabId: string, statement: string, plan: QueryPlan): void {
@@ -487,10 +486,10 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
         path: tab.path,
         statements,
       });
-      // P12 round 2 finding #3: the tab may have closed while this run was in flight — `rt` is
-      // still a live reference to the detached runtime object (deleting `runtime[tabId]` doesn't
-      // touch it), so `rt.opId !== opId` alone doesn't catch this and every write below would leak
-      // a result nothing can ever reach again (resultPages.ts's `nextSeq` never repeats).
+      // The tab may have closed while this run was in flight — `rt` is still a live reference to
+      // the detached runtime object (deleting `runtime[tabId]` doesn't touch it), so
+      // `rt.opId !== opId` alone doesn't catch this and every write below would leak a result
+      // nothing can ever reach again (resultPages.ts's `nextSeq` never repeats).
       if (!runtime[tabId]) return;
       if (rt.opId !== opId) return; // superseded by a newer run
 
@@ -532,7 +531,7 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
 
   function stop(tabId: string): void {
     const rt = runtime[tabId];
-    // P12 round 2 finding #5: set synchronously, not left to the in-flight promise's own eventual
+    // Set synchronously, not left to the in-flight promise's own eventual
     // rejection — if the auto-explain batch happens to resolve normally before the cancel signal
     // reaches it (rather than rejecting with E_CANCELLED), rt.status would otherwise still read
     // 'running' when run()'s post-await guard checks it, and the real (possibly expensive) query
@@ -565,11 +564,11 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
     pushPlanResult(tabId, worst.statement, worst.plan);
   }
 
-  /** C12/D11/D13: composes `kind`'s own EXPLAIN for `statement`, issues it through the same
+  /** Composes `kind`'s own EXPLAIN for `statement`, issues it through the same
    *  `data:execute` op *Run statement* uses, parses the result, and pushes it as a plan result set.
-   *  Unlike `run()`, a failure here is returned rather than written into `rt.error` — D19's silent-
+   *  Unlike `run()`, a failure here is returned rather than written into `rt.error` — the silent-
    *  degrade rule is for auto-explain specifically; the manual Explain button surfaces its own
-   *  failure the same way Format does (P13's own component-local strip, ConsoleView.vue). */
+   *  failure the same way Format does (the component-local strip, ConsoleView.vue). */
   async function explain(
     tabId: string,
     kind: ConnectionKind,

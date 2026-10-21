@@ -1,7 +1,7 @@
-// Package testsupport is the Go analogue of packages/db-fixtures/support/*.ts (A19): the Docker gate, real
-// container startup, and seed-SQL loading each adapter's own acceptance spec needs. One container
-// per test binary, started lazily on first call and reused by every later call in the same
-// process — a fresh container per test would make the suite unusable (§11b).
+// Package testsupport is the Go analogue of packages/db-fixtures/support/*.ts: the Docker gate,
+// real container startup, and seed-SQL loading each adapter's own acceptance spec needs. One
+// container per test binary, started lazily on first call and reused by every later call in the
+// same process — a fresh container per test would make the suite unusable.
 package testsupport
 
 import (
@@ -76,8 +76,8 @@ const (
 // failure that makes go test ./internal/adapters/postgres unusable without Docker) when the
 // daemon is unreachable.
 //
-// Memoized process-wide by fixture[T] (bun:test's own beforeAll/afterAll-per-file precedent,
-// §11b/B15) — termination is deliberately NOT wired to any one test's t.Cleanup: see fixture.go's
+// Memoized process-wide by fixture[T] (bun:test's own beforeAll/afterAll-per-file precedent) —
+// termination is deliberately NOT wired to any one test's t.Cleanup: see fixture.go's
 // own doc comment for why. Call StopPostgres from the package's own TestMain instead.
 func StartPostgres(t *testing.T) *PgFixture {
 	return pgMemo.start(t, "postgres container", startPostgres)
@@ -92,7 +92,7 @@ func StopPostgres() {
 func startPostgres() (*PgFixture, error) {
 	ctx := context.Background()
 
-	// The same wait strategy P58a's own M0 probe confirmed working in this sandbox: Postgres logs
+	// The same wait strategy confirmed working in this sandbox: Postgres logs
 	// "database system is ready to accept connections" twice during initdb's own double-boot, and
 	// waiting for the second occurrence is what @testcontainers/postgresql's own pg_isready-based
 	// healthcheck solves on the TypeScript side — testcontainers-go's postgres module has no
@@ -129,7 +129,7 @@ func startPostgres() (*PgFixture, error) {
 	}
 	// postgres.ts's own start(): app.big_rows is created by the seed file but populated and
 	// ANALYZEd separately (opts?.seedBigTable ?? true) — done unconditionally here since every one
-	// of this package's own tests wants the real 1,000,000-row table, not the P1-only empty-table
+	// of this package's own tests wants the real 1,000,000-row table, not the empty-table
 	// shortcut the TS harness offers callers that don't need paging.
 	if err := seedBigRows(ctx, uri); err != nil {
 		return nil, err

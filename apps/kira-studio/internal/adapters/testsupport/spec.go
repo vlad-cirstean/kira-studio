@@ -25,7 +25,7 @@ type hasConnectionID interface {
 }
 
 // FixtureNodePath is NodePath for a fixture (redis/sqs/postgres/kafka/mongo/s3's own
-// nodePath(fixture, segments...), P107 I2-28) — each caller instantiates it once as
+// nodePath(fixture, segments...)) — each caller instantiates it once as
 // `var nodePath = testsupport.FixtureNodePath[*testsupport.XFixture]`, so every existing call
 // site (nodePath(fixture, seg(...))) is untouched.
 func FixtureNodePath[F hasConnectionID](fixture F, segments ...model.PathSegment) model.NodePath {
@@ -40,7 +40,7 @@ func OffsetRead(path model.NodePath, pageSize int) adapters.ReadRequest {
 }
 
 // InsertDeleteRoundTrip is mysqlfamily's and sqlite's own "mutate: insert then delete
-// round-trips" test body (P107 I2-28) — insert two rows, count, delete one by key, count again,
+// round-trips" test body — insert two rows, count, delete one by key, count again,
 // read the survivor back. path's own table must already exist and be empty; setup/cleanup (which
 // differs per adapter — mysqlfamily provisions the scratch table over a side DSN connection,
 // sqlite over the adapter's own Execute console) stays each caller's own.
@@ -160,7 +160,7 @@ func DocBodyAt(t *testing.T, p page.DocumentPage, row int) *string {
 // KVPairs reads every field/value pair off a KeyValuePage into a map — the Go analogue of
 // redis.spec.ts's kvPairs. A map, not a slice, because most callers (hash/set/zset reads) need to
 // assert the exact *set* of pairs a page carries, order-independent — HSCAN's own round order is
-// not stable across containers (§1.11/RD-1(a)), so an ordered comparison would be flaky by
+// not stable across containers, so an ordered comparison would be flaky by
 // construction. A row whose value is SQL/redis NULL has no representation here (redis has no NULL
 // value concept at the KeyValuePage level); every field name in a real page is expected non-null.
 func KVPairs(t *testing.T, p page.KeyValuePage) map[string]string {
@@ -205,8 +205,8 @@ func Strp(s string) *string { return &s }
 // per-message key reads. SQS's MessageId is always present on a received message, but the reader
 // stays nil-able (chunkCellAt, not a bare string) for the same reason DocIDAt does: a page.Chunk's
 // null-vs-empty-string distinction is a property of the chunk format, not of any one producer's
-// data, and a per-package copy that assumed "always present" would be the exact risk P58c §1.3 gap
-// 3 already named once for Document/KeyValue readers.
+// data, and a per-package copy that assumed "always present" would be the exact risk already
+// named once for Document/KeyValue readers.
 func StreamKeyAt(t *testing.T, p page.StreamPage, row int) *string {
 	t.Helper()
 	return chunkCellAt(t, p.Keys, row)

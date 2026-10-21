@@ -42,7 +42,7 @@ import {
 import { useTabIncognitoStore } from './tabIncognito';
 import { TAB_KINDS } from './tabKinds';
 
-// P103 Part 2 (§5.2): the shared skeleton (persistableTabs/saveIfChanged/openTab/closeTab/…, see
+// The shared skeleton (persistableTabs/saveIfChanged/openTab/closeTab/…, see
 // that file's own header) now lives in packages/workbench/src/state/createTabsStore.ts. This file
 // is what's left: per-kind typed sugar (openDataTab, openDocumentTab-shaped patchers, …) and
 // every Studio-only feature — incognito filtering (persistable), the `hydrated` reconnect gate
@@ -85,16 +85,16 @@ export const useRecentTablesStore = defineStore('recentTables', () => {
   return { ...toRefs(state), recordRecent, pruneRecent };
 });
 
-// Result of an open*Tab call (`null` when the connection is gone): `reused` tells the caller whether an existing tab was activated
-// (Task 62) rather than a fresh one created — a fresh tab is about to fetch on mount anyway, so
-// only a caller that cares about the double-click "also reload the data" behavior needs to check
-// this; everyone else can destructure just `id` and ignore it.
+// Result of an open*Tab call (`null` when the connection is gone): `reused` tells the caller
+// whether an existing tab was activated rather than a fresh one created — a fresh tab is about to
+// fetch on mount anyway, so only a caller that cares about the double-click "also reload the data"
+// behavior needs to check this; everyone else can destructure just `id` and ignore it.
 export interface OpenTabResult {
   id: string;
   reused: boolean;
 }
 
-// §8.4: "not yet loaded, shows Reconnect & load" — in memory only, like useRecentTablesStore's own
+// "not yet loaded, shows Reconnect & load" — in memory only, like useRecentTablesStore's own
 // entries above; a restored session comes back with every tab in this state (hydrateTabs never
 // adds to it), and reconnecting or reopening a tab against a live connection is what clears it
 // (onOpened below). Module-local rather than part of tabsState (createTabsStore's own reactive
@@ -166,10 +166,10 @@ export const useTabsStore = createTabsStore({
     const recentTablesStore = useRecentTablesStore(pinia);
     const tabIncognitoStore = useTabIncognitoStore(pinia);
 
-    // D7: main's `tabs.connection_id` is ON DELETE CASCADE, so a deleted connection's `tabs` rows
+    // main's `tabs.connection_id` is ON DELETE CASCADE, so a deleted connection's `tabs` rows
     // are already gone server-side — a tab this store still holds for it is a row that can never
     // be re-inserted (every later debounced save would throw FOREIGN KEY constraint failed and get
-    // silently discarded, F7). Closing skips the discard prompt (the connection is gone; a declined or
+    // silently discarded). Closing skips the discard prompt (the connection is gone; a declined or
     // superseded prompt would keep the orphan) but shares closeTabInternal with a manual close, so
     // pages and runtime are freed by one code path.
     control.onConnectionsChanged((records) => {
@@ -181,12 +181,12 @@ export const useTabsStore = createTabsStore({
       recentTablesStore.pruneRecent(liveIds);
     });
 
-    // P43 F9/D12: an explicit Disconnect (or a lost connection surfacing as 'error') never used to
+    // An explicit Disconnect (or a lost connection surfacing as 'error') never used to
     // touch the hydrated set at all — only a failed *load* did, so a tab kept rendering its
     // pre-disconnect rows until the moment something happened to try reading it again. Regating
-    // here puts every open tab of the connection behind §8.4's Reconnect gate the instant the
+    // here puts every open tab of the connection behind the Reconnect gate the instant the
     // connection itself says it is gone, matching what the engine already did with its own cache.
-    // D13: only the page bytes are freed — the runtime record (count, selection, find toolbar,
+    // Only the page bytes are freed — the runtime record (count, selection, find toolbar,
     // actionError) stays, so the tab that comes back on reconnect is still the same tab, not a
     // blank one.
     control.onConnectionState((state) => {
@@ -198,10 +198,10 @@ export const useTabsStore = createTabsStore({
       }
     });
 
-    // P71 §3.1: turning incognito on flushes the tab's existing row immediately, rather than at
+    // Turning incognito on flushes the tab's existing row immediately, rather than at
     // whatever unrelated state change saves next — tabIncognito.ts cannot call saveNow directly
     // (it would recreate the cycle its own module comment avoids), so it publishes the toggle here
-    // instead. P79 review fix (Functional, LOW): saves unconditionally, not only when turning
+    // instead. Saves unconditionally, not only when turning
     // incognito ON — setIncognito (tabIncognito.ts) already updates incognitoState.ids before
     // firing this listener, so persistableTabs()'s own isIncognito filter already sees the new
     // state either direction; an on-only guard would leave a tab switched back to normal
@@ -210,7 +210,7 @@ export const useTabsStore = createTabsStore({
       actions.saveNow();
     });
 
-    // P39 F16/D12: the six Studio openers below shared this exact sequence — find-existing-and-
+    // The six Studio openers below shared this exact sequence — find-existing-and-
     // activate (opt-in per caller via `reuse`), else create-and-push-and-activate, then an opt-in
     // recordRecent — differing only in which of those two opt-ins applied and which kind/state
     // constructor built the record. `recentKind` used to be handled inline inside the shared
@@ -267,7 +267,7 @@ export const useTabsStore = createTabsStore({
     // data/definition, a console is a scratch work surface (like a SQL client's "New Query"), so
     // the same target routinely wants several independent consoles open at once.
     //
-    // D9: opened at the bare connection root (`path === ''`), a Postgres console has no session-
+    // Opened at the bare connection root (`path === ''`), a Postgres console has no session-
     // level way to redirect itself to a non-primary database — substituting a remembered "Set as
     // default" path here, before the path ever reaches the engine, needs no adapter change at all.
     function openConsoleTab(connectionId: string, path: string): string {
@@ -332,7 +332,7 @@ export const useTabsStore = createTabsStore({
       );
     }
 
-    // Opens a 'browse' tab (P41 D11/D14) over a redis database / s3 bucket's key or object space —
+    // Opens a 'browse' tab over a redis database / s3 bucket's key or object space —
     // identity is the container (`path`), reused across "Browse keys"/"Browse objects" invocations
     // on the same container the same way openDataTab reuses a table's tab; `newTab` opens a fresh
     // one regardless, with its own independent levelPath.

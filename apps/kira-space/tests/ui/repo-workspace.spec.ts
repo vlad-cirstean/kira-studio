@@ -16,7 +16,7 @@ import { emitWailsEvent } from './support/mockRuntime';
 import { repoRowById, repoTab, treeRow } from './support/repoRows';
 import type { ControlSnapshot } from './support/types';
 
-// C5 §15: the cheapest proof of this phase's one real claim a unit test can't reach — a repo
+// The cheapest proof of the one real claim a unit test can't reach — a repo
 // workspace's own isolated, pinned-plus-preview tab strip, and that studio's own strip never shows
 // a repo tab. "Import a fixture repository" here means seeding codeWorkspaceListRepos with one
 // already-imported repo (the same shortcut mode-switch.spec.ts's own createAndConnect takes for a
@@ -115,7 +115,7 @@ test('a repo workspace: pinned graph tab, preview-slot reuse, and promotion', as
   await expect(repoRowById(page, REPO.id)).toBeVisible();
 
   // Opening it activates its own workspace and the row itself. A single click (onRowClick's own
-  // open-or-activate semantics), not a double click: P84 §8.3's auto-switch-to-Files already fires
+  // open-or-activate semantics), not a double click: the auto-switch-to-Files already fires
   // on this same click, so a genuine second click at the same fixed point (what `.dblclick()`
   // sends) now lands on the Files tab's own relocated view-strip instead of the vanished row — a
   // real double-click's second physical click racing the same instant re-layout, not a test
@@ -196,9 +196,9 @@ test('a repo workspace: "Open changes" opens a diff tab', async ({ relaunch }) =
   await expect(page.locator('[data-testid="menu-item-open-changes"]')).toHaveCount(0);
 });
 
-// C7 §10: the one UI case a Go test or typecheck can't reach — the CHANNEL.codeSearch
-// subscription, the out-of-order merge-by-path (D11), and the result-click-to-preview-tab path
-// (D12). Everything upstream of the event stream (the scanner itself, the coalescer) has its own
+// The one UI case a Go test or typecheck can't reach — the CHANNEL.codeSearch
+// subscription, the out-of-order merge-by-path, and the result-click-to-preview-tab path.
+// Everything upstream of the event stream (the scanner itself, the coalescer) has its own
 // coverage (search_test.go, the Go package's own layering); this only exercises what those can't.
 test('a repo workspace: search streams results out of order and opens a match', async ({
   relaunch,
@@ -291,13 +291,12 @@ test('a repo workspace: search streams results out of order and opens a match', 
   await expect(previewTab).toContainText('a.ts');
 });
 
-// C11 §11/S16 — deliberately shallow (the plan's own words): the deep review behaviour (a real
-// branch comparison, marking, comments) needs a real repository and is the manual recipe's job
-// (docs/HISTORY.md (v1.5 C11) step 7), not a UI spec. This asserts only that
-// switching the panel to Review actually mounts the real @kira/git-ui ReviewView.vue bundle over
-// the native git stream and renders something real (its own branch picker) rather than an empty
-// container — the one thing neither typecheck nor a Go test can reach for this phase, the same
-// role the diff-tab/search/quick-open specs above already play for C6/C7/C9.
+// Deliberately shallow: the deep review behaviour (a real branch comparison, marking, comments)
+// needs a real repository and is the manual recipe's job (docs/HISTORY.md step 7), not a UI spec.
+// This asserts only that switching the panel to Review mounts the real @kira/git-ui ReviewView.vue
+// bundle over the native git stream and renders something real (its own branch picker) rather than
+// an empty container — the one thing neither typecheck nor a Go test can reach for this phase,
+// the same role the diff-tab/search/quick-open specs above already play.
 test('a repo workspace: switching the panel to Review mounts the review sidebar', async ({
   relaunch,
 }) => {
@@ -321,9 +320,8 @@ test('a repo workspace: switching the panel to Review mounts the review sidebar'
   await expect(picker.getByText('main', { exact: true })).toBeVisible();
 });
 
-// P92 item 6: Review moved from a third value of the Files body's own Files/Search segment to a
-// top-level tab alongside Repos/Files, so all three read as peers — this asserts that structure
-// directly (labels, order, and that the Files body's own inner strip is back down to two
+// Review is a top-level tab alongside Repos/Files, so all three read as peers — this asserts that
+// structure directly (labels, order, and that the Files body's own inner strip is back down to two
 // segments) rather than only the "Review mounts the review sidebar" behaviour the test above
 // already covers.
 test('a repo workspace: the panel has three top-level tabs (Repos/Files/Review), and the Files tab keeps its own two-segment Files/Search strip', async ({
@@ -356,11 +354,10 @@ test('a repo workspace: the panel has three top-level tabs (Repos/Files/Review),
   await expect(page.locator('[data-testid="repo-view-files"]')).toHaveCount(0);
 });
 
-// P62 §9: deliberately shallow, matching C11's own call for the review sidebar above — tests/ui/
-// has no git-stream mock that can answer blame.line, so asserting a real blame answer would need a
-// fixture that is its own piece of work, not this row's (§9's own reasoning). What this tier CAN
-// assert: the gitRepoIdFor === undefined guard (§4.1) is honest (no crash, no annotation) rather
-// than assumed, and toggling the setting leaves the editor mounted and healthy either way.
+// Deliberately shallow: tests/ui/ has no git-stream mock that can answer blame.line, so asserting
+// a real blame answer would need a fixture that is its own piece of work. What this tier CAN
+// assert: the gitRepoIdFor === undefined guard is honest (no crash, no annotation) rather than
+// assumed, and toggling the setting leaves the editor mounted and healthy either way.
 test('a repo workspace: the blame annotation stays off with no git record, and its setting toggles safely', async ({
   relaunch,
 }) => {
@@ -417,10 +414,10 @@ test('a repo workspace: the blame annotation stays off with no git record, and i
   await expect(page.locator('.kira-blame-inline')).toHaveCount(0);
 });
 
-// P76 §5/§12.2: the status bar's own blame item, plus §2's revision-pinned guard proven the same
+// The status bar's own blame item, plus the revision-pinned guard proven the same
 // way the test above proves its guard — a resolvable trap, not an absent one. Both `repo.open` and
 // `blame.line` answer in each relaunch below; if `blameable` ever again omitted `rev === null`
-// (§2's fix), the revision-pinned half would call them too and the item would wrongly appear.
+// (the fix), the revision-pinned half would call them too and the item would wrongly appear.
 test('contract: a repo workspace: the status bar blame item follows the cursor, and never shows on a revision-pinned tab (P76)', async ({
   relaunch,
 }) => {
@@ -459,12 +456,12 @@ test('contract: a repo workspace: the status bar blame item follows the cursor, 
   {
     // A revision-pinned repo-file tab (`rev` set), seeded directly as a restored tab — the real
     // navigation paths to one (a commit's "Go to file", a diff tab's own go-to-file command) both
-    // need `graph.stream`/`file.goToTarget`, which this mock deliberately never answers (§10).
+    // need `graph.stream`/`file.goToTarget`, which this mock deliberately never answers.
     // Marking it `active` here (unlike the restored-tab test above, which leaves its tab inactive
     // to exercise ensureWorkspaceShell's own fallback) means it renders as soon as the workspace
     // itself activates, with no tree click needed.
     //
-    // P114: unlike the first half, boot itself opens the git transport here — main.ts's own
+    // Unlike the first half, boot itself opens the git transport here — main.ts's own
     // post-hydrate fall-forward mounts this active tab's RepoFileView before app.mount, so before
     // any click is even possible. The mock must exist before that first page script runs, which
     // `installGitStreamMock`'s `page.evaluate` (installed after `relaunch()` resolves) is too late
@@ -518,7 +515,7 @@ test('contract: a repo workspace: the status bar blame item follows the cursor, 
     // Content only renders from state = 'found', which RepoFileView.vue's mount() reaches only
     // after synchronously evaluating the `blameable` guard (`rev === null`) earlier in the same
     // function — so this assertion (unlike a bare toBeVisible(), which an empty 'loading' host
-    // would also satisfy) proves the guard actually ran.
+    // would also satisfy) proves the guard ran.
     const editor = page.locator('[data-testid="repo-file-editor"]');
     await expect(editor.locator('.view-lines')).toContainText('export const a = 1;');
     await expect(page.locator('[data-testid="blame-status"]')).toHaveCount(0);
@@ -566,10 +563,10 @@ test('closing the active repo workspace from its row menu falls back to the empt
   await expect(repoTab(page, 'repo-graph')).toHaveCount(0);
 });
 
-// P82 §12.3: expanding a row lists its worktrees without opening it (the twisty's own
-// @click.stop, §8.1), and clicking a linked worktree switches to it — importing it as its own
+// Expanding a row lists its worktrees without opening it (the twisty's own
+// @click.stop), and clicking a linked worktree switches to it — importing it as its own
 // code_repos row first, since this app has none for that root yet — the same premise
-// WorktreeList.vue's own switch rests on, not a second worktree-switching path (§5).
+// WorktreeList.vue's own switch rests on, not a second worktree-switching path.
 test('contract: a repo workspace: expanding a row lists its worktrees, and switching to one opens its own workspace', async ({
   relaunch,
 }) => {
@@ -641,9 +638,9 @@ test('contract: a repo workspace: expanding a row lists its worktrees, and switc
   await expect(page.locator('[data-testid="repo-worktrees"]')).toHaveCount(0);
 });
 
-// P84 §13.4: the hydration path — a worktree imported in an *earlier* session has both rows already
-// in codeWorkspaceListRepos on boot, with no click to supply §4.5's hint. This is what proves the
-// batched RepoWorktreeLinks call itself is wired: §13.3's own test would pass even if it were never
+// The hydration path — a worktree imported in an *earlier* session has both rows already
+// in codeWorkspaceListRepos on boot, with no click to supply the hint. This is what proves the
+// batched RepoWorktreeLinks call itself is wired: the test would pass even if it were never
 // called, since the click-time hint alone is enough there.
 test('a worktree imported in an earlier session lists only under its parent', async ({
   relaunch,
@@ -686,9 +683,9 @@ test('a worktree imported in an earlier session lists only under its parent', as
   await expect(page.locator('[data-testid="menu-item-remove"]')).toBeVisible();
 });
 
-// P67b §6/§9: a .ts row and a .go row carry different per-language icon styles (ported from the
+// A .ts row and a .go row carry different per-language icon styles (ported from the
 // diff tree's own setiIconFor rule, repo/fileIcon.ts), and a directory row still carries a real
-// codicon (folder/folder-opened) — §6.2/OQ-3: no directory-icon rule was ported, since the diff
+// codicon (folder/folder-opened) — no directory-icon rule was ported, since the diff
 // tree has none.
 test('a repo workspace: file-tree rows carry per-language icons, directories keep their codicon', async ({
   relaunch,
@@ -749,16 +746,15 @@ const TERMINAL_OPEN_OK: ControlSnapshot = {
   response: { shell: '/bin/zsh' },
 };
 
-// P83 §17.2/§17.3: the embedded terminal's own wiring — real shell I/O is out of scope for this
-// tier (§17.3's own stated boundary; internal/terminal/session_test.go covers that). This is a
+// The embedded terminal's own wiring — real shell I/O is out of scope for this
+// tier (the stated boundary; internal/terminal/session_test.go covers that). This is a
 // wiring test, not a call-count test: it proves subscribe -> decode -> term.write -> DOM by
 // rendering a synthesized `kira:terminal:data` chunk inside the real xterm.js DOM it mounts.
 //
-// P100 Part 2: the "+" opens a terminal directly, no dropdown — TabStrip.vue's own onNewTab calls
+// The "+" opens a terminal directly, no dropdown — TabStrip.vue's own onNewTab calls
 // openRepoTerminalTab unconditionally; Studio's own launch-kind menu (Terminal/Claude Code/a
 // configured script) was never ported (no AgentSessions/CustomScripts store here, main.ts's own
-// doc comment; P127 dropped Studio's own AgentSessions store too, so that particular gap has since
-// closed on its own).
+// doc comment).
 test("the tab strip's + opens a terminal tab at the active repository's root", async ({
   relaunch,
 }) => {
@@ -775,7 +771,7 @@ test("the tab strip's + opens a terminal tab at the active repository's root", a
 
   // .xterm-rows appearing proves the dynamic import of terminalRenderer.ts settled and xterm
   // mounted; the terminalOpen call itself is fire-and-forget from the shared terminal host's own
-  // mount() (P128 §2.5: the one component every terminal tab, repo-scoped or module-scoped, now
+  // mount() (the one component every terminal tab, repo-scoped or module-scoped, now
   // renders through), so a plain synchronous check can race its still-in-flight mocked round trip
   // — expect.poll rather than a fixed wait.
   await expect(page.locator('.xterm-rows')).toBeVisible();
@@ -800,10 +796,9 @@ test("the tab strip's + opens a terminal tab at the active repository's root", a
   await expect(page.locator('.xterm-rows')).toContainText('hello');
 });
 
-// P83 §10.2/§11.2: a worktree row's own context menu (out of scope for P82 — nothing needed one
-// until a terminal could be opened at a worktree that isn't the active workspace) plus the
-// indicator's own row-specificity: it must key off the terminal's cwd, not merely "a terminal is
-// open somewhere in this repository".
+// A worktree row's own context menu (nothing needed one until a terminal could be opened at a
+// worktree that isn't the active workspace) plus the indicator's own row-specificity: it must key
+// off the terminal's cwd, not merely "a terminal is open somewhere in this repository".
 test("a worktree row's menu opens a terminal there, and both rows show the indicator", async ({
   relaunch,
 }) => {
@@ -845,9 +840,8 @@ test("a worktree row's menu opens a terminal there, and both rows show the indic
     .toBe(true);
 
   // openRepoTerminalTab opens repo.id's own workspace as a side effect (it calls
-  // openRepoWorkspace), so P84 §8.3's auto-switch already flipped the panel to Files — switch
-  // back to see the worktree rows again (the same migration §13.2 applies at :652/:673; this
-  // test's own "never opens a workspace" note in the P84 plan missed this call chain).
+  // openRepoWorkspace), so the auto-switch already flipped the panel to Files — switch
+  // back to see the worktree rows again (the same migration applies at :652/:673).
   await page.locator('[data-testid="git-panel-tab-repos"]').click();
 
   // Both row kinds share the same indicator markup (data-testid="repo-terminal-indicator",
@@ -934,15 +928,15 @@ test('every repo row shows its checked-out branch, main worktree first', async (
   await expect(worktreeRows.first().locator('.worktree-badge')).toHaveText('Main');
 });
 
-// P92 item 5: "Open all changes" (CommitMeta.vue) on a multi-file commit opens exactly one
+// "Open all changes" (CommitMeta.vue) on a multi-file commit opens exactly one
 // repo-multi-diff tab, not one repo-diff tab per file — hostHandlers.ts's own 'editor
-// .openAllChanges' handler, driven end to end through a real graph.stream chunk (§10's own
-// known-gap note: no prior UI test has driven this method through gitStreamMock.ts — see
-// graphStreamFixture.ts's own doc comment for why this needs real FlatBuffers encoding, not a
-// hand-rolled one). `file.read` is deliberately left unanswered: RepoMultiDiffView.vue's own
-// section headers (`.path`/`.path-dir`) render from the tab's own file list unconditionally, with
-// no dependency on a section's diff editor ever finishing its load (RepoMultiDiffView.vue's own
-// template) — that's what this test asserts, not diff content.
+// .openAllChanges' handler, driven end to end through a real graph.stream chunk (no prior UI test
+// has driven this method through gitStreamMock.ts — see graphStreamFixture.ts's own doc comment
+// for why this needs real FlatBuffers encoding, not a hand-rolled one). `file.read` is
+// deliberately left unanswered: RepoMultiDiffView.vue's own section headers (`.path`/`.path-dir`)
+// render from the tab's own file list unconditionally, with no dependency on a section's diff
+// editor ever finishing its load (RepoMultiDiffView.vue's own template) — that's what this test
+// asserts, not diff content.
 test('a repo workspace: "Open all changes" on a commit opens one multi-diff tab listing every changed path', async ({
   relaunch,
 }) => {
@@ -1066,7 +1060,7 @@ test('the Git panel top-level tabs render at 4px radius with normal letter spaci
   expect(filesSpacing).toBe('normal');
 });
 
-// P93 §8.4: the desktop app's own DOM-level check for the collapse/branch-order feature —
+// The desktop app's own DOM-level check for the collapse/branch-order feature —
 // `graph-branch-order.spec.ts` (webview-interaction) already covers the toolbar toggle, the
 // dashed fork stubs and the no-overlap/no-scrollbar cases in detail; this only exercises what is
 // specific to the desktop host: `RepoGraphView.vue`'s own `KeepAlive` (a tab switch away and back

@@ -18,7 +18,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
-	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -30,16 +29,15 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-// main's startup order mirrors src/main/index.ts (P52 §4.1), with the upgradeLegacySecrets step
-// deleted, not ported (P52 §6.4): config.EnsureLayout -> logging.Init/Sweep -> storage.Open
-// (migrates) -> secrets.New -> repos.New + repos.NewSecrets -> Settings.GetAll ->
-// adapterhost.NewRouter -> preconnect.New -> connections.New(...).Start -> tree.New ->
-// router.PushCacheConfig -> oplog.New(...).Start -> metrics ticker Start -> shell.NewQuitter ->
-// application.New(Services, ShouldQuit, OnShutdown) -> attach the deferred emitter and the
-// Quitter to the now-real App -> menu -> engine stream -> reopen handler -> the main window ->
-// app.Run() (P56 §4.11). There is no Node engine child to start any more (P58f M10 Phase 4).
+// main's startup order mirrors src/main/index.ts, with the upgradeLegacySecrets step deleted, not
+// ported: config.EnsureLayout -> logging.Init/Sweep -> storage.Open (migrates) -> secrets.New ->
+// repos.New + repos.NewSecrets -> Settings.GetAll -> adapterhost.NewRouter -> preconnect.New ->
+// connections.New(...).Start -> tree.New -> router.PushCacheConfig -> oplog.New(...).Start ->
+// metrics ticker Start -> shell.NewQuitter -> application.New(Services, ShouldQuit, OnShutdown) ->
+// attach the deferred emitter and the Quitter to the now-real App -> menu -> engine stream ->
+// reopen handler -> the main window -> app.Run(). There is no Node engine child to start any more.
 func main() {
-	// P100 Part 1: startupfail moved to repo-root internal/ and can no longer read
+	// startupfail moved to repo-root internal/ and can no longer read
 	// internal/config/internal/buildinfo itself (Go's internal/ rule — a repo-root package cannot
 	// import anything under apps/kira-studio/internal), so this app constructs its own Reporter,
 	// carrying its own Info, and threads it through every boot-failure site below instead of
@@ -70,7 +68,6 @@ func main() {
 		// P87 §3/§4: a runtime.GOOS switch — a real caffeinate child on macOS, a documented no-op
 		// everywhere else.
 		KeepAwakeDriver: keepawake.NewPlatformDriver(),
-		McpInstaller:    mcpinstall.New(mcpinstall.Deps{}),
 		AppName:         "Kira Studio", Version: buildinfo.Version,
 	})
 	if err != nil {
@@ -167,11 +164,11 @@ type postAppDeps struct {
 func wireWindowsAndMenu(d postAppDeps) {
 	app := d.app
 
-	// The sheet a Save/Open dialog attaches to is the window that actually asked — Current()
+	// The sheet a Save/Open dialog attaches to is the window that asked — Current()
 	// resolves the real key window on darwin ([NSApp keyWindow], application_darwin.go); the
 	// registry fallback only matters where Current() can't resolve one (this sandbox's Linux
 	// build, mid-startup before any window is focused) so a dialog call still has some live
-	// window to attach to rather than none (F4's second half — the single `mainWindow` var this
+	// window to attach to rather than none (the single `mainWindow` var this
 	// replaces always attached to whichever window was created most recently, not the caller).
 	windowToActOn := func() application.Window {
 		if w := app.Window.Current(); w != nil {
@@ -228,7 +225,7 @@ func wireWindowsAndMenu(d postAppDeps) {
 	}
 }
 
-// buildErrorHandler builds main's own application.Options.ErrorHandler (G29 D7/F6): catches the two
+// buildErrorHandler builds main's own application.Options.ErrorHandler: catches the two
 // pre-window fatal paths Wails takes itself, without ever returning to main -- application.New's
 // own transport-start failure, and webview_window_darwin.go's GetStartURL failure during
 // first-window creation, inside Run(). handleError (application.go) prefers ErrorHandler over its
@@ -251,10 +248,10 @@ func buildErrorHandler(reporter *startupfail.Reporter) func(error) {
 	}
 }
 
-// windowStore adapts *repos.WindowsRepo to shell.WindowRepo (P103 Part 3 §6.3 / P107 I2-3). Kira
-// Studio's own model.WindowRecord alone still carries Mode (P22 D12), so it stays its own type
+// windowStore adapts *repos.WindowsRepo to shell.WindowRepo. Kira
+// Studio's own model.WindowRecord alone still carries Mode, so it stays its own type
 // rather than a plain alias of shell.WindowRecord/appstorage.WindowRecord — this adapter is what
-// that costs. Kira Space's identical-minus-Mode WindowRecord is a true alias now (P107 I2-3), so
+// that costs. Kira Space's identical-minus-Mode WindowRecord is a true alias now, so
 // its own main.go passes *repos.WindowsRepo straight through, no adapter needed. WindowBounds is a
 // plain alias on both sides already, so no per-field conversion remains here either.
 type windowStore struct{ repo *repos.WindowsRepo }

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// P108 Part 20 F4: a caller can still be holding a *Session another goroutine just closed
+// A caller can still be holding a *Session another goroutine just closed
 // (CloseWorkspace, RemoveRepo, or a git.path change through Registry.Open) — before this fix,
 // catfileSession respawned a fresh, never-closed cat-file pair on it (a permanent leak, CloseAll
 // cannot reach a session already out of the registry), and BeginSearch handed out a live context

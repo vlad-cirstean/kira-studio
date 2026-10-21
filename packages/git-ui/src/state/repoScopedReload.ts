@@ -3,13 +3,14 @@ import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import type { BridgeClient } from '../bridge/client.ts';
 
 /**
- * P113 F8: `RefsState`/`WorktreeState`/`StackState`/`StashState`/`OpsState` each wire the same
+ * `RefsState`/`WorktreeState`/`StackState`/`StashState`/`OpsState` each wire the same
  * frame around their own `repo.changed` subscription — ignore an event for any other repo (and,
- * for four of the five, any event `kind` but the one that actually invalidates this class's own
+ * for four of the five, any event `kind` but the one that invalidates this class's own
  * data), track the active repoId for `reload()`'s own in-flight-repo-switch guard, and log a
- * background reload's rejection under this class's own scope. Each class's own `reload()` body (which bridge method, how the result
- * applies, its own `createLatestRequest` tracker) is untouched — only this surrounding wiring
- * moved out, so the latest-request-wins ordering itself is unchanged.
+ * background reload's rejection under this class's own scope. Each class's own `reload()` body
+ * (which bridge method, how the result applies, its own `createLatestRequest` tracker) is untouched
+ * — only this surrounding wiring moved out, so the latest-request-wins ordering itself is
+ * unchanged.
  *
  * `RepoSettingsState` listens on a different event (`repoSettings.changed`, no `kind` field) and
  * needs a bare generation counter instead of latest-request-wins (its own doc comment: a `set()`

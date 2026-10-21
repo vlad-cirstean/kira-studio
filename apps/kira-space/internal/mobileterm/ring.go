@@ -1,4 +1,4 @@
-// Package mobileterm lets a phone drive a claude-code agent terminal over a WebSocket while the
+// Package mobileterm lets a phone drive a agent terminal over a WebSocket while the
 // desktop window keeps its own view. One Broker is the terminal.Arbiter for those terminals.
 package mobileterm
 

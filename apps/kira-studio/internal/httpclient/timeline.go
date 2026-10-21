@@ -10,18 +10,16 @@ import (
 	"time"
 )
 
-// maxHopHeaderBytes — F21: http.Transport.MaxResponseHeaderBytes defaults to 10 MB and
-// sharedClient leaves it unset, so a 10-hop redirect chain could otherwise carry ~100 MB of
-// response headers into Response and, via D10, into kira.sqlite. Capped here, with the
-// truncation reported (HeadersElided) rather than hidden — the same "truncate visibly, never
-// silently" posture P8 D5 and P9 D4 both take.
+// maxHopHeaderBytes — http.Transport.MaxResponseHeaderBytes defaults to 10 MB and sharedClient
+// leaves it unset, so a 10-hop redirect chain could otherwise carry ~100 MB of response headers
+// into Response and into kira.sqlite. Capped here, with the truncation reported (HeadersElided)
+// rather than hidden.
 const maxHopHeaderBytes = 8 * 1024
 
 // Phase is one measured interval within a hop. A nil *Phase (every use below is a pointer with
-// `omitempty`) means the phase did not happen at all — a reused connection has no DNS/connect/TLS
-// (F3), a literal-IP URL has no DNS (F5), a plain-http URL has no TLS — which is a different fact
-// from a phase that took no measurable time, and the SPEC's own P10 row requires the two not be
-// confused (D4).
+// `omitempty`) means the phase did not happen at all — a reused connection has no DNS/connect/TLS,
+// a literal-IP URL has no DNS, a plain-http URL has no TLS — which is a different fact
+// from a phase that took no measurable time.
 type Phase struct {
 	StartOffsetMs float64 `json:"startOffsetMs"` // from the send's t0, not the hop's own start
 	DurationMs    float64 `json:"durationMs"`
@@ -69,10 +67,10 @@ type TimelineHop struct {
 }
 
 // Timeline is Response.Timeline — the full chronological sequence of what happened while the
-// request ran (SPEC P10). Hops[:len-1] are exactly the same hops Response.Redirects projects
-// (D3); the last hop is the one that produced Response's own Status/Headers/Body. TotalMs is
-// measured directly (time.Since over the whole send), never summed from the hops' own totals —
-// the same "never claim time it did not measure" rule D5 states for a hop's own phases.
+// request ran. Hops[:len-1] are exactly the same hops Response.Redirects projects; the last hop
+// is the one that produced Response's own Status/Headers/Body. TotalMs is measured directly
+// (time.Since over the whole send), never summed from the hops' own totals — the same "never claim
+// time it did not measure" rule for a hop's own phases.
 type Timeline struct {
 	Hops    []TimelineHop `json:"hops"`
 	TotalMs float64       `json:"totalMs"`
@@ -92,27 +90,27 @@ type hop struct {
 	tlsStart, tlsDone         time.Time
 	wroteRequest, firstByte   time.Time
 
-	// sentCookieValues is P90 item 2: every Cookie header value httptrace.WroteHeaderField saw
-	// written on this hop — the jar injects Cookie inside net/http, after CheckRedirect, so there
-	// is nowhere else to read what actually went out (client.go's own Send never sees the final
-	// wire headers, only the ones it built before net/http added the jar's own cookies).
+	// sentCookieValues is every Cookie header value httptrace.WroteHeaderField saw written on this
+	// hop — the jar injects Cookie inside net/http, after CheckRedirect, so there is nowhere else
+	// to read what went out (client.go's own Send never sees the final wire headers, only the ones
+	// it built before net/http added the jar's own cookies).
 	sentCookieValues []string
 }
 
 // timeline is one Send call's collector, installed once on sendCtx and inherited across every
-// hop because net/http's redirect path builds each subsequent request with ctx: ireq.ctx (F1).
-// checkRedirect closes the current hop and opens the next — F2's finding that it is the only
-// delimiter that cannot invent a phantom hop from a mid-hop connection retry (F8).
+// hop because net/http's redirect path builds each subsequent request with ctx: ireq.ctx.
+// checkRedirect closes the current hop and opens the next — it is the only
+// delimiter that cannot invent a phantom hop from a mid-hop connection retry.
 //
 // The mutex is required, not defensive: httptrace hooks run on the transport's own dial and read
-// goroutines while checkRedirect and Send run on the caller's (F14) — F15 ran 8 concurrent sends
-// of a 3-redirect chain under -race clean with exactly this locking shape.
+// goroutines while checkRedirect and Send run on the caller's — 8 concurrent sends
+// of a 3-redirect chain ran under -race clean with exactly this locking shape.
 type timeline struct {
 	mu    sync.Mutex
 	start time.Time
 	hops  []*hop
 
-	// receivedCookies is P90 item 2: every Set-Cookie parsed from a hop's raw response headers, as
+	// receivedCookies is every Set-Cookie parsed from a hop's raw response headers, as
 	// they arrive — closeHop and finishFinal both append to this directly from resp.Header, before
 	// capHopHeaders (below) ever elides anything from the hop's own displayed Headers, so a long
 	// Set-Cookie never silently vanishes from the Cookies tab the way a capped header would.
@@ -190,9 +188,9 @@ func (tl *timeline) fillConnectionPhases(h *hop) {
 }
 
 // finish stamps a hop that got a real response — an intermediate redirect (headers non-nil) or
-// the final one (headers nil, D9's do-not-duplicate rule). now is the hop's own end instant:
+// the final one (headers nil, the do-not-duplicate rule). now is the hop's own end instant:
 // checkRedirect's own moment for an intermediate hop (net/http drains and closes the redirect
-// body just before it, F2), or the moment io.ReadAll returns for the final hop.
+// body just before it), or the moment io.ReadAll returns for the final hop.
 func (tl *timeline) finish(
 	h *hop, now time.Time, status int, statusText, proto string, headers []Header,
 ) {
@@ -205,7 +203,7 @@ func (tl *timeline) finish(
 	h.StartOffsetMs = tl.offsetMs(h.openedAt)
 	h.TotalMs = round3(now.Sub(h.openedAt).Seconds() * 1000)
 	tl.fillConnectionPhases(h)
-	// D8: guarded against both of F9's measured cases — a server may answer before the request is
+	// Guarded against both of the measured cases — a server may answer before the request is
 	// fully written (a 1xx, or a rejection mid-upload), in which case GotFirstResponseByte
 	// precedes WroteRequest, or WroteRequest never fires at all because the transport abandoned
 	// the body write. Either way there is no meaningful wait interval, and reporting a negative or
@@ -222,7 +220,7 @@ func (tl *timeline) finish(
 
 // openHop appends the next bucket, already addressed with the request that is about to run —
 // known at this point because checkRedirect's own req argument (or, for hop 0, Send's already-
-// resolved request) is exactly that request, so a failed later hop (D15) never has to guess which
+// resolved request) is exactly that request, so a failed later hop never has to guess which
 // URL it was trying.
 func (tl *timeline) openHop(method, url string) {
 	tl.hops = append(tl.hops, &hop{
@@ -254,12 +252,11 @@ func (tl *timeline) finishFinal(now time.Time, resp *http.Response) Timeline {
 	return tl.snapshotLocked(now)
 }
 
-// finishFailed closes the timeline's open hop with the error the send died on (D15) — used only
+// finishFailed closes the timeline's open hop with the error the send died on — used only
 // when Send returns before a response ever arrived for this hop (a refused connect, a DNS
 // failure, a mid-body read failure). There is no status, no proto and no wait/download phase,
 // since none of those were ever measured; DNS/connect/TLS are filled exactly as they would be for
-// a successful hop, because F10 measured that those are real and complete right up to the
-// failure.
+// a successful hop, because those are real and complete right up to the failure.
 func (tl *timeline) finishFailed(now time.Time, errMsg string) Timeline {
 	tl.mu.Lock()
 	defer tl.mu.Unlock()
@@ -281,7 +278,7 @@ func (tl *timeline) snapshotLocked(now time.Time) Timeline {
 	return Timeline{Hops: hops, TotalMs: round3(now.Sub(tl.start).Seconds() * 1000)}
 }
 
-// redirectHops projects every hop but the last into RedirectHop — D3: the existing field is
+// redirectHops projects every hop but the last into RedirectHop — the existing field is
 // derived from the timeline rather than collected a second time, so the two can never drift
 // apart. Byte-identical to what the pre-phase checkRedirect produced (client_test.go's own
 // TestSend_RedirectChain passes unedited on this).
@@ -324,11 +321,11 @@ func (tl *timeline) receivedCookiesSnapshot() []Cookie {
 	return out
 }
 
-// trace builds the httptrace.ClientTrace installed once on sendCtx (D2). Every hook records a
+// trace builds the httptrace.ClientTrace installed once on sendCtx. Every hook records a
 // timestamp or a flag and returns — there is no error path, so a hook can never fail a send, and
 // the cost (a handful of time.Now() calls and uncontended mutex acquisitions per hop) is
-// unmeasurable against a request whose cheapest measured hop was 0.4 ms (F1) and whose realistic
-// wait is tens of milliseconds (F7).
+// unmeasurable against a request whose cheapest measured hop was 0.4 ms and whose realistic
+// wait is tens of milliseconds.
 func (tl *timeline) trace() *httptrace.ClientTrace {
 	return &httptrace.ClientTrace{
 		GetConn: func(hostPort string) {

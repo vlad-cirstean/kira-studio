@@ -106,7 +106,7 @@ func openAgent(t *testing.T, app *flowharness.App, id, cwd string) {
 	t.Helper()
 	if _, err := app.W.Terminal.Open(terminal.OpenArgs{
 		TerminalID: id, WindowKey: window, Cwd: cwd, Cols: 100, Rows: 30,
-		Command: "claude", LaunchKind: terminal.LaunchKindClaudeCode,
+		Command: "claude", LaunchKind: terminal.LaunchKindAgent,
 	}); err != nil {
 		t.Fatalf("Terminal.Open %s: %v", id, err)
 	}
@@ -116,8 +116,8 @@ func openAgent(t *testing.T, app *flowharness.App, id, cwd string) {
 // running claude does. curl returns after the listener answered, so the event is handled on return.
 func hook(t *testing.T, app *flowharness.App, terminalID, payload string) {
 	t.Helper()
-	_, env := app.W.AgentHooks.ComposeLaunch(terminalID, "", "claude")
-	st := app.W.AgentHooks.Status()
+	_, env := app.W.AgentHooks.Compose("claude", terminalID, "", "claude")
+	st := app.W.AgentHooks.Status("claude")
 	if !st.Running || len(env) == 0 {
 		t.Fatalf("hooks not running: %+v", st)
 	}
@@ -155,9 +155,9 @@ func focus(t *testing.T, app *flowharness.App, f bridge.ReportFocusArgs) {
 	}
 }
 
-func setNotify(t *testing.T, app *flowharness.App, p model.ClaudeCodePatch) {
+func setNotify(t *testing.T, app *flowharness.App, p model.AgentPatch) {
 	t.Helper()
-	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{ClaudeCode: &p}}); err != nil {
+	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{Agent: &p}}); err != nil {
 		t.Fatalf("Settings.Set: %v", err)
 	}
 }
@@ -240,7 +240,7 @@ func openAgent2(t *testing.T, app *flowharness.App, l adewire.Launch) {
 	t.Helper()
 	if _, err := app.W.Terminal.Open(terminal.OpenArgs{
 		TerminalID: l.TerminalID, WindowKey: window, Cwd: l.Cwd, Cols: 100, Rows: 30,
-		Command: l.Command, LaunchKind: terminal.LaunchKindClaudeCode,
+		Command: l.Command, LaunchKind: terminal.LaunchKindAgent,
 	}); err != nil {
 		t.Fatalf("Terminal.Open %s: %v", l.Command, err)
 	}

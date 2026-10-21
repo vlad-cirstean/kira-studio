@@ -201,6 +201,7 @@ const CONTROL: ControlSnapshot[] = [
       options: {},
       preconnect: null,
       preconnectSidecar: false,
+      preconnectDelaySec: 0,
       autoExplain: false,
       throttlePerSec: 0,
     },
@@ -315,10 +316,9 @@ const P95_SAMPLES = 40;
 // peak, and the v1.1 P22 memory study's top rung (456).
 const SCROLL_COVERAGE_LADDER = [40, 100, 200, 456];
 
-// P22 iter2 D7: logged, never gated — see measureSustainedScroll's own header comment for why a
-// main-thread-scrolled tier can't falsify `uncoveredPx` (P22 iter2 F4). Pass 1's `notifiesPerFrame`
-// gate is gone with it (F1: it measured `measureScrollCoverage`'s own SUB_STEPS_PER_FRAME constant,
-// not the app).
+// Logged, never gated — see measureSustainedScroll's own header comment for why a
+// main-thread-scrolled tier can't falsify `uncoveredPx`. The `notifiesPerFrame` gate is gone with
+// it (it measured `measureScrollCoverage`'s own SUB_STEPS_PER_FRAME constant, not the app).
 function logCoverage(label: string, velocity: number, uncoveredPx: number[]): void {
   console.log(
     `budgets.spec.ts scroll coverage (${label}, ${velocity}px/frame): ` +
@@ -336,7 +336,7 @@ function suggestPopupShown(): boolean {
   return w.querySelector('.monaco-list-row') !== null;
 }
 
-// P18 addendum D26. `measureClickToDom`'s "arm the observer and read `performance.now()` inside
+// `measureClickToDom`'s "arm the observer and read `performance.now()` inside
 // one synchronous evaluate() call" trick doesn't transfer directly to a keystroke: unlike
 // `.click()`, there is no script-callable way to make an element genuinely receive typed input —
 // it has to go through Playwright's own `keyboard.press`, a real Node round trip. So this arms the
@@ -383,7 +383,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   relaunch,
   consoleErrors,
 }) => {
-  // P22 Pass B: the column/row overscan-invariant loops below now poll (`expect.poll`, up to 2s
+  // The column/row overscan-invariant loops below now poll (`expect.poll`, up to 2s
   // each) instead of a fixed 50ms sleep, since the off-limits chase/budget mechanism paces the
   // window's growth toward the overscan target across several rAF turns rather than filling it
   // synchronously — that adds real, variable wall-clock time across 22 loop iterations that this
@@ -418,7 +418,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   await bigRowsRow.dblclick();
   const grid = page.locator('[data-testid="data-grid"]');
   await expect(grid).toBeVisible();
-  // P22 Pass B — the actual scrollable element is SlickGrid's own right/data viewport
+  // The actual scrollable element is SlickGrid's own right/data viewport
   // (support/grid.ts's own GRID_SCROLLER_SELECTOR/gridScroller), not `grid` (the outer host div,
   // kept above only for the "is a grid on screen at all" visibility check) — that div never
   // scrolls itself, so every `.scrollTop`/`.scrollLeft`/`.scrollWidth`/`.scrollHeight` read or
@@ -443,23 +443,23 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   );
   logStats('scroll response (work)', scrollDeltas);
   logStats('scroll response (end-to-end)', scrollE2eDeltas);
-  // P57 M5: docs/PERF.md's §2.1 budget is 8ms; this tier's WebKit sits at 12ms with margin.
-  // P139: the work mark sat in the host scroll listener, before SlickGrid's scrollRenderThrottling
+  // docs/PERF.md's budget is 8ms; this tier's WebKit sits at 12ms with margin.
+  // The work mark sat in the host scroll listener, before SlickGrid's scrollRenderThrottling
   // deferred the far-jump render, so 'work' included the throttle wait (p50 12-17ms, flaky). The
   // mark now fires at KiraSlickGrid.render() entry: measured p50 6-8ms, quiet and under load.
-  // P161: re-measured on this container with no other browser running: p50 9-14ms and max up to
-  // 68ms, identical at 058623df (P139's own commit) and HEAD, with no grid render code changed in
-  // between. The host runs the same render ~1.4x slower than P139's, so the bounds follow the
-  // host (docs/PERF.md §2.1). Still tight enough to catch a render-per-step regression.
+  // Re-measured on this container with no other browser running: p50 9-14ms and max up to
+  // 68ms, identical at 058623df and HEAD, with no grid render code changed in between. The host
+  // runs the same render ~1.4x slower, so the bounds follow the host (docs/PERF.md). Still tight
+  // enough to catch a render-per-step regression.
   expect(percentile(scrollDeltas, 50)).toBeLessThanOrEqual(16);
   expect(Math.max(...scrollDeltas)).toBeLessThanOrEqual(80);
 
-  // --- 1a. sustained-velocity coverage ladder (P22 iter2 D7), on big_rows (narrow, >200,000px
+  // --- 1a. sustained-velocity coverage ladder, on big_rows (narrow, >200,000px
   // scrollable — plenty of room for every rung below). Unlike measureScrollResponses above (one
-  // step from an idle DOM, P22 F6), this keeps scrolling — uncoveredPx is whether the mounted row
+  // step from an idle DOM), this keeps scrolling — uncoveredPx is whether the mounted row
   // band still covers the viewport *while* scrolling continues, not just once it settles. Logged,
   // not gated (measureSustainedScroll's own comment says why a main-thread-scrolled tier can't
-  // falsify this) — see docs/PERF.md §2.1a for what a real measurement needs instead.
+  // falsify this) — see docs/PERF.md for what a real measurement needs instead.
   await viewport.evaluate((el) => {
     el.scrollTop = 0;
   });
@@ -474,14 +474,14 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     });
   }
 
-  // 1a2's own D4 render-count gate (a row sliding to a new position without content changing
+  // The render-count gate (a row sliding to a new position without content changing
   // must not re-render) was a property of DataGrid.vue's own Vue-reconciliation render path,
-  // measured via GridRow.vue's onUpdated hook — deleted at P22 Pass B's cutover (C17) along with
-  // that hook; see support/measure.ts's own comment. SlickGrid manages its own DOM directly, with
+  // measured via GridRow.vue's onUpdated hook — deleted along with that hook; see
+  // support/measure.ts's own comment. SlickGrid manages its own DOM directly, with
   // no equivalent "did this row's Vue props change" question to ask.
 
-  // --- 1b. scroll_grid (60 cols x 5000 rows, P29 D14): the wide-AND-tall shape neither big_rows
-  // nor wide_table alone can show (F8) — horizontal response, vertical response on a wide table,
+  // --- 1b. scroll_grid (60 cols x 5000 rows): the wide-AND-tall shape neither big_rows
+  // nor wide_table alone can show — horizontal response, vertical response on a wide table,
   // the deterministic overscan-coverage invariant on both axes, a DOM-size bound, and the direct
   // proof that a sub-row scroll mutates nothing. -----------------------------------------------
   await openRowMenu(page, SCROLL_GRID_PATH);
@@ -514,9 +514,9 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
 
   // The rendered column window extends >= OVERSCAN_PX beyond both viewport edges at every
   // position, clamped at the table's own edges — this is the assertion that fails against the
-  // pre-P29 code (zero column overscan) and passes once the buffer is symmetric with the row axis.
+  // code with zero column overscan and passes once the buffer is symmetric with the row axis.
   //
-  // P22 Pass B: this has to measure BODY cells (`[data-testid="grid-cell"]`), not header cells.
+  // This has to measure BODY cells (`[data-testid="grid-cell"]`), not header cells.
   // SlickGrid never virtualizes the header row — `onHeaderCellRendered`'s own comment states it
   // fires "once per column per setColumns call (never per scroll frame — headers aren't
   // virtualized)" — so every one of the table's columns always has a header cell in the DOM
@@ -668,9 +668,9 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     });
   }
 
-  // --- 1b2. D3's own cell-cap holds (P22 iter2 D3(c)) — the wide table is the case the cap exists
-  // for (F6/D3(c): a flat row-count overscan raise would blow budgets.spec.ts's own < 2 500 DOM-
-  // cell bound here). A synthetic high velocity (well past anything §7.3's real-hardware protocol
+  // --- 1b2. The cell-cap holds — the wide table is the case the cap exists
+  // for (a flat row-count overscan raise would blow budgets.spec.ts's own < 2 500 DOM-
+  // cell bound here). A synthetic high velocity (well past anything the real-hardware protocol
   // is likely to report) drives the row axis's runway to its ceiling; the mounted cell count must
   // still stay under the same bound item 1b's own coverage-invariant loop asserts at rest.
   await viewport.evaluate((el) => {
@@ -683,10 +683,10 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     el.scrollTop = 0;
   });
 
-  // A sub-row scroll mutates nothing (D4); crossing a row boundary does.
+  // A sub-row scroll mutates nothing; crossing a row boundary does.
   //
-  // P57 M5 finding: this mock's own scroll_grid fixture only ever captures one pageSize=100 page
-  // (§ this file's own header comment), so `scrollHeight` here is ~100 rows' worth, not the real
+  // This mock's own scroll_grid fixture only ever captures one pageSize=100 page
+  // (this file's own header comment), so `scrollHeight` here is ~100 rows' worth, not the real
   // table's 5000 — a hardcoded baseline picked without checking that range can land exactly on
   // `maxScrollTop` (clamped, no room left for the cross-row check below to move into) or,
   // separately, coincidentally right at the overscan window's own recompute boundary for this
@@ -717,13 +717,13 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     const row = el.querySelector('[data-testid="grid-row"]');
     return row ? row.getBoundingClientRect().height : 28;
   });
-  // P57 M5 finding: a delta of exactly one row height is not a reliable positive control — whether
+  // A delta of exactly one row height is not a reliable positive control — whether
   // it shifts the mounted row range by a full row (forcing at least one add/remove) depends on
   // where the *current* scrollTop happens to sit relative to the overscan window's own boundary,
   // which is exactly the coincidence the sub-row assertion above had to move away from. A delta
   // comfortably larger than the whole overscan window (OVERSCAN_PX) removes that dependency
   // entirely — it's guaranteed to push the visible+overscan range past what's currently mounted,
-  // regardless of the starting scrollTop's alignment. Capped to the room actually left below the
+  // regardless of the starting scrollTop's alignment. Capped to the room left below the
   // sub-row baseline (`maxScrollTop`, this mock's own pageSize=100 ceiling) rather than assumed
   // — an uncapped delta from a baseline already close to that ceiling would itself clamp to
   // exactly where it started, i.e. a genuine positive control could silently see zero movement.
@@ -762,7 +762,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     el.scrollTop = 0;
   });
 
-  // P22 Pass B: `[data-testid="grid-cell"][data-row="N"]` alone is never valid for SlickGrid's DOM
+  // `[data-testid="grid-cell"][data-row="N"]` alone is never valid for SlickGrid's DOM
   // shape — `data-row` is written on the `.slick-row` (SlickGridHost.vue's own `tagRenderedRows`),
   // never on the cell — so this needs the row-scoped selector every other subsystem uses
   // (support/grid.ts's own `gridCellSelector`), not a flat compound one. The unscoped version never
@@ -892,13 +892,13 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   logStats('cached tree expand', expandDeltas);
   expect(percentileNearestRank(expandDeltas, 95)).toBeLessThanOrEqual(50);
 
-  // --- 5. console keystroke -> completion popup visible, p50 <= 50ms (P18 addendum D26) -------
-  // APP_PATH (a schema), not DB_PATH (the bare database) — P60b: with no DDL document, a console's
-  // own completion needs a schema-or-deeper container with cached relations (D4/D5); a raw
-  // database node has none (Postgres columns are schema-scoped) and correctly offers no popup at
-  // all (§12.1's own "all three empty: no popup" line) — under CodeMirror this was masked by
-  // `@codemirror/lang-sql`'s own built-in keyword-only fallback, outside this app's completion
-  // architecture. APP_PATH's children are already warmed by step 4 above.
+  // --- 5. console keystroke -> completion popup visible, p50 <= 50ms -------
+  // APP_PATH (a schema), not DB_PATH (the bare database) — with no DDL document, a console's own
+  // completion needs a schema-or-deeper container with cached relations; a raw database node has
+  // none (Postgres columns are schema-scoped) and correctly offers no popup at all (the "all three
+  // empty: no popup" line) — under CodeMirror this was masked by `@codemirror/lang-sql`'s own
+  // built-in keyword-only fallback, outside this app's completion architecture. APP_PATH's children
+  // are already warmed by step 4 above.
   await openRowMenu(page, APP_PATH);
   await page.click('[data-testid="menu-item-open-console"]');
   const consoleView = page.locator('[data-testid="console-view"]');

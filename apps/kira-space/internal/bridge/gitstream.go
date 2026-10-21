@@ -42,9 +42,9 @@ type requestFn = func(ctx context.Context, method string, params json.RawMessage
 
 // repoSettingsSetTouchesRestrictedField are the RepoSettingsPatchWire leaves repoSettings.set must
 // refuse on this stream: the worktree prepare script and base path are written only in-process by
-// Kira Space (the ADE repo config), never by a renderer. Follows this package's existing json.RawMessage-decode-and-inspect precedent
-// (gitrpc's own handlers all decode params into a typed struct before acting on it; this does the
-// same, just to inspect instead of dispatch).
+// Kira Space (the ADE repo config), never by a renderer. Follows this package's existing
+// json.RawMessage-decode-and-inspect precedent (gitrpc's own handlers all decode params into a
+// typed struct before acting on it; this does the same, to inspect instead of dispatch).
 func repoSettingsSetTouchesRestrictedField(params json.RawMessage) bool {
 	var p gitrpc.RepoSettingsSetParams
 	if err := json.Unmarshal(params, &p); err != nil {
@@ -75,19 +75,19 @@ type CredentialAsker interface {
 
 // ServeGitStream runs for the life of one renderer connection, mirroring ServeEngineStream
 // (stream.go). There is no handshake: the peer is this process's own
-// webview, not an external client the trust store exists to gate (docs/HISTORY.md (v1.5)
-// C10-git-graph-native.md §3.2). gconn still does its real job — per-connection repo holds, so
-// repo.close only ever releases this connection's own hold (gitrpc/handlers.go), and Emit for
-// repo.changed. Its credential prompts go to the relay, tagged with windowKey (P246).
+// webview, not an external client the trust store exists to gate. gconn still does its real job —
+// per-connection repo holds, so repo.close only ever releases this connection's own hold
+// (gitrpc/handlers.go), and Emit for repo.changed. Its credential prompts go to the relay, tagged
+// with windowKey.
 func ServeGitStream(router *gitrpc.Router, conn StreamSession, windowKey string, relay CredentialAsker) {
 	gconn := gitsession.NewConn(newStreamConnID(), nativeClientID, nativeLabel, nil)
 	gconn.RouteCredentials(func(ctx context.Context, req gitaskpass.Request) (string, bool) {
 		return relay.AskFrom(ctx, windowKey, nativeLabel, req)
 	})
-	// P67e/D5: still opted out, but no longer because writes were refused here — a periodic
+	// Still opted out, but no longer because writes were refused here — a periodic
 	// background `git fetch --prune` is a network write the user never pressed a button for, and
-	// every fetch this phase admits is one they did (P67e's own plan doc §9 OQ-2, docs/HISTORY.md (v1.6)).
-	// One deleted line whenever someone actually wants automatic background fetching for this Conn.
+	// every fetch this phase admits is one they did.
+	// One deleted line whenever someone wants automatic background fetching for this Conn.
 	gconn.DisableAutoFetch()
 	defer gconn.Close()
 

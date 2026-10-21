@@ -1,4 +1,4 @@
-// Finding 16 of the v1.2 P14 round-1 review: buildQuery (url.ts) and goQueryEscape (escape.ts)
+// buildQuery (url.ts) and goQueryEscape (escape.ts)
 // both used to encodeURIComponent/escape a query param or urlencoded field whole, including any
 // literal `{{name}}` inside it — turning it into `%7B%7Bname%7D%7D`, a form neither substitution
 // engine (this package's own resolve, nor internal/apivars/resolve.go) recognises any more. Both
@@ -63,7 +63,7 @@ describe('http/url.ts buildQuery leaves a {{variable}} reference untouched', () 
   });
 });
 
-// P21 round 3 functional finding 11: parseQuery/buildQuery were not exact inverses in two ways —
+// parseQuery/buildQuery were not exact inverses in two ways —
 // a literal '+' was left alone on decode but encoded to '%2B' on the way back out, and a valueless
 // `?flag` always rebuilt as `flag=`. Because HttpRequestView.vue rewrites the *whole* query string
 // from the table whenever any row changes, both asymmetries silently rewrote params the user never

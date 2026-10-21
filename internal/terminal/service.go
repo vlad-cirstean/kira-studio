@@ -9,21 +9,21 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// P86 §4: the three wire values a LaunchKind arg accepts (packages/shared/domain/tabs.ts's
-// terminalLaunchKindSchema, field for field). Only LaunchKindClaudeCode counts toward
+// The three wire values a LaunchKind arg accepts (packages/shared/domain/tabs.ts's
+// terminalLaunchKindSchema, field for field). Only LaunchKindAgent counts toward
 // OpenParams.Agent; a custom script that happens to run `claude` counts as a script, deliberately
-// (§4: "so the implementation does not 'fix' it into a heuristic").
+// ("so the implementation does not 'fix' it into a heuristic").
 const (
-	LaunchKindShell      = "shell"
-	LaunchKindClaudeCode = "claude-code"
-	LaunchKindScript     = "script"
+	LaunchKindShell  = "shell"
+	LaunchKindAgent  = "agent"
+	LaunchKindScript = "script"
 )
 
 // ValidLaunchKind reports whether v is "" (treated as LaunchKindShell, so an older caller keeps
 // working) or one of the three named kinds above.
 func ValidLaunchKind(v string) bool {
 	switch v {
-	case "", LaunchKindShell, LaunchKindClaudeCode, LaunchKindScript:
+	case "", LaunchKindShell, LaunchKindAgent, LaunchKindScript:
 		return true
 	default:
 		return false
@@ -52,7 +52,7 @@ func DefaultCwd() string {
 	return home
 }
 
-// Service is BoundService's own "generic half" (P107 T2-7, P128 §2.1): Write/Resize/Close and the
+// Service is BoundService's own "generic half": Write/Resize/Close and the
 // coalescing output pump, over a Registry and an Emitter. A separate type from BoundService, not
 // methods on it directly, since Service also exports OpenWithCoalescedOutput and positional
 // Write/Resize/Close — embedding it into BoundService would bind those too.

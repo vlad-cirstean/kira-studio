@@ -1,5 +1,5 @@
 // client_test.go is a pure unit test (no container) for BuildConfig's URI-mode query-string
-// handling — P21 round 1 architecture/security finding 1: a connection URI's query parameters
+// handling — a connection URI's query parameters
 // used to be copied verbatim into mysql.Config.Params, which go-sql-driver executes as a literal
 // unescaped `SET <k> = <v>` statement at connect time.
 package mysqlfamily_test
@@ -68,13 +68,13 @@ func TestBuildConfig_URISslmodeStillAppliesTLS(t *testing.T) {
 	}
 }
 
-// TestBuildConfig_TLSConfigNameStableAcrossConnectionIDs is the regression test for P21 round 2
-// architecture/security finding 8's registry-leak half: BuildConfig used to register the driver's
-// process-global TLS config under "kira-"+cfg.ID, so every distinct connection id minted its own
-// entry — never deregistered on disconnect or delete — that accumulated for the life of the
-// process. Two connections with different ids but the same effective TLS settings (same host,
-// same sslmode) must now register under the *same* name, proving the registration is keyed on the
-// settings rather than the id and is therefore idempotent instead of unbounded.
+// TestBuildConfig_TLSConfigNameStableAcrossConnectionIDs is the regression test for the
+// registry leak: BuildConfig used to register the driver's process-global TLS config under
+// "kira-"+cfg.ID, so every distinct connection id minted its own entry — never deregistered on
+// disconnect or delete — that accumulated for the life of the process. Two connections with
+// different ids but the same effective TLS settings (same host, same sslmode) must now register
+// under the *same* name, proving the registration is keyed on the settings rather than the id and
+// is therefore idempotent instead of unbounded.
 func TestBuildConfig_TLSConfigNameStableAcrossConnectionIDs(t *testing.T) {
 	cfgA := model.ResolvedConnectionConfig{ID: "conn-aaaa", Mode: "uri", URI: ptr("mysql://u:p@same-host:3306/db?sslmode=verify-full")}
 	cfgB := model.ResolvedConnectionConfig{ID: "conn-bbbb", Mode: "uri", URI: ptr("mysql://u:p@same-host:3306/db?sslmode=verify-full")}

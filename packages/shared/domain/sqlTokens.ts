@@ -1,6 +1,6 @@
-// P60b D1: the SQL parse layer for the query console's language service (completion, diagnostics,
+// The SQL parse layer for the query console's language service (completion, diagnostics,
 // hover, the DDL extractor) — a third sibling of sql-split.ts/sqlLint.ts, not a new dependency
-// (§2's library survey: no candidate covers all five dialects this app supports with the required
+// (no candidate covers all five dialects this app supports with the required
 // error tolerance, byte-accurate offsets and MIT-compatible license — sql-parser-cst is the best
 // technical fit but GPL-2.0-or-later, declined on distribution grounds). Produces exactly the
 // shallow tree shape `views/console/lezerNodes.ts` used to get from `@codemirror/lang-sql`:
@@ -57,7 +57,7 @@ function group(name: string, from: number, to: number, children: readonly MNode[
 
 const NAME_KINDS = new Set(['Identifier', 'QuotedIdentifier', 'Keyword']);
 
-// §3.2 pass 1: any maximal run `name ('.' name)+` becomes one CompositeIdentifier, children being
+// Any maximal run `name ('.' name)+` becomes one CompositeIdentifier, children being
 // the name nodes and the literal '.' nodes in order (splitComposite/sqlDiagnostics.ts both depend
 // on that exact shape). Applied once per flat token level — both the root statement list and every
 // Parens' own children — since a qualified reference can appear inside a parenthesised expression
@@ -101,7 +101,7 @@ function groupComposite(nodes: readonly MNode[]): MNode[] {
   return out;
 }
 
-// §3.2 pass 2: split a (already composite-grouped) flat token list into Statement nodes on
+// Split a (already composite-grouped) flat token list into Statement nodes on
 // top-level ';' — never inside a Parens/String/comment, which the scanner has already resolved by
 // construction (a ';' inside any of those was consumed as part of that span, never emitted as its
 // own token). The terminating ';' is included as the Statement's own last child (ddl.ts/sqlRefs.ts
@@ -301,8 +301,8 @@ function scanParenGroup(
 
 // One flat level of tokens (the root document, or a Parens' own contents) — a Parens is produced
 // here directly (nested via a normal recursive call, not a caller-managed stack — the recursion is
-// the stack), balanced or, at EOF, an unterminated one ending at the source length (R2: never
-// throws). `stopIndex` bounds the level from outer callers that already consumed a partner ')' —
+// the stack), balanced or, at EOF, an unterminated one ending at the source length (never throws).
+// `stopIndex` bounds the level from outer callers that already consumed a partner ')' —
 // unused at the root, where any stray ')' is tolerated as ordinary Punctuation.
 function scanLevel(
   source: string,
@@ -384,7 +384,7 @@ function scanLevel(
   return { nodes, next: i };
 }
 
-// D2: a module-level memo, key (options, source) both compared by reference, size 2, FIFO —
+// A module-level memo, key (options, source) both compared by reference, size 2, FIFO —
 // several callers (a hover, a lint run, a completion) over the same untouched document string
 // share one tokenize, restoring the perf fix `editor/hover.ts`'s old `syntaxTree(view.state)`
 // handoff existed for (up to ~51ms on a 191KB document, over budget with no debounce). Works

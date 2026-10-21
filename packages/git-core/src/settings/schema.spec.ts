@@ -118,7 +118,7 @@ describe('repoSettingKeys', () => {
   test('returns exactly the ten source: "repo" keys, G18 D1/G24 D16/G25 D10/G28 D16', () => {
     const expected: SettingKey[] = [
       'kiraSpace.checkout.autoStash',
-      'kiraSpace.github.enabled',
+      'kiraSpace.gitHost.provider',
       'kiraSpace.graph.pageSize',
       'kiraSpace.graph.scope',
       'kiraSpace.pull.strategy',

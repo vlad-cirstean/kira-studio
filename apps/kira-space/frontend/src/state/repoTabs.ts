@@ -22,18 +22,18 @@ export interface OpenRepoFileOpts {
   // `revealLine` — a search result (or a go-to-definition match) carries a column worth restoring
   // a cursor to within this session, not across a restart.
   reveal?: { line: number; column?: number; endColumn?: number };
-  /** P74 §7.3: non-null opens `path` read-only at that revision instead of the worktree file —
+  /** Non-null opens `path` read-only at that revision instead of the worktree file —
    *  part of this tab's own identity (below), so two different revisions of the same path are two
    *  different tabs, never one silently replacing the other. `undefined`/`null` both mean the
-   *  worktree file, every caller from before this phase included. */
+   *  worktree file. */
   rev?: string | null;
 }
 
-// C5 §5.2: the repo workspace's own file-open entry point — every tree row click and every
-// search/quick-open match (§12) routes through this, never openTab directly, so the preview/pin
-// rules stay in exactly one place (openTab itself, §15.1's own unit-tested mechanism).
+// The repo workspace's own file-open entry point — every tree row click and every
+// search/quick-open match routes through this, never openTab directly, so the preview/pin
+// rules stay in exactly one place (openTab itself, the unit-tested mechanism).
 //
-// P74 §7.3: does its own existing-tab lookup rather than opening through `openTab`'s `reuse: true`
+// Does its own existing-tab lookup rather than opening through `openTab`'s `reuse: true`
 // branch — `openTab`'s own dedupe key is (workspaceId, kind, connectionId, path), which has no
 // room for `rev`; without this, opening the same path at two different revisions would collide
 // into one tab (the identical gap `openRepoCommitDiffTab`'s own doc comment names, one kind over).
@@ -82,7 +82,7 @@ export function openRepoFileTab(
   return result;
 }
 
-// C6 §8.1/D9: "Open changes" opens a permanent tab, never the preview slot — a single tree click
+// "Open changes" opens a permanent tab, never the preview slot — a single tree click
 // already owns the preview slot for the file viewer, so this context-menu action behaves like the
 // menu's existing "Open" (permanent). openTab's dedupe key is (workspaceId, kind, connectionId,
 // path), so a diff tab and a file tab for the same path coexist, and a second "Open changes"
@@ -95,9 +95,9 @@ export function openRepoDiffTab(repoId: string, path: string): OpenTabResult {
   });
 }
 
-// P107 I2-20: openRepoCommitDiffTab/openRepoReviewDiffTab share this reuse-or-open frame — find an
-// existing tab over the same (path, left, right, review-or-not) key, replay the P79 preview-cohort
-// fix on a hit, else delegate to openTab with reuse:false so C5's own dedupe key (workspaceId,
+// openRepoCommitDiffTab/openRepoReviewDiffTab share this reuse-or-open frame — find an
+// existing tab over the same (path, left, right, review-or-not) key, replay the preview-cohort
+// fix on a hit, else delegate to openTab with reuse:false so the dedupe key (workspaceId,
 // kind, connectionId, path) never collides two different revision pairs of the same file.
 // `review: null` selects openRepoCommitDiffTab's own commit-diff match/build; non-null selects
 // openRepoReviewDiffTab's review-diff ones — the two are otherwise identical.
@@ -186,7 +186,7 @@ export function openRepoCommitDiffTab(
   });
 }
 
-// P92 item 5 (§7.2): one commit's whole changed-file set in one tab — `editor.openAllChanges`'s
+// One commit's whole changed-file set in one tab — `editor.openAllChanges`'s
 // own replacement for its old one-`repo-diff`-tab-per-file loop. Unlike openRepoCommitDiffTab
 // above, the dedupe key needs no extra revision-pair lookup of its own: `right` (the commit sha)
 // IS the tab's `path`, already unique per commit, so openTab's own `reuse: true` is enough — a
@@ -214,9 +214,9 @@ export function openRepoMultiDiffTab(
   );
 }
 
-// C11 §7.5/§7.4 (S8): the review-diff counterpart to openRepoCommitDiffTab above — same shape.
-// `review` turns on `reviewDecorations.ts`'s comment/mark layer (§7.4) over the same left/right
-// pair; `left` is the merge base or `reviewedAtSha` (§7.2's two diff modes), `right` is always
+// The review-diff counterpart to openRepoCommitDiffTab above — same shape.
+// `review` turns on `reviewDecorations.ts`'s comment/mark layer over the same left/right
+// pair; `left` is the merge base or `reviewedAtSha` (the two diff modes), `right` is always
 // `review.branchTip`.
 export function openRepoReviewDiffTab(
   repoId: string,
@@ -241,14 +241,14 @@ export function openRepoReviewDiffTab(
   });
 }
 
-// P83 §10.3: opens a terminal tab in codeRepoId's own workspace, rooted at `cwd` — the tab-strip
+// Opens a terminal tab in codeRepoId's own workspace, rooted at `cwd` — the tab-strip
 // "+" (active workspace's root) and both GitPanel.vue row menus (a repo's root or a worktree's own
 // path) all funnel through this. openRepoWorkspace runs first: a tab must belong to a workspace
 // whose strip is on screen, and right-clicking a closed repository's row would otherwise open an
-// invisible tab. `launch`, when given (P85 §5.3), seeds the session's initial command/title/rail
-// colour — omitted, this is P83's own plain terminal, unchanged.
+// invisible tab. `launch`, when given, seeds the session's initial command/title/rail
+// colour — omitted, this is the plain terminal, unchanged.
 //
-// P91 §6: delegates to state/terminalTabs.ts's openTerminalTab for the actual tab-open — this
+// Delegates to state/terminalTabs.ts's openTerminalTab for the actual tab-open — this
 // function's own remaining job is exactly "which workspace does the tab belong to", the
 // openRepoWorkspace side effect that the Automations module's own opener must NOT have.
 export function openRepoTerminalTab(
@@ -260,7 +260,7 @@ export function openRepoTerminalTab(
   return openTerminalTab({ workspaceId: repoWorkspaceKey(codeRepoId), cwd, codeRepoId, launch });
 }
 
-// C5 §6.1: creates repoId's own pinned graph tab if it has none, and activates it only when the
+// Creates repoId's own pinned graph tab if it has none, and activates it only when the
 // workspace currently has no active tab at all — called by openRepoWorkspace (state/workspace.ts)
 // and once per restored repo after hydrateTabs (main.ts's own bootstrap), never from inside
 // hydrateTabs itself (state/tabs.ts already depends on this module for closeWorkspaceTabs's own

@@ -7,16 +7,16 @@ import {
   startSqlite,
 } from './support/sqlite';
 
-// P8 §6.2 — the real multi-window proof this sandbox *can* run: one real Go backend
-// (`-tags server`), two browser pages navigated to `/?window=w-one` and `/?window=w-two` (D2's
+// The real multi-window proof this sandbox *can* run: one real Go backend
+// (`-tags server`), two browser pages navigated to `/?window=w-one` and `/?window=w-two` (the
 // key mechanism), no native window and no mocking. SQLite, so it needs no container
-// (`sqlite-real.spec.ts`'s own Docker-free precedent). Against the pre-C4 tree this fails by
+// (`sqlite-real.spec.ts`'s own Docker-free precedent). Against the old tree this fails by
 // showing the other page's tab (or none, depending on save order) — the exact destructive finding
-// §1.3(c) reproduced with two independent HTTP clients; against the post-C4/C5 tree it passes.
+// reproduced with two independent HTTP clients; against the new tree it passes.
 //
-// This proves the storage-and-bridge half of multi-window (F6, and D2's key plumbing) — nothing
+// This proves the storage-and-bridge half of multi-window (the key plumbing) — nothing
 // about menus, focus, sheets, cascade placement or window rectangles, which need a real native
-// window and are §6.3's job on a Mac.
+// window on a Mac.
 
 let sqlite: SqliteFixture | null = null;
 

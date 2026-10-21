@@ -9,7 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// TestWriteSkipsGrpcItems is §6.2's one postman/write_test.go case (P11 D12/F22): a tree
+// TestWriteSkipsGrpcItems is the one postman/write_test.go case: a tree
 // containing a gRPC item exports valid v2.1 JSON containing only the HTTP items — Collection
 // v2.1 has no representation for a gRPC request, so CollectionsService.Export counts the same
 // skip (scanning the tree itself) to report it, rather than this package silently dropping data.

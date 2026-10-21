@@ -34,7 +34,7 @@ var numberDBTypes = map[string]bool{
 }
 var temporalDBTypes = map[string]bool{"TIMESTAMP": true, "DATE": true, "TIME": true, "DATETIME": true}
 
-// typeClassForField is console.ts's typeClassForField, minus its boolean case (B4: go-sql-driver's
+// typeClassForField is console.ts's typeClassForField, minus its boolean case (go-sql-driver's
 // ColumnTypeLength is commented out upstream, so a TINYINT console column has no display-width
 // signal to distinguish tinyint(1) from any other TINYINT — it classifies as 'number', a documented
 // capability loss recorded in docs/ARCHITECTURE.md, not an oversight).
@@ -57,7 +57,7 @@ func typeClassForField(dbType string) page.TypeClass {
 // runRaw is console.ts's own low-level runner, deliberately separate from query.go's
 // runArrayQuery/runCommand — it must not call op.SetCommand() per statement, and it needs full
 // field metadata (name + DatabaseTypeName) those discard. QueryContext is used unconditionally,
-// never ExecContext: MY-1 confirmed a non-row-returning statement (UPDATE/INSERT/DDL) still comes
+// never ExecContext: a non-row-returning statement (UPDATE/INSERT/DDL) still comes
 // back through QueryContext with zero columns, the same signal SQLite's own StatementSync gives —
 // so the console needs no per-statement leading-keyword decision the way ClickHouse's does.
 // Rows stream into the page builder and stop at limit; Close then drains the rest off the wire
@@ -199,7 +199,7 @@ func sessionReadOnly(p page.TabularPage) bool {
 }
 
 // execute is console.ts's execute. readOnly closes the gap client.go's own
-// SET SESSION TRANSACTION READ ONLY leaves open (P2 R2): that session default only governs
+// SET SESSION TRANSACTION READ ONLY leaves open: that session default only governs
 // transactions not yet started, so a statement in this batch could flip it back for whatever
 // runs after. Wrapping the batch in an explicit START TRANSACTION READ ONLY is a hard server-side
 // backstop here — confirmed against a real server that, unlike Postgres, MariaDB/MySQL refuse

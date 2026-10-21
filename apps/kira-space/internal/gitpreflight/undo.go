@@ -2,11 +2,11 @@ package gitpreflight
 
 import "sync"
 
-// UndoRecord is one captured undo — a port of undo/slot.ts's own UndoRecord, plus D7's two
+// UndoRecord is one captured undo — a port of undo/slot.ts's own UndoRecord, plus two
 // attribution fields. OriginConn/OriginLabel never cross the wire directly (UndoSlotSnapshot has
-// no such field) — SnapshotFor composes the attribution as a read-time suffix instead (D7).
+// no such field) — SnapshotFor composes the attribution as a read-time suffix instead.
 // OriginConn is a plain string rather than gitsession.ConnID: this package imports gitclient/
-// porcelain and stdlib only (D3), never gitsession.
+// porcelain and stdlib only, never gitsession.
 type UndoRecord struct {
 	ID string
 	// Label is upstream's exact text ("Deleted branch <name>" / "Deleted tag <name>") — F9: the
@@ -47,11 +47,11 @@ type UndoSlotSnapshot struct {
 	CreatedAt   int64  `json:"createdAt"`
 }
 
-// SnapshotFor composes SPEC §6's undo attribution as a read-time SUFFIX, appended only when conn
-// is not the record's own originator (D7/F9): this keeps the single-window label byte-identical to
-// upstream's — two future phases (G12/G13) pattern-match on it, both start-anchored — while still
-// satisfying "so a second window sees 'Undo reset of main (window: repo-review)'". A record with
-// no origin label (a raw socket client that sent none) gets no suffix rather than "(window: )".
+// SnapshotFor composes the undo attribution as a read-time SUFFIX, appended only when conn is not
+// the record's own originator: this keeps the single-window label byte-identical to upstream's —
+// two future phases pattern-match on it, both start-anchored — while still satisfying "so a second
+// window sees 'Undo reset of main (window: repo-review)'". A record with no origin label (a raw
+// socket client that sent none) gets no suffix rather than "(window: )".
 func (r *UndoRecord) SnapshotFor(conn string) UndoSlotSnapshot {
 	label := r.Label
 	if conn != r.OriginConn && r.OriginLabel != "" {
@@ -75,11 +75,11 @@ type UndoPolicy struct {
 	Reason string
 }
 
-// UndoSlot is one repo's undo slot (SPEC §6: "one per repo, not per connection") — a direct port
-// of undo/slot.ts's own UndoSlot, with its own mutex per gitsession's cache pattern (D7). Its three
+// UndoSlot is one repo's undo slot ("one per repo, not per connection") — a direct port
+// of undo/slot.ts's own UndoSlot, with its own mutex per gitsession's cache pattern. Its three
 // lifecycle bounds are gitsession's own: the next op on the repo clears it (Set, called
 // unconditionally by RunOp — clearing is the default, retaining the explicit act), the entry's
-// teardown drops it (it simply goes out of scope with the RepoEntry), and undo.run refuses a
+// teardown drops it (it goes out of scope with the RepoEntry), and undo.run refuses a
 // recovery sha that no longer resolves (gitsession.UndoRun, after Take).
 type UndoSlot struct {
 	mu     sync.Mutex

@@ -73,7 +73,7 @@ func (c *exitCollector) last() Exit {
 func TestOneShotExitZero(t *testing.T) {
 	s := New()
 	start := time.Now()
-	got, err := s.Start(context.Background(), "c1", "true")
+	got, err := s.Start(context.Background(), "c1", "true", nil, 0)
 	elapsed := time.Since(start)
 	if err != nil {
 		t.Fatalf("Start: %v", err)
@@ -101,7 +101,7 @@ func TestFailureBeforeSettleCarriesStderrTail(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := New()
-			_, err := s.Start(context.Background(), "c1", tt.command)
+			_, err := s.Start(context.Background(), "c1", tt.command, nil, 0)
 			if err == nil {
 				t.Fatalf("Start: want an error, got none")
 			}
@@ -120,7 +120,7 @@ func TestDiedBetweenStartAndArm(t *testing.T) {
 	var oe exitCollector
 	s.OnExit(oe.handle)
 
-	got, err := s.Start(context.Background(), "c1", "sleep 0.2; echo dying >&2; exit 7")
+	got, err := s.Start(context.Background(), "c1", "sleep 0.2; echo dying >&2; exit 7", nil, 0)
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestSelfInflictedKillDoesNotFireOnExit(t *testing.T) {
 		var oe exitCollector
 		s.OnExit(oe.handle)
 
-		if _, err := s.Start(context.Background(), "c1", "sleep 30"); err != nil {
+		if _, err := s.Start(context.Background(), "c1", "sleep 30", nil, 0); err != nil {
 			t.Fatalf("Start: %v", err)
 		}
 		s.Arm("c1")
@@ -174,11 +174,11 @@ func TestSelfInflictedKillDoesNotFireOnExit(t *testing.T) {
 		var oe exitCollector
 		s.OnExit(oe.handle)
 
-		if _, err := s.Start(context.Background(), "c1", "sleep 30"); err != nil {
+		if _, err := s.Start(context.Background(), "c1", "sleep 30", nil, 0); err != nil {
 			t.Fatalf("Start (1): %v", err)
 		}
 		s.Arm("c1")
-		if _, err := s.Start(context.Background(), "c1", "sleep 30"); err != nil {
+		if _, err := s.Start(context.Background(), "c1", "sleep 30", nil, 0); err != nil {
 			t.Fatalf("Start (2): %v", err)
 		}
 		time.Sleep(1 * time.Second)
@@ -189,7 +189,7 @@ func TestSelfInflictedKillDoesNotFireOnExit(t *testing.T) {
 	})
 }
 
-// TestStopOnAlreadyDeadEntrySkipsSignalling is P21 round 3 finding 6: an entry whose sidecar died
+// TestStopOnAlreadyDeadEntrySkipsSignalling: an entry whose sidecar died
 // on its own before Arm was ever called (the exact case entryDead/TestDiedBetweenStartAndArm
 // above covers) is deliberately left tracked in s.entries for Arm to consume — but Arm may never
 // come (a connection removed, or a connect that fails, before arming). killEntry used to signal
@@ -210,7 +210,7 @@ func TestStopOnAlreadyDeadEntrySkipsSignalling(t *testing.T) {
 	// A script that survives long enough to settle as a sidecar, then exits on its own — the
 	// settle window is 80ms in this package's test init, so "sleep 0.2" reliably settles first.
 	s := New()
-	got, err := s.Start(context.Background(), "c1", "sleep 0.2; exit 0")
+	got, err := s.Start(context.Background(), "c1", "sleep 0.2; exit 0", nil, 0)
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestStopOnAlreadyDeadEntrySkipsSignalling(t *testing.T) {
 // still be dead by the time Stop returns, and Stop must block for the real exit.
 func TestSigtermEscalatesToSigkill(t *testing.T) {
 	s := New()
-	if _, err := s.Start(context.Background(), "c1", `trap "" TERM; sleep 30`); err != nil {
+	if _, err := s.Start(context.Background(), "c1", `trap "" TERM; sleep 30`, nil, 0); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 	pid := entryPID(t, s, "c1")
@@ -258,7 +258,7 @@ func TestBackgroundedSetsidChildDoesNotDelayStart(t *testing.T) {
 	s.OnExit(oe.handle)
 
 	begin := time.Now()
-	got, err := s.Start(context.Background(), "c1", "setsid sleep 2 & exit 0")
+	got, err := s.Start(context.Background(), "c1", "setsid sleep 2 & exit 0", nil, 0)
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -281,7 +281,7 @@ func TestOneShotWithBackgroundChildKeepsRealExitAndIsReaped(t *testing.T) {
 	t.Run("non-zero exit is an error and kills the child", func(t *testing.T) {
 		pidFile := t.TempDir() + "/pid"
 		s := New()
-		_, err := s.Start(context.Background(), "c1", fmt.Sprintf("sleep 30 & echo $! > %s; echo boom >&2; exit 3", pidFile))
+		_, err := s.Start(context.Background(), "c1", fmt.Sprintf("sleep 30 & echo $! > %s; echo boom >&2; exit 3", pidFile), nil, 0)
 		if err == nil || !strings.Contains(err.Error(), "exit 3") || !strings.Contains(err.Error(), "boom") {
 			t.Fatalf("Start error = %v, want exit 3 with stderr tail", err)
 		}
@@ -291,7 +291,7 @@ func TestOneShotWithBackgroundChildKeepsRealExitAndIsReaped(t *testing.T) {
 	t.Run("exit zero is one-shot and Stop kills the child", func(t *testing.T) {
 		pidFile := t.TempDir() + "/pid"
 		s := New()
-		got, err := s.Start(context.Background(), "c1", fmt.Sprintf("sleep 30 >/dev/null 2>&1 & echo $! > %s", pidFile))
+		got, err := s.Start(context.Background(), "c1", fmt.Sprintf("sleep 30 >/dev/null 2>&1 & echo $! > %s", pidFile), nil, 0)
 		if err != nil || got.Kind != KindOneShot {
 			t.Fatalf("Start = %+v, %v, want one-shot", got, err)
 		}
@@ -318,10 +318,10 @@ func readPID(t *testing.T, path string) int {
 	return pid
 }
 
-// TestStartAbortsOnContextCancellationDuringSettle is F4 (P108 Part 3): a caller racing Start with
+// TestStartAbortsOnContextCancellationDuringSettle: a caller racing Start with
 // a context that gets cancelled before the script settles (connections.Service.Disconnect/Remove
 // against an in-flight Connect) must get an aborted Start back promptly, with the spawned process
-// actually killed — it never got far enough to settle into s.entries, so an external Stop(id)
+// killed — it never got far enough to settle into s.entries, so an external Stop(id)
 // call would otherwise find nothing tracked and leave it running untracked.
 func TestStartAbortsOnContextCancellationDuringSettle(t *testing.T) {
 	pidFile, err := os.CreateTemp(t.TempDir(), "pid")
@@ -337,7 +337,7 @@ func TestStartAbortsOnContextCancellationDuringSettle(t *testing.T) {
 	time.AfterFunc(20*time.Millisecond, cancel)
 
 	start := time.Now()
-	_, err = s.Start(ctx, "c1", fmt.Sprintf("echo $$ > %s; sleep 30", pidFile.Name()))
+	_, err = s.Start(ctx, "c1", fmt.Sprintf("echo $$ > %s; sleep 30", pidFile.Name()), nil, 0)
 	elapsed := time.Since(start)
 
 	if !errors.Is(err, context.Canceled) {
@@ -368,7 +368,7 @@ func TestStartAbortsOnContextCancellationDuringSettle(t *testing.T) {
 // backgrounds its own child must not leave that grandchild running after Stop.
 func TestProcessGroupKillReachesGrandchild(t *testing.T) {
 	s := New()
-	if _, err := s.Start(context.Background(), "c1", "sleep 300 & sleep 300"); err != nil {
+	if _, err := s.Start(context.Background(), "c1", "sleep 300 & sleep 300", nil, 0); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 	pgid := entryPID(t, s, "c1")
@@ -380,4 +380,147 @@ func TestProcessGroupKillReachesGrandchild(t *testing.T) {
 	// answering for a zombie for a second or two after it has already received and acted on
 	// the signal — poll rather than asserting ESRCH on the first check.
 	waitUntil(t, 5*time.Second, func() bool { return syscall.Kill(-pgid, 0) == syscall.ESRCH })
+}
+
+func fileReady(path string) *ReadyCheck {
+	return &ReadyCheck{Addr: path, Check: func(context.Context) error {
+		_, err := os.Stat(path)
+		return err
+	}}
+}
+
+// TestStartWaitsForProbePastSettleWindow pins the race fix: a script alive past settleWindow is
+// not ready until the probe says so.
+func TestStartWaitsForProbePastSettleWindow(t *testing.T) {
+	flag := t.TempDir() + "/up"
+	s := New()
+	t.Cleanup(s.StopAll)
+
+	start := time.Now()
+	got, err := s.Start(context.Background(), "c1", fmt.Sprintf("sleep 0.4; touch %s; exec sleep 30", flag), fileReady(flag), 0)
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if got.Kind != KindSidecar {
+		t.Errorf("Kind = %q, want sidecar", got.Kind)
+	}
+	if elapsed < 400*time.Millisecond {
+		t.Errorf("Start returned after %s, before the probe could succeed", elapsed)
+	}
+	if _, statErr := os.Stat(flag); statErr != nil {
+		t.Errorf("Start returned before the script became ready: %v", statErr)
+	}
+}
+
+func TestStartProbeTimeoutKillsScript(t *testing.T) {
+	old := readyTimeout
+	readyTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { readyTimeout = old })
+
+	pidFile := t.TempDir() + "/pid"
+	s := New()
+	_, err := s.Start(context.Background(), "c1", fmt.Sprintf("echo $$ > %s; sleep 30", pidFile), fileReady(t.TempDir()+"/never"), 0)
+	if err == nil || !strings.Contains(err.Error(), "not ready") {
+		t.Fatalf("Start error = %v, want a not-ready error", err)
+	}
+	data, readErr := os.ReadFile(pidFile)
+	if readErr != nil {
+		t.Fatalf("read pid: %v", readErr)
+	}
+	pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+	waitUntil(t, 2*time.Second, func() bool { return !processAlive(pid) })
+}
+
+func TestStartCancelDuringProbeWait(t *testing.T) {
+	pidFile := t.TempDir() + "/pid"
+	s := New()
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(150*time.Millisecond, cancel)
+
+	_, err := s.Start(ctx, "c1", fmt.Sprintf("echo $$ > %s; sleep 30", pidFile), fileReady(t.TempDir()+"/never"), 0)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Start error = %v, want context.Canceled", err)
+	}
+	data, readErr := os.ReadFile(pidFile)
+	if readErr != nil {
+		t.Fatalf("read pid: %v", readErr)
+	}
+	pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+	waitUntil(t, 2*time.Second, func() bool { return !processAlive(pid) })
+}
+
+// TestStartDelay pins the delay floor: Start returns at max(delay, readiness), an exit-0 script
+// waits the delay out, and a failure or cancel ends it at once.
+func TestStartDelay(t *testing.T) {
+	alwaysReady := &ReadyCheck{Addr: "always", Check: func(context.Context) error { return nil }}
+	neverReady := &ReadyCheck{Addr: "never", Check: func(context.Context) error { return errors.New("closed") }}
+	oldTimeout := readyTimeout
+	t.Cleanup(func() { readyTimeout = oldTimeout })
+
+	tests := []struct {
+		name       string
+		command    string
+		ready      *ReadyCheck
+		timeout    time.Duration
+		delay      time.Duration
+		wantKind   string
+		wantErr    string
+		minElapsed time.Duration
+		maxElapsed time.Duration
+	}{
+		{name: "exit 0 waits out delay", command: "true", delay: 300 * time.Millisecond, wantKind: KindOneShot, minElapsed: 300 * time.Millisecond},
+		{name: "probe ready before delay", command: "exec sleep 30", ready: alwaysReady, delay: 300 * time.Millisecond, wantKind: KindSidecar, minElapsed: 300 * time.Millisecond},
+		{name: "settle before delay", command: "exec sleep 30", delay: 300 * time.Millisecond, wantKind: KindSidecar, minElapsed: 300 * time.Millisecond},
+		{name: "failure ends at once", command: "echo boom >&2; exit 3", delay: 5 * time.Second, wantErr: "boom", maxElapsed: time.Second},
+		{name: "timeout counts from delay end", command: "exec sleep 30", ready: neverReady, timeout: 200 * time.Millisecond, delay: 300 * time.Millisecond, wantErr: "not ready", minElapsed: 500 * time.Millisecond},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			readyTimeout = oldTimeout
+			if tt.timeout > 0 {
+				readyTimeout = tt.timeout
+			}
+			s := New()
+			t.Cleanup(s.StopAll)
+			start := time.Now()
+			got, err := s.Start(context.Background(), "c1", tt.command, tt.ready, tt.delay)
+			elapsed := time.Since(start)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("Start error = %v, want %q", err, tt.wantErr)
+				}
+			} else if err != nil || got.Kind != tt.wantKind {
+				t.Fatalf("Start = %+v, %v; want kind %q", got, err, tt.wantKind)
+			}
+			if elapsed < tt.minElapsed {
+				t.Errorf("Start took %s, want >= %s", elapsed, tt.minElapsed)
+			}
+			if tt.maxElapsed > 0 && elapsed >= tt.maxElapsed {
+				t.Errorf("Start took %s, want < %s", elapsed, tt.maxElapsed)
+			}
+		})
+	}
+
+	t.Run("cancel during delay kills group", func(t *testing.T) {
+		pidFile := t.TempDir() + "/pid"
+		s := New()
+		t.Cleanup(s.StopAll)
+		ctx, cancel := context.WithCancel(context.Background())
+		time.AfterFunc(100*time.Millisecond, cancel)
+		start := time.Now()
+		_, err := s.Start(ctx, "c1", fmt.Sprintf("echo $$ > %s; exec sleep 30", pidFile), nil, 5*time.Second)
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("Start error = %v, want context.Canceled", err)
+		}
+		if elapsed := time.Since(start); elapsed >= time.Second {
+			t.Errorf("Start took %s after cancel, want < 1s", elapsed)
+		}
+		data, readErr := os.ReadFile(pidFile)
+		if readErr != nil {
+			t.Fatalf("read pid: %v", readErr)
+		}
+		pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+		waitUntil(t, 2*time.Second, func() bool { return !processAlive(pid) })
+	})
 }

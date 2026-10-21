@@ -1,11 +1,10 @@
-// collections_export_atomicity_test.go is P21 round 3 architecture/security finding 7: Export
-// used to os.Create(args.Path) directly — truncate-or-create — and stream
-// postman.Write straight into it, so any failure after that point (a marshal error, a full disk,
-// the process being killed mid-write) left the destination empty or half-written, with no cleanup.
-// A re-export over an existing, good file is exactly the ordinary case (the save panel offers the
-// existing filename), so this destroyed a good file on a failed re-export. writeExportFile now
-// writes to a sibling temp file and renames onto the destination only once the write fully
-// succeeds, mirroring internal/adapters/s3/transfer.go's downloadObject.
+// collections_export_atomicity_test.go: Export used to os.Create(args.Path) directly —
+// truncate-or-create — and stream postman.Write straight into it, so any failure after that point
+// (a marshal error, a full disk, the process being killed mid-write) left the destination empty or
+// half-written, with no cleanup. A re-export over an existing, good file is exactly the ordinary
+// case (the save panel offers the existing filename), so this destroyed a good file on a failed
+// re-export. writeExportFile now writes to a sibling temp file and renames onto the destination
+// only once the write fully succeeds, mirroring internal/adapters/s3/transfer.go's downloadObject.
 package bridge
 
 import (

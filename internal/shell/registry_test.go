@@ -6,12 +6,12 @@ import (
 	"github.com/kirathecat/kira-studio/internal/shell"
 )
 
-// Real-interaction fix (item 8 — a webview process outlives its window, and duplicates on
-// reopen): Count() is the new seam AttachCloseFlush reads (closeflush.go) to decide Hide() vs
-// Close() for a window that's finishing its close-flush wait — `== 1` means "I am the only
-// window left, closing me for real would orphan my own webview process with nothing able to
+// A webview process outlives its window, and duplicates on reopen: Count() is the new seam
+// AttachCloseFlush reads (closeflush.go) to decide Hide() vs Close() for a window that's
+// finishing its close-flush wait — `== 1` means "I am the only window left, closing me for real
+// would orphan my own webview process with nothing able to
 // bring it back but a brand-new one". These tests exercise Count() against Add/RemoveAndCount
-// directly, the same registry entry points main.go's own openWindow call actually uses, rather
+// directly, the same registry entry points main.go's own openWindow call uses, rather
 // than the *AttachCloseFlush* decision itself — RegisterHook's own dispatch calls into Wails'
 // InvokeSync main-thread pump the moment any hook lets a real Close()/Hide() through
 // (window_test.go's own newAttachedWindow comment: this is unsafe to exercise outside a real

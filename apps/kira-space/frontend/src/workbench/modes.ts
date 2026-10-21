@@ -12,7 +12,7 @@ import type { SpaceMode } from '../state/mode';
 // terminal at step 7, ade here at step 8).
 export const MODE_ORDER: SpaceMode[] = ['git', 'ade', 'automations', 'memory'];
 
-// P129 Part 3 §0.12: the base `ModeDef` union, not `ModeRegistry<SpaceMode, PanelModeDef>` — `ade`
+// The base `ModeDef` union, not `ModeRegistry<SpaceMode, PanelModeDef>` — `ade`
 // below is the app's first `layout: 'full'` module. Kira Studio's own `MODES` stays pinned to
 // `PanelModeDef` (its shell still reads `.panel`/`.start` unconditionally); this app's shell now
 // branches on `layout` instead (`workbench/WorkbenchShell.vue`'s own `isFull` computed).

@@ -14,8 +14,8 @@ const maskKeyBytes = 32
 
 // MaskKeysRepo is the only file in this tree that reads or writes
 // connections.mask_correlation_key — SecretsRepo's own "only file that touches this column"
-// discipline (secrets.go:21-23), applied to M5's correlation key. It is deliberately not part of
-// ConnectionFields (model/connection.go's own D9), so a key can never reach the renderer, the
+// discipline (secrets.go:21-23), applied to the correlation key. It is deliberately not part of
+// ConnectionFields (model/connection.go), so a key can never reach the renderer, the
 // connection URI, or the Copy URI menu item.
 type MaskKeysRepo struct {
 	db     *sql.DB
@@ -52,17 +52,18 @@ func (r *MaskKeysRepo) Get(connectionID string) ([]byte, error) {
 }
 
 // EnsureKey returns the connection's own key, minting and persisting a fresh 32-byte one on first
-// call (plan §2.5's own "lazy creation... the first time a connection renders a mask whose rule has
+// call ("lazy creation... the first time a connection renders a mask whose rule has
 // correlate: true"). A connection with no correlating rule never calls this and so never gets one.
 //
-// Two callers can race here on first use (M7 finding: the MCP render path's own MaskSetFor and the
+// Two callers can race here on first use (the MCP render path's own MaskSetFor and the
 // grid preview's own CorrelationKeyHex, both resolving the same connection's key at once). The
 // write below is guarded by
 //
 //	WHERE mask_correlation_key = ''
 //
-// rather than an unconditional UPDATE, so only the first writer's key is ever persisted; a losing caller's RowsAffected is 0 and it
-// re-reads the winner's key instead of returning the one it generated but never actually stored —
+// rather than an unconditional UPDATE, so only the first writer's key is ever persisted; a losing
+// caller's RowsAffected is 0 and it re-reads the winner's key instead of returning the one it
+// generated but never stored —
 // both callers then build their own mask.Set from the same bytes, with nothing left to invalidate.
 func (r *MaskKeysRepo) EnsureKey(connectionID string) ([]byte, error) {
 	existing, err := r.Get(connectionID)

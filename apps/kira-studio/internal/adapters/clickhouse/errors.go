@@ -48,8 +48,7 @@ func extractCodeFromBody(body string) (code, message string) {
 
 // mapCode is errors.ts's own mapError, minus the AdapterError passthrough (nothing in this Go
 // package ever wraps one) and re-pointed at a (code, message) pair the caller already extracted
-// per B12, rather than a driver error object — dispatched on the numeric code, never on message
-// text (P36 D26).
+// rather than a driver error object — dispatched on the numeric code, never on message text.
 func mapCode(code, message string) error {
 	switch code {
 	case unknownDatabase:

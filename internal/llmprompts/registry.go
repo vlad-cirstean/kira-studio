@@ -28,6 +28,11 @@ type MergeVars struct {
 	MaxLines int `json:"maxLines" prompt:"required"`
 }
 
+// RewriteVars fills the short-text rewrite prompt.
+type RewriteVars struct {
+	MaxWidth int `json:"maxWidth" prompt:"required"`
+}
+
 // FinalizeVars fills the import finalize prompt.
 type FinalizeVars struct {
 	MaxItems int `json:"maxItems"`
@@ -447,6 +452,63 @@ var MemoryMergeRules = define(Entry{
 3. Drop a fact that is not a memory or is run trivia (see above), other trivia, time-bound or navigation: list it in "dropped" with why. Drop any secret (password, token, API key, private key); never keep it.`,
 }, NoVars{})
 
+// MemoryRewriteSystem is the system prompt of the short-text rewrite: ingest_files with distill and
+// mode rewrite, and the UI Distill view's Rewrite tab, clean one text in its own form.
+var MemoryRewriteSystem = define(Entry{
+	ID: "memory.rewrite.system", Kind: KindSystem, Apps: spaceApp, Applies: NextCall,
+	TitleKey:          "llmPrompts.entry.memoryRewriteSystem.title",
+	PurposeKey:        "llmPrompts.entry.memoryRewriteSystem.description",
+	UsedByKey:         "llmPrompts.entry.memoryRewriteSystem.usedBy.body",
+	RequiredFragments: []ID{"memory.dataHygiene"},
+	Default: `You clean one short text, usually a code comment: drop its trivia, keep every fact and its form. Output only the schema.
+
+{{template "memory.dataHygiene"}}
+
+Input: "text" (verbatim, with its comment markers and indentation) and optional "context" (code around it; read it, never rewrite or quote it).
+
+Keep, exactly:
+- Every non-obvious why, constraint, workaround, limit, consequence and cross-reference to another file, function or setting.
+- Cause links (because, so, since, otherwise, unless). Splitting a sentence keeps its link.
+- Negations (not, never, no, only, except), numbers, units, identifiers, paths, error strings, quoted literals and backticked spans, verbatim, backticks included.
+- Qualifiers of scope and place ("here", "itself", "per call", "on the server").
+- What the declaration below holds, when the text defines it.
+- Cross-references: "ports X", "mirrors X", "X's twin", and "see issue, PR or URL". A doc comment's opening clause that names the documented symbol stays.
+
+Drop:
+- Internal tracking labels whose meaning lives outside the text: ticket, phase, milestone, review-finding, iteration or version identifiers, section-sign references, and references to a plan or tracker document. Keep the fact a label tags. If removing a label leaves a claim false or dangling, keep the clause's truth: drop the whole clause or say what holds now. After removing a leading label, capitalise the word that now starts the sentence, unless it is code (identifier, path, type, literal): code stays as written. Drop a word only when it pointed at the dropped label (a possessive "own" whose owner was the label); elsewhere "own" and every other word stay. Never leave a phrase whose referent was dropped. Capitalise only the first word of a sentence, and only when it is a plain word; a sentence that starts with a quote, bracket or tool name keeps it as written. A deleted possessive label before a noun ("X's guard") becomes "the" ("the guard"). A number that names a part of the code or of the text itself (step 2, level 3, rule 1/3) is not a label.
+- History narration, only these: who changed it, when, in which version; a moved-from or renamed-from note. Change-marker words ("now", "no longer", "used to", "previously", "old", "new", "still", "unchanged") stay: a clause holding one stays verbatim, word included. Every other past-tense sentence or clause stays as written, including how earlier code failed, what the current code replaced, and why: it is the reason for the current code. When unsure whether a clause is history or reason, keep it. An equivalence, safety or cost comparison (as safe as X, O(1) instead of O(n), provably unchanged) is a fact, not history.
+- A sentence that restates what the context code shows and states nothing more. A stated invariant, contract or guarantee stays.
+- Filler, only these hedges: "really", "basically", "actually", "simply", and "just" as a hedge. Remove every occurrence, also inside a longer clause ("actually did" becomes "did"). Keep every other word, intensifiers and intent words included. "just" meaning "only" or "recently" stays.
+- Prose notes (text that is not a code comment): history, dates, versions and old values are content. Drop only the listed hedges, never reflow, keep the line structure.
+
+Form:
+- Same form as the input: same comment markers, same kind of comment (a doc comment stays one and keeps the language's doc convention; Markdown stays Markdown).
+- Each line starts with the leading whitespace of the input line it replaces; block comment lines keep their prefix.
+- Code comment lines at most {{.MaxWidth}} columns, indentation and markers included; a tab counts 4. Prose has no width rule. Before answering, measure every code comment line of "text" (tab = 4 columns), including lines no drop touched; reflow any line over the width at the last space that fits.
+- Words you keep stay as written: no rewording, no sentence split or merge, no punctuation change. Reflow only code comment lines a drop touched, and every line over the width, also in a text with nothing to drop; a single unbreakable token (URL, path) may exceed it. Kept text is copied character for character: no added escape characters, no trailing spaces.
+- Keep the input's trailing newline, or its absence.
+- Never add a fact, example or claim the text does not state. Never reword an identifier, literal or error string.
+- A tool directive (//go:build, //nolint, eslint-disable, @ts-ignore and the like) or a licence header stays byte for byte.
+- Every sentence you keep stays complete; a drop never leaves a fragment.
+- Never longer than the input, except markers and indentation a reflow of an over-width line adds.
+
+Already clean: no label, no history narration, no restated code, no listed hedge, every code comment line within width. A clean text is returned verbatim, byte for byte. Style is never a reason to change text. Judge only by the lists above: a text whose remaining sentences match none of them comes back verbatim, however it reads.
+
+"text": the full result, markers and indentation included; the input verbatim when already clean.
+"dropped": each word, label or clause of the input missing from "text", with "why": "tag", "history", "restatesCode" or "trivia". Empty when "text" is the input. Every entry in "dropped" is absent from "text", and every hedge word listed there is gone; check each one before answering.
+"reason": one short sentence.`,
+	Schema: `{
+  "type": "object", "additionalProperties": false, "required": ["text", "dropped", "reason"],
+  "properties": {
+    "text": {"type": "string"},
+    "dropped": {"type": "array", "items": {
+      "type": "object", "additionalProperties": false, "required": ["text", "why"],
+      "properties": {"text": {"type": "string"}, "why": {"enum": ["tag", "history", "restatesCode", "trivia"]}}}},
+    "reason": {"type": "string"}
+  }
+}`,
+}, RewriteVars{MaxWidth: 100})
+
 // MemoryImportFinalizeSystem is the system prompt of the run that stores one imported file's facts.
 var MemoryImportFinalizeSystem = define(Entry{
 	ID: "memory.import.finalize.system", Kind: KindSystem, Apps: spaceApp, Applies: NextCall,
@@ -599,7 +661,7 @@ var (
 // MemoryToolIngestFiles describes the ingest_files tool.
 var MemoryToolIngestFiles = define(Entry{
 	ID: "memory.mcp.tool.ingest_files", Kind: KindTool, Apps: spaceApp, Applies: NewSession, Name: "ingest_files",
-	Default: `Store the facts and rules of files and folders by path, in the background. Send absolute paths, never content: Kira reads the files. Reads Markdown, text, JSON and JSON Lines; a kira-memory doc format file is applied as is. Every fact gets the given origin, scope and groups. Returns a job id for ingest_status. A large job waits for the user to start it in Kira Space. With distill true, stores nothing and returns the merged lines of text or one file; the call waits for them.`,
+	Default: `Store the facts and rules of files and folders by path, in the background. Send absolute paths, never content: Kira reads the files. Reads Markdown, text, JSON and JSON Lines; a kira-memory doc format file is applied as is. Every fact gets the given origin, scope and groups. Returns a job id for ingest_status. A large job waits for the user to start it in Kira Space. With distill true, stores nothing and returns the merged lines of text or one file; the call waits for them. With distill true and mode rewrite, returns the text rewritten in its own form with trivia dropped and every fact kept, or unchanged when already clean; text only, at most 2000 characters.`,
 }, NoVars{})
 
 var (
@@ -615,7 +677,9 @@ var (
 	_ = arg(MemoryToolIngestFiles.id, "writeDoc", spaceApp, NewSession, `also write each file's facts beside it as <name>.memory.md in kira-memory doc format; default false`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "session", spaceApp, NewSession, `Claude Code session id; omit for this session`, NoVars{})
 	_ = arg(MemoryToolIngestFiles.id, "text", spaceApp, NewSession, `text to distill, at most {{.Max}} characters; only with distill true`, MaxVars{Max: 120000})
-	_ = arg(MemoryToolIngestFiles.id, "distill", spaceApp, NewSession, `true: store nothing and return the merged lines; takes text or one path and no other argument; default false`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "distill", spaceApp, NewSession, `true: store nothing and return the merged lines; takes text or one path, plus mode and context; no store argument; default false`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "mode", spaceApp, NewSession, `facts: merged lines (default); rewrite: one same-form rewrite of short text such as a code comment`, NoVars{})
+	_ = arg(MemoryToolIngestFiles.id, "context", spaceApp, NewSession, `code around the text, read only, at most {{.Max}} characters; only with mode rewrite`, MaxVars{Max: 6000})
 )
 
 // MemoryToolIngestStatus describes the ingest_status tool.

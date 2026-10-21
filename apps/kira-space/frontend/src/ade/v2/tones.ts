@@ -31,8 +31,8 @@ export const TONE_SOLID_CLASS: Record<Tone, string> = {
   grey: 'bg-tone-grey-solid text-tone-ink border-transparent',
 };
 
-/** Solid of a task action: its tone, or the Claude brand colour for a launch (`▶ Run`). */
+/** Solid of a task action: its tone, or the agent colour for a launch (`▶ Run`). */
 export const ACTION_CLASS: Record<TaskAction['tone'] | Tone, string> = {
   ...TONE_SOLID_CLASS,
-  claude: 'bg-claude text-tone-ink border-transparent',
+  agent: 'bg-agent text-tone-ink border-transparent',
 };

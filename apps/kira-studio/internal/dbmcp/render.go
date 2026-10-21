@@ -55,7 +55,7 @@ func errResult(text string) (*mcp.CallToolResult, any, error) {
 	}, nil, nil
 }
 
-// jsonResult marshals v as compact JSON and wraps it as a successful result (§5.1): the exact
+// jsonResult marshals v as compact JSON and wraps it as a successful result: the exact
 // structs the frontend receives, no prose wrapper and no human formatting — the client is a model
 // composing SQL against identifiers that can contain spaces, quotes and non-ASCII, and JSON
 // round-trips them exactly.
@@ -67,7 +67,7 @@ func jsonResult(v any) (*mcp.CallToolResult, any, error) {
 	return textResult(string(encoded))
 }
 
-// toolError classifies err per §5.3's split. A caller-correctable condition — an *adapters.Error
+// toolError classifies err. A caller-correctable condition — an *adapters.Error
 // carrying a real E_* code (adapters.CodeOf), or an *ipcerr.Error (e.g. ipcerr.Disconnected) —
 // becomes an IsError result with the adapter's own message verbatim, prefixed with its code so a
 // client can branch on it without parsing prose. Anything else is a genuine internal fault,
@@ -84,7 +84,7 @@ func toolError(err error) (*mcp.CallToolResult, any, error) {
 }
 
 // maskedToolError is toolError's own sibling for a query executed against a connection with
-// active mask rules (finding #4, M6): a Postgres/MySQL driver error routinely embeds the value
+// active mask rules: a Postgres/MySQL driver error routinely embeds the value
 // that failed — a type-cast error names the literal it couldn't parse, for instance — so passing
 // the adapter's message straight through leaked the real, unmasked value one row at a time (e.g.
 // SELECT email::int FROM customers LIMIT 1 OFFSET n). The code (whatever adapters.CodeOf/ipcerr
@@ -133,9 +133,9 @@ type connectionView struct {
 	Description string `json:"description,omitempty"`
 	// Permissions is M2's per-operation MCP mode, always present.
 	Permissions connectionPermissions `json:"permissions"`
-	// MaskedColumns is M5 §4.5's own addition: "table.column: kind" per rule, sorted, capped at 50
-	// with a trailing "+N more" entry — so a client that does not know a column is masked does not
-	// misread a bucket string (e.g. "[1000-10000)") as a literal value. Omitted when the connection
+	// MaskedColumns is "table.column: kind" per rule, sorted, capped at 50 with a trailing
+	// "+N more" entry — so a client that does not know a column is masked does not misread a bucket
+	// string (e.g. "[1000-10000)") as a literal value. Omitted when the connection
 	// has no rules at all.
 	MaskedColumns []string `json:"maskedColumns,omitempty"`
 }
@@ -163,10 +163,10 @@ func maskedColumnsFor(rules []model.MaskRule) []string {
 	return out
 }
 
-// --- run_query's own projection (§5.2) — a projection because rows cross to the frontend as
+// --- run_query's own projection — a projection because rows cross to the frontend as
 // FlatBuffers (page.Chunk), so no existing JSON row shape exists to reuse. One entry point
-// (renderPage) so M5's anonymization filter has exactly one place to insert itself, between
-// Query.Execute and this projection (§9's own seam). ---
+// (renderPage) so the anonymization filter has exactly one place to insert itself, between
+// Query.Execute and this projection. ---
 
 type tabularColumn struct {
 	Name      string `json:"name"`
@@ -175,15 +175,15 @@ type tabularColumn struct {
 }
 
 // planEnvelope is embedded in each result struct so `plan` inlines into the same JSON object the
-// client already reads — run_query's response shape is otherwise unchanged from M1/M2. Omitted
+// client already reads — run_query's response shape is otherwise unchanged. Omitted
 // entirely when no plan was produced (omitempty on a nil pointer), never a `"plan": null` a
-// client might read as "planned, found nothing" (M3 §5.3).
+// client might read as "planned, found nothing".
 type planEnvelope struct {
 	Plan *planSummary `json:"plan,omitempty"`
-	// AdditionalStatementResults/Note are withAdditionalStatementResultsNote's own fields (M7
-	// finding #17), set directly here rather than through a marshal/unmarshal/remarshal round trip
-	// — omitempty keeps run_query's ordinary (single-statement) response shape byte-for-byte
-	// unchanged from before this field existed.
+	// AdditionalStatementResults/Note are withAdditionalStatementResultsNote's own fields, set
+	// directly here rather than through a marshal/unmarshal/remarshal round trip — omitempty keeps
+	// run_query's ordinary (single-statement) response shape byte-for-byte unchanged from before
+	// this field existed.
 	AdditionalStatementResults int    `json:"additionalStatementResults,omitempty"`
 	Note                       string `json:"note,omitempty"`
 }
@@ -257,10 +257,10 @@ type streamResult struct {
 	planEnvelope
 }
 
-// cellAt returns row's own text from chunk, or nil for SQL NULL — §5.2's own flagged hazard: a
-// NULL row and an empty string both have Offsets[i] == Offsets[i+1], and only the Nulls bitset
-// (page.IsNull) tells them apart. Getting this backwards renders NULL as "" — valid JSON a model
-// would reason over incorrectly, with nothing failing anywhere.
+// cellAt returns row's own text from chunk, or nil for SQL NULL — a NULL row and an empty string
+// both have Offsets[i] == Offsets[i+1], and only the Nulls bitset (page.IsNull) tells them apart.
+// Getting this backwards renders NULL as "" — valid JSON a model would reason over incorrectly,
+// with nothing failing anywhere.
 func cellAt(chunk page.Chunk, row int) *string {
 	if page.IsNull(chunk, row) {
 		return nil
@@ -629,9 +629,9 @@ func newMaskRenameRefusedError(column string) error {
 // masked column is not in the result set at all, but its name appears somewhere in the statement
 // — most often a WHERE/JOIN filter with no rename involved. A word-level text scan can't tell that
 // apart from a rename this function's other checks failed to catch, so it refuses either way, but
-// this message never claims to have found a rename or transform it didn't actually see (M7 finding
-// — the previous shared wording read as a false positive to an AI client filtering on, but not
-// selecting, a masked column).
+// this message never claims to have found a rename or transform it didn't see (the previous shared
+// wording read as a false positive to an AI client filtering on, but not selecting, a masked
+// column).
 func newMaskMentionedButAbsentRefusedError(column string) error {
 	return &maskingRefusedError{msg: fmt.Sprintf(
 		"this query references a masked column (%q) that isn't in the result set — refused because a text scan can't tell whether it was filtered, renamed, or transformed; select it by its own name to see the masked value",
@@ -639,7 +639,7 @@ func newMaskMentionedButAbsentRefusedError(column string) error {
 	)}
 }
 
-// riskyResultTypeClasses is F1's own generic guard (P108 Part 7 review, finding #1): a column's
+// riskyResultTypeClasses is the generic guard: a column's
 // own name matching a mask rule is not the only way a masked value reaches the client — any
 // column whose type can itself carry a whole row or several columns' worth of data bypasses
 // name-based matching entirely once the real value is wrapped inside it, with no per-column
@@ -697,7 +697,7 @@ func hasPositionalColumnAliasList(statement string) bool {
 	return false
 }
 
-// refuseRiskyStatementSyntax is F1's own third guard: three concrete SQL shapes verified against
+// refuseRiskyStatementSyntax is the third guard: three concrete SQL shapes verified against
 // real engines that rename or transform selected columns with no per-column textual trace a
 // word-scan could catch (a Postgres Unicode-escaped identifier reaching a masked column under a
 // name that never appears in the statement as plain text; the FROM-clause positional alias list
@@ -727,11 +727,11 @@ func newMaskRiskySyntaxRefusedError(reason string) error {
 	)}
 }
 
-// newMaskColumnlessKeyValueRefusedError is renderKeyValuePage's own refusal (finding #3, M7): a
+// newMaskColumnlessKeyValueRefusedError is renderKeyValuePage's own refusal: a
 // keyvalue page whose Field values carry no genuine per-entry identifier (page.KeyValuePage's own
 // FieldsAreColumns=false — a Redis list/set's synthetic display index, a stream entry id, a
 // generic console reply with no per-command shape) can never be checked against a mask rule at
-// all: RuleFor/ApplyColumn would just never match, passing the real value straight through while
+// all: RuleFor/ApplyColumn would never match, passing the real value straight through while
 // list_connections still reports the connection as protected. Same fail-closed posture as the
 // document/stream page refusal above: refuse outright rather than silently skip masking.
 func newMaskColumnlessKeyValueRefusedError() error {
@@ -740,12 +740,11 @@ func newMaskColumnlessKeyValueRefusedError() error {
 
 // renderPage projects one page.Page into its own JSON-ready envelope, capped at maxRows. plan is
 // run_query's own auto-force-explain result (nil when auto-force-explain is off, the statement
-// was not explainable, or the plan-only EXPLAIN failed) — M5's own seam (M1 §9), now taking a plan
-// summary alongside the page (M3 §5.3). mk is the connection's resolved masking state (M5 §4.2);
-// nil means no rules on this connection, and the projection behaves exactly as it does today.
-// statement is the original SQL text (finding #3, M6) — used only to catch a masked column
-// reaching the result set renamed or transformed past columnRules's exact-name match; empty for a
-// page kind rendered on some other path that has none to offer.
+// was not explainable, or the plan-only EXPLAIN failed) — now taking a plan summary alongside the
+// page. mk is the connection's resolved masking state; nil means no rules on this connection, and
+// the projection behaves exactly as it does today. statement is the original SQL text — used only
+// to catch a masked column reaching the result set renamed or transformed past columnRules's
+// exact-name match; empty for a page kind rendered on some other path that has none to offer.
 func renderPage(p page.Page, maxRows int, plan *planSummary, mk *maskset, statement string) (any, error) {
 	switch pg := p.(type) {
 	case page.TabularPage:
@@ -797,12 +796,12 @@ func renderPage(p page.Page, maxRows int, plan *planSummary, mk *maskset, statem
 
 // withAdditionalStatementResultsNote marks rendered (a run_query result, always one of the
 // concrete *Result structs above) with the count of further statement results the adapter
-// produced but this call did not render (finding #12, M6) — e.g. `args.SQL` held more than one
+// produced but this call did not render — e.g. `args.SQL` held more than one
 // `;`-separated statement, and only the first one's page is ever projected. Without this, extra
 // statements ran (a write among them, possibly) with no sign in the response that anything but
 // the shown result happened.
 //
-// Sets planEnvelope's own fields directly on rendered's concrete type (M7 finding #17) instead of
+// Sets planEnvelope's own fields directly on rendered's concrete type instead of
 // a marshal/unmarshal/remarshal round trip through a generic map: the previous shape serialized
 // the whole result three times over — once here to get JSON bytes, once back into a map to add two
 // fields, and a third time in jsonResult's own final Marshal — real, avoidable cost proportional to
@@ -901,7 +900,7 @@ func renderDocumentPage(pg page.DocumentPage, maxRows int) documentResult {
 	return documentResult{Kind: "document", Documents: docs, RowCount: pg.RowCount, Returned: returned, Truncated: returned < pg.RowCount || pg.Position.Truncated}
 }
 
-// renderKeyValuePage also masks (§4.3): a Redis hash field or an S3 metadata key is column-shaped,
+// renderKeyValuePage also masks: a Redis hash field or an S3 metadata key is column-shaped,
 // so a rule whose column_name matches keyValueEntry.Field masks that entry's Value. Resolved per
 // entry, not once per call like renderTabularPage's columns — a keyvalue page has no fixed column
 // set (Field varies row to row), so there is no per-column list to precompute against.

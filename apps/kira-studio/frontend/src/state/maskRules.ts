@@ -1,12 +1,12 @@
-// M5 §7.2: the one store the Privacy tab (ConnectionDialog.vue), the grid header menu (menu.ts)
+// The one store the Privacy tab (ConnectionDialog.vue), the grid header menu (menu.ts)
 // and the grid preview (maskPreview.ts, via SlickGridHost.vue) all share — mirrors
 // state/schemas.ts's own shape. No second copy in the dialog's own draft: a rule takes effect
 // immediately (it is not part of the connection's save/cancel draft), matching how the header
 // menu writes one.
 //
-// P99 §5.5: the rule list and the masked-column counts both live in TanStack Query's cache
+// The rule list and the masked-column counts both live in TanStack Query's cache
 // (queryKeys below), not in a `reactive` — a connectionId absent from the `['maskRules', id]`
-// cache means "never loaded" (the same D2-style "absent until loaded" convention schemas.ts
+// cache means "never loaded" (the same "absent until loaded" convention schemas.ts
 // uses); every real caller now goes through a `useQuery` (ConnectionDialog.vue, SlickGridHost.vue)
 // whose own `enabled`/auto-fetch subsumes the old explicit "loaded?" check.
 
@@ -40,7 +40,7 @@ export async function loadMaskRules(connectionId: string): Promise<MaskRule[]> {
   return rules;
 }
 
-// P99 §5.5: upsert/remove re-call loadMaskRules synchronously (not a `useMutation` +
+// upsert/remove re-call loadMaskRules synchronously (not a `useMutation` +
 // `invalidateQueries`) — a caller reads maskRulesFor/hasMaskRules right after either resolves
 // (menu.ts's own existingMaskRule scan, ConnectionDialog.vue's Privacy tab), and
 // `invalidateQueries` alone only refetches an *active* `useQuery` observer, which not every caller
@@ -79,12 +79,12 @@ export async function regenerateMaskKey(connectionId: string): Promise<void> {
   await control.maskRulesRegenerateKey(connectionId);
   // Force the next correlationKeyFor to refetch — every existing tag is now stale.
   invalidateCorrelationKey(connectionId);
-  // M7 finding #12: SlickGridHost's own maskPreview/rules watch depends on the `['maskRules',
+  // SlickGridHost's own maskPreview/rules watch depends on the `['maskRules',
   // connectionId]` query data's identity, not its contents, and neither that nor maskPreview
   // itself changes here — without this, a tab whose preview is already open on this connection
   // keeps showing its now-stale tag cache (computed under the old key) until some unrelated
   // toggle or reload happens to refresh it. Reassigning to a shallow copy (same rules, new
-  // reference) forces that watch to re-run without actually changing any rule.
+  // reference) forces that watch to re-run without changing any rule.
   const rules = queryClient.getQueryData<MaskRule[]>(maskRulesQueryKey(connectionId));
   if (rules) queryClient.setQueryData(maskRulesQueryKey(connectionId), [...rules]);
 }
@@ -97,7 +97,7 @@ function hexToBytes(hex: string): Uint8Array {
   return bytes;
 }
 
-/** Resolves connectionId's own correlation key (§6.3), fetching (and caching) it on first use.
+/** Resolves connectionId's own correlation key, fetching (and caching) it on first use.
  *  `null` means the connection currently needs no key (no correlating rule) — a real miss, not a
  *  loading state; the grid preview's own tag cache degrades to "no tag" for every value in that
  *  case, per maskPreview.ts's own fail-closed comment. */
@@ -119,9 +119,9 @@ export async function loadMaskRuleCounts(): Promise<Record<string, number>> {
   return counts;
 }
 
-// P108 Part 12 F18: the push already carries the fresh rule list (bridge/maskrules.go's own
+// The push already carries the fresh rule list (bridge/maskrules.go's own
 // broadcastRules re-lists before emitting), so this writes straight into the cache — loadMaskRules'
-// own two-cache-write shape (rules + counts, kept in lockstep), just from a pushed payload instead
+// own two-cache-write shape (rules + counts, kept in lockstep), from a pushed payload instead
 // of an IPC round trip. No writeGeneration guard (state/schemas.ts's own fuller shape): this module
 // has no local draft to race against a fetch already in flight — a rule takes effect immediately
 // (this file's own header comment), so there is nothing an incoming push here could ever clobber.
@@ -132,7 +132,7 @@ function applyRemote(event: MaskRulesChangedEvent): void {
     [event.connectionId]: event.rules.length,
   }));
   // regenerateMaskKey's own cross-window counterpart: a key rotation elsewhere makes this window's
-  // own cached correlation key wrong (still importable, just no longer the key run_query's render
+  // own cached correlation key wrong (still importable, no longer the key run_query's render
   // path or a fresh CorrelationKey call would return), so drop it — the next correlationKeyFor call
   // re-fetches the new one, same as a local regenerate already forces for the window that ran it.
   if (event.keyRegenerated) invalidateCorrelationKey(event.connectionId);
@@ -142,8 +142,8 @@ let unsubscribeChanged: (() => void) | null = null;
 let unsubscribeConnectionsChanged: (() => void) | null = null;
 
 /** main.ts's boot sequence, beside initSchemaSync — live before any Privacy tab, header menu or
- *  grid preview ever mounts, whether or not one does this session (initSchemaSync's own precedent,
- *  P108 Part 12 F3). Without this, a rule added/removed/regenerated in one window never reached any
+ *  grid preview ever mounts, whether or not one does this session (initSchemaSync's own precedent).
+ *  Without this, a rule added/removed/regenerated in one window never reached any
  *  other window's own `['maskRules', connectionId]` cache — the Settings glance's counts, the
  *  Privacy tab's list and the grid preview's tags all stayed stale until something unrelated
  *  happened to refetch them. */

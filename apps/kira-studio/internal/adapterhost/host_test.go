@@ -65,10 +65,10 @@ func TestRunOp_RefusesDuplicateOpID(t *testing.T) {
 	wg.Wait()
 }
 
-// P21 round 1 architecture/security finding 11: quoteIdent (postgres/mysqlfamily/sqlite/clickhouse
-// read.go) panics with an *adapters.Error carrying E_QUERY on a NUL byte in an identifier — a
-// user-input problem, not an internal fault. safeRun's recover() used to always fold a panic into
-// a fresh E_INTERNAL, losing that code and presenting the query error as an internal one.
+// quoteIdent (postgres/mysqlfamily/sqlite/clickhouse read.go) panics with an *adapters.Error
+// carrying E_QUERY on a NUL byte in an identifier — a user-input problem, not an internal fault.
+// safeRun's recover() used to always fold a panic into a fresh E_INTERNAL, losing that code and
+// presenting the query error as an internal one.
 func TestRunOp_PreservesAnAdaptersErrorCodeAcrossAPanic(t *testing.T) {
 	h := NewHost(adapters.Deps{}, nil)
 	_, _, err := h.RunOp(context.Background(), OpSpec{OpID: "op-panic-typed", Kind: "read"},
@@ -100,7 +100,7 @@ func TestRunOp_UntypedPanicStillBecomesInternalError(t *testing.T) {
 
 // CancelOp must stay two-step and in order: the local abort unblocks the running RunOp call
 // immediately (never mind whether the adapter ever answers), and only then is the adapter's own
-// Cancel called — the one that actually kills the server-side work (§5.1: cancellation is always
+// Cancel called — the one that kills the server-side work (cancellation is always
 // forwarded, and the local abort alone is not a cancel).
 func TestCancelOp_LocalAbortThenAdapterCancel(t *testing.T) {
 	h := NewHost(adapters.Deps{}, nil)
@@ -158,10 +158,10 @@ func TestCancelOp_LocalAbortThenAdapterCancel(t *testing.T) {
 	}
 }
 
-// F5 (P108 Part 6): delivery used to be a non-blocking send into a fixed 32-slot buffer, silently
+// Delivery used to be a non-blocking send into a fixed 32-slot buffer, silently
 // dropping an event outright once it filled — a dropped op:end leaves an op_log row stuck
-// "running" forever, and a dropped op:start produces the same phantom "test"-kind record F3 fixed
-// the vocabulary side of. This emits far more than that old buffer's own capacity before the
+// "running" forever, and a dropped op:start produces a phantom "test"-kind record.
+// This emits far more than that old buffer's own capacity before the
 // subscriber ever reads a single one (the exact shape a burst of concurrent ops produces — up to
 // 64 concurrent data ops, per session.go's own inflight cap, plus tree/dbmcp/http/grpc ops, easily
 // outpacing oplog's own synchronous SQLite write plus Wails emit per event) and confirms every one

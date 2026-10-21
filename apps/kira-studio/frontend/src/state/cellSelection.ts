@@ -19,7 +19,7 @@ export interface SelectedCell {
   value: string | null;
   /** The engine cut this value at MAX_CELL_BYTES; the rest was never fetched (D14). */
   truncated: boolean;
-  /** M5 §6.5: true when `value` is the grid's own mask-preview redaction, not the stored value —
+  /** True when `value` is the grid's own mask-preview redaction, not the stored value —
    *  `ReadOnlyReason`'s `'masked'` arm (views/shared/celleditor/state.ts) reads this first, ahead
    *  of every other reason, since it is the one the user can fix by toggling the preview off.
    *  `undefined`/absent means "this view has no masking concept at all" (every publisher other
@@ -28,7 +28,7 @@ export interface SelectedCell {
   /** Whether the page has a primary key at all (P5 D14) — computed once here, since whether a
    *  page has one is grid-only knowledge and `views/shared/celleditor/` may not import `views/grid/`. */
   hasPrimaryKey: boolean;
-  /** F3 (P108 Part 10): the server computes a generated column's value — an UPDATE into one is
+  /** The server computes a generated column's value — an UPDATE into one is
    *  refused at commit. `readOnlyReasonFor` reads this to block the dock the same way the grid's
    *  own `onBeforeEditCell` does; `undefined` means "this view has no generated-column concept"
    *  (every publisher other than the grid), treated identically to `false`. */
@@ -40,12 +40,12 @@ export interface SelectedCell {
   /** Set only by a publisher that can genuinely stage a write for this exact cell — today only
    *  `DataGrid.vue`, closing over `stageEdit(tabId, row, columnName, newValue)`, and
    *  `KeyValueView.vue`, for an S3 object's own editable `Body` row. `StreamView.vue` and
-   *  `ConsoleResultGrid.vue` publish too but never set this (both are viewers, P43 F3/D4 — the
+   *  `ConsoleResultGrid.vue` publish too but never set this (both are viewers — the
    *  dock mounting them passes `readOnly`). `undefined` means "this view never lets the panel edit
    *  its cells" — the panel forces read-only whenever this is absent, regardless of
    *  `readOnlyReasonFor()`, so a publisher that never sets it keeps its cells read-only in the
    *  panel by default rather than needing to opt out. `views/documents/` publishes nothing at all
-   *  (§8.7: a document's own row is already the read/write surface) and mounts no dock. */
+   *  (a document's own row is already the read/write surface) and mounts no dock. */
   onEdit?: (newValue: string) => void;
   /** Sibling to `onEdit`, closing over `discardCellEdit(tabId, row, columnName)` — what the panel's
    *  Revert button calls to un-stage a pending edit, not just visually reset its own buffer.

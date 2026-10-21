@@ -2,10 +2,10 @@ import type { AgentActivity, AgentEvent } from '@shared/domain/agent';
 
 export const MAX_RUNNING_TOOLS = 64;
 
-// WAKE_TOOLS is P129 Part 1 §4.8's own set — a PreToolUse naming one of these arms `wakeArmed`,
-// which turns a following Stop into 'waiting' instead of 'idle'. A `Bash` background run cannot
-// arm it: `tool_input` is never decoded (P86's own privacy rule), so a backgrounded watcher script
-// is indistinguishable from any other Bash call here (docs/ARCHITECTURE.md's own known limitation).
+// WAKE_TOOLS is the set — a PreToolUse naming one of these arms `wakeArmed`, which turns a
+// following Stop into 'waiting' instead of 'idle'. A `Bash` background run cannot arm it:
+// `tool_input` is never decoded (the privacy rule), so a backgrounded watcher script is
+// indistinguishable from any other Bash call here (docs/ARCHITECTURE.md's own known limitation).
 const WAKE_TOOLS = new Set(['Monitor', 'ScheduleWakeup']);
 
 function emptyActivity(sessionId: string | null, now: number): AgentActivity {
@@ -20,9 +20,9 @@ function emptyActivity(sessionId: string | null, now: number): AgentActivity {
   };
 }
 
-// P86 §13: the one piece here with real interacting rules, fed by an out-of-order external
+// The one piece here with real interacting rules, fed by an out-of-order external
 // producer — each hook is its own `curl` process, so a PostToolUse can legitimately arrive before
-// its own PreToolUse. Pure: (prev, event, now) => next — `now` is injected (P129 Part 1 §4.8) so
+// its own PreToolUse. Pure: (prev, event, now) => next — `now` is injected so
 // this stays pure; createAgentSessionsStore passes Date.now(). createAgentSessionsStore applies it
 // below; the unit test (agentActivityReducer.spec.ts, colocated) calls it directly.
 export function reduceAgentActivity(
@@ -76,7 +76,7 @@ export function reduceAgentActivity(
       // one signal this reducer has that the session is expecting an external event, not the user.
       const phase = base.wakeArmed ? 'waiting' : 'idle';
       // Clears everything else (P86 §13 rule 4), which is what heals a session that lost a
-      // PostToolUse to the listener's own bounds (internal/agenthooks/http.go §6.1).
+      // PostToolUse to the listener's own bounds (internal/harness/claude/hooks/http.go §6.1).
       return {
         ...base,
         phase,

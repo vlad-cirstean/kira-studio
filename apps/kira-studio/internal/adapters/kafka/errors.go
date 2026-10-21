@@ -11,7 +11,7 @@ import (
 )
 
 // mapError is errors.ts's mapError, ported from librdkafka's numeric error codes to *kerr.Error's
-// protocol codes (P58e E4). Dispatch order ports errors.ts's own verbatim: cancellation first,
+// protocol codes. Dispatch order ports errors.ts's own verbatim: cancellation first,
 // then connect, then timeout, then auth, then the unknown-topic special case, then E_QUERY as the
 // default — the default is load-bearing, because a topic/partition gone at read time (deleted
 // concurrently) is an ordinary query-time condition, not a connection failure.
@@ -35,7 +35,7 @@ func mapError(err error) *adapters.Error {
 	// ERR__ALL_BROKERS_DOWN, ERR__STATE, ERR__AUTHENTICATION) have no protocol-level equivalent in
 	// franz-go's *kerr.Error — re-derived from Go's own network error types instead, the same
 	// pattern postgres/errors.go, mysqlfamily/errors.go, redis/errors.go and awscfg/errors.go
-	// already use. KF-4(g): Ping against an unreachable host returns a *fmt.wrapError around a
+	// already use. Ping against an unreachable host returns a *fmt.wrapError around a
 	// plain *net.OpError, reachable via errors.As, in ~280µs.
 	if ne := adapters.ClassifyNetError(err); ne.DNS || ne.OpError != nil {
 		return adapters.New(adapters.CodeConnect, message, err)

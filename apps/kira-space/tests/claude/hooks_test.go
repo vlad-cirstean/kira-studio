@@ -51,7 +51,7 @@ func TestTerminalAgentHooks(t *testing.T) {
 	}
 }
 
-// hookEvents copies internal/agenthooks/config.go's hookEvents for the same reason.
+// hookEvents copies internal/harness/claude/hooks/config.go's hookEvents for the same reason.
 var hookEvents = []string{"SessionStart", "SessionEnd", "PreToolUse", "PostToolUse", "Notification", "Stop", "UserPromptSubmit"}
 
 // captureSettings writes a hooks file whose every event appends its raw stdin payload as one
@@ -95,7 +95,7 @@ func readPayloads(t *testing.T, capture string) []map[string]any {
 	return out
 }
 
-// TestHookPayloadContract catches CLI payload drift: the fields internal/agenthooks/http.go's
+// TestHookPayloadContract catches CLI payload drift: the fields internal/harness/claude/hooks/http.go's
 // hookRequest decodes (unexported; the always-present and per-event ones are listed below) must be
 // in what the installed CLI sends, and the CLI must accept every event the hooks file names.
 func TestHookPayloadContract(t *testing.T) {
@@ -162,7 +162,7 @@ func keys[V any](m map[string]V) []string {
 func TestShimInertForPlainClaude(t *testing.T) {
 	repo := flowRepo(t)
 	app := newRealApp(t, repo)
-	status := app.W.AgentHooks.Status()
+	status := app.W.AgentHooks.Status("claude")
 	if !status.Running || status.SettingsPath == "" {
 		t.Fatalf("agent hooks not running: %+v", status)
 	}

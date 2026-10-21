@@ -14,10 +14,10 @@ type windowEntry struct {
 	order     int
 }
 
-// WindowRegistry tracks every currently open window by its key (P8 C2). Window creation runs on
+// WindowRegistry tracks every currently open window by its key. Window creation runs on
 // the menu-click/reopen-handler goroutine and beforeFlush runs on the quit goroutine, so this is
 // mutex-guarded — unlike the single `detachWindow`/`mainWindow` package vars it replaces, which
-// only ever worked because at most one window could exist at a time (F4).
+// only ever worked because at most one window could exist at a time.
 type WindowRegistry struct {
 	mu      sync.Mutex
 	entries map[string]windowEntry
@@ -31,7 +31,7 @@ func NewWindowRegistry() *WindowRegistry {
 
 // Add registers a newly opened window under key, replacing whatever was registered there before.
 // A reopened window reusing its old key is exactly what used to detach window 1's listeners the
-// moment window 2 was created (F4) — now each key gets its own slot, so one key's Add can never
+// moment window 2 was created — now each key gets its own slot, so one key's Add can never
 // clobber another key's entry. order is the window's stored order; the lowest one is the main
 // window (MainKey).
 func (r *WindowRegistry) Add(key string, order int, win *application.WebviewWindow, detach func()) {
@@ -84,7 +84,7 @@ func (r *WindowRegistry) SetTitle(key, title string) bool {
 // DetachAll runs every registered window's detach exactly once. This is beforeFlush's whole job:
 // the code this replaces detached only the single most-recently-created window, so an earlier
 // window's bounds listener would keep firing into a WindowsRepo whose *sql.DB teardown had
-// already closed (P2 R1's finding, now true per-window instead of only for the newest one).
+// already closed (now true per-window instead of only for the newest one).
 func (r *WindowRegistry) DetachAll() {
 	r.mu.Lock()
 	detaches := make([]func(), 0, len(r.entries))
@@ -98,7 +98,7 @@ func (r *WindowRegistry) DetachAll() {
 }
 
 // Count reports how many windows are currently registered — AttachCloseFlush's own real-interaction
-// fix (item 8: the webview-process leak) reads this immediately before deciding how a window's
+// fix (the webview-process leak) reads this immediately before deciding how a window's
 // close finishes: 1 means the window asking is the last one, so closing it would otherwise leave
 // the app running (Mac.ApplicationShouldTerminateAfterLastWindowClosed: false, main.go) with no
 // window able to bring its own now-orphaned webview process back — Hide (reused on the next
@@ -141,8 +141,8 @@ func closeDecision(isEphemeral bool, otherRealWindows int) (hide, deleteRow bool
 	return otherRealWindows == 0, otherRealWindows > 0
 }
 
-// Focus brings key's own window to the front — AdeTaskService.FocusSession's own cross-window Open
-// (P129 Part 7 §0.9). false for an unknown key (the window closed between the lookup and this
+// Focus brings key's own window to the front — AdeTaskService.FocusSession's own cross-window Open.
+// false for an unknown key (the window closed between the lookup and this
 // call). Show/UnMinimise/Focus each wrap their real work in application.InvokeSync internally
 // (vendored webview_window.go), so this is safe to call from any goroutine.
 func (r *WindowRegistry) Focus(key string) bool {
@@ -218,7 +218,7 @@ func (r *WindowRegistry) Keys() []string {
 
 // RemoveAndCount unregisters key (a no-op if it was never registered, e.g. a duplicate close
 // event) and runs its detach, then reports how many windows remain registered — one atomic
-// operation so a window closing at the same instant as another can't race the decision D5 makes
+// operation so a window closing at the same instant as another can't race the decision made
 // from the result: only the close that empties the registry keeps that window's `windows` row
 // (so a later Dock click restores the same workbench); every other close deletes its row.
 func (r *WindowRegistry) RemoveAndCount(key string) (remaining int) {

@@ -34,8 +34,8 @@ func isReadOnlyErr(err error) bool {
 // --- guardRepoSettingsSet: the field-level restriction on repoSettings.set (finding C12-1). ---
 
 // TestGuardRepoSettingsSet_AllowedFieldsReachInnerHandler pins the non-regression half: a patch
-// touching only fields that were always meant to work over this stream (graph paging/scope, and —
-// since P67e — PullStrategy/CheckoutAutoStash, the settings for operations this stream now admits)
+// touching only fields that were always meant to work over this stream (graph paging/scope, and
+// PullStrategy/CheckoutAutoStash, the settings for operations this stream now admits)
 // must still reach the real handler unchanged.
 func TestGuardRepoSettingsSet_AllowedFieldsReachInnerHandler(t *testing.T) {
 	cases := []struct {
@@ -112,10 +112,10 @@ func TestGuardRepoSettingsSet_RestrictedFieldsAreRefused(t *testing.T) {
 	}
 }
 
-// TestRepoSettingsSetTouchesRestrictedField_CoversEveryPatchField is C13-11's second forcing
+// TestRepoSettingsSetTouchesRestrictedField_CoversEveryPatchField is the second forcing
 // function: repoSettingsSetTouchesRestrictedField (gitstream.go) hard-codes which
 // RepoSettingsPatchWire leaves are restricted, with nothing checking that list against the type's
-// own actual field set — exactly the gap that let the original C12-1 bug happen (a new patch field
+// own actual field set — exactly the gap that let the original bug happen (a new patch field
 // silently inheriting "allowed" until someone thought to add it to the restricted list by hand).
 // This sets exactly one field at a time (via reflection over the real struct, not a hand-maintained
 // mirror of its field names) to a real, non-nil value, marshals a genuine RepoSettingsSetParams,
@@ -129,16 +129,16 @@ func TestRepoSettingsSetTouchesRestrictedField_CoversEveryPatchField(t *testing.
 	// distinction is the entire point: a `restricted[name]` map with only the 4 restricted names
 	// listed would let a brand-new field pass this test by pure coincidence whenever
 	// repoSettingsSetTouchesRestrictedField ALSO (correctly, by omission) treats it as unrestricted
-	// — both sides silently agreeing is exactly the undetected-gap failure mode C12-1 was, and
+	// — both sides silently agreeing is exactly the undetected-gap failure mode, and
 	// exactly what a first draft of this test (using a plain bool map, no `seen`/`ok` check) still
 	// let through uncaught in testing.
 	//
 	// Mirrors gitstream.go's own repoSettingsSetTouchesRestrictedField doc comment: the two `true`
 	// entries are write-only surface a compromised graph mount could otherwise stage (a prepare
-	// script/base path; gitrpc refuses the script on every connection since P172, this guard is
-	// defence in depth). PullStrategy/CheckoutAutoStash flipped to `false` in P67e (docs/HISTORY.md (v1.6)
-	// P67e-git-relax-read-only.md D4) — they configure operations this stream now admits, not
-	// write-only surface. Every `false` entry is a per-repo graph/UI preference.
+	// script/base path; gitrpc refuses the script on every connection, this guard is
+	// defence in depth). PullStrategy/CheckoutAutoStash flipped to `false` — they configure
+	// operations this stream now admits, not write-only surface. Every `false` entry is a
+	// per-repo graph/UI preference.
 	knownFields := map[string]bool{
 		"WorktreePrepareScript": true,
 		"WorktreeBasePath":      true,
@@ -149,7 +149,7 @@ func TestRepoSettingsSetTouchesRestrictedField_CoversEveryPatchField(t *testing.
 		"StashShowInGraph":      false,
 		"StashIncludeUntracked": false,
 		"ReviewBaseCandidates":  false,
-		"GithubEnabled":         false,
+		"GitHostProvider":       false,
 	}
 
 	patchType := reflect.TypeOf(gitrpc.RepoSettingsPatchWire{})

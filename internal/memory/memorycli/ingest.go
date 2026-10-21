@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
@@ -17,9 +18,9 @@ import (
 
 // RunIngest is the `memory-ingest` subcommand body: the detached import runner, one per memory.db.
 // It exits 0 at once when another runner holds the store's lock, and after the store has been idle.
-// promptsPath is the app's llm-prompts.json. Diagnostics go to stderr, which the launcher appends to
-// the runner log.
-func RunIngest(args []string, promptsPath string) int {
+// promptsPath is the app's llm-prompts.json; agents picks the provider and models its model per
+// call. Diagnostics go to stderr, which the launcher appends to the runner log.
+func RunIngest(args []string, promptsPath string, agents harness.Selector, models memory.ModelSource) int {
 	if len(args) > 0 {
 		fmt.Fprintln(os.Stderr, "memory-ingest takes no arguments")
 		return 2
@@ -39,13 +40,13 @@ func RunIngest(args []string, promptsPath string) int {
 	if promptsPath != "" {
 		prompts = llmprompts.NewStore(promptsPath)
 	}
-	claude := memory.NewCLIRunner()
-	svc := memory.NewService(store, claude, memory.ServiceOptions{
+	agent := memory.NewAgentRunner(agents, models)
+	svc := memory.NewService(store, agent, memory.ServiceOptions{
 		Embedder: embed.NewClient(embed.ClientOptions{Spec: embed.Default, Home: memory.Home()}), Prompts: prompts,
 	})
 	defer svc.Close()
 	runner, err := importer.NewRunner(store, importer.RunnerOptions{
-		Agent: importer.ClaudeAgent{Runner: claude, Executable: exe, Home: memory.Home(), Prompts: prompts},
+		Agent: importer.ModelAgent{Runner: agent, Executable: exe, Home: memory.Home(), Prompts: prompts},
 		Docs:  svc,
 	})
 	if err != nil {

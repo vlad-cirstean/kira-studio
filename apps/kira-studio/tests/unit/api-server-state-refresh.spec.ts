@@ -1,4 +1,4 @@
-// P175 D4: the history list's lazy-when-hidden refresh (P8 D11) and the jar cookie list's
+// The history list's lazy-when-hidden refresh and the jar cookie list's
 // delete-vs-in-flight ordering are invalidation rules over TanStack Query observers, plus two
 // races. Observers are mounted with effectScope().run(useQuery) — every composable here passes the
 // shared queryClient explicitly — and results are read through queryClient.getQueryData.

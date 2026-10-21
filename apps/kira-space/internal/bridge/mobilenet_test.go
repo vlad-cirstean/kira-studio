@@ -12,6 +12,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileweb"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
@@ -23,8 +24,10 @@ import (
 // idleReader answers every read empty: the supervisor test never serves a request.
 type idleReader struct{}
 
-func (idleReader) Board(context.Context) (adewire.Board, error)   { return adewire.Board{}, nil }
-func (idleReader) Prs(context.Context) (adewire.PrsResult, error) { return adewire.PrsResult{}, nil }
+func (idleReader) Board(context.Context) (adewire.Board, error) { return adewire.Board{}, nil }
+func (idleReader) ChangeRequests(context.Context) (adewire.ChangeRequestsResult, error) {
+	return adewire.ChangeRequestsResult{}, nil
+}
 func (idleReader) Sessions(context.Context) (adewire.SessionsResult, error) {
 	return adewire.SessionsResult{}, nil
 }
@@ -36,6 +39,9 @@ func (idleReader) Backlog(context.Context) (adewire.BacklogResult, error) {
 }
 func (idleReader) Repos(context.Context) (adewire.ReposResult, error) {
 	return adewire.ReposResult{}, nil
+}
+func (idleReader) HostProviders(context.Context) (githost.Providers, error) {
+	return githost.Providers{}, nil
 }
 func (idleReader) ReadLog(context.Context, adewire.ReadLogArgs) (adewire.LogPage, error) {
 	return adewire.LogPage{}, nil

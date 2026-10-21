@@ -26,8 +26,8 @@ export const usePageSearchFilterStore = defineStore('pageSearchFilter', () => {
 
   registerTabRuntimeCleanup(clearSearchFilterState);
 
-  // P24 D2/D3: ascending, de-duplicated page-row indices with at least one match, or `null` when
-  // the filter is off or there's no completed scan to filter by (D7: an empty query shows every
+  // Ascending, de-duplicated page-row indices with at least one match, or `null` when
+  // the filter is off or there's no completed scan to filter by (an empty query shows every
   // row). Every scanner emits matches in ascending row order (the outer loop is always `row`), so
   // this is one de-duplicating pass with no sort and no Set.
   function matchedRowsOf(

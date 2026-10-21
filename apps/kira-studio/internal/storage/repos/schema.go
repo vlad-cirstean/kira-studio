@@ -8,7 +8,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// SchemaRepo reads and writes the `connection_ddl` table (P18 v1.1 D2) — one row per connection,
+// SchemaRepo reads and writes the `connection_ddl` table — one row per connection,
 // absent until the user writes one. Modelled on FiltersRepo: a single upsert rather than the
 // delete-all-then-insert dance Filters.Replace needs, since this table has exactly one row per
 // connection instead of a set of rows.

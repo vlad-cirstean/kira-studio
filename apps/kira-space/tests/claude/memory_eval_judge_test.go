@@ -14,7 +14,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	harnessclaude "github.com/kirathecat/kira-studio/internal/harness/claude"
 	"github.com/kirathecat/kira-studio/internal/memory/importer"
 )
 
@@ -49,7 +49,7 @@ func judgeCall(ctx context.Context, model, system string, schema []byte, input a
 		"--tools", "", "--disable-slash-commands", "--no-session-persistence", "--permission-prompts", "none",
 		"--output-format", "json", "--json-schema", string(schema), "--system-prompt", system, "--max-budget-usd", budget)
 	cmd.Dir = dir
-	cmd.Env = claudeheadless.ScrubSessionEnv(os.Environ())
+	cmd.Env = harnessclaude.ScrubSessionEnv(os.Environ())
 	cmd.Stdin = bytes.NewReader(in)
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb

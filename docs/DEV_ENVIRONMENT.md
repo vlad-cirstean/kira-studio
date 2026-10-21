@@ -274,8 +274,8 @@ historical prose.
 - **The session's own auto-mode permission classifier blocks `git remote set-url`/`git remote add`
   outright, even against a disposable scratch repo built for a live check** (P129 Part 6's own
   `§6.1`) — flagged as a "Remote Repoint" regardless of intent. A live check that needs a
-  GitHub-shaped `origin` to exercise a GitHub-gated code path (`githubRepo`'s own host check,
-  `gh.go`) cannot repoint an existing scratch remote to fake that shape in this environment; plan
+  GitHub-shaped `origin` to exercise a GitHub-gated code path (`githost/github`'s `ParseRemote`
+  and `Claims`) cannot repoint an existing scratch remote to fake that shape in this environment; plan
   around it (seed the scratch repo with the right remote URL from the start, before it exists as a
   git remote at all) or fall back to reading the gate's own source plus its existing unit coverage,
   rather than spending a retry loop on the same denied action.
@@ -440,6 +440,10 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`. Run `bun run build:space-
   (builds `apps/kira-space/bin/kira-space-server-test` and `bin/fakeclaude`, gitignored).
 - Fake `claude`/`gh`: the test binary or `fakeclaude` symlinked as `claude`/`gh`. Scenario JSON
   path in `KIRA_FAKE_SCEN`, call records (`.args`, `.cwd`, `.prompt`) in `KIRA_FAKE_DIR`.
+- Second code host: `flowharness.WithGitHost(fakehost.New())` registers an in-process `forge.test` host
+  (merge requests) after GitHub. No CLI, no PATH. Use `WithoutGh()` to prove no step reaches `gh`.
+  `fakehost.WithoutSync` hides `FileReviewSync`. Flow: `flows/githostflow`; UI half
+  `tests/ui/git-host-provider.spec.ts`.
 - Harness roots use a short `os.MkdirTemp("", "ksf")` path: unix-socket paths cap near 108 bytes.
 - Many watchers per parallel test can hit the inotify limit; raise `fs.inotify.max_user_instances`.
 - Run `go test` with `CGO_ENABLED=1`; lint with `PATH=$HOME/go/bin:$PATH`.
@@ -481,17 +485,18 @@ Opt-in tests that run the real `claude` CLI and spend tokens. Never in CI, pre-c
 
 | Changed area (paths) | Command |
 |---|---|
-| Hook injection, shim, listener: `internal/agenthooks/**`, `apps/kira-space/internal/ade/tracker.go`, `internal/terminal/bound.go` | `bun run test:claude:space -run 'TestTerminalAgentHooks\|TestHookPayloadContract\|TestShimInertForPlainClaude'` |
-| Claude config isolation: anything that composes a `claude` argv or env, `apps/kira-space/internal/appwire/wire.go` | `bun run test:claude:space -run TestRealClaudeSettingsUntouched` |
-| ADE runs and sessions: `apps/kira-space/internal/{ade,adeflow}/**, internal/claudeheadless/**` | `bun run test:claude:space -run 'TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeManualSession\|TestAdeRebaseRun\|TestAdeResumeRun\|TestAdeResumeLost\|TestAdeReviewStep\|TestAdeReviewLost\|TestAdeSandbox\|TestAdeSandboxReadOnly'` |
+| Hook injection, shim, listener: `internal/harness/claude/hooks/**`, `apps/kira-space/internal/ade/tracker.go`, `internal/terminal/bound.go` | `bun run test:claude:space -run 'TestTerminalAgentHooks\|TestHookPayloadContract\|TestShimInertForPlainClaude'` |
+| Claude config isolation: anything that composes a `claude` argv or env (`internal/harness/claude/**`), `apps/kira-space/internal/appwire/wire.go` | `bun run test:claude:space -run TestRealClaudeSettingsUntouched` |
+| ADE runs and sessions: `apps/kira-space/internal/{ade,adeflow}/**, internal/agentmcp/**, internal/harness/claude/headless.go` | `bun run test:claude:space -run 'TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeManualSession\|TestAdeRebaseRun\|TestAdeResumeRun\|TestAdeResumeLost\|TestAdeReviewStep\|TestAdeReviewLost\|TestAdeSandbox\|TestAdeSandboxReadOnly'` |
 | Agent sandbox: `internal/agentsandbox/**`, `apps/kira-space/internal/ade/sandbox.go` | `bun run test:claude:space -run 'TestAdeSandbox\|TestAdeSandboxReadOnly' -count=1`. Linux checks the second layer (flags, note, `enforced 0`); the macOS half is in the Mac checklist below. |
-| Smart scripts: `internal/{claudeheadless,scriptruns,scripts}/**` (incl. `scheduler.go`, `confirm.go`), `apps/kira-space/internal/ade/automation.go` | `bun run test:claude:space -run 'TestSmartScriptRun\|TestSmartScriptResume'` and `bun run test:claude:studio -run TestSmartScriptRun` |
-| Memory MCP and install: `internal/memory/memorycli/**`, `internal/memory/mcpserver/**`, `internal/memory/memfmt/**`, `internal/mcpinstall/**`, `apps/kira-space/internal/bridge/memory.go`, `apps/kira-space/internal/bridge/memorydistill.go` | `bun run test:claude:space -run 'TestMemoryMcpThroughClaude\|TestMemoryMcpFollowsDocs\|TestMemoryInstallRegisters\|TestMemoryDistill\|TestMemoryDistillBridge'` (`TestMemoryDistill` covers `ingest_files` with `distill` true, P297; `TestMemoryDistillBridge` covers the UI bridge call, P285 Part 4, P297) |
-| Memory gate: `internal/memory/{claude.go,gate*.go,service.go}` | `bun run test:claude:space -run TestMemoryGate` |
-| Memory import and ingest: `internal/memory/importer/**`, `internal/memory/claude.go` | `bun run test:claude:space -run 'TestMemoryImport\|TestMemoryIngest\|TestMemoryDistill\|TestMemoryDistillBridge\|TestMemoryDistillTrivia'` (import about 50 s, 0.14 USD, P211; ingest P274) |
+| Smart scripts: `internal/{agentmcp,scriptruns,scripts}/**` (incl. `scheduler.go`, `confirm.go`), `internal/harness/claude/headless.go`, `apps/kira-space/internal/ade/automation.go` | `bun run test:claude:space -run 'TestSmartScriptRun\|TestSmartScriptResume'` and `bun run test:claude:studio -run TestSmartScriptRun` |
+| Memory MCP and install: `internal/memory/memorycli/**`, `internal/memory/mcpserver/**`, `internal/memory/memfmt/**`, `internal/harness/claude/mcpinstall/**`, `apps/kira-space/internal/bridge/memory.go`, `apps/kira-space/internal/bridge/memorydistill.go` | `bun run test:claude:space -run 'TestMemoryMcpThroughClaude\|TestMemoryMcpFollowsDocs\|TestMemoryInstallRegisters\|TestMemoryDistill\|TestMemoryDistillBridge'` (`TestMemoryDistill` covers `ingest_files` with `distill` true, P297; `TestMemoryDistillBridge` covers the UI bridge call, P285 Part 4, P297; `TestMemoryDistillRewrite` covers mode rewrite, P315, about 0.01 USD) |
+| Memory gate: `internal/memory/{agentrunner.go,gate*.go,service.go}`, `internal/harness/claude/structured.go` | `bun run test:claude:space -run TestMemoryGate` |
+| Memory import and ingest: `internal/memory/importer/**`, `internal/harness/claude/structured.go` | `bun run test:claude:space -run 'TestMemoryImport\|TestMemoryIngest\|TestMemoryDistill\|TestMemoryDistillBridge\|TestMemoryDistillTrivia'` (import about 50 s, 0.14 USD, P211; ingest P274; the `TestMemoryDistill` prefix also runs `TestMemoryDistillRewrite`, P315) |
 | Memory ingest eval (P285): `internal/llmprompts` memory.import.* prompts, `internal/memory/importer/{chunk,extract,finalize}*.go` quality | `bun run eval:memory` with `KIRA_EVAL_MODE=run KIRA_EVAL_ROUND=<name>` (see ARCHITECTURE "Memory ingest eval"). Opt-in, never in hooks or CI. Costs about 4 to 5 USD per tuning run (8 to 10 min), judge included; P285 spent 57.9 USD in all; Part 2 spent 28.5 USD (ledger `spend-p2.jsonl`). Part 3 spent about 5.4 USD on the eval (ledger `spend-p3.jsonl`). P289 spent about 8.9 USD on the 5-source subset (ledger `spend-p289.jsonl`; `KIRA_EVAL_ONLY=plan-p257,spec-chunk-go,doc-arch-prompts,cmt-runner-go,json-ade-errors`, about 1.5 USD per round); run the test binary from `apps/kira-space/tests/claude` (`go test -c`) to keep a tree edit from changing a round midway. `KIRA_EVAL_MODE=footprint` with `KIRA_EVAL_ROUNDS=<r1,r2>` re-renders stored facts of past rounds and costs nothing. P291 (retrieval and telegraph eval) spent 14.04 USD of 20 (ledger `P291-runs/spend-p291.jsonl`, set `KIRA_EVAL_RUNS_DIR=P291-runs KIRA_EVAL_LEDGER=spend-p291.jsonl`); modes `questions`, `keys`, `telegraph`, `score` (with `KIRA_EVAL_STYLE=tele`) are paid, `retrieval` and `compare` are free and need `KIRA_ORT_LIB` (`sh scripts/fetch-onnxruntime.sh linux-x64`). Not a pass/fail row: it scores quality. |
 | DB MCP: `apps/kira-studio/internal/dbmcp/**`, `apps/kira-studio/internal/bridge/dbmcp.go` | `bun run test:claude:studio` |
 | Prompt registry, store, templates: `internal/llmprompts/**` (after a default rewrite run the whole row; regenerate goldens with `go test ./internal/llmprompts -run TestGolden -update` and contracts with `KIRA_CONTRACT=write`) | memory gate, memory MCP, memory import, ADE, smart scripts and DB MCP rows above: `test:claude:space -run 'TestMemoryGate\|TestMemoryMcpThroughClaude\|TestMemoryMcpFollowsDocs\|TestMemoryInstallRegisters\|TestMemoryImport\|TestMemoryIngest\|TestMemoryDistill\|TestMemoryDistillBridge\|TestMemoryDistillTrivia\|TestAdeHeadlessRun\|TestAdeStepResults\|TestAdeManualSession\|TestAdeRebaseRun\|TestAdeResumeRun\|TestAdeResumeLost\|TestAdeSandbox\|TestSmartScriptRun\|TestSmartScriptResume'` and `bun run test:claude:studio` |
+| Any other `internal/harness/**` change | `bun run test:claude` |
 | Claude CLI upgrade | `bun run test:claude` |
 
 Sandbox notes:
@@ -869,7 +874,7 @@ flick). Add a view by copying a probe and calling `measureFlick` over `FLICK_LAD
 - RSS comes from `ps`. On macOS it omits CoreAnimation/IOSurface graphics memory, the dominant
   scroll cost there. Read real footprint with `apps/kira-studio/frontend/proto/grid/mac/wkhost.swift`.
 - Env knobs: `NDOCS` (documents), `NROWS`/`NCOLS` (console grid), `BODYKIND`/`NITEMS` (HTTP
-  response), `NTABLES` (tree), `GRAPH_N` (git graph).
+  response), `NTABLES` (tree), `GRAPH_N` (git graph), `NCONTAINERS` (docker list).
 
 ## Grid prototype (P165) — `proto/grid/`
 
@@ -925,8 +930,8 @@ Every name read or set in Go. "Set by" says who supplies it; "you" means set it 
 | `KIRA_INSECURE_SECRETS` | `1` stores secrets unencrypted on Linux without a keyring. Dev only | you; IPC fixture harness |
 | `KIRA_NO_STARTUP_ALERT` | Skips the native startup-failure dialog; the failure is still logged (`startupfail`) | you, CI and headless runs |
 | `KIRA_ORT_LIB` | ONNX Runtime shared library path, else the bundled copy | you |
-| `KIRA_TERMINAL_ID`, `KIRA_AGENT_HOOK_SOCKET`, `KIRA_AGENT_HOOK_TOKEN` | Identify a terminal and its hook socket to the Claude hook shim | `terminal` on launch, `agenthooks` |
-| `KIRA_USER_STATUSLINE` | The user's own statusline command the hook shim chains to | `agenthooks` shim |
+| `KIRA_TERMINAL_ID`, `KIRA_AGENT_HOOK_SOCKET`, `KIRA_AGENT_HOOK_TOKEN` | Identify a terminal and its hook socket to the Claude hook shim | `terminal` on launch, `harness/claude/hooks` |
+| `KIRA_USER_STATUSLINE` | The user's own statusline command the hook shim chains to | `harness/claude/hooks` shim |
 | `KIRA_ASKPASS_SOCK`, `KIRA_ASKPASS_TOKEN`, `KIRA_ASKPASS_OPID`, `KIRA_ASKPASS_TIMEOUT_MS` | Git askpass helper reaches the prompt broker; per-op id and timeout | `gitaskpass` broker. `loginshell` strips the first two |
 | `KIRA_PREPARE`, `KIRA_WORKTREE_PATH`, `KIRA_WORKTREE_BRANCH`, `KIRA_REPO_ROOT`, `KIRA_REPO_COMMON_DIR` | Worktree prepare script context. `KIRA_WORKTREE_BRANCH` is omitted on a detached head | `gitprepare` |
 | `KIRA_TASK`, `KIRA_REPO`, `KIRA_BRANCH`, `KIRA_BASE`, `KIRA_<NAME>` | Built-in vars of an automation script (`scripts.BuiltinEnv`) | `adeflow` automations |
@@ -946,3 +951,15 @@ Every name read or set in Go. "Set by" says who supplies it; "you" means set it 
 | `KIRA_GIT_DIFFERENTIAL`, `KIRA_GIT_PERF` | `1` runs the git search differential test, the git perf probe | you |
 | `KIRA_DATAGRIP_REAL_PROJECT` | Path of a real DataGrip project for the opt-in import test | you |
 | `KIRA_EMBED_SMOKE_WORKER`, `KIRA_EMBED_FAKE_WORKER`, `KIRA_ASKPASS_HELPER_PROCESS`, `KIRA_TEST_MARKER` | Re-exec markers inside the owning package's tests; never set by hand | the tests themselves |
+
+## Comment sweep (P320)
+
+`go run ./scripts/commentsweep <cmd>`, from repo root. `run` spends tokens: needs an authenticated `claude` on `PATH`
+and builds `kira-space` (`bun run build:space` when `frontend/dist` or `dist-mobile` is missing). Work dir
+`.commentsweep/` (gitignored, resumable): `manifest.jsonl` holds every comment found, any size, with its status.
+
+- `scan [--min-chars 300]`: extract only, counts and cost projection. Refuses a dirty in-scope tree.
+- `run --max-usd X [--jobs 4] [--lang go|ts|vue]`: one `ingest_files` rewrite call per comment; rerun after a halt.
+- `apply --lang L [--dry-run]`: byte-splice, code-identity check, never commits. `restore --ids a,b` undoes units.
+- `report --not-applied`: every comment that did not ship, grouped by status. `report --sample N --out F`: judge sample.
+- `status`: outcomes, spend, applied files.

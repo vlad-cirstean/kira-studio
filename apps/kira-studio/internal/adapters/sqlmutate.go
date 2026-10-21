@@ -74,10 +74,10 @@ func AssertKeyIsPrimaryKey(primaryKey []string, key model.RowValues, qualifiedNa
 }
 
 // ValueRenderer is the Go analogue of sql-mutate.ts's ValueRenderer<P> — the one thing the three
-// SQL dialects disagree on is the placeholder each renderer emits ($n vs ?), which BuildKeysetPredicate
-// already takes as a parameter for the same reason. It also takes the column name (NewParamRenderer's
-// own binary-decoding gate below needs it) and can fail: a malformed edited value must be reported,
-// not silently mis-encoded.
+// SQL dialects disagree on is the placeholder each renderer emits ($n vs ?), which
+// BuildKeysetPredicate already takes as a parameter for the same reason. It also takes the column
+// name (NewParamRenderer's own binary-decoding gate below needs it) and can fail: a malformed
+// edited value must be reported, not silently mis-encoded.
 type ValueRenderer func(name string, value *string, params *[]any) (string, error)
 
 // LiteralRenderer is preview()'s renderer (never executes): an escaped SQL literal, no params
@@ -104,9 +104,8 @@ func DecodeBinaryCellText(text string) ([]byte, error) {
 // placeholder for the position it landed at. isBinary reports whether name is a binary-typed
 // column: such a column's value arrives here still spelled in the "0x<hex>" display convention
 // (read unchanged, or hand-edited) and must be decoded into raw bytes before being bound — handing
-// the driver that display string as-is silently corrupts the column's real bytes on every edit
-// (P2 R1 finding), since it is the ASCII text "0x4142" that gets stored, not the two bytes it
-// denotes.
+// the driver that display string as-is silently corrupts the column's real bytes on every edit,
+// since it is the ASCII text "0x4142" that gets stored, not the two bytes it denotes.
 func NewParamRenderer(placeholder func(int) string, isBinary func(name string) bool) ValueRenderer {
 	return func(name string, value *string, params *[]any) (string, error) {
 		if value != nil && isBinary(name) {
@@ -241,7 +240,7 @@ func CompileMutationOps(relationSQL string, ordered []model.MutationRowOp, param
 
 // BinaryColumnsOf builds the isBinary lookup NewParamRenderer needs from a read target's own
 // resolved column types — a binary column's edited value is still spelled in the "0x<hex>" display
-// convention and must be decoded to raw bytes before it reaches the driver (P2 R1). typeClassFor is
+// convention and must be decoded to raw bytes before it reaches the driver. typeClassFor is
 // the caller's own dialect-specific mapping.
 func BinaryColumnsOf(columns []model.ColumnMeta, typeClassFor func(dataType string) page.TypeClass) func(name string) bool {
 	binary := make(map[string]bool, len(columns))
@@ -273,8 +272,8 @@ func PreviewSQLMutation(plan model.MutationPlan, relationSQL string, literalRend
 // while asserting each affects exactly one row, commit — with a deferred rollback (never skipped
 // on an early return) that only fires when commit never happened. exec is the caller's own
 // SuppressCommand-style command executor; rollback runs on its own detached, timeout-bounded ctx so
-// it always reaches the server regardless of the caller's own ctx state (P2 R2's own rule, common to
-// all three adapters' mutate()).
+// it always reaches the server regardless of the caller's own ctx state (common to all three
+// adapters' mutate()).
 func RunSQLMutation(ctx context.Context, beginSQL string, exec func(sqlText string, params []any) (int64, error), rollback func(context.Context), compiled []CompiledOp) (model.MutationResult, error) {
 	if _, err := exec(beginSQL, nil); err != nil {
 		return model.MutationResult{}, err
@@ -322,7 +321,7 @@ type RelationalMutateDeps struct {
 }
 
 // RunRelationalMutate is mutate.ts's own mutate, shared verbatim across postgres/mysqlfamily/
-// sqlite (P107 I2-11): AssertWritable, resolve+validate, compile, one SetCommand call, then
+// sqlite: AssertWritable, resolve+validate, compile, one SetCommand call, then
 // RunSQLMutation. deps.Resolve, deps.Exec and deps.Rollback stay adapter-owned because their own
 // driver calls (execFor/getReadTarget/runCommand signatures, the rollback statement itself) differ
 // per package.
@@ -353,8 +352,7 @@ func RunRelationalMutate(ctx context.Context, op *OpCtx, readOnly bool, plan mod
 
 // ResolveDatabaseTablePath ports sql-mutate.ts's resolveDatabaseTablePath — the two-segment
 // database/table path check clickhouse/mysql-family/sqlite's mutate.ts each wrote out; postgres
-// keeps its own three-segment resolveTablePath. Ported here in M1 because P58b's three adapters
-// all need it and M1 is the substrate milestone.
+// keeps its own three-segment resolveTablePath.
 func ResolveDatabaseTablePath(path model.NodePath) (database, table string, err error) {
 	segs, err := RequirePath(path, "mutate", Seg("database"), Seg("table"))
 	if err != nil {

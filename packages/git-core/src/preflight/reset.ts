@@ -1,12 +1,12 @@
 /**
- * `docs/plans/P10.md` §7.7's reset classifier. Unlike `classifyRevert`/`classifyCheckout`, there
- * is no dirty-worktree blocker here at all — a dirty tree is exactly what `soft`/`mixed` are FOR
- * (probe 1), and `hard`'s destruction of it is `destroys` plus `requiresTypedConfirmation`, an
- * advisory the dialog surfaces, not a refusal. The only real blockers are an in-progress operation
- * (probe 3: git does not refuse a mid-merge reset on its own, so this classifier is the one place
+ * The reset classifier. Unlike `classifyRevert`/`classifyCheckout`, there
+ * is no dirty-worktree blocker here at all — a dirty tree is exactly what `soft`/`mixed` are FOR,
+ * and `hard`'s destruction of it is `destroys` plus `requiresTypedConfirmation`, an advisory
+ * the dialog surfaces, not a refusal. The only real blockers are an in-progress operation
+ * (git does not refuse a mid-merge reset on its own, so this classifier is the one place
  * that does) and an unresolved target.
  *
- * G22 D3/D12: this is the one classifier in the whole P10 chapter kept alive in TWO languages —
+ * This is the one classifier kept alive in TWO languages —
  * `internal/gitpreflight/reset.go`'s own `ClassifyReset` is the authoritative twin (a direct,
  * field-for-field port), and this copy exists solely so `packages/git-ui/src/state/ops.ts`'s
  * `previewResetMode` can recompute the dialog's mode-radio verdict with no round trip. Any change

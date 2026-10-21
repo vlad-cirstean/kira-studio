@@ -48,7 +48,7 @@ whatever sandbox a session happens to be in),
 - Styling uses Tailwind v4 with CSS-first config; tokens mirror VS Code Dark Modern.
 - Dynamic colours must be Record<Enum,string> class maps of full literals, never template-built class names, because Tailwind emits only scanned literals.
 - ADE tones are @theme tokens in ade/v2/tones.css.
-- Every palette colour mark must go through colorMarkClass(mark, color) in packages/theme/src/connColor.ts: rail on left-panel rows, bar on tabs, dot inline, band under view toolbars; no colour leaves the slot empty, and a dot shows a ring.
+- Every palette colour mark must go through colorMarkClass(mark, color) in packages/theme/src/connColor.ts: rail on left-panel rows, bar on tabs, dot inline, band under view toolbars; no colour leaves the slot empty, and a dot shows a ring. The rail is 4px (`w-1`).
 - When converting off plain CSS, stop at the first fitting rung: (1) Tailwind default-scale utility; (2) existing @theme token utility backed by a --kira-* property; (3) a new @theme token only when the value recurs 3+ times or is a deliberate design seam; (4) an arbitrary value only for a one-off or genuinely runtime/viewport/calc value, with a stated reason.
 - Define each @theme name once, because Tailwind v4 resolves a duplicated name to the last-loaded definition (base.css and shadcn-bridge.css declare @theme on the same root); never re-declare a name shadcn's bridge already owns.
 - The duplicate --color-muted, --color-input and --color-border declarations were deleted from base.css and now live only in shadcn-bridge.css; legacy meanings moved to bg-field and text-muted-foreground.
@@ -406,7 +406,8 @@ whatever sandbox a session happens to be in),
 schema_version(version)
 settings(key, value)                                   -- fonts, sizes, budgets, toggles
 connections(id, name, kind, color, mode, read_only, host, port, database, username, password,
-            uri, options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec,
+            uri, options_json, preconnect, preconnect_sidecar, preconnect_delay_sec, auto_explain,
+            throttle_per_sec,
             created_at, updated_at, sort_order, mcp_enabled, mcp_description, mcp_read_mode,
             mcp_write_mode, mcp_ddl_mode, mcp_auto_explain, mask_correlation_key)
                                                        -- v1.7: mcp_enabled (0/1, default 0, 0020);
@@ -470,7 +471,10 @@ custom_scripts(id, name, command, working_dir, dir_mode, kind, params_json, smar
                                                        -- 0036 / 0029), schedule_json (Part 4, 0037 /
                                                        -- 0030; '' = not recurring):
                                                        -- NULL = ungrouped, FK to
-                                                       -- custom_script_collections ON DELETE CASCADE
+                                                       -- custom_script_collections ON DELETE CASCADE;
+                                                       -- sort_order is dense per collection (NULL =
+                                                       -- ungrouped set); Move appends to the end of
+                                                       -- the target set
 script_runs(id, script_id, script_name, color, kind, trigger_kind, state, terminal_id, cwd, command,
             outcome_json, created_at, started_at, finished_at, model, session_id, prompt, params_json,
             tools_json, task_id, task_title, branch_id, branch_label)
@@ -488,9 +492,9 @@ script_run_logs(run_id, seq, stream, text)              -- P242 Part 2; smart-ru
                                                        -- stdout|stderr|event
 custom_script_collections(id, name, sort_order, created_at, updated_at)
                                                        -- P219; one row per script collection, name
-                                                       -- trimmed, 64 runes max, order is sort_order,
-                                                       -- name (creation order). Empty ones may exist.
-ui_layout(key, value)                                   -- panel sizes, visibility (app-wide)
+                                                       -- trimmed, 64 runes max, order is sort_order
+                                                       -- (user drag order), name. Empty ones may exist.
+ui_layout(key, value)                                   -- panel visibility (app-wide), panel sizes per module (modes.<mode>.*)
 windows(key, order, bounds_json)                        -- one row per workbench (P8)
 tabs(id, connection_id, path, kind, state_json, order, active, window_key, workspace_id)
                                                        -- session restore, window_key ON DELETE
@@ -787,7 +791,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - ScriptLauncher.Exited finishes a run from the session's exit code and the registry's close cause (CauseUser from Terminal.Close or ScriptRuns.Stop, CauseWindow, CauseQuit).
 - Recover runs at boot and fails every run a dead process left running, with the reason "interrupted: Kira Studio closed while it ran".
 - The scriptRuns frontend query is keyed ['scriptRuns','list'] and is patched in place by the push channel, with no polling; memory runs stay out of the Automations list.
-- A smart script (custom_scripts.kind = smart) runs as headless Claude via claude -p through internal/claudeheadless (moved from Space's adeagent), sharing the launch, stream-json parser and finish_step loopback server with the ADE run engine.
+- A smart script (custom_scripts.kind = smart) runs as headless Claude via claude -p through internal/agentmcp (moved from Space's adeagent), sharing the launch, stream-json parser and finish_step loopback server with the ADE run engine.
 - Smart script defaults are model sonnet, 1 USD budget (--max-budget-usd) and 15 min timeout; bounds in internal/scripts/smart.go are 20 params, 20000-char prompt, budget 0.05-25 USD, timeout 1 min-2 h.
 - Smart runs are Isolated: --setting-sources '' loads no Claude settings file, --strict-mcp-config allows only the report server plus the MCP servers the script ticked, and --permission-prompts none denies instead of asking.
 - A smart script's --tools and --allowedTools come from its tool allowlist (built-ins Read, Grep, Glob, Edit, Write, NotebookEdit, Bash; default Read, Grep, Glob).
@@ -816,10 +820,12 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - TerminalTabView.vue/TerminalHostView.vue read neither workspaceId nor codeRepoId; the tab prop is typed against TerminalHostView's own prop shape, not either app's tab-record type.
 - The Operations dock is a full-width flex sibling below the shell's project/main row, outside any split, because nesting it as a vertical group hung the render process on a tree-row click (never root-caused).
 - WorkbenchShell.vue renders the project panel and the dock through ResizeHandle (px, clamped to [180, 480] and [100, 500]), previewing locally and emitting resize-project/resize-ops on release; project and main share one row so their heights match.
+- Project width and dock height are keyed by active module (`modes.<mode>.project.width`, `modes.<mode>.project.widthUserSet`, `modes.<mode>.operations.height`); each shell passes `layoutStore.sizesFor(modeStore.active)`. Visibility and cell editor height stay app-wide.
 - The Operations panel is shared: OpLogPanel.vue (generic over R extends OpLogRecord) in packages/workbench is the panel shell, and createOpLogStore<R>({ control, searchText? }) is the Pinia store factory.
 - opLogRecordSchema/OpLogRecord in packages/shared/domain/ops.ts (id, startedAt, durationMs, kind as plain z.string(), status, command, error) is the base contract that consumers' own op records extend.
 - Kira Studio's OpRecord extends opLogRecordSchema with connectionId, tabId, kind: opKindSchema, rows, commandTruncated and path; it is the first consumer, and Kira Space's SpaceOpRecord is the second (P132 Part 2).
 - Kira Studio's OperationsPanel.vue wraps OpLogPanel with its own columns array, #cell/#detail slots, and a menuFor prop building a five-item context menu around Studio-only actions (reveal tab, re-run).
+- OpLogPanel.vue shows a live elapsed clock (op-elapsed, m:ss) for every running row, ticked by one shared VueUse interval paused while runningCount is 0; finished rows show the formatted durationMs.
 - opLogMenuItems supplies the three generic menu items (copy-command, copy-error, cancel) in a fixed order so a consumer can destructure them.
 - toggleOperationsPanel/setOperationsHeight moved from Kira Studio's state/layout.ts into the shared createLayoutStore.ts core, used by both apps.
 - No Kira-Studio import (MonacoHost, a connections store, kira-studio) may reach the shared package; this was verified by a closing-audit grep in P132 Part 1 §7.
@@ -864,7 +870,8 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - TabStrip reads the narrow TabStripHost seam (host.ts): an optional host prop, falling back to the injected WorkbenchHost, which extends it. Optional capabilities (close*, duplicate, promote, preview, moveTab) hide their affordance when absent.
 - TabStrip has a #tab-leading slot that renders before the title, and the kind flag pinnedTitle makes a pinned chip labelled rather than icon-only.
 - Tab reorder uses vue-draggable-plus useDraggable in forceFallback mode on the scrolling row only (pinned chips sit outside it), bound to an id mirror so the library reverts its own DOM move; onUpdate commits once per drop via moveTab.
-- The reorder binding is util/useSortableReorder.ts, shared with Studio's column, environment and variable lists.
+- The reorder binding is useSortableReorder (packages/workbench/src/behaviour/sortableReorder.ts), shared with Studio's column, environment and variable lists, the Automations panel (SortableList.vue) and Space's Git panel repo list. Its keyboardHandle option limits Alt+Arrow moves to an item's own row.
+- Studio's project tree is virtualized, so connection drag uses project/connectionReorder.ts (VueUse pointer hit-testing, drop line, edge auto-scroll). Alt+Up/Down go through the connection menu's Move up/down items.
 - Adding a tab kind takes one registry entry each in state/tabKinds.ts and workbench/tabViews.ts, not editing a dispatch chain in three files.
 - 'http-request' is the first Api-mode tab kind: TAB_KIND_MODE['http-request'] is 'api' and every other entry is 'studio'.
 - Tab kinds are a vocabulary that Go's model.RenderableTabKinds must also carry; no compiler catches a miss, and tests/unit/go-ts-vocabulary-parity.spec.ts checks it.
@@ -894,7 +901,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - ConnectionsService.SecretsStatus is the Api module's only call into a Studio service (used by api/VariableSetView.vue's OS-keychain check). It reports a process-wide platform fact and lives on ConnectionsService only historically; the proper fix is a separate SecretsService, a new bound method out of scope for P12.
 - No Go domain package may import internal/bridge. Repo-root internal/ipcerr (the error type every bound method returns) was moved out of internal/bridge/ipcerr so connections, secrets and tree no longer depend on the IPC transport layer.
 - apps/kira-studio/internal/layering_test.go's TestDomainPackagesDoNotImportBridge runs go list -deps against the named domain packages so imports into internal/bridge/... fail a test. Kira Space has its own apps/kira-space/internal/layering_test.go, and both use the shared helper internal/layeringtest.
-- The layering tests do not cover repo-root internal/ packages (e.g. internal/agenthooks, internal/terminal), because Go's internal/ visibility rule already stops them from importing either app's internal/bridge.
+- The layering tests do not cover repo-root internal/ packages (e.g. internal/harness, internal/terminal), because Go's internal/ visibility rule already stops them from importing either app's internal/bridge.
 - api/reveal.ts's runReveal is the single four-outcome switch (revealed | cancelled | confirmation-required | error) with a recurse-once-on-confirmation shape, shared by revealVariable, revealHistoryEntry and the Copy as curl reveal loop. The Copy as curl loop calls revealVariable rather than hand-rolling its own copy.
 - project/ConnectionDialog.vue keeps its own copy of the gated-reveal loop on purpose, because sharing it would need a home both project/** and api/** may import, i.e. a new Studio↔Api shared module, created by the phase whose job is removing couplings between them.
 - packages/api-core/src/http/escape.ts is the one exported goQueryEscape, imported by both curl/generate.ts and raw/generate.ts, which now live in one package's src/http/ tree.
@@ -1347,7 +1354,7 @@ keepawake` (repo-root as of v1.9 P116, shared by both apps rather than Kira Stud
 independent, level-shaped reasons onto one `Controller`, a set of held reasons rather than a
 refcount (a refcount double-acquires the moment either source re-asserts a level it already holds).
 The titlebar toggle is the manual reason in both apps. The agent reason is Kira Space only (P188):
-Settings leaf `claudeCode.keepAwakeWithAgents` (Claude Code pane), applied by the package-level
+Settings leaf `agent.keepAwakeWithAgents` (Agent pane), applied by the package-level
 `bridge.KeepAwakeRecompute` against the live count of terminal-registry agent sessions plus `ade`
 sessions running headless. It emits `ChannelKeepAwake` only when the agent reason flips. Triggers:
 terminal `Registry.OnChange`, ade board `OnSessions`, `SettingsService.OnChanged`, boot. Kira Studio
@@ -1366,24 +1373,24 @@ no-op while nothing is held. Every non-darwin build gets a documented no-op driv
 titlebar hides its button outright rather than offering a control that does nothing, and Kira
 Studio's titlebar toggle is its only reason.
 
-**Claude Code hook monitoring is a shared, host-wired package (P127).** What was Kira Studio's own
+**Hook monitoring is a shared, host-wired package (P127), now the Claude provider's optional hook role (P316).** What was Kira Studio's own
 `internal/agenthooks` (P86-P126: the local HTTP listener a Claude Code hook shells out to, plus the
 bridge glue that started it, composed a tab's launch and projected running sessions to the
-renderer) moved to repo-root `internal/agenthooks` — `Manager` (start/stop/status, plus
-`ComposeLaunch(terminalID, cwd, command)` for the `--settings` flag and hook env a launcher adds to a terminal command), the
+renderer) moved to repo-root `internal/agenthooks`, then (P316) to `internal/harness/claude/hooks` — `Server` (start/stop/status, plus
+`Compose(terminalID, cwd, command)` for the `--settings` flag and hook env a launcher adds to a terminal command), the
 socket protocol and its documented bounds (one connection at a time, bounded event size). The
 renderer-side reducer and store hoisted the same way, to
 `packages/workbench/src/state/{agentActivity,createAgentSessionsStore}.ts`; the wire types both
 sides share stayed at `packages/shared/domain/agent.ts` (unmoved — already shared, P86); the two
 event-channel strings hoisted to `internal/appevent`. What a host app still supplies itself: the
 on/off setting (if any), the bound service surface a hook's own launch reaches, and wiring
-`Manager.ComposeLaunch`'s result into its own `TerminalService.Open` — never `ComposeLaunch`'s env
+`harness.Hooks.Compose`'s result into its own `TerminalService.Open` — never `Compose`'s env
 map directly, since `KIRA_AGENT_HOOK_TOKEN` must stay inside Go. **Kira Space is the first, and so
 far only, consumer (P129 Part 1)** — Kira Studio dropped its own bridge/UI/settings leaves at P127
-and wires none of this; the agent keep-awake reason is Kira Space-only (above, P188). Kira Space's `internal/appwire/wire.go` (`wireTracker`) starts `agenthooks.Manager`
+and wires none of this; the agent keep-awake reason is Kira Space-only (above, P188). Kira Space's `internal/appwire/wire.go` (`wireTracker`) starts the `harness.Hooks` hub, which starts each provider's `harness.HookHost`,
 unconditionally, with no on/off setting of its own (P129 Part 1's own posture: a start failure —
 `curl` missing, a bind conflict — is logged, never fatal, and sessions still spawn and track with
-activity icons simply absent). `hookEvents` (`internal/agenthooks/config.go`) now also asks Claude
+activity icons simply absent). `hookEvents` (`internal/harness/claude/hooks/config.go`) now also asks Claude
 Code to fire `UserPromptSubmit`, the one hook event P127's own set left out — `reduceAgentActivity`
 (below) is its first consumer. `AgentEvent` gains `lastAssistantMessage` (P238; Stop's reply text, bounded to 200 bytes on a rune
 boundary like `message`; `packages/shared/domain/agent.ts`).
@@ -1486,6 +1493,9 @@ packaged app does not), where the identical application code runs unchanged over
 - Each app's bridge Windows/Terminal service is a one-line struct embedding the shared type, so Wails' FQN, derived from the embedding type's package, reads WindowsService.Ensure / TerminalService.Open without a binding-name shim.
 - Kira Space's WindowsService gained Ensure/SetMode in P128 §2.2; it previously bound only OpenNew.
 - Behind Kira Studio's services: internal/storage (repos plus forward-only SQL migrations), internal/tree/service.go (children/describe/definition cache-aside), internal/preconnect (pre-connect script supervisor state machine), internal/secrets (keychain), internal/adapterhost, internal/adapters, internal/oplog.
+- Pre-connect readiness: Supervisor.Start takes a ReadyCheck. When the connection's target is loopback with an explicit port (connections.readyAddr), Start probes a TCP dial every 100 ms while the script lives and returns once it connects (60 s timeout kills the script); every other target keeps the 2 s settle window. A fixed window raced slow tunnels (kubectl port-forward, ssh -L): Connect dialed before the port listened.
+- Per-connection `preconnectDelaySec` (0-300, 0 = off) is a floor: connect waits until both the delay and the readiness rule hold. An exit-0 script still waits out the delay; a failing script or Cancel ends it at once; the 60 s timeout starts at delay end. It sizes the wait for non-loopback tunnels and floors a port that already listens before the script runs.
+- The script's startup wait runs as the op kind 'preconnect' (Backend.RunPreconnect, command = script text, nil connection id for a dialog Test). It ends before the 'connect' op starts, Cancel in the Operations panel aborts it, and Re-run is disabled for it. `op:start` carries `delayMs` for a delayed preconnect (live only, not in `op_log`); the Operations panel counts it down in the command cell.
 - internal/oplog holds the op-log event type and its two topics, relocated from the deleted internal/enginehost (P58f D9); repo-root internal/metrics is shared with Kira Space since v1.9 P116.
 - Multi-window (P8): the tab set and active tab (tabs.window_key) and the window's rectangle (windows.bounds_json) are per-window; a second window is reachable via Window → New Window (⇧⌘N).
 - App-wide state shared by all windows: connections and live state, settings, op log, all three cache tiers, metrics readout, keychain, pre-connect supervision, panel layout, because they belong to the one process and database.
@@ -1517,7 +1527,7 @@ packaged app does not), where the identical application code runs unchanged over
 - The update check and in-app install (P66, P119) are shared by both apps. The status bar's right-hand group can show an update-available item, placed first so the app-metrics readout keeps its position.
 - Clicking the update item, or a new version becoming available while the app is open, opens a modal UpdateDialog.vue with an Update button. P119 deliberately replaced Kira Studio's click-opens-the-release-page behavior with this dialog.
 - Repo-root internal/appupdate.Checker, moved out of Kira Studio's internal/ at P119 so Kira Space can share it, makes one plain net/http GET against the kira-studio GitHub releases/latest API and imports nothing under either app's internal/.
-- The update checker does not depend on internal/ghclient (it needs an authenticated gh CLI, the wrong precondition for a check run for every user) or internal/httpclient (the user-facing request builder); it only restates their GitHub API version header value.
+- The update checker does not depend on githost/github (it needs an authenticated gh CLI, the wrong precondition for a check run for every user) or internal/httpclient (the user-facing request builder); it only restates their GitHub API version header value.
 - When buildinfo.Version is a dev sentinel (0.0.0, 0.0.0-dev, 0.0.0-unknown), the update check is suppressed entirely (no request, cache write or goroutine) and InstallUpdate refuses. Only tagged release builds reach the network or install.
 - Each app's renderer polls for updates hourly after the first window mounts, off the boot critical path. Go caches the answer for 6 hours after a successful check and 30 minutes after a failed one, and singleflight collapses concurrent callers, so Go sets the real network cadence.
 - A failed update check (network error, 404, or 403 rate-limit) is silent: no item, no error dialog, no console output, only a debug-level log. A 404 occurs because release.yml publishes only after all gates pass and drafts are invisible to /releases/latest.
@@ -1612,7 +1622,7 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 
 ### Go packages
 
-- Every git package in Kira Space's git module is its own internal/git* package (plus internal/ghclient); no phase merged git code into a shared file where a per-module one would do.
+- Every git package in Kira Space's git module is its own internal/git* package (plus internal/githost); no phase merged git code into a shared file where a per-module one would do.
 - startupfail is not a git package; it is repo-root shared infrastructure, hoisted by P100 Part 1 and reused by both apps' boot sequences. It is listed in the git module's package table only because Kira Space's boot depends on it.
 - TestDomainPackagesDoNotImportBridge in apps/kira-space/internal/layering_test.go covers the git packages, as Kira Studio's own copy covers the Studio and Api domain packages.
 - No internal/git* package imports internal/bridge, and none imports or is imported by an adapter package.
@@ -1628,12 +1638,12 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 | `gitops` | The write side: branch, checkout, tag, revert, reset, cherry-pick, stash, fetch, push, pull, worktree, stack/restack, conflict handling, and stderr progress parsing |
 | `gitsearch` | The cancellable, time-boxed tail scan and the Go matcher, plus the RE2/`RegExp` dialect reconciliation (below) |
 | `gitreview` | `review.db`'s whole surface: compressed content snapshots, fast/slow-path diff selection, partial-review ranges, the flat AI-comment list, and the TTL reaper (Storage, above) |
-| `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `ghclient` and stdlib only |
-| `gitrpc` | The method table (`app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**48**, P257), and the wire types |
+| `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `githost` and stdlib only |
+| `gitrpc` | The method table (`app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**50**, P318), and the wire types |
 | `gitwire` | Generated FlatBuffers code for the git data plane |
 | `gitaskpass` | The credential broker and its `GIT_ASKPASS` shim, over its own private socket, with a bounded wait |
 | `gitprepare` | The worktree prepare script's execution seam, called by ADE only — the one shell exception, below |
-| `ghclient` | `gh` CLI discovery and spawn discipline mirroring `gitclient`'s own `Locator`/probe/TTL-cache shape, a `GhStatus` classification, and PR lookup through `gh api` |
+| `githost` | Provider-neutral code host contract and registry (see Git host abstraction, below). `githost/github` is the `gh` provider: CLI discovery and spawn discipline mirroring `gitclient`'s own `Locator`/probe/TTL-cache shape, a status classification, and change request lookup through `gh api`. `githost/providers` builds the registry |
 | `startupfail` (repo-root, shared — not a git package, see above) | Native, pre-window failure alerts for every boot step (below) |
 | `rpcstream` (repo-root, shared) | The correlated-RPC-with-credits protocol (above) — module-agnostic by design, hoisted out of `apps/kira-studio/internal/bridge` at P100 so both apps import it |
 | `config` (`AcquireLock`) | The `app.lock` single-instance flock (Transport, above) |
@@ -1642,9 +1652,9 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - Never interpolate an app-supplied value into the gitprepare command string; the string is the user's own typed command, and app data (worktree path, branch, repo root) reaches the script only as environment variable values.
 - repoSettings.set refuses to set the prepare command on every gitrpc connection (P172), so no renderer can choose or change what runs; ADE runs the prepare script and the Git window never does (P202).
 - The gitprepare package imports only the standard library and knows nothing about repositories, sessions or approval; gitsession owns every policy decision, so the feature can be tested without spawning a real shell.
-- GitHub authentication is delegated entirely to gh and the app holds no GitHub credential: no OAuth flow, no token prompt, no reading of gh's keychain entry; PR lookups go through gh api.
-- GhStatus is a discriminated union mirroring GitStatus: ok, notFound (install gh), unauthenticated (run gh auth login), and forbidden (403 from insufficient scope or unauthorized org SSO, shown as the fix rather than a raw HTTP status).
-- GhStatus failures never block git itself; they only blank the PR indicator (fail-open).
+- A provider owns its credentials; the app holds none. The github provider delegates to gh: no OAuth flow, no token prompt, no reading of gh's keychain entry; lookups go through gh api.
+- githost.Status kind is ok, notFound (install the CLI), unauthenticated (log in) or forbidden (403 from insufficient scope or unauthorized org SSO, shown as the fix rather than a raw HTTP status). It mirrors GitStatus.
+- A Status failure never blocks git itself; it only blanks the change request indicator (fail-open).
 - gh stdout is capped at 64 MiB while reading, derived from the worst case of a 100-item open-PR page; overflow reports forbidden with a too-large reason, never "unreadable response".
 - autoFetchOutcome classifies ticks: busy (OperationInProgress, Cancelled) reschedules at the normal interval and counts nothing; transient (NetworkFailed, LockHeld) backs off; permanent (every other kind, including AuthFailed, RemoteNotFound, Unknown) stops auto-fetch.
 - Transient auto-fetch failures reschedule at min(interval << failures, max(interval, 60 min)) with the shift clamped at 16 and no attempt limit, so an offline night never stops it; a success resets the count.
@@ -1770,8 +1780,8 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - In Kira Space a tab switch fully unmounts and remounts the graph; there is no KeepAlive around MainView.vue's component :is, so continuity comes from persisted view state.
 - RepoGraphView.vue constructs a TabViewStateStore per mount; git-ui's unmount()/mount() serialize the lane layout, scroll position and loaded rows into the pinned graph tab's persisted state.viewState and rebuild from it on the next mount.
 - graphVisibility.ts's GRAPH_VISIBLE_KEY/MountHandle.setVisible (background-pause optimization) is unreachable in Kira Space because no caller invokes it and there is no mounted-but-backgrounded state; RepoGraphView.vue has no such hooks.
-- PR ancestry is rebuilt with a base cutoff (state/pr.ts rebuildAncestry): each PR's baseRef is resolved locally via rowOfBranchTip (a decoration scan, no new RPC) and its ancestors excluded, so PR badges no longer tag nearly all loaded history behind a PR branch.
-- Bursts of individually-resolving PR branches coalesce into one ancestry rebuild per tick via scheduleAncestryRebuild's nextTick drain.
+- Change request ancestry is rebuilt with a base cutoff (state/changeRequests.ts rebuildAncestry): each baseRef is resolved locally via rowOfBranchTip (a decoration scan, no new RPC) and its ancestors excluded, so badges no longer tag nearly all loaded history behind a branch.
+- Bursts of individually-resolving change request branches coalesce into one ancestry rebuild per tick via scheduleAncestryRebuild's nextTick drain.
 - There is no gitrpc method allowlist (removed in P243 Part 2 with the extension): every gitrpc method is served, and a method the contract does not name does not exist.
 - guardRepoSettingsSet in gitstream.go refuses repoSettings.set with E_READ_ONLY when its patch touches the prepare script or worktreeBasePath, which only Kira Space writes in-process (ADE repo config).
 - The gitrpc Router refuses the prepare-script leaf on every connection (P172), and there is no gitrpc method for shell execution since 46 removed worktree.prepare.
@@ -1817,9 +1827,9 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - GraphOrderState.rebuild reconciles tips against the store: because refs reload before the graph re-walks, a tip sha the store lacks keeps the sha its group last used (HEAD by index, others by key), else HEAD's group would empty and the history collapse.
 - The auto-refresh viewport restore anchors on the top row's sha, and CommitGrid resizes the SlickGrid canvas on a height-only change.
 - A walk reset remembers its loaded row count (gitsession.Walk.keepRows); the next graph.stream re-reads whole pages until the store holds that many rows, so Refresh after Show more keeps the loaded depth.
-- GitHub PR facts (gitsession/gh.go) survive a refs change: markStale() drops only GitHub-remote detection, stale entries (up to ghStaleMax 1 h) serve at once with one single-flight background refresh per key, and the post-fetch purge reads fresh so closed PRs still purge.
-- pr.ts keeps last-known PR facts per repo (cap 8), restores them on setRepoId and revalidates.
-- CommitGrid badges a PR only on the commit its head points at (PrState.prsHeadedAt(sha)); the details pane keeps the ancestry-derived prForCommit.
+- Change request facts (gitsession/changerequests.go) survive a refs change: markStale() drops only remote detection, stale entries (up to 1 h) serve at once with one single-flight background refresh per key, and the post-fetch purge reads fresh so closed change requests still purge.
+- changeRequests.ts keeps last-known facts per repo (cap 8), restores them on setRepoId and revalidates.
+- CommitGrid badges a change request only on the commit its head points at; the details pane keeps the ancestry-derived changeRequestForCommit.
 - The graph column never renders narrower than graphColumnWidth(laneCount) (at most 12 lanes, 173px) in any mode.
 - CommitGrid keeps a grow-only lane floor per mount: a refresh restarts laneCount at 0 and never shrinks it, and a repo switch remounts and resets it.
 - On a first-ever mount (no persisted view state) the graph column tracks the lane floor, even below the stored width, until the user drags it; stored widths are preferences and only a drag writes one.
@@ -1876,6 +1886,66 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - appearance.inlineBlame is a settings toggle, defaulted on, that gates only the inline renderer and is watched live by RepoFileView.vue so toggling affects open tabs immediately.
 - Settings are Go-persisted, one row per leaf, typed via AppearanceSettings/AppearancePatch in internal/storage/model/settings.go; a leaf without a Go counterpart is silently discarded on Set and reverts to its zod default on read.
 
+### Git host abstraction (P318)
+
+- internal/githost is the neutral contract. A Provider composes four roles: Remotes (ParseRemote, Claims), Auth (Status, Account), ChangeRequests (ForCommit, ForBranch, Open) and URLs (ChangeRequestURL, RepoURL, BranchURL, IsChangeRequestURL, ParseLink). FileReviewSync (ChangeFiles, SetFilesViewed) is optional. Callers depend on the narrowest role.
+- "Change request" is the neutral name for a pull or merge request. A provider supplies Terms (label, change request, noun, short, CLI); the UI reads them from githost.Info. No neutral caller holds a provider word.
+- providers.New builds the Registry: github first, then extras. appwire.Options.GitHosts (a Registry; nil is github alone) and flowharness.WithGitHost add providers. flowharness/fakehost is the test-only second host (forge.test, merge requests).
+- Selector.Resolve(setting, remoteURL) picks the provider. Setting kiraSpace.gitHost.provider (per repo) is auto, off or a provider id. auto picks the first provider that parses the origin remote and Claims its host. An unknown id logs a warning and falls back to auto. A pinned id that does not parse the remote resolves to none.
+- The server composes every link (changeRequest.browserUrl, ChangeRequestsResult.BranchURLs, HostLink on tasks and backlog items); the renderer never builds a host URL. Only URLs a provider approves via IsChangeRequestURL open.
+- git-ipc adds gitHost.info (the repo's resolved host, null for none) and gitHost.providers. Space adds GitHostService.Providers and AdeTaskService.HostProviders (phone). Contract version 50 renames the PR-named requests and fields to change request names.
+- Breaker, snapshot and per-branch caches live in the repo entry's host state, not in a provider.
+- ADE storage: ade_tasks.host_url, ade_backlog.host_url, ade_viewed_sync (provider, change_number). Migration 0044 renames github_url, ade_gh_synced and pr_number.
+- No CI status or change request comment roles exist. Add one as a new optional role beside FileReviewSync.
+
+## Agent harness (P316)
+
+The agent CLI sits behind one interface, so a second provider needs no caller change.
+
+- `internal/harness` holds the neutral contract. `Provider` is one value with these roles: `Locator`
+  (find the CLI), `Structured` (one isolated JSON call, memory), `Headless` (a streamed run with an MCP
+  report, ADE steps and smart scripts), `Interactive` (the PTY command, resume, first prompt), `Sandboxed`
+  (what the OS sandbox opens and denies) and `MCPHost` (MCP config, tool names, user servers, installing
+  Kira's servers). Names (`Label`, `ProductLabel`, `HeadlessLabel`, `Command`), `Models` (aliases and a
+  default) and `ModelLabel` are plain methods.
+- Optional roles are found by type assertion, so a provider compiles without stubs: `HookHost` (hook
+  events for interactive sessions; `harness.Hooks` starts every host and composes launches by provider id)
+  and `UsageReporter` (feeds `agentusage`). A provider without them has no activity icons, no
+  finished/needs-input notes and no usage item.
+- `internal/harness/claude` is the only provider. `internal/harness/providers.New` is the single
+  registration point (Claude first, then any extra). Everything Claude-specific lives under it: argv,
+  stream-json parsing, MCP config shape, sandbox profile needs, hooks (`hooks`), the CLI installer
+  (`mcpinstall`) and error texts.
+- `harness.Selector` resolves `Active()` from the `agent.provider` setting per use; an unset, unreadable or
+  unregistered id falls back to `claude` with a warning, never an error. `For(id)` serves a stored
+  conversation and returns `ErrProviderGone` for an unregistered id, mapped to the
+  `backend.core.agent.providerGone.body` conflict. Settings validation accepts any well-formed id, so a
+  provider can be removed without bricking the setting. There is no UI to pick the provider.
+- Run binding: `ade_sessions` and `script_runs` store `provider`. New work uses `Active()`; resume,
+  take over and Continue in terminal use the stored provider, even after the setting changes.
+- Models: `memory.models` maps provider id to alias; smart scripts store an alias in their own `model`
+  field, validated against the union of registered catalogs.
+- UI derivation: the bound `AgentService` (`internal/harness/agentsvc`, both apps) answers `Info()` for the
+  active provider and `InfoFor(id)` for a stored one: `AgentInfo{id, label, productLabel, command,
+  headlessLabel, models, defaultModel, hooks, usage}`. The frontend reads it through
+  `packages/workbench/src/agent/agentInfo.ts` (TanStack Query, keys `['agent','info']`,
+  `['agent','infoFor',id]`; a settings save that changes `agent.provider` invalidates `['agent']`) and
+  feeds `{agent}`, `{product}`, `{headless}` and `{command}` to every catalog message as ambient defaults
+  (`setMessageDefaults`), so templates need no per-call param. The phone reads `GET /api/agent/info`.
+  Settings hide the hook-only notification switches and the usage switch when `hooks`/`usage` are false.
+  Provider labels are plain Go strings, not catalog keys.
+- Outcome and sandbox texts name the provider (`runoutcome.Agent`, `agentsandbox.Namer`).
+- Still Claude-specific by nature: `internal/flowtest/fakeagent` keeps its `claude` persona (the Claude
+  CLI double); real-claude tests (`apps/*/tests/claude`) test the Claude provider; the built-in tool
+  vocabulary of scripts and the `--allowedTools` argv use Claude's tool names, which a new provider maps in
+  `MCPHost.ToolArgs`; the `--color-agent` CSS token keeps Claude's colour value.
+- Add a provider: implement `harness.Provider` and any optional roles in `internal/harness/<id>`, add it to
+  `providers.New`, and keep its CLI strings and error texts inside its package. No caller changes.
+- Test: `flows/harnessflow` `TestSecondProviderRegistered` registers `internal/flowtest/fakeprovider`
+  (id `fake`, models `fast`/`deep`, no hooks, no usage; interactive sessions run the `kira-fake-agent`
+  persona) and drives distill, a smart script, an ADE headless step, an interactive session, resume after
+  a switch, unknown-id fallback and provider-gone. UI half: `tests/ui/agent-provider.spec.ts`.
+
 ## ADE: Kira Space task planner (v2.0)
 
 Kira Space's `ade` module plans tasks across repositories and runs Claude Code on them. It is a
@@ -1894,7 +1964,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 ### Process wiring
 
-- In internal/appwire/wire.go, wireAdeTask builds ade.TaskBoard from TaskBoardDeps: repos, discovery GitStatus (no GitPath), its own gitsession.Conn named ade-board, adeflow.Reader over <home>/workflows, the claudeheadless finish_step server, the Tracker, log sink and session store.
+- In internal/appwire/wire.go, wireAdeTask builds ade.TaskBoard from TaskBoardDeps: repos, discovery GitStatus (no GitPath), its own gitsession.Conn named ade-board, adeflow.Reader over <home>/workflows, the agentmcp finish_step server, the Tracker, log sink and session store.
 - wireAdeTask calls Recover() then Start() on the task board, and installs board.OnTUIStopped as the tracker's stopped handler.
 - bridge.AdeTaskService binds 64 methods, each with one adeTask* entry in frontend/src/bridge/index.ts.
 - AdeTaskService push channels are defined in bridge/adewire/channels.go with prefix kira:adetask: and suffixes board, backlog, workflows, repos, runs, log, sessions and open-session; open-session is emitted to one window via EmitTo.
@@ -1988,7 +2058,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 - Headless runs execute via a login shell running claude -p with --output-format stream-json, --verbose, --session-id, --mcp-config and --setting-sources, cwd the worktree, prompt on stdin, using Setsid and procgroup.GracefulCancel; no --permission-mode and no --strict-mcp-config.
 - App setting ade.headlessSettingSources is either all (the default, meaning user,project,local) or user.
-- The finish_step MCP server (internal/claudeheadless) uses one loopback listener with a bearer token per run (tokenauth); the last call wins and applies at process exit.
+- The finish_step MCP server (internal/agentmcp) uses one loopback listener with a bearer token per run (tokenauth); the last call wins and applies at process exit.
 - The per-run MCP config is <home>/ade/runs/<runId>.mcp.json with mode 0600, deleted at process exit; the token is never put on argv.
 - A grant with declared results (P247) gets its own per-run mcp.Server whose status enum is the result ids plus needs_input; implicit grants keep the shared servers and done|failed|needs_input.
 - suffix.go holds the text appended to the message; FinishStepSuffixFor(results) names the result ids, and the TS mirror is finishStepSuffix.
@@ -2004,7 +2074,7 @@ and `docs/HISTORY.md (v2.0)`.
 - A once step runs in the first mine branch's worktree (D12), and there is no concurrency cap (D8).
 - Restart recovery (D7): Recover() runs before Start(); running runs become stuck with note 'interrupted by restart', running setups fail, task sessions stop, and stale *.mcp.json files are removed.
 - After restart, pending runs keep their launch spec and launch when their gate opens; nothing auto-resumes, and a restart-stuck agent run offers Resume.
-- Agent tools (P199) are implemented in ade/agenttools.go as claudeheadless.SpaceTools on *ade.TaskBoard; the loopback MCP server issues scoped grants (run, task, Space) with one bearer token per launch.
+- Agent tools (P199) are implemented in ade/agenttools.go as agentmcp.SpaceTools on *ade.TaskBoard; the loopback MCP server issues scoped grants (run, task, Space) with one bearer token per launch.
 - A workflow with kira_space_mcp gives headless runs and the task's TUI sessions the Space grant: task_info, declare_repos, request_branch, branch_status.
 - declare_repos accepts registered repos only and is additive.
 - request_branch checks the name with git check-ref-format --branch, refuses main and integration branches, is idempotent, refuses rename and collisions, and sets up the worktree and prepare script through ensureWorktree/startSetup.
@@ -2019,11 +2089,11 @@ and `docs/HISTORY.md (v2.0)`.
 - When a session is resumed after a kill, the turn in flight is lost and its tool effects may be half-applied.
 - Resuming an unknown session id makes the Claude CLI exit 1 with No conversation found with session ID: <id>.
 - The Claude CLI treats --resume together with --session-id as an error, so a resumed launch drops --session-id.
-- AdeTaskRepo.RecoverRunning writes launch_resume_id from ade_sessions.claude_session_id in the same UPDATE that marks the run stuck, only for agent and smart-step runs (purpose = '' with a session).
+- AdeTaskRepo.RecoverRunning writes launch_resume_id from ade_sessions.agent_session_id in the same UPDATE that marks the run stuck, only for agent and smart-step runs (purpose = '' with a session).
 - Rebase and script-step runs, user stops and needs_input runs get no launch_resume_id; adewire.Run.resumable is stuck plus that id.
 - TaskBoard.ResumeRun clears the old spec first, so a second click refuses, then queues attempt+1 with Launch{ResumeID, Prompt: RunResumeLine, Note: "resumed after restart"}.
-- On resume, startRun reuses the Claude session id and composeResumePrompt appends the finish instruction; RunResumeLine (run.resume.line) is one shared prompt for ADE and smart scripts.
-- When claudeheadless.IsNoConversation matches the last stderr line, the outcome becomes runoutcome.EndResumeLost (failed, source start) with no automatic fresh run; Retry or Run again starts anew.
+- On resume, startRun reuses the agent session id and composeResumePrompt appends the finish instruction; RunResumeLine (run.resume.line) is one shared prompt for ADE and smart scripts.
+- When the run's provider reports ResumeLost for the last stderr line (Claude: No conversation found), the outcome becomes runoutcome.EndResumeLost (failed, source start) with no automatic fresh run; Retry or Run again starts anew.
 - Smart scripts in both apps store script_runs.resume_id and resumed_from (Studio migration 0038, Space 0035).
 - Repo.FailRunning and finish set resume_id = session_id for a smart run ended with source restart (crash and graceful quit).
 - Smart script resume: Service.Resume re-plans from the current script, TakeResume compare-and-swaps the id, and the new run row carries resumedFrom and the same session id.
@@ -2050,7 +2120,7 @@ and `docs/HISTORY.md (v2.0)`.
 - model.AdeRunOutcome is runoutcome.Outcome plus an optional Report (conflicted files, last git error, what was tried) and Rebase facts; finish_step takes reason, conflictedFiles, lastGitError, tried.
 - The rebase run timeout is Deps.RebaseTimeout.
 - The rebase agent has no Bash and loads no settings file (Isolated); git runs only through the git tool on the kira-ade MCP server.
-- The git tool requires worktree to be a stack worktree and args to match an exact shape in claudeheadless.CheckGitArgs; -c, -C, --output, --exec and --upload-pack are rejected, and unlisted options fail, abbreviations included.
+- The git tool requires worktree to be a stack worktree and args to match an exact shape in agentmcp.CheckGitArgs; -c, -C, --output, --exec and --upload-pack are rejected, and unlisted options fail, abbreviations included.
 - Stack worktrees are passed as --add-dir so child branches can restack and edit.
 - AbortRebase runs git rebase --abort in the worktree; BranchInventory keeps the worktree path of a mid-rebase branch (detached HEAD, read from rebase-merge/head-name) so abort and rebaseInProgress work.
 - MCP run_outcome (Space grant, same task only) returns the latest ended runs with outcome so another agent can read why a rebase failed; kind automation returns the task's ended script runs.
@@ -2060,7 +2130,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 ### Interactive sessions
 
-- A single ade.Tracker instance is shared by terminal.BoundService.ComposeAgent (Compose), terminal.Registry.OnChange (Reconcile), agenthooks.Manager OnEvent (HandleEvent) and the board (Send, Get).
+- A single ade.Tracker instance is shared by terminal.BoundService.ComposeAgent (Compose), terminal.Registry.OnChange (Reconcile), harness.Hooks OnEvent (HandleEvent) and the board (Send, Get).
 - Tracker.Prepare records a pending launch intent with a 2 min TTL; the renderer opens the terminal through the ordinary TerminalService.Open; ComposeAgent then consumes the intent, inserts the ade_sessions row as running and appends hooks env, --settings and the initial prompt.
 - Reconcile stops a session record only when its terminal is gone and a 30s grace window has passed.
 - The user message follows ' -- ' in argv so it cannot parse as a flag.
@@ -2087,7 +2157,7 @@ and `docs/HISTORY.md (v2.0)`.
 - The sandbox does not cover TUI sessions and Take over, script steps, setup scripts, folder-mode automations, or memory claude calls.
 - The Enforcer interface has Support, Prepare and Watch; System() is real only on darwin, elsewhere Support is Enforced:false with Reason NotEnforcedKey and Prepare still builds profile, flags and env but no wrapper.
 - sandboxtest.Fake stands in for flow tests; the flow harness defaults to a not-enforced fake so contracts do not depend on the host OS.
-- With claudeheadless.Spec.Sandbox, Script emits exec /usr/bin/env -u … K=V /usr/bin/sandbox-exec -f <profile> claude … after the login shell sources the user profile.
+- With agentmcp.Spec.Sandbox, Script emits exec /usr/bin/env -u … K=V /usr/bin/sandbox-exec -f <profile> claude … after the login shell sources the user profile.
 - The profile is checked with sandbox-exec -f <profile> /usr/bin/true first; a failure fails the run before claude starts.
 - The sandbox env redirects build caches to <AgentDir>/sandbox-cache/ and sets TMPDIR to the run scratch.
 - The second sandbox layer uses --add-dir and --disallowedTools (Bash(git branch:*), Bash(git worktree:*), edit tools for read); it is the only layer on Linux, where the notice says it does not stop shell commands.
@@ -2097,16 +2167,16 @@ and `docs/HISTORY.md (v2.0)`.
 - A failed run with denials gets reason 'Sandbox blocked <op> <path>.'; a sign-in failure with the keychain denied gets the token hint; denial and notice lines go to the run log on stdout.
 - Sandbox data is stored in table ade_run_sandbox (migration 0037): access, enforced, resolved policy JSON, profile, denials; AdeTaskService.Run.sandbox carries the badge and RunSandbox returns the detail.
 - Setting ade.sandboxKeychain defaults to false.
-- fetch_remote and push_branch run in the app, unsandboxed (TaskBoard implements claudeheadless.SandboxGit via Grant.Sandbox).
+- fetch_remote and push_branch run in the app, unsandboxed (TaskBoard implements agentmcp.SandboxGit via Grant.Sandbox).
 - push_branch pushes the run's branch to the same-named remote branch (RemoteOpParams.RemoteBranch), refuses protected branches, and is refused for read steps.
 - request_branch remains the way to create a branch and its worktree.
 
-### Claude launch check and folder-scan hiding (P277)
+### Agent launch check and folder-scan hiding (P277)
 
-- toolexec.ResolveClaude finds the claude CLI before any launch by checking PATH, then well-known install paths (ClaudeCandidates), then the user's login shell, because a GUI app's PATH can differ.
-- Tests replace the system well-known claude install paths with SetSystemClaudePaths.
-- When ResolveClaude finds no claude CLI it returns ErrClaudeMissing, which lists every probed place.
-- ade.Tracker.Prepare, the terminal claude-code path and claudeheadless call RequireClaude, so a missing CLI shows a Kira error instead of the shell's text.
+- The provider's Locate finds its CLI before any launch (Claude: PATH, then well-known install paths, then the user's login shell, because a GUI app's PATH can differ; internal/harness/claude/locate.go).
+- Tests replace the system well-known claude install paths with claude.SetSystemPaths.
+- When Locate finds no CLI it returns a harness.ErrNotFound error that lists every probed place.
+- ade.Tracker.Prepare, the terminal agent-launch path and the headless runners call Locate, so a missing CLI shows a Kira error instead of the shell's text.
 - code_repos.hidden_rev (migration 0034) counts writes of the hidden flag.
 - A folder scan applies its stored hidden flag (ApplyFolderHidden) only to repos whose hidden_rev still equals the one stored at import, in one transaction, so a repo unhidden or toggled meanwhile is never re-hidden.
 
@@ -2114,7 +2184,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 Desktop notification when a Kira Space agent finishes or needs input. Package `internal/agentnotify`,
 built in `appwire.Build` and fed by two existing callbacks: the hooks `OnEvent` (every Kira-launched
-claude-code PTY) and the board's `OnRuns` (headless runs, which have no hooks).
+agent PTY) and the board's `OnRuns` (headless runs, which have no hooks).
 
 | Source | Note |
 |---|---|
@@ -2130,7 +2200,7 @@ claude-code PTY) and the board's `OnRuns` (headless runs, which have no hooks).
 - Each window reports focus through AgentNotifyService.ReportFocus, debounced 150 ms (state/agentNotify.ts).
 - Agent notifications have a cooldown of 10 s per (terminal or run, kind).
 - A note id is <kind>:<id> so a newer note replaces the older one.
-- Settings claudeCode.notifyEnabled (master), notifyOnFinished, notifyOnNeedsInput, notifyOnRunEnded and notifyIncludeMessage all default to on.
+- Settings agent.notifyEnabled (master), notifyOnFinished, notifyOnNeedsInput, notifyOnRunEnded and notifyIncludeMessage all default to on.
 - SendTest ignores focus suppression and cooldown.
 - Notifier.Click focuses the window and pushes kira:agent:revealTerminal or kira:agent:revealTask (EmitTo, Space only); an ADE record goes through FocusSession.
 - notify_darwin.go (darwin && !server) registers the Wails v3 notifications service; its sink WailsSink lives in internal/desknotify, shared with prompt notifications (P246).
@@ -2167,30 +2237,33 @@ answers. Bound as `PromptsService` (`List`, `MainWindow`, `Claim`, `Raise`, `Dis
 - The stream no longer carries credential.request or credential.provide (contract 47); the relay snapshot kira:git:credential plus GitCredentialService.Provide is the only path for Git credentials.
 - Prompt routing is tested by flows/promptflow in both apps, dbmcpflow TestDbMcpApprovalRoutes, Space gitflow TestCredentialRoutes, mobileflow TestMobilePairingRoutes, tests/ui/prompts.spec.ts and tests/e2e-real/prompts-two-windows-real.spec.ts; the recording sink is internal/flowtest/notifysink.
 
-### Claude Code usage limits (P239)
+### Agent usage limits (P239, P316)
 
 ADE status-bar item `5h 23% · wk 41%` with reset times in a tooltip. No credential read, no network
-call: Kira only listens to what Claude Code already computes. Package `internal/claudeusage`
-(`Service.Ingest`, `Get`), bound as `ClaudeUsageService` (Kira Space only), push
-`kira:claude:usage` (Space only, at most one per 10 s on a changed value).
+call: Kira only listens to what the agent already computes. Package `apps/kira-space/internal/agentusage`
+(`Service.Ingest`, `Get`), bound as `AgentUsageService` (Kira Space only), push
+`kira:agent:usage` (Space only, at most one per 10 s on a changed value). Usage is an optional provider
+role (`harness.UsageReporter`): only a provider that reports it feeds the service (Claude does), and
+`AgentService.Info.usage` hides the item for a provider that does not. Windows are `harness.RateWindow`
+(`UsedPercent` 0..100).
 
 | Feed | Source | Units |
 |---|---|---|
 | `session` | interactive tab: statusline `rate_limits.five_hour` and `seven_day` | `used_percentage` 0-100, `resets_at` epoch s |
 | `run` | headless run: stream-json `rate_limit_event.rate_limit_info.unifiedWindows` | `utilization` 0..1, `resetsAt` epoch s |
 
-- claude -p never invokes a statusLine (checked on claude 2.1.295), so headless runs feed usage limits through their output instead, via claudeheadless.Handler.OnRateLimits chained from ade/runs.go.
+- claude -p never invokes a statusLine (checked on claude 2.1.295), so headless runs feed usage limits through their output instead, via agentmcp.Handler.OnRateLimits chained from ade/runs.go.
 - For usage readings, the newest reading wins per window; the tooltip shows the source and its age.
-- Manager.ComposeLaunch(terminalID, cwd, command) writes <server dir>/settings-<12 hex>.json (0600; hooks plus a statusLine pointing at the shim in statusline mode) and passes it to --settings.
+- hooks.Server.Compose(terminalID, cwd, command) writes <server dir>/settings-<12 hex>.json (0600; hooks plus a statusLine pointing at the shim in statusline mode) and passes it to --settings.
 - Claude Code replaces the user's own statusline for the session, so the shim runs the user's statusline command and prints its output; lookup is read-only: project .claude/settings.local.json, .claude/settings.json, then $CLAUDE_CONFIG_DIR or ~/.claude settings.json, passed as KIRA_USER_STATUSLINE. The user's files are never written.
 - The shim forwards a payload containing rate_limits at most once per 30 s per terminal, in the background, to POST /statusline (same token and terminal checks as /hook, 64 KiB cap).
 - The /statusline listener decodes rate_limits only; nothing else of the payload is kept.
 - Usage states are ok, waiting (nothing yet: Usage: –, hint "Start a Claude Code session to see usage") and off.
 - A usage window whose reset time has passed is dropped on read.
-- The last usage numbers persist atomically to <KIRA_SPACE_HOME>/claude-usage.json (0600) and reload at start.
-- Setting claudeCode.usageEnabled (default on): when off, no statusLine is injected into new launches, the usage item is hidden, and Get returns off; it applies only to launches after the change.
-- Frontend usage display: state/claudeUsage.ts (TanStack Query, 60 s poll, push replaces the cache) and workbench/ClaudeUsageItem.vue (tones at 80 and 95 percent), shown in ADE mode only.
-- Usage limit tests: flows/usageflow (statusline through the real shim and socket, run stream through the board) and tests/ui/claude-usage.spec.ts.
+- The last usage numbers persist atomically to <KIRA_SPACE_HOME>/agent-usage.json (0600) and reload at start.
+- Setting agent.usageEnabled (default on): when off, no statusLine is injected into new launches, the usage item is hidden, and Get returns off; it applies only to launches after the change.
+- Frontend usage display: state/agentUsage.ts (TanStack Query, 60 s poll, push replaces the cache) and workbench/AgentUsageItem.vue (tones at 80 and 95 percent), shown in ADE mode only.
+- Usage limit tests: flows/usageflow (statusline through the real shim and socket, run stream through the board) and tests/ui/agent-usage.spec.ts.
 
 ### Worktree setup
 
@@ -2246,8 +2319,8 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 - A stopped review agent row resumes with --resume and the same claudeSessionId; if the recorded cwd is gone, the old row loses purpose and a new one launches.
 - TakeOver of the review agent row goes through launchReviewAgent.
 - Questions to the review agent are pasted bracketed through Tracker.Send, and Send is disabled while the agent waits on input.
-- GitHub sync is one way and uses gh only: GitHubSyncPlan decides per file (ghSyncDecision), and Apply marks files with one aliased markFileAsViewed mutation via gh api graphql.
-- ade_gh_synced records files this app marked as viewed; un-reviewing one fires unmarkFileAsViewed server side through the unmark observer (SetObserver), for ledger files only. Partial reviews never sync.
+- Viewed sync is one way and needs a provider with FileReviewSync (status unsupported otherwise): ViewedSyncPlan decides per file, and Apply marks files through the provider. The github provider uses one aliased markFileAsViewed mutation via gh api graphql.
+- ade_viewed_sync (provider, change_number per row) records files this app marked as viewed; a row of another provider or change request drops at the next plan; un-reviewing one fires unmarkFileAsViewed server side through the unmark observer (SetObserver), for ledger files only. Partial reviews never sync.
 - Review comments carry kind (change|question) and state (open|addressed) plus the agent's reply, repliedAt and sentAt (gitreview 0004); older rows read as change/open.
 - review.comment.add takes kind; review.comment.setState reopens or addresses a comment; the export marks the kind and state.
 - The review window's right pane has SecondaryTabs (ade-review-right-tabs): AdeWorkflowReviewPanel (comments, route, Send to agent, round block, finish buttons; shown while the branch has a review step run) and the review agent. The tab pick lives in useAdeReviewWindowStore.
@@ -2258,8 +2331,8 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 
 ### Tests
 
-- ADE Go tests cover internal/ade (board, integration, deploy, run engine, steps, tracker), adeflow, claudeheadless and bridge/adewire; run them with go test -race, together with gitsession.
-- The P199 protocol is covered by claudeheadless TestGrantScopes (go-sdk client) and agenttools_test.go.
+- ADE Go tests cover internal/ade (board, integration, deploy, run engine, steps, tracker), adeflow, agentmcp and bridge/adewire; run them with go test -race, together with gitsession.
+- The P199 protocol is covered by agentmcp TestGrantScopes (go-sdk client) and agenttools_test.go.
 - ADE frontend tests: tests/unit/ade-v2-* cover board parity with the mockup's logic, dialog, drop plan, progress and timeline; ade-notes-markdown is also covered; 17 tests/ui/ade-v2-*.spec.ts run on the mock runtime.
 - There is one ADE visual spec, tests/visual/ade-workflow-graph.spec.ts (P247).
 - The live smoke test (server build, real claude -p) covers runs, send-back, restart recovery, Spec/Start/Take over sessions, and merge, rebase and archive dialogs.
@@ -2296,7 +2369,7 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 - Write rate per device is 1/s burst 10; terminal attach is 1 per 2 s burst 3.
 - Stale guard: FromStepID on SetTaskStepArgs, StartRunArgs and LaunchStepArgs is checked inside taskMu; a mismatch is ade.ErrStale (bridge E_STALE, HTTP 409). Desktop leaves it empty.
 - PTYs stay window-owned: a phone launch or take-over makes the server EmitTo kira:mobile:openLaunch to one real (non-ephemeral) window, which runs the desktop openLaunch and acks via MobileAccessService.LaunchOpened. The request waits 20 s (504 E_LAUNCH_TIMEOUT); no window gives 409 E_NO_WINDOW; the phone gets only the ADE session id, never a terminal id.
-- internal/terminal.Arbiter (nil in Kira Studio) hooks BoundService for claude-code terminals, sees output from spawn and gates window Write and Resize; mobileterm.Broker implements it. Each terminal has a 1 MiB ring with absolute byte offsets, so attach replays history; a slow phone gets {type:"reset"} plus the oldest byte held and never blocks the PTY reader.
+- internal/terminal.Arbiter (nil in Kira Studio) hooks BoundService for agent terminals, sees output from spawn and gates window Write and Resize; mobileterm.Broker implements it. Each terminal has a 1 MiB ring with absolute byte offsets, so attach replays history; a slow phone gets {type:"reset"} plus the oldest byte held and never blocks the PTY reader.
 - Takeover has one controller per terminal: desktop (default), or phone (connected: phone input and size apply, window Write dropped, window Resize only recorded; offline: 60 s grace). It returns to desktop on desktop Reconnect, phone Release or leaving the screen, grace expiry, 15 min without phone input, device revoked or agent input off, server stop, or PTY exit.
 - On return to desktop the PTY is resized to the recorded desktop size. A second device gets 409 E_TERMINAL_BUSY; the same device replaces its old socket. Attach resolves the session via Tracker.TerminalOf and accepts only a running TUI task session.
 - The terminal uses WebSocket via github.com/coder/websocket (ISC) because SSE plus POST cannot keep keystrokes ordered on HTTP/1.1. Binary frames carry terminal bytes; text frames are JSON (hello, reset, throttled out; resize, release in). ?cols&rows are required and ?from=<offset> resumes.
@@ -2337,24 +2410,25 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 - Search results are ordered by score, relevance, keyword, then newer seq; Memory.match is keyword, semantic or both.
 - Vector search is an exact scan over a per-process decoded cache (Store.vectors, keyed on model, dim, row count and max seq; migration 6 indexes memory_embeddings(model)), about 1.5 KB per fact resident; budgets are 150 ms at 20k facts and 600 ms at 100k.
 - The search query embeds with a 5 s timeout, and any embedder failure leaves keyword results unchanged. The gate's related-memory lookup uses the same search (limit 10).
-- Writes embed in the same transaction as the insert (best effort, 10 s). Reconcile candidates are FTS top 10 plus up to 5 vector neighbours with doc-to-doc cosine at least 0.85; without that floor every store would reach the Sonnet call.
+- Writes embed in the same transaction as the insert (best effort, 10 s). Reconcile candidates are FTS top 10 plus up to 5 vector neighbours with doc-to-doc cosine at least 0.85; without that floor every store would reach the Claude call.
 - Backfill (Service.StartBackfill, kicked by Search, Store, service open and install) embeds memories lacking a vector in batches of 32, newest current first; each batch commits alone, and two racing processes write identical rows.
 - Service.SemanticStatus is off (no embedder), notInstalled, unavailable (with worker message), indexing (done/total) or ready; the bridge overlays downloading (bytes). kira:memory:semantic, coalesced to one per 250 ms, tells the UI to refetch. MCP search_memories output carries semantic and a note when results are keyword-only.
-- Service.Store pipeline: validation, gate (one Sonnet call that splits atomic facts, challenges ambiguity, weak reasons and secrets, adds keywords), reconcile (one call for facts with candidates; hash short-circuit and no-candidate add skip it), then per-fact commit in one BEGIN IMMEDIATE transaction with optimistic revision check (2 retries).
+- Service.Store pipeline: validation, gate (one Claude call that splits atomic facts, challenges ambiguity, weak reasons and secrets, adds keywords), reconcile (one call for facts with candidates; hash short-circuit and no-candidate add skip it), then per-fact commit in one BEGIN IMMEDIATE transaction with optimistic revision check (2 retries).
 - A gate challenge stores nothing and is stateless: the caller resubmits with clarifications. At most 2 store pipelines run at once.
-- memory.CLIRunner runs claude -p with --model sonnet, --safe-mode, empty --setting-sources, --strict-mcp-config, no tools, --disable-slash-commands, --no-session-persistence, --permission-prompts none, JSON output with schema, --max-budget-usd 0.50; input on stdin, empty temp cwd, session env variables stripped, auth variables kept, 120 s timeout.
-- CLIRunner does not use --bare because it forces API-key auth.
-- toolexec.RunIO returns stdout alongside an *ExecError because claude -p prints its structured error to stdout; unknown-flag stderr maps to ErrClaudeOutdated ('update Claude Code').
+- memory.AgentRunner runs the active provider's Structured role with the model from Kira Space setting memory.models[provider id] (default: the provider's catalog default), resolved per call. The Claude provider (internal/harness/claude/structured.go) runs claude -p with --model, --safe-mode, empty --setting-sources, --strict-mcp-config, no tools, --disable-slash-commands, --no-session-persistence, --permission-prompts none, JSON output with schema, --max-budget-usd 0.50; input on stdin, empty temp cwd, session env variables stripped, auth variables kept, 120 s timeout.
+- The Claude provider does not use --bare because it forces API-key auth.
+- memory.models (P314, P316) is a Kira Space settings leaf in kira.db: a map from provider id to a model alias of that provider's catalog (Claude: haiku, sonnet or opus; aliases, so the CLI picks the current model of that family). AgentRunner takes a ModelSource: the app reads it through SettingsRepo, and memory-mcp and memory-ingest open kira.db per call (appwire.memoryModelAt; a missing file means the provider default and is never created). An invalid or unreadable value falls back to the provider default with a warning. A change applies from the next agent call in every process, with no restart. scripts/docshistory always runs the default.
+- toolexec.RunIO returns stdout alongside an *ExecError because claude -p prints its structured error to stdout; unknown-flag stderr maps to harness.ErrOutdated ('update Claude Code').
 - The MCP server is '<Kira Space executable> memory-mcp' over stdio, spawned per session by Claude Code, working with the app closed or open; main.go calls appwire.RunArgvShim before startupfail and acquireSingleInstance.
 - MCP tools are store_memory (progress checking, reconciling, saving), search_memories (includeHistory, scopes, origins, project, limit), memory_history, memory_context, plus ingest_files and ingest_status when Options.Ingest is set (not in import mode); ingest_files with distill true needs Options.Distill, else refused.
-- The memory MCP server registers as kira-memory with claude mcp add-json --scope user from Kira Space Settings > Memory, using the shared repo-root internal/mcpinstall.
+- The memory MCP server registers as kira-memory with claude mcp add-json --scope user from Kira Space Settings > Memory, through the active provider's MCPInstaller (Claude: internal/harness/claude/mcpinstall).
 - Memory MCP agent doc texts live in internal/llmprompts/registry.go (memory.mcp.*) and are read once per session.
 - Memory store contract: the store splits and rewords facts; the agent sends each with reason, origin and scope and never invents a reason; files go by path.
 - Take numbers in memory MCP tool descriptions from Go constants (memory.MaxItems, MaxGroups, search and context limits, maxIngestPaths), never literals.
 - A code comment cites a memory by fact id (one token km_ plus 12 base32 chars, memfmt.FactID; P296), never a version id, and carries no header, fact copy, reason, origin or scope; the tool never writes or returns comment text.
 - bridge.MemoryService emits kira:memory:changed after its own writes and, via a 2 s PRAGMA data_version watcher, after the MCP subprocess writes.
 - memory is the last mode in MODE_ORDER (windows.mode vocabulary, no migration); the memory UI lives in shared packages/workbench/src/memory/ and Kira Studio hosts none of it.
-- Memory setup lives only in Kira Space Settings > Memory (MemoryPane.vue); the module hosts no setup action, and MemorySetupHint only links there through MemoryModuleContext.openSettings.
+- Memory setup lives only in Kira Space Settings > Memory (MemoryPane.vue), which also holds the memory model select, saved with the dialog; the module hosts no setup action, and MemorySetupHint only links there through MemoryModuleContext.openSettings.
 - useModelDownloadsStore holds the download AbortController, so Cancel survives closing Settings.
 - settings/SemanticModelSection.vue adds a semantic badge on rows found by meaning only.
 - There is no detection of whether the memory MCP is registered with Claude Code (open item).
@@ -2384,7 +2458,7 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 - The 'Stated in <from>, <heading>' locator uses the ### heading, never the category.
 - FormatDoc writes ## Facts then ## Rules and drops an empty category; writeDocFile migrates a v2 doc of its own group in place; ApplyDoc takes the kind from the category; sameDocFact compares kind, so a kind change is a new version.
 - memcheck reports one id with two kinds as drift. A doc has one provenance.
-- memories.kind is fact or rule (migration 8, default fact, in the immutable trigger); the gate sets it and it is never caller-set; empty means fact, any other value is ErrClaudeOutput.
+- memories.kind is fact or rule (migration 8, default fact, in the immutable trigger); the gate sets it and it is never caller-set; empty means fact, any other value is harness.ErrOutput.
 - Reconcile keeps kinds apart: checkDecision turns a noop or update across kinds into an add. Existing rows are facts and there is no reclassification.
 
 - Bulk import (P211) lives in internal/memory/importer and is bound as MemoryImportService, which shares the engine MemoryService opens lazily; the scheduler runs in a detached runner.
@@ -2415,20 +2489,27 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 - P274 adds import file state verifying and file kinds json, jsonl, memdoc.
 - Import retries (backoff/v4) are 3 per call; rate-limit errors share one cooldown across workers; usage-limit and auth errors pause the job; a budget error fails only that item.
 - Added, updated and noop counts come from memory_events grouped by source_ref, never from the agent, so a re-run finalize cannot double count.
-- Import security: containment of the Sonnet call that can store memories is the three-tool allowlist, forced attribution, the gate on every fact and no shell, file or network tools; a hostile document can still make the agent store a false fact, visible in history with its source path.
+- Import security: containment of the Claude call that can store memories is the three-tool allowlist, forced attribution, the gate on every fact and no shell, file or network tools; a hostile document can still make the agent store a false fact, visible in history with its source path.
 - MCP tools ingest_files and ingest_status on kira-memory ingest by path: content never crosses MCP; the tool creates a job and returns its id and the runner reads the files.
 - Ingest origin is user, agent or external (UI jobs speak as user or external); MCP job facts carry the requesting session, the file's document group and the job's task/thread groups (job groups cap at 4).
 - Ingest scope project without a project argument uses DetectProject of the first path, then the server's project.
 - MCP import limits: a job over 300 chunks stops at awaiting for UI confirmation; at most 5 active MCP jobs; same roots and provenance as an active job returns that job's id; a relative or missing path is refused.
 - ingest_files with distill true runs the import pipeline synchronously in process and stores nothing; there is no distill tool and no job rows.
-- Distill pipeline: chunk, ClaudeAgent.Extract per chunk (three at once), build facts, cross-check questionable ones with ClaudeAgent.Verify in batches, then one ClaudeAgent.Merge call (no tools, no MCP) returning lines, unresolved and dropped.
+- Distill pipeline: chunk, ModelAgent.Extract per chunk (three at once), build facts, cross-check questionable ones with ModelAgent.Verify in batches, then one ModelAgent.Merge call (no tools, no MCP) returning lines, unresolved and dropped.
 - The distill merge covers the input only and never reads the store.
 - Distill input is text (at most 120 000 characters, source name text.md) or one absolute file; store-only arguments are refused with distill, and text without distill is refused.
 - Distill limits: 120 000 characters, 16 chunks, a tooManyFacts guard, and a 2.00 USD spend cap per call across all stages; no stage starts once reported spend reaches it. No retry.
 - Distill is not registered in import mode.
+- Distill mode `facts` (default) runs the pipeline above. Mode `rewrite` cleans one short text in its own form: text only (path refused), at most 2000 characters (`tooLong`), optional read-only `context` (6000 characters), refused without rewrite.
+- Every text gets the rewrite call; there is no pre-check and no check call.
+- Rewrite is one structured `ModelAgent.Rewrite` call (system prompt `memory.rewrite.system`, no tools, 90 s, 0.25 USD budget). Unusable output (`harness.ErrOutput`, empty text) retries once, then keeps the input with gate `output`. Other errors return as errors.
+- Rewrite returns the full text: the input verbatim when already clean. Outcomes: rewritten (`changed` true), unchanged (`changed` false, gate empty, an accepted no-op), kept (a gate rejected the draft; input returned, `draft` and `gate` set). No shrink rule; `grew` (draft longer than input, plus a reflow allowance when the draft fixes an over-width input) is the only length guard.
+- Text that does not open with a comment marker is prose: only `grew`, `form` and `tokens` apply, with no width rule and no reflow. Rewrite gates accept or reject, never edit text. `hedge` runs first, then the rest in order, stopping at the first failure: `grew`, `form` (comment markers, trailing newline; for prose, the draft must be the input minus listed hedge words, same line structure), `indent`, `width` (100 columns, tab 4; a changed draft keeps no line over 100, inherited lines included), `directive` (lines stay byte for byte), `tokens` (backtick spans, quoted spans outside backticks (backticks inside a span are stripped before comparing), numbers, identifiers must survive unless listed in `dropped`; path tokens checked per component; line breaks joined). `hedge` runs right after the model call, before every other gate, on every draft except one identical to the input: a draft with really, basically, actually or simply outside backtick code and quoted spans is retried once; a second such draft keeps the original, as does a retry call that errors (outcome `hedge`). A quoted span may wrap across one line break.
+- Rewrite result: `Chunks` 0, `Lines` and `Unresolved` empty, `CostUSD` sums every call. MCP renders the final text, then `kept: <gate>` or `unchanged`, then `dropped: <text> | <why>` lines for a changed text. The result carries `draft` and `dropped` for audit; the UI schema omits `draft`.
+- Distill UI: Facts and Rewrite tabs under source Text. Rewrite shows the text, why a gate kept the original, the dropped list and Copy; no Store or Import.
 - bridge.MemoryDistillService runs the same importer.Distiller per call, sharing prompts and engine with MemoryService; only one distill call runs at a time app-wide (TryLock), a second gets E_CONFLICT.
 - MemoryDistillService.ToImport writes <memory home>/distilled/distilled-<UTC>-<4 hex>.md (dir 0700, file 0600, heading plus one bullet per line, 1 to 640 lines) and creates an import job on channel ui.
-- Distill progress is emitted on kira:memory:distill with payload {requestId, stage, done, total, costUsd}; stage is extract, verify or merge.
+- Distill progress is emitted on kira:memory:distill with payload {requestId, stage, done, total, costUsd}; stage is extract, verify, merge or rewrite.
 - Cancelling a bound distill call cancels ctx (E_CANCELLED); stages already finished stay charged.
 - importer.DistillError reasons (tooLong, tooManyParts, tooManyFacts, unreadable, spendCap) map to catalog keys backend.space.memory.distill.<reason>.body with E_BAD_REQUEST; other errors go through memoryErr.
 - Distill is read-only: no memory.db write and no kira:memory:changed event.
@@ -2604,12 +2685,12 @@ call: Kira only listens to what Claude Code already computes. Package `internal/
 - If the store file is corrupt or an override no longer validates, the default is used, a warning is logged, and it is flagged in Settings (storeError, invalid); defaultChanged flags an override made against an older default.
 - Server-side validation requires that the template parses, every prompt:"required" variable is referenced, every required fragment is included, and it executes against example vars.
 - The memory system prompts must include the memory.dataHygiene fragment, which is the injection defence.
-- Schema-bound prompts (gate, reconcile, merge, import extract, verify and finalize) keep their JSON schema fixed, shown read-only in Settings.
-- There is no global prompt source; consumers get a llmprompts.Source (Resolve, Revision) through their options (memory.ServiceOptions, mcpserver.Options, claudeheadless, scriptruns, ADE, dbmcp).
+- Schema-bound prompts (gate, reconcile, merge, rewrite, import extract, verify and finalize) keep their JSON schema fixed, shown read-only in Settings.
+- There is no global prompt source; consumers get a llmprompts.Source (Resolve, Revision) through their options (memory.ServiceOptions, mcpserver.Options, agentmcp, scriptruns, ADE, dbmcp).
 - Defaults() is the registry-only source, and Store.Resolve stats the file per call and re-reads on mtime or size change.
 - Gate, reconcile, import, headless suffixes and ADE messages resolve per call, so an edit applies on the next call.
 - memory-mcp (stdio subprocess) builds server instructions, tool and argument descriptions once per process, so edits apply only to new Claude sessions (newSession, shown in Settings).
-- dbmcp and claudeheadless rebuild their MCP server when Revision() changes.
+- dbmcp and agentmcp rebuild their MCP server when Revision() changes.
 - LlmPromptsService (List, Save, Preview) exists in both apps and emits event kira:llmPrompts:changed with {revision}; Save is all-or-nothing with per-id errors returned as an E_BAD_REQUEST payload.
 - Preview with real vars also renders the ADE run dialog and step inspector, so no TypeScript copy of a prompt exists.
 - Settings has a Prompts section before Advanced in both apps (packages/workbench/src/llmPrompts/) with list, Monaco editor, diff against default, Preview and per-entry reset; drafts live in Pinia store llmPromptDrafts, and dialog Save saves prompts first, then the settings patch.
@@ -2663,19 +2744,19 @@ the git UI is its only caller (`repo/git/hostHandlers.ts:433`), binding Space's 
 (P74 §3, P79 batch B).** That package used to be outside the `window.open` deny row's own scope.
 Every externally-openable link in the git UI is a `<button>` calling a host capability, never an
 anchor: the PR surfaces (`CommitMeta.vue`, `BranchPicker.vue`/`StackList.vue` stack badges,
-`refBadges.ts`'s SlickGrid formatter) go through `pr.browserUrl`/`GitHubService.OpenPullRequestURL`,
+`refBadges.ts`'s SlickGrid formatter) go through `changeRequest.browserUrl`/`GitHostService.OpenChangeRequestURL`,
 and a URL found inside a commit message body (`linkify.ts`) goes through a new generic
 `link.openExternal`. Both are gated on `capabilities.openExternal`, and a surface renders a
 plain `<span>` when the host does not report it (`CommitMeta.vue`'s own button/span split — P79
 batch F closed the one PR icon that was missing the gate). `link.openExternal` is generic where
-`pr.openExternal` is not, per `internal/bridge/link.go`'s own reasoning: a PR URL is composed
+`changeRequest.openExternal` is not, per `internal/bridge/link.go`'s own reasoning: a change request URL is composed
 server-side from data the app controls, while a commit-body URL **is** the untrusted content,
 already visible to the renderer as linkified text — so the only check left is the URL's own shape.
 `LinkService.OpenExternal` refuses anything that is not a well-formed `http`/`https` URL with a
 non-empty host, before `Browser.OpenURL` ever sees it, and the git-ui host handlers do the
-equivalent shape validation. The host check for a PR URL is
-`gitsession.IsGitHubHost` — `github.com` plus any host `gh`'s own `Discovery` has authenticated
-against — shared by the composer and the validator, not two hand-rolled allowlists (P79 batch B; the
+equivalent shape validation. The check for a change request URL is
+`Registry.IsChangeRequestURL`: some registered provider accepts it (github: `github.com` plus any host `gh`'s own `Discovery` has authenticated
+against) — shared by the composer and the validator, not two hand-rolled allowlists (P79 batch B; the
 previous hardcoded literal broke GitHub Enterprise Server entirely, since the validator's allowlist
 was not really an allowlist for a GHES host).
 
@@ -2739,10 +2820,10 @@ repo's CI runs.
 - The flow gRPC server runs unary methods through its interceptor, so Calls() and required metadata cover unary and streams.
 - createTerminalsStore (shared by both apps and the Docker exec store) keeps one terminalWrite in flight per tab and coalesces chunks typed meanwhile (state/orderedWrites.ts), because concurrent bound calls reach the backend in any order.
 - Space flow tier: apps/kira-space/internal/appwire is the composition root; Build(Options) wires repos, git, terminal, ADE, memory, mobile and bound services; main.go supplies native pieces and tests supply fakes.
-- Space flow harness uses real SQLite, git (fixed dates, git fast-import history), git stream, PTY, watchers and mobile HTTP; it fakes the claude and gh CLIs (internal/flowtest/fakeagent, scenario JSON), dialogs, browser, keep-awake, LAN detection and window manager.
+- Space flow harness uses real SQLite, git (fixed dates, git fast-import history), git stream, PTY, watchers and mobile HTTP; it fakes the claude and gh CLIs (internal/flowtest/fakeagent, scenario JSON), a second code host (flowharness/fakehost, registered with WithGitHost), dialogs, browser, keep-awake, LAN detection and window manager.
 - appwire.Options exposes test seams GhLocator, TrackerGrace and MobilePoll, set via flowharness.WithoutGh, WithTrackerGrace and WithMobilePoll.
 - The fake claude prints no stream init line under --output-format json, accepts an inline --mcp-config, and answers headless calls by --system-prompt through scenario prompts rules.
-- Space flow tests live in internal/flows/{gitflow,repoflow,editorflow,adeflow,memoryflow,termflow,appflow,mobileflow}; bun run test:flows:space is the general suite, and test:flows:space:complete sets KIRA_FLOW_COMPLETE=1 and adds slow permutation coverage.
+- Space flow tests live in internal/flows/{gitflow,repoflow,editorflow,adeflow,memoryflow,termflow,appflow,mobileflow,githostflow}; bun run test:flows:space is the general suite, and test:flows:space:complete sets KIRA_FLOW_COMPLETE=1 and adds slow permutation coverage.
 - Space e2e-real tier (project e2e-real, bun run test:e2e-real:space) uses a go build -tags server binary on a temp home, fake claude/gh first on PATH, and Chromium on /?window=<uuid>.
 - The Space server build locates git through gitclient.NewHostLocator (locator_server.go), not the darwin-only locator.
 - Space e2e-real has no native dialogs (stubbed with page.route) and no mobile access.
@@ -3115,9 +3196,9 @@ Performance:
 - **Semantic memory search is unverified on a Mac (P210).** Loading the bundled dylib from `Contents/Frameworks`, int8 kernels on arm64 and the worker footprint were checked on Linux only (95 MB loaded, 137 MB peak). Delete once checked on a Mac.
 - **Semantic search is English-oriented (P210).** arctic-embed-s is English-only; non-English memories rank by keywords mostly. The smallest multilingual alternative under 500 MB (multilingual-e5-small int8, 362 MB peak) retrieves worse on English.
 - **Headless ADE runs create unnamed branches before the agent can request one (P199).** `request_branch` names a branch only when the agent calls it; a branch the run already created keeps its generated name, and rename is refused.
-- **`declare_repos`, `request_branch` and `branch_status` are untested against a real board and real `claude` (P199).** Covered by the `claudeheadless` go-sdk client test and `agenttools_test.go` only; `task_info` runs in the real `TestSmartScriptRun`. Delete once one live run calls them.
+- **`declare_repos`, `request_branch` and `branch_status` are untested against a real board and real `claude` (P199).** Covered by the `agentmcp` go-sdk client test and `agenttools_test.go` only; `task_info` runs in the real `TestSmartScriptRun`. Delete once one live run calls them.
 - **Unsaved ADE workflow edits are lost when the whole Agents module is switched away (P196).** The leave guard covers list switch, import/new, mode toggle and shell tab change, not a module switch.
-- **PR facts correct on the next request, not by push (P189).** No server-to-client PR-changed notification exists; a client revalidation after `refsChanged` can hit a stale server entry, bounded by the TTL and the next refs change.
+- **Change request facts correct on the next request, not by push (P189).** No server-to-client change notification exists; a client revalidation after `refsChanged` can hit a stale server entry, bounded by the TTL and the next refs change.
 - **The graph keeps its pre-refresh scroll offset after an auto refresh (P203).** A new tip is off screen until scrolled or remounted.
 - **`ui-timing` budgets fail in the WebKit sandbox even on an idle host (P250, P264, P266, P267, P277).** Two Studio tests fail (`budgets.spec.ts` interactions, `perf.spec.ts` scroll); the rest of `ui-timing` passes. Measured idle (load below 2, no leftover process): scroll work p50 17-18 ms vs 16, `perf.spec.ts` scroll frame p95 89-96 ms vs 80, tab switch p95 up to 363 ms vs 300, cached tree expand p95 58 ms vs 50, console keystroke p50 55 ms vs 50. Cause: this host's WebKit runs JS work 1.8x and DOM work 2.9x slower than Chromium on the same host. The same code passes in Chromium with margin. Profiling found no hot-path work left to cut (SlickGrid render, keystroke and tree paths are already batched), so no `perf` change landed. Budgets are never loosened. Delete once the project passes on the CI runner, a Mac or a faster host.
 - **Docker: remote `tcp://` without TLS is allowed (P200),** flagged `secure: false` in the UI. Exec sessions stay in the Terminal tab's chip list after the container stops; close the chip by hand.

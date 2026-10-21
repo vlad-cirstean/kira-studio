@@ -1,9 +1,9 @@
-// Package gitstore is the packing half of upstream's commitStore.ts (D12): a column-wise commit
+// Package gitstore is the packing half of upstream's commitStore.ts: a column-wise commit
 // store built by appending porcelain.CommitRecord values in walk order, and a slice packer that
 // produces the wire's PackedCommitChunk shape. Every mechanism that exists only for the renderer
 // (lane layout, on-screen materialisation, resolving a parent to a row) is dropped — this store
-// only ever appends and packs, so a parent's sha is stored directly and never resolved to a row
-// (F11).
+// only ever appends and packs, so a parent's sha is stored directly and never resolved to a
+// row.
 package gitstore
 
 import (

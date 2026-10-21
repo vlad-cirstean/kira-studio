@@ -55,8 +55,7 @@ const CLOSERS = new Set(Object.values(WRAP_PAIRS));
  *  3. Backspace with the caret between an empty pair (`{|}`) deletes both in one keystroke.
  *
  *  `e.isComposing` bails out — a CJK/IME composition keydown must never be mistaken for a literal
- *  bracket/quote keystroke (not exercised by this sandbox's tests; recorded, not claimed, per the
- *  plan's own §4). */
+ *  bracket/quote keystroke (not exercised by this sandbox's tests). */
 export function autoClosePairsOnType(e: KeyboardEvent): void {
   if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
   const el = e.target;

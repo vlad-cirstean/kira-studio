@@ -23,9 +23,9 @@ const (
 )
 
 // partitionWindow is read.ts's PartitionWindow, with int64 offsets rather than decimal strings
-// (P58e E6/E7 — Go's int64 has no JS-number-precision problem, so toNativeOffset's safe-integer
-// guard has no equivalent here). Field names/tags match read.ts's own naming (partition/next/end)
-// per P58e E17's diffability rule — this struct's own shape is the page token's payload.
+// (Go's int64 has no JS-number-precision problem, so toNativeOffset's safe-integer guard has no
+// equivalent here). Field names/tags match read.ts's own naming (partition/next/end) per the
+// diffability rule — this struct's own shape is the page token's payload.
 type partitionWindow struct {
 	Partition int32 `json:"partition"`
 	Next      int64 `json:"next"`
@@ -51,7 +51,7 @@ func parseStreamFilter(raw *string) (kafkaStreamFilter, error) {
 }
 
 // readFingerprintParts is requestFingerprint({topic, pageSize, filter})'s Go shape (read.ts:205) —
-// the fingerprint covers only these three, deliberately (P58e E7). Field names/tags/order must
+// the fingerprint covers only these three, deliberately. Field names/tags/order must
 // match kafka_test.go scenario 20's own reconstruction exactly, since RequestFingerprint hashes
 // the marshalled JSON bytes.
 type readFingerprintParts struct {
@@ -275,23 +275,23 @@ func freshWindows(ctx context.Context, adm *kadm.Client, topic string, rawFilter
 	return windows, nil
 }
 
-// advanceWindows applies P43 iter2 F19/D26's end-of-log clamp for one poll round (P58e E9, unit
-// tested per P58e E26 in read_test.go), refined by F2. touched carries the HighWatermark this SAME
-// round reported for every partition the fetch actually mentioned; recordsThisRound carries how
-// many records this SAME round's own fetches.Records() held for each partition, counted before any
-// page-budget cutoff — a partition is provably drained — its remaining [Next, End) gap can only
-// ever be non-data offsets (a transaction's commit marker, a compacted offset, or one aged out by
-// retention) that will never arrive as a record — only when THIS round delivered/skipped zero
-// records for it (not merely "the round as a whole wasn't page-capped": franz-go caps each
-// partition's own fetch at 1 MiB per round (config.go's maxPartBytes) independent of the overall
-// page budget, so a partition can have real, un-fetched data left in [Next, End) even in a round
-// that, as a whole, came in under the page budget — the previous "round wasn't page-capped" test
-// alone treated "the broker had less of *this* partition to send this specific round" as "this
-// partition is drained", silently truncating the browse), and the round's own reported watermark
-// for that partition has reached or passed its frozen End. This is evaluated after every delivering
-// round, never after a follow-up "peek" poll: KF-3 found that once a partition is genuinely
-// exhausted, a subsequent poll blocks for the caller's entire remaining context with no partition
-// metadata to peek at, so the clamp signal has to come from the fetch that actually delivered data.
+// advanceWindows applies the end-of-log clamp for one poll round (unit tested in read_test.go).
+// touched carries the HighWatermark this SAME round reported for every partition the fetch
+// mentioned; recordsThisRound carries how many records this SAME round's own fetches.Records() held
+// for each partition, counted before any page-budget cutoff — a partition is provably drained —
+// its remaining [Next, End) gap can only ever be non-data offsets (a transaction's commit marker,
+// a compacted offset, or one aged out by retention) that will never arrive as a record — only when
+// THIS round delivered/skipped zero records for it (not merely "the round as a whole wasn't
+// page-capped": franz-go caps each partition's own fetch at 1 MiB per round (config.go's
+// maxPartBytes) independent of the overall page budget, so a partition can have real, un-fetched
+// data left in [Next, End) even in a round that, as a whole, came in under the page budget — the
+// previous "round wasn't page-capped" test alone treated "the broker had less of *this* partition
+// to send this specific round" as "this partition is drained", silently truncating the browse),
+// and the round's own reported watermark for that partition has reached or passed its frozen End.
+// This is evaluated after every delivering round, never after a follow-up "peek" poll: once a
+// partition is genuinely exhausted, a subsequent poll blocks for the caller's entire remaining
+// context with no partition metadata to peek at, so the clamp signal has to come from the fetch
+// that delivered data.
 func advanceWindows(windows []partitionWindow, touched map[int32]int64, recordsThisRound map[int32]int) {
 	for i := range windows {
 		w := &windows[i]
@@ -338,9 +338,9 @@ func prepareWindows(ctx context.Context, adm *kadm.Client, topic string, req ada
 	return windows, remaining, nil
 }
 
-// openBrowseClient builds readTopic's own ephemeral browse client (P58e E5): a
+// openBrowseClient builds readTopic's own ephemeral browse client: a
 // kgo.ConsumePartitions client anchored at each remaining window's own Next offset — never
-// kgo.ConsumeTopics or kgo.ConsumerGroup, which is what makes the no-group promise (P10 D6)
+// kgo.ConsumeTopics or kgo.ConsumerGroup, which is what makes the no-group promise
 // structural rather than disciplinary.
 func openBrowseClient(baseOpts []kgo.Opt, topic string, remaining []partitionWindow) (*kgo.Client, error) {
 	partitionOffsets := make(map[int32]kgo.Offset, len(remaining))
@@ -360,7 +360,7 @@ func openBrowseClient(baseOpts []kgo.Opt, topic string, remaining []partitionWin
 // pollRoundResult is pollRound's own verdict on what readTopic's poll loop should do next: keep
 // polling, or stop — and if it stopped because MAX_EMPTY_POLLS was reached, readTopic still has to
 // set exhaustedByEmptyPolls itself (pollRoundExhausted only reports the fact; the latch it drives
-// stays in readTopic, per P21 round 3 finding 3 — see readTopic's own comment).
+// stays in readTopic, see readTopic's own comment).
 type pollRoundResult int
 
 const (
@@ -371,7 +371,7 @@ const (
 
 // pollRound runs one PollRecords round of readTopic's browse loop: polls under a per-round bound
 // (see readTopic's own comment on why), classifies the outcome, and — for a successful poll —
-// pushes whatever new rows it delivered into builder and applies P43 iter2 F19/D26's advanceWindows
+// pushes whatever new rows it delivered into builder and applies the advanceWindows
 // clamp. emptyPolls is the running MAX_EMPTY_POLLS counter, carried across rounds by the caller.
 // collected is passed and returned by value rather than by pointer so the caller's own loop
 // condition (`collected < req.PageSize`) always reads a value it assigned itself.
@@ -414,9 +414,9 @@ func pollRound(ctx context.Context, browse *kgo.Client, windows []partitionWindo
 		*emptyPolls++
 	} else {
 		*emptyPolls = 0
-		// F2: counted over every record this round actually delivered, before the page-budget
+		// Counted over every record this round delivered, before the page-budget
 		// break below stops processing them — advanceWindows' own "this partition delivered zero
-		// records this round" signal must reflect what the broker actually sent, not how much of
+		// records this round" signal must reflect what the broker sent, not how much of
 		// that this round's own page cap left time to consume.
 		records := fetches.Records()
 		for _, rec := range records {
@@ -479,13 +479,13 @@ func clampExhaustedWindows(windows []partitionWindow) {
 	}
 }
 
-// readTopic is read.ts's readTopic (:193-319). P58e E5: the browse client is a fresh, ephemeral
+// readTopic is read.ts's readTopic (:193-319). The browse client is a fresh, ephemeral
 // kgo.Client per call, built from the adapter's own baseOpts plus kgo.ConsumePartitions at exact
 // offsets — never kgo.ConsumeTopics or kgo.ConsumerGroup, which is what makes the no-group promise
-// (P10 D6) structural rather than disciplinary. P58e E3: ctx goes straight to every kadm/kgo call;
+// structural rather than disciplinary. ctx goes straight to every kadm/kgo call;
 // each poll additionally runs on its own bounded sub-context (see the loop below) because
 // PollRecords, given nothing new to deliver, does not return on its own — it keeps retrying
-// internally against FetchMaxWait until data arrives or its context ends (KF-3), so an unbounded
+// internally against FetchMaxWait until data arrives or its context ends, so an unbounded
 // per-round context would hang the whole op on a genuinely-exhausted-with-a-gap topic.
 func readTopic(ctx context.Context, adm *kadm.Client, baseOpts []kgo.Opt, topic string, req adapters.ReadRequest, op *adapters.OpCtx) (page.StreamPage, error) {
 	if err := adapters.CheckNotStarted(ctx); err != nil {
@@ -562,7 +562,7 @@ pollLoop:
 		return page.StreamPage{}, err
 	}
 
-	// P21 round 3 functional finding 3: advanceWindows' own per-round clamp never fires for a
+	// advanceWindows' own per-round clamp never fires for a
 	// window whose remaining gap is entirely non-data offsets *and* every round against it failed
 	// outright (DeadlineExceeded, no watermark reported) rather than succeeding empty — see the
 	// exhaustedByEmptyPolls comment above. Having now genuinely retried maxEmptyPolls times against
@@ -580,15 +580,15 @@ pollLoop:
 // countTopic returns an upper bound from high/low watermarks, summed across every partition;
 // compaction and transaction markers leave offsets with no record.
 //
-// P21 round 2 functional finding 7: rawFilter used to be dropped on the floor entirely (the
-// caller always passed nil), so "N total" answered the high/low watermark across *every*
-// partition even when the browse itself (read.ts's own freshWindows, called from readTopic) was
-// scoped to a partition/offset/timestamp filter — the toolbar's own "<n> rows on this page" and
-// "<N> total" then answered two different questions side by side. This now calls the exact same
-// freshWindows the read path uses to open a browse under this filter, and sums each window's own
-// [Next, End) gap — a partition filter narrows which windows exist at all, and an offset/timestamp
-// filter moves Next away from the partition's true start offset, both of which now scope the
-// total identically to what a browse under this filter would actually return.
+// rawFilter used to be dropped on the floor entirely (the caller always passed nil), so "N total"
+// answered the high/low watermark across *every* partition even when the browse itself (read.ts's
+// own freshWindows, called from readTopic) was scoped to a partition/offset/timestamp filter —
+// the toolbar's own "<n> rows on this page" and "<N> total" then answered two different questions
+// side by side. This now calls the exact same freshWindows the read path uses to open a browse
+// under this filter, and sums each window's own [Next, End) gap — a partition filter narrows which
+// windows exist at all, and an offset/timestamp filter moves Next away from the partition's true
+// start offset, both of which now scope the total identically to what a browse under this filter
+// would return.
 func countTopic(ctx context.Context, adm *kadm.Client, topic string, rawFilter *string) (adapters.CountResult, error) {
 	if err := adapters.CheckNotStarted(ctx); err != nil {
 		return adapters.CountResult{}, err

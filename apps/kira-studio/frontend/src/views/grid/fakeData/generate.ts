@@ -6,11 +6,11 @@ import type { SqlDialect } from '../../shared/sqlIdent';
 import { parseTypeBounds, type TypeBounds } from './typeBounds';
 import type { ColumnPlan, GeneratorId, Recipe } from './types';
 
-// P15 D1: a capability test (tabular + canInsert), not a kind check — a future adapter with real
+// A capability test (tabular + canInsert), not a kind check — a future adapter with real
 // columns and an insert path opts in for free. Deliberately narrower than isWritable/canInsert
 // alone: mongo/redis/kafka/sqs/s3 all have canInsert but no column set to generate against.
 //
-// P12 round 1 finding #16: the one gate for whether Generate data is offered at all, shared by
+// The one gate for whether Generate data is offered at all, shared by
 // DataToolbar.vue's own button and DataView.vue's command-palette entry — previously restated by
 // hand in both, already caught drifting once (the second copy's own comment admitted it "mirrors
 // DataToolbar.vue's canGenerateData exactly").
@@ -18,10 +18,10 @@ export function canGenerateDataFor(caps: Caps | null, readOnly: boolean | undefi
   return !!caps?.tabular && !!caps?.canInsert && !readOnly;
 }
 
-// D2: the one dynamic import of fakerEntry.ts, memoised (a failed load is not kept) at module scope so a second run (or a
-// second Preview) pays nothing beyond the first — the whole reason fakerEntry.ts exists as its
-// own file is to give this import a clean, statically-analysable re-export to split on (P13's D2
-// precedent), rather than leaving Rollup to shape a chunk around an inline dynamic namespace.
+// The one dynamic import of fakerEntry.ts, memoised (a failed load is not kept) at module scope so
+// a second run (or a second Preview) pays nothing beyond the first — the whole reason fakerEntry.ts
+// exists as its own file is to give this import a clean, statically-analysable re-export to split
+// on, rather than leaving Rollup to shape a chunk around an inline dynamic namespace.
 type Faker = Awaited<ReturnType<typeof loadFaker>>;
 let fakerPromise: Promise<Faker> | null = null;
 async function loadFaker() {
@@ -36,10 +36,10 @@ function getFaker(): Promise<Faker> {
   return fakerPromise;
 }
 
-// D6: 500 rows/batch — ~0.12 MiB of request JSON and ~35ms to generate (F8), comfortably inside
-// the ~150ms-per-step budget (docs/ARCHITECTURE.md's Invariants section), two orders of magnitude under the 8 MiB
-// inbound-queue admission ceiling (F9.2), and a 500-statement (not 100 000-statement) op_log.command
-// row (F9.1) — none of which anything else here truncates.
+// 500 rows/batch — ~0.12 MiB of request JSON and ~35ms to generate, comfortably inside the
+// ~150ms-per-step budget (docs/ARCHITECTURE.md's Invariants section), two orders of magnitude
+// under the 8 MiB inbound-queue admission ceiling, and a 500-statement (not 100 000-statement)
+// op_log.command row — none of which anything else here truncates.
 export const BATCH_SIZE = 500;
 
 function clamp(text: string, maxLength: number | undefined): string {
@@ -70,7 +70,7 @@ function randomIntText(faker: Faker, bounds: TypeBounds): string {
   return faker.number.int({ min: 0, max: 1_000_000 }).toString();
 }
 
-// F7/P21 round 1: the ISO-8601-with-`Z` fall-through is correct for Postgres (format_type's own
+// The ISO-8601-with-`Z` fall-through is correct for Postgres (format_type's own
 // `timestamp without/with time zone`, both of which accept it) and harmless for SQLite (text
 // storage) — it is wrong for the mysql family, where `dataType` is COLUMN_TYPE: `datetime`/
 // `timestamp` reject the trailing `Z` outright in strict mode (Incorrect datetime value) or
@@ -103,7 +103,7 @@ function fakerCall(
   dialect: SqlDialect | undefined,
 ): () => string {
   switch (id) {
-    // P21 round 3 functional finding 1: every one of these text generators used to return
+    // Every one of these text generators used to return
     // faker's raw output with no reference to bounds.maxLength, even though it is already parsed
     // out of the column's own varchar(n)/char(n)/nvarchar(n)/FixedString(n) declaration and
     // handed in here. A value even one character over the column's declared length aborted the
@@ -135,7 +135,7 @@ function fakerCall(
     case 'company.name':
       return () => clamp(faker.company.name(), bounds.maxLength);
     case 'finance.amount':
-      // P21 round 3 functional finding 2: finance.amount is offered (and name-heuristic-matched
+      // finance.amount is offered (and name-heuristic-matched
       // via price/amount/total/cost/salary) for both text and number columns, but used to ignore
       // the column's own numeric bounds entirely — faker's default 0..1000 range with 2 decimals
       // overflows a narrow numeric(p,s) and isn't even syntactically valid for an integer column.
@@ -147,7 +147,7 @@ function fakerCall(
       if (bounds.intRange) return () => randomIntText(faker, bounds);
       if (bounds.precision !== undefined) {
         const dec = bounds.scale ?? 0;
-        // F19 (P108 Part 10): numeric(p,p) (precision === scale, e.g. numeric(2,2), max 0.99) has
+        // numeric(p,p) (precision === scale, e.g. numeric(2,2), max 0.99) has
         // no whole-number digits at all — the old Math.max(1, ...) floor forced at least one,
         // generating up to 9.99 and overflowing every batch. wholeDigits = 0 means the max is just
         // under 1 (1 - 10 ** -dec), not 10 ** 0 - 1 = 0.
@@ -318,10 +318,10 @@ export interface RunGenerationArgs {
   signal: AbortSignal;
 }
 
-// D6/D7: the whole run, one batch at a time — each its own data.mutate call (its own op id, its
-// own place to fail), stopping at the first failure (or the caller's own cancellation) rather than
-// retrying or resuming. `committedRows` on a thrown GenerationError is what the dialog reports
-// alongside the server's own message.
+// The whole run, one batch at a time — each its own data.mutate call (its own op id, its own place
+// to fail), stopping at the first failure (or the caller's own cancellation) rather than retrying
+// or resuming. `committedRows` on a thrown GenerationError is what the dialog reports alongside the
+// server's own message.
 export async function runGeneration(args: RunGenerationArgs): Promise<void> {
   const faker = await getFaker();
   faker.seed(args.seed);

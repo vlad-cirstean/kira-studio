@@ -108,9 +108,9 @@ func TestParseProjectAcceptsIdeaDirDirectly(t *testing.T) {
 	}
 }
 
-// TestParseProjectDirResolvesToParentOfIdea is the review finding: whichever of the project folder
-// or its .idea folder the caller passed in, Project.Dir must always be the project's own root (the
-// .idea folder's parent) — never the .idea folder itself — since jdbc.go's expandMacros resolves
+// TestParseProjectDirResolvesToParentOfIdea: whichever of the project folder or its .idea folder
+// the caller passed in, Project.Dir must always be the project's own root (the .idea folder's
+// parent) — never the .idea folder itself — since jdbc.go's expandMacros resolves
 // $PROJECT_DIR$/$ProjectFileDir$ against it directly.
 func TestParseProjectDirResolvesToParentOfIdea(t *testing.T) {
 	viaRoot, err := ParseProject("testdata/project-six")

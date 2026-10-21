@@ -6,10 +6,10 @@ import (
 )
 
 // creditGate is rpc.ts's own CreditGate class, transcribed: a small counting semaphore an open
-// stream's emit loop waits on before pushing its next chunk. P1's one stream handler
-// (graph.stream) never actually calls acquire — it has no commits to walk yet (§0.2) — but the
-// mechanism is written now, correctly, rather than stubbed, since P2 is the first real consumer
-// and this is the one place its backpressure has to be exactly right.
+// stream's emit loop waits on before pushing its next chunk. The one stream handler
+// (graph.stream) never calls acquire — it has no commits to walk yet — but the mechanism is
+// written now, correctly, rather than stubbed, since this is the one place its backpressure has
+// to be exactly right.
 type creditGate struct {
 	mu        sync.Mutex
 	available int

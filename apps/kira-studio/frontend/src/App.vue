@@ -3,6 +3,7 @@
 // (delayDuration/skipDelayDuration) through.
 import { TooltipProvider } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { agentControlKey, useAgentMessageDefaults } from '@workbench/agent/agentInfo';
 import { automationsModuleKey } from '@workbench/automations/module';
 import ScheduleConfirmPrompt from '@workbench/automations/schedule/ScheduleConfirmPrompt.vue';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
@@ -21,7 +22,7 @@ import CommandPalette from '@workbench/shortcuts/CommandPalette.vue';
 import { runCommand } from '@workbench/shortcuts/commands';
 import { providePaletteCommands, usePaletteStore } from '@workbench/shortcuts/palette';
 import { appUpdateStoreKey } from '@workbench/state/createAppUpdateStore';
-import { markRaw, onMounted, onUnmounted, provide } from 'vue';
+import { getCurrentInstance, markRaw, onMounted, onUnmounted, provide } from 'vue';
 import ApiDialogs from './api/ApiDialogs.vue';
 import { useCollectionsStore } from './api/state/collections';
 import { openApiRequestTab } from './api/tabs';
@@ -56,6 +57,8 @@ provide(workbenchHostKey, createWorkbenchHost());
 provide(automationsModuleKey, createAutomationsModule());
 provide(promptsControlKey, control);
 provide(llmPromptsControlKey, control);
+// App level, not component level: Pinia stores and composables outside the tree inject it too.
+getCurrentInstance()?.appContext.app.provide(agentControlKey, control);
 
 const appUpdateStore = useAppUpdateStore();
 provide(appUpdateStoreKey, appUpdateStore);
@@ -77,6 +80,7 @@ const collectionsStore = useCollectionsStore();
 const connectionDialogStore = useConnectionDialogStore();
 const tabsStore = useTabsStore();
 const settingsStore = useSettingsStore();
+useAgentMessageDefaults(() => settingsStore.agent.provider, control);
 const keepAwakeStore = useKeepAwakeStore();
 
 let unsubscribe: Array<() => void> = [];

@@ -4,7 +4,7 @@ import { compareNatural } from '@workbench/behaviour/match';
 import { sleep } from '@workbench/testing/unit/async';
 import { BridgeClient } from '../bridge/client.ts';
 import { FakeTransport } from '../testing/fakeTransport.ts';
-import { PrState } from './pr.ts';
+import { ChangeRequestState } from './changeRequests.ts';
 import { StackState } from './stack.ts';
 
 const REPO_A = '/repos/a';
@@ -137,20 +137,20 @@ describe('StackState — reload', () => {
   });
 });
 
-describe('StackState — PrState.ensureSnapshot (F13)', () => {
+describe('StackState — ChangeRequestState.ensureSnapshot (F13)', () => {
   test('called once per load with the union of every branch name', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO_A);
     const stack = new StackState(bridge, pr);
 
     const prCalls: string[] = [];
     transport.onRequest = (method, params) => {
       if (method === 'stack.list') return oneStackResult();
-      if (method === 'branch.resolvePr') {
+      if (method === 'branch.resolveChangeRequest') {
         prCalls.push((params as { branch: string }).branch);
-        return { kind: 'ok', prs: [] };
+        return { kind: 'ok', changeRequests: [] };
       }
       throw new Error(`unscripted request ${method}`);
     };
@@ -165,18 +165,18 @@ describe('StackState — PrState.ensureSnapshot (F13)', () => {
   test('a second load does not re-request an already-cached branch', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO_A);
     const stack = new StackState(bridge, pr);
 
     let resolveCalls = 0;
     transport.onRequest = (method, params) => {
       if (method === 'stack.list') return oneStackResult();
-      if (method === 'branch.resolvePr') {
+      if (method === 'branch.resolveChangeRequest') {
         resolveCalls++;
         return {
           kind: 'ok',
-          prs: [
+          changeRequests: [
             {
               number: 1,
               title: 't',

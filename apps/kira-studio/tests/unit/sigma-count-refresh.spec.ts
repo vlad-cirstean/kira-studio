@@ -1,5 +1,5 @@
-// P2 R2: views/grid/state.ts's runCount passes `refresh: rt.count?.stale === true` to data.count
-// (P13 D18 — a Σ click on an already-fresh count stays an L3 hit, only a stale one bypasses it),
+// views/grid/state.ts's runCount passes `refresh: rt.count?.stale === true` to data.count
+// (a Σ click on an already-fresh count stays an L3 hit, only a stale one bypasses it),
 // but the copy-pasted runCount in views/documents, views/keyvalue and views/stream never carried
 // that line over: every call always sent refresh as undefined/false, so once their cached count
 // went stale, clicking Σ could never force a real recount — it kept re-reading the same stale L3
@@ -17,7 +17,7 @@ setActivePinia(pinia);
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
 const { control } = await import('../../frontend/src/bridge/control');
-// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — a real (never-settling in this harness) control.tabsSave triggered
 // incidentally by opening a tab below would otherwise wedge every later spec's own tabsSave
 // assertions for the rest of the process. This spec doesn't test persistence, so give it a

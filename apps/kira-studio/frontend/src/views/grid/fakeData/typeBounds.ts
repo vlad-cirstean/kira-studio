@@ -1,11 +1,11 @@
-// D5: the declared type's own length/precision/enum-member bounds, parsed out of `dataType` — the
-// server's verbatim, per-dialect type string (F10 — `ColumnDescriptor.dataType`, e.g.
+// The declared type's own length/precision/enum-member bounds, parsed out of `dataType` — the
+// server's verbatim, per-dialect type string (`ColumnDescriptor.dataType`, e.g.
 // 'varchar(50)', 'numeric(20,6)', 'int unsigned', 'Enum8(\'a\' = 1, \'b\' = 2)'). `typeClass`
 // alone collapses all of these onto seven buckets and can't answer "how long" or "which members".
 //
 // Integer ranges are BigInt, never `number` — a `bigint`/`UInt64` column's range exceeds
 // Number.MAX_SAFE_INTEGER, and every generated value travels as text (RowValues' `*string`), so
-// nothing here ever needs to fit a JS float64 (F10's "a bigint is generated as a decimal string,
+// nothing here ever needs to fit a JS float64 ("a bigint is generated as a decimal string,
 // never a JavaScript number").
 export interface TypeBounds {
   maxLength?: number;
@@ -18,7 +18,7 @@ export interface TypeBounds {
 
 // ClickHouse's own fixed-width integer types are case-sensitive and collide by name with
 // Postgres/MySQL's lowercase ones if naively lowercased first ('Int8' is an 8-bit signed integer;
-// postgres's 'int8' — never actually emitted by format_type, but listed defensively below — is a
+// postgres's 'int8' — never emitted by format_type, but listed defensively below — is a
 // 64-bit bigint). Matched case-sensitively, before anything is lowercased, so the two families
 // never conflate.
 const CLICKHOUSE_INT_RANGES: Record<string, { min: bigint; max: bigint }> = {
@@ -112,9 +112,9 @@ export function parseTypeBounds(dataType: string): TypeBounds {
     };
   }
 
-  // mysqlfamily reads COLUMN_TYPE, not DATA_TYPE (F10), so an unsigned int arrives as
-  // "int unsigned" (occasionally with a now-vestigial display width, "int(10) unsigned"). F6/P21
-  // round 1: the display-width group used to be stripped only on the unsigned branch — MariaDB
+  // mysqlfamily reads COLUMN_TYPE, not DATA_TYPE, so an unsigned int arrives as
+  // "int unsigned" (occasionally with a now-vestigial display width, "int(10) unsigned"). The
+  // display-width group used to be stripped only on the unsigned branch — MariaDB
   // still emits one for signed integers too (int(11), bigint(20), smallint(6), tinyint(4)), which
   // wasn't a key in SQL_INT_RANGES, so parseTypeBounds silently returned {} and generation fell
   // through to its unbounded 0..1,000,000 default against columns with real, much narrower

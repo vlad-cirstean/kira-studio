@@ -1,10 +1,10 @@
 import { editorForTab } from './editors';
 
-// C7 D12: the fix for the case C6 left — RepoFileView.vue applies its own `revealLine` on mount
-// only (§9.3/§12), so a jump into a tab that is *already mounted and active* (the common case for
-// a search result: two matches in the file you're already reading, or a go-to-definition inside
-// the current file) moves nothing today. A pending reveal per tab: applied immediately when that
-// tab's editor is live (requestReveal), consumed on mount otherwise (consumeReveal).
+// RepoFileView.vue applies its own `revealLine` on mount only, so a jump into a tab that is
+// *already mounted and active* (the common case for a search result: two matches in the file
+// you're already reading, or a go-to-definition inside the current file) moves nothing today.
+// A pending reveal per tab: applied immediately when that tab's editor is live (requestReveal),
+// consumed on mount otherwise (consumeReveal).
 //
 // Carries a column/endColumn, which repo-file's own persisted tab state (repoFileTabStateSchema)
 // deliberately does not — a column is worth restoring a cursor to within a session, not across a

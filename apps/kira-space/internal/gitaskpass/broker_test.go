@@ -19,7 +19,7 @@ import (
 // TestHelperProcess): a no-op unless KIRA_ASKPASS_HELPER_PROCESS=1 is set, which only this
 // package's own tests ever set — so this test contributes nothing when the suite runs normally,
 // and becomes the real askpass helper when the shim execs this same test binary with
-// "-test.run=TestAskpassHelperProcess --" (helperCommand, below). This is D8's own test seam: the
+// "-test.run=TestAskpassHelperProcess --" (helperCommand, below). This is the test seam: the
 // whole broker is provable with no app binary at all.
 func TestAskpassHelperProcess(t *testing.T) {
 	if os.Getenv("KIRA_ASKPASS_HELPER_PROCESS") != "1" {
@@ -149,7 +149,7 @@ func TestBroker_DismissalExitsNonZeroPromptly(t *testing.T) {
 	}
 }
 
-// TestRunHelper_SSHAskPassPromptNone_NeverContactsTheBroker is F19's own regression guard: OpenSSH
+// TestRunHelper_SSHAskPassPromptNone_NeverContactsTheBroker is the regression guard: OpenSSH
 // sets SSH_ASKPASS_PROMPT=none for a FIDO/security-key touch notification, where no text answer is
 // ever expected — the old design still relayed this through the broker as an ordinary masked text
 // prompt, leaving a stale, meaningless prompt on screen. The helper must exit 0 without ever
@@ -178,7 +178,7 @@ func TestRunHelper_SSHAskPassPromptNone_NeverContactsTheBroker(t *testing.T) {
 	}
 }
 
-// TestRunHelper_SSHAskPassPromptConfirm_AnswerNeverPrintedExitCodeCarriesTheDecision is F19's own
+// TestRunHelper_SSHAskPassPromptConfirm_AnswerNeverPrintedExitCodeCarriesTheDecision is the
 // regression guard for OpenSSH's yes/no variant: the Request reaching the Prompter must say
 // Confirm (so a real UI shows Yes/No, not a masked text field) and Masked=false (a yes/no question
 // is not itself a secret), and the helper's own exit code — never printed stdout — must carry the
@@ -437,7 +437,7 @@ func TestRunHelper_BrokerNeverAnswersExitsOneWithinItsOwnTimeout(t *testing.T) {
 	}
 }
 
-// TestBuildShim_NoCharacterNeedsRefusing is F13's own regression guard for the OLD design's own
+// TestBuildShim_NoCharacterNeedsRefusing is the regression guard for the OLD design's own
 // refusal list: single-quoting (below) has no special character at all except the quote itself,
 // so none of these — a double quote, a newline, or any of the shell metacharacters double-quoting
 // used to leave live ($, backtick, \) — needs erroring out any more.
@@ -453,7 +453,7 @@ func TestBuildShim_NoCharacterNeedsRefusing(t *testing.T) {
 	}
 }
 
-// TestBuildShim_ShellMetacharactersDoNotExpand is F13's own security regression guard: the OLD
+// TestBuildShim_ShellMetacharactersDoNotExpand is the security regression guard: the OLD
 // design double-quoted each helper-command element, and double quotes still let the shell expand
 // $var, $(...) and backticks inside them — an executable path containing one of these ran
 // arbitrary commands, or resolved to the wrong path, before the shim ever execed anything.

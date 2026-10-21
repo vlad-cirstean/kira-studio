@@ -14,7 +14,7 @@ type CacheSettings struct {
 	L2BudgetMb int `json:"l2BudgetMb"`
 }
 
-// AdvancedSettings' own LogLevel is P120: Studio's own diagnostic-log verbosity, its own name/key
+// AdvancedSettings' own LogLevel is Studio's own diagnostic-log verbosity, its own name/key
 // (`advanced.logLevel`), no longer the shared appsettings.AdvancedCore embed both apps used to
 // share under a name that never fit Studio's own module set.
 // internal/logging.SetLevel is its actual mechanism; appsettings.ValidLogLevel is its validator,
@@ -35,7 +35,7 @@ type DbMcpSettings struct {
 	ServerEnabled bool `json:"serverEnabled"`
 }
 
-// ApiSettings mirrors packages/shared/domain/settings.ts's apiSettingsSchema (P90 item 1) — the
+// ApiSettings mirrors packages/shared/domain/settings.ts's apiSettingsSchema — the
 // seven request settings that used to be httpclient package constants (internal/httpclient's own
 // options.go states the coupling back at this file: its normalize() defaults must equal
 // DefaultSettings().Api field for field). HTTPVersion is "1.1" | "2"; RequestTimeoutMs is
@@ -57,6 +57,7 @@ type Settings struct {
 	Advanced   AdvancedSettings       `json:"advanced"`
 	Api        ApiSettings            `json:"api"`
 	DbMcp      DbMcpSettings          `json:"dbMcp"`
+	Agent      appsettings.Agent      `json:"agent"`
 }
 
 // DefaultSettings mirrors packages/shared/domain/settings.ts's defaultSettings verbatim.
@@ -84,13 +85,13 @@ func DefaultSettings() Settings {
 			DisableCookieJar: true,
 		},
 		DbMcp: DbMcpSettings{ServerEnabled: false},
+		Agent: appsettings.DefaultAgent(),
 	}
 }
 
 // DataPatch and CachePatch mirror settings.ts's `.partial()` per-section patch shapes — every leaf
-// is optional, present only when the caller means to change it (D15: SettingsRepo.Set writes only
-// the leaves actually patched). Appearance's own patch shape is appsettings.AppearancePatch
-// (P103 Part 4 §7.1).
+// is optional, present only when the caller means to change it (SettingsRepo.Set writes only
+// the leaves patched). Appearance's own patch shape is appsettings.AppearancePatch.
 type DataPatch struct {
 	DefaultPageSize *int `json:"defaultPageSize,omitempty"`
 }
@@ -130,6 +131,7 @@ type SettingsPatch struct {
 	Advanced   *AdvancedPatch               `json:"advanced,omitempty"`
 	Api        *ApiPatch                    `json:"api,omitempty"`
 	DbMcp      *DbMcpPatch                  `json:"dbMcp,omitempty"`
+	Agent      *appsettings.AgentPatch      `json:"agent,omitempty"`
 }
 
 // ValidHTTPVersion mirrors settings.ts's HTTP_VERSIONS — Go's HTTP/1 *is* 1.1, so "1" is never a
@@ -149,7 +151,7 @@ func ValidPageSize(v int) bool {
 }
 
 // InRange (settings.ts's z.number().int().min(lo).max(hi)), ValidRowDensity and ValidLogLevel
-// moved to appsettings (P103 Part 4 §7.1) — this file's own remaining bounds
+// moved to appsettings — this file's own remaining bounds
 // (Data/Cache/Advanced/Api are all per-app-only sections) are built on appsettings.InRange
 // directly rather than a redundant local copy.
 var (
@@ -231,5 +233,5 @@ func (p SettingsPatch) Validate() error {
 	if err := validateApiSection(p.Api); err != nil {
 		return err
 	}
-	return nil
+	return appsettings.ValidateAgent(p.Agent)
 }

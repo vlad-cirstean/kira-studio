@@ -28,28 +28,28 @@ interface BrowseViewRuntime {
   filter: string;
   /** The row that holds the list's roving tab stop, by path. */
   selected: string | null;
-  /** P43 iter3 D39: monotonic per tab. `load()` captures it before its own await and drops its
+  /** Monotonic per tab. `load()` captures it before its own await and drops its
    *  result on all three exit paths if a newer load has started since — the same supersession
    *  guard grid/documents/keyvalue/stream all keep as `opId`, expressed as a counter because
-   *  `kira:tree:children` is not a cancellable engine op and has no op id to compare (D16, above). */
+   *  `kira:tree:children` is not a cancellable engine op and has no op id to compare. */
   loadSeq: number;
-  /** P63: the split's value pane — the selected leaf's own pager position. Backs the
+  /** The split's value pane — the selected leaf's own pager position. Backs the
    *  `${tabId}::preview` KeyValueHost (BrowseView.vue registers it), so KeyValuePane's pager has
    *  somewhere to read/write for a target that is not a real tab. Runtime-only, like `selected`
-   *  itself (§5) — a selection this belongs to never survives a restore either. Reset to page 0
+   *  itself — a selection this belongs to never survives a restore either. Reset to page 0
    *  on every new selection (`selectRow` below); `previewPageSize` persists across selections,
    *  mirroring how a real KeyValue tab's own page size survives paging through different pages. */
   previewPageIndex: number;
   previewPageSize: PageSize;
-  /** P63 §4.3: redis key path -> its TYPE, filled in windowed (BrowseView.vue's own
+  /** Redis key path -> its TYPE, filled in windowed (BrowseView.vue's own
    *  `@visible-range` handler calls ensureKeyTypes below with the paths currently on screen) —
    *  never the whole level, which can hold up to 200 000 keys (redis/catalog.go's own scanCount x
-   *  maxScanRounds). `markRaw`'d for the same reason `nodes` is (P21 round 3 performance finding
-   *  8): a Map bounded by what has been scrolled past is far smaller than a whole level, but nothing
-   *  here mutates in a way a template needs cell-by-cell reactivity for either, so `keyTypesVersion`
-   *  below (bumped whenever new entries land) is what a template actually observes. Cleared on
-   *  every level change (setLevel), same reason `selected`/`filter` are: a path from the previous
-   *  level must never colour a row in this one. */
+   *  maxScanRounds). `markRaw`'d for the same reason `nodes` is: a Map bounded by what has been
+   *  scrolled past is far smaller than a whole level, but nothing here mutates in a way a template
+   *  needs cell-by-cell reactivity for either, so `keyTypesVersion` below (bumped whenever new
+   *  entries land) is what a template observes. Cleared on every level change (setLevel),
+   *  same reason `selected`/`filter` are: a path from the previous level must never colour
+   *  a row in this one. */
   keyTypes: Map<string, string>;
   keyTypesVersion: number;
 }
@@ -102,15 +102,15 @@ export const useBrowseViewStore = defineStore('browseView', () => {
     try {
       const result = await control.treeChildren(tab.connectionId, level, opts?.refresh ?? false);
       if (rt.loadSeq !== seq) return; // superseded by a newer load
-      // P21 round 3 performance finding 8: `runtime` (viewOp.ts's createRuntimeStore) is a deep
+      // `runtime` (viewOp.ts's createRuntimeStore) is a deep
       // reactive() — necessary for the plain scalar fields every other view's runtime keeps, but a
       // Redis/S3 level can hold up to 200 000 TreeNodes (redis/catalog.go's own scanCount x
-      // maxScanRounds), and assigning a plain array here would wrap every one of them (and their own
-      // `badges` array) in its own reactivity Proxy the moment filteredNodes reads them — for state
-      // nothing here ever mutates in place (`nodes` is always replaced wholesale, never pushed into).
-      // markRaw is project/state/tree.ts's own precedent for exactly this shape (`children`'s own
-      // comment: "deep-wrapping every one of them in a reactivity Proxy bought nothing no writer ever
-      // used").
+      // maxScanRounds), and assigning a plain array here would wrap every one of them (and their
+      // own `badges` array) in its own reactivity Proxy the moment filteredNodes reads them — for
+      // state nothing here ever mutates in place (`nodes` is always replaced wholesale, never
+      // pushed into). markRaw is project/state/tree.ts's own precedent for exactly this shape
+      // (`children`'s own comment: "deep-wrapping every one of them in a reactivity Proxy bought
+      // nothing no writer ever used").
       rt.nodes = markRaw(result.nodes);
       rt.truncated = result.truncated;
       rt.status = 'idle';
@@ -124,7 +124,7 @@ export const useBrowseViewStore = defineStore('browseView', () => {
       }
       rt.status = 'error';
       rt.error = { code: failure.code, message: failure.message };
-      // P21 round 3 functional finding 14: levelPath has already advanced (setLevel patches it
+      // levelPath has already advanced (setLevel patches it
       // before calling load) — leaving the *previous* level's nodes in place here attributes a
       // listing to the wrong level under the new breadcrumb, and a row action (Delete, say) run
       // against it would target a node under the old level while the header says otherwise.
@@ -141,7 +141,7 @@ export const useBrowseViewStore = defineStore('browseView', () => {
   async function setLevel(tabId: string, level: string): Promise<void> {
     const tab = useTabsStore().findBrowseTab(tabId);
     if (!tab) return;
-    // P21 round 3 functional finding 14: a level change used to keep the previous level's own
+    // A level change used to keep the previous level's own
     // `filter`/`selected` — descending into a container while a substring filter was active carried
     // that now-meaningless filter into the new level's listing (silently hiding most or all of its
     // children, with the filter box's leftover text the only clue), and `selected` could go on
@@ -201,12 +201,12 @@ export const useBrowseViewStore = defineStore('browseView', () => {
   // still can't turn this into a whole-level fetch.
   const KEY_TYPES_BATCH_LIMIT = 200;
 
-  // P63 §4.3: fetches redis TYPE for `paths` not already known or already in flight, batched and
+  // Fetches redis TYPE for `paths` not already known or already in flight, batched and
   // windowed by the caller (BrowseView.vue's own `@visible-range` handler) rather than eagerly for
-  // a whole level. Dedupes against `rt.keyTypes` (already answered) and this tab's own in-flight set
-  // (a request already running) — interacting rules over an in-flight set plus a loadSeq guard, the
-  // "cache invalidation with interacting rules" case CLAUDE.md's own testing bar names, covered by
-  // state.spec.ts's own dedupe/supersede test.
+  // a whole level. Dedupes against `rt.keyTypes` (already answered) and this tab's own in-flight
+  // set (a request already running) — interacting rules over an in-flight set plus a loadSeq guard,
+  // the "cache invalidation with interacting rules" case CLAUDE.md's own testing bar names,
+  // covered by state.spec.ts's own dedupe/supersede test.
   function ensureKeyTypes(tabId: string, paths: readonly string[]): void {
     const rt = runtime[tabId];
     if (!rt) return;

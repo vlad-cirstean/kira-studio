@@ -294,8 +294,8 @@ func TestClassifyStashBranch_ValidNameBlockedCheckout(t *testing.T) {
 	}
 }
 
-// TestClassifyStashBranch_NoPredictionField — probe 11: StashBranchPreflight carries no prediction
-// field at all. In Go this is structural (the type has no Prediction field), so the test simply
+// TestClassifyStashBranch_NoPredictionField — StashBranchPreflight carries no prediction
+// field at all. In Go this is structural (the type has no Prediction field), so the test
 // confirms the struct compiles and the classifier never sets one — a compile-time guarantee TS
 // needed a runtime `'prediction' in result` check for.
 func TestClassifyStashBranch_NoPredictionField(t *testing.T) {

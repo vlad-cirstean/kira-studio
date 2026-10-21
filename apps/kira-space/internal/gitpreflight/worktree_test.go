@@ -81,7 +81,7 @@ func TestClassifyWorktreeAdd_DetachHere_SuppressedAlongsideAnotherBlocker(t *tes
 
 // TestClassifyWorktreeAdd_DetachHere_NeverForDetachMode proves detachHere is meaningless (and
 // never offered) for a request already in detach mode — ClassifyWorktreeAddInput's own
-// BranchCheckedOutElsewhere is defined only for existingBranch mode anyway (D4), so this proves the
+// BranchCheckedOutElsewhere is defined only for existingBranch mode anyway, so this proves the
 // route stays empty rather than depending on that convention alone.
 func TestClassifyWorktreeAdd_DetachHere_NeverForDetachMode(t *testing.T) {
 	t.Parallel()

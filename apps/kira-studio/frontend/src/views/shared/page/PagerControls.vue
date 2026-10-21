@@ -5,10 +5,10 @@ import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { computed, ref, watch } from 'vue';
 
-// P48 F4: the first/prev/page-jump/next/last pager DataToolbar.vue and DocumentView.vue each
+// The first/prev/page-jump/next/last pager DataToolbar.vue and DocumentView.vue each
 // wrote out — same five controls, same order, same pageDisplay/pageInputValue/pageCount/onJump
 // computeds, differing only in their data-testid prefix and the "count first" tooltip's noun.
-// D7: uses the document view's own icon spelling (arrow-left/arrow-right for prev/next) — the
+// Uses the document view's own icon spelling (arrow-left/arrow-right for prev/next) — the
 // grid's own chevron-left/chevron-right pair for First and Previous rendered two identical
 // glyphs side by side, which this fixes by construction.
 const props = defineProps<{
@@ -29,7 +29,7 @@ const pageDisplay = computed(() => props.pageIndex + 1);
 // component makes forces a re-render, and Vue reasserts the bound value on the DOM input
 // regardless of whether pageDisplay itself changed — wiping out whatever the user has typed but
 // not yet committed. Mirroring it through its own ref, kept in sync with pageDisplay only when
-// the page actually advances, avoids the fight.
+// the page advances, avoids the fight.
 const pageInputValue = ref(String(pageDisplay.value));
 watch(pageDisplay, (v) => {
   pageInputValue.value = String(v);
@@ -40,9 +40,9 @@ const pageCount = computed(() => {
   return Math.max(1, Math.ceil(props.count / props.pageSize));
 });
 
-// P21 round 3 functional finding 12: a rejected jump (non-numeric, or < 1) used to leave
+// A rejected jump (non-numeric, or < 1) used to leave
 // pageInputValue exactly as the user left it forever — the box's own resync only ever runs off
-// `watch(pageDisplay, ...)` above, which fires only when the page actually changes, so a rejected
+// `watch(pageDisplay, ...)` above, which fires only when the page changes, so a rejected
 // jump (nothing changes) never touched it. And a jump past the last known page was never clamped
 // here at all (state.ts's own goToPage only clamps at 0), so typing e.g. 99 against a 3-page
 // result silently asked for an offset far past the end.

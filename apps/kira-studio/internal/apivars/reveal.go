@@ -26,10 +26,10 @@ type RevealResult struct {
 	Outcome string  `json:"outcome"`
 }
 
-// Reveal never errors (P25 D9's contract, inherited via P14): an undecryptable secret, a declined
-// prompt, or a required confirmation all come back as a RevealResult naming its own Outcome, not a
-// rejected call. Gated through the SAME *localauth.Authorizer instance connections.Service.Reveal
-// uses (D8) — a grace granted by either reveal covers the other.
+// Reveal never errors: an undecryptable secret, a declined prompt, or a required confirmation all
+// come back as a RevealResult naming its own Outcome, not a rejected call. Gated through the SAME
+// *localauth.Authorizer instance connections.Service.Reveal uses — a grace granted by either reveal
+// covers the other.
 func (s *Service) Reveal(variableID string, confirmed bool) RevealResult {
 	if variableID == "" {
 		msg := "variableId is required"

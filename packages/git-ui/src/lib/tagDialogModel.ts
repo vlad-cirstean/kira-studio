@@ -1,10 +1,10 @@
 /**
- * `docs/plans/P6.md` W15: `TagDialog.vue`'s pure half. P6 has no `preflight.tagCreate` wire entry
- * (only checkout and revert get one — see `contract.ts`'s own comment), so this is a structural
- * adaptation of `core`'s `classifyTagCreate` over the wire's `RefRow` rather than a `RefRecord`:
- * a `RefRow` already carries `annotation` directly, so there is nothing here that needs
+ * `TagDialog.vue`'s pure half. There is no `preflight.tagCreate` wire entry (only checkout and
+ * revert get one — see `contract.ts`'s own comment), so this is a structural adaptation of
+ * `core`'s `classifyTagCreate` over the wire's `RefRow` rather than a `RefRecord`: a `RefRow`
+ * already carries `annotation` directly, so there is nothing here that needs
  * `objectType`/`isAnnotated` at all. `validateRefName` itself IS imported from `core` — it takes
- * no `RefRecord`, so there is no reason to duplicate probe P3's own `@{`/leading-`-`/empty rules.
+ * no `RefRecord`, so there is no reason to duplicate the `@{`/leading-`-`/empty rules.
  */
 import { type TextRef, validateRefName } from '@kira/git-core';
 import type { RefRow } from '@kira/git-ipc';

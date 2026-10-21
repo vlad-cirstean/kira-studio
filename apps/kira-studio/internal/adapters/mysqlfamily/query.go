@@ -30,10 +30,10 @@ type QueryOptions struct {
 var setCommand = adapters.SetCommand
 
 // runArrayQuery is read.ts's/console.ts's own runQuery({rowsAsArray: true, ...}) call shape: every
-// row scanned as []*string in column order, nil for SQL NULL, via B3's DatabaseTypeName-driven
+// row scanned as []*string in column order, nil for SQL NULL, via the DatabaseTypeName-driven
 // cellText — never a typeCast callback (the driver has none). The server-side kill is entirely
 // adapter.go's Cancel (KILL QUERY over a side connection) — this function does not and must not
-// try to make the query itself abort (B6, adapters.RunWithAbortRace's own contract).
+// try to make the query itself abort (adapters.RunWithAbortRace's own contract).
 func runArrayQuery(ctx context.Context, conn Entry, query string, params []any, op *adapters.OpCtx, track TrackQuery, opts QueryOptions) ([][]*string, error) {
 	setCommand(op, query, params, opts.LogParams)
 	if err := adapters.CheckNotStarted(ctx); err != nil {
@@ -90,7 +90,7 @@ func runArrayQuery(ctx context.Context, conn Entry, query string, params []any, 
 	})
 }
 
-// streamArrayQuery is runArrayQuery's single-pass twin (P2 R1): onRow is called once per scanned
+// streamArrayQuery is runArrayQuery's single-pass twin: onRow is called once per scanned
 // row, in order, with a []*string the callback owns, instead of every row being materialized into
 // a [][]*string only to be transposed into the page builder immediately after. runArrayQuery
 // itself stays as the array-returning shape countRows and the catalog paths want.

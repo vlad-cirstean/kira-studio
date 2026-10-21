@@ -1,6 +1,7 @@
 // Frozen at P143 (ADE v2 wire contract). Mirrors apps/kira-space/internal/bridge/adewire.
 // Changing a key, type or value set is a contract change (docs/HISTORY.md (v2.0 P143) rule 1).
 
+import type { GitHostInfo } from '@kira/git-ipc';
 import type { RunOutcome } from '@shared/domain/runOutcome';
 
 // ---- shared
@@ -174,7 +175,7 @@ export interface Integration {
   note: string;
   recorded: boolean /* D14: app's merge dialog recorded it */;
 }
-export interface PR {
+export interface ChangeRequest {
   number: number;
   title: string;
   state: string;
@@ -367,13 +368,24 @@ type AdeRunOutcome = RunOutcome & {
   rebase?: RebaseFacts;
   route?: string;
 };
+/** A code host provider's display text, as `GitHostService.Providers` and `/api/ade/hosts` answer. */
+export type HostInfo = GitHostInfo;
+export interface HostProviders {
+  providers: HostInfo[];
+}
+export interface HostLink {
+  provider: string;
+  kind: 'changeRequest' | 'issue';
+  ref: string;
+}
 export interface Task {
   id: string;
   kind: 'task' | 'review' | 'parked';
   title: string /* '' = default title */;
   owner: string;
   jira: Jira | null;
-  githubUrl: string;
+  hostUrl: string;
+  hostLink: HostLink | null /* hostUrl as a provider recognises it */;
   workflowId: string /* '' = none */;
   entryStepId: string /* the step the task last entered | 'done' | '' without a workflow */;
   since: Record<
@@ -418,14 +430,15 @@ export interface Board {
   worktreeBasePath: string;
   autofetchMinutes: number;
 }
-export interface RepoPrs {
+interface RepoHost {
   codeRepoId: string;
   kind: 'ok' | 'disabled' | 'unavailable';
-  webUrl: string;
+  host: HostInfo | null;
 }
-export interface PrsResult {
-  repos: RepoPrs[];
-  branches: Record<string, PR> /* branchId */;
+export interface ChangeRequestsResult {
+  repos: RepoHost[];
+  branches: Record<string, ChangeRequest> /* branchId */;
+  branchUrls: Record<string, string> /* branchId -> web page; absent without a host */;
 }
 
 // ---- backlog (§11.1, O2)
@@ -434,7 +447,8 @@ export interface BacklogItem {
   text: string;
   addedAt: number;
   jira: Jira | null;
-  githubUrl: string;
+  hostUrl: string;
+  hostLink: HostLink | null;
   notes: string;
 }
 export interface BacklogResult {
@@ -507,7 +521,8 @@ export interface LogPage {
 }
 export interface Session {
   id: string;
-  claudeSessionId: string;
+  agentSessionId: string;
+  provider: string;
   mode: 'tui' | 'headless';
   state: 'running' | 'stopped';
   activity:
@@ -560,39 +575,41 @@ export interface ReviewAgentLaunch {
   resumed: boolean;
   note: string /* '' or why a fresh one started */;
 }
-type GhSyncStatus =
+type ViewedSyncStatus =
   | 'ok'
   | 'noPr'
   | 'prClosed'
   | 'disabled'
-  | 'ghMissing'
+  | 'cliMissing'
   | 'unauthenticated'
   | 'unavailable'
-  | 'headNotFetched';
-interface GhSyncFile {
+  | 'headNotFetched'
+  | 'unsupported';
+interface ViewedSyncFile {
   path: string;
   action: 'mark' | 'unmark' | 'alreadyViewed' | 'skip';
   reason: '' | 'notReviewed' | 'partial' | 'changedSinceReview' | 'differsFromPrHead' | 'notInPr';
 }
-export interface GhSyncPlan {
-  status: GhSyncStatus;
+export interface ViewedSyncPlan {
+  status: ViewedSyncStatus;
   message: string;
   account: string;
-  pr: PR | null;
+  changeRequest: ChangeRequest | null;
+  host: HostInfo | null;
   headSha: string;
   localTip: string;
-  files: GhSyncFile[];
+  files: ViewedSyncFile[];
 }
-interface GhSyncFailure {
+interface ViewedSyncFailure {
   path: string;
   error: string;
 }
-export interface GhSyncResult {
-  status: GhSyncStatus;
+export interface ViewedSyncResult {
+  status: ViewedSyncStatus;
   message: string;
   marked: string[];
   unmarked: string[];
-  failed: GhSyncFailure[];
+  failed: ViewedSyncFailure[];
 }
 
 // ---- push payloads
@@ -620,7 +637,7 @@ export interface MobileOpenLaunchEvent {
 export interface CreateTaskArgs {
   title: string;
   jira: Jira | null;
-  githubUrl: string;
+  hostUrl: string;
   notes: string;
   codeRepoIds: string[];
   workflowId: string;
@@ -703,7 +720,7 @@ export interface TaskPatch {
   title: string | null;
   jira: Jira | null;
   clearJira: boolean;
-  githubUrl: string | null;
+  hostUrl: string | null;
   est: string | null;
   notes: string | null;
   color: number | null;
@@ -744,7 +761,7 @@ export interface BacklogPatch {
   text: string | null;
   jira: Jira | null;
   clearJira: boolean;
-  githubUrl: string | null;
+  hostUrl: string | null;
   notes: string | null;
 }
 export interface UpdateBacklogItemArgs {

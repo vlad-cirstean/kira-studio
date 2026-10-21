@@ -4,14 +4,14 @@ import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 import { connectionRow } from './support/tree';
 
-// Ported from tests/e2e/preconnect.spec.ts (P57 D16). That file is split in two, mirroring
+// Ported from tests/e2e/preconnect.spec.ts. That file is split in two, mirroring
 // connections.spec.ts/tree.spec.ts's own discipline: a dialog+failure-before-connect half that
 // needs no real adapter, and a "sidecar lifecycle against a live connection" half that spawns a
 // real shell process and inspects its real PID on the filesystem. Only the first half ports —
 // the second has no equivalent in a tier with no real backend process to spawn or supervise
 // (same reasoning as workbench.spec.ts's dropped relaunch scenarios), and is covered instead by
-// apps/kira-studio/internal/preconnect/supervisor_test.go and tail_test.go (real Go coverage of exactly the
-// exit-drops-the-connection and one-shot-exit-is-fine behaviors that half asserted).
+// apps/kira-studio/internal/preconnect/supervisor_test.go and tail_test.go (real Go coverage of
+// exactly the exit-drops-the-connection and one-shot-exit-is-fine behaviors that half asserted).
 //
 // Two of the first half's own checks are also dropped: "saving persists it" and "the stored value
 // survives a relaunch" both needed a real relaunch to prove (tests/ui/fixtures.ts's own header
@@ -37,6 +37,7 @@ const CREATED: ConnectionSummary = {
   options: {},
   preconnect: 'echo hi',
   preconnectSidecar: false,
+  preconnectDelaySec: 0,
   autoExplain: false,
   throttlePerSec: 0,
   mcpEnabled: false,
@@ -71,6 +72,7 @@ const CONTROL: ControlSnapshot[] = [
       options: {},
       preconnect: 'echo hi',
       preconnectSidecar: false,
+      preconnectDelaySec: 0,
       autoExplain: false,
       throttlePerSec: 0,
     },
@@ -96,6 +98,7 @@ const CONTROL: ControlSnapshot[] = [
         options: {},
         preconnect: null,
         preconnectSidecar: false,
+        preconnectDelaySec: 0,
         autoExplain: false,
         throttlePerSec: 0,
         mcpEnabled: false,
@@ -127,6 +130,7 @@ const CONTROL: ControlSnapshot[] = [
         options: {},
         preconnect: 'echo nope >&2; exit 3',
         preconnectSidecar: false,
+        preconnectDelaySec: 0,
         autoExplain: false,
         throttlePerSec: 0,
         mcpEnabled: false,
@@ -223,4 +227,60 @@ test('preconnect — dialog field, and failure before connect', async ({ relaunc
   const statusTooltip = page.locator('[data-slot="tooltip-content"]').first();
   await expect(statusTooltip).toContainText(/exit 3/);
   await expect(statusTooltip).toContainText(/nope/);
+});
+
+test('preconnect delay — field shows with a script, range-checks, and is sent on save', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.connectionsList, response: [] },
+      {
+        channel: IPC.connectionsCreate,
+        args: {
+          name: 'Preconnect Test',
+          kind: 'postgres',
+          color: 'none',
+          mode: 'fields',
+          readOnly: false,
+          host: '127.0.0.1',
+          port: 5432,
+          database: 'testdb',
+          username: 'testuser',
+          password: null,
+          uri: null,
+          options: {},
+          preconnect: 'echo hi',
+          preconnectSidecar: false,
+          preconnectDelaySec: 5,
+          autoExplain: false,
+          throttlePerSec: 0,
+        },
+        response: { ...CREATED, preconnectDelaySec: 5 },
+      },
+    ],
+  });
+
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-name"]', 'Preconnect Test');
+  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await page.fill('[data-testid="connection-port"]', '5432');
+  await page.fill('[data-testid="connection-database"]', 'testdb');
+  await page.fill('[data-testid="connection-username"]', 'testuser');
+  await page.click('[data-testid="connection-tab-preconnect"]');
+  const delay = page.locator('[data-testid="connection-preconnect-delay"]');
+  await expect(delay).toHaveCount(0);
+  await page.fill('[data-testid="connection-preconnect"]', 'echo hi');
+  await expect(delay).toBeVisible();
+
+  await delay.fill('301');
+  await expect(page.locator('[data-testid="connection-preconnect-delay-error"]')).toBeVisible();
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
+
+  await delay.fill('5');
+  await expect(page.locator('[data-testid="connection-preconnect-delay-error"]')).toHaveCount(0);
+  await page.click('[data-testid="connection-save"]');
+  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
 });

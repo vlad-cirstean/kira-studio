@@ -1,24 +1,22 @@
 <script setup lang="ts">
 /**
- * §6.2's toolbar: `[repo ▾] [branch ▾] │ ⟳ │ Fetch Pull Push │ Stash ▾ │ ⚙`. P4 built only the
- * first and third groups; P6 (W13/W17) adds the second — the branch/tag picker — and the undo
- * affordance, since both need P6's ref list and op executor. `docs/plans/P8.md` W17 adds the
- * fetch/pull/push group itself; the trailing `⚙` is a settings gear (G18 D13): the gear opens
+ * The toolbar: `[repo ▾] [branch ▾] │ ⟳ │ Fetch Pull Push │ Stash ▾ │ ⚙`. The second group — the
+ * branch/tag picker — and the undo affordance are there since both need the ref list and op
+ * executor. The trailing `⚙` is a settings gear: the gear opens
  * `App.vue`'s own `RepoSettingsDialog.vue`, this toolbar owning no dialog state of its own
  * (`openRepoSettings` emit), the same shape `stashChanges` already follows.
  *
- * `docs/plans/P11.md` W14 originally added a fifth slot here, `SearchBox.vue`, crammed into this
- * same row. G-UX D9 (item 9) moves it out entirely — a row of its own, below the toolbar,
+ * `SearchBox.vue` is out of this row entirely — a row of its own, below the toolbar,
  * toggled rather than always rendered (`App.vue` owns it now, alongside `AppToolbar`, not this
  * component).
  *
  * Chrome: `ViewToolbar` (the app's bar height, border and padding), Kira's radius and shadow tiers.
  *
- * There is no `remotes.list` endpoint (P6/P8 both skip it, per `rowMenuModel.ts`'s own
- * `remoteNamesFrom` doc comment) and remote *management* is out of scope entirely (§10's scope
- * table), so this toolbar reads remote names from whatever remote-tracking branches already
+ * There is no `remotes.list` endpoint (per `rowMenuModel.ts`'s own
+ * `remoteNamesFrom` doc comment) and remote *management* is out of scope entirely, so this
+ * toolbar reads remote names from whatever remote-tracking branches already
  * loaded and targets the current branch's upstream remote, else `origin`, else the first name —
- * `defaultRemote` below. Fetch/Pull/Push are simply absent (not disabled) when no remote is
+ * `defaultRemote` below. Fetch/Pull/Push are absent (not disabled) when no remote is
  * known at all: there is nothing to name in the tooltip and no useful default to pick.
  */
 import type { StashEntry } from '@kira/git-ipc';
@@ -39,11 +37,11 @@ import { type MenuSection, sectionsToMenuItems } from '../lib/menuModel.ts';
 import type { PickerTab } from '../lib/pickerModel.ts';
 import { defaultRemoteFor, remoteNamesFrom } from '../lib/rowMenuModel.ts';
 import type { AsyncFailure } from '../state/asyncFailures.ts';
+import type { ChangeRequestState } from '../state/changeRequests.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { GraphViewState } from '../state/graphView.ts';
 import { composeAutoFetchStoppedAnnouncement } from '../state/liveAnnouncements.ts';
 import type { OpsState } from '../state/ops.ts';
-import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
 import type { RepoState } from '../state/repo.ts';
 import type { StackState } from '../state/stack.ts';
@@ -54,10 +52,9 @@ import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
 // BranchPicker's own emits declaration — a type-only import here breaks that inference (TS7006).
 // PullStrategyPicker and RefreshButton: a .vue default export is a *value* — the component object
 // the template instantiates. `import type` erases it, and Vue then renders the tag as an unknown
-// element with nothing inside it (G14 F1/F3). The script's only reference to RefreshButton is
+// element with nothing inside it. The script's only reference to RefreshButton is
 // `InstanceType<typeof …>`, so biome's useImportType cannot tell (it is off for `**/*.vue` in
-// `biome.json` for exactly this class of false positive, P96 §5.2); the template is the real
-// caller.
+// `biome.json` for exactly this class of false positive); the template is the real caller.
 import BranchPicker from './BranchPicker.vue';
 import PullStrategyPicker from './PullStrategyPicker.vue';
 import RefreshButton from './RefreshButton.vue';
@@ -75,7 +72,7 @@ const props = defineProps<{
   actions: DetailActions | undefined;
   /** G24 D9: `BranchPicker.vue`'s own `#123` branch-tip badge source — optional, mirrors every
    *  other G24 prop threaded through this toolbar's own children. */
-  prState?: PrState;
+  changeRequestState?: ChangeRequestState;
   /** Whether `App.vue`'s own search row is currently open — drives the toggle button's `active`
    *  state, the same `active` = "revealed" convention `ReviewView.vue`'s own filter toggle uses. */
   searchOpen: boolean;
@@ -123,10 +120,10 @@ function copy(text: string, message: string): void {
 }
 
 // P74 §3.3: BranchPicker.vue's own branch-row badge and StackList.vue's own row badge each open
-// a PR the same way CommitMeta.vue's facts-row icon/"Pull request" row do — one action, threaded
+// a PR the same way CommitMeta.vue's facts-row icon/change request row do — one action, threaded
 // down rather than reimplemented at either call site.
-function openPullRequest(number: number): void {
-  void props.actions?.openPullRequest({ number });
+function openChangeRequest(number: number): void {
+  void props.actions?.openChangeRequest({ number });
 }
 
 const refreshButtonRef = ref<InstanceType<typeof RefreshButton> | null>(null);
@@ -236,10 +233,10 @@ const progressText = computed(() => {
   return progress.remote ? t('git.toolbar.progressRemote.status', { phase }) : phase;
 });
 
-/** D50's cancellability table, read into the toolbar's own affordance: only fetch and pull's own
+/** The cancellability table, read into the toolbar's own affordance: only fetch and pull's own
  *  fetch phase are killable, so the button is disabled-with-reason for the other three kinds
  *  rather than hidden — clicking it while, say, a push is in flight is a legitimate thing to try,
- *  and `remote.cancel` answers honestly (`cancelled: false`) either way (W19's own "cancel is
+ *  and `remote.cancel` answers honestly (`cancelled: false`) either way (the "cancel is
  *  refused mid-push" criterion). */
 const cancelDisabledReason = computed(() => {
   switch (props.opsState.activeRemoteOp.value) {
@@ -262,7 +259,7 @@ async function doCancel(): Promise<void> {
   await props.opsState.cancelRemote();
 }
 
-// G10 D17/F15: forwarded so App.vue's palette dispatcher can drive the same affordances a click
+// Forwarded so App.vue's palette dispatcher can drive the same affordances a click
 // already does — one implementation, reached from two inputs, exactly like `refresh` above. Each
 // is a one-line delegation to a handler this file already has, or to a nested component's own
 // `defineExpose`.
@@ -284,10 +281,10 @@ const stashDisabled = computed(
 </script>
 
 <template>
-  <!-- W14 (axe `aria-allowed-role`): `role="toolbar"` is not among the roles the ARIA spec
+  <!-- (axe `aria-allowed-role`): `role="toolbar"` is not among the roles the ARIA spec
        allows overriding a `<header>`'s own implicit "banner" role with — a plain `<div>` carries
        no implicit role of its own to conflict with the explicit one, which is all this element
-       ever wanted (§6.2's own layout, not a page banner). -->
+       ever wanted (the layout, not a page banner). -->
   <ViewToolbar role="toolbar" :aria-label="t('git.toolbar.region.aria')">
     <BranchPicker
       ref="branchPickerRef"
@@ -296,8 +293,8 @@ const stashDisabled = computed(
       :stash="stashState"
       :worktrees="worktreeState"
       :stack="stackState"
-      :pr="prState"
-      :open-pull-request="openPullRequest"
+      :change-requests="changeRequestState"
+      :open-change-request="openChangeRequest"
       @branchFromStash="(entry) => emit('branchFromStash', entry)"
       @saveGlobalStash="emit('saveGlobalStash')"
       @saveEntryToGlobalStash="(entry) => emit('saveEntryToGlobalStash', entry)"

@@ -6,7 +6,7 @@ import {
 } from '@shared/domain/tabs';
 import { z } from 'zod';
 
-// P103 Part 2 (§5.1): Kira Space's own tab-kind vocabulary, split out of the old shared
+// Kira Space's own tab-kind vocabulary, split out of the old shared
 // `packages/shared/domain/tabs.ts` — 5 kinds, `terminal` the one genuinely shared with Kira
 // Studio (its schema stays in the shared file). Absorbs the old `SpaceTabKind` alias, now the
 // vocabulary itself rather than a narrower view onto a wider shared one.
@@ -40,7 +40,7 @@ export const SPACE_TAB_KIND_MODE: Record<SpaceTabKind, TabScope> = {
   'script-run': 'repo',
 };
 
-// C5 §6.2: the permanently pinned, unclosable first tab every repo workspace reserves for the
+// The permanently pinned, unclosable first tab every repo workspace reserves for the
 // git graph. `viewState` holds git-ui's own `PersistedViewState` (version-6 shape) — a permissive
 // passthrough rather than re-deriving that shape here; git-ui's own `parsePersistedViewState` is
 // the sole validator. `reviewSession` is a second opaque blob of the same shape, the review

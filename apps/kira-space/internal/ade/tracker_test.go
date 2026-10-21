@@ -11,7 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/agenthooks"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
@@ -89,16 +89,17 @@ func newTestTracker(t *testing.T) (*Tracker, *repos.AdeSessionsRepo, *fakeLive, 
 
 	live := newFakeLive()
 	clock := newFakeClock()
-	// ClaudeBin points Prepare's own CLI preflight check at this test binary (always present and
+	// AgentBin points Prepare's own CLI preflight check at this test binary (always present and
 	// executable) rather than the real "claude" — these tests mock the launch itself via live/
-	// WriteTerminal, so what ClaudeBin resolves to past the preflight check never runs.
+	// WriteTerminal, so what AgentBin resolves to past the preflight check never runs.
 	self, err := os.Executable()
 	if err != nil {
 		t.Fatalf("os.Executable: %v", err)
 	}
 	tr := NewTracker(TrackerDeps{
+		Agent: testAgents,
 		Store: repositories.AdeSessions, LiveAgents: live.AgentSessions, WriteTerminal: live.Write,
-		Now: clock.Now, Grace: 20 * time.Millisecond, PendingTTL: time.Minute, ClaudeBin: self,
+		Now: clock.Now, Grace: 20 * time.Millisecond, PendingTTL: time.Minute, AgentBin: self,
 	})
 	return tr, repositories.AdeSessions, live, clock
 }
@@ -137,8 +138,8 @@ func TestTracker_PrepareComposeReconcileLive(t *testing.T) {
 	if sessions[0].TerminalID != res.TerminalID {
 		t.Fatalf("terminalId = %q, want %q", sessions[0].TerminalID, res.TerminalID)
 	}
-	if sessions[0].ClaudeSessionID != res.SessionID {
-		t.Fatalf("claudeSessionId = %q, want %q", sessions[0].ClaudeSessionID, res.SessionID)
+	if sessions[0].AgentSessionID != res.SessionID {
+		t.Fatalf("agentSessionId = %q, want %q", sessions[0].AgentSessionID, res.SessionID)
 	}
 
 	// Still live: Reconcile must not stop it, grace or not.
@@ -224,7 +225,7 @@ func TestTracker_ResumeUnknownRecordRefused(t *testing.T) {
 	}
 }
 
-func TestTracker_ResumeUsesRecordedCwdAndReusesClaudeSessionID(t *testing.T) {
+func TestTracker_ResumeUsesRecordedCwdAndReusesAgentSessionID(t *testing.T) {
 	tr, _, live, clock := newTestTracker(t)
 	// A real, existing directory (unlike the bare "/repo" other cases in this file use): the resume
 	// branch now os.Stat()s the recorded cwd (§0.12), so this needs to be an actual path.
@@ -262,28 +263,28 @@ func TestTracker_ResumeUsesRecordedCwdAndReusesClaudeSessionID(t *testing.T) {
 	}
 }
 
-func TestTracker_HandleEventUpdatesClaudeSessionIDOnClear(t *testing.T) {
+func TestTracker_HandleEventUpdatesAgentSessionIDOnClear(t *testing.T) {
 	tr, store, live, _ := newTestTracker(t)
 	res := composeAndSpawn(t, tr, live, PrepareArgs{TaskID: "t1", Cwd: "/repo"})
 	sessions, _ := listSessions(tr)
 	recordID := sessions[0].ID
 
 	newClaudeID := "11111111-1111-1111-1111-111111111111"
-	tr.HandleEvent(agenthooks.Event{TerminalID: res.TerminalID, Event: "SessionStart", SessionID: newClaudeID})
+	tr.HandleEvent(harness.AgentEvent{TerminalID: res.TerminalID, Event: "SessionStart", SessionID: newClaudeID})
 
 	rec, err := store.Get(recordID)
 	if err != nil || rec == nil {
 		t.Fatalf("Get after /clear: %v %v", rec, err)
 	}
-	if rec.ClaudeSessionID != newClaudeID {
-		t.Fatalf("claudeSessionId after /clear = %q, want %q", rec.ClaudeSessionID, newClaudeID)
+	if rec.AgentSessionID != newClaudeID {
+		t.Fatalf("agentSessionId after /clear = %q, want %q", rec.AgentSessionID, newClaudeID)
 	}
 }
 
 func TestTracker_HandleEventUnknownTerminalIgnored(t *testing.T) {
 	tr, _, _, _ := newTestTracker(t)
 	// Must not panic or error for a terminal this tracker never Composed.
-	tr.HandleEvent(agenthooks.Event{TerminalID: "unknown", Event: "Stop"})
+	tr.HandleEvent(harness.AgentEvent{TerminalID: "unknown", Event: "Stop"})
 }
 
 func TestTracker_SendWritesBracketedPasteThenEnter(t *testing.T) {
@@ -310,10 +311,10 @@ func TestTracker_SendRefusedWhenNotRunning(t *testing.T) {
 	}
 }
 
-// TestTracker_ConcurrentComposeReconcileHandleEvent is P129 Part 1 §6.1's own race guard: three
-// call sources (BoundService.Open's own goroutine via Compose, Registry.OnChange's own goroutine
-// via Reconcile, agenthooks' own request-handler goroutine via HandleEvent) genuinely run
-// concurrently in production. Run with -race.
+// TestTracker_ConcurrentComposeReconcileHandleEvent is the race guard: three call sources
+// (BoundService.Open's own goroutine via Compose, Registry.OnChange's own goroutine via Reconcile,
+// the hooks listener's request-handler goroutine via HandleEvent) genuinely run concurrently in
+// production. Run with -race.
 func TestTracker_ConcurrentComposeReconcileHandleEvent(t *testing.T) {
 	tr, _, live, _ := newTestTracker(t)
 
@@ -348,7 +349,7 @@ func TestTracker_ConcurrentComposeReconcileHandleEvent(t *testing.T) {
 		wg2.Add(1)
 		go func() {
 			defer wg2.Done()
-			tr.HandleEvent(agenthooks.Event{TerminalID: res.TerminalID, Event: "PreToolUse", ToolName: "Bash"})
+			tr.HandleEvent(harness.AgentEvent{TerminalID: res.TerminalID, Event: "PreToolUse", ToolName: "Bash"})
 			tr.Reconcile()
 		}()
 	}
@@ -397,7 +398,7 @@ func TestTracker_ResumeAfterAbandonedLaunchAndDoubleComposeGuard(t *testing.T) {
 	tr.Reconcile()
 	p1, _ := tr.Prepare(args)
 	tr.mu.Lock()
-	tr.pending["second"] = pendingIntent{RecordID: recordID, ClaudeSessionID: p1.SessionID, Command: p1.Command, Resume: true, CreatedAt: clock.Now()}
+	tr.pending["second"] = pendingIntent{RecordID: recordID, AgentSessionID: p1.SessionID, Command: p1.Command, Resume: true, CreatedAt: clock.Now()}
 	tr.mu.Unlock()
 	if _, _, err := tr.Compose(p1.TerminalID, "", p1.Command); err != nil {
 		t.Fatalf("first Compose: %v", err)
@@ -416,7 +417,7 @@ func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
 
 	res, err := tr.Prepare(PrepareArgs{
 		TaskID: "t1", BranchID: "b1", StepID: "s1", Cwd: cwd, Resumes: "claude-9",
-		ExtraArgs: []string{"--add-dir", "/x y"}, Message: "go on",
+		AddDirs: []string{"/x y"}, Message: "go on",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -425,7 +426,7 @@ func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := tr.deps.ClaudeBin + " --resume 'claude-9' '--add-dir' '/x y' -- 'go on'"; composed != want {
+	if want := tr.deps.AgentBin + " --resume 'claude-9' '--add-dir' '/x y' -- 'go on'"; composed != want {
 		t.Fatalf("composed = %q, want %q", composed, want)
 	}
 	rec, err := store.Get(res.RecordID)
@@ -433,7 +434,7 @@ func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
 		t.Fatalf("record = %v, %v", rec, err)
 	}
 	if rec.Mode != model.AdeSessionModeTUI || rec.TaskID != "t1" || rec.BranchID != "b1" ||
-		rec.StepID != "s1" || rec.Resumes != "claude-9" || rec.ClaudeSessionID != "claude-9" || rec.RunID != "" {
+		rec.StepID != "s1" || rec.Resumes != "claude-9" || rec.AgentSessionID != "claude-9" || rec.RunID != "" {
 		t.Fatalf("record = %+v", rec)
 	}
 
@@ -455,7 +456,7 @@ func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if again.RecordID != res.RecordID || again.Command != tr.deps.ClaudeBin+" --resume 'claude-9'" {
+	if again.RecordID != res.RecordID || again.Command != tr.deps.AgentBin+" --resume 'claude-9'" {
 		t.Fatalf("resume = %+v", again)
 	}
 	if _, _, err := tr.Compose(again.TerminalID, "", again.Command); err != nil {

@@ -262,7 +262,7 @@ func TestRegistry_ReleaseTwiceIsANoOp(t *testing.T) {
 	}
 }
 
-// TestRegistry_ReleaseToZeroClosesCatFileButKeepsWatcherAndCaches is D13(a)'s own proof: the
+// TestRegistry_ReleaseToZeroClosesCatFileButKeepsWatcherAndCaches is the proof: the
 // cat-file pair is pure cost during the linger window (two OS processes for a session nobody is
 // using) and is closed at refcount zero, while the watcher — and everything else the linger window
 // exists to keep valid — stays alive. A re-acquire inside the window reuses the same entry and

@@ -15,7 +15,7 @@ const responsibilityTracked = true
 
 // responsiblePID returns the pid macOS considers responsible for launching pid — the same
 // mechanism Activity Monitor uses to group a WKWebView helper (com.apple.WebKit.WebContent etc.,
-// reparented to launchd, ppid=1) under the app that actually asked for it, rather than under
+// reparented to launchd, ppid=1) under the app that asked for it, rather than under
 // whatever spawned it in the kernel's own ppid sense. Not declared in a public header, but a
 // long-stable libSystem symbol (also relied on by Chromium's process_metrics_mac.mm for the same
 // reason). Returns -1 if the pid has no distinct responsible process (e.g. a normal top-level app).

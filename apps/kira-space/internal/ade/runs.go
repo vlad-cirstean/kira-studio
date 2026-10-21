@@ -16,7 +16,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/loginshell"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
@@ -38,7 +39,7 @@ const (
 )
 
 // recordFinish is the MCP server's callback; the last call of a run wins and is applied at exit.
-func (b *TaskBoard) recordFinish(runID string, f claudeheadless.Finish) {
+func (b *TaskBoard) recordFinish(runID string, f agentmcp.Finish) {
 	if b.tuiBound(runID) {
 		b.goTracked(func() { b.applyTUIFinish(runID, f) }) // a taken-over run: applied at call time (R14)
 		return
@@ -48,7 +49,7 @@ func (b *TaskBoard) recordFinish(runID string, f claudeheadless.Finish) {
 	b.runMu.Unlock()
 }
 
-func (b *TaskBoard) takeFinish(runID string) (claudeheadless.Finish, bool) {
+func (b *TaskBoard) takeFinish(runID string) (agentmcp.Finish, bool) {
 	b.runMu.Lock()
 	defer b.runMu.Unlock()
 	f, ok := b.finishes[runID]
@@ -565,11 +566,16 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		runPath = smart.dir
 	}
 	var sessionID, prompt string
+	var agent harness.Provider
 	stepN, stepOf := stepNumber(plan, idx)
 	if def.Kind == adewire.KindAgent {
 		sessionID = b.newID()
 		patch.SessionID = &sessionID
-		claudeID := cmpNonEmpty(spec.ResumeID, b.newID())
+		agentSessionID := cmpNonEmpty(spec.ResumeID, b.newID())
+		agent, err = b.agentForResume(spec.ResumeID)
+		if err != nil {
+			return run, err
+		}
 		switch {
 		case spec.ResumeID != "":
 			prompt = composeResumePrompt(b.prompts(), spec.Prompt, def.Results)
@@ -584,7 +590,7 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		}
 		if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
 			ID: sessionID, Mode: model.AdeSessionModeHeadless, TaskID: tc.task.ID, BranchID: sb.ID,
-			StepID: def.ID, RunID: run.ID, Resumes: spec.ResumeID, ClaudeSessionID: claudeID, Cwd: runPath,
+			StepID: def.ID, RunID: run.ID, Resumes: spec.ResumeID, AgentSessionID: agentSessionID, Cwd: runPath, Provider: agent.ID(),
 			State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 		}); err != nil {
 			return run, err
@@ -607,7 +613,7 @@ func (b *TaskBoard) startRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 		go func() {
 			defer b.wg.Done()
 			defer endRun()
-			b.superviseAgent(runCtx, updated, agentLaunch{def: def, sessionID: sessionID, resume: spec.ResumeID, path: runPath, worktree: path, prompt: prompt, timeout: timeout, smart: smart})
+			b.superviseAgent(runCtx, updated, agentLaunch{def: def, sessionID: sessionID, resume: spec.ResumeID, path: runPath, worktree: path, prompt: prompt, timeout: timeout, smart: smart, agent: agent})
 		}()
 	} else {
 		go func() {
@@ -631,7 +637,7 @@ type outcome struct {
 	state, note, summary string
 	exit                 *int
 	noAdvance            bool // a user stop: the engine does not move the task on
-	lost                 bool // a resume whose Claude conversation is gone
+	lost                 bool // a resume whose agent conversation is gone
 	out                  model.AdeRunOutcome
 }
 
@@ -641,8 +647,8 @@ func fromOutcome(state string, o runoutcome.Outcome) outcome {
 }
 
 // agentEnd is how an agent process ended, for the no-report outcomes.
-func agentEnd(exit claudeheadless.Exit, runErr error, timeout string) runoutcome.Process {
-	p := runoutcome.Process{Kind: runoutcome.KindAgent, ExitCode: exit.Code, Timeout: timeout}
+func agentEnd(agent runoutcome.Agent, exit harness.Exit, runErr error, timeout string) runoutcome.Process {
+	p := runoutcome.Process{Agent: agent, Kind: runoutcome.KindAgent, ExitCode: exit.Code, Timeout: timeout}
 	switch {
 	case runErr != nil:
 		p.End, p.Err = runoutcome.EndStartErr, runErr
@@ -652,18 +658,18 @@ func agentEnd(exit claudeheadless.Exit, runErr error, timeout string) runoutcome
 	return p
 }
 
-func (b *TaskBoard) settingSources() string {
+func (b *TaskBoard) configScope() harness.ConfigScope {
 	if b.deps.HeadlessSettingSources != nil && b.deps.HeadlessSettingSources() == "user" {
-		return settingSourcesUser
+		return harness.ConfigUser
 	}
-	return settingSourcesAll
+	return harness.ConfigAll
 }
 
-func allowedTools(step []string, space bool) []string {
+func allowedTools(p harness.MCPHost, step []string, space bool) []string {
 	out := slices.Clone(step)
-	want := []string{claudeheadless.FinishStepTool, claudeheadless.RunOutcomeTool}
+	want := harness.ToolNames(p, agentmcp.FinishStep, agentmcp.RunOutcome)
 	if space {
-		want = append(want, claudeheadless.SpaceToolNames...)
+		want = append(want, harness.ToolNames(p, agentmcp.SpaceToolIDs...)...)
 	}
 	for _, t := range want {
 		if !slices.Contains(out, t) {
@@ -684,13 +690,36 @@ type agentLaunch struct {
 	smart    *smartStep
 	// git, when set, makes the run a sandboxed git agent: only the listed built-ins, no settings files,
 	// the worktrees added as directories and the git tool granted.
-	git *claudeheadless.GitGrant
+	git *agentmcp.GitGrant
 	// review, when set, makes the run a review round: it may answer those comments.
-	review *claudeheadless.ReviewGrant
+	review *agentmcp.ReviewGrant
+	// agent is the provider the conversation runs under.
+	agent harness.Provider
+}
+
+// agentFor is the provider a launch runs under: the one that ran the conversation it continues
+// (id), or the active one for a new conversation (id "").
+func (b *TaskBoard) agentFor(id string) (harness.Provider, error) {
+	if id == "" {
+		return b.deps.Agent.Active(), nil
+	}
+	return b.deps.Agent.For(id)
+}
+
+// agentForResume is agentFor over the provider recorded with the session a resume continues.
+func (b *TaskBoard) agentForResume(resumeID string) (harness.Provider, error) {
+	if resumeID == "" {
+		return b.deps.Agent.Active(), nil
+	}
+	id, err := b.deps.Sessions.ProviderOfAgentSession(resumeID)
+	if err != nil {
+		return nil, err
+	}
+	return b.agentFor(id)
 }
 
 // grantResults are the results finish_step takes for a run: a rebase run or review round keeps the implicit pair.
-func grantResults(implicit bool, def stepDef) []claudeheadless.ResultSpec {
+func grantResults(implicit bool, def stepDef) []agentmcp.ResultSpec {
 	if implicit {
 		return nil
 	}
@@ -729,18 +758,19 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		return
 	}
 	defer b.endSandbox(run.ID, sbx)
-	var grantSandbox *claudeheadless.SandboxGrant
+	var grantSandbox *agentmcp.SandboxGrant
 	if sbx != nil {
 		grantSandbox = sbx.grant
 	}
-	cfg, release, err := b.agent.Register(claudeheadless.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space, Git: l.git, Review: l.review, Sandbox: grantSandbox, Results: grantResults(rebase || round, def)})
+	cfg, release, err := b.agent.Register(agentmcp.Grant{RunID: run.ID, TaskID: run.TaskID, Space: space, Git: l.git, Review: l.review, Sandbox: grantSandbox, Agent: l.agent, Results: grantResults(rebase || round, def)})
 	if err != nil {
 		fail(err)
 		return
 	}
-	spec := claudeheadless.Spec{
-		ClaudeBin: cmpNonEmpty(b.deps.ClaudeBin, "claude"), Dir: l.path, Prompt: l.prompt, SessionID: b.sessionClaudeID(sessionID),
-		Resume: l.resume, MCPConfigPath: cfg, SettingSources: b.settingSources(), AllowedTools: roundTools(allowedTools(def.AllowedTools, space), round), DisallowedTools: def.DisallowedTools,
+	agent := l.agent
+	spec := harness.HeadlessSpec{
+		Bin: b.deps.AgentBin, Dir: l.path, Prompt: l.prompt, SessionID: b.sessionAgentID(sessionID),
+		Resume: l.resume, MCPConfigs: []string{cfg}, Config: b.configScope(), AllowedTools: roundTools(agent, allowedTools(agent, def.AllowedTools, space), round), DisallowedTools: def.DisallowedTools,
 		Timeout: l.timeout,
 	}
 	spec.Env = gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: l.path})
@@ -751,26 +781,30 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		spec.Isolated, spec.Tools, spec.AddDirs = true, rebaseBuiltins, l.git.Worktrees
 	}
 	if l.smart != nil {
-		spec = l.smart.spec(spec, space)
+		spec = l.smart.spec(agent, spec, space)
 		if names := l.smart.mcpNames(); len(names) > 0 {
-			path, relUser, err := claudeheadless.WriteUserConfig(os.Getenv, b.deps.AgentDir, run.ID, names)
+			path, relUser, err := agent.WriteUserMCPConfig(os.Getenv, b.deps.AgentDir, run.ID, names)
 			if err != nil {
 				release()
 				fail(err)
 				return
 			}
 			defer relUser()
-			spec.MCPConfigPaths = []string{path}
+			spec.MCPConfigs = append(spec.MCPConfigs, path)
 		}
 	}
 	spec = b.applySandbox(spec, sbx, l)
 	b.noticeSandbox(sink, sbx)
-	var res *claudeheadless.Result
+	var res *harness.Result
 	var stopWatch func()
-	exit, runErr := claudeheadless.Run(ctx, spec, claudeheadless.Handler{
-		OnLine:       func(l claudeheadless.Line) { sink.add(l.Stream, l.Text) },
-		OnRateLimits: b.deps.OnRateLimits,
-		OnResult:     func(r claudeheadless.Result) { res = &r },
+	onLimits := b.deps.OnRateLimits
+	if !harness.ReportsUsage(agent) {
+		onLimits = nil
+	}
+	exit, runErr := agent.RunHeadless(ctx, spec, harness.Handler{
+		OnLine:       func(l harness.Line) { sink.add(l.Stream, l.Text) },
+		OnRateLimits: onLimits,
+		OnResult:     func(r harness.Result) { res = &r },
 		OnStart: func(pid int) {
 			if sbx.on() {
 				stopWatch = b.watchSandbox(run, sbx, sink, pid)
@@ -785,6 +819,24 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 	if b.ctx.Err() != nil {
 		return // app quit: rows stay running (R18)
 	}
+	b.endAgentRun(ctx, run, l, runEnd{exit: exit, err: runErr, res: res, sink: sink, sbx: sbx, complete: complete})
+}
+
+// runEnd is what a headless agent run left behind.
+type runEnd struct {
+	exit     harness.Exit
+	err      error
+	res      *harness.Result
+	sink     *logSink
+	sbx      *sandboxRun
+	complete func(outcome)
+}
+
+// endAgentRun maps how an agent process ended to the run's outcome and completes the run.
+func (b *TaskBoard) endAgentRun(ctx context.Context, run model.AdeRun, l agentLaunch, e runEnd) {
+	def, sessionID, agent := l.def, l.sessionID, l.agent
+	exit, runErr, res, sink, sbx, complete := e.exit, e.err, e.res, e.sink, e.sbx, e.complete
+	rebase := run.Purpose == model.AdeRunPurposeRebase
 	if out, ok := stopOutcome(ctx); ok {
 		b.takeFinish(run.ID)
 		code := exit.Code
@@ -797,68 +849,72 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, l agen
 		return
 	}
 	if rebase {
+		an := runoutcome.AgentOf(agent)
 		code := exit.Code
-		o := runoutcome.ForProcess(agentEnd(exit, runErr, def.Timeout)).WithLastError(sink.lastStderr())
+		o := runoutcome.ForProcess(agentEnd(an, exit, runErr, def.Timeout)).WithLastError(sink.lastStderr())
 		end := sbx.sandboxOutcome(fromOutcome(model.AdeRunFailed, o), sink.lastStderr())
 		end.out.ExitCode = &code
 		f, ok := b.takeFinish(run.ID)
-		var report *claudeheadless.Finish
+		var report *agentmcp.Finish
 		if ok {
 			report = &f
 		}
 		b.completeRebase(run, sessionID, report, end)
 		return
 	}
+	resumeLost := l.resume != "" && agent.ResumeLost(sink.lastStderr())
+	an := runoutcome.AgentOf(agent)
 	if l.smart != nil {
-		b.completeRun(run, sessionID, sbx.sandboxOutcome(b.smartOutcome(run.ID, exit, runErr, res, l.smart, def.Results, sink.lastStderr(), l.resume != ""), sink.lastStderr()))
+		b.completeRun(run, sessionID, sbx.sandboxOutcome(b.smartOutcome(an, run.ID, exit, runErr, res, l.smart, def.Results, sink.lastStderr(), resumeLost), sink.lastStderr()))
 		return
 	}
-	complete(sbx.sandboxOutcome(b.agentOutcome(run.ID, exit, runErr, def, sink.lastStderr(), l.resume != ""), sink.lastStderr()))
+	complete(sbx.sandboxOutcome(b.agentOutcome(an, run.ID, exit, runErr, def, sink.lastStderr(), resumeLost), sink.lastStderr()))
 }
 
 // roundTools adds the reply tool to a review round's allowed tools.
-func roundTools(tools []string, round bool) []string {
-	if round && !slices.Contains(tools, claudeheadless.ReviewReplyTool) {
-		return append(tools, claudeheadless.ReviewReplyTool)
+func roundTools(p harness.MCPHost, tools []string, round bool) []string {
+	reply := p.MCPToolName(agentmcp.ReviewReply)
+	if round && !slices.Contains(tools, reply) {
+		return append(tools, reply)
 	}
 	return tools
 }
 
-// sessionClaudeID reads the Claude session id stored with the ade_sessions row.
-func (b *TaskBoard) sessionClaudeID(sessionID string) string {
+// sessionAgentID reads the agent session id stored with the ade_sessions row.
+func (b *TaskBoard) sessionAgentID(sessionID string) string {
 	rec, err := b.deps.Sessions.Get(sessionID)
 	if err != nil || rec == nil {
 		return b.newID()
 	}
-	return rec.ClaudeSessionID
+	return rec.AgentSessionID
 }
 
-// lostOutcome is the outcome of a resume whose Claude conversation is gone.
-func lostOutcome(resumed bool, lastErr string) (outcome, bool) {
-	if !resumed || !claudeheadless.IsNoConversation(lastErr) {
+// lostOutcome is the outcome of a resume whose agent conversation is gone.
+func lostOutcome(agent runoutcome.Agent, lost bool, lastErr string) (outcome, bool) {
+	if !lost {
 		return outcome{}, false
 	}
-	o := runoutcome.ForProcess(runoutcome.Process{Kind: runoutcome.KindAgent, End: runoutcome.EndResumeLost}).WithLastError(lastErr)
+	o := runoutcome.ForProcess(runoutcome.Process{Agent: agent, Kind: runoutcome.KindAgent, End: runoutcome.EndResumeLost}).WithLastError(lastErr)
 	out := fromOutcome(model.AdeRunFailed, o)
 	out.lost = true
 	return out, true
 }
 
-func (b *TaskBoard) agentOutcome(runID string, exit claudeheadless.Exit, runErr error, def stepDef, lastErr string, resumed bool) outcome {
+func (b *TaskBoard) agentOutcome(an runoutcome.Agent, runID string, exit harness.Exit, runErr error, def stepDef, lastErr string, resumeLost bool) outcome {
 	code := exit.Code
 	f, finished := b.takeFinish(runID)
 	if !finished {
-		if out, ok := lostOutcome(resumed, lastErr); ok {
+		if out, ok := lostOutcome(an, resumeLost, lastErr); ok {
 			return out
 		}
-		o := runoutcome.ForProcess(agentEnd(exit, runErr, def.Timeout)).WithLastError(lastErr)
+		o := runoutcome.ForProcess(agentEnd(an, exit, runErr, def.Timeout)).WithLastError(lastErr)
 		return fromOutcome(model.AdeRunFailed, o)
 	}
 	return fromFinish(f, &code, def.Results)
 }
 
 // fromFinish is the outcome of a run whose agent called finish_step.
-func fromFinish(f claudeheadless.Finish, exit *int, results []adewire.StepResult) outcome {
+func fromFinish(f agentmcp.Finish, exit *int, results []adewire.StepResult) outcome {
 	o := runoutcome.Outcome{Source: runoutcome.SourceAgent, Reported: true, Summary: f.Summary, ExitCode: exit}
 	state := finishState(&o, f, results)
 	out := fromOutcome(state, o)
@@ -868,7 +924,7 @@ func fromFinish(f claudeheadless.Finish, exit *int, results []adewire.StepResult
 
 // finishState fills o from a finish_step call and returns the run state: done for an ok result,
 // failed for a not-ok one. results are the step's; none = the implicit done and failed.
-func finishState(o *runoutcome.Outcome, f claudeheadless.Finish, results []adewire.StepResult) string {
+func finishState(o *runoutcome.Outcome, f agentmcp.Finish, results []adewire.StepResult) string {
 	if f.Status == "needs_input" {
 		o.Status, o.Reason = runoutcome.StatusBlocked, cmpNonEmpty(f.Reason, f.Summary)
 		return model.AdeRunStuck
@@ -887,16 +943,16 @@ func finishState(o *runoutcome.Outcome, f claudeheadless.Finish, results []adewi
 }
 
 // resultSpecs are a step's results as the MCP grant takes them.
-func resultSpecs(results []adewire.StepResult) []claudeheadless.ResultSpec {
-	out := make([]claudeheadless.ResultSpec, len(results))
+func resultSpecs(results []adewire.StepResult) []agentmcp.ResultSpec {
+	out := make([]agentmcp.ResultSpec, len(results))
 	for i, r := range results {
-		out[i] = claudeheadless.ResultSpec{ID: r.ID, OK: r.OK, Description: r.Description}
+		out[i] = agentmcp.ResultSpec{ID: r.ID, OK: r.OK, Description: r.Description}
 	}
 	return out
 }
 
 // reportOf is the detail a finish_step call carried beyond status and summary, nil when none.
-func reportOf(f claudeheadless.Finish) *model.AgentReport {
+func reportOf(f agentmcp.Finish) *model.AgentReport {
 	if len(f.ConflictedFiles) == 0 && f.LastGitError == "" && f.Tried == "" {
 		return nil
 	}
@@ -1138,12 +1194,12 @@ func (b *TaskBoard) RetryRun(ctx context.Context, runID string) error {
 	return err
 }
 
-// runResumable says a restart stopped the run mid-session, so its Claude conversation can continue.
+// runResumable says a restart stopped the run mid-session, so its agent conversation can continue.
 func runResumable(run model.AdeRun) bool {
 	return run.Purpose != model.AdeRunPurposeRebase && run.State == model.AdeRunStuck && run.Launch.ResumeID != "" && run.StartedAt != nil
 }
 
-// ResumeRun continues the Claude session of a run a restart stopped, as a new attempt.
+// ResumeRun continues the agent session of a run a restart stopped, as a new attempt.
 func (b *TaskBoard) ResumeRun(ctx context.Context, runID string) error {
 	run, err := b.deps.Tasks.GetRun(runID)
 	if err != nil {
@@ -1446,7 +1502,7 @@ func (b *TaskBoard) Sessions(_ context.Context) (adewire.SessionsResult, error) 
 
 func toWireSession(s model.AdeSession) adewire.Session {
 	w := adewire.Session{
-		ID: s.ID, ClaudeSessionID: s.ClaudeSessionID, Mode: s.Mode, State: s.State, TerminalID: s.TerminalID,
+		ID: s.ID, AgentSessionID: s.AgentSessionID, Provider: s.Provider, Mode: s.Mode, State: s.State, TerminalID: s.TerminalID,
 		TaskID: s.TaskID, BranchID: s.BranchID, StepID: s.StepID, RunID: s.RunID, Resumes: s.Resumes, Purpose: s.Purpose,
 		Cwd: s.Cwd, StartedAt: s.StartedAt, LastActiveAt: s.LastActiveAt,
 	}

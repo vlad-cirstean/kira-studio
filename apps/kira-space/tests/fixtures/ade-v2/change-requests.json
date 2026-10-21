@@ -1,0 +1,130 @@
+{
+  "repos": [
+    {
+      "codeRepoId": "repo-web-app",
+      "kind": "ok",
+      "host": {
+        "id": "github",
+        "label": "GitHub",
+        "changeRequest": "Pull request",
+        "changeRequestNoun": "pull request",
+        "changeRequestShort": "PR",
+        "cli": "GitHub CLI (gh)",
+        "fileReviewSync": true
+      }
+    },
+    {
+      "codeRepoId": "repo-api",
+      "kind": "ok",
+      "host": {
+        "id": "github",
+        "label": "GitHub",
+        "changeRequest": "Pull request",
+        "changeRequestNoun": "pull request",
+        "changeRequestShort": "PR",
+        "cli": "GitHub CLI (gh)",
+        "fileReviewSync": true
+      }
+    },
+    {
+      "codeRepoId": "repo-mobile",
+      "kind": "disabled",
+      "host": null
+    }
+  ],
+  "branches": {
+    "b_cart": {
+      "number": 1431,
+      "title": "Stabilise cart total test",
+      "state": "Merged",
+      "url": "https://github.com/acme/web-app/pull/1431"
+    },
+    "b_bill": {
+      "number": 1427,
+      "title": "Usage-based billing",
+      "state": "Open",
+      "url": "https://github.com/acme/web-app/pull/1427"
+    },
+    "b_meter": {
+      "number": 218,
+      "title": "Usage metering endpoints",
+      "state": "Approved",
+      "url": "https://github.com/acme/api/pull/218"
+    },
+    "b_auth": {
+      "number": 1423,
+      "title": "OAuth login: providers, callback, sessions",
+      "state": "Open",
+      "url": "https://github.com/acme/web-app/pull/1423"
+    },
+    "b_authui": {
+      "number": 1425,
+      "title": "Login screen UI",
+      "state": "Draft",
+      "url": "https://github.com/acme/web-app/pull/1425"
+    },
+    "b_authcb": {
+      "number": 211,
+      "title": "OAuth callback + token exchange",
+      "state": "Approved",
+      "url": "https://github.com/acme/api/pull/211"
+    },
+    "b_hooks": {
+      "number": 212,
+      "title": "Outgoing webhooks",
+      "state": "Approved",
+      "url": "https://github.com/acme/api/pull/212"
+    },
+    "b_sara": {
+      "number": 1402,
+      "title": "Payments: adapter refactor",
+      "state": "Changes requested",
+      "url": "https://github.com/acme/web-app/pull/1402"
+    },
+    "b_li": {
+      "number": 1411,
+      "title": "Search schema v2",
+      "state": "Approved",
+      "url": "https://github.com/acme/web-app/pull/1411"
+    },
+    "b_search": {
+      "number": 1426,
+      "title": "Index on write",
+      "state": "Open",
+      "url": "https://github.com/acme/web-app/pull/1426"
+    },
+    "b_notif": {
+      "number": 1428,
+      "title": "In-app notifications",
+      "state": "Open",
+      "url": "https://github.com/acme/web-app/pull/1428"
+    },
+    "b_deps": {
+      "number": 1433,
+      "title": "Bump dependencies",
+      "state": "Open",
+      "url": "https://github.com/acme/web-app/pull/1433"
+    },
+    "b_pushapi": {
+      "number": 216,
+      "title": "Store device push tokens",
+      "state": "Approved",
+      "url": "https://github.com/acme/api/pull/216"
+    }
+  },
+  "branchUrls": {
+    "b_cart": "https://github.com/acme/web-app/tree/fix/cart-flaky",
+    "b_bill": "https://github.com/acme/web-app/tree/feat/usage-billing",
+    "b_meter": "https://github.com/acme/api/tree/feat/usage-metering",
+    "b_auth": "https://github.com/acme/web-app/tree/feat/oauth-login",
+    "b_authui": "https://github.com/acme/web-app/tree/feat/oauth-login-ui",
+    "b_authcb": "https://github.com/acme/api/tree/feat/oauth-callback",
+    "b_hooks": "https://github.com/acme/api/tree/feat/webhooks",
+    "b_sara": "https://github.com/acme/web-app/tree/sara/payments-refactor",
+    "b_li": "https://github.com/acme/web-app/tree/li/search-schema",
+    "b_search": "https://github.com/acme/web-app/tree/feat/search-index",
+    "b_notif": "https://github.com/acme/web-app/tree/feat/notifications",
+    "b_deps": "https://github.com/acme/web-app/tree/chore/deps-bump",
+    "b_pushapi": "https://github.com/acme/api/tree/feat/push-tokens"
+  }
+}

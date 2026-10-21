@@ -2,11 +2,11 @@ import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 
-// P119: the status-bar update-available item and the modal update dialog it opens, replacing
-// P66's own update-banner (release-page-link) behavior. Default boot answers "no update"
-// (mockRuntime.ts's own WILDCARD_DEFAULTS[IPC.updateStatus]), so case 1 proves the hidden-by-default
-// shape every other existing spec/snapshot silently relies on; the rest seed an available update
-// explicitly.
+// The status-bar update-available item and the modal update dialog it opens, replacing
+// the update-banner (release-page-link) behavior. Default boot answers "no update"
+// (mockRuntime.ts's own WILDCARD_DEFAULTS[IPC.updateStatus]), so case 1 proves the
+// hidden-by-default shape every other existing spec/snapshot silently relies on; the rest seed an
+// available update explicitly.
 
 test('no update available: no status-bar item, no dialog', async ({ kira }) => {
   const { window } = kira;

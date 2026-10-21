@@ -9,10 +9,10 @@ import { patchHttpRequestTabState } from '../../api/tabs';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import { chooseBodyFile } from './files';
 
-// P3 C9/D4: the binary (Postman `file`) body — one whole local file, sent as the entire request
+// The binary (Postman `file`) body — one whole local file, sent as the entire request
 // body. Choose file / name (size) / Clear over state.binaryFile, the same shape FormDataTable's
-// file row uses (D15) and UploadObjectDialog.vue established (D4's precedent). The caption in
-// RequestBodyPane.vue already reads "No Content-Type (binary)" for this mode (C5/F3/D7).
+// file row uses and UploadObjectDialog.vue established. The caption in
+// RequestBodyPane.vue already reads "No Content-Type (binary)" for this mode.
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 
 // P7 F15: an imported `--data-binary @path` has no size to supply (the renderer never reads a

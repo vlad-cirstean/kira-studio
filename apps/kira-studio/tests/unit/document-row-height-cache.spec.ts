@@ -1,6 +1,6 @@
-// P21 round 3 performance finding 4: rowHeight (for an expanded row) used to derive its answer by
+// rowHeight (for an expanded row) used to derive its answer by
 // re-running parseRow -> parseDocument (a full EJSON parse) and visibleLines (a tree walk) on
-// *every* call, and pruneRows (P5 C3/F4's own window pruning) evicts parseCache outside the visible
+// *every* call, and pruneRows (window pruning) evicts parseCache outside the visible
 // window on every scroll — so bumping rowsVersion for one row's own togglePath re-parsed every
 // *other* expanded document on the page from scratch, only to recompute a line count that hadn't
 // changed. lineCounts fixes that: it survives pruneRows and is invalidated only by togglePath (for

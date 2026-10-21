@@ -12,10 +12,10 @@ import (
 // reviewStepID is the id of the manual review step; ▶ Review there opens the review agent.
 const reviewStepID = "review"
 
-// launchReviewAgent is the one launcher of a task's review agent: a new conversation, or the stopped
-// one resumed with fresh --add-dir directories. message is the user's first message ("" = none on a
-// resume, the composed review message on a new launch). step, when set, adds its prompt to the
-// composed message. The task mutex is held.
+// launchReviewAgent is the one launcher of a task's review agent: a new conversation, or the
+// stopped one resumed with fresh --add-dir directories. message is the user's first message ("" =
+// none on a resume, the composed review message on a new launch). step, when set, adds its prompt
+// to the composed message. The task mutex is held.
 func (b *TaskBoard) launchReviewAgent(ctx context.Context, tc *taskCtx, tr *Tracker, message string, step *adewire.WorkflowStep) (adewire.Launch, bool, string, error) {
 	row, err := b.deps.Sessions.ReviewAgent(tc.task.ID)
 	if err != nil {
@@ -28,14 +28,10 @@ func (b *TaskBoard) launchReviewAgent(ctx context.Context, tc *taskCtx, tr *Trac
 	if err != nil {
 		return adewire.Launch{}, false, "", err
 	}
-	var addDirs []string
-	if len(extra) > 0 {
-		addDirs = append([]string{"--add-dir"}, extra...)
-	}
 	note := ""
 	if row != nil {
 		if info, serr := os.Stat(row.Cwd); serr == nil && info.IsDir() {
-			res, err := tr.Prepare(PrepareArgs{TaskID: tc.task.ID, Resume: row.ID, Message: message, ExtraArgs: addDirs})
+			res, err := tr.Prepare(PrepareArgs{TaskID: tc.task.ID, Resume: row.ID, Message: message, AddDirs: extra})
 			if err != nil {
 				return adewire.Launch{}, false, "", err
 			}
@@ -54,7 +50,7 @@ func (b *TaskBoard) launchReviewAgent(ctx context.Context, tc *taskCtx, tr *Trac
 		}
 	}
 	res, err := tr.Prepare(PrepareArgs{
-		TaskID: tc.task.ID, Cwd: cwd, Message: message, ExtraArgs: addDirs, Purpose: model.AdeSessionPurposeReview,
+		TaskID: tc.task.ID, Cwd: cwd, Message: message, AddDirs: extra, Purpose: model.AdeSessionPurposeReview,
 	})
 	if err != nil {
 		return adewire.Launch{}, false, "", err

@@ -1,26 +1,23 @@
 <script setup lang="ts">
 import type { ScriptRun } from '@shared/domain/scriptRuns';
 import type { CustomScript, ScriptCollection, ScriptKind } from '@shared/domain/scripts';
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
 import InlineState from '@theme/components/InlineState.vue';
 import SearchField from '@theme/components/SearchField.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import TruncatedText from '@theme/components/TruncatedText.vue';
 import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
-import { rowIndent, rowMeta, rowVariants } from '@theme/lib/rowVariants';
 import { useEventListener } from '@vueuse/core';
 import { useCopy } from '@workbench/behaviour/clipboard';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import { usePersistedState } from '@workbench/behaviour/persisted';
+import { moveId } from '@workbench/behaviour/sortableReorder';
 import { useTreeShortcuts } from '@workbench/behaviour/treeShortcuts';
-import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
-import TreeTwisty from '@workbench/components/TreeTwisty.vue';
+import SortableList from '@workbench/components/SortableList.vue';
 import { moveToCollectionMenu } from '@workbench/lib/collectionMenu';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
@@ -31,6 +28,7 @@ import { useRerun, useRunScript } from './runScript';
 import RunsSection from './runs/RunsSection.vue';
 import { useScriptRuns } from './runs/runsQueries';
 import ScriptDialog from './ScriptDialog.vue';
+import ScriptGroupHeader from './ScriptGroupHeader.vue';
 import ScriptRow from './ScriptRow.vue';
 import { useScheduleConfirmStore } from './schedule/confirmDialog';
 import { useRemoveScript } from './scriptActions';
@@ -106,6 +104,24 @@ function toggleGroup(id: string): void {
 
 function openGroup(id: string): void {
   collapsed.value = collapsed.value.filter((n) => n !== id);
+}
+
+// Drag and Alt+arrow reorder stay inside one set; a search shows a filtered subset, so it pauses them.
+const reorderOff = computed(() => search.value.trim() !== '');
+const ungroupedIds = computed(() => view.value.ungrouped.map((s) => s.id));
+const groupIds = computed(() => view.value.groups.map((g) => g.collection.id));
+
+function reorderScripts(
+  collectionId: string | null,
+  ids: readonly string[],
+  from: string,
+  to: string,
+): void {
+  void guarded(() => scripts.reorder(collectionId, moveId(ids, from, to)));
+}
+
+function reorderGroups(from: string, to: string): void {
+  void guarded(() => scripts.reorderCollections(moveId(groupIds.value, from, to)));
 }
 
 const empty = computed(() => scripts.records().length === 0 && scripts.collections().length === 0);
@@ -471,67 +487,79 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
             actionError
           }}</InlineState>
           <div ref="treeEl" class="flex flex-col" data-testid="script-list">
-            <ScriptRow
-              v-for="script in view.ungrouped"
-              :key="script.id"
-              :script="script"
-              :depth="0"
-              :live-run="liveRunByScript.get(script.id)"
-              v-bind="nav.rowProps(`script:${script.id}`)"
-              @run="runScript(script)"
-              @menu="onContextMenu($event, script)"
-            />
-            <template v-for="group in view.groups" :key="group.collection.id">
-              <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the header button toggles by keyboard. -->
+            <SortableList
+              :ids="ungroupedIds"
+              draggable='[data-nav-key^="script:"]'
+              :disabled="reorderOff"
+              class="flex flex-col"
+              @move="(from, to) => reorderScripts(null, ungroupedIds, from, to)"
+            >
+              <ScriptRow
+                v-for="script in view.ungrouped"
+                :key="script.id"
+                :script="script"
+                :depth="0"
+                :live-run="liveRunByScript.get(script.id)"
+                v-bind="nav.rowProps(`script:${script.id}`)"
+                @run="runScript(script)"
+                @menu="onContextMenu($event, script)"
+              />
+            </SortableList>
+            <SortableList
+              :ids="groupIds"
+              draggable="[data-group-entry]"
+              handle='[data-testid="script-group"]'
+              keyboard-handle='[data-testid="script-group"]'
+              :disabled="reorderOff"
+              class="flex flex-col"
+              @move="reorderGroups"
+            >
               <div
-                :class="rowVariants({ layout: 'tree' })"
-                :style="rowIndent(0)"
-                data-testid="script-group"
-                :data-id="group.collection.id"
-                :data-name="group.collection.name"
-                v-bind="nav.rowProps(`group:${group.collection.id}`)"
-                @contextmenu.prevent.stop="onCollectionContextMenu($event, group.collection)"
+                v-for="group in view.groups"
+                :key="group.collection.id"
+                data-group-entry
+                class="flex flex-col"
               >
-                <TreeTwisty
-                  :expanded="isOpen(group.collection.id)"
-                  :has-children="group.rows.length > 0"
+                <ScriptGroupHeader
+                  :collection="group.collection"
+                  :count="group.rows.length"
+                  :open="isOpen(group.collection.id)"
+                  :renaming="renamingId === group.collection.id"
+                  v-bind="nav.rowProps(`group:${group.collection.id}`)"
                   @toggle="toggleGroup(group.collection.id)"
-                />
-                <CodiconIcon
-                  name="folder-library"
-                  :size="13"
-                  class="shrink-0 text-muted-foreground"
-                />
-                <InlineEditInput
-                  v-if="renamingId === group.collection.id"
-                  :name="group.collection.name"
-                  data-testid="script-collection-rename-input"
                   @commit="(name) => commitRename(group.collection, name)"
                   @cancel="renamingId = null"
+                  @menu="onCollectionContextMenu($event, group.collection)"
                 />
-                <button
-                  v-else
-                  type="button"
-                  class="flex-1 min-w-0 cursor-default border-0 bg-transparent p-0 text-left font-medium text-inherit"
-                  :aria-expanded="isOpen(group.collection.id)"
-                  @click="toggleGroup(group.collection.id)"
-                  ><TruncatedText :text="group.collection.name" /></button
+                <SortableList
+                  v-if="isOpen(group.collection.id)"
+                  :ids="group.rows.map((s) => s.id)"
+                  draggable='[data-nav-key^="script:"]'
+                  :disabled="reorderOff"
+                  class="flex flex-col"
+                  @move="
+                  (from, to) =>
+                    reorderScripts(
+                      group.collection.id,
+                      group.rows.map((s) => s.id),
+                      from,
+                      to,
+                    )
+                "
                 >
-                <span :class="rowMeta">{{ group.rows.length }}</span>
+                  <ScriptRow
+                    v-for="script in group.rows"
+                    :key="script.id"
+                    :script="script"
+                    :depth="1"
+                    :live-run="liveRunByScript.get(script.id)"
+                    v-bind="nav.rowProps(`script:${script.id}`)"
+                    @run="runScript(script)"
+                    @menu="onContextMenu($event, script)"
+                  />
+                </SortableList>
               </div>
-              <div v-if="isOpen(group.collection.id)" class="flex flex-col">
-                <ScriptRow
-                  v-for="script in group.rows"
-                  :key="script.id"
-                  :script="script"
-                  :depth="1"
-                  :live-run="liveRunByScript.get(script.id)"
-                  v-bind="nav.rowProps(`script:${script.id}`)"
-                  @run="runScript(script)"
-                  @menu="onContextMenu($event, script)"
-                />
-              </div>
-            </template>
+            </SortableList>
           </div>
         </div>
         <EmptyState

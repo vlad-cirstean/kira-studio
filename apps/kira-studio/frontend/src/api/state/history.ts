@@ -5,19 +5,18 @@ import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { computed, type MaybeRefOrGetter, reactive, toValue, watch } from 'vue';
 import { refreshApiQuery } from './apiQueries';
 
-// P175 D4 (P12 D12's successor): the per-protocol response-history server state — the list per
-// scope and one snapshot per entry — as TanStack Query, plus the small per-tab UI state (the entry
-// being viewed, the last action error) the two Pinia stores wrap. Deliberately does not reuse
-// views/shared/viewOp.ts's createRuntimeStore: that file lives under views/**, which api/** (D16
-// rule (a)) may not import.
+// The per-protocol response-history server state — the list per scope and one snapshot per entry —
+// as TanStack Query, plus the small per-tab UI state (the entry being viewed, the last action
+// error) the two Pinia stores wrap. Deliberately does not reuse views/shared/viewOp.ts's
+// createRuntimeStore: that file lives under views/**, which api/** may not import.
 //
 // Keys mirror Go's scope key (repos/history.go): `[domain, itemId, scratchTabId]`, the tab id only
 // for a scratch tab, so two tabs on one saved request share one list.
 //
-// P8 D11 is `enabled`: the list observer is enabled only while the History pane shows. A disabled
+// `enabled`: the list observer is enabled only while the History pane shows. A disabled
 // observer still reads the cached list (the segment count) but is not `active`, so invalidating
 // after a send only marks it stale; showing the pane refetches once. A prefetch on pane mount and
-// on an itemId change (Save as adopts the scratch history) is D11's "one initial fetch".
+// on an itemId change (Save as adopts the scratch history) is the "one initial fetch".
 
 interface HistoryTab {
   id: string;

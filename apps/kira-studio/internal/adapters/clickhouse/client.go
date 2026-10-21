@@ -15,10 +15,10 @@ import (
 // with no persistent client-level session the way @clickhouse/client had, these travel as URL
 // query parameters on every single request instead of being set once at connect time.
 // Deliberately does NOT include `readonly` — query.go sends that per request instead, because it
-// must apply to every data/console/mutation request but never to Cancel's own KILL QUERY (D7/D8).
+// must apply to every data/console/mutation request but never to Cancel's own KILL QUERY.
 //
 // output_format_json_quote_64bit_integers is the one addition beyond client.ts's own list, and a
-// real M6.4 finding: this server's own default for plain `FORMAT JSON` (catalog.go's/read.go's
+// real finding: this server's own default for plain `FORMAT JSON` (catalog.go's/read.go's
 // RunCatalogQuery, used for total_rows/count()/etc.) is to emit a UInt64/Int64 as a bare JSON
 // number, not a quoted string — verified directly against clickhouse-server:26.3, not assumed —
 // and every catalog struct in this package is typed `string`/`*string` for exactly such columns
@@ -96,7 +96,7 @@ func targetFromFields(cfg model.ResolvedConnectionConfig) (host, database, usern
 // is http vs https; require/verify-full/prefer all just mean "speak https", the same collapsed
 // distinction client.ts's own comment already committed to for this driver.
 func resolveScheme(options map[string]any) (string, error) {
-	// P21 round 2 architecture/security finding 3: `prefer` is a valid, documented value for
+	// `prefer` is a valid, documented value for
 	// every other engine (postgres/mysqlfamily/redis/mongo/kafka) — ClickHouse rejecting it
 	// was the one adapter out of step, and since Options only ever comes from a connection
 	// string's own query parameters (there is no fields-mode sslmode UI), a user carrying one
@@ -163,14 +163,14 @@ func parsePort(s string) (int, error) {
 	return n, nil
 }
 
-// dialTimeout/tlsHandshakeTimeout bound connection *setup* only (finding F5) — never a query's own
+// dialTimeout/tlsHandshakeTimeout bound connection *setup* only — never a query's own
 // running time. http.Client's own Timeout field (removed here) covers the whole request including
 // reading the response body, so any query genuinely running longer than it failed client-side with
 // no KILL QUERY ever sent, breaking the Stop-button contract Postgres already honours via
 // statement_timeout=0 (per ClickHouse's own defaults the server keeps running a query after the
 // client gives up on it). Cancellation is ctx-driven instead (query.go's own
 // http.NewRequestWithContext, honoured natively), matching every other adapter's own contract; a
-// local abort sends KILL QUERY over a side request exactly like Cancel already does (D7/D8).
+// local abort sends KILL QUERY over a side request exactly like Cancel already does.
 const (
 	dialTimeout         = 10 * time.Second
 	tlsHandshakeTimeout = 10 * time.Second

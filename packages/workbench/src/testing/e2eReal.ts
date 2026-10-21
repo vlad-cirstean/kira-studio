@@ -19,9 +19,9 @@ const staleLockAgeMs = 10 * 60 * 1000; // 10 minutes
 // specific failure instead of a silent-forever hang on a killed run's leftover lock file.
 const acquireLockTimeoutMs = 15 * 60 * 1000; // 15 minutes
 
-/** True when pid does not name a live process on this machine — the PID-liveness half of F10's
+/** True when pid does not name a live process on this machine — the PID-liveness half of the
  *  stale-lock check. ESRCH means no such process (dead); EPERM means it exists but isn't ours to
- *  signal (still alive, just owned by someone else) — anything else is treated as "can't tell,
+ *  signal (still alive, owned by someone else) — anything else is treated as "can't tell,
  *  assume alive" so this never falsely reclaims a lock a live process still holds. */
 function processIsDead(pid: number): boolean {
   try {
@@ -32,10 +32,10 @@ function processIsDead(pid: number): boolean {
   }
 }
 
-// isLockStale is F10's own reclaim decision: age-based (a lock older than staleLockAgeMs, the
+// isLockStale is the reclaim decision: age-based (a lock older than staleLockAgeMs, the
 // simplest and most robust signal — a build genuinely running this long would be its own separate
 // problem) OR the PID the lock file itself records is no longer alive (a killed run's own lock,
-// caught quickly even before the age threshold). Either check returning false just means "keep
+// caught quickly even before the age threshold). Either check returning false means "keep
 // waiting", never "this lock is definitely healthy" — a lock that vanished between the EEXIST
 // above and this check (a racing worker already reclaimed or released it) reads as not stale
 // either, which is correct: there is nothing left here for this call to reclaim. lockPath defaults

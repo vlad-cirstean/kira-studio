@@ -1,7 +1,6 @@
-// P94 pass 3 §4.3, shape 4 first pattern: SlickGridHost.vue's onPaste's pure target-resolution
-// and cell-staging logic, lifted out with everything it needs passed in explicitly (§4.2) —
-// never reaching back into the SFC's own reactive scope. The SFC keeps the guard clauses, the
-// clipboard read, and these two calls.
+// SlickGridHost.vue's onPaste's pure target-resolution and cell-staging logic, lifted out with
+// everything it needs passed in explicitly — never reaching back into the SFC's own reactive scope.
+// The SFC keeps the guard clauses, the clipboard read, and these two calls.
 import type { TabularPage } from '@shared/protocol/page';
 import type { Selection } from '../shared/slick/selection';
 import { usePendingChangesStore } from './pendingChanges';
@@ -15,15 +14,14 @@ export interface PasteTarget {
   rowAt: (ri: number) => number | undefined;
 }
 
-/** D5/finding 3 round 2's target resolution, corrected by F4 (P108 Part 10): every kind now goes
- *  through the same filter/selection-aware mapping `range` already used — `row` and `cell` used to
- *  fall back to plain `startRow + ri` arithmetic, which is wrong on two counts: for `row`, it
- *  ignored which rows were actually selected (a ctrl-click selection of rows 2, 7, 9 pasted into
- *  2, 3, 4); for both, `startRow + ri` can land on a row the active search filter hides, staging an
- *  invisible write the user never saw until the filter cleared.
+/** Target resolution: every kind now goes through the same filter/selection-aware mapping `range`
+ *  already used — `row` and `cell` used to fall back to plain `startRow + ri` arithmetic, which is
+ *  wrong on two counts: for `row`, it ignored which rows were selected (a ctrl-click selection of
+ *  rows 2, 7, 9 pasted into 2, 3, 4); for both, `startRow + ri` can land on a row the active
+ *  search filter hides, staging an invisible write the user never saw until the filter cleared.
  *
  *  `row` kind: clipboard row `ri` maps onto the `ri`-th selected row in ascending order. When the
- *  clipboard has fewer rows than the selection, later selected rows are simply never reached (the
+ *  clipboard has fewer rows than the selection, later selected rows are never reached (the
  *  caller's own loop only ever calls `rowAt` for `ri < pastedRowCount`) — nothing to explicitly
  *  stop. When the clipboard has *more* rows than the selection, the remainder continues into the
  *  insert region right after the last real row, exactly like `range`'s own overflow.
@@ -82,7 +80,7 @@ function stagePastedRow(
         pendingChangesStore.stageInsertValue(tabId, insertId, name, cols[ci] as string);
       }
     } else if (!columnIsGenerated(page, name)) {
-      // F3 (P108 Part 10): this branch used to stage unconditionally — the server computes a
+      // This branch used to stage unconditionally — the server computes a
       // generated column's value, so an existing-row paste into one staged an UPDATE the engine
       // refuses at commit, the one paste path the doc comment above already (wrongly) claimed
       // skipped it.
@@ -93,11 +91,11 @@ function stagePastedRow(
 
 /** Stages every pasted cell (`parsed`, one string[] per clipboard row) at `target`'s rows/
  *  columns — an existing page row via `stageEdit`, a new row (`row >= page.rowCount`) via
- *  `addInsertRow`/`stageInsertValue`. P2 R2: a paste landing on a display row that already has a
+ *  `addInsertRow`/`stageInsertValue`. A paste landing on a display row that already has a
  *  staged insert updates that insert's `values` in place rather than always appending a sibling
  *  — `pending.inserts` is positional (`inserts[row - page.rowCount]`). Returns every display row
  *  whose insert (new or already-staged) this call touched — the caller's own render/invalidate
- *  pass needs both (C9/§5 D9 rule 1: a reused insert's `<input>` needs invalidating too). */
+ *  pass needs both (a reused insert's `<input>` needs invalidating too). */
 export function applyPastedCells(
   tabId: string,
   page: TabularPage,

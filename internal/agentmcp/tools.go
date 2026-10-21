@@ -1,0 +1,29 @@
+package agentmcp
+
+import "github.com/kirathecat/kira-studio/internal/harness"
+
+// ServerName is the MCP server name in the run's --mcp-config.
+const ServerName = "kira-ade"
+
+// Tool ids of the Kira tool server; harness.ToolNames renders them in a provider's names.
+var (
+	FinishStep  = harness.MCPTool{Server: ServerName, Tool: "finish_step"}
+	RunOutcome  = harness.MCPTool{Server: ServerName, Tool: "run_outcome"}
+	Git         = harness.MCPTool{Server: ServerName, Tool: "git"}
+	ReviewReply = harness.MCPTool{Server: ServerName, Tool: "reply_review_comment"}
+
+	// SpaceToolIDs are the Kira Space tools; a headless run and a TUI launch pass them next to
+	// finish_step when the workflow turns the tools on.
+	SpaceToolIDs = []harness.MCPTool{
+		{Server: ServerName, Tool: "task_info"},
+		{Server: ServerName, Tool: "declare_repos"},
+		{Server: ServerName, Tool: "request_branch"},
+		{Server: ServerName, Tool: "branch_status"},
+	}
+
+	// SandboxToolIDs are the sandbox git tools.
+	SandboxToolIDs = []harness.MCPTool{
+		{Server: ServerName, Tool: "fetch_remote"},
+		{Server: ServerName, Tool: "push_branch"},
+	}
+)

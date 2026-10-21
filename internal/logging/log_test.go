@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// TestSetLevel is P72 §9.2's own regression guard: advanced.gitLogLevel shipped with no consumer
-// (finding 1b) — this proves SetLevel genuinely moves the process handler's threshold, not just
+// TestSetLevel is the regression guard: advanced.gitLogLevel shipped with no consumer — this proves
+// SetLevel genuinely moves the process handler's threshold, not just
 // that it accepts a string. Uses the package's own `level` LevelVar, the same one Init wires into
 // the real handler, rather than a private one, so a wiring regression there would fail this too.
 func TestSetLevel(t *testing.T) {

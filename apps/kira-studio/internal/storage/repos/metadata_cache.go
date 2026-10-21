@@ -39,7 +39,7 @@ func readPayload(q interface {
 	return payload
 }
 
-// fetchedAtKey is the reserved payload key holding each kind's own last-write timestamp (P24 D3):
+// fetchedAtKey is the reserved payload key holding each kind's own last-write timestamp:
 // { "children": …, "columns": …, "fetchedAt": {"children": "…", "columns": "…"} }. The four kind
 // names are a closed set fixed in internal/tree/service.go, so this can never collide with a
 // payload key.
@@ -62,7 +62,7 @@ func fetchedAtFor(payload map[string]json.RawMessage, kind string) string {
 
 // Get is JSON.parse'd, NOT further validated here — callers parse through their own domain
 // shape and treat a mismatch as a miss (metadata-cache.ts's own discipline). The second return is
-// the payload's own per-kind fetch time (P24 D3) — internal/tree.Service is the sole judge of
+// the payload's own per-kind fetch time — internal/tree.Service is the sole judge of
 // whether that makes it stale.
 func (r *MetadataCacheRepo) Get(connectionID, path, kind string) (json.RawMessage, string, error) {
 	payload := readPayload(r.DB, connectionID, path)
@@ -72,8 +72,8 @@ func (r *MetadataCacheRepo) Get(connectionID, path, kind string) (json.RawMessag
 // Put merges payload into the existing row's {children?, describe?, definition?, columns?} object
 // (the unique index is (connection_id, path) — kind is not part of the key, so a 'children'
 // payload and a 'describe' payload for the same path share one row) and stamps this kind's own
-// entry in the reserved fetchedAt map (P24 D3) — every other kind's payload AND fetch time is left
-// untouched. Then runs D20's per-connection eviction — all in one transaction.
+// entry in the reserved fetchedAt map — every other kind's payload AND fetch time is left
+// untouched. Then runs the per-connection eviction — all in one transaction.
 func (r *MetadataCacheRepo) Put(connectionID, path, kind string, payload json.RawMessage) error {
 	tx, err := r.DB.Begin()
 	if err != nil {

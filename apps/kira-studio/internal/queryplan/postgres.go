@@ -8,7 +8,7 @@ import (
 // postgres.go ports planParsers/postgres.ts verbatim: Postgres's `EXPLAIN (FORMAT JSON, COSTS
 // TRUE, ...)` returns one row, one column QUERY PLAN, whose text is a JSON array of one
 // `{ Plan: {...} }`. Only fields available *without* ANALYZE are read — this app never issues
-// ANALYZE (§1.1/§8.3).
+// ANALYZE.
 
 type pgRawNode struct {
 	NodeType     *string           `json:"Node Type"`

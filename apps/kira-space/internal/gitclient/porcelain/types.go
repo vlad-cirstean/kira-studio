@@ -1,8 +1,7 @@
-// Package porcelain is the log walk's own porcelain layer (docs/HISTORY.md (v1.3 G3),
-// D8): the -z/%x1f record splitter, the log record format and its argv
-// builders, decoration classification, and the ref snapshot the paged walk's --skip resume guards
-// itself with. Nothing else — status/diff/stash/refs.list's own parser each land with the RPC
-// that reads them (G4/G5/G8).
+// Package porcelain is the log walk's own porcelain layer: the -z/%x1f record splitter, the log
+// record format and its argv builders, decoration classification, and the ref snapshot the paged
+// walk's --skip resume guards itself with. Nothing else — status/diff/stash/refs.list's own parser
+// each land with the RPC that reads them.
 package porcelain
 
 // CommitIdentity is a commit's author or committer identity — structurally matching
@@ -27,8 +26,8 @@ const (
 
 // DecorationRef is one ref pointing at a commit, classified from `%D`'s output — structurally
 // matching @kira/git-ipc's own DecorationRef union: Name is meaningless for "head", IsHead is
-// meaningful only for "branch", Index only for "stash". JSON tags (G4, D5): unused by G3's own
-// FlatBuffers packing, load-bearing once commit.detail crosses this struct as plain JSON.
+// meaningful only for "branch", Index only for "stash". JSON tags: unused by the FlatBuffers
+// packing, load-bearing once commit.detail crosses this struct as plain JSON.
 type DecorationRef struct {
 	Kind   DecorationRefKind `json:"kind"`
 	Name   string            `json:"name,omitempty"`
@@ -70,8 +69,8 @@ type WalkSpec struct {
 	// supplies real values.
 	StashShas    []string
 	IncludeStash bool
-	// ExcludeStash: G28 D15 -- when true, RevSetArgs also emits `--exclude=refs/stash` (the
-	// decidable "off" half of kiraSpace.stash.showInGraph, which has shipped inert since G18).
+	// ExcludeStash: when true, RevSetArgs also emits `--exclude=refs/stash` (the
+	// decidable "off" half of kiraSpace.stash.showInGraph, which has shipped inert).
 	// Populated server-side in gitrpc/graph.go from the repo's stored settings -- no wire change.
 	// Deliberately does NOT change anything when false/unset: today's de-facto "on" behaviour
 	// (refs/stash swept into --all like any other ref) is untouched either way.

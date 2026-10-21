@@ -1,7 +1,8 @@
 {
   "session": {
     "id": "rv01",
-    "claudeSessionId": "claude-rv01",
+    "agentSessionId": "claude-rv01",
+    "provider": "claude",
     "mode": "tui",
     "state": "running",
     "activity": "idle",

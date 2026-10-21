@@ -96,15 +96,15 @@ export function partitionChildren(nodes: TreeNode[]): {
 }
 
 // Kinds whose rows no longer expand in the tree, whatever a cached TreeNode's `hasChildren` says
-// (P19 D5) — a table's columns moved into the definition view, and the adapters that produce these
-// kinds already stopped emitting column children, but an L1 payload cached before this phase can
-// still carry `hasChildren: true` until the connection's next reconnect. P23 D3 adds `topic` for
-// the same reason: its partitions moved into the definition view too.
+// — a table's columns moved into the definition view, and the adapters that produce these
+// kinds already stopped emitting column children, but a cached L1 payload can still carry
+// `hasChildren: true` until the connection's next reconnect. `topic` is included for the same
+// reason: its partitions moved into the definition view too.
 //
-// P41: `keyBrowser`, true only for a connection whose Caps say so (redis/s3), adds `database`/
+// `keyBrowser`, true only for a connection whose Caps say so (redis/s3), adds `database`/
 // `bucket` to the same stale-cache guard — the adapters already report `hasChildren: false` for
 // them (redis/catalog.ts, s3/catalog.ts), and their own key space is now browsed in a Browse tab
-// (§8.18) instead. Not a bare `NodeKind` entry the way `table`/`topic` are: `database` is shared
+// instead. Not a bare `NodeKind` entry the way `table`/`topic` are: `database` is shared
 // by five engines that must stay expand-only (postgres/mysql-family/sqlite/clickhouse/mongo), so
 // the cut needs the connection's own capability, not the kind alone.
 export function isLeafKind(kind: NodeKind, keyBrowser = false): boolean {

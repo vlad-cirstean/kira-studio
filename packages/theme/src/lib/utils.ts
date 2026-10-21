@@ -1,7 +1,7 @@
 import { type ClassValue, clsx } from 'clsx';
 import { extendTailwindMerge } from 'tailwind-merge';
 
-// P110 B1: tailwind-merge's default config has no notion of base.css's kira-* scale steps, so it
+// tailwind-merge's default config has no notion of base.css's kira-* scale steps, so it
 // misreads e.g. `text-kira-sm` as a text *colour* utility and never dedupes it against a real
 // colour class, or against `text-kira-md` from the same scale. Registering the real groups here
 // (names taken from base.css's `@theme`) fixes both: kira-scale classes merge against their own

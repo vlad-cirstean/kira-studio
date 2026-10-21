@@ -1,7 +1,7 @@
 import type { PageCursor } from '@shared/protocol/dataOps';
 import { stopOp } from '../viewOp';
 
-// P107 I2-14: documents/state.ts, grid/state.ts and shared/keyvalue/state.ts each declared the
+// documents/state.ts, grid/state.ts and shared/keyvalue/state.ts each declared the
 // same stop/goNext/goPrev/goFirst/goLast/goToPage/resetTokens bodies, differing only in their own
 // tab accessor pair (findDocumentTab/patchDocumentTabState, findDataTab/patchDataTabState,
 // keyValueHost/host.patch). `host` below is that pair, generalized. stream/state.ts is
@@ -41,15 +41,15 @@ export function createPageNavigation<R extends PageNavRuntime>(
     stopOp(host.runtime(id));
   }
 
-  // D7's cursor choice: prefer the token when one is available, falling back to offset — the
+  // The cursor choice: prefer the token when one is available, falling back to offset — the
   // pager position (pageIndex) always advances by one regardless of which strategy served it.
   //
-  // F7 (P108 Part 10): a second Next click landing before the first click's read returns used to
+  // A second Next click landing before the first click's read returns used to
   // reuse the *first* click's stale nextToken (the successful load hadn't refreshed it yet) while
-  // pageIndex had already been bumped twice — the pager showed page 3 over page 2's actually-
+  // pageIndex had already been bumped twice — the pager showed page 3 over page 2's
   // requested-but-not-yet-applied rows. rt.opId !== null means a load for this tab is still in
   // flight; ignoring the stray click until it resolves means prevIndex below is always the index
-  // of the last page that actually landed, not a second optimistic guess stacked on the first.
+  // of the last page that landed, not a second optimistic guess stacked on the first.
   async function goNext(id: string): Promise<void> {
     const tab = host.tab(id);
     if (!tab) return;

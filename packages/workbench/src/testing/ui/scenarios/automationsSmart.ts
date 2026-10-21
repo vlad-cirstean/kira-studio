@@ -5,6 +5,7 @@ import { type ControlSnapshot, emitWailsEvent } from '../mockRuntime';
 import type { ScenarioEnv } from './env';
 
 type Env = ScenarioEnv<
+  | 'agentInfo'
   | 'customScriptsCreate'
   | 'customScriptsList'
   | 'customScriptsUpdate'
@@ -14,6 +15,7 @@ type Env = ScenarioEnv<
   | 'scriptRunsMcpTools'
   | 'scriptRunsPreview'
   | 'scriptRunsReadLog'
+  | 'scriptRunsResumeCommand'
   | 'scriptRunsStart'
   | 'terminalOpen'
 >;
@@ -260,6 +262,38 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
       });
   });
 
+  test('the smart model select lists the active provider models', async ({ relaunch }) => {
+    const provider = {
+      id: 'fake',
+      label: 'Fake agent',
+      productLabel: 'Fake agent',
+      command: 'kira-fake-agent',
+      headlessLabel: 'kira-fake-agent headless',
+      models: [
+        { id: 'fast', label: 'fast' },
+        { id: 'deep', label: 'deep' },
+      ],
+      defaultModel: 'fast',
+      hooks: false,
+      usage: false,
+    };
+    const { window: page } = await relaunch({
+      control: [
+        { channel: IPC.customScriptsList, response: { collections: [], scripts: [] } },
+        { channel: IPC.agentInfo, response: provider },
+      ],
+    });
+    await openPanel(page);
+    await page.locator('[data-testid="automations-add"]').click();
+    await page.locator('[data-testid="menu-item-new-smart-script"]').click();
+    const model = page.locator('[data-testid="script-dialog"] [data-testid="smart-model"]');
+    await expect(model).toHaveValue('fast');
+    const values = await model
+      .locator('option')
+      .evaluateAll((els) => els.map((e) => (e as HTMLOptionElement).value));
+    expect(values).toEqual(['fast', 'deep']);
+  });
+
   test('a smart script row has the AI badge and opens the run dialog', async ({ relaunch }) => {
     const { window: page, control } = await relaunch({ control: BASE });
     await openPanel(page);
@@ -367,7 +401,15 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
   test('a failed run shows its reason and Continue in terminal resumes the session', async ({
     relaunch,
   }) => {
-    const { window: page, control } = await relaunch({ control: BASE });
+    const { window: page, control } = await relaunch({
+      control: [
+        ...BASE,
+        {
+          channel: IPC.scriptRunsResumeCommand,
+          response: contract('smart', 'ScriptRunsService.ResumeCommand'),
+        },
+      ],
+    });
     await openPanel(page);
     await page.locator(`[data-testid="script-${SMART.id}"]`).click();
     await page.locator('[data-testid="run-start"]').click();
@@ -393,7 +435,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     await view.locator('[data-testid="run-continue"]').click();
     await expect
       .poll(() => control.log().find((e) => e.channel === IPC.terminalOpen)?.args)
-      .toMatchObject({ command: "claude --resume 'sess-1'", launchKind: 'claude-code' });
+      .toMatchObject({ command: "claude --resume 'sess-1'", launchKind: 'agent' });
   });
 
   test('a normal script with params starts through a launch token', async ({ relaunch }) => {

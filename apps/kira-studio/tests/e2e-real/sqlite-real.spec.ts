@@ -8,12 +8,13 @@ import {
   startSqlite,
 } from './support/sqlite';
 
-// E1 (P57-e2e-revisit.md §6/§8) — the Docker-free anchor for the real-backend tier: a real SQLite
-// connection through the real dialog, through the real Go bridge, to a real file seeded from packages/db-fixtures/fixtures/0009_sqlite_seed.sql, and back. This is a
-// *wiring* proof, not a UI-fidelity one (D5) — everything about rendering/interaction (selection
-// edges, keyboard nav, the cell editor, sticky bands, virtualisation, word wrap) already has a
-// verified tests/ui/ port against a mock; this spec exists to prove the real bytes travel the
-// whole way, which no mocked tier can.
+// The Docker-free anchor for the real-backend tier: a real SQLite connection through the real
+// dialog, through the real Go bridge, to a real file seeded from
+// packages/db-fixtures/fixtures/0009_sqlite_seed.sql, and back. This is a *wiring* proof, not a
+// UI-fidelity one — everything about rendering/interaction (selection edges, keyboard nav, the
+// cell editor, sticky bands, virtualisation, word wrap) already has a verified tests/ui/ port
+// against a mock; this spec exists to prove the real bytes travel the whole way, which no mocked
+// tier can.
 
 let sqlite: SqliteFixture | null = null;
 
@@ -23,7 +24,7 @@ test.beforeAll(async () => {
     return;
   }
   // Default options, deliberately — `ANALYZE big_rows` is what gives the database a
-  // `sqlite_stat1` table at all (§3.3/§7 item 1: the SQLite adapter's tree-children query joins
+  // `sqlite_stat1` table at all (the SQLite adapter's tree-children query joins
   // it unconditionally, and a database that has never been ANALYZE'd at all — not just missing an
   // estimate for one table — surfaces a real `E_QUERY` on the very first tree expansion). Skipping
   // the big_rows seed here would trade this spec's own real backend for a real error it isn't
@@ -54,14 +55,13 @@ test('real backend through a plain browser tab: connect, tree, rows', async ({
   await page.click('[data-testid="connection-save"]');
   await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
 
-  // §5: server mode delivers the create-connection event on an independent WebSocket, which can
+  // Server mode delivers the create-connection event on an independent WebSocket, which can
   // (and here does) land before the create call's own HTTP response resolves — the renderer's
   // optimistic append then duplicates the just-replaced record in the tree, and every downstream
   // row (database, table, …) duplicates right along with it, since both copies share the same
-  // expanded-path state. That's a real, separately-tracked app finding (P57-e2e-revisit.md §5/D6),
-  // not this spec's to fix. A reload re-hydrates from a plain `ConnectionsService.List` call —
-  // real backend state, not a UI row count the harness itself can make non-deterministic — which
-  // the doc's own §5 confirms shows exactly one row.
+  // expanded-path state. That's a real, separately-tracked app finding, not this spec's to fix.
+  // A reload re-hydrates from a plain `ConnectionsService.List` call — real backend state,
+  // not a UI row count the harness itself can make non-deterministic — which shows exactly one row.
   await page.reload();
   await page.waitForSelector('[data-testid="status-bar"]');
 
@@ -93,7 +93,7 @@ test('real backend through a plain browser tab: connect, tree, rows', async ({
   // A real DATA_OP page over the bulk WebSocket stream, through bridge/port.ts's decodeFrame.
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(3, { timeout: 10_000 });
-  // P22 Pass B's own DOM shape (tests/ui/support/grid.ts's `gridCellSelector` documents this):
+  // The DOM shape (tests/ui/support/grid.ts's `gridCellSelector` documents this):
   // `data-row` is written on the `.slick-row`/`[data-testid="grid-row"]` ancestor, never on the
   // `.slick-cell` itself, and with `frozenColumn: 0` that row element is cloned once per pane, so
   // the cell lookup has to be scoped to the right (non-frozen) pane's row to stay unambiguous.
@@ -102,9 +102,9 @@ test('real backend through a plain browser tab: connect, tree, rows', async ({
   );
   await expect(firstIdCell).toHaveText('1');
 
-  // P56's own named symptom ("engine connecting" forever) turning `ok` is the single clearest
-  // signal the whole stack — bridge/port.ts's Stream and the Go stream — is really wired, not stubbed (P57-e2e-revisit.md §3.3).
-  // A handled bound-call error is a real HTTP 422 under Wails (CLAUDE.md P57 finding) — nothing in
+  // The named symptom ("engine connecting" forever) turning `ok` is the single clearest
+  // signal the whole stack — bridge/port.ts's Stream and the Go stream — is wired, not stubbed.
+  // A handled bound-call error is a real HTTP 422 under Wails (CLAUDE.md finding) — nothing in
   // this scenario should trigger one, so the console should carry nothing at all, not even that.
   expect(consoleErrors).toEqual([]);
 });

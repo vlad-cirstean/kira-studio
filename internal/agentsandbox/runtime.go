@@ -10,14 +10,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
-// Runtime is what the sandboxed `claude` and its tools need from the machine.
+// Runtime is what the sandboxed agent and its tools need from the machine.
 type Runtime struct {
 	Home string
-	// ClaudePrefix is the install tree of the resolved claude binary.
-	ClaudePrefix string
+	// Agent is what the agent itself needs; Provider answers the rest of the sandbox questions.
+	Agent    harness.SandboxNeeds
+	Provider harness.Sandboxed
 	// PathPrefixes are read-only toolchain trees under Home, taken from the login shell's PATH.
 	PathPrefixes []string
 	// UserTemp and UserCache are darwin's per-user temp and cache dirs; frameworks write there
@@ -27,52 +29,54 @@ type Runtime struct {
 }
 
 var (
-	rtMu  sync.Mutex
-	rtVal *Runtime
+	rtMu   sync.Mutex
+	rtVals = map[string]Runtime{}
 )
 
 const discoverTimeout = 20 * time.Second
 
-// DiscoverRuntime probes once per app session. The probe is detached from the caller's context, so
-// one stopped run cannot shrink the set for the rest of the session. A probe that finds no claude or
-// times out reading the login shell PATH is not cached; the next launch retries. The lock is not held
-// across the probe, so concurrent launches do not queue behind a slow shell.
-func DiscoverRuntime(_ context.Context, claudeBin string) Runtime {
+// DiscoverRuntime probes once per provider and app session. The probe is detached from the caller's
+// context, so one stopped run cannot shrink the set for the rest of the session. A probe that finds
+// no agent CLI or times out reading the login shell PATH is not cached; the next launch retries.
+// The lock is not held across the probe, so concurrent launches do not queue behind a slow shell.
+func DiscoverRuntime(_ context.Context, p harness.Provider, bin string) Runtime {
 	rtMu.Lock()
-	cached := rtVal
+	cached, ok := rtVals[p.ID()]
 	rtMu.Unlock()
-	if cached != nil {
-		return *cached
+	if ok {
+		return cached
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), discoverTimeout)
 	defer cancel()
-	rt, complete := discover(ctx, claudeBin)
+	rt, complete := discover(ctx, p, bin)
 	if complete {
 		rtMu.Lock()
-		rtVal = &rt
+		rtVals[p.ID()] = rt
 		rtMu.Unlock()
 	}
 	return rt
 }
 
 // discover reports whether the probe is complete enough to cache.
-func discover(ctx context.Context, claudeBin string) (Runtime, bool) {
-	rt := Runtime{SSHAuthSock: os.Getenv("SSH_AUTH_SOCK")}
+func discover(ctx context.Context, p harness.Provider, bin string) (Runtime, bool) {
+	rt := Runtime{SSHAuthSock: os.Getenv("SSH_AUTH_SOCK"), Provider: p}
 	if h, err := os.UserHomeDir(); err == nil {
 		rt.Home = realPath(h)
 	} else {
 		slog.Warn("sandbox: no home dir", "scope", "agentsandbox", "err", err)
 	}
-	if bin, _, err := toolexec.ResolveClaude(ctx, toolexec.ClaudeDeps{Bin: claudeBin}); err == nil {
-		rt.ClaudePrefix = claudePrefix(realPath(bin))
+	resolved := ""
+	if path, err := p.Locate(ctx, bin); err == nil {
+		resolved = realPath(path)
 	} else {
-		slog.Warn("sandbox: claude not resolved", "scope", "agentsandbox", "err", err)
+		slog.Warn("sandbox: agent not resolved", "scope", "agentsandbox", "agent", p.ID(), "err", err)
 	}
+	rt.Agent = p.SandboxNeeds(rt.Home, resolved)
 	var pathOK bool
 	rt.PathPrefixes, pathOK = shellPathPrefixes(ctx, rt.Home)
 	rt.UserTemp = getconf(ctx, "DARWIN_USER_TEMP_DIR")
 	rt.UserCache = getconf(ctx, "DARWIN_USER_CACHE_DIR")
-	return rt, rt.ClaudePrefix != "" && pathOK
+	return rt, rt.Agent.InstallPrefix != "" && pathOK
 }
 
 func realPath(p string) string {
@@ -80,15 +84,6 @@ func realPath(p string) string {
 		return r
 	}
 	return p
-}
-
-// claudePrefix is two levels above bin/claude for an npm-style install, else the binary's folder.
-func claudePrefix(bin string) string {
-	dir := filepath.Dir(bin)
-	if filepath.Base(dir) == "bin" {
-		return filepath.Dir(dir)
-	}
-	return dir
 }
 
 // shellPathPrefixes reports ok=false when the probe ran and failed; nothing to probe is ok.

@@ -23,9 +23,9 @@ var (
 	doneLine    = regexp.MustCompile(`^(.+?):\s+(\d+), done\.$`)
 )
 
-// ProgressParser is a pure incremental decoder over git's own stderr progress stream (D15), ported
+// ProgressParser is a pure incremental decoder over git's own stderr progress stream, ported
 // from upstream's progress.ts. Write may be called with arbitrarily chunked bytes — a chunk
-// boundary can fall mid-percentage (probe P9) — and splits on BOTH '\r' (an update within one
+// boundary can fall mid-percentage — and splits on BOTH '\r' (an update within one
 // phase) and '\n' (a phase's own final line).
 type ProgressParser struct {
 	emit func(Progress)
@@ -39,14 +39,14 @@ func NewProgressParser(emit func(Progress)) *ProgressParser {
 }
 
 // maxBufferedLine bounds how many bytes of an incomplete (no '\r'/'\n' seen yet) line Write will
-// hold onto before giving up on it. G31 round-2 architecture/security review, finding #8: a real
-// git progress line is well under 200 bytes (probe P9's own examples); nothing legitimate ever
-// approaches this. Without a bound, p.buf grew for as long as bytes kept arriving with no line
-// terminator at all — a malicious or simply broken remote's side-band progress channel could hold
-// this app's memory growing for the full life of the fetch/clone/push. Once the cap is hit, the
-// buffered bytes are dropped (the same fate an oversized line would meet anyway — processLine's
-// own regexes never match anything remotely this large) and Write resumes scanning fresh for the
-// next terminator, so a well-formed line right after an oversized one is still decoded normally.
+// hold onto before giving up on it. A real git progress line is well under 200 bytes; nothing
+// legitimate ever approaches this. Without a bound, p.buf grew for as long as bytes kept arriving
+// with no line terminator at all — a malicious or broken remote's side-band progress channel
+// could hold this app's memory growing for the full life of the fetch/clone/push. Once the cap is
+// hit, the buffered bytes are dropped (the same fate an oversized line would meet anyway —
+// processLine's own regexes never match anything remotely this large) and Write resumes scanning
+// fresh for the next terminator, so a well-formed line right after an oversized one is still
+// decoded normally.
 const maxBufferedLine = 64 << 10
 
 // Write feeds chunk into the decoder. Every complete '\r'- or '\n'-terminated line is processed
@@ -112,11 +112,11 @@ func atoiPtr(s string) *int {
 }
 
 // Throttle wraps emit so a percentage update fires at most once per every, per call site — a real
-// transfer can produce dozens of CR-separated percentage updates a second (probe P9), and
-// building/encoding/writing every one of them across the wire would be pure waste. D15's own
-// guarantee ("the final state of a phase is always emitted") is met without a trailing-edge timer:
+// transfer can produce dozens of CR-separated percentage updates a second, and
+// building/encoding/writing every one of them across the wire would be pure waste. The guarantee
+// ("the final state of a phase is always emitted") is met without a trailing-edge timer:
 // a percentage-less update (Percent == nil, e.g. "Enumerating objects: N, done.") and a 100%
-// update (which is always a phase's own last one — probe P9's own "…, done." lines report 100%
+// update (which is always a phase's own last one — the "…, done." lines report 100%
 // the one time they appear) both pass straight through unconditionally; only a percentage strictly
 // below 100 is ever coalesced. now is injected so this is testable without sleeping.
 func Throttle(emit func(Progress), every time.Duration, now func() time.Time) func(Progress) {

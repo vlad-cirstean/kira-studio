@@ -75,7 +75,7 @@ const SETTINGS = {
   'kiraSpace.stash.includeUntracked': false,
   'kiraSpace.review.baseCandidates': ['main'],
   'kiraSpace.pull.strategy': 'auto',
-  'kiraSpace.github.enabled': true,
+  'kiraSpace.gitHost.provider': 'auto',
   'kiraSpace.worktree.prepareScript': '',
   'kiraSpace.worktree.basePath': '',
   'kiraSpace.checkout.autoStash': true,

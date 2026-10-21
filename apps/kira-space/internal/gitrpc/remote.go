@@ -21,9 +21,9 @@ func validPullStrategy(s string) bool {
 }
 
 // remote.pullPreflight/remote.pushPreflight are reads and stay on the request ctx. remote.run
-// detaches (D19/G5 D8, applied again): a write already in flight must never be killed by a client
-// disconnect or a `cancel` frame — remote.cancel (below) is the one deliberate, in-band way to end
-// a killable phase early. remote.cancel is a fast, synchronous state mutation and needs no detaching of its own.
+// detaches: a write already in flight must never be killed by a client disconnect or a `cancel`
+// frame — remote.cancel (below) is the one deliberate, in-band way to end a killable phase early.
+// remote.cancel is a fast, synchronous state mutation and needs no detaching of its own.
 
 func (r *Router) handleRemotePullPreflight(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	return handleRepoCall(ctx, c, "remote.pullPreflight", params,
@@ -78,7 +78,7 @@ func (r *Router) handleRemoteRun(ctx context.Context, c *gitsession.Conn, params
 			if err := requireNonEmpty("remote.run", "repoId", p.RepoID, "kind", p.Kind, "remote", p.Remote); err != nil {
 				return "", err
 			}
-			// D8 (see validRefArg, review.go): remote.run is the one write path that spawns `git
+			// (see validRefArg, review.go): remote.run is the one write path that spawns `git
 			// fetch`/`push` with a client-supplied remote name as its own argv token — unguarded, a
 			// remote beginning with "-" is read as an option (e.g. `--upload-pack=<cmd>`) rather
 			// than a remote name, letting a client run arbitrary commands via a local-path

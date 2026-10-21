@@ -138,7 +138,7 @@ export class ShaTable {
     return this.appendBytes(hexToBytes(hex, this.#widthBytes));
   }
 
-  /** As `append`, but from raw bytes rather than hex — the wire-format path (W3), where a
+  /** As `append`, but from raw bytes rather than hex — the wire-format path, where a
    *  packed chunk's shas already arrive as binary and re-stringifying them to hex first would
    *  be pure waste. Width is detected from `bytes.length` the same way `append` detects it from
    *  hex length. */

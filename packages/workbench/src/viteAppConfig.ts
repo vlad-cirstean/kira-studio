@@ -31,7 +31,7 @@ export function defineAppViteConfig({
     // docs/PERF.md's real-hardware scroll protocol can run. KIRA_DEBUG_HOOKS covers the two
     // *built* bundles that also need the window.__kira* hooks: build:dev (a DEV=true native
     // build) and build:test (what tests/ui and tests/ipc:fe build against) — everything else,
-    // including the packaged production build, gets the hooks compiled out (P29 F1).
+    // including the packaged production build, gets the hooks compiled out.
     const debugHooks = command === 'serve' || process.env.KIRA_DEBUG_HOOKS === '1';
     return {
       base: './',
@@ -68,7 +68,7 @@ export function defineAppViteConfig({
           // P103 (byte-identical tier): the shared theme/shadcn-vue/primitive source, this app
           // importing rather than owning its own copy.
           '@theme': fileURLToPath(new URL('../../../packages/theme/src', configUrl)),
-          // P103 Part 1: the byte-identical/code-identical workbench tier hoisted out of both
+          // The byte-identical/code-identical workbench tier hoisted out of both
           // apps' own src/ into one real location — this app importing, not owning, its own
           // copy. Follows @theme's own alias shape exactly (not packages/git-ui's exports-map
           // precedent), since these files import @theme/*/@shared/* themselves, which only

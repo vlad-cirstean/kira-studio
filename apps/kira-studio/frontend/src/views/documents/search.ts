@@ -14,7 +14,7 @@ export interface Match {
   end: number;
 }
 
-// P27 D9/P31 D20: DocumentView.vue's collapsed row shows only the `_id` until expanded (D1) —
+// DocumentView.vue's collapsed row shows only the `_id` until expanded —
 // exported so the view can build the *same* string a search matched against, and wrap the
 // matched substring using search.ts's own start/end offsets without the two ever disagreeing.
 // This searches the whole document body regardless, whitespace collapsed and never truncated, so
@@ -23,7 +23,7 @@ export function previewLineFor(body: string): string {
   return body.replace(/\s+/g, ' ').trim();
 }
 
-// Scoped to the loaded page only, never the server (§8.5's D28, this view's own precedent) —
+// Scoped to the loaded page only, never the server —
 // and to each document's rendered preview line specifically, not the full raw EJSON body: a
 // document's "columns" are dynamic, so there is no per-field grid to search field-by-field the
 // way views/grid/search.ts does, and full-text-over-EJSON would be new scope this task doesn't
@@ -39,11 +39,9 @@ function runSearch(
   ) => void,
 ): SearchHandle<Match> {
   const page = getPage(tabId);
-  // P42 D39: runPageScan scans the rows DocumentView.vue's VirtualList currently has on screen
-  // (D37) first.
-  // P108 Part 11 F12: Part 10 F16 left this branch uncapped on purpose — a user regex like
-  // `(a+)+$` against one long document body still blocks the main thread. Same partial
-  // mitigation grid/search.ts already applies, same condition (regex-only).
+  // runPageScan scans the rows DocumentView.vue's VirtualList currently has on screen first.
+  // A user regex like `(a+)+$` against one long document body still blocks the main thread. Same
+  // partial mitigation grid/search.ts already applies, same condition (regex-only).
   const regexTextCap = q.regex ? REGEX_SCAN_TEXT_CAP : undefined;
   return runPageScan(
     page,

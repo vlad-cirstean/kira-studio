@@ -35,10 +35,10 @@ func TestParseShowBodyAndSignature_Trailers(t *testing.T) {
 	}
 }
 
-// TestParseShowBodyAndSignature_Signed proves probe P5 held: the container's own inability to
-// verify an SSH signature (no allowedSignersFile configured) writes to stderr but never disturbs
-// the parsed record — classification stays by exit code, exactly the same %G?="N" shape an
-// unsigned commit produces, and the record still parses cleanly.
+// TestParseShowBodyAndSignature_Signed proves the container's own inability to verify an SSH
+// signature (no allowedSignersFile configured) writes to stderr but never disturbs the parsed
+// record — classification stays by exit code, exactly the same %G?="N" shape an unsigned commit
+// produces, and the record still parses cleanly.
 func TestParseShowBodyAndSignature_Signed(t *testing.T) {
 	t.Parallel()
 	sig, trailers, body, err := porcelain.ParseShowBodyAndSignature(readShowFixture(t, "show/signed.bin"))

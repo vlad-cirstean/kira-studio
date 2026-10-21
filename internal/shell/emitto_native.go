@@ -4,7 +4,7 @@ package shell
 
 import "github.com/wailsapp/wails/v3/pkg/application"
 
-// EmitTo delivers to exactly one window (P8 D6/C6) — the mechanism the per-window close-flush
+// EmitTo delivers to exactly one window — the mechanism the per-window close-flush
 // handshake needs, since app.Event.Emit fans out to every window (transport_event_ipc.go). A key
 // naming no live window (already closed, or never existed) is a silent no-op, matching Emit's own
 // "no app yet" no-op above.

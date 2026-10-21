@@ -10,7 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
-const columns = `id, script_id, script_name, color, kind, trigger_kind, state, terminal_id, cwd, command, outcome_json, created_at, started_at, finished_at, model, session_id, prompt, params_json, tools_json, task_id, task_title, branch_id, branch_label, resume_id, resumed_from`
+const columns = `id, script_id, script_name, color, kind, trigger_kind, state, terminal_id, cwd, command, outcome_json, created_at, started_at, finished_at, model, session_id, prompt, params_json, tools_json, task_id, task_title, branch_id, branch_label, resume_id, resumed_from, provider`
 
 // keepFinished is how many finished runs are retained.
 const keepFinished = 500
@@ -27,7 +27,7 @@ func scan(row rowScanner) (Run, error) {
 	if err := row.Scan(&r.ID, &r.ScriptID, &r.ScriptName, &r.Color, &r.Kind, &r.Trigger, &r.State, &r.TerminalID,
 		&r.Cwd, &r.Command, &outcome, &r.CreatedAt, &started, &finished,
 		&r.Model, &r.SessionID, &r.Prompt, &paramsJSON, &toolsJSON,
-		&r.TaskID, &r.TaskTitle, &r.BranchID, &r.BranchLabel, &resumeID, &r.ResumedFrom); err != nil {
+		&r.TaskID, &r.TaskTitle, &r.BranchID, &r.BranchLabel, &resumeID, &r.ResumedFrom, &r.Provider); err != nil {
 		return Run{}, err
 	}
 	r.Resumable = resumeID != ""
@@ -80,11 +80,11 @@ func (r *Repo) Insert(run Run) error {
 	if err != nil {
 		return fmt.Errorf("scriptruns: encode tools: %w", err)
 	}
-	if _, err := r.DB.Exec(`INSERT INTO script_runs (`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?)`,
+	if _, err := r.DB.Exec(`INSERT INTO script_runs (`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?)`,
 		run.ID, run.ScriptID, run.ScriptName, run.Color, run.Kind, run.Trigger, run.State, run.TerminalID,
 		run.Cwd, run.Command, outcome, run.CreatedAt, run.StartedAt, run.FinishedAt,
 		run.Model, run.SessionID, run.Prompt, string(params), string(tools),
-		run.TaskID, run.TaskTitle, run.BranchID, run.BranchLabel, run.ResumedFrom); err != nil {
+		run.TaskID, run.TaskTitle, run.BranchID, run.BranchLabel, run.ResumedFrom, run.Provider); err != nil {
 		return fmt.Errorf("scriptruns: insert %s: %w", run.ID, err)
 	}
 	return nil
@@ -224,9 +224,9 @@ func (r *Repo) BeginWaiting(id string, run Run) (bool, error) {
 		return false, fmt.Errorf("scriptruns: encode tools: %w", err)
 	}
 	res, err := r.DB.Exec(`UPDATE script_runs SET state = 'running', started_at = ?, cwd = ?, command = ?, prompt = ?, params_json = ?,
-		tools_json = ?, model = ?, session_id = ?, task_id = ?, task_title = ?, branch_id = ?, branch_label = ?
+		tools_json = ?, model = ?, session_id = ?, provider = ?, task_id = ?, task_title = ?, branch_id = ?, branch_label = ?
 		WHERE id = ? AND state = 'waiting'`, run.StartedAt, run.Cwd, run.Command, run.Prompt, string(params), string(tools),
-		run.Model, run.SessionID, run.TaskID, run.TaskTitle, run.BranchID, run.BranchLabel, id)
+		run.Model, run.SessionID, run.Provider, run.TaskID, run.TaskTitle, run.BranchID, run.BranchLabel, id)
 	if err != nil {
 		return false, fmt.Errorf("scriptruns: begin waiting %s: %w", id, err)
 	}

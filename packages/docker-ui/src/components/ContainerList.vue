@@ -1,23 +1,19 @@
 <script setup lang="ts">
+import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
-import Spinner from '@theme/components/Spinner.vue';
-import StatusDot from '@theme/components/StatusDot.vue';
-import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { t } from '@theme/i18n';
-import { rowActions, rowIndent, rowMeta, rowVariants } from '@theme/lib/rowVariants';
-import { cn } from '@theme/lib/utils';
 import { copyText } from '@workbench/behaviour/clipboard';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
 import QueryState from '@workbench/components/QueryState.vue';
-import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { useRowHeight } from '@workbench/lib/rowHeight';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
-import { computed } from 'vue';
-import { isActiveState, publishedPorts, stateDotTone } from '../lib/format';
-import { useContainerAction, useContainers } from '../queries';
+import { computed, ref } from 'vue';
+import { isActiveState } from '../lib/format';
+import { type ContainerAction, useContainerAction, useContainers } from '../queries';
 import { useDockerUiStore } from '../state/dockerUi';
 import type { DockerContainer } from '../wire';
-import OriginIcon from './OriginIcon.vue';
+import ContainerGroupRow from './ContainerGroupRow.vue';
+import ContainerRow from './ContainerRow.vue';
 import VirtualList from './VirtualList.vue';
 
 const { single: groupRowHeight, double: containerRowHeight } = useRowHeight();
@@ -28,13 +24,13 @@ interface GroupRow {
   name: string;
   members: DockerContainer[];
 }
-interface ContainerRow {
+interface ContainerItem {
   kind: 'container';
   key: string;
   container: DockerContainer;
   grouped: boolean;
 }
-type Row = GroupRow | ContainerRow;
+type Row = GroupRow | ContainerItem;
 
 const ui = useDockerUiStore();
 const containers = useContainers();
@@ -96,11 +92,6 @@ const emptyCopy = computed(() => {
   return { title: t('docker.container.none.empty'), hint: t('docker.container.none.emptyHint') };
 });
 
-function portLabel(c: DockerContainer): string {
-  const ports = publishedPorts(c.ports);
-  return ports.length > 1 ? `${ports[0]} +${ports.length - 1}` : (ports[0] ?? '');
-}
-
 function isOpen(name: string): boolean {
   return searching.value || !ui.collapsedGroups.includes(name);
 }
@@ -109,18 +100,15 @@ function isSelected(c: DockerContainer): boolean {
   return ui.selection?.kind === 'container' && ui.selection.id === c.id;
 }
 
-function runningCount(g: GroupRow): number {
-  return g.members.filter((c) => c.state === 'running').length;
-}
-
-function act(c: DockerContainer, action: 'start' | 'stop' | 'restart'): void {
+function act(c: DockerContainer, action: ContainerAction): void {
   actions.run(c.id, action).catch(() => {
     // Surfaced through `actions.error`.
   });
 }
 
-function groupAction(g: GroupRow, action: 'start' | 'stop'): void {
-  const targets = g.members.filter((c) =>
+function groupAction(project: string, action: 'start' | 'stop'): void {
+  const group = rows.value.find((r): r is GroupRow => r.kind === 'group' && r.name === project);
+  const targets = (group?.members ?? []).filter((c) =>
     action === 'start' ? c.state !== 'running' : isActiveState(c.state),
   );
   for (const c of targets) act(c, action);
@@ -194,6 +182,14 @@ function menuFor(row: Row): MenuItem[] {
   return row.kind === 'container' ? menuItems(row.container) : [];
 }
 
+function selectContainer(c: DockerContainer): void {
+  ui.select({ kind: 'container', id: c.id });
+}
+
+function openContainer(c: DockerContainer): void {
+  ui.select({ kind: 'container', id: c.id }, 'logs');
+}
+
 function selectRow(row: Row): void {
   if (row.kind === 'container') ui.select({ kind: 'container', id: row.container.id });
 }
@@ -207,6 +203,8 @@ function openRow(row: Row): void {
   if (row.kind === 'group') ui.toggleGroup(row.name);
   else ui.select({ kind: 'container', id: row.container.id }, 'logs');
 }
+
+const listEl = ref<HTMLElement | null>(null);
 
 const groupTree = {
   depth: (row: Row) => (row.kind === 'group' || !row.grouped ? 0 : 1),
@@ -232,142 +230,42 @@ const groupTree = {
         :description="emptyCopy.hint"
       />
     </template>
-    <VirtualList
-      :rows="rows"
-      :row-heights="rowHeights"
-      testid="docker-container-list"
-      :select="selectRow"
-      :menu-for="menuFor"
-      :open="openRow"
-      :menu="onKeyMenu"
-      :tree="groupTree"
-    >
-      <template #row="{ row, nav }">
-        <div
-          v-if="row.kind === 'group'"
-          v-bind="nav"
-          :tabindex="nav.tabindex"
-          :class="cn(rowVariants({ layout: 'tree' }), 'group/row h-full')"
-          :style="rowIndent(0)"
-          data-testid="docker-group"
-          :data-project="row.name"
-        >
-          <TreeTwisty
-            :expanded="isOpen(row.name)"
-            :has-children="true"
-            @toggle="ui.toggleGroup(row.name)"
+    <div ref="listEl" class="flex min-h-0 flex-1 flex-col">
+      <VirtualList
+        :rows="rows"
+        :row-heights="rowHeights"
+        testid="docker-container-list"
+        :select="selectRow"
+        :menu-for="menuFor"
+        :open="openRow"
+        :menu="onKeyMenu"
+        :tree="groupTree"
+      >
+        <template #row="{ row, nav }">
+          <ContainerGroupRow
+            v-if="row.kind === 'group'"
+            v-bind="nav"
+            :name="row.name"
+            :running="row.members.filter((c) => c.state === 'running').length"
+            :total="row.members.length"
+            :open="isOpen(row.name)"
+            @toggle="ui.toggleGroup"
+            @group-action="groupAction"
           />
-          <OriginIcon origin="compose" data-testid="docker-group-icon" />
-          <button
-            type="button"
-            class="min-w-0 flex-1 cursor-default truncate border-0 bg-transparent p-0 text-left font-medium text-inherit"
-            :aria-expanded="isOpen(row.name)"
-            @click="ui.toggleGroup(row.name)"
-            >{{
-              row.name
-            }}</button
-          >
-          <span :class="rowMeta">{{ runningCount(row) }}/{{ row.members.length }}</span>
-          <span :class="cn('flex items-center', rowActions)">
-            <TooltipIconButton
-              icon="play"
-              :label="t('common.action.startAll.label')"
-              tone="ok"
-              data-testid="docker-group-start"
-              @click="groupAction(row, 'start')"
-            />
-            <TooltipIconButton
-              icon="debug-stop"
-              :label="t('common.action.stopAll.label')"
-              tone="error"
-              data-testid="docker-group-stop"
-              @click="groupAction(row, 'stop')"
-            />
-          </span>
-        </div>
-        <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
-        <div
-          v-else
-          :class="
-          cn(
-            rowVariants({ layout: 'double', selected: isSelected(row.container) }),
-            'group/row grid h-full grid-cols-[0.5rem_minmax(0,1fr)_auto_1.25rem] grid-rows-[auto_auto] items-center gap-x-1.5 gap-y-0.5',
-          )
-        "
-          :style="rowIndent(row.grouped ? 1 : 0)"
-          data-testid="docker-row"
-          :data-id="row.container.id"
-          :data-name="row.container.name"
-          :data-state="row.container.state"
-          role="option"
-          :aria-selected="isSelected(row.container)"
-          v-bind="nav"
-          :tabindex="nav.tabindex"
-          @click="ui.select({ kind: 'container', id: row.container.id })"
-          @dblclick="ui.select({ kind: 'container', id: row.container.id }, 'logs')"
-        >
-          <StatusDot :tone="stateDotTone(row.container.state)" data-testid="docker-state-dot" />
-          <span class="flex min-w-0 items-center gap-1.5">
-            <span
-              class="truncate"
-              :class="row.container.state === 'running' ? '' : 'text-muted-foreground'"
-              data-testid="docker-row-name"
-              >{{
-                row.container.name
-              }}</span
-            >
-            <OriginIcon
-              v-if="row.container.origin !== '' && !(row.container.origin === 'compose' && row.grouped)"
-              :origin="row.container.origin"
-              :name="row.container.originName"
-            />
-          </span>
-          <span
-            v-if="row.container.state !== 'running'"
-            :class="cn('text-right', rowMeta)"
-            data-testid="docker-row-state"
-            >{{
-              row.container.state
-            }}</span
-          >
-          <span v-else />
-          <span class="row-span-2 flex items-center justify-end">
-            <Spinner v-if="actions.isBusy(row.container.id)" label="" />
-            <span v-else :class="cn('flex', rowActions)">
-              <TooltipIconButton
-                v-if="row.container.state !== 'running'"
-                icon="play"
-                :label="t('common.action.start.label')"
-                tone="ok"
-                data-testid="docker-row-start"
-                @click.stop="act(row.container, 'start')"
-              />
-              <TooltipIconButton
-                v-else
-                icon="debug-stop"
-                :label="t('common.action.stop.label')"
-                tone="error"
-                data-testid="docker-row-stop"
-                @click.stop="act(row.container, 'stop')"
-              />
-            </span>
-          </span>
-          <span />
-          <span
-            class="col-span-2 flex min-w-0 items-baseline gap-1.5 text-kira-sm text-muted-foreground"
-          >
-            <span class="truncate" data-testid="docker-row-image">{{ row.container.image }}</span>
-            <span
-              v-if="portLabel(row.container)"
-              class="max-w-[40%] shrink-0 truncate font-data"
-              data-testid="docker-row-ports"
-              >{{
-                portLabel(row.container)
-              }}</span
-            >
-          </span>
-        </div>
-      </template>
-    </VirtualList>
+          <ContainerRow
+            v-else
+            v-bind="nav"
+            :container="row.container"
+            :grouped="row.grouped"
+            :selected="isSelected(row.container)"
+            :busy="actions.isBusy(row.container.id)"
+            @select="selectContainer"
+            @open="openContainer"
+            @act="act"
+          />
+        </template>
+      </VirtualList>
+    </div>
+    <AttributeTooltip :container="listEl" />
   </QueryState>
 </template>

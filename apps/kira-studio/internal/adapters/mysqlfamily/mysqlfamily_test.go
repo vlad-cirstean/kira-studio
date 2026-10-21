@@ -166,14 +166,14 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 	})
 
-	// P24: a fields-mode connection with no `database` (input.go's Validate never requires one for
+	// A fields-mode connection with no `database` (input.go's Validate never requires one for
 	// this kind) must still connect. Before adapter.go's Connect scanned DATABASE() into a plain
 	// Go string, an unset default schema (client.go's BuildConfig only sets mc.DBName when
 	// cfg.Database is non-empty) made DATABASE() return SQL NULL, and database/sql's Scan into a
 	// non-nullable string failed the whole probe with "converting NULL to string is unsupported" —
 	// 100% reproducible for every such connection, surfacing as a plain E_QUERY the instant a real
 	// user tried a database-less connection, which read exactly like the reported "fails to
-	// authenticate". Reproduced against a real container before the fix and confirmed fixed after.
+	// authenticate".
 	t.Run("connect with no database", func(t *testing.T) {
 		a := newAdapter(t, kind)
 		noDB := cfg
@@ -293,7 +293,7 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 	})
 
-	// P2 R2: a MySQL/MariaDB constraint name only has to be unique within its own schema — two
+	// A MySQL/MariaDB constraint name only has to be unique within its own schema — two
 	// unrelated tables in two different databases legitimately reusing the same constraint name
 	// (a very plausible thing to do) must not be folded into one merged, corrupted entry. The
 	// grouping logic itself (groupForeignKeys) has its own unconditional, engine-independent
@@ -501,7 +501,7 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 			t.Errorf("page-before's first id = %v, want 1 (display order preserved)", backFirstID)
 		}
 
-		// P2 R1 regression: a "before" page is fetched in descending (fetch) order and reversed to
+		// Regression: a "before" page is fetched in descending (fetch) order and reversed to
 		// ascending (display) order — the streaming readPage must swap its tracked first/last raw
 		// rows along with builder.Reverse(), or this page's own NextToken (built from
 		// CellAt(rowCount-1,...), the last *displayed* row) would be built from the wrong row's
@@ -627,9 +627,9 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 	})
 
 	t.Run("preview escapes backslash in literal values", func(t *testing.T) {
-		// P2 R1 regression: MySQL/MariaDB treat \ as a string-literal escape character (unlike
+		// MySQL/MariaDB treat \ as a string-literal escape character (unlike
 		// Postgres/SQLite), so an unescaped backslash in a preview literal would mis-render what
-		// the dialect actually parses — e.g. a trailing \' would escape the closing quote instead
+		// the dialect parses — e.g. a trailing \' would escape the closing quote instead
 		// of ending the string. preview() never executes, so this only checks the rendered text.
 		a := connectedAdapter(t, kind, cfg)
 		plan := model.MutationPlan{
@@ -712,15 +712,15 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 	})
 
-	// P2 R2: a cancellation landing between START TRANSACTION and COMMIT left neither COMMIT nor
+	// A cancellation landing between START TRANSACTION and COMMIT left neither COMMIT nor
 	// the compensating ROLLBACK ever reaching the server — both are gated by the same
 	// CheckNotStarted check COMMIT itself is, so an already-observed-as-cancelled ctx short-
 	// circuits ROLLBACK exactly like it does COMMIT. Because this adapter's *sql.Conn is pinned
 	// for its whole lifetime (SetMaxOpenConns(1)), the server session was then left inside that
 	// still-open transaction indefinitely: the next Mutate's own START TRANSACTION landed inside
 	// it, so its COMMIT silently committed the earlier cancelled write too — worse than a hang.
-	// flippingCtx sweeps every plausible cancellation point and, for whichever ones actually
-	// trigger (an error from Mutate), proves the transaction was really rolled back: a clean
+	// flippingCtx sweeps every plausible cancellation point and, for whichever ones
+	// trigger (an error from Mutate), proves the transaction was rolled back: a clean
 	// follow-up Mutate on a different row must succeed quickly and must not also commit the
 	// earlier row's cancelled change.
 	t.Run("mutate: a cancellation between START TRANSACTION and COMMIT does not leak an open transaction", func(t *testing.T) {
@@ -831,7 +831,7 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 	})
 
-	// P2 R1: a VARBINARY column's edited value arrives from the grid still spelled in the app's
+	// A VARBINARY column's edited value arrives from the grid still spelled in the app's
 	// own "0x<hex>" display convention (read.go's own cellText) — Mutate must decode it back into
 	// raw bytes before binding it as a parameter, not hand the driver that ASCII text as if it
 	// were the new column content.
@@ -1042,7 +1042,7 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 			// P26 §3.2(5): a DDL statement takes a different server-side path than DELETE — untested
 			// before this.
 			{"CREATE TABLE p26_ro_escape (id INT)"},
-			// Review finding, case 2: the batch's own COMMIT ends the wrapping read-only transaction,
+			// The batch's own COMMIT ends the wrapping read-only transaction,
 			// after which SET SESSION took effect immediately for the plain-autocommit write that
 			// followed — confirmed against a real server before the fix that this created the table
 			// on both mariadb (tx_read_only) and mysql (transaction_read_only).

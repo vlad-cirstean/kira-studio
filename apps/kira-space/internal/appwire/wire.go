@@ -13,24 +13,23 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeflow"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/agentnotify"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/agentusage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/claudeusage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileterm"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/internal/appevent"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	memembed "github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/memcheck"
@@ -41,12 +40,14 @@ import (
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
-// RunArgvShim runs the askpass, memory-mcp, memory-ingest, memory-embed and memory-check subcommands, before anything
-// Wails-related, so they never start a window. memory-mcp is Claude Code's stdio MCP server; it runs
-// before startupfail and the single-instance lock, so it works while the window is open.
+// RunArgvShim runs the askpass, memory-mcp, memory-ingest, memory-embed and memory-check
+// subcommands, before anything Wails-related, so they never start a window. memory-mcp is Claude
+// Code's stdio MCP server; it runs before startupfail and the single-instance lock, so it works
+// while the window is open.
 // memory-embed is the ONNX embedding worker those processes and the app spawn; same ordering for
 // the same reason. memory-check is the kira-memory doc validator, run as a git hook.
-// memory-ingest is the detached bulk-import runner (one per memory.db) that the app and the MCP server spawn.
+// memory-ingest is the detached bulk-import runner (one per memory.db) that the app and the MCP
+// server spawn.
 func RunArgvShim(args []string) (code int, ok bool) {
 	if len(args) < 2 {
 		return 0, false
@@ -55,9 +56,9 @@ func RunArgvShim(args []string) (code int, ok bool) {
 	case "askpass":
 		return gitaskpass.RunHelper(args[2:], os.Environ(), os.Stdout), true
 	case "memory-mcp":
-		return memorycli.Run(args[2:], filepath.Join(config.KiraSpaceHome(), "llm-prompts.json")), true
+		return memorycli.Run(args[2:], filepath.Join(config.KiraSpaceHome(), "llm-prompts.json"), agentSelectorAt(config.DbPath()), memoryModelAt(config.DbPath())), true
 	case "memory-ingest":
-		return memorycli.RunIngest(args[2:], filepath.Join(config.KiraSpaceHome(), "llm-prompts.json")), true
+		return memorycli.RunIngest(args[2:], filepath.Join(config.KiraSpaceHome(), "llm-prompts.json"), agentSelectorAt(config.DbPath()), memoryModelAt(config.DbPath())), true
 	case "memory-embed":
 		return memembed.RunWorker(args[2:]), true
 	case "memory-check":
@@ -93,43 +94,43 @@ type gitWired struct {
 	opLog         *oplog.Log
 }
 
-// wireTracker constructs and starts the ade.Tracker and the agenthooks.Manager it drives, wired
+// wireTracker constructs and starts the ade.Tracker and the harness.Hooks hub it drives, wired
 // together before any window exists so Compose never races an unset hooks func with a real launch.
 // Rows a previous process life left running are stopped by the task board's Recover.
 func wireTracker(
 	repositories *repos.Repos, registry *terminal.Registry, emitter appevent.Emitter, events *bridge.Events,
-	grace time.Duration, notifier *agentnotify.Notifier, usage *claudeusage.Service,
-) (*ade.Tracker, *agenthooks.Manager) {
+	grace time.Duration, notifier *agentnotify.Notifier, usage *agentusage.Service, agents harness.Selector,
+) (*ade.Tracker, *harness.Hooks) {
 	tracker := ade.NewTracker(ade.TrackerDeps{
-		Store: repositories.AdeSessions, LiveAgents: registry.AgentSessions,
+		Agent: agents, Store: repositories.AdeSessions, LiveAgents: registry.AgentSessions,
 		WriteTerminal: registry.Write, Now: time.Now, Grace: grace,
 		OnChange: func() { bridge.AdeTaskSessionsChanged(events) },
 	})
 
 	// Hooks are always on: a start failure (curl missing, a bind conflict) is logged, never fatal —
 	// sessions still spawn and track, activity icons stay absent.
-	hooks := agenthooks.NewManager(agenthooks.Options{
-		OnEvent: func(ev agenthooks.Event) {
+	hooks := harness.NewHooks(agents.Registry, harness.HookOptions{
+		OnEvent: func(ev harness.AgentEvent) {
 			tracker.HandleEvent(ev)
 			bridge.EmitAgentEvent(emitter, ev)
 			notifier.HandleEvent(ev)
 		},
 		StatusLine: usageEnabled(repositories),
-		OnStatusLine: func(_ string, rl agenthooks.RateLimits) {
-			var five, seven *claudeusage.Window
+		OnStatusLine: func(_ string, rl harness.RateLimits) {
+			var five, seven *agentusage.Window
 			if rl.FiveHour != nil {
-				five = claudeusage.FromSession(rl.FiveHour.UsedPercentage, rl.FiveHour.ResetsAt)
+				five = agentusage.FromSession(rl.FiveHour.UsedPercent, rl.FiveHour.ResetsAt)
 			}
 			if rl.SevenDay != nil {
-				seven = claudeusage.FromSession(rl.SevenDay.UsedPercentage, rl.SevenDay.ResetsAt)
+				seven = agentusage.FromSession(rl.SevenDay.UsedPercent, rl.SevenDay.ResetsAt)
 			}
-			usage.Ingest(claudeusage.SourceSession, five, seven)
+			usage.Ingest(agentusage.SourceSession, five, seven)
 		},
 	})
 	if err := hooks.Start(); err != nil {
 		slog.Warn("agent hooks: start", "scope", "ade", "err", err)
 	}
-	tracker.SetHooks(hooks.ComposeLaunch)
+	tracker.SetHooks(hooks.Compose)
 	return tracker, hooks
 }
 
@@ -182,7 +183,8 @@ func closeTaskReviewWindows(repositories *repos.Repos, closeWindow func(key stri
 func wireAdeTask(
 	repositories *repos.Repos, events *bridge.Events, git gitWired, tracker *ade.Tracker, closeTerminal func(string) error,
 	closeReviewWindows func(taskID string), credentials *gitcred.Relay, keepAwake *bridge.KeepAwakeService,
-	notifier *agentnotify.Notifier, usage *claudeusage.Service, rebaseTimeout time.Duration, runs *scriptruns.Service,
+	notifier *agentnotify.Notifier, usage *agentusage.Service, rebaseTimeout time.Duration, runs *scriptruns.Service,
+	agents harness.Selector,
 ) *ade.TaskBoard {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
@@ -191,6 +193,7 @@ func wireAdeTask(
 	gitPath := adeGitPathSetting(repositories)
 	runs.SandboxKeychain = sandboxKeychain(repositories)
 	board := ade.NewTaskBoard(ade.TaskBoardDeps{
+		Agent:   agents,
 		Prompts: runs.LlmPrompts,
 		Tasks:   repositories.AdeTasks, Backlog: repositories.AdeBacklog, RepoConfig: repositories.AdeRepoConfig,
 		CodeRepos: repositories.CodeRepos, GitRepoSettings: repositories.GitRepoSettings.Get,
@@ -211,7 +214,7 @@ func wireAdeTask(
 		Sandbox:         runs.Sandbox, RunSandbox: repositories.AdeRunSandbox,
 		Tracker:       tracker,
 		CloseTerminal: closeTerminal,
-		Windows:       repositories.Windows, ReviewWindows: repositories.AdeReview, GhSynced: repositories.AdeGhSynced,
+		Windows:       repositories.Windows, ReviewWindows: repositories.AdeReview, ViewedSync: repositories.AdeViewedSync,
 		CloseReviewWindows: closeReviewWindows,
 		OnRuns: func(ev adewire.RunsChangedEvent) {
 			bridge.AdeTaskRunsChanged(events, ev)
@@ -219,15 +222,15 @@ func wireAdeTask(
 		},
 		OnLog:    func(ev adewire.LogEvent) { bridge.AdeTaskLogAppended(events, ev) },
 		OnReview: func(ev adewire.ReviewEvent) { bridge.AdeTaskReviewChanged(events, ev) },
-		OnRateLimits: func(rl claudeheadless.RateLimits) {
-			var five, seven *claudeusage.Window
+		OnRateLimits: func(rl harness.RateLimits) {
+			var five, seven *agentusage.Window
 			if rl.FiveHour != nil {
-				five = claudeusage.FromRun(rl.FiveHour.Utilization, rl.FiveHour.ResetsAt)
+				five = agentusage.FromSession(rl.FiveHour.UsedPercent, rl.FiveHour.ResetsAt)
 			}
 			if rl.SevenDay != nil {
-				seven = claudeusage.FromRun(rl.SevenDay.Utilization, rl.SevenDay.ResetsAt)
+				seven = agentusage.FromSession(rl.SevenDay.UsedPercent, rl.SevenDay.ResetsAt)
 			}
-			usage.Ingest(claudeusage.SourceRun, five, seven)
+			usage.Ingest(agentusage.SourceRun, five, seven)
 		},
 		OnSessions: func() {
 			bridge.AdeTaskSessionsChanged(events)
@@ -302,7 +305,7 @@ func adeCloseTerminal(registry *terminal.Registry) func(id string) error {
 
 // shutdownTracker is wireTracker's teardown half: flushes the tracker's still-in-memory lastActive
 // values, then stops the hooks listener.
-func shutdownTracker(tracker *ade.Tracker, hooks *agenthooks.Manager) {
+func shutdownTracker(tracker *ade.Tracker, hooks *harness.Hooks) {
 	if err := tracker.Close(); err != nil {
 		slog.Warn("ade: close", "scope", "ade", "err", err)
 	}
@@ -312,13 +315,12 @@ func shutdownTracker(tracker *ade.Tracker, hooks *agenthooks.Manager) {
 }
 
 // wireGit builds the git runner, discovery (over locator), session registry and router.
-func wireGit(repositories *repos.Repos, locator gitclient.Locator, ghLocator ghclient.Locator) gitWired {
+func wireGit(repositories *repos.Repos, locator gitclient.Locator, hosts *githost.Registry) gitWired {
 	gitRunner := gitclient.NewExecRunner()
 	gitDiscovery := gitclient.NewDiscovery(locator, gitRunner, gitclient.NewRealClock())
 	gitRegistry := gitsession.NewRegistry(gitRunner)
-	if ghLocator != nil {
-		gitRegistry.Gh = ghclient.NewClient(
-			ghclient.NewDiscovery(ghLocator, ghclient.NewExecRunner(), ghclient.NewRealClock()), ghclient.NewExecRunner())
+	if hosts != nil {
+		gitRegistry.Hosts = githost.Selector{Registry: hosts}
 	}
 	opLog := oplog.New()
 	gitRegistry.OpLog = opLog
@@ -377,18 +379,18 @@ func wireTermBroker(tracker *ade.Tracker, registry *terminal.Registry, emitter a
 	})
 }
 
-// notifyPrefs reads the claudeCode.notify* leaves; a read failure turns notifications off.
-// usageEnabled reads claudeCode.usageEnabled fresh; a read failure counts as on (the default).
+// usageEnabled reads agent.usageEnabled fresh; a read failure counts as on (the default).
 func usageEnabled(repositories *repos.Repos) func() bool {
 	return func() bool {
 		s, err := repositories.Settings.GetAll()
 		if err != nil {
 			return true
 		}
-		return s.ClaudeCode.UsageEnabled
+		return s.Agent.UsageEnabled
 	}
 }
 
+// notifyPrefs reads the agent.notify* leaves; a read failure turns notifications off.
 func notifyPrefs(repositories *repos.Repos) func() agentnotify.Prefs {
 	return func() agentnotify.Prefs {
 		s, err := repositories.Settings.GetAll()
@@ -396,7 +398,7 @@ func notifyPrefs(repositories *repos.Repos) func() agentnotify.Prefs {
 			slog.Warn("notify: read settings", "scope", "notify", "err", err)
 			return agentnotify.Prefs{}
 		}
-		c := s.ClaudeCode
+		c := s.Agent
 		return agentnotify.Prefs{
 			Enabled: c.NotifyEnabled, OnFinished: c.NotifyOnFinished, OnNeedsInput: c.NotifyOnNeedsInput,
 			OnRunEnded: c.NotifyOnRunEnded, IncludeMessage: c.NotifyIncludeMessage,
@@ -413,6 +415,9 @@ func (w *Wired) describeAgent(terminalID, cwd string) agentnotify.Target {
 		t.RecordID = recordID
 		if rec, err := w.Tracker.Get(recordID); err == nil && rec != nil {
 			t.TaskID = rec.TaskID
+			if p, err := w.Agents.For(rec.Provider); err == nil {
+				t.Agent = p.Label()
+			}
 			if title := w.taskTitle(rec.TaskID); title != "" {
 				t.Name = title
 			}

@@ -52,7 +52,7 @@ const (
 )
 
 // Installer runs scripts/install.sh detached, in self-update mode, and waits for its own fd-3
-// hand-off (the script's own §2.1 contract: one line `staged <tag>` then the fd closes) before
+// hand-off (the script's own contract: one line `staged <tag>` then the fd closes) before
 // Stage returns — the caller (each app's own UpdateService.InstallUpdate) quits only once Stage
 // has returned nil, never before.
 //
@@ -100,8 +100,8 @@ func NewInstaller(app App, runningVersion string) *Installer {
 
 // DisplayLogPath is what the dialog shows the user — never crosses back into a filesystem call
 // here (the literal "~" is for display only). Same path scripts/install.sh computes from
-// $HOME/Library/Logs/<App name>/install.log (§2.1) — the two spellings are a contract; this
-// comment and that script's own §2.1 comment each name the other.
+// $HOME/Library/Logs/<App name>/install.log — the two spellings are a contract; this
+// comment and that script's own comment each name the other.
 func (i *Installer) DisplayLogPath() string {
 	return filepath.Join("~", "Library", "Logs", i.app.Name, "install.log")
 }
@@ -291,7 +291,7 @@ func openLogFile(logPath, appName, running string) (*os.File, error) {
 	return f, nil
 }
 
-// spawnAndAwait runs scriptPath detached (§3.3 step 5) and waits for its hand-off (step 6): a
+// spawnAndAwait runs scriptPath detached and waits for its hand-off: a
 // `staged <tag>` line on fd 3 means the new bundle is ready and the caller may quit; anything else
 // (EOF, an unexpected line, cancellation, or the stage deadline) means nothing changed. logFile is
 // always closed here — the child holds its own duplicated copy once Start succeeds.

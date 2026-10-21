@@ -1,4 +1,4 @@
-// P60b §3/§8.3: sql-tokens.ts's own contract — the scanner and its two grouping passes. Earns a
+// sql-tokens.ts's own contract — the scanner and its two grouping passes. Earns a
 // unit test per CLAUDE.md's bar (interacting lexical-state rules, boundary arithmetic): nested
 // Parens; a `;`/quote/comment interaction; unterminated string/comment/paren never throwing;
 // CompositeIdentifier runs; the MySQL-vs-Postgres double-quote split; backslashEscapes on/off.

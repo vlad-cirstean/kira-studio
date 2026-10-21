@@ -3,7 +3,7 @@ import { t } from '@theme/i18n';
 import { copyAndAnnounce } from '../behaviour/clipboard';
 import type { MenuItem } from '../state/contextMenu';
 
-// P132 Part 1 (§2.3): OpLogPanel.vue's own column contract — `columns` is a plain prop array
+// OpLogPanel.vue's own column contract — `columns` is a plain prop array
 // rather than a slot-per-column scheme, so a consumer states its own column set (order + width)
 // in one place and gets the header row for free. Kept out of the .vue file (a plain-object-typed
 // default in a generic SFC's own defineProps has no factory to call it from) so it's importable

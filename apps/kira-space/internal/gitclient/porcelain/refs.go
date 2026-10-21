@@ -10,8 +10,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpath"
 )
 
-// RefsFormat is refs.list's own eleven-field for-each-ref format (D10), %00-delimited (F3, not
-// %1f): %(taggername) is attacker-controlled (a tag's tagger identity) and CAN carry a literal
+// RefsFormat is refs.list's own eleven-field for-each-ref format, %00-delimited (not %1f):
+// %(taggername) is attacker-controlled (a tag's tagger identity) and CAN carry a literal
 // 0x1f — verified against real git 2.43 — which would silently shift %(taggerdate:unix) and, on
 // TagRefsFormat's own extension, the annotation's subject/body after it. NUL is the one byte git
 // guarantees can never appear inside any of its own field values, so it is the only delimiter safe
@@ -26,9 +26,9 @@ const RefsFormat = "%(refname)%00%(objectname)%00%(objecttype)%00%(upstream)%00%
 const refsFieldCount = 11
 
 // TagRefsFormat is the tags-only scope's own format — RefsFormat plus the annotation's
-// subject/body, %00-delimited same as every other field (F3) and NUL-terminated: an annotation
-// body legally contains raw newlines, so this one spawn is NUL-framed rather than LF-framed (D10).
-// git still appends its own trailing "\n" after the literal %00, same as before F3 — parseRefRowsNUL's
+// subject/body, %00-delimited same as every other field and NUL-terminated: an annotation
+// body legally contains raw newlines, so this one spawn is NUL-framed rather than LF-framed.
+// git still appends its own trailing "\n" after the literal %00 — parseRefRowsNUL's
 // own doc comment covers the resulting byte layout in detail.
 const TagRefsFormat = RefsFormat + "%(contents:subject)%00%(contents:body)%00"
 
@@ -36,13 +36,12 @@ const TagRefsFormat = RefsFormat + "%(contents:subject)%00%(contents:body)%00"
 const tagRefsFieldCount = 13
 
 // HeadsRefsArgs is refs.list's branches+remote-branches spawn — committer-date order, upstream's
-// own sort for the branch picker. --exclude (G32 round-3 functional-correctness review, finding
-// #5) drops refs/remotes/<remote>/HEAD, the symbolic pointer every `git clone`d repo carries —
-// left in, it showed as a phantom third badge alongside the real default branch's own remote
-// tracking badge, appeared in the branch picker as a checkout-able row, and actually attempting
-// that checkout failed outright ("HEAD" is not a legal branch name). Verified against real git
-// 2.43: --exclude combines with the positive refs/heads/refs/remotes patterns rather than
-// replacing them.
+// own sort for the branch picker. --exclude drops refs/remotes/<remote>/HEAD, the symbolic pointer
+// every `git clone`d repo carries — left in, it showed as a phantom third badge alongside the real
+// default branch's own remote tracking badge, appeared in the branch picker as a checkout-able row,
+// and attempting that checkout failed outright ("HEAD" is not a legal branch name). Verified
+// against real git 2.43: --exclude combines with the positive refs/heads/refs/remotes patterns
+// rather than replacing them.
 func HeadsRefsArgs() []string {
 	return []string{
 		"for-each-ref", "--format=" + RefsFormat, "--sort=-committerdate",

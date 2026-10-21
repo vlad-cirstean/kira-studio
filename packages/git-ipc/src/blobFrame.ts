@@ -1,5 +1,6 @@
 /**
- * The blob-frame body shape (G3 plan D4), used by `streamChannel.ts`. Environment-agnostic on purpose — no `node:net`/`Buffer` — since the Wails stream side
+ * The blob-frame body shape, used by `streamChannel.ts`. Environment-agnostic on purpose — no
+ * `node:net`/`Buffer` — since the Wails stream side
  * runs in a browser context with no Node globals.
  *
  * Layout: `0x00 | uint32BE headerLen | headerJSON | blob…to the end of the frame`. A frame's first

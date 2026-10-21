@@ -3,8 +3,8 @@ package bridge
 import (
 	"sync"
 
-	"github.com/kirathecat/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/internal/appevent"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
@@ -49,11 +49,11 @@ func AgentSessionsChanged(e appevent.Emitter, reg *terminal.Registry) {
 	e.Emit(ChannelAgentSessions, AgentSessionsEvent{Sessions: toWireAgentSessions(reg.AgentSessions())})
 }
 
-// EmitAgentEvent is agenthooks.Options.OnEvent's own broadcast half (main.go wires it alongside
-// Tracker.HandleEvent) — emitted verbatim: agenthooks.Event's JSON tags already match
+// EmitAgentEvent is harness.HookOptions.OnEvent's own broadcast half (main.go wires it alongside
+// Tracker.HandleEvent) — emitted verbatim: harness.AgentEvent's JSON tags already match
 // ChannelAgentEvent's own payload shape field for field (packages/shared/domain/agent.ts's
 // AgentEvent), so no separate wire-projection type is needed, matching Kira Studio's own deleted
-// precedent (P127, d20bc970^).
-func EmitAgentEvent(e appevent.Emitter, ev agenthooks.Event) {
+// precedent (d20bc970^).
+func EmitAgentEvent(e appevent.Emitter, ev harness.AgentEvent) {
 	e.Emit(ChannelAgentEvent, ev)
 }

@@ -14,8 +14,8 @@ func FetchArgs(remote string, prune, pruneTags bool) []string {
 	return append(argv, remote)
 }
 
-// FetchRefspecArgs builds pull's own step 1 (D12/D18): a fully-qualified refspec on both sides
-// (F14), fetching exactly the one branch the integrate phase is about to merge/rebase onto.
+// FetchRefspecArgs builds pull's own step 1: a fully-qualified refspec on both sides,
+// fetching exactly the one branch the integrate phase is about to merge/rebase onto.
 // --prune-tags is never offered here: a pull is scoped to one branch, and pruning every
 // local-only tag on every pull would be a much bigger blast radius than the user asked for.
 func FetchRefspecArgs(remote, branch string, prune bool) []string {

@@ -108,10 +108,10 @@ func TestClassifyCheckout_BothBlockerKindsSuppressRoutes(t *testing.T) {
 	}
 }
 
-// TestClassifyCheckout_StashAvailableAddsRoute is widened at G28 D2: a tracked-only block with
+// TestClassifyCheckout_StashAvailableAddsRoute is widened: a tracked-only block with
 // StashAvailable now also offers "autoStash" alongside "discard"/"stashAndCarry" — all three
 // routes clear a tracked-only block, and the classifier reports every one that applies rather than
-// picking among them (D16's routing policy is what actually chooses, client-side).
+// picking among them (the routing policy is what chooses, client-side).
 func TestClassifyCheckout_StashAvailableAddsRoute(t *testing.T) {
 	t.Parallel()
 	got := gitpreflight.ClassifyCheckout(gitpreflight.ClassifyCheckoutInput{
@@ -135,10 +135,10 @@ func TestClassifyCheckout_StashAvailableAddsRoute(t *testing.T) {
 	}
 }
 
-// TestClassifyCheckout_AutoStash_TrackedOnlyUntrackedOnlyAndBoth is G28 D2's own route table
-// (§7.1 item 4): "autoStash" is offered for a tracked-only, an untracked-only, AND a both-kinds
-// dirty block — unlike "discard"/"stashAndCarry", which the untracked case suppresses entirely
-// (probe P9), "stash push -u" (probe P15) is the one argv that clears every dirty-tree blocker, so
+// TestClassifyCheckout_AutoStash_TrackedOnlyUntrackedOnlyAndBoth is the route table: "autoStash" is
+// offered for a tracked-only, an untracked-only, AND a both-kinds
+// dirty block — unlike "discard"/"stashAndCarry", which the untracked case suppresses entirely,
+// "stash push -u" is the one argv that clears every dirty-tree blocker, so
 // this route does not share their restriction.
 func TestClassifyCheckout_AutoStash_TrackedOnlyUntrackedOnlyAndBoth(t *testing.T) {
 	t.Parallel()
@@ -220,9 +220,9 @@ func TestClassifyCheckout_DetachHere_WorktreeConflictAlone_SwitchToBranch(t *tes
 	}
 }
 
-// TestClassifyCheckout_DetachHere_ComposesWithAutoStash is plan §3.8's own "worktree conflict +
+// TestClassifyCheckout_DetachHere_ComposesWithAutoStash is the "worktree conflict +
 // dirty -> BOTH routes" case: a target simultaneously checked out elsewhere AND dirty-blocked
-// offers both routes — they compose client-side (D16) into one re-issued request, this classifier
+// offers both routes — they compose client-side into one re-issued request, this classifier
 // only reports each is individually available.
 func TestClassifyCheckout_DetachHere_ComposesWithAutoStash(t *testing.T) {
 	t.Parallel()
@@ -237,10 +237,10 @@ func TestClassifyCheckout_DetachHere_ComposesWithAutoStash(t *testing.T) {
 	}
 }
 
-// TestClassifyCheckout_DetachHere_NeverForDetachModeOrNonBranchTarget is G28 D6's own negative
-// cases: an explicit detach-mode request is already the thing detachHere would do (offering it
-// would route to an outcome already asked for), and a tag/sha target already detaches
-// unconditionally — detachHere is meaningless for either.
+// TestClassifyCheckout_DetachHere_NeverForDetachModeOrNonBranchTarget is the negative cases: an
+// explicit detach-mode request is already the thing detachHere would do (offering it would route
+// to an outcome already asked for), and a tag/sha target already detaches unconditionally —
+// detachHere is meaningless for either.
 func TestClassifyCheckout_DetachHere_NeverForDetachModeOrNonBranchTarget(t *testing.T) {
 	t.Parallel()
 	path := "/elsewhere"

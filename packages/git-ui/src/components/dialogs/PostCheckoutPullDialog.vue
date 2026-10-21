@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
- * G-UX (item 3): "when checking out a branch that advanced, ask if I want to pull it too" —
+ * "when checking out a branch that advanced, ask if I want to pull it too" —
  * `OpsState.runCheckout`'s own post-switch confirm step (`#maybePromptPostCheckoutPull`), mirroring
  * `PullDialog.vue`'s "a pending ref set by the state class, this dialog renders while it is set,
  * resolving it settles the promise the caller is awaiting" shape, one route simpler: there is only
  * ever Pull now / Not now, never a hazard to describe.
  *
- * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now.
+ * The modal shell is shadcn's `Dialog`/`DialogContent` now.
  */
 import { Button } from '@theme/components/ui/button';
 import {

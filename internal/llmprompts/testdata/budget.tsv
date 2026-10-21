@@ -4,6 +4,7 @@ memory.kinds	971
 memory.runTrivia	1194
 memory.merge.rules	766
 memory.merge.system	3824
+memory.rewrite.system	5571
 memory.gate.system	4354
 memory.reconcile.system	1444
 memory.import.extract.system	4020
@@ -36,7 +37,7 @@ memory.mcp.tool.memory_history.arg.id	33
 memory.mcp.tool.memory_context	171
 memory.mcp.tool.memory_context.arg.id	33
 memory.mcp.tool.memory_context.arg.limit	48
-memory.mcp.tool.ingest_files	478
+memory.mcp.tool.ingest_files	667
 memory.mcp.tool.ingest_files.arg.paths	135
 memory.mcp.tool.ingest_files.arg.origin	106
 memory.mcp.tool.ingest_files.arg.sourceTag	115
@@ -49,7 +50,9 @@ memory.mcp.tool.ingest_files.arg.groups.title	25
 memory.mcp.tool.ingest_files.arg.writeDoc	99
 memory.mcp.tool.ingest_files.arg.session	45
 memory.mcp.tool.ingest_files.arg.text	66
-memory.mcp.tool.ingest_files.arg.distill	108
+memory.mcp.tool.ingest_files.arg.distill	128
+memory.mcp.tool.ingest_files.arg.mode	98
+memory.mcp.tool.ingest_files.arg.context	80
 memory.mcp.tool.ingest_status	260
 memory.mcp.tool.ingest_status.arg.id	31
 memory.mcp.remember.description	63

@@ -1,8 +1,7 @@
-// D21: the five EXPLAIN plan normalizers + D15's issue rules earn a unit test — five dialects ×
+// The five EXPLAIN plan normalizers + the issue rules earn a unit test — five dialects ×
 // several node shapes is precisely a decision structure too large to hold in one's head. Every
-// fixture below is F11-F15's own verified real-server output, pasted verbatim (this repo's
-// "capture, don't hand-write" discipline applied where a capture tool wasn't needed because the
-// capture is already in the plan doc).
+// fixture below is the verified real-server output, pasted verbatim (this repo's
+// "capture, don't hand-write" discipline applied where a capture tool wasn't needed).
 
 import { describe, expect, test } from 'bun:test';
 import { ExplainTruncatedError, parseExplainPages } from '../../frontend/src/views/console/plan';
@@ -24,7 +23,7 @@ import {
   normalize,
 } from '../fixtures/explain-plans/loader';
 
-// M3 §2.4: the JSON literals moved out into tests/fixtures/explain-plans/*.input.json — the
+// The JSON literals moved out into tests/fixtures/explain-plans/*.input.json — the
 // parity fixtures the new describe('parity fixtures') block below and internal/queryplan's own
 // parse_test.go both read — and read back in here rather than duplicated, wherever a case below
 // corresponds to one fixture exactly. Existing per-rule assertions are unchanged.
@@ -104,9 +103,9 @@ describe('parseMysqlPlan — F12', () => {
 describe('parseMariadbPlan — F13', () => {
   test('a same-named cost field is not comparable to MySQL’s', () => {
     const plan = parseMariadbPlan(rawTextOf('mariadb-nested-loop'), 100_000);
-    // F17's own empirical proof: this genuine full scan reads more rows than F12's MySQL example
+    // Empirical proof: this genuine full scan reads more rows than the MySQL example
     // (100,175 vs 62,643) yet its identically-named `cost` field (16.59) is three orders of
-    // magnitude smaller than MySQL's 6,304.55 for that comparable scan — the reason D14 thresholds
+    // magnitude smaller than MySQL's 6,304.55 for that comparable scan — the reason to threshold
     // on rows, never on either dialect's own cost number.
     expect(plan.nativeCost).toEqual({ value: 16.5855622, unit: 'mariadb-cost' });
     expect(plan.estimatedRowsRead).toBe(100175);
@@ -220,7 +219,7 @@ describe('parseClickhousePlan — F15', () => {
   });
 
   test('page order is asserted, not trusted — plan is page 0, estimate is page 1 (§7.3)', () => {
-    // parseExplainPages (plan.ts) is the caller that actually receives the two Execute pages in
+    // parseExplainPages (plan.ts) is the caller that receives the two Execute pages in
     // order; this asserts the parser's own estimateRows parameter is what estimatedRowsRead comes
     // from, so a caller that swapped page order would produce a visibly wrong number rather than
     // a silent one.

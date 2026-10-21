@@ -1,9 +1,11 @@
 package scriptruns
 
 import (
+	"errors"
 	"log/slog"
 	"strings"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/scripts"
@@ -21,6 +23,10 @@ func (s *Service) Resume(id string) (Started, error) {
 	if run.Kind != KindSmart || !run.Resumable {
 		return Started{}, notResumable
 	}
+	prov, err := s.Agent.For(run.Provider)
+	if err != nil {
+		return Started{}, providerGone(err)
+	}
 	rec, err := s.Scripts.Get(run.ScriptID)
 	if err != nil {
 		return Started{}, ipcerr.InternalErr(err)
@@ -29,7 +35,7 @@ func (s *Service) Resume(id string) (Started, error) {
 		return Started{}, ipcerr.T(ipcerr.CodeNotFound, "automations.script.gone.error", nil)
 	}
 	args, names := resumeArgs(run, *rec)
-	p, err := s.plan(args, planOpts{})
+	p, err := s.plan(args, planOpts{provider: prov.ID()})
 	if err != nil {
 		return Started{}, err
 	}
@@ -93,4 +99,36 @@ func resumeArgs(run Run, rec scripts.CustomScript) (RunArgs, []string) {
 		}
 	}
 	return args, secrets
+}
+
+// ResumeCommand is the terminal command that continues a smart run's saved conversation.
+func (s *Service) ResumeCommand(id string) (string, error) {
+	run, err := s.Runs.Get(id)
+	if err != nil {
+		return "", err
+	}
+	if run.Kind != KindSmart || run.SessionID == "" {
+		return "", ipcerr.T(ipcerr.CodeBadRequest, "backend.core.scriptRun.resumeCommandNone.body", nil)
+	}
+	prov, err := s.Agent.For(run.Provider)
+	if err != nil {
+		return "", providerGone(err)
+	}
+	return prov.InteractiveCommand(harness.InteractiveSpec{SessionID: run.SessionID, Resume: true}), nil
+}
+
+// providerGone maps an unregistered stored provider to its user-facing error.
+func providerGone(err error) error {
+	if errors.Is(err, harness.ErrProviderGone) {
+		return ipcerr.T(ipcerr.CodeConflict, "backend.core.agent.providerGone.body", nil)
+	}
+	return ipcerr.InternalErr(err)
+}
+
+// agentFor is the provider a plan runs under: the one named by id, else the active one.
+func (s *Service) agentFor(id string) (harness.Provider, error) {
+	if id == "" {
+		return s.Agent.Active(), nil
+	}
+	return s.Agent.For(id)
 }

@@ -21,11 +21,11 @@ import (
 // different table (P5 D13).
 const variableHistoryLimit = 20
 
-// VariablesRepo owns three tables (P5 D4): api_environments, api_variables and
+// VariablesRepo owns three tables: api_environments, api_variables and
 // api_variable_history. One repo for both scopes (collection and environment), not two: a
 // collection variable and an environment variable share every field, every secret rule, the same
 // history table and the same dense-sort_order arithmetic — the asymmetry that split
-// api_collections from api_items (P4 D2) does not exist here.
+// api_collections from api_items does not exist here.
 //
 // No prepared statement: these queries run on dialog open/edit, not per keystroke (mirrors
 // CollectionsRepo's own reasoning).
@@ -45,7 +45,7 @@ func NewVariables(db *sql.DB, cipher Cipher) *VariablesRepo {
 
 // ---- environments (D3) ----
 
-// P18 D18: unlike repos/connections.go:53 (which *drops* a row whose colour it does not
+// Unlike repos/connections.go:53 (which *drops* a row whose colour it does not
 // recognise), an environment owns variables and a collection's requests reference it — losing one
 // over a cosmetic column is a data-loss bug waiting for a hand-edited database. An unrecognised
 // stored value is coerced to 'none' instead, with the same slog.Warn.
@@ -120,15 +120,15 @@ func (r *VariablesRepo) UpdateEnvironment(id, name, description, color string) e
 	return sqlitex.RequireOneRow(res, "environment "+id)
 }
 
-// DuplicateEnvironment is P17 D17/item 4: a raw-column copy of one environment and its variables —
-// F9's own precedent (connections.Service.Duplicate's "a raw column copy, not decrypt-then-
+// DuplicateEnvironment is a raw-column copy of one environment and its variables — the precedent
+// (connections.Service.Duplicate's "a raw column copy, not decrypt-then-
 // re-encrypt — the plaintext is never used, so there is no reason for this path to need the OS
 // key at all"), applied verbatim here since api_variables.secret_value holds the same kira:v3:
 // envelope connections.password does. This is a same-kind copy (variable → variable, ScopeVariable
-// both sides — P29), which is exactly what the scope-bound AAD leaves untouched.
+// both sides), which is exactly what the scope-bound AAD leaves untouched.
 //
 //  1. A new environment row, name+" copy", description copied, sort_order = MAX+1,
-//     is_active = 0 — the active environment is a single app-global selection (D3); duplicating
+//     is_active = 0 — the active environment is a single app-global selection; duplicating
 //     the active one must not create a second active row or silently steal the selection.
 //  2. Every variable row copied with a fresh id, secret_value copied as the raw ciphertext column
 //     (never decrypted) — duplication needs no OS key, prompts no reveal gate, and works on a
@@ -447,7 +447,7 @@ func (r *VariablesRepo) readVariableForUpdate(tx *sql.Tx, id string) (existingVa
 	return row, nil
 }
 
-// updateVariableUntouched is Upsert's value == nil branch — F2 (P108 Part 3): nothing about the
+// updateVariableUntouched is Upsert's value == nil branch — nothing about the
 // value transitioned, so value/secret_value/is_secret stay exactly as stored (an isSecret flip
 // with no real value to move into/out of secret_value has no meaning here; the frontend never
 // sends one) and no history is recorded, only name/description.
@@ -548,7 +548,7 @@ func (r *VariablesRepo) insertVariable(tx *sql.Tx, scope model.VariableScope, ow
 	return v, nil
 }
 
-// purgePlaintextHistory is Finding 1 (P21 round 3, architecture/security): a variable flipped
+// purgePlaintextHistory: a variable flipped
 // from plain to secret must not leave its pre-secret plaintext sitting in api_variable_history.
 // recordHistory stamps a row's is_secret from the flag *at the time that row was written*, so
 // every history row recorded while this variable was still plain (is_secret = 0) — including,
@@ -578,7 +578,7 @@ func (r *VariablesRepo) encryptFor(value string, isSecret bool) (storedValue str
 	return "", &encrypted, nil
 }
 
-// valueChanged decrypts the stored old value (if secret) once and compares plaintext — D13:
+// valueChanged decrypts the stored old value (if secret) once and compares plaintext:
 // comparing ciphertext directly is meaningless, since GCM nonces differ per encryption. A decrypt
 // failure (a keychain reset, a database copied from another machine) is reported and treated as
 // "cannot tell", so no history entry is recorded for it — recording garbage would only compound the
@@ -607,10 +607,10 @@ func (r *VariablesRepo) recordHistory(tx *sql.Tx, variableID, oldPlain string, o
 	var secretValue *string
 	if oldSecret {
 		value = ""
-		// P29: api_variable_history.secret_value is its own scope, so the value being replaced is
+		// api_variable_history.secret_value is its own scope, so the value being replaced is
 		// re-sealed under ScopeVariableHistory rather than copied across from api_variables — a
 		// verbatim copy would be a ciphertext sealed for one column sitting in another, which is
-		// exactly what this phase's AAD refuses. Every caller reaches here only through
+		// exactly what the AAD refuses. Every caller reaches here only through
 		// valueChanged's ok return, so oldPlain is a real, already-decrypted plaintext and this
 		// Encrypt cannot fail for an unavailable cipher.
 		enc, err := r.cipher.Encrypt(secrets.ScopeVariableHistory, oldPlain)
@@ -642,8 +642,8 @@ func (r *VariablesRepo) recordHistory(tx *sql.Tx, variableID, oldPlain string, o
 }
 
 // Delete removes one variable (and its history, cascaded) and re-indexes its surviving siblings
-// dense — CollectionsRepo.Delete's own discipline (P4). It returns the deleted variable's scope
-// and owner id (P112) so the bridge can emit an api-data-changed event without a second query —
+// dense — CollectionsRepo.Delete's own discipline. It returns the deleted variable's scope
+// and owner id so the bridge can emit an api-data-changed event without a second query —
 // which would also race the delete.
 func (r *VariablesRepo) Delete(id string) (model.VariableScope, string, error) {
 	if id == "" {
@@ -722,11 +722,11 @@ func (r *VariablesRepo) Reorder(scope model.VariableScope, ownerID string, ids [
 	return nil
 }
 
-// ApplyBulk is P17 D22/D23's own transaction: one scope's whole variable set replaced by a parsed
+// ApplyBulk is the transaction: one scope's whole variable set replaced by a parsed
 // `.env` entry list in a single atomic step — match by name (positionally for a duplicate key,
-// mirroring dotenv.ts#reconcileEnv exactly, §4's own guard that the two reconciles agree), update/
-// insert/delete per D22's five rules, record history through the existing recordHistory helper for
-// every value that actually changed, then re-index sort_order dense in the entries' own order.
+// mirroring dotenv.ts#reconcileEnv exactly, the guard that the two reconciles agree), update/
+// insert/delete per the five rules, record history through the existing recordHistory helper for
+// every value that changed, then re-index sort_order dense in the entries' own order.
 //
 // Why one transaction and not N Upsert + M Delete + one Reorder from the renderer: a fifteen-line
 // paste would be sixteen IPC round trips with no atomicity — a failure halfway would leave a set
@@ -829,11 +829,11 @@ func (r *VariablesRepo) loadBulkExisting(tx *sql.Tx, column, ownerID string) ([]
 	return existing, nil
 }
 
-// applyBulkEntry is ApplyBulk phase 2's own per-entry body: match entry against the next unmatched
-// existing row of the same name (positional, mirroring dotenv.ts#reconcileEnv exactly — §4's own
-// guard that the two reconciles agree), update it per D22 rules 1/3, or insert a new row per D22
-// rule 2 when unmatched. Counts the outcome into result and always returns the id that becomes
-// this entry's place in finalOrder, whichever row it ended up being.
+// applyBulkEntry is ApplyBulk's per-entry body: match entry against the next unmatched
+// existing row of the same name (positional, mirroring dotenv.ts#reconcileEnv exactly — the
+// guard that the two reconciles agree), update it, or insert a new row when unmatched. Counts the
+// outcome into result and always returns the id that becomes this entry's place in finalOrder,
+// whichever row it ended up being.
 func (r *VariablesRepo) applyBulkEntry(tx *sql.Tx, scope model.VariableScope, ownerID string, entry model.VariableBulkEntry, pools map[string][]bulkExistingRow, nextIndex map[string]int, matched map[string]bool, now string, result *model.VariableBulkResult) (string, error) {
 	pool := pools[entry.Name]
 	idx := nextIndex[entry.Name]
@@ -1025,7 +1025,7 @@ func (r *VariablesRepo) History(variableID string) ([]model.VariableHistoryEntry
 // ---- the gated reveal's own accessors (D8) — called only after apivars.Service has already
 // authorized the reveal; neither method gates anything itself. ----
 
-// revealSecret is RevealValue's and RevealHistoryValue's own shared shape (P107 I2-9): read
+// revealSecret is RevealValue's and RevealHistoryValue's own shared shape: read
 // is_secret/secret_value off table by id, refuse a missing row or a non-secret one, decrypt under
 // scope. noun names the row in every error string ("variable" / "history entry") — RevealValue's
 // own decrypt error previously omitted it ("decrypt %s: %w") where RevealHistoryValue's included
@@ -1067,12 +1067,12 @@ func (r *VariablesRepo) RevealHistoryValue(historyID string) (string, error) {
 	return r.revealSecret("api_variable_history", secrets.ScopeVariableHistory, "history entry", historyID)
 }
 
-// SecretsFor decrypts every secret variable reachable from a send — D2's precedence, environment
+// SecretsFor decrypts every secret variable reachable from a send — the precedence, environment
 // over collection, applied here as "insert the collection's secrets, then let the environment's
 // overwrite same-named ones", so the returned map already reflects who wins. Either id may be ""
 // (a scratch tab has no collection; no environment may be selected). A single entry's decrypt
-// failure is logged (naming the variable, never the value, D5) and simply absent from the result —
-// D10: the reference then resolves to nothing and the reference stays literal, rather than failing
+// failure is logged (naming the variable, never the value) and absent from the result —
+// the reference then resolves to nothing and the reference stays literal, rather than failing
 // the whole send over one bad row.
 func (r *VariablesRepo) SecretsFor(collectionID, environmentID string) (map[string]string, error) {
 	out := map[string]string{}
@@ -1090,7 +1090,7 @@ func (r *VariablesRepo) SecretsFor(collectionID, environmentID string) (map[stri
 }
 
 // mergeSecrets is one scope's own resolution pass (collection, then environment — SecretsFor's own
-// call order, D2). D12: a duplicate name within *this* scope resolves first-wins by sort_order —
+// call order). A duplicate name within *this* scope resolves first-wins by sort_order —
 // ORDER BY makes that the query's own row order, and seen skips a later row sharing an
 // already-decrypted name rather than overwriting it. seen is local to this call, never shared with
 // the caller's out map, so a later call for a higher-precedence scope (environment) still
@@ -1112,9 +1112,9 @@ func (r *VariablesRepo) mergeSecrets(out map[string]string, column, ownerID stri
 		if seen[name] {
 			continue
 		}
-		// F5: mark seen before the validity/decrypt checks below, so a NULL or undecryptable row
-		// still shadows — both a later same-named row further down this scope's sort_order (D12's
-		// first-wins), and a same-named value SecretsFor's own earlier, lower-precedence call
+		// Mark seen before the validity/decrypt checks below, so a NULL or undecryptable row
+		// still shadows — both a later same-named row further down this scope's sort_order
+		// (first-wins), and a same-named value SecretsFor's own earlier, lower-precedence call
 		// (collection, before environment) already wrote into out. Without this, the next row
 		// with the same name won, silently substituting a different scope's value: Send would use
 		// the collection's secret while findSecretVariableId (curl.ts) already treats the broken
@@ -1138,8 +1138,8 @@ func (r *VariablesRepo) mergeSecrets(out map[string]string, column, ownerID stri
 
 // ---- import promotion (P4 D9's hand-off, closed by D15/F5) ----
 
-// promotedVariableRow is one collection-level `variable[]` entry as it appears in a pre-P5
-// collection's origin_json. Decoded independently of internal/postman's own decoders (which are
+// promotedVariableRow is one collection-level `variable[]` entry as it appears in a collection's
+// origin_json. Decoded independently of internal/postman's own decoders (which are
 // unexported, and this package must not reach past that) — this is the one place a
 // collection-level variable array needs decoding with no postman.Tree machinery around it.
 type promotedVariableRow struct {
@@ -1175,8 +1175,8 @@ func scalarString(raw json.RawMessage) string {
 	return ""
 }
 
-// promoteIfNeeded is D15/F5's one-shot: a collection imported before this phase still carries its
-// top-level `variable[]` inside origin_json (variables_promoted = 0). This moves it into rows,
+// promoteIfNeeded is the one-shot: a collection still carries its top-level `variable[]` inside
+// origin_json (variables_promoted = 0). This moves it into rows,
 // sheds the member from origin_json so the exporter never re-emits it from there, and stamps the
 // flag — all inside one transaction, idempotent (a second call is a no-op because the flag is
 // already 1).
@@ -1270,15 +1270,14 @@ func (r *VariablesRepo) PromoteImported(collectionID string) error {
 	return r.promoteIfNeeded(collectionID)
 }
 
-// ImportVariables writes a freshly-imported collection's own promoted `variable[]` (D15) as rows,
+// ImportVariables writes a freshly-imported collection's own promoted `variable[]` as rows,
 // stamping variables_promoted = 1 immediately — these rows already *are* the promoted set, so
 // there is nothing left for promoteIfNeeded to do for this collection.
 //
 // Called by CollectionsService.Import right after CollectionsRepo.ImportTree creates the
-// collection row — deliberately a second call, not folded into that one transaction (F13's own
-// property does not extend here): encrypting a secret value needs this repo's own Cipher, which
-// CollectionsRepo does not have and should not be given (D4/F4's module boundary keeps
-// secret_value's only writers in this one repo).
+// collection row — deliberately a second call, not folded into that one transaction: encrypting a
+// secret value needs this repo's own Cipher, which CollectionsRepo does not have and should not be
+// given (the module boundary keeps secret_value's only writers in this one repo).
 func (r *VariablesRepo) ImportVariables(collectionID string, vars []postman.Variable) error {
 	tx, err := r.db.Begin()
 	if err != nil {

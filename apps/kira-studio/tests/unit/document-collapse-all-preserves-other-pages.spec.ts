@@ -1,4 +1,4 @@
-// P21 round 3 functional finding 13: setAllExpanded's collapse branch replaced state.expanded
+// setAllExpanded's collapse branch replaced state.expanded
 // wholesale with a fresh map containing only the ids it was handed (the currently rendered page),
 // discarding every `false` entry for a document on any other page — an absent key means expanded,
 // so paging away and back re-expanded everything collapsed there. state.expanded is persisted tab
@@ -14,7 +14,7 @@ import { seedConnectionRecord } from './support/connectionRecord.ts';
 setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
-// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — a real (never-settling in this harness) control.tabsSave triggered
 // incidentally by opening a tab below would otherwise wedge every later spec's own tabsSave
 // assertions for the rest of the process. This spec doesn't test persistence, so give it a

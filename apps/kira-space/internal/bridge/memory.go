@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
-	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/memory/importer"
@@ -29,7 +29,7 @@ const ChannelMemorySemantic = "kira:memory:semantic"
 // payload is empty; the UI refetches the job list and the open job.
 const ChannelMemoryImport = "kira:memory:import"
 
-// memoryServerName is the name the kira-memory stdio server registers under in Claude Code.
+// memoryServerName is the name the kira-memory stdio server registers under in the agent.
 const memoryServerName = "kira-memory"
 
 const (
@@ -38,18 +38,13 @@ const (
 	memoryUIListLimit   = 100
 )
 
-// MemoryMcpInstaller is mcpinstall.Installer's seam as MemoryService consumes it.
-type MemoryMcpInstaller interface {
-	Status() mcpinstall.Status
-	InstallStdio(ctx context.Context, name, command string, args []string) mcpinstall.Result
-}
-
 // MemoryService is the Memory module's bridge over the shared memory.Service. memory.db opens on
 // first use; a watcher then turns the MCP subprocess's commits into ChannelMemoryChanged.
 type MemoryService struct {
 	events    appcore.Emitter
-	installer MemoryMcpInstaller
+	installer harness.MCPInstaller
 	prompts   llmprompts.Source
+	agent     *memory.AgentRunner
 
 	mu        sync.Mutex
 	svc       *memory.Service
@@ -72,8 +67,8 @@ type MemoryService struct {
 }
 
 // NewMemoryService wires the module; spec is the embedding model it installs and runs.
-func NewMemoryService(events appcore.Emitter, installer MemoryMcpInstaller, prompts llmprompts.Source, spec embed.Spec) *MemoryService {
-	s := &MemoryService{events: events, installer: installer, prompts: prompts, spec: spec}
+func NewMemoryService(events appcore.Emitter, installer harness.MCPInstaller, prompts llmprompts.Source, spec embed.Spec, agents harness.Selector, models memory.ModelSource) *MemoryService {
+	s := &MemoryService{events: events, installer: installer, prompts: prompts, spec: spec, agent: memory.NewAgentRunner(agents, models)}
 	s.semanticEvents = newCoalescer(emitGap, func() { events.Emit(ChannelMemorySemantic, struct{}{}) })
 	s.importEvents = newCoalescer(emitGap, func() { events.Emit(ChannelMemoryImport, struct{}{}) })
 	return s
@@ -87,7 +82,7 @@ func (s *MemoryService) service() *memory.Service {
 	}
 	s.store = memory.OpenDefault()
 	s.embedder = embed.NewClient(embed.ClientOptions{Spec: s.spec, Home: memory.Home(), OnState: s.emitSemantic})
-	s.svc = memory.NewService(s.store, memory.NewCLIRunner(), memory.ServiceOptions{
+	s.svc = memory.NewService(s.store, s.agent, memory.ServiceOptions{
 		Embedder: s.embedder, OnChange: s.emitChanged, OnSemantic: s.emitSemantic, Prompts: s.prompts,
 	})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -118,7 +113,7 @@ func (s *MemoryService) importer() (*importer.Engine, error) {
 	}
 	s.engine, err = importer.Open(s.store, importer.Options{
 		Launcher:  importer.SpawnLauncher{Executable: exe, LogPath: importer.DefaultLogPath(s.store)},
-		Available: memory.NewCLIRunner().Available,
+		Available: s.agent.Available,
 		OnChange:  s.emitImport,
 	})
 	return s.engine, err
@@ -183,9 +178,9 @@ func memoryErr(err error) error {
 	switch {
 	case err == nil:
 		return nil
-	case errors.Is(err, memory.ErrInvalid), errors.Is(err, memory.ErrClaudeNotFound), errors.Is(err, memory.ErrClaudeAuth),
-		errors.Is(err, memory.ErrClaudeBudget), errors.Is(err, memory.ErrClaudeMaxTurns), errors.Is(err, memory.ErrClaudeTimeout), errors.Is(err, memory.ErrClaudeOutput),
-		errors.Is(err, memory.ErrClaudeOutdated), errors.Is(err, memory.ErrClaudeRateLimited), errors.Is(err, memory.ErrClaudeUsageLimit):
+	case errors.Is(err, memory.ErrInvalid), errors.Is(err, harness.ErrNotFound), errors.Is(err, harness.ErrAuth),
+		errors.Is(err, harness.ErrBudget), errors.Is(err, harness.ErrMaxTurns), errors.Is(err, harness.ErrTimeout), errors.Is(err, harness.ErrOutput),
+		errors.Is(err, harness.ErrOutdated), errors.Is(err, harness.ErrRateLimited), errors.Is(err, harness.ErrUsageLimit):
 		return ipcerr.BadRequest(err.Error())
 	case errors.Is(err, embed.ErrChecksum):
 		return ipcerr.BadRequest(err.Error())
@@ -346,10 +341,10 @@ func (s *MemoryService) RetrySemantic() {
 
 // MemoryMcpStatus is the Connect dialog's pre-click read.
 type MemoryMcpStatus struct {
-	Command         string   `json:"command"`
-	Executable      string   `json:"executable"`
-	ClaudeAvailable bool     `json:"claudeAvailable"`
-	Probed          []string `json:"probed"`
+	Command        string   `json:"command"`
+	Executable     string   `json:"executable"`
+	AgentAvailable bool     `json:"agentAvailable"`
+	Probed         []string `json:"probed"`
 }
 
 // MemoryCheckHook is what Settings > Memory shows to install the kira-memory commit check in
@@ -360,7 +355,7 @@ type MemoryCheckHook struct {
 	HookLine       string `json:"hookLine"`
 }
 
-// MemoryInstallResult is mcpinstall's outcome vocabulary on the wire.
+// MemoryInstallResult is the installer's outcome vocabulary on the wire.
 type MemoryInstallResult struct {
 	Outcome string   `json:"outcome"`
 	Detail  string   `json:"detail"`
@@ -380,13 +375,13 @@ func memoryExecutable() (string, error) {
 	return exe, nil
 }
 
-// McpStatus reports the registration command for this binary and whether `claude` is installed.
+// McpStatus reports the registration command for this binary and whether the agent CLI is installed.
 func (s *MemoryService) McpStatus() MemoryMcpStatus {
 	inst := s.installer.Status()
-	st := MemoryMcpStatus{ClaudeAvailable: inst.ClaudePath != "", Probed: inst.Probed}
+	st := MemoryMcpStatus{AgentAvailable: inst.Path != "", Probed: inst.Probed}
 	if exe, err := memoryExecutable(); err == nil {
 		st.Executable = exe
-		st.Command = mcpinstall.StdioCommand(memoryServerName, exe, []string{"memory-mcp"})
+		st.Command = s.installer.StdioCommand(memoryServerName, exe, []string{"memory-mcp"})
 	}
 	return st
 }
@@ -400,12 +395,12 @@ func (s *MemoryService) CheckHook() MemoryCheckHook {
 	return MemoryCheckHook{Executable: exe, InstallCommand: memcheck.InstallCommand(exe), HookLine: memcheck.HookLine(exe)}
 }
 
-// InstallClaudeCode registers the kira-memory stdio server with Claude Code. It never returns a
+// InstallAgent registers the kira-memory stdio server with the active agent. It never returns a
 // Go error: every outcome is a value the dialog renders.
-func (s *MemoryService) InstallClaudeCode(ctx context.Context) MemoryInstallResult {
+func (s *MemoryService) InstallAgent(ctx context.Context) MemoryInstallResult {
 	exe, err := memoryExecutable()
 	if err != nil {
-		return MemoryInstallResult{Outcome: mcpinstall.OutcomeInstallFailed, Detail: err.Error(), Probed: []string{}}
+		return MemoryInstallResult{Outcome: harness.OutcomeInstallFailed, Detail: err.Error(), Probed: []string{}}
 	}
 	r := s.installer.InstallStdio(ctx, memoryServerName, exe, []string{"memory-mcp"})
 	if r.Probed == nil {

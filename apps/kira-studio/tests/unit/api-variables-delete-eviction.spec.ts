@@ -1,13 +1,13 @@
-// P108 F9: deleteEnvironment closed the environment's own variable-set tabs and reloaded the list,
+// deleteEnvironment closed the environment's own variable-set tabs and reloaded the list,
 // but left `incognitoEnvByTab` entries holding the deleted id (an incognito tab kept substituting
 // its plain values in stage 1 while Go resolved no secrets for the missing environment) and left
 // the environment-scope variables query cached forever (a later read for that owner id would keep
 // reading the deleted rows back). This pins both evictions.
 //
-// P112: `listCache` is gone — eviction is `reconcileEnvironments`/`reconcileTree` (apiQueries.ts),
+// `listCache` is gone — eviction is `reconcileEnvironments`/`reconcileTree` (apiQueries.ts),
 // run from `afterEnvironmentsListChange`/`afterTreeListChange` after every list mutation. The
 // collection-delete case below is `reconcileTree`'s own half, re-added now that
-// `collections.ts`'s own migration (commit 5) wires `deleteRow` through `afterTreeListChange`.
+// `collections.ts`'s own migration wires `deleteRow` through `afterTreeListChange`.
 import '@workbench/testing/unit/window';
 
 import { afterAll, describe, expect, test } from 'bun:test';

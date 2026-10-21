@@ -5,11 +5,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// This file hoists the prologue postgres/mysqlfamily/sqlite's own readPage each ran verbatim
-// (P94 pass 2, commit 1): tiebreaker selection, effective-order computation, keyset support
-// assertion, fetch-column resolution, display column construction, the request fingerprint and the
-// scan ORDER BY. SQL text assembly, parameter binding and row streaming genuinely differ per
-// dialect and stay in each adapter.
+// This file hoists the prologue postgres/mysqlfamily/sqlite's own readPage each ran verbatim:
+// tiebreaker selection, effective-order computation, keyset support assertion, fetch-column
+// resolution, display column construction, the request fingerprint and the scan ORDER BY. SQL text
+// assembly, parameter binding and row streaming genuinely differ per dialect and stay in each
+// adapter.
 
 // RelationalPageArgs is what the three SQL adapters' readPage prologues actually differ on, beyond
 // the columns/projection/sort/cursor every one of them shares.
@@ -120,7 +120,7 @@ type RelationalFingerprint[P any] struct {
 }
 
 // KeysetPageCollector is readPage's post-stream bookkeeping, byte-identical across all three
-// relational adapters (P107 I2-11): row counting against PageSize, the ReverseRows edge-row swap,
+// relational adapters: row counting against PageSize, the ReverseRows edge-row swap,
 // and the BuildKeysetPosition/builder.Finish call. Row storage and cell access stay adapter-owned
 // (firstRow/lastRow are []*string on postgres/mysqlfamily, []any on sqlite) — swapEdges and cellAt
 // are the seam.

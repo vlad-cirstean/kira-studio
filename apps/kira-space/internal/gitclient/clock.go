@@ -2,10 +2,9 @@ package gitclient
 
 import "time"
 
-// Clock is D2's time seam — declared alongside Runner and Watcher from this package's first
-// commit, per the same reasoning: a TTL-gated cache (discovery.go's re-probe interval) is
-// unit-testable against a fake clock that jumps forward on command, never against a real one a
-// test would have to sleep through.
+// Clock is the time seam — declared alongside Runner and Watcher, per the same reasoning: a
+// TTL-gated cache (discovery.go's re-probe interval) is unit-testable against a fake clock that
+// jumps forward on command, never against a real one a test would have to sleep through.
 type Clock interface {
 	Now() time.Time
 }

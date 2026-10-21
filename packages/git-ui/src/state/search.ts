@@ -1,14 +1,14 @@
 import type { CompiledQuery, LoadedScanResult, SearchField, SearchScope } from '@kira/git-core';
 import { compileQuery, matchRef, searchLoadedCommits } from '@kira/git-core';
-import type { RefRow, ResultOf } from '@kira/git-ipc';
+import type { GitHostInfo, RefRow, ResultOf } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
 import { type ComputedRef, computed, type ShallowRef, shallowRef, watch } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { createCancellableTimer } from './cancellableTimer.ts';
+import type { ChangeRequestState } from './changeRequests.ts';
 import type { GraphViewState } from './graphView.ts';
-import type { PrState } from './pr.ts';
 import type { RefsState } from './refs.ts';
 
 export type SearchRunResult = ResultOf<'search.run'>;
@@ -20,7 +20,7 @@ const LOADED_SCAN_BUDGET_MS = 120;
 /** OQ3: loaded-hit cap. A scan that hit it is `truncated`, so `matchCount` reports inexact — this
  *  bounds how many rows `SearchResults.vue` could ever render from the client-side half. */
 const LOADED_HIT_LIMIT = 500;
-/** G30 round-1 performance review, finding #4: `#runLoadedScan` re-scans the ENTIRE loaded store
+/** `#runLoadedScan` re-scans the ENTIRE loaded store
  *  from row 0 every time it runs (`searchLoadedCommits` has no incremental/resume mode), and used
  *  to be wired to fire on every single `loadedRows` change — the `revealSha` "load page after page
  *  until the target sha appears" loop (`graphView.ts`) could fire dozens of these full re-scans in
@@ -29,25 +29,25 @@ const LOADED_HIT_LIMIT = 500;
  *  scroll-triggered load still re-scans almost immediately (imperceptible), long enough to coalesce
  *  a tight loadMore() burst into one scan at the burst's own final row count instead of one per
  *  page. A genuine query/scope change (`compiled`/`generation`) is NOT debounced — see the split
- *  watchers below — typing a character must still re-scan synchronously, hard part 4's own budget
+ *  watchers below — typing a character must still re-scan synchronously, the budget
  *  governs that cost, not this one. */
 const LOADED_SCAN_COALESCE_MS = 50;
-/** Hard part 6 / §7.8: below this, a query matches most of a repository, and spawning a ~1 s walk
+/** Below this, a query matches most of a repository, and spawning a ~1 s walk
  *  on the very first keystroke of every search is the wrong trade. Two characters, not one.
  *  Exported so `SearchResults.vue`'s own "search message bodies" affordance can tell a too-short
  *  query apart from `tailSkippedByExhaustion` below — offering the override makes no sense for a
  *  query this short regardless of how much history is loaded. */
 export const MIN_TAIL_QUERY_LENGTH = 2;
-/** OQ1: once the whole history is loaded and it is this small, the *only* thing the tail scan
- *  still adds is a body-only match (hard part 1) — not worth a ~1 s walk on every keystroke.
+/** Once the whole history is loaded and it is this small, the *only* thing the tail scan
+ *  still adds is a body-only match — not worth a ~1 s walk on every keystroke.
  *  `runBodySearch()` is the on-demand escape hatch `SearchResults.vue`'s "search message bodies"
- *  affordance (W12) calls when a user asks for it anyway. */
+ *  affordance calls when a user asks for it anyway. */
 const SKIP_TAIL_MAX_ROWS = 20_000;
 
-/** A ref hit, shaped for `SearchResults.vue`'s grouped listbox (§7.8: "each hit showing its kind
+/** A ref hit, shaped for `SearchResults.vue`'s grouped listbox ("each hit showing its kind
  *  so a tag and a branch of the same name are distinguishable"). Carries the whole `RefRow` the
  *  hit came from rather than re-deriving a subset, since selecting one needs `peeledObjectId ??
- *  objectId` (W14) — information a trimmed shape would have to duplicate. */
+ *  objectId` — information a trimmed shape would have to duplicate. */
 export interface RefHit {
   readonly ref: RefRow;
   readonly fields: readonly SearchField[];
@@ -111,7 +111,7 @@ export function buildCommitHits(
         // double-counting — so it must count only a hit that was *already one of `loaded.hits`*
         // (this row was in `byRow` before this loop touched it), not merely "this row happens to
         // be paged into the store". A body-only match on an already-loaded row is the case that
-        // tells the two apart: the client-side scan never reads `body` (hard part 1), so such a
+        // tells the two apart: the client-side scan never reads `body`, so such a
         // row is loaded but was never a *loaded hit* — counting it as an overlap here silently
         // discarded it from `matchCount.n` entirely (0 = 0 loaded + 1 tail − 1 wrongly-assumed
         // overlap) even though it still (correctly) got a `CommitHit` entry below, an invisible
@@ -156,18 +156,17 @@ export function buildCommitHits(
 }
 
 /**
- * `docs/plans/P11.md` W10: §7.8's search box as reactive state, shaped like `RefsState`/
- * `StashState` closely enough that `SearchBox.vue`/`SearchResults.vue` (W11/W12) need nothing
- * bespoke to consume it — three toggles and a scope compile into one query (hard part 2), which
- * two independent halves then match against: `refHits`/`loaded` are pure, synchronous folds
- * (`matchRef`/`searchLoadedCommits`, both measured at 13-38 ms, probe 9b) that run on every
- * keystroke with no round trip; `tail` is a debounced `search.run` request that only exists to
- * cover what the loaded store structurally cannot (hard part 1: a commit body).
+ * The search box as reactive state, shaped like `RefsState`/`StashState` closely enough that
+ * `SearchBox.vue`/`SearchResults.vue` need nothing bespoke to consume it — three toggles and a
+ * scope compile into one query, which two independent halves then match against:
+ * `refHits`/`loaded` are pure, synchronous folds (`matchRef`/`searchLoadedCommits`, both measured
+ * at 13-38 ms) that run on every keystroke with no round trip; `tail` is a debounced `search.run`
+ * request that only exists to cover what the loaded store structurally cannot (a commit body).
  *
- * **What this class does not do.** It does not highlight anything (W13's job, driven off
- * `searchGeneration`), does not open a dropdown or own focus (W11/W12), and does not itself call
+ * **What this class does not do.** It does not highlight anything (driven off
+ * `searchGeneration`), does not open a dropdown or own focus, and does not itself call
  * `GraphViewState.revealSha` — `next()`/`previous()` only move `activeIndex` over `commitHits`;
- * a consumer (`App.vue`, W14) watches `activeHit` and drives the reveal-and-select side effect,
+ * a consumer (`App.vue`) watches `activeHit` and drives the reveal-and-select side effect,
  * exactly as it already owns the equivalent decision for a `StashState`/`DetailState` selection.
  */
 export class SearchState {
@@ -179,6 +178,8 @@ export class SearchState {
 
   /** Recompiled per keystroke, never throws (probe 4) — see `core`'s `compileQuery`. */
   readonly compiled: ComputedRef<CompiledQuery>;
+  /** The repo's code host, naming change-request fields in result labels. */
+  readonly host: ComputedRef<GitHostInfo | null>;
   /** `compiled.kind === "invalid"`'s own message, or `undefined` — `SearchBox.vue`'s inline error,
    *  wired to the input via `aria-describedby`. */
   readonly error: ComputedRef<string | undefined>;
@@ -192,7 +193,7 @@ export class SearchState {
    *  tail was skipped (OQ1) or never scheduled (query too short, or `scope` is `"refs"`). */
   readonly tail: ShallowRef<SearchRunResult | undefined> = shallowRef(undefined);
   /** `true` once a `repo.changed { refsChanged }` has landed since `tail` was last populated —
-   *  the tail is never silently re-run for it (§7.8: search is a question asked at a moment), so
+   *  the tail is never silently re-run for it (search is a question asked at a moment), so
    *  this is `SearchResults.vue`'s own "results may be stale" hint instead. Cleared by the next
    *  successful tail request or by `setRepoId`. */
   readonly tailStale: ShallowRef<boolean> = shallowRef(false);
@@ -209,8 +210,8 @@ export class SearchState {
    *  `CommitGrid.vue`'s own watcher on this re-renders the message column's highlight, mirroring
    *  its existing `graphView.generation` watcher exactly. */
   readonly searchGeneration: ShallowRef<number> = shallowRef(0);
-  /** OQ1's own skip condition, exposed in isolation (rather than only inside `#shouldRunTail`,
-   *  private below) so `SearchResults.vue`'s "search message bodies" affordance (W12) can tell
+  /** The skip condition, exposed in isolation (rather than only inside `#shouldRunTail`,
+   *  private below) so `SearchResults.vue`'s "search message bodies" affordance can tell
    *  *why* the tail did not run — only this reason is worth offering an on-demand override for; a
    *  too-short query or `scope: "refs"` are not, and the affordance's own visibility condition
    *  checks those separately with `MIN_TAIL_QUERY_LENGTH` above. */
@@ -227,7 +228,7 @@ export class SearchState {
   /** G24 D11: optional so a caller with nothing to match PRs against (every pre-G24 caller, and
    *  this class's own existing tests) keeps working with `matchRef`'s `pr` arg simply `undefined`
    *  — byte-identical to this seam's pre-G24 behaviour. */
-  readonly #pr: PrState | undefined;
+  readonly #changeRequests: ChangeRequestState | undefined;
   #repoId: string | undefined;
   #tailController: AbortController | undefined;
   readonly #tailTimer = createCancellableTimer(() => this.#runTail(), TIMING.search);
@@ -238,11 +239,17 @@ export class SearchState {
   readonly #unsubscribeRefsChanged: () => void;
   readonly #stopWatchers: readonly (() => void)[];
 
-  constructor(bridge: BridgeClient, refs: RefsState, graph: GraphViewState, pr?: PrState) {
+  constructor(
+    bridge: BridgeClient,
+    refs: RefsState,
+    graph: GraphViewState,
+    changeRequests?: ChangeRequestState,
+  ) {
     this.#bridge = bridge;
     this.#refs = refs;
     this.#graph = graph;
-    this.#pr = pr;
+    this.#changeRequests = changeRequests;
+    this.host = computed(() => changeRequests?.host.value ?? null);
 
     this.compiled = computed(() =>
       compileQuery({
@@ -264,8 +271,8 @@ export class SearchState {
       const hits: RefHit[] = [];
       const collect = (rows: readonly RefRow[]): void => {
         for (const row of rows) {
-          const pr = this.#pr?.byBranch.value.get(row.shortName);
-          const fields = matchRef(row, ok, pr);
+          const changeRequest = this.#changeRequests?.byBranch.value.get(row.shortName);
+          const fields = matchRef(row, ok, changeRequest);
           if (fields.length > 0) hits.push(toRefHit(row, fields));
         }
       };
@@ -294,12 +301,12 @@ export class SearchState {
       const tailTotal = tail?.kind === 'ok' ? tail.total : 0;
       const n = loadedLen + tailTotal - commitHitsResult.value.overlapCount;
       // Exact only when both halves are known to have seen everything they were asked to: the
-      // client-side scan never hit its own time box, and (when a tail actually ran) the tail
+      // client-side scan never hit its own time box, and (when a tail ran) the tail
       // scanned to git's own end without its own cap truncating the wire payload. A skipped tail
-      // (OQ1) does not itself make this inexact — that skip's own premise is "the store already
+      // does not itself make this inexact — that skip's own premise is "the store already
       // is the whole rev set" — but a tail that ran and was capped or time-boxed does.
       const loadedExact = loaded === undefined || (loaded.complete && !loaded.truncated);
-      // G23 D6: an `unsupportedPattern` tail is NOT exact — it is silent about the whole
+      // An `unsupportedPattern` tail is NOT exact — it is silent about the whole
       // not-yet-walked tail (and therefore any body-only match), unlike `invalidPattern`, which
       // the client never sends a request for in the first place (compileQuery already refused
       // it, so there is nothing the tail could have missed).
@@ -311,7 +318,7 @@ export class SearchState {
       return { n, exact: loadedExact && tailExact };
     });
     // G24 D7 point 4/D11: entering a scope that can show a ref hit is one of the few user acts
-    // allowed to touch the network at all — warms PrState's own byBranch cache so the very next
+    // allowed to touch the network at all — warms ChangeRequestState's own byBranch cache so the very next
     // keystroke's own synchronous refHits computed already has PR records to match against (F16's
     // own "adds no process and no network round trip to a keystroke"). G32 round-3 performance
     // review, finding #3: unlike BranchPicker.vue's own equivalent warm (capped to what it
@@ -320,13 +327,13 @@ export class SearchState {
     // itself still bounds how many requests are ever in flight at once (PR_ENSURE_SNAPSHOT_
     // CONCURRENCY), and a branch already resolved or already in flight costs nothing on a repeat
     // call. On a repo with very many branches this remains a real, if one-time-per-scope-entry,
-    // cost — see PrState's own class doc comment for what it actually costs a branch with no PR.
+    // cost — see ChangeRequestState's own class doc comment for what it actually costs a branch with no PR.
     watch(this.scope, (scope) => {
-      if (scope === 'commits' || this.#pr === undefined) return;
+      if (scope === 'commits' || this.#changeRequests === undefined) return;
       const names = [...this.#refs.branches.value, ...this.#refs.remoteBranches.value].map(
         (r) => r.shortName,
       );
-      void this.#pr.ensureSnapshot(names);
+      void this.#changeRequests.ensureSnapshot(names);
     });
     this.activeHit = computed(() => this.commitHits.value[this.activeIndex.value]);
     this.tailSkippedByExhaustion = computed(
@@ -339,7 +346,7 @@ export class SearchState {
       if (this.tail.value !== undefined) this.tailStale.value = true;
     });
 
-    // Per keystroke, synchronous half (hard part 4's own budget, not the debounce below) — a
+    // Per keystroke, synchronous half (not the debounce below) — a
     // genuine query change must re-scan immediately, never coalesced. Deliberately the SAME
     // trigger set the original single watcher used (compiled + generation), minus loadedRows
     // (split out below) — scope is intentionally NOT a trigger here, unchanged from before this
@@ -392,8 +399,8 @@ export class SearchState {
     this.activeIndex.value = (this.activeIndex.value - 1 + len) % len;
   }
 
-  /** `SearchResults.vue`'s "search message bodies" affordance (W12) — the on-demand escape hatch
-   *  for OQ1's skip: forces one tail request even though the whole (small) history is already
+  /** `SearchResults.vue`'s "search message bodies" affordance — the on-demand escape hatch
+   *  for the skip: forces one tail request even though the whole (small) history is already
    *  loaded, because that is the one case the skip's own premise does not cover (a body-only
    *  match). A no-op with no compiled query to run. */
   runBodySearch(): void {

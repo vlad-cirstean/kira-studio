@@ -17,7 +17,7 @@ const hardCapRows = 20_000
 // below) — these two close the gap, mirroring api_response_history/grpc_call_history's own shape
 // (F2) rather than inventing a fifth.
 const (
-	// maxOpCommandBytes is grpc_history.go's maxGrpcMessageBytes verbatim (D1(a)): an op-log
+	// maxOpCommandBytes is grpc_history.go's maxGrpcMessageBytes verbatim: an op-log
 	// command is one label among as many as hardCapRows, worth less than a stored gRPC message a
 	// user opens and reads. It is also the largest cap that keeps the table under roughly twice
 	// its budget between two prunes (pruneEveryOps * (maxOpCommandBytes + maxOpErrorBytes) ≈ one
@@ -29,8 +29,8 @@ const (
 	maxOpErrorBytes = 8 * 1024
 )
 
-// opLogByteBudget is D2's table-wide ceiling — grpc_history.go's own grpcHistoryByteBudget
-// verbatim (P11 D11's argument: a quarter of api_response_history's 128 MiB, for a table of
+// opLogByteBudget is the table-wide ceiling — grpc_history.go's own grpcHistoryByteBudget
+// verbatim (the argument: a quarter of api_response_history's 128 MiB, for a table of
 // machine-generated labels rather than results a person asked for). A var, not a const, only so
 // SetOpLogByteBudgetForTest (ops_internal_test.go) can shrink it for one test, mirroring
 // response_history.go's/grpc_history.go's own historyByteBudget/grpcHistoryByteBudget split.
@@ -96,11 +96,11 @@ func (r *OpsRepo) ReconcileInterrupted() (n int64, err error) {
 	return n, nil
 }
 
-// Finish records a running op's terminal state (ops.ts's finishOp), applying D1(a)/(b)'s per-row
-// caps first. patch is a pointer so it is truncated in place: the caller (oplog.Wiring) builds its
+// Finish records a running op's terminal state (ops.ts's finishOp), applying the per-row caps
+// first. patch is a pointer so it is truncated in place: the caller (oplog.Wiring) builds its
 // live-update record from the same patch it just passed in, rather than from the pre-truncation
-// event payload, so a push and a subsequent reload never disagree about what was actually stored.
-// The returned bool is D1(c)'s command_truncated flag.
+// event payload, so a push and a subsequent reload never disagree about what was stored.
+// The returned bool is the command_truncated flag.
 func (r *OpsRepo) Finish(opID string, patch *model.OpFinish) (commandTruncated bool, err error) {
 	if patch.Command != nil && len(*patch.Command) > maxOpCommandBytes {
 		truncated := capUTF8(*patch.Command, maxOpCommandBytes)
@@ -199,8 +199,8 @@ func (r *OpsRepo) Recent(limit int) ([]model.OpRecord, error) {
 }
 
 // Prune mirrors ops.ts's pruneOps: a retention-days cut, then a hard cap on total row count, then
-// D2's table-wide byte budget — cheapest and most selective pass first, each shrinking the input
-// the next pass has to consider. P52 §5.4's rewrite — every pass is a single DELETE with a
+// the table-wide byte budget — cheapest and most selective pass first, each shrinking the input
+// the next pass has to consider. Every pass is a single DELETE with a
 // subquery, never per-call-shape SQL.
 func (r *OpsRepo) Prune(retentionDays int) error {
 	cutoff := kiratime.FormatISO(time.Now().Add(-time.Duration(retentionDays) * 24 * time.Hour))
@@ -216,18 +216,18 @@ func (r *OpsRepo) Prune(retentionDays int) error {
 		return fmt.Errorf("repos/ops: prune hard cap: %w", err)
 	}
 
-	// D2: a table-wide byte budget, oldest-first — response_history.go's/grpc_history.go's own
+	// A table-wide byte budget, oldest-first — response_history.go's/grpc_history.go's own
 	// sweep transposed onto op_log, gated behind the op_log_bytes covering index
 	// (0015_p23_op_log_bytes.sql) so the expensive window-function DELETE is skipped whenever the
-	// table is nowhere near budget. Safe only because D1(a)/(b)'s per-row caps hold: no single row
+	// table is nowhere near budget. Safe only because the per-row caps hold: no single row
 	// can exceed 64 KiB + 8 KiB, three orders of magnitude under half the budget, so the row that
 	// triggered this prune (if any) is never itself evicted.
 	//
 	// Why here rather than on every Append/Finish: op_log gets a row for every database operation
 	// the app performs, not a user-initiated send — putting a SUM plus a window-function DELETE in
-	// front of all of them would be strictly worse than the exact regression P21 round 3 finding 11
+	// front of all of them would be strictly worse than the exact regression
 	// caught on the other two history tables. Prune already runs at launch and every 500 completed
-	// ops (oplog/wire.go), and the overshoot that cadence permits is bounded by construction: D1's
+	// ops (oplog/wire.go), and the overshoot that cadence permits is bounded by construction: the
 	// 64 KiB cap was derived from exactly that arithmetic.
 	var totalBytes int64
 	if err := r.DB.QueryRow(`SELECT COALESCE(SUM(stored_bytes), 0) FROM op_log`).Scan(&totalBytes); err != nil {

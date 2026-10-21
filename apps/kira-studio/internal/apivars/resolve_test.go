@@ -171,16 +171,15 @@ func TestResolveRequestReturnsExactlyTheSecretsItSubstituted(t *testing.T) {
 		}
 	})
 
-	// Round-2 review finding 6: a reference that never resolves — a stale id, a typo, or a secret
-	// whose decrypt failed — is left verbatim in the URL by design (D10). Resolver.Text/URLText
-	// always call Resolve with secretNames nil (D9/F21's own extraction), so a name that turns out
-	// not to be any of this scope's secrets falls into the exact same branch a decrypt failure
-	// would — reproduced here with a plain unresolvable name, since the fixture already has a
-	// space in it (a real Postman variable-name shape, substitute.ts's own doc). The raw space
-	// used to reach net/http's own request line unescaped, which the *server* rejects with a 400
-	// before ever reading a single header — driven through a real httpclient.Send against a real
-	// httptest server, not just url.Parse (which tolerates the raw space and never errors, so it
-	// alone would not have caught this).
+	// A reference that never resolves — a stale id, a typo, or a secret whose decrypt failed — is
+	// left verbatim in the URL by design. Resolver.Text/URLText always call Resolve with
+	// secretNames nil, so a name that turns out not to be any of this scope's secrets falls into
+	// the exact same branch a decrypt failure would — reproduced here with a plain unresolvable
+	// name, since the fixture already has a space in it (a real Postman variable-name shape,
+	// substitute.ts's own doc). The raw space used to reach net/http's own request line unescaped,
+	// which the *server* rejects with a 400 before ever reading a single header — driven through a
+	// real httpclient.Send against a real httptest server, not just url.Parse (which tolerates
+	// the raw space and never errors, so it alone would not have caught this).
 	t.Run("finding 6: an unresolved reference with a space in its name doesn't break the request line", func(t *testing.T) {
 		var gotRequestURI string
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -207,7 +206,7 @@ func TestResolveRequestReturnsExactlyTheSecretsItSubstituted(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Send: %v", err)
 		}
-		// The server actually received and parsed a well-formed request line — "the reference
+		// The server received and parsed a well-formed request line — "the reference
 		// itself isn't found by the server" (it's an unresolved {{...}} token, not this app's
 		// concern) shows up as *this handler's own* status, never a client-side 400 from a
 		// malformed request line the server bounced before routing it anywhere.
@@ -219,7 +218,7 @@ func TestResolveRequestReturnsExactlyTheSecretsItSubstituted(t *testing.T) {
 		}
 	})
 
-	// P17 D9/§5: a piped secret's UsedSecret.Rendered is the *transformed* form, not the
+	// A piped secret's UsedSecret.Rendered is the *transformed* form, not the
 	// plaintext — the property bridge/http.go's secretReplacer is built on. This is the Go-level
 	// proof that the resolver itself hands out the right text; bridge/http_test.go proves the
 	// masking replacer built from it.

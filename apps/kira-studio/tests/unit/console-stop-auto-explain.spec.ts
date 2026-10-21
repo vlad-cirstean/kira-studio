@@ -1,4 +1,4 @@
-// P12 round 1 finding #5: Stop was a no-op while auto-explain's pre-run EXPLAIN batch was in
+// Stop was a no-op while auto-explain's pre-run EXPLAIN batch was in
 // flight — rt.opId held the *real* run's future id, which the backend had never registered, so
 // stopOp's control.opsCancel(rt.opId) call landed on nothing. The EXPLAIN batch then always ran to
 // completion and the real (possibly expensive) query fired regardless of the Stop press. This

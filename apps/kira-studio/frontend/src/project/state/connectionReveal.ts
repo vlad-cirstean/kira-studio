@@ -6,7 +6,7 @@ export type ConnectionRevealResult =
   | { outcome: 'revealed'; password: string | null; uri: string | null }
   | { outcome: 'error'; error: string };
 
-// P14 D6: the backend decides the outcome, this renders it. Recurses once for the
+// The backend decides the outcome, this renders it. Recurses once for the
 // confirmation-required -> user confirms -> re-ask-with-confirmed:true path. Resolves undefined
 // when the user cancelled or declined, or when isCurrent turned false across an await (the caller
 // moved on; nothing may be written or shown for it).

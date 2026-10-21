@@ -84,7 +84,7 @@ func (s *blockingReflectionServer) ServerReflectionInfo(stream grpc.BidiStreamin
 	return stream.Context().Err()
 }
 
-// TestResolveReflection_UnresponsiveServer_TimesOutBounded is P108 F4: a server that accepts the
+// TestResolveReflection_UnresponsiveServer_TimesOutBounded: a server that accepts the
 // reflection stream and never answers must not block Describe forever — resolveReflection has to
 // bound the whole resolution itself, since Describe (bridge/grpc.go) calls it directly rather than
 // through the RunOp/Stop cancel path. defaultReflectionTimeout is lowered for the test so this

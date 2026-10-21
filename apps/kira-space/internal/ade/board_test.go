@@ -41,6 +41,7 @@ func newBoardHarness(t *testing.T) *boardHarness {
 	h := &boardHarness{t: t, repos: r}
 	h.status.Store(gitclient.GitStatus{Kind: "ok", Path: "git"})
 	h.board = NewTaskBoard(TaskBoardDeps{
+		Agent:       testAgents,
 		Credentials: gitcred.New(),
 		Tasks:       r.AdeTasks, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos, Runner: gitclient.NewExecRunner(),
 		Registry:  registry,

@@ -1,4 +1,4 @@
-// P5 D18: the {{name}} substitution engine is written twice — once here (src/http/substitute.ts)
+// The {{name}} substitution engine is written twice — once here (src/http/substitute.ts)
 // and once in Go (internal/apivars/resolve.go) — and pinned to the same behaviour by one shared
 // corpus, read by both a Go test and this one, rather than by two independently-imagined test
 // suites. A case added to the corpus must pass on both sides or one of them fails.
@@ -88,7 +88,7 @@ describe('http/substitute.ts resolve() dynamic callback (P6 D2/D3)', () => {
   });
 });
 
-// Finding 6 (v1.2 P14 round 2): a template-reference span left literal because it names nothing
+// A template-reference span left literal because it names nothing
 // (`unknown`) or generates nothing (`dynamic`, no catalogued generator) must not survive into the
 // final URL carrying a raw space/&/#/= — those break url.Parse's RawQuery or the request line
 // itself. `sanitizeUrlSpan` (the optional 5th argument) is applied to exactly those two kinds and
@@ -134,7 +134,7 @@ describe('http/substitute.ts resolve() sanitizeUrlSpan (P14 round-2 finding 6)',
   });
 });
 
-// P15b D1: classifyReference is resolve()'s own branch order, extracted so the highlighter and the
+// classifyReference is resolve()'s own branch order, extracted so the highlighter and the
 // hover agree with the send path about what each reference name means — this pins the precedence
 // order itself ($dynamic before secret before value before unknown), independent of resolve()'s
 // own corpus-driven cases above.
@@ -205,11 +205,10 @@ describe('http/substitute.ts splitTemplateSpans offsets (P15b D1)', () => {
   });
 });
 
-// P17 D8: the SPEC's second question — a pipe applies AFTER per-occurrence dynamic-value
-// generation, not before. The one assertion that pins it: two occurrences of the same
-// `{{$guid | upper}}`-shaped reference must generate two *different* values (P6 D3's own
-// per-occurrence freshness, untouched by D6) and each must be independently transformed — never
-// the same value generated once and reused.
+// A pipe applies AFTER per-occurrence dynamic-value generation, not before. The one assertion that
+// pins it: two occurrences of the same `{{$guid | upper}}`-shaped reference must generate two
+// *different* values (the per-occurrence freshness) and each must be independently transformed —
+// never the same value generated once and reused.
 describe('http/substitute.ts resolve() pipe/dynamic-value ordering (P17 D8)', () => {
   test('two occurrences of {{$guid | upper}} yield two different upper-cased values', () => {
     let n = 0;

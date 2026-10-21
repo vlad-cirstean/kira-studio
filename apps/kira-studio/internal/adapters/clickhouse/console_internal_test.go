@@ -1,7 +1,7 @@
-// console_internal_test.go guards M7 finding #10: run_query classified any bare (non-ANALYZE)
+// console_internal_test.go guards: run_query classified any bare (non-ANALYZE)
 // EXPLAIN as ClassRead via the shared, dialect-agnostic adapters.ClassifySQL — safe on
 // Postgres/MySQL/MariaDB/SQLite, whose plain EXPLAIN never executes its target, but not confirmed
-// safe on ClickHouse (docs/HISTORY.md (v1.7 M3) §8.1's own "the one it does not clear"). A connection with
+// safe on ClickHouse (docs/HISTORY.md "the one it does not clear"). A connection with
 // write:deny could otherwise run a write through `EXPLAIN <DELETE ...>` typed straight into
 // run_query's raw SQL argument.
 package clickhouse
@@ -41,8 +41,8 @@ func TestClassifyClickHouseSQLReclassifiesBareExplainByTarget(t *testing.T) {
 	}
 }
 
-// TestClassifyClickHouseSQLHandlesComposedExplainStatements guards F4: every statement
-// queryplan.StatementsFor("clickhouse", ...) actually composes must classify by its real target,
+// TestClassifyClickHouseSQLHandlesComposedExplainStatements guards: every statement
+// queryplan.StatementsFor("clickhouse", ...) composes must classify by its real target,
 // not ClassUnknown, so explain_query and run_query's auto-explain never silently fail to
 // classify. Built from the composer itself (not a hand-copied string) so the two can't drift
 // apart again.

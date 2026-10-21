@@ -15,10 +15,10 @@ import { useFocusOnMount } from '@workbench/behaviour/focus';
 import { type ComponentPublicInstance, computed, ref, useTemplateRef } from 'vue';
 import { useGitCredentialStore } from '../state/gitCredential';
 
-// P67e D10 / P246: git's own askpass prompt, mounted by PromptHost for the routed
-// `git-credential` entry whose ref is a relay request id. Escape and the frame's close hide it in this
-// window (the op keeps waiting); Cancel answers null (the op fails). The typed value lives only in `value`, cleared
-// in the same statement that answers, and is never logged or persisted.
+// git's own askpass prompt, mounted by PromptHost for the routed `git-credential` entry whose ref
+// is a relay request id. Escape and the frame's close hide it in this window
+// (the op keeps waiting); Cancel answers null (the op fails). The typed value lives only in
+// `value`, cleared in the same statement that answers, and is never logged or persisted.
 const props = defineProps<{ entry: RoutedPrompt; more: number }>();
 const emit = defineEmits<{ hide: [] }>();
 const store = useGitCredentialStore();

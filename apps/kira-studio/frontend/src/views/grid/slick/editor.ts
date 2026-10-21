@@ -12,17 +12,16 @@ import type { RowHandle } from './dataSource';
 // `value =`, so a multi-line value would silently flatten and re-stage on leaving the cell.
 // Typing a break stays blocked (see `blockModifiedEnter`); breaks come from a paste or the value.
 //
-// P22 Pass B, C8/§5 D8 — the incumbent's own single overlay `<input>` (`-iter2-pacing` D4:
+// The incumbent's own single overlay `<input>` (
 // `editingCellRect`/`editingCell`/`editingBuffer`/`isEditing`/`.cell-input-overlay`,
 // `RowSig.editingCol`) goes away entirely. SlickGrid puts the editor *inside* the active cell node
 // itself (`makeActiveCellEditable`, `slick.grid.ts:4004-4075`: `args.container` IS
-// `this.activeCellNode`, emptied first unless `suppressClearOnEdit`) — a return to the shape this
-// editor had before that pass, not a new one.
+// `this.activeCellNode`, emptied first unless `suppressClearOnEdit`).
 //
 // A grid-owned instance cannot be constructed with tabId/displayCell/stageEdit closed over (the
 // grid calls `new useEditor(editorArgs)` itself, `slick.grid.ts:4059`, passing only
 // `EditorArguments`) so SlickGridHost.vue binds this file's own `editorCtx` — the same reassigned-
-// plain-object idiom `formatterCtx` already uses there for the identical reason (D0: nothing on
+// plain-object idiom `formatterCtx` already uses there for the identical reason (nothing on
 // this synchronous edit-open/commit path may create a Vue reactive dependency).
 export interface EditorContext {
   /** The cell's current, staged-aware display text for `(page row, column name)`. */
@@ -46,7 +45,7 @@ function blockModifiedEnter(e: KeyboardEvent): void {
 // biome-ignore lint/suspicious/noExplicitAny: see comment above.
 type AnyData = any;
 
-/** §5 D8. Confirmed against source, not assumed: `slick.grid.ts` never calls `.init()` on a
+/** Confirmed against source, not assumed: `slick.grid.ts` never calls `.init()` on a
  *  constructed editor (a `grep -n "currentEditor.init"` over the whole file returns nothing) — the
  *  documented `Editor.init(args)` entry point is a convention other editors use, not a contract
  *  SlickGrid enforces, so this class does its DOM-building work in the constructor itself rather
@@ -98,12 +97,12 @@ export class KiraCellEditor<
     return this.input.value;
   }
 
-  /** D8's own rule: never write to `item`. `RowHandle` is `Object.freeze`d (`dataSource.ts`) and the
+  /** The rule: never write to `item`. `RowHandle` is `Object.freeze`d (`dataSource.ts`) and the
    *  page behind it is frozen with a tripwire (`store.ts`) — a write would throw, which is the
    *  *correct* behaviour here, not a bug to route around. `this.args.item` (the row this editor was
-   *  opened for, captured at construction) is used instead of the `item` parameter SlickGrid passes,
-   *  since a `updateRow`/`updateItem` between open and commit could otherwise hand back a different
-   *  reference than the one this editor is actually editing. */
+   *  opened for, captured at construction) is used instead of the `item` parameter SlickGrid
+   *  passes, since a `updateRow`/`updateItem` between open and commit could otherwise hand back a
+   *  different reference than the one this editor is editing. */
   applyValue(_item: unknown, state: string): void {
     const name = String(this.args.column.field);
     const row = (this.args.item as RowHandle).row;

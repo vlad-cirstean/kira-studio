@@ -6,11 +6,11 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// seedDatabase runs sql (the repo's own packages/db-fixtures/fixtures/0001_seed.sql, unmodified — D12) against
-// uri. Postgres's simple query protocol natively executes a semicolon-separated multi-statement
-// body as one message; pgx's Exec sends the simple protocol when called with no arguments, so the
-// whole seed file runs in one call, exactly as psql or node-postgres's own multi-statement query
-// would.
+// seedDatabase runs sql (the repo's own packages/db-fixtures/fixtures/0001_seed.sql, unmodified)
+// against uri. Postgres's simple query protocol natively executes a semicolon-separated
+// multi-statement body as one message; pgx's Exec sends the simple protocol when called with no
+// arguments, so the whole seed file runs in one call, exactly as psql or node-postgres's own
+// multi-statement query would.
 func seedDatabase(ctx context.Context, uri, sql string) error {
 	conn, err := pgx.Connect(ctx, uri)
 	if err != nil {

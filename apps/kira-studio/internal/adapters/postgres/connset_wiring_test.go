@@ -12,8 +12,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// White-box (package postgres) coverage for NewConnSet's own wiring onto adapters.ConnSet (P107
-// T2-2) — the LRU/single-flight behaviour itself is covered once, generically, by
+// White-box (package postgres) coverage for NewConnSet's own wiring onto adapters.ConnSet — the
+// LRU/single-flight behaviour itself is covered once, generically, by
 // internal/adapters's own connset_test.go; what's left here is postgres-specific: the primaryKey
 // normalization between Acquire's key and dial's own database argument still lines up, and Acquire
 // (through the shared pool) still serializes concurrent dials for the same database with no real

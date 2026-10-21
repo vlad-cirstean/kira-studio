@@ -52,7 +52,7 @@ func TestScanFile_LiteralMatchesOnOneLine(t *testing.T) {
 	}
 }
 
-// TestScanFile_ColumnAgreesWithLineIndex is D6's own cross-check: a match's Column must equal
+// TestScanFile_ColumnAgreesWithLineIndex is the cross-check: a match's Column must equal
 // exactly what LineIndex.Position gives for the same byte, for a match landing right after a
 // 3-byte rune (€, one UTF-16 unit) and right after a surrogate-pair emoji (😀, two UTF-16 units) —
 // the two genuinely different cases rule 2 distinguishes.
@@ -138,7 +138,7 @@ func TestBuildPreview_CutsOnRuneBoundaries(t *testing.T) {
 	}
 }
 
-// TestScanFile_ZeroWidthPatternTerminates is the one genuine trap in the scan loop (§3.3): a
+// TestScanFile_ZeroWidthPatternTerminates is the one genuine trap in the scan loop: a
 // zero-width match (here, "x*" against a line with no 'x' at all) must advance by one byte rather
 // than looping forever at the same position. This test's own failure mode, if the rule regressed,
 // is a hang, not a wrong answer.
@@ -186,8 +186,8 @@ func TestScanFile_NULInFirst8KiBIsBinary(t *testing.T) {
 	}
 }
 
-// TestScanFile_NULOnlyOnMatchLineDropsWholeFile is gate 4: a file whose first 8 KiB is plain ASCII
-// (so gate 3's sniff passes it as text) but whose body later contains a NUL on a line that would
+// TestScanFile_NULOnlyOnMatchLineDropsWholeFile: a file whose first 8 KiB is plain ASCII
+// (so the sniff passes it as text) but whose body later contains a NUL on a line that would
 // otherwise be a match must be dropped whole — including a match already collected earlier in the
 // same file.
 func TestScanFile_NULOnlyOnMatchLineDropsWholeFile(t *testing.T) {
@@ -230,7 +230,7 @@ func TestScanFile_RegexAnchorsPerLine(t *testing.T) {
 	}
 }
 
-// TestScanFile_RegexAnchorsWithinLine is C12-2: ^ must anchor to the real start of the line even
+// TestScanFile_RegexAnchorsWithinLine: ^ must anchor to the real start of the line even
 // past an earlier match on that same line, not to wherever the previous match happened to end. The
 // old find-and-reslice loop re-sliced the line at each match's end and re-ran the regex against
 // that slice, which made "^" look true again at the slice's own start — wrongly reporting two
@@ -249,7 +249,7 @@ func TestScanFile_RegexAnchorsWithinLine(t *testing.T) {
 	}
 }
 
-// TestScanFile_WordBoundaryWithinLine is C12-2's other half: the same re-slicing bug made a `\b`
+// TestScanFile_WordBoundaryWithinLine: the same re-slicing bug made a `\b`
 // alternative in the pattern falsely match mid-word, since the reslice presented a false "start of
 // line" as a false word boundary too. "bar|\bfoo" against "barfoo foo" must match only the real
 // "bar" at the start and the real, boundary-preceded "foo" at the end — never the "foo" embedded
@@ -271,10 +271,10 @@ func TestScanFile_WordBoundaryWithinLine(t *testing.T) {
 	}
 }
 
-// TestScanFile_FIFO_SkippedWithoutHanging is F12's search-side twin of
+// TestScanFile_FIFO_SkippedWithoutHanging is the search-side twin of
 // TestReadFile_FIFO_ReturnsMissingWithoutHanging (files_test.go) — gate 2's os.Stat now rejects a
-// non-regular file before scanFile ever calls os.Open, which is the only ordering that actually
-// avoids the hang (os.Open, not os.Stat, is what blocks opening a FIFO with no writer).
+// non-regular file before scanFile ever calls os.Open, which is the only ordering that avoids
+// the hang (os.Open, not os.Stat, is what blocks opening a FIFO with no writer).
 func TestScanFile_FIFO_SkippedWithoutHanging(t *testing.T) {
 	dir := t.TempDir()
 	fifoPath := filepath.Join(dir, "pipe")

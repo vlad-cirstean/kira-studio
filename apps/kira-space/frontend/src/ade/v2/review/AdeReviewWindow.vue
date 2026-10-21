@@ -11,7 +11,7 @@ import TitleBarBase from '@workbench/components/TitleBar.vue';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, useTemplateRef } from 'vue';
 import { onReviewRepaint } from '../../../repo/git/transport';
-import { ghSyncPlanPrefix, useReviewStep } from '../queries';
+import { useReviewStep, viewedSyncPlanPrefix } from '../queries';
 import { useAdeReviewWindowStore } from '../state/adeReviewWindow';
 import AdeReviewAgentPanel from './AdeReviewAgentPanel.vue';
 import AdeReviewFiles from './AdeReviewFiles.vue';
@@ -29,7 +29,7 @@ const files = useTemplateRef('files');
 
 // A mark from the file list or from a diff editor can change what a sync would do.
 function refreshSyncPlan(): void {
-  void queryClient.invalidateQueries({ queryKey: ghSyncPlanPrefix });
+  void queryClient.invalidateQueries({ queryKey: viewedSyncPlanPrefix });
 }
 tryOnScopeDispose(
   onReviewRepaint((e) => {

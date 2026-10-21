@@ -11,7 +11,7 @@ func strPtr(s string) *string { return &s }
 // derefOrNil is testx.DerefOrNil (P107 I2-28).
 var derefOrNil = testx.DerefOrNil
 
-// TestURIHasAmbiguousPassword is F3 (P108 Part 3): findAuthority ends the authority at the first
+// TestURIHasAmbiguousPassword: findAuthority ends the authority at the first
 // /, ? or # after "://", so an unencoded one of those inside a password truncates the detected
 // authority before the real '@' — userinfoPassword then reports no password at all, and
 // foldPassword would inject a second one. This is the guard that rejects that shape at

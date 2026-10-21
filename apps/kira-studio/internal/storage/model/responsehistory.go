@@ -23,10 +23,10 @@ type ResponseHistoryEntry struct {
 	StoredBytes int     `json:"storedBytes"`
 }
 
-// ResponseHistoryRequest is the stage-1 request stored beside a response (D2/F3): {{$dynamic}} and
+// ResponseHistoryRequest is the stage-1 request stored beside a response: {{$dynamic}} and
 // non-secret {{name}} substituted, a secret still spelled {{name}} — never the resolved,
-// secret-bearing request httpclient.Send actually sent. httpclient.Header/Body are reused
-// directly (F1) rather than re-declared: their JSON shape already matches
+// secret-bearing request httpclient.Send sent. httpclient.Header/Body are reused
+// directly rather than re-declared: their JSON shape already matches
 // packages/shared/domain/http.ts's HttpHeaderWire/HttpBodyWire exactly, and unlike
 // model.SavedRequest (which mirrors a different renderer-owned shape, collections.go) there is no
 // existing type here to keep field-identical to instead.
@@ -38,9 +38,9 @@ type ResponseHistoryRequest struct {
 }
 
 // ResponseHistorySnapshot is one entry's full stored shape — Entry rebuilt from the row's own
-// summary columns (D4's Get; never duplicated inside snapshot_json), Response the unmodified P2
-// httpclient.Response (F1 — this identity is what makes ResponsePane.vue's source swap, D10, a
-// one-line change), and D5's two storage-cap flags for each side.
+// summary columns (the Get; never duplicated inside snapshot_json), Response the unmodified
+// httpclient.Response (this identity is what makes ResponsePane.vue's source swap a one-line
+// change), and the two storage-cap flags for each side.
 type ResponseHistorySnapshot struct {
 	Entry                       ResponseHistoryEntry   `json:"entry"`
 	Request                     ResponseHistoryRequest `json:"request"`
@@ -53,11 +53,11 @@ type ResponseHistorySnapshot struct {
 	RequestFieldsElided bool `json:"requestFieldsElided,omitempty"`
 }
 
-// ResponseHistoryRecord is Record's one argument — D2's bridge/http.go call site builds this
+// ResponseHistoryRecord is Record's one argument — the bridge/http.go call site builds this
 // directly from HttpSendArgs (stage-1, never resolved) and the httpclient.Response the send just
 // produced. ItemID is "" for a scratch tab (never nil — the repo is the one place that decides
 // whether "" becomes a NULL column); EnvironmentID is an id, resolved to a name by Record itself
-// at write time (D2).
+// at write time.
 type ResponseHistoryRecord struct {
 	ItemID        string
 	TabID         string

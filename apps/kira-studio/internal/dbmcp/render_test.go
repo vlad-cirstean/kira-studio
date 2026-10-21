@@ -12,7 +12,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// TestRenderTabularPageNullVersusEmptyString is §8's own named hazard: a NULL row and an empty
+// TestRenderTabularPageNullVersusEmptyString is the named hazard: a NULL row and an empty
 // string both have Offsets[i] == Offsets[i+1], and only the Nulls bitset (page.IsNull) tells them
 // apart. Getting cellAt backwards renders NULL as "" — valid JSON a model would reason over
 // incorrectly, with nothing failing anywhere.
@@ -210,9 +210,9 @@ func (unknownPage) Rows() int               { return 0 }
 // --- M5 §8: masking applied per column, not per row; NULL untouched; a document/stream page
 // refused when rules exist; a keyvalue entry masked by its Field name. ---
 
-// TestColumnRulesResolvesOncePerColumn pins §4.2's own cost rule directly: columnRules builds one
+// TestColumnRulesResolvesOncePerColumn pins the cost rule directly: columnRules builds one
 // index-aligned []*mask.Rule from the column list, called exactly once by renderTabularPage before
-// its row loop (source fact) — this test is what would break if that call moved inside the loop
+// its row loop — this test is what would break if that call moved inside the loop
 // and started re-resolving per cell.
 func TestColumnRulesResolvesOncePerColumn(t *testing.T) {
 	columns := []page.ColumnDescriptor{
@@ -293,10 +293,9 @@ func TestRenderTabularPageNullPassesThroughUnmasked(t *testing.T) {
 	}
 }
 
-// TestRenderPageRefusesDocumentAndStreamPagesWhenRulesExist is §4.4's own decision: a document or
+// TestRenderPageRefusesDocumentAndStreamPagesWhenRulesExist: a document or
 // stream page is refused outright on a connection with at least one mask rule, never partially
-// masked — the plan's own reasoning is that a partial mask the user believes is total is worse
-// than a clear refusal.
+// masked — a partial mask the user believes is total is worse than a clear refusal.
 func TestRenderPageRefusesDocumentAndStreamPagesWhenRulesExist(t *testing.T) {
 	set := mask.Set{Masker: mask.New(nil), Rules: map[string]mask.Rule{"ssn": {Kind: mask.KindRedact}}}
 
@@ -329,10 +328,10 @@ func TestRenderPageRefusesDocumentAndStreamPagesWhenRulesExist(t *testing.T) {
 	}
 }
 
-// TestRenderPageRefusesRenamedOrTransformedMaskedColumn is finding #3 (M6): an alias, a wrapping
-// expression, or a subquery all produce a result column name columnRules's exact-name match can't
-// see — without a refusal, the real value would return unmasked, the opposite of this design's
-// stated over-mask-on-ambiguity intent.
+// TestRenderPageRefusesRenamedOrTransformedMaskedColumn: an alias, a wrapping expression, or a
+// subquery all produce a result column name columnRules's exact-name match can't see — without a
+// refusal, the real value would return unmasked, the opposite of this design's stated
+// over-mask-on-ambiguity intent.
 func TestRenderPageRefusesRenamedOrTransformedMaskedColumn(t *testing.T) {
 	set := mask.Set{Masker: mask.New(nil), Rules: map[string]mask.Rule{"email": {Kind: mask.KindRedact}}}
 
@@ -375,7 +374,7 @@ func TestRenderPageRefusesRenamedOrTransformedMaskedColumn(t *testing.T) {
 	}
 
 	// A masked column selected once under its own name and again under a different alias must
-	// still be refused (finding #1, M7): the exact-name occurrence alone must not excuse the
+	// still be refused: the exact-name occurrence alone must not excuse the
 	// second, differently-named projection of the same value — the previous implementation's
 	// "present under its own name" short-circuit skipped the check entirely here, returning
 	// "leak" completely unmasked.
@@ -443,8 +442,8 @@ func TestRenderPageRefusesRenamedOrTransformedMaskedColumn(t *testing.T) {
 
 	// Filtering on a masked column that is NOT selected at all is refused (the scanner can't tell
 	// a WHERE-only mention from an actual rename it failed to catch), but must not claim to have
-	// found a rename or transform it never actually saw — the WHERE-clause case gets its own,
-	// accurate wording (M7 finding).
+	// found a rename or transform it never saw — the WHERE-clause case gets its own,
+	// accurate wording.
 	b5 := page.NewTabularPageBuilder([]page.ColumnDescriptor{
 		{Name: "id", DataType: "int4", TypeClass: page.TypeClassNumber},
 	})
@@ -461,7 +460,7 @@ func TestRenderPageRefusesRenamedOrTransformedMaskedColumn(t *testing.T) {
 	}
 }
 
-// TestMaskedToolErrorWithholdsAdapterMessage is finding #4 (M6): a Postgres/MySQL driver error
+// TestMaskedToolErrorWithholdsAdapterMessage: a Postgres/MySQL driver error
 // routinely embeds the offending value (e.g. a failed type-cast error names the literal it could
 // not parse) — over a connection with active mask rules, maskedToolError must keep the parsed
 // error code (no row data) but never the adapter's own message text.
@@ -565,12 +564,12 @@ func TestRenderKeyValuePageMasksByFieldName(t *testing.T) {
 	}
 }
 
-// TestRenderPageRefusesRiskyResultColumns is F1 (P108 Part 7 review, finding #1): a masked
-// connection must refuse a tabular result column whose type can itself carry a whole row or
-// several columns' worth of data (JSON, array, composite/"other") — matching by output column
-// name alone cannot see a masked value smuggled inside one of these, and the existing statement
-// text-scan (maskedColumnRenamedOrHidden) never fires either, since the masked column's own name
-// never appears as plain text in a statement like `SELECT json_agg(t) FROM (...) t`.
+// TestRenderPageRefusesRiskyResultColumns: a masked connection must refuse a tabular result column
+// whose type can itself carry a whole row or several columns' worth of data (JSON, array,
+// composite/"other") — matching by output column name alone cannot see a masked value smuggled
+// inside one of these, and the existing statement text-scan (maskedColumnRenamedOrHidden) never
+// fires either, since the masked column's own name never appears as plain text in a statement
+// like `SELECT json_agg(t) FROM (...) t`.
 func TestRenderPageRefusesRiskyResultColumns(t *testing.T) {
 	set := mask.Set{Masker: mask.New(nil), Rules: map[string]mask.Rule{"email": {Kind: mask.KindRedact}}}
 
@@ -615,10 +614,9 @@ func TestRenderPageRefusesRiskyResultColumns(t *testing.T) {
 	}
 }
 
-// TestRefuseRiskyStatementSyntax is F1's own second and third guards (P108 Part 7 review, finding
-// #1): three concrete SQL shapes verified against real engines that rename or transform every
-// selected column with no per-column textual trace maskedColumnRenamedOrHidden's word-scan could
-// ever find.
+// TestRefuseRiskyStatementSyntax is the second and third guards: three concrete SQL shapes verified
+// against real engines that rename or transform every selected column with no per-column textual
+// trace maskedColumnRenamedOrHidden's word-scan could ever find.
 func TestRefuseRiskyStatementSyntax(t *testing.T) {
 	risky := []struct {
 		name      string
@@ -684,7 +682,7 @@ func TestRefuseRiskyStatementSyntax(t *testing.T) {
 	}
 }
 
-// TestRenderPageRefusesColumnlessKeyValuePage is finding #3 (M7): a keyvalue page whose Field
+// TestRenderPageRefusesColumnlessKeyValuePage: a keyvalue page whose Field
 // values carry no real per-entry identifier (page.KeyValuePage.FieldsAreColumns=false — a Redis
 // list/set's synthetic display index, a generic console reply with no per-command shape) must be
 // refused when the connection has active mask rules, never silently rendered unmasked under a

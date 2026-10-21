@@ -48,17 +48,21 @@ func NewMemoryDistillService(mem *MemoryService, dialogs Dialogs, events appcore
 }
 
 // MemoryDistillArgs is Distill's argument shape: exactly one of Text and Path. RequestID tags the
-// progress events.
+// progress events. Mode is "", facts or rewrite; rewrite takes text only.
 type MemoryDistillArgs struct {
 	RequestID string `json:"requestId"`
 	Text      string `json:"text"`
 	Path      string `json:"path"`
+	Mode      string `json:"mode"`
 }
 
 // MemoryDistillResult sizes count characters (runes) and tokens (runes/3) of the input and of the
-// output as Copy puts it on the clipboard (line texts joined by newlines). Unresolved lists facts the
-// input leaves open.
+// output as Copy puts it on the clipboard (line texts joined by newlines). Unresolved lists facts
+// the input leaves open. In rewrite mode Rewrite holds the outcome, Lines and Unresolved are empty
+// and OutChars counts its text.
 type MemoryDistillResult struct {
+	Mode       string                    `json:"mode"`
+	Rewrite    *importer.RewriteResult   `json:"rewrite"`
 	Lines      []importer.Line           `json:"lines"`
 	Unresolved []importer.UnresolvedFact `json:"unresolved"`
 	CostUSD    float64                   `json:"costUsd"`
@@ -69,8 +73,8 @@ type MemoryDistillResult struct {
 	OutTokens  int                       `json:"outTokens"`
 }
 
-// MemoryDistillProgress is the ChannelMemoryDistill payload. Stage is extract, verify or merge; Done
-// and Total count the parts, cross-check batches or the one merge of that stage.
+// MemoryDistillProgress is the ChannelMemoryDistill payload. Stage is extract, verify, merge or rewrite; Done and Total count the
+// parts, cross-check batches or the one call of that stage.
 type MemoryDistillProgress struct {
 	RequestID string  `json:"requestId"`
 	Stage     string  `json:"stage"`
@@ -85,6 +89,8 @@ type MemoryDistillLimits struct {
 	MaxParts      int     `json:"maxParts"`
 	SpendCapUSD   float64 `json:"spendCapUsd"`
 	StoreMaxLines int     `json:"storeMaxLines"`
+	// RewriteMaxChars bounds the text of a rewrite call.
+	RewriteMaxChars int `json:"rewriteMaxChars"`
 }
 
 type MemoryDistillChoice struct {
@@ -104,6 +110,7 @@ func (s *MemoryDistillService) Limits() MemoryDistillLimits {
 	return MemoryDistillLimits{
 		MaxChars: importer.MaxDistillRunes, MaxParts: importer.MaxDistillChunks,
 		SpendCapUSD: importer.DistillSpendCapUSD, StoreMaxLines: memory.MaxItems,
+		RewriteMaxChars: importer.RewriteMaxRunes,
 	}
 }
 
@@ -135,14 +142,23 @@ func (s *MemoryDistillService) Distill(ctx context.Context, args MemoryDistillAr
 	if args.Path != "" && !filepath.IsAbs(args.Path) {
 		return MemoryDistillResult{}, ipcerr.Contract("path must be absolute")
 	}
+	switch args.Mode {
+	case "", importer.ModeFacts:
+	case importer.ModeRewrite:
+		if args.Path != "" {
+			return MemoryDistillResult{}, ipcerr.Contract("mode %s takes text, not a path", importer.ModeRewrite)
+		}
+	default:
+		return MemoryDistillResult{}, ipcerr.Contract("unknown mode %q", args.Mode)
+	}
 	if !s.distilling.TryLock() {
 		return MemoryDistillResult{}, ipcerr.T(ipcerr.CodeConflict, "backend.space.memory.distill.busy.body", nil)
 	}
 	defer s.distilling.Unlock()
 
-	d := importer.Distiller{Runner: memory.NewCLIRunner(), Prompts: s.mem.prompts}
+	d := importer.Distiller{Runner: s.mem.agent, Prompts: s.mem.prompts}
 	res, err := d.Distill(ctx, importer.DistillRequest{
-		Text: args.Text, Path: args.Path,
+		Text: args.Text, Path: args.Path, Mode: args.Mode,
 		Progress: func(p importer.DistillProgress) {
 			s.events.Emit(ChannelMemoryDistill, MemoryDistillProgress{RequestID: args.RequestID, Stage: p.Stage, Done: p.Done, Total: p.Total, CostUSD: p.CostUSD})
 		},
@@ -162,7 +178,11 @@ func (s *MemoryDistillService) Distill(ctx context.Context, args MemoryDistillAr
 		texts[i] = l.Text
 	}
 	out := utf8.RuneCountInString(strings.Join(texts, "\n"))
+	if res.Rewrite != nil {
+		out = utf8.RuneCountInString(res.Rewrite.Text)
+	}
 	return MemoryDistillResult{
+		Mode: res.Mode, Rewrite: res.Rewrite,
 		Lines: lines, Unresolved: unresolved, CostUSD: res.CostUSD, Chunks: res.Chunks,
 		InChars: res.InRunes, OutChars: out,
 		InTokens: tokensOf(res.InRunes), OutTokens: tokensOf(out),

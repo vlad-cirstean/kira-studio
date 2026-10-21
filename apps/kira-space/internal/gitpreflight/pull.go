@@ -64,10 +64,10 @@ type PullConfigValues struct {
 // MapRebaseValue maps a raw `branch.<name>.rebase`/`pull.rebase` config value onto a PullStrategy:
 // true (and its own synonyms) or interactive/merges -> rebase, false (and its own synonyms) ->
 // merge; anything else (including an unrecognised string, or nil) is not a decision this key
-// makes, ok is false. Exported (P108 Part 15 F6 fix) so ResolveRebaseMerges (below) can reuse the
+// makes, ok is false. Exported so ResolveRebaseMerges (below) can reuse the
 // SAME precedence decision without duplicating this table.
 //
-// F6 fix: git itself accepts boolean synonyms case-insensitively — `git_config_bool`'s own
+// Git itself accepts boolean synonyms case-insensitively — `git_config_bool`'s own
 // accepted spellings are yes/on/1 (true) and no/off/0 (false), alongside true/false themselves —
 // plus the short forms `i` (interactive) and `m` (merges). Before this fix, only the four exact
 // strings "true"/"false"/"interactive"/"merges" were recognised, so e.g. `pull.rebase=yes` fell
@@ -89,7 +89,7 @@ func MapRebaseValue(raw *string) (PullStrategy, bool) {
 
 // WantsRebaseMerges reports whether raw (the SAME `branch.<name>.rebase`/`pull.rebase` value
 // MapRebaseValue above already classified as PullRebase) specifically asked for `--rebase-merges`
-// rather than a plain rebase (F6): git's own "merges"/"m" shorthand preserves merge commits during
+// rather than a plain rebase: git's own "merges"/"m" shorthand preserves merge commits during
 // the rebase instead of linearizing them away. Kept as its own function, not folded into
 // MapRebaseValue's own return: PullStrategy's wire union stays exactly the three values
 // @kira/git-ipc already declares (widening it to a fourth is a git-ipc contract change) — called
@@ -109,7 +109,7 @@ func WantsRebaseMerges(raw *string) bool {
 
 // ResolveRebaseMerges reports whether a ladder result should rebase with --rebase-merges: only
 // when config itself chose to rebase, and the winning key said "merges"/"m". Computed once by
-// remote.pullPreflight (P111) and carried on PullPreflight.rebaseMerges/RemoteOpParams.rebaseMerges
+// remote.pullPreflight and carried on PullPreflight.rebaseMerges/RemoteOpParams.rebaseMerges
 // through to remote.run, which no longer re-derives it from a second git config spawn.
 func ResolveRebaseMerges(strategy PullStrategy, source PullStrategySource, cfg PullConfigValues) bool {
 	if strategy != PullRebase {
@@ -125,7 +125,7 @@ func ResolveRebaseMerges(strategy PullStrategy, source PullStrategySource, cfg P
 	}
 }
 
-// ResolvePullStrategy is D18's six-step, first-match-wins ladder, ported from preflight/pull.ts's
+// ResolvePullStrategy is the six-step, first-match-wins ladder, ported from preflight/pull.ts's
 // own resolvePullStrategy:
 //  1. an explicit choice for this one invocation
 //  2. settingStrategy, unless "auto" (or "")
@@ -162,11 +162,10 @@ type ClassifyPullInput struct {
 	Dirty         bool
 }
 
-// ClassifyPull is §7.3's pull pre-flight, ported from preflight/pull.ts's own buildPullPreflight.
-// `routes` carries `stashAndCarry` whenever any blocker exists (F19: the only PullBlocker there is
-// dirtyNonFastForward, so "the only blocker is dirtyNonFastForward" reduces to "there is a
-// blocker at all") — G12 is what makes that route actually runnable; this phase computes the
-// blocker faithfully regardless (D18).
+// ClassifyPull is the pull pre-flight, ported from preflight/pull.ts's own buildPullPreflight.
+// `routes` carries `stashAndCarry` whenever any blocker exists (the only PullBlocker there is
+// is dirtyNonFastForward, so "the only blocker is dirtyNonFastForward" reduces to "there is a
+// blocker at all").
 func ClassifyPull(in ClassifyPullInput) PullPreflight {
 	diverged := in.Behind > 0 && in.Ahead > 0
 	wouldRewriteHistory := in.Strategy != PullFFOnly && (diverged || in.Behind > 0)

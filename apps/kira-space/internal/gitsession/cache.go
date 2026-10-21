@@ -24,9 +24,9 @@ type detailCacheKey struct {
 
 // detailCache caches commit.detail results by <sha>:<parentIndex>, capped at detailCacheCap
 // entries (plain LRU by entry count — a CommitDetail is small and roughly fixed-size, unlike a
-// patch), and dropped **whole** on refsChanged (D7): one field of the cached value (decoration,
+// patch), and dropped **whole** on refsChanged: one field of the cached value (decoration,
 // %D) is a fact about refs, not about the commit, and there is no per-entry way to know which
-// entries a given ref move actually touched. Backed by golang-lru (P113 G9, library-first over a
+// entries a given ref move touched. Backed by golang-lru (library-first over a
 // hand-rolled slice-based LRU) — its Cache[K, V] is safe for concurrent use on its own, so no
 // wrapper mutex is needed here.
 type detailCache struct {
@@ -52,12 +52,11 @@ func (c *detailCache) dropAll() {
 	c.c.Purge()
 }
 
-// valueCache is refsCache/stackCache's own shared shape (P113 G9): one repository, one cached
+// valueCache is refsCache/stackCache's own shared shape: one repository, one cached
 // value — refs.list and stack.list each have exactly one answer per repository, never many, so no
 // LRU is needed here, unlike detailCache/diffCache. Dropped whole on refsChanged, before the
-// fan-out (entry.go's note), the same ordering G4 D7 established for the detail cache. Pre-flight
-// and the write executor never read either (D10/F16): a decision that precedes a write always
-// takes a fresh snapshot.
+// fan-out (entry.go's note), the same ordering as the detail cache. Pre-flight and the write
+// executor never read either: a decision that precedes a write always takes a fresh snapshot.
 type valueCache[T any] struct {
 	mu    sync.Mutex
 	value T
@@ -118,15 +117,14 @@ type mergeBaseCacheValue struct {
 }
 
 // mergeBaseCache caches `git merge-base <base> <branch>`'s own result by (base, branch) REF NAME
-// pair (G30 round-1 performance review, finding #8: every review RPC — review.files,
-// review.fileDiff, RangeFiles's other caller — re-spawned this uncached, once per request, even
-// though the same (base, branch) pair is looked up on nearly every one of them while a review
-// session sits open). base/branch are ref names, not shas, so — the same reasoning detailCache's
-// own dropAll already documents for refs/%D decoration — a ref moving can change what its own
-// merge-base with another ref resolves to, and there is no per-entry way to know which cached
-// pairs a given ref move actually touched: dropped **whole** on refsChanged, capped at
-// mergeBaseCacheCap entries (plain LRU by entry count). Backed by golang-lru, same as detailCache
-// (P113 G9).
+// pair (every review RPC — review.files, review.fileDiff, RangeFiles's other caller — re-spawned
+// this uncached, once per request, even though the same (base, branch) pair is looked up on nearly
+// every one of them while a review session sits open). base/branch are ref names, not shas, so —
+// the same reasoning detailCache's own dropAll already documents for refs/%D decoration — a ref
+// moving can change what its own merge-base with another ref resolves to, and there is no
+// per-entry way to know which cached pairs a given ref move touched: dropped **whole** on
+// refsChanged, capped at mergeBaseCacheCap entries (plain LRU by entry count). Backed by
+// golang-lru, same as detailCache.
 type mergeBaseCache struct {
 	c *lru.Cache[mergeBaseCacheKey, mergeBaseCacheValue]
 }
@@ -162,16 +160,16 @@ type diffCacheEntry struct {
 	// size"), reused as the cache's accounting unit so the two numbers can never diverge
 }
 
-// diffCache caches one file's patch by <baseSha>:<sha>:<path>, LRU-evicted by total bytes (D7),
+// diffCache caches one file's patch by <baseSha>:<sha>:<path>, LRU-evicted by total bytes,
 // and **never invalidated**: two tree oids and a path determine a patch forever, which is exactly
 // why this cache carries no drop-on-refsChanged logic at all — that absence is deliberate, not an
-// oversight (D7).
+// oversight.
 //
-// G30 round-1 performance review, finding #9: `order` used to be a plain `[]diffCacheKey`, so
+// `order` used to be a plain `[]diffCacheKey`, so
 // every touch-on-get and every re-set of an already-cached key did a linear scan
 // (removeFromOrderLocked) to find and splice the key out before re-appending it — O(n) per access
-// against a cache with no entry-count cap at all (only a 4 MiB byte budget, D7's own choice,
-// which a repository with many small-patch files can hold thousands of entries under). `order` is
+// against a cache with no entry-count cap at all (only a 4 MiB byte budget, which
+// a repository with many small-patch files can hold thousands of entries under). `order` is
 // now a `container/list.List` (front = least-recently-used, back = most-recently-used) plus an
 // `elems` index from key to `*list.Element`, giving touch/remove both O(1): `MoveToBack` and
 // `Remove` are pointer operations on the list's own doubly-linked nodes, never a scan.

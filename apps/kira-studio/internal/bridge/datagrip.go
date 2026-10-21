@@ -8,10 +8,10 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// DataGripService is P25's importer: a folder (the DataGrip project's own) crosses the bridge as
-// a path, exactly like CollectionsService.Import (F10's "only the path crosses the bridge"
+// DataGripService is the importer: a folder (the DataGrip project's own) crosses the bridge as
+// a path, exactly like CollectionsService.Import (the "only the path crosses the bridge"
 // convention) — here it is a security property too, since the decrypted password never crosses
-// the bridge at all (D9). Both methods return their internal/datagrip result type directly
+// the bridge at all. Both methods return their internal/datagrip result type directly
 // (Preview/Report already carry the JSON tags the wire shape needs), the same way
 // ConnectionsService.List returns model.ConnectionSummary directly rather than through a mirror
 // type.
@@ -51,10 +51,10 @@ func (c datagripCreator) Create(in datagrip.CreatorInput) (model.ConnectionSumma
 	return c.svc.Create(connections.Input{ConnectionFields: in.ConnectionFields, Password: in.Password})
 }
 
-// Import is D9's second step — Apply re-parses, fetches and decrypts each selected row's password
-// once, and calls Create through the adapter above. D8: this app's own secret-storage
-// availability (not DataGrip's) is checked once here rather than inside internal/datagrip, which
-// has no dependency on internal/secrets at all.
+// Apply re-parses, fetches and decrypts each selected row's password once, and calls Create
+// through the adapter above. This app's own secret-storage availability (not DataGrip's) is
+// checked once here rather than inside internal/datagrip, which has no dependency on
+// internal/secrets at all.
 func (s *DataGripService) Import(args DataGripImportArgs) (datagrip.Report, error) {
 	if args.Path == "" {
 		return datagrip.Report{}, ipcerr.Required("path")

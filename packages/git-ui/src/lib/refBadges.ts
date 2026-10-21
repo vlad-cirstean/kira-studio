@@ -1,29 +1,29 @@
 /**
- * `docs/plans/P4.md` W7: pure DOM-builder functions for the ref badges shown inline at the start
- * of the message cell (§6.2) — not a Vue SFC, because a SlickGrid formatter is synchronous and
+ * Pure DOM-builder functions for the ref badges shown inline at the start
+ * of the message cell — not a Vue SFC, because a SlickGrid formatter is synchronous and
  * mounting a component per badge per row would mean a Vue app instance and lifecycle per badge,
  * created and torn down as rows scroll, orders of magnitude more expensive than the badges
- * themselves for nothing (§3.1's tree update: `RefBadge.vue` → `refBadges.ts`). The same reasoning
- * applies to `columns.ts`'s other formatters and to W8's graph column: nothing inside a grid row
+ * themselves for nothing. The same reasoning
+ * applies to `columns.ts`'s other formatters and to the graph column: nothing inside a grid row
  * is a Vue component.
  *
  * The single source for "is this row a stash" is `DecorationRef`'s `stash` kind
  * (`store.decorationAt(row)`, `packages/git/src/parse/log.ts`'s `parseDecorationToken`) — never a
  * second heuristic over the subject line, which an ordinary commit could coincidentally match.
- * W8's graph-column stash node shape reads the exact same decoration, so the two never disagree.
+ * The graph-column stash node shape reads the exact same decoration, so the two never disagree.
  *
  * Split deliberately in two: `badgeSpecFor`/`planBadges` are pure functions over data (no DOM),
  * unit-tested directly below in `tests/unit/ui/refBadges.spec.ts`; `buildRefBadges` and its
- * private `build*Element` helpers touch `document` and so, per this repo's own W6 precedent (no
+ * private `build*Element` helpers touch `document` and so, per this repo's own precedent (no
  * jsdom/happy-dom is wired into `bun:test` — confirmed, not assumed), are exercised only by
- * W13's Playwright pass rather than here.
+ * the Playwright pass rather than here.
  */
 import type { DecorationRef } from '@kira/git-core';
-import type { PrRecord } from '@kira/git-ipc';
+import type { ChangeRequestRecord } from '@kira/git-ipc';
 import { t } from '@theme/i18n';
 import { BADGE_ICONS } from '../icons/index.ts';
-import { prBadgeClass, type RefBadgeVariant, refBadgeClass } from './badgeClass.ts';
-import { prStateLabel } from './prStateLabel.ts';
+import { changeRequestBadgeClass, type RefBadgeVariant, refBadgeClass } from './badgeClass.ts';
+import { changeRequestStateLabel } from './changeRequestStateLabel.ts';
 
 // §6.2: badge text truncates at ~190px (full name in the tooltip); the icon keeps its size.
 /** A Git ref name, not prose. */
@@ -39,11 +39,11 @@ export interface BadgeSpec {
   readonly variant: RefBadgeVariant;
   readonly text: string;
   readonly isCurrentBranch: boolean;
-  /** `docs/plans/P7.md` W14: set only for `branch`/`remoteBranch` — the two kinds
+  /** Set only for `branch`/`remoteBranch` — the two kinds
    *  `CommitGrid.vue`'s ref-badge hit-test and `App.vue`'s ref context menu care about. A tag/HEAD
    *  badge has no review action and no rename/delete-from-the-graph menu, so it carries neither
    *  field — the hit-test's own `[data-ref-kind]` selector is exactly this distinction, made a DOM
-   *  query rather than a second decoration check. `docs/plans/P9.md` W14 adds `"stash"`: a stash
+   *  query rather than a second decoration check. Adds `"stash"`: a stash
    *  badge's own menu (`buildStashMenu`) needs the same hit-test seam, `refName` carrying
    *  `stash@{N}` rather than a ref name proper (there is no ref for anything but the top entry —
    *  see `parseDecorationToken`'s own doc comment). */
@@ -96,7 +96,7 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
         refName: `stash@{${ref.index}}`,
       };
     case 'head':
-      // Detached HEAD: §6.2's table describes the filled dot as a modifier on the *branch*
+      // Detached HEAD: the table describes the filled dot as a modifier on the *branch*
       // badge, but a detached HEAD has no branch decoration alongside it to modify — this is
       // the one case the table's wording does not literally cover. It gets the same local-branch
       // pill and dot, with the literal text "HEAD" standing in for a branch name that does not
@@ -167,9 +167,9 @@ function buildBadgeElement(
   if (spec.isCurrentBranch) classes.push('ring-1 ring-inset ring-current');
   badge.className = refBadgeClass(variant, 'shrink min-w-0', ...classes);
   if (spec.icon === BADGE_ICONS.tag) badge.dataset.testid = 'badge-tag';
-  // P131 Part 2: the full name lives in `data-kira-tip`, read by the one `AttributeTooltip`
+  // The full name lives in `data-kira-tip`, read by the one `AttributeTooltip`
   // CommitGrid.vue mounts over its grid host — a mouse-hover affordance independent of whether the
-  // ~190px CSS truncation (`BADGE_LABEL_CLASS`) actually clips this particular badge's text. This file
+  // ~190px CSS truncation (`BADGE_LABEL_CLASS`) clips this particular badge's text. This file
   // is plain DOM code outside Vue, so it writes the attribute a real `Tooltip`/`TooltipTrigger`
   // would otherwise carry, rather than using either directly. No `aria-label` alongside it: the
   // visible label span below already gives this badge a real accessible name.
@@ -197,11 +197,11 @@ function buildBadgeElement(
   badge.appendChild(label);
 
   if (spec.isCurrentBranch) {
-    // G-UX (item 1): a check glyph, not a plain dot — the dot was a 5×5px circle, easy to miss
+    // A check glyph, not a plain dot — the dot was a 5×5px circle, easy to miss
     // next to the badge's own icon; a recognisable checkmark reads as "current" at a glance
     // without needing colour to carry the meaning. Still `role="img"` + `aria-label`, the same
     // "reliably reach the accessibility tree as a second, non-text signal" reasoning the dot it
-    // replaces already established (§6.1/§7's own "no colour/shape-only meaning" still applies).
+    // replaces already established (the "no colour/shape-only meaning" still applies).
     const check = document.createElement('span');
     check.className = 'codicon codicon-check shrink-0 text-focus';
     check.setAttribute('role', 'img');
@@ -221,13 +221,13 @@ function buildOverflowBadge(overflow: OverflowSpec): HTMLSpanElement {
 }
 
 // ---------------------------------------------------------------------------------------
-// G24 D9/D10.8: the per-commit graph indicator — one badge per commit, never one per associated
+// The per-commit graph indicator — one badge per commit, never one per associated
 // PR. Kept in this file (not a new module) since it is, structurally, a fifth badge kind sharing
 // every one of `buildBadgeElement`'s conventions (`refBadgeClass`, an icon, `data-kira-tip`) —
 // it just never goes through `badgeSpecFor`/`DecorationRef`, since a PR is not a ref decoration.
 // ---------------------------------------------------------------------------------------
 
-const PR_STATE_PRECEDENCE: Readonly<Record<PrRecord['state'], number>> = {
+const PR_STATE_PRECEDENCE: Readonly<Record<ChangeRequestRecord['state'], number>> = {
   open: 0,
   draft: 1,
   merged: 2,
@@ -237,7 +237,9 @@ const PR_STATE_PRECEDENCE: Readonly<Record<PrRecord['state'], number>> = {
 /** D9's own precedence rule: `open > draft > merged > closed`, ties broken by most recently
  *  updated — "which one PR does the graph indicator show when a commit is associated with more
  *  than one" (§10.8's own recommendation). `undefined` for an empty list, never thrown. */
-export function pickBestPr(prs: readonly PrRecord[]): PrRecord | undefined {
+export function pickBestChangeRequest(
+  prs: readonly ChangeRequestRecord[],
+): ChangeRequestRecord | undefined {
   if (prs.length === 0) return undefined;
   return [...prs].sort((a, b) => {
     const precedence = PR_STATE_PRECEDENCE[a.state] - PR_STATE_PRECEDENCE[b.state];
@@ -247,31 +249,36 @@ export function pickBestPr(prs: readonly PrRecord[]): PrRecord | undefined {
 
 /** Builds the graph indicator's own badge for one commit's associated PR(s), or `null` when there
  *  is nothing to show — every non-resolved-with-a-PR outcome (not-yet-resolved, in-flight,
- *  `disabled`, `unavailable`, or resolved-with-none) is exactly this `null` (D9's own "inert,
- *  never noisy" rule): the caller never has to branch on which of those five it actually got.
- *  P74 §3: never a real `<a href>` — under Wails an anchor click navigates the app's own window
+ *  `disabled`, `unavailable`, or resolved-with-none) is exactly this `null` (the "inert,
+ *  never noisy" rule): the caller never has to branch on which of those five it got.
+ *  Never a real `<a href>` — under Wails an anchor click navigates the app's own window
  *  itself rather than opening a browser tab (there is no separate tab to open one in), the same
  *  defect class `CommitMeta.vue`/`BranchPicker.vue`/`StackList.vue`'s own PR links carried before
- *  §3's fix. A `<button data-pr-number>` (click routed through
- *  `CommitGrid.vue`'s own `onClick` delegation to `DetailActions.openPullRequest`, which composes
- *  and opens the URL host-side). The PR's state is carried as a border colour class, never as text (`prBadgeClass`) —
- *  width is scarce, and the tooltip already names the state in words. */
-export function buildPrBadge(prs: readonly PrRecord[]): HTMLElement | null {
-  const best = pickBestPr(prs);
+ *  the fix. A `<button data-change-request-number>` (click routed through
+ *  `CommitGrid.vue`'s own `onClick` delegation to `DetailActions.openChangeRequest`, which composes
+ *  and opens the URL host-side). The PR's state is carried as a border colour class, never as text
+ *  (`changeRequestBadgeClass`) — width is scarce, and the tooltip already names the state in
+ *  words. */
+export function buildChangeRequestBadge(prs: readonly ChangeRequestRecord[]): HTMLElement | null {
+  const best = pickBestChangeRequest(prs);
   if (best === undefined) return null;
 
   const badge = document.createElement('button');
-  badge.className = prBadgeClass(best.state);
-  badge.dataset.testid = 'badge-pr';
+  badge.className = changeRequestBadgeClass(best.state);
+  badge.dataset.testid = 'badge-change-request';
   badge.type = 'button';
   // Not a Tab stop inside the roving-tabindex grid; Enter on it would toggle the detail pane.
   badge.tabIndex = -1;
-  badge.dataset.prNumber = String(best.number);
-  const state = prStateLabel(best.state);
+  badge.dataset.changeRequestNumber = String(best.number);
+  const state = changeRequestStateLabel(best.state);
   badge.setAttribute(
     'data-kira-tip',
     prs.length > 1
-      ? t('git.refBadge.prMore.tooltip', { title: best.title, state, count: prs.length - 1 })
+      ? t('git.refBadge.changeRequestMore.tooltip', {
+          title: best.title,
+          state,
+          count: prs.length - 1,
+        })
       : t('common.dashPair.label', { first: best.title, second: state }),
   );
 

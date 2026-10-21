@@ -9,6 +9,7 @@ import {
   installControlMocks as sharedInstallControlMocks,
 } from '@workbench/testing/ui/mockRuntime';
 import { defaultSettings } from '../../../frontend/src/state/settingsDomain';
+import { contract } from './contract';
 import { IPC } from './ipcChannels';
 import type { ControlSnapshot } from './types';
 
@@ -24,10 +25,12 @@ const WAILS_RUNTIME_JS = resolveWailsRuntimeJsPath(resolve(__dirname, '../../../
 const BRIDGE_PKG = 'github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge';
 
 // One line per request/response channel — the FQN half of each pair, read off the generated
-// bindings themselves (`grep -rhoE '\$Call\.ByName\("[^"]+"' apps/kira-space/frontend/bindings/…/bridge/*.js`),
+// bindings themselves (`grep -rhoE '\$Call\.ByName\("[^"]+"'
+// apps/kira-space/frontend/bindings/…/bridge/*.js`),
 // not retyped from memory — the same discipline Kira Studio's own copy of this table follows.
 const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
-  githubOpenPullRequestUrl: 'GitHubService.OpenPullRequestURL',
+  gitHostOpenChangeRequestUrl: 'GitHostService.OpenChangeRequestURL',
+  gitHostProviders: 'GitHostService.Providers',
   linkOpenExternal: 'LinkService.OpenExternal',
   settingsGetAll: 'SettingsService.GetAll',
   settingsSet: 'SettingsService.Set',
@@ -90,6 +93,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   customScriptsRenameCollection: 'CustomScriptsService.RenameCollection',
   customScriptsDeleteCollection: 'CustomScriptsService.DeleteCollection',
   customScriptsMove: 'CustomScriptsService.Move',
+  customScriptsReorder: 'CustomScriptsService.Reorder',
+  customScriptsReorderCollections: 'CustomScriptsService.ReorderCollections',
   scriptRunsList: 'ScriptRunsService.List',
   scriptRunsNextFires: 'ScriptRunsService.NextFires',
   scriptRunsSchedulePreview: 'ScriptRunsService.SchedulePreview',
@@ -102,12 +107,15 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   promptsRaise: 'PromptsService.Raise',
   promptsDismiss: 'PromptsService.Dismiss',
   promptsSendTest: 'PromptsService.SendTest',
+  agentInfo: 'AgentService.Info',
+  agentInfoFor: 'AgentService.InfoFor',
   llmPromptsList: 'LlmPromptsService.List',
   llmPromptsSave: 'LlmPromptsService.Save',
   llmPromptsPreview: 'LlmPromptsService.Preview',
   scriptRunsGet: 'ScriptRunsService.Get',
   scriptRunsStop: 'ScriptRunsService.Stop',
   scriptRunsResume: 'ScriptRunsService.Resume',
+  scriptRunsResumeCommand: 'ScriptRunsService.ResumeCommand',
   scriptRunsResolveDir: 'ScriptRunsService.ResolveDir',
   scriptRunsPreview: 'ScriptRunsService.Preview',
   scriptRunsStart: 'ScriptRunsService.Start',
@@ -118,7 +126,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   keepAwakeSetManual: 'KeepAwakeService.SetManual',
   agentNotifyReportFocus: 'AgentNotifyService.ReportFocus',
   agentNotifySendTest: 'AgentNotifyService.SendTest',
-  claudeUsageGet: 'ClaudeUsageService.Get',
+  agentUsageGet: 'AgentUsageService.Get',
 
   // P128 §2.2/§2.6: this app now persists a per-window module mode too, via the same shared
   // internal/windowsvc.Service Kira Studio's own WindowsService embeds.
@@ -139,7 +147,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
 
   // P145: the ade v2 board surface (AdeTaskService, bridge/index.ts `adeTask*`).
   adeTaskBoard: 'AdeTaskService.Board',
-  adeTaskPrs: 'AdeTaskService.Prs',
+  adeTaskChangeRequests: 'AdeTaskService.ChangeRequests',
   adeTaskRefresh: 'AdeTaskService.Refresh',
   adeTaskForcePush: 'AdeTaskService.ForcePush',
   adeTaskCreateTask: 'AdeTaskService.CreateTask',
@@ -191,8 +199,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeTaskReviewWindowTarget: 'AdeTaskService.ReviewWindowTarget',
   adeTaskReviewAgent: 'AdeTaskService.ReviewAgent',
   adeTaskLaunchReviewAgent: 'AdeTaskService.LaunchReviewAgent',
-  adeTaskGitHubSyncPlan: 'AdeTaskService.GitHubSyncPlan',
-  adeTaskGitHubSyncApply: 'AdeTaskService.GitHubSyncApply',
+  adeTaskViewedSyncPlan: 'AdeTaskService.ViewedSyncPlan',
+  adeTaskViewedSyncApply: 'AdeTaskService.ViewedSyncApply',
   adeTaskArchiveRisk: 'AdeTaskService.ArchiveRisk',
   adeTaskArchiveTask: 'AdeTaskService.ArchiveTask',
   adeTaskRecordMerge: 'AdeTaskService.RecordMerge',
@@ -211,7 +219,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   memoryProjects: 'MemoryService.Projects',
   memoryMcpStatus: 'MemoryService.McpStatus',
   memoryCheckHook: 'MemoryService.CheckHook',
-  memoryMcpInstall: 'MemoryService.InstallClaudeCode',
+  memoryMcpInstall: 'MemoryService.InstallAgent',
   memorySemanticStatus: 'MemoryService.SemanticStatus',
   memorySemanticInstall: 'MemoryService.InstallSemanticModel',
   memorySemanticRetry: 'MemoryService.RetrySemantic',
@@ -245,7 +253,7 @@ export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = bu
 // one of main.ts's own unconditional-every-boot Promise.all calls (bootstrap()'s own doc comment)
 // no committed fixture will ever snapshot, or a fire-and-forget call no spec asserts on the echo
 // of — the same reasoning Kira Studio's own WILDCARD_DEFAULTS carries per entry, trimmed to this
-// app's own boot sequence. P128 §2.2/§2.6: `windowsEnsure` joins this table with a static `'git'`
+// app's own boot sequence. `windowsEnsure` joins this table with a static `'git'`
 // answer, unlike Kira Studio's own copy — this app has no existing spec whose boot mode needs
 // inferring from an already-provided fixture (Studio's own inferredBootMode helper exists only
 // because some of its specs restore an Api-mode tab as active); every Space spec boots into `git`
@@ -261,6 +269,9 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.promptsRaise]: 'null',
   [IPC.promptsDismiss]: 'null',
   [IPC.promptsSendTest]: 'null',
+  // The active agent provider's names: the claude provider, as the Go flow test writes it.
+  [IPC.agentInfo]: JSON.stringify(contract('agent', 'AgentService.Info')),
+  [IPC.agentInfoFor]: JSON.stringify(contract('agent', 'AgentService.Info')),
   // The prompt editor's calls; a spec answers List/Save from tests/contract/llm-prompts.json.
   [IPC.llmPromptsList]: '{"prompts":[],"storeError":"","revision":0}',
   [IPC.llmPromptsSave]: '{"prompts":[],"storeError":"","revision":0}',
@@ -295,25 +306,24 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.codeWorkspaceOpenWorkspace]: 'null',
   [IPC.codeWorkspaceCloseWorkspace]: 'null',
   [IPC.codeWorkspaceCancelSearch]: 'null',
-  // P116 G5: main.ts's bootstrap() joins keepAwakeStore.initKeepAwake() into the optional
+  // main.ts's bootstrap() joins keepAwakeStore.initKeepAwake() into the optional
   // Promise.allSettled group, same reasoning as the rest of this table's every-boot calls. The
-  // plan (docs/HISTORY.md (v1.9 P116)) names `supported: false` here, but this
+  // plan (docs/HISTORY.md) names `supported: false` here, but this
   // deliberately follows Kira Studio's own WILDCARD_DEFAULTS value instead (`supported: true`) —
   // Studio's own comment explains why: the UI suite runs against a static server, not a real Go
   // build, and a spec that never cares about keep-awake should still see the titlebar button it
   // will ship with. A spec that DOES care (window-chrome.spec.ts's own keep-awake cases) still wins
   // with its own snapshot.
-  // P238: every window reports its focus at boot.
+  // Every window reports its focus at boot.
   [IPC.agentNotifyReportFocus]: 'null',
   [IPC.agentNotifySendTest]: 'null',
   // P239: nothing reported yet.
-  [IPC.claudeUsageGet]: JSON.stringify({
+  [IPC.agentUsageGet]: JSON.stringify({
     state: 'waiting',
     source: '',
     fiveHour: null,
     sevenDay: null,
     updatedAt: 0,
-    detail: 'Start a Claude Code session to see usage',
   }),
   [IPC.keepAwakeStatus]: JSON.stringify({ manual: false, supported: true, error: '' }),
   // P119: no update available by default — same shape as Kira Studio's own WILDCARD_DEFAULTS

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// P108 Part 20 F12: os.Stat never blocks regardless of what the path names, but os.Open does —
+// os.Stat never blocks regardless of what the path names, but os.Open does —
 // opening a FIFO for reading blocks until some other process opens its write end. A FIFO reached
 // through a symlink git tracked (never an escape: pathsafe.ValidateRelPath's requireUnder already
 // rejects anything outside root) passed the old code's stat (size 0, not a dir) straight into a

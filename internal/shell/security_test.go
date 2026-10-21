@@ -32,10 +32,10 @@ func TestHarden_DenyByDefaultPosture(t *testing.T) {
 	}
 }
 
-// TestOptions_FileDropDisabled: P56 §1.6 says EnableFileDrop must be left false — the app wires no
+// TestOptions_FileDropDisabled: EnableFileDrop must be left false — the app wires no
 // data-file-drop-target element and no FilesDropped handler anywhere, so enabling it would only
-// widen the webview's OS-level attack surface for a feature nothing uses. Regression test for the
-// P2 R1 finding where this had drifted to true.
+// widen the webview's OS-level attack surface for a feature nothing uses. Regression test for
+// where this had drifted to true.
 func TestOptions_FileDropDisabled(t *testing.T) {
 	opts := shell.Options(shell.Harden(), shell.WindowRecord{Key: "main"}, nil, shell.Config{WindowTitle: "Shell Test"})
 

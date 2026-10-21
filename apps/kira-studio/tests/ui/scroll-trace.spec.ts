@@ -13,13 +13,13 @@ import {
 } from './support/postgresFixture';
 import { expandRow, findRow, openRowMenu } from './support/tree';
 
-// P22 iter2 D2: window.__kiraScrollTrace is a real-hardware field probe, not a tests/ui/ instrument
+// window.__kiraScrollTrace is a real-hardware field probe, not a tests/ui/ instrument
 // (its own header comment, views/shared/slick/scrollTrace.ts) — nothing here can drive a real macOS
 // momentum scroll or observe the compositor-ahead condition that produces the user's actual
 // symptom. What this file *can* prove, sandboxed: the probe exists, is inert until start(), and
 // start()/stop() produce the documented shape when driven by ordinary (main-thread) scrolling —
-// the mechanism working as designed, not the real-hardware fix being proven (that's §7.3 of
-// docs/HISTORY.md (v1.1 P22), run by a human on a Mac).
+// the mechanism working as designed, not the real-hardware fix being proven (that's
+// docs/HISTORY.md, run by a human on a Mac).
 
 const CONNECTION_ID = 'conn-scroll-trace';
 const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Scroll Trace DB', 'grey');
@@ -43,6 +43,7 @@ const CONTROL: ControlSnapshot[] = [
       options: {},
       preconnect: null,
       preconnectSidecar: false,
+      preconnectDelaySec: 0,
       autoExplain: false,
       throttlePerSec: 0,
     },
@@ -93,9 +94,9 @@ test('__kiraScrollTrace — inert until start(), documented shape on stop()', as
   const grid = page.locator('[data-testid="data-grid"]');
   await expect(grid).toBeVisible();
   await page.click('[data-testid="page-size-10000"]');
-  // P22 Pass B — the actual scrollable element is SlickGrid's own right/data viewport
+  // The actual scrollable element is SlickGrid's own right/data viewport
   // (support/grid.ts's own GRID_SCROLLER_SELECTOR), not the outer `[data-testid="data-grid"]`
-  // host div: that div never scrolls itself (C13 made this doubly true — it now also carries the
+  // host div: that div never scrolls itself (it now also carries the
   // empty-state overlays as siblings of the actual SlickGrid-owned mount node), so setting
   // `scrollTop` on it moved nothing.
   const viewport = page.locator(GRID_SCROLLER_SELECTOR);

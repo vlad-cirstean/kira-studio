@@ -4,12 +4,12 @@ import { errorText } from '@workbench/bridge/codedError';
 import { data } from '../../bridge/data';
 import { reloadTabsForTarget } from '../../state/viewCommands';
 
-// P48 F18: the nine-call-site body behind documents/keyvalue/stream's mutations.ts (P8's ground
-// rules — mutate immediately, no pendingChanges.ts-style staged plan, no preview step): resolve
-// the tab, one data.mutate, reload the tab's own page, then tell every sibling tab open on the
-// same target. `after` covers the one optional tail two of those nine call sites add
-// (deleteKey's browseInvalidate) — addKey is not built on this at all, since it opens a new tab
-// instead of reloading the current one.
+// The nine-call-site body behind documents/keyvalue/stream's mutations.ts (the ground rules —
+// mutate immediately, no pendingChanges.ts-style staged plan, no preview step): resolve the tab,
+// one data.mutate, reload the tab's own page, then tell every sibling tab open on the same target.
+// `after` covers the one optional tail two of those nine call sites add (deleteKey's
+// browseInvalidate) — addKey is not built on this at all, since it opens a new tab instead of
+// reloading the current one.
 export function createImmediateMutator<
   T extends { connectionId: string | null; path: string },
 >(opts: {
@@ -30,7 +30,7 @@ export function createImmediateMutator<
       path: tab.path,
       ops,
     });
-    // F14 (P108 Part 10): the write above already succeeded — a failure in any step below (this
+    // The write above already succeeded — a failure in any step below (this
     // tab's own reload, telling sibling tabs, the caller's `after`) must not read as "the mutation
     // failed" to a caller whose own catch reports it that way; a user retrying on that false
     // signal duplicates a non-idempotent write (Redis list push, stream XADD). Each step gets its

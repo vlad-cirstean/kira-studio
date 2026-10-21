@@ -386,7 +386,7 @@ onUnmounted(() => {
     <!-- The Mongo dialect of the filter row: one filter box, permanent, never closed — plus a
          SORT box beside it (read.ts's structured-sort-only rule, see ./sortDocument.ts's
          sortSpecToText/parseSortText), FilterToolbar.vue's ORDER BY box narrowed to the one form
-         Mongo can actually execute and reworded to Mongo's own sort-document syntax rather than SQL's.
+         Mongo can execute and reworded to Mongo's own sort-document syntax rather than SQL's.
          History button and Clear button match FilterToolbar.vue's own layout exactly — this row
          used to have neither. -->
     <DocumentFilterRow :tab="tab" />
@@ -412,10 +412,10 @@ onUnmounted(() => {
       @close="onCloseSearch"
     />
 
-    <!-- Item 4: the reconnect gate used to replace this whole ViewChrome (header, toolbar and
+    <!-- The reconnect gate used to replace this whole ViewChrome (header, toolbar and
          all) — every other view but the grid's DataView.vue did the same, the one inconsistency
          this fixes. The chrome above (and so its toolbar rows) now always renders; only the body
-         — the part that actually needs a live connection — swaps for the gate. -->
+         — the part that needs a live connection — swaps for the gate. -->
     <EmptyState
       v-if="needsReconnect"
       data-testid="document-reconnect"

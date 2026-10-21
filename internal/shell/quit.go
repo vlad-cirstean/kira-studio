@@ -33,11 +33,11 @@ func (s QuitStatus) Total() int { return s.Agents + s.Runs + s.Scripts }
 
 // Quitter is the Go analogue of src/main/index.ts:151-163's before-quit handler. It is wired
 // three ways: application.Options.ShouldQuit (which covers Cmd+Q, the Apple menu, the Dock and
-// App.Quit() alike — §1.3), application.Options.OnShutdown, and the menu's own Quit item.
+// App.Quit() alike), application.Options.OnShutdown, and the menu's own Quit item.
 //
-// P8 C8/D7: waits for every live window's flush ack, not just the first — restoring
+// Waits for every live window's flush ack, not just the first — restoring
 // 18fe7bb^:src/main/index.ts:47-60's Promise.all-over-every-window behaviour, which the original
-// Go port (P56) collapsed to a single sync.Once-closed channel. With two windows open, the old
+// Go port collapsed to a single sync.Once-closed channel. With two windows open, the old
 // shape let window A's ack release the wait while window B's own tabsSave was still in flight,
 // racing teardown's db.Close() against it.
 type Quitter struct {
@@ -62,11 +62,11 @@ type Quitter struct {
 
 // NewQuitter takes the two teardown halves already wrapped in sync.OnceFunc by the caller, so
 // main.go states the order in one place. flushTimeout is index.ts's FLUSH_TIMEOUT_MS, and it
-// remains one single cap for the whole handshake, not one per window — matching both Electron's
-// own single FLUSH_TIMEOUT_MS and this app's pre-P8 behaviour. liveWindowKeys is read once, at
-// the moment quitting actually starts (flushThenQuit), not at construction time — main.go passes
-// its shell.WindowRegistry's own Keys method. events is a Signaller (P103 Part 3) — each app's own
-// *bridge.Events satisfies it by embedding *appevent.Events.
+// remains one single cap for the whole handshake, not one per window — matching Electron's own
+// single FLUSH_TIMEOUT_MS. liveWindowKeys is read once, at the moment quitting starts
+// (flushThenQuit), not at construction time — main.go passes its shell.WindowRegistry's own Keys
+// method. events is a Signaller — each app's own *bridge.Events satisfies it by embedding
+// *appevent.Events.
 func NewQuitter(events Signaller, beforeFlush, teardown func(), flushTimeout time.Duration, liveWindowKeys func() []string) *Quitter {
 	return &Quitter{
 		events:         events,
@@ -126,7 +126,7 @@ func (q *Quitter) Attach(app *application.App) {
 	q.app.Store(app)
 }
 
-// ShouldQuit is application.Options.ShouldQuit. It NEVER blocks (P56 D2): the renderer's ack is
+// ShouldQuit is application.Options.ShouldQuit. It NEVER blocks: the renderer's ack is
 // itself a bound call, which arrives through the main thread (application_darwin.go:431's
 // processURLRequest), so a handler that waited here would deadlock the very ack it waits for and
 // guarantee the timeout — losing exactly the debounced tab save the handshake exists to protect

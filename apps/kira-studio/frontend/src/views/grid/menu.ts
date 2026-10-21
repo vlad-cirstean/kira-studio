@@ -19,7 +19,7 @@ import { requestCellFocus } from './focusRequest';
 import { usePendingChangesStore } from './pendingChanges';
 import { useGridViewStore } from './state';
 
-// F1/P21 round 1: the pure half of ColumnsMenu.vue's own close() — "None" seeds `selected` from
+// The pure half of ColumnsMenu.vue's own close() — "None" seeds `selected` from
 // the table/view's primary-key columns, which is empty for any relation with no primary key (every
 // Postgres/MySQL view or matview, and any PK-less table). Zero selected columns falls back to null
 // ("all columns") rather than a projection selecting nothing, the same fallback
@@ -34,7 +34,7 @@ export function nextProjectionFromSelectedColumns(
   return [...selectedColumnNames];
 }
 
-// F1/P21 round 1: the pure half of "Hide column" — split out so the boundary case (hiding the
+// The pure half of "Hide column" — split out so the boundary case (hiding the
 // last remaining column) is covered without exercising setProjection's own real load() pipeline.
 // Returns null ("all columns", ResolveProjection's own meaning for it) rather than an empty array
 // when nothing would be left selected; every SQL adapter turns a non-nil empty projection into
@@ -51,9 +51,7 @@ export function nextProjectionAfterHidingColumn(
 
 // Produced locally from the path, never round-tripped to the engine for a string join — the same
 // discipline SlickGridHost.vue's own qualifiedName() and project/menus.ts's qualifiedNameFor use.
-// P67 §5.1: exported — the preview popover needs the referenced table's display name for its
-// header, and duplicating the decodePath + QUALIFIED_KINDS filter is exactly the drift P7 D9
-// avoided.
+// Exported — the preview popover needs the referenced table's display name for its header.
 const QUALIFIED_KINDS = new Set(['schema', 'table', 'view', 'matview']);
 export function qualifiedNameForPath(connectionId: string, path: string): string {
   return decodePath(connectionId, path)
@@ -68,14 +66,14 @@ export interface FkNavContext {
   rowValues: Record<string, string | null>;
 }
 
-// P7 D1: builds "<refCol> = '<val>' AND ..." for a (possibly composite) FK edge against the
+// Builds "<refCol> = '<val>' AND ..." for a (possibly composite) FK edge against the
 // *target* table's own columns, sourcing values from this row via the edge's own columns. Shared
 // by both directions (meta.foreignKeys and meta.referencedBy) since both use the same "my
 // columns, their referencedPath/referencedColumns" convention regardless of which populated them.
-// Returns null (P7 D2) — never an IS NULL clause — when a needed source value is missing or NULL:
-// there is no row to jump to, unlike D5's filter-by-value which treats NULL as a real predicate.
-// P67 §4.1: exported — the preview popover needs this same filter to scope its own tab-free
-// `data.read`, and reuses this builder rather than re-deriving it (one shared builder, §5.1's own
+// Returns null — never an IS NULL clause — when a needed source value is missing or NULL:
+// there is no row to jump to, unlike the filter-by-value which treats NULL as a real predicate.
+// Exported — the preview popover needs this same filter to scope its own tab-free
+// `data.read`, and reuses this builder rather than re-deriving it (one shared builder, the
 // "never threaded from the caller" rule applies here too).
 export function foreignKeyValueFilter(
   dialect: SqlDialect | undefined,
@@ -112,7 +110,7 @@ function navigateForeignKey(entry: ForeignKeyMeta, ctx: FkNavContext): void {
   void useGridViewStore().setFilter(tabId, filter);
 }
 
-/** P67: the same jump navigateForeignKey performs, then a request to land the caret in the
+/** The same jump navigateForeignKey performs, then a request to land the caret in the
  *  related record — the grid tab IS the edit surface (no second editor exists), so "edit the
  *  related record" is "open it there and select a cell in it".
  *
@@ -252,7 +250,7 @@ export interface CellMenuContext {
   /** F3 (P108 Part 10): the server computes a generated column's value — Edit/Set NULL must
    *  refuse it the same way onBeforeEditCell does, not just the insert paths. */
   isGenerated: boolean;
-  /** F6 (P108 Part 10): this exact cell's own raw value is truncated (the engine's 64 KiB cap) —
+  /** This exact cell's own raw value is truncated (the engine's 64 KiB cap) —
    *  "Filter by this value" would then build a predicate against only the stored prefix, matching
    *  nothing real. A staged, uncommitted edit does NOT get this treatment (interaction.spec.ts's
    *  own "stage NULL, then filter by it" scenario): `rowValues` below already comes from
@@ -276,7 +274,7 @@ export interface CellMenuContext {
 // to referenced row / Referenced by (P7).
 export function cellMenu(ctx: CellMenuContext): MenuItem[] {
   const editDisabled = !ctx.canEdit || ctx.isDeleted || ctx.isGenerated;
-  // F6: built from the raw rowValues, never ctx.text/ctx.isNull (the masked/display pair) — a
+  // Built from the raw rowValues, never ctx.text/ctx.isNull (the masked/display pair) — a
   // masked or truncated cell under preview used to compare against text nothing in the table
   // matches; the FK nav button already used raw values (unaffected, still correct) while this
   // menu's own filter/FK items did not.
@@ -367,10 +365,10 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       run: () => usePendingChangesStore().stageNull(ctx.tabId, ctx.row, ctx.columnName),
     },
     {
-      // P31 D33/F32: singular "row" (not rowMenu's "row(s)") — a cell selection is one row by
+      // Singular "row" (not rowMenu's "row(s)") — a cell selection is one row by
       // construction, so the plural label rowMenu correctly uses for its own multi-row case would
       // be a lie here. Same shortcut/danger/disabled as rowMenu's own Delete row(s) so the printed
-      // key and DataGrid.vue's D32 keyboard handler can't drift apart.
+      // key and DataGrid.vue's keyboard handler can't drift apart.
       type: 'item',
       id: 'delete-row',
       label: t('studio.grid.deleteRows.label', { count: 1 }),
@@ -424,9 +422,9 @@ function hasPendingChange(ctx: RowMenuContext): boolean {
 // D6: Copy row(s) ▸ TSV/CSV/JSON/INSERT, Duplicate row(s), Revert row(s), Delete row(s) — all act
 // on the full row selection.
 export function rowMenu(ctx: RowMenuContext): MenuItem[] {
-  // A1/P21 round 1: building the menu used to eagerly decode every selected row across every
+  // Building the menu used to eagerly decode every selected row across every
   // column (ctx.rows.map(ctx.snapshot)) whether or not any of the four items below ever runs —
-  // including on every Delete keypress, which routes through this same builder (P21 D5's "printed
+  // including on every Delete keypress, which routes through this same builder (the "printed
   // shortcut and executed action can't drift" rule) purely to dispatch, never reading snapshots at
   // all. headerMenu's own columnValues already takes this shape (a thunk, invoked inside run());
   // this mirrors it, memoized once so the four Copy row(s) items share a single pass if more than
@@ -525,10 +523,9 @@ export interface HeaderMenuContext {
   tablePath: string;
 }
 
-// M5 §6.7/§2.3: the six kinds offered from the header menu, in the same display order §2.3's own
-// table uses. Deliberately not exhaustive of every field a rule carries (keepHint/correlate stay
-// at their sensible defaults here — the Privacy tab, §7.4, is where those get tuned) — "mark this
-// column PII" is meant to be one click, not a form.
+// The six kinds offered from the header menu. Deliberately not exhaustive of every field a rule
+// carries (keepHint/correlate stay at their sensible defaults here — the Privacy tab is where those
+// get tuned) — "mark this column PII" is meant to be one click, not a form.
 const MASK_KIND_CHOICES: { kind: MaskKind; labelKey: MessageKey }[] = [
   { kind: 'name', labelKey: 'common.field.name.label' },
   { kind: 'email', labelKey: 'common.field.email.label' },
@@ -544,14 +541,14 @@ function defaultCorrelateFor(kind: MaskKind): boolean {
   return kind !== 'number' && kind !== 'date';
 }
 
-// The header menu's own scoping choice: matches by column name alone (case-insensitive), the same
-// rule §4.2 uses for render-time matching — so "Not PII" and the checked kind reflect whatever
-// rule is actually masking this column today, even one authored in the Privacy tab against a
-// different table_name (or '*'). A rule this menu itself writes always uses THIS tab's own
-// qualified table name (qualifiedNameForPath, below) — so repeat visits from the same tab's header
-// menu edit the same row rather than accumulating duplicates; only a rule already present under a
-// different table_name is left in place by "Not PII" here (removing every rule matching a column
-// name across every table would reach outside this menu's own tab-scoped intent).
+// The header menu's own scoping choice: matches by column name alone (case-insensitive) — so
+// "Not PII" and the checked kind reflect whatever rule is masking this column today, even one
+// authored in the Privacy tab against a different table_name (or '*'). A rule this menu itself
+// writes always uses THIS tab's own qualified table name (qualifiedNameForPath, below) — so
+// repeat visits from the same tab's header menu edit the same row rather than accumulating
+// duplicates; only a rule already present under a different table_name is left in place by
+// "Not PII" here (removing every rule matching a column name across every table would reach
+// outside this menu's own tab-scoped intent).
 function existingMaskRule(ctx: HeaderMenuContext): MaskRule | undefined {
   const lower = ctx.columnName.toLowerCase();
   const rules = maskRulesFor(ctx.connectionId).filter((r) => r.columnName.toLowerCase() === lower);
@@ -571,11 +568,11 @@ async function markColumnMaskKind(ctx: HeaderMenuContext, kind: MaskKind): Promi
     keepHint: true,
     correlate: defaultCorrelateFor(kind),
   });
-  // §6.7: "the effect is immediately visible" — toggling preview on for this tab is what makes
+  // "the effect is immediately visible" — toggling preview on for this tab is what makes
   // marking a column PII feel like it did something, right where the user was looking. Blocked
   // only while an edit or insert row is staged (setMaskPreview's own pending-changes guard); the
   // rule itself is still saved either way, so say why the preview did not also turn on rather than
-  // leaving it looking like the menu action had no effect (M7 finding).
+  // leaving it looking like the menu action had no effect.
   if (!useGridViewStore().setMaskPreview(ctx.tabId, true)) {
     useGridViewStore().setActionError(ctx.tabId, t('studio.grid.menu.markedSensitive.error'));
   }
@@ -625,8 +622,8 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
       type: 'item',
       id: 'hide-column',
       label: t('studio.grid.menu.hideColumn.label'),
-      // D8: reuses the same setProjection() ColumnsMenu.vue calls — no second, competing
-      // "which columns are shown" mechanism. F1/P21 round 1 note: this deliberately does not lock
+      // Reuses the same setProjection() ColumnsMenu.vue calls — no second, competing
+      // "which columns are shown" mechanism. This deliberately does not lock
       // out every primary-key column the way ColumnsMenu.vue's own checkbox does — hiding one
       // column of a *composite* key while the others stay visible is legitimate, tested behaviour
       // (interaction.spec.ts's own composite-PK coverage), and the real bug (walking the

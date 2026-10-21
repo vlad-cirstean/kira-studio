@@ -14,7 +14,7 @@ import (
 // that no longer names any entry in the stash list — a caller mistake (the webview only ever passes
 // a sha it read out of a previous stash.list result) or a genuine race (the stack changed between
 // list and this call). gitrpc maps this to E_BAD_REQUEST, same as every other "the caller's own
-// data is now stale" case this phase's neighbours already use (mapDetailError, detail.go).
+// data is now stale" case the neighbours already use (mapDetailError, detail.go).
 var ErrStashNotFound = errors.New("gitsession: no stash entry matches this sha")
 
 // distinctBaseShas collects every distinct StashEntry.BaseSha, preserving first-seen order — the
@@ -34,7 +34,7 @@ func distinctBaseShas(entries []porcelain.StashEntry) []string {
 // resolveBaseSubjects resolves every distinct StashEntry.BaseSha in provisional to its own commit
 // subject (model/stash.ts's own doc comment — %gs cannot name a PARENT commit's subject), via one
 // small batch spawn (StashBaseSubjectArgs) skipped entirely when provisional has no base shas.
-// Shared by StashList and GlobalStashList (P107 I2-33), which otherwise reparse their own raw
+// Shared by StashList and GlobalStashList, which otherwise reparse their own raw
 // output with the result.
 func (e *RepoEntry) resolveBaseSubjects(ctx context.Context, provisional []porcelain.StashEntry) (map[string]string, error) {
 	baseShas := distinctBaseShas(provisional)
@@ -48,7 +48,7 @@ func (e *RepoEntry) resolveBaseSubjects(ctx context.Context, provisional []porce
 	return porcelain.ParseStashBaseSubjects(subjRaw)
 }
 
-// StashList is stash.list's own query (D3, probe 12): one spawn (StashListArgs) plus
+// StashList is stash.list's own query: one spawn (StashListArgs) plus
 // resolveBaseSubjects. Deliberately uncached: every mutating stash op and every stash preflight
 // re-reads this immediately before acting, as its own sha-verification race guard (the contract's
 // own "the service verifies... immediately before writing" convention) — a stale cached value here
@@ -96,11 +96,11 @@ func (e *RepoEntry) resolveStashEntry(ctx context.Context, sha string) (porcelai
 	return porcelain.StashEntry{}, ErrStashNotFound
 }
 
-// GlobalStashList is globalStash.list's own query (G28 D9): one spawn (GlobalStashListRefsArgs)
+// GlobalStashList is globalStash.list's own query: one spawn (GlobalStashListRefsArgs)
 // answering the bucket's own sha set, stopping there — no second spawn at all — when the bucket is
-// empty (probe P10: an empty namespace answers exit 0 with empty output). Otherwise a second spawn
+// empty (an empty namespace answers exit 0 with empty output). Otherwise a second spawn
 // (GlobalStashLogArgs) reads every entry's own commit metadata in the same header-then-numstat
-// framing stash.list's own format uses (probe P12), plus resolveBaseSubjects — exactly the same
+// framing stash.list's own format uses, plus resolveBaseSubjects — exactly the same
 // three-spawn shape StashList already has, reused rather than re-invented. Deliberately uncached,
 // same reason StashList is uncached: every mutating global-stash op re-reads this immediately
 // before acting, as its own race guard.
@@ -158,9 +158,9 @@ func (e *RepoEntry) resolveStashEntryScoped(ctx context.Context, sha, scope stri
 }
 
 // resolveStashEntryAnyScope resolves sha against BOTH buckets — the stack first, then the global
-// bucket — for globalStashSave's own "promote an existing entry" source (D10 step 3): the source
+// bucket — for globalStashSave's own "promote an existing entry" source: the source
 // sha the caller supplies is not itself scoped on the wire (globalStashSave has no scope field at
-// all, D10), because either an ordinary stack entry OR an already-global one is a legal source to
+// all), because either an ordinary stack entry OR an already-global one is a legal source to
 // copy from.
 func (e *RepoEntry) resolveStashEntryAnyScope(ctx context.Context, sha string) (porcelain.StashEntry, error) {
 	entry, err := e.resolveStashEntry(ctx, sha)
@@ -180,10 +180,10 @@ type StashShowResult struct {
 	Changes []porcelain.FileChange `json:"changes"`
 }
 
-// StashShow is stash.show's own query (D3, F9): the same NameStatusArgs
-// spawn commit.detail already uses, from the stash's own base to the stash commit itself, plus — when the
-// stash has an untracked half — an ls-tree over the untracked helper commit's own tree, each path
-// folded in as FileAdded (untracked content by definition has no "before"). G28 D12: scope-aware
+// StashShow is stash.show's own query: the same NameStatusArgs spawn commit.detail already uses,
+// from the stash's own base to the stash commit itself, plus — when the stash has an
+// untracked half — an ls-tree over the untracked helper commit's own tree, each path
+// folded in as FileAdded (untracked content by definition has no "before"). Scope-aware
 // (resolveStashEntryScoped) so a global entry's own file tree renders through this exact same
 // query, with no other change at all — a stash commit's own tree diffed against its base means the
 // same thing regardless of which bucket the commit's ref lives in.

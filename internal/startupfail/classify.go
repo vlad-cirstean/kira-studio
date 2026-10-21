@@ -6,10 +6,10 @@ import (
 	"unicode/utf8"
 )
 
-// detailCap bounds Message.Detail (D5): the alert body carries a collapsed, single-line, truncated
+// detailCap bounds Message.Detail: the alert body carries a collapsed, single-line, truncated
 // summary of the raw error; the *Copy Details* clipboard payload (render.go's RenderClipboard)
 // carries the full, uncapped error instead, so nothing is ever lost — only abbreviated in the part
-// macOS actually renders on screen.
+// macOS renders on screen.
 const detailCap = 500
 
 // Message is Classify's whole output — everything render.go needs to compose the alert title/body
@@ -29,12 +29,12 @@ type Message struct {
 	Detail string
 }
 
-// schemaTooNew is the duck-typed interface D1 recognises internal/storage's SchemaTooNewError
-// through, without importing internal/storage at all: this package's whole job is formatting
+// schemaTooNew is the duck-typed interface through which internal/storage's SchemaTooNewError is
+// recognised, without importing internal/storage at all: this package's whole job is formatting
 // strings and building an argv, and pulling in modernc.org/sqlite just so it could use errors.As
 // on the real type would make it something other than a true leaf. Any error implementing this
 // method — including internal/gitreview's byte-identical refusal, if a future phase ever needs it
-// to — is recognised the same way (D1's rejected-alternative note).
+// to — is recognised the same way.
 type schemaTooNew interface {
 	SchemaTooNew() (found, known int)
 }
@@ -64,14 +64,14 @@ func bugMessage(step Step, headline, detail string) Message {
 	return Message{Step: step, Expected: false, Headline: headline, Advice: bugAdvice, Detail: detail}
 }
 
-// Classify implements D5's table exactly: one Message shape for every Step, plus the
-// schema-too-new variant of StepStorage (D1) recognised via the schemaTooNew interface above —
-// deliberately not a tenth Step constant (D5's own note: it is "a variant of StepStorage not a
+// Classify implements the table exactly: one Message shape for every Step, plus the
+// schema-too-new variant of StepStorage recognised via the schemaTooNew interface above —
+// deliberately not a tenth Step constant (the note: it is "a variant of StepStorage not a
 // separate Step").
 //
 // The switch below carries no default case: Go's switch gives no compile-time exhaustiveness
 // guarantee over a defined string type on its own, so classify_test.go's table test — which
-// enumerates every Step constant declared in step.go — is what actually catches a Step added
+// enumerates every Step constant declared in step.go — is what catches a Step added
 // without a matching arm here; the one line after the switch is a safe, honest fallback for a Step
 // value nothing in this codebase ever constructs, not a substitute for that test.
 func Classify(step Step, err error, info Info) Message {

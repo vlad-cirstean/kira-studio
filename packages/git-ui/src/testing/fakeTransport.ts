@@ -11,7 +11,7 @@ import type {
 } from '@kira/git-ipc';
 
 /**
- * P107 I2-27: the same fake `Transport` every `state/*.test.ts` file established independently —
+ * The same fake `Transport` every `state/*.test.ts` file established independently —
  * `request()` is scripted per call via `onRequest` (which receives the method name so one script
  * can branch on it, or return a `deferred().promise` for a test that controls exactly when a call
  * settles), `calls` logs every request made, `on`/`emit` are a real in-memory pub/sub, `stream` is

@@ -24,7 +24,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
@@ -147,7 +147,7 @@ func fakeFinish(cfgPath, status, summary string) error {
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return err
 	}
-	entry := cfg.MCPServers[claudeheadless.ServerName]
+	entry := cfg.MCPServers[agentmcp.ServerName]
 	token := strings.TrimPrefix(entry.Headers["Authorization"], "Bearer ")
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -214,10 +214,12 @@ func newEngine(t *testing.T, scen map[string][]string) *engine {
 	e.workdir = wfDir
 	e.live = newFakeLive()
 	e.tracker = NewTracker(TrackerDeps{
+		Agent: testAgents,
 		Store: r.AdeSessions, LiveAgents: e.live.AgentSessions, WriteTerminal: e.live.Write, Now: time.Now,
-		Grace: 20 * time.Millisecond, PendingTTL: time.Minute, ClaudeBin: self,
+		Grace: 20 * time.Millisecond, PendingTTL: time.Minute, AgentBin: self,
 	})
 	e.board = NewTaskBoard(TaskBoardDeps{
+		Agent:       testAgents,
 		Credentials: gitcred.New(),
 		Tracker:     e.tracker,
 		CloseTerminal: func(id string) error {
@@ -231,7 +233,7 @@ func newEngine(t *testing.T, scen map[string][]string) *engine {
 		GitRepoSettings: r.GitRepoSettings.Get, Runner: gitclient.NewExecRunner(), Registry: registry,
 		GitStatus: func(context.Context) gitclient.GitStatus { return gitclient.GitStatus{Kind: "ok", Path: "git"} },
 		Workflows: &adeflow.Reader{Dir: wfDir, Store: r.AdeTasks},
-		Logs:      r.AdeLogs, Sessions: r.AdeSessions, AgentDir: filepath.Join(t.TempDir(), "agent"), ClaudeBin: self,
+		Logs:      r.AdeLogs, Sessions: r.AdeSessions, AgentDir: filepath.Join(t.TempDir(), "agent"), AgentBin: self,
 		OnLog:            func(ev adewire.LogEvent) { e.mu.Lock(); e.logs = append(e.logs, ev); e.mu.Unlock() },
 		AutofetchMinutes: func() int { return 0 }, HomeDir: e.home,
 	})
@@ -403,7 +405,7 @@ func TestRunEngine_eachRepoAutoAdvanceApprovalAndStepDone(t *testing.T) {
 	}
 
 	args := e.fakeFile("api-1.args")
-	for _, want := range []string{"--output-format\nstream-json", "--setting-sources\nuser,project,local", claudeheadless.FinishStepTool, "Bash(git *)"} {
+	for _, want := range []string{"--output-format\nstream-json", "--setting-sources\nuser,project,local", toolName(agentmcp.FinishStep), "Bash(git *)"} {
 		if !strings.Contains(args, want) {
 			t.Fatalf("argv lacks %q:\n%s", want, args)
 		}
@@ -415,7 +417,7 @@ func TestRunEngine_eachRepoAutoAdvanceApprovalAndStepDone(t *testing.T) {
 	if strings.Contains(args, "Bearer") {
 		t.Fatal("bearer token on argv")
 	}
-	if prompt := e.fakeFile("api-1.prompt"); !strings.Contains(prompt, "Step 1/2: one") || !strings.Contains(prompt, claudeheadless.FinishInstruction(llmprompts.Defaults(), nil)) {
+	if prompt := e.fakeFile("api-1.prompt"); !strings.Contains(prompt, "Step 1/2: one") || !strings.Contains(prompt, agentmcp.FinishInstruction(llmprompts.Defaults(), nil)) {
 		t.Fatalf("prompt = %q", prompt)
 	}
 

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/agentusage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/claudeusage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/testx"
@@ -26,7 +26,7 @@ var settingsArg = regexp.MustCompile(`--settings '([^']+)'`)
 // the env the shell would see.
 func launch(t *testing.T, app *flowharness.App, terminalID, cwd string) (doc map[string]any, settingsPath string, env []string) {
 	t.Helper()
-	command, env := app.W.AgentHooks.ComposeLaunch(terminalID, cwd, "claude")
+	command, env := app.W.AgentHooks.Compose("claude", terminalID, cwd, "claude")
 	m := settingsArg.FindStringSubmatch(command)
 	if m == nil || len(env) == 0 {
 		t.Fatalf("no --settings or env in %q", command)
@@ -74,18 +74,18 @@ func payload(five float64, fiveReset int64, seven float64, sevenReset int64) str
 
 func in(d time.Duration) int64 { return time.Now().Add(d).Unix() }
 
-func usage(t *testing.T, app *flowharness.App) claudeusage.Snapshot {
+func usage(t *testing.T, app *flowharness.App) agentusage.Snapshot {
 	t.Helper()
-	snap, err := app.W.ClaudeUsageSvc.Get()
+	snap, err := app.W.AgentUsageSvc.Get()
 	if err != nil {
 		t.Fatal(err)
 	}
 	return snap
 }
 
-func waitState(t *testing.T, app *flowharness.App, pred func(claudeusage.Snapshot) bool) claudeusage.Snapshot {
+func waitState(t *testing.T, app *flowharness.App, pred func(agentusage.Snapshot) bool) agentusage.Snapshot {
 	t.Helper()
-	var last claudeusage.Snapshot
+	var last agentusage.Snapshot
 	testx.WaitUntil(t, waitFor, func() bool {
 		last = usage(t, app)
 		return pred(last)
@@ -95,8 +95,8 @@ func waitState(t *testing.T, app *flowharness.App, pred func(claudeusage.Snapsho
 
 func setUsage(t *testing.T, app *flowharness.App, on bool) {
 	t.Helper()
-	p := model.ClaudeCodePatch{UsageEnabled: &on}
-	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{ClaudeCode: &p}}); err != nil {
+	p := model.AgentPatch{UsageEnabled: &on}
+	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{Agent: &p}}); err != nil {
 		t.Fatalf("Settings.Set: %v", err)
 	}
 }

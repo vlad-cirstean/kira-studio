@@ -10,7 +10,7 @@ import (
 
 func strPtr(s string) *string { return &s }
 
-// TestResolveFIFOInsertFields_NonFIFOQueueIsUntouched is F9's own control case: a standard queue's
+// TestResolveFIFOInsertFields_NonFIFOQueueIsUntouched is the control case: a standard queue's
 // insert never needs (or gets) MessageGroupId/MessageDeduplicationId, and never pays for the extra
 // GetQueueAttributes round trip content-based-dedup detection would otherwise cost (client is nil
 // here — a real client would panic if this path touched it).
@@ -24,7 +24,7 @@ func TestResolveFIFOInsertFields_NonFIFOQueueIsUntouched(t *testing.T) {
 	}
 }
 
-// TestResolveFIFOInsertFields_FIFOMissingGroupIDIsQueryError is F9's own regression: a FIFO queue
+// TestResolveFIFOInsertFields_FIFOMissingGroupIDIsQueryError is the regression: a FIFO queue
 // insert with no $messageGroupId used to reach AWS's own SendMessage with neither field set,
 // failing with AWS's own opaque rejection — this asserts the adapter now catches it first with a
 // clear message.

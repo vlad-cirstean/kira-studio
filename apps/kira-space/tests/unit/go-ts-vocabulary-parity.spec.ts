@@ -1,4 +1,4 @@
-// P103 Part 2 (§5.1): Kira Space's own half of the Go/TS tab-kind vocabulary parity check —
+// Kira Space's own half of the Go/TS tab-kind vocabulary parity check —
 // Kira Studio's own copy (apps/kira-studio/tests/unit/go-ts-vocabulary-parity.spec.ts) used to
 // check the one shared 16-member RENDERABLE_TAB_KINDS against Kira Studio's Go list alone,
 // leaving this app's own five-kind vocabulary unchecked against anything. This is the one

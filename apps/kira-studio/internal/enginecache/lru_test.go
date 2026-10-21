@@ -77,7 +77,7 @@ func TestByteLru_DeleteWhere(t *testing.T) {
 	}
 }
 
-// P21 round 3 functional finding 16: countStore.markTargetStale used to round-trip a stale flip
+// countStore.markTargetStale used to round-trip a stale flip
 // through Set — Set's own "touch" semantics (stamp `at: time.Now()`, move to the newest end) are
 // right for a fetch that genuinely refreshes an entry, but wrong for this purely local field flip,
 // which carries no new recency information at all. Update exists precisely to mutate a value in

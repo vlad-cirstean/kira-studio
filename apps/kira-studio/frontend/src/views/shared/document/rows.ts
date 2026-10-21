@@ -1,6 +1,6 @@
 // The row model the virtualized document list reads: one memoized parse per page row, the
 // per-path expansion set, and the exact row height. Plain Maps/Sets keyed by row and by path —
-// never reactive (§0, D21) — with `rowsVersion` as the one reactive surface, mirroring documents/page.ts's
+// never reactive — with `rowsVersion` as the one reactive surface, mirroring documents/page.ts's
 // own `pageVersion`. A `reactive()` tree here would put a Proxy around every node of every document
 // on the page, which is exactly the frame budget this phase exists to protect.
 
@@ -10,11 +10,11 @@ import { defineStore } from 'pinia';
 import { reactive } from 'vue';
 import { type BsonType, type DocNode, parseDocument, parseIdLabel } from './ejson';
 
-// P42 D9: this module used to import documentRow from views/documents/page.ts directly — the one
-// edge that blocked the move here, since views/console/ (the phase's other row source) may not
-// import views/documents/* (biome.json's views/<kind>/* rule). A registered source replaces it:
-// the view that owns a scope (a document tab's id, or a console result's key) registers where its
-// rows come from, and every function below still just calls the same-shaped local documentRow().
+// This module used to import documentRow from views/documents/page.ts directly — the one edge
+// that blocked the move here, since views/console/ may not import views/documents/*
+// (biome.json's views/<kind>/* rule). A registered source replaces it: the view that owns a
+// scope (a document tab's id, or a console result's key) registers where its rows come from,
+// and every function below still calls the same-shaped local documentRow().
 type RowSource = (
   row: number,
 ) => { id: string; body: string; isTruncated?: boolean; bodyByteLength: number } | null;
@@ -51,14 +51,14 @@ interface Parsed {
 interface TabRows {
   parseCache: Map<number, Parsed>;
   expandedPaths: Map<number, Set<string>>;
-  // P21 round 3 performance finding 4: `rowHeight`'s answer for an expanded row is a single
+  // `rowHeight`'s answer for an expanded row is a single
   // integer (the visible-line count) — a few bytes, against a whole DocNode tree in parseCache —
   // but it used to be derived from parseCache/visibleLines on every call, so `pruneRows` evicting
-  // parseCache outside the visible window (P5 C3/F4's own window pruning) meant every rowHeights
-  // recompute after a scroll re-parsed every expanded document on the page from scratch, just to
+  // parseCache outside the visible window meant every rowHeights
+  // recompute after a scroll re-parsed every expanded document on the page from scratch, to
   // answer a question whose answer hadn't changed. `lineCounts` is deliberately NOT touched by
   // pruneRows below — it survives exactly what parseCache doesn't — and is invalidated only where
-  // the line count can actually change: togglePath (this row's own expansion set changed) and a
+  // the line count can change: togglePath (this row's own expansion set changed) and a
   // full resetRows/dropRows (the whole page, or scope, is gone). `null` caches the "no root, raw
   // fallback" case so a document that failed to parse doesn't retry parsing it every call either.
   lineCounts: Map<number, number | null>;
@@ -210,16 +210,16 @@ export const useDocumentRowsStore = defineStore('documentRows', () => {
     rowsVersion.n++;
   }
 
-  /** P5 C3/F4: prunes `parseCache` to the visible window (widened by VirtualList's own overscan —
+  /** Prunes `parseCache` to the visible window (widened by VirtualList's own overscan —
    *  already folded into the caller's `start`/`end`, `DocumentView.vue`'s `onVisibleRange`). The
    *  O(rowCount) parse pass a page's initial load needs — VirtualList's own exact-height math needs
-   *  every *expanded* row's line count, and every document defaults to expanded (P27 D2) — no
+   *  every *expanded* row's line count, and every document defaults to expanded — no
    *  longer stays retained for the whole page once the window has moved past a row.
    *
    *  `expandedPaths` is pruned too, but only for a row whose set is *empty* — a row the user
-   *  actually drilled a nested field into keeps its expansion memory regardless of scroll position,
+   *  drilled a nested field into keeps its expansion memory regardless of scroll position,
    *  so expanding a document, scrolling far away and scrolling back still shows it expanded.
-   *  `lineCounts` (finding 4) is never pruned here at all — it is the answer `rowHeight` needs for
+   *  `lineCounts` is never pruned here at all — it is the answer `rowHeight` needs for
    *  every row on the page, not just the visible window, and costs a few bytes/row against a whole
    *  `DocNode` tree. */
   function pruneRows(scope: string, start: number, end: number): void {
@@ -233,7 +233,7 @@ export const useDocumentRowsStore = defineStore('documentRows', () => {
     }
   }
 
-  /** P43 iter2 F23/D32: releases everything this module holds for one scope — a closed document
+  /** Releases everything this module holds for one scope — a closed document
    *  tab, or a closed console result set whose key nothing can ever match again (state.ts's own
    *  `nextSeq`). Distinct from `resetRows` above, which keeps the entry because the same scope is
    *  about to hold a *new* page — `dropRows` is for a scope that is never coming back. Registered

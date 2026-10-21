@@ -1,4 +1,6 @@
-// P86: the TypeScript mirrors of Go's terminal.AgentSession/agenthooks.Event wire shapes.
+import { z } from 'zod';
+
+// The TypeScript mirrors of Go's terminal.AgentSession/harness.AgentEvent wire shapes.
 // grpc-history.ts's own precedent — types, not guards: neither crosses a storage boundary or gets
 // restored, so nothing here earns a Zod-parse boundary. control.ts `trust<T>()`s them like every
 // other bound result.
@@ -16,7 +18,7 @@ export interface AgentSessionsEvent {
   sessions: AgentSession[];
 }
 
-// agenthooks.Event's own wire projection, ChannelAgentEvent's payload (§6) — one hook firing for
+// harness.AgentEvent's own wire projection, ChannelAgentEvent's payload (§6) — one hook firing for
 // one tab. Every field the listener kept; everything else (tool_input, tool_response,
 // transcript_path, ...) was already dropped server-side and never reaches here.
 export interface AgentEvent {
@@ -36,10 +38,10 @@ export interface AgentEvent {
   lastAssistantMessage: string; // Stop, bounded server-side
 }
 
-// §13's own reducer output — one Claude Code tab's current activity, derived from the AgentEvent
-// stream by state/agentActivity.ts's reduceAgentActivity. 'waiting' is P129 Part 1's own addition:
-// a session that armed a wake tool (Monitor, ScheduleWakeup) before its own Stop is "waiting on
-// monitor", not plain idle (design mapping done in Part 3's UI, not here).
+// Reducer output — one Claude Code tab's current activity, derived from the AgentEvent
+// stream by state/agentActivity.ts's reduceAgentActivity. 'waiting': a session that armed a wake
+// tool (Monitor, ScheduleWakeup) before its own Stop is "waiting on monitor", not plain idle
+// (design mapping done in the UI, not here).
 export type AgentPhase = 'idle' | 'working' | 'attention' | 'waiting';
 
 export interface AgentActivity {
@@ -56,3 +58,17 @@ export interface AgentActivity {
   // every event updates it, including one that leaves phase unchanged.
   at: number;
 }
+
+// agentsvc.Info: what the UI needs to name and configure one agent provider.
+export const agentInfoSchema = /*#__PURE__*/ z.object({
+  id: z.string(),
+  label: z.string(),
+  productLabel: z.string(),
+  command: z.string(),
+  headlessLabel: z.string(),
+  models: z.array(z.object({ id: z.string(), label: z.string() })),
+  defaultModel: z.string(),
+  hooks: z.boolean(),
+  usage: z.boolean(),
+});
+export type AgentInfo = z.infer<typeof agentInfoSchema>;

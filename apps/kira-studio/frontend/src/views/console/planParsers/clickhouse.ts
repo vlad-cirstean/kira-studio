@@ -2,8 +2,8 @@ import { t } from '@theme/i18n';
 import { pushWideScanIssue, rollupIssues } from '../planIssues';
 import type { PlanNode, QueryPlan } from '../planModel';
 
-// P18 (v1.1) D13/D14/D15/D16: ClickHouse's `EXPLAIN PLAN json = 1, indexes = 1, description = 1`
-// plus a second `EXPLAIN ESTIMATE` call — F15. Neither reports a cost, so `nativeCost` stays
+// ClickHouse's `EXPLAIN PLAN json = 1, indexes = 1, description = 1`
+// plus a second `EXPLAIN ESTIMATE` call. Neither reports a cost, so `nativeCost` stays
 // unset; ESTIMATE's own row count is the *only* size figure available, and the plan's own
 // `Indexes[]` entries are the only index-usage signal — `Selected Granules == Initial Granules`
 // (with `Condition: "true"`) is ClickHouse's own "no index narrowed the read" tell.

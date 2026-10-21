@@ -1,9 +1,9 @@
 import { expect, test } from './fixtures';
 
-// Ported from tests/e2e/smoke.spec.ts (P57 D16). The app-name assertion (`app.evaluate(({app}) =>
+// Ported from tests/e2e/smoke.spec.ts. The app-name assertion (`app.evaluate(({app}) =>
 // app.getName())`) has no analogue here — there is no Electron `app` object, and the bundle's
-// display name (P57 D11) is a packaged-build property this tier's static server never sets up;
-// it stays a manual macOS check (§6).
+// display name is a packaged-build property this tier's static server never sets up;
+// it stays a manual macOS check.
 test('workbench launches with all chrome regions and a healthy engine', async ({
   kira,
   consoleErrors,
@@ -13,10 +13,10 @@ test('workbench launches with all chrome regions and a healthy engine', async ({
   // `WILDCARD_DEFAULTS` (no fixture needs to spell it out).
   const { window } = kira;
 
-  // 'toolbar' is intentionally not a fixed shell region any more (P16 design system LAW 09):
+  // 'toolbar' is intentionally not a fixed shell region any more:
   // each view now renders its own toolbar, so with no connections/tabs (this fixture's empty
   // boot) there is none — the tab strip stays mounted but empty, and MainView's own FirstRun
-  // screen is what actually carries the "what do I do now" messaging.
+  // screen is what carries the "what do I do now" messaging.
   const alwaysPresent = ['project-panel', 'tab-strip', 'main-view', 'status-bar'];
   for (const testid of alwaysPresent) {
     await expect(window.locator(`[data-testid="${testid}"]`)).toBeVisible();

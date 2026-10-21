@@ -172,7 +172,7 @@ func revListShas(t *testing.T, dir string) []string {
 	return strings.Fields(string(out))
 }
 
-// TestConn_ReviewWalkDoesNotDisturbTheGraphWalk is D3's whole correctness claim: build both walks
+// TestConn_ReviewWalkDoesNotDisturbTheGraphWalk is the whole correctness claim: build both walks
 // on one Conn against one repository, page and stream each, and assert the graph's store row
 // count, nextSeq (observed via Status/Stream chunk seq) and log session are untouched across the
 // review walk's whole life, including its replacement by a second range.
@@ -274,16 +274,16 @@ func TestConn_ReviewWalkDoesNotDisturbTheGraphWalk(t *testing.T) {
 	}
 }
 
-// TestConn_MarkWalksStaleRacesSafelyWithWalkRebuild is G32 round-3 architecture/security review,
-// finding #6's own regression proof. Walk's own `*slot = w` / `(*slot).dispose(); *slot = nil`
-// (rebuilding pair.graph/pair.review on a spec change) only ever runs under c.mu — but
-// markWalksStale used to read those same two fields AFTER releasing c.mu, exactly the "in the real
-// system" scenario Open's own entry.Subscribe callback creates: refsChanged fires on the watcher's
-// notification goroutine, concurrently with an RPC handler goroutine rebuilding a walk via
-// graph.stream/review.stream. One goroutine repeatedly alternates the graph slot between two specs
-// (forcing repeated dispose-and-replace, exactly Walk's own mutation path) while a second
-// concurrently calls markWalksStale — go test -race is what actually proves this, by flagging the
-// unsynchronized read/write pre-fix and staying silent post-fix.
+// TestConn_MarkWalksStaleRacesSafelyWithWalkRebuild is the regression proof.
+// Walk's own `*slot = w` / `(*slot).dispose(); *slot = nil` (rebuilding pair.graph/pair.review on
+// a spec change) only ever runs under c.mu — but markWalksStale used to read those same two fields
+// AFTER releasing c.mu, exactly the "in the real system" scenario Open's own entry.Subscribe
+// callback creates: refsChanged fires on the watcher's notification goroutine, concurrently with
+// an RPC handler goroutine rebuilding a walk via graph.stream/review.stream. One goroutine
+// repeatedly alternates the graph slot between two specs (forcing repeated dispose-and-replace,
+// exactly Walk's own mutation path) while a second concurrently calls markWalksStale
+// — go test -race is what proves this, by flagging the unsynchronized read/write pre-fix and
+// staying silent post-fix.
 func TestConn_MarkWalksStaleRacesSafelyWithWalkRebuild(t *testing.T) {
 	t.Parallel()
 	skipWithoutGitWalk(t)
@@ -320,12 +320,13 @@ func TestConn_MarkWalksStaleRacesSafelyWithWalkRebuild(t *testing.T) {
 	wg.Wait()
 }
 
-// TestConn_DisableAutoFetch_OptsThisConnOutOfArming is C13-10: the native git-graph mount's own
+// TestConn_DisableAutoFetch_OptsThisConnOutOfArming: the native git-graph mount's own
 // Conn (bridge/gitstream.go's ServeGitStream) calls DisableAutoFetch before serving any request,
 // so its own repo.open must never be what arms a RepoEntry's background auto-fetch timer —
-// docs/ARCHITECTURE.md's "Git graph in the native workspace (C10)" section documents that surface as read-only, and a real `git fetch
-// --prune` is a write. An ordinary Conn (no DisableAutoFetch call) opening the identical scenario
-// DOES arm it, proving this test's own assertion actually distinguishes the two rather than being
+// docs/ARCHITECTURE.md's "Git graph in the native workspace (C10)" section documents that
+// surface as read-only, and a real `git fetch --prune` is a write.
+// An ordinary Conn (no DisableAutoFetch call) opening the identical scenario
+// DOES arm it, proving this test's own assertion distinguishes the two rather than being
 // vacuously true regardless of the fix.
 func TestConn_DisableAutoFetch_OptsThisConnOutOfArming(t *testing.T) {
 	t.Parallel()
@@ -366,7 +367,7 @@ func TestConn_DisableAutoFetch_OptsThisConnOutOfArming(t *testing.T) {
 
 	// An ordinary Conn later opening the SAME repository the native Conn opened quietly (reusing
 	// that already-constructed, still-unarmed entry) must still arm it -- EnsureAutoFetch's own
-	// existing off→on path (F4/D5), untouched by AcquireQuiet, which only ever affects the one
+	// existing off→on path, untouched by AcquireQuiet, which only ever affects the one
 	// moment a brand-new entry is constructed.
 	ordinary2 := NewConn("ordinary-2", "client", "Some editor", nil)
 	summary3, err := ordinary2.Open(context.Background(), reg, "/usr/bin/git", "/repo-native")
@@ -384,8 +385,8 @@ func TestConn_DisableAutoFetch_OptsThisConnOutOfArming(t *testing.T) {
 	}
 }
 
-// TestRegistry_ReconcileAutoFetch_NeverArmsAQuietOnlyEntry is C14-3: a real gap in C13-10's own
-// fix. DisableAutoFetch/AcquireQuiet correctly stopped the native mount's own repo.open from arming
+// TestRegistry_ReconcileAutoFetch_NeverArmsAQuietOnlyEntry is a real gap in the fix.
+// DisableAutoFetch/AcquireQuiet correctly stopped the native mount's own repo.open from arming
 // a brand-new entry directly, but ReconcileAutoFetch (called from bridge/settings.go whenever the
 // user changes fetch.autoIntervalMinutes in Settings) called EnsureAutoFetch on EVERY constructed
 // entry with no memory of how each was acquired — so a repository opened ONLY through the native
@@ -393,7 +394,7 @@ func TestConn_DisableAutoFetch_OptsThisConnOutOfArming(t *testing.T) {
 // defeating the "provably read-only" guarantee for that surface. This proves: (1) a quiet-only
 // entry stays unarmed across a ReconcileAutoFetch call, and (2) once a real (non-quiet) Conn also
 // opens that same repository, ReconcileAutoFetch can arm it correctly — the "starts quiet-only,
-// later gets a real paired connection" case C14-3's own fix has to handle without over-correcting.
+// later gets a real paired connection" case the fix has to handle without over-correcting.
 func TestRegistry_ReconcileAutoFetch_NeverArmsAQuietOnlyEntry(t *testing.T) {
 	t.Parallel()
 	reg := newTestRegistry()
@@ -446,8 +447,8 @@ func TestRegistry_ReconcileAutoFetch_NeverArmsAQuietOnlyEntry(t *testing.T) {
 	}
 }
 
-// TestConn_EmitSetEmitConcurrentAccessIsRace_Free is P108 Part 17 review F9's own regression
-// guard: bridge's ServeGitStream constructs a Conn with no Emit yet,
+// TestConn_EmitSetEmitConcurrentAccessIsRace_Free is the regression guard: bridge's ServeGitStream
+// constructs a Conn with no Emit yet,
 // start a goroutine that can call Emit (gitrpc.Router.ForConn's own repoSettings.changed
 // forwarding goroutine, started as soon as ForConn is called) before its own SetEmit call
 // installs the real function moments later — an unguarded bare field there is a genuine read/write

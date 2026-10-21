@@ -9,9 +9,9 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// preflight.reset and preflight.cherryPick — thin dispatch (D20, matching refs.go's own shape for
+// preflight.reset and preflight.cherryPick — thin dispatch (matching refs.go's own shape for
 // this exact category of handler): decode params, resolve c's held RepoEntry, call one RepoEntry
-// method, marshal. Both are reads, so neither detaches ctx (D8 — that's op.run/undo.run's own
+// method, marshal. Both are reads, so neither detaches ctx (that's op.run/undo.run's own
 // concern, ops.go).
 
 func (r *Router) handlePreflightReset(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {

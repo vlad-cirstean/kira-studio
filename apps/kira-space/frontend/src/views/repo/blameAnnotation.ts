@@ -1,6 +1,6 @@
 import { t } from '@theme/i18n';
 /**
- * P62 §4 / P76 §4 — the repo file viewer's own git-blame annotation: injected text at the end of
+ * The repo file viewer's own git-blame annotation: injected text at the end of
  * the cursor's line, `<author>, <age> · <subject>`. The request lifecycle (debounce, cache,
  * cancellation, `repo.changed` invalidation) lives in `blameLine.ts`'s `createBlameLineController`,
  * shared with the status-bar widget (`RepoFileView.vue`) — this module is only the Monaco

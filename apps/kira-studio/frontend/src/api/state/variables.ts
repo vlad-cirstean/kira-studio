@@ -31,19 +31,19 @@ import {
 import { useCollectionsStore } from './collections';
 import { createRevealExpiry } from './revealExpiry';
 
-// P5 D3/D11: the environment list and the app-global active selection — read-only at this point
-// (list and switch); editing, secrets, history and reordering land in later commits on this same
-// store. Mirrors http/state/collections.ts's own shape: one reactive object, re-listed after every
+// The environment list and the app-global active selection — read-only at this point (list and
+// switch); editing, secrets, history and reordering land in later commits on this same store.
+// Mirrors http/state/collections.ts's own shape: one reactive object, re-listed after every
 // mutation rather than patched locally, since the list is small and this keeps the store
-// impossible to get out of step with what Go actually stored.
+// impossible to get out of step with what Go stored.
 //
-// P99: split out of the original single variables.ts into two stores — this one (environments) and
-// useVariableSetStore below (the variable-set tab's runtime, send-time cache, gated reveal and
-// history popover). The two are genuinely independent: nothing here reaches into the variable-set
-// machinery, and nothing there reaches back into environment CRUD.
+// Split into two stores — this one (environments) and useVariableSetStore below
+// (the variable-set tab's runtime, send-time cache, gated reveal and history popover). The two
+// are genuinely independent: nothing here reaches into the variable-set machinery, and nothing
+// there reaches back into environment CRUD.
 
 interface VariablesState {
-  /** P108 F10: an environment CRUD call's own failure message — every mutation below used to let
+  /** An environment CRUD call's own failure message — every mutation below used to let
    *  this throw uncaught (a fire-and-forget `void` call from EnvironmentsView.vue), so a failed
    *  create/rename/delete/duplicate/reorder/activate left the row exactly as it was with nothing
    *  telling the user why. Cleared on the next successful mutation. */
@@ -59,7 +59,7 @@ export const useVariablesStore = defineStore('variables', () => {
     state.error = null;
   }
 
-  // P112: the environments list is now TanStack Query's cache, not a store field — this observer
+  // The environments list is now TanStack Query's cache, not a store field — this observer
   // is app-lifetime (created once, with the setup store's own effect scope owning it), so
   // invalidateQueries always has an active observer to refetch. queryClient is passed explicitly
   // (not injected): main.ts creates stores before app.use(VueQueryPlugin), and unit tests mount no
@@ -78,11 +78,11 @@ export const useVariablesStore = defineStore('variables', () => {
    *  uses, and what control.httpSend's environmentId will carry at send time. */
   const activeEnvironmentId = computed(() => activeEnvironment.value?.id ?? '');
 
-  /** P18 D17/D19: the active environment's colour, for the request views' toolbar rail and head
-   *  dot (LAW 07) — 'none' with no environment active, the same "the rail slot stays reserved
+  /** The active environment's colour, for the request views' toolbar rail and head
+   *  dot — 'none' with no environment active, the same "the rail slot stays reserved
    *  either way" treatment a colour of 'none' already gets. Always defined (never undefined), so
    *  ViewChrome's `envColor` prop always drives the dot rather than falling through to a
-   *  connection's own colour, which an Api tab never has (F20 #6). */
+   *  connection's own colour, which an Api tab never has. */
   const activeEnvironmentColor = computed<PaletteColor>(
     () => activeEnvironment.value?.color ?? 'none',
   );
@@ -116,12 +116,12 @@ export const useVariablesStore = defineStore('variables', () => {
     }
   }
 
-  // ---- P71 §3.3: the per-tab environment override ----
+  // ---- The per-tab environment override ----
   //
   // An incognito tab's own environment pick lives here, in memory, never touching
   // api_environments.is_active — switching environment is the main reason to open an incognito tab
-  // at all, so the selector itself stays enabled and useful rather than disabled (§3.3's own
-  // "declined" note). Absent (no entry) until the user actually picks one: an incognito tab inherits
+  // at all, so the selector itself stays enabled and useful rather than disabled.
+  // Absent (no entry) until the user picks one: an incognito tab inherits
   // the app-wide selection at open time, so the common case is byte-identical to today.
   const incognitoEnvByTab = new Map<string, string>(); // tabId → environment id ('' = none)
 
@@ -152,11 +152,11 @@ export const useVariablesStore = defineStore('variables', () => {
     incognitoEnvByTab.delete(tabId);
   });
 
-  // P108 F9, kept under a new mechanism: an incognito tab's own override is never cleared by
-  // anything else — left in place after its environment is deleted, it kept substituting the
-  // deleted environment's plain values while Go resolved no secrets for the (now missing) id. This
-  // now also fires for a delete made in *another* window, which F9's own local-only loop never
-  // saw. Skipped while envQuery.data.value is undefined, so an unloaded list never wipes overrides.
+  // An incognito tab's own override is never cleared by anything else — left in place after its
+  // environment is deleted, it kept substituting the deleted environment's plain values while Go
+  // resolved no secrets for the (now missing) id. This now also fires for a delete made in
+  // *another* window. Skipped while envQuery.data.value is undefined, so an unloaded list never
+  // wipes overrides.
   watch(environments, (list) => {
     if (envQuery.data.value === undefined) return;
     const ids = new Set(list.map((e) => e.id));
@@ -227,10 +227,10 @@ export const useVariablesStore = defineStore('variables', () => {
     queryClient,
   );
 
-  /** Deleting the active environment leaves none active (D3) — there is nothing to reassign.
-   *  Closes any open variable-set tab for it too (D16) — unlike a request tab, it has no state of
-   *  its own worth preserving once its owner is gone. The incognito-override drop (F9) and the
-   *  cached variable-rows eviction (F9) both now happen reactively — the `environments` watch
+  /** Deleting the active environment leaves none active — there is nothing to reassign.
+   *  Closes any open variable-set tab for it too — unlike a request tab, it has no state of
+   *  its own worth preserving once its owner is gone. The incognito-override drop and the
+   *  cached variable-rows eviction both now happen reactively — the `environments` watch
    *  above and `reconcileEnvironments` (afterEnvironmentsListChange) — rather than as explicit
    *  steps here. */
   async function deleteEnvironment(id: string): Promise<void> {
@@ -264,7 +264,7 @@ export const useVariablesStore = defineStore('variables', () => {
     }
   }
 
-  // ---- the environments surface (D3/D11, re-homed to a tab by P28 D16(c)) ----
+  // ---- the environments surface ----
   //
   // The dialog flag and its open/close pair are gone. `openEnvironments()` is the one entry point
   // every caller uses; it opens (or focuses) the environments tab. It used to also refresh the
@@ -315,17 +315,17 @@ export const useVariablesStore = defineStore('variables', () => {
   };
 });
 
-// ---- the variable-set tab (P17 D16) — one scope's variable list, one runtime per open tab ----
+// ---- the variable-set tab — one scope's variable list, one runtime per open tab ----
 //
-// R10 re-homes what used to be the single VariablesDialog's own state (variablesDialogState) into
+// Re-homes what used to be the single VariablesDialog's own state (variablesDialogState) into
 // a per-tab runtime — createRuntimeStore's own shape (views/httprequest/state.ts:132's precedent),
 // since a variable-set tab, unlike the dialog it replaces, can now be open more than once at a
 // time (one per collection/environment).
 //
-// P112: the row list itself moved to a TanStack Query cache (apiVariablesQueryOptions) — a
+// The row list itself moved to a TanStack Query cache (apiVariablesQueryOptions) — a
 // component observes it directly with useVariableRows; non-component code reads it through
-// loadVariableRows/getQueryData (§3.5). This store keeps only what a query cache cannot hold: a
-// mutation's own per-tab error (F10), the gated reveal, and the history popover — reachable from
+// loadVariableRows/getQueryData. This store keeps only what a query cache cannot hold: a
+// mutation's own per-tab error, the gated reveal, and the history popover — reachable from
 // each other (revealHistoryEntry/restoreHistoryEntry into setVariableSetError/upsertVariable/
 // openHistoryMenu), which is why they still share one store rather than three.
 
@@ -362,9 +362,9 @@ interface HistoryMenuState {
   entries: ApiVariableHistoryEntry[];
 }
 
-// ---- the merged value/secret cache, shared by both protocols (P12 D9/F10) ----
+// ---- the merged value/secret cache, shared by both protocols ----
 //
-// P112: pure functions over rows now, not store members reading a scope/owner-keyed cache —
+// Pure functions over rows now, not store members reading a scope/owner-keyed cache —
 // mergedValuesAndSecrets/overviewRows used to call `cachedVariables` internally; every caller now
 // already holds its own rows (a useVariableRows observer's `.data`, or a loadVariableRows/
 // getQueryData read) and passes them in directly.
@@ -398,9 +398,9 @@ export function mergeVariableRows(
   return { values, secretNames };
 }
 
-// P17 D20/item 8: one row of the read-only overview panel — every stored row from both scopes
+// One row of the read-only overview panel — every stored row from both scopes
 // (not deduplicated into a single resolved value the way mergeVariableRows is, since the panel's
-// whole point is to make D2's precedence *visible*: a shadowed collection row still appears,
+// whole point is to make the precedence *visible*: a shadowed collection row still appears,
 // dimmed, rather than disappearing the way it would in the merged map above).
 
 /** D20: environment rows first (the scope that wins precedence, D2), then collection rows, each
@@ -431,8 +431,8 @@ async function apiIdsForTab(
   tabId: string,
   itemId: string | null,
 ): Promise<{ collectionId: string; environmentId: string }> {
-  // Awaits the tree and environments queries first (cache-first; a fetch only actually happens
-  // before either store's own app-lifetime observer has resolved once) — closes F5's "tree not
+  // Awaits the tree and environments queries first (cache-first; a fetch only happens
+  // before either store's own app-lifetime observer has resolved once) — closes the "tree not
   // loaded yet" gap at send/describe time, rather than reading whatever the store happened to have
   // synchronously.
   await Promise.all([loadCollectionsTree(), loadEnvironments()]);
@@ -442,12 +442,12 @@ async function apiIdsForTab(
   };
 }
 
-/** P112: replaces five duplicated sync blocks in views/httprequest/state.ts, views/grpcrequest/
+/** Replaces five duplicated sync blocks in views/httprequest/state.ts, views/grpcrequest/
  *  state.ts and (via variableCompletion.ts) both request views — each used to read
  *  collectionIdFor/environmentIdForTab then mergedValuesAndSecrets over a store cache that
  *  ensureVariablesLoaded had to be trusted to already have populated. Awaiting loadVariableRows
  *  means a send after an invalidation always refetches first, so stale plain values can never
- *  substitute — the concrete F12 symptom this closes. */
+ *  substitute. */
 export async function variablesForSend(
   tabId: string,
   itemId: string | null,
@@ -466,7 +466,7 @@ export async function variablesForSend(
 }
 
 export const useVariableSetStore = defineStore('variableSet', () => {
-  // P1 D7: api/ may not import views/shared/viewOp.ts's own createRuntimeStore (the module-boundary
+  // api/ may not import views/shared/viewOp.ts's own createRuntimeStore (the module-boundary
   // lint rule) — this is that same small "one reactive record, keyed by tabId, created on first
   // touch" shape, inlined rather than hoisted somewhere both sides could reach, since this is the
   // only api/-side per-tab runtime that exists. Returned as a named property directly (not
@@ -520,7 +520,7 @@ export const useVariableSetStore = defineStore('variableSet', () => {
   /** id: '' creates a new row (D19). value is three-state (F2, P108 Part 3): null means "leave the
    *  stored value untouched" — VariableSetView.vue's own valueTouched flag is what decides which
    *  one it sends; every other caller here (restoreHistoryEntry) always has a real value in hand. */
-  /** P108 F10: this (and deleteVariable/reorderVariables below) used to let a failed IPC call
+  /** This (and deleteVariable/reorderVariables below) used to let a failed IPC call
    *  throw uncaught — VariableSetView.vue's own call sites (commitDraft, row delete, drag/keyboard
    *  reorder) have no try/catch of their own, so a rejected edit vanished with nothing telling the
    *  user why the row snapped back. Reuses the tab's own `variableSetError`/setVariableSetError —
@@ -643,7 +643,7 @@ export const useVariableSetStore = defineStore('variableSet', () => {
    *  this is the one place a secret's plaintext exists in the renderer at all. Shared with
    *  state/curl.ts's own reveal loop (revealSecretValues calls the same revealVariable below), so
    *  clearRevealed stays a store method (not private) — every dialog that can populate this map
-   *  must also be able to clear it (finding 5: a stale entry left behind by one dialog must never
+   *  must also be able to clear it (a stale entry left behind by one dialog must never
    *  let a *different*, later-opened dialog trust it in place of its own re-auth gate). Returned as
    *  a named property directly (not toRefs-spread) — same Record-with-dynamic-keys reasoning as
    *  variableSetRuntime/listCache above.
@@ -654,9 +654,9 @@ export const useVariableSetStore = defineStore('variableSet', () => {
 
   /** Drops every revealed secret's plaintext from memory — called by every dialog/popover close
    *  path that can populate revealedValues (closeVariablesDialog here, closeCopyAsCurlDialog in
-   *  curl.ts), the same honest "not scrubbed, just dropped" limit P14 §0.3 states for its own reveal
-   *  map (JS offers no way to zero a string in memory). Also cancels this id's grace-expiry timer
-   *  (finding 5) so a delayed callback can't fire against a map a later reveal has since repopulated. */
+   *  curl.ts), the honest "not scrubbed, just dropped" limit (JS offers no way to zero a string
+   *  in memory). Also cancels this id's grace-expiry timer so a delayed callback can't fire
+   *  against a map a later reveal has since repopulated. */
   function clearRevealed(): void {
     for (const id of Object.keys(revealedValues)) delete revealedValues[id];
     revealedValuesExpiry.clearAll();
@@ -668,12 +668,12 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     revealedValuesExpiry.clear(id);
   }
 
-  /** P12 D13: runs over http/reveal.ts's shared recurse-once switch — the pattern used to be
+  /** Runs over http/reveal.ts's shared recurse-once switch — the pattern used to be
    *  hand-copied from ConnectionDialog.vue's own requestReveal (there was nothing importable to
-   *  reuse, §1.4/OQ-2); now it is the module's own shared loop, used here and by
+   *  reuse); now it is the module's own shared loop, used here and by
    *  revealHistoryEntry below.
    *
-   *  R10: `onError` is now required rather than falling back to a singleton dialog's error field —
+   *  `onError` is now required rather than falling back to a singleton dialog's error field —
    *  there is no longer one such field to fall back to (a variable-set view writes into its own
    *  tab's runtime via setVariableSetError; the *Copy as curl* reveal loop, http/state/curl.ts, has
    *  its own error sink either way). */
@@ -708,9 +708,9 @@ export const useVariableSetStore = defineStore('variableSet', () => {
    *  property directly, same reasoning as the other Record-shaped fields above. */
   const revealedHistoryValues = reactive<Record<string, string>>({});
 
-  // Finding 5: this map used to be cleared only by the popover's own close path
+  // This map used to be cleared only by the popover's own close path
   // (openHistoryMenu/closeHistoryMenu below) — nothing re-masked a revealed prior value once the
-  // grace it came from had actually expired, so a popover left open (or, per the comment on
+  // grace it came from had expired, so a popover left open (or, per the comment on
   // openHistoryMenu below, torn down without its own @close firing) could hold a decrypted secret
   // history value indefinitely. Same grace, same discipline as revealedValues above.
   const revealedHistoryValuesExpiry = createRevealExpiry(revealedHistoryValues);
@@ -720,13 +720,13 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     revealedHistoryValuesExpiry.clearAll();
   }
 
-  /** Finding 5: VariableRow.vue's popover is `v-if`-gated on `historyMenuState.variableId ===
+  /** VariableRow.vue's popover is `v-if`-gated on `historyMenuState.variableId ===
    *  row.id`, so switching from one row's history button to another's unmounts the first popover
    *  without ever firing its own `@close` — closeHistoryMenu below would never run for it. Clearing
    *  here too, before the new popover's own state lands, closes that gap regardless of whether the
    *  previous popover ever closes "cleanly".
    *
-   *  P108 F13: this had no guard against a *second* call landing before the first's own
+   *  This had no guard against a *second* call landing before the first's own
    *  `variablesHistory` await resolved — opening one row's history, then another's before the
    *  first reply arrived, let the first call's stale reply win the race and overwrite `entries`
    *  with the wrong row's history right after the second call had already set `variableId` to the
@@ -766,11 +766,11 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     clearRevealedHistory();
   }
 
-  // P108 F13: closing the tab this popover belongs to used to leave historyMenuState pointing at
-  // it — restoreHistoryEntry's own row lookup would keep resolving against a dead tab's scope/owner,
-  // and the popover itself, still `open`, would keep showing a dead tab's history. Same "this tab's
-  // own leftover state is this store's job to clear" discipline registerTabRuntimeCleanup already
-  // applies to variableSetRuntime.
+  // Closing the tab this popover belongs to used to leave historyMenuState pointing at
+  // it — restoreHistoryEntry's own row lookup would keep resolving against a dead tab's
+  // scope/owner, and the popover itself, still `open`, would keep showing a dead tab's history.
+  // Same "this tab's own leftover state is this store's job to clear" discipline
+  // registerTabRuntimeCleanup already applies to variableSetRuntime.
   registerTabRuntimeCleanup((tabId) => {
     if (historyMenuState.tabId === tabId) closeHistoryMenu();
   });

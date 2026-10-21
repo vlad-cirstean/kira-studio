@@ -42,8 +42,7 @@ func TestBroker_FIFOOrder_OnlyHeadPresented(t *testing.T) {
 	clock := newFakeClock()
 	b := newTestBroker(clock.Now)
 
-	// G31 round-2 functional-correctness review, finding #6: Request now emits on every enqueue,
-	// not only when the new request becomes the head (see that fix's own comment on Request) — a
+	// Request now emits on every enqueue, not only when the new request becomes the head — a
 	// second/third request queueing behind an already-presented head changes Queued and must be
 	// reported too. This test's own subscriber therefore collapses CONSECUTIVE duplicate head
 	// IDs before asserting order, exactly like main.go's own real subscriber does (deduping on
@@ -119,13 +118,12 @@ func TestBroker_FIFOOrder_OnlyHeadPresented(t *testing.T) {
 	}
 }
 
-// TestBroker_QueuedCountChangeIsEmittedEvenBehindAPresentedHead is G31 round-2 functional-
-// correctness review finding #6's own regression coverage: enqueueing a second/third request
-// behind an already-presented head used to change Queued (SPEC §3.3's own "visible count") but
-// never emit at all — Request's own `presented := len(b.queue) == 1` gate meant only the very
-// first request of a queue ever triggered a snapshot. GitPairingDialog.vue's "1 of {{ queued }}
-// waiting" line is fed solely by this emitter, so it stayed stuck reporting 1 no matter how many
-// more requests queued up.
+// TestBroker_QueuedCountChangeIsEmittedEvenBehindAPresentedHead is the regression coverage:
+// enqueueing a second/third request behind an already-presented head used to change Queued (the
+// "visible count") but never emit at all — Request's own `presented := len(b.queue) == 1` gate
+// meant only the very first request of a queue ever triggered a snapshot. GitPairingDialog.vue's
+// "1 of {{ queued }} waiting" line is fed solely by this emitter, so it stayed stuck reporting 1
+// no matter how many more requests queued up.
 func TestBroker_QueuedCountChangeIsEmittedEvenBehindAPresentedHead(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
@@ -171,9 +169,9 @@ func TestBroker_DeadlineMeasuredFromEnqueue_NotPresentation(t *testing.T) {
 
 	// "b" queues behind "a" and is never presented (never the head) before it is swept — if the
 	// deadline were instead measured from presentation, an un-presented "b" would have no running
-	// countdown yet and this ExpireOverdue call would time out "a" only. Measured from enqueue
-	// (D8), both cross their identical 120s window at the same moment regardless of queue
-	// position, so both time out here.
+	// countdown yet and this ExpireOverdue call would time out "a" only. Measured from enqueue,
+	// both cross their identical 120s window at the same moment regardless of queue position,
+	// so both time out here.
 	enqueuedA := make(chan Request[struct{}], 1)
 	doneA := make(chan Outcome, 1)
 	go func() { doneA <- b.Request("a", struct{}{}, func(req Request[struct{}]) { enqueuedA <- req }) }()
@@ -206,13 +204,12 @@ func TestBroker_DeadlineMeasuredFromEnqueue_NotPresentation(t *testing.T) {
 	}
 }
 
-// TestBroker_RequestAfterShutdownIsAbortedImmediately is P108 Part 17 review F4(b)'s own regression
-// guard: a handshake that already read hello but reaches Request only after Shutdown has already
-// cleared the queue used to enqueue a fresh entry and block forever on <-entry.result —
-// expireLoop has already exited by the time Shutdown runs (its closeCh is closed) so nothing would
-// ever resolve it, and closing the underlying net.Conn does nothing to unblock a plain channel
-// receive either. F11: the outcome is Aborted, not Denied — the server going away is not a
-// decision about this client.
+// TestBroker_RequestAfterShutdownIsAbortedImmediately is the regression guard: a handshake that
+// already read hello but reaches Request only after Shutdown has already cleared the queue used to
+// enqueue a fresh entry and block forever on <-entry.result — expireLoop has already exited by the
+// time Shutdown runs (its closeCh is closed) so nothing would ever resolve it, and closing the
+// underlying net.Conn does nothing to unblock a plain channel receive either. The outcome is
+// Aborted, not Denied — the server going away is not a decision about this client.
 func TestBroker_RequestAfterShutdownIsAbortedImmediately(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
@@ -305,13 +302,13 @@ func TestBroker_DoubleAnswer_ReportsAlreadyResolved(t *testing.T) {
 	}
 }
 
-// TestBroker_QueueBoundedAgainstUnlimitedEnqueue is G31 round-2 architecture/security review,
-// finding #10: clientID is entirely client-supplied and unauthenticated at Request time (handshake
-// row 7), so nothing but testMaxQueue stops a local process from opening far more concurrent
-// connections than any real user could ever triage, each blocking a goroutine on its own result
-// channel for up to testTimeout. This proves Request aborts immediately (F11: capacity, not a
-// user decision) — no enqueue, no onEnqueued call, matching the cooldown short-circuit's own
-// contract — once the queue is already at the cap, rather than growing without bound.
+// TestBroker_QueueBoundedAgainstUnlimitedEnqueue: clientID is entirely client-supplied and
+// unauthenticated at Request time (handshake row 7), so nothing but testMaxQueue stops a local
+// process from opening far more concurrent connections than any real user could ever triage, each
+// blocking a goroutine on its own result channel for up to testTimeout. This proves Request aborts
+// immediately (capacity, not a user decision) — no enqueue, no onEnqueued call, matching the
+// cooldown short-circuit's own contract — once the queue is already at the cap, rather than
+// growing without bound.
 func TestBroker_QueueBoundedAgainstUnlimitedEnqueue(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
@@ -359,15 +356,14 @@ func TestBroker_QueueBoundedAgainstUnlimitedEnqueue(t *testing.T) {
 	}
 }
 
-// TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient is G31 round-2 architecture/
-// security review, finding #10's other half: Deny only ever resolved the ONE entry named by its
-// requestID — the presented head, in practice, since that's the only request a window's dialog
-// ever has a RequestID for. A clientID that opened several concurrent connections before the first
-// was ever presented had its OTHER already-queued requests survive untouched, bypassing the very
-// cooldown the denial just started (the cooldown only short-circuits a NEW Request() call, never
-// one already queued). This proves denying one request from a client also resolves every other
-// request already queued from that SAME client, as denied — while leaving an unrelated client's
-// own queued request untouched.
+// TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient: Deny only ever resolved the ONE
+// entry named by its requestID — the presented head, in practice, since that's the only request a
+// window's dialog ever has a RequestID for. A clientID that opened several concurrent connections
+// before the first was ever presented had its OTHER already-queued requests survive untouched,
+// bypassing the very cooldown the denial just started (the cooldown only short-circuits a NEW
+// Request() call, never one already queued). This proves denying one request from a client also
+// resolves every other request already queued from that SAME client, as denied — while leaving
+// an unrelated client's own queued request untouched.
 func TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
@@ -418,7 +414,7 @@ func TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient(t *testing.T)
 	<-doneB
 }
 
-// TestBroker_ApproveAdmitsOnlyThePresentedRequest is P172's guard: a client id is client-asserted,
+// TestBroker_ApproveAdmitsOnlyThePresentedRequest is the guard: a client id is client-asserted,
 // so one Approve must admit exactly one connection. A same-client sibling resolves Aborted
 // with no token (it redials and reuses the stored token, or is prompted itself); an unrelated
 // client's request stays queued.

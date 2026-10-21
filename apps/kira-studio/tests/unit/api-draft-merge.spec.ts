@@ -1,4 +1,4 @@
-// P112 §6.5: mergeDrafts is the decision structure behind VariableSetView.vue's and
+// mergeDrafts is the decision structure behind VariableSetView.vue's and
 // EnvironmentsView.vue's own syncDrafts — CLAUDE.md's test bar admits a dedicated spec for exactly
 // this: several interacting rules (dirty-against-seed, still-differs-from-incoming, drop-if-absent)
 // that a plain visual read of the function body doesn't make obvious are all correct at once.

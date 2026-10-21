@@ -16,7 +16,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// P4 D2: two tables, one repo. `sort_order` is dense within a parent and rewritten wholesale on
+// Two tables, one repo. `sort_order` is dense within a parent and rewritten wholesale on
 // any insert or delete — exactly the discipline TabsRepo.Save already applies to tabs."order" —
 // because Postman's `item` is an ordered array, so order is data, not presentation.
 //
@@ -102,7 +102,7 @@ var (
 	ErrNotARequest  = errors.New("repos/collections: item is not a request of this protocol")
 )
 
-// getRequestBody is GetRequest's and GetGrpcRequest's shared shape (P107 I2-9): read
+// getRequestBody is GetRequest's and GetGrpcRequest's shared shape: read
 // kind/protocol/request_json by item id, refuse a missing row, a non-request item or a protocol
 // mismatch, then hand the raw body to decode. errLabel keeps the two callers' error text exactly
 // as it was ("get request %s" for HTTP, "get grpc request %s" for gRPC) rather than merging them.
@@ -164,7 +164,7 @@ func decodeSavedRequest(itemID, body string) (model.SavedRequest, error) {
 		slog.Warn("collection request failed validation", "scope", "storage/collections", "id", itemID, "err", err)
 		return model.SavedRequest{}, fmt.Errorf("repos/collections: item %s: %w", itemID, err)
 	}
-	// P22b D7: ParamDescriptions is brand new — every row saved before this phase has no such key
+	// ParamDescriptions is brand new — every row saved earlier has no such key
 	// at all, so json.Unmarshal leaves the field nil, which re-marshals as JSON `null` rather than
 	// an absent key (no `omitempty` tag, matching this struct's other map/slice fields). Normalized
 	// here rather than relying on the frontend's own Zod default, which only ever fires for
@@ -271,11 +271,11 @@ func (r *CollectionsRepo) CreateGrpcItem(collectionID string, parentID *string, 
 	return createItem(r.DB, item, string(encoded))
 }
 
-// createItem is CreateItem's and CreateGrpcItem's own shared tail (P107 I2-9): open a
-// transaction, claim the next sort_order under item's own parent, insert the row, commit. The
-// callers diverge too much before this point to share more — an HTTP item may be a folder with no
-// body at all, while a gRPC item is always a request whose Method/URL come from Service/Target,
-// never from a Body — so each still builds its own item/requestJSON first.
+// createItem is CreateItem's and CreateGrpcItem's own shared tail: open a transaction, claim the
+// next sort_order under item's own parent, insert the row, commit. The callers diverge too much
+// before this point to share more — an HTTP item may be a folder with no body at all, while a gRPC
+// item is always a request whose Method/URL come from Service/Target, never from a Body — so each
+// still builds its own item/requestJSON first.
 func createItem(db *sql.DB, item model.CollectionItem, requestJSON string) (model.CollectionItem, error) {
 	tx, err := db.Begin()
 	if err != nil {
@@ -323,9 +323,9 @@ func insertItem(tx *sql.Tx, item model.CollectionItem, requestJSON, originJSON s
 	return nil
 }
 
-// verifyRequestItem is SaveRequest's and SaveGrpcRequest's shared read-and-check (P107 I2-9):
+// verifyRequestItem is SaveRequest's and SaveGrpcRequest's shared read-and-check:
 // confirm itemID names a request item of the wanted protocol, returning origin_json for
-// SaveRequest's own shedding — SaveGrpcRequest has no origin to shed (F22) and just discards it.
+// SaveRequest's own shedding — SaveGrpcRequest has no origin to shed and discards it.
 // The gRPC path now reads one column it never used before (origin_json); no caller or test
 // observes that, and it keeps this one query shared instead of duplicated a third time.
 func verifyRequestItem(db *sql.DB, itemID, wantProtocol string) (originJSON string, err error) {
@@ -461,7 +461,7 @@ func (r *CollectionsRepo) Rename(id, target, name string) error {
 // Delete removes a collection (and its whole item tree) or one item (and its subtree). The cascade
 // is genuine: db.go's DSN sets _foreign_keys=1 on every connection the pool opens, so
 // api_items.parent_id REFERENCES api_items(id) ON DELETE CASCADE deletes a subtree at any depth
-// in one statement, with no recursive delete in Go (F9). Surviving siblings are re-indexed dense.
+// in one statement, with no recursive delete in Go. Surviving siblings are re-indexed dense.
 func (r *CollectionsRepo) Delete(id, target string) error {
 	table, err := targetTable(target)
 	if err != nil {

@@ -1,8 +1,8 @@
-// P112 §6.5: VariableSetView.vue's and EnvironmentsView.vue's own `syncDrafts` used to wipe every
+// VariableSetView.vue's and EnvironmentsView.vue's own `syncDrafts` used to wipe every
 // draft — including a trailing/in-progress edit — on any change to the underlying rows list. That
 // was harmless while the list only ever changed after this same window's own commit. Once a
 // cross-window `api-data-changed` broadcast can refetch the same list mid-edit, wiping would erase
-// text the user is actively typing — a regression this phase itself would introduce.
+// text the user is actively typing.
 //
 // The rule, extracted once so both views share it: for each incoming row, keep the existing draft
 // only when it has changed since it was last seeded ("dirty against its seed") *and* it still

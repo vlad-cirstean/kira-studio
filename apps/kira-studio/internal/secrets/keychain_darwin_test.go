@@ -11,13 +11,11 @@ import (
 	"github.com/keybase/go-keychain"
 )
 
-// TestRealKeychainRoundTrip is P52 §6.5's recovered Keychain coverage (P51 §3.8 flagged it as
-// permanently lost when the UI suite moved to the isolated webkit tier) — one of the few things
-// this migration makes strictly better (P52 §11). It exercises the real macOS Keychain under a
-// test-only service/account, never the user's real key, and cannot be compiled or run outside
-// darwin (see docs/HISTORY.md (v1 P55)/§8 — this Linux sandbox excludes
-// this file by build tag rather than skipping it at runtime, which is the honest form P52 §13
-// requires).
+// TestRealKeychainRoundTrip is the recovered Keychain coverage (permanently lost when the UI suite
+// moved to the isolated webkit tier) — one of the few things this migration makes strictly better.
+// It exercises the real macOS Keychain under a test-only service/account, never the user's real
+// key, and cannot be compiled or run outside darwin (see docs/HISTORY.md — this Linux sandbox
+// excludes this file by build tag rather than skipping it at runtime).
 func TestRealKeychainRoundTrip(t *testing.T) {
 	const (
 		testService = "Kira Studio Secrets (test)"

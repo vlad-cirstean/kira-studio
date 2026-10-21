@@ -19,7 +19,7 @@ import (
 const approvalPlanIssuesCap = 10
 
 // approvalPlanFrom projects plan into the evidence the approval dialog shows: warn-severity
-// issues first (the ones a decision actually turns on), capped at approvalPlanIssuesCap with
+// issues first (the ones a decision turns on), capped at approvalPlanIssuesCap with
 // IssuesOmitted carrying the remainder. nil in, nil out — an ordinary permission prompt with no
 // plan attached (auto-force-explain off, or the statement was not explainable) carries no plan.
 func approvalPlanFrom(plan *queryplan.Plan, thresholdRows int) *ApprovalPlan {
@@ -71,10 +71,11 @@ func summaryOf(plan *queryplan.Plan, thresholdRows int) *planSummary {
 }
 
 // maskPlanForMaskedConnection strips whatever an EXPLAIN plan can carry of real row data when the
-// connection has active mask rules (F5): MySQL/MariaDB substitute real column values from a
+// connection has active mask rules: MySQL/MariaDB substitute real column values from a
 // const-evaluated table into another table's own attached_condition (surfaced as Node.Detail) and
 // index_condition (a metric), and ClickHouse's index metrics carry the same kind of evaluated
-// condition text (" condition"); only allowlisted metric labels survive. Column-name masking cannot see through either — they are plan prose, not a result
+// condition text (" condition"); only allowlisted metric labels survive. Column-name masking cannot
+// see through either — they are plan prose, not a result
 // set row — so both are blanked outright rather than filtered by column name. Raw is dropped
 // unconditionally too, regardless of IncludeRaw: it is the server's own EXPLAIN text verbatim, the
 // same data by construction.
@@ -129,10 +130,10 @@ func maskPlanNode(n queryplan.Node) queryplan.Node {
 	return n
 }
 
-// assertComposedStatementsAreReads is §8.3's checkable defense in depth: before executing a
+// assertComposedStatementsAreReads is the checkable defense in depth: before executing a
 // composed EXPLAIN batch, every statement statements.go composed is passed through
 // Query.ClassifyStatement and must report ClassRead. This is the one property the whole "EXPLAIN
-// never bypasses the permission gate" argument (§8) rests on — if a future dialect's EXPLAIN
+// never bypasses the permission gate" argument rests on — if a future dialect's EXPLAIN
 // spelling ever classifies as anything but a read, it must not reach the server through this path.
 // A non-read verdict (or a classification failure) is an internal refusal, not a caller error —
 // the caller did nothing wrong; this app's own composer produced something it does not trust.
@@ -153,10 +154,10 @@ func (s *Server) assertComposedStatementsAreReads(ctx context.Context, connectio
 
 // planFor composes, verifies and runs this connection's own EXPLAIN for sql, and parses the
 // result. Returns (nil, nil) when this kind has no EXPLAIN this app can parse or sql is not
-// explainable — a no-op, not a failure (auto-force-explain's own posture, M3 §5.1). Any other
+// explainable — a no-op, not a failure (auto-force-explain's own posture). Any other
 // error (classification refusal, execute failure, parse failure) is returned for the caller to
 // decide how to degrade — runQuery's own step 7 treats every error here as "no plan", never a
-// reason to block the real query (§5.2's own D19 rule 6 posture); explainQuery instead surfaces it.
+// reason to block the real query; explainQuery instead surfaces it.
 func (s *Server) planFor(ctx context.Context, summary model.ConnectionSummary, sql, path string) (*queryplan.Plan, error) {
 	if !queryplan.Supported(summary.Kind) || !queryplan.Explainable(sql) {
 		return nil, nil

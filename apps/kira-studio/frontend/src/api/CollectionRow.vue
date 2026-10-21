@@ -15,7 +15,7 @@ import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, type HTMLAttributes } from 'vue';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 
-// P4 D13: the same rowIndent indent, roving tabindex and twisty as project/TreeRow.vue,
+// The same rowIndent indent, roving tabindex and twisty as project/TreeRow.vue,
 // with three differences that are the whole reason this is a separate file rather than a widened
 // shared row: no connection colour rail, no status dot and no EngineIcon (none of which mean
 // anything here); a leading **method chip** for a request row, which is what Postman itself shows

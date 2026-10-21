@@ -194,3 +194,6 @@ apps/kira-space/bin/
 
 # Astro generated types (site/)
 site/.astro/
+
+# commentsweep work dir (P320)
+.commentsweep/

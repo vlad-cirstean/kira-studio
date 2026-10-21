@@ -1,7 +1,7 @@
 // Package claude runs Kira Space's Claude Code integrations against the real `claude` CLI. Own Go
 // module, so no default command (`go test ./...`, lint, CI) compiles or runs it. Every test spends
-// real tokens (haiku, tiny prompts, a budget cap). See docs/DEV_ENVIRONMENT.md "Real `claude` tests"
-// for the area-to-command table.
+// real tokens (haiku, tiny prompts, a budget cap). See docs/DEV_ENVIRONMENT.md "Real `claude`
+// tests" for the area-to-command table.
 package claude
 
 import (
@@ -20,7 +20,7 @@ import (
 func TestMain(m *testing.M) {
 	if os.Getenv("KIRA_TEST_MEMORY_MCP") == "1" {
 		// KIRA_TEST_PROMPTS reaches the gate and reconcile prompts of an eval run (P285).
-		os.Exit(memorycli.Run(os.Args[2:], os.Getenv("KIRA_TEST_PROMPTS")))
+		os.Exit(memorycli.Run(os.Args[2:], os.Getenv("KIRA_TEST_PROMPTS"), agentSelector(), nil))
 	}
 	if os.Getenv("KIRA_EVAL_EMBED_WORKER") == "1" {
 		// The retrieval eval's embedding worker (P291): this binary re-executed as `memory-embed`.

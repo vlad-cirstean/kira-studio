@@ -1,9 +1,9 @@
 /**
- * §7.11's in-progress state machine and §7's `OpRequest`/`OpResult` union — the types the whole
- * phase is typed against. Pure data and pure functions only; `git/src/ops/conflict.ts` is the
- * only thing that reads `.git`'s state files off disk, and it hands its result to
- * `classifyInProgress` below as plain data (`InProgressStateFiles`), which is what makes the
- * precedence table a named unit test per row instead of an integration-only fact.
+ * The in-progress state machine and the `OpRequest`/`OpResult` union. Pure data and pure
+ * functions only; `git/src/ops/conflict.ts` is the only thing that reads `.git`'s state files
+ * off disk, and it hands its result to `classifyInProgress` below as plain data
+ * (`InProgressStateFiles`), which is what makes the precedence table a named unit test per row
+ * instead of an integration-only fact.
  */
 
 /** `HeadState` is already `core`'s own (`model/repo.ts`) — not re-declared here. */
@@ -40,8 +40,8 @@ export interface InProgressOperation {
   /** Continue is *enabled* only when this is 0 (§7.11). Kept separate from
    *  `conflictedPaths.length` so a host that caps the path list cannot accidentally enable it. */
   readonly unmergedCount: number;
-  /** P10 probe 6: true for `cherryPick` and `revert` — the two sequencer operations git gives a
-   *  `--skip` — and, since G26 D12, `rebase` too. Without this the banner would offer a Continue
+  /** True for `cherryPick` and `revert` — the two sequencer operations git gives a
+   *  `--skip` — and `rebase` too. Without this the banner would offer a Continue
    *  that cannot succeed on an empty pick (`CHERRY_PICK_HEAD` present, zero unmerged paths —
    *  Continue refuses, `--skip` is git's own named remedy). */
   readonly canSkip: boolean;
@@ -69,7 +69,7 @@ export interface InProgressStateFiles {
   /** `rebase-merge/onto`'s content, trimmed — a sha — or `rebase-apply/`'s own copy, same rule. */
   readonly rebaseOnto: string | undefined;
   readonly sequencerDir: boolean;
-  /** F2's own re-derived kind: when `sequencerDir` is set but every `*Head` field above is already
+  /** Re-derived kind: when `sequencerDir` is set but every `*Head` field above is already
    *  `undefined` (a paused multi-commit revert/cherry-pick whose current commit was finished with
    *  a plain `git commit` instead of `--continue`), git's own sequencer state machine is still
    *  mid-run — this is `'revert'` or `'cherryPick'`, read from `sequencer/todo`'s first pending
@@ -104,11 +104,11 @@ function operationOf(
 }
 
 /**
- * §7.11's precedence table, exactly: rebase shadows everything else (a rebase stopped on a
+ * The precedence table, exactly: rebase shadows everything else (a rebase stopped on a
  * conflict also leaves the sequencer files a cherry-pick would), then merge, cherry-pick,
  * revert, bisect, and finally a bare "unmerged paths with none of the six state files present"
  * fallback (a resolved-then-reset state, or `git checkout -m`). `AUTO_MERGE` is deliberately not
- * an input here — probe P4 found it left behind after an aborted cherry-pick, so it is a stale
+ * an input here — probe found it left behind after an aborted cherry-pick, so it is a stale
  * artefact, not a state signal.
  */
 export function classifyInProgress(input: {
@@ -119,7 +119,7 @@ export function classifyInProgress(input: {
 
   if (s.rebaseMergeDir || s.rebaseApplyDir) {
     if (s.rebaseApplyDir && s.rebaseApplyApplying) {
-      // F3: rebase-apply/ with an "applying" marker is a plain `git am`, not a rebase at all --
+      // rebase-apply/ with an "applying" marker is a plain `git am`, not a rebase at all --
       // `rebase --continue`/`--abort`/`--skip` all refuse outright ("It looks like 'git am' is in
       // progress. Cannot rebase."). Report-only: every Can* flag false. A dedicated `am`
       // InProgressKind would be a git-ipc wire-contract change -- out of scope here, so this
@@ -211,7 +211,7 @@ export function classifyInProgress(input: {
 }
 
 // ---------------------------------------------------------------------------------------
-// §7's op.run union, and the undo slot's own wire-shaped snapshot (structurally copied onto
+// The op.run union, and the undo slot's own wire-shaped snapshot (structurally copied onto
 // the wire by packages/ipc — see that package's contract.ts).
 // ---------------------------------------------------------------------------------------
 
@@ -372,10 +372,10 @@ export type OpErrorKind =
   | 'ProtectedBranch'
   /** P8: a remote op was cancelled mid-flight (D50) — never a git-reported failure either. */
   | 'Cancelled'
-  /** P9: a pop/apply merged with conflicts. Deliberately NOT detected from a stderr pattern — a
-   *  conflicting pop writes to stdout and leaves stderr empty (probe 5) — `RepoService`
+  /** A pop/apply merged with conflicts. Deliberately NOT detected from a stderr pattern — a
+   *  conflicting pop writes to stdout and leaves stderr empty — `RepoService`
    *  classifies it from `exitCode !== 0` plus a post-op status read-back finding unmerged paths.
-   *  The stash is ALWAYS kept (§7.6); the message says so. */
+   *  The stash is ALWAYS kept; the message says so. */
   | 'StashConflict'
   /** P9: `apply --index`/`pop --index` onto an already-conflicted index —
    *  `error: conflicts in index. Try without --index.` (probe 10). Distinct from `StashConflict`
@@ -406,7 +406,7 @@ export type OpErrorKind =
   /** G28 D10: `globalStashSave` from the current working tree with nothing dirty — `git stash
    *  create` answers exit 0 with empty output on a clean tree (probe P4). */
   | 'NothingToStash'
-  /** G30 round-1 functional-correctness review, finding #2: `remote.run`'s pull integrate phase
+  /** `remote.run`'s pull integrate phase
    *  (merge/rebase) re-checks HEAD is still the branch the pull was started for, immediately
    *  before that write — a fetch can take arbitrary wall-clock time, during which another
    *  window/terminal can check out a different branch, and without this the merge/rebase would
@@ -435,15 +435,15 @@ export interface OpResult {
 }
 
 // ---------------------------------------------------------------------------------------
-// The gate (§7.11): "operations that git would refuse anyway" while an operation is in
+// The gate: "operations that git would refuse anyway" while an operation is in
 // progress. Probed exhaustively — git refuses switch during merge/cherry-pick/rebase/revert,
 // and would refuse reset and another revert; it does NOT refuse branch/tag creation. So the
-// gate is scoped to exactly checkout and revert at P6, plus, at P9, stashPop/stashApply/
-// stashBranch — `classifyStashPop` already emits an `inProgressOperation` blocker for these
-// three, and GATED_OP_KINDS is what additionally makes the toolbar disable them. `stashPush`
+// gate is scoped to exactly checkout and revert, plus stashPop/stashApply/stashBranch —
+// `classifyStashPop` already emits an `inProgressOperation` blocker for these three, and
+// GATED_OP_KINDS is what additionally makes the toolbar disable them. `stashPush`
 // and `stashDrop` are deliberately NOT gated: stashing during a conflicted state is a
 // legitimate escape hatch, and dropping touches only the stash stack, never the worktree.
-// P10 probe 3 adds `reset`: git does NOT refuse `reset --mixed`/`--hard` mid-merge/mid-pick — it
+// Adds `reset`: git does NOT refuse `reset --mixed`/`--hard` mid-merge/mid-pick — it
 // silently succeeds and abandons the sequencer state — so this gate is the ONLY thing standing
 // between a user and that data loss, unlike every op above it, which merely mirrors git's own
 // refusal. `cherryPick` is gated for the ordinary reason (git does refuse a second cherry-pick

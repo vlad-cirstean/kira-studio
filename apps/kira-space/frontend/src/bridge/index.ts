@@ -1,11 +1,12 @@
 import * as AdeTaskService from '@bindings/adetaskservice.js';
 import * as AgentNotifyService from '@bindings/agentnotifyservice.js';
-import * as ClaudeUsageService from '@bindings/claudeusageservice.js';
+import * as AgentService from '@bindings/agentservice.js';
+import * as AgentUsageService from '@bindings/agentusageservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as CustomScriptsService from '@bindings/customscriptsservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as GitCredentialService from '@bindings/gitcredentialservice.js';
-import * as GitHubService from '@bindings/githubservice.js';
+import * as GitHostService from '@bindings/githostservice.js';
 import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
@@ -70,16 +71,16 @@ import type { TabRecord } from '../state/tabDomain';
 import { memoryControl } from './memoryControl';
 
 // bridge/index.ts is this app's own composition root — Kira Studio's own bridge/index.ts, trimmed
-// to the 15 services apps/kira-space/main.go actually binds (Part 1's own service list, plus
-// LinkService added alongside this file — P100 Part 2 found repo/git/hostHandlers.ts's
-// link.openExternal handler had no Go counterpart here; see internal/bridge/link.go). No
-// apiControl.ts equivalent: this app has exactly one bound-call surface, not two composed halves.
-// P103 Part 2 (§5.6): a growing subset of that surface's own methods — the ones byte-for-byte
-// identical with Kira Studio's own studioControl — now come from createCoreControl.ts, shared with
-// Kira Studio's own copy of this file; this app's own remaining methods are defined right here.
-// P116 H5 moved ten more (open-settings/toggle-project-panel/tab-next/prev/close, keep-awake, app-metrics,
-// windowsOpenNew) into that same shared factory once this app grew its own window-chrome parity
-// (G1-G5/G7) — this app now has its own metrics ticker (main.go's own metrics.NewAppTicker) and
+// to the 15 services apps/kira-space/main.go binds (LinkService added alongside this file —
+// repo/git/hostHandlers.ts's link.openExternal handler had no Go counterpart here; see
+// internal/bridge/link.go). No apiControl.ts equivalent: this app has exactly one bound-call
+// surface, not two composed halves.
+// A growing subset of that surface's own methods — the ones byte-for-byte identical with Kira
+// Studio's own studioControl — now come from createCoreControl.ts, shared with Kira Studio's own
+// copy of this file; this app's own remaining methods are defined right here.
+// Ten more (open-settings/toggle-project-panel/tab-next/prev/close, keep-awake, app-metrics,
+// windowsOpenNew) moved into that same shared factory once this app grew its own window-chrome
+// parity — this app now has its own metrics ticker (main.go's own metrics.NewAppTicker) and
 // keep-awake controller, so both are wired the same way Kira Studio's own copy of this file is.
 const spaceControl = {
   customScriptsList: (): Promise<ScriptsSnapshot> =>
@@ -97,6 +98,10 @@ const spaceControl = {
     unwrap(CustomScriptsService.DeleteCollection({ id })),
   customScriptsMove: (id: string, collectionId: string | null): Promise<void> =>
     unwrap(CustomScriptsService.Move({ id, collectionId })),
+  customScriptsReorder: (collectionId: string | null, ids: string[]): Promise<void> =>
+    unwrap(CustomScriptsService.Reorder({ collectionId, ids })),
+  customScriptsReorderCollections: (ids: string[]): Promise<void> =>
+    unwrap(CustomScriptsService.ReorderCollections({ ids })),
   onCustomScriptsChanged: (cb: (snapshot: ScriptsSnapshot) => void): (() => void) =>
     on(CHANNEL.customScriptsChanged, (r) => cb(scriptsSnapshotOf(r))),
 
@@ -119,6 +124,8 @@ const spaceControl = {
     ),
   scriptRunsResume: (id: string): Promise<ScriptRunStarted> =>
     unwrap(ScriptRunsService.Resume({ id })).then((r) => trust<ScriptRunStarted>(r)),
+  scriptRunsResumeCommand: (runId: string): Promise<string> =>
+    unwrap(ScriptRunsService.ResumeCommand({ runId })),
   scriptRunsReadLog: (id: string, afterSeq: number): Promise<ScriptRunLogPage> =>
     unwrap(ScriptRunsService.ReadLog({ id, afterSeq })).then((r) => {
       const page = trust<Partial<ScriptRunLogPage>>(r);
@@ -170,8 +177,10 @@ const spaceControl = {
   onViewFind: (cb: () => void): (() => void) => on(CHANNEL.viewFind, cb),
   onReviewCode: (cb: () => void): (() => void) => on(CHANNEL.reviewCode, cb),
 
-  githubOpenPullRequestUrl: (url: string): Promise<void> =>
-    unwrap(GitHubService.OpenPullRequestURL({ url })),
+  gitHostOpenChangeRequestUrl: (url: string): Promise<void> =>
+    unwrap(GitHostService.OpenChangeRequestURL({ url })),
+  gitHostProviders: (): Promise<V2.HostProviders> =>
+    unwrap(GitHostService.Providers()).then((r) => trust<V2.HostProviders>(r)),
 
   gitCredentialPending: (): Promise<GitCredentialPrompt[]> =>
     unwrap(GitCredentialService.Pending()).then((r) => trust<GitCredentialPrompt[]>(r ?? [])),
@@ -296,8 +305,8 @@ const spaceControl = {
   // P144: AdeTaskService (v2 task board). Types from ../ade/v2/wire; payload-free pushes invalidate queries.
   adeTaskBoard: (): Promise<V2.Board> =>
     unwrap(AdeTaskService.Board()).then((r) => trust<V2.Board>(r)),
-  adeTaskPrs: (): Promise<V2.PrsResult> =>
-    unwrap(AdeTaskService.Prs()).then((r) => trust<V2.PrsResult>(r)),
+  adeTaskChangeRequests: (): Promise<V2.ChangeRequestsResult> =>
+    unwrap(AdeTaskService.ChangeRequests()).then((r) => trust<V2.ChangeRequestsResult>(r)),
   adeTaskRefresh: (args: V2.RefreshArgs): Promise<V2.RefreshResult> =>
     unwrap(AdeTaskService.Refresh(args)).then((r) => trust<V2.RefreshResult>(r)),
   adeTaskForcePush: (args: V2.BranchArgs): Promise<V2.ForcePushResult> =>
@@ -414,10 +423,10 @@ const spaceControl = {
     unwrap(AdeTaskService.ReviewAgent(args)).then((r) => trust<V2.ReviewAgentState>(r)),
   adeTaskLaunchReviewAgent: (args: V2.TaskArgs): Promise<V2.ReviewAgentLaunch> =>
     unwrap(AdeTaskService.LaunchReviewAgent(args)).then((r) => trust<V2.ReviewAgentLaunch>(r)),
-  adeTaskGitHubSyncPlan: (args: V2.BranchArgs): Promise<V2.GhSyncPlan> =>
-    unwrap(AdeTaskService.GitHubSyncPlan(args)).then((r) => trust<V2.GhSyncPlan>(r)),
-  adeTaskGitHubSyncApply: (args: V2.BranchArgs): Promise<V2.GhSyncResult> =>
-    unwrap(AdeTaskService.GitHubSyncApply(args)).then((r) => trust<V2.GhSyncResult>(r)),
+  adeTaskViewedSyncPlan: (args: V2.BranchArgs): Promise<V2.ViewedSyncPlan> =>
+    unwrap(AdeTaskService.ViewedSyncPlan(args)).then((r) => trust<V2.ViewedSyncPlan>(r)),
+  adeTaskViewedSyncApply: (args: V2.BranchArgs): Promise<V2.ViewedSyncResult> =>
+    unwrap(AdeTaskService.ViewedSyncApply(args)).then((r) => trust<V2.ViewedSyncResult>(r)),
   adeTaskArchiveRisk: (args: V2.TaskArgs): Promise<V2.ArchiveRisk> =>
     unwrap(AdeTaskService.ArchiveRisk(args)).then((r) => trust<V2.ArchiveRisk>(r)),
   adeTaskArchiveTask: (args: V2.TaskArgs): Promise<void> =>
@@ -447,27 +456,26 @@ const spaceControl = {
   onAgentRevealScriptRun: (cb: (event: { runId: string; label: string }) => void): (() => void) =>
     on('kira:agent:revealScriptRun', cb),
   // P239: Claude Code usage limits for the ADE status bar.
-  claudeUsageGet: (): Promise<ClaudeUsageSnapshot> => unwrap(ClaudeUsageService.Get()),
-  onClaudeUsage: (cb: (snapshot: ClaudeUsageSnapshot) => void): (() => void) =>
-    on('kira:claude:usage', cb),
+  agentUsageGet: (): Promise<AgentUsageSnapshot> => unwrap(AgentUsageService.Get()),
+  onAgentUsage: (cb: (snapshot: AgentUsageSnapshot) => void): (() => void) =>
+    on('kira:agent:usage', cb),
 };
 
-export interface ClaudeUsageWindow {
+export interface AgentUsageWindow {
   usedPercent: number;
   /** Unix milliseconds. */
   resetsAt: number;
 }
 
-export interface ClaudeUsageSnapshot {
+export interface AgentUsageSnapshot {
   /** ok, waiting or off. */
   state: string;
   /** session or run; empty until a reading arrives. */
   source: string;
-  fiveHour: ClaudeUsageWindow | null;
-  sevenDay: ClaudeUsageWindow | null;
+  fiveHour: AgentUsageWindow | null;
+  sevenDay: AgentUsageWindow | null;
   /** Unix milliseconds. */
   updatedAt: number;
-  detail: string;
 }
 
 interface AgentNotifyFocus {
@@ -495,6 +503,7 @@ export const control = {
     update: UpdateService,
     prompts: PromptsService,
     llmPrompts: LlmPromptsService,
+    agent: AgentService,
   }),
   ...memoryControl,
   ...spaceControl,

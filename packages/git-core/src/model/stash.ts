@@ -7,7 +7,7 @@
  */
 export interface StashEntry {
   /** The N in `stash@{N}` at the moment of the read. Positional and unstable — never an
-   *  identity. Every mutating argv that uses it is guarded by `sha` (P9 probe 8): git refuses a
+   *  identity. Every mutating argv that uses it is guarded by `sha`: git refuses a
    *  raw sha for `pop`/`drop`, and `stash branch <name> <sha>` applies but silently skips the
    *  drop, so every stack-mutating op carries both and the caller verifies `rev-parse
    *  stash@{N}` still equals `sha` immediately before writing. */
@@ -22,7 +22,7 @@ export interface StashEntry {
    *  PARENT commit's subject (only the stash commit's own `%gs`), so `queries.ts`'s `stashList`
    *  fetches it with one extra, tiny batch spawn (`log --no-walk`) over every entry's distinct
    *  `baseSha`, keyed back onto each entry here. `StashList.vue`'s "base commit short sha +
-   *  subject" row (§3.1) is the one reader; empty string if a batch spawn somehow omitted a sha
+   *  subject" row is the one reader; empty string if a batch spawn somehow omitted a sha
    *  (should not happen — every `baseSha` is a real, reachable commit — but a stash list
    *  should never fail to render over a lookup gap that is not itself worth surfacing). */
   readonly baseSubject: string;
@@ -43,7 +43,7 @@ export interface StashEntry {
   readonly branch: string | null;
   readonly timestamp: number; // unix seconds
   /** Tracked files the stash changes, from the same single `stash list --numstat` spawn that
-   *  reads everything else here (P9 probe 12). Untracked files are never counted here — `-u` in
+   *  reads everything else here. Untracked files are never counted here — `-u` in
    *  `stash list` means `--patch`, not `--include-untracked`, so there is no way to see them
    *  without a spawn per entry. `includedUntracked` flags their possible presence and
    *  `stash.show` gives the real list. */

@@ -1,4 +1,4 @@
-// P2 R2 (task #99): every page/*.ts row/cell accessor built on top of views/shared/page/store.ts's
+// Every page/*.ts row/cell accessor built on top of views/shared/page/store.ts's
 // `cached()` (memoized decoded text) still allocated a brand-new return object on *every* call,
 // even for the same already-decoded row — and grid/page.ts's `cell()` in particular is called
 // several times per cell per render straight from a template (ConsoleResultGrid.vue, DataGrid.vue).

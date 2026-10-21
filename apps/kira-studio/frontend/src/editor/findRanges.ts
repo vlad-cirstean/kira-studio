@@ -2,12 +2,12 @@ import type { RangeHighlight } from '@workbench/editor/ranges';
 import { REGEX_SCAN_TEXT_CAP } from '../views/shared/page/scan';
 import { compileSearchPattern, type SearchPatternOptions } from './searchPattern';
 
-// P16 D11: the find bar's own "find" — not @codemirror/search (that package is not a dependency,
+// The find bar's own "find" — not @codemirror/search (that package is not a dependency,
 // and the requirement here is this app's own toolbar chrome and its own --kira-search-match token
 // pair, not a re-skinned vendor panel). Returns ranges in the shape rangeHighlightPlugin already
-// consumes, so a find bar is just another `rangeHighlights` source.
+// consumes, so a find bar is another `rangeHighlights` source.
 //
-// P28 D11: the three options the data views' own SearchToolbar has always had (match case, whole
+// The three options the data views' own SearchToolbar has always had (match case, whole
 // word, regex) now apply here too, and they are compiled by `editor/searchPattern.ts`'s own
 // `compileSearchPattern` rather than by a second implementation — so "whole word" and "regex" mean
 // exactly the same thing in a request/response find as in a grid search.
@@ -28,7 +28,7 @@ interface MatchPosition {
   to: number;
 }
 
-// P21 round 3 performance finding 2: on one keystroke, ResponseFindBar.vue's own matchCounts calls
+// On one keystroke, ResponseFindBar.vue's own matchCounts calls
 // this once per target (1-2), scrollToCurrent calls it again for the target the current match
 // lands in, and the pane's own per-target highlighters call it again per target just to derive a
 // running cursor — every one of those for the *same* (doc, query) pair, and every call re-walked
@@ -60,7 +60,7 @@ function matchPositions(doc: string, query: string, o: FindOptions): readonly Ma
     // not cached: the next keystroke usually makes it valid again.
     return positions;
   }
-  // P108 Part 11 F12: a user regex runs against a response/request body this app doesn't control —
+  // A user regex runs against a response/request body this app doesn't control —
   // `(a+)+$` still blocked the main thread here, the same ReDoS shape scan.ts's own
   // REGEX_SCAN_TEXT_CAP mitigates for a grid/console/document cell. A literal/whole-word search has
   // no user-controlled quantifiers to backtrack on, so only regex mode truncates. `scanned` is a

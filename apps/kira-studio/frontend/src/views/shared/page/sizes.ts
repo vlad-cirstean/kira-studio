@@ -1,10 +1,10 @@
 import type { PageSize } from '@shared/domain/tabs';
 
-// P39 F14: the same 10/100/1000/10000 + '10'/'100'/'1k'/'10k' literal, once, differing only in
-// each view's own testid prefix. P43 iter3 D46: `maxPageSize` (Caps' own optional ceiling) filters
-// the list down to what the engine can actually serve — omitting it (or passing null/undefined,
-// the shape `caps.maxPageSize` itself takes when absent) is byte-for-byte today's behaviour, which
-// is what the three unchanged call sites (grid/documents/keyvalue) rely on.
+// The same 10/100/1000/10000 + '10'/'100'/'1k'/'10k' literal, once, differing only in each view's
+// own testid prefix. `maxPageSize` (Caps' own optional ceiling) filters the list down to what the
+// engine can serve — omitting it (or passing null/undefined, the shape `caps.maxPageSize` itself
+// takes when absent) is byte-for-byte today's behaviour, which is what the three unchanged call
+// sites (grid/documents/keyvalue) rely on.
 export function pageSizeOptions(
   testidPrefix: '' | 'document-' | 'keyvalue-' | 'stream-',
   maxPageSize?: number | null,

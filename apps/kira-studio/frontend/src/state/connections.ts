@@ -87,6 +87,29 @@ export const useConnectionsStore = defineStore('connections', () => {
     return created;
   }
 
+  // Optimistic like the tab strip; a rejection (an id deleted in another window) restores the
+  // persisted order before rethrowing.
+  async function reorderConnections(ids: string[]): Promise<void> {
+    const byId = new Map(state.records.map((r) => [r.id, r]));
+    const listed = ids.flatMap((id) => byId.get(id) ?? []);
+    state.records = [...listed, ...state.records.filter((r) => !ids.includes(r.id))];
+    try {
+      state.records = await control.connectionsReorder(ids);
+    } catch (err) {
+      state.records = await control.connectionsList();
+      throw err;
+    }
+  }
+
+  async function moveConnection(id: string, step: -1 | 1): Promise<void> {
+    const ids = state.records.map((r) => r.id);
+    const from = ids.indexOf(id);
+    const to = from + step;
+    if (from < 0 || to < 0 || to >= ids.length) return;
+    [ids[from], ids[to]] = [ids[to], ids[from]];
+    await reorderConnections(ids);
+  }
+
   async function deleteConnection(id: string): Promise<void> {
     await control.connectionsDelete(id);
     state.records = state.records.filter((r) => r.id !== id);
@@ -103,7 +126,7 @@ export const useConnectionsStore = defineStore('connections', () => {
     state.states[id] = s;
   }
 
-  // P39 iter2 F9/D9: the find-existing -> strip id/sortOrder/createdAt/updatedAt -> connectionsUpdate
+  // The find-existing -> strip id/sortOrder/createdAt/updatedAt -> connectionsUpdate
   // -> splice-back body setConnectionColor and setConnectionReadOnly share. Returns whether a
   // record was found and patched — setConnectionReadOnly's reconnect tail must still not run when
   // it wasn't, which is why this isn't the void the two public functions themselves return.
@@ -187,6 +210,8 @@ export const useConnectionsStore = defineStore('connections', () => {
     hydrateConnections,
     upsertRecord,
     duplicateConnection,
+    reorderConnections,
+    moveConnection,
     deleteConnection,
     connectConnection,
     disconnectConnection,
@@ -213,6 +238,7 @@ function defaultDraft(): ConnectionInput {
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    preconnectDelaySec: 0,
     autoExplain: false,
     throttlePerSec: 0,
     mcpEnabled: false,
@@ -243,14 +269,14 @@ export const useConnectionDialogStore = defineStore('connectionDialog', () => {
     });
   }
 
-  // P14 D1: editing no longer reveals anything on open — the dialog used to call reveal() here and
-  // put the plaintext straight into `draft.password` (P25 D9's old contract), but that secret was
+  // Editing no longer reveals anything on open — the dialog used to call reveal() here and
+  // put the plaintext straight into `draft.password`, but that secret was
   // then sitting in the DOM the whole time the dialog was open, whether or not the user ever asked
-  // to see it (the eye toggle was just `type="password"` vs `type="text"` over a value already
+  // to see it (the eye toggle was `type="password"` vs `type="text"` over a value already
   // there — no real confirmation gated it at all). The draft now opens with `password: null`, which
   // Update's three-state convention already treats as "unchanged" (service.go:253) — exactly what
-  // URI mode has done since P2 R2, extended here to fields mode too. ConnectionDialog.vue's own
-  // `onReveal()` is what actually fetches the secret now, gated behind local authentication
+  // URI mode has done, extended here to fields mode too. ConnectionDialog.vue's own
+  // `onReveal()` is what fetches the secret now, gated behind local authentication
   // (internal/localauth), only when the user presses "Show password".
   function openEditDialog(id: string): void {
     const summary = useConnectionsStore().connectionRecord(id);

@@ -19,13 +19,12 @@ import DataPane from './settings/DataPane.vue';
 
 const SETTINGS_DB_PATH = '~/.kira-studio/kira.sqlite';
 
-// P103 Part 2 (§5.5): the old single-file workbench/SettingsDialog.vue, now a thin composition
-// over SettingsShell.vue plus this app's own seven panes (workbench/settings/*.vue, extracted
-// verbatim from this file's own former inline `<template v-if>` branches — see SettingsShell.vue's
-// own file-level comment for what stays app-side and why). Everything genuinely app-specific stays
-// here: which six of Settings' sections this dialog edits, the dialog's own width/height, the
-// deep-link reset, and the footer markup (its one small, real difference from Kira Space's own —
-// see SettingsShell.vue's comment #2).
+// The old single-file workbench/SettingsDialog.vue, now a thin composition
+// over SettingsShell.vue plus this app's own seven panes (workbench/settings/*.vue — see
+// SettingsShell.vue's own file-level comment for what stays app-side and why). Everything
+// genuinely app-specific stays here: which six of Settings' sections this dialog edits, the
+// dialog's own width/height, the deep-link reset, and the footer markup (its one small, real
+// difference from Kira Space's own — see SettingsShell.vue's comment #2).
 const emit = defineEmits<{ close: [] }>();
 
 const settingsStore = useSettingsStore();

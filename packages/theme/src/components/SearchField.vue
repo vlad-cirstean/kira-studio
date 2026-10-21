@@ -9,7 +9,7 @@ import {
 import { t } from '@theme/i18n';
 import { useTemplateRef } from 'vue';
 
-// P262 §2.5: the one search/filter text box. Attrs (data-testid, @keydown, @keydown.enter, ...) land
+// The one search/filter text box. Attrs (data-testid, @keydown, @keydown.enter, ...) land
 // on the <input>. Esc clears a non-empty value and stops there; an empty field lets Esc bubble so
 // the surrounding surface (dialog, popover, find bar) still closes. Callers focus via the exposed
 // focus() (biome noAutofocus forbids the attribute).

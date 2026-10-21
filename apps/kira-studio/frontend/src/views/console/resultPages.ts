@@ -1,14 +1,14 @@
 import { cellByteLength, cellText, isNull, isTruncated, type Page } from '@shared/protocol/page';
 import { createPageStore, type RetentionEntry, retentionEntries } from '../shared/page/store';
 
-// The console's own page store (P5.5), widened in P8 to hold either page kind — a console
+// The console's own page store, widened to hold either page kind — a console
 // result can be tabular (SQL) or document (Mongo shell), unlike `views/grid/page.ts`'s store,
 // which stays tabular-only because a 'data' tab is never anything else. Kept as a sibling file
 // rather than widening grid/page.ts's `cell()`/DataGrid.vue's call sites, which assume tabular
 // throughout.
 //
-// P48 F19: rebuilt on the shared factory — the two-level decode cache and visible-window pruning
-// this file grew separately (P43 F2/D3) now live in views/shared/page/store.ts, shared with
+// Rebuilt on the shared factory — the two-level decode cache and visible-window pruning
+// this file grew separately now live in views/shared/page/store.ts, shared with
 // views/grid/page.ts's own copy of both.
 const store = createPageStore<Page>();
 
@@ -55,7 +55,7 @@ export function cell(key: string, row: number, col: number): CellView {
 }
 
 /** Document-only: one document's id/body text, decoded from a DocumentPage's chunks. Mirrors
- *  views/documents/page.ts's own documentRow() (P43 iter2 D28) — the divergence (this one
+ *  views/documents/page.ts's own documentRow() — the divergence (this one
  *  hard-coded `isTruncated: false`) meant the console's own cell-editor publish could never know
  *  a Mongo console document's body was cut, unlike the data-tab equivalent. */
 export function documentRow(

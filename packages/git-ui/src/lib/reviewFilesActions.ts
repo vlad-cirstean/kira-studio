@@ -41,10 +41,10 @@ export function createReviewFilesActions(
       if (!repo) throw new Error('goToFile: no active repo');
       return bridge.request('editor.goToFile', { repoId: repo, rev, path, line });
     },
-    async openPullRequest({ number }) {
+    async openChangeRequest({ number }) {
       const repo = repoId();
-      if (!repo) throw new Error('openPullRequest: no active repo');
-      await bridge.request('pr.openExternal', { repoId: repo, number });
+      if (!repo) throw new Error('openChangeRequest: no active repo');
+      await bridge.request('changeRequest.openExternal', { repoId: repo, number });
     },
     async openExternalLink(url) {
       await bridge.request('link.openExternal', { url });

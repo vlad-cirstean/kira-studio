@@ -107,7 +107,7 @@ func TestParseBlameLine_EmptyInput(t *testing.T) {
 	}
 }
 
-// TestIsUncommittedBlameSHA is F18's own regression guard: the uncommitted-line sentinel is an
+// TestIsUncommittedBlameSHA is the regression guard: the uncommitted-line sentinel is an
 // all-zero string, but its WIDTH depends on this repository's own object format — 40 zeros for
 // SHA-1, 64 for SHA-256 (verified against real git --object-format=sha256), never just a longer
 // run of the same SHA-1-width value. IsUncommittedBlameSHA must recognise both, and reject

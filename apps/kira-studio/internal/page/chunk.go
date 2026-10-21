@@ -1,10 +1,10 @@
 // Package page is the Go analogue of packages/shared/protocol/page.ts: the columnar TextColumnChunk
 // codec, the four page-kind builders, and the byte-size accounting the L2 cache budgets against.
 //
-// Bulk data crosses the wire as a FlatBuffers Frame (P11), not JSON+base64 (superseding P58 D5):
+// Bulk data crosses the wire as a FlatBuffers Frame, not JSON+base64:
 // EncodePage (encode.go) writes a Chunk's four buffers into a FlatBuffers table with zero copying
 // on the decode side — offsets/truncated are [uint32] vectors specifically so the generated
-// TypeScript can hand back a zero-copy Uint32Array view (P11 D4).
+// TypeScript can hand back a zero-copy Uint32Array view.
 package page
 
 import (
@@ -38,7 +38,7 @@ const (
 // the only thing that distinguishes them — every value reaching a builder is a *string all the way
 // from the driver's row scan, never a bare "" standing in for NULL.
 //
-// Offsets and Truncated are []uint32, not []byte (P11 D4/D7) — EncodePage writes each as a
+// Offsets and Truncated are []uint32, not []byte — EncodePage writes each as a
 // FlatBuffers [uint] vector, which is 4-byte aligned by construction, letting the generated
 // TypeScript decoder hand back a zero-copy Uint32Array view over the received frame instead of a
 // manual byte-by-byte reinterpretation.

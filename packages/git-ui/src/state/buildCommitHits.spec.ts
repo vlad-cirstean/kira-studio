@@ -3,12 +3,11 @@ import type { LoadedScanResult } from '@kira/git-core';
 import { buildCommitHits, type SearchRunResult } from './search.ts';
 
 /**
- * `docs/plans/P11.md` W20 / `docs/plans/G23-search.md` F12/D11: `buildCommitHits`'s own merge is
- * subtle enough (and was untested enough before this phase, when `tail` was always `undefined`
- * at runtime) to deserve direct, pure-function coverage. The four cases named in G23's own file
- * table: a loaded hit, a tail-only hit, a body-only tail hit on an already-loaded row (the exact
- * bug W20 names — counting it as `overlap` would silently zero it out of `matchCount.n` even
- * though it still gets a `CommitHit` entry), and a genuine overlap.
+ * `buildCommitHits`'s own merge is subtle enough (and was untested enough when `tail` was always
+ * `undefined` at runtime) to deserve direct, pure-function coverage. The four cases named in the
+ * file table: a loaded hit, a tail-only hit, a body-only tail hit on an already-loaded row (the
+ * exact bug — counting it as `overlap` would silently zero it out of `matchCount.n` even though
+ * it still gets a `CommitHit` entry), and a genuine overlap.
  */
 
 interface Row {

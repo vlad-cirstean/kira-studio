@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
 
-// Item 2's "with history": mirrors views/shared/FilterHistoryMenu.vue's *shape* (a recency-ordered list,
+// "with history": mirrors views/shared/FilterHistoryMenu.vue's *shape* (a recency-ordered list,
 // pinned entries exempt from the cap) but deliberately not its storage — the SQL grid's filter
 // history is a real SQLite table (main/storage/repos/filter-history.ts), and adding a matching
 // one here would mean touching this app's own SQLite schema, which is out of scope for this pass.

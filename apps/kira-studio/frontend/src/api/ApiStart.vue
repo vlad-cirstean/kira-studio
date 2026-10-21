@@ -11,13 +11,13 @@ import { openApiRequestTab, openGrpcRequestTab } from './tabs';
 const collectionsStore = useCollectionsStore();
 const importCurlStore = useImportCurlStore();
 
-// D13: the mode's front door — StudioStart.vue's own first-run shape verbatim (mark, title, one
+// The mode's front door — StudioStart.vue's own first-run shape verbatim (mark, title, one
 // line of copy, one Button variant="dialog-primary" button), the same `api/ -> state/` edge
-// CollectionsPanel.vue's own New request action uses (D7).
+// CollectionsPanel.vue's own New request action uses.
 //
-// P4 C9 adds a secondary action beside it: on a first run there is nothing to open, and importing
+// A secondary action sits beside it: on a first run there is nothing to open, and importing
 // an existing collection is the other thing someone arriving here wants to do. The primary
-// button's `new-request-start` testid is untouched — two existing specs click it (F11).
+// button's `new-request-start` testid is untouched — two existing specs click it.
 function onImport(): void {
   void collectionsStore.importCollection();
 }

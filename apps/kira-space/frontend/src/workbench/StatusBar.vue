@@ -7,6 +7,7 @@ import {
   TooltipDisabledTrigger,
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
+import { useAgentInfo } from '@workbench/agent/agentInfo';
 import RunsStatusItem from '@workbench/automations/runs/RunsStatusItem.vue';
 import AppMetricsItem from '@workbench/components/AppMetricsItem.vue';
 import StatusBarBase from '@workbench/components/StatusBar.vue';
@@ -18,19 +19,19 @@ import { useBlameStatusStore } from '../state/blameStatus';
 import { useModeStore } from '../state/mode';
 import { useSettingsStore } from '../state/settings';
 import { blameLineText, blameLineTooltip } from '../views/repo/blameLine';
-import ClaudeUsageItem from './ClaudeUsageItem.vue';
+import AgentUsageItem from './AgentUsageItem.vue';
 
-// P103 Part 2 (§5.4): Kira Studio's own workbench/StatusBar.vue, trimmed to the blame item (P76
-// §5.2) on the left. Now a thin composition over the shared bar chrome
-// (packages/workbench/src/components/StatusBar.vue). P116 G7 adds the app-metrics item back —
-// AppMetricsItem.vue, shared with Kira Studio's own copy of this file. P119 adds the update item,
-// same shared component (UpdateAvailableItem.vue) and the same in-app dialog Kira Studio's own
-// copy opens.
+// Kira Studio's own workbench/StatusBar.vue, trimmed to the blame item on the left. Now a thin
+// composition over the shared bar chrome (packages/workbench/src/components/StatusBar.vue). The
+// app-metrics item is added back — AppMetricsItem.vue, shared with Kira Studio's own copy of this
+// file. The update item is added, same shared component (UpdateAvailableItem.vue) and the same
+// in-app dialog Kira Studio's own copy opens.
 const blameStatusStore = useBlameStatusStore();
 const appMetricsStore = useAppMetricsStore();
 const appUpdateStore = useAppUpdateStore();
 const modeStore = useModeStore();
 const settingsStore = useSettingsStore();
+const { info: agentInfo } = useAgentInfo();
 
 // P76 §5.2: 'none' and 'uncommitted' both render nothing — an always-present "Uncommitted" readout
 // is the extension's own choice; this bar hides items with nothing to say instead.
@@ -67,8 +68,10 @@ function onRevealBlameCommit(): void {
         </TooltipTrigger>
         <TooltipContent>{{ blameTooltip }}</TooltipContent>
       </Tooltip>
-      <!-- P239: Claude Code usage limits, ADE module only. -->
-      <ClaudeUsageItem v-if="modeStore.active === 'ade' && settingsStore.claudeCode.usageEnabled" />
+      <!-- P239: agent usage limits, ADE module only, for a provider that reports them. -->
+      <AgentUsageItem
+        v-if="modeStore.active === 'ade' && settingsStore.agent.usageEnabled && agentInfo.usage"
+      />
     </template>
     <template #right>
       <RunsStatusItem />
@@ -80,7 +83,7 @@ function onRevealBlameCommit(): void {
       />
       <AppMetricsItem :sample="appMetricsStore.sample" />
     </template>
-    <!-- P110 I2-19 (§3.5.3): `.blame`'s font: inherit + color/disabled rules, and `.blame-text`'s
+    <!-- `.blame`'s font: inherit + color/disabled rules, and `.blame-text`'s
          truncation, folded onto the button/span above -- Preflight already sets `font: inherit` on
          every <button>, so `text-kira-sm` was redundant with what the button already inherits and
          was dropped; `text-fg` and `disabled:cursor-default` stay explicit (a plain <button> resets

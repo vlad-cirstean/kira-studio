@@ -9,7 +9,7 @@ import (
 
 // testApp is the one *application.App every shell_test file shares — application.New
 // short-circuits on a non-nil globalApplication (application.go:49-51), so a test binary gets
-// exactly one *App for its whole life (P56 §1.7, probed). Tests must use distinct event names or
+// exactly one *App for its whole life. Tests must use distinct event names or
 // unsubscribe, and none of them may call Run().
 var testApp *application.App
 

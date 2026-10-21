@@ -1,11 +1,10 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P6.md` W13: the picker's tags section, as its own component (judgment call 5's own
- * words: "a real component… not a sibling dropdown"). Renders exactly what `BranchPicker.vue`
- * hands it (already filtered/sorted/capped by `refListModel.ts`'s shared fold) plus its own
- * annotated/lightweight distinction (§7.9) and its own ref-scoped context menu (W14) — the same
- * menu shape `BranchPicker.vue`'s branch/remote rows use, built here because tag rows live in
- * this file's own template, not that one's.
+ * The picker's tags section, as its own component ("a real component… not a sibling dropdown").
+ * Renders exactly what `BranchPicker.vue` hands it (already filtered/sorted/capped by
+ * `refListModel.ts`'s shared fold) plus its own annotated/lightweight distinction and its own
+ * ref-scoped context menu — the same menu shape `BranchPicker.vue`'s branch/remote rows use, built
+ * here because tag rows live in this file's own template, not that one's.
  */
 import { shortSha } from '@kira/git-core';
 import type { InProgressOperation, RefRow } from '@kira/git-ipc';
@@ -42,7 +41,7 @@ async function checkout(row: RefRow): Promise<void> {
   await props.ops.runCheckout(row.shortName, 'switch');
 }
 
-/** §7.9: the commit a tag ultimately resolves to — the peeled commit for an annotated tag (whose
+/** The commit a tag ultimately resolves to — the peeled commit for an annotated tag (whose
  *  own `objectId` is the TAG OBJECT's sha, not a commit's), the ref's own `objectId` for a
  *  lightweight one. Mirrors `core`'s `tagTargetCommit`, adapted to the wire's `RefRow` rather than
  *  a full `RefRecord` (this file has no need for `objectType`). */

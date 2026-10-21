@@ -16,12 +16,12 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 )
 
-// CancelRemote is remote.cancel's own entry point. SPEC §6's own "active remote op (≤1)" box is
-// shared across every connection open on this repository (D9/D11/D20): a second remote.run on the
-// same repository, from any connection, is refused rather than queued (upstream's own OQ7 — a
-// push sitting invisibly behind a ninety-second fetch is worse than being told to wait, and it
-// makes "which op does cancel cancel?" ambiguous). The box itself is opSlot (opslot.go) — shared
-// with stack.go's restack slot.
+// CancelRemote is remote.cancel's own entry point. The "active remote op (≤1)" box is shared
+// across every connection open on this repository: a second remote.run on the same repository,
+// from any connection, is refused rather than queued (a push sitting invisibly behind a
+// ninety-second fetch is worse than being told to wait, and it makes "which op does cancel
+// cancel?" ambiguous). The box itself is opSlot (opslot.go) — shared with stack.go's restack
+// slot.
 func (e *RepoEntry) CancelRemote() bool {
 	return e.remoteOp.tryCancel()
 }
@@ -126,10 +126,10 @@ func (e *RepoEntry) coreAskPass(ctx context.Context) string {
 	return e.askPassValue
 }
 
-// withAskpass runs fn with the env D8's shim needs, or with none at all (D10) when a user's own
+// withAskpass runs fn with the env the shim needs, or with none at all when a user's own
 // core.askPass or an inherited GIT_ASKPASS should win instead, or when there is no broker, or no
-// connection to relay a prompt to at all (auto-fetch's own ctx: it never prompts, D23, structurally
-// rather than by policy — conn is simply nil).
+// connection to relay a prompt to at all (auto-fetch's own ctx: it never prompts, structurally
+// rather than by policy — conn is nil).
 func (e *RepoEntry) withAskpass(ctx context.Context, conn *Conn, deps RemoteDeps, fn func(env []string) error) error {
 	if deps.Askpass == nil || conn == nil || !deps.Askpass.ShouldInterpose(e.coreAskPass(ctx)) {
 		return fn(nil)
@@ -143,11 +143,11 @@ func (e *RepoEntry) withAskpass(ctx context.Context, conn *Conn, deps RemoteDeps
 	})
 }
 
-// runRemoteSpawn runs one remote-op argv OUTSIDE the repo's read/write gate (D11): a fetch or a
+// runRemoteSpawn runs one remote-op argv OUTSIDE the repo's read/write gate: a fetch or a
 // push writes objects and remote-tracking refs under git's own locking, takes no index lock and
 // touches no worktree file, so it is exactly as safe alongside a concurrent read (or a concurrent
 // checkout) as it is from a terminal — the shared slot above is the only serialization a remote op
-// needs against ANOTHER remote op. Setsid (D6, opted in here and nowhere else in this chapter's
+// needs against ANOTHER remote op. Setsid (opted in here and nowhere else in this chapter's
 // already-shipped code) keeps the child off any controlling terminal.
 func (e *RepoEntry) runRemoteSpawn(ctx context.Context, argv, env []string, onStderr func([]byte)) (gitclient.Result, error) {
 	e.noteWrite(ctx, argv)
@@ -178,11 +178,11 @@ func remoteTipsEqual(current, expected *string) bool {
 	return *current == *expected
 }
 
-// resolveUpstreamRemoteBranch is fetch/pull/push's own shared upstream lookup (G32 round-3
-// functional-correctness review, finding #1/#3): a branch's already-configured upstream can name
+// resolveUpstreamRemoteBranch is fetch/pull/push's own shared upstream lookup: a branch's
+// already-configured upstream can name
 // ANY branch on the remote, not just one sharing the local branch's own name (`git checkout -b
 // feat origin/main`, or any fork workflow, produces exactly this) — %(upstream) (the SAME
-// for-each-ref field `PullPreflight` already trusts, D10's own precedent) is the one source of
+// for-each-ref field `PullPreflight` already trusts) is the one source of
 // truth for "where does this branch's history already live on <remote>," never a same-name guess.
 // Returns the remote-side branch name to fetch from / push to, and whether an upstream configured
 // for THIS remote specifically was found. When it wasn't (no upstream at all, a purely local
@@ -228,7 +228,7 @@ func (e *RepoEntry) refSnapshot(ctx context.Context) (map[string]string, error) 
 	return porcelain.ParseRefSnapshot(raw)
 }
 
-// diffRefSnapshots is D13's own fetch/pull RefUpdate[] derivation: present-after-only is a created
+// diffRefSnapshots is the fetch/pull RefUpdate[] derivation: present-after-only is a created
 // ref (from: nil); present-before-only is a deleted one (to: nil); changed is both, with `forced`
 // resolved by one merge-base --is-ancestor per changed ref that has both endpoints — a set that is
 // empty or tiny in every realistic fetch, and exactly empty for a first clone-shaped one where
@@ -283,15 +283,15 @@ func (e *RepoEntry) remoteResultNoSpawn(ctx context.Context, opErr *RemoteOpErro
 	return RemoteOpResult{OK: false, Error: opErr, Updates: []gitops.RefUpdate{}, Head: head, InProgress: inProgress}, nil
 }
 
-// RunRemote is remote.run's own executor (D11/D13/D18/D19/D20), in this exact order:
+// RunRemote is remote.run's own executor, in this exact order:
 //
-//  0. ctx is already detached from the request by gitrpc (D19/G5 D8) — wrapped here in the
+//  0. ctx is already detached from the request by gitrpc — wrapped here in the
 //     entry's own WithCancel, which is what remote.cancel and teardown's forceCancel act on.
 //  1. claim the shared slot; already claimed -> {ok:false, OperationInProgress} with NO write.
-//  2. protected-branch re-check for forcePush/deleteRemoteBranch (D17) -> {ok:false, ProtectedBranch}.
-//  3. forcePush only: re-read the remote tip and compare with expectedRemoteTip (D12)
+//  2. protected-branch re-check for forcePush/deleteRemoteBranch -> {ok:false, ProtectedBranch}.
+//  3. forcePush only: re-read the remote tip and compare with expectedRemoteTip
 //     -> {ok:false, LeaseViolation} BEFORE any push spawns.
-//  4. askpass: interpose or not (D10), never for a nil conn (D23).
+//  4. askpass: interpose or not, never for a nil conn.
 //     5/6/7: per-kind spawn, below — fetch/push family/pull.
 //  8. read back head + in-progress, ALWAYS — success, failure or cancellation.
 //  9. release the slot (deferred, so it holds across every early return) and return.
@@ -329,7 +329,7 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 
 	protectedBranches, _, _ := e.settings()
 
-	// F2 (P108 Part 16 review): resolve the upstream remote branch name ONCE per RunRemote call for
+	// Resolve the upstream remote branch name ONCE per RunRemote call for
 	// forcePush — the protected-branch gate, the lease check and runPushFamily's own spawn each
 	// used to re-resolve it separately (three separate git-config-backed reads that can disagree if
 	// config changes mid-flight); forcePushRemoteBranch is empty and unused for every other kind.
@@ -345,13 +345,14 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 	}
 
 	if params.Kind == "forcePush" || params.Kind == "deleteRemoteBranch" {
-		// P108 Part 15 F1 fix: this gate must match/confirm against the UPSTREAM's branch name, not
+		// This gate must match/confirm against the UPSTREAM's branch name, not
 		// params.Branch's LOCAL one — runPushFamily below force-pushes to
 		// resolveUpstreamRemoteBranch's result, which can differ from params.Branch (a local "feat"
 		// tracking "origin/main"). Checking params.Branch let a force-push to a differently-named
 		// protected upstream skip the typed-confirmation gate entirely: MatchProtectedBranch never
-		// saw the real destination name. deleteRemoteBranch already names the remote branch directly
-		// in params.Branch (runPushFamily's own default case), so only forcePush needs the resolve.
+		// saw the real destination name. deleteRemoteBranch already names the remote branch
+		// directly in params.Branch (runPushFamily's own default case), so only forcePush needs
+		// the resolve.
 		checkBranch := params.Branch
 		if params.Kind == "forcePush" {
 			checkBranch = forcePushRemoteBranch
@@ -365,10 +366,10 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 	}
 
 	if params.Kind == "forcePush" {
-		// G32 round-3 finding #3's own shape: the lease re-check must compare against the SAME
-		// remote-side ref PushPreflight quoted expectedRemoteTip from, or a differently-named
-		// upstream makes both sides consistently (and wrongly) nil — passing the lease check
-		// trivially right before the push spawns against the wrong destination anyway.
+		// The lease re-check must compare against the SAME remote-side ref PushPreflight quoted
+		// expectedRemoteTip from, or a differently-named upstream makes both sides consistently
+		// (and wrongly) nil — passing the lease check trivially right before the push spawns
+		// against the wrong destination anyway.
 		currentTip, err := e.readRemoteTip(ctx, params.Remote, forcePushRemoteBranch)
 		if err != nil {
 			return RemoteOpResult{}, err
@@ -380,7 +381,7 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 		}
 	}
 
-	// D7: from here on every remaining path spawns at least one real git process that can touch
+	// From here on every remaining path spawns at least one real git process that can touch
 	// refs (fetch/push/pull all can) — drop the shared caches synchronously on every exit below,
 	// success, a classified failure or a genuine spawn error alike, rather than waiting for the
 	// watcher's own debounced signal to notice our own write.
@@ -426,7 +427,7 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 	return RemoteOpResult{OK: opErr == nil, Error: opErr, Updates: nonNil(updates), Head: head, InProgress: inProgress}, nil
 }
 
-// runFetch executes a plain fetch — killable (D19), no gate (D11). roCtx (never cancelled by
+// runFetch executes a plain fetch — killable, no gate. roCtx (never cancelled by
 // remote.cancel) is used for the ref-snapshot reads bracketing the spawn, so "whatever updates had
 // already landed" can still be reported even when spawnCtx was cancelled mid-flight; only the
 // actual git spawn takes spawnCtx.
@@ -465,10 +466,10 @@ func (e *RepoEntry) runFetch(roCtx, spawnCtx context.Context, conn *Conn, deps R
 	return updates, nil, nil
 }
 
-// runPushFamily executes push/forcePush/deleteRemoteBranch — --porcelain always (F10), NEVER
-// killable (D19: the remote may already have accepted it, so a cancelled push has an unknowable
+// runPushFamily executes push/forcePush/deleteRemoteBranch — --porcelain always, NEVER
+// killable (the remote may already have accepted it, so a cancelled push has an unknowable
 // outcome). forcePushRemoteBranch is RunRemote's own single resolveUpstreamRemoteBranch call for
-// this RunRemote invocation (F2, P108 Part 16 review) — used only for the "forcePush" case, empty
+// this RunRemote invocation — used only for the "forcePush" case, empty
 // and unused for "push"/"deleteRemoteBranch".
 func (e *RepoEntry) runPushFamily(ctx context.Context, conn *Conn, deps RemoteDeps, params RemoteOpParams, forcePushRemoteBranch string, onStderr func([]byte)) ([]gitops.RefUpdate, *RemoteOpError, error) {
 	var argv []string
@@ -530,11 +531,11 @@ func (e *RepoEntry) runPushFamily(ctx context.Context, conn *Conn, deps RemoteDe
 	return updates, opErr, nil
 }
 
-// runPullOp executes D18's two tracked steps: fetch the one branch (killable), then exactly one of
+// runPullOp executes the two tracked steps: fetch the one branch (killable), then exactly one of
 // merge --ff-only/merge --no-edit/rebase against the just-fetched remote-tracking ref (NEVER
-// killable — a genuine local write, gated by Repo.Write exactly like G5's own ops, D11). A
-// conflicting merge/rebase lands in G5's own in-progress banner — this adds no detection of its
-// own (D18).
+// killable — a genuine local write, gated by Repo.Write exactly like the ops). A
+// conflicting merge/rebase lands in the in-progress banner — this adds no detection of its
+// own.
 func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps RemoteDeps, params RemoteOpParams, onStderr func([]byte)) ([]gitops.RefUpdate, *RemoteOpError, error) {
 	e.remoteOp.setKillable(true)
 	opFrom(roCtx).SetCancel(e.CancelRemote)
@@ -606,9 +607,8 @@ func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps 
 
 	var opErr *RemoteOpError
 	writeErr := e.Repo.Write(roCtx, func(wctx context.Context) error {
-		// G30 round-1 functional-correctness review, finding #2 (originally checked here, but
-		// stale and non-atomic — F5, P108 Part 16 review): unlike forcePush's own re-check above
-		// (step 3, D12) and every other write in this chapter ("a pre-flight is advice, not a
+		// (originally checked here, but stale and non-atomic): unlike forcePush's own re-check
+		// above (step 3) and every other write in this chapter ("a pre-flight is advice, not a
 		// lock", ops.go's own prepareReset doc comment), this integrate phase must re-verify HEAD
 		// is still params.Branch before merging/rebasing INTO WHATEVER IS CHECKED OUT NOW. The
 		// fetch above can take an arbitrary amount of wall-clock time (network, credential prompt)
@@ -646,8 +646,8 @@ func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps 
 		if res.ExitCode != 0 {
 			// Probed here, real git 2.43: a merge conflict's own "CONFLICT (content): …" line is
 			// on STDOUT, while a rebase conflict's "could not apply …" is on stderr — combined so
-			// ClassifyOpError's existing Conflict row (ported from G5, stderr-only there because
-			// checkout/revert never put anything actionable on stdout) sees whichever one fired.
+			// ClassifyOpError's existing Conflict row (stderr-only, because checkout/revert never
+			// put anything actionable on stdout) sees whichever one fired.
 			combined := string(res.Stdout) + "\n" + string(res.Stderr)
 			kind, message := gitops.ClassifyRemoteError("", combined, res.ExitCode)
 			opErr = &RemoteOpError{Kind: kind, Message: message}
@@ -675,12 +675,12 @@ func parseAheadBehind(raw []byte) (ahead, behind int, err error) {
 	return ahead, behind, nil
 }
 
-// PushPreflight is remote.pushPreflight's own orchestration (D12/F15): the remote-tracking ref's
+// PushPreflight is remote.pushPreflight's own orchestration: the remote-tracking ref's
 // own existence/sha stands in for "upstream" here — a branch with no upstream, or one whose
 // remote-tracking ref has been pruned, is the common case wouldSetUpstream exists to describe
-// (F15) — and ahead/behind is read ONLY once that ref is confirmed to exist (rev-list dies on a
-// missing ref, probe P11). The ref checked is the branch's REAL upstream-side name
-// (resolveUpstreamRemoteBranch, G32 round-3 finding #3), not an assumed same-name one — a branch
+// — and ahead/behind is read ONLY once that ref is confirmed to exist (rev-list dies on a
+// missing ref). The ref checked is the branch's REAL upstream-side name
+// (resolveUpstreamRemoteBranch), not an assumed same-name one — a branch
 // already tracking a differently-named upstream must never be reported as "would set upstream"
 // just because no same-named ref happens to exist yet.
 func (e *RepoEntry) PushPreflight(ctx context.Context, remote, branch string) (gitpreflight.PushPreflight, error) {
@@ -758,12 +758,12 @@ func parsePullConfig(raw []byte, branch string) gitpreflight.PullConfigValues {
 	return cfg
 }
 
-// PullPreflight is remote.pullPreflight's own orchestration (D18): one config --null --get-regexp
+// PullPreflight is remote.pullPreflight's own orchestration: one config --null --get-regexp
 // spawn feeds the strategy ladder; upstream/ahead/behind come from the branch's own for-each-ref
-// row (the SAME %(upstream)/%(upstream:track) fields refs.list already computes, D10's own
-// precedent — no second, hand-rolled resolution of "this branch's own configured upstream"). A
-// "gone" remote-tracking ref (config still points at it, but for-each-ref can no longer resolve
-// it) reports ahead/behind as 0 rather than guessing.
+// row (the SAME %(upstream)/%(upstream:track) fields refs.list already computes — no second,
+// hand-rolled resolution of "this branch's own configured upstream"). A "gone" remote-tracking ref
+// (config still points at it, but for-each-ref can no longer resolve it) reports ahead/behind as 0
+// rather than guessing.
 func (e *RepoEntry) PullPreflight(ctx context.Context, branch, strategySetting string) (gitpreflight.PullPreflight, error) {
 	cfgRaw, err := e.runAllowingExit(ctx, gitops.PullConfigArgs(branch), 0, 1)
 	if err != nil {

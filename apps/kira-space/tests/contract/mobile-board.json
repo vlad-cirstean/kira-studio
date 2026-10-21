@@ -6,7 +6,8 @@
     "items": [
       {
         "addedAt": 0,
-        "githubUrl": "",
+        "hostLink": null,
+        "hostUrl": "",
         "id": "<id:1>",
         "jira": null,
         "notes": "",
@@ -16,7 +17,8 @@
   },
   "http:POST /api/ade/backlog/items": {
     "addedAt": 0,
-    "githubUrl": "",
+    "hostLink": null,
+    "hostUrl": "",
     "id": "<id:1>",
     "jira": null,
     "notes": "",

@@ -1,9 +1,9 @@
 // Package metrics is the Go analogue of Electron's app.getAppMetrics(): it sums memory and CPU
-// across the app's whole process set on a timer (P52 §8.4), and it is also the instrument gate
-// G1 (§3.3) is measured with. The memory figure is RSS everywhere except darwin, where it is
+// across the app's whole process set on a timer, and it is also the instrument gate
+// G1 is measured with. The memory figure is RSS everywhere except darwin, where it is
 // ri_phys_footprint (proc_pid_rusage(RUSAGE_INFO_V2)) — the figure Activity Monitor's own "Memory"
 // column shows, which excludes shared system pages RSS double-counts across this app's own
-// multi-process set (P7 F1/D2). cmd/g1measure, this package's own throwaway RSS-only measurement
+// multi-process set. cmd/g1measure, this package's own throwaway RSS-only measurement
 // tool, is unaffected — see its own header comment.
 //
 // The process set is not obvious and getting it wrong invalidates any measurement built on this
@@ -26,12 +26,12 @@ import (
 // jitter), not the per-core-sum a tool like `top` reports per process (which can read e.g. 350% on
 // a busy quad-core machine) — StatusBar.vue renders it as a plain "N%" with no further context or
 // clamping (and reserves only 4 characters of layout width for it, "100%"), so a raw per-core-sum
-// would both mean the wrong thing to a reader and overflow that reserved width (P2 R1). MemoryBytes
-// is RSS everywhere except darwin, where it is phys_footprint — see this package's own doc comment
-// (P7 D2). LogicalCPUs and ProcessCount exist so a renderer can state what CPUPercent is a
+// would both mean the wrong thing to a reader and overflow that reserved width. MemoryBytes is RSS
+// everywhere except darwin, where it is phys_footprint — see this package's own doc comment.
+// LogicalCPUs and ProcessCount exist so a renderer can state what CPUPercent is a
 // percentage *of* and how many processes MemoryBytes covers, rather than leaving a reader to take
-// either figure on faith (P7 F6, D6) — ProcessCount is the number of pids that actually answered
-// the probe this tick (the ones MemoryBytes is summed over), not the number discovered.
+// either figure on faith — ProcessCount is the number of pids that answered the probe this tick
+// (the ones MemoryBytes is summed over), not the number discovered.
 type Sample struct {
 	CPUPercent   float64 `json:"cpuPercent"`
 	MemoryBytes  uint64  `json:"memoryBytes"`
@@ -41,7 +41,7 @@ type Sample struct {
 
 // cpuState is one pid's cumulative CPU time, tagged with the OS process-creation time it was read
 // from — the tag is what lets two samples of "the same pid" be told apart from two samples of two
-// different processes that happen to share a pid number (P2 R1): a short-lived helper can exit and
+// different processes that happen to share a pid number: a short-lived helper can exit and
 // have its pid recycled to an unrelated new process well within one sample interval, and comparing
 // cumulative times across that boundary produces a meaningless (often negative) delta.
 type cpuState struct {
@@ -52,7 +52,7 @@ type cpuState struct {
 // procSample is one probe's answer for a single pid: the process-identity tag (createTime, same
 // role as cpuState's) plus the two readings Sample needs from it. Sampler.probe is the seam every
 // platform's syscalls sit behind, so Sample itself, cpuDeltaPercent and CachedPIDs never call an
-// OS API directly — see probe_darwin.go/probe_other.go (D3).
+// OS API directly — see probe_darwin.go/probe_other.go.
 type procSample struct {
 	cpuSeconds float64
 	memBytes   uint64
@@ -62,20 +62,20 @@ type procSample struct {
 // cpuSanityThresholdPercent is cpuDeltaPercent's own sanity bound: a normalized reading above this
 // before clamping means an accounting bug (a stale-baseline spike, a bad probe read), not
 // measurement jitter, and is worth a log line even though the emitted sample still gets clamped to
-// a displayable range (F3).
+// a displayable range.
 const cpuSanityThresholdPercent = 110
 
 // Sampler keeps the previous CPU-time sample so CPUPercent reports a live delta (matching
 // today's cpu.percentCPUUsage semantics) rather than gopsutil's own cumulative-since-start
 // figure, normalized by the machine's own logical core count so it lands in the same 0-100 range
-// regardless of how many cores the process set is spread across (P2 R1).
+// regardless of how many cores the process set is spread across.
 type Sampler struct {
-	// P21 round 2 performance finding 10(a): pids also returns any procSample its own call
+	// pids also returns any procSample its own call
 	// already obtained for a subset of the returned pids — CachedPIDs.PIDs's own rescan path
 	// probes every pid to get its createTime anyway, so Sample below reuses that result directly
 	// instead of calling probe a second time for the same pid on the same tick. nil/empty is
 	// always a valid answer (a revalidate-only tick has no fresh probe data to offer; any
-	// pids-only caller can simply return nil), so this is additive, not a stricter contract.
+	// pids-only caller can return nil), so this is additive, not a stricter contract.
 	pids        func() ([]int32, map[int32]procSample, error)
 	probe       func(pid int32) (procSample, bool)
 	prevCPU     map[int32]cpuState
@@ -84,7 +84,7 @@ type Sampler struct {
 }
 
 // NewSampler takes a pid-discovery function so the caller decides how the process set is found —
-// see Sum below for the bundle-matching implementation this app actually uses. The per-process
+// see Sum below for the bundle-matching implementation this app uses. The per-process
 // probe itself is always defaultProbe (platform-selected, see probe_darwin.go/probe_other.go) —
 // there is no production caller that needs a different one, so it is not part of this signature.
 func NewSampler(pids func() ([]int32, map[int32]procSample, error)) *Sampler {
@@ -136,13 +136,13 @@ func (s *Sampler) Sample() (Sample, error) {
 // guard and the core-count normalization are both unit-testable without a real OS process: a pid
 // only contributes if it named the same process (matching createTime) in both snapshots — a pid
 // missing from prev (a genuinely new process, including one whose probe failed last tick — see
-// Sample's D7 handling above) or whose createTime changed (an exited process's pid reused by an
+// Sample's handling above) or whose createTime changed (an exited process's pid reused by an
 // unrelated new one) contributes nothing for this tick, rather than a delta computed against a
 // stranger's cumulative CPU time. A per-pid delta that goes backwards (a non-monotonic read) is
 // clamped to 0 rather than subtracted from the other pids' genuine usage, and the normalized
 // result is clamped to [0, 100] — a raw value above cpuSanityThresholdPercent is logged once with
 // the pids that produced it, since that means an accounting bug worth seeing rather than jitter to
-// round away silently (F3).
+// round away silently.
 func cpuDeltaPercent(prev, cur map[int32]cpuState, elapsedSeconds float64, logicalCPUs int) float64 {
 	if elapsedSeconds <= 0 || logicalCPUs <= 0 {
 		return 0
@@ -251,10 +251,10 @@ func AppProcessSet(anchorNeedles, helperNeedles []string) ([]int32, error) {
 // includeHelper is AppProcessSet's own inclusion rule, pulled out pure and platform-independent
 // (responsibilityTracked is the only thing that varies by platform) so both branches are
 // unit-testable everywhere: untracked platforms (every non-darwin build) always include a
-// helper-needle match unfiltered, since P52 §2.3 already confirmed those are real ppid children
+// helper-needle match unfiltered, since those are real ppid children
 // with no cross-app over-match risk. A tracked platform (darwin) must fail closed instead: a -1
 // "no distinct responsible process" answer from responsiblePID is exactly the
-// belongs-to-some-other-app case this whole mechanism exists to exclude (P2 R1 — the previous
+// belongs-to-some-other-app case this whole mechanism exists to exclude (the previous
 // `resp == -1 || anchorSet[resp]` unconditionally included that case too, defeating the check it
 // sat right next to).
 func includeHelper(tracked, isAnchor bool) bool {
@@ -275,7 +275,7 @@ func containsAny(s string, needles []string) bool {
 
 // CachedPIDs wraps a pid-resolving func (AppProcessSet, in production) so a caller that samples
 // on a fixed cadence for the life of the process — main.go's own metrics ticker — doesn't walk
-// every process on the machine on every single tick (P2 R1): resolve only runs once every
+// every process on the machine on every single tick: resolve only runs once every
 // rescanEvery calls; between full resolves, the pids it found are kept as long as they still name
 // the same OS process (a fresh, targeted process.NewProcess(pid).CreateTime() lookup — cheap
 // compared to resolve's own Exe() lookup on every process on the machine — still matches what was
@@ -303,7 +303,7 @@ func NewCachedPIDs(resolve func() ([]int32, error), rescanEvery int) *CachedPIDs
 
 // PIDs is the func a Ticker/Sampler calls each tick.
 // PIDs is the func a Ticker/Sampler calls each tick — see Sampler.pids' own doc comment for why
-// it also returns a procSample map (P21 round 2 performance finding 10a): on a rescan tick,
+// it also returns a procSample map: on a rescan tick,
 // resolve's own createTime check already probed every pid once, so this hands that same result to
 // Sample rather than making it probe the identical pid a second time in the same tick. A
 // revalidate-only tick (sinceScan != 0) has no fresh probe data of its own to offer — revalidate
@@ -359,7 +359,7 @@ func (c *CachedPIDs) revalidate() {
 // NewProcess/CreateTime lookup), so CachedPIDs' idea of "the same process" and cpuState's can
 // never diverge — the create-time tag both use to detect pid reuse always comes from one place.
 // defaultProbe is platform-selected: probe_darwin.go (native, requires cgo) or probe_other.go
-// (gopsutil, every other build) — see D3.
+// (gopsutil, every other build).
 func processCreateTime(pid int32) (int64, bool) {
 	ps, ok := defaultProbe(pid)
 	if !ok {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
@@ -139,6 +140,100 @@ func TestScriptCollections(t *testing.T) {
 	}
 	if !sameJSON(again, listed) {
 		t.Fatalf("after Restart = %+v, want %+v", again, listed)
+	}
+}
+
+func TestScriptOrder(t *testing.T) {
+	app := flowharness.New(t)
+	cs := app.W.CustomScripts
+	mk := func(name string, coll *string) scripts.CustomScript {
+		t.Helper()
+		rec, err := cs.Create(bridge.CustomScriptsCreateArgs{Fields: scripts.CustomScriptFields{Name: name, Command: "echo " + name, Color: "blue", CollectionID: coll}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return rec
+	}
+	x, err := cs.CreateCollection(bridge.CustomScriptsCreateCollectionArgs{Name: "X"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	y, err := cs.CreateCollection(bridge.CustomScriptsCreateCollectionArgs{Name: "Y"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s1, s2, s3 := mk("s1", nil), mk("s2", nil), mk("s3", nil)
+	t1, t2 := mk("t1", &x.ID), mk("t2", &x.ID)
+
+	ungrouped := bridge.CustomScriptsReorderArgs{IDs: []string{s3.ID, s1.ID, s2.ID}}
+	inX := bridge.CustomScriptsReorderArgs{CollectionID: &x.ID, IDs: []string{t2.ID, t1.ID}}
+	colls := bridge.CustomScriptsReorderCollectionsArgs{IDs: []string{y.ID, x.ID}}
+	for _, call := range []func() error{
+		func() error { return cs.Reorder(ungrouped) },
+		func() error { return cs.Reorder(inX) },
+		func() error { return cs.ReorderCollections(colls) },
+	} {
+		if err := call(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	order := func(snap scripts.Snapshot) (ung, inx, cols []string) {
+		for _, s := range snap.Scripts {
+			switch {
+			case s.CollectionID == nil:
+				ung = append(ung, s.Name)
+			case *s.CollectionID == x.ID:
+				inx = append(inx, s.Name)
+			}
+		}
+		for _, c := range snap.Collections {
+			cols = append(cols, c.Name)
+		}
+		return
+	}
+	check := func(label string, snap scripts.Snapshot, wantX string) {
+		t.Helper()
+		ung, inx, cols := order(snap)
+		if got := strings.Join(ung, ","); got != "s3,s1,s2" && !(wantX == "t2,t1,s1" && got == "s3,s2") {
+			t.Fatalf("%s ungrouped = %s", label, got)
+		}
+		if got := strings.Join(inx, ","); got != wantX {
+			t.Fatalf("%s X = %s, want %s", label, got, wantX)
+		}
+		if got := strings.Join(cols, ","); got != "Y,X" {
+			t.Fatalf("%s collections = %s", label, got)
+		}
+	}
+	listed, err := cs.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("List", listed, "t2,t1")
+	if got := lastSnapshot(t, app); !sameJSON(got, listed) {
+		t.Fatalf("event snapshot %+v differs from List %+v", got, listed)
+	}
+
+	if err := cs.Move(bridge.CustomScriptsMoveArgs{ID: s1.ID, CollectionID: &x.ID}); err != nil {
+		t.Fatal(err)
+	}
+	moved, err := cs.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("after Move", moved, "t2,t1,s1")
+
+	app.Contract(t, "script-order", "args:CustomScriptsService.Reorder#ungrouped", ungrouped)
+	app.Contract(t, "script-order", "args:CustomScriptsService.Reorder#collection", inX)
+	app.Contract(t, "script-order", "args:CustomScriptsService.ReorderCollections", colls)
+
+	app.Restart(t)
+	again, err := app.W.CustomScripts.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sameJSON(again, moved) {
+		t.Fatalf("after Restart = %+v, want %+v", again, moved)
 	}
 }
 

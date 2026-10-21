@@ -4,8 +4,8 @@ import { GUTTER_WIDTH } from '../page/columns';
 import type { EdgeHash } from './cssLayers';
 import type { Selection } from './selection';
 
-// P113 F1 — the remainder of T2-17's own move (see selectionEdges.ts's own header comment): five
-// more pieces views/console/ConsoleSlickGrid.vue and views/grid/SlickGridHost.vue still carried as
+// The remainder of the move (see selectionEdges.ts's own header comment): five more pieces
+// views/console/ConsoleSlickGrid.vue and views/grid/SlickGridHost.vue still carried as
 // separate, byte-identical (or near-identical) copies. Same rule as selectionEdges.ts: pure
 // functions/callbacks only, no reference to either host's own `grid`/`dataSource` module-scope
 // `let`s — biome.json's own views/<kind>/* boundary is why this lives here rather than being
@@ -45,7 +45,7 @@ export function gutterColumn(
   };
 }
 
-/** The drag-in-progress fill preview (D4/D2 in each host's own history) — the live twin of
+/** The drag-in-progress fill preview — the live twin of
  *  `computeSelEdgeHashes`' perimeter, same "every caller hands in its own rendered-bounds/
  *  page-row/field mapping" shape. `fieldAtDisplayCol` returning `undefined` (SlickGridHost.vue's
  *  own case, whose columns can be reordered/hidden) skips that cell rather than writing a
@@ -112,10 +112,9 @@ export function subscribeRangeSelecting(
   }
 }
 
-/** The `--kira-header-row-height` live row-density watch — byte-identical in both hosts (not named
- *  in P113's own finding, found alongside it: same file, same duplication shape). `getGrid` reads
- *  the caller's own module-scope `grid` fresh on fire, matching the plain `let` (never a ref) rule
- *  every other piece here already follows. */
+/** The `--kira-header-row-height` live row-density watch — byte-identical in both hosts.
+ *  `getGrid` reads the caller's own module-scope `grid` fresh on fire, matching the plain `let`
+ *  (never a ref) rule every other piece here already follows. */
 export function subscribeRowHeight(
   rowHeight: Ref<number>,
   getGrid: () => {

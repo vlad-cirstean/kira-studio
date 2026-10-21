@@ -33,20 +33,19 @@ import { useInlineBlame } from './useInlineBlame';
 
 type StandaloneEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
 
-// 7e (P68 review): D11's own comment claims the reading view is "re-rendered at most once" since
-// the source never changes underneath it — true only within one mount. A mere tab switch away and
-// back destroys and remounts this component (MainView's own v-if, same as every other tab view),
-// which used to re-issue the IPC file read and re-run markdown-it plus a full DOM rebuild every
-// time. Cached by tab id, module-level so it survives the remount; invalidated by
-// registerTabRuntimeCleanup below, the same per-tab-close hook browse/state.ts and keyvalue/state.ts
-// already use for their own runtime maps.
+// The comment claims the reading view is "re-rendered at most once" since the source never changes
+// underneath it — true only within one mount. A mere tab switch away and back destroys and
+// remounts this component (MainView's own v-if, same as every other tab view), which used to
+// re-issue the IPC file read and re-run markdown-it plus a full DOM rebuild every time. Cached by
+// tab id, module-level so it survives the remount; invalidated by registerTabRuntimeCleanup below,
+// the same per-tab-close hook browse/state.ts and keyvalue/state.ts already use for their own
+// runtime maps.
 //
-// Group 4 (P69 review): keyed on tab id ALONE used to go stale whenever the underlying file
-// changed between mounts of the same tab (a `git pull`, a branch checkout, an external edit —
-// routine since P67e made the git surface write-capable) — `mount()` re-reads the file from disk
-// on every remount, so Source would show fresh bytes while Reading kept showing stale rendered
-// HTML. Each entry now also carries the exact `fileText` it was rendered from, so a changed
-// `content` naturally misses the cache instead of matching on tab id alone.
+// Keyed on tab id ALONE used to go stale whenever the underlying file changed between mounts of
+// the same tab (a `git pull`, a branch checkout, an external edit) — `mount()` re-reads the file
+// from disk on every remount, so Source would show fresh bytes while Reading kept showing stale
+// rendered HTML. Each entry now also carries the exact `fileText` it was rendered from, so a
+// changed `content` naturally misses the cache instead of matching on tab id alone.
 const markdownHtmlByTabId = new Map<string, { content: string; html: string }>();
 registerTabRuntimeCleanup((tabId) => {
   markdownHtmlByTabId.delete(tabId);
@@ -63,9 +62,9 @@ const container = ref<HTMLElement | null>(null);
 const readingPane = ref<HTMLElement | null>(null);
 let editorInstance: StandaloneEditor | null = null;
 
-// D11: only true `markdown` (§2.3's `.md`/`.markdown`/`.mdown`/… — never `.mdx`, which colors as
-// its own Monaco language) grows a toolbar at all; every other file type stays byte-identical to
-// before this phase. D12: opens on Source, like every other file type — a reading view is opt-in,
+// Only true `markdown` (the `.md`/`.markdown`/`.mdown`/… — never `.mdx`, which colors as
+// its own Monaco language) grows a toolbar at all; every other file type stays byte-identical.
+// Opens on Source, like every other file type — a reading view is opt-in,
 // restored per tab from `markdownReading`.
 const isMarkdown = computed(() => monacoLanguageFor(props.tab.path) === 'markdown');
 const view = ref<'source' | 'reading'>(props.tab.state.markdownReading ? 'reading' : 'source');
@@ -84,9 +83,9 @@ const viewOptions = computed(() => [
   },
 ]);
 
-// D11: rendered lazily on first switch to Reading, then cached — a markdown file opened and never
+// Rendered lazily on first switch to Reading, then cached — a markdown file opened and never
 // toggled never pays `markdown-it`'s import cost, and a plain read-only view is re-rendered at most
-// once per tab, not once per mount (7e, P68 review: markdownHtmlByTabId above survives a tab
+// once per tab, not once per mount (markdownHtmlByTabId above survives a tab
 // switch-away-and-back, since the source text never changes underneath it either way).
 async function ensureMarkdownRendered(): Promise<void> {
   if (renderedHtml.value !== null || !fileText.value) return;
@@ -113,11 +112,11 @@ function onViewChange(next: 'source' | 'reading'): void {
   }
 }
 
-// D13: every anchor click is neutralised — there is no back button in this webview, so an
+// Every anchor click is neutralised — there is no back button in this webview, so an
 // accidental navigation would strand the user with no way home short of a restart. A same-page
 // `#anchor` link still scrolls (to a heading `renderMarkdownReading`'s own slugger id'd); anything
 // else is left inert, its target already surfaced through the link's own `title` (set at render
-// time), never actually opened — see the plan's own §5.4/§1.7 for why that stays out of this phase.
+// time), never opened.
 function onReadingClick(event: MouseEvent): void {
   const anchor = (event.target as HTMLElement).closest('a');
   if (!anchor) return;
@@ -204,7 +203,7 @@ async function mount(): Promise<void> {
   editorInstance = editor;
   disposeDistill = attachDistillSelection(editor, props.tab.path);
 
-  // P62 §4.1: attached after the editor exists, guarded on the setting and on whether this
+  // Attached after the editor exists, guarded on the setting and on whether this
   // window has a git record for the repository at all (`gitRepoIdFor`'s own "never guessed"
   // contract) — a silent no-op either way, never an error surface for a repo file view that has
   // always worked with no git backing. Read live (not just at mount) so toggling the setting
@@ -217,10 +216,9 @@ async function mount(): Promise<void> {
     inlineBlame.attach({ gitRepoId, workspaceRepoId: repoId, path: props.tab.path, editor, mod });
   }
 
-  // §9.3/§12, widened by C7 D12: a pending reveal (a search result or go-to-definition match that
-  // arrived while this tab wasn't mounted) wins over the persisted revealLine — the mount-time
-  // case D12's own fix doesn't change, since consumeReveal only ever has something to give when a
-  // reveal request preceded this exact mount.
+  // A pending reveal (a search result or go-to-definition match that arrived while this tab wasn't
+  // mounted) wins over the persisted revealLine — the mount-time case the fix doesn't change, since
+  // consumeReveal only ever has something to give when a reveal request preceded this exact mount.
   const pendingReveal = consumeReveal(props.tab.id);
   if (pendingReveal) {
     if (pendingReveal.column === undefined) {
@@ -251,7 +249,7 @@ async function mount(): Promise<void> {
   });
   disposeCursorSub = () => sub.dispose();
 
-  // C7 D13/§6: no second find UI — features/register.all.js already ships Monaco's own find
+  // No second find UI — features/register.all.js already ships Monaco's own find
   // widget (case/word/regex toggles, match navigation and highlighting all included), so this
   // view's whole in-file-search deliverable is registering the app-wide `view.find` command onto
   // it, the exact lifecycle ConsoleView.vue and seven other views already use for this command id.
@@ -295,7 +293,7 @@ onUnmounted(() => {
           @update:model-value="(v) => onViewChange(v as 'source' | 'reading')"
         />
       </ViewToolbar>
-      <!-- D11: `v-show`, never `v-if` — the editor widget must never be disposed/recreated by this
+      <!-- `v-show`, never `v-if` — the editor widget must never be disposed/recreated by this
            toggle, only hidden, so scroll position/selection/find state survive a round trip.
            flex-1/min-h-0 (not h-full/w-full, the standalone-mount branch below) since this is
            nested in the markdown toolbar's own flex column. -->

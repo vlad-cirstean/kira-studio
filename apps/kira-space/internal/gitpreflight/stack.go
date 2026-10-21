@@ -1,13 +1,13 @@
-// G26's own pure model: the nine wire types D17 counts for this phase's contract bump, plus
-// ParseStackConfig/BuildStacks/ClassifyRestack — every one of them a pure function over plain data,
-// exactly like this package's other classifiers (ClassifyCheckout/ClassifyReset). No spawn, no
-// filesystem: gitsession/stack.go is the only place that ever runs a git process for the stack
-// feature, and it does so BEFORE calling into this file, never after.
+// The pure model: the nine wire types, plus ParseStackConfig/BuildStacks/ClassifyRestack — every
+// one of them a pure function over plain data, exactly like this package's other classifiers
+// (ClassifyCheckout/ClassifyReset). No spawn, no filesystem: gitsession/stack.go is the only place
+// that ever runs a git process for the stack feature, and it does so BEFORE calling into this
+// file, never after.
 //
-// D4's one rule underlies everything here: staleness is `behind > 0` from `rev-list --left-right`
-// and NOTHING else — never a stored plan, never merge-base inference on its own (F4/probe P6 shows
-// that is provably wrong the moment a parent is amended). BuildStacks/ClassifyRestack both take
-// pre-computed behind/ahead counts as input; they never guess at them.
+// The one rule underlies everything here: staleness is `behind > 0` from `rev-list --left-right`
+// and NOTHING else — never a stored plan, never merge-base inference on its own (that is provably
+// wrong the moment a parent is amended). BuildStacks/ClassifyRestack both take pre-computed
+// behind/ahead counts as input; they never guess at them.
 package gitpreflight
 
 import (
@@ -16,7 +16,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 )
 
-// MaxStackedBranches (D3) bounds both the number of `rev-list --left-right` spawns a stack.list
+// MaxStackedBranches bounds both the number of `rev-list --left-right` spawns a stack.list
 // costs and the number of iterations a cycle walk will ever take — a pre-existing cycle in a
 // hand-edited config cannot spin BuildStacks/ClassifyRestack's own cycle detection. A branch beyond
 // the cap is still listed (never silently dropped) but with behind/ahead left at zero, since no
@@ -78,7 +78,7 @@ type StackSummary struct {
 type StackListResult struct {
 	Stacks []StackSummary `json:"stacks"`
 	// Orphans: branches whose recorded parent no longer resolves to any ref, or that sit in a
-	// cycle — never silently dropped (D3's own doc comment), always surfaced with a remedy. Their
+	// cycle — never silently dropped, always surfaced with a remedy. Their
 	// own State is always StackParentMissing (a cycle offers no more of a "commit ahead/behind"
 	// concept than a dangling parent does), ParentTip is always nil, and Depth is always 0.
 	Orphans []StackBranch `json:"orphans"`
@@ -120,9 +120,9 @@ type RestackPreflight struct {
 
 // StackConfigEntry is one branch's raw, unresolved config row — ParseStackConfig's own output
 // shape, before BuildStacks resolves it against live refs. "" means "not set" for either field
-// (D2: never absent, always the empty string once a key has ever been written, but ALSO genuinely
+// (never absent, always the empty string once a key has ever been written, but ALSO genuinely
 // absent for a branch that was never stacked at all — ParseStackConfig does not distinguish the
-// two, since D4/D14 only ever ask "is this non-empty", never "was this key ever written").
+// two).
 type StackConfigEntry struct {
 	Branch string
 	Parent string
@@ -132,14 +132,14 @@ type StackConfigEntry struct {
 const stackParentSuffix = ".kirastackparent"
 const stackBaseSuffix = ".kirastackbase"
 
-// ParseStackConfig parses D1/probe P3's own `git config --local --null --get-regexp
+// ParseStackConfig parses the `git config --local --null --get-regexp
 // '^branch\..*\.kirastack'` output: NUL-terminated records, key and value separated by a NEWLINE —
 // byte-identical to the framing gitsession's own parsePullConfig already reads (a different
 // package, the same git behaviour). Case-insensitive on the "branch." prefix and the ".kirastack*"
-// suffix (probe P1: git lowercases the variable name on write, but this parser trusts nothing about
+// suffix (git lowercases the variable name on write, but this parser trusts nothing about
 // case); the branch name's own case is read from the ORIGINAL key, never the lowercased copy, so
-// indices stay valid (lower-casing never changes a string's length). Never splits on "." (probe P4:
-// a branch named "feat.x" round-trips as branch.feat.x.kirastackparent, matched by stripping the
+// indices stay valid (lower-casing never changes a string's length). Never splits on "."
+// (a branch named "feat.x" round-trips as branch.feat.x.kirastackparent, matched by stripping the
 // known prefix and suffix, not by field-splitting).
 func ParseStackConfig(raw []byte) map[string]StackConfigEntry {
 	out := map[string]StackConfigEntry{}
@@ -208,10 +208,10 @@ type resolvedNode struct {
 	depth int
 }
 
-// DetectCycleFrom walks parent pointers up from start (D10's own stackSet cycle check, and this
-// file's own orphan/cycle discrimination): returns the ordered list of branch names in the cycle
-// (starting at start) the moment a repeat is found, or nil if the walk reaches a resolvable base or
-// a dangling parent first. Bounded by MaxStackedBranches iterations (D3's own stated defence: a
+// DetectCycleFrom walks parent pointers up from start (the stackSet cycle check, and this file's
+// own orphan/cycle discrimination): returns the ordered list of branch names in the cycle (starting
+// at start) the moment a repeat is found, or nil if the walk reaches a resolvable base or a
+// dangling parent first. Bounded by MaxStackedBranches iterations (the stated defence: a
 // pre-existing cycle in a hand-edited config cannot spin this).
 func DetectCycleFrom(config map[string]StackConfigEntry, start string) []string {
 	visited := map[string]int{start: 0}
@@ -239,7 +239,8 @@ type existsAsRef func(name string) bool
 
 // resolveStackBase is BuildStacks' own per-branch memoized walk: returns the ultimate resolvable
 // base name for branch, or resolveBroken when the chain hits a dangling parent, a cycle, or the
-// chain exceeding MaxStackedBranches hops (checked by the caller from depth). Memoized so a forest of depth d costs O(n) total,
+// chain exceeding MaxStackedBranches hops (checked by the caller from depth). Memoized so a forest
+// of depth d costs O(n) total,
 // not O(n*d).
 func resolveStackBase(branch string, config map[string]StackConfigEntry, exists existsAsRef, memo map[string]resolvedNode) resolvedNode {
 	if n, ok := memo[branch]; ok && n.state != resolveInProgress {
@@ -271,11 +272,11 @@ func resolveStackBase(branch string, config map[string]StackConfigEntry, exists 
 		return n
 	}
 
-	// F9 fix: a parent with its OWN kirastack config (parentIsStacked) but no ref left at all —
+	// A parent with its OWN kirastack config (parentIsStacked) but no ref left at all —
 	// removed via `update-ref -d`, which leaves the branch.<x>.kirastack* config behind — must not
 	// be walked into as though it still existed. Left unchecked, the walk below still resolves to
 	// whatever base THAT dangling parent's own chain would have reached, so branch lands in
-	// baseGroups under a base it was never actually stacked on, and flattenStack (which only walks
+	// baseGroups under a base it was never stacked on, and flattenStack (which only walks
 	// from a base through its own MEMBER branches, never the refless parent itself) then drops it
 	// from both Stacks and Orphans — silently, breaking BuildStacks' own "never drops a branch"
 	// contract. Broken here instead: branch becomes a visible orphan, same as a plain dangling
@@ -310,7 +311,7 @@ type StackRefInfo struct {
 	HasUpstream  bool
 }
 
-// BuildStacksInput is BuildStacks' own parameter object (D3): every value already resolved by the
+// BuildStacksInput is BuildStacks' own parameter object: every value already resolved by the
 // caller — gitsession.Stacks() reads the config, the refs snapshot, and spawns exactly one
 // `rev-list --left-right` per candidate stacked branch (bounded by MaxStackedBranches) before ever
 // calling this pure function.
@@ -321,10 +322,10 @@ type BuildStacksInput struct {
 	// BaseTips: the tip of every name that could be a base — local branches (duplicated from
 	// LocalRefs for a uniform lookup) and remote-tracking branches.
 	BaseTips map[string]string
-	// BehindAhead: behind/ahead counts (D4/porcelain.LeftRightCountArgs), keyed by branch name —
-	// present only for branches gitsession actually spawned a count for (the first
+	// BehindAhead: behind/ahead counts (porcelain.LeftRightCountArgs), keyed by branch name —
+	// present only for branches gitsession spawned a count for (the first
 	// MaxStackedBranches candidates in sorted order); a branch with no entry here is treated as
-	// behind=0/ahead=0 (D3's own truncation clause: never dropped, just uncounted).
+	// behind=0/ahead=0 (the truncation clause: never dropped, just uncounted).
 	BehindAhead map[string]LeftRightCount
 }
 
@@ -345,12 +346,12 @@ func sortedStrings(s []string) []string {
 	return out
 }
 
-// BuildStacks is D3's own forest assembly, pure and total: it never drops a branch on the floor
+// BuildStacks is the forest assembly, pure and total: it never drops a branch on the floor
 // (a dangling parent or a cycle lands in Orphans, never silently vanishes), it detects cycles
 // (DetectCycleFrom) rather than looping forever, and it pre-order-flattens each tree bottom-to-top
 // with children visited in sorted-name order (a deterministic rendering — and test — order for what
 // SPEC allows to be a genuine fork). Only LOCAL branches with a non-empty recorded parent are ever
-// candidates for stack membership (D1); the branch a config entry names as its OWN parent value is
+// candidates for stack membership; the branch a config entry names as its OWN parent value is
 // never itself required to exist in Config (a plain, never-stacked branch or a remote-tracking ref
 // has no kirastack keys of its own).
 func BuildStacks(in BuildStacksInput) StackListResult {
@@ -569,10 +570,10 @@ func findOrphan(orphans []StackBranch, target string) (StackBranch, bool) {
 	return StackBranch{}, false
 }
 
-// ClassifyRestack is D14's own restack classifier: six blockers in one fixed order
+// ClassifyRestack is the restack classifier: six blockers in one fixed order
 // (inProgressOperation, notStacked, cycle, parentMissing, checkedOutElsewhere, dirtyWorktree —
-// D14's own stated order, "the dialog's own headline" convention ClassifyCheckout already
-// established), a plan (D14's own cascade rule: a branch is planned iff it is needsRestack OR any
+// the stated order, "the dialog's own headline" convention ClassifyCheckout already
+// established), a plan (the cascade rule: a branch is planned iff it is needsRestack OR any
 // ancestor of it in the stack is planned), and restoresHead/needsForcePush/routes.
 func ClassifyRestack(in ClassifyRestackInput) RestackPreflight {
 	blockers := []RestackBlocker{}

@@ -15,7 +15,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
-	"github.com/kirathecat/kira-studio/internal/mcpinstall"
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/claude"
 	"github.com/kirathecat/kira-studio/internal/memory"
 )
 
@@ -127,8 +128,8 @@ func TestGateRejectsOrFails(t *testing.T) {
 
 	gate(t, app, "gate-malformed.json")
 	if _, err := app.W.Memory.Store(ctx, twoItemsArgs()); err == nil ||
-		!strings.Contains(err.Error(), memory.ErrClaudeOutput.Error()) {
-		t.Fatalf("malformed gate output error = %v, want %q", err, memory.ErrClaudeOutput)
+		!strings.Contains(err.Error(), claude.New().Fail(harness.ErrOutput).Error()) {
+		t.Fatalf("malformed gate output error = %v, want %q", err, claude.New().Fail(harness.ErrOutput))
 	}
 	empty("malformed gate output")
 
@@ -179,14 +180,14 @@ func TestConnectClaudeCode(t *testing.T) {
 	before := app.W.Memory.McpStatus()
 	exe := flowharness.Replace(before.Executable, "<bin>/kira-space")
 	app.Contract(t, "memory-settings", "MemoryService.McpStatus", before, exe)
-	if !before.ClaudeAvailable || !filepath.IsAbs(before.Executable) || !strings.Contains(before.Command, "memory-mcp") {
+	if !before.AgentAvailable || !filepath.IsAbs(before.Executable) || !strings.Contains(before.Command, "memory-mcp") {
 		t.Fatalf("McpStatus = %+v, want claude found and an absolute executable", before)
 	}
-	res := app.W.Memory.InstallClaudeCode(ctx)
-	if res.Outcome != mcpinstall.OutcomeInstalled {
-		t.Fatalf("InstallClaudeCode = %+v, want installed", res)
+	res := app.W.Memory.InstallAgent(ctx)
+	if res.Outcome != harness.OutcomeInstalled {
+		t.Fatalf("InstallAgent = %+v, want installed", res)
 	}
-	app.Contract(t, "memory-settings", "MemoryService.InstallClaudeCode", res, exe)
+	app.Contract(t, "memory-settings", "MemoryService.InstallAgent", res, exe)
 	argv := recordedArgs(t, app)
 	if len(argv) != 2 {
 		t.Fatalf("claude ran %d times, want the remove and add-json pair: %q", len(argv), argv)

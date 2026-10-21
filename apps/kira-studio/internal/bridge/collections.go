@@ -16,23 +16,22 @@ import (
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
-// CollectionsService is P4 D11 — the QueriesService shape (a typed-struct wrapper per method, with
-// an explicit guard and an ipcerr translation) over Deps.Repos.Collections, plus the two file
+// CollectionsService is the QueriesService shape (a typed-struct wrapper per method, with an
+// explicit guard and an ipcerr translation) over Deps.Repos.Collections, plus the two file
 // methods.
 //
-// **Go reads and writes the file.** P3 §2 F7 measured the control plane: CHUNK_THRESHOLD is
-// 512 KiB with a serial fetch per chunk and an outright refusal above a 64 MiB assembled body, so
-// a 10-50 MB collection through the renderer would be 20-100 serial round trips and, above the
-// ceiling, an unattributable "assembled body too large". The renderer's whole involvement is a
-// path string from FilesService.ChooseOpen/ChooseSave — the identical shape P3 D4 established for
-// a request body's file.
+// **Go reads and writes the file.** CHUNK_THRESHOLD is 512 KiB with a serial fetch per chunk and
+// an outright refusal above a 64 MiB assembled body, so a 10-50 MB collection through the
+// renderer would be 20-100 serial round trips and, above the ceiling, an unattributable
+// "assembled body too large". The renderer's whole involvement is a path string from
+// FilesService.ChooseOpen/ChooseSave — the identical shape established for a request body's file.
 //
 // **No op-log row and no new op kind.** The ring-and-Stop machinery ARCHITECTURE.md's ~150 ms
 // invariant refers to is ViewChrome + useRunState(tabId), which is per tab; an import initiated
 // from the left panel has no tab, so joining the op log would buy an Operations-panel row and
 // nothing the user is looking at. Cancelling a single all-or-nothing local transaction has no
 // useful semantics either. The panel's own header action carries a spinner instead, and Wails
-// handles each bound call in its own goroutine (P2 §2 F12), so a long import blocks that call and
+// handles each bound call in its own goroutine, so a long import blocks that call and
 // nothing else.
 type CollectionsService struct{ Deps appcore.Deps }
 
@@ -352,11 +351,11 @@ func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportReport, e
 	// change, one harmless refetch) and rollback failure (the partially imported collection stays
 	// visible, and other windows must see it too).
 	defer emitApiData(s.Deps.Events, treeChange())
-	// D15/F13: a second call, deliberately — encrypting a secret variable needs VariablesRepo's
-	// own Cipher, which CollectionsRepo does not have (D4/F4's module boundary). See
+	// A second call, deliberately — encrypting a secret variable needs VariablesRepo's
+	// own Cipher, which CollectionsRepo does not have (the module boundary). See
 	// VariablesRepo.ImportVariables' own comment for why this cannot join ImportTree's transaction.
 	//
-	// P21 round 1 architecture/security finding 10: the two commits are not atomic across that
+	// The two commits are not atomic across that
 	// boundary. If this second one fails — the realistic case is a `type: "secret"` variable on a
 	// machine where secret storage is unavailable — the collection and its whole request tree
 	// ImportTree just committed would otherwise be left behind, visible in the panel, while the
@@ -364,7 +363,7 @@ func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportReport, e
 	// one statement) keeps what's on disk matching the reported outcome.
 	if len(tree.Variables) > 0 {
 		if err := s.Deps.Repos.Variables.ImportVariables(collection.ID, tree.Variables); err != nil {
-			// P108 F19: a failed compensating Delete used to only be logged — the returned error
+			// A failed compensating Delete used to only be logged — the returned error
 			// still just named ImportVariables' own failure, so the renderer reported "import
 			// failed" while the collection ImportTree already committed stayed in the tree,
 			// visible in the panel, with nothing telling the user it was there. Folding the delete
@@ -429,12 +428,11 @@ func writeExportFile(path string, write func(*os.File) error) error {
 	return nil
 }
 
-// ExportReport is Export's answer — D16: a secret is written valueless, and SecretCount is what
-// lets the renderer say so once, rather than that being a fact only discoverable by opening the
-// file. SkippedGrpc is P11 D12/F22's own addition: Postman Collection v2.1 has no representation
-// for a gRPC request, so every protocol='grpc' item is skipped and the skip is reported — silently
-// dropping requests from an export would be the worst possible reading of "faithful round-trip"
-// (P4 D12's own rule, applied again).
+// ExportReport is Export's answer — a secret is written valueless, and SecretCount is what lets
+// the renderer say so once, rather than that being a fact only discoverable by opening the file.
+// SkippedGrpc: Postman Collection v2.1 has no representation for a gRPC request, so every
+// protocol='grpc' item is skipped and the skip is reported — silently dropping requests from an
+// export would be the worst possible reading of "faithful round-trip".
 type ExportReport struct {
 	SecretCount int `json:"secretCount"`
 	SkippedGrpc int `json:"skippedGrpc"`
@@ -444,7 +442,7 @@ type ExportReport struct {
 // than streamed: a collection is rows in a local table and the writer needs the tree in memory to
 // rebuild the nested arrays anyway.
 //
-// P21 round 3 finding 7: this used to os.Create(args.Path) directly — truncate-or-create — and
+// This used to os.Create(args.Path) directly — truncate-or-create — and
 // stream postman.Write straight into it, so a marshal error, a full disk, or the process dying
 // mid-write left the destination empty or half-written with no cleanup, silently destroying
 // whatever was there before (a re-export is exactly the kind of save people make over last week's

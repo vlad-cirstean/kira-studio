@@ -1,5 +1,5 @@
 /**
- * `docs/plans/P4.md` W14: pure text-composition for a row's accessible name — kept DOM-free and
+ * Pure text-composition for a row's accessible name — kept DOM-free and
  * out of `CommitGrid.vue` so the exact wording is unit-testable directly, the same split
  * `refBadges.ts` already makes between `badgeSpecFor`/`planBadges` (pure) and its own DOM
  * builders. `CommitGrid.vue`'s `onRendered` handler calls `composeRowLabel` once per rendered row
@@ -33,7 +33,7 @@ function describeDecoration(ref: DecorationRef): string {
 }
 
 /**
- * A row's whole accessible name — "subject, author, relative date, refs" (the plan's own list).
+ * A row's whole accessible name — "subject, author, relative date, refs".
  * `dateText` is passed in rather than recomputed here so the announced date always matches
  * whichever of relative/absolute the date column is currently showing (`dateFormatter`'s own
  * `ctx`, `CommitGrid.vue`'s `dateFormatRef`) — this function has no clock or format preference of

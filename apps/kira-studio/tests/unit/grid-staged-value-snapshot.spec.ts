@@ -1,4 +1,4 @@
-// P21 round 3 performance finding 10: SlickGridHost.vue's own header states the rule ("Vue must
+// SlickGridHost.vue's own header states the rule ("Vue must
 // not see the grid" — the cell extractor runs *during* SlickGrid's own synchronous render), but
 // createDisplayValueExtractor read pending edits/inserts through pendingFor()/stagedValue() inside
 // its per-cell closure — pendingState[tabId] is a reactive proxy, its `edits` a reactive-wrapped
@@ -6,18 +6,18 @@
 // rawPendingFor unwraps the same underlying object via toRaw. It is called *inside* the returned
 // per-cell closure (once per cell, as before the fix) rather than once at build time: an earlier
 // version of this fix snapshotted it once at build time on the theory that SlickGridHost.vue
-// always rebuilds the extractor on every staging change, which is false (its own C5/§5 D5 watch
+// always rebuilds the extractor on every staging change, which is false (its own watch
 // invalidates/re-renders the touched rows on a stageEdit/stageNull/stageDelete without ever
 // rebuilding this extractor — see dataSource.ts's own corrected comment) and was a real regression
 // caught by tests/ui/mutations.spec.ts, tests/ui/cell-editor.spec.ts and
 // tests/ui/interaction.spec.ts. Reading through toRaw still removes 3 of the original 4 proxy traps
 // per cell (the Map wrapper, its `.get()` result wrapper, and the `.changes` field wrapper) — only
 // the one unavoidable top-level `pendingState[tabId]` read stays live, which is what correctness
-// here actually requires.
+// here requires.
 //
 // pendingChanges.ts transitively reaches bridge/data.ts -> '/wails/runtime.js' at module scope,
-// hence the dynamic import after @workbench/testing/unit/window's mock.module registration — the same pattern
-// row-values-visible-span.spec.ts already uses for the same reason.
+// hence the dynamic import after @workbench/testing/unit/window's mock.module registration —
+// the same pattern row-values-visible-span.spec.ts already uses for the same reason.
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
@@ -60,9 +60,9 @@ const { setPage } = await import('../../frontend/src/views/grid/page');
 
 // createDisplayValueExtractor now resolves each columnOrder entry to a page-column index at build
 // time (fieldToPageCol), so it always dereferences page.columns even when every test case here
-// only cares about the staged-edit path. An empty-columns fake page makes every `pageColumnIndexFor`
-// lookup miss (-1) by construction, which is exactly what "no page value available" means for these
-// tests — none of them exercise the real page.ts decode path (cell()).
+// only cares about the staged-edit path. An empty-columns fake page makes every
+// `pageColumnIndexFor` lookup miss (-1) by construction, which is exactly what "no page value
+// available" means for these tests — none of them exercise the real page.ts decode path (cell()).
 const NO_PAGE = { columns: [] } as unknown as TabularPage;
 
 describe('rawPendingFor (finding 10)', () => {

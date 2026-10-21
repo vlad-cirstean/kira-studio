@@ -2,10 +2,9 @@ package bridge
 
 import "testing"
 
-// P120: Space's LinkService URL-scheme guard, moved from Kira Studio's own bridge package (which
-// had a byte-identical LinkService only for a UI surface it never had a caller for) — the git-ui
-// host's link.openExternal handler is this app's only real user of it. fakeBrowser is
-// github_test.go's own bridge.Browser test double, reused here rather than redeclared.
+// Space's LinkService URL-scheme guard — the git-ui host's link.openExternal handler is this app's
+// only real user of it. fakeBrowser is github_test.go's own bridge.Browser test double, reused here
+// rather than redeclared.
 func TestLinkService_OpenExternal(t *testing.T) {
 	tests := []struct {
 		name    string

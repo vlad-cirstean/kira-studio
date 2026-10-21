@@ -9,10 +9,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// RunRowOps is redis/mongo/s3/sqs's own mutate loop, carried verbatim across all four (P107
-// T2-4): readOnly guard, iterate plan.Ops, call apply per op, accumulate the affected count,
-// assemble the result. apply owns the per-op-kind switch and any per-engine error mapping; i is
-// the op's own index in plan.Ops, for an apply that wants it.
+// RunRowOps is redis/mongo/s3/sqs's own mutate loop, carried verbatim across all four: readOnly
+// guard, iterate plan.Ops, call apply per op, accumulate the affected count, assemble the result.
+// apply owns the per-op-kind switch and any per-engine error mapping; i is the op's own index in
+// plan.Ops, for an apply that wants it.
 func RunRowOps(ctx context.Context, plan model.MutationPlan, readOnly bool, apply func(ctx context.Context, i int, op model.MutationRowOp) (affected int, err error)) (model.MutationResult, error) {
 	if err := AssertWritable(readOnly); err != nil {
 		return model.MutationResult{}, err
@@ -32,8 +32,8 @@ func RunRowOps(ctx context.Context, plan model.MutationPlan, readOnly bool, appl
 }
 
 // RunKindDispatched folds mutate's own statements-join + SetCommand + RunRowOps call, repeated
-// across mongo/redis/s3/sqs (P107 I2-12) with a hand-rolled ";\n" join loop T1-3's own
-// strings.Join replacement missed. dispatch is the caller's own per-op-kind switch — sqs's own
+// across mongo/redis/s3/sqs with a hand-rolled ";\n" join loop the strings.Join replacement missed.
+// dispatch is the caller's own per-op-kind switch — sqs's own
 // switch (no true "update" case, an unsupported error instead) genuinely differs from
 // mongo/redis/s3's shared "update/delete/default-insert" shape (DispatchUpdateDeleteInsert
 // below), so the switch itself is the caller's, not folded in here.

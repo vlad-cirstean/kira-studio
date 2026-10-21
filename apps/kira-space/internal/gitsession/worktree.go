@@ -72,9 +72,9 @@ func findWorktree(records []porcelain.WorktreeRecord, path string) (porcelain.Wo
 	return porcelain.WorktreeRecord{}, false
 }
 
-// Worktrees is worktree.list's own query (D1) — probe P4/P1: `worktree list`'s own first record is
+// Worktrees is worktree.list's own query — `worktree list`'s own first record is
 // always the main worktree, so IsMain is positional, never re-derived from a separate spawn.
-// OpenElsewhere is computed per entry via e.isOpen (F7/Registry.IsOpen) for every entry other than
+// OpenElsewhere is computed per entry via e.isOpen (Registry.IsOpen) for every entry other than
 // this one's own current worktree — never for IsCurrent (a worktree cannot be "open elsewhere"
 // relative to itself).
 func (e *RepoEntry) Worktrees(ctx context.Context) ([]WorktreeEntry, error) {
@@ -133,10 +133,9 @@ func isPathInsideRepo(path, root string) bool {
 	return rel == "." || (!strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != "..")
 }
 
-// WorktreeAddPreflight is preflight.worktreeAdd's own orchestration (D4/F2): no new spawn beyond
-// the refs snapshot pre-flight already uses for branchCheckedOutElsewhere/branchExists (F2 — the
-// SAME %(worktreepath) crossing G5 built), plus one resolveCommit re-check for the start point and
-// two plain os.Stat calls for the path itself.
+// WorktreeAddPreflight is preflight.worktreeAdd's own orchestration: no new spawn beyond
+// the refs snapshot pre-flight already uses for branchCheckedOutElsewhere/branchExists, plus one
+// resolveCommit re-check for the start point and two plain os.Stat calls for the path itself.
 func (e *RepoEntry) WorktreeAddPreflight(ctx context.Context, p WorktreeAddParams) (gitpreflight.WorktreeAddPreflight, error) {
 	snapshot, err := e.refsSnapshot(ctx)
 	if err != nil {
@@ -242,7 +241,7 @@ func (e *RepoEntry) worktreeIsDirty(ctx context.Context, dir string) (bool, erro
 	return len(gitpreflight.DirtyPaths(statusResult)) > 0, nil
 }
 
-// WorktreeRemovePreflight is preflight.worktreeRemove's own orchestration (D8/F7/F8): notAWorktree
+// WorktreeRemovePreflight is preflight.worktreeRemove's own orchestration: notAWorktree
 // is checked first and, when true, short-circuits every other read (the security gate — there is
 // nothing left worth computing about a path that is not a real worktree). The dirty check is
 // skipped whenever any of the four other blockers already applies — one fewer spawn, and
@@ -289,7 +288,7 @@ func (e *RepoEntry) WorktreeRemovePreflight(ctx context.Context, path string) (g
 // ---------------------------------------------------------------------------------------
 
 // worktreeAddBlockedError maps ClassifyWorktreeAdd's own five blocker kinds onto EXISTING
-// OpErrorKind values (D16: this phase adds exactly one new kind to the whole contract, WorktreeLocked,
+// OpErrorKind values (exactly one new kind is added to the whole contract, WorktreeLocked,
 // spent entirely on the remove side) — a defensive re-check server-side; the dialog's own Create
 // button is disabled by the SAME preflight before this is ever reachable in ordinary use.
 func worktreeAddBlockedError(pf gitpreflight.WorktreeAddPreflight) *OpError {
@@ -311,9 +310,9 @@ func worktreeAddBlockedError(pf gitpreflight.WorktreeAddPreflight) *OpError {
 	}
 }
 
-// prepareWorktreeAdd is worktreeAdd's own opSpec.Prepare (D2/D3): re-runs the SAME preflight
+// prepareWorktreeAdd is worktreeAdd's own opSpec.Prepare: re-runs the SAME preflight
 // classification host-side immediately before the write (never trusting a client-side preflight
-// that may have gone stale), then builds exactly one of D3's three explicit-commit-ish argv
+// that may have gone stale), then builds exactly one of the three explicit-commit-ish argv
 // variants — bare DWIM is never reachable from this path.
 func prepareWorktreeAdd(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
 	pf, err := e.WorktreeAddPreflight(ctx, WorktreeAddParams{
@@ -341,7 +340,7 @@ func prepareWorktreeAdd(ctx context.Context, e *RepoEntry, _ ConnID, _ string, o
 }
 
 // worktreeRemoveBlockedError maps ClassifyWorktreeRemove's own five blocker kinds — "locked" is the
-// one row that reuses D15's own new WorktreeLocked kind (the exact remedy git itself would name);
+// one row that reuses the new WorktreeLocked kind (the exact remedy git itself would name);
 // every other blocker is a structural refusal the UI should never let a user reach in the first
 // place (the Remove button/menu item is disabled for all four), so "Unknown" plus a plain-English
 // reason is what a defensive server-side re-check answers for them.
@@ -364,12 +363,12 @@ func worktreeRemoveBlockedError(pf gitpreflight.WorktreeRemovePreflight) *OpErro
 	}
 }
 
-// prepareWorktreeRemove is worktreeRemove's own opSpec.Prepare (D2/D8/F8): re-runs the FULL
+// prepareWorktreeRemove is worktreeRemove's own opSpec.Prepare: re-runs the FULL
 // preflight classification immediately before the write (never trusting the client's own possibly
 // stale copy), and — for the dirty route — re-derives the confirmation token FRESH from that same
 // re-check and compares it byte for byte against what the client typed; force is decided
 // server-side from the fresh verdict, never taken as the client's own claim (fail-safe over
-// fail-open, D8's own stated principle for this destructive path).
+// fail-open, the stated principle for this destructive path).
 func prepareWorktreeRemove(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
 	pf, err := e.WorktreeRemovePreflight(ctx, op.Path)
 	if err != nil {

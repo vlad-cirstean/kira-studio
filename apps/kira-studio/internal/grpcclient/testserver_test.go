@@ -93,8 +93,8 @@ type echoImpl struct {
 // registerEcho registers svc onto s with generic dynamicpb-based handlers (grpc.MethodHandler's
 // `dec func(any) error` and grpc.StreamHandler's ServerStream both work uniformly over a
 // *dynamicpb.Message, since it implements proto.Message and the default "proto" codec just calls
-// proto.Marshal/Unmarshal) — no generated code anywhere, mirroring the probe's own registration
-// (F1/F5). `ss: nil` on RegisterService skips its type-check against HandlerType entirely, which
+// proto.Marshal/Unmarshal) — no generated code anywhere, mirroring the probe's own registration.
+// `ss: nil` on RegisterService skips its type-check against HandlerType entirely, which
 // is what makes a fully dynamic registration possible with no interface to satisfy.
 func registerEcho(s *grpc.Server, svc protoreflect.ServiceDescriptor, impl *echoImpl) {
 	unary := svc.Methods().ByName("Unary")
@@ -185,7 +185,7 @@ func startEchoServer(t *testing.T, protoSource string, impl *echoImpl, withRefle
 		// generated code registers its own descriptors globally via an init() function this test
 		// fixture stands in for). This is the test SERVER's own registration, playing the role of
 		// an arbitrary real gRPC server — a different actor from internal/grpcclient's own client
-		// code under test, which is what F14's "never touch GlobalFiles" rule is actually about.
+		// code under test, which is what the "never touch GlobalFiles" rule is about.
 		registerGlobalForReflection(t, svc.ParentFile())
 		reflection.Register(s)
 	}
@@ -196,10 +196,10 @@ func startEchoServer(t *testing.T, protoSource string, impl *echoImpl, withRefle
 	return echoServer{addr: addr}
 }
 
-// waitEchoServerReady blocks until the server behind addr actually completes a real request,
+// waitEchoServerReady blocks until the server behind addr completes a real request,
 // instead of returning the instant net.Listen succeeds. net.Listen binds the socket immediately,
 // so a client's TCP connect can succeed into the kernel backlog well before the s.Serve goroutine
-// above — let alone its per-connection HTTP/2 dispatch — has actually run: under heavy load the
+// above — let alone its per-connection HTTP/2 dispatch — has run: under heavy load the
 // gap is wide enough that a real request lands on a connection nobody is properly serving yet and
 // sees a raw io.EOF instead of a response (the flake this fixes: descriptors_test.go's own
 // NoReflection case, "error = EOF" instead of a proper E_BAD_REQUEST).
@@ -217,7 +217,7 @@ func startEchoServer(t *testing.T, protoSource string, impl *echoImpl, withRefle
 // typical contention (confirmed reproducible with zero Docker involvement, under a synthetic
 // all-cores CPU stress) — that residual is a different, broader hazard (any fresh connection's
 // first RPC, not only one made right after a listener opens) whose full fix is a client-side retry
-// inside internal/grpcclient's own production dial path, out of a test-speed phase's scope.
+// inside internal/grpcclient's own production dial path.
 func waitEchoServerReady(t *testing.T, addr string) {
 	t.Helper()
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))

@@ -14,13 +14,13 @@ import { shallowRef } from 'vue';
 export type ConnectionState = 'connecting' | 'connected' | 'error';
 
 /**
- * The real typed client (P3 W9) over the `Transport` W2 provides: `request`/`on`/`stream`
+ * The real typed client over the `Transport`: `request`/`on`/`stream`
  * forward directly (both already fully typed by the contract), plus the one thing every host
  * needs and no host should reimplement — the `app.init` handshake that turns "a channel
- * exists" into "connectionState is actually connected", carrying the git snapshot every other
+ * exists" into "connectionState is connected", carrying the git snapshot every other
  * `state/` module bootstraps from.
  *
- * Keeps the reactive surface small on purpose (§5.3): only `connectionState` is a Vue ref.
+ * Keeps the reactive surface small on purpose: only `connectionState` is a Vue ref.
  * Commit data never becomes reactive here or anywhere downstream of it.
  */
 export class BridgeClient {
@@ -35,9 +35,9 @@ export class BridgeClient {
 
   /** Performs the `app.init` handshake exactly once *per success*, however many callers ask for
    *  it — every `state/` module that needs the initial snapshot awaits the same promise. A
-   *  rejection clears the memo before rethrowing (G12 D6) so a later call genuinely retries
+   *  rejection clears the memo before rethrowing so a later call genuinely retries
    *  rather than replaying the same failure forever — the property a webview opened before Kira
-   *  Studio's socket is up depends on (F7). */
+   *  Studio's socket is up depends on. */
   init(): Promise<ResultOf<'app.init'>> {
     if (!this.#initPromise) {
       this.#initPromise = this.#transport.request('app.init', {}).then(

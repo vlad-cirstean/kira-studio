@@ -328,7 +328,7 @@ func gatherFacts(man evalManifest, cfg storeCfg, primary roundData, srcs []evalS
 func seedStore(ctx context.Context, dir string, facts []seedFact) (*seededStore, error) {
 	st := memory.NewStore(filepath.Join(dir, "memory.db"))
 	ss := &seededStore{st: st, facts: facts, byKM: map[string]int{}, km: map[fkey]string{}}
-	ss.kw = memory.NewService(st, memory.NewCLIRunner(), memory.ServiceOptions{})
+	ss.kw = memory.NewService(st, newAgentRunner(), memory.ServiceOptions{})
 	groups := map[string]string{}
 	for i, f := range facts {
 		gk := f.key.Round + "/" + f.key.Source
@@ -725,7 +725,7 @@ func runStore(t *testing.T, ctx context.Context, emb *evalEmbedder, ss *seededSt
 		r, c := runMode(ss.kw, 10, g)
 		record(variantKey(cfg, "-", "keyword"), r, c)
 	}
-	runner := memory.NewCLIRunner()
+	runner := newAgentRunner()
 	for _, recipe := range recipes {
 		docText := map[string]string{}
 		for _, f := range ss.facts {

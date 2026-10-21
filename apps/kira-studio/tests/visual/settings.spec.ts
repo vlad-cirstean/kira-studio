@@ -1,10 +1,10 @@
 import { expect, test } from '../ui/fixtures';
 import { openSettings } from '../ui/support/settings';
 
-// P110 I2-1b: one baseline per settings pane. Pre-approved re-record: the run-state/error/dialog
-// colour and spinner-speed disclosures (§1.4) never touch these panes. I2-26's own fieldVariants()
-// -> Field/FieldLabel conversion is measured pixel-identical (§3.6.4), so these baselines must pass
-// unchanged through I2-26.
+// One baseline per settings pane. Pre-approved re-record: the run-state/error/dialog
+// colour and spinner-speed disclosures never touch these panes. The fieldVariants()
+// -> Field/FieldLabel conversion is measured pixel-identical, so these baselines must pass
+// unchanged.
 const sections = ['Appearance', 'Data', 'Cache', 'Api', 'Database MCP', 'Advanced'] as const;
 
 for (const section of sections) {

@@ -5,10 +5,10 @@ import { modeTab, openHttpModeAndNewRequest } from './support/apiMode';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
-// P2 §6.2: three tests, one httpSend snapshot each (F16 — a channel with more than one snapshot
-// matches on args, and the send's renderer-minted opId makes those args unmatchable across two
-// sends in one test; OQ-8 hands the contained fix, a per-snapshot matchIgnoreKeys, forward for
-// whichever phase actually needs two responses on one channel).
+// Three tests, one httpSend snapshot each (a channel with more than one snapshot matches on args,
+// and the send's renderer-minted opId makes those args unmatchable across two sends in one test;
+// the contained fix, a per-snapshot matchIgnoreKeys, is handed forward for whichever phase needs
+// two responses on one channel).
 
 test('Http request — send, view a JSON response, and Params-table <-> URL sync', async ({
   relaunch,
@@ -160,7 +160,7 @@ test('Http request — a 404 shows its own hint', async ({ relaunch }) => {
   );
 });
 
-// P22b D2: a header's value cell now completes from a vocabulary keyed by the row's own name —
+// A header's value cell now completes from a vocabulary keyed by the row's own name —
 // a whole-value entry for Content-Type (replaces the field) and a prefix entry for Authorization
 // (inserts `Bearer ` and leaves the caret after it, so {{variable}} completion can take over for
 // the credential itself).
@@ -344,10 +344,10 @@ test('Http request — a header description survives a tab reload', async ({ rel
   );
 });
 
-// P22b D16: the trailing blank row IS the add affordance (FieldRowsTable.vue's own displayRows
-// comment), so the row a user needs next is the one that appears BELOW the one they just filled
-// in — off the fold on any table long enough to scroll (F24). Guarded on growth only: deleting a
-// row must never move the scroll position.
+// The trailing blank row IS the add affordance (FieldRowsTable.vue's own displayRows comment), so
+// the row a user needs next is the one that appears BELOW the one they just filled in — off the
+// fold on any table long enough to scroll. Guarded on growth only: deleting a row must never move
+// the scroll position.
 test('Http request — a new header row scrolls into view when it appears (D16)', async ({
   relaunch,
 }) => {
@@ -397,7 +397,7 @@ test('Http request — a new header row scrolls into view when it appears (D16)'
   expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(tableBox.y + tableBox.height + 1);
 });
 
-// The growth guard (D16's own reasoning: "without it, deleting the second row of forty would
+// The growth guard (the reasoning: "without it, deleting the second row of forty would
 // jump to the fortieth"): removing a row is a shrink, and must never scroll anywhere. Scrolled to
 // the top, removing a row further down the (still off-screen) list must leave the top in view —
 // deliberately not reusing the scroll-into-view test above, whose own scroll-to-bottom state
@@ -448,9 +448,9 @@ test('Http request — deleting a header row does not scroll (D16 guard)', async
   await expect(table.evaluate((el) => el.scrollTop)).resolves.toBe(0);
 });
 
-// P71 §11: the phase's own actual claim, stated as an assertion — toggling incognito then sending
+// The claim, stated as an assertion — toggling incognito then sending
 // carries `incognito: true` on the httpSend args, and no tabsSave call ever carries this tab, not
-// even the one the toggle itself fires (setIncognito's own on-transition flush, §3.1) to drop the
+// even the one the toggle itself fires (setIncognito's own on-transition flush) to drop the
 // tab's existing row immediately.
 test('Http request — an incognito tab sends with incognito:true and is never in a tabsSave', async ({
   relaunch,
@@ -477,8 +477,8 @@ test('Http request — an incognito tab sends with incognito:true and is never i
   await page.fill('[data-testid="http-url"]', 'https://api.example.com/ping');
 
   // Everything up to here is ordinary, persisted tab activity — the assertion below is scoped to
-  // what happens *after* the toggle (the phase's own "prospective, not retroactive" rule, §3.1),
-  // not to the tab's whole history in this test.
+  // what happens *after* the toggle (the "prospective, not retroactive" rule), not to the tab's
+  // whole history in this test.
   // Wait out the URL edit's debounced save so it cannot land after the toggle and count as one.
   await expect
     .poll(() =>
@@ -801,9 +801,9 @@ function measureGrowField(wrap: Locator): Promise<GrowMeasurement> {
   });
 }
 
-// P90 §4.5: the grow-field fix, the one assertion a browser is needed for. A textarea/overlay pair
-// must wrap on the same boundaries and occupy the same box (defect B), the textarea must not
-// scroll internally once its track has grown to fit (defect C), and a click near the end of the
+// The grow-field fix, the one assertion a browser is needed for. A textarea/overlay pair
+// must wrap on the same boundaries and occupy the same box, the textarea must not
+// scroll internally once its track has grown to fit, and a click near the end of the
 // visible 3rd line must place the caret in that line, not the 2nd (the reported symptom). Line
 // boundaries are read off the overlay's own Range client rects rather than assumed from a
 // character count, so this does not encode a font metric. Content stays within the field's own

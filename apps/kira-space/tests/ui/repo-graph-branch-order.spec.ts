@@ -7,10 +7,10 @@ import {
   buildMultiBranchRefsList,
 } from './support/graphStreamFixture';
 
-// Branch-grouped layout over the multi-branch fixture: main (3 commits), feature-newer (5, collapses
-// by default) and feature-older (2). Collapsed order: M0 M1 M2 F0 [placeholder] F4 G0 G1 (8 rows);
-// expanded: 10 rows. Ported from the VS Code webview suite; the collapse toggle itself and the
-// search reveal are covered in repo-workspace.spec.ts.
+// Branch-grouped layout over the multi-branch fixture: main (3 commits), feature-newer (5,
+// collapses by default) and feature-older (2). Collapsed order: M0 M1 M2 F0 [placeholder] F4 G0 G1
+// (8 rows); expanded: 10 rows. The collapse toggle itself and the search reveal are covered in
+// repo-workspace.spec.ts.
 
 const grid = '[data-testid="commit-grid"]';
 

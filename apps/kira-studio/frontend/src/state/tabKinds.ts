@@ -73,15 +73,15 @@ import {
 import { useTabIncognitoStore } from './tabIncognito';
 import { useTerminalsStore } from './terminals';
 
-// P1 D4/F19: the tab-kind registry, split from workbench/tabViews.ts (C4) by the lint rules —
+// The tab-kind registry, split from workbench/tabViews.ts by the lint rules —
 // this half is component-free (title/icon/railColor/dropResources/menuExtras/state constructors
-// only), so it can live in state/ without creating a state/ -> workbench/ edge biome.json forbids
-// (F19). Every entry below carries Studio's existing per-kind behaviour verbatim: TabStrip.vue's
-// old iconFor body, tabTitle (F10), connectionRecord(tab.connectionId)?.color, and the "Reveal in
-// project panel" menu item (F11) — nothing here changes what Studio does, only where it lives.
+// only), so it can live in state/ without creating a state/ -> workbench/ edge biome.json forbids.
+// Every entry below carries Studio's existing per-kind behaviour verbatim: TabStrip.vue's
+// old iconFor body, tabTitle, connectionRecord(tab.connectionId)?.color, and the "Reveal in
+// project panel" menu item — nothing here changes what Studio does, only where it lives.
 // TabIcon stays a plain string alias (not inlined as `string` directly) since TabStrip.vue's own
 // `icon(tab)` call sites read through this type name.
-// P103 Part 2 (§5.1): `TabKindDef` itself is now `@workbench/tabs/types`'s generic contract,
+// `TabKindDef` itself is now `@workbench/tabs/types`'s generic contract,
 // instantiated once below (via `TabKindRegistry`) with this app's own icon/rail-colour/menu-item
 // types.
 type TabIcon = string;
@@ -242,13 +242,13 @@ export const TAB_KINDS: TabKindRegistry<
     // transparent (P1 F17).
     railColor: () => undefined,
     defaultState: () => defaultHttpRequestTabState(),
-    // D2: deliberately breaks with every Studio kind's "same target, fresh default state" — an
+    // Deliberately breaks with every Studio kind's "same target, fresh default state" — an
     // HTTP request's state *is* the request, so duplicating it to try a variant is the only
-    // reason anyone would. P3 F10: headers/urlEncoded/formData are deep-copied since each row is
+    // reason anyone would. headers/urlEncoded/formData are deep-copied since each row is
     // an object in an array (a shallow spread would share row objects between the two tabs, so
     // editing one's fields would edit the other's); binaryFile is copied as a fresh object.
-    // P4 D14: a duplicated tab is an **unsaved copy** — which is what duplicating a saved request
-    // to try a variant means. Clearing both is also what keeps `path` honest (F13): the duplicate
+    // A duplicated tab is an **unsaved copy** — which is what duplicating a saved request
+    // to try a variant means. Clearing both is also what keeps `path` honest: the duplicate
     // carries the original's path, so leaving itemId set would make openTab's reuse lookup
     // activate the copy when the user next opened the original from the tree.
     duplicateState: (tab: HttpRequestTabRecord): HttpRequestTabState => ({
@@ -344,11 +344,11 @@ export const TAB_KINDS: TabKindRegistry<
     menuExtras: () => [],
     parseState: parseStateWith(environmentsTabStateSchema),
   },
-  // P103 Part 2 (§5.1): `TAB_KINDS` is a total function over this app's own real vocabulary — no
+  // `TAB_KINDS` is a total function over this app's own real vocabulary — no
   // unreachable member to keep total against a wider union.
-  // P83 §7.2: an embedded shell at a working directory, rendered with @xterm/xterm. P85
-  // §5.2: a launch's own label (a script's name, or 'Claude Code') wins over the cwd's basename.
-  // P113 F6: the descriptor itself moved to workbench's own terminalTabKind, shared with
+  // An embedded shell at a working directory, rendered with @xterm/xterm.
+  // A launch's own label (a script's name, or 'Claude Code') wins over the cwd's basename.
+  // The descriptor itself moved to workbench's own terminalTabKind, shared with
   // kira-space's identical copy — only the mode constant and dropResources' own store differ.
   terminal: terminalTabKind<'terminal', TabRecord, TabIcon, ConnectionColor, MenuItem>(
     STUDIO_TAB_KIND_MODE.terminal,

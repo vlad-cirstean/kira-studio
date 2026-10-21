@@ -1,6 +1,6 @@
 // Package kirapaths is the repo-root generalization of the on-disk layout logic
 // apps/kira-studio/internal/config/paths.go used to own outright (KiraHome/DbPath/LogsDir/
-// EnsureLayout): P100 Part 1 needed the same shape for apps/kira-space's own, separate home
+// EnsureLayout): the same shape was needed for apps/kira-space's own, separate home
 // directory (KIRA_SPACE_HOME/~/.kira-space, never sharing a home, or a database with
 // Kira Studio). Rather than duplicate this
 // logic per app, each app's own internal/config becomes a thin wrapper parameterized by its own
@@ -30,7 +30,7 @@ func Home(envVar, dirName string) string {
 // DbPathAt is the app's database file path under an explicit home dir — a caller resolves its own
 // home first (via Home, honouring its own env var) rather than this package doing an env lookup
 // itself, the same "explicit home, not a hidden env read" shape paths.go's own DbPathAt used
-// (letting a test avoid t.Setenv's parallel-test panic, v1.4 P1). fileName is the app's own
+// (letting a test avoid t.Setenv's parallel-test panic). fileName is the app's own
 // database file name ("kira.db" / a future app's own choice).
 func DbPathAt(home, fileName string) string {
 	return filepath.Join(home, fileName)

@@ -6,10 +6,10 @@ import (
 	"log/slog"
 )
 
-// reclaimThresholdBytes is P23 D5(b)'s trigger for running incremental_vacuum at startup — not
+// reclaimThresholdBytes is the trigger for running incremental_vacuum at startup — not
 // zero, since incremental_vacuum moves pages and doing that for a few hundred kilobytes on every
-// launch is churn with no user-visible benefit. 16 MiB is half op_log's own new table budget (D2)
-// and an eighth of api_response_history's — "one of this app's caps actually fired and released
+// launch is churn with no user-visible benefit. 16 MiB is half op_log's own new table budget
+// and an eighth of api_response_history's — "one of this app's caps fired and released
 // something worth releasing."
 const reclaimThresholdBytes = 16 * 1024 * 1024
 
@@ -20,11 +20,11 @@ type Maintenance struct {
 	DB *sql.DB
 }
 
-// Reclaim mirrors D5(b): on a database opened with _auto_vacuum=INCREMENTAL (db.go's buildDSN;
-// inert, so a no-op, on one opened before this phase), returns freed pages to the filesystem once
-// the freelist has grown past reclaimThresholdBytes. Run once at startup, beside the two
-// SweepOrphans calls already there (main.go) — quit is when a write must not be the thing that
-// goes wrong, the same reason every other sweep in this app runs at launch rather than at exit.
+// Reclaim, on a database opened with _auto_vacuum=INCREMENTAL (db.go's buildDSN), returns freed
+// pages to the filesystem once the freelist has grown past reclaimThresholdBytes. Run once at
+// startup, beside the two SweepOrphans calls already there (main.go) — quit is when a write must
+// not be the thing that goes wrong, the same reason every other sweep in this app runs at launch
+// rather than at exit.
 func (m *Maintenance) Reclaim() error {
 	var autoVacuum int
 	if err := m.DB.QueryRow(`PRAGMA auto_vacuum`).Scan(&autoVacuum); err != nil {

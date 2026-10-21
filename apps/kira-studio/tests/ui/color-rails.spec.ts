@@ -7,8 +7,8 @@ import { IPC } from './support/ipcChannels';
 // rail share one class string and geometry; apps/kira-space/tests/ui/color-rails.spec.ts pins
 // the same literal for the Space rails.
 
-const RAIL_CLASS = 'absolute inset-y-0 left-0 w-0.5 bg-conn-cyan';
-const EMPTY_RAIL_CLASS = 'absolute inset-y-0 left-0 w-0.5';
+const RAIL_CLASS = 'absolute inset-y-0 left-0 w-1 bg-conn-cyan';
+const EMPTY_RAIL_CLASS = 'absolute inset-y-0 left-0 w-1';
 
 const CONNECTION: ConnectionSummary = {
   id: 'conn-rail',
@@ -25,6 +25,7 @@ const CONNECTION: ConnectionSummary = {
   options: {},
   preconnect: null,
   preconnectSidecar: false,
+  preconnectDelaySec: 0,
   autoExplain: false,
   throttlePerSec: 0,
   mcpEnabled: false,
@@ -84,7 +85,7 @@ test('tree and script rails share one class, geometry and paint', async ({ relau
     [treeBox, treeRowBox],
     [box, rowBox],
   ] as const) {
-    expect(b?.width).toBe(2);
+    expect(b?.width).toBe(4);
     expect(b?.x).toBe(r?.x);
     expect(b?.height).toBe(r?.height);
   }

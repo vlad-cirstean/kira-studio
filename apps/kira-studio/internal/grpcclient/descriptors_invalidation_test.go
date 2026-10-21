@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-// TestDescriptorCachePut_SkipsStaleGenerationAfterInvalidate is P108 F11's own staleness guard: a
+// TestDescriptorCachePut_SkipsStaleGenerationAfterInvalidate is the staleness guard: a
 // resolution already in flight when InvalidateCache runs must not Put its (now stale) result back
 // into the cache. descriptorCachePut takes the generation resolveSource captured before it started
 // resolving; InvalidateCache bumps the key's generation, so a Put carrying the pre-bump value must
@@ -49,8 +49,8 @@ func TestDescriptorCachePut_SkipsStaleGenerationAfterInvalidate(t *testing.T) {
 	}
 }
 
-// TestResolveSource_ConcurrentCallsCollapseIntoOneReflectionResolution is P108 F11's other half:
-// concurrent resolveSource calls for the same not-yet-cached Source must collapse into one
+// TestResolveSource_ConcurrentCallsCollapseIntoOneReflectionResolution: concurrent resolveSource
+// calls for the same not-yet-cached Source must collapse into one
 // underlying resolution (golang.org/x/sync/singleflight), not one reflection round trip per
 // caller. Counted at the transport level (a grpc.StreamInterceptor around the real reflection
 // service) rather than by mocking resolveReflection, so the assertion holds for the actual

@@ -160,7 +160,7 @@ func TestParseFileDiffBody_NoNewlineAtEof(t *testing.T) {
 	}
 }
 
-// TestParseFileDiffBody_BlankContextLineSuppressed is F4's own regression guard: a user's
+// TestParseFileDiffBody_BlankContextLineSuppressed is the regression guard: a user's
 // diff.suppressBlankEmpty=true makes git print a bare empty line (no leading " ") for a blank
 // CONTEXT line — the fixture is captured with that config spliced in ahead of gitclient's own
 // -c diff.suppressBlankEmpty=false override, proving parseOneHunk tolerates the bare line as

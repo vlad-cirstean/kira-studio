@@ -240,7 +240,7 @@ func groupByDB(dbIndices []int) (order []int, byDB map[int][]int) {
 	return order, byDB
 }
 
-// keyTypes is P63 §4.3's pipelined TYPE batch: one round trip for every key in `keys`, answered in
+// keyTypes is the pipelined TYPE batch: one round trip for every key in `keys`, answered in
 // the same order they were given. TYPE never errors for a missing key — it replies "none" — so a
 // key deleted between the SCAN that found it and this call reports "none" here rather than failing
 // the whole batch; the renderer's own redisTypeIcon falls back to the generic glyph for that case.

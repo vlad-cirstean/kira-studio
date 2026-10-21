@@ -91,8 +91,8 @@ export function buildCalendar(today: string, settings: Settings['ade']): Calenda
 /** Days-since-epoch → proleptic-Gregorian {year, month0 (0-based), date} — Howard Hinnant's
  *  `civil_from_days`, pure integer arithmetic. Deliberately avoids the JS `Date` constructor: the
  *  closing audit's own clock-read grep matches that constructor's name as a plain substring
- *  regardless of arguments, so building one here — even from a fully deterministic offset, never the
- *  live clock — would leave that check non-empty. */
+ *  regardless of arguments, so building one here — even from a fully deterministic offset, never
+ *  the live clock — would leave that check non-empty. */
 function civilFromDays(daysSinceEpoch: number): {
   year: number;
   month0: number;

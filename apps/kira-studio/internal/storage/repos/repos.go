@@ -10,10 +10,10 @@ import (
 )
 
 // Repos is every storage repo that needs no cipher, constructed once at startup. SecretsRepo is
-// deliberately not a member — it needs a Cipher that does not exist until P55, so it is
-// constructed separately via NewSecrets (D5). Variables follows the exact same shape (P5) via
-// NewVariables — set by main.go once the cipher is wired, rather than widening this constructor's
-// signature for the one repo among many that needs one.
+// deliberately not a member — it needs a Cipher that does not exist, so it is constructed
+// separately via NewSecrets. Variables follows the exact same shape via NewVariables — set by
+// main.go once the cipher is wired, rather than widening this constructor's signature for the one
+// repo among many that needs one.
 type Repos struct {
 	Settings        *SettingsRepo
 	Layout          *LayoutRepo

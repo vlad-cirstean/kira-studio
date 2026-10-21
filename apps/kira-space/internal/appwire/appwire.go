@@ -1,7 +1,7 @@
 // Package appwire is Kira Space's composition root: it builds the 24 bound services, the git router
 // and socket, the ADE tracker and board, and their teardown. main and the flow-test harness
-// (internal/flowharness) both call Build, so a test cannot wire differently from production. It sits
-// above internal/bridge in the layering, like internal/appshell.
+// (internal/flowharness) both call Build, so a test cannot wire differently from production. It
+// sits above internal/bridge in the layering, like internal/appshell.
 package appwire
 
 import (
@@ -16,28 +16,29 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/agentnotify"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/agentusage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/claudeusage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileterm"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileweb"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/appupdate"
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/agentsvc"
+	"github.com/kirathecat/kira-studio/internal/harness/providers"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
-	"github.com/kirathecat/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/internal/memory/embed"
 	"github.com/kirathecat/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/internal/prompts"
@@ -69,8 +70,8 @@ type Options struct {
 	MobileDetect func() (lannet.Network, error)
 	MobileFind   func(lannet.Identity) (lannet.Network, error)
 	MobilePoll   time.Duration
-	// GhLocator resolves the gh CLI; nil means the platform locator.
-	GhLocator ghclient.Locator
+	// GitHosts are the registered code-host providers; nil means the real GitHub provider alone.
+	GitHosts *githost.Registry
 	// TrackerGrace is how long the ADE tracker waits before it reads a spawned TUI session as
 	// stopped; zero means the tracker default.
 	TrackerGrace time.Duration
@@ -86,6 +87,8 @@ type Options struct {
 	Clock           scriptruns.Clock
 	// EmbedSpec is the semantic-search model; nil means embed.Default (a flow-test seam).
 	EmbedSpec *embed.Spec
+	// Providers is the agent harness registry; nil means providers.New() (a flow-test seam).
+	Providers *harness.Registry
 }
 
 // ShellHooks completes the window-manager seams once the shell exists. CloseWindow, FocusWindow and
@@ -112,7 +115,7 @@ type Wired struct {
 
 	Git           gitWired
 	Tracker       *ade.Tracker
-	AgentHooks    *agenthooks.Manager
+	AgentHooks    *harness.Hooks
 	AgentNotify   *agentnotify.Notifier
 	TermBroker    *mobileterm.Broker
 	TermRegistry  *terminal.Registry
@@ -122,7 +125,7 @@ type Wired struct {
 	UpdateInstall *appupdate.Installer
 
 	GitCredential  *bridge.GitCredentialService
-	GitHub         *bridge.GitHubService
+	GitHost        *bridge.GitHostService
 	Link           *bridge.LinkService
 	Files          *bridge.FilesService
 	Settings       *bridge.SettingsService
@@ -147,8 +150,11 @@ type Wired struct {
 	Update         *bridge.UpdateService
 	CodeWorkspace  *bridge.CodeWorkspaceService
 	AgentNotifySvc *bridge.AgentNotifyService
-	ClaudeUsage    *claudeusage.Service
-	ClaudeUsageSvc *bridge.ClaudeUsageService
+	AgentUsage     *agentusage.Service
+	AgentUsageSvc  *bridge.AgentUsageService
+	// Agents resolves the active agent provider per call.
+	Agents   harness.Selector
+	AgentSvc *bridge.AgentService
 
 	reopen          func()
 	detachMetrics   func()
@@ -163,10 +169,18 @@ type Wired struct {
 func Build(opts Options) *Wired {
 	repositories := opts.Repos
 	w := &Wired{Repos: repositories}
+	registry := opts.Providers
+	if registry == nil {
+		registry = providers.New()
+	}
+	w.Agents = agentSelector(registry, repositories.Settings)
+	w.AgentSvc = &bridge.AgentService{Service: &agentsvc.Service{Agents: w.Agents}}
+	repositories.CustomScripts.Agents = registry
+	repositories.Settings.Agents = registry
 
 	credentialRelay := gitcred.New()
 	w.Windows = shell.NewWindowRegistry()
-	git := wireGit(repositories, opts.Locator, opts.GhLocator)
+	git := wireGit(repositories, opts.Locator, opts.GitHosts)
 	w.Git, w.CredentialRelay = git, credentialRelay
 
 	// The tap feeds every window-wide event to the phone event hub, which drops what is not allowlisted.
@@ -205,7 +219,7 @@ func Build(opts Options) *Wired {
 	}
 	w.GitCredential = &bridge.GitCredentialService{Deps: deps, Relay: credentialRelay}
 	w.detachGitCred = bridge.AttachGitCredentialPush(w.GitCredential)
-	w.GitHub = &bridge.GitHubService{Deps: deps, Browser: opts.Browser}
+	w.GitHost = &bridge.GitHostService{Deps: deps, Browser: opts.Browser}
 	w.Link = &bridge.LinkService{Browser: opts.Browser}
 	w.Settings = &bridge.SettingsService{Deps: deps}
 	w.Layout = &bridge.LayoutService{Deps: deps}
@@ -216,20 +230,21 @@ func Build(opts Options) *Wired {
 	w.TermRegistry = terminalRegistry
 	w.AgentNotify = agentnotify.New(agentnotify.Deps{
 		Prefs: notifyPrefs(repositories), Describe: w.describeAgent, TaskTitle: w.taskTitle, Reveal: w.revealNote,
-		Alive: func(key string) bool { return slices.Contains(w.Windows.Keys(), key) },
+		AgentLabel: func() string { return w.Agents.Active().Label() },
+		Alive:      func(key string) bool { return slices.Contains(w.Windows.Keys(), key) },
 	})
 	w.AgentNotifySvc = &bridge.AgentNotifyService{N: w.AgentNotify}
-	w.ClaudeUsage = claudeusage.New(claudeusage.Deps{
-		Enabled: usageEnabled(repositories), Path: filepath.Join(config.KiraSpaceHome(), "claude-usage.json"),
-		OnChange: func() { bridge.ClaudeUsageChanged(emitter, w.ClaudeUsage.Get()) },
+	w.AgentUsage = agentusage.New(agentusage.Deps{
+		Enabled: usageEnabled(repositories), Path: filepath.Join(config.KiraSpaceHome(), "agent-usage.json"),
+		OnChange: func() { bridge.AgentUsageChanged(emitter, w.AgentUsage.Get()) },
 	})
-	w.ClaudeUsageSvc = &bridge.ClaudeUsageService{U: w.ClaudeUsage}
-	adeTracker, agentHooks := wireTracker(repositories, terminalRegistry, emitter, events, opts.TrackerGrace, w.AgentNotify, w.ClaudeUsage)
+	w.AgentUsageSvc = &bridge.AgentUsageService{U: w.AgentUsage}
+	adeTracker, agentHooks := wireTracker(repositories, terminalRegistry, emitter, events, opts.TrackerGrace, w.AgentNotify, w.AgentUsage, w.Agents)
 	w.Tracker, w.AgentHooks = adeTracker, agentHooks
 
 	// P128 §2.1: the bound terminal methods live once in internal/terminal.BoundService; this
 	// app's own TerminalService only embeds it. ComposeAgent (P129 Part 1 §4.1) rewrites every
-	// claude-code launch through adeTracker.Compose.
+	// agent launch through adeTracker.Compose.
 	termBroker := wireTermBroker(adeTracker, terminalRegistry, emitter)
 	w.TermBroker = termBroker
 	runs := &scriptruns.Service{
@@ -240,6 +255,7 @@ func Build(opts Options) *Wired {
 		},
 		EmitLog:      func(p scriptruns.LogPush) { emitter.Emit(bridge.ChannelScriptRunLog, p) },
 		SmartTimeout: opts.SmartTimeout, ScheduleTimeout: opts.ScheduleTimeout, Prompts: w.Prompts, LlmPrompts: promptStore,
+		Agent: w.Agents,
 	}
 	if opts.Clock != nil {
 		runs.Now = opts.Clock.Now
@@ -255,10 +271,10 @@ func Build(opts Options) *Wired {
 	w.ScriptRuns = &bridge.ScriptRunsService{Bound: &scriptruns.Bound{Svc: runs}}
 	w.Terminal = &bridge.TerminalService{BoundService: &terminal.BoundService{
 		Emit: emitter, Registry: terminalRegistry, ComposeAgent: adeTracker.Compose, AbortAgent: adeTracker.Abort,
-		Arbiter: termBroker, Scripts: runs,
+		Arbiter: termBroker, Scripts: runs, Agent: w.Agents,
 	}}
 	// P116 G5 keep-awake toggle plus P188's agent reason: the live Claude Code session count —
-	// terminal agent tabs and running headless ade sessions — against claudeCode.keepAwakeWithAgents.
+	// terminal agent tabs and running headless ade sessions — against agent.keepAwakeWithAgents.
 	w.KeepAwakeCtl = keepawake.New(opts.KeepAwakeDriver)
 	w.KeepAwake = &bridge.KeepAwakeService{
 		Emit: emitter, Toggle: &keepawake.Toggle{Ctl: w.KeepAwakeCtl},
@@ -271,7 +287,7 @@ func Build(opts Options) *Wired {
 	if opts.EmbedSpec != nil {
 		embedSpec = *opts.EmbedSpec
 	}
-	w.Memory = bridge.NewMemoryService(emitter, mcpinstall.New(mcpinstall.Deps{}), promptStore, embedSpec)
+	w.Memory = bridge.NewMemoryService(emitter, harness.ActiveInstaller(w.Agents), promptStore, embedSpec, w.Agents, memoryModelFrom(repositories.Settings))
 	removeLegacyGitSocket()
 	go removeRetiredModels()
 
@@ -283,11 +299,11 @@ func Build(opts Options) *Wired {
 				return w.AdeTask.CloseWindow(key)
 			}
 			return w.Windows.Close(key)
-		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.ClaudeUsage, opts.RebaseTimeout, runs)
+		}), credentialRelay, w.KeepAwake, w.AgentNotify, w.AgentUsage, opts.RebaseTimeout, runs, w.Agents)
 	runs.ADE = w.AdeBoard
 	w.sched = &scriptruns.Scheduler{Svc: runs, Clock: opts.Clock}
 	w.sched.Start()
-	w.AdeTask = &bridge.AdeTaskService{Engine: w.AdeBoard, Registry: terminalRegistry, Emit: emitter}
+	w.AdeTask = &bridge.AdeTaskService{Engine: w.AdeBoard, Registry: terminalRegistry, Emit: emitter, Hosts: git.registry.Hosts.Registry}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
 	// (P129 Part 1 §4.2 step 4).
@@ -313,10 +329,14 @@ func Build(opts Options) *Wired {
 	w.Mobile = bridge.NewMobileAccessService(&bridge.MobileAccessService{
 		Deps: deps, Reader: w.AdeTask, Hub: mobileHub, Broker: mobileweb.NewBroker(time.Now, w.Prompts), Assets: opts.MobileAssets,
 		AgentSessions: func() any { return w.Terminal.AgentSessions() },
-		Writer:        &bridge.MobileWriter{Svc: w.AdeTask, Launches: mobileLaunches},
-		Launches:      mobileLaunches,
-		Terminals:     termBroker,
-		Detect:        opts.MobileDetect, Find: opts.MobileFind, Poll: opts.MobilePoll,
+		AgentInfo: func() any {
+			info, _ := w.AgentSvc.Info()
+			return info
+		},
+		Writer:    &bridge.MobileWriter{Svc: w.AdeTask, Launches: mobileLaunches},
+		Launches:  mobileLaunches,
+		Terminals: termBroker,
+		Detect:    opts.MobileDetect, Find: opts.MobileFind, Poll: opts.MobilePoll,
 		IsLAN: opts.MobileIsLAN,
 	})
 	w.detachMobile = bridge.AttachMobilePush(w.Mobile)
@@ -372,18 +392,18 @@ func (w *Wired) reopenWindow() {
 // StartMobile starts the phone server when settings enable it; call after the shell is up.
 func (w *Wired) StartMobile() { bridge.StartMobileIfEnabled(w.Mobile) }
 
-// Bound returns the 24 bound services in registration order.
+// Bound returns the 26 bound services in registration order.
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.GitCredential),
-		application.NewService(w.CodeWorkspace), application.NewService(w.GitHub), application.NewService(w.Link),
+		application.NewService(w.CodeWorkspace), application.NewService(w.GitHost), application.NewService(w.Link),
 		application.NewService(w.Files), application.NewService(w.Settings), application.NewService(w.Layout),
 		application.NewService(w.Tabs), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Terminal),
 		application.NewService(w.AdeTask), application.NewService(w.Ops), application.NewService(w.Lifecycle),
 		application.NewService(w.KeepAwake), application.NewService(w.Mobile), application.NewService(w.Memory),
 		application.NewService(w.MemoryImport), application.NewService(w.MemoryDistill), application.NewService(w.WindowsSvc), application.NewService(w.Update),
-		application.NewService(w.AgentNotifySvc), application.NewService(w.ClaudeUsageSvc),
-		application.NewService(w.PromptsSvc), application.NewService(w.LlmPromptsSvc),
+		application.NewService(w.AgentNotifySvc), application.NewService(w.AgentUsageSvc),
+		application.NewService(w.PromptsSvc), application.NewService(w.LlmPromptsSvc), application.NewService(w.AgentSvc),
 	}
 }
 

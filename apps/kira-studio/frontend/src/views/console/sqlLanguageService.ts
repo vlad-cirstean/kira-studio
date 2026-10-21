@@ -5,23 +5,23 @@ import { type DdlSchema, namespaceFromCached, toSqlNamespace } from './ddl';
 import { sqlKeywordCompletionSource } from './sqlKeywordCompletion';
 import { RELATION_POSITION_RE, sqlSchemaCompletionSource } from './sqlSchemaCompletion';
 
-// P18 (v1.1) D1 — why this is a "language service", not a language server.
+// Why this is a "language service", not a language server.
 //
 // The SPEC row asks for "a SQL language server (completions, diagnostics, hovers)". Those three
 // verbs are textDocument/completion, textDocument/publishDiagnostics and textDocument/hover — and
 // this app's own `MonacoHost.vue` already exposes each one directly as a `completionSources`
-// prop, a `lintSource` prop and a `hoverSource` prop (P60a §3.1). What an LSP actually buys a
+// prop, a `lintSource` prop and a `hoverSource` prop. What an LSP buys a
 // general-purpose editor is process isolation and editor-independence: one server binary serving
 // many editors, keeping a heavy analysis off the UI thread. This app has exactly one editor, one
-// renderer, and an analysis whose entire state is one parsed object — and P58f M10 deleted the
-// vendored Node runtime an LSP child process would need, while the shipped build deliberately
+// renderer, and an analysis whose entire state is one parsed object — and the vendored Node
+// runtime an LSP child process would need was deleted, while the shipped build deliberately
 // opens no local TCP port for another process to reach (docs/ARCHITECTURE.md's Process model). So:
 // three providers over one DdlSchema, composed through props the console already had
 // (completionSources, lintSource, hoverSource) — the same providers an LSP would run, in-process,
 // with none of the machinery a real one exists for. Don't re-litigate this from the SPEC's wording
 // alone.
 
-// P4: a relation name needing quotes (case-sensitive, a reserved word) gets `insert` set to its
+// A relation name needing quotes (case-sensitive, a reserved word) gets `insert` set to its
 // quoted form, the same identNeedsQuoting/quoteIdent rule namespaceFromCached (ddl.ts) and
 // views/grid/filterCompletion.ts's own column completions already follow — `label` stays bare so
 // matching/highlighting still works against the plain name.
@@ -47,21 +47,22 @@ function relationCompletionSource(
   };
 }
 
-/** P19 D14, widened by P22c D4 and P4: layered, not all-or-nothing. A DDL document (`schema`) still
+/** Layered, not all-or-nothing. A DDL document (`schema`) still
  *  wins wholesale when one has any tables, with `relations` merged into its table names at a
- *  relation position (the schema source takes `relations` itself: the first non-null source wins). With no document, `cached` (P22c: the metadata cache's own columns for
+ *  relation position (the schema source takes `relations` itself: the first non-null source wins).
+ *  With no document, `cached` (the metadata cache's own columns for
  *  this console's container, state/schemaColumns.ts's cachedRelationsFor) fills in the identical
  *  schema-aware completion — table names, `table.` column completion, alias resolution — with no
- *  manual step, ALSO paired with `relations` (P4): a root-opened console's cached container and its
+ *  manual step, ALSO paired with `relations`: a root-opened console's cached container and its
  *  wider set of tree-loaded relation names (completion.ts's own root branch) don't have to be the
  *  same container, so a name the cache doesn't cover but the tree already does is not discarded.
  *  Only once BOTH `schema` and `cached` are empty does `relations` (consoleRelationNames —
  *  completion.ts's own tree-cache read, mirroring mongoCompletionSource's identical technique for
- *  collections) carry the whole load alone, paired with an explicit keyword source the same reason
- *  D5/F3 already gives (`override` replaces language-data sources wholesale). All three empty is
+ *  collections) carry the whole load alone, paired with an explicit keyword source (`override`
+ *  replaces language-data sources wholesale). All three empty is
  *  exactly today's `undefined` — deliberate, not a gap to patch by having the language service
- *  query the database itself: D5 keeps the "no introspection from the language layer" rule, and
- *  this file's diagnostics/hover providers read the same effective schema (D6), so completion never
+ *  query the database itself: the "no introspection from the language layer" rule holds, and
+ *  this file's diagnostics/hover providers read the same effective schema, so completion never
  *  disagrees with them about what the console knows. */
 export function sqlCompletionSources(
   dialect: SqlDialect,

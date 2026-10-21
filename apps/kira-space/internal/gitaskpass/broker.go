@@ -18,8 +18,8 @@ import (
 	"github.com/kirathecat/kira-studio/internal/localsock"
 )
 
-// DefaultTimeout is the broker's own bound on one credential wait (D4's table) — long enough for a
-// human to actually type a passphrase, short enough that a broker-side bug can never hang a remote
+// DefaultTimeout is the broker's own bound on one credential wait — long enough for a
+// human to type a passphrase, short enough that a broker-side bug can never hang a remote
 // op forever. Mirrored to the helper via KIRA_ASKPASS_TIMEOUT_MS (WithOp) so the helper's own
 // independent deadline agrees with the broker's.
 const DefaultTimeout = 120 * time.Second
@@ -60,8 +60,8 @@ type Broker struct {
 }
 
 // New constructs the broker's 0700 temp directory, writes the shim, opens the private socket
-// (0600) and starts accepting connections. A failure here is never fatal to the caller (D8/D10's
-// own "a broker that fails to start... every remote op then runs with no interposition" — a nil
+// (0600) and starts accepting connections. A failure here is never fatal to the caller
+// ("a broker that fails to start... every remote op then runs with no interposition" — a nil
 // *Broker is main.go's own already-supported path, not built here).
 func New(opts Options) (*Broker, error) {
 	timeout := opts.Timeout
@@ -82,7 +82,7 @@ func New(opts Options) (*Broker, error) {
 		return nil, err
 	}
 
-	// localsock.Listen is agenthooks.New's own identical precedent (D8's whole security boundary,
+	// localsock.Listen is the Claude hooks listener's identical precedent (D8's whole security boundary,
 	// P107 T2-9): no other OS user can read the shim or reach the socket.
 	ln, err := localsock.Listen(localsock.Options{DirPrefix: "kira-askpass-", TokenBytes: 32})
 	if err != nil {
@@ -104,8 +104,8 @@ func New(opts Options) (*Broker, error) {
 	return b, nil
 }
 
-// buildShim renders the shim script (D8): one `exec` of helperCommand's own argv, each element
-// single-quoted (F13), followed by "$1" (git's own prompt argument, still double-quoted — that is
+// buildShim renders the shim script: one `exec` of helperCommand's own argv, each element
+// single-quoted, followed by "$1" (git's own prompt argument, still double-quoted — that is
 // shell syntax the shim itself needs for word-splitting/expansion, never attacker-controlled
 // content, so it is never quoted the same way as helperCommand's own elements).
 func buildShim(helperCommand []string) (string, error) {
@@ -124,7 +124,7 @@ func buildShim(helperCommand []string) (string, error) {
 //	'\''
 //
 // — close the quote, emit a backslash-escaped literal quote outside it, reopen the quote (the
-// standard POSIX idiom). F13: unlike double-quoting (which still expands $var, $(...), backticks and
+// standard POSIX idiom). Unlike double-quoting (which still expands $var, $(...), backticks and
 // backslash escapes inside it — the actual vulnerability this replaces), single quotes have no
 // special character at all except the quote itself, so no character, including a literal newline
 // (POSIX shell treats an embedded newline inside a single-quoted string as ordinary data, not a
@@ -133,9 +133,9 @@ func shellQuoteSingle(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// Env returns the constant env every remote-op spawn needs to reach this broker (D8): GIT_ASKPASS/
+// Env returns the constant env every remote-op spawn needs to reach this broker: GIT_ASKPASS/
 // SSH_ASKPASS point at the shim, SSH_ASKPASS_REQUIRE=force is what makes OpenSSH >= 8.4 use
-// SSH_ASKPASS unconditionally (probed against 9.6, P4), and the session socket/token are constant
+// SSH_ASKPASS unconditionally (probed against 9.6), and the session socket/token are constant
 // for this broker's whole lifetime — WithOp layers the per-op id and timeout on top.
 func (b *Broker) Env() []string {
 	return []string{
@@ -155,10 +155,10 @@ func (b *Broker) ShouldInterpose(coreAskPass string) bool {
 }
 
 // WithOp registers prompter for one op (a fresh, unguessable 16-byte op id), runs fn with the
-// per-op env it needs (KIRA_ASKPASS_OPID, KIRA_ASKPASS_TIMEOUT_MS), and unregisters the prompter on
-// every exit path — a Prompter never outlives the op it was supplied for. ctx bounds every prompt
-// this op's spawn might trigger; D4's table names the other three bounds (dismissal, the broker's
-// own timer, Conn's own disconnect signal) as Prompter.Ask's own responsibility.
+// per-op env it needs (KIRA_ASKPASS_OPID, KIRA_ASKPASS_TIMEOUT_MS), and unregisters the prompter
+// on every exit path — a Prompter never outlives the op it was supplied for. ctx bounds every
+// prompt this op's spawn might trigger; the table names the other three bounds (dismissal, the
+// broker's own timer, Conn's own disconnect signal) as Prompter.Ask's own responsibility.
 func (b *Broker) WithOp(ctx context.Context, prompter Prompter, fn func(opEnv []string) error) error {
 	opID, err := localsock.RandHex(16)
 	if err != nil {
@@ -186,7 +186,7 @@ func (b *Broker) Close() error {
 	return b.ln.Close()
 }
 
-// handleConn answers exactly one request-response round trip (D8's protocol) — bounded by
+// handleConn answers exactly one request-response round trip — bounded by
 // b.timeout plus a small grace so a slow-to-connect helper's own read never races the broker
 // closing the connection out from under it. The op-scoped context additionally bounds
 // Prompter.Ask below (WithOp's ctx) so this op's own cancellation ends the wait promptly, and a

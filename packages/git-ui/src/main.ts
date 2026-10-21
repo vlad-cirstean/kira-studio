@@ -12,7 +12,7 @@ import type { DateFormat, ViewStateStore } from './state/viewState.ts';
 
 export interface MountHandle {
   unmount(): void;
-  /** P79 review fix (Performance, LOW): `false` while backgrounded (a KeepAlive deactivate) lets
+  /** `false` while backgrounded (a KeepAlive deactivate) lets
    *  `CommitGrid.vue`'s own generation-triggered rebuild defer to a single catch-up on the next
    *  `true`, instead of paying that cost once per missed bump against a grid nobody can see. Only
    *  meaningful for `view: "graph"` — a no-op call for a `"review"` mount, which has no
@@ -40,24 +40,23 @@ export interface MountOptions {
   readonly onReviewMarked?: (path: string) => void;
   /** Only meaningful when `view === "review"`: receives a handle that opens a file's diff, as a click in the Files pane does. */
   readonly onReviewApi?: (api: { selectFile: (path: string) => void }) => void;
-  /** G10 D19: only meaningful when `view === "graph"` — the exact mirror of `target` above, for a
+  /** Only meaningful when `view === "graph"` — the exact mirror of `target` above, for a
    *  palette command that fired while the graph webview was cold (`panelView.ts`'s own
-   *  `#pendingUiAction`/bootstrap-island arm). `undefined`/`null` means no action is pending. G14
-   *  D10: renamed from `pendingAction` and grown an optional `target`, mirroring `ui.action`'s own
-   *  shape. */
+   *  `#pendingUiAction`/bootstrap-island arm). `undefined`/`null` means no action is pending.
+   *  Mirrors `ui.action`'s own shape. */
   readonly pendingUiAction?: {
     action: UiActionKind;
     target?: { repoId: string; sha: string };
   } | null;
-  /** P72 §9.1: only meaningful when `view === "graph"` — Kira Space's own app-wide
+  /** Only meaningful when `view === "graph"` — Kira Space's own app-wide
    *  `appearance.dateFormat` (`packages/shared/domain/settings.ts`), read once at mount time and
    *  preferred over `PersistedViewState.dateFormat` when present (`App.vue`'s own `bootstrap()`).
    *  `undefined`/absent keeps today's behaviour: `PersistedViewState`'s own stored value, or its
-   *  `'relative'` default — the shape every pre-P72 call site (and every test that constructs
+   *  `'relative'` default — the shape every call site (and every test that constructs
    *  `MountOptions` without this field) already gets for free. Not reactive: this is the value as
-   *  of this webview's cold mount, not a live prop — a later change to the app-wide setting reaches an already-mounted graph on its next
-   *  remount (a closed tab, or a KeepAlive `:max` eviction, `RepoGraphView.vue`), not while it
-   *  stays cached. */
+   *  of this webview's cold mount, not a live prop — a later change to the app-wide setting reaches
+   *  an already-mounted graph on its next remount (a closed tab, or a KeepAlive `:max` eviction,
+   *  `RepoGraphView.vue`), not while it stays cached. */
   readonly dateFormat?: DateFormat;
   /** P173: only meaningful when `view === "graph"` — opens the host's Operations log. Absent where
    *  the host has none; the failure banner then names it in text instead. */
@@ -67,12 +66,10 @@ export interface MountOptions {
 }
 
 /**
- * Mounts the app shell into `container`, wired to `transport` and `viewState`, Kira Space's mounts call this rather than each owning their
- * own bootstrap. `viewState` is what P3 W9 adds: it keeps
- * scroll/selection/loaded-row state across an unmount (§2.1). `view` is what P7 W9 adds: one build, one
- * entry (§6.8/D41) — the host's own injected initial state says which root this call mounts,
- * never a second bundle. Both are breaking changes to the one function every mount calls, and both were made the same
- * way: every call site moves in the same commit.
+ * Mounts the app shell into `container`, wired to `transport` and `viewState`, Kira Space's mounts
+ * call this rather than each owning their own bootstrap. `viewState` keeps
+ * scroll/selection/loaded-row state across an unmount. `view` is one build, one entry — the host's
+ * own injected initial state says which root this call mounts, never a second bundle.
  */
 export function mount(container: Element, opts: MountOptions): MountHandle {
   // §5.1 perf budgets are measured from navigation start (the implicit start of a

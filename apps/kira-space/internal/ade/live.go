@@ -15,9 +15,13 @@ import (
 var (
 	errStopped     = errors.New("stopped by you")
 	errBoardClosed = errors.New("the task board is closed")
-	errTakenOver   = errors.New("taken over in Claude Code")
 	errArchived    = errors.New("task archived")
 )
+
+// takenOver is the cancel cause of a run taken over in the agent's own terminal.
+type takenOver struct{ product string }
+
+func (e takenOver) Error() string { return "taken over in " + e.product }
 
 // stopWait bounds how long a stop waits for the process to exit; a var so a test can shorten it.
 var stopWait = 15 * time.Second
@@ -87,11 +91,14 @@ func stopOutcome(ctx context.Context) (outcome, bool) {
 		out.noAdvance = true
 		return out, true
 	}
-	switch context.Cause(ctx) {
+	cause := context.Cause(ctx)
+	var taken takenOver
+	if errors.As(cause, &taken) {
+		return cancelled(model.AdeRunStuck, taken.Error())
+	}
+	switch cause {
 	case errStopped:
 		return cancelled(model.AdeRunStuck, errStopped.Error())
-	case errTakenOver:
-		return cancelled(model.AdeRunStuck, errTakenOver.Error())
 	case errArchived:
 		return cancelled(model.AdeRunFailed, "stopped: "+errArchived.Error())
 	}

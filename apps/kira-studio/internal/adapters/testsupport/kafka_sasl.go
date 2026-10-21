@@ -20,7 +20,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// P25 §2.3's one genuine exception to "one container per adapter": SASL is a *listener* property
+// The one genuine exception to "one container per adapter": SASL is a *listener* property
 // fixed at broker boot, so a PLAINTEXT broker (kafka.go's StartKafka) cannot be made to require
 // SASL at runtime the way every other adapter's least-privilege principals are created inside an
 // already-running container. This is a second, purpose-built single-node KRaft broker whose only
@@ -32,13 +32,13 @@ const (
 	kafkaSaslContainerPort  = "9095/tcp"
 	kafkaSaslControllerPort = "9094/tcp"
 
-	// KafkaSaslNoAclUsername/Password (finding 4): a second principal baked into the same
+	// KafkaSaslNoAclUsername/Password: a second principal baked into the same
 	// PLAIN JAAS config, granted no ACLs at all once the authorizer below is enabled — the
 	// SASL-authenticated-but-authorization-refused principal clickhouse/mongo/redis's own matrices
 	// already have and kafka's did not. Static config, same as kira/kira, since PLAIN's credential
 	// table is boot-time only (no dynamic-user API the way SCRAM has).
 	//
-	// round-2 finding 7: the password must differ from the username (matrix.go's own
+	// The password must differ from the username (matrix.go's own
 	// FixturePassword comment states the rule this used to violate — a fixture password must never
 	// collide as a substring with any other fixture identifier, since the leak-assertion does a
 	// substring check). Currently inert since this row expects success, but fragile for a future
@@ -87,9 +87,9 @@ func pickFreeHostPort() (int, error) {
 func startKafkaSasl() (*KafkaSaslFixture, error) {
 	ctx := context.Background()
 
-	// KF-4(a) (kafka.go's own comment) generalizes: the advertised listener has to name a port
-	// that is known *before* the broker's own server.properties is generated from its env, which
-	// testcontainers' own random port mapping cannot give us in time. Reserving a host port
+	// The advertised listener has to name a port that is known *before* the broker's own
+	// server.properties is generated from its env, which testcontainers' own random port mapping
+	// cannot give us in time. Reserving a host port
 	// ourselves and binding it explicitly via HostConfigModifier — rather than kafka.go's own
 	// module's start-blocked-then-rewrite-and-launch script — sidesteps that entirely: the
 	// advertised address is known up front, so the broker boots directly with its real
@@ -119,7 +119,7 @@ func startKafkaSasl() (*KafkaSaslFixture, error) {
 	// traffic, and each user_<name>=<password> is one entry in the table of credentials it accepts
 	// from an incoming client. kira is also this cluster's sole super user (KAFKA_SUPER_USERS
 	// below) so enabling the authorizer doesn't change its own behaviour or break inter-broker
-	// traffic; kira_noacl authenticates the same way but is granted no ACLs at all, for finding 4's
+	// traffic; kira_noacl authenticates the same way but is granted no ACLs at all, for the
 	// authorization-refusal pin.
 	jaas := fmt.Sprintf(
 		`org.apache.kafka.common.security.plain.PlainLoginModule required username="%[1]s" password="%[2]s" user_%[1]s="%[2]s" user_%[3]s="%[4]s";`,
@@ -137,8 +137,9 @@ func startKafkaSasl() (*KafkaSaslFixture, error) {
 		Env: map[string]string{
 			// The image's own /etc/confluent/docker/configure script hard-fails ("dub ensure
 			// KAFKA_OPTS") the instant KAFKA_ADVERTISED_LISTENERS contains a SASL_ scheme, unless
-			// KAFKA_OPTS is set to *something* — the per-listener KAFKA_LISTENER_NAME_..._SASL_JAAS_CONFIG
-			// below is what actually configures PLAIN, so this only has to satisfy that check, not
+			// KAFKA_OPTS is set to *something* — the per-listener
+			// KAFKA_LISTENER_NAME_..._SASL_JAAS_CONFIG below is what configures PLAIN, so this only
+			// has to satisfy that check, not
 			// name a real login-config file.
 			"KAFKA_OPTS":                                 "-Dkira.kafka.matrix.sasl=true",
 			"CLUSTER_ID":                                 kafkaSaslClusterID,
@@ -165,7 +166,7 @@ func startKafkaSasl() (*KafkaSaslFixture, error) {
 			"KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR": "1",
 			"KAFKA_TRANSACTION_STATE_LOG_MIN_ISR":            "1",
 			"KAFKA_AUTO_CREATE_TOPICS_ENABLE":                "false",
-			// KRaft's own ACL authorizer (finding 4) — StandardAuthorizer, not the ZooKeeper-era
+			// KRaft's own ACL authorizer — StandardAuthorizer, not the ZooKeeper-era
 			// AclAuthorizer, since this cluster has no ZooKeeper at all. kira is the sole
 			// SASL-authenticated super user, so it bypasses every ACL check exactly as it did with
 			// no authorizer configured at all (both its own client use and its inter-broker
@@ -200,7 +201,7 @@ func startKafkaSasl() (*KafkaSaslFixture, error) {
 	return &KafkaSaslFixture{Config: cfg, Host: daemonHost, Port: hostPort, container: container}, nil
 }
 
-// CreateTopicSasl is CreateTopic's (kafka.go) sibling for the SASL broker (P26 §3.8) — kafka.go's
+// CreateTopicSasl is CreateTopic's (kafka.go) sibling for the SASL broker — kafka.go's
 // own CreateTopic takes a *KafkaFixture and reaches its already-built Admin field directly, which
 // this fixture has no equivalent of (its Config carries no credentials of its own, a case sets them
 // — kafka_sasl.go's own doc comment), so this dials a short-lived, correctly-authenticated kadm

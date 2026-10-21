@@ -7,12 +7,12 @@ import (
 )
 
 // TabRecord's `State` stays raw JSON here — Kira Studio's own model.TabRecord (storage/model/
-// tabs.go) does the same, for the same reason (D3): packages/shared/domain/tabs.ts's per-kind
+// tabs.go) does the same, for the same reason: packages/shared/domain/tabs.ts's per-kind
 // discriminated union is renderer-side validation logic, not storage shape. Go validates only the
 // envelope it owns: kind is in RenderableTabKinds and State parses as a JSON object.
 //
 // Kira Studio's own TabRecord also carries ConnectionID (a DB-connection scope) — Kira Space has
-// no connections concept, so this copy drops that field entirely (P100 Part 2, plan §5.4).
+// no connections concept, so this copy drops that field entirely.
 // WorkspaceID is required here for every kind, unlike Kira Studio's own optional field: every tab
 // kind this app has is scoped to a repository, so there is no "app-wide" tab to fall back to.
 type TabRecord struct {
@@ -51,7 +51,7 @@ func IsJSONObject(raw []byte) bool {
 // Validate asserts the same envelope repos.TabsRepo.List already enforces on read, plus the
 // non-empty identity fields no SQL constraint covers — Kira Studio's own TabRecord.Validate,
 // minus the ConnectionID it never had here, and with WorkspaceID required for every kind (every
-// kind here is a repo kind) rather than only "terminal" (P107 I2-30).
+// kind here is a repo kind) rather than only "terminal".
 func (t TabRecord) Validate() error {
 	return appstorage.ValidateTab(appstorage.TabFields{
 		ID: t.ID, Path: t.Path, Kind: t.Kind, State: t.State, WorkspaceID: t.WorkspaceID,

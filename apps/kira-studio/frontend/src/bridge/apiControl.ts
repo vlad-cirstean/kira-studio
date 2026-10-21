@@ -38,13 +38,13 @@ import type { ApiDataChangedEvent } from '@shared/protocol/events';
 import { CHANNEL } from '@shared/protocol/events';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 
-// P12 D11: the module's own binding surface, split out of control.ts's single 605-line file
-// (F13) — the 39 of 106 methods whose prefix is httpSend, grpc*, onGrpcCall, collections*,
-// variables*, history* or grpcHistory*. Every call site is unchanged (bridge/index.ts composes
-// this into the one exported `control` object — round-1 review finding 19 moved that composition,
-// and this file's own on/trust/unwrap/windowKey import, out of control.ts and into rpc.ts/index.ts
-// so this file never imports control.ts, which composes it back in), and mockRuntime.ts's channel
-// map is unchanged — this is a source-file split, not a binding-surface change.
+// The module's own binding surface — the 39 of 106 methods whose prefix is httpSend, grpc*,
+// onGrpcCall, collections*, variables*, history* or grpcHistory*. Every call site is unchanged
+// (bridge/index.ts composes this into the one exported `control` object — that composition, and
+// this file's own on/trust/unwrap/windowKey import, moved out of control.ts and into
+// rpc.ts/index.ts so this file never imports control.ts, which composes it back in), and
+// mockRuntime.ts's channel map is unchanged — this is a source-file split, not a binding-surface
+// change.
 
 // model.VariableScope is a named Go string type (unlike, say, model.CollectionItem.Kind, which is
 // a plain `string`), so the generator emits a real TS `enum` for it — a plain 'collection' |
@@ -57,21 +57,20 @@ function scopeArg(scope: VariableScope): WailsStorageModels.VariableScope {
 }
 
 export const apiControl = {
-  // P2 D3: runs through the same op scheduler/op log the DB adapters use (opId is
+  // Runs through the same op scheduler/op log the DB adapters use (opId is
   // renderer-minted, exactly like every data-plane op's own beginOp) — never the webview's own
   // fetch (docs/ARCHITECTURE.md's "Go owns the network"). The generated Send drops the injected
-  // ctx parameter from its TS signature (§6.1) — Wails still passes it through server-side, so a
-  // window closing mid-request still aborts it. P5 D6: collectionId/environmentId name the scope
+  // ctx parameter from its TS signature — Wails still passes it through server-side, so a
+  // window closing mid-request still aborts it. collectionId/environmentId name the scope
   // stage 2 (Go) resolves secrets against — both '' is valid (a scratch tab, no environment).
-  // P8 D2: itemId travels alongside so Go can record a response-history entry under the right
+  // itemId travels alongside so Go can record a response-history entry under the right
   // scope — '' for a scratch tab, exactly like collectionId/environmentId's own "possibly empty"
-  // shape above. Optional here (C3): a missing field decodes as Go's zero value ("") on the wire,
-  // and state.ts's send() only starts actually passing it in C4.
-  // P71 §4: incognito mirrors itemId's own optional-on-the-TS-side shape — a missing field
+  // shape above. Optional here: a missing field decodes as Go's zero value ("") on the wire.
+  // incognito mirrors itemId's own optional-on-the-TS-side shape — a missing field
   // decodes as Go's zero value (false) on the wire.
-  // P90: options carries the per-request overrides of the seven api settings leaves — state.ts's
+  // options carries the per-request overrides of the seven api settings leaves — state.ts's
   // send() builds it from tab.state.settings with every null leaf dropped (buildSettingsWire), so
-  // Go's Options only ever sees the leaves this request actually overrides.
+  // Go's Options only ever sees the leaves this request overrides.
   httpSend: (args: {
     opId: string;
     tabId: string;
@@ -125,7 +124,7 @@ export const apiControl = {
   }): Promise<GrpcSchemaWire> =>
     unwrap(GrpcService.Describe(args)).then((r) => trust<GrpcSchemaWire>(r)),
 
-  // P11 D7/D8: runs through the same op scheduler/op log HttpService.Send already does (opId
+  // Runs through the same op scheduler/op log HttpService.Send already does (opId
   // renderer-minted, tabId/windowKey addressing exactly like httpSend/TabsService's own shape).
   // `streaming` tells Go which of Unary/ServerStream to run — the renderer already knows this
   // from the schema it resolved via grpcDescribe.
@@ -165,12 +164,12 @@ export const apiControl = {
   onApiDataChanged: (cb: (event: ApiDataChangedEvent) => void): (() => void) =>
     on(CHANNEL.apiDataChanged, cb),
 
-  // P4 D11: nine wrappers over CollectionsService. These stay typed against the generated models
+  // Nine wrappers over CollectionsService. These stay typed against the generated models
   // rather than `trust<T>()`-ing a domain type, because the one place a saved request's shape
   // genuinely has to be trusted is where it becomes tab state — `openCollectionRequestTab` Zod-
-  // parses it there (D4), which is the app's single trust boundary for this document rather than
+  // parses it there, which is the app's single trust boundary for this document rather than
   // a second one here. Only a *path* ever crosses this bridge for import/export, never a file's
-  // bytes (D11/F16): Go reads and Go writes.
+  // bytes: Go reads and Go writes.
   collectionsList: (): Promise<{
     collections: WailsModels.CollectionSummary[];
     items: WailsModels.ItemSummary[];
@@ -230,8 +229,8 @@ export const apiControl = {
   collectionsExport: (collectionId: string, path: string): Promise<WailsModels.ExportReport> =>
     unwrap(CollectionsService.Export({ collectionId, path })),
 
-  // P5 D19: thirteen wrappers over VariablesService — typed against the shared domain mirrors
-  // (D20) rather than the generated models directly, the one difference from collectionsList's
+  // Thirteen wrappers over VariablesService — typed against the shared domain mirrors
+  // rather than the generated models directly, the one difference from collectionsList's
   // own precedent above (nothing here becomes tab state, so there is no equivalent reason to stay
   // close to the wire shape).
   variablesListEnvironments: (): Promise<ApiEnvironment[]> =>

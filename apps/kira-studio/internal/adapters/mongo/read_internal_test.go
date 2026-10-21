@@ -83,7 +83,7 @@ func TestMergeKeysetIDCondition_OperatorDocumentExistingID_BothPreserved(t *test
 	}
 }
 
-// TestKeysetIDCondition_TypeWidening is F6's own regression: a bare {_id:{$gt/$lt: boundary}} only
+// TestKeysetIDCondition_TypeWidening is the regression: a bare {_id:{$gt/$lt: boundary}} only
 // ever matches _id values of the boundary's own BSON type — reproduced here directly against
 // keysetIDCondition (not a live server) since this is the boundary-arithmetic decision CLAUDE.md's
 // test bar calls out. Confirmed to fail against the pre-fix mergeKeysetIDCondition (which built a

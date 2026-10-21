@@ -10,7 +10,7 @@ import (
 
 // The three patterns assertSingleStatement strips from the remainder after the first top-level
 // ';' — query.ts's own "whitespace, one trailing ';', and SQL comments are the only things
-// tolerated there" (F9/D9), ported verbatim as regexes since the remainder, by construction, opens
+// tolerated there", ported verbatim as regexes since the remainder, by construction, opens
 // outside any string literal.
 var (
 	commentLine           = regexp.MustCompile(`--[^\n]*`)
@@ -90,8 +90,8 @@ func scanBacktickArm(s string, i int) (nextIndex, nextState int) {
 // firstTopLevelSemicolon scans sqlText once, tracking comment/string-literal state, and returns
 // the byte index of the first ';' that appears outside a comment or a quoted literal — or -1 if
 // there is none. This is Go's answer to query.ts's own guard, which instead compared the full text
-// against `StatementSync.sourceSQL` (the exact substring node:sqlite's own prepare() actually
-// compiled) — database/sql exposes no such "how much did the driver consume" signal for any
+// against `StatementSync.sourceSQL` (the exact substring node:sqlite's own prepare() compiled)
+// — database/sql exposes no such "how much did the driver consume" signal for any
 // driver, modernc.org/sqlite included (verified against its own stmt.go: a multi-statement string
 // is detected internally via SQLite's own pzTail, but that fact never crosses the driver.Stmt
 // interface), so the boundary is found by parsing the SQL text directly instead.
@@ -123,12 +123,12 @@ func firstTopLevelSemicolon(s string) int {
 	return -1
 }
 
-// assertSingleStatement is query.ts's own guard (F9/D9, re-derived per B9/SQ-1): whitespace, one
-// trailing ';', and SQL comments after the first top-level ';' are the only things tolerated;
-// anything else means a smuggled second statement — the console's own contract (§8.14) is one page
-// per statement, and modernc.org/sqlite executes a multi-statement string in full (SQ-1) rather
-// than silently dropping the tail the way node:sqlite's prepare() did, so the enforcement has to
-// happen here, before the driver ever sees the text.
+// assertSingleStatement is query.ts's own guard: whitespace, one trailing ';', and SQL comments
+// after the first top-level ';' are the only things tolerated; anything else means a smuggled
+// second statement — the console's own contract is one page per statement, and modernc.org/sqlite
+// executes a multi-statement string in full rather than silently dropping the tail the way
+// node:sqlite's prepare() did, so the enforcement has to happen here, before the driver ever sees
+// the text.
 func assertSingleStatement(sqlText string) error {
 	idx := firstTopLevelSemicolon(sqlText)
 	if idx < 0 {
@@ -148,7 +148,7 @@ var setCommand = adapters.SetCommand
 // runRows is query.ts's runQuery generalized with a per-row scan callback, the same shape
 // mysqlfamily/catalog.go's queryExec uses — catalog.go's typed pragma reads and read.go's own
 // positional row reads both go through this. ctx is always the adapter-owned driverCtx
-// (adapter.go's runOnConn), never the op's own context — B8's whole point.
+// (adapter.go's runOnConn), never the op's own context.
 func runRows(ctx context.Context, conn *sql.Conn, sqlText string, params []any, op *adapters.OpCtx, logParams bool, scan func(*sql.Rows) error) error {
 	setCommand(op, sqlText, params, logParams)
 	if err := assertSingleStatement(sqlText); err != nil {
@@ -177,7 +177,7 @@ func runRows(ctx context.Context, conn *sql.Conn, sqlText string, params []any, 
 // runArrayQuery is read.ts's runQuery({rowsAsArray: true}) — every row scanned positionally into
 // []any, the driver's own native Go value for each cell (nil/int64/float64/string/[]byte, plus the
 // one coercion the driver performs itself for a DATE/DATETIME/TIMESTAMP-declared column — see
-// read.go's selectExpr and toCellText). D3's setReadBigInts has no Go analogue to opt into: an
+// read.go's selectExpr and toCellText). The setReadBigInts has no Go analogue to opt into: an
 // int64 is already exact, so there is no equivalent to node:sqlite's ERR_OUT_OF_RANGE to avoid.
 func runArrayQuery(ctx context.Context, conn *sql.Conn, sqlText string, params []any, op *adapters.OpCtx, logParams bool) ([][]any, error) {
 	var out [][]any
@@ -209,7 +209,7 @@ func runArrayQuery(ctx context.Context, conn *sql.Conn, sqlText string, params [
 	return out, err
 }
 
-// streamArrayQuery is runArrayQuery's single-pass twin (P2 R1): onRow is called once per scanned
+// streamArrayQuery is runArrayQuery's single-pass twin: onRow is called once per scanned
 // row, in order, with a []any the callback owns, instead of every row being materialized into a
 // [][]any only to be transposed into the page builder immediately after. runArrayQuery itself
 // stays as the array-returning shape countRows wants.

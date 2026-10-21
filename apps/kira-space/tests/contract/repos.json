@@ -8,5 +8,11 @@
     "repoId": "<work>/proj",
     "root": "<work>/proj",
     "sortOrder": 0
+  },
+  "args:CodeWorkspaceService.ReorderRepos": {
+    "ids": [
+      "<id:2>",
+      "<id:1>"
+    ]
   }
 }

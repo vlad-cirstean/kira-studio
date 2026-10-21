@@ -36,15 +36,15 @@ type DataSource struct {
 
 // Project is one Scan's worth of parsed input — every data source the shared file names, in
 // document order, correlated with whatever the local file (if any) says about it. CreatedIn is
-// the local file's own <component created-in="…">, used by D5 to rank candidate IDE config
-// directories; "" when the local file is absent.
+// the local file's own <component created-in="…">, used to rank candidate IDE config directories;
+// "" when the local file is absent.
 type Project struct {
 	Dir         string
 	DataSources []DataSource
 	CreatedIn   string
 }
 
-// xmlSharedDoc / xmlLocalDoc each match both real root shapes (F1): <project><component
+// xmlSharedDoc / xmlLocalDoc each match both real root shapes: <project><component
 // name="DataSourceManagerImpl">… and <application><component name="dataSourceStorage">… wrap an
 // identical <component> directly under the document root, so a struct keyed on the root's
 // children (not the root's own element name) parses either one without a second code path. The

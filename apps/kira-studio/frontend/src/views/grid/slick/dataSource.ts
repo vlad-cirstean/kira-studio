@@ -4,8 +4,8 @@ import type { RowHandle } from '../../shared/slick/dataSource';
 import { type CellView, cell } from '../page';
 import { usePendingChangesStore } from '../pendingChanges';
 
-// P30 §3 prerequisite: the generic display-position/`CustomDataView` core that used to live in
-// this one file moved to `views/shared/slick/dataSource.ts` (SPEC §11 — `views/console/*` may not
+// The generic display-position/`CustomDataView` core that used to live in
+// this one file moved to `views/shared/slick/dataSource.ts` (`views/console/*` may not
 // import `views/grid/*`, and that core has no dependency on a data tab in the first place). This
 // file keeps only what genuinely does: `createDisplayValueExtractor`/`pendingRowClasses` both read
 // `pendingChanges.ts`. Re-exported verbatim so `SlickGridHost.vue`'s own import
@@ -41,12 +41,12 @@ export function createDisplayValueExtractor(
   for (let i = 0; i < columnOrder.length; i++) {
     fieldToPageCol.set(columnOrder[i], pageColumnIndexFor(page, columnOrder, i));
   }
-  // P21 round 3 performance finding 10, corrected: an earlier version of this fix snapshotted
+  // An earlier version of this fix snapshotted
   // `pending` once here, at extractor-build time, on the theory that SlickGridHost.vue always
   // rebuilds `dataSource.setState` (and therefore this extractor) on every staging change. That
   // theory was wrong and a real regression (caught by tests/ui/mutations.spec.ts,
   // tests/ui/cell-editor.spec.ts and tests/ui/interaction.spec.ts all failing): SlickGridHost.vue's
-  // own C5/§5 D5 watch (the `pendingFor(tabId)?.edits`/`.deletes` signature) invalidates and
+  // own watch (the `pendingFor(tabId)?.edits`/`.deletes` signature) invalidates and
   // re-renders the touched rows on every stageEdit/stageNull/stageDelete, but never calls
   // `dataSource.setState` to rebuild this extractor — its own comment says exactly why: "a
   // committed edit renders correctly for free" *because* the old closure re-read stagedValue()
@@ -81,13 +81,13 @@ export function createDisplayValueExtractor(
 /** The dirty/deleted-rail source for `GridDataSourceState.rowClasses` (§5 item 18) — a page row
  *  index in, the same two mutually-exclusive rail classes GridRow.vue's own CSS already draws
  *  (`.gutter-cell.dirty`/`.gutter-cell.deleted`, ported verbatim in `slickTheme.css`). */
-// C10/§4 item 18 — the third case Pass A's own stale comment already promised, checked first: a
-// pending-insert row is never simultaneously a real, deleted, or dirty page row (it has no page
-// row at all — `row` here is `pageRowAt`'s own pseudo-row-number past `pageRowCount`, D1's insert
-// region), so it can never collide with the other two. `pending-delete` is DataGrid.vue's own
-// literal class name (`GridRow.vue:41` — the strike-through/opacity rule), added alongside
-// `kira-row-deleted` (this file's own rail-only class, `slickTheme.css`'s `.kira-gutter::before`
-// selector) rather than replacing it — the two mechanisms are independent and this pass ports both.
+// The third case, checked first: a pending-insert row is never simultaneously a real, deleted, or
+// dirty page row (it has no page row at all — `row` here is `pageRowAt`'s own pseudo-row-number
+// past `pageRowCount`, the insert region), so it can never collide with the other two.
+// `pending-delete` is DataGrid.vue's own literal class name (`GridRow.vue:41` — the
+// strike-through/opacity rule), added alongside `kira-row-deleted` (this file's own rail-only
+// class, `slickTheme.css`'s `.kira-gutter::before` selector) rather than replacing it — the two
+// mechanisms are independent and this pass ports both.
 export function pendingRowClasses(
   tabId: string,
   row: number,

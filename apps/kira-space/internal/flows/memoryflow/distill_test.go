@@ -300,7 +300,8 @@ func TestBridgeDistill(t *testing.T) {
 	}
 	joined := mergedLines[0].Text + "\n" + mergedLines[1].Text
 	if !slices.Equal(res.Lines, mergedLines) || res.Chunks != 1 || res.CostUSD < 0.029 || res.CostUSD > 0.031 ||
-		len(res.Unresolved) != 1 || res.Unresolved[0].Questions[0] != "Which service restarts?" {
+		len(res.Unresolved) != 1 || res.Unresolved[0].Questions[0] != "Which service restarts?" ||
+		res.Mode != "facts" || res.Rewrite != nil {
 		t.Fatalf("result = %+v", res)
 	}
 	if res.InChars != utf8.RuneCountInString(text) || res.OutChars != utf8.RuneCountInString(joined) ||

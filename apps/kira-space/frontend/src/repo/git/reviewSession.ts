@@ -1,12 +1,12 @@
 /**
- * C11 §8.3 (S6) — session persistence through the pinned repo-graph tab's own state, the native
+ * Session persistence through the pinned repo-graph tab's own state, the native
  * counterpart to the extension's `context.workspaceState`-backed `ReviewSessionStore`. The review
- * panel itself is not a tab (§5.3), so it has no tab record of its own to persist through, and
+ * panel itself is not a tab, so it has no tab record of its own to persist through, and
  * `repo/state/search.ts` shows the native panel-state precedent is in-memory only (no
- * `control.*` persistence call) — which would lose exactly the resume point G19 D11b built this
+ * `control.*` persistence call) — which would lose exactly the resume point this was built
  * for. The pinned `repo-graph` tab is the right host instead: created once per repo workspace
  * (`ensureWorkspaceShell`), never closed, and already carrying one opaque git-ui-owned blob
- * (`repoGraphTabStateSchema.viewState`, C10 S13) — `reviewSession` is a second field of the same
+ * (`repoGraphTabStateSchema.viewState`) — `reviewSession` is a second field of the same
  * shape, and this module mirrors `viewStateStore.ts` line for line over it.
  *
  * The value stays opaque to this host, same discipline as `viewState`: `ReviewView.vue`/

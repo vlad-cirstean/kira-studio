@@ -17,21 +17,22 @@ import (
 
 // flippingCtx simulates a real cancellation landing after exactly `after` deliberate ctx.Err()
 // checks — adapters.CheckNotStarted's own calls (query.go's runRows/runCommand), the only places in
-// this package that explicitly ask "has this op been cancelled". Done() is a pure accessor: it never
-// advances the counter itself, only Err() does. This distinction matters because modernc.org/sqlite's
-// own driver calls ctx.Done() on every single statement execution as part of its interruptOnDone
-// machinery (a background goroutine watching for the channel to close, to fire sqlite3_interrupt) —
-// if Done() itself also tripped the counter, that housekeeping call would silently advance the count
-// on every statement regardless of any real cancellation, making `after` mean nothing. With Done()
-// inert, the channel only closes once cumulative Err() checks cross `after`, and from that instant
-// modernc.org/sqlite's own Done()-driven interrupt machinery reacts exactly the way a genuine
-// context.WithCancel's cancel() would — including for BEGIN IMMEDIATE/COMMIT, which (via
-// RunSQLMutation's shared execCommand) carry their own CheckNotStarted like every other statement;
-// only the cleanup ROLLBACK runs on a detached cleanupCtx and so never trips this counter at all.
-// This lets a test force a cancellation to land at an exact, deterministic point in mutate()'s own
-// sequence of ctx-checked calls (the catalog lookup inside getReadTarget, then each compiled row
-// op) without any sleep or goroutine race — which of those calls lands where isn't part of this
-// package's exported surface, so a test sweeps every plausible index instead of hardcoding one.
+// this package that explicitly ask "has this op been cancelled". Done() is a pure accessor: it
+// never advances the counter itself, only Err() does. This distinction matters because
+// modernc.org/sqlite's own driver calls ctx.Done() on every single statement execution as part of
+// its interruptOnDone machinery (a background goroutine watching for the channel to close, to fire
+// sqlite3_interrupt) — if Done() itself also tripped the counter, that housekeeping call would
+// silently advance the count on every statement regardless of any real cancellation, making `after`
+// mean nothing. With Done() inert, the channel only closes once cumulative Err() checks cross
+// `after`, and from that instant modernc.org/sqlite's own Done()-driven interrupt machinery reacts
+// exactly the way a genuine context.WithCancel's cancel() would — including for BEGIN
+// IMMEDIATE/COMMIT, which (via RunSQLMutation's shared execCommand) carry their own CheckNotStarted
+// like every other statement; only the cleanup ROLLBACK runs on a detached cleanupCtx and so never
+// trips this counter at all. This lets a test force a cancellation to land at an exact,
+// deterministic point in mutate()'s own sequence of ctx-checked calls (the catalog lookup inside
+// getReadTarget, then each compiled row op) without any sleep or goroutine race — which of those
+// calls lands where isn't part of this package's exported surface, so a test sweeps every plausible
+// index instead of hardcoding one.
 type flippingCtx struct {
 	context.Context
 	calls *int32
@@ -129,18 +130,18 @@ func TestMutateCancelledMidTransactionDoesNotLeakOpenTransaction(t *testing.T) {
 			continue
 		}
 
-		// A cancellation landed somewhere at or before COMMIT. What that leaves row 1 holding is not
-		// fully determined for sqlite specifically: modernc.org/sqlite's own cancellation model fires
-		// sqlite3_interrupt() from a background goroutine racing the statement's own completion
-		// (interruptOnDone) — the same ambiguity Go's database/sql docs call out for a
-		// context-cancelled Tx.Commit generally ("the operation may have succeeded"), and empirically
-		// reproducible here under heavy CPU contention. The one guarantee this fix actually makes,
-		// and the one the original bug broke, is narrower and fully deterministic regardless of that
-		// race: the transaction is always definitively ended (rolled back or committed), never left
-		// open — so a completely unrelated follow-up mutate, on the same pooled connection
-		// (SetMaxOpenConns(1) means the next db.Conn() call hands back the very connection the
-		// cancelled mutate left behind) and a real bounded ctx, must always complete quickly rather
-		// than hang or fail behind a stale open transaction.
+		// A cancellation landed somewhere at or before COMMIT. What that leaves row 1 holding is
+		// not fully determined for sqlite specifically: modernc.org/sqlite's own cancellation model
+		// fires sqlite3_interrupt() from a background goroutine racing the statement's own
+		// completion (interruptOnDone) — the same ambiguity Go's database/sql docs call out for a
+		// context-cancelled Tx.Commit generally ("the operation may have succeeded"), and
+		// empirically reproducible here under heavy CPU contention. The one guarantee this fix
+		// makes, and the one the original bug broke, is narrower and fully deterministic regardless
+		// of that race: the transaction is always definitively ended (rolled back or committed),
+		// never left open — so a completely unrelated follow-up mutate, on the same pooled
+		// connection (SetMaxOpenConns(1) means the next db.Conn() call hands back the very
+		// connection the cancelled mutate left behind) and a real bounded ctx, must always complete
+		// quickly rather than hang or fail behind a stale open transaction.
 		followUpCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		err = runMutate(followUpCtx, "op-followup", orderItemsQuantityPlan("2", "55"))
 		cancel()

@@ -1,15 +1,14 @@
 package gitops
 
-// WorktreeListArgs lives in gitclient/porcelain (the read side, D1) — this file holds only the
-// three write-argv builders G25 adds (D2/D3): worktreeAdd's three creation modes, plus
-// worktreeRemove. Every worktreeAdd variant passes an explicit commit-ish and a leading `--`
-// before the path (D3) — bare DWIM (probe M8: `git worktree add <path>` with no commit-ish
-// silently creates a branch named after the path's basename) is never relied on anywhere in this
-// file.
+// WorktreeListArgs lives in gitclient/porcelain (the read side) — this file holds only the
+// three write-argv builders: worktreeAdd's three creation modes, plus worktreeRemove. Every
+// worktreeAdd variant passes an explicit commit-ish and a leading `--` before the path — bare
+// DWIM (`git worktree add <path>` with no commit-ish silently creates a branch named after the
+// path's basename) is never relied on anywhere in this file.
 
-// WorktreeAddExistingBranchArgs builds `git worktree add -- <path> <branch>` — D2's
+// WorktreeAddExistingBranchArgs builds `git worktree add -- <path> <branch>` — the
 // "existingBranch" mode: branch is an already-existing local branch name, passed as the explicit
-// commit-ish so git never has to guess one (D3). `--` (probe P5's own flag surface: `add [-f]
+// commit-ish so git never has to guess one. `--` (the flag surface: `add [-f]
 // [--detach] [--checkout] [--lock [--reason <s>]] [--orphan] [(-b|-B) <branch>] <path>
 // [<commit-ish>]`) guards a path that happens to start with `-`.
 func WorktreeAddExistingBranchArgs(path, branch string) []string {
@@ -29,9 +28,9 @@ func WorktreeAddDetachArgs(path, commitish string) []string {
 	return []string{"worktree", "add", "--detach", "--", path, commitish}
 }
 
-// WorktreeRemoveArgs builds `git worktree remove [--force] <path>` (probe P5: `remove [-f]
+// WorktreeRemoveArgs builds `git worktree remove [--force] <path>` (`remove [-f]
 // <worktree>` is the entire flag surface — no `--` separator exists for this subcommand). force is
-// D8's own dirty-route flag, gated host-side by a freshly re-checked typed confirmation
+// the dirty-route flag, gated host-side by a freshly re-checked typed confirmation
 // (gitsession's own prepareWorktreeRemove) before this argv is ever built — never offered for the
 // three unconditional blockers (mainWorktree/currentWorktree/openInAnotherWindow/locked), which
 // have no force route at all.

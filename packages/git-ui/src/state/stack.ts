@@ -9,12 +9,12 @@ import type {
 import { createLatestRequest } from '@workbench/behaviour/latest';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
+import type { ChangeRequestState } from './changeRequests.ts';
 import { isCancelledTransport } from './isCancelled.ts';
-import type { PrState } from './pr.ts';
 import { RepoScopedReload } from './repoScopedReload.ts';
 
 /** Every branch name across a `stack.list` result — `StackList.vue`'s own row set, and F13's own
- *  "warm `PrState.byBranch` for the whole stack view in one call" input. */
+ *  "warm `ChangeRequestState.byBranch` for the whole stack view in one call" input. */
 function allBranchNames(
   stacks: readonly StackSummary[],
   orphans: readonly StackBranch[],
@@ -28,17 +28,17 @@ function allBranchNames(
 }
 
 /**
- * G26 D3/F13: the stack forest as reactive state, mirroring `WorktreeState`'s own shape (reloaded
+ * The stack forest as reactive state, mirroring `WorktreeState`'s own shape (reloaded
  * on the same `repo.changed`/`refsChanged` signal, the same in-flight repo-switch guard on
  * `reload`). `previewRestack`/`runRestack`/`cancelRestack` are this class's own three mutating
  * entry points into `preflight.restack`/`stack.restack`/`stack.cancelRestack` — `StackDialog.vue`'s
  * whole restack flow is these three calls plus the reactive `restacking`/`progress` pair below.
  *
- * F13's own hand-forward is realized here exactly as G24 §9 anticipated: after every load, this
- * class calls `PrState.ensureSnapshot` with the union of every branch name in the result — no new
- * RPC, no new cache, no new rate-limit exposure beyond the snapshot G24 already fetches lazily.
+ * The hand-forward is realized here: after every load, this class calls
+ * `ChangeRequestState.ensureSnapshot` with the union of every branch name in the result —
+ * no new RPC, no new cache, no new rate-limit exposure beyond the snapshot already fetched lazily.
  * `pr` is optional (mirroring `SearchState`'s own constructor) so a test — or a future host with no
- * GitHub surface at all — can construct this class without one.
+ * change request surface at all — can construct this class without one.
  */
 export class StackState {
   readonly stacks: ShallowRef<readonly StackSummary[]> = shallowRef([]);
@@ -54,14 +54,14 @@ export class StackState {
   readonly progress: ShallowRef<readonly RestackProgress[]> = shallowRef([]);
 
   readonly #bridge: BridgeClient;
-  readonly #pr: PrState | undefined;
+  readonly #pr: ChangeRequestState | undefined;
   readonly #repo: RepoScopedReload;
   readonly #unsubscribeProgress: () => void;
   /** F5: a `refsChanged` event fired twice in quick succession can reply out of order — only the
    *  latest issued `reload()` is ever allowed to apply. */
   readonly #reloadRequest = createLatestRequest<ResultOf<'stack.list'>>(isCancelledTransport);
 
-  constructor(bridge: BridgeClient, pr?: PrState) {
+  constructor(bridge: BridgeClient, pr?: ChangeRequestState) {
     this.#bridge = bridge;
     this.#pr = pr;
     this.#repo = new RepoScopedReload(bridge, 'gitStack', {
@@ -117,7 +117,7 @@ export class StackState {
     return this.#bridge.request('preflight.restack', { repoId, branch });
   }
 
-  /** Runs the whole restack, then reloads (D16: the server already dropped its own stack cache on
+  /** Runs the whole restack, then reloads (the server already dropped its own stack cache on
    *  the write, but this class's own reactive `stacks`/`orphans` need their own fresh read the same
    *  way every other mutating call in this codebase reloads its own state after `op.run`/
    *  `remote.run` settles). `progress` is cleared at the start of THIS run, never accumulating

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
@@ -222,19 +223,26 @@ func TestNoRemoteAndPr(t *testing.T) {
 		t.Fatalf("fetch without a remote = %+v, want a classified error", res)
 	}
 
-	for name, res := range map[string]gitrpc.PrLookupResult{
-		"commit": call[gitrpc.PrLookupResult](t, r.gs, "commit.resolvePr", gitrpc.CommitResolvePrParams{RepoID: id, SHA: sha}),
-		"branch": call[gitrpc.PrLookupResult](t, r.gs, "branch.resolvePr", gitrpc.BranchResolvePrParams{RepoID: id, Branch: "main"}),
+	for name, res := range map[string]gitrpc.ChangeRequestLookup{
+		"commit": call[gitrpc.ChangeRequestLookup](t, r.gs, "commit.resolveChangeRequests", gitrpc.CommitResolveChangeRequestsParams{RepoID: id, SHA: sha}),
+		"branch": call[gitrpc.ChangeRequestLookup](t, r.gs, "branch.resolveChangeRequest", gitrpc.BranchResolveChangeRequestParams{RepoID: id, Branch: "main"}),
 	} {
-		if len(res.PRs) != 0 {
-			t.Fatalf("%s.resolvePr = %+v, want no PRs", name, res)
+		if len(res.ChangeRequests) != 0 {
+			t.Fatalf("%s.resolveChangeRequests = %+v, want no PRs", name, res)
 		}
 	}
 
+	if info := call[gitrpc.GitHostInfoResult](t, r.gs, "gitHost.info", gitrpc.GitHostInfoParams{RepoID: id}); info.Host != nil {
+		t.Fatalf("gitHost.info without a remote = %+v, want null", info.Host)
+	}
+	if p := call[githost.Providers](t, r.gs, "gitHost.providers", struct{}{}); len(p.Providers) != 1 || p.Providers[0].ID != "github" {
+		t.Fatalf("gitHost.providers = %+v, want github", p)
+	}
+
 	repo.AddRemote("https://gitlab.example.com/team/proj.git")
-	url := call[gitrpc.PrBrowserUrlResult](t, r.gs, "pr.browserUrl", gitrpc.PrBrowserUrlParams{RepoID: id, Number: 7})
+	url := call[gitrpc.ChangeRequestBrowserUrlResult](t, r.gs, "changeRequest.browserUrl", gitrpc.ChangeRequestBrowserUrlParams{RepoID: id, Number: 7})
 	if url.URL != nil {
-		t.Fatalf("pr.browserUrl for a non-GitHub remote = %q, want null", *url.URL)
+		t.Fatalf("changeRequest.browserUrl for a non-GitHub remote = %q, want null", *url.URL)
 	}
 }
 

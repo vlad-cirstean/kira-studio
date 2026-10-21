@@ -1,6 +1,8 @@
 package bridge
 
 import (
+	"slices"
+
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
@@ -25,6 +27,11 @@ type LayoutSetArgs struct {
 func (s *LayoutService) Set(args LayoutSetArgs) (model.Layout, error) {
 	if p := args.Patch.Panel; p != nil && p.Ade != nil && p.Ade.Width != nil && !model.ValidAdePanelWidth(*p.Ade.Width) {
 		return model.Layout{}, ipcerr.Contract("layout: panel.ade.width: invalid value %v", *p.Ade.Width)
+	}
+	for mode := range args.Patch.Modes {
+		if !slices.Contains(model.WindowModes.Valid, mode) {
+			return model.Layout{}, ipcerr.Contract("layout: modes: unknown mode %q", mode)
+		}
 	}
 	merged, err := s.Deps.Repos.Layout.Set(args.Patch)
 	if err != nil {

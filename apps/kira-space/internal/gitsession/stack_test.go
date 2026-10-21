@@ -225,9 +225,9 @@ func TestStacks_LinearChain_RealRepo(t *testing.T) {
 	}
 }
 
-// TestStacks_ManySiblingBranches_EachGetsItsOwnCorrectCount is G31 round-2 performance review,
-// finding #6: buildStacksFromSnapshot's own per-candidate rev-list spawns now run concurrently
-// (one goroutine per candidate, writing only its own indexed slot) instead of strictly serially.
+// TestStacks_ManySiblingBranches_EachGetsItsOwnCorrectCount: buildStacksFromSnapshot's own
+// per-candidate rev-list spawns now run concurrently (one goroutine per candidate, writing only its
+// own indexed slot) instead of strictly serially.
 // Five sibling branches off main, each carrying a DISTINCT, distinguishable number of its own
 // commits, is a slot-mixup detector: a wrong index (or a race on the shared behindAhead map) would
 // show up as a branch reporting some OTHER branch's Ahead count, not just as a flaky test.
@@ -349,10 +349,10 @@ func TestRestackPreflight_DirtyWorktreeBlocks(t *testing.T) {
 	}
 }
 
-// TestRestackPreflight_RecordedBaseFallsBackToMergeBase is D14/F4's own honest-degrade case: a
+// TestRestackPreflight_RecordedBaseFallsBackToMergeBase is the honest-degrade case: a
 // branch with NO recorded base at all still gets a plan entry, sourced from merge-base.
 // ---------------------------------------------------------------------------------------
-// stackSet (D10)
+// stackSet
 // ---------------------------------------------------------------------------------------
 
 func strPtr(s string) *string { return &s }
@@ -618,7 +618,7 @@ func TestRunOp_BranchDelete_ReparentsChildren(t *testing.T) {
 
 	// Undo must restore BOTH feat1 itself and feat2's own prior pointer (back to feat1). Read the
 	// stack config FRESH (never entry.Stacks' own cache, which UndoRun does not invalidate — a
-	// pre-existing gap in UndoRun predating this phase, noted rather than papered over here) and
+	// pre-existing gap in UndoRun, noted rather than papered over here) and
 	// via a fresh refs read for feat1's own existence, exactly what a real client's next
 	// stack.list after the watcher's own refsChanged signal would see.
 	undoResult, err := entry.UndoRun(ctx, "test-client-label", result.Undo.ID)
@@ -925,12 +925,12 @@ func (r failOnStackConfigSetRunner) Start(ctx context.Context, gitPath string, s
 	return r.Runner.Start(ctx, gitPath, spec)
 }
 
-// TestRunRestack_UndoClearedAfterEarlierWriteThenGenuineError is F9's own regression proof (P108
-// Part 16 review): a stale undo record (from an EARLIER, unrelated successful op) used to survive
-// a restack whose own per-branch write (StackConfigSetArgs, right after that branch's rebase
-// already landed for real) fails with a genuine Go-level error — runRestackPlan returned early on
-// that werr, never reaching RunRestack's own end-of-function e.undo.Set(prep.undo)/nil. Its replay
-// is an absolute-ref write that assumes nothing has moved since it was captured, exactly what the
+// TestRunRestack_UndoClearedAfterEarlierWriteThenGenuineError is the regression proof: a stale
+// undo record (from an EARLIER, unrelated successful op) used to survive a restack whose own
+// per-branch write (StackConfigSetArgs, right after that branch's rebase already landed for real)
+// fails with a genuine Go-level error — runRestackPlan returned early on that werr, never reaching
+// RunRestack's own end-of-function e.undo.Set(prep.undo)/nil. Its replay is an absolute-ref write
+// that assumes nothing has moved since it was captured, exactly what the
 // rebase that just landed did.
 func TestRunRestack_UndoClearedAfterEarlierWriteThenGenuineError(t *testing.T) {
 	t.Parallel()
@@ -960,7 +960,7 @@ func TestRunRestack_UndoClearedAfterEarlierWriteThenGenuineError(t *testing.T) {
 	}
 }
 
-// TestRunRestackPlan_CancelDuringWriteGateReportsCancelledNotRawError is F9's own second
+// TestRunRestackPlan_CancelDuringWriteGateReportsCancelledNotRawError is the second
 // regression proof: CancelRestack can race Repo.Write's own gate wait inside runRestackSpawn —
 // opCtx cancelled before that write's closure ever ran returns gitclient.ErrCancelled directly,
 // bypassing gitclient.Classify's usual KindCancelled classification. runRestackPlan must still
@@ -970,7 +970,7 @@ func TestRunRestack_UndoClearedAfterEarlierWriteThenGenuineError(t *testing.T) {
 // An uncontended Repo.Write never even checks ctx.Done() (its own doc comment: the gate is granted
 // on the very first loop iteration when nothing else holds it) — reproducing the race for real
 // needs genuine contention, not timing luck, so a held write from a separate goroutine is what
-// forces runRestackSpawn's own Repo.Write call to actually park in its ctx.Done()/wait select.
+// forces runRestackSpawn's own Repo.Write call to park in its ctx.Done()/wait select.
 // Drives runRestackPlan directly (same package) rather than the full RunRestack, since the exact
 // boundary this fix touches is runRestackPlan's own handling of runRestackSpawn's returned error.
 func TestRunRestackPlan_CancelDuringWriteGateReportsCancelledNotRawError(t *testing.T) {
@@ -1076,16 +1076,16 @@ func TestRestackSlot_ForceCancel(t *testing.T) {
 	}
 }
 
-// TestCommitResolves_NewlineRecordedBaseDoesNotDesyncSharedSession is G32 round-3
-// architecture/security review, finding #2's own regression proof: recordedBase (commitResolves'
-// own sha argument) is read straight out of branch.<name>.kirastackbase — this file's own
-// DetectCycleFrom/resolveStackBase doc comments already treat a hand-edited config as a real
-// threat model, and git config values may legally contain a literal newline. Before the fix,
-// commitResolves passed sha+"^{commit}" straight to the shared cat-file session's Check (one
-// line in, one line out); a newline embedded in sha made git read it as TWO --batch-check
-// queries while Check only ever consumes ONE response — the second, leftover response line then
-// silently answers the very next, wholly unrelated Check call on this same session, for the life
-// of the RepoEntry (the exact desync shape G31-ARCH2 already fixed for Blob/blobOID/blobOIDs).
+// TestCommitResolves_NewlineRecordedBaseDoesNotDesyncSharedSession is the regression proof:
+// recordedBase (commitResolves' own sha argument) is read straight out of
+// branch.<name>.kirastackbase — this file's own DetectCycleFrom/resolveStackBase doc comments
+// already treat a hand-edited config as a real threat model, and git config values may legally
+// contain a literal newline. Before the fix, commitResolves passed sha+"^{commit}" straight to the
+// shared cat-file session's Check (one line in, one line out); a newline embedded in sha made git
+// read it as TWO --batch-check queries while Check only ever consumes ONE response — the second,
+// leftover response line then silently answers the very next, wholly unrelated Check call on
+// this same session, for the life of the RepoEntry (the exact desync shape already fixed for
+// Blob/blobOID/blobOIDs).
 func TestCommitResolves_NewlineRecordedBaseDoesNotDesyncSharedSession(t *testing.T) {
 	t.Parallel()
 	skipWithoutGitStack(t)

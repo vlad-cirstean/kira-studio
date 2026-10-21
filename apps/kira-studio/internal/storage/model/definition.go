@@ -62,8 +62,8 @@ var (
 	definitionOrigins   = map[string]bool{"server": true, "composed": true}
 )
 
-// ValidateObjectDefinition is the explicit check that replaces zod's safeParse (P55 §1.6),
-// including the .default([]) that keeps a pre-P23 cached definition (with no `sections` key at
+// ValidateObjectDefinition is the explicit check that replaces zod's safeParse,
+// including the .default([]) that keeps a cached definition (with no `sections` key at
 // all) parsing: Sections/Notes/Constraints normalize from nil to [] first, exactly as
 // ValidateObjectMeta does for its own list fields.
 func ValidateObjectDefinition(def *ObjectDefinition) bool {

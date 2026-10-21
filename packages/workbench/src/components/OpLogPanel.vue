@@ -12,20 +12,20 @@ import { tableHeadClass, tableHeadRowClass, tableRowClass } from '@theme/compone
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
-import { computed, ref } from 'vue';
+import { useIntervalFn } from '@vueuse/core';
+import { computed, ref, watch } from 'vue';
 import { useCopy } from '../behaviour/clipboard';
-import { displayValue, formatClockTime, formatDuration } from '../behaviour/format';
+import { displayValue, formatClockTime, formatDuration, formatElapsed } from '../behaviour/format';
 import { useListNavigation } from '../behaviour/listNavigation';
+import { TIMING } from '../behaviour/timing';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '../behaviour/virtualRows';
 import { type OpLogColumn, type OpLogStatusFilter, opLogMenuItems } from '../lib/opLog';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 
-// P132 Part 1 (§2.3): hoisted from Kira Studio's own workbench/panels/OperationsPanel.vue —
-// store-agnostic (props/emits only, no Pinia import here), generic over each app's own record
-// shape so Kira Space's git op log (Part 2) reuses this unchanged. Markup, virtual-list wiring,
-// keyboard handling and every data-testid below are that file's own, byte-for-byte. `columns`
-// replaces its old hard-coded `grid-cols-[90px_140px_...]` arbitrary value (P110 B36's own note
-// there no longer applies — the shape is now data, not a class).
+// Store-agnostic (props/emits only, no Pinia import here), generic over each app's own record
+// shape so Kira Space's git op log reuses this unchanged. `columns` replaces its old
+// hard-coded `grid-cols-[90px_140px_...]` arbitrary value (the note there no longer applies —
+// the shape is now data, not a class).
 interface Props {
   records: readonly R[];
   runningCount: number;
@@ -37,6 +37,8 @@ interface Props {
   clearHint: string;
   canCancel?: (record: R) => boolean;
   menuFor?: (record: R) => MenuItem[];
+  /** Replaces the command cell of a running row while non-null; `now` is the shared clock. */
+  runningNote?: (record: R, now: number) => string | null;
 }
 const props = defineProps<Props>();
 
@@ -110,7 +112,7 @@ const listItems = computed<OpsListItem[]>(() => {
   return out;
 });
 
-// P104 §3.4: VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
+// VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
 // useVirtualRows composable -- every row here is a fixed 18px (the same JS/CSS-numeric
 // requirement the component's own comment below states).
 // Fixed rows, numerically equal to --kira-h-xs; the CSS height (h-4.5) must match.
@@ -166,6 +168,32 @@ defineSlots<{
 function durationText(ms: number | null): string | null {
   return ms === null ? null : formatDuration(ms);
 }
+
+// One shared clock for every running row (rows are virtualized, so a per-row timer would churn).
+const now = ref(Date.now());
+const { pause, resume } = useIntervalFn(
+  () => {
+    now.value = Date.now();
+  },
+  TIMING.clockTick,
+  { immediate: false },
+);
+watch(
+  () => props.runningCount,
+  (count) => {
+    if (count > 0) {
+      now.value = Date.now();
+      resume();
+    } else pause();
+  },
+  { immediate: true },
+);
+function runningNoteFor(record: R): string | null {
+  return record.status === 'running' ? (props.runningNote?.(record, now.value) ?? null) : null;
+}
+function elapsedText(record: R): string {
+  return formatElapsed(Math.max(0, now.value - Date.parse(record.startedAt)));
+}
 </script>
 
 <template>
@@ -218,11 +246,11 @@ function durationText(ms: number | null): string | null {
         @scroll="onScroll"
       >
         <!--
-          The expanded command/error detail rows embed a #detail slot (the host app's editor, D18/D19
-          P60a) inside a fixed virtual row rather than the list itself being variable-height (P2 §0
-          note 14 leaves it fixed on purpose). The row height below is JS, not CSS (P24 D34) — it
-          has to stay numerically equal to --kira-h-xs (18px), which every row below and any #detail
-          content's own fixed-height styling must match.
+          The expanded command/error detail rows embed a #detail slot (the host app's editor) inside
+          a fixed virtual row rather than the list itself being variable-height (fixed on purpose).
+          The row height below is JS, not CSS — it has to stay numerically equal to --kira-h-xs
+          (18px), which every row below and any #detail content's own fixed-height
+          styling must match.
         -->
         <ul
           :aria-label="t('common.module.operations.label')"
@@ -260,12 +288,28 @@ function durationText(ms: number | null): string | null {
                     <CodiconIcon name="debug-stop" :size="13" />
                   </Button>
                 </span>
+                <span
+                  v-else-if="column.id === 'duration' && listItems[vi.index].record.status === 'running'"
+                  class="font-data"
+                  data-testid="op-elapsed"
+                  >{{
+                    elapsedText(listItems[vi.index].record)
+                  }}</span
+                >
                 <span v-else-if="column.id === 'duration'">{{
                   displayValue(durationText(listItems[vi.index].record.durationMs))
                 }}</span>
                 <template v-else-if="column.id === 'command'">
                   <span
-                    v-if="listItems[vi.index].record.status === 'error'"
+                    v-if="runningNoteFor(listItems[vi.index].record)"
+                    class="block min-w-0 text-muted-foreground"
+                    data-testid="op-running-note"
+                    >{{
+                      runningNoteFor(listItems[vi.index].record)
+                    }}</span
+                  >
+                  <span
+                    v-else-if="listItems[vi.index].record.status === 'error'"
                     class="block min-w-0 font-data text-error"
                     ><TruncatedText :text="listItems[vi.index].record.error ?? ''" /></span
                   >

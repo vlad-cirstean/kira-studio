@@ -1,9 +1,9 @@
-// P17 D12: the fake. namespace is additive and permanent beside Postman's own $name spellings —
-// this is the proof that the alias layer actually works end to end (every $name still resolves,
+// The fake. namespace is additive and permanent beside Postman's own $name spellings —
+// this is the proof that the alias layer works end to end (every $name still resolves,
 // unchanged) rather than a migration in disguise. ALIAS_TO_FAKE/GENERATORS's own exhaustiveness is
-// already a compiler guarantee (F12/D12's own doc comment) — what earns a test here is the
-// dispatch function (generate()) that branches between the two vocabularies, and the specific
-// collapse the plan names by name ($guid and $randomUUID both reaching fake.string.uuid).
+// already a compiler guarantee — what earns a test here is the dispatch function (generate()) that
+// branches between the two vocabularies, and the specific collapse ($guid and $randomUUID both
+// reaching fake.string.uuid).
 
 import { describe, expect, test } from 'bun:test';
 import { ALIAS_TO_FAKE, DYNAMIC_NAMES, FAKE_NAMES } from '../src/http/dynamic/catalog';

@@ -14,7 +14,7 @@ function refsResult(headName: string): ResultOf<'refs.list'> {
   };
 }
 
-// F5: the server runs one goroutine per request, so two `repo.changed` (`refsChanged`) events in
+// The server runs one goroutine per request, so two `repo.changed` (`refsChanged`) events in
 // quick succession — a commit then a checkout, say — can have their `refs.list` replies arrive in
 // EITHER order. Before this fix, `reload()` guarded only on `repoId`, so the older reply, arriving
 // last, silently overwrote the newer one and stayed there until the next event.

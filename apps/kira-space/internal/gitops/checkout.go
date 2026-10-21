@@ -1,16 +1,14 @@
-// Package gitops is the argv-builder half of G5's write path (D4): checkout/branch/tag/revert
+// Package gitops is the argv-builder half of the write path: checkout/branch/tag/revert
 // argv, the .git state-file reader with its continue/abort/skip tables, and the operation-level
 // error classifier. It holds no policy at all — nothing here decides WHETHER to run a command,
-// only how to shape it once gitpreflight (pure) or gitsession (stateful) has decided to. Created
-// with exactly what G5 spawns; G7/G12/G13 each add one file beside these with no rework of
-// anything here.
+// only how to shape it once gitpreflight (pure) or gitsession (stateful) has decided to.
 package gitops
 
 // SwitchArgs builds `git switch --no-guess <branch>`, with --discard-changes when discard is true
-// (§7.5's "discard" route — never offered for an untracked block, probe P9). --no-guess (probe
-// P7): without it, `git switch topic` silently creates a local branch tracking `origin/topic`
-// when only the remote-tracking ref exists — CheckoutPreflight.createsTracking turns that same
-// case into a labelled choice instead, so this file must never let git make it silently.
+// (the "discard" route — never offered for an untracked block). --no-guess: without it,
+// `git switch topic` silently creates a local branch tracking `origin/topic` when only the
+// remote-tracking ref exists — CheckoutPreflight.createsTracking turns that same case into a
+// labelled choice instead, so this file must never let git make it silently.
 func SwitchArgs(branch string, discard bool) []string {
 	if discard {
 		return []string{"switch", "--no-guess", "--discard-changes", branch}
@@ -21,7 +19,7 @@ func SwitchArgs(branch string, discard bool) []string {
 // SwitchDetachArgs builds `git switch --detach <target>` — a tag, a raw sha, or an explicitly
 // detached remote-tracking checkout. --no-guess has no effect on --detach (there is nothing to
 // guess a branch name from) but costs nothing to keep, so every `switch` invocation this package
-// builds carries it uniformly (§7.3's own exit criterion).
+// builds carries it uniformly.
 func SwitchDetachArgs(target string, discard bool) []string {
 	if discard {
 		return []string{"switch", "--no-guess", "--discard-changes", "--detach", target}

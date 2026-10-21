@@ -6,9 +6,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// TestResolveFromInputPrefersURIEmbeddedPassword pins P2 R2's fix to the "Test connection" path:
+// TestResolveFromInputPrefersURIEmbeddedPassword pins the fix to the "Test connection" path:
 // a password typed directly into the URI (e.g. after retyping the whole URI for a different host)
-// must be what actually gets tested, not a stale in.Password left over from before the edit — the
+// must be what gets tested, not a stale in.Password left over from before the edit — the
 // old code unconditionally injected in.Password over whatever the URI already carried, silently
 // discarding a freshly typed password (and, since it travelled with a URI now pointing at a
 // different host, silently testing the *old* host's credentials against the new one instead).
@@ -51,8 +51,8 @@ func TestResolveFromInputFallsBackToInputPasswordWhenURIHasNone(t *testing.T) {
 	}
 }
 
-// TestResolveFromInputMintsAUniqueIDPerCall is the P21 round 2 architecture/security finding 9
-// regression: the id used to be the literal "test" every single call — with two workbench windows
+// TestResolveFromInputMintsAUniqueIDPerCall is the regression: the id used to be the literal
+// "test" every single call — with two workbench windows
 // open, two concurrent Test connection presses on two different drafts both used that same key,
 // and Preconnect.Supervisor.Start kills anything already tracked under a key it is given, so the
 // second Start SIGTERMed the first's still-settling pre-connect script (and the first Test's own
@@ -71,5 +71,34 @@ func TestResolveFromInputMintsAUniqueIDPerCall(t *testing.T) {
 	}
 	if first.config.ID == second.config.ID {
 		t.Fatalf("two resolveFromInput calls minted the same id (%q) — two concurrent Test calls would still collide on Preconnect's key", first.config.ID)
+	}
+}
+
+func TestReadyAddr(t *testing.T) {
+	intPtr := func(v int) *int { return &v }
+	tests := []struct {
+		name string
+		cfg  model.ResolvedConnectionConfig
+		want string
+	}{
+		{"fields localhost", model.ResolvedConnectionConfig{Kind: "postgres", Mode: "fields", Host: strPtr("localhost"), Port: intPtr(5432)}, "localhost:5432"},
+		{"fields 127.0.0.2", model.ResolvedConnectionConfig{Kind: "postgres", Mode: "fields", Host: strPtr("127.0.0.2"), Port: intPtr(1)}, "127.0.0.2:1"},
+		{"fields ipv6 loopback", model.ResolvedConnectionConfig{Kind: "postgres", Mode: "fields", Host: strPtr("::1"), Port: intPtr(5432)}, "[::1]:5432"},
+		{"fields remote", model.ResolvedConnectionConfig{Kind: "postgres", Mode: "fields", Host: strPtr("db.example.com"), Port: intPtr(5432)}, ""},
+		{"fields no port", model.ResolvedConnectionConfig{Kind: "postgres", Mode: "fields", Host: strPtr("localhost")}, ""},
+		{"file kind", model.ResolvedConnectionConfig{Kind: "sqlite", Mode: "fields", Host: strPtr("localhost"), Port: intPtr(1)}, ""},
+		{"uri loopback", model.ResolvedConnectionConfig{Kind: "postgres", Mode: "uri", URI: strPtr("postgresql://u:p@127.0.0.1:6543/db")}, "127.0.0.1:6543"},
+		{"uri ipv6", model.ResolvedConnectionConfig{Kind: "postgres", Mode: "uri", URI: strPtr("postgresql://u@[::1]:6543/db")}, "[::1]:6543"},
+		{"uri no port", model.ResolvedConnectionConfig{Kind: "postgres", Mode: "uri", URI: strPtr("postgresql://u@localhost/db")}, ""},
+		{"uri remote", model.ResolvedConnectionConfig{Kind: "postgres", Mode: "uri", URI: strPtr("postgresql://u@db.example.com:5432/db")}, ""},
+		{"uri multi-host", model.ResolvedConnectionConfig{Kind: "mongodb", Mode: "uri", URI: strPtr("mongodb://localhost:1,localhost:2/db")}, ""},
+		{"uri unparsable", model.ResolvedConnectionConfig{Kind: "postgres", Mode: "uri", URI: strPtr("://bad")}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := readyAddr(tt.cfg); got != tt.want {
+				t.Errorf("readyAddr = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

@@ -18,11 +18,10 @@ import {
 } from './types.ts';
 
 /**
- * G21 D3/D14: the first test in `src/graph` — F3's own worked example ("the canonical `feature`
- * off `main`"), root-caused in the phase's Findings: `feature`'s oldest commit (row 3) has parent
- * row 5, the shared merge base; `main`'s row 4 also parents row 5. Before D3, row 3's edge was
- * left claiming its own (feature's) lane all the way to row 5, disconnected from the commit it
- * converges into. D3 patches it to bend into row 5's actual lane.
+ * The first test in `src/graph` — the worked example ("the canonical `feature` off `main`"):
+ * `feature`'s oldest commit (row 3) has parent row 5, the shared merge base; `main`'s row 4 also
+ * parents row 5. Row 3's edge was left claiming its own (feature's) lane all the way to row 5,
+ * disconnected from the commit it converges into. It is patched to bend into row 5's actual lane.
  *
  * Six commits, topo order (row 0 newest), every row single-parent except the root:
  *   row 0 --> row 1 --> row 4 --\
@@ -118,7 +117,8 @@ describe('assignLanes — G21 D3 merge-in convergence', () => {
     const built2 = chunk2.edgeBuffer.build(4, 6);
     // Three patch records travel through chunk 2's own `patches`, all naming edges that live in
     // chunk 1 (global indices < 4): slot 1's resolution (edge 1 -> toRow 4), slot 3's resolution
-    // (edge 3 -> toRow 5), and the convergence discovered at row 5 (edge 3 -> toLane 0) — the same edge patched twice, for two independent fields.
+    // (edge 3 -> toRow 5), and the convergence discovered at row 5 (edge 3 -> toLane 0) — the same
+    // edge patched twice, for two independent fields.
     expect(built2.patches.length).toBe(3 * PATCH_STRIDE);
     const records = [];
     for (let i = 0; i < built2.patches.length; i += PATCH_STRIDE) {

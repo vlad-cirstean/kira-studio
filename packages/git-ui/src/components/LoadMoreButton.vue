@@ -51,7 +51,7 @@ function handleCancel(): void {
 </script>
 
 <template>
-  <!-- G16 D9: `remaining > 0` guards against F7's zero-chunk hole — a re-stream that emits no
+  <!-- `remaining > 0` guards against the zero-chunk hole — a re-stream that emits no
        chunk leaves no server-side signal to correct, so this is the one place that hole can be
        closed. Kept visible while a load is in flight (`isLoading`) so Cancel does not vanish
        mid-load. -->

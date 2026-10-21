@@ -7,12 +7,14 @@ import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useTreeShortcuts } from '@workbench/behaviour/treeShortcuts';
 import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
+import { logError } from '@workbench/bridge/log';
 import { useRowHeight } from '@workbench/lib/rowHeight';
 import { type MenuItem, runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useTabsStore } from '../state/tabs';
 import { reloadTab } from '../state/viewCommands';
+import { useConnectionReorder } from './connectionReorder';
 import { emptyBackgroundMenu, menuForRow } from './menu';
 import { type TreeRowVm, useTreeStore } from './state/tree';
 import TreeRow from './TreeRow.vue';
@@ -35,10 +37,11 @@ const KEYVALUE_OPENABLE_KINDS = new Set(['key', 'object']);
 // browse-only leaves with nothing to open (onOpen's hasChildren guard makes double-click a no-op
 // on them, same as a column/index leaf).
 const STREAM_OPENABLE_KINDS = new Set(['topic', 'queue']);
-// P41 D17: a redis `database` / s3 `bucket` row, on a connection whose caps say its key space is
+// A redis `database` / s3 `bucket` row, on a connection whose caps say its key space is
 // unbounded — double-click/Enter opens a Browse tab instead of the ordinary expand/collapse
 // toggle. Gated on the capability, never the row kind alone (`database` is shared by six engines
-// that stay expand-only, F13) or the connection kind (Caps is the only thing the UI reads, ARCHITECTURE.md).
+// that stay expand-only) or the connection kind (Caps is the only thing the UI reads,
+// ARCHITECTURE.md).
 function isKeyBrowserRow(row: TreeRowVm): boolean {
   if (row.kind !== 'database' && row.kind !== 'bucket') return false;
   return connectionsStore.states[row.connectionId]?.caps?.keyBrowser === true;
@@ -55,7 +58,27 @@ const { virtualItems, totalSize, band, onScroll, revealKey } = useTreeVirtualRow
   scrollElement: scrollEl,
 });
 
-// F3 (P108 Part 12): initTreeSync/initSchemaSync/initSchemaColumnsSync used to be wired from here,
+// Raw `search` (not the debounced query) so typing pauses drag at once.
+const { draggingId, drop } = useConnectionReorder({
+  container: scrollEl,
+  ids: () => connectionsStore.records.map((r) => r.id),
+  disabled: () => treeStore.search.trim() !== '' || connectionsStore.records.length < 2,
+  rowHeight: () => rowHeight.value,
+  onReorder: (ids) =>
+    void connectionsStore
+      .reorderConnections(ids)
+      .catch((err) => logError('projectTree', 'reorder failed', err)),
+});
+
+function dragProps(row: TreeRowVm) {
+  if (row.kind !== 'connection') return {};
+  return {
+    dragging: draggingId.value === row.connectionId,
+    dropEdge: drop.value?.id === row.connectionId ? drop.value.edge : null,
+  };
+}
+
+// initTreeSync/initSchemaSync/initSchemaColumnsSync used to be wired from here,
 // on mount — moved to main.ts's bootstrap() so they're live whether or not this panel ever
 // mounts (a window in API/Terminal mode, or one with no connections at boot, used to get none of
 // them for the whole session). See bootstrap()'s own comment for the full reasoning.
@@ -78,10 +101,10 @@ function onSelect(row: TreeRowVm): void {
   treeStore.selectRow(row.key);
 }
 
-// The twisty always expands/collapses. A group row (P19) has no adapter path behind it — it's a
+// The twisty always expands/collapses. A group row has no adapter path behind it — it's a
 // pure view over its parent's already-fetched children — so it toggles treeStore.expanded
-// directly rather than going through treeStore.expand()/treeStore.collapse(), which would connect the connection and
-// issue an IPC call for a synthetic path no adapter has ever heard of.
+// directly rather than going through treeStore.expand()/treeStore.collapse(), which would connect
+// the connection and issue an IPC call for a synthetic path no adapter has ever heard of.
 function onToggle(row: TreeRowVm): void {
   if (row.kind === 'group') {
     treeStore.toggleGroup(row.connectionId, row.path);
@@ -198,12 +221,23 @@ function viaMenu(id: ShortcutId): (key: string) => void {
     if (row) runMenuShortcut(menuForRow(row), id);
   };
 }
+// Rows are index-keyed, so after a move the focused element would show another row: scroll to the
+// moved row and focus it again.
+function moveViaMenu(id: ShortcutId): (key: string) => void {
+  const run = viaMenu(id);
+  return (key) => {
+    run(key);
+    void revealKey(key).then(() => nav.focusKey(key));
+  };
+}
 useTreeShortcuts(nav, {
   'tree.copyName': viaMenu('tree.copyName'),
   'tree.copyUri': viaMenu('tree.copyUri'),
   'tree.rename': viaMenu('tree.rename'),
   'tree.duplicate': viaMenu('tree.duplicate'),
   'tree.delete': viaMenu('tree.delete'),
+  'list.moveUp': moveViaMenu('list.moveUp'),
+  'list.moveDown': moveViaMenu('list.moveDown'),
 });
 
 // The tree background has no interactive role of its own: bind its listener via VueUse.
@@ -216,7 +250,7 @@ useEventListener(treeBodyEl, 'contextmenu', onBackgroundContextMenu);
     <div ref="treeBodyEl" class="flex-1 min-h-0" data-testid="tree-background">
       <div
         ref="scrollEl"
-        class="virtual-list h-full overflow-auto"
+        :class="['virtual-list h-full overflow-auto', draggingId && 'select-none']"
         data-testid="virtual-list"
         role="tree"
         :aria-label="t('studio.project.tree.aria')"
@@ -230,6 +264,7 @@ useEventListener(treeBodyEl, 'contextmenu', onBackgroundContextMenu);
               :row="slot.row"
               :selected="treeStore.selected === slot.row.key"
               :sticky="true"
+              v-bind="dragProps(slot.row)"
               @select="onSelect"
               @toggle="onToggle"
               @open="onOpen"
@@ -245,6 +280,7 @@ useEventListener(treeBodyEl, 'contextmenu', onBackgroundContextMenu);
               :row="treeStore.visibleRows[item.index]"
               :selected="treeStore.selected === treeStore.visibleRows[item.index].key"
               :sticky="false"
+              v-bind="dragProps(treeStore.visibleRows[item.index])"
               @select="onSelect"
               @toggle="onToggle"
               @open="onOpen"

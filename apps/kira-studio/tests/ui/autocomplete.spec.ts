@@ -83,6 +83,7 @@ function mariadbCreateArgs(name: string) {
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    preconnectDelaySec: 0,
     autoExplain: false,
     throttlePerSec: 0,
   };
@@ -252,7 +253,7 @@ test('Mongo filter row — the FILTER label lights up, an idle blur is a no-op, 
 
   const filterInput = page.locator('[data-testid="document-search"]');
   // AutocompleteField's prefix label is a sibling of the real <input> (both under one .p-input
-  // box), not a descendant of it -- data-testid lands on the input via $attrs. P110 B25: the old
+  // box), not a descendant of it -- data-testid lands on the input via $attrs. The old
   // `.ph`/`.ph-active` classes are gone (folded into direct text-muted-foreground/text-state-on
   // utilities), and the box itself is a <fieldset> (InputGroup), not a <span> -- selected
   // structurally (the one span holding this literal text) rather than by either retired name.
@@ -305,7 +306,7 @@ test('Mongo filter row — the FILTER label lights up, an idle blur is a no-op, 
 //
 // Same clipboard-spy approach as data-view.spec.ts's own installClipboardSpy: this tier runs
 // WebKit, which has no Chromium-style clipboard-permission grant to make, so spying on writeText
-// proves what actually landed without a real OS clipboard round trip.
+// proves what landed without a real OS clipboard round trip.
 test('Mongo document row — Copy document / Copy as JSON / Copy _id', async ({
   relaunch,
   consoleErrors,
@@ -478,7 +479,7 @@ test('autocomplete — console shows SQL keywords on a resolved dialect (MariaDB
   expect(consoleErrors).toEqual([]);
 });
 
-// P22 D8/F13/F14, narrowed by P60b: originally one specification expressed twice — the plain-field
+// Originally one specification expressed twice — the plain-field
 // popup (primitives.css's `.p-completion*`) and CodeMirror's own tooltip, byte-for-byte matched on
 // every chrome/sizing/row metric because this app owned both DOMs. Monaco's suggest widget is a
 // native VS Code component with its own packaged stylesheet this app doesn't author — dogfooding
@@ -490,8 +491,8 @@ test('autocomplete — console shows SQL keywords on a resolved dialect (MariaDB
 // `editorSuggestWidget.background` entry (confirmed wired to the CSS custom property Monaco's
 // *editor-root* theming would read, and confirmed present with the right value right up to the
 // widget's own reparented location — `editor/monaco.ts`'s `overflowWidgetsContainer()` — the
-// break is specifically the widget's packaged CSS, not this app's own theme wiring). Out of P60b's
-// own scope (the SQL language service, not Monaco's asset pipeline) to chase further; this is
+// break is specifically the widget's packaged CSS, not this app's own theme wiring). Out of the
+// scope (the SQL language service, not Monaco's asset pipeline) to chase further; this is
 // purely cosmetic — the widget is fully interactive and, against this app's own uniformly dark
 // chrome, the missing background is not visibly wrong. What's left to assert honestly: both
 // popups exist, are visible, and share the same font (the one property that *does* apply, since
@@ -625,10 +626,9 @@ test('autocomplete — Mongo console completes collections, methods and operator
 
   await connectMongo(page, 'Mongo', 'green', { expand: true, dbPath: MONGO_DB_PATH });
 
-  // realities #10's wart, fixed in the addendum (D23): the console used to be handed
-  // `language="sql"` for every engine, including Mongo. It now gets its own `mongo` mode, so a
-  // shell command like `find` is no longer coloured as a SQL keyword, and completion offers only
-  // what mongo/console.ts's own grammar accepts.
+  // The console used to be handed `language="sql"` for every engine, including Mongo. It now gets
+  // its own `mongo` mode, so a shell command like `find` is no longer coloured as a SQL keyword,
+  // and completion offers only what mongo/console.ts's own grammar accepts.
   await openConsoleFromMenu(page, MONGO_DB_PATH);
   const mongoConsole = page.locator('[data-testid="console-view"]');
   await expect(mongoConsole).toBeVisible();
@@ -707,8 +707,8 @@ test('autocomplete — Mongo console degrades to methods/operators when the data
   expect(consoleErrors).toEqual([]);
 });
 
-// P22c D8: Mongo has no field-level schema (F11) — its own mechanism is a sample of whatever
-// documents a collection's own document view has actually loaded, keyed by
+// Mongo has no field-level schema — its own mechanism is a sample of whatever documents a
+// collection's own document view has loaded, keyed by
 // (connectionId, database, collection), never cached server-side. Opening the document view on
 // `widgets` (loading its own real page via widgetsFixture's port snapshot) is what fills the
 // sample the console then reads from — no separate round trip of its own.
@@ -888,7 +888,7 @@ test('console lint — Mongo diagnostics (D24)', async ({ relaunch, consoleError
   await page.waitForTimeout(500);
 
   // An unsupported method is flagged, worded exactly the way mongo/console.ts's own parser
-  // rejects it (D24). Monaco renders a marker's own squiggly as an empty, absolutely-positioned
+  // rejects it. Monaco renders a marker's own squiggly as an empty, absolutely-positioned
   // decoration div (unlike CodeMirror's own inline mark, which wrapped the flagged source text
   // itself and so had real text content to assert against) — the message only ever surfaces
   // through Monaco's built-in marker hover, so this hovers the flagged word instead of reading
@@ -960,7 +960,7 @@ test('console lint — Redis diagnostics (D24)', async ({ relaunch, consoleError
   await expect(multilineConsole).toBeVisible();
   await multilineConsole.locator('.view-lines').click();
 
-  // F10's known splitter bug (out of scope to fix here): a statement spanning more than one
+  // The known splitter bug (out of scope to fix here): a statement spanning more than one
   // non-empty line warns instead of silently mis-executing. It's a single diagnostic (one issue,
   // `from`→`to` spanning both lines) — Monaco's own marker decoration, like CodeMirror's mark
   // before it, can't render as one inline span across a line break, so it renders one

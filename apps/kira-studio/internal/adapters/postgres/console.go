@@ -36,10 +36,10 @@ type rawResult struct {
 	bytes int
 }
 
-// runRaw is console.ts's runRaw: §8.14's own low-level runner, deliberately separate from
+// runRaw is console.ts's runRaw: the low-level runner, deliberately separate from
 // runArrayQuery/runCommand — the console needs full field metadata (name + type OID) those
 // discard, and it must not call op.SetCommand() per statement — execute() below calls it once for
-// the whole batch (P5 D9's precedent). Always text-mode (mirrors read.go's identity type parsing)
+// the whole batch. Always text-mode (mirrors read.go's identity type parsing)
 // so every cell arrives as the server's own text representation, with no per-type Go conversion to
 // undo.
 func runRaw(ctx context.Context, conn *trackedConn, sql string, params []any, op *adapters.OpCtx, track TrackQuery, limit page.ResultCap) (rawResult, error) {
@@ -113,10 +113,9 @@ func runRaw(ctx context.Context, conn *trackedConn, sql string, params []any, op
 // pgTypeMeta is lookupTypeNames' own per-OID result: the type's name plus whether pg_type reports
 // it as composite (typtype = 'c') — a table or view's own implicit row type, or an explicit CREATE
 // TYPE AS composite, either way a single result column carrying every one of ITS OWN columns'
-// worth of data behind one name (P108 Part 7 review, finding #1: `SELECT c FROM customers c`'s own
-// "c" column has DataType "customers", which typeClassFor's name-based guess has no way to tell
-// apart from an ordinary unrecognised scalar type — pg_type is the one place that distinction is
-// actually knowable).
+// worth of data behind one name (`SELECT c FROM customers c`'s own "c" column has DataType
+// "customers", which typeClassFor's name-based guess has no way to tell apart from an ordinary
+// unrecognised scalar type — pg_type is the one place that distinction is knowable).
 type pgTypeMeta struct {
 	name      string
 	composite bool
@@ -230,11 +229,11 @@ func verifyReadOnlyWrap(ctx context.Context, conn *trackedConn, op *adapters.OpC
 }
 
 // execute is console.ts's execute. readOnly closes the gap client.go's own
-// SET default_transaction_read_only=on leaves open (P2 R2): that session default only governs
+// SET default_transaction_read_only=on leaves open: that session default only governs
 // transactions *not yet started*, so a statement in this very batch could otherwise flip the
 // session's default (or, on Postgres specifically, the current transaction's own read-write mode
 // via SET TRANSACTION READ WRITE) and have every following statement in the batch run writable.
-// Wrapping the whole batch in an explicit BEGIN READ ONLY transaction closes every angle actually
+// Wrapping the whole batch in an explicit BEGIN READ ONLY transaction closes every angle
 // tried against a real server except that one specific statement, which
 // AssertNoTransactionEscalation rejects outright before anything runs.
 func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string, limit page.ResultCap) ([]page.Page, error) {

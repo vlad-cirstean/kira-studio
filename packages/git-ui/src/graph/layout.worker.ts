@@ -1,7 +1,7 @@
 /**
- * P4 W4: the module worker side of layout — receives one `LayoutRequest`, calls the pure
- * `layoutAppend` (P2), and posts back a `LayoutResponse` with the new chunk's buffers
- * transferred (§5.5). Deliberately thin: `layoutAppend` already does the real work, and the
+ * The module worker side of layout — receives one `LayoutRequest`, calls the pure
+ * `layoutAppend`, and posts back a `LayoutResponse` with the new chunk's buffers
+ * transferred. Deliberately thin: `layoutAppend` already does the real work, and the
  * frontier this worker receives on each request and returns in each response is threaded
  * through, never held here — `layoutClient.ts` owns its lifecycle (`reset()` on a repo switch
  * or a refresh), matching `core/graph/types.ts`'s own note that a frontier is "returned rather

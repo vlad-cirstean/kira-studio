@@ -202,8 +202,8 @@ test('the Claude Code keychain switch saves ade.sandboxKeychain with the dialog'
 }) => {
   const { window: page, control } = await openPlan(relaunch);
   await emitWailsEvent(page, IPC.openSettings, undefined);
-  await page.locator('[data-testid="settings-section-Claude Code"]').click();
-  const sw = page.locator(t('settings-claude-code-sandbox-keychain'));
+  await page.locator('[data-testid="settings-section-Agent"]').click();
+  const sw = page.locator(t('settings-agent-sandbox-keychain'));
   await expect(sw).toHaveAttribute('aria-checked', 'false');
   await sw.click();
   await page.locator(t('settings-save')).click();

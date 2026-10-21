@@ -57,7 +57,7 @@ function commitOps(size: number): void {
 <template>
   <!-- flex-1 (was dropped converting the old grid's `flex: 1` to Tailwind classes, collapsing the
        whole shell to content height) and gap-0.5 (the old grid's row-gap, 2px, between rows) both
-       reproduce byte-identical geometry to the pre-P104 CSS grid. The dock's own 6px gaps above and
+       reproduce byte-identical geometry to the previous CSS grid. The dock's own 6px gaps above and
        below (main-to-dock, dock-to-status) come from this same gap-0.5 plus the handle's own h-0.5
        and the status bar's own mt-1 below — no separate spacing rule for the dock. -->
   <div class="workbench-shell flex flex-1 flex-col min-h-0 gap-0.5 px-1.5 pb-0.5 bg-chrome">

@@ -38,8 +38,8 @@ var refIshNames = map[string]bool{
 	"REVERT_HEAD":      true,
 	"BISECT_LOG":       true,
 	"sequencer":        true,
-	// G26 D16: a hand-edited .git/config is the one legitimate out-of-app way to change a stack —
-	// D1 deliberately chose a human-readable store precisely so a user CAN edit it directly — and
+	// A hand-edited .git/config is the one legitimate out-of-app way to change a stack —
+	// a human-readable store was deliberately chosen precisely so a user CAN edit it directly — and
 	// without this, that edit produces no signal at all until something else touches a ref. Written
 	// rarely enough (--set-upstream-to, remote add, and now this) that a spurious refsChanged costs
 	// one debounced cache drop.
@@ -53,16 +53,16 @@ func stripLockSuffix(name string) string {
 	return strings.TrimSuffix(name, ".lock")
 }
 
-// classify decides what path changing means for summary's repository, in upstream's own order
-// (D9): a path under commonDir/refs is always refsChanged; gitDir's own index is worktreeChanged;
+// classify decides what path changing means for summary's repository, in upstream's own order:
+// a path under commonDir/refs is always refsChanged; gitDir's own index is worktreeChanged;
 // only then do the ref-ish basenames (checked in either commonDir or gitDir, so a linked
 // worktree's own MERGE_HEAD/sequencer/rebase-* are covered too) apply.
 //
-// G27 D5b/F2: path is normalized to NFC (not just Cleaned) because it is the one raw, OS-supplied
+// Path is normalized to NFC (not just Cleaned) because it is the one raw, OS-supplied
 // byte string in this whole comparison — commonDir/gitDir arrive already NFC (resolveOrKeep below
-// normalizes them, and Identify normalized summary's originals, D5a). Without this, a repository
+// normalizes them, and Identify normalized summary's originals). Without this, a repository
 // at a non-ASCII path could see every rule below fall through on a form mismatch and the watcher
-// would go permanently, silently dead (F2) rather than merely misclassifying one path.
+// would go permanently, silently dead rather than merely misclassifying one path.
 func classify(summary RepoSummary, path string) (Signal, bool) {
 	commonDir := gitpath.CleanNFC(summary.CommonDir)
 	gitDir := gitpath.CleanNFC(summary.GitDir)
@@ -83,29 +83,26 @@ func classify(summary RepoSummary, path string) (Signal, bool) {
 		return SignalRefsChanged, true
 	}
 
-	// G25 D17/F9: a detached `worktree add`/`remove` writes only under commonDir/worktrees/<name>/
-	// (its own per-worktree HEAD, gitdir file, lock file) — for any worktree OTHER than this
-	// summary's own gitDir, none of the two rules just above ever matches (dir is neither gitDir
-	// nor commonDir), a real, pre-existing G5-era gap this phase makes reachable for the first time
-	// (creating/removing a worktree was not something this app could do before now). Checked LAST,
-	// after the more specific gitDir-scoped rules above, so this summary's OWN worktree files (in
-	// particular its own index, which lives at exactly this same path) keep resolving through the
-	// more specific rule that already names the right signal for them. Treated as refsChanged, not
-	// a new third Signal kind: the same read (refs.list/worktree.list) is what a client re-requests
-	// either way, and G5 never introduced worktreeChanged for anything but the index.
+	// A detached `worktree add`/`remove` writes only under commonDir/worktrees/<name>/ (its own
+	// per-worktree HEAD, gitdir file, lock file) — for any worktree OTHER than this summary's own
+	// gitDir, none of the two rules just above ever matches (dir is neither gitDir nor commonDir).
+	// Checked LAST, after the more specific gitDir-scoped rules above, so this summary's OWN
+	// worktree files (in particular its own index, which lives at exactly this same path) keep
+	// resolving through the more specific rule that already names the right signal for them.
+	// Treated as refsChanged, not a new third Signal kind: the same read (refs.list/worktree.list)
+	// is what a client re-requests either way.
 	if worktreesRoot := filepath.Join(commonDir, "worktrees"); path == worktreesRoot || strings.HasPrefix(path, worktreesRoot+string(filepath.Separator)) {
 		return SignalRefsChanged, true
 	}
 	return "", false
 }
 
-// rawEvent is one filesystem notification, stripped of every backend-specific concept (G9 D6).
+// rawEvent is one filesystem notification, stripped of every backend-specific concept.
 // Path is meaningless when Rescan is set. classify normalizes both sides of every comparison to
-// NFC (G27 D5b/F2), which is what makes Path agree with classify's comparison target regardless
-// of the byte form the backend or the filesystem itself hands back — not, as this comment used to
-// claim, because the two were already guaranteed equal by construction. Path is still resolved
-// once in NewRepoWatcher against a watcher-local copy of the summary (D7) — necessary because
-// FSEvents itself always reports realpaths (F9) — normalization is what covers the rest.
+// NFC, which is what makes Path agree with classify's comparison target regardless
+// of the byte form the backend or the filesystem itself hands back. Path is still resolved
+// once in NewRepoWatcher against a watcher-local copy of the summary — necessary because
+// FSEvents itself always reports realpaths — normalization is what covers the rest.
 type rawEvent struct {
 	Path   string
 	Rescan bool
@@ -137,11 +134,10 @@ type RepoWatcher struct {
 }
 
 // resolveOrKeep resolves path to its realpath, falling back to path unchanged if it does not
-// exist yet (a repository mid-init) or cannot be resolved for any other reason — matching what
-// the fsnotify backend already tolerated before this phase. G27 D5b: the result is normalized to
-// NFC on both the success and fallback arms — filepath.EvalSymlinks reads link *targets* from the
-// filesystem, so its output is not guaranteed to inherit Identify's already-NFC form (D5a) the
-// way a value merely copied from summary would.
+// exist yet (a repository mid-init) or cannot be resolved for any other reason. The result is
+// normalized to NFC on both the success and fallback arms — filepath.EvalSymlinks reads link
+// *targets* from the filesystem, so its output is not guaranteed to inherit Identify's already-NFC
+// form the way a value merely copied from summary would.
 func resolveOrKeep(path string) string {
 	resolved, err := filepath.EvalSymlinks(path)
 	if err != nil {
@@ -152,11 +148,11 @@ func resolveOrKeep(path string) string {
 
 // NewRepoWatcher starts watching summary's repository.
 //
-// FSEvents reports realpaths, always (F9): on macOS /tmp and /var are symlinks into /private, so
+// FSEvents reports realpaths, always: on macOS /tmp and /var are symlinks into /private, so
 // an unresolved commonDir would never prefix-match an event path and the watcher would silently
 // classify nothing, forever. Resolving once here — into a copy local to the watcher — is what
 // makes the backend's watch roots and classify's comparisons agree by construction, on every
-// platform (D7). The resolved copy never escapes this file: summary.RepoID and every wire/cache
+// platform. The resolved copy never escapes this file: summary.RepoID and every wire/cache
 // value elsewhere keep using the original, unresolved paths.
 func NewRepoWatcher(summary RepoSummary) (*RepoWatcher, error) {
 	resolved := summary
@@ -213,11 +209,10 @@ func (w *RepoWatcher) emit(sig Signal) {
 	}
 }
 
-// run is the watcher's single goroutine (D11): it owns the two pending flags and the leading-
+// run is the watcher's single goroutine: it owns the two pending flags and the leading-
 // window debounce timer, and is the only place that reads w.src.Events() or writes pendingRefs/
 // pendingWorktree, so neither needs a lock. Rescan means "something changed and we don't know
-// what" — coalesced overflow/dropped events on either backend (D9) — and raises both signals,
-// exactly as the fsnotify-only version of this file always did for ErrEventOverflow.
+// what" — coalesced overflow/dropped events on either backend — and raises both signals.
 func (w *RepoWatcher) run() {
 	defer close(w.done)
 	defer close(w.out)

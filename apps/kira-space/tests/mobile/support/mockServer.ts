@@ -19,6 +19,10 @@ const MIME: Readonly<Record<string, string>> = {
   '.ttf': 'font/ttf',
 };
 
+const AGENT_INFO = JSON.parse(
+  readFileSync(resolve(__dirname, '../../contract/agent.json'), 'utf8'),
+) as Record<string, unknown>;
+
 const fixture = (name: string): unknown =>
   JSON.parse(readFileSync(join(FIXTURES, `${name}.json`), 'utf8'));
 
@@ -104,7 +108,15 @@ async function serveFile(res: ServerResponse, pathname: string): Promise<void> {
 function writeReply(path: string, body: string): unknown {
   const args = body ? (JSON.parse(body) as Record<string, string>) : {};
   if (path === '/api/ade/backlog/items')
-    return { id: 'i-new', text: args.text, addedAt: 0, jira: null, githubUrl: '', notes: '' };
+    return {
+      id: 'i-new',
+      text: args.text,
+      addedAt: 0,
+      jira: null,
+      hostUrl: '',
+      hostLink: null,
+      notes: '',
+    };
   if (path === '/api/ade/backlog/move') return {};
   if (path === '/api/ade/tasks/step') return { taskId: args.taskId, stepId: args.stepId };
   if (path === '/api/ade/tasks/run') return { runIds: ['run-new'] };
@@ -149,10 +161,11 @@ export async function startMobileServer(): Promise<MobileServer> {
   ).repos.map(({ codeRepoId, name, nickname }) => ({ codeRepoId, name, nickname }));
   const reads: Record<string, unknown> = {
     '/api/ade/board': fixture('board'),
-    '/api/ade/prs': fixture('prs'),
+    '/api/ade/change-requests': fixture('change-requests'),
     '/api/ade/sessions': fixture('sessions'),
     '/api/ade/workflows': fixture('workflows'),
     '/api/ade/repos': { repos },
+    '/api/ade/hosts': fixture('host-providers'),
     '/api/ade/log': fixture('log-page'),
   };
 
@@ -227,6 +240,8 @@ export async function startMobileServer(): Promise<MobileServer> {
             : writeReply(path, body),
         );
       }
+    } else if (path === '/api/agent/info' && method === 'GET') {
+      json(res, 200, AGENT_INFO['AgentService.Info']);
     } else if (path === '/api/agent/sessions' && method === 'GET') {
       json(res, 200, { sessions: state.agentSessions });
     } else if (path === '/api/ade/backlog' && method === 'GET') {

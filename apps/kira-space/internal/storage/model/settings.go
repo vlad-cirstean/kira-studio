@@ -2,18 +2,20 @@ package model
 
 import (
 	"fmt"
+	"log/slog"
 	"regexp"
 
 	"github.com/kirathecat/kira-studio/internal/appsettings"
+	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
-// Kira Space's own trimmed Settings model (P100 Part 1). Data/Cache/Api/DbMcp are dropped
+// Kira Space's own trimmed Settings model. Data/Cache/Api/DbMcp are dropped
 // entirely: all four are DB-client-only concerns (page sizes, the query cache budget, HTTP client
-// tuning, the embedded DB MCP server) Kira Space has no use for. ClaudeCode is P188's own leaf.
-// Appearance/Advanced/Git are this app's own (P120): the only app with a git module, so the two
+// tuning, the embedded DB MCP server) Kira Space has no use for. Agent carries the leaves.
+// Appearance/Advanced/Git are this app's own: the only app with a git module, so the two
 // appearance leaves only the git module uses (InlineBlame/DateFormat), its own diagnostic-log leaf
 // (GitLogLevel — Kira Studio's own is a same-shaped but separately named/keyed advanced.logLevel,
-// not a shared struct any more) and the server-owned git leaves (G7 D16) all live here rather than
+// not a shared struct any more) and the server-owned git leaves all live here rather than
 // in the shared appsettings package.
 type AdvancedSettings struct {
 	// GitLogLevel is P72 §9.2's genuinely app-wide replacement for the per-repo kiraSpace.log.level
@@ -25,8 +27,8 @@ type AdvancedSettings struct {
 }
 
 // Appearance embeds appsettings.Appearance for the five leaves both apps share, plus the two only
-// this app's git module uses: InlineBlame (P62's git-blame annotation toggle in the repo file
-// viewer) and DateFormat (P72 §9.1's relative-vs-absolute commit timestamp preference). The
+// this app's git module uses: InlineBlame (the git-blame annotation toggle in the repo file
+// viewer) and DateFormat (the relative-vs-absolute commit timestamp preference). The
 // embedding flattens on the wire — encoding/json promotes an embedded struct's fields on both
 // marshal and unmarshal.
 type Appearance struct {
@@ -42,8 +44,7 @@ type GitSettings struct {
 	ProtectedBranches []string `json:"protectedBranches"`
 	// FetchAutoIntervalMinutes is minutes between automatic background fetches; 0 disables it.
 	FetchAutoIntervalMinutes int `json:"fetchAutoIntervalMinutes"`
-	// GitPath is G18 D15's fix: this leaf was always classified server-owned but its wiring was
-	// dead (Discovery.Status(ctx, "") hardcoded at every call site) until that phase. Empty means
+	// GitPath: this leaf was always classified server-owned. Empty means
 	// "auto-discover" — gitclient.Discovery's own existing contract, unvalidated beyond "is a
 	// string" (a bad path is tolerated the same way Discovery's own probe already falls through
 	// its classified-error states rather than pre-validating).
@@ -71,10 +72,12 @@ type AdeSettings struct {
 	SandboxKeychain bool `json:"sandboxKeychain"`
 }
 
-// ClaudeCodeSettings is P188's keep-awake-with-agents leaf: on, this Mac stays awake while any
-// Claude Code session runs (a terminal agent tab or a running headless ade session), independent of
-// the title bar's own keep-awake toggle. Off by default — an OS power assertion is opt-in.
-type ClaudeCodeSettings struct {
+// AgentSettings embeds appsettings.Agent (the provider both apps share) plus this app's agent
+// leaves. KeepAwakeWithAgents: on, this Mac stays awake while any agent session runs (a terminal
+// agent tab or a running headless ade session), independent of the title bar's own keep-awake
+// toggle. Off by default — an OS power assertion is opt-in.
+type AgentSettings struct {
+	appsettings.Agent
 	KeepAwakeWithAgents bool `json:"keepAwakeWithAgents"`
 	// Notify* are P238's desktop-notification leaves, all on by default: NotifyEnabled is the master
 	// switch, the next three pick which events notify, NotifyIncludeMessage puts the reply text in
@@ -89,10 +92,10 @@ type ClaudeCodeSettings struct {
 	UsageEnabled bool `json:"usageEnabled"`
 }
 
-// DefaultClaudeCodeSettings mirrors settingsDomain.ts's claudeCodeSettingsSchema defaults.
-func DefaultClaudeCodeSettings() ClaudeCodeSettings {
-	return ClaudeCodeSettings{
-		NotifyEnabled: true, NotifyOnFinished: true, NotifyOnNeedsInput: true, NotifyOnRunEnded: true,
+// DefaultAgentSettings mirrors settingsDomain.ts's agentSettingsSchema defaults.
+func DefaultAgentSettings() AgentSettings {
+	return AgentSettings{
+		Agent: appsettings.DefaultAgent(), NotifyEnabled: true, NotifyOnFinished: true, NotifyOnNeedsInput: true, NotifyOnRunEnded: true,
 		NotifyIncludeMessage: true, UsageEnabled: true,
 	}
 }
@@ -108,13 +111,21 @@ type MobileSettings struct {
 	AgentInput bool `json:"agentInput"`
 }
 
+// MemorySettings is P314's memory-feature leaf: Models maps a provider id to the model alias its
+// memory calls use (gate, reconcile, import, distill). A provider with no entry uses its catalog
+// default.
+type MemorySettings struct {
+	Models map[string]string `json:"models"`
+}
+
 type Settings struct {
-	Appearance Appearance         `json:"appearance"`
-	Advanced   AdvancedSettings   `json:"advanced"`
-	Git        GitSettings        `json:"git"`
-	Ade        AdeSettings        `json:"ade"`
-	ClaudeCode ClaudeCodeSettings `json:"claudeCode"`
-	Mobile     MobileSettings     `json:"mobile"`
+	Appearance Appearance       `json:"appearance"`
+	Advanced   AdvancedSettings `json:"advanced"`
+	Git        GitSettings      `json:"git"`
+	Ade        AdeSettings      `json:"ade"`
+	Mobile     MobileSettings   `json:"mobile"`
+	Memory     MemorySettings   `json:"memory"`
+	Agent      AgentSettings    `json:"agent"`
 }
 
 // DefaultMobileSettings mirrors settingsDomain.ts's mobileSettingsSchema defaults.
@@ -157,11 +168,12 @@ func DefaultSettings() Settings {
 			InlineBlame: true,
 			DateFormat:  "relative",
 		},
-		Advanced:   AdvancedSettings{GitLogLevel: "info", NotifyPrompts: true},
-		Git:        DefaultGitSettings(),
-		Ade:        DefaultAdeSettings(),
-		ClaudeCode: DefaultClaudeCodeSettings(),
-		Mobile:     DefaultMobileSettings(),
+		Advanced: AdvancedSettings{GitLogLevel: "info", NotifyPrompts: true},
+		Git:      DefaultGitSettings(),
+		Ade:      DefaultAdeSettings(),
+		Mobile:   DefaultMobileSettings(),
+		Memory:   MemorySettings{Models: map[string]string{}},
+		Agent:    DefaultAgentSettings(),
 	}
 }
 
@@ -207,8 +219,9 @@ type AdePatch struct {
 	SandboxKeychain        *bool   `json:"sandboxKeychain,omitempty"`
 }
 
-// ClaudeCodePatch mirrors ClaudeCodeSettings' own `.partial()` shape.
-type ClaudeCodePatch struct {
+// AgentPatch mirrors AgentSettings' own `.partial()` shape.
+type AgentPatch struct {
+	appsettings.AgentPatch
 	KeepAwakeWithAgents  *bool `json:"keepAwakeWithAgents,omitempty"`
 	NotifyEnabled        *bool `json:"notifyEnabled,omitempty"`
 	NotifyOnFinished     *bool `json:"notifyOnFinished,omitempty"`
@@ -225,13 +238,20 @@ type MobilePatch struct {
 	AgentInput *bool `json:"agentInput,omitempty"`
 }
 
+// MemoryPatch mirrors MemorySettings' own `.partial()` shape.
+type MemoryPatch struct {
+	// Models replaces the whole map.
+	Models *map[string]string `json:"models,omitempty"`
+}
+
 type SettingsPatch struct {
 	Appearance *AppearancePatch `json:"appearance,omitempty"`
 	Advanced   *AdvancedPatch   `json:"advanced,omitempty"`
 	Git        *GitPatch        `json:"git,omitempty"`
 	Ade        *AdePatch        `json:"ade,omitempty"`
-	ClaudeCode *ClaudeCodePatch `json:"claudeCode,omitempty"`
 	Mobile     *MobilePatch     `json:"mobile,omitempty"`
+	Memory     *MemoryPatch     `json:"memory,omitempty"`
+	Agent      *AgentPatch      `json:"agent,omitempty"`
 }
 
 // validateAppearanceSection mirrors upsertAppearance's own leaf list (repos/settings.go).
@@ -260,8 +280,7 @@ func validateAdvancedSection(a *AdvancedPatch) error {
 
 // ValidFetchAutoIntervalMinutes and ValidGraphFontSize are exported (not just used by
 // validateGitSection below): repos/settings.go's own readGit needs the identical bound to filter a
-// stored leaf on read, the same way the former appsettings.ReadGit did in one package with its own
-// validators.
+// stored leaf on read.
 var (
 	ValidFetchAutoIntervalMinutes = appsettings.InRange(0, 1440)
 	// P92 item 9: settingsDomain.ts's own FONT_SIZE_RANGE, floored at 0 (the "follow the app"
@@ -360,6 +379,52 @@ func validateMobileSection(m *MobilePatch) error {
 	return nil
 }
 
+// validMemoryModel reports whether alias is in provider's catalog. A provider that is not
+// registered passes: its entry is kept and ignored until the provider returns.
+func validMemoryModel(reg *harness.Registry, provider, alias string) bool {
+	p, ok := reg.Get(provider)
+	return !ok || p.Models().Valid(alias)
+}
+
+// CleanMemoryModels drops the entries whose provider id is malformed or whose alias is not in the
+// catalog of the provider registered in reg.
+func CleanMemoryModels(reg *harness.Registry, models map[string]string) map[string]string {
+	out := make(map[string]string, len(models))
+	for id, alias := range models {
+		if !appsettings.ValidProviderID(id) || !validMemoryModel(reg, id, alias) {
+			slog.Warn("settings: ignoring memory model", "scope", "settings", "provider", id, "model", alias)
+			continue
+		}
+		out[id] = alias
+	}
+	return out
+}
+
+func validateMemorySection(m *MemoryPatch) error {
+	if m == nil || m.Models == nil {
+		return nil
+	}
+	for id := range *m.Models {
+		if !appsettings.ValidProviderID(id) {
+			return fmt.Errorf("model: memory.models: invalid provider id %q", id)
+		}
+	}
+	return nil
+}
+
+// CheckModels checks every patched alias against the catalog of its provider registered in reg.
+func (m *MemoryPatch) CheckModels(reg *harness.Registry) error {
+	if m == nil || m.Models == nil {
+		return nil
+	}
+	for id, alias := range *m.Models {
+		if !validMemoryModel(reg, id, alias) {
+			return fmt.Errorf("model: memory.models.%s: invalid value %q", id, alias)
+		}
+	}
+	return nil
+}
+
 // Validate checks every leaf the caller actually patched against settings.ts's bounds, naming the
 // offending leaf in the error — fontFamily and fontSize have no bounds in the TS schema either, so
 // they are accepted as-is.
@@ -376,5 +441,14 @@ func (p SettingsPatch) Validate() error {
 	if err := validateAdeSection(p.Ade); err != nil {
 		return err
 	}
-	return validateMobileSection(p.Mobile)
+	if err := validateMobileSection(p.Mobile); err != nil {
+		return err
+	}
+	if err := validateMemorySection(p.Memory); err != nil {
+		return err
+	}
+	if p.Agent == nil {
+		return nil
+	}
+	return appsettings.ValidateAgent(&p.Agent.AgentPatch)
 }

@@ -137,7 +137,7 @@ func (li *LineIndex) Position(row, byteColumn int) (line, column int) {
 
 // utf16Units counts how many UTF-16 code units b's runes encode to, under rules 2/3 above: one
 // unit per rune at or below U+FFFF, two for a surrogate pair, one per invalid UTF-8 byte. Extracted
-// out of Position's own loop (C7 S1) so the search scanner — which has one line in hand, not a
+// out of Position's own loop so the search scanner — which has one line in hand, not a
 // whole file, and so cannot call LineIndex.Position directly — computes a match's column with the
 // exact same rules rather than a second implementation that could quietly disagree with it on a
 // line containing a non-ASCII rune.

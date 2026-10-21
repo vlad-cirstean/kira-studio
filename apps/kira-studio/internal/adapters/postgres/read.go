@@ -15,7 +15,7 @@ import (
 // identifier — the server stores them as NUL-terminated C strings, so one physically cannot
 // contain a NUL byte — but it stays, matching the TypeScript's own defensive check; panicking
 // (rather than threading an error return through every quoteIdent call site) is fine specifically
-// because this can only ever fire from Host.RunOp's own recover() boundary (P58 D16), which turns
+// because this can only ever fire from Host.RunOp's own recover() boundary, which turns
 // it into a failed op rather than a crash — the exact reason that boundary exists.
 var quoteIdent = adapters.QuoteIdentDouble
 
@@ -61,15 +61,15 @@ func normalizeCellText(value string, typeClass page.TypeClass) string {
 // readReq is adapter.ts's ReadRequest minus Path — the request shape readPage actually consumes.
 type readReq = adapters.ReadReq
 
-// assertReadOnlyFilterSortSafe is F1 fix step 3's own guard, called from Read/Count before either
+// assertReadOnlyFilterSortSafe is the guard, called from Read/Count before either
 // touches a connection: a grid filter and a text-sort clause are raw SQL fragments concatenated
 // straight into a WHERE/ORDER BY and run over pgx's simple protocol (query.go's TextMode) with no
 // wrapping read-only transaction and no classification of their own — unlike a console statement,
 // which AssertNoTransactionEscalation already covers. Postgres's simple protocol runs every
 // statement found in a string it is handed, so on a read-only connection either input hiding a
-// second top-level statement is rejected outright rather than let it run. Only gated on readOnly
-// (finding F1's own fix step 3 scope): a non-read-only connection's own MCP write-permission gate
-// is a separate concern this function does not attempt to close.
+// second top-level statement is rejected outright rather than let it run. Only gated on readOnly:
+// a non-read-only connection's own MCP write-permission gate is a separate concern this function
+// does not attempt to close.
 func assertReadOnlyFilterSortSafe(readOnly bool, filter *string, sort *model.SortSpec) error {
 	if !readOnly {
 		return nil
@@ -152,7 +152,7 @@ func readPage(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track 
 			// normalizeCellText only ever rewrites a TypeClassBinary cell (the `\x…` -> `0x…`
 			// bytea_output rewrite) — every other type class returns its input string unchanged, so
 			// reusing the already-scanned *string directly avoids a needless extra allocation +
-			// pointer per cell (P2 R1) for what is, on any non-binary column, every row of the page.
+			// pointer per cell for what is, on any non-binary column, every row of the page.
 			if v == nil || columns[i].TypeClass != page.TypeClassBinary {
 				values[i] = v
 				continue

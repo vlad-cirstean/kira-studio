@@ -9,11 +9,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 )
 
-// mapError mirrors errors.ts's mapError (C13). Ordered per P58c §4.4's own table: a genuine
-// context cancellation first (this only ever fires for Connect's own real ctx — every data-plane
-// call runs on RunWithAbortRace's detached context, which never surfaces context.Canceled here);
-// then a network/server-selection failure; then the two auth command codes (18 =
-// AuthenticationFailed, 13 = Unauthorized); else E_QUERY, same as errors.ts's own fallback.
+// mapError mirrors errors.ts's mapError. Ordered: a genuine context cancellation first (this only
+// ever fires for Connect's own real ctx — every data-plane call runs on RunWithAbortRace's
+// detached context, which never surfaces context.Canceled here); then a network/server-selection
+// failure; then the two auth command codes (18 = AuthenticationFailed, 13 = Unauthorized); else
+// E_QUERY, same as errors.ts's own fallback.
 func mapError(err error) *adapters.Error {
 	if err == nil {
 		return nil

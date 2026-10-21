@@ -7,7 +7,7 @@ import { control } from '../../../bridge/control';
 import AdeAbortRebaseDialog from '../AdeAbortRebaseDialog.vue';
 import AdeAddPopover from '../AdeAddPopover.vue';
 import AdeBacklogPage from '../backlog/AdeBacklogPage.vue';
-import AdeClaudeDialog from '../dialog/AdeClaudeDialog.vue';
+import AdeAgentDialog from '../dialog/AdeAgentDialog.vue';
 import AdeNeedsPage from '../needs/AdeNeedsPage.vue';
 import AdePanel from '../panel/AdePanel.vue';
 import AdePlanView from '../plan/AdePlanView.vue';
@@ -150,7 +150,7 @@ onScopeDispose(() => offReviewCode?.());
       </template>
     </div>
     <AdeRunDialog />
-    <AdeClaudeDialog />
+    <AdeAgentDialog />
     <AdeAbortRebaseDialog />
     <AdeTakeOverDialog />
   </Tabs>

@@ -63,7 +63,7 @@ describe('flattenTreeRows — basic correctness', () => {
   });
 });
 
-// G30 round-1 performance review, finding #7: `rows.push(...flattenTreeRows(...))` spread a
+// `rows.push(...flattenTreeRows(...))` spread a
 // freshly built sub-array into the parent's row list at every directory level — a single spread
 // call's own argument count is bounded by the engine's call-stack-sized argument list (V8's own
 // figure is commonly cited around 65k; this test runtime's engine — Bun's JSC — has a materially

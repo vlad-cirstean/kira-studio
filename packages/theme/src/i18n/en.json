@@ -183,7 +183,7 @@
         "label": "{mode} at {folder}"
       },
       "isolated": {
-        "body": "Your Claude settings files are not loaded."
+        "body": "Your {agent} settings files are not loaded."
       },
       "limits": {
         "label": "Model {model}, budget {budget}, timeout {timeout}"
@@ -448,7 +448,7 @@
         "placeholder": "Add tool by name"
       },
       "badge": {
-        "tooltip": "Smart script that runs Claude headless"
+        "tooltip": "Smart script that runs {agent} headless"
       },
       "bashExample": {
         "example": "git status:*"
@@ -466,7 +466,7 @@
         "label": "MCP tools"
       },
       "mcpHint": {
-        "hint": "Only servers from your user Claude config are listed."
+        "hint": "Only servers from your user {agent} config are listed."
       },
       "mcpNone": {
         "emptyHint": "No MCP servers."
@@ -496,6 +496,14 @@
   },
   "backend": {
     "core": {
+      "agent": {
+        "missing": {
+          "body": "{product} CLI not found. Install it, then retry. Looked in: {probed}."
+        },
+        "providerGone": {
+          "body": "The agent that ran this conversation is no longer available."
+        }
+      },
       "appUpdate": {
         "canceled": {
           "body": "The update was cancelled."
@@ -523,11 +531,6 @@
         },
         "timedOut": {
           "body": "The update took too long and was stopped."
-        }
-      },
-      "claude": {
-        "missing": {
-          "body": "Claude Code CLI not found. Install it, then retry. Looked in: {probed}."
         }
       },
       "docker": {
@@ -698,6 +701,9 @@
         },
         "promptTooLong": {
           "body": "The prompt is longer than {max} characters."
+        },
+        "resumeCommandNone": {
+          "body": "Only a smart run with a saved conversation can continue in a terminal."
         },
         "resumeMissing": {
           "body": "Resume needs values for: {names}. Run it again instead."
@@ -933,11 +939,11 @@
       "agent": {
         "finished": {
           "body": "Open Kira Space to read the reply.",
-          "title": "Claude finished · {name}"
+          "title": "{agent} finished · {name}"
         },
         "needsInput": {
           "body": "Open Kira Space to answer.",
-          "title": "Claude needs input · {name}"
+          "title": "{agent} needs input · {name}"
         }
       },
       "automation": {
@@ -1132,7 +1138,7 @@
         },
         "sandbox": {
           "auth": {
-            "body": "Claude can’t sign in because the sandbox blocks the keychain. Turn on keychain access in the Claude Code settings, or run claude setup-token and export the token from your shell profile."
+            "body": "{agent} can’t sign in because the sandbox blocks the keychain. Turn on keychain access in the {product} settings, or run {command} setup-token and export the token from your shell profile."
           },
           "blocked": {
             "body": "Sandbox blocked {op} {target}."
@@ -1141,7 +1147,7 @@
             "body": "The sandbox is unavailable because /usr/bin/sandbox-exec is missing. Turn the step’s sandbox off or repair macOS."
           },
           "notEnforced": {
-            "body": "The sandbox is not enforced on this OS. It runs on macOS only. Claude permission rules still apply, but they do not stop shell commands."
+            "body": "The sandbox is not enforced on this OS. It runs on macOS only. {agent} permission rules still apply, but they do not stop shell commands."
           },
           "pathMissing": {
             "body": "Sandbox path missing: {path}."
@@ -1213,9 +1219,12 @@
           "body": "The workspace was closed. Reopen it and retry."
         }
       },
-      "github": {
-        "notPullRequestUrl": {
-          "body": "That isn’t a GitHub pull request link."
+      "gitHost": {
+        "notChangeRequestUrl": {
+          "body": "That isn’t a {changeRequests} link."
+        },
+        "notLink": {
+          "error": "Not a {links}."
         }
       },
       "gitrpc": {
@@ -1655,6 +1664,9 @@
         "portRequired": {
           "body": "Port is required."
         },
+        "preconnectDelayRange": {
+          "body": "Pre-connect delay must be a whole number of seconds from 0 to 300."
+        },
         "preconnectExit": {
           "error": "Pre-connect script exited {detail}{tail}. Connection dropped."
         },
@@ -2013,6 +2025,15 @@
     "advanced": {
       "label": "Advanced"
     },
+    "agentCliNotFound": {
+      "error": "{product}’s CLI isn’t available. Copy the command above and run it yourself once it is installed."
+    },
+    "agentRegistered": {
+      "description": "Registered with {product}."
+    },
+    "agentRegistrationRefused": {
+      "error": "{product} refused the registration: {detail}. Copy the command above and run it yourself."
+    },
     "appearance": {
       "label": "Appearance"
     },
@@ -2024,15 +2045,6 @@
     },
     "changed": {
       "status": "Changed"
-    },
-    "claudeCliNotFound": {
-      "error": "Claude Code’s CLI isn’t available. Copy the command above and run it yourself once it is installed."
-    },
-    "claudeCodeRegistered": {
-      "description": "Registered with Claude Code."
-    },
-    "claudeRegistrationRefused": {
-      "error": "Claude Code refused the registration: {detail}. Copy the command above and run it yourself."
     },
     "closed": {
       "status": "Closed"
@@ -2246,6 +2258,15 @@
     "forcePush": {
       "label": "Force push"
     },
+    "gitHost": {
+      "changeRequest": {
+        "label": "Change request"
+      },
+      "changeRequestShort": {
+        "label": "CR"
+      },
+      "label": "Code host"
+    },
     "goToFile": {
       "label": "Go to file"
     },
@@ -2398,14 +2419,8 @@
       "label": "Port"
     },
     "product": {
-      "claudeCode": {
-        "label": "Claude Code"
-      },
       "docker": {
         "label": "Docker"
-      },
-      "github": {
-        "label": "GitHub"
       },
       "jira": {
         "label": "Jira"
@@ -2432,8 +2447,8 @@
     "refreshAll": {
       "label": "Refresh all"
     },
-    "registerWithClaudeCode": {
-      "label": "Register with Claude Code"
+    "registerWithAgent": {
+      "label": "Register with {product}"
     },
     "removed": {
       "status": "Removed"
@@ -3352,9 +3367,9 @@
         "error": "Couldn’t load more history: {error}",
         "title": "Couldn’t load more history"
       },
-      "openPullRequest": {
-        "error": "Couldn’t open the pull request: {error}",
-        "title": "Couldn’t open the pull request"
+      "openChangeRequest": {
+        "error": "Couldn’t open the {changeRequestNoun}: {error}",
+        "title": "Couldn’t open the {changeRequestNoun}"
       },
       "refresh": {
         "error": "Couldn’t refresh: {error}",
@@ -3400,6 +3415,17 @@
         "example": "your package manager’s Git upgrade command"
       }
     },
+    "changeRequest": {
+      "noAnswer": {
+        "hint": "{label} did not answer."
+      },
+      "open": {
+        "aria": "Open {changeRequestNoun} #{number} on {label}"
+      },
+      "summary": {
+        "tooltip": "#{number} {title} — {state}"
+      }
+    },
     "commit": {
       "committer": {
         "label": "Committer"
@@ -3407,14 +3433,11 @@
       "copySha": {
         "tooltip": "Copy full SHA"
       },
-      "noPullRequest": {
-        "empty": "No pull request"
+      "noChangeRequest": {
+        "empty": "No {changeRequestNoun}"
       },
       "openAllChanges": {
         "tooltip": "Open all changes"
-      },
-      "pullRequest": {
-        "label": "Pull request"
       },
       "signature": {
         "label": "Signature"
@@ -3649,8 +3672,11 @@
         "checkout": {
           "label": "Switching branches"
         },
-        "githubEnabled": {
-          "label": "Show pull request status for this repository"
+        "hostAuto": {
+          "option": "Detect from remote"
+        },
+        "hostProvider": {
+          "label": "Show status from"
         },
         "includeUntracked": {
           "label": "Check the untracked files option by default in the stash dialog"
@@ -3682,7 +3708,6 @@
         "alreadyHere": {
           "body": "HEAD is already here. This resets your working state only."
         },
-        "branch": {},
         "discard": {
           "body": "This will permanently discard these uncommitted changes."
         },
@@ -3697,7 +3722,6 @@
           "hint": "Uncommitted changes are destroyed and are not recoverable.",
           "label": "Hard"
         },
-        "head": {},
         "leaving": {
           "body": "{count} commit will leave {ref}. | {count} commits will leave {ref}."
         },
@@ -4666,17 +4690,6 @@
         "label": "{name} (unborn)"
       }
     },
-    "pr": {
-      "noAnswer": {
-        "hint": "GitHub did not answer."
-      },
-      "openOnGithub": {
-        "aria": "Open pull request #{number} on GitHub"
-      },
-      "summary": {
-        "tooltip": "#{number} {title} — {state}"
-      }
-    },
     "pullStrategy": {
       "auto": {
         "option": "Auto (follow Git configuration)"
@@ -4701,7 +4714,7 @@
       }
     },
     "refBadge": {
-      "prMore": {
+      "changeRequestMore": {
         "tooltip": "{title} — {state} (and {count} more)"
       }
     },
@@ -4934,14 +4947,14 @@
         "authorEmail": {
           "label": "Author email"
         },
+        "changeRequestNumber": {
+          "label": "{changeRequestShort} number"
+        },
+        "changeRequestTitle": {
+          "label": "{changeRequestShort} title"
+        },
         "committerEmail": {
           "label": "Committer email"
-        },
-        "prNumber": {
-          "label": "PR number"
-        },
-        "prTitle": {
-          "label": "PR title"
         },
         "sha": {
           "label": "SHA"
@@ -4982,8 +4995,8 @@
       "checkoutAutoStash": {
         "description": "When uncommitted changes block a branch switch, stash them and switch instead of asking. The stash is tagged with the branch you left and is never popped automatically. Off restores the old dialog (discard, stash and carry, or cancel)."
       },
-      "githubEnabled": {
-        "description": "Show pull request status for this repository. Needs the GitHub CLI (gh), installed and signed in. Off stops every gh call and hides every badge."
+      "gitHostProvider": {
+        "description": "Which code host supplies pull request status for this repository. Detect from remote follows the origin remote. Off stops every host call and hides every badge."
       },
       "graphPageSize": {
         "description": "How many commits a single page fetches when you load more."
@@ -5257,7 +5270,7 @@
   "llmPrompts": {
     "applies": {
       "newSession": {
-        "hint": "A change applies to new Claude sessions. Running sessions keep the old text."
+        "hint": "A change applies to new {agent} sessions. Running sessions keep the old text."
       },
       "nextCall": {
         "hint": "A change applies to the next call."
@@ -5300,7 +5313,7 @@
         "description": "The first message of a manual step session. It carries the step name, task, repositories, notes and the step prompt.",
         "title": "Manual step message",
         "usedBy": {
-          "body": "Sent to Claude when a manual step session starts."
+          "body": "Sent to {agent} when a manual step session starts."
         }
       },
       "adeRebaseContextLine": {
@@ -5377,7 +5390,7 @@
         "description": "Explains how an agent should explore connections and run queries through the database MCP server.",
         "title": "Database MCP instructions",
         "usedBy": {
-          "body": "Sent to Claude when it connects to the database MCP server."
+          "body": "Sent to {agent} when it connects to the database MCP server."
         }
       },
       "headlessFinishStepAck": {
@@ -5426,7 +5439,7 @@
         "description": "Tells the agent the order to use the Kira Space tools. It reads the task, declares repositories, then branches.",
         "title": "Kira Space tools instructions",
         "usedBy": {
-          "body": "Sent to Claude when a run connects to the Kira Space tools server."
+          "body": "Sent to {agent} when a run connects to the Kira Space tools server."
         }
       },
       "headlessSpaceSuffix": {
@@ -5437,7 +5450,7 @@
         }
       },
       "memoryDataHygiene": {
-        "description": "A paragraph that tells Claude to treat the document text as data and never follow instructions found inside it.",
+        "description": "A paragraph that tells {agent} to treat the document text as data and never follow instructions found inside it.",
         "title": "Untrusted input notice",
         "usedBy": {
           "body": "Included in the memory gate, reconcile, import extract, import verify and import finalize prompts."
@@ -5447,7 +5460,7 @@
         "description": "Judges each fact before it is stored. It splits the fact into single claims, adds keywords, or challenges it with questions.",
         "title": "Memory gate",
         "usedBy": {
-          "body": "Sent as the system prompt of the Claude call that checks every memory save. The reply follows a fixed schema."
+          "body": "Sent as the system prompt of the {agent} call that checks every memory save. The reply follows a fixed schema."
         }
       },
       "memoryImportExtractSystem": {
@@ -5461,14 +5474,14 @@
         "description": "Merges the facts of one imported file and stores them through the memory tools.",
         "title": "Import finalize",
         "usedBy": {
-          "body": "Sent as the system prompt of the Claude run that finishes one file of a memory import."
+          "body": "Sent as the system prompt of the {agent} run that finishes one file of a memory import."
         }
       },
       "memoryImportVerifySystem": {
         "description": "Checks doubtful facts of an imported file against the file itself.",
         "title": "Import cross-check",
         "usedBy": {
-          "body": "Sent as the system prompt of the Claude run that reads the source file to confirm, rewrite or reject doubtful facts during a memory import."
+          "body": "Sent as the system prompt of the {agent} run that reads the source file to confirm, rewrite or reject doubtful facts during a memory import."
         }
       },
       "memoryKinds": {
@@ -5496,7 +5509,7 @@
         "description": "Tells an agent what each stored fact needs, how to send files by path and how to search.",
         "title": "Memory server instructions",
         "usedBy": {
-          "body": "Sent to Claude when a session connects to the memory MCP server. A change applies to new sessions."
+          "body": "Sent to {agent} when a session connects to the memory MCP server. A change applies to new sessions."
         }
       },
       "memoryMcpRememberMessage": {
@@ -5538,14 +5551,21 @@
         "description": "Merges the facts extracted from one input into short lines, one per fact or rule, without storing anything.",
         "title": "Merge lines",
         "usedBy": {
-          "body": "Sent as the system prompt of the last Claude call when the ingest_files tool runs with distill true and when the distill view runs."
+          "body": "Sent as the system prompt of the last {agent} call when the ingest_files tool runs with distill true and when the distill view runs."
         }
       },
       "memoryReconcileSystem": {
         "description": "Compares new facts with similar stored memories and picks add, update or no change for each.",
         "title": "Memory reconcile",
         "usedBy": {
-          "body": "Sent as the system prompt of the Claude call that runs after the gate accepts a fact."
+          "body": "Sent as the system prompt of the {agent} call that runs after the gate accepts a fact."
+        }
+      },
+      "memoryRewriteSystem": {
+        "description": "Rewrites one short text, such as a code comment, in its own form. Drops trivia and keeps every fact.",
+        "title": "Rewrite text",
+        "usedBy": {
+          "body": "Sent as the system prompt of the {agent} call when the distill view runs in rewrite mode and when the ingest_files tool runs with distill true and mode rewrite."
         }
       },
       "memoryRunTrivia": {
@@ -5586,7 +5606,7 @@
         "description": "A closing instruction added to the end of an agent prompt."
       },
       "system": {
-        "description": "A system prompt sent with a Claude call. The reply follows a fixed schema."
+        "description": "A system prompt sent with a {agent} call. The reply follows a fixed schema."
       },
       "tool": {
         "description": "The description an agent reads for this MCP tool."
@@ -5745,7 +5765,7 @@
         "placeholder": "Your answer"
       },
       "checking": {
-        "loading": "Checking with Claude…"
+        "loading": "Checking with {agent}…"
       },
       "findProject": {
         "placeholder": "Find or enter a project key"
@@ -5770,7 +5790,7 @@
       },
       "text": {
         "label": "What to remember",
-        "placeholder": "Facts in your own words; Claude splits and checks them"
+        "placeholder": "Facts in your own words; {agent} splits and checks them"
       },
       "useProject": {
         "label": "Use {project}"
@@ -5872,6 +5892,14 @@
       "input": {
         "placeholder": "Paste text to condense"
       },
+      "mode": {
+        "facts": {
+          "label": "Facts"
+        },
+        "rewrite": {
+          "label": "Rewrite"
+        }
+      },
       "open": {
         "label": "Distill text"
       },
@@ -5888,6 +5916,9 @@
         "merge": {
           "status": "Merging lines: {done} of {total} · {cost}"
         },
+        "rewrite": {
+          "status": "Rewriting · {cost}"
+        },
         "verify": {
           "status": "Checking against the source: {done} of {total} · {cost}"
         }
@@ -5901,6 +5932,55 @@
         },
         "summary": {
           "status": "{inChars} to {outChars} characters ({percent}) · {inTokens} to {outTokens} tokens · {cost}"
+        }
+      },
+      "rewrite": {
+        "copy": {
+          "announce": "Copied the rewrite"
+        },
+        "dropped": {
+          "title": "Left out"
+        },
+        "hint": "The text comes back in its own form with trivia dropped. Facts, negations and numbers stay.",
+        "kept": {
+          "directive": {
+            "body": "Kept the original. The rewrite changed a directive."
+          },
+          "form": {
+            "body": "Kept the original. The rewrite changed the comment markers."
+          },
+          "grew": {
+            "body": "Kept the original. The rewrite was longer."
+          },
+          "hedge": {
+            "body": "Kept the original. The rewrite still held a hedge word."
+          },
+          "indent": {
+            "body": "Kept the original. The rewrite changed the indentation."
+          },
+          "output": {
+            "body": "Kept the original. {agent} returned no usable rewrite."
+          },
+          "tokens": {
+            "body": "Kept the original. The rewrite lost a name, number or quoted text."
+          },
+          "width": {
+            "body": "Kept the original. The rewrite had a line wider than 100 columns."
+          }
+        },
+        "unchanged": {
+          "body": "Already concise. Nothing to drop."
+        },
+        "why": {
+          "restatesCode": {
+            "label": "Restates the code"
+          },
+          "tag": {
+            "label": "Phase or plan tag"
+          },
+          "trivia": {
+            "label": "Trivia"
+          }
         }
       },
       "run": {
@@ -5934,7 +6014,7 @@
       },
       "channel": {
         "agent": {
-          "description": "Started by Claude session {session}."
+          "description": "Started by {agent} session {session}."
         },
         "ui": {
           "label": "Manual"
@@ -5942,13 +6022,13 @@
       },
       "confirm": {
         "calls": {
-          "label": "{count} Claude call | {count} Claude calls"
+          "label": "{count} {agent} call | {count} {agent} calls"
         },
         "chunks": {
           "label": "{count} chunk | {count} chunks"
         },
         "cost": {
-          "description": "Runs on your Claude subscription. {skipped}, {ignored}."
+          "description": "Runs on your {agent} subscription. {skipped}, {ignored}."
         },
         "estimate": {
           "description": "{files}, {chunks}, {calls}, {duration}."
@@ -6030,7 +6110,6 @@
         "finalizing": {
           "status": "Finalising"
         },
-        "skipped": {},
         "verifying": {
           "status": "Cross-checking"
         }
@@ -6099,8 +6178,8 @@
         "hint": "The server runs this app’s executable with {command}. Install again if the app moves."
       },
       "connect": {
-        "description": "Registers the kira-memory MCP server. Claude Code then gets the store_memory, search_memories and memory_history tools and the /mcp__kira-memory__remember command. The Claude Code CLI must be installed for the store check to run.",
-        "title": "Connect Claude Code"
+        "description": "Registers the kira-memory MCP server. {product} then gets the store_memory, search_memories and memory_history tools and the /mcp__kira-memory__remember command. The {product} CLI must be installed for the store check to run.",
+        "title": "Connect {product}"
       }
     },
     "panel": {
@@ -6113,8 +6192,8 @@
       "both": {
         "status": "Both sources"
       },
-      "connectClaude": {
-        "hint": "Connect Claude Code in the settings to let it store memories."
+      "connectAgent": {
+        "hint": "Connect {product} in the settings to let it store memories."
       },
       "filter": {
         "label": "Filters"
@@ -6127,7 +6206,7 @@
       },
       "list": {
         "empty": "No memories yet",
-        "emptyHint": "Add one, or let Claude Code store them.",
+        "emptyHint": "Add one, or let {product} store them.",
         "loading": "Loading memories…"
       },
       "search": {
@@ -6208,7 +6287,6 @@
       "emptyHint": "Select a result to see its reason and history.",
       "event": {
         "action": {
-          "added": {},
           "reconfirmed": {
             "status": "Reconfirmed"
           },
@@ -6241,7 +6319,7 @@
         "label": "Fact ID"
       },
       "noSession": {
-        "description": "Not stored from a Claude Code session."
+        "description": "Not stored from a {product} session."
       },
       "reason": {
         "label": "Reason:"
@@ -6291,7 +6369,7 @@
         "hint": "Replying to agents is off for this phone."
       },
       "takeOverConfirm": {
-        "body": "{what}. Taking over stops the background run and continues it in Claude Code on your computer.",
+        "body": "{what}. Taking over stops the background run and continues it in {product} on your computer.",
         "title": "Take over run?"
       }
     },
@@ -6374,13 +6452,13 @@
         "body": "Agents start now in the worktrees of “{title}”."
       },
       "startSessionConfirm": {
-        "body": "A Claude Code session for {step} opens on your computer."
+        "body": "A {product} session for {step} opens on your computer."
       },
       "startThisStepConfirm": {
         "title": "Start this step?"
       },
       "startThisStepSessionConfirm": {
-        "body": "A Claude Code session for this step opens on your computer."
+        "body": "A {product} session for this step opens on your computer."
       },
       "stopFirst": {
         "hint": "Stop its running agents first to move it."
@@ -6609,10 +6687,10 @@
           "placeholder": "Paste a link or key (optional)"
         },
         "noBranchesYet": {
-          "hint": "No branches yet. Claude creates one per repository on start."
+          "hint": "No branches yet. {agent} creates one per repository on start."
         },
         "notes": {
-          "placeholder": "Context for Claude (optional)"
+          "placeholder": "Context for {agent} (optional)"
         },
         "searchBranches": {
           "placeholder": "Search branches in all repositories"
@@ -6625,6 +6703,96 @@
         },
         "trigger": {
           "label": "Add task"
+        }
+      },
+      "agentDialog": {
+        "archive": {
+          "title": "Archive would lose work"
+        },
+        "autostash": {
+          "label": "Autostash the uncommitted changes, rebase, then restore them"
+        },
+        "busy": {
+          "hint": "Agents are busy on branches this would rewrite. Wait until they’re idle or need input."
+        },
+        "busyOverridden": {
+          "hint": "Override is on. This is sent even though these agents are busy."
+        },
+        "changeBase": {
+          "title": "Change the base"
+        },
+        "deleteAnyway": {
+          "label": "Delete anyway",
+          "tooltip": "Skip {agent} and delete the worktrees now. Uncommitted changes are lost"
+        },
+        "headless": {
+          "body": "A background run is active on {branch}. Stop it on the sessions tab, or wait."
+        },
+        "launchFailed": {
+          "error": "Couldn’t launch the session."
+        },
+        "message": {
+          "label": "Message to {agent}"
+        },
+        "noOp": {
+          "hint": "The branch already sits on this base. Saving only records it."
+        },
+        "onlyAgent": {
+          "label": "{session} (only agent)"
+        },
+        "override": {
+          "label": "Override…"
+        },
+        "pushMerge": {
+          "label": "Also push {target}"
+        },
+        "pushOff": {
+          "hint": "Off. It stays local; push it yourself later."
+        },
+        "pushRebase": {
+          "label": "Also force-push after rebasing"
+        },
+        "reMerge": {
+          "title": "Re-merge into {target}"
+        },
+        "risk": {
+          "body": "{risk}. Tell {agent} what to do with it, or delete the worktrees anyway."
+        },
+        "riskRepo": {
+          "label": "{repo} has {facts}"
+        },
+        "riskUncommitted": {
+          "label": "{count} uncommitted"
+        },
+        "riskUnmerged": {
+          "label": "{count} unmerged commit | {count} unmerged commits"
+        },
+        "runInBackground": {
+          "label": "Run in background"
+        },
+        "saveBase": {
+          "label": "Save base"
+        },
+        "send": {
+          "label": "Send to {agent}"
+        },
+        "sendAndArchive": {
+          "label": "Send to {agent}, then archive"
+        },
+        "sendAnyway": {
+          "label": "Send anyway"
+        },
+        "start": {
+          "title": "Start {product} (interactive)"
+        },
+        "startsWhenReady": {
+          "loading": "Starts when ready…"
+        },
+        "step": {
+          "title": "{step} · interactive {product}"
+        },
+        "undoOverride": {
+          "label": "Undo override"
         }
       },
       "agentOrigin": {
@@ -6660,7 +6828,6 @@
         "chipBlocked": {
           "label": "{name} · needs you"
         },
-        "chipFailed": {},
         "none": {
           "empty": "No automations yet"
         }
@@ -6680,9 +6847,6 @@
           "body": "Deletes “{text}” from the backlog. This can’t be undone.",
           "title": "Delete backlog item?"
         },
-        "github": {
-          "placeholder": "Paste a GitHub PR or issue link"
-        },
         "intro": {
           "hint": "Get it out of your head and order it later, most important first. Nothing here is on the plan yet."
         },
@@ -6691,6 +6855,9 @@
         },
         "jira": {
           "placeholder": "Paste a Jira link or key"
+        },
+        "link": {
+          "placeholder": "Paste a {labels} {shorts} or issue link"
         },
         "notPlanned": {
           "label": "Backlog · not planned"
@@ -6779,7 +6946,7 @@
           },
           "notCreated": {
             "label": "Not created",
-            "tooltip": "Claude creates it when the task starts"
+            "tooltip": "{agent} creates it when the task starts"
           },
           "notPushed": {
             "label": "↑ Not pushed",
@@ -6841,10 +7008,10 @@
           },
           "start": {
             "label": "▶ Start",
-            "tooltip": "Start Claude Code in its worktree"
+            "tooltip": "Start {product} in its worktree"
           },
           "takeOver": {
-            "tooltip": "Continue the rebase yourself in Claude Code"
+            "tooltip": "Continue the rebase yourself in {product}"
           },
           "waiting": {
             "label": "⏳ {owner}",
@@ -6973,7 +7140,7 @@
             "label": "▶ Run"
           },
           "runAgents": {
-            "tooltip": "Run {step} with background agents (claude -p)"
+            "tooltip": "Run {step} with background agents ({headless})"
           },
           "runReview": {
             "tooltip": "Start {step}; it waits for your review"
@@ -6983,10 +7150,10 @@
           },
           "session": {
             "label": "▶ {step}",
-            "tooltip": "Open an interactive Claude Code session for {step}"
+            "tooltip": "Open an interactive {product} session for {step}"
           },
           "takeOver": {
-            "tooltip": "{step} needs you; continue it yourself in Claude Code"
+            "tooltip": "{step} needs you; continue it yourself in {product}"
           }
         },
         "taskMenu": {
@@ -6997,7 +7164,7 @@
             "label": "Jira link"
           },
           "latestSessionId": {
-            "label": "Latest Claude session ID"
+            "label": "Latest {agent} session ID"
           },
           "liveBlocked": {
             "tooltip": "Stop its running agents first"
@@ -7020,8 +7187,8 @@
           "moveToStep": {
             "label": "Move to step"
           },
-          "openGithub": {
-            "label": "Open on GitHub"
+          "openHost": {
+            "label": "Open on {label}"
           },
           "openJira": {
             "label": "Open Jira issue"
@@ -7065,9 +7232,6 @@
         "copyBranchLink": {
           "tooltip": "Copy branch link"
         },
-        "copyPrLink": {
-          "tooltip": "Copy PR link"
-        },
         "deployedTo": {
           "label": "Deployed to"
         },
@@ -7092,9 +7256,6 @@
         "noIntegration": {
           "emptyHint": "This repository has no integration branches besides main."
         },
-        "pr": {
-          "label": "PR"
-        },
         "preparing": {
           "status": "Preparing"
         },
@@ -7114,7 +7275,6 @@
           "notMerged": {
             "status": "Not merged"
           },
-          "open": {},
           "unknown": {
             "status": "Unknown"
           }
@@ -7143,96 +7303,6 @@
           "label": "{where} · {count} uncommitted"
         }
       },
-      "claudeDialog": {
-        "archive": {
-          "title": "Archive would lose work"
-        },
-        "autostash": {
-          "label": "Autostash the uncommitted changes, rebase, then restore them"
-        },
-        "busy": {
-          "hint": "Agents are busy on branches this would rewrite. Wait until they’re idle or need input."
-        },
-        "busyOverridden": {
-          "hint": "Override is on. This is sent even though these agents are busy."
-        },
-        "changeBase": {
-          "title": "Change the base"
-        },
-        "deleteAnyway": {
-          "label": "Delete anyway",
-          "tooltip": "Skip Claude and delete the worktrees now. Uncommitted changes are lost"
-        },
-        "headless": {
-          "body": "A background run is active on {branch}. Stop it on the sessions tab, or wait."
-        },
-        "launchFailed": {
-          "error": "Couldn’t launch the session."
-        },
-        "message": {
-          "label": "Message to Claude"
-        },
-        "noOp": {
-          "hint": "The branch already sits on this base. Saving only records it."
-        },
-        "onlyAgent": {
-          "label": "{session} (only agent)"
-        },
-        "override": {
-          "label": "Override…"
-        },
-        "pushMerge": {
-          "label": "Also push {target}"
-        },
-        "pushOff": {
-          "hint": "Off. It stays local; push it yourself later."
-        },
-        "pushRebase": {
-          "label": "Also force-push after rebasing"
-        },
-        "reMerge": {
-          "title": "Re-merge into {target}"
-        },
-        "risk": {
-          "body": "{risk}. Tell Claude what to do with it, or delete the worktrees anyway."
-        },
-        "riskRepo": {
-          "label": "{repo} has {facts}"
-        },
-        "riskUncommitted": {
-          "label": "{count} uncommitted"
-        },
-        "riskUnmerged": {
-          "label": "{count} unmerged commit | {count} unmerged commits"
-        },
-        "runInBackground": {
-          "label": "Run in background"
-        },
-        "saveBase": {
-          "label": "Save base"
-        },
-        "send": {
-          "label": "Send to Claude"
-        },
-        "sendAndArchive": {
-          "label": "Send to Claude, then archive"
-        },
-        "sendAnyway": {
-          "label": "Send anyway"
-        },
-        "start": {
-          "title": "Start Claude Code (interactive)"
-        },
-        "startsWhenReady": {
-          "loading": "Starts when ready…"
-        },
-        "step": {
-          "title": "{step} · interactive Claude Code"
-        },
-        "undoOverride": {
-          "label": "Undo override"
-        }
-      },
       "dayOffConfirm": {
         "body": "{day} is now a day off. This moves {count} task planned for it to {to}. | {day} is now a day off. This moves {count} tasks planned for it to {to}.",
         "title": "Move tasks?"
@@ -7251,7 +7321,6 @@
         "hours": {
           "option": "Hours"
         },
-        "label": {},
         "spans": {
           "label": "Spans {count} day | Spans {count} days"
         },
@@ -7296,7 +7365,7 @@
       },
       "headless": {
         "footer": {
-          "hint": "Read-only log of a background run. Take it over to continue it yourself in Claude Code."
+          "hint": "Read-only log of a background run. Take it over to continue it yourself in {product}."
         },
         "status": {
           "label": "Background run · step {step} · {state} · {ago}"
@@ -7308,7 +7377,7 @@
           "tooltip": "Stop this run; it becomes stuck"
         },
         "takeOver": {
-          "tooltip": "Continue this run yourself in an interactive Claude Code session"
+          "tooltip": "Continue this run yourself in an interactive {product} session"
         }
       },
       "link": {
@@ -7317,9 +7386,6 @@
         },
         "field": {
           "label": "{label} link"
-        },
-        "notGithub": {
-          "error": "Not a GitHub PR or issue link."
         },
         "notJira": {
           "error": "Not a Jira key or link."
@@ -7345,7 +7411,6 @@
             "label": "Took {duration}"
           }
         },
-        "footer": {},
         "interactiveSessions": {
           "label": "{count} interactive session | {count} interactive sessions"
         },
@@ -7376,10 +7441,10 @@
             "label": "Approve step “{name}”"
           },
           "question": {
-            "label": "Claude Code is waiting for your answer on {branch}"
+            "label": "{product} is waiting for your answer on {branch}"
           },
           "questionSpec": {
-            "label": "Claude Code is waiting for your answer (spec)"
+            "label": "{product} is waiting for your answer (spec)"
           },
           "rebaseFailed": {
             "label": "Rebase of {branch} failed"
@@ -7492,14 +7557,12 @@
           "inProgress": {
             "body": "A rebase is still in progress in the worktree."
           },
-          "no": {},
           "notVerified": {
             "label": "Not verified by git"
           },
           "verified": {
             "label": "Verified by git"
-          },
-          "yes": {}
+          }
         },
         "endedBy": {
           "label": "Ended by {source}"
@@ -7569,9 +7632,6 @@
         }
       },
       "plan": {
-        "band": {
-          "hours": {}
-        },
         "branchRow": {
           "menuTitle": {
             "label": "{name} in {repo}"
@@ -7613,8 +7673,7 @@
           },
           "hide": {
             "label": "Hide history"
-          },
-          "title": {}
+          }
         },
         "repoChip": {
           "neverFetched": {
@@ -7682,8 +7741,6 @@
         "barTipRun": {
           "label": "{nick} {state}"
         },
-        "barTipStep": {},
-        "failed": {},
         "fix": {
           "label": "{step} · fix {count}"
         },
@@ -7782,30 +7839,28 @@
             "hint": "That window is gone."
           },
           "intro": {
-            "hint": "Ask questions about this branch in a Claude Code session."
+            "hint": "Ask questions about this branch in a {product} session."
           },
           "label": "Review agent",
-          "panel": {},
           "resume": {
             "label": "Resume review agent"
           },
           "start": {
             "label": "Start review agent"
-          },
-          "waiting": {}
+          }
         },
         "compose": {
           "answering": {
             "loading": "Answering…"
           },
           "blocked": {
-            "tooltip": "Claude Code is waiting for an answer in its terminal"
+            "tooltip": "{product} is waiting for an answer in its terminal"
           },
           "dropReference": {
             "aria": "Drop the code reference"
           },
           "noSubmit": {
-            "hint": "Claude Code did not take the message; press Enter in its terminal."
+            "hint": "{product} did not take the message; press Enter in its terminal."
           },
           "question": {
             "aria": "Question for the review agent",
@@ -7825,28 +7880,31 @@
             "label": "Syncing as {account}"
           },
           "button": {
-            "label": "Sync to GitHub"
+            "label": "Sync to {label}"
           },
           "buttonCount": {
-            "label": "Sync to GitHub · {count}"
+            "label": "Sync to {label} · {count}"
           },
           "changedSinceReview": {
             "status": "Changed since review"
           },
+          "cliMissing": {
+            "tooltip": "Install the {cli}"
+          },
+          "closed": {
+            "tooltip": "{changeRequestShort} #{number} is closed"
+          },
           "confirm": {
-            "label": "Mark {count} file viewed on PR #{pr} | Mark {count} files viewed on PR #{pr}"
+            "label": "Mark {count} file viewed on {changeRequestShort} #{number} | Mark {count} files viewed on {changeRequestShort} #{number}"
           },
           "confirmUnmark": {
-            "label": "Mark {count} file viewed on PR #{pr}, unmark {unmarked} | Mark {count} files viewed on PR #{pr}, unmark {unmarked}"
+            "label": "Mark {count} file viewed on {changeRequestShort} #{number}, unmark {unmarked} | Mark {count} files viewed on {changeRequestShort} #{number}, unmark {unmarked}"
           },
-          "differsFromPrHead": {
-            "status": "Differs from the PR head"
-          },
-          "ghMissing": {
-            "tooltip": "Install the GitHub CLI (gh)"
+          "differsFromHead": {
+            "status": "Differs from the {changeRequestShort} head"
           },
           "headDiffers": {
-            "label": "PR head {head} ≠ local {local}"
+            "label": "{changeRequestShort} head {head} ≠ local {local}"
           },
           "loadFailed": {
             "error": "Couldn’t load the sync plan: {error}"
@@ -7857,8 +7915,8 @@
           "nothing": {
             "empty": "Nothing to sync"
           },
-          "notInPr": {
-            "status": "Not in the PR"
+          "notInChangeRequest": {
+            "status": "Not in the {changeRequestShort}"
           },
           "notReviewed": {
             "status": "Not reviewed"
@@ -7866,13 +7924,9 @@
           "partial": {
             "status": "Partly reviewed"
           },
-          "prClosed": {
-            "tooltip": "PR #{number} is closed"
-          },
           "refreshRepo": {
             "label": "Refresh repository"
           },
-          "skipped": {},
           "synced": {
             "status": "Synced {count} file | Synced {count} files"
           },
@@ -8005,7 +8059,7 @@
             "label": "Network access"
           },
           "networkOff": {
-            "status": "Claude API only"
+            "status": "{agent} API only"
           },
           "networkOn": {
             "status": "All hosts"
@@ -8075,10 +8129,10 @@
           "status": "Fix round {count} of {max}"
         },
         "modeAgent": {
-          "label": "Agent · background claude -p"
+          "label": "Agent · background {headless}"
         },
         "modeManual": {
-          "label": "Manual · interactive Claude Code"
+          "label": "Manual · interactive {product}"
         },
         "modeOwn": {
           "label": "Manual · your own work"
@@ -8133,7 +8187,7 @@
           "title": "{step} report"
         },
         "resume": {
-          "tooltip": "Continue the interrupted Claude session"
+          "tooltip": "Continue the interrupted {agent} session"
         },
         "skipThis": {
           "label": "Skip this step"
@@ -8148,10 +8202,10 @@
         }
       },
       "takeOverConfirm": {
-        "body": "“{step}” is still running on {branch}. Taking over stops it, marks it stuck and continues it in Claude Code."
+        "body": "“{step}” is still running on {branch}. Taking over stops it, marks it stuck and continues it in {product}."
       },
       "takeOverTaskConfirm": {
-        "body": "“{step}” is still running. Taking over stops it, marks it stuck and continues it in Claude Code."
+        "body": "“{step}” is still running. Taking over stops it, marks it stuck and continues it in {product}."
       },
       "taskPanel": {
         "reviewNote": {
@@ -8170,14 +8224,14 @@
           "option": "Add repository…",
           "tooltip": "Add a branch in this repository; created when work starts"
         },
-        "githubPlaceholder": {
-          "placeholder": "Paste GitHub issue or PR link"
-        },
         "issue": {
           "label": "Issue"
         },
         "jiraPlaceholder": {
           "placeholder": "Paste Jira link or key"
+        },
+        "linkPlaceholder": {
+          "placeholder": "Paste {labels} issue or {shorts} link"
         },
         "notMerging": {
           "hint": "Stays on the plan; never merged."
@@ -8326,7 +8380,7 @@
             "example": "~/…/workflow.yaml"
           },
           "intro": {
-            "body": "A workflow is the list of steps a task goes through. Agent steps run Claude in the background with {command}. Script steps run a command. Review steps wait for your review. Manual steps are your own work, optionally with an interactive Claude Code session. Each step sets the task status."
+            "body": "A workflow is the list of steps a task goes through. Agent steps run {agent} in the background with {headless}. Script steps run a command. Review steps wait for your review. Manual steps are your own work, optionally with an interactive {product} session. Each step sets the task status."
           },
           "new": {
             "label": "New workflow"
@@ -8387,7 +8441,7 @@
             "label": "Allow writes"
           },
           "network": {
-            "hint": "Off: Claude API only.",
+            "hint": "Off: {agent} API only.",
             "label": "Allow network"
           },
           "offWarning": {
@@ -8486,7 +8540,7 @@
             "hint": "Exit code 0 ends with done, any other with failed."
           },
           "session": {
-            "label": "Open an interactive Claude Code session"
+            "label": "Open an interactive {product} session"
           },
           "status": {
             "label": "Task status while in this step"
@@ -8532,7 +8586,7 @@
             "label": "Sends to a new agent"
           },
           "session": {
-            "label": "Interactive Claude Code session"
+            "label": "Interactive {product} session"
           },
           "smart": {
             "label": "Smart"
@@ -8567,9 +8621,6 @@
       "base": {
         "label": "Base"
       },
-      "claudeSession": {
-        "label": "Claude {id}"
-      },
       "day": {
         "earlier": {
           "label": "Earlier"
@@ -8581,17 +8632,14 @@
           "label": "Tomorrow"
         }
       },
-      "githubIssue": {
-        "label": "Issue {ref}"
-      },
-      "githubPr": {
-        "label": "PR {ref}"
-      },
       "hidden": {
         "status": "Hidden"
       },
       "hideLog": {
         "label": "Hide log"
+      },
+      "issue": {
+        "label": "Issue {ref}"
       },
       "move": {
         "label": "Move"
@@ -8960,8 +9008,70 @@
           "label": "Git log level"
         },
         "ignoreRepoSettings": {
-          "description": "Runs claude -p with --setting-sources user. When off, the repository’s Claude settings also load, and their deny rules still apply.",
+          "description": "Runs {headless} with --setting-sources user. When off, the repository’s {agent} settings also load, and their deny rules still apply.",
           "label": "Background agents ignore repository settings"
+        }
+      },
+      "agent": {
+        "keepAwake": {
+          "description": "Prevents idle sleep, and system sleep on mains power, while a {product} terminal tab or a background agent is running. Independent of the title bar’s own keep-awake button. Either one is enough to keep the machine awake.",
+          "label": "Keep this Mac awake while a {product} session is running"
+        },
+        "notify": {
+          "description": "Posts to the system notification centre, and clicking one opens that session. On macOS the first one asks for permission. Reply text only goes to the local notification centre, never off this Mac. Nothing shows while you are looking at that session.",
+          "label": "Notify me when a {product} session needs me"
+        },
+        "notifyFinished": {
+          "label": "When a session finishes"
+        },
+        "notifyIncludeMessage": {
+          "label": "Show the start of the reply in the notification"
+        },
+        "notifyNeedsInput": {
+          "label": "When a session needs input"
+        },
+        "notifyRunEnded": {
+          "label": "When a background ADE run ends"
+        },
+        "sandboxKeychain": {
+          "description": "Lets sandboxed agents read the macOS keychain so {agent} can sign in. Off by default. Without it, set a token from {command} setup-token. Applies on macOS only.",
+          "label": "Keychain access for sandboxed agents"
+        },
+        "usage": {
+          "description": "Shows the 5-hour and weekly limits that {product} sessions started from Kira Space report. {product} hands the numbers to a status-line hook on this Mac. Nothing is sent anywhere, and no login or token is read. Applies to sessions started after you change it. Available on {agent} subscription plans only.",
+          "label": "Show {product} usage limits in the ADE status bar"
+        }
+      },
+      "agentUsage": {
+        "fiveHourLong": {
+          "label": "Five-hour"
+        },
+        "line": {
+          "status": "{window}: {percent}% used · resets {when} (in {left})"
+        },
+        "readFailed": {
+          "error": "Couldn’t read the usage limits."
+        },
+        "session": {
+          "label": "Session"
+        },
+        "sourceRun": {
+          "status": "From a background ADE run, {when}"
+        },
+        "sourceSession": {
+          "status": "From a {product} session, {when}"
+        },
+        "unavailable": {
+          "status": "Usage unavailable"
+        },
+        "unknown": {
+          "status": "Usage: –"
+        },
+        "waiting": {
+          "hint": "Start a {product} session to see usage."
+        },
+        "weeklyLong": {
+          "label": "Weekly"
         }
       },
       "appearance": {
@@ -8984,65 +9094,6 @@
         },
         "wordWrap": {
           "description": "Long lines wrap instead of scrolling, in the file viewer."
-        }
-      },
-      "claudeCode": {
-        "keepAwake": {
-          "description": "Prevents idle sleep, and system sleep on mains power, while a Claude Code terminal tab or a background agent is running. Independent of the title bar’s own keep-awake button. Either one is enough to keep the machine awake.",
-          "label": "Keep this Mac awake while a Claude Code session is running"
-        },
-        "notify": {
-          "description": "Posts to the system notification centre, and clicking one opens that session. On macOS the first one asks for permission. Reply text only goes to the local notification centre, never off this Mac. Nothing shows while you are looking at that session.",
-          "label": "Notify me when a Claude Code session needs me"
-        },
-        "notifyFinished": {
-          "label": "When a session finishes"
-        },
-        "notifyIncludeMessage": {
-          "label": "Show the start of the reply in the notification"
-        },
-        "notifyNeedsInput": {
-          "label": "When a session needs input"
-        },
-        "notifyRunEnded": {
-          "label": "When a background ADE run ends"
-        },
-        "sandboxKeychain": {
-          "description": "Lets sandboxed agents read the macOS keychain so Claude can sign in. Off by default. Without it, set a token from claude setup-token. Applies on macOS only.",
-          "label": "Keychain access for sandboxed agents"
-        },
-        "usage": {
-          "description": "Shows the 5-hour and weekly limits that Claude Code sessions started from Kira Space report. Claude Code hands the numbers to a status-line hook on this Mac. Nothing is sent anywhere, and no login or token is read. Applies to sessions started after you change it. Available on Claude subscription plans only.",
-          "label": "Show Claude Code usage limits in the ADE status bar"
-        }
-      },
-      "claudeUsage": {
-        "fiveHourLong": {
-          "label": "Five-hour"
-        },
-        "line": {
-          "status": "{window}: {percent}% used · resets {when} (in {left})"
-        },
-        "readFailed": {
-          "error": "Couldn’t read the usage limits."
-        },
-        "session": {
-          "label": "Session"
-        },
-        "sourceRun": {
-          "status": "From a background ADE run, {when}"
-        },
-        "sourceSession": {
-          "status": "From a Claude Code session, {when}"
-        },
-        "unavailable": {
-          "status": "Usage unavailable"
-        },
-        "unknown": {
-          "status": "Usage: –"
-        },
-        "weeklyLong": {
-          "label": "Weekly"
         }
       },
       "git": {
@@ -9074,9 +9125,15 @@
           "title": "Git remote operations"
         }
       },
+      "memory": {
+        "agentModel": {
+          "description": "Model for memory store checks, import and distill. Sonnet is the default.",
+          "label": "{agent} model"
+        }
+      },
       "mobileAccess": {
         "agentInput": {
-          "description": "Anyone holding a phone with this on can type into Claude Code and run commands as you. Each phone also needs agent input turned on in its own row below. Turning this off ends every phone terminal now.",
+          "description": "Anyone holding a phone with this on can type into {product} and run commands as you. Each phone also needs agent input turned on in its own row below. Turning this off ends every phone terminal now.",
           "label": "Let phones reply to agents and control their terminals"
         },
         "devices": {
@@ -11623,6 +11680,9 @@
         "revealTab": {
           "label": "Reveal originating tab"
         }
+      },
+      "preconnectDelay": {
+        "status": "Connecting in {remaining}"
       }
     },
     "pager": {
@@ -11795,6 +11855,13 @@
           "label": "Pre-connect command",
           "warning": {
             "body": "This command runs on your machine with your permissions every time this connection connects."
+          }
+        },
+        "preconnectDelay": {
+          "description": "Seconds to wait after the command starts before the first connect attempt. 0 (default) connects as soon as the command is ready. Cancel it while it runs from the operations list.",
+          "label": "Wait before connecting (seconds)",
+          "range": {
+            "status": "Whole seconds, {min}–{max}"
           }
         },
         "privacy": {
@@ -13158,7 +13225,7 @@
     },
     "quitConfirm": {
       "agents": {
-        "label": "Claude sessions: {count}"
+        "label": "{agent} sessions: {count}"
       },
       "body": "Running now: {count}. Quitting stops them. Resume each one later from its run.",
       "quit": {

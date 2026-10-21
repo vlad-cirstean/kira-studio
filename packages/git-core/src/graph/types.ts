@@ -1,16 +1,14 @@
 /**
- * The contract between `CommitStore` (W4), the lane-layout algorithm (W6-W9), and the thread
- * the layout eventually runs on (P4's worker). Written before the algorithm because the buffer
- * layout is the part the IPC contract (P3) and the renderer (P4) have to agree with, and
- * because the decisions in it are the ones that are expensive to change later — see
- * `docs/plans/P2.md`'s "Where the worker line falls" for why the worker *file* is P4's while
- * this contract and the algorithm behind it are P2's.
+ * The contract between `CommitStore`, the lane-layout algorithm, and the thread
+ * the layout eventually runs on. Written before the algorithm because the buffer
+ * layout is the part the IPC contract and the renderer have to agree with, and
+ * because the decisions in it are the ones that are expensive to change later.
  */
 
 /** The row range `CommitStore.layoutInput()` hands to `layoutAppend()`, plus the parent CSR
  *  slice it reads. `parentOffsets`/`parentRows` are the *whole* store's columns (absolute
  *  indices), not sliced to `[from, to)` — the algorithm needs to see resolved parents outside
- *  the new range to patch edges emitted in an earlier chunk (§5.2's "route remaining parents"
+ *  the new range to patch edges emitted in an earlier chunk (the "route remaining parents"
  *  step can reach back across a page boundary). */
 export interface LayoutInput {
   readonly from: number;
@@ -71,7 +69,7 @@ export interface LayoutChunk {
    *  previous page's edges without re-laying it out. `toRow`/`toLane` each carry
    *  `PATCH_UNCHANGED` when that particular field is not what this record is patching, so a
    *  `toRow`-only resolution (a parent page loading) and a `toLane`-only convergence
-   *  (G21 D3: a lane discovered to converge into another at its target row) share one record
+   *  (a lane discovered to converge into another at its target row) share one record
    *  shape and one applier loop instead of two. Empty when this chunk patched nothing outside
    *  itself. */
   readonly patches: Uint32Array;
@@ -103,7 +101,7 @@ export interface LayoutFrontier {
   /** Colour assigned to each currently-open lane, parallel to `openLanes`; meaningless where
    *  the lane is `LANE_EMPTY`. */
   readonly laneColors: readonly number[];
-  /** G21 D3a: the *global* edge index of the edge that last set `openLanes[lane]` to a real row
+  /** The *global* edge index of the edge that last set `openLanes[lane]` to a real row
    *  (not `LANE_PENDING`), parallel to `openLanes`/`laneColors`; `-1` where the lane holds no
    *  such edge (empty, or still pending). This is what lets step 2's convergence discovery
    *  (`lanes.ts`) patch the *edge*, not just the lane bookkeeping, once a second lane turns out
@@ -146,8 +144,8 @@ export interface ColorState {
 export const DEFAULT_PALETTE_SIZE = 8;
 
 // ---------------------------------------------------------------------------------------
-// Worker message shapes (types only) — what P4's layout.worker.ts will speak. Declared here,
-// not invented separately by P3's IPC contract and P4's worker, so the two cannot drift.
+// Worker message shapes (types only) — what layout.worker.ts will speak. Declared here,
+// not invented separately by the IPC contract and the worker, so the two cannot drift.
 // ---------------------------------------------------------------------------------------
 
 export interface LayoutRequest {

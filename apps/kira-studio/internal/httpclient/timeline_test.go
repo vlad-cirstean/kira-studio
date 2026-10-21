@@ -12,8 +12,8 @@ import (
 	"testing"
 )
 
-// §6.2: seven cases guarding the bucketing (order-dependent across two goroutines, F14) and the
-// two measured phase-arithmetic traps (F8, F9) — not CRUD round trips. Explicitly not tested:
+// Seven cases guarding the bucketing (order-dependent across two goroutines) and the
+// two measured phase-arithmetic traps — not CRUD round trips. Explicitly not tested:
 // that httptrace fires at all (stdlib), that a float64 rounds, that an absent phase marshals to a
 // missing key (a json tag) — each restates a short function body (CLAUDE.md).
 
@@ -305,7 +305,7 @@ func TestTimeline_HeaderCapTruncatesAndFlagsElision(t *testing.T) {
 	}
 }
 
-// ---- 7. Concurrency (F14/F15) ----
+// ---- 7. Concurrency ----
 //
 // 16 concurrent sends of the same 3-redirect chain, each asserting four hops with the right
 // statuses — the collector's own proof that it is race-free (run this file with -race, per

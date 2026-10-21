@@ -1,4 +1,4 @@
-// P74 §7.3: openRepoFileTab's own existing-tab lookup includes `rev` — the worktree file and the
+// openRepoFileTab's own existing-tab lookup includes `rev` — the worktree file and the
 // same path at a revision (or at two different revisions) must never collapse into one tab, the
 // identical class of gap openRepoReviewDiffTab's own bug (repo-review-diff-tab.spec.ts) guards one
 // kind over. Also covers repoFileTitle carrying the short rev (tabKinds.ts), the one visible signal
@@ -13,7 +13,7 @@ import { pinia } from '../../frontend/src/state/pinia';
 setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
-// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — restoreAfterEach restores control back to its real (never-settling in this
 // harness) tabsSave after every test, so a one-time override here only covered this file's first
 // test. The override is set *before* restoreAfterEach snapshots control, not in beforeEach: the

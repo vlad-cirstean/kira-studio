@@ -1,5 +1,5 @@
-// sort_internal_test.go is P21 round 3 performance finding 7: listTablesAndViews' sort used to be
-// a hand-rolled O(n²) insertion sort, justified only by "sort.SliceStable would need the `sort`
+// sort_internal_test.go: listTablesAndViews' sort used to be a hand-rolled O(n²) insertion sort,
+// justified only by "sort.SliceStable would need the `sort`
 // import" — already wrong, since sqlite/catalog.go imports it for exactly this. Rewritten to
 // sort.SliceStable over a precomputed lowercased-name slice; this pins the rewrite as behavior-
 // preserving (tables before views/matviews, then a case-insensitive name compare, stable on ties).

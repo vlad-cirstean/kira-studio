@@ -2,7 +2,7 @@ import { buildPackedChunk } from '@kira/git-core/testing/packedChunk';
 import type { PackedCommitChunk } from '@kira/git-ipc';
 import { encodeStreamPayload } from '@kira/git-ipc/codec';
 
-// P92 item 5: `gitStreamMock.ts`'s own doc comment flags `graph.stream` as a known gap (P74/P75)
+// `gitStreamMock.ts`'s own doc comment flags `graph.stream` as a known gap
 // — its `resultByMethod` dict only ever answers a plain unary `req`/`res`, and `graph.stream`
 // opens as a `t: 'open'` stream, pushing `t: 'chunk'` frames that carry one real binary payload
 // (the packed commit rows, FlatBuffers-encoded by `graphChunkCodec.ts`'s `toWire`, wrapped by
@@ -23,7 +23,7 @@ export function buildOneCommitChunk(sha: string, subject: string): PackedCommitC
   return buildPackedChunk([{ sha, subject }]);
 }
 
-// P93 §8.4: a multi-branch fixture — `fakeGraphHost.ts`'s own `buildBranchOrderChunk` (the VS
+// A multi-branch fixture — `fakeGraphHost.ts`'s own `buildBranchOrderChunk` (the VS
 // Code interaction suite's analogous fixture) builds the same table via the shared
 // `@kira/git-core/testing/packedChunk` builder. Same shape: `main` (HEAD, 3 commits) plus two
 // feature branches forked off it at different depths, one long enough to collapse (n >

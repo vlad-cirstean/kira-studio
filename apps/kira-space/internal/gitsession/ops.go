@@ -17,18 +17,17 @@ import (
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
-// ErrInvalidResetMode is prepareReset's own validation refusal (G30 round-1 architecture/security
-// review, finding #5) — op.Mode must be "soft", "mixed" or "hard", the same three op.run's own
-// write path was always meant to be reachable with; preflight.reset (gitrpc/reset.go) already
-// validates this, but the write path did not.
+// ErrInvalidResetMode is prepareReset's own validation refusal — op.Mode must be "soft", "mixed" or
+// "hard", the same three op.run's own write path was always meant to be reachable with;
+// preflight.reset (gitrpc/reset.go) already validates this, but the write path did not.
 var ErrInvalidResetMode = errors.New("gitsession: reset mode must be soft, mixed, or hard")
 
 // ErrInvalidOpArg mirrors gitrpc's own validRefArg (review.go): every read-side RPC that lets a
 // client-supplied ref/sha/name reach a git argv already runs it through validRefArg first
-// (non-empty, no leading "-") before D8's "the one entrance a client-supplied ref name reaches an
+// (non-empty, no leading "-") before "the one entrance a client-supplied ref name reaches an
 // argv" — op.run's own write path never had the same guard, even though its prepare* functions
-// below splice OpRequest fields into argv exactly the same way (G32 round-3 architecture/security
-// review, finding #4). A value beginning with "-" would be read by git as a flag of its own rather
+// below splice OpRequest fields into argv exactly the same way.
+// A value beginning with "-" would be read by git as a flag of its own rather
 // than the name/rev/sha it is meant to be — many git subcommands scan their WHOLE argv for
 // dash-prefixed tokens, not just a leading one, so this applies at every position, not only the
 // first.
@@ -60,9 +59,9 @@ type OpRequest struct {
 	Target              string `json:"target,omitempty"` // checkout, tagCreate
 	Mode                string `json:"mode,omitempty"`   // checkout: "switch" | "detach"
 	DiscardLocalChanges bool   `json:"discardLocalChanges,omitempty"`
-	// AutoStash is G28 D3's own checkout addition: prepend a whole-tree `stash push [-u]` tagged
-	// with the CURRENT branch, so the switch cannot be blocked by a dirty tree. Never popped back
-	// (D1). Mutually exclusive with DiscardLocalChanges — prepareCheckout refuses both at once
+	// AutoStash is the checkout addition: prepend a whole-tree `stash push [-u]` tagged
+	// with the CURRENT branch, so the switch cannot be blocked by a dirty tree. Never popped back.
+	// Mutually exclusive with DiscardLocalChanges — prepareCheckout refuses both at once
 	// rather than guessing which the caller meant.
 	AutoStash bool `json:"autoStash,omitempty"` // checkout
 
@@ -92,21 +91,21 @@ type OpRequest struct {
 	RestoreIndex     bool     `json:"restoreIndex,omitempty"`     // stashApply/stashPop
 	Branch           string   `json:"branch,omitempty"`           // stashBranch
 
-	// ConfirmToken is G22's own addition (D8): reset's own typed confirmation, required (and
-	// re-checked host-side by prepareReset) exactly when Mode == "hard" and destroys, recomputed
-	// fresh from a status read immediately before the write, is non-empty. A pointer: the wire's
-	// own `string | undefined` (contract.ts's own OpRequest.reset.confirmToken). G25 reuses this
-	// same field for worktreeRemove's own typed confirmation (the worktree's basename, D8) — same
-	// "optional, re-checked host-side against a fresh recompute" shape, different op kind.
+	// ConfirmToken is reset's own typed confirmation, required (and re-checked host-side by
+	// prepareReset) exactly when Mode == "hard" and destroys, recomputed fresh from a status read
+	// immediately before the write, is non-empty. A pointer: the wire's own `string | undefined`
+	// (contract.ts's own OpRequest.reset.confirmToken). This same field is reused for
+	// worktreeRemove's own typed confirmation (the worktree's basename) — same "optional,
+	// re-checked host-side against a fresh recompute" shape, different op kind.
 	ConfirmToken *string `json:"confirmToken,omitempty"` // reset, worktreeRemove
 
-	// Path is G25 D2's own addition — worktreeAdd's target path and worktreeRemove's target
-	// worktree, both absolute (the client always resolves against basePath/the repo root before
-	// sending). Mode/Branch/StartPoint/Force above are ALL reused as-is for the two new kinds:
+	// Path is worktreeAdd's target path and worktreeRemove's target worktree, both absolute (the
+	// client always resolves against basePath/the repo root before sending).
+	// Mode/Branch/StartPoint/Force above are ALL reused as-is for the two new kinds:
 	// Mode carries worktreeAdd's "existingBranch"|"newBranch"|"detach", Branch its branch name,
 	// StartPoint its explicit commit-ish, and Force worktreeRemove's own client-claimed force —
-	// though prepareWorktreeRemove never actually trusts that claim, recomputing it fresh from the
-	// server-side preflight verdict instead (D8's own fail-safe-over-fail-open principle).
+	// though prepareWorktreeRemove never trusts that claim, recomputing it fresh from the
+	// server-side preflight verdict instead (the fail-safe-over-fail-open principle).
 	Path string `json:"path,omitempty"` // worktreeAdd, worktreeRemove
 
 	// Parent is G26 D10's own stackSet addition — nil means "remove Branch from its stack" (D2
@@ -117,12 +116,11 @@ type OpRequest struct {
 	// single-line, validated host-side (a newline would corrupt the reflog-subject-shaped line
 	// every reader of this bucket parses).
 	Label string `json:"label,omitempty"` // globalStashSave
-	// Scope is G28 D17's own addition, threaded through the wire's own widened preflight/stash.show
-	// params (a later step) — "" or "stack" for the ordinary stack, "global" for the bucket. Sha
-	// above is reused as-is for globalStashRemove's own target (D11) and, when non-empty, for
-	// globalStashSave's own "promote an existing entry" source (D10) — the source there is resolved
-	// across BOTH buckets (resolveStashEntryAnyScope), so it deliberately carries no Scope of its
-	// own.
+	// Scope is threaded through the wire's own widened preflight/stash.show params — "" or "stack"
+	// for the ordinary stack, "global" for the bucket. Sha above is reused as-is for
+	// globalStashRemove's own target and, when non-empty, for globalStashSave's own "promote an
+	// existing entry" source — the source there is resolved across BOTH buckets
+	// (resolveStashEntryAnyScope), so it deliberately carries no Scope of its own.
 	Scope string `json:"scope,omitempty"`
 }
 
@@ -157,7 +155,7 @@ type prepared struct {
 	argvList   [][]string
 	undo       *gitpreflight.UndoRecord
 	earlyError *OpError
-	// autoStashApplied is prepareCheckout's own F12 signal (P108 Part 16 review): true exactly
+	// autoStashApplied is prepareCheckout's own signal: true exactly
 	// when argvList's own first entry is the auto-stash's `stash push` — RunOp uses it to enrich
 	// a later argv's own failure message with "your changes were stashed", rather than leaving
 	// that fact silent, once a real stash exists to point to.
@@ -169,35 +167,34 @@ type prepared struct {
 	expectRefs []string
 }
 
-// opSpec is one opTable entry (D6) — the Go stand-in for upstream's TypeScript mapped type
+// opSpec is one opTable entry — the Go stand-in for upstream's TypeScript mapped type
 // (UNDO_POLICY): Undo and Prepare live in the SAME struct literal, so there is no second place to
 // forget an undo policy when adding an operation. TestOpTable_EveryEntryStatesAnUndoPolicy is what
 // stands where `tsc` stood upstream.
 type opSpec struct {
 	Undo    gitpreflight.UndoPolicy
 	Prepare func(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error)
-	// Reclassify: nil for every kind that does not need it (fourteen of seventeen served kinds
-	// after G22). When set, called AFTER the write loop and AFTER the post-write
+	// Reclassify: nil for every kind that does not need it (fourteen of seventeen served kinds).
+	// When set, called AFTER the write loop and AFTER the post-write
 	// statusAndInProgress read RunOp already performs — reusing that read, not adding a second one
 	// — with the raw OpError the stderr-only classification produced (nil on a clean exit), the
 	// fresh porcelain.StatusResult, and the fresh *gitpreflight.InProgressOperation (nil when
-	// nothing is in progress). G22 widened this by the third parameter: an empty cherry-pick is
-	// distinguishable from every other clean-tree pick failure ONLY by CHERRY_PICK_HEAD still
-	// being set, which lives in the in-progress classification, never in status output. Returns
-	// the OpError RunOp should actually report; a kind with no Reclassify keeps the stderr-only
-	// result unchanged.
+	// nothing is in progress). An empty cherry-pick is distinguishable from every other clean-tree
+	// pick failure ONLY by CHERRY_PICK_HEAD still being set, which lives in the in-progress
+	// classification, never in status output. Returns the OpError RunOp should report; a kind with
+	// no Reclassify keeps the stderr-only result unchanged.
 	Reclassify func(opErr *OpError, status porcelain.StatusResult, inProgress *gitpreflight.InProgressOperation) *OpError
 }
 
-// opTable serves twenty-two of OpRequest's twenty-four kinds (D5) — the other two (tagPush/
+// opTable serves twenty-two of OpRequest's twenty-four kinds — the other two (tagPush/
 // tagDeleteRemote) answer ErrUnservedOpKind, never a stub. Labels are ported verbatim from
-// undo/slot.ts's own UNDO_POLICY; G17 added the five stash kinds (note stashDrop's own Undo:
+// undo/slot.ts's own UNDO_POLICY; the five stash kinds (note stashDrop's own Undo:
 // undo/slot.ts marks it undoable, not notUndoable like its four stash siblings —
-// captureStashDropUndo below is why); G22 adds reset/cherryPick, both undoable (D9); G28 adds
-// globalStashSave (notUndoable — copies, never drops its source, D10) and globalStashRemove
-// (undoable — the cleanest undo in the table, an exact single-argv replay, D11).
+// captureStashDropUndo below is why); reset/cherryPick, both undoable; globalStashSave
+// (notUndoable — copies, never drops its source) and globalStashRemove
+// (undoable — the cleanest undo in the table, an exact single-argv replay).
 var opTable = map[string]opSpec{
-	// checkout: notUndoable, its reason widened at G28 D3 to name the auto-stash honestly — an
+	// checkout: notUndoable, its reason widened to name the auto-stash honestly — an
 	// auto-stashed switch leaves a clean tree on the new branch, and the reason text is the one
 	// place a user re-discovering this op later (via the undo-slot tooltip's own reason fallback)
 	// learns where their work went.
@@ -285,12 +282,12 @@ var opTable = map[string]opSpec{
 		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.Undoable},
 		Prepare: prepareReset,
 	},
-	// cherryPick: undoable (D9) via `reset --keep <prev>` — never `--hard`, since a pick is legal
+	// cherryPick: undoable via `reset --keep <prev>` — never `--hard`, since a pick is legal
 	// with unrelated dirt already in the tree and `--keep` refuses rather than destroy it.
 	// Withheld entirely for `--no-commit` (that pick moves no ref) and for a conflicting/empty
 	// pick (RunOp's own `succeeded` gate drops it, no per-kind logic needed). Reclassify detects
-	// F6's own EmptyCherryPick, which G17's seam could not: it needs CHERRY_PICK_HEAD, which lives
-	// in the in-progress classification, never in status output.
+	// the EmptyCherryPick, which the seam could not: it needs CHERRY_PICK_HEAD, which lives in the
+	// in-progress classification, never in status output.
 	"cherryPick": {
 		Undo:       gitpreflight.UndoPolicy{Kind: gitpreflight.Undoable},
 		Prepare:    prepareCherryPick,
@@ -303,10 +300,10 @@ var opTable = map[string]opSpec{
 		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.NotUndoable, Reason: "Remove the worktree to undo this."},
 		Prepare: prepareWorktreeAdd,
 	},
-	// worktreeRemove: notUndoable (F8) — a removed worktree's own modified/untracked files are not
-	// recoverable by any git argv at all (F8's own doc comment); this is the one kind in the whole
+	// worktreeRemove: notUndoable — a removed worktree's own modified/untracked files are not
+	// recoverable by any git argv at all; this is the one kind in the whole
 	// opTable whose "undo" would require restoring deleted files from nowhere, so it is never
-	// offered even the honest "no undo" framing a ref-only op gets — G22 D8's typed-confirmation
+	// offered even the honest "no undo" framing a ref-only op gets — the typed-confirmation
 	// pattern (prepareWorktreeRemove) is what stands in for undo here instead.
 	"worktreeRemove": {
 		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.NotUndoable, Reason: "Removed worktree files cannot be recovered — there is no undo for this."},
@@ -326,7 +323,7 @@ var opTable = map[string]opSpec{
 		Undo:    gitpreflight.UndoPolicy{Kind: gitpreflight.NotUndoable, Reason: "Remove it from the global stash to undo this."},
 		Prepare: prepareGlobalStashSave,
 	},
-	// globalStashRemove: undoable (D11) — the cleanest undo in the whole table: the replay is an
+	// globalStashRemove: undoable — the cleanest undo in the whole table: the replay is an
 	// EXACT single `update-ref <ref> <sha>` recreating the same ref at the same object, no
 	// positional ambiguity at all (contrast stashDrop's own `stash store`, which is not guaranteed
 	// to land back at the same stack index).
@@ -336,23 +333,22 @@ var opTable = map[string]opSpec{
 	},
 }
 
-// prepareCheckout is checkout's own Prepare, widened at G28 D3 by the auto-stash arm: when
+// prepareCheckout is checkout's own Prepare, widened by the auto-stash arm: when
 // op.AutoStash is set, a whole-tree `stash push [-u]` argv is PREPENDED to the switch argv this
 // function already built, so both run in order under RunOp's own single e.Repo.Write acquisition
-// (F6, and F12/P108 Part 16 review: this claim did not actually hold until runWriteArgvList
-// replaced the old per-argv runWriteArgv loop — each argv used to take Repo.Write SEPARATELY,
-// leaving a real window for another write to land between the stash and the switch) — there is no
-// window in which the tree is stashed and the switch never happened. If the switch still fails
-// after the stash succeeded (a real git-level conflict, not a race), RunOp appends the exact stash
-// ref to the error message (autoStashApplied) rather than leaving that fact silent. Never pops back
-// (D1) — the entry stays in the stash list, tagged with the CURRENT branch via git's own reflog-
-// subject convention, cross-branch apply (D5) is the deliberate, user-initiated recovery path.
+// (this claim did not hold until runWriteArgvList replaced the old per-argv runWriteArgv loop —
+// each argv used to take Repo.Write SEPARATELY, leaving a real window for another write to land
+// between the stash and the switch) — there is no window in which the tree is stashed and the
+// switch never happened. If the switch still fails after the stash succeeded (a real git-level
+// conflict, not a race), RunOp appends the exact stash ref to the error message (autoStashApplied)
+// rather than leaving that fact silent. Never pops back — the entry stays in the stash list,
+// tagged with the CURRENT branch via git's own reflog-
+// subject convention, cross-branch apply is the deliberate, user-initiated recovery path.
 func prepareCheckout(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
-	// G32 round-3 architecture/security review, finding #4: op.Target reaches SwitchArgs/
-	// SwitchDetachArgs/SwitchCreateTrackingArgs as a bare argv token below — unresolved (the "sha"
-	// fallback in resolveCheckoutTarget) when it does not match a known branch/tag/remote-branch
-	// name, so a leading "-" was never actually screened out on this path the way it is for the
-	// read-side RPCs.
+	// op.Target reaches SwitchArgs/SwitchDetachArgs/SwitchCreateTrackingArgs as a bare argv token
+	// below — unresolved (the "sha" fallback in resolveCheckoutTarget) when it does not match a
+	// known branch/tag/remote-branch name, so a leading "-" was never screened out on this path
+	// the way it is for the read-side RPCs.
 	if err := validOpArg("target", op.Target); err != nil {
 		return prepared{}, err
 	}
@@ -388,7 +384,7 @@ func prepareCheckout(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op O
 		return prepared{argvList: [][]string{switchArgv}}, nil
 	}
 
-	// D3 step 2 (F15/probe P17): a host-side in-progress re-check BEFORE any argv is built —
+	// A host-side in-progress re-check BEFORE any argv is built —
 	// `stash push` during a conflicted merge exits non-zero with EMPTY stderr, which
 	// ClassifyOpError would misclassify as Unknown. A pre-flight is advice, not a lock; a dialog
 	// can sit open arbitrarily long between the pre-flight read and this write.
@@ -403,9 +399,9 @@ func prepareCheckout(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op O
 		}}, nil
 	}
 
-	// D3 step 3: recompute dirtiness from THIS status read, never the client's claim — a stale
-	// pre-flight could otherwise stash a tree that has since gone clean (probe P16: `stash push` on
-	// a clean tree prints "No local changes to save" and creates no entry, which would be a
+	// Recompute dirtiness from THIS status read, never the client's claim — a stale pre-flight
+	// could otherwise stash a tree that has since gone clean (`stash push` on a clean tree prints
+	// "No local changes to save" and creates no entry, which would be a
 	// confusing no-op announcement). Nothing dirty -> omit the stash argv entirely.
 	dirty := gitpreflight.DirtyPaths(statusResult)
 	if len(dirty) == 0 {
@@ -459,11 +455,11 @@ func prepareBranchCreate(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op
 	return p, nil
 }
 
-// prepareBranchDelete is branchDelete's own Prepare, widened at G26 §10.9/D-3.12 to re-parent the
+// prepareBranchDelete is branchDelete's own Prepare, widened to re-parent the
 // deleted branch's own stack children onto ITS OWN parent (possibly "", if the deleted branch was
 // itself not stacked) — "PR 1 merged, delete branch 1, branches 2..n now sit on main" is the single
 // most common stack lifecycle event, and leaving the children pointing at a now-gone branch would
-// make the feature feel broken at exactly the moment it should feel best (§10.9). The undo record
+// make the feature feel broken at exactly the moment it should feel best. The undo record
 // is captured FIRST (before either the delete or the re-parent writes), widened by
 // captureBranchDeleteUndo itself to also restore every child's own prior pointer.
 func prepareBranchDelete(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error) {
@@ -590,7 +586,7 @@ func prepareStashApply(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op O
 }
 
 // stashPositionMismatch verifies `rev-parse stash@{index} == sha` immediately before a
-// position-addressed write (pop/drop/branch — probe 8: none of the three can address by sha alone),
+// position-addressed write (pop/drop/branch — none of the three can address by sha alone),
 // per the contract's own "the service verifies... immediately before writing" convention
 // (contract.ts:603-604). A non-nil *OpError is an early refusal — no write is ever spawned.
 func stashPositionMismatch(ctx context.Context, e *RepoEntry, index int, sha string) (*OpError, error) {
@@ -631,13 +627,13 @@ func prepareStashDrop(ctx context.Context, e *RepoEntry, conn ConnID, connLabel 
 	return prepared{argvList: [][]string{gitops.StashDropArgs(op.Index)}, undo: undo}, nil
 }
 
-// prepareStashBranch gains its G28 D12 arm: for op.Scope == "global", there is no stack position
+// For op.Scope == "global", there is no stack position
 // to verify at all (a global entry is addressed purely by sha), so this skips
-// stashPositionMismatch entirely and uses StashBranchByShaArgs — probe 8's own "given a raw sha,
+// stashPositionMismatch entirely and uses StashBranchByShaArgs — the "given a raw sha,
 // `stash branch` applies but silently never drops" finding is precisely the desired behaviour for
 // a keep-forever bucket entry.
 func prepareStashBranch(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
-	// G32 round-3 architecture/security review, finding #4: op.Branch reaches StashBranchArgs/
+	// op.Branch reaches StashBranchArgs/
 	// StashBranchByShaArgs as a bare argv token on both arms below; op.Sha reaches
 	// StashBranchByShaArgs the same way on the global arm only (the stack arm addresses by
 	// position, verified fresh by stashPositionMismatch, never by op.Sha itself).
@@ -660,22 +656,22 @@ func prepareStashBranch(ctx context.Context, e *RepoEntry, _ ConnID, _ string, o
 	return prepared{argvList: [][]string{gitops.StashBranchArgs(op.Branch, op.Index)}}, nil
 }
 
-// prepareGlobalStashSave is globalStashSave's own Prepare (D10), two sources, always COPYING and
+// prepareGlobalStashSave is globalStashSave's own Prepare, two sources, always COPYING and
 // never dropping either one:
 //
 //  1. Validate label: non-empty after trim, no newline (a newline would corrupt the reflog-
 //     subject-shaped line every reader of this bucket parses).
 //  2. Source = the CURRENT working tree (op.Sha == ""): `git stash create <label>` through runOne
-//     — a read-pool spawn that writes only loose objects and touches no ref, index or worktree
-//     (probe P4), the same latitude stashPopPrediction's own `merge-tree --write-tree` already
-//     takes. Empty output means a clean tree (probe P4) -> NothingToStash, no write.
+//     — a read-pool spawn that writes only loose objects and touches no ref, index or worktree,
+//     the same latitude stashPopPrediction's own `merge-tree --write-tree` already
+//     takes. Empty output means a clean tree -> NothingToStash, no write.
 //  3. Source = an EXISTING entry (op.Sha != ""): resolved fresh across BOTH buckets
 //     (resolveStashEntryAnyScope) -> NotFound if absent. `commit-tree` over the source's own tree
 //     and parent list under a NEW subject that PRESERVES the source's own origin-branch tag
-//     (probe P23) — never re-stamped with whatever is checked out now.
+//     — never re-stamped with whatever is checked out now.
 //
 // Either way, the one write this function ever prepares is `update-ref <ref> <newSha>` —
-// idempotent (probe P10) — never a second argv, never anything that could drop the source.
+// idempotent — never a second argv, never anything that could drop the source.
 func prepareGlobalStashSave(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
 	label := strings.TrimSpace(op.Label)
 	if label == "" || strings.ContainsAny(op.Label, "\n\r") {
@@ -739,15 +735,15 @@ func prepareGlobalStashSave(ctx context.Context, e *RepoEntry, _ ConnID, _ strin
 	return prepared{argvList: [][]string{gitops.GlobalStashSetArgs(newSha)}}, nil
 }
 
-// prepareGlobalStashRemove is globalStashRemove's own Prepare (D11) — the cleanest undo in the
+// prepareGlobalStashRemove is globalStashRemove's own Prepare — the cleanest undo in the
 // whole opTable:
 //
-//  1. A required existence check (GlobalStashRefExistsArgs) BEFORE the write — probe P10:
+//  1. A required existence check (GlobalStashRefExistsArgs) BEFORE the write:
 //     `update-ref -d` on an absent ref exits 0 SILENTLY, which would otherwise make "remove
 //     nothing" look like a successful removal.
 //  2. The undo record captured before the write: an EXACT `update-ref <ref> <sha>` replay
 //     (GlobalStashSetArgs, the same builder globalStashSave's own write uses — re-creating an
-//     identical ref at an identical object is idempotent, probe P10) — no positional ambiguity at
+//     identical ref at an identical object is idempotent) — no positional ambiguity at
 //     all, unlike stashDrop's own `stash store` replay.
 //  3. The delete itself uses the expected-old-value form (GlobalStashDeleteArgs), so a concurrent
 //     change to the same ref refuses rather than silently deleting whatever now sits there.
@@ -792,15 +788,14 @@ func prepareGlobalStashRemove(ctx context.Context, e *RepoEntry, conn ConnID, co
 	return prepared{argvList: [][]string{gitops.GlobalStashDeleteArgs(op.Sha)}, undo: undo}, nil
 }
 
-// prepareReset is reset's own Prepare (D8/D9). P10 probe 3: git itself only refuses a --soft
-// reset mid-merge — --mixed/--hard succeed and silently delete MERGE_HEAD, abandoning the
-// operation. This host-side gate is the ONLY thing standing between a user and that data loss,
-// re-checked here immediately before the write — a pre-flight is advice, not a lock. The same
-// status read doubles as the FRESH state destroys is recomputed from below (D8's second re-check)
-// and the pre-write HEAD sha the undo record captures (F12).
+// prepareReset is reset's own Prepare. git itself only refuses a --soft reset mid-merge —
+// --mixed/--hard succeed and silently delete MERGE_HEAD, abandoning the operation. This host-side
+// gate is the ONLY thing standing between a user and that data loss, re-checked here immediately
+// before the write — a pre-flight is advice, not a lock. The same status read doubles as the FRESH
+// state destroys is recomputed from below and the pre-write HEAD sha the undo record captures.
 func prepareReset(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error) {
-	// G30 round-1 architecture/security review, finding #5: unlike preflight.reset (gitrpc/reset.go),
-	// the WRITE path never validated op.Mode — it reached ResetArgs verbatim, building
+	// Unlike preflight.reset (gitrpc/reset.go), the WRITE path never validated op.Mode — it reached
+	// ResetArgs verbatim, building
 	// `reset --<mode> <target>`. ResetArgs' own doc comment already documents "keep" as
 	// deliberately unreachable through this string (reserved for the undo replay's ResetKeepArgs);
 	// with no validation here a client could reach it directly (or any other `git reset` long
@@ -853,10 +848,10 @@ func prepareReset(ctx context.Context, e *RepoEntry, conn ConnID, connLabel stri
 		}
 	}
 
-	// D9/F9: captured BEFORE the write, so the undo's replay can match THIS reset's own mode — the
+	// Captured BEFORE the write, so the undo's replay can match THIS reset's own mode — the
 	// reflog cannot supply it (every reset logs `reset: moving to <sha>`, soft or hard alike), so
 	// capture-before is the only mechanism, exactly as for branch/tag delete and stash drop.
-	// F12: statusResult.Branch.OID is "" on an unborn HEAD — no undo record is captured then,
+	// statusResult.Branch.OID is "" on an unborn HEAD — no undo record is captured then,
 	// which is correct, since there is no commit to return to.
 	var undo *gitpreflight.UndoRecord
 	if statusResult.Branch.OID != "" {
@@ -879,10 +874,10 @@ func prepareReset(ctx context.Context, e *RepoEntry, conn ConnID, connLabel stri
 	return prepared{argvList: [][]string{gitops.ResetArgs(op.Mode, op.Target)}, undo: undo, expectRefs: []string{"HEAD"}}, nil
 }
 
-// prepareCherryPick is cherryPick's own Prepare (D8/D9). Same rationale as prepareReset's own
-// re-check just above — probe 3 is reset's own finding, but the gate is the same mechanism and a
-// stale pre-flight is exactly as possible here (git DOES refuse a second cherry-pick mid-sequence,
-// but not every in-progress kind — the host-side gate covers all of them uniformly).
+// prepareCherryPick is cherryPick's own Prepare. Same rationale as prepareReset's own
+// re-check just above — the gate is the same mechanism and a stale pre-flight is exactly as
+// possible here (git DOES refuse a second cherry-pick mid-sequence, but not every in-progress
+// kind — the host-side gate covers all of them uniformly).
 func prepareCherryPick(ctx context.Context, e *RepoEntry, conn ConnID, connLabel string, op OpRequest) (prepared, error) {
 	// G32 round-3 architecture/security review, finding #4: reaches CherryPickArgs as a bare argv
 	// token, with no resolution step of its own (unlike reset's op.Target, which resolveCommit now
@@ -918,12 +913,11 @@ func prepareCherryPick(ctx context.Context, e *RepoEntry, conn ConnID, connLabel
 	return prepared{argvList: [][]string{gitops.CherryPickArgs(op.Sha, op.Mainline, op.NoCommit)}, undo: undo, expectRefs: []string{"HEAD"}}, nil
 }
 
-// reclassifyCherryPick is cherryPick's own Reclassify (D6/F6). Probe 6: an empty pick exits
-// non-zero, leaves CHERRY_PICK_HEAD set, a clean worktree and ZERO unmerged paths —
-// indistinguishable from a fully-resolved pick by state files alone, and its whole message ("The
-// previous cherry-pick is now empty…") goes to STDOUT, so the stderr-only table could only ever
-// say Unknown. The banner offers both Continue and Skip and names which is which, rather than
-// guessing.
+// reclassifyCherryPick is cherryPick's own Reclassify. An empty pick exits non-zero, leaves
+// CHERRY_PICK_HEAD set, a clean worktree and ZERO unmerged paths — indistinguishable from a
+// fully-resolved pick by state files alone, and its whole message ("The previous cherry-pick is now
+// empty…") goes to STDOUT, so the stderr-only table could only ever say Unknown. The banner offers
+// both Continue and Skip and names which is which, rather than guessing.
 func reclassifyCherryPick(opErr *OpError, status porcelain.StatusResult, inProgress *gitpreflight.InProgressOperation) *OpError {
 	// Upstream's own guard, kept: a pick that failed for a NAMED reason (MainlineRequired,
 	// Conflict, LockHeld) must never be re-labelled an empty pick just because the tree happens to
@@ -944,15 +938,14 @@ func reclassifyCherryPick(opErr *OpError, status porcelain.StatusResult, inProgr
 	}
 }
 
-// reclassifyStashPop is stashPop's/stashApply's own Reclassify (D6/D7). Probe 5: a conflicting
-// pop/apply writes to stdout and leaves stderr EMPTY — ClassifyOpError's stderr-only path already
-// misclassified this as "Unknown"; the post-write status read-back RunOp already fetches is what
-// tells a real conflict apart from every other non-zero exit here. D7: the "untracked working tree
-// file" stderr pattern is shared with checkout's own blocker, so its generic
-// UntrackedWouldBeOverwritten kind is remapped to the stash-specific StashUntrackedCollision here —
-// the one place with the caller context (stash pop/apply) ClassifyOpError itself does not have.
-// The third parameter (G22's own widening, D6) is unused here — an empty cherry-pick is the only
-// kind that needs it.
+// reclassifyStashPop is stashPop's/stashApply's own Reclassify. A conflicting pop/apply writes
+// to stdout and leaves stderr EMPTY — ClassifyOpError's stderr-only path already misclassified
+// this as "Unknown"; the post-write status read-back RunOp already fetches is what tells a real
+// conflict apart from every other non-zero exit here. The "untracked working tree file" stderr
+// pattern is shared with checkout's own blocker, so its generic UntrackedWouldBeOverwritten kind
+// is remapped to the stash-specific StashUntrackedCollision here — the one place with the caller
+// context (stash pop/apply) ClassifyOpError itself does not have. The third parameter is unused
+// here — an empty cherry-pick is the only kind that needs it.
 func reclassifyStashPop(opErr *OpError, status porcelain.StatusResult, _ *gitpreflight.InProgressOperation) *OpError {
 	if opErr == nil {
 		return nil
@@ -996,7 +989,7 @@ func prepareSequencerVerb(
 
 func newUndoID() string { return uuid.NewString() }
 
-// captureBranchDeleteUndo is undo-capture for a branch delete (probe P4), captured BEFORE the
+// captureBranchDeleteUndo is undo-capture for a branch delete, captured BEFORE the
 // write: the branch's current tip sha plus every branch.<name>.* config line, replayed back in
 // order on undo. Best-effort — any failure (a race with something else deleting the branch first)
 // yields nil rather than aborting the delete itself.
@@ -1015,7 +1008,7 @@ func (e *RepoEntry) captureBranchDeleteUndo(ctx context.Context, conn ConnID, co
 		replay = append(replay, gitops.BranchConfigRestoreArgs(cfgRes.Stdout)...)
 	}
 
-	// G26 §10.9/D-3.12: prepareBranchDelete re-parents this branch's own stack children onto ITS
+	// prepareBranchDelete re-parents this branch's own stack children onto ITS
 	// parent as part of the SAME delete — so undoing the delete must also restore every child's
 	// prior pointer, not just the deleted branch's own. Best-effort exactly like the read above: a
 	// failure here must not abort capturing the undo for the branch's own restoration.
@@ -1036,7 +1029,7 @@ func (e *RepoEntry) captureBranchDeleteUndo(ctx context.Context, conn ConnID, co
 	}
 }
 
-// captureTagDeleteUndo is undo-capture for a tag delete (probe P3): reads the ref fresh (never the
+// captureTagDeleteUndo is undo-capture for a tag delete: reads the ref fresh (never the
 // refs cache), immediately before the delete. The replay sha (row.ObjectID) is already the right
 // value for either kind without branching on ObjectType: for an annotated tag it is the TAG
 // OBJECT's own sha (still resolvable after `tag -d`, which only removes the ref); for a
@@ -1100,17 +1093,17 @@ func (e *RepoEntry) captureStashDropUndo(ctx context.Context, conn ConnID, connL
 // genuine spawn failure comes back as a real Go error (propagated by the caller, never folded into
 // an OpResult); a non-zero exit that the process itself completed is classified through
 // gitops.ClassifyOpError and returned as *OpError instead — op.run/undo.run's own "a git failure
-// is an expected outcome with a rendering" rule (D14's own final paragraph).
+// is an expected outcome with a rendering" rule.
 func (e *RepoEntry) runWriteArgv(ctx context.Context, argv []string) (*OpError, error) {
 	opErr, _, err := e.runWriteArgvList(ctx, [][]string{argv})
 	return opErr, err
 }
 
-// runWriteArgvList runs every argv in argvList, in order, under ONE e.Repo.Write acquisition (F12,
-// P108 Part 16 review) — closes the window a per-argv Write left open for another window's own
+// runWriteArgvList runs every argv in argvList, in order, under ONE e.Repo.Write acquisition
+// — closes the window a per-argv Write left open for another window's own
 // write to interleave between two argvs that are meant to happen as one unit (e.g. the auto-stash
 // checkout's own `stash push` immediately followed by `switch` — prepareCheckout's own doc comment
-// already claimed this atomicity; it did not actually hold before this fix). Stops at the first
+// already claimed this atomicity; it did not hold before this fix). Stops at the first
 // classified failure without running the rest; failedAt is that argv's own index, -1 if every argv
 // completed cleanly. A cancelled ctx or a genuine spawn failure comes back as a real Go error,
 // exactly like runWriteArgv's own single-argv contract.
@@ -1154,18 +1147,18 @@ func (e *RepoEntry) runGuardedWriteArgvList(ctx context.Context, argvList [][]st
 	return opErr, failedAt, err
 }
 
-// RunOp is op.run's own executor (D6/D8), in this exact order:
-//  0. ctx is already detached from the request by the caller (gitrpc, D8) — RunOp does not detach
+// RunOp is op.run's own executor, in this exact order:
+//  0. ctx is already detached from the request by the caller (gitrpc) — RunOp does not detach
 //     it itself, it only ever sees the already-detached one.
-//  1. spec, ok := opTable[op.Kind]; !ok -> ErrUnservedOpKind (D5).
+//  1. spec, ok := opTable[op.Kind]; !ok -> ErrUnservedOpKind.
 //  2. prepared, err := spec.Prepare(...) — argv, and the undo record CAPTURED FIRST, before any
 //     write. earlyError short-circuits with no write ever spawned.
-//  3. Each argv is written in order through e.Repo.Write (F12: cross-connection serial) — the
+//  3. Each argv is written in order through e.Repo.Write (cross-connection serial) — the
 //     first classified failure stops the remaining argv (there is at most one entry beyond the
 //     first for any kind this phase serves, so this only matters for branchCreate+track).
 //  4. Arm the undo slot iff the write succeeded (or an earlier argv already landed) AND
 //     opTable[kind].Undo is undoable — consulting the table, not merely whether Prepare happened to
-//     build a record, keeps the policy in one place (D6). Armed before the read-back so a read
+//     build a record, keeps the policy in one place. Armed before the read-back so a read
 //     failure never drops the record of a write that landed.
 //  5. Read back head + in-progress state, ALWAYS (a conflicting revert fails with Conflict and
 //     LEAVES REVERT_HEAD; this is what surfaces it here rather than a watcher tick). A read error
@@ -1198,7 +1191,7 @@ func (e *RepoEntry) RunOp(ctx context.Context, conn ConnID, connLabel string, op
 		return OpResult{OK: false, Error: prep.earlyError, Undo: nil, Head: head, InProgress: inProgress}, nil
 	}
 
-	// D7: drops the shared caches synchronously once a write has actually been attempted, on EVERY
+	// Drops the shared caches synchronously once a write has been attempted, on EVERY
 	// exit path below (success, a classified failure, a genuine spawn error) — a half-applied write
 	// invalidates just as much as a whole one, and the watcher's own debounced signal must not be
 	// the only thing that ever notices our own write.
@@ -1212,10 +1205,10 @@ func (e *RepoEntry) RunOp(ctx context.Context, conn ConnID, connLabel string, op
 	// just did. e.undo.Set(record) below still runs this op's own record once it actually succeeds.
 	e.undo.Set(nil)
 
-	// F12 (P108 Part 16 review): the whole argvList runs under ONE Repo.Write acquisition —
+	// The whole argvList runs under ONE Repo.Write acquisition —
 	// prepareCheckout's own doc comment already claimed this ("there is no window in which the
 	// tree is stashed and the switch never happened"), which runWriteArgv's own per-argv Write
-	// did not actually deliver.
+	// did not deliver.
 	opErr, failedAt, werr := e.runWriteArgvList(ctx, prep.argvList)
 	if werr != nil {
 		return OpResult{}, werr
@@ -1362,7 +1355,7 @@ func (e *RepoEntry) tipsMoved(ctx context.Context, want map[string]string) (bool
 
 // UndoRun is undo.run's own executor. It validates first — the record is only Taken (so a replayed
 // undo cannot be replayed twice, and a stale/already-superseded id answers NotFound) once the
-// recovery sha still exists (§7.12's "so the user can recover manually even after the slot is
+// recovery sha still exists (the "so the user can recover manually even after the slot is
 // cleared" only holds if a stale sha is refused rather than replayed against something else) and
 // no ref the op moved has moved again. A transient check error therefore leaves the record armed.
 // The replay then runs as one write list, the same read-back/error-mapping shape as RunOp.

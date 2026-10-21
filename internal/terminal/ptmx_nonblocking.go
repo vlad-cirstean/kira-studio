@@ -14,7 +14,7 @@ import (
 // f.Fd() for its ioctls, which forces blocking mode and drops the fd from the poller; a blocked
 // read(2) then survives Close, so Session.Close could never unblock readLoop. It consumes ptmx.
 //
-// Shared by darwin and Linux since P180: darwin used to keep the creack/pty default (blocking
+// Shared by darwin and Linux: darwin used to keep the creack/pty default (blocking
 // fd), on the theory that kqueue might not poll a pty master. Verified on real Mac hardware
 // instead of assumed: TestSessionCloseKillsProcessGroup, plus a one-off regression backgrounding
 // a job detached into its own session (setsid) so it survives the shell's SIGHUP/SIGKILL and

@@ -1,7 +1,7 @@
-// P42 F3/D7: a plain mouse produces only a vertical wheel axis (deltaY); a horizontally
+// A plain mouse produces only a vertical wheel axis (deltaY); a horizontally
 // overflowing strip needs its own wheel->scroll translation to be reachable by wheel rather than
 // only trackpad or drag. Lives at the renderer root (format.ts/clipboard.ts/fonts.ts's own
-// precedent, P24 D35) because both workbench/ and views/console/ need it, and workbench/ ->
+// precedent) because both workbench/ and views/console/ need it, and workbench/ ->
 // views/ and views/ -> workbench/ are both forbidden (biome.json).
 
 /** Translates a vertical wheel gesture into horizontal scroll on an overflowing element — a

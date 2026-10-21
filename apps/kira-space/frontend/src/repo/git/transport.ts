@@ -1,22 +1,22 @@
 /**
- * C10 §3.5/§8 (S12) — the native `Transport` git-ui's `mount()` is handed, and the per-repo-
- * workspace cache over it (§8: "one transport per repo workspace, not per mount").
+ * The native `Transport` git-ui's `mount()` is handed, and the per-repo-
+ * workspace cache over it ("one transport per repo workspace, not per mount").
  *
  * This implements `Transport` directly, dispatching per method to `hostHandlers.ts`'s own map
  * (`editor.openDiff`, `clipboard.write`, `app.init`'s host half and `repo.list` are host concerns
  * the Go server has no case for) or forwarding to the git stream.
  *
- * No length prefix, no pairing, no trust store: `streamChannel.ts` (S2) is message-framed already,
+ * No length prefix, no pairing, no trust store: `streamChannel.ts` is message-framed already,
  * and `internal/bridge/gitstream.go`'s own doc comment states why there is no handshake — the peer
  * is this process's own webview, not an external client a trust store exists to gate
- * (`docs/HISTORY.md (v1.5 C10)` §3.2).
+ * (`docs/HISTORY.md (v1.5 C10)`).
  *
- * C11 §8.1 (S4) adds a small local event bus alongside the remote one: `review.target` and
+ * This adds a small local event bus alongside the remote one: `review.target` and
  * `ui.action` are composed host-side (`review.open`'s handler, and the repaint choreography below)
  * and Go never emits either — the honest native analogue of what `KiraReviewViewProvider` does
- * with `this.#server?.emit(...)`, not a workaround. §7.6's repaint choreography lives here too,
+ * with `this.#server?.emit(...)`, not a workaround. The repaint choreography lives here too,
  * as a post-processing step over `request()`: both halves of the review UI (the panel's own pane
- * components and `reviewDecorations.ts`'s Monaco layer, S9) share one `Transport` per repo
+ * components and `reviewDecorations.ts`'s Monaco layer) share one `Transport` per repo
  * workspace, so a mutation's success is the one place to fan a repaint out to both.
  */
 import type {
@@ -78,10 +78,10 @@ function createLocalEmitter(): {
   };
 }
 
-// §7.6's repaint table, the two mutation-triggered rows — `repo.changed` needs no entry here,
+// The repaint table, the two mutation-triggered rows — `repo.changed` needs no entry here,
 // since it already crosses as an ordinary Go-emitted event `reviewDecorations.ts` subscribes to
 // directly via `transport.on`. Module-level, not per-transport: a listener (one per open review
-// diff editor, S9) filters by its own `(repoId, branch)` or `path`, so one registry serves every
+// diff editor) filters by its own `(repoId, branch)` or `path`, so one registry serves every
 // open repo workspace.
 export type ReviewRepaintEvent =
   | { readonly kind: 'comments'; readonly repoId: string; readonly branch: string }
@@ -205,14 +205,14 @@ function createNativeGitTransport(codeRepoId: string): Transport {
     },
   };
 
-  // F3: the channel closing (including a self-inflicted close from a decodeFrame failure) used to
+  // The channel closing (including a self-inflicted close from a decodeFrame failure) used to
   // go unnoticed entirely — nothing ever subscribed to onClose, so every already-in-flight
   // request/stream on this client hung forever, and a stale entry in sharedClientsByCodeRepoId
   // kept handing the now-dead transport to every later gitTransportFor call. remote.dispose()
   // rejects every pending request/stream immediately; evicting the map entry makes the next
   // gitTransportFor call dial a fresh connection instead of reusing this one.
   //
-  // The identity check guards a narrower race this fix adds (P108 Part 20 F3): `onClose` fires
+  // The identity check guards a narrower race this fix adds: `onClose` fires
   // asynchronously, from the socket's own close event, strictly after `channel.close()` returns —
   // so `disposeGitTransport(id)` followed by a same-tick `gitTransportFor(id)` (collapse/re-expand
   // a worktree, or close/reopen a workspace) can install a NEW shared client for `codeRepoId`
@@ -233,12 +233,12 @@ function createNativeGitTransport(codeRepoId: string): Transport {
 }
 
 /** An `AbortController` that aborts as soon as either input signal does. Not `AbortSignal.any` —
- *  this repo does not rely on it anywhere else, and this is the phase's only use.
+ *  this repo does not rely on it anywhere else.
  *
- * 8c (P68 review): `{once:true}` alone only removes the listener on the signal that actually
- * fired — `b`'s own long-lived signal is `leaseOf`'s `streams.signal`, which outlives this one
- * `stream()` call for the whole mount, so its listener (closing over `controller`) leaked for the
- * mount's own lifetime every time `a` (the caller's per-call signal) fired first, the normal case.
+ * `{once:true}` alone only removes the listener on the signal that fired — `b`'s own long-lived
+ * signal is `leaseOf`'s `streams.signal`, which outlives this one `stream()` call for the whole
+ * mount, so its listener (closing over `controller`) leaked for the mount's own lifetime every time
+ * `a` (the caller's per-call signal) fired first, the normal case.
  * `onAbort` now removes both listeners itself the first time either fires, so `once:true` is no
  * longer needed on either registration. */
 function linkAbort(a: AbortSignal, b?: AbortSignal): AbortSignal {
@@ -268,7 +268,7 @@ interface SharedClient {
  *  untracked — an orphaned response from a departed mount resolves into a dead closure, exactly
  *  as it already does today for call sites (`RepoDiffView.vue`, `RepoFileView.vue`) that never
  *  dispose anything. `on` and `stream` ARE tracked, so a departed mount's subscriptions and
- *  long-lived streams (`graph.stream`) actually stop instead of quietly leaking. `dispose()`
+ *  long-lived streams (`graph.stream`) stop instead of quietly leaking. `dispose()`
  *  releases only this lease's own registrations and NEVER closes the underlying socket — that is
  *  `disposeGitTransport`'s job alone. */
 function leaseOf(shared: SharedClient): Transport {
@@ -338,13 +338,13 @@ function evictSharedClient(codeRepoId: string, shared: SharedClient): void {
   shared.transport.dispose();
 }
 
-/** One transport LEASE per call (§2.1), over one shared client per repo workspace — cached across
+/** One transport LEASE per call, over one shared client per repo workspace — cached across
  *  mount/unmount of the pinned graph tab, so a cold remount reuses the same underlying stream
  *  rather than opening a second one and losing whatever repo hold the first took. Never returns
  *  the same object twice: each caller (`RepoGraphView.vue`, `RepoReviewView.vue`,
  *  `RepoDiffView.vue`, `RepoFileView.vue`) gets its own lease, so one mount tearing its lease down
  *  on unmount no longer kills every other mount sharing the workspace. The shared client itself is
- *  disposed only when the workspace closes (`state/workspace.ts`, S17), never on a mere tab-hide. */
+ *  disposed only when the workspace closes (`state/workspace.ts`), never on a mere tab-hide. */
 export function gitTransportFor(codeRepoId: string): Transport {
   let shared = sharedClientsByCodeRepoId.get(codeRepoId);
   if (!shared) {

@@ -20,20 +20,20 @@ import { useImportCurlStore } from './state/curl';
 
 const importCurlStore = useImportCurlStore();
 
-// P7 D12: paste, live preview, live warnings, Import. A plain <textarea> rather than CodeMirror —
-// there is no grammar to highlight and P3 D1's bundle argument applies. Everything below the
-// textarea recomputes on every input (parseCurl is pure and synchronous, D12) — the warnings are
+// Paste, live preview, live warnings, Import. A plain <textarea> rather than CodeMirror —
+// there is no grammar to highlight and the bundle argument applies. Everything below the
+// textarea recomputes on every input (parseCurl is pure and synchronous) — the warnings are
 // shown *before* Import is pressed, deliberately diverging from ImportReportStrip's post-hoc
-// report (D4): a curl paste is a short string sitting right there, so the honest place to say
+// report: a curl paste is a short string sitting right there, so the honest place to say
 // "-k was ignored" is beside it, while it can still be edited.
 const text = ref('');
 
-// Finding 15: for a large pasted curl command (a big JSON body, say), re-lexing the whole text on
-// every single keystroke just to update a one-line summary has no business running that often —
+// For a large pasted curl command (a big JSON body, say), re-lexing the whole text on
+// every single keystroke to update a one-line summary has no business running that often —
 // the textarea itself (`text`) stays bound immediately so typing never stutters; the preview below
-// reads a debounced copy instead (TIMING.preview, shared with every other parse preview). Unlike EditRawRequestDialog.vue's
-// own copy, this one has no external-open reset to preserve, so refDebounced (P99 Part 3) is a
-// direct fit — no manual watch/setTimeout needed.
+// reads a debounced copy instead (TIMING.preview, shared with every other parse preview).
+// Unlike EditRawRequestDialog.vue's own copy, this one has no external-open reset to preserve, so
+// refDebounced is a direct fit — no manual watch/setTimeout needed.
 const debouncedText = refDebounced(text, TIMING.preview);
 
 const preview = computed(() => importCurlStore.previewCurl(debouncedText.value));

@@ -12,7 +12,7 @@ import (
 
 // WindowRepo is what OpenWindow/OpenNewWindow/ReopenWindows need from an app's own
 // *repos.WindowsRepo — WindowStore's own SetBounds (Attach's write) plus List/Create/Delete. Each
-// app's own windowStore adapter (already there for WindowStore, P103 Part 3 §6.3) grows these
+// app's own windowStore adapter (already there for WindowStore) grows these
 // three methods, converting its own storage/model.WindowRecord at the same boundary SetBounds
 // already crosses.
 type WindowRepo interface {
@@ -31,8 +31,8 @@ func ToWindowRecord(key string, order int, bounds *WindowBounds) WindowRecord {
 
 // WindowOpenerDeps is OpenWindow/OpenNewWindow/ReopenWindows' own shared dependency set — every
 // piece main.go's own windowOpener struct used to carry, narrowed to what these three functions
-// actually touch: Terminal is the terminal.Registry itself (not the whole per-app bound
-// TerminalService, which stays a concrete Wails-bound type per P103 §2.3), and Repo is the one
+// touch: Terminal is the terminal.Registry itself (not the whole per-app bound
+// TerminalService, which stays a concrete Wails-bound type), and Repo is the one
 // adapter each app already builds for WindowDeps.Windows.
 type WindowOpenerDeps struct {
 	App        *application.App
@@ -53,11 +53,11 @@ type WindowOpenerDeps struct {
 
 // OpenWindow opens one workbench from an already-persisted record and registers it — the one path
 // every window (startup, reopen, "New Window") ultimately goes through. Its own WindowClosing
-// listener implements D5: delete the row only if another window remains open, so closing the last
+// listener: delete the row only if another window remains open, so closing the last
 // window leaves it behind for the next Dock click or relaunch to restore.
 //
-// primaryWorkArea (Options' first-launch size clamp, P22 D6(a)) is resolved fresh here, on every
-// call, rather than captured once before app.Run() — round-2 review finding 4: GetPrimary() is
+// primaryWorkArea (Options' first-launch size clamp) is resolved fresh here, on every
+// call, rather than captured once before app.Run() — GetPrimary() is
 // backed by a cache macOS only starts populating once its native run loop's
 // ApplicationDidFinishLaunching fires (application_darwin.go's own `run()`), which happens only
 // after C.run() — i.e. strictly after app.Run() is called, never before. A value captured before
@@ -100,7 +100,7 @@ func OpenWindow(d WindowOpenerDeps, rec WindowRecord) {
 	win.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
 		// A window that closes mid-quit-handshake without ever acking through the flush channel is
 		// removed from the pending set here rather than being waited out for the full timeout
-		// (C8) — a no-op when no quit is in flight, since Quitter.Flushed ignores a key it isn't
+		// — a no-op when no quit is in flight, since Quitter.Flushed ignores a key it isn't
 		// currently waiting on.
 		d.Quitter.Flushed(rec.Key)
 		// P83 §4's teardown table: a terminal never outlives the window that opened it, even when

@@ -162,8 +162,8 @@ export const TAB_KINDS: TabKindRegistry<SpaceTabKind, TabRecord, TabIcon, Palett
       parseState: parseStateWith(repoMultiDiffTabStateSchema),
     },
     // An embedded shell at one worktree's directory, rendered with @xterm/xterm. A launch's own
-    // label (a script's name, or 'Claude Code') wins over the cwd's basename. P113 F6: the
-    // descriptor itself moved to workbench's own terminalTabKind, shared with kira-studio's
+    // label (a script's name, or 'Claude Code') wins over the cwd's basename.
+    // The descriptor itself moved to workbench's own terminalTabKind, shared with kira-studio's
     // identical copy — only the mode constant and dropResources' own store differ per app.
     terminal: terminalTabKind<'terminal', TabRecord, TabIcon, PaletteColor, MenuItem>(
       SPACE_TAB_KIND_MODE.terminal,

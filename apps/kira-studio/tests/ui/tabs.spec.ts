@@ -9,7 +9,7 @@ import {
 import { dragTab, tabLocator } from './support/tabs';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
-// Ported from tests/e2e/tabs.spec.ts (P57 D16). Its "session restore" section (roughly the back
+// Ported from tests/e2e/tabs.spec.ts. Its "session restore" section (roughly the back
 // half of the first scenario) asserts three tabs across two connections surviving a real
 // relaunch(), including which ones reconnect and which persisted page/page-size values come back
 // — none of that has an equivalent here (tests/ui/fixtures.ts's own header comment: no backing
@@ -42,6 +42,7 @@ const CONTROL: ControlSnapshot[] = [
       options: {},
       preconnect: null,
       preconnectSidecar: false,
+      preconnectDelaySec: 0,
       autoExplain: false,
       throttlePerSec: 0,
     },
@@ -66,6 +67,7 @@ const CONTROL: ControlSnapshot[] = [
         options: {},
         preconnect: null,
         preconnectSidecar: false,
+        preconnectDelaySec: 0,
         autoExplain: false,
         throttlePerSec: 0,
         password: null,
@@ -212,7 +214,7 @@ test('tabs — independent state, context menu, colours', async ({ relaunch }) =
   await expect(page.locator('[data-testid="toolbar-rail"]')).toHaveClass(/\bbg-conn-magenta\b/);
 });
 
-// P23: the Color submenu's own trigger was ContextMenu.vue's `.submenu` CSS — `left: 100%; top:
+// The Color submenu's own trigger was ContextMenu.vue's `.submenu` CSS — `left: 100%; top:
 // -4px`, no flip, no clamp at all — so a submenu opened near the window's right edge rendered
 // partly or wholly offscreen. A narrow viewport plus a right-click near the trigger row's own
 // right edge (rather than its center) reproduces exactly that geometry: the top-level menu still
@@ -256,10 +258,10 @@ test('a submenu near the right edge flips to open on the left instead of running
   await expect(page.locator('[data-testid="menu-item-color-magenta"]')).toBeVisible();
 });
 
-// P31 item 2/D6/D7: WorkbenchShell's own class name used to collide with TabStrip's identically
-// named root under scoped CSS's "child inherits the parent's scope id too" rule, so the outer
-// overflow: hidden always won regardless of what TabStrip.vue itself declared (F7). D6 renames the
-// outer wrapper; D7 adds a wheel handler and a visible thin scrollbar.
+// WorkbenchShell's own class name used to collide with TabStrip's identically named root under
+// scoped CSS's "child inherits the parent's scope id too" rule, so the outer overflow: hidden
+// always won regardless of what TabStrip.vue itself declared. Renames the outer wrapper; adds a
+// wheel handler and a visible thin scrollbar.
 test('the tab strip scrolls once tabs overflow it (P31 D6/D7)', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: CONTROL });
   await createAndConnect(page);

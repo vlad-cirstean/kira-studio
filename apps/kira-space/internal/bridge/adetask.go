@@ -10,8 +10,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/terminal"
@@ -37,6 +39,8 @@ type AdeTaskService struct {
 	Registry    *terminal.Registry
 	Emit        appcore.Emitter
 	FocusWindow func(key string) bool
+	// Hosts validates pasted issue and change-request links.
+	Hosts *githost.Registry
 	// OpenWindow, CloseWindow and SetWindowTitle serve review windows; func fields like FocusWindow.
 	OpenWindow     func(rec shell.WindowRecord)
 	CloseWindow    func(key string) bool
@@ -102,6 +106,7 @@ var adeTaskCatalog = []struct {
 	{repos.ErrBacklogGone, ipcerr.CodeNotFound, "backend.space.ade.backlogGone.body"},
 	{repos.ErrRunNotFound, ipcerr.CodeNotFound, "backend.space.ade.runNotFound.body"},
 	{ade.ErrSessionNotFound, ipcerr.CodeNotFound, "backend.space.ade.sessionNotFound.body"},
+	{harness.ErrProviderGone, ipcerr.CodeConflict, "backend.core.agent.providerGone.body"},
 }
 
 var adeTaskContract = []error{repos.ErrReviewKind, ade.ErrSessionWrongTask, ade.ErrCommandMismatch}
@@ -168,7 +173,7 @@ func validateCreateTask(a adewire.CreateTaskArgs) error {
 	if err := validateAdeTaskJira(a.Jira); err != nil {
 		return err
 	}
-	if err := validateAdeURL(a.GithubURL, "githubUrl"); err != nil {
+	if err := validateAdeURL(a.HostURL, "hostUrl"); err != nil {
 		return err
 	}
 	if err := validateAdeNotes(a.Notes); err != nil {
@@ -235,8 +240,8 @@ func validateUpdateTask(a adewire.UpdateTaskArgs) error {
 	if err := validateAdeTaskJira(p.Jira); err != nil {
 		return err
 	}
-	if p.GithubURL != nil {
-		if err := validateAdeURL(*p.GithubURL, "githubUrl"); err != nil {
+	if p.HostURL != nil {
+		if err := validateAdeURL(*p.HostURL, "hostUrl"); err != nil {
 			return err
 		}
 	}
@@ -290,8 +295,8 @@ func validateBacklogPatch(p adewire.BacklogPatch) error {
 	if err := validateAdeTaskJira(p.Jira); err != nil {
 		return err
 	}
-	if p.GithubURL != nil {
-		if err := validateAdeURL(*p.GithubURL, "githubUrl"); err != nil {
+	if p.HostURL != nil {
+		if err := validateAdeURL(*p.HostURL, "hostUrl"); err != nil {
 			return err
 		}
 	}
@@ -308,8 +313,8 @@ func (s *AdeTaskService) Board(ctx context.Context) (adewire.Board, error) {
 	return b, adeTaskError(err)
 }
 
-func (s *AdeTaskService) Prs(ctx context.Context) (adewire.PrsResult, error) {
-	r, err := s.Engine.Prs(ctx)
+func (s *AdeTaskService) ChangeRequests(ctx context.Context) (adewire.ChangeRequestsResult, error) {
+	r, err := s.Engine.ChangeRequests(ctx)
 	return r, adeTaskError(err)
 }
 
@@ -349,10 +354,30 @@ func (s *AdeTaskService) Repos(ctx context.Context) (adewire.ReposResult, error)
 	return r, adeTaskError(err)
 }
 
+// HostProviders lists every registered code host provider; the phone reads it for its link labels.
+func (s *AdeTaskService) HostProviders(context.Context) (githost.Providers, error) {
+	return githost.Providers{Providers: s.Hosts.Infos()}, nil
+}
+
 // --- writes ------------------------------------------------------------------------------------
+
+// validateHostLink refuses a non-empty value no registered provider recognises as an issue or
+// change-request link.
+func (s *AdeTaskService) validateHostLink(raw string) error {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	if _, ok := s.Hosts.ParseLink(raw); ok {
+		return nil
+	}
+	return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitHost.notLink.error", map[string]string{"links": s.Hosts.LinkLabels()})
+}
 
 func (s *AdeTaskService) CreateTask(ctx context.Context, args adewire.CreateTaskArgs) (adewire.Task, error) {
 	if err := validateCreateTask(args); err != nil {
+		return adewire.Task{}, err
+	}
+	if err := s.validateHostLink(args.HostURL); err != nil {
 		return adewire.Task{}, err
 	}
 	t, err := s.Engine.CreateTask(ctx, args)
@@ -362,6 +387,11 @@ func (s *AdeTaskService) CreateTask(ctx context.Context, args adewire.CreateTask
 func (s *AdeTaskService) UpdateTask(ctx context.Context, args adewire.UpdateTaskArgs) (adewire.Task, error) {
 	if err := validateUpdateTask(args); err != nil {
 		return adewire.Task{}, err
+	}
+	if args.Patch.HostURL != nil {
+		if err := s.validateHostLink(*args.Patch.HostURL); err != nil {
+			return adewire.Task{}, err
+		}
 	}
 	t, err := s.Engine.UpdateTask(ctx, args)
 	return t, adeTaskError(err)
@@ -489,6 +519,11 @@ func (s *AdeTaskService) UpdateBacklogItem(ctx context.Context, args adewire.Upd
 	}
 	if err := validateBacklogPatch(args.Patch); err != nil {
 		return adewire.BacklogItem{}, err
+	}
+	if args.Patch.HostURL != nil {
+		if err := s.validateHostLink(*args.Patch.HostURL); err != nil {
+			return adewire.BacklogItem{}, err
+		}
 	}
 	it, err := s.Engine.UpdateBacklogItem(ctx, args)
 	return it, adeTaskError(err)
@@ -998,20 +1033,20 @@ func (s *AdeTaskService) LaunchReviewAgent(ctx context.Context, args adewire.Tas
 	return l, adeTaskError(err)
 }
 
-// GitHubSyncPlan reports what syncing the branch's reviewed files to its PR would do.
-func (s *AdeTaskService) GitHubSyncPlan(ctx context.Context, args adewire.BranchArgs) (adewire.GhSyncPlan, error) {
+// ViewedSyncPlan reports what syncing the branch's reviewed files to its PR would do.
+func (s *AdeTaskService) ViewedSyncPlan(ctx context.Context, args adewire.BranchArgs) (adewire.ViewedSyncPlan, error) {
 	if err := validateAdeTaskID(args.BranchID, "branchId"); err != nil {
-		return adewire.GhSyncPlan{}, err
+		return adewire.ViewedSyncPlan{}, err
 	}
-	p, err := s.Engine.GitHubSyncPlan(ctx, args.BranchID)
+	p, err := s.Engine.ViewedSyncPlan(ctx, args.BranchID)
 	return p, adeTaskError(err)
 }
 
-// GitHubSyncApply marks and unmarks the branch's files on its PR as planned.
-func (s *AdeTaskService) GitHubSyncApply(ctx context.Context, args adewire.BranchArgs) (adewire.GhSyncResult, error) {
+// ViewedSyncApply marks and unmarks the branch's files on its PR as planned.
+func (s *AdeTaskService) ViewedSyncApply(ctx context.Context, args adewire.BranchArgs) (adewire.ViewedSyncResult, error) {
 	if err := validateAdeTaskID(args.BranchID, "branchId"); err != nil {
-		return adewire.GhSyncResult{}, err
+		return adewire.ViewedSyncResult{}, err
 	}
-	r, err := s.Engine.GitHubSyncApply(ctx, args.BranchID)
+	r, err := s.Engine.ViewedSyncApply(ctx, args.BranchID)
 	return r, adeTaskError(err)
 }

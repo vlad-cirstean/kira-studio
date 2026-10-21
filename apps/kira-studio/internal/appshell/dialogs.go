@@ -6,7 +6,7 @@ import (
 )
 
 // Dialogs adapts repo-root internal/shell.Dialogs' plain-parameter methods to this app's own
-// bound-service bridge.Dialogs interface (P103 Part 3) — bridge.SaveFileRequest/OpenFileRequest/
+// bound-service bridge.Dialogs interface — bridge.SaveFileRequest/OpenFileRequest/
 // OpenDirectoryRequest are Wails-bound service parameter types, so they stay here, destructured
 // into shell.Dialogs' plain-parameter calls, rather than moving into the shared package.
 type Dialogs struct {

@@ -8,7 +8,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 )
 
-// TestSubscriber_BurstCoalescesFarBelowSignalCount is D14's central claim: a burst of many
+// TestSubscriber_BurstCoalescesFarBelowSignalCount is the central claim: a burst of many
 // signals, delivered to a subscriber whose first delivery is held (forcing a real backlog to
 // accumulate behind it), produces far fewer deliver calls than signals — the honest assertion,
 // since the exact call count depends on scheduling (how many notes land before the first delivery

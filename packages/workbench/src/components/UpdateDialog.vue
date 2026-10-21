@@ -13,8 +13,8 @@ import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import type { AppUpdateStore } from '../state/createAppUpdateStore';
 
-// P119: the in-app update flow, replacing Kira Studio's own release-page banner click (§4.6's
-// deliberate behavior change). ConfirmDialog.vue/GitCredentialDialog.vue's own shadcn-vue Dialog
+// The in-app update flow, replacing Kira Studio's own release-page banner click.
+// ConfirmDialog.vue/GitCredentialDialog.vue's own shadcn-vue Dialog
 // structure and classes; the store is a prop (StackDialog.vue's own precedent, packages/git-ui) —
 // App.vue owns the v-if (`v-if="store.dialogOpen"`, mounted beside <ConfirmDialog />, the same
 // mount-order-decides-stacking reason ConfirmDialog.vue's own comment gives), so this component

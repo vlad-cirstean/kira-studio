@@ -3,9 +3,9 @@ import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 import type { ControlSnapshot } from './support/types';
 
-// P128 §5.2: module switching is multi-step, cross-store state (the mode store, the workspace
+// Module switching is multi-step, cross-store state (the mode store, the workspace
 // store, and the tabs store's own per-workspace filtering all shift together) — the one thing this
-// new surface (P128 §2.6-§2.8) has no other coverage for. Mirrors Kira Studio's own
+// new surface has no other coverage for. Mirrors Kira Studio's own
 // mode-switch.spec.ts, trimmed to the three properties genuinely new here: boot honours a
 // persisted mode, a click eventually (never synchronously) reaches windowsSetMode, and a full
 // round trip across all three modules leaves the right tabs showing in each.

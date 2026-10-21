@@ -1,15 +1,15 @@
 <script setup lang="ts">
 /**
- * G25 D2-D4/D9-D14: "Create Worktree…" (`AppToolbar.vue`'s own button, and the palette's
+ * "Create Worktree…" (`AppToolbar.vue`'s own button, and the palette's
  * `createWorktree` action).
  *
- * The three explicit modes (D3): `existingBranch` (pick a branch already in `refs`), `newBranch`
+ * The three explicit modes: `existingBranch` (pick a branch already in `refs`), `newBranch`
  * (name + start point), `detach` (a bare commit-ish). `preflight.worktreeAdd`'s own live
- * pre-flight (D4) re-runs on every keystroke, exactly like `RevertDialog.vue`'s mainline picker
+ * pre-flight re-runs on every keystroke, exactly like `RevertDialog.vue`'s mainline picker
  * re-runs `previewRevertMainline` — this dialog never lets `runWorktreeAdd` spawn against a
  * blocked combination the user can already see is blocked.
  *
- * P131 Part 1 §6.1/§6.2: the modal shell is shadcn's `Dialog`/`DialogContent` now, `title` feeds
+ * The modal shell is shadcn's `Dialog`/`DialogContent` now, `title` feeds
  * `DialogTitle`'s default slot, and the create phase's mode picker/text fields are
  * RadioGroup/Input.
  */
@@ -43,7 +43,7 @@ const props = defineProps<{
   ops: OpsState;
   refs: RefsState;
   /** Set by `AppToolbar.vue`'s "Create Worktree…" button, the `createWorktree` palette action, or
-   *  a "Create worktree here…" row action (P76 §8/§9), via `App.vue`. A fresh object (even `{}`)
+   *  a "Create worktree here…" row action, via `App.vue`. A fresh object (even `{}`)
    *  opens the dialog and re-seeds it; `undefined` closes it. Watched by reference rather
    *  than a boolean so a second row action re-seeds even while the dialog is already open. */
   createRequest: WorktreeCreateSeed | undefined;
@@ -158,8 +158,8 @@ async function submitCreate(): Promise<void> {
   emit('close');
 }
 
-/** G28 D7: closes G25 §9's own named hand-forward — OFFERED, never taken automatically (unlike
- *  checkout's own D6 route): this dialog is already open, so there is a natural place to ask,
+/** Closes the named hand-forward — OFFERED, never taken automatically (unlike
+ *  checkout's own route): this dialog is already open, so there is a natural place to ask,
  *  and `worktree add` carries no "never blocks" promise to keep. Re-issues the SAME `worktreeAdd`
  *  op with `mode: 'detach'` and `startPoint: <that branch>` — no new op kind, no new argv. */
 function detachHereBranch(): string | undefined {

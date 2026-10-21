@@ -23,7 +23,7 @@ type queueListing struct {
 // listQueues is catalog.ts's listQueues. The tree is a flat queue list, no deeper level; name is
 // the URL's last path segment. ListQueues already has every queue's full URL in hand while paging,
 // so it hands the name->URL map back instead of discarding it — adapter.go caches it, avoiding a
-// GetQueueUrl round trip on every read()/count() call (P58d D9).
+// GetQueueUrl round trip on every read()/count() call.
 func listQueues(ctx context.Context, client *sqs.Client) (queueListing, error) {
 	nodes := []model.TreeNode{}
 	urlByName := map[string]string{}

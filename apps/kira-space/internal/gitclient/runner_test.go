@@ -39,7 +39,7 @@ func TestBuildEnv_ExtraWinsOverHygieneOnDuplicateKey(t *testing.T) {
 	}
 }
 
-// TestBuildEnv_StripsGitRedirectEnvKeys is F16's own regression guard: an inherited GIT_DIR (or
+// TestBuildEnv_StripsGitRedirectEnvKeys is the regression guard: an inherited GIT_DIR (or
 // any of gitRedirectEnvKeys) must never reach the child, regardless of Spec.Dir — it silently
 // retargets every spawn to a different repository. Stripped, not overridden with an empty value
 // (git does not treat GIT_DIR= the same as unset).
@@ -238,15 +238,15 @@ func TestStart_CancellationKillsAndUnblocksReader(t *testing.T) {
 	}
 }
 
-// TestStart_CancellationStopsEscalationTimerAfterCleanExit is G31 round-2 architecture/security
-// review, finding #11: cmd.Cancel's own SIGKILL-escalation timer (armed on SIGTERM, to fire after
-// gracefulStopDelay) used to never be stopped once the process actually exited — a clean SIGTERM
-// exit (the overwhelmingly common case, exactly what this test's shim does) still left the timer
-// ticking toward a SIGKILL nothing needs, each one a live goroutine referencing this process for
-// the whole gracefulStopDelay window; narrower but real, a SIGKILL later fired at a pid that has
-// since been reused by an unrelated process group would land on the wrong target. gracefulStopDelay
-// and killGroup are both package vars specifically so this test can shrink the window and observe
-// the escalation directly, rather than relying on an on-demand-unreproducible real pid reuse.
+// TestStart_CancellationStopsEscalationTimerAfterCleanExit: cmd.Cancel's own SIGKILL-escalation
+// timer (armed on SIGTERM, to fire after gracefulStopDelay) used to never be stopped once the
+// process exited — a clean SIGTERM exit (the overwhelmingly common case, exactly what this test's
+// shim does) still left the timer ticking toward a SIGKILL nothing needs, each one a live goroutine
+// referencing this process for the whole gracefulStopDelay window; narrower but real, a SIGKILL
+// later fired at a pid that has since been reused by an unrelated process group would land on the
+// wrong target. gracefulStopDelay and killGroup are both package vars specifically so this test can
+// shrink the window and observe the escalation directly, rather than relying on an
+// on-demand-unreproducible real pid reuse.
 func TestStart_CancellationStopsEscalationTimerAfterCleanExit(t *testing.T) {
 	requireExecGit(t)
 	r := NewExecRunner()
@@ -319,7 +319,7 @@ func TestExecProcess_CloseIsIdempotentAndSafeAfterWait(t *testing.T) {
 	}
 }
 
-// TestStart_GrandchildDoesNotHoldPipeOpen is the one test that proves D3's Setpgid is doing
+// TestStart_GrandchildDoesNotHoldPipeOpen is the one test that proves the Setpgid is doing
 // anything at all: the direct child (the "git" shim) exits almost immediately, but a grandchild it
 // backgrounded inherits stdout and keeps its write end open. Without a group-wide kill the reader
 // would block for the grandchild's full 30s; with one (triggered here by cancelling ctx once the
@@ -362,14 +362,14 @@ func TestStart_GrandchildDoesNotHoldPipeOpen(t *testing.T) {
 	_, _ = p.Wait()
 }
 
-// TestRun_DoesNotHangOnGrandchildHoldingPipesOpen is F5's own regression guard: Run's buffered
+// TestRun_DoesNotHangOnGrandchildHoldingPipesOpen is the regression guard: Run's buffered
 // path (bufferedExecProcess) must not block forever reading to an EOF a hook's backgrounded
 // grandchild — inheriting stdout/stderr, e.g. a post-commit/post-checkout hook's `cmd &` without
 // redirecting output — can hold off indefinitely, with no ctx cancellation to rescue it (the
 // ordinary case: nothing here ever cancels ctx, unlike TestStart_GrandchildDoesNotHoldPipeOpen's
-// own streaming-path scenario, which needs an explicit cancel to trigger the group kill). Before
-// F5, this hung for the shim's full 30-second background sleep at best (StdoutPipe()/
-// StderrPipe() readers get no help from cmd.WaitDelay); after it, cmd.Stdout/cmd.Stderr being
+// own streaming-path scenario, which needs an explicit cancel to trigger the group kill).
+// Previously, this hung for the shim's full 30-second background sleep at best (StdoutPipe()/
+// StderrPipe() readers get no help from cmd.WaitDelay); now cmd.Stdout/cmd.Stderr being
 // plain io.Writers lets Go's own copy goroutines — and WaitDelay's force-close against them —
 // unblock Wait almost immediately once the direct child (the shim) has exited.
 func TestRun_DoesNotHangOnGrandchildHoldingPipesOpen(t *testing.T) {

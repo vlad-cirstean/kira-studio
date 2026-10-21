@@ -10,7 +10,7 @@ import {
 } from './support/mongoFixture';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
-// P21 round 2 functional finding 3: DocumentView.vue used to gate Add/Edit/Delete on Caps alone
+// DocumentView.vue used to gate Add/Edit/Delete on Caps alone
 // (a static per-adapter literal, internal/adapters/mongo/caps.go, that never narrows for a
 // connection's own read-only flag) — grid/keyvalue/browse's own write gates already combine the
 // two (KeyValueView.vue's own canUpdate/canDelete/canInsert), but this view didn't, so the
@@ -44,6 +44,7 @@ const CONTROL: ControlSnapshot[] = [
       options: {},
       preconnect: null,
       preconnectSidecar: false,
+      preconnectDelaySec: 0,
       autoExplain: false,
       throttlePerSec: 0,
     },
@@ -105,10 +106,10 @@ test('a read-only MongoDB connection disables Add/Edit/Delete on the document vi
   });
 
   // Real-interaction fix (reported bug — the pager sits on the right instead of where it made
-  // sense before): mirrors DataToolbar.vue's own P28 D7 revert of d2892f49/P22 D4 — the pager sits
+  // sense before): mirrors DataToolbar.vue — the pager sits
   // at the toolbar's reading edge, immediately before the page-size picker it pages through,
-  // rather than alone at the far #toolbar-end. Relative positions, not pixel ones (data-view.spec.ts's
-  // own pattern), so a token or spacing change still cannot break this.
+  // rather than alone at the far #toolbar-end. Relative positions, not pixel ones
+  // (data-view.spec.ts's own pattern), so a token or spacing change still cannot break this.
   const pagerBox = await page.locator('[data-testid="document-pager"]').boundingBox();
   const pageSizeBox = await page.locator('[data-testid="document-page-size-picker"]').boundingBox();
   if (!pagerBox || !pageSizeBox) {

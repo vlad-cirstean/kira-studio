@@ -10,10 +10,10 @@ import (
 // query below — a compile-time platform fact, not an I/O probe.
 const keychainSupported = false
 
-// readKeychainPassword has no implementation outside darwin+cgo (D1): the Linux default backend
+// readKeychainPassword has no implementation outside darwin+cgo: the Linux default backend
 // is the freedesktop Secret Service over libsecret, which needs cgo — this repo's Go is
 // deliberately cgo-free (CLAUDE.md) — and Windows does not ship this app at all. Both refuse by
-// name (case 23) rather than silently reporting "not found", which would be indistinguishable
+// name rather than silently reporting "not found", which would be indistinguishable
 // from a real miss.
 func readKeychainPassword(uuid string) (password, username string, err error) {
 	if runtime.GOOS == "windows" {

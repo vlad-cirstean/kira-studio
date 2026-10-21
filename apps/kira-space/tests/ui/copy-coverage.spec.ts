@@ -11,7 +11,7 @@ import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
-// P265 Stream B: chrome text on the ADE, repos, settings, memory and title bar surfaces comes from
+// Chrome text on the ADE, repos, settings, memory and title bar surfaces comes from
 // the catalog. The pseudo-locale wraps catalog messages, so a literal shows as a letter outside the
 // markers. Fixture data (names, titles, ids, paths, times) is allowed by exact match. The git
 // surfaces are covered by copy-coverage-git.spec.ts.
@@ -144,7 +144,7 @@ reviewTest('review window', async ({ relaunch }) => {
     control: adeV2Control([
       { channel: IPC.adeTaskReviewWindowTarget, response: target },
       { channel: IPC.adeTaskReviewAgent, response: { session: null, hostWindowKey: '' } },
-      { channel: IPC.adeTaskGitHubSyncPlan, response: adeFixture('gh-sync-plan') },
+      { channel: IPC.adeTaskViewedSyncPlan, response: adeFixture('viewed-sync-plan') },
     ]),
     gitStream: {
       repoId: target.gitRepoId,
@@ -207,15 +207,16 @@ test('settings dialog, every pane', async ({ relaunch }) => {
   await emitWailsEvent(page, IPC.openSettings, undefined);
   await page.locator(t('settings-dialog')).waitFor();
   await setPseudoLocale(page);
-  const allow = fixtureData();
-  for (const section of [
-    'Appearance',
-    'Git',
-    'Mobile access',
-    'Claude Code',
-    'Memory',
-    'Advanced',
-  ]) {
+  // Provider names (the section label, model options) come from the provider, not the catalog.
+  const agent = contract<{ productLabel: string; models: { label: string }[] }>(
+    'agent',
+    'AgentService.Info',
+  );
+  const allow = [
+    ...fixtureData(),
+    ...[agent.productLabel, ...agent.models.map((m) => m.label)].map((v) => new RegExp(`^${v}$`)),
+  ];
+  for (const section of ['Appearance', 'Git', 'Mobile access', 'Agent', 'Memory', 'Advanced']) {
     await page.locator(t(`settings-section-${section}`)).click();
     await expectCatalogText(page.locator(t('settings-dialog')), { allow });
   }

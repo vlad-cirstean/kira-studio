@@ -75,8 +75,8 @@ func TestRemoteOpSlot_ForceCancelIgnoresKillable(t *testing.T) {
 	}
 }
 
-// TestResolveUpstreamRemoteBranch is G32 round-3 functional-correctness review finding #1/#3's own
-// regression proof: fetch/pull/push used to assume a branch's remote-side name always matches its
+// TestResolveUpstreamRemoteBranch is the regression proof: fetch/pull/push used to assume a
+// branch's remote-side name always matches its
 // local name — real for a first push, false for `git checkout -b feat origin/main` and every fork
 // workflow. %(upstream) doesn't need a reachable remote or an existing remote-tracking ref to
 // resolve (it's computed purely from branch.<name>.{remote,merge} config), so this needs no bare
@@ -126,12 +126,12 @@ func TestResolveUpstreamRemoteBranch(t *testing.T) {
 	}
 }
 
-// TestPushPreflight_DifferentlyNamedUpstreamIsNotWouldSetUpstream is G32 round-3
-// functional-correctness review finding #3's own regression proof: before the fix, PushPreflight
-// checked refs/remotes/<remote>/<localBranchName> for existence regardless of the branch's real
-// configured upstream, so a branch already tracking a differently-named remote branch was reported
-// as "would set upstream" (and pushed to a brand-new same-named remote branch, silently rebinding
-// the branch's tracking config) purely because no same-named ref happened to exist yet.
+// TestPushPreflight_DifferentlyNamedUpstreamIsNotWouldSetUpstream is the regression proof: before
+// the fix, PushPreflight checked refs/remotes/<remote>/<localBranchName> for existence regardless
+// of the branch's real configured upstream, so a branch already tracking a differently-named remote
+// branch was reported as "would set upstream" (and pushed to a brand-new same-named remote branch,
+// silently rebinding the branch's tracking config) purely because no same-named ref happened to
+// exist yet.
 func TestPushPreflight_DifferentlyNamedUpstreamIsNotWouldSetUpstream(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -165,11 +165,10 @@ func TestPushPreflight_DifferentlyNamedUpstreamIsNotWouldSetUpstream(t *testing.
 	}
 }
 
-// TestRunRemote_ForcePush_ProtectedGateChecksUpstreamName is P108 Part 15 F1's own regression
-// proof, a security-relevant force-push bypass (flagged for Part 16's future reviewer — this file
-// is Part 16's, not yet reviewed, but the bug and its fix both sit at this exact boundary). Before
-// the fix, RunRemote's protected-branch gate matched/confirmed against params.Branch, the LOCAL
-// branch name — but a force-push actually lands on resolveUpstreamRemoteBranch's result, which can
+// TestRunRemote_ForcePush_ProtectedGateChecksUpstreamName is the regression proof, a
+// security-relevant force-push bypass (the bug and its fix both sit at this exact boundary).
+// Before the fix, RunRemote's protected-branch gate matched/confirmed against params.Branch, the
+// LOCAL branch name — but a force-push lands on resolveUpstreamRemoteBranch's result, which can
 // differ. A local "feat" tracking a protected "origin/main" upstream slipped past the gate
 // entirely: MatchProtectedBranch never saw "main", so any (or no) confirmation matched by omission.
 func TestRunRemote_ForcePush_ProtectedGateChecksUpstreamName(t *testing.T) {
@@ -278,12 +277,11 @@ func TestPushPreflight_ProtectedByChecksUpstreamName(t *testing.T) {
 	}
 }
 
-// TestPushPreflight_ResolvedBranchIsUpstreamName is F2's own regression proof (P108 Part 16
-// review): ForcePushDialog.vue can only ever gate on and display the LOCAL branch name unless the
-// wire response also carries the resolved UPSTREAM one -- a local "feat" tracking a differently
-// named "main" must report ResolvedBranch "main", not "feat", or the dialog's own confirm gate
-// can never be satisfied against a backend that (correctly, since Part 15's F1) checks the
-// upstream name.
+// TestPushPreflight_ResolvedBranchIsUpstreamName is the regression proof: ForcePushDialog.vue can
+// only ever gate on and display the LOCAL branch name unless the wire response also carries the
+// resolved UPSTREAM one -- a local "feat" tracking a differently named "main" must report
+// ResolvedBranch "main", not "feat", or the dialog's own confirm gate can never be satisfied
+// against a backend that (correctly) checks the upstream name.
 func TestPushPreflight_ResolvedBranchIsUpstreamName(t *testing.T) {
 	t.Parallel()
 	skipWithoutGitStack(t)
@@ -320,11 +318,11 @@ func runGitStackOutput(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// TestRunRemote_Pull_ClearsUndoSlot is G32 round-3 functional-correctness review finding #2's own
-// regression proof: a reset (or any other Undoable RunOp kind)'s undo record is an absolute ref
-// write that assumes nothing has moved the branch since it was captured. RunRemote never touched
-// the undo slot at all before this fix, so a pull landing after such an op left a stale record in
-// place — clicking Undo would silently move the branch back past whatever the pull just brought in.
+// TestRunRemote_Pull_ClearsUndoSlot is the regression proof: a reset (or any other Undoable RunOp
+// kind)'s undo record is an absolute ref write that assumes nothing has moved the branch since it
+// was captured. RunRemote never touched the undo slot at all before this fix, so a pull landing
+// after such an op left a stale record in place — clicking Undo would silently move the branch back
+// past whatever the pull just brought in.
 func TestRunRemote_Pull_ClearsUndoSlot(t *testing.T) {
 	t.Parallel()
 	remoteDir := t.TempDir()
@@ -377,11 +375,11 @@ func TestRunRemote_Pull_ClearsUndoSlot(t *testing.T) {
 	}
 }
 
-// TestRunRemote_Pull_BranchChangedIsDetectedInsideTheWrite is F5's own regression proof (P108 Part
-// 16 review): the "is the pulled branch still checked out" re-check now runs fresh, INSIDE
-// Repo.Write, immediately before the merge/rebase spawns -- not before Repo.Write is even
-// acquired. Confirms the refactor still catches "the checked-out branch changed" and reports
-// BranchChanged rather than silently merging into whatever is checked out now.
+// TestRunRemote_Pull_BranchChangedIsDetectedInsideTheWrite is the regression proof: the "is the
+// pulled branch still checked out" re-check now runs fresh, INSIDE Repo.Write, immediately before
+// the merge/rebase spawns -- not before Repo.Write is even acquired. Confirms the refactor still
+// catches "the checked-out branch changed" and reports BranchChanged rather than silently merging
+// into whatever is checked out now.
 func TestRunRemote_Pull_BranchChangedIsDetectedInsideTheWrite(t *testing.T) {
 	t.Parallel()
 	skipWithoutGitStack(t)

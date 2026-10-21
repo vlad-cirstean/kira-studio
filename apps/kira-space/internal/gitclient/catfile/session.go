@@ -1,8 +1,8 @@
-// Package catfile is the paged history pipeline's blob/metadata reader (docs/HISTORY.md (v1.3 G3),
-// D11): two persistent `git cat-file` processes
+// Package catfile is the paged history pipeline's blob/metadata reader (docs/HISTORY.md):
+// two persistent `git cat-file` processes
 // (`--batch-check` for metadata-only lookups, `--batch` for content), each driven one request at
-// a time by writing a revision per line and reading its two-phase response. Built in this phase;
-// its first production caller is G4's commit.detail/commit.fileDiff/blob-read work — RepoEntry
+// a time by writing a revision per line and reading its two-phase response. Its first production
+// caller is the commit.detail/commit.fileDiff/blob-read work — RepoEntry
 // owns a Session lazily (constructed on first use, torn down with the entry) so a connection that
 // never needs it never pays for two extra processes.
 package catfile
@@ -32,7 +32,7 @@ var ErrTooLarge = errors.New("catfile: blob exceeds the configured size gate")
 // maxConsecutiveFailures bounds the persistent process's own lazy-restart circuit breaker: after
 // this many consecutive failures (a spawn failure, or a response readHeader/readContent could not
 // parse), further requests fail immediately with errCircuitOpen rather than spawning yet another
-// doomed process — a git binary that is simply broken (wrong permissions, corrupt install) must
+// doomed process — a git binary that is broken (wrong permissions, corrupt install) must
 // not be retried forever.
 const maxConsecutiveFailures = 3
 
@@ -100,7 +100,7 @@ func (p *persistentProcess) fail() {
 	p.failures++
 }
 
-// watchCtx interrupts an in-flight write/read by closing proc once ctx is done (F11: Check/Read/
+// watchCtx interrupts an in-flight write/read by closing proc once ctx is done (Check/Read/
 // CheckMany previously took no context at all, so a stalled reply blocked the caller — and every
 // later caller queued behind it on mu — with no way to cancel). It never touches persistentProcess
 // state itself (only the main goroutine, already holding mu, does that) — Process.Close is
@@ -173,8 +173,8 @@ func (p *persistentProcess) request(ctx context.Context, line string, readResp f
 	return nil
 }
 
-// requestPipelined is request's own multi-line counterpart, CheckMany's own use (G32 round-3
-// performance review, finding #4): request's write-then-read ordering deadlocks once a batch is
+// requestPipelined is request's own multi-line counterpart, CheckMany's own use: request's
+// write-then-read ordering deadlocks once a batch is
 // large enough to fill BOTH this process's own pipe to the child (our write blocks) AND the
 // child's stdout pipe back to us (git blocks writing responses to a reader that hasn't started
 // draining, since we're still mid-write) — reachable in practice via CheckMany at roughly a
@@ -194,9 +194,9 @@ func (p *persistentProcess) requestPipelined(ctx context.Context, lines string, 
 	}
 	stop := watchCtx(ctx, p.proc)
 	// stdin is captured into a local before the goroutine starts, not read as p.stdin from
-	// inside it: fail() (below, and F8's own new early call on a respErr) nils p.stdin under mu
-	// as soon as readResp returns, which could otherwise race this goroutine's own unsynchronized
-	// read of that same field against a p that has already moved on.
+	// inside it: fail() (below, and the new early call on a respErr) nils p.stdin under mu as soon
+	// as readResp returns, which could otherwise race this goroutine's own unsynchronized read of
+	// that same field against a p that has already moved on.
 	stdin := p.stdin
 	writeErrCh := make(chan error, 1)
 	go func() {
@@ -205,7 +205,7 @@ func (p *persistentProcess) requestPipelined(ctx context.Context, lines string, 
 	}()
 	respErr := readResp(p.reader)
 	if respErr != nil {
-		// F8: fail() (closing stdin, killing the process) BEFORE draining writeErrCh — a large
+		// fail() (closing stdin, killing the process) BEFORE draining writeErrCh — a large
 		// enough batch's own writer goroutine can be blocked on a full stdin pipe (git itself
 		// blocked writing a response to a reader that just stopped reading, on the very same
 		// batch), so waiting on writeErrCh first, as this used to, could deadlock this call
@@ -270,7 +270,7 @@ func NewSession(deps Deps, maxBlobBytes int64) *Session {
 }
 
 // Check resolves rev via --batch-check alone — no content is ever read. Returns ErrMissing when
-// git could not resolve rev. ctx (F11) can cancel a stalled reply — a hung child, or a partial
+// git could not resolve rev. ctx can cancel a stalled reply — a hung child, or a partial
 // clone's lazy blob fetch from its promisor remote — without blocking this caller, and every other
 // caller queued behind it on the persistent process's own mutex, forever.
 func (s *Session) Check(ctx context.Context, rev string) (ObjectInfo, error) {
@@ -295,13 +295,13 @@ func (s *Session) Check(ctx context.Context, rev string) (ObjectInfo, error) {
 
 // CheckMany resolves every rev in revs via ONE --batch-check round trip — one write of all of
 // them, then all their header lines read back in the same order — rather than one request() call
-// (one write, one read, under the process's own single-request mutex) per rev (G30 round-1
-// performance review, finding #5): `cat-file --batch-check` is explicitly designed to take many
-// revisions in one write and stream back all the answers, the whole point of a persistent process
-// in the first place. The returned slice is the same length as revs, in the same order; a rev git
-// could not resolve gets a zero ObjectInfo at its own index (Check's own ErrMissing becomes a
-// per-Go-error return for a single rev, but a batch of N cannot fail some and succeed others
-// through one error return, so "missing" is a zero-value slot here instead).
+// (one write, one read, under the process's own single-request mutex) per rev:
+// `cat-file --batch-check` is explicitly designed to take many revisions in one write and stream
+// back all the answers, the whole point of a persistent process in the first place. The returned
+// slice is the same length as revs, in the same order; a rev git could not resolve gets a zero
+// ObjectInfo at its own index (Check's own ErrMissing becomes a per-Go-error return for a single
+// rev, but a batch of N cannot fail some and succeed others through one error return, so
+// "missing" is a zero-value slot here instead).
 func (s *Session) CheckMany(ctx context.Context, revs []string) ([]ObjectInfo, error) {
 	if len(revs) == 0 {
 		return nil, nil
@@ -335,11 +335,11 @@ func (s *Session) CheckMany(ctx context.Context, revs []string) ([]ObjectInfo, e
 
 // Read resolves rev and returns its content. Checks the size via --batch-check first (Check) and
 // answers ErrTooLarge without ever asking --batch for the bytes when it exceeds the session's
-// gate. F9: that gate alone is not enough against a mutable rev (e.g. "HEAD:<path>", codeworkspace/
+// gate. That gate alone is not enough against a mutable rev (e.g. "HEAD:<path>", codeworkspace/
 // diff.go's readHeadSide, or a client-supplied rev via file.read) — the --batch-check process and
 // the --batch process below are two SEPARATE, independently-spawned processes, each resolving rev
 // against whatever HEAD happens to be at the moment IT runs, so HEAD moving between the two calls
-// means the size that passed the gate is not the size actually about to be read. batchInfo.Size —
+// means the size that passed the gate is not the size about to be read. batchInfo.Size —
 // this second process's own, independent snapshot — is re-checked inside the same closure that
 // already has it, before readContent's own unbounded allocation.
 func (s *Session) Read(ctx context.Context, rev string) (ObjectInfo, []byte, error) {
@@ -408,7 +408,7 @@ func (s *Session) CheckOneShot(ctx context.Context, rev string) (ObjectInfo, err
 
 // ReadOneShot answers a rev the batch protocol cannot express — a path containing a newline
 // (`cat-file --batch` reads one request per line, so a newline mid-request would be seen as two).
-// F12: checks the size via `cat-file -s <rev>` FIRST, argv-only (no line framing to break, same as
+// Checks the size via `cat-file -s <rev>` FIRST, argv-only (no line framing to break, same as
 // the read itself), so the gate is exact before any unbounded read starts — the previous design
 // read the whole (possibly enormous) object into memory via `git show <rev>` and only checked its
 // length afterward, reachable with a client-supplied rev plus a hostile path. A non-zero exit on

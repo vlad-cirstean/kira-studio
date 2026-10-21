@@ -32,22 +32,22 @@ import { useSettingsStore } from './state/settings';
 import { useTabsStore } from './state/tabs';
 import { useTerminalsStore } from './state/terminals';
 import { GENERAL_WORKSPACE, useWorkspaceStore } from './state/workspace';
-// P131 Part 1 §3.2: styles.css re-exports @workbench/workbench.css (itself @theme/base.css, P104)
-// and adds one more @source over packages/git-ui/src, so this app's own unprefixed root scans
-// git-ui's migrated shadcn call sites too. Importing both here would compile base.css as two
-// separate Tailwind roots and double its output — this is the one entry point now.
+// styles.css re-exports @workbench/workbench.css (itself @theme/base.css) and adds one more @source
+// over packages/git-ui/src, so this app's own unprefixed root scans git-ui's migrated shadcn call
+// sites too. Importing both here would compile base.css as two separate Tailwind roots and double
+// its output — this is the one entry point now.
 import './styles.css';
 
-// P100 Part 2: Kira Studio's own main.ts bootstrap, trimmed to this app's own state layer — no
+// Kira Studio's own main.ts bootstrap, trimmed to this app's own state layer — no
 // __KIRA_DEBUG_HOOKS__ block (that whole retention-probe apparatus is data-grid/query-result
 // specific: grid/documents/keyvalue/stream/console page stores, none of which exist here) and no
 // ops/dbMcp stores (none of those subsystems exist in this app — apps/kira-space/
-// main.go's own Services list has no counterpart for any of them). P127: Studio's own
+// main.go's own Services list has no counterpart for any of them). Studio's own
 // agentHooks/agentSessions stores left too (agent-activity monitoring moved to a shared home, used
 // by no app as of this phase), so that gap has since closed on its own.
-// P116 G5/G7 add appMetrics/keepAwake back — this app now has its own metrics ticker and
-// keep-awake toggle (main.go's own metrics.NewAppTicker/keepawake.New). P119 adds appUpdate back
-// too — this app now has its own update checker/installer.
+// This app now has its own metrics ticker and
+// keep-awake toggle (main.go's own metrics.NewAppTicker/keepawake.New).
+// This app now has its own update checker/installer.
 async function mountShell(): Promise<void> {
   // Every store used here runs before app.use(pinia) below, so each needs the module-level
   // `pinia` instance passed explicitly (Pinia has no active instance yet at this point).
@@ -69,18 +69,18 @@ async function mountShell(): Promise<void> {
   const workspaceStore = useWorkspaceStore(pinia);
   const reviewWindowStore = useAdeReviewWindowStore(pinia);
 
-  // P129 Part 3 §2.8 item 2: right after the stores are built, before mount() below, so no push
-  // (`kira:adetask:*` channels/agent `Stop`) is missed between mount
-  // and this window's first `useAdeSnapshot`/`useAdeSessions` call. No teardown — the window is the
-  // lifetime (queries.ts's own doc comment).
+  // Right after the stores are built, before mount() below, so no push (`kira:adetask:*`
+  // channels/agent `Stop`) is missed between mount and this window's first
+  // `useAdeSnapshot`/`useAdeSessions` call. No teardown — the window is the lifetime
+  // (queries.ts's own doc comment).
   installAdeSignals(queryClient, agentSessionsStore);
 
   // Kira Studio's own initAppMetrics precedent: just subscribes, no data dependency — runs
   // synchronously before the Promise.all below rather than joining it.
   appMetricsStore.initAppMetrics();
 
-  // P128 §2.2/§2.6: this app now persists a per-window module mode too (internal/windowsvc,
-  // shared with Kira Studio since this phase) — hydrated before any other window-scoped state,
+  // This app now persists a per-window module mode too (internal/windowsvc,
+  // shared with Kira Studio) — hydrated before any other window-scoped state,
   // mirroring Kira Studio's own main.ts:338. The fall-forward onto the first restored repo below
   // still runs regardless of which mode this resolves to (state/workspace.ts's own
   // `openRepoWorkspace`/`activateWorkspace` doc comment: that fall-forward must honour a persisted
@@ -132,10 +132,10 @@ async function mountShell(): Promise<void> {
     workspaceStore.openReviewWorkspace(reviewTarget.codeRepoId);
   }
 
-  // C5 §6.1: hydrateTabs (state/tabs.ts) already derived workspaceStore.openRepos from the
-  // restored tabs themselves — ensureWorkspaceShell's own doc comment calls for running it once per
-  // restored repo right here, after hydrateTabs, since hydrateTabs itself never calls back into it
-  // (avoiding a third link in that module pair's existing two-way call graph).
+  // hydrateTabs (state/tabs.ts) already derived workspaceStore.openRepos from the restored tabs
+  // themselves — ensureWorkspaceShell's own doc comment calls for running it once per restored repo
+  // right here, after hydrateTabs, since hydrateTabs itself never calls back into it (avoiding a
+  // third link in that module pair's existing two-way call graph).
   if (!reviewTarget) for (const repoId of workspaceStore.openRepos) ensureWorkspaceShell(repoId);
   // Falls forward onto the last active repo (persisted per window), else the first restored one,
   // so a relaunch with open repositories skips the empty GitStart screen. `activateWorkspace`
@@ -167,9 +167,9 @@ async function mountShell(): Promise<void> {
   useAppUpdateStore().initAppUpdate();
 }
 
-// F2: mountShell's own essential hydrates (layout/settings/codeRepos/tabs) can still reject — a DB
-// error, or a busy DB past the 5s _busy_timeout (F7's second-instance case makes this plausible).
-// P113 F6: the catch-and-retry wrapper itself moved to workbench/bootstrapShell.ts, shared with
+// mountShell's own essential hydrates (layout/settings/codeRepos/tabs) can still reject — a DB
+// error, or a busy DB past the 5s _busy_timeout (the second-instance case makes this plausible).
+// The catch-and-retry wrapper itself moved to workbench/bootstrapShell.ts, shared with
 // kira-studio's own identical copy.
 // Test builds only: the copy-coverage specs switch the locale to the pseudo-locale.
 if (__KIRA_DEBUG_HOOKS__) installCopyTestHook();

@@ -9,7 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
-const adeBacklogColumns = `id, text, position, jira_key, jira_url, github_url, notes, added_at`
+const adeBacklogColumns = `id, text, position, jira_key, jira_url, host_url, notes, added_at`
 
 // AdeBacklogRepo reads and writes ade_backlog: the ordered list of work not yet a task.
 type AdeBacklogRepo struct {
@@ -18,7 +18,7 @@ type AdeBacklogRepo struct {
 
 func scanAdeBacklog(row rowScanner) (model.AdeBacklogItem, error) {
 	var i model.AdeBacklogItem
-	err := row.Scan(&i.ID, &i.Text, &i.Position, &i.JiraKey, &i.JiraURL, &i.GithubURL, &i.Notes, &i.AddedAt)
+	err := row.Scan(&i.ID, &i.Text, &i.Position, &i.JiraKey, &i.JiraURL, &i.HostURL, &i.Notes, &i.AddedAt)
 	return i, err
 }
 
@@ -52,7 +52,7 @@ func (r *AdeBacklogRepo) Add(i model.AdeBacklogItem) (model.AdeBacklogItem, erro
 		return model.AdeBacklogItem{}, fmt.Errorf("repos: next ade backlog position: %w", err)
 	}
 	if _, err := r.DB.Exec(`INSERT INTO ade_backlog (`+adeBacklogColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		i.ID, i.Text, i.Position, i.JiraKey, i.JiraURL, i.GithubURL, i.Notes, i.AddedAt); err != nil {
+		i.ID, i.Text, i.Position, i.JiraKey, i.JiraURL, i.HostURL, i.Notes, i.AddedAt); err != nil {
 		return model.AdeBacklogItem{}, fmt.Errorf("repos: insert ade backlog %s: %w", i.ID, err)
 	}
 	return i, nil
@@ -81,8 +81,8 @@ func (r *AdeBacklogRepo) Update(id string, p model.AdeBacklogPatch) (model.AdeBa
 	if p.JiraURL != nil {
 		cur.JiraURL = *p.JiraURL
 	}
-	if p.GithubURL != nil {
-		cur.GithubURL = *p.GithubURL
+	if p.HostURL != nil {
+		cur.HostURL = *p.HostURL
 	}
 	if p.Notes != nil {
 		cur.Notes = *p.Notes
@@ -90,8 +90,8 @@ func (r *AdeBacklogRepo) Update(id string, p model.AdeBacklogPatch) (model.AdeBa
 	if err := cur.Validate(); err != nil {
 		return model.AdeBacklogItem{}, err
 	}
-	if _, err := tx.Exec(`UPDATE ade_backlog SET text = ?, jira_key = ?, jira_url = ?, github_url = ?, notes = ? WHERE id = ?`,
-		cur.Text, cur.JiraKey, cur.JiraURL, cur.GithubURL, cur.Notes, id); err != nil {
+	if _, err := tx.Exec(`UPDATE ade_backlog SET text = ?, jira_key = ?, jira_url = ?, host_url = ?, notes = ? WHERE id = ?`,
+		cur.Text, cur.JiraKey, cur.JiraURL, cur.HostURL, cur.Notes, id); err != nil {
 		return model.AdeBacklogItem{}, fmt.Errorf("repos: update ade backlog %s: %w", id, err)
 	}
 	if err := tx.Commit(); err != nil {

@@ -1,9 +1,8 @@
-// Package sqlite_test is the Go analogue of packages/db-fixtures/sqlite.spec.ts. Not every one of the spec's
-// 43 scenarios has a Go twin — the ones ported are the load-bearing behaviours P58 D12's own
-// "adapter-first-test-first" rule exists to protect, plus the four new/changed cases §5.4 of
-// docs/HISTORY.md (v1 P58b) calls out (B7's value-follows-the-value codec, the
-// real modernc.org/sqlite decltype coercion this session found and fixed, B8's real cancellation,
-// and the mattn-regression-class "cancel then reuse" case).
+// Package sqlite_test is the Go analogue of packages/db-fixtures/sqlite.spec.ts. Not every one of
+// the spec's 43 scenarios has a Go twin — the ones ported are the load-bearing behaviours the
+// "adapter-first-test-first" rule exists to protect, plus the four new/changed cases (the
+// value-follows-the-value codec, the real modernc.org/sqlite decltype coercion, the real
+// cancellation, and the mattn-regression-class "cancel then reuse" case).
 package sqlite_test
 
 import (
@@ -434,7 +433,7 @@ func TestSqlite(t *testing.T) {
 			t.Errorf("page-before's first id = %v, want 1 (display order preserved)", backFirstID)
 		}
 
-		// P2 R1 regression: a "before" page is fetched in descending (fetch) order and reversed to
+		// Regression: a "before" page is fetched in descending (fetch) order and reversed to
 		// ascending (display) order — the streaming readPage must swap its tracked first/last raw
 		// rows along with builder.Reverse(), or this page's own NextToken (built from
 		// CellAt(rowCount-1,...), the last *displayed* row) would be built from the wrong row's
@@ -478,10 +477,10 @@ func TestSqlite(t *testing.T) {
 		}
 	})
 
-	// P26 §3.3(1)/(2): caps.go declares ServerFilter/Projection both true; there was no Filter test
-	// at all before this, and Projection appeared only inside a value-codec test. Wired through
-	// scenarios.go's shared constructors (P26 §2.2/P26 review F3) rather than hand-rolled, so this
-	// scenario also backs Tier 2 via RunMatrix's own Then slices for the same capability.
+	// caps.go declares ServerFilter/Projection both true; there was no Filter test at all before
+	// this, and Projection appeared only inside a value-codec test. Wired through scenarios.go's
+	// shared constructors rather than hand-rolled, so this scenario also backs Tier 2 via
+	// RunMatrix's own Then slices for the same capability.
 	testsupport.RunScenarios(t, connectedAdapter(t, cfg), cfg,
 		testsupport.FilterNarrowsResult(
 			nodePath(cfg.ID, seg("database", "main"), seg("table", "customers")),
@@ -585,8 +584,8 @@ func TestSqlite(t *testing.T) {
 		}
 	})
 
-	// P2 R2's "cancellation between BEGIN IMMEDIATE and COMMIT" regression test lives in
-	// mutate_internal_test.go (package sqlite), not here: runOnConn (B8) deliberately never lets
+	// The "cancellation between BEGIN IMMEDIATE and COMMIT" regression test lives in
+	// mutate_internal_test.go (package sqlite), not here: runOnConn deliberately never lets
 	// Adapter.Mutate's own outer ctx reach mutate()'s internals — its work runs on an adapter-owned
 	// driverCtx, cancelled only by Adapter.Cancel or the goroutine's own completion (abort.go's
 	// RunWithAbortRace doc comment calls this sqlite's "opposite polarity" versus postgres/mysql).
@@ -874,7 +873,7 @@ func TestSqlite(t *testing.T) {
 		}
 	})
 
-	// P2 R1: a BLOB column's edited value arrives from the grid still spelled in the app's own
+	// A BLOB column's edited value arrives from the grid still spelled in the app's own
 	// "0x<hex>" display convention (read.go's cellText above) — Mutate must decode it back into
 	// raw bytes before binding it as a parameter, not hand the driver that 6-character ASCII
 	// string as if it were the new column content.
@@ -918,11 +917,10 @@ func TestSqlite(t *testing.T) {
 		}
 	})
 
-	// The real, previously-undocumented modernc.org/sqlite finding this session made: unlike
-	// node:sqlite, this driver silently re-parses a TEXT value into a Go time.Time whenever the
-	// column's declared type is DATE/DATETIME/TIMESTAMP and the text happens to look like a date —
-	// read.go's selectExpr routes around it. This test would fail immediately without that fix
-	// (every datetime_a/date_a cell would render the Go default time.Time string instead of the
+	// Unlike node:sqlite, this driver silently re-parses a TEXT value into a Go time.Time whenever
+	// the column's declared type is DATE/DATETIME/TIMESTAMP and the text happens to look like a
+	// date — read.go's selectExpr routes around it. This test would fail immediately without that
+	// fix (every datetime_a/date_a cell would render the Go default time.Time string instead of the
 	// server's own stored text).
 	t.Run("BOOLEAN renders 0/1, DATETIME/DATE render their stored text unmodified", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)
@@ -1009,7 +1007,7 @@ func TestSqlite(t *testing.T) {
 		}
 	})
 
-	// P2 R1: SetMaxOpenConns(1) means a second op can genuinely queue inside a.db.Conn(ctx) waiting
+	// SetMaxOpenConns(1) means a second op can genuinely queue inside a.db.Conn(ctx) waiting
 	// for the sole connection, rather than ever reaching a statement at all — cancelling that
 	// queued op's own local ctx must still report E_CANCELLED, not the generic E_QUERY runOnConn's
 	// mapError fallback used to produce for db.Conn's own ctx.Err() return.

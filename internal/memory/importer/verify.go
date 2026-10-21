@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/memory"
 )
@@ -117,7 +118,7 @@ type verifyWire struct {
 
 // Verify judges the facts against a copy of the source in an otherwise empty working dir, with
 // only Read and Grep.
-func (a ClaudeAgent) Verify(ctx context.Context, in VerifyInput) (VerifyOutput, error) {
+func (a ModelAgent) Verify(ctx context.Context, in VerifyInput) (VerifyOutput, error) {
 	source := "source" + strings.ToLower(filepath.Ext(in.Path))
 	input, err := json.Marshal(verifyWire{Document: verifyDoc{Path: in.Path, Title: in.Title, Source: source}, Facts: in.Facts})
 	if err != nil {
@@ -127,7 +128,7 @@ func (a ClaudeAgent) Verify(ctx context.Context, in VerifyInput) (VerifyOutput, 
 	res, err := a.Runner.RunResult(ctx, memory.Call{
 		System: llmprompts.MemoryImportVerifySystem.Text(a.prompts(), llmprompts.VerifyVars{MaxFacts: verifyBatch}),
 		Input:  string(input), Schema: llmprompts.MemoryImportVerifySystem.Schema(),
-		Tools: []string{"Read", "Grep"}, Files: map[string][]byte{source: in.Source}, MaxTurns: turns,
+		ReadFiles: true, Files: map[string][]byte{source: in.Source}, MaxTurns: turns,
 		Timeout: timeout, Budget: budget,
 	})
 	out := VerifyOutput{CostUSD: res.CostUSD}
@@ -141,7 +142,7 @@ func (a ClaudeAgent) Verify(ctx context.Context, in VerifyInput) (VerifyOutput, 
 		}
 	}
 	if err := json.Unmarshal(res.Output, &parsed); err != nil {
-		return out, memory.ErrClaudeOutput
+		return out, a.Runner.Fail(harness.ErrOutput)
 	}
 	asked := map[string]bool{}
 	for _, f := range in.Facts {
@@ -160,7 +161,7 @@ func (a ClaudeAgent) Verify(ctx context.Context, in VerifyInput) (VerifyOutput, 
 		}
 	}
 	if len(out.Verdicts) == 0 {
-		return out, memory.ErrClaudeOutput
+		return out, a.Runner.Fail(harness.ErrOutput)
 	}
 	return out, nil
 }

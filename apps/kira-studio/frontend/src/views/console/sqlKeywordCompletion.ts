@@ -1,4 +1,4 @@
-// P60b §5.2: the successor to `@codemirror/lang-sql`'s `keywordCompletionSource(dialect, true)` —
+// The successor to `@codemirror/lang-sql`'s `keywordCompletionSource(dialect, true)` —
 // every dialect's keywords and type names, uppercased (`editor/languages.ts`'s now-removed
 // `upperCaseKeywords: true`, whose own reasoning stays true: house style, and Monaco's own
 // suggest-widget matcher case-folds the same way CodeMirror's `FuzzyMatcher` did, so typing `sel`

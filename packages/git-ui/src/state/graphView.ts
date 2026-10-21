@@ -24,15 +24,15 @@ export type { ChunkSource };
 export type LoadingState = 'idle' | 'streaming' | 'loadingMore' | 'refreshing';
 
 /**
- * The UI-side half of §5.4's cache/rehydration story (P3 W9), rebuilt for P4 W5 into the module
- * every component reads (docs/plans/P4.md W5). `store` is the client's own `CommitStore`, fed
+ * The UI-side half of the cache/rehydration story, the module every component reads. `store` is
+ * the client's own `CommitStore`, fed
  * one `graph.stream` chunk at a time via `appendPacked` — which is also where the ordering
  * guarantee lives: `CommitStore.appendPacked` throws if a chunk does not start exactly at the
  * store's current row count, so an out-of-order or duplicated chunk is a loud bug rather than
  * silently corrupted state. This file adds no ordering check of its own; the store's is the
- * only one, and re-implementing it here would just be a second place to get it wrong.
+ * only one, and re-implementing it here would be a second place to get it wrong.
  *
- * `store` and `layout` are `markRaw`'d and never become reactive (§5.3) — only the scalars
+ * `store` and `layout` are `markRaw`'d and never become reactive — only the scalars
  * below are.
  *
  * **`generation` is the mechanism that makes a reset visible to the grid.** Nothing else
@@ -43,7 +43,7 @@ export type LoadingState = 'idle' | 'streaming' | 'loadingMore' | 'refreshing';
  *
  * **Layout is driven from the append, not from the render.** After each chunk lands, the whole
  * list is laid out again and `#publish` swaps `layout`, `plan` and `laneCount` in one synchronous
- * step. `onPlanPublished` is the extension point W6's `CommitGrid.vue` subscribes through to
+ * step. `onPlanPublished` is the extension point `CommitGrid.vue` subscribes through to
  * repaint inside that same step — kept as a plain subscribe/unsubscribe callback (mirroring
  * `BridgeClient.on`) rather than a direct reference to the grid, so this file stays ignorant of
  * SlickGrid entirely. Rows can be *listed* before their lanes exist, which is correct and is what
@@ -61,9 +61,9 @@ export class GraphViewState {
   readonly exhausted: ShallowRef<boolean>;
   readonly lastChunkSource: ShallowRef<ChunkSource | undefined>;
   readonly laneCount: ShallowRef<number> = shallowRef(0);
-  /** P93 §7: the current `RowPlan` (branch-grouped, or `identityRowPlan` with no `#order`
-   *  attached, §5.4) — `CommitGrid.vue`'s own translation sites and `columns.ts`/`graphColumn.ts`
-   *  read this to convert between display rows (SlickGrid's own indexing) and store rows
+  /** The current `RowPlan` (branch-grouped, or `identityRowPlan` with no `#order` attached) —
+   *  `CommitGrid.vue`'s own translation sites and `columns.ts`/`graphColumn.ts` read this to
+   *  convert between display rows (SlickGrid's own indexing) and store rows
    *  (`CommitStore`/`SelectionState`'s). A fresh object on every publish. */
   readonly plan: ShallowRef<RowPlan> = shallowRef(identityRowPlan(0));
   readonly loading: ShallowRef<LoadingState> = shallowRef('idle');
@@ -88,7 +88,7 @@ export class GraphViewState {
   #loadController: AbortController | undefined;
   #repoId: string | undefined;
   #layoutSubmitMarked = false;
-  /** F1: bumped by `reset()` (repo switch). `#runLoad` captures this at entry and checks it again
+  /** Bumped by `reset()` (repo switch). `#runLoad` captures this at entry and checks it again
    *  before its post-request resync — a bump in between means the repo switched out from under
    *  it, so its captured `repoId` is now stale and its resync must be skipped rather than
    *  reopening/resyncing the *old* repo's stream over the new one. */
@@ -107,9 +107,9 @@ export class GraphViewState {
   #autoRefreshPending = false;
   #lastAutoRefreshAt = 0;
 
-  /** `order` is P93 §7's `GraphOrderState` — optional, since not every host of this class needs
-   *  branch grouping (a caller that omits it gets the identity plan, §5.4, reproducing pre-P93
-   *  behaviour exactly). When given, `#rebuildLayout` (below) rebuilds its plan on every call —
+  /** `order` is the `GraphOrderState` — optional, since not every host of this class needs
+   *  branch grouping (a caller that omits it gets the identity plan). When given, `#rebuildLayout`
+   *  (below) rebuilds its plan on every call —
    *  see `rebuildOrder()`'s own doc comment for why that is a plain method, not a reactive watch
    *  over `order.revision`. */
   constructor(
@@ -149,10 +149,11 @@ export class GraphViewState {
   /**
    * Opens `graph.stream` for `repoId`. `resumeThroughRow` defaults to this store's own current
    * row count, which is exactly what a post-remount rehydration needs: a freshly constructed
-   * `GraphViewState` (the only kind that exists right after a remount, §2.1) starts at 0, so the default asks the host to replay every row it still has cached
-   * from row 0 — the single round trip that is "rehydrates without re-running git" from the
-   * UI's side (§5.4). The same default also makes a same-session reconnect (the store already
-   * holds N rows) resume from N instead of re-fetching them.
+   * `GraphViewState` (the only kind that exists right after a remount) starts at 0, so the default
+   * asks the host to replay every row it still has cached from row 0 — the single round trip that
+   * is "rehydrates without re-running git" from the UI's side. The same default also makes a
+   * same-session reconnect (the store already holds N rows) resume from N instead of
+   * re-fetching them.
    *
    * Supersedes any still-open stream on this instance: aborting the previous
    * `#abortController` ends it. A restart at row 0 streams into a staging store; the list swaps
@@ -195,14 +196,14 @@ export class GraphViewState {
   }
 
   /**
-   * Loads `pages` more pages (default 1) and folds them into the store — the flow W9's
+   * Loads `pages` more pages (default 1) and folds them into the store — the flow the
    * `LoadMoreButton.vue` drives: `graph.loadMore` reads pages into the *host's* store and
    * returns without pushing rows; the rows only arrive by re-opening `graph.stream` from
    * `loadedRows`, which the host then answers entirely from cache. Two round trips, and the
    * right shape: the alternative (one stream kept open for the session) makes the host hold a
    * stream across a webview disposal it cannot observe.
    *
-   * Idempotent while already loading (§5.1.1's "a second press is a no-op, not a queued second
+   * Idempotent while already loading ("a second press is a no-op, not a queued second
    * page") — including while `loadAll()`'s own loop is running, since it calls this directly.
    */
   async loadMore(pages = 1): Promise<void> {
@@ -219,11 +220,11 @@ export class GraphViewState {
     }
   }
 
-  /** Loops `loadMore` until the host reports the history exhausted (§5.1.1's Alt-click "loads
+  /** Loops `loadMore` until the host reports the history exhausted (the Alt-click "loads
    *  everything"). Appends progressively — each `loadMore` call still folds its page in via the
    *  usual re-open-and-stream path — so the list stays live throughout rather than jumping once
    *  at the end. `cancelLoad()` stops it between pages; the page in flight when cancelled still
-   *  completes and is kept (§5.1.1: "rows already read are kept") — the same one
+   *  completes and is kept ("rows already read are kept") — the same one
    *  `AbortController` spans the whole loop so a cancel reaches whichever page is currently in
    *  flight, not just the next one. */
   async loadAll(): Promise<void> {
@@ -237,9 +238,9 @@ export class GraphViewState {
         await this.#runLoad('loadingMore', () =>
           this.#bridge.request('graph.loadMore', { repoId, pages: 1 }, controller.signal),
         );
-        // G16 D8: a termination guard independent of the exhaustion signal — a page that
+        // A termination guard independent of the exhaustion signal — a page that
         // appended no rows means there are no more rows, whatever `exhausted` says. Without
-        // this, a walk whose re-stream never reports exhausted (F4) spins forever, repacking
+        // this, a walk whose re-stream never reports exhausted spins forever, repacking
         // and re-emitting the whole history every iteration.
         if (this.loadedRows.value === before) break;
       }
@@ -252,14 +253,14 @@ export class GraphViewState {
   }
 
   /**
-   * `docs/plans/P11.md` W13: a tail search hit's `row` is `-1` (`SearchState.CommitHit`'s own doc
-   * comment) until this resolves it into a real, loaded row — §5.1.1's own sentence ("selecting
-   * such a result loads the pages up to it"), implemented as `loadAll()`'s exact loop shape (one
-   * shared `AbortController`, so a single cancel reaches whichever page is currently in flight)
-   * but exiting the moment the sha appears rather than only at exhaustion. `signal` is the
-   * caller's own (`SearchState`/`App.vue`, W14) — aborting it stops the loop between pages, the
-   * same "the page already in flight still completes and is kept" guarantee `cancelLoad()` gives
-   * `loadMore`/`loadAll`, since it aborts the very controller the in-flight request was given.
+   * A tail search hit's `row` is `-1` (`SearchState.CommitHit`'s own doc comment) until this
+   * resolves it into a real, loaded row ("selecting such a result loads the pages up to it"),
+   * implemented as `loadAll()`'s exact loop shape (one shared `AbortController`, so a single
+   * cancel reaches whichever page is currently in flight) but exiting the moment the sha appears
+   * rather than only at exhaustion. `signal` is the caller's own (`SearchState`/`App.vue`) —
+   * aborting it stops the loop between pages, the same "the page already in flight still completes
+   * and is kept" guarantee `cancelLoad()` gives `loadMore`/`loadAll`, since it aborts the very
+   * controller the in-flight request was given.
    *
    * Returns `"cancelled"` rather than `"notFound"` when the signal — not the history — is what
    * stopped the loop, so a caller does not misreport a cancellation as "this commit does not
@@ -298,13 +299,14 @@ export class GraphViewState {
   }
 
   /**
-   * §6.2's refresh action: forces a full re-query bypassing every cache. `graph.refresh` only
+   * The refresh action: forces a full re-query bypassing every cache. `graph.refresh` only
    * marks the host's session stale — the actual re-walk happens on the `graph.stream` re-open
    * that follows, whose first chunk lands with `from: 0`, which starts a staged restart: the
    * old history stays on screen until the re-walked one is ready, then replaces it at once
-   * (`PackedStreamState.commitStaged`, bumping `generation`). Idempotent while already refreshing (§6.2: "a second press while running is a no-op").
-   * Not cancellable — unlike `loadMore`/`loadAll`, §6.2 describes no cancel affordance for
-   * refresh, only a spinner, so this does not touch `#loadController`.
+   * (`PackedStreamState.commitStaged`, bumping `generation`). Idempotent while already refreshing
+   * ("a second press while running is a no-op").
+   * Not cancellable — unlike `loadMore`/`loadAll`, refresh has no cancel affordance, only a
+   * spinner, so this does not touch `#loadController`.
    */
   async refresh(): Promise<void> {
     const repoId = this.#repoId;
@@ -313,11 +315,11 @@ export class GraphViewState {
   }
 
   /** Runs one load-shaped operation (`graph.loadMore`/`graph.refresh`) followed by the
-   *  cache-only stream re-open that actually folds the new rows in, under one `loading` state.
+   *  cache-only stream re-open that folds the new rows in, under one `loading` state.
    *  Shared by `loadMore`/`loadAll`/`refresh` so each keeps its own idempotency check but none
    *  duplicates the "request, then reopen, then always resync" shape — including on
    *  cancellation, where the resync is what turns "rows already read are kept" into the client
-   *  actually seeing them. */
+   *  seeing them. */
   async #runLoad(state: LoadingState, request: () => Promise<unknown>): Promise<void> {
     try {
       await this.#runLoadSteps(state, request);
@@ -346,14 +348,14 @@ export class GraphViewState {
       // Cancelled mid-request: fall through to the resync below anyway, so whatever the host
       // already read before the abort lands on the client instead of being silently dropped.
     } finally {
-      // F1: a reset() (repo switch) landed while `request()` was in flight — `repoId` above is
+      // A reset() (repo switch) landed while `request()` was in flight — `repoId` above is
       // now the *old* repo's. This call no longer owns the load: the new repo's own reset() +
       // openStream() already drives `loading` and the stream, so resyncing here would reopen the
       // old repo's stream over it and stomp `loading` out from under it. Skip silently.
       if (generation === this.#loadGeneration) {
         try {
           await this.openStream(repoId, this.loadedRows.value);
-          // G16 D7: closes F7's zero-chunk hole. A re-stream that emits nothing (the client
+          // A re-stream that emits nothing (the client
           // already holds every row the host has) never calls #applyChunk, so
           // exhausted/remaining would otherwise be stuck at whatever the last real chunk said —
           // which is exactly "Load the last 0". graph.status already exists and answers exactly
@@ -391,7 +393,7 @@ export class GraphViewState {
   /** Clears every loaded row. Call before opening a stream for a newly *selected* repo — never
    *  needed for a fresh mount or remount, whose store already starts empty.
    *
-   *  F1: aborts whichever `loadMore`/`loadAll`/`revealSha` is in flight and bumps
+   *  Aborts whichever `loadMore`/`loadAll`/`revealSha` is in flight and bumps
    *  `#loadGeneration`, so that call's own `#runLoad` resync (still keyed on the *old* repo)
    *  skips itself instead of reopening/resyncing the old repo's stream over the caller's own
    *  `openStream(newRepoId)` that always follows this (`App.vue`'s `handleRepoOpened`). Forces
@@ -405,9 +407,9 @@ export class GraphViewState {
     this.#loadGeneration++;
     this.loading.value = 'idle';
     this.streamFailure.value = undefined;
-    // F11: `#resetLayout()`'s own `#layoutClient.reset()` below turns any relayout still in flight
+    // `#resetLayout()`'s own `#layoutClient.reset()` below turns any relayout still in flight
     // into a no-op `LayoutClientStaleError` (`#rebuildLayout`'s own catch), so a
-    // `#drainLayoutRebuilds` loop already running simply sees nothing pending once that settles and
+    // `#drainLayoutRebuilds` loop already running sees nothing pending once that settles and
     // exits; a fresh one starts the moment the new repo's own stream applies a chunk.
     this.#layoutPending = false;
     this.#resetLayout();
@@ -436,7 +438,7 @@ export class GraphViewState {
    *  `AUTO_REFRESH_MIN_GAP_MS` since the last auto-refresh *completed* — a single delay covers
    *  both, since whichever bound is larger is the one that matters. A timer already pending
    *  absorbs further arrivals for free (the same "leading window" shape the server's own watcher
-   *  debounce already uses, F3). */
+   *  debounce already uses). */
   #scheduleAutoRefresh(): void {
     if (this.#autoRefreshTimer.pending) return;
     const sinceLastRefresh = Date.now() - this.#lastAutoRefreshAt;
@@ -457,7 +459,7 @@ export class GraphViewState {
       // one refresh path is worth the one extra ~1ms request (D10).
       await this.refresh();
     } catch (error) {
-      // F10: `#scheduleAutoRefresh`'s own `void this.#runAutoRefresh()` has no caller left to hand
+      // `#scheduleAutoRefresh`'s own `void this.#runAutoRefresh()` has no caller left to hand
       // a rejection to — logging here, not in `refresh()` itself, is what stands between a
       // disconnect/git error on an auto-refresh and a silent unhandled rejection, while any future
       // direct caller of `refresh()` still sees it thrown.
@@ -500,10 +502,10 @@ export class GraphViewState {
   }
 
   /**
-   * P93 §5.3: rebuilds `#order`'s plan (if attached — otherwise the identity plan, §5.4) against
+   * Rebuilds `#order`'s plan (if attached — otherwise the identity plan) against
    * the store's current rows, projects it into display-row coordinates, and re-lays-out the
    * *whole* visible list in one worker pass. Replaces the old per-chunk incremental
-   * `submit(store.layoutInput(from, to))`/`layout.append(...)` pair — §5.1's reason: under
+   * `submit(store.layoutInput(from, to))`/`layout.append(...)` pair — under
    * display order a new page's rows scatter into existing groups, so there is no contiguous
    * `[from, to)` range left to append incrementally; every plan-affecting change (a page
    * landing, a group toggled, tips changing) relays out from scratch.
@@ -521,7 +523,7 @@ export class GraphViewState {
     const plan = this.#order?.plan.value ?? identityRowPlan(source.rowCount);
     const input = projectLayoutInput(plan, source.layoutInput(0, source.rowCount));
 
-    // W15's `layoutSubmitMs` — the worker round trip for the *first* relayout only, so a
+    // The `layoutSubmitMs` — the worker round trip for the *first* relayout only, so a
     // first-paint `firstPageMs`/`worstFrameMs` miss is attributable to this hop or not in one
     // line rather than re-derived. Marked here, not measured externally, because this `await` is
     // the only place that round trip is ever isolated from the rest of this method's own work.
@@ -588,7 +590,7 @@ export class GraphViewState {
     this.streamFailure.value = undefined;
     if (range.staged && this.#packed.pendingStore === undefined) return; // still filling
 
-    // F11: folds `range` in and returns WITHOUT awaiting its own relayout — `rpc.ts`'s per-chunk
+    // Folds `range` in and returns WITHOUT awaiting its own relayout — `rpc.ts`'s per-chunk
     // credit gate (`INITIAL_STREAM_CREDIT`) waits on this method's own promise before letting the
     // host send the next wire chunk, so a fast return here is what lets a large load (a 200k-row
     // rehydration is 400 500-row chunks) pipeline many wire chunks per relayout instead of paying
@@ -617,7 +619,7 @@ export class GraphViewState {
         await this.#rebuildLayout();
       }
     } catch (error) {
-      // F11: `#applyChunk` no longer awaits this loop (that is the whole point — see its own
+      // `#applyChunk` no longer awaits this loop (that is the whole point — see its own
       // comment), so a `dispose()` racing a relayout still in flight (the worker itself torn
       // down mid-`submit`, a non-`LayoutClientStaleError` rejection) has no caller left to hand
       // this to. Logged, matching this file's own `graph.status failed after load` precedent —

@@ -2,10 +2,10 @@ import type { TerminalLaunchKind } from '@shared/domain/tabs';
 import { t } from '@theme/i18n';
 import type { Launch, LaunchStepArgs, SendArgs, StartBranchArgs } from '../wire';
 
-// One target's delivery: a running TUI session (`Send`) or a fresh launch whose terminal this window
-// then opens. Turn watching is the flow's concern; `onArmed` fires at the exact moment it must arm
-// `adeTurns.watch`: before `Send` for a running session (terminal id known), after the launch call
-// for a new one (the terminal id only exists once the server returns it).
+// One target's delivery: a running TUI session (`Send`) or a fresh launch whose terminal this
+// window then opens. Turn watching is the flow's concern; `onArmed` fires at the exact moment it
+// must arm `adeTurns.watch`: before `Send` for a running session (terminal id known), after the
+// launch call for a new one (the terminal id only exists once the server returns it).
 
 export type DeliverTarget =
   | { kind: 'send'; sessionId: string; terminalId: string; message: string }
@@ -41,11 +41,11 @@ export async function openLaunch(
     80,
     24,
     launch.command,
-    'claude-code',
+    'agent',
   );
   const entry = deps.terminalSession(launch.terminalId);
   if (entry?.status === 'failed')
-    throw new Error(entry.error || t('space.ade.claudeDialog.launchFailed.error'));
+    throw new Error(entry.error || t('space.ade.agentDialog.launchFailed.error'));
 }
 
 /** Delivers one message; returns the launch for a new session, `null` for a `Send`. */

@@ -57,7 +57,7 @@ func TestClaudeSettingsUntouched(t *testing.T) {
 		argv := agentArgv(t, app, func() {
 			if _, err := app.W.Terminal.Open(terminal.OpenArgs{
 				TerminalID: launch.TerminalID, WindowKey: window, Cwd: launch.Cwd, Cols: 100, Rows: 30,
-				Command: launch.Command, LaunchKind: terminal.LaunchKindClaudeCode,
+				Command: launch.Command, LaunchKind: terminal.LaunchKindAgent,
 			}); err != nil {
 				t.Fatal(err)
 			}

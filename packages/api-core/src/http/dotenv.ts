@@ -1,5 +1,5 @@
-// P17 D21/D22/D2: the bulk `.env`-format editor's own pure logic — serialize, parse, reconcile —
-// a renderer-side authoring format with no Go twin (D2): Go receives a normalized entry list
+// The bulk `.env`-format editor's own pure logic — serialize, parse, reconcile —
+// a renderer-side authoring format with no Go twin: Go receives a normalized entry list
 // (VariablesRepo.ApplyBulk), never `.env` text, so there is no second parser to drift. Pure and
 // DOM-free, the same reason substitute.ts/transforms.ts are: a plain, unit-testable import.
 
@@ -63,7 +63,7 @@ export interface EnvDiff {
   removed: EnvDiffRemove[];
   /** True when the surviving rows' relative order differs from their current sort_order. */
   reordered: boolean;
-  /** D22's own rename warning trigger: a name that vanished and a name that appeared in the same
+  /** Rename warning trigger: a name that vanished and a name that appeared in the same
    *  diff is exactly what a rename typed into the editor looks like from the reconcile's point of
    *  view — there is no way to tell that apart from an unrelated delete-and-add, which is the
    *  entire reason this is a warning rather than an automatic rename. */
@@ -161,14 +161,14 @@ function scanQuoted(raw: string): string | null {
 }
 
 /**
- * Parses `.env`-format text into an ordered entry list — D21's eight line forms:
+ * Parses `.env`-format text into an ordered entry list — the eight line forms:
  * a blank line (ends the pending comment block), a `# text` comment (accumulates into the next
  * pair's description), the exact secret marker (dropped, never a description), an `export `-
  * prefixed pair (the prefix is stripped), an unquoted/double-quoted/single-quoted value, and a
  * bare `KEY=` (`hasValue: false`). Anything else is a parse error carrying its 1-based line
  * number — line-oriented and single-pass, so a caller can stop at the first bad line.
  *
- * Value rules follow common dotenv implementations (P175 D3): an unquoted value ends at a `#`
+ * Value rules follow common dotenv implementations: an unquoted value ends at a `#`
  * preceded by whitespace (`a#b` keeps its `#`) and is trimmed; a quoted value needs a closing quote
  * on the same line followed by nothing or a `# comment`, else the whole text is an unquoted value
  * (`'abc` stays `'abc`, never an error). Single quotes are literal; double quotes decode escapes.
@@ -243,9 +243,9 @@ export function parseEnv(text: string): EnvParseResult {
 
 /**
  * Diffs `parsed` (a fresh parseEnv result) against `existing` (the rows the editor opened with) —
- * D22's five rules, matching by name and positionally for a duplicate key (the Nth occurrence of a
+ * the five rules, matching by name and positionally for a duplicate key (the Nth occurrence of a
  * name maps to the Nth existing row with that name, in `existing`'s own order). Pure and read-only:
- * this never talks to Go — VariablesRepo.ApplyBulk (D23) reconciles independently server-side from
+ * this never talks to Go — VariablesRepo.ApplyBulk reconciles independently server-side from
  * the same parsed entries, and the two reconciles are expected to agree.
  */
 export function reconcileEnv(existing: readonly EnvRow[], parsed: readonly EnvEntry[]): EnvDiff {

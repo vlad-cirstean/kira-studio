@@ -10,9 +10,9 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox/sandboxtest"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 	"github.com/kirathecat/kira-studio/internal/testx"
@@ -207,7 +207,7 @@ func TestSandboxPrepareFails(t *testing.T) {
 
 func TestSandboxTools(t *testing.T) {
 	call := func(tool string, args map[string]any) fakeagent.MCPCall {
-		return fakeagent.MCPCall{Server: claudeheadless.ServerName, Tool: tool, Args: args}
+		return fakeagent.MCPCall{Server: agentmcp.ServerName, Tool: tool, Args: args}
 	}
 	tolerated := func(c fakeagent.MCPCall) fakeagent.MCPCall { c.Tolerate = true; return c }
 	result := func(f *runFixture, tool string) string {

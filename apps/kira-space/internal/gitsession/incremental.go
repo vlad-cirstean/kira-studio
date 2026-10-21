@@ -91,8 +91,8 @@ func reviewFileStatus(rec gitreview.FileRecord, found, changedSinceReview bool) 
 
 // ReviewFileStatusFor converts a freshly-written FileRecord (review.mark's own return, gitrpc's
 // only external caller) into the wire's ReviewFileStatus. changedSinceReview is always false
-// immediately after a mark, since the record was just re-snapshotted against the branch tip
-// (D10 step 4) — the record and the tip agree by construction.
+// immediately after a mark, since the record was just re-snapshotted against the branch tip —
+// the record and the tip agree by construction.
 func ReviewFileStatusFor(rec gitreview.FileRecord) ReviewFileStatus {
 	return reviewFileStatus(rec, true, false)
 }
@@ -106,11 +106,11 @@ func nonNil[T any](s []T) []T {
 	return s
 }
 
-// mergeBase is `merge-base <base> <branch>` (D6) — exit 0 the shared ancestor sha, exit 1
-// "unrelated" (probe P2), anything else a classified error. sharesHistory (review.go) is now a
+// mergeBase is `merge-base <base> <branch>` — exit 0 the shared ancestor sha, exit 1
+// "unrelated", anything else a classified error. sharesHistory (review.go) is now a
 // thin wrapper over this: one helper, two callers, one spawn.
 //
-// G30 round-1 performance review, finding #8: this used to spawn `git merge-base` uncached on
+// This used to spawn `git merge-base` uncached on
 // EVERY call — and RangeFiles (this method's own two production callers, review.files and
 // review.fileDiff) calls it on nearly every request a review session makes, re-deriving the exact
 // same (base, branch) answer over and over for the life of that session. Cached by (base, branch)
@@ -161,15 +161,14 @@ func (e *RepoEntry) branchTip(ctx context.Context, branch string) (string, error
 }
 
 // blobOID resolves rev:path's current blob oid via the cat-file batch session, "" (not an error)
-// for a path that does not exist there — the natural comparand for tier 0 (F6): the empty string
+// for a path that does not exist there — the natural comparand for tier 0: the empty string
 // vs. a record's own empty string (ContentAbsent) is "still deleted", "unchanged" with no special
 // case.
 //
-// G31 round-2 architecture/security review, finding #2 (queries.go's Blob, the same class of
-// bug): a newline anywhere in `full` (rev included) desyncs the persistent --batch-check
-// session's one-line-in-one-line-out protocol for every later caller sharing it, silently, for
-// the life of the RepoEntry — routed through CheckOneShot instead, the --batch-check counterpart
-// of readCurrentContent's own ReadOneShot fallback below.
+// (queries.go's Blob, the same class of bug): a newline anywhere in `full` (rev included) desyncs
+// the persistent --batch-check session's one-line-in-one-line-out protocol for every later caller
+// sharing it, silently, for the life of the RepoEntry — routed through CheckOneShot instead, the
+// --batch-check counterpart of readCurrentContent's own ReadOneShot fallback below.
 func (e *RepoEntry) blobOID(ctx context.Context, rev, path string) (string, error) {
 	session := e.CatFile()
 	if session == nil {
@@ -193,7 +192,7 @@ func (e *RepoEntry) blobOID(ctx context.Context, rev, path string) (string, erro
 }
 
 // blobOIDs resolves the current blob oid for every path in paths, at rev, in ONE --batch-check
-// round trip rather than one per path (G30 round-1 performance review, finding #5) — RangeFiles'
+// round trip rather than one per path — RangeFiles'
 // own review-status loop is the one caller that needs many of these at once, and a long-lived
 // branch review with hundreds of previously-reviewed files paid one serialized pipe round trip
 // per file before this. Same "" (not an error) contract as blobOID for a path that does not exist
@@ -244,10 +243,10 @@ func (e *RepoEntry) blobOIDs(ctx context.Context, rev string, paths []string) ([
 }
 
 // readCurrentContent reads rev:path's content through the cat-file batch session, or the one-shot
-// fallback for a path the batch protocol cannot express (a newline in the path, F5's own rarity
-// note) — mirrors RepoEntry.Blob's own two-path shape.
+// fallback for a path the batch protocol cannot express (a newline in the path) — mirrors
+// RepoEntry.Blob's own two-path shape.
 //
-// Also returns the blob's own OID (G31 round-2 performance review, finding #5): Read's own
+// Also returns the blob's own OID: Read's own
 // internal Check call already resolves it before fetching content, and MarkFile needs both the
 // content (to classify/count lines) AND the OID (to compare against the stored record) for the
 // exact same rev — discarding it here just to have blobOID re-resolve the identical rev via a
@@ -293,14 +292,14 @@ func countLines(content []byte) int {
 }
 
 // readSnapshotSource resolves tip:path's content and classifies it exactly as a snapshot is
-// classified at mark time (D9): ContentAbsent for a path git cannot resolve there, ContentTooLarge
+// classified at mark time: ContentAbsent for a path git cannot resolve there, ContentTooLarge
 // over the cap (either MaxSnapshotBytes or the cat-file session's own 10 MiB gate), ContentBinary
 // via the NUL sniff, else ContentText with the content and its line count. Only ContentText's
 // content/lineCount are meaningful; every other kind returns (kind, nil, 0, nil).
 //
-// Also returns the blob's own OID whenever content was actually read (G31 round-2 performance
-// review, finding #5) — readCurrentContent's own doc comment explains why this piggybacks for
-// free; "" for every kind that never called readCurrentContent's content path.
+// Also returns the blob's own OID whenever content was read — readCurrentContent's own doc comment
+// explains why this piggybacks for free; "" for every kind that never called
+// readCurrentContent's content path.
 func (e *RepoEntry) readSnapshotSource(ctx context.Context, tip, path string) (gitreview.ContentKind, []byte, int, string, error) {
 	oid, content, err := e.readCurrentContent(ctx, tip, path)
 	if err != nil {
@@ -371,19 +370,19 @@ func (e *RepoEntry) parseAndResolve(ctx context.Context, raw []byte) (porcelain.
 	return parsed, body, nil
 }
 
-// FileDelta is D7's three-tier "what changed since you reviewed" selection, verbatim:
+// FileDelta is the three-tier "what changed since you reviewed" selection, verbatim:
 //
-//  0. blob-oid equality (F6) — exact, no diff at all, and the only tier that answers correctly
+//  0. blob-oid equality — exact, no diff at all, and the only tier that answers correctly
 //     when the snapshot commit has been pruned AND the content is unchanged.
 //  1. merge-base --is-ancestor: the snapshot sha is still reachable, an ordinary git diff is
 //     exact and the stored blob is never read.
 //  2. diff --no-index against the decompressed stored blob: history was rewritten (exit 1, the
-//     common amend/rebase/squash case, probe P2) or the sha is genuinely pruned (exit 128) — both
+//     common amend/rebase/squash case) or the sha is genuinely pruned (exit 128) — both
 //     take the slow path. A non-text snapshot has nothing to diff against: snapshotUnavailable.
 //
 // Do not collapse this to two tiers — tier 0 is not an optimisation, it is the only tier that
 // answers correctly when the snapshot commit is pruned AND unchanged, and it is what keeps
-// RangeFiles from spawning a diff per file (D7/D18).
+// RangeFiles from spawning a diff per file.
 func (e *RepoEntry) FileDelta(ctx context.Context, branch, path string, rec gitreview.FileRecord, snapshot []byte, tip string) (deltaResult, error) {
 	currentOID, err := e.blobOID(ctx, tip, path)
 	if err != nil {
@@ -413,12 +412,11 @@ func (e *RepoEntry) FileDelta(ctx context.Context, branch, path string, rec gitr
 		if err != nil {
 			return deltaResult{}, err
 		}
-		// G31 round-2 functional-correctness review, finding #7: parseAndResolve's own
-		// MaxPatchBytes gate returns a zero-value ParsedBody (no hunks) for BodyTooLarge, so
-		// `rec.LineCount + sumHunkDelta(nil)` silently equals rec.LineCount — the SNAPSHOT's line
-		// count for a file that ancestorRes.ExitCode == 0 already proved changed. That stale
-		// estimate then overwrote MarkFile's own freshly-measured snapshotLineCount and clamped
-		// ProjectRanges/reviewMarking.ts's own clampRanges to the wrong length, silently
+		// parseAndResolve's own MaxPatchBytes gate returns a zero-value ParsedBody (no hunks) for
+		// BodyTooLarge, `rec.LineCount + sumHunkDelta(nil)` silently equals rec.LineCount — the
+		// SNAPSHOT's line count for a file that ancestorRes.ExitCode == 0 already proved changed.
+		// That stale estimate then overwrote MarkFile's own freshly-measured snapshotLineCount and
+		// clamped ProjectRanges/reviewMarking.ts's own clampRanges to the wrong length, silently
 		// truncating or no-oping a mark past the estimate's own too-short bound. The slow path and
 		// the noSnapshot path both already measure the real count directly; do the same here
 		// instead of estimating from hunks that were never parsed.
@@ -523,10 +521,10 @@ func (e *RepoEntry) rangeFileDiffBody(ctx context.Context, mergeBase, tip, path 
 	return body, int64(len(raw)), nil
 }
 
-// RangeFiles is review.files' own orchestration (D6): the range's file list — the exact pair
+// RangeFiles is review.files' own orchestration: the range's file list — the exact pair
 // CommitDetail already runs, run concurrently — joined against every stored record's tier-0
 // (blob-oid) check, so a per-file "has this changed since you reviewed it" answer costs one pipe
-// round trip, never a diff, for every file that has a record (F6).
+// round trip, never a diff, for every file that has a record.
 func (e *RepoEntry) RangeFiles(ctx context.Context, base, branch string) (RangeFilesResult, error) {
 	res, _, err := e.rangeFilesRecords(ctx, base, branch)
 	return res, err
@@ -645,7 +643,7 @@ func (e *RepoEntry) ReviewSnapshot(ctx context.Context, branch, path string) (Re
 	return out, nil
 }
 
-// ReviewFileDiff is review.fileDiff's own orchestration (D13): the delta selection runs in BOTH
+// ReviewFileDiff is review.fileDiff's own orchestration: the delta selection runs in BOTH
 // modes (reviewedRanges needs the projection either way); mode decides only which patch becomes
 // body — the range diff, or the delta FileDelta already computed. deltaSource always describes the
 // projection, never the body.
@@ -710,7 +708,7 @@ func (e *RepoEntry) ReviewFileDiff(ctx context.Context, base, branch, path, mode
 
 // normalizeState turns a computed range set into the schema's own (state, ranges) shape: a range
 // set that covers every line of the current file is stored as "full" (a state, not a materialised
-// [1..N] range, D10); anything smaller (including empty — nothing reviewed) is "partial" with its
+// [1..N] range); anything smaller (including empty — nothing reviewed) is "partial" with its
 // concrete ranges.
 func normalizeState(next []gitreview.LineRange, lineCount int) (string, []gitreview.LineRange) {
 	if lineCount > 0 && gitreview.CountLines(next) == lineCount {
@@ -731,10 +729,9 @@ func (e *RepoEntry) MarkFile(ctx context.Context, branch, path string, reviewed 
 		return gitreview.FileRecord{}, err
 	}
 
-	// G31 round-2 performance review, finding #5: currentOID comes straight off
-	// readSnapshotSource's own return now, instead of a second, separately-spawned blobOID call
-	// for the identical tip:path — readCurrentContent's own doc comment explains why the OID was
-	// already sitting there for free.
+	// currentOID comes straight off readSnapshotSource's own return now, instead of a second,
+	// separately-spawned blobOID call for the identical tip:path — readCurrentContent's own doc
+	// comment explains why the OID was already sitting there for free.
 	contentKind, content, snapshotLineCount, currentOID, err := e.readSnapshotSource(ctx, tip, path)
 	if err != nil {
 		return gitreview.FileRecord{}, err
@@ -761,15 +758,15 @@ func (e *RepoEntry) MarkFile(ctx context.Context, branch, path string, reviewed 
 		}
 	}
 
-	// D10's "given absent => the whole file" used to materialize as gitreview.Expand(currentLineCount)
-	// and rely on normalizeState's own CountLines(next) == lineCount check to fold that back into
-	// "full". That breaks for any file that snapshots at lineCount 0 — deleted at the branch tip,
-	// binary, too-large, or genuinely empty (G30 round-1 functional-correctness review, finding
-	// #1): Expand(0) is nil, so `next` is empty regardless of `reviewed`, and normalizeState reads
-	// an empty range set as "partial" with no ranges, which reviewFileStatus maps straight back to
-	// "none" — the file can never be marked reviewed. "the whole file" is a state, not a
-	// materialized range, so it is set directly here, independent of whether this file currently
-	// has any lines to materialize a range over.
+	// The "given absent => the whole file" used to materialize as
+	// gitreview.Expand(currentLineCount) and rely on normalizeState's own CountLines(next) ==
+	// lineCount check to fold that back into "full". That breaks for any file that snapshots at
+	// lineCount 0 — deleted at the branch tip, binary, too-large, or genuinely empty: Expand(0) is
+	// nil, so `next` is empty regardless of `reviewed`, and normalizeState reads an empty range set
+	// as "partial" with no ranges, which reviewFileStatus maps straight back to "none" — the file
+	// can never be marked reviewed. "the whole file" is a state, not a materialized range, so it is
+	// set directly here, independent of whether this file currently has any lines to materialize a
+	// range over.
 	var state string
 	var storedRanges []gitreview.LineRange
 	if ranges == nil {

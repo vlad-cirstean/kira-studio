@@ -1,9 +1,9 @@
-// P7 D6: the flag table is data. One entry per known spelling (long and short alike); the only
-// thing the argv walk needs to stay in step is `arity` — a flag whose arity we get wrong swallows
-// the URL, which is F6's exact failure mode in every published parser. Two deliberately separate
+// The flag table is data. One entry per known spelling (long and short alike); the only thing the
+// argv walk needs to stay in step is `arity` — a flag whose arity we get wrong swallows the URL,
+// which is the exact failure mode in every published parser. Two deliberately separate
 // "not represented" categories (`ignored` vs `warned`) rather than one, because conflating them is
 // how an importer becomes either noisy (flagging things that change nothing) or dishonest (staying
-// silent about things that do) — D6's own reasoning.
+// silent about things that do).
 
 type CurlFlagArity = 0 | 1;
 type CurlFlagCategory = 'known' | 'ignored' | 'warned';
@@ -16,10 +16,10 @@ export type CurlFlagId =
   | 'upload-file'
   | 'get'
   | 'url'
-  // F10-F13: the four -d-family spellings differ in their @-handling and are kept as distinct ids
+  // The four -d-family spellings differ in their @-handling and are kept as distinct ids
   // rather than one shared 'data' — 'data' is -d/--data/--data-ascii (an @file is inlined with
   // newlines stripped), 'data-raw' never gives @ special meaning, 'data-binary' inlines an @file
-  // without stripping newlines, and 'data-urlencode' has its own @/=@/name@ forms (D8).
+  // without stripping newlines, and 'data-urlencode' has its own @/=@/name@ forms.
   | 'data'
   | 'data-raw'
   | 'data-binary'
@@ -166,10 +166,10 @@ export function lookupFlag(token: string): FlagSpec | undefined {
 }
 
 /**
- * D6: "short-flag clustering (`-sSL`) is expanded". Only ever expands a cluster whose every
- * character is a *known, arity-0* short flag — the same safety margin D6's "an unknown flag is
- * assumed to take no value" rule uses: a cluster that might end in a value-taking flag (getopt's
- * own `-o file` glued as `-Xo`) is deliberately left alone rather than guessed at, and falls
+ * "short-flag clustering (`-sSL`) is expanded". Only ever expands a cluster whose every character
+ * is a *known, arity-0* short flag — the same safety margin the "an unknown flag is assumed to
+ * take no value" rule uses: a cluster that might end in a value-taking flag (getopt's own
+ * `-o file` glued as `-Xo`) is deliberately left alone rather than guessed at, and falls
  * through to an ordinary (likely `unknown-flag`) lookup instead.
  */
 export function expandShortCluster(token: string): string[] | null {

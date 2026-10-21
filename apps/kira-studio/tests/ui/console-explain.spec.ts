@@ -13,9 +13,9 @@ import {
   postgresConnectionSummary,
 } from './support/postgresFixture';
 
-// P18 (v1.1) §7.2: an Explain press is one data:execute call and the data plane is mocked here the
-// same way console-format.spec.ts's own Format scenarios are — the point is asserting the real
-// rendering of a real server's real output (F11's own verified Postgres JSON, pasted verbatim)
+// An Explain press is one data:execute call and the data plane is mocked here the same way
+// console-format.spec.ts's own Format scenarios are — the point is asserting the real rendering
+// of a real server's real output (the verified Postgres JSON, pasted verbatim)
 // without needing a server.
 
 // F11's own verified join plan — the root Limit reports 10 rows over a 184,153-row Seq Scan on
@@ -277,10 +277,10 @@ test('Query console — Raw is one toggle away', async ({ relaunch }) => {
   await page.click('[data-testid="explain-raw-toggle"]');
   const raw = view.locator('[data-testid="explain-raw"]');
   await expect(raw).toBeVisible();
-  // `plan.raw` is the server's own text verbatim, never re-formatted (D16) — F11's JSON is
+  // `plan.raw` is the server's own text verbatim, never re-formatted — the JSON is
   // minified, so this checks the raw text exactly as it would come back over the wire.
-  // ExplainResultView's own host is MonacoHost (P60a) — same host the console's query editor
-  // above it now uses too (P60b), both read through the identical `editorText()` helper.
+  // ExplainResultView's own host is MonacoHost — same host the console's query editor
+  // above it now uses too, both read through the identical `editorText()` helper.
   expect(await editorText(raw)).toContain('"Node Type":"Seq Scan"');
 });
 
@@ -303,8 +303,8 @@ test('Query console — not explainable (an UPDATE) disables the button', async 
   await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
   const view = page.locator('[data-testid="console-view"]');
 
-  // D12: the button never disappears (SELECT/WITH-only is a per-statement state, not a
-  // per-console capability) — it just refuses this one statement. An empty console has no
+  // The button never disappears (SELECT/WITH-only is a per-statement state, not a
+  // per-console capability) — it refuses this one statement. An empty console has no
   // statement at the cursor at all, so a SELECT is typed first to prove the button starts enabled
   // before the UPDATE below disables it.
   await typeInto(view, page, JOIN_SQL);

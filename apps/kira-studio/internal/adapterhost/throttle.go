@@ -13,7 +13,7 @@ import (
 // not look like a hung app forever.
 const throttleMaxWait = 30 * time.Second
 
-// throttledKinds is every op kind RunOp actually paces — every real kind (P28 §5.5) EXCEPT
+// throttledKinds is every op kind RunOp paces — every real kind EXCEPT
 // connect/disconnect/test: a throttle must never be able to lock a user out of connecting to, or
 // disconnecting from, the connection whose throttle is misconfigured, and test runs against a
 // throwaway adapter that was never registered live and carries no connection id at all.

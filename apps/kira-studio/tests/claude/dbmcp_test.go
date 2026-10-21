@@ -10,7 +10,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
-	"github.com/kirathecat/kira-studio/internal/mcpinstall"
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/claude/mcpinstall"
+	"github.com/kirathecat/kira-studio/internal/loginshell"
 )
 
 const dbServer = "kira-db"
@@ -38,9 +40,9 @@ func enableDbMcp(t *testing.T, app *realApp) (connName, url, helper string) {
 	if err != nil || !st.Running {
 		t.Fatalf("DbMcp.SetEnabled = %+v, %v, want running", st, err)
 	}
-	// The harness's installer fake records what InstallClaudeCode would register; the call is
+	// The harness's installer fake records what InstallAgent would register; the call is
 	// synchronous, so Installs is stable after it.
-	app.W.DbMcp.InstallClaudeCode(ctx)
+	app.W.DbMcp.InstallAgent(ctx)
 	if len(app.McpInstaller.Installs) != 1 {
 		t.Fatalf("installer fake saw %d installs, want 1", len(app.McpInstaller.Installs))
 	}
@@ -54,7 +56,7 @@ func TestDbMcpThroughClaude(t *testing.T) {
 	connName, url, helper := enableDbMcp(t, app)
 	cfg := filepath.Join(t.TempDir(), "mcp.json")
 	raw, err := json.Marshal(map[string]any{"mcpServers": map[string]any{
-		dbServer: map[string]any{"type": "http", "url": url, "headersHelper": mcpinstall.ShellQuote(helper)},
+		dbServer: map[string]any{"type": "http", "url": url, "headersHelper": loginshell.Quote(helper)},
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -90,7 +92,7 @@ func TestDbMcpInstallRegisters(t *testing.T) {
 	app := newRealApp(t)
 	_, url, helper := enableDbMcp(t, app)
 	res := mcpinstall.New(mcpinstall.Deps{LookPath: func(string) (string, error) { return app.Claude, nil }}).Install(ctx, dbServer, url, helper)
-	if res.Outcome != mcpinstall.OutcomeInstalled {
+	if res.Outcome != harness.OutcomeInstalled {
 		t.Fatalf("Install = %+v, want installed", res)
 	}
 	raw, err := os.ReadFile(filepath.Join(app.Home, ".claude.json"))

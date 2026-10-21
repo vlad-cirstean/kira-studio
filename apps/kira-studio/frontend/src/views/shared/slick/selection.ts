@@ -9,13 +9,13 @@ export type Selection =
   | { kind: 'row'; rows: number[] }
   | { kind: 'column'; cols: number[] };
 
-// P22 Pass B, C4/§5 D4 — pure functions, unit-testable without a DOM. `SlickHybridSelectionModel`
+// Pure functions, unit-testable without a DOM. `SlickHybridSelectionModel`
 // owns the geometry (`SlickRange[]`, always in *display-position* space — SlickGrid indexes the
-// `CustomDataView` it was handed, never a page row, F14); `Selection` (state.ts) carries the
+// `CustomDataView` it was handed, never a page row); `Selection` (state.ts) carries the
 // `kind` copy/the three menus/the cell-editor publish/Delete all branch on, and its own row
 // fields are *page rows*. Neither side can be the sole authority — SlickGridHost.vue translates
 // between the two spaces via dataSource.ts's own `rowAtDisplayPosition`/`displayPositionOf`
-// (identity today, real once C12 wires a live search filter); these functions themselves are
+// (identity today); these functions themselves are
 // deliberately position/page-row agnostic, just the structural `SlickRange[]` <-> `Selection`
 // shape mapping.
 //
@@ -24,13 +24,11 @@ export type Selection =
 // `+1`, named once here in both directions.
 const GUTTER_OFFSET = 1;
 
-/** P28 D8, promoted out of SlickGridHost.vue (real-interaction fix, §4a/§4d): does the current
- *  selection already cover this cell? The gutter menu has always asked this (onGutterContextMenu's
- *  own `inSelection`); the cell menu itself only started asking after P28 D8's own fix — the
- *  reported "select several rows, right-click, and they deselect". Exported here (rather than kept
- *  as a private helper inside the host) so both SlickGridHost.vue's onCellContextMenu (deciding
- *  whether a right-click replaces the selection or acts on it, D8) and its own unit tests can share
- *  one copy — the same "pure Selection logic belongs in this file" rule `selectionFromRanges`/
+/** Does the current selection already cover this cell? The gutter menu has always asked this
+ *  (onGutterContextMenu's own `inSelection`). Exported here (rather than kept as a private helper
+ *  inside the host) so both SlickGridHost.vue's onCellContextMenu (deciding whether a right-click
+ *  replaces the selection or acts on it) and its own unit tests can share one copy — the same "pure
+ *  Selection logic belongs in this file" rule `selectionFromRanges`/
  *  `rangesFromSelection` above already follow. */
 export function selectionCovers(
   sel: Selection | null | undefined,
@@ -119,7 +117,7 @@ export function selectionFromRanges(
  * context menus' "replace the selection first" rule, `scrollCellIntoView` from search/FK-nav).
  * `rowCount`/`colCount` are display-row-count/display-column-count (never counting the gutter),
  * in whatever row space the caller's own `sel` is already in (page row today; display position
- * once C12's caller translates first) — this function does no row-space translation of its own,
+ * once the caller translates first) — this function does no row-space translation of its own,
  * matching `selectionFromRanges`'s own position/page-row-agnostic contract.
  */
 export function rangesFromSelection(

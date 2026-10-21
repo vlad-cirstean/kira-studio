@@ -29,7 +29,7 @@ export interface RelaunchOptions extends UiFixturesOptions {
   control?: readonly ControlSnapshot[];
   stream?: readonly StudioPortSnapshot[];
   /** Playwright's own `BrowserContextOptions.timezoneId` (e.g. `'America/New_York'`) — this
-   *  sandbox's own system timezone is UTC (P57 M5 finding, porting cell-editor.spec.ts), which
+   *  sandbox's own system timezone is UTC, which
    *  silently makes any "local time differs from UTC" assertion vacuously true-or-false depending
    *  on the host machine rather than the app's own behaviour, since `browser.newPage()` otherwise
    *  inherits the host's real zone. A spec that genuinely needs Local and UTC to differ should
@@ -40,7 +40,7 @@ export interface RelaunchOptions extends UiFixturesOptions {
 export type Relaunch = RelaunchOf<KiraAppExtra, RelaunchOptions>;
 
 /**
- * The `tests/ui/` counterpart to `tests/e2e/fixtures.ts` (P57 D16). There is no more Electron
+ * The `tests/ui/` counterpart to `tests/e2e/fixtures.ts`. There is no more Electron
  * process, no `KIRA_HOME`, and no real backend of any kind — `relaunch()` here means "open a fresh
  * page against the static build and mock both wire protocols from scratch", not "restart a real
  * app process". A spec that genuinely needs a second `relaunch()` to assert something survives a

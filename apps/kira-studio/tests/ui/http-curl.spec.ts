@@ -6,10 +6,10 @@ import { contract } from './support/contract';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
-// P7 §6.3: six scenarios against the real built bundle, none needing a mockRuntime.ts change
-// (F16) — variablesReveal is already registered (§1.4), and every other bound call this phase
-// touches (collectionsList, variablesList, variablesListEnvironments) is an existing channel.
-// Own file, per §0.3.
+// Six scenarios against the real built bundle, none needing a mockRuntime.ts change —
+// variablesReveal is already registered, and every other bound call these scenarios touch
+// (collectionsList, variablesList, variablesListEnvironments) is an existing channel.
+// Own file.
 
 const NOW = '2026-01-01T00:00:00.000Z';
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;

@@ -1,13 +1,12 @@
-// P12 round 2 finding #11's original requirement, restated for P60b: no redundant full parse on
-// the hover path — measured up to ~51ms on a 191KB document, over the app's own 50ms interaction
-// budget, with no debounce (unlike the lint path). Before P60b, `editor/hover.ts`'s
+// No redundant full parse on the hover path — measured up to ~51ms on a 191KB document, over the
+// app's own 50ms interaction budget, with no debounce (unlike the lint path). `editor/hover.ts`'s
 // `buildHoverSource` read CodeMirror's own incrementally-maintained `syntaxTree(view.state)` once
 // and handed it through; that tree no longer exists (Monaco keeps none). `sql-tokens.ts`'s own D2
 // memo — module-level, keyed by (options, source) both compared by reference, size 2 — is what
 // carries the property forward: several calls over the same untouched document string in one
 // interaction burst share one real tokenize.
 //
-// P60b's OQ-3: keep the rewrite rather than delete the spec — the underlying requirement is still
+// Keep the rewrite rather than delete the spec — the underlying requirement is still
 // real. Proved here by reference identity, not a call counter: an ES module's own named export
 // can't be reassigned from outside to count calls (the old spec's `dialect.language.parser.parse =
 // …` monkeypatch worked only because that was a mutable property on a library object, not a module

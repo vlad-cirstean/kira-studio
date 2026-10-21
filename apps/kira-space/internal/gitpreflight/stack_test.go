@@ -182,7 +182,7 @@ func TestBuildStacks_Orphan_DanglingParent(t *testing.T) {
 	}
 }
 
-// TestBuildStacks_RefusedParentStackedButRefless is P108 Part 15 F9's own regression proof:
+// TestBuildStacks_RefusedParentStackedButRefless is the regression proof:
 // feat2's own kirastack config still names feat1 as ITS parent (parentIsStacked=true for feat2),
 // but feat2 has no ref left at all — removed via `git update-ref -d`, which leaves the
 // branch.feat2.kirastack* config behind. feat3 (parent: feat2) must land as a visible orphan, not

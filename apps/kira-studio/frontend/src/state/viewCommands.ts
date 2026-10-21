@@ -1,7 +1,7 @@
 import type { SortSpec } from '@shared/domain/queries';
 import { useTabsStore } from './tabs';
 
-// P39 iter3 D5/D6: the leaf-registry inversion state/tabRuntime.ts already uses, applied to the six
+// The leaf-registry inversion state/tabRuntime.ts already uses, applied to the six
 // project/ -> views/ edges (ProjectTree.vue's four reload imports, menus.ts's runCount/
 // runDocumentCount/setFilter/setProjection/setSort). Registration happens at module scope in each
 // view's own state.ts, and every one of those modules is reached by a chain of static imports from
@@ -61,8 +61,8 @@ export function dataQueryCommands(): DataQueryCommands {
   return dataQueryCmds;
 }
 
-// P41: an S3 upload can land in a container the project tree no longer renders (a bucket's own
-// prefix level, once redis/s3 stop expanding — D5) — UploadObjectDialog.vue can no longer reach
+// An S3 upload can land in a container the project tree no longer renders (a bucket's own
+// prefix level, once redis/s3 stop expanding) — UploadObjectDialog.vue can no longer reach
 // for project/state/tree.ts's refresh() (project/ must not import views/), so it calls this
 // instead. The Browse view owns that level's cache now.
 let browseInvalidateFn: ((connectionId: string, path: string) => Promise<void>) | null = null;
@@ -81,13 +81,13 @@ export function browseInvalidate(connectionId: string, path: string): void {
   void browseInvalidateFn?.(connectionId, path);
 }
 
-// P43 F10/D14: §7's "L2 is invalidated by any local mutation on the same target" is kept by the
-// engine (engine/data.ts's cache.invalidateAfterMutation), but the renderer's own per-tab page
+// The "L2 is invalidated by any local mutation on the same target" is kept by the engine
+// (engine/data.ts's cache.invalidateAfterMutation), but the renderer's own per-tab page
 // stores are not — a second tab open on the same (connectionId, path) kept rendering rows a
 // sibling tab had already deleted or edited, with no user action able to notice. Skips the tab
 // that performed the mutation (its own caller already reloads it, with the pages-only invalidate
-// scope P13 D18 needs — a second reload here would double it) and every tab still behind the
-// reconnect gate (§8.4: it has no page to correct, and will load fresh when pressed). Only the
+// scope — a second reload here would double it) and every tab still behind the
+// reconnect gate (it has no page to correct, and will load fresh when pressed). Only the
 // four kinds a mutation ever targets — a Browse tab's path is a container, never a mutation's own
 // (connectionId, path).
 export function reloadTabsForTarget(connectionId: string, path: string, exceptTabId: string): void {

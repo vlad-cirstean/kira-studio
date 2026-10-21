@@ -23,8 +23,8 @@ const (
 
 // Error is the one error type every function in this package returns on failure — mirrors
 // httpclient.Error's own shape (Code + Message), widened by one field. Partial is non-nil only for
-// a ServerStream that delivered some messages before failing or being cancelled (F8): the terminal
-// counts/header/trailer it got as far as, mirroring P10 D15's own Details channel so
+// a ServerStream that delivered some messages before failing or being cancelled: the terminal
+// counts/header/trailer it got as far as, mirroring the Details channel so
 // bridge/grpc.go can still record a completed history entry and push a terminal event carrying the
 // true partial state.
 type Error struct {

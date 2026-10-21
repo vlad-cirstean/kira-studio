@@ -14,9 +14,9 @@ type Browser interface {
 }
 
 // OpenExternalURL opens raw in the OS browser, refusing anything that is not a well-formed
-// http(s) URL with a non-empty host — both apps' own bridge.LinkService.OpenExternal (P107 I2-6).
+// http(s) URL with a non-empty host — both apps' own bridge.LinkService.OpenExternal.
 // The check is the shape of the URL alone: raw is already untrusted, renderer-visible content
-// (a linkified commit message, P79 finding 4), never composed server-side.
+// (a linkified commit message), never composed server-side.
 func OpenExternalURL(browser Browser, raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {

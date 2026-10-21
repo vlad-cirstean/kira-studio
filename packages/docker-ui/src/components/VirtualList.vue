@@ -3,7 +3,7 @@ import { type ListNavigationOptions, useListNavigation } from '@workbench/behavi
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { useRowHeight } from '@workbench/lib/rowHeight';
 import type { MenuItem } from '@workbench/state/contextMenu';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -69,16 +69,28 @@ const nav = useListNavigation<T>({
   rendered: () => virtualItems.value,
 });
 
+// Stable handlers per row key let rows skip re-render when the virtual range changes.
+const handlers = new Map<string, { onFocus: () => void; onContextmenu: (e: MouseEvent) => void }>();
+watch(
+  () => props.rows,
+  () => handlers.clear(),
+);
+
 function rowNav(row: T) {
-  return {
-    ...nav.rowProps(row.key),
-    onContextmenu: (e: MouseEvent) => {
-      const items = props.menuFor?.(row) ?? [];
-      if (items.length === 0) return;
-      e.preventDefault();
-      nav.contextMenu(row, e, items);
-    },
-  };
+  let h = handlers.get(row.key);
+  if (!h) {
+    h = {
+      onFocus: nav.rowProps(row.key).onFocus,
+      onContextmenu: (e: MouseEvent) => {
+        const items = props.menuFor?.(row) ?? [];
+        if (items.length === 0) return;
+        e.preventDefault();
+        nav.contextMenu(row, e, items);
+      },
+    };
+    handlers.set(row.key, h);
+  }
+  return { 'data-nav-key': row.key, tabindex: nav.tabindexFor(row.key), ...h };
 }
 </script>
 
@@ -93,7 +105,7 @@ function rowNav(row: T) {
     <div class="relative" :style="{ height: `${totalSize}px` }">
       <div
         v-for="vi in virtualItems"
-        :key="String(vi.key)"
+        :key="rows[vi.index]!.key"
         :class="VIRTUAL_ROW_CLASS"
         :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
       >

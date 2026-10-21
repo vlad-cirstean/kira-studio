@@ -1,15 +1,13 @@
 <script setup lang="ts">
 /**
- * "Create branch here" (W14's row menu). §10's own exit table and W15's own text enumerate only
- * `CheckoutDialog`/`TagDialog`/`RevertDialog` — branch creation has no comparable hazard (git
- * never refuses it, and there is no annotated-tag-style silent-data-loss case to guard), so this
- * file is a judgment call rather than something the plan named directly: the same small
- * name/start-point/checkout-toggle modal `TagDialog.vue` uses for a tag, reusing `core`'s own
- * `validateRefName` prefilter (branch and tag names share the same `check-ref-format --branch`
- * rule, §7.5/§7.9 both cite it).
+ * "Create branch here" (the row menu). Branch creation has no comparable hazard (git never refuses
+ * it, and there is no annotated-tag-style silent-data-loss case to guard), so this file is the
+ * same small name/start-point/checkout-toggle modal `TagDialog.vue` uses for a tag, reusing
+ * `core`'s own `validateRefName` prefilter (branch and tag names share the same
+ * `check-ref-format --branch` rule).
  *
- * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
- * only supplies its own body/footer content.
+ * The modal shell is shadcn's `Dialog`/`DialogContent` now — this file still only supplies its own
+ * body/footer content.
  */
 import { shortSha, validateRefName } from '@kira/git-core';
 import { Button } from '@theme/components/ui/button';

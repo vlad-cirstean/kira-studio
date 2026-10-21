@@ -48,8 +48,8 @@ func (childrenNilAdapter) Children(ctx context.Context, path model.NodePath, op 
 	return adapters.TreeChildren{Nodes: nodes}, nil
 }
 
-// C16: a native adapter's nil Nodes slice must cross the wire as `[]`, never `null` — the same
-// hazard Describe/Definition were already fixed for at P58b's closeout. Asserting on the
+// A native adapter's nil Nodes slice must cross the wire as `[]`, never `null` — the same
+// hazard Describe/Definition were already fixed for. Asserting on the
 // marshalled JSON, not len(nodes)==0, is the point: len() is 0 for both nil and empty slices, so a
 // test that only checked length would pass on the very bug this guards against.
 func TestRouter_Children_NilNodesMarshalAsEmptyArray(t *testing.T) {
@@ -88,7 +88,7 @@ func (describeDefinitionFakeAdapter) Definition(ctx context.Context, path model.
 	return model.ObjectDefinition{}, nil
 }
 
-// P2 R1: Describe/Definition must thread tabID through to the op:start event the same way every
+// Describe/Definition must thread tabID through to the op:start event the same way every
 // other tab-scoped op does — the frontend's per-tab op log and status bar key off it. router.go
 // used to accept tabID from tree.Backend's own signature and then never put it in the OpSpec it
 // built, so op:start always reported a nil TabID for these two kinds.
@@ -156,7 +156,7 @@ func (reconnectFakeAdapter) Connect(context.Context, model.ResolvedConnectionCon
 func (reconnectFakeAdapter) Disconnect(context.Context) error { return nil }
 func (reconnectFakeAdapter) Caps() adapters.Caps              { return adapters.Caps{} }
 
-// P2 R1: Connect's own "a live adapter is already registered" branch is a real reconnect path
+// Connect's own "a live adapter is already registered" branch is a real reconnect path
 // (reached whenever connectionsConnect races ahead of onPreconnectExit's async Disconnect) —
 // unlike Disconnect, it never called cache.DropConnection, so L2 pages and L3 counts keyed by the
 // old connectionId survived the reconnect and could be served back as stale results against the

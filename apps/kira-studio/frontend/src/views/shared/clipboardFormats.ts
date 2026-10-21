@@ -6,16 +6,16 @@ import { quoteIdent, quoteLiteral, type SqlDialect } from './sqlIdent';
 export interface RowSnapshot {
   columns: string[];
   values: Record<string, string | null>;
-  // F2/P21 round 1: which of `values` came from a cell the engine truncated (its 64 KiB display
-  // cap) — so a format that generates something meant to be *run* (rowsToInsert) can refuse to
-  // treat the truncated prefix as the real value, the same reason P24 D27 makes such a cell
-  // non-editable in the grid itself. Optional: most snapshot builders have no truncation to report.
+  // Which of `values` came from a cell the engine truncated (its 64 KiB display cap) — so a format
+  // that generates something meant to be *run* (rowsToInsert) can refuse to treat the truncated
+  // prefix as the real value, the same reason such a cell is non-editable in the grid itself.
+  // Optional: most snapshot builders have no truncation to report.
   truncated?: ReadonlySet<string>;
 }
 
-// P21 round 3 finding 10 (architecture/security): a cell is untrusted database content — the same
-// reason SlickGridHost.vue explicitly disables enableHtmlRendering — but every text clipboard
-// format below used to hand it straight to a spreadsheet. A value whose first character is one of
+// A cell is untrusted database content — the same reason SlickGridHost.vue explicitly disables
+// enableHtmlRendering — but every text clipboard format below used to hand it straight to a
+// spreadsheet. A value whose first character is one of
 // `= + - @` TAB CR is evaluated as a formula the moment it's pasted into Excel/LibreOffice/Sheets
 // (CWE-1236); prefixing it with a single quote is the standard mitigation. Applied before any
 // other quoting/escaping below, so it survives a format's own quote-doubling untouched.
@@ -23,13 +23,13 @@ function neutralizeFormulaPrefix(value: string): string {
   return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
 }
 
-// P21 round 3 finding 7 (functional): TSV has no native quoting, but real spreadsheet clipboard
+// TSV has no native quoting, but real spreadsheet clipboard
 // TSV does — a field carrying an embedded tab, quote or newline is wrapped in double quotes with
 // `"` doubled, exactly CSV's own rule (csvField below). Without this, a `text` column holding an
 // embedded tab or newline shifted every subsequent column (tab) or split one row into two
 // (newline) on paste back into this app's own grid — copy→paste corrupted the very data it copied.
 //
-// F5 (P108 Part 10): no longer calls neutralizeFormulaPrefix. Plain Copy (this format) is not an
+// No longer calls neutralizeFormulaPrefix. Plain Copy (this format) is not an
 // explicit spreadsheet-bound export — CWE-1236's mitigation belongs on csvField below (Copy as
 // CSV) and rowsToInsert, formats a user chooses specifically to hand to a spreadsheet or run as
 // SQL. Applying it here too meant a plain range/row/column copy of `-5` wrote `'-5` to the
@@ -48,7 +48,7 @@ export function rowsToTsv(rows: RowSnapshot[]): string {
   return rows.map((r) => r.columns.map((c) => tsvField(r.values[c] ?? '')).join('\t')).join('\n');
 }
 
-// P108 Part 11 F7: a console result routinely repeats a column name (`SELECT a.id, b.id FROM a
+// A console result routinely repeats a column name (`SELECT a.id, b.id FROM a
 // JOIN b`, `SELECT 1 AS x, 2 AS x` — ConsoleSlickGrid.vue's own comment says so). RowSnapshot keys
 // `values` by name, so a repeated name's later occurrence silently overwrote the earlier one's
 // entry — row copy showed the same value under both headers, and JSON dropped a key entirely.
@@ -77,12 +77,12 @@ interface CellText {
   isNull: boolean;
 }
 
-// A cell/range/column-selection copy reads the same displayed values a row copy does (D6's
-// rationale, above) — `cellAt` is the grid's own `displayCell`, kept as a parameter rather than a
+// A cell/range/column-selection copy reads the same displayed values a row copy does — `cellAt` is
+// the grid's own `displayCell`, kept as a parameter rather than a
 // second RowSnapshot pass because a range/column selection is addressed by (row, display column)
 // pairs, not by whole rows. `rows` is an explicit, possibly-non-contiguous list (never a `[r0,r1]`
-// bound walked internally) so a caller under an active filter can pass only the actually-visible
-// rows within a range — finding 3 (round 2): a `range`-kind selection's own copy used to walk
+// bound walked internally) so a caller under an active filter can pass only the visible
+// rows within a range — a `range`-kind selection's own copy used to walk
 // every page row between its two corners regardless of what the filter was hiding.
 export function columnsToTsv(
   rows: readonly number[],
@@ -121,16 +121,15 @@ export function rowsToJson(rows: RowSnapshot[]): string {
   );
 }
 
-// A generated statement for the user to review/edit, same trust boundary as D5's WHERE clause —
-// every value is quoted text (or bare NULL), never a typed literal (P5's "never a typed JS
-// value" ground rule applies here too).
+// A generated statement for the user to review/edit, same trust boundary as the WHERE clause —
+// every value is quoted text (or bare NULL), never a typed literal.
 //
-// F3/P21 round 1: the column list used to be hard-coded `"${c}"` regardless of dialect, which is a
+// The column list used to be hard-coded `"${c}"` regardless of dialect, which is a
 // *string literal* in a column position on MySQL/MariaDB (without ANSI_QUOTES) and ClickHouse —
 // this was the one clipboard format claiming to produce runnable SQL and unusable on 3 of 5
-// engines. Values now go through quoteLiteral (backslash-aware where the dialect needs it, F3) and
+// engines. Values now go through quoteLiteral (backslash-aware where the dialect needs it) and
 // columns through quoteIdent, both dialect-driven like every other generated predicate in this
-// app. F2: a value the engine truncated is never written as a literal — INSERTing its 64 KiB
+// app. A value the engine truncated is never written as a literal — INSERTing its 64 KiB
 // prefix as if it were the real value would silently corrupt the copy on execution — a comment
 // names the column instead so the omission is visible, not silent.
 export function rowsToInsert(
@@ -163,7 +162,7 @@ export function rowsToInsert(
 /** TSV if `text` contains a tab character; one single value if it has neither a tab nor a newline
  *  or its CSV parse is ragged; otherwise CSV (quoted-field aware).
  *
- *  F5 (P108 Part 10): the "one single value" case is new. Before it, any clipboard text with no
+ *  The "one single value" case is new. Before it, any clipboard text with no
  *  tab fell through to parseCsv regardless of source — a single cell copied from this app itself
  *  (`Main St, Apt 4`, `[1,2]`) split on commas into two+ columns and, for a multi-line value,
  *  split into rows. A single-cell copy/paste round trip must reproduce the one value it copied,
@@ -188,7 +187,7 @@ function parseCsv(text: string): string[][] {
 }
 
 // parseDelimitedText is the shared quoted-field-aware state machine behind both parseCsv and the
-// TSV branch of parseDelimited — P21 round 3 finding 6 (functional): the TSV branch used to be a
+// TSV branch of parseDelimited — the TSV branch used to be a
 // bare `split('\n').map(line => line.split('\t'))`, so it had neither the CSV branch's trailing-
 // empty-row guard (every clipboard source puts a trailing newline on the clipboard, which produced
 // a bogus extra row that silently blanked or inserted the row below whatever was pasted) nor any

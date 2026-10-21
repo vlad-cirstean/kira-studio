@@ -5,9 +5,9 @@ import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support
 import type { ControlSnapshot } from '../support/types';
 import { controlSnapshots, portSnapshots } from './redis.fixture';
 
-// P50 §4.3 / P57 D13-D16 — the redis split's frontend half. Real Vue and real bridge/{control,port
+// The redis split's frontend half. Real Vue and real bridge/{control,port
 // }.ts, both wire protocols mocked from the exact fixture redis.backend.spec.ts asserts against —
-// no container, no Docker, and (since P57) no Electron process either: a page against the static
+// no container, no Docker, and no Electron process either: a page against the static
 // build, both mocks installed at the network layer before the one navigation `relaunch()` does.
 
 interface TreeNodeLike {
@@ -16,9 +16,7 @@ interface TreeNodeLike {
 }
 
 /** Every path this spec's locators need comes from the fixture's own captured tree.ts:children()
- *  responses, never hand-typed — the same discipline the backend spec follows, and the reason
- *  F7 (a hand-written tree node's wrong `path` shape, silently rendered) was the plan's own
- *  strongest finding. */
+ *  responses, never hand-typed — the same discipline the backend spec follows. */
 function nodePathByName(name: string): string {
   for (const snap of controlSnapshots as ControlSnapshot[]) {
     if (snap.channel !== 'kira:tree:children') continue;
@@ -227,10 +225,10 @@ test('redis (frontend, mocked IPC) — browse tab: filter and Up', async ({
   await user1Row.dblclick();
   await expect(browseView).toHaveAttribute('data-level', USER_1_NS_PATH);
 
-  // P57 finding: `data-level` and the row list itself update off two separate reactive triggers
+  // `data-level` and the row list itself update off two separate reactive triggers
   // (project/state/tree.ts's own level ref vs. its children fetch resolving) — a gap real
   // Electron IPC's own round-trip latency happened to always outlast, but this tier's HTTP mock
-  // sometimes doesn't. `expect.poll` waits for the count to actually settle before this test reads
+  // sometimes doesn't. `expect.poll` waits for the count to settle before this test reads
   // it as a plain number to reuse below, rather than reading `data-level` matching as a proxy for
   // "the rows are here too".
   await expect.poll(() => browseView.locator('[data-testid="browse-row"]').count()).toBe(4);

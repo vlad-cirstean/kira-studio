@@ -8,14 +8,14 @@ import {
 } from '@kira/shared/domain/http';
 import type { TextRef } from '../lib/textRef';
 
-// P15 D6: a UI-level body-mode selection — HTTP_BODY_MODES itself is unchanged (still six values,
+// A UI-level body-mode selection — HTTP_BODY_MODES itself is unchanged (still six values,
 // no 'json'); this is only what the segmented control in RequestBodyPane.vue renders and reads,
 // layered over the same `bodyMode`/`codeLanguage` storage. See RequestBodyPane.vue's own
 // `selection` computed for the mapping.
 export type HttpBodySelection = HttpBodyMode | 'json';
 
-// C5/D9: the body-mode segments, in the builder's own order; the visible label and tooltip live in
-// the catalog (`studio.http.bodyMode.<value>`). P15 D6: `json` is a presentation-only segment
+// The body-mode segments, in the builder's own order; the visible label and tooltip live in
+// the catalog (`studio.http.bodyMode.<value>`). `json` is a presentation-only segment
 // between raw and code — selecting it patches `{bodyMode: 'code', codeLanguage: 'json'}`, so it
 // needs no schema/wire value of its own.
 export const BODY_MODE_OPTIONS: readonly {

@@ -1,18 +1,17 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P6.md` W13: §6.2's `[branch ▾]` toolbar slot. P77 redesigns it from seven stacked
- * sections in one scroll context into a five-tab structure — Branches (local + remote sub-group),
+ * `[branch ▾]` toolbar slot. It has a five-tab structure — Branches (local + remote sub-group),
  * Tags, Stashes (stack + global-bucket sub-group), Worktrees, Stacks — over one `ToggleGroup`
- * strip (§3, `type="single"`, P131 Part 2). `pickerModel.ts` owns the fold (filter/order/cap) for
- * every tab; this file renders
- * the strip, the filter box and the active tab's body, and still owns every ref-scoped write this
- * file has always owned (checkout, rename, delete, the stack-navigation row-menu arms) — `TagList`/
- * `StashList`/`GlobalStashList`/`WorktreeList`/`StackList` render their own tab's rows from an
- * already filtered/ordered/capped prop, the same contract `TagList.vue` has had since P6.
+ * strip (`type="single"`). `pickerModel.ts` owns the fold (filter/order/cap) for every tab; this
+ * file renders the strip, the filter box and the active tab's body, and still owns every
+ * ref-scoped write this file has always owned (checkout, rename, delete, the stack-navigation
+ * row-menu arms) — `TagList`/`StashList`/`GlobalStashList`/`WorktreeList`/`StackList` render their
+ * own tab's rows from an already filtered/ordered/capped prop, the same contract `TagList.vue` has
+ * had.
  *
- * Every row also carries the ref-scoped menu (`useSectionMenu`) (W14: "every row also carries the
- * context menu W14 builds, which is where the destructive actions live") — a kebab button (mouse
- * *and* keyboard reachable) plus a plain right-click, both opening the same menu.
+ * Every row also carries the ref-scoped menu (`useSectionMenu`), which is where the destructive
+ * actions live — a kebab button (mouse *and* keyboard reachable) plus a plain right-click, both
+ * opening the same menu.
  */
 import type { StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
@@ -49,8 +48,8 @@ import { REF_LIST_SECTION_CAP } from '../lib/refListModel.ts';
 import { remoteNamesFrom } from '../lib/rowMenuModel.ts';
 import { shaLabel } from '../lib/text.ts';
 import { useFieldFocus } from '../lib/useFieldFocus.ts';
+import type { ChangeRequestState } from '../state/changeRequests.ts';
 import type { OpsState } from '../state/ops.ts';
-import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
 import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
@@ -71,10 +70,10 @@ const props = defineProps<{
   stack: StackState;
   /** G24 D9's own branch-tip badge — optional so a caller with nothing to show yet gets a plain,
    *  badge-free picker (mirrors `CommitGrid.vue`'s own `pr` prop). */
-  pr?: PrState;
-  /** P74 §3.3: `AppToolbar.vue`'s own `openPullRequest` — threaded down rather than reimplemented
+  changeRequests?: ChangeRequestState;
+  /** P74 §3.3: `AppToolbar.vue`'s own `openChangeRequest` — threaded down rather than reimplemented
    *  here or in `StackList.vue`. */
-  openPullRequest: (number: number) => void;
+  openChangeRequest: (number: number) => void;
 }>();
 
 /** OQ3: bubbled straight through from `StashList.vue`'s own emit — see that component's own doc
@@ -146,7 +145,7 @@ const pickerInput = computed<PickerInput>(() => ({
   orphans: props.stack.orphans.value,
 }));
 
-// P79: split into two computeds so a tab switch (only ever changing `activeTab`) never re-runs the
+// Split into two computeds so a tab switch (only ever changing `activeTab`) never re-runs the
 // expensive filter fold over every list — `filteredPicker` depends only on `(pickerInput, filter)`,
 // `ordered` only adds the cheap per-tab ordering pass on top. See `pickerModel.ts`'s own doc
 // comment on `filterPickerInput`.
@@ -212,7 +211,7 @@ function showMoreStacks(): void {
 watch(filter, resetCaps);
 
 // ---------------------------------------------------------------------------------------
-// §7.3: roving focus over the active tab's own rows through `useListNavigation`. The rows live in
+// Roving focus over the active tab's own rows through `useListNavigation`. The rows live in
 // this picker's child lists, so the roving stop is tracked from `focusin` on the shared container.
 // `branch-row`/`branch-row-main` stay as bare query hooks for `closest()`/`querySelector()`.
 // ---------------------------------------------------------------------------------------
@@ -335,7 +334,7 @@ function close(): void {
   resetCaps();
 }
 
-// G10 D17/P77 §13: forwarded so App.vue's palette dispatcher can open this panel exactly the way
+// Forwarded so App.vue's palette dispatcher can open this panel exactly the way
 // clicking its own trigger does — the picker is the only place the UI names a ref/stash/worktree/
 // stack to act on, so every such palette command reaches one of `openBranchPicker`/`openTagPicker`/
 // `openStashPicker`/`openWorktreePicker`/`openStackPicker`. `tab` is optional so the click-trigger
@@ -349,7 +348,7 @@ defineExpose({ open });
 /** The Popover's own `@update:open` -- fired for every dismissal (trigger click, Escape, outside
  *  click) and every trigger-click open. `true` just tracks the boolean (the palette route's own
  *  `open()` already set it directly); the filter-focus-on-open side effect lives in
- *  `onOpenAutoFocus` below, so it fires for both routes alike, P77 §7.2's own requirement. */
+ *  `onOpenAutoFocus` below, so it fires for both routes alike. */
 function onOpenChange(value: boolean): void {
   if (value) isOpen.value = true;
   else close();
@@ -363,7 +362,7 @@ function onOpenAutoFocus(e: Event): void {
   focusFilter();
 }
 
-/** W20: reka's own close-auto-focus fires after the panel's exit animation, which could steal
+/** reka's own close-auto-focus fires after the panel's exit animation, which could steal
  *  focus back from a dialog `runCheckout` opens in the meantime (`closeForCheckout` below already
  *  moves focus to the trigger synchronously, before that animation even starts). Suppressed for
  *  exactly that one call, not for every close. */
@@ -374,7 +373,7 @@ function onCloseAutoFocus(e: Event): void {
   suppressCloseAutoFocus = false;
 }
 
-/** W20: `close()` unmounts the whole panel, including whatever row button the click just
+/** `close()` unmounts the whole panel, including whatever row button the click just
  *  focused — by the time `runCheckout` might open `CheckoutDialog.vue`, that button is gone and
  *  a dialog's own focus-return capture would land on nothing (the browser's own fallback,
  *  `<body>`). Moving focus to the trigger *first*, synchronously — a stable control that survives
@@ -387,17 +386,16 @@ function closeForCheckout(): void {
   close();
 }
 
-// G24 D7 point 4: opening the picker is one of the few user acts allowed to touch the network at
-// all — warms every visible branch's own PR record in one go. G32 round-3 performance review,
-// finding #3: "visible" used to mean the repo's FULL branch list, not what `model` (above) actually
-// renders — `branch.resolvePr` answers a branch WITH an open PR from its already-cached bulk
-// snapshot at no extra cost (D6), but one WITHOUT falls through to its own per-branch `gh api`
-// call, so a repo with hundreds of branches fanned out hundreds of `gh` spawns from one picker
-// open, easily arming GitHub's rate-limit breaker. Scoped to the Branches tab's own visible rows
-// (each capped at `REF_LIST_SECTION_CAP`) and keyed off that computed itself, not just `isOpen`, so
-// typing a filter that surfaces a branch outside the initial page still gets it warmed. P77: a
-// picker opened on a non-Branches tab now warms nothing at all, since `model.branchesLocal`/
-// `branchesRemote` are only ever materialised for the active tab (§8's own closing note).
+// Opening the picker is one of the few user acts allowed to touch the network at
+// all — warms every visible branch's own PR record in one go. "visible" used to mean the repo's
+// FULL branch list, not what `model` (above) renders — `branch.resolveChangeRequest` answers a
+// branch WITH an open PR from its already-cached bulk snapshot at no extra cost, but one WITHOUT
+// falls through to its own per-branch host call, so a repo with hundreds of branches fanned out
+// hundreds of host calls from one picker open, easily arming the host rate-limit breaker. Scoped to
+// the Branches tab's own visible rows (each capped at `REF_LIST_SECTION_CAP`) and keyed off that
+// computed itself, not just `isOpen`, so typing a filter that surfaces a branch outside the initial
+// page still gets it warmed. A picker opened on a non-Branches tab now warms nothing at all, since
+// `model.branchesLocal`/`branchesRemote` are only ever materialised for the active tab.
 const visibleBranchNames = computed<readonly string[]>(() => {
   if (!isOpen.value) return [];
   return [
@@ -406,8 +404,8 @@ const visibleBranchNames = computed<readonly string[]>(() => {
   ];
 });
 watch(visibleBranchNames, (names) => {
-  if (names.length === 0 || !props.pr) return;
-  void props.pr.ensureSnapshot(names);
+  if (names.length === 0 || !props.changeRequests) return;
+  void props.changeRequests.ensureSnapshot(names);
 });
 </script>
 
@@ -479,8 +477,8 @@ watch(visibleBranchNames, (names) => {
               :refs="refs"
               :ops="ops"
               :stack="stack"
-              :pr="pr"
-              :open-pull-request="openPullRequest"
+              :change-requests="changeRequests"
+              :open-change-request="openChangeRequest"
               :local-section="model.branchesLocal"
               :remote-section="model.branchesRemote"
               :active-row-id="activeRowId"
@@ -579,8 +577,8 @@ watch(visibleBranchNames, (names) => {
                 :stacks="model.stacks"
                 :orphans="model.orphans"
                 :ops="ops"
-                :pr="pr"
-                :open-pull-request="openPullRequest"
+                :change-requests="changeRequests"
+                :open-change-request="openChangeRequest"
                 :focused-row-id="activeRowId"
                 @openRestackDialog="(branch) => emit('openRestackDialog', branch)"
                 @openSetParentDialog="(branch) => emit('openSetStackParentDialog', branch)"

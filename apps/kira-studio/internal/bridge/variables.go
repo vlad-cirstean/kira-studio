@@ -7,11 +7,11 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// VariablesService is P5 D19 — the CollectionsService/QueriesService shape (a typed-struct
-// wrapper per method, with an explicit guard and an ipcerr translation). Every plain CRUD method
-// wraps Deps.Repos.Variables directly, exactly as CollectionsService wraps Deps.Repos.Collections
-// (P4 D11) — no service layer buys anything for a straight repo call. Reveal/RevealHistory are the
-// two exceptions: they need the Authorizer gate, so they go through Deps.ApiVars instead (D8).
+// VariablesService is the CollectionsService/QueriesService shape (a typed-struct wrapper per
+// method, with an explicit guard and an ipcerr translation). Every plain CRUD method wraps
+// Deps.Repos.Variables directly, exactly as CollectionsService wraps Deps.Repos.Collections — no
+// service layer buys anything for a straight repo call. Reveal/RevealHistory are the two
+// exceptions: they need the Authorizer gate, so they go through Deps.ApiVars instead.
 type VariablesService struct{ Deps appcore.Deps }
 
 // ---- environments (D3) ----
@@ -144,12 +144,12 @@ func (s *VariablesService) List(args VariablesScopeArgs) ([]model.Variable, erro
 	return ipcerr.InternalResult(s.Deps.Repos.Variables.List(args.Scope, args.OwnerID))
 }
 
-// VariablesUpsertArgs's ID is "" for a create (D19). Value is a three-state pointer — nil = leave
-// the stored value untouched (F2, P108 Part 3), mirroring bridge.ConnectionsUpdateArgs.Password's
-// own "nil = unchanged" contract. When non-nil it is always the plaintext — the one direction D5
-// never restricts: the user just typed it into a revealed, editable field. The frontend sends nil
-// whenever a draft's value was never actually touched (its seeded value is always "" for a secret,
-// D4/D5's list projection) — see VariableSetView.vue's own valueTouched flag.
+// VariablesUpsertArgs's ID is "" for a create. Value is a three-state pointer — nil = leave
+// the stored value untouched, mirroring bridge.ConnectionsUpdateArgs.Password's
+// own "nil = unchanged" contract. When non-nil it is always the plaintext — the user just typed
+// it into a revealed, editable field. The frontend sends nil whenever a draft's value was never
+// touched (its seeded value is always "" for a secret, the list projection) — see
+// VariableSetView.vue's own valueTouched flag.
 type VariablesUpsertArgs struct {
 	Scope       model.VariableScope `json:"scope"`
 	OwnerID     string              `json:"ownerId"`

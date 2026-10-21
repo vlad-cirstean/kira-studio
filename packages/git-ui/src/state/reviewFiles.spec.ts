@@ -18,7 +18,7 @@ const REPO = '/repos/a';
 const BRANCH = 'feature';
 const BASE = 'main';
 
-// G30 round-1 functional-correctness review, finding #3: `#openInEditor` used to read the SHARED
+// `#openInEditor` used to read the SHARED
 // `reviewedAtSha` ref — written only by `#loadDiff`'s own response, fired concurrently and not
 // awaited by `selectFile` — instead of the just-clicked file's own `entry.review.reviewedAtSha`
 // (already in hand from the file list). Selecting a.ts then b.ts in `sinceReview` mode opened
@@ -94,7 +94,7 @@ describe('ReviewFilesState — sinceReview mode opens each file against its own 
   });
 });
 
-// G30 round-1 functional-correctness review, finding #6: mark()'s own `finally` only clears
+// mark()'s own `finally` only clears
 // `pending` when `this.#target` still identically equals the target that was current when the
 // request started. A setTarget call landing while a mark() is in flight (a base-resolution
 // change, the stale-review banner, Refresh review) swaps that identity, so the guard never
@@ -149,11 +149,11 @@ describe('ReviewFilesState — pending never latches across a setTarget while a 
   });
 });
 
-// G30 round-1 functional-correctness review, finding #7: mark()'s own request had no catch at
-// all — a rejection propagated straight out of mark() as a rejected promise, and every real
-// caller (ReviewFilesPane.vue's onToggleReviewed, ReviewView.vue's toggleFileReviewed palette
-// action) calls it as `void mark(...)`, discarding that promise. The failure became an unhandled
-// rejection with nothing user-visible: the checkbox just silently reverted on the next render.
+// mark()'s own request had no catch at all — a rejection propagated straight out of mark() as a
+// rejected promise, and every real caller (ReviewFilesPane.vue's onToggleReviewed, ReviewView.vue's
+// toggleFileReviewed palette action) calls it as `void mark(...)`, discarding that promise. The
+// failure became an unhandled rejection with nothing user-visible: the checkbox silently reverted
+// on the next render.
 describe('ReviewFilesState — a failed mark() surfaces on markError instead of vanishing', () => {
   test('a rejected review.mark sets markError and clears pending, without throwing out of mark()', async () => {
     const transport = new FakeTransport();

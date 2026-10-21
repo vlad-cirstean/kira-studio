@@ -4,11 +4,10 @@ import {
   countNewRows,
 } from '../../frontend/src/views/shared/slick/kiraSlickGrid';
 
-// P22 spike C4: KiraSlickGrid.getRenderedRange's own row-bounds arithmetic is rowRangeBounds
+// KiraSlickGrid.getRenderedRange's own row-bounds arithmetic is rowRangeBounds
 // (views/shared/page/columns.ts) — covered by tests/unit/row-range-bounds.spec.ts, not this file
-// (finding 4, round 2: an earlier version of this comment claimed that coverage lived HERE, which
-// was never true — this file has only ever covered the column-axis overscan clamp below, and
-// separately `countNewRows`, the batch-cap arithmetic `getRenderedRange` also uses).
+// (This file has only ever covered the column-axis overscan clamp below, and separately
+// `countNewRows`, the batch-cap arithmetic `getRenderedRange` also uses).
 
 describe('clampColumnOverscan (P22 spike D4) — the column-axis overscan clamp', () => {
   test('1. expands both sides by overscanPx when there is room', () => {

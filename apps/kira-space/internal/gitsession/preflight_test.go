@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// initPreflightTestRepo builds a one-commit repo suitable for every F1 (P108 Part 16 review)
+// initPreflightTestRepo builds a one-commit repo suitable for every
 // regression test below: real git 2.43 probes confirmed a client-supplied value reaching an
 // unvalidated argv position (e.g. `--output=<path>`) writes or truncates an arbitrary file —
 // these tests confirm the guard rejects that value before any such spawn runs.

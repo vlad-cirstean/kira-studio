@@ -38,9 +38,9 @@ interface DataViewRuntime extends PagedViewRuntime {
   lastStrategy: 'keyset' | 'offset';
   prevToken: string | null;
   selection: Selection | null;
-  /** M5 §6.2: this tab's own masking preview toggle — per-tab, session-only, never persisted (a
+  /** This tab's own masking preview toggle — per-tab, session-only, never persisted (a
    *  masked view must not silently outlive the session and leave a user reading buckets as real
-   *  numbers tomorrow). A preview convenience, not a security boundary (§6.1) — the MCP path is
+   *  numbers tomorrow). A preview convenience, not a security boundary — the MCP path is
    *  the real one. */
   maskPreview: boolean;
   /** Widths measured for the column set `key` names; reused across reloads while that set is
@@ -64,17 +64,17 @@ export const useGridViewStore = defineStore('gridView', () => {
   const { runtime, ensureRuntime, setActionError, toggleSearchOpen, setSearchOpen } =
     createRuntimeStore<DataViewRuntime>(defaultRuntime);
 
-  /** M5 §6.2. The pending-changes guard lives here, not at any one caller (M6 finding #8: it used
-   *  to sit only at DataToolbar.vue's own toggle button, so menu.ts's `markColumnMaskKind` —
-   *  marking a column PII via the header menu — could turn preview on directly, bypassing it,
-   *  while a cell edit or insert row was staged. That left `maskPreview` and pending changes
-   *  coexisting, a state nothing downstream (the toolbar's disabled toggle, DataView.vue's
-   *  edit-action gating, SlickGridHost's own "no insert row while masked" assumption) was written
-   *  to handle. Centralizing the guard here means no caller, menu or toolbar or otherwise, can
-   *  ever turn preview on while a change is pending — the one place this invariant needs to hold.
+  /** The pending-changes guard lives here, not at any one caller (it used to sit only at
+   *  DataToolbar.vue's own toggle button, so menu.ts's `markColumnMaskKind` — marking a column
+   *  PII via the header menu — could turn preview on directly, bypassing it, while a cell edit or
+   *  insert row was staged. That left `maskPreview` and pending changes coexisting, a state
+   *  nothing downstream (the toolbar's disabled toggle, DataView.vue's edit-action gating,
+   *  SlickGridHost's own "no insert row while masked" assumption) was written to handle.
+   *  Centralizing the guard here means no caller, menu or toolbar or otherwise, can ever turn
+   *  preview on while a change is pending — the one place this invariant needs to hold.
    *
-   *  Returns whether preview actually turned on (or off) — `on && hasPending` is the one case it
-   *  didn't (M7 finding): `markColumnMaskKind` silently swallowed that outcome, so a column marked
+   *  Returns whether preview turned on (or off) — `on && hasPending` is the one case it
+   *  didn't: `markColumnMaskKind` silently swallowed that outcome, so a column marked
    *  PII while an edit was staged looked like nothing happened at all, with no feedback anywhere.
    */
   function setMaskPreview(tabId: string, on: boolean): boolean {
@@ -109,7 +109,7 @@ export const useGridViewStore = defineStore('gridView', () => {
     }
   }
 
-  // P2 R2 (task #93): `revertPageIndexOnFailure`, when given, is the pageIndex the tab was showing
+  // `revertPageIndexOnFailure`, when given, is the pageIndex the tab was showing
   // before its caller optimistically advanced it for this load — goNext/goPrev/goFirst/goLast/
   // goToPage and the filter/sort/projection/pageSize setters below all patch pageIndex to the new
   // page *before* the (possibly failing) request completes, on the assumption it will land. A
@@ -132,7 +132,7 @@ export const useGridViewStore = defineStore('gridView', () => {
     const opId = beginOp(rt);
 
     // A 'data' tab only ever exists against a tabular-shaped adapter (Postgres/MariaDB) — Mongo
-    // opens a 'document' tab instead (P8) — so expectKind narrows rather than widening
+    // opens a 'document' tab instead — so expectKind narrows rather than widening
     // setPage/getPage. A stop button that blanks the grid is worse than the query the user
     // stopped — a failure here (below) leaves the previously rendered page exactly as it was.
     await runPagedLoad({
@@ -201,7 +201,7 @@ export const useGridViewStore = defineStore('gridView', () => {
     if (!tab?.connectionId) return;
     await data.invalidate(tab.connectionId, tab.path, 'pages');
     await load(tabId, { mode: 'offset', offset: tab.state.pageIndex * tab.state.pageSize });
-    // F12 (P108 Part 10): a commit that deletes every row on the current page left this reload
+    // A commit that deletes every row on the current page left this reload
     // showing an empty grid still labelled page N — nothing else corrects it (goLast/the count
     // chip both still read the pre-delete total until a fresh count runs). Step back one page,
     // same as a manual Previous click, when the reload above came back empty.
@@ -217,7 +217,7 @@ export const useGridViewStore = defineStore('gridView', () => {
       useTabsStore().patchDataTabState(tabId, { pageIndex: prevIndex });
       await load(tabId, { mode: 'offset', offset: prevIndex * tab.state.pageSize });
     }
-    // §7's "immediately marked stale" needs the toolbar's own `rt.count` mirror to pick up the
+    // The "immediately marked stale" needs the toolbar's own `rt.count` mirror to pick up the
     // server-side mark, which nothing else here does. `rt.count?.stale` is still false at this
     // point, so runCount's own `refresh` flag stays false too — this reads the now-stale L3 entry
     // (a cache hit, not a rescan; handleRead/handleCount's contract keeps a hit out of the op log)
@@ -239,9 +239,9 @@ export const useGridViewStore = defineStore('gridView', () => {
     );
   }
 
-  // I2-14: stop/goFirst/goNext/goPrev/goLast/goToPage/resetTokens — mirrors views/documents/
+  // stop/goFirst/goNext/goPrev/goLast/goToPage/resetTokens — mirrors views/documents/
   // state.ts's own set exactly, modulo the tab accessor pair below. Every state-changing control
-  // resets paging to page 0 (§8.5) — page 40 at 100 rows is not page 40 at 10 000, and a changed
+  // resets paging to page 0 — page 40 at 100 rows is not page 40 at 10 000, and a changed
   // filter/sort/projection invalidates whatever tokens were held; goLast requires a count — the
   // toolbar disables ⏭ until Σ has run.
   const { stop, goNext, goPrev, goFirst, goLast, goToPage, resetTokens } = createPageNavigation({
@@ -331,7 +331,7 @@ export const useGridViewStore = defineStore('gridView', () => {
   };
 });
 
-// P21 round 2 functional finding 2: pendingChanges.ts already imports from this
+// pendingChanges.ts already imports from this
 // module, so importing `runtime` back from there would be a cycle — it registers an accessor
 // instead (the same registry-inversion shape as state/viewCommands.ts's registerTabReload below),
 // so buildPlan can tell a partial composite-key projection from a complete one.

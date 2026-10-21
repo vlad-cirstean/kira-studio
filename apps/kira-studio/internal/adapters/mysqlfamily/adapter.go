@@ -15,9 +15,9 @@ import (
 )
 
 // connState is every field Connect/Disconnect write concurrently with an in-flight op reading them
-// (F3) — a real data race, not a theoretical one, same class as postgres/adapter.go's own (the
-// running-query bookkeeping below is unrelated, tracker's own lock, P107 T2-3). Guarded together
-// via adapters.Guarded (P113 G1); shared with postgres's identical shape via relational.ConnState.
+// — a real data race, not a theoretical one, same class as postgres/adapter.go's own (the
+// running-query bookkeeping below is unrelated, tracker's own lock). Guarded together
+// via adapters.Guarded; shared with postgres's identical shape via relational.ConnState.
 type connState = relational.ConnState[*ConnSet]
 
 // Adapter is index.ts's MysqlFamilyAdapter — one implementation for both MariaDB and MySQL,
@@ -74,13 +74,14 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 
 	exec := execFor(entry, op, a.trackerFor(op.OpID))
 	var serverVersion, charset string
-	// P24: DATABASE() is SQL NULL, not "", whenever the connection was opened with no default
+	// DATABASE() is SQL NULL, not "", whenever the connection was opened with no default
 	// schema (client.go's BuildConfig only sets mc.DBName when cfg.Database is non-empty) — a
 	// completely ordinary case for a connection meant to browse every database on the server
-	// (docs/ARCHITECTURE.md's PostgreSQL / MariaDB / MySQL section, database -> tables), and one Validate (input.go)
+	// (docs/ARCHITECTURE.md's PostgreSQL / MariaDB / MySQL section, database -> tables), and one
+	// Validate (input.go)
 	// deliberately allows. Scanning that NULL into a plain string panics-the-query with "converting
 	// NULL to string is unsupported", failing Connect outright for every such connection — a
-	// sql.NullString is what actually tolerates it.
+	// sql.NullString is what tolerates it.
 	var database sql.NullString
 	found := false
 	err = exec(ctx, "SELECT VERSION() AS version, DATABASE() AS `database`, @@character_set_server AS charset", nil,
@@ -118,7 +119,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 }
 
 // Disconnect is index.ts's disconnect — relational.Disconnect carries the body shared with
-// postgres's identical Disconnect (P113 G1): F4's cancel-then-drain sequencing (KILL QUERY over a
+// postgres's identical Disconnect: the cancel-then-drain sequencing (KILL QUERY over a
 // side connection, this adapter's existing Cancel path, before Drain, whose own wait is bounded by
 // ctx rather than able to block this call for as long as the longest still-running query).
 func (a *Adapter) Disconnect(ctx context.Context) error {

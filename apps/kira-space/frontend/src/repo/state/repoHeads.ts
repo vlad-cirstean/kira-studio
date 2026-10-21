@@ -16,7 +16,7 @@ export const useRepoHeadsStore = defineStore('repoHeads', () => {
   const workspaceStore = useWorkspaceStore();
   const visibility = useRepoVisibilityStore();
 
-  // P83 plan §12.3: every repo row's checked-out branch, session-scoped and module-level — same
+  // Every repo row's checked-out branch, session-scoped and module-level — same
   // shape as worktrees.ts's byRepo/search.ts's repoSearchView. `null` means "known, and there is
   // none" (a bare repository, or a row RepoHeads could not read); an absent key means "not fetched
   // yet", so a collapsed row renders no label rather than a stale one.
@@ -44,7 +44,7 @@ export const useRepoHeadsStore = defineStore('repoHeads', () => {
 
   /** One batched `RepoHeads` call — every listed row when `ids` is omitted (mount, a records
    *  change; hidden repos stay out so they cost no git spawn), one row for a `refsChanged` event
-   *  (§12.3 trigger 3, a one-row `RepoHeads` call over the same batched method). No coalescing:
+   *  (a one-row `RepoHeads` call over the same batched method). No coalescing:
    *  each trigger fires at most once per its own event, nothing bursts this. */
   async function refreshRepoHeads(ids?: string[]): Promise<void> {
     const target = ids ?? visibility.listedIds;
@@ -70,7 +70,7 @@ export const useRepoHeadsStore = defineStore('repoHeads', () => {
     },
   );
 
-  // §12.3 trigger 3: one lease per open repo workspace, created and released by the same eviction
+  // One lease per open repo workspace, created and released by the same eviction
   // pattern worktrees.ts:149-155 established. `gitTransportFor` returns a lease over the existing
   // shared client an open workspace's own graph tab already created — nothing new opened here.
   // `immediate: true` so a repo workspace already open when this store first activates is covered

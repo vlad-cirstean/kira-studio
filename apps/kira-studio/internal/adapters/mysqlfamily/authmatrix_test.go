@@ -76,7 +76,7 @@ func runFamilyAuthMatrix(t *testing.T, kind string, fixture any, cfg model.Resol
 			Expect: testsupport.Outcome{Succeed: true, Details: map[string]string{"database": ""}},
 		},
 		{
-			// Deviation from the plan's own row: catalog.go's systemSchemas filter excludes
+			// catalog.go's systemSchemas filter excludes
 			// information_schema/performance_schema/mysql/sys from Children() unconditionally, for
 			// every user — not merely for a scoped one, so "root's tree includes a system schema
 			// the scoped user cannot see" does not hold for this adapter. Verified directly (both

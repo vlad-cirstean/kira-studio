@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import { expect, test } from './fixtures';
 import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
@@ -24,10 +25,7 @@ async function openMemorySettings(page: Page): Promise<void> {
 // and TestInstallSemanticModelCancelled.
 test('contract: Connect Claude Code shows the registration command', async ({ relaunch }) => {
   const status = contract<{ command: string }>('memory-settings', 'MemoryService.McpStatus');
-  const installed = contract<{ outcome: string }>(
-    'memory-settings',
-    'MemoryService.InstallClaudeCode',
-  );
+  const installed = contract<{ outcome: string }>('memory-settings', 'MemoryService.InstallAgent');
   expect(installed.outcome).toBe('installed');
   const { window: page } = await relaunch({
     control: [
@@ -172,4 +170,33 @@ test('semantic unavailable: shows the reason and a retry', async ({ relaunch }) 
   await expect
     .poll(() => control.log().some((e) => e.channel === IPC.memorySemanticRetry))
     .toBe(true);
+});
+
+// Contract memory-settings. Backend half: memoryflow TestMemoryModels.
+test('contract: memory model saves memory.models with the dialog', async ({ relaunch }) => {
+  const memory = contract<{ models: Record<string, string> }>(
+    'memory-settings',
+    'SettingsService.GetAll#memory',
+  );
+  const patch = contract<{ memory: { models: Record<string, string> } }>(
+    'memory-settings',
+    'SettingsService.Set#memory-model',
+  );
+  const { window: page, control } = await relaunch({
+    control: [{ channel: IPC.settingsGetAll, response: { ...defaultSettings, memory } }],
+  });
+  await openMemorySettings(page);
+  const select = page.locator('[data-testid="settings-memory-agent-model"]');
+  const reset = page.locator('[data-testid="settings-reset-memory-agentModel"]');
+  await expect(select).toHaveValue('sonnet');
+  await expect(reset).toBeDisabled();
+
+  await select.selectOption(patch.memory.models.claude ?? '');
+  await expect(reset).toBeEnabled();
+  expect(control.log().some((e) => e.channel === IPC.settingsSet)).toBe(false);
+
+  await page.locator('[data-testid="settings-save"]').click();
+  await expect
+    .poll(() => control.log().find((e) => e.channel === IPC.settingsSet)?.args)
+    .toEqual({ patch });
 });

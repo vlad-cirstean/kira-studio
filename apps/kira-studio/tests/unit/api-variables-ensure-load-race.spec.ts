@@ -1,12 +1,12 @@
-// P108 F2: ensureVariablesLoaded had no dedupe or sequencing. `if (!ownerId || listCache[key])
+// ensureVariablesLoaded had no dedupe or sequencing. `if (!ownerId || listCache[key])
 // return; listCache[key] = await control.variablesList(...)` let two concurrent callers each fire
 // their own request, and a slow first reply landing after a later loadVariableSetRows (a post-edit
 // refresh) overwrote the just-written fresh rows with the pre-edit list — every subsequent send for
 // that scope then substituted stale plain values until the next edit.
 //
-// P112: `listCache` and its hand-rolled dedupe are gone. loadVariableRows (apiQueries.ts) is
+// `listCache` and its hand-rolled dedupe are gone. loadVariableRows (apiQueries.ts) is
 // `queryClient.query()`, which dedupes concurrent callers for the same key on its own — the first
-// half of F2 needs no dedicated fix any more, just a pin that the dedupe still holds. The second
+// half needs no dedicated fix any more, just a pin that the dedupe still holds. The second
 // half — a stale in-flight reply landing after a fresher write must not clobber it — is
 // refreshApiQuery's own documented race (apiQueries.ts, above its definition): an observer-less
 // in-flight `queryClient.query` caller (e.g. send()) must not have its invalidation cleared by that
@@ -85,7 +85,7 @@ describe('loadVariableRows / refreshApiQuery race handling (P108 F2 successor)',
 
     // No active observer exists for this key here (no mounted useVariableRows/store), so
     // refreshApiQuery's own refetch is a no-op the moment it runs — same as any other unobserved
-    // key (commit 2's own "invalidating keys nothing observes yet is a no-op"). What it still
+    // key ("invalidating keys nothing observes yet is a no-op"). What it still
     // guarantees is that the query is left marked invalidated, so the *next* read — a real send(),
     // never this test's own probe — does not keep trusting the stale reply and fetches again.
     const after = await loadVariableRows('collection', collectionId);

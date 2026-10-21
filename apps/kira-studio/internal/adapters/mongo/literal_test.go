@@ -1,5 +1,5 @@
-// The table-driven oracle for literal.go (P58 D11, P58c C4), written before literal.go itself.
-// Case groups mirror docs/HISTORY.md (v1 P58c)'s bar exactly: every escape, both
+// The table-driven oracle for literal.go, written before literal.go itself.
+// Case groups mirror docs/HISTORY.md's bar exactly: every escape, both
 // quote styles, both comment forms, trailing commas, the six constructors with and without an
 // argument, the thirteen EJSON wrapper keys, and the position-bearing error messages ported
 // byte-for-byte from src/engine/adapters/mongo/literal.ts.

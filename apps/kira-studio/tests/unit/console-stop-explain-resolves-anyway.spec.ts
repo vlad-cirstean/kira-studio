@@ -1,5 +1,5 @@
-// P12 round 2 finding #5: even with finding #4's identity-guarded explainOpId clear, nothing
-// recorded that Stop was pressed if the in-flight EXPLAIN `data.execute` call happened to resolve
+// Even with the identity-guarded explainOpId clear, nothing recorded that Stop was pressed if the
+// in-flight EXPLAIN `data.execute` call happened to resolve
 // normally before the cancel signal reached it (rather than rejecting with E_CANCELLED) — rt.status
 // was still 'running', rt.opId was still this run's, so run()'s post-await guard passed and the
 // real (possibly expensive) query fired anyway despite the Stop press. This drives run()/stop() end

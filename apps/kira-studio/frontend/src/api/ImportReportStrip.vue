@@ -7,7 +7,7 @@ import { useCollectionsStore } from './state/collections';
 
 const collectionsStore = useCollectionsStore();
 
-// P4 D12: the import report is part of the feature, not decoration. Every warning kind is a case
+// The import report is part of the feature, not decoration. Every warning kind is a case
 // where the app quietly does something other than what the file said — a script that is kept but
 // never run, an auth block whose values are dropped and never applied, a GraphQL body imported as
 // JSON, a file referenced by a name from another machine — and the alternative to saying so here
@@ -15,10 +15,10 @@ const collectionsStore = useCollectionsStore();
 //
 // A pre-import preview dialog was considered and declined: it is a second UI for an operation that
 // is almost never wrong, and the report after the fact carries the same information at a tenth of
-// the cost. Import is not undoable in P4; deleting the collection is the undo, one context-menu
+// the cost. Import is not undoable; deleting the collection is the undo, one context-menu
 // item away.
 //
-// P104 §9: Alert with the `warn`/`note` tone variants, dynamic per warning count — the same tone
+// Alert with the `warn`/`note` tone variants, dynamic per warning count — the same tone
 // vocabulary RawExchangePane.vue's own dynamic-tone strip uses.
 const report = computed(() => collectionsStore.report);
 

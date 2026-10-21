@@ -27,10 +27,10 @@ import { browseInvalidate } from '../state/viewCommands';
 const objectStoreStore = useObjectStoreStore();
 const tabsStore = useTabsStore();
 
-// P33 D17: three entry points as of P41 (the Browse panel's own container rows/toolbar and — until
-// the tree stops rendering bucket/prefix rows, P41 D5 — the tree's own bucket/prefix menu) — driven
+// Three entry points (the Browse panel's own container rows/toolbar and — until
+// the tree stops rendering bucket/prefix rows — the tree's own bucket/prefix menu) — driven
 // entirely by state/objectStore.ts's uploadDialogState so project/menus.ts can open it without
-// importing this component or any views/ module (§11's dependency rule).
+// importing this component or any views/ module (the dependency rule).
 
 const chosenFile = ref<{ path: string; name: string; size: number } | null>(null);
 const key = ref('');
@@ -53,7 +53,7 @@ const {
   tabsStore.openKeyValueTab(connectionId, newPath, { newTab: true });
 });
 
-// P43 F1/D1: every ancestor `prefix` segment of the container path, joined — not just the last
+// Every ancestor `prefix` segment of the container path, joined — not just the last
 // one. A bucket has none; a one-level-nested container has one; `bucket/prefix:a/prefix:b` joins
 // to `a/b/`. The old `pathTail`-only version silently dropped every segment above the immediate
 // parent, so an upload two or more levels deep prefilled a key that was missing its own ancestry

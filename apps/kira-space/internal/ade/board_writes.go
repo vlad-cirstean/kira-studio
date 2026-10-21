@@ -14,6 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 )
@@ -57,7 +58,7 @@ func (b *TaskBoard) wireTask(t model.AdeTask) (adewire.Task, error) {
 	if err != nil {
 		return adewire.Task{}, err
 	}
-	out := toWireTask(t, ids, runs, reviews)
+	out := b.toWireTask(t, ids, runs, reviews)
 	decorateTask(&out, t, b.liveWorkflows())
 	b.badgeTasks([]adewire.Task{out})
 	return out, nil
@@ -127,7 +128,7 @@ func (b *TaskBoard) CreateTask(ctx context.Context, args adewire.CreateTaskArgs)
 	}
 	task := model.AdeTask{
 		ID: b.newID(), Kind: model.AdeTaskKindTask, Title: title, JiraKey: jiraKey, JiraURL: jiraURL,
-		GithubURL: args.GithubURL, Notes: args.Notes, CreatedAt: b.deps.Now().UnixMilli(),
+		HostURL: args.HostURL, Notes: args.Notes, CreatedAt: b.deps.Now().UnixMilli(),
 	}
 	if args.WorkflowID != "" {
 		if b.deps.Workflows == nil {
@@ -169,7 +170,7 @@ func (b *TaskBoard) UpdateTask(_ context.Context, args adewire.UpdateTaskArgs) (
 	if p.Jira != nil && p.ClearJira {
 		return adewire.Task{}, invalid("jira and clearJira are mutually exclusive")
 	}
-	patch := model.AdeTaskPatch{Title: p.Title, GithubURL: p.GithubURL, Est: p.Est, Notes: p.Notes, Color: p.Color, Kind: p.Kind}
+	patch := model.AdeTaskPatch{Title: p.Title, HostURL: p.HostURL, Est: p.Est, Notes: p.Notes, Color: p.Color, Kind: p.Kind}
 	if p.Title != nil {
 		trimmed := strings.TrimSpace(*p.Title)
 		patch.Title = &trimmed
@@ -469,8 +470,8 @@ func (b *TaskBoard) SetQueuedAfter(_ context.Context, args adewire.SetQueuedAfte
 
 // --- backlog -----------------------------------------------------------------------------------
 
-func toWireBacklog(i model.AdeBacklogItem) adewire.BacklogItem {
-	out := adewire.BacklogItem{ID: i.ID, Text: i.Text, AddedAt: i.AddedAt, GithubURL: i.GithubURL, Notes: i.Notes}
+func (b *TaskBoard) toWireBacklog(i model.AdeBacklogItem) adewire.BacklogItem {
+	out := adewire.BacklogItem{ID: i.ID, Text: i.Text, AddedAt: i.AddedAt, HostURL: i.HostURL, HostLink: b.hostLink(i.HostURL), Notes: i.Notes}
 	if i.JiraKey != "" || i.JiraURL != "" {
 		out.Jira = &adewire.Jira{Key: i.JiraKey, URL: i.JiraURL}
 	}
@@ -485,7 +486,7 @@ func (b *TaskBoard) Backlog(_ context.Context) (adewire.BacklogResult, error) {
 	}
 	out := adewire.BacklogResult{Items: make([]adewire.BacklogItem, len(items))}
 	for i, it := range items {
-		out.Items[i] = toWireBacklog(it)
+		out.Items[i] = b.toWireBacklog(it)
 	}
 	return out, nil
 }
@@ -501,7 +502,7 @@ func (b *TaskBoard) AddBacklogItem(_ context.Context, args adewire.AddBacklogIte
 		return adewire.BacklogItem{}, err
 	}
 	b.notifyBacklog()
-	return toWireBacklog(item), nil
+	return b.toWireBacklog(item), nil
 }
 
 // UpdateBacklogItem applies a patch.
@@ -510,7 +511,7 @@ func (b *TaskBoard) UpdateBacklogItem(_ context.Context, args adewire.UpdateBack
 	if p.Jira != nil && p.ClearJira {
 		return adewire.BacklogItem{}, invalid("jira and clearJira are mutually exclusive")
 	}
-	patch := model.AdeBacklogPatch{Text: p.Text, GithubURL: p.GithubURL, Notes: p.Notes}
+	patch := model.AdeBacklogPatch{Text: p.Text, HostURL: p.HostURL, Notes: p.Notes}
 	if p.Text != nil {
 		trimmed := strings.TrimSpace(*p.Text)
 		if trimmed == "" {
@@ -530,7 +531,7 @@ func (b *TaskBoard) UpdateBacklogItem(_ context.Context, args adewire.UpdateBack
 		return adewire.BacklogItem{}, err
 	}
 	b.notifyBacklog()
-	return toWireBacklog(item), nil
+	return b.toWireBacklog(item), nil
 }
 
 // MoveBacklogItem moves an item to toIndex.
@@ -569,7 +570,7 @@ func (b *TaskBoard) PromoteBacklogItem(_ context.Context, args adewire.BacklogIt
 	}
 	task, err := b.deps.Backlog.Promote(item.ID, model.AdeTask{
 		ID: b.newID(), Kind: model.AdeTaskKindTask, Title: item.Text, JiraKey: item.JiraKey, JiraURL: item.JiraURL,
-		GithubURL: item.GithubURL, Notes: item.Notes, CreatedAt: b.deps.Now().UnixMilli(),
+		HostURL: item.HostURL, Notes: item.Notes, CreatedAt: b.deps.Now().UnixMilli(),
 	})
 	if err != nil {
 		return adewire.Task{}, err
@@ -665,4 +666,16 @@ func queueCycle(byID map[string]model.AdeTaskBranch, selfID string, start model.
 		cur = next
 	}
 	return true
+}
+
+// hostLink is the issue or change-request link a pasted URL names, nil when none matches.
+func (b *TaskBoard) hostLink(raw string) *githost.Link {
+	if raw == "" || b.deps.Registry == nil {
+		return nil
+	}
+	l, ok := b.deps.Registry.Hosts.Registry.ParseLink(raw)
+	if !ok {
+		return nil
+	}
+	return &l
 }

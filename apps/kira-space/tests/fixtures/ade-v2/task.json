@@ -7,7 +7,8 @@
     "key": "PAY-121",
     "url": "https://acme.atlassian.net/browse/PAY-121"
   },
-  "githubUrl": "",
+  "hostUrl": "",
+  "hostLink": null,
   "workflowId": "standard",
   "entryStepId": "spec",
   "since": {},

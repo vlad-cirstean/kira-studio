@@ -1,17 +1,17 @@
 /**
- * C11 §7.3/§7.4 (S9) — the review diff's own Monaco layer: gutter glyphs for hunk/comment state,
+ * The review diff's own Monaco layer: gutter glyphs for hunk/comment state,
  * inline comment threads, and the "mark reviewed"/"add a comment" gestures. No precedent
- * elsewhere in this repo (§7's own doc comment) — everything here was designed against the
- * pinned `monaco-editor@0.56.0` source, not from memory (§7.3's two gotchas below).
+ * elsewhere in this repo — everything here was designed against the
+ * pinned `monaco-editor@0.56.0` source, not from memory.
  *
- * §7.2's whole reason this module computes no line mapping of its own: a review diff's right-hand
+ * The whole reason this module computes no line mapping of its own: a review diff's right-hand
  * document is always `<branchTip>:<path>`, and `review.comment.list`/`review.fileDiff` already
  * return `range` in exactly those coordinates (anchored server-side, `gitsession/comments.go`) —
  * this module places a decoration at `comment.range.start` and renders `anchor` as a label, the
  * same two lines of logic `reviewComments.ts:63-74` already uses.
  *
- * Two decoration lanes keep a hunk glyph and a comment glyph from colliding on the same line
- * (§7.3): hunk state renders in `GlyphMarginLane.Right`, comment/add-comment glyphs in
+ * Two decoration lanes keep a hunk glyph and a comment glyph from colliding on the same line:
+ * hunk state renders in `GlyphMarginLane.Right`, comment/add-comment glyphs in
  * `GlyphMarginLane.Left`.
  */
 
@@ -45,7 +45,7 @@ type ModifiedEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
 type DeltaDecoration = import('monaco-editor').editor.IModelDeltaDecoration;
 type ViewZone = import('monaco-editor').editor.IViewZone;
 
-// §3.1: pinned monaco-editor@0.56.0's own `view.js` appends `.view-zones` BEFORE `.view-lines` in
+// Pinned monaco-editor@0.56.0's own `view.js` appends `.view-zones` BEFORE `.view-lines` in
 // `.lines-content`, and `viewLines.js` sizes `.view-lines` to the full scroll width/height with no
 // z-index of its own (`position: absolute; z-index: auto`) — a later positioned sibling with
 // `z-index: auto` loses every hit test to it. `10` is VS Code's own value for the view-zone
@@ -73,20 +73,20 @@ export interface ReviewDecorationsHandle {
 }
 
 // reviewMarking.ts:221-241's own memoised resolveBase, ported: review.fileDiff needs `base`, which
-// nothing on the diff tab carries directly (only `leftRev`, §7.5) — re-resolving here, memoised by
+// nothing on the diff tab carries directly (only `leftRev`) — re-resolving here, memoised by
 // (repoId, branch), is the same trade the extension already made rather than threading `base`
 // through the whole tab-open path for a value this module can cheaply ask for itself. Module-level
 // (not per-handle): two review diff tabs for the same branch share one resolution.
 //
-// C12-7: only a SUCCESSFUL resolution stays cached. A failure (e.g. a transient index.lock
+// Only a SUCCESSFUL resolution stays cached. A failure (e.g. a transient index.lock
 // conflict) used to cache `null` forever, with no expiry — every load() thereafter silently
 // early-returned, permanently disabling the whole review layer for that branch until the app
 // restarted. Evicting the entry on failure lets the next call (this editor's own retry, or
 // another editor's load()) try fresh instead of replaying the same rejection from cache forever.
 //
-// C13-9: a REJECTION is now propagated (not swallowed into a `null` value) so load() can tell it
+// A REJECTION is now propagated (not swallowed into a `null` value) so load() can tell it
 // apart from a resolved `base: null` — the legitimate, permanent "no base branch configured for
-// this repository" answer. C12-7's collapse of both into the same cached `null` routed a
+// this repository" answer. The collapse of both into the same cached `null` routed a
 // permanent condition to the same "Couldn't load, click Retry" banner built for transient
 // failures — Retry could never succeed there, since re-resolving just returns the same `null`.
 const baseMemo = new Map<string, Promise<string | null>>();
@@ -127,11 +127,11 @@ export function attachReviewDecorations(
   modifiedEditor.updateOptions({ glyphMargin: true });
 
   let disposed = false;
-  // C14-2: separate counters per resource -- loadDiff and loadComments used to share one loadSeq,
+  // Separate counters per resource -- loadDiff and loadComments used to share one loadSeq,
   // so a fast loadComments (single DB read) firing while a slower loadDiff (server-side git diff)
   // was still in flight bumped the shared counter and made the diff load discard its own result on
   // resolution, with nothing else left to re-fetch it. Each counter still guarantees its own "a
-  // stale result never clobbers a fresher one" property; the two just can no longer invalidate each
+  // stale result never clobbers a fresher one" property; the two can no longer invalidate each
   // other.
   let diffSeq = 0;
   let commentsSeq = 0;
@@ -191,7 +191,7 @@ export function attachReviewDecorations(
     });
   }
 
-  // C12-7: resolveBase's own failure (a transient index.lock conflict, most likely) used to be
+  // resolveBase's own failure (a transient index.lock conflict, most likely) used to be
   // invisible — the diff still rendered, just with zero gutter glyphs/highlighting/comments and no
   // indication anything had gone wrong. A plain DOM view zone (no Vue mount needed, unlike
   // openZone/closeZone's own compose/thread box above) banners the real failure at the top of the
@@ -327,19 +327,19 @@ export function attachReviewDecorations(
     }
   }
 
-  // C13-12: split from one combined load() into loadDiff()/loadComments() — onReviewRepaint's own
-  // fan-out (below) now dispatches by the repaint event's own `kind` instead of always reloading
-  // both. A `mark` mutation can't change the comment list; a `comments` mutation can't change the
-  // file diff — with N open review tabs on one branch, reloading both on every mutation cost N
-  // redundant full diffs (a real server-side git diff, review.fileDiff) plus N full branch-wide
-  // comment re-fetches (re-anchoring every comment on the branch server-side) for every single
-  // comment click or mark toggle. C14-2: each now guards against staleness with its own counter
-  // (diffSeq/commentsSeq) rather than one shared one — see those declarations' own comment.
+  // onReviewRepaint's own fan-out (below) now dispatches by the repaint event's own `kind`
+  // instead of always reloading both. A `mark` mutation can't change the comment list;
+  // a `comments` mutation can't change the file diff — with N open review tabs on one branch,
+  // reloading both on every mutation cost N redundant full diffs (a real server-side git diff,
+  // review.fileDiff) plus N full branch-wide comment re-fetches (re-anchoring every comment on
+  // the branch server-side) for every single comment click or mark toggle. Each now guards against
+  // staleness with its own counter (diffSeq/commentsSeq) rather than one shared one — see those
+  // declarations' own comment.
 
   // reviewMarking.ts:245-288's own resolution chain, ported: sinceReview first, retried as `range`
   // only when the file's own reviewedAtSha has moved past what this tab was opened against — the
   // same "never silently switch modes under an open tab" rule.
-  // Returns whether the diff actually loaded — C13-12's own load() uses this so a failed diff load
+  // Returns whether the diff loaded — the load() uses this so a failed diff load
   // (any of the three early-return cases below) skips the now-separate loadComments() call too,
   // preserving the original combined function's own short-circuit: no point fetching a branch's
   // full comment list for an editor that has nothing to anchor it against and is showing an error
@@ -426,7 +426,7 @@ export function attachReviewDecorations(
       return;
     }
     if (disposed || seq !== commentsSeq) return;
-    // C14-6: review.comment.list is scoped to the whole review SESSION (every file on the
+    // review.comment.list is scoped to the whole review SESSION (every file on the
     // branch), not this editor's own file -- without this filter, a comment on another file could
     // paint as a phantom glyph/hover/thread here if that file happened to have a line at the same
     // number.
@@ -439,10 +439,10 @@ export function attachReviewDecorations(
   }
 
   /** The mount-time (and Retry-button) load only — reloads reachable from onReviewRepaint's own
-   *  fan-out below call loadDiff/loadComments directly, whichever the mutation could actually have
+   *  fan-out below call loadDiff/loadComments directly, whichever the mutation could have
    *  changed. Skips loadComments() when the diff itself never loaded (any of loadDiff's own three
    *  early-return cases) — no point fetching a branch's full comment list for an editor that is
-   *  showing an error banner instead, the original combined function's own short-circuit. */
+   *  showing an error banner instead. */
   async function load(): Promise<void> {
     if (await loadDiff()) await loadComments();
   }
@@ -462,11 +462,11 @@ export function attachReviewDecorations(
       logError('reviewDecorations', 'review.mark failed', err);
       return;
     }
-    // F9 (reviewMarking.ts:520-521): never predict the stored state locally — reload from the
+    // (reviewMarking.ts:520-521): never predict the stored state locally — reload from the
     // server's own fresh review.fileDiff. No explicit reload here: transport.ts's own repaint
-    // fan-out (§7.6) is the ONE reload path for every open tab on this (repoId, branch, path),
+    // fan-out is the ONE reload path for every open tab on this (repoId, branch, path),
     // this editor included — its `onReviewRepaint` filter matches this editor's own deps just
-    // like every other subscriber's (C12-4: an extra `load()` call here used to double-reload
+    // like every other subscriber's (an extra `load()` call here used to double-reload
     // this same editor, since the fan-out never excluded the tab that made the call).
   }
 
@@ -618,11 +618,11 @@ export function attachReviewDecorations(
     run: () => void mark(currentSelectionRange(), false),
   });
 
-  // §7.6's repaint table, the listening side of transport.ts's fan-out — a mutation from either
-  // half of the UI (this editor or the panel's own Comments pane) reloads this editor exactly
-  // once it actually succeeded. C13-12: dispatches by the event's own `kind` rather than always
-  // reloading both halves — a `mark` mutation can only have changed the file diff (reviewed
-  // ranges/hunks), a `comments` mutation only the comment list.
+  // The listening side of transport.ts's fan-out — a mutation from either half of the UI (this
+  // editor or the panel's own Comments pane) reloads this editor exactly once it succeeded.
+  // Dispatches by the event's own `kind` rather than always reloading both halves — a `mark`
+  // mutation can only have changed the file diff (reviewed ranges/hunks), a `comments` mutation
+  // only the comment list.
   const unsubscribeRepaint = onReviewRepaint((event) => {
     if (event.repoId !== deps.gitRepoId || event.branch !== deps.review.branch) return;
     if (event.kind === 'mark') {

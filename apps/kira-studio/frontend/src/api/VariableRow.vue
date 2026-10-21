@@ -53,9 +53,9 @@ const emit = defineEmits<{
   history: [];
 }>();
 
-// D9/§1.4: "not yet revealed, the eye is the reveal action; once revealed, it's a free
+// "not yet revealed, the eye is the reveal action; once revealed, it's a free
 // client-side mask toggle — no second round trip, no second prompt." A secret's `row.value` is ''
-// until VariablesDialog.vue writes the revealed plaintext into this row's own draft (D5's
+// until VariablesDialog.vue writes the revealed plaintext into this row's own draft (the
 // projection guarantee: List/Upsert never hand this component a secret's real value any other
 // way) — the transition from '' to non-empty, while still isSecret, is exactly "just revealed",
 // which is when the value should first render unmasked rather than start hidden again.
@@ -94,11 +94,11 @@ function onHistoryOpenChange(open: boolean): void {
 </script>
 
 <template>
-  <!-- P22b D9: a grid, not independent flex items -- F13's own finding was that adjacent rows'
+  <!-- A grid, not independent flex items -- the finding was that adjacent rows'
        name/value/description columns never lined up, since each field carried its own `flex`
        value and a secret row's reveal button (inside the value cell) shifted its neighbours.
        Named, fixed-fraction columns: handle, name, value, description, secret toggle, history,
-       remove. grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto] -- same disclosed section 1.2
+       remove. grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto] -- same disclosed
        allowlist gap as VariableSetView.vue's own header-row and VariablesOverviewPanel.vue's
        overview-row -- a pre-existing value relocated, not a new one. -->
   <div

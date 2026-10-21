@@ -14,6 +14,7 @@ export function mongoCreateArgs(name: string) {
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    preconnectDelaySec: 0,
     autoExplain: false,
     throttlePerSec: 0,
   };
@@ -35,6 +36,7 @@ export function redisCreateArgs(name: string) {
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    preconnectDelaySec: 0,
     autoExplain: false,
     throttlePerSec: 0,
   };
@@ -56,6 +58,7 @@ export function postgresCreateArgs(name: string, color: string) {
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    preconnectDelaySec: 0,
     autoExplain: false,
     throttlePerSec: 0,
   };

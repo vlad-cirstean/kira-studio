@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { setiIconFor } from './setiFileIcon.ts';
 
-// G-UX (item 10): `seti-icons`' own bundled data has no `files`/`extensions`/`partials` entry for
+// `seti-icons`' own bundled data has no `files`/`extensions`/`partials` entry for
 // `go.mod`/`go.sum`/`go.work`(`.sum`) at all — every one of `getDetails`' own lookup stages misses
 // (see setiFileIcon.ts's own doc comment for exactly why), so before this fix they fell all the
 // way through to the generic default icon despite being at least as common in a real Go diff as

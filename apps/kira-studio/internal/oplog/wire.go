@@ -1,7 +1,7 @@
 // Package oplog is the Go analogue of src/main/oplog.ts: pure orchestration over
 // internal/storage/repos.OpsRepo's Append/Finish/Prune — subscribing to op:start/op:end events,
 // forwarding an update for the renderer's op-log panel, and reconciling whatever was still running
-// when the event source's channel closes (app shutdown, P58f D9).
+// when the event source's channel closes (app shutdown).
 package oplog
 
 import (
@@ -15,17 +15,17 @@ import (
 	"github.com/kirathecat/kira-studio/internal/notify"
 )
 
-// Event is the op-log's own event shape. EventSource is a consumer-declared interface (A11's
-// discipline), so its payload type belongs with the consumer, here, rather than with whichever
-// producer happens to publish it first (P58f D9) — enginehost.Event was that producer's own type,
-// borrowed only because oplog was its sole consumer.
+// Event is the op-log's own event shape. EventSource is a consumer-declared interface, so its
+// payload type belongs with the consumer, here, rather than with whichever producer happens to
+// publish it first — enginehost.Event was that producer's own type, borrowed only because oplog
+// was its sole consumer.
 type Event struct {
 	Topic   string
 	Payload json.RawMessage
 }
 
 // Event topics this package's consume loop switches on, mirroring ENGINE_EVENT.opStart/opEnd
-// (packages/shared/protocol/engine-ops.ts:21-25). There is no EventEngineDown any more (P58f D9):
+// (packages/shared/protocol/engine-ops.ts:21-25). There is no EventEngineDown any more:
 // adapterhost.Host, the only producer left, never published one — that was enginehost.Host's own
 // synthetic topic for a Node child exiting — and reconciliation now runs whenever the event
 // channel closes for any reason, orderly shutdown included, rather than waiting for a topic that
@@ -62,6 +62,8 @@ type inFlightOp struct {
 	// Append for it, handleOpEnd skips Finish, and finishInFlight skips it on shutdown. The live
 	// Operations-panel update (updates.Emit) still fires in all three cases.
 	incognito bool
+	// delayMs is P307 Part 2: a preconnect op's configured wait (0 = none), carried onto its records.
+	delayMs int
 }
 
 // Wiring is the Go analogue of oplog.ts's wireOplog, split into New/Start/Stop (P54 D14): New
@@ -90,11 +92,11 @@ func (w *Wiring) OnUpdate(fn func(model.OpRecord)) (unsubscribe func()) {
 	return w.updates.Subscribe(fn)
 }
 
-// Start reconciles whatever op_log left 'running' after a hard kill (review finding: consume's own
-// finishInFlight only runs on an orderly channel close, never after SIGKILL/OOM/a panic), prunes
-// once (oplog.ts:28), and then consumes events on one goroutine until Stop is called or the event
+// Start reconciles whatever op_log left 'running' after a hard kill (consume's own finishInFlight
+// only runs on an orderly channel close, never after SIGKILL/OOM/a panic), prunes once
+// (oplog.ts:28), and then consumes events on one goroutine until Stop is called or the event
 // source's channel closes on its own (adapterhost.Host's, once app teardown unsubscribes every
-// subscriber — P54 §4.2, P58f D9). Reconciliation runs first, before anything else in this app
+// subscriber). Reconciliation runs first, before anything else in this app
 // touches op_log, so a restart after a crash never hydrates the Operations panel with a phantom
 // still-running op.
 func (w *Wiring) Start() {
@@ -109,8 +111,8 @@ func (w *Wiring) Start() {
 	go w.consume(events)
 }
 
-// Stop ends the consumer goroutine (main's before-quit; a test's own cleanup) and — P21 round 3
-// finding 3 — waits for it to actually finish before returning, up to stopWait. Without this,
+// Stop ends the consumer goroutine (main's before-quit; a test's own cleanup) and waits for it to
+// finish before returning, up to stopWait. Without this,
 // unsubscribe only closes the event channel; consume still has to drain, exit its range loop and
 // run finishInFlight (one repos.OpsRepo.Finish write per still-running op), and nothing previously
 // synchronised that with the caller. main.go's teardown calls repositories.Close()/db.Close()
@@ -143,7 +145,7 @@ func (w *Wiring) prune() {
 // consume is the only reader and writer of inFlight, so that map needs no mutex — nobody should
 // add one. The `for evt := range events` loop ends when the event source's channel closes — Stop's
 // unsubscribe (main's before-quit) causes that in production — at which point finishInFlight
-// reconciles whatever never reached a terminal state (P58f D9).
+// reconciles whatever never reached a terminal state.
 func (w *Wiring) consume(events <-chan Event) {
 	defer close(w.done)
 
@@ -169,6 +171,7 @@ func (w *Wiring) handleOpStart(payload json.RawMessage, inFlight map[string]inFl
 		Kind         string  `json:"kind"`
 		StartedAt    string  `json:"startedAt"`
 		Incognito    bool    `json:"incognito"`
+		DelayMs      int     `json:"delayMs"`
 	}
 	if err := json.Unmarshal(payload, &evt); err != nil || !model.ValidOpKind(evt.Kind) {
 		return
@@ -176,7 +179,7 @@ func (w *Wiring) handleOpStart(payload json.RawMessage, inFlight map[string]inFl
 
 	rec := inFlightOp{
 		connectionID: evt.ConnectionID, tabID: evt.TabID, kind: evt.Kind, startedAt: evt.StartedAt,
-		incognito: evt.Incognito,
+		incognito: evt.Incognito, delayMs: evt.DelayMs,
 	}
 	inFlight[evt.OpID] = rec
 
@@ -195,7 +198,15 @@ func (w *Wiring) handleOpStart(payload json.RawMessage, inFlight map[string]inFl
 	w.updates.Emit(model.OpRecord{
 		ID: evt.OpID, ConnectionID: rec.connectionID, TabID: rec.tabID, StartedAt: rec.startedAt,
 		DurationMs: nil, Kind: rec.kind, Status: "running", Rows: nil, Command: nil, Error: nil,
+		DelayMs: delayPtr(rec.delayMs),
 	})
+}
+
+func delayPtr(ms int) *int {
+	if ms <= 0 {
+		return nil
+	}
+	return &ms
 }
 
 func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlightOp, completedSincePrune int) int {
@@ -217,7 +228,7 @@ func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlig
 		Path: evt.Path,
 	}
 
-	// P71 §4.3: the inFlight lookup moves above Finish (oplog.ts:80-84's exact fallbacks for an
+	// The inFlight lookup moves above Finish (oplog.ts:80-84's exact fallbacks for an
 	// op:end with no matching op:start still apply below) so an incognito op's own skip decision
 	// is known before deciding whether to write anything at all — nothing was ever Appended for
 	// it (handleOpStart's own skip), so Finish would either no-op or fail against a missing row.
@@ -230,7 +241,7 @@ func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlig
 		// thing that truncates them in place, and this op's live record is in-memory only, never
 		// written to op_log, so there is nothing to truncate for.
 	} else {
-		// P23 D1(c): Finish truncates patch.Command/patch.Error in place, so the record built
+		// Finish truncates patch.Command/patch.Error in place, so the record built
 		// below (and pushed live to the renderer) reflects exactly what was stored, never the
 		// pre-truncation event payload — a live update must not disagree with a subsequent
 		// Recent() reload about whether Re-run should be disabled.
@@ -248,6 +259,7 @@ func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlig
 	}
 	if ok {
 		record.ConnectionID, record.TabID, record.StartedAt, record.Kind = started.connectionID, started.tabID, started.startedAt, started.kind
+		record.DelayMs = delayPtr(started.delayMs)
 	} else {
 		record.StartedAt, record.Kind = kiratime.NowISO(), "test"
 	}
@@ -262,11 +274,10 @@ func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlig
 }
 
 // finishInFlight mirrors oplog.ts's engine:down handler, generalised from "the engine child died"
-// to "the event source is done" (P58f D9): whatever op-log rows were still 'running' when consume's
+// to "the event source is done": whatever op-log rows were still 'running' when consume's
 // range loop ended is finished with message, and dropped from inFlight so a crash mid-session
 // cannot grow the map without bound. A hard kill (SIGKILL, OOM, a panic outside Host.safeRun) still
-// leaves 'running' rows — this only runs on an orderly channel close, same as it only ran on an
-// orderly child exit before P58f.
+// leaves 'running' rows — this only runs on an orderly channel close.
 func (w *Wiring) finishInFlight(inFlight map[string]inFlightOp, message string) {
 	now := time.Now()
 	for opID, rec := range inFlight {

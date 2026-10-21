@@ -9,16 +9,16 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import { useAdeReviewWindowStore } from '../../ade/v2/state/adeReviewWindow';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
-// C6 §8.1: the diff editor mount, modelled on RepoFileView.vue line for line — same lazy Monaco
+// The diff editor mount, modelled on RepoFileView.vue line for line — same lazy Monaco
 // bootstrap, same read-only posture, same navigation registration. The one real difference is the
 // editor itself: a diff editor over two models (HEAD, worktree) instead of one.
 //
-// C10 §6.1/§6.2: extends this same tab kind for a *commit* diff (openRepoCommitDiffTab, S15)
-// rather than forking a second one — repoDiffTabStateSchema's revision pair (S8) is null on both
-// sides for C6's original HEAD-vs-worktree comparison (unchanged below) and non-null for a commit
+// Extends this same tab kind for a *commit* diff (openRepoCommitDiffTab)
+// rather than forking a second one — repoDiffTabStateSchema's revision pair is null on both
+// sides for the original HEAD-vs-worktree comparison (unchanged below) and non-null for a commit
 // diff.
 //
-// P92 item 5: the content-resolution + editor-construction body now lives in useDiffEditor.ts,
+// The content-resolution + editor-construction body now lives in useDiffEditor.ts,
 // shared with RepoMultiDiffView.vue's own per-file sections — this view keeps only what stays
 // single-active-view scoped: repoId resolution, the view.find/repo.goToFileFromDiff command
 // registrations, and review-decorations wiring.
@@ -75,7 +75,7 @@ async function mount(): Promise<void> {
   const mod = await loadMonaco();
   const gitRepoId = left === null ? undefined : gitRepoIdFor(repoId);
 
-  // C7 D13/§6: the modified (worktree) pane, never the HEAD pane — the same reasoning
+  // The modified (worktree) pane, never the HEAD pane — the same reasoning
   // useDiffEditor's own goToFile follows for which side is navigable. view.find is a global
   // command, so it must reach through to one editor pane rather than the diff editor as a whole
   // (IStandaloneDiffEditor itself has no getAction).

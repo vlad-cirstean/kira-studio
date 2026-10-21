@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { SMART_MODELS, type SmartSettings } from '@shared/domain/scripts';
+import type { SmartSettings } from '@shared/domain/scripts';
 import { Field, FieldLabel } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { t } from '@theme/i18n';
+import { useAgentInfo } from '@workbench/agent/agentInfo';
 
 const smart = defineModel<SmartSettings>({ required: true });
+const { info } = useAgentInfo();
 </script>
 
 <template>
@@ -19,7 +21,7 @@ const smart = defineModel<SmartSettings>({ required: true });
         size="kira-lg"
         data-testid="smart-model"
       >
-        <option v-for="m in SMART_MODELS" :key="m" :value="m">{{ m }}</option>
+        <option v-for="m in info.models" :key="m.id" :value="m.id">{{ m.id }}</option>
       </NativeSelect>
     </Field>
     <Field class="w-32">

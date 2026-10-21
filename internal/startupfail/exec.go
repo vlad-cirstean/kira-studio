@@ -17,12 +17,12 @@ func realStat(path string) (os.FileInfo, error) { return os.Stat(path) }
 
 // realGetenv exists as its own named function (rather than os.Getenv used inline) for one reason:
 // scripts/verify-packaging.sh's check S8 fails the build if apps/kira-studio/main.go itself
-// contains "os.Getenv" — so the one environment read this package needs (KIRA_NO_STARTUP_ALERT,
-// D9) must happen entirely inside internal/startupfail, never in main.go (F13).
+// contains "os.Getenv" — so the one environment read this package needs (KIRA_NO_STARTUP_ALERT)
+// must happen entirely inside internal/startupfail, never in main.go.
 func realGetenv(key string) string { return os.Getenv(key) }
 
-// realRun is D8's argv-only spawn — toolexec's argv-only run (D3's own house precedent) adapted
-// to also carry stdin bytes (pbcopy reads its clipboard payload on stdin, D10) and return stdout
+// realRun is the argv-only spawn — toolexec's argv-only run (the house precedent) adapted
+// to also carry stdin bytes (pbcopy reads its clipboard payload on stdin) and return stdout
 // as a string (present() needs to read which button `display alert` returned). Setpgid (not
 // Setsid), WaitDelay, and cmd.Env = os.Environ() are toolexec's own choices for the same reason: a
 // short-lived, non-interactive spawn that still needs the user's real session environment to reach

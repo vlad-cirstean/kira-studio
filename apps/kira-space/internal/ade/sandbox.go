@@ -17,8 +17,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
@@ -27,15 +28,17 @@ import (
 
 // sandboxRun is the live sandbox of one run.
 type sandboxRun struct {
-	access   agentsandbox.Access
-	prep     agentsandbox.Prepared
-	policy   agentsandbox.Policy
-	tracker  agentsandbox.Tracker
-	keychain bool
-	grant    *claudeheadless.SandboxGrant
-	scratch  string
-	notes    []string
-	release  func()
+	access     agentsandbox.Access
+	prep       agentsandbox.Prepared
+	policy     agentsandbox.Policy
+	tracker    agentsandbox.Tracker
+	keychain   bool
+	authFailed func(string) bool
+	agent      agentsandbox.Namer
+	grant      *agentmcp.SandboxGrant
+	scratch    string
+	notes      []string
+	release    func()
 }
 
 // sandboxTarget is what the sandbox git tools act on: the run's own repo, branch and worktree.
@@ -45,11 +48,11 @@ type sandboxTarget struct {
 
 // sandboxGrantFor is the tool grant of a run: nil when no sandbox git tool applies (rebase runs keep
 // their `git` tool, access off runs are unconfined).
-func sandboxGrantFor(rebase bool, access agentsandbox.Access) *claudeheadless.SandboxGrant {
+func sandboxGrantFor(rebase bool, access agentsandbox.Access) *agentmcp.SandboxGrant {
 	if rebase || access == agentsandbox.AccessOff {
 		return nil
 	}
-	return &claudeheadless.SandboxGrant{Push: access == agentsandbox.AccessWrite}
+	return &agentmcp.SandboxGrant{Push: access == agentsandbox.AccessWrite}
 }
 
 // sandboxInput builds the policy input of a launch.
@@ -105,7 +108,8 @@ func (b *TaskBoard) prepareSandbox(ctx context.Context, run model.AdeRun, l agen
 	if rebase {
 		sd = adewire.DefaultSandbox()
 	}
-	sr := &sandboxRun{access: agentsandbox.Access(sd.Access)}
+	agent := l.agent
+	sr := &sandboxRun{access: agentsandbox.Access(sd.Access), authFailed: agent.IsAuthFailure, agent: agent}
 	if sr.access == agentsandbox.AccessOff {
 		return sr, b.storeSandbox(run.ID, sr, false, "")
 	}
@@ -113,7 +117,7 @@ func (b *TaskBoard) prepareSandbox(ctx context.Context, run model.AdeRun, l agen
 	if err != nil {
 		return nil, err
 	}
-	rt := agentsandbox.DiscoverRuntime(ctx, cmpNonEmpty(b.deps.ClaudeBin, "claude"))
+	rt := agentsandbox.DiscoverRuntime(ctx, agent, b.deps.AgentBin)
 	pol, notes, err := agentsandbox.ResolvePolicy(in, rt)
 	if err != nil {
 		return nil, err
@@ -183,7 +187,7 @@ func (sr *sandboxRun) on() bool { return sr != nil && sr.access != agentsandbox.
 
 // apply adds the sandbox to the process spec: launch wrap, environment, permission flags, the tool
 // names and the prompt note.
-func (b *TaskBoard) applySandbox(spec claudeheadless.Spec, sr *sandboxRun, l agentLaunch) claudeheadless.Spec {
+func (b *TaskBoard) applySandbox(spec harness.HeadlessSpec, sr *sandboxRun, l agentLaunch) harness.HeadlessSpec {
 	if !sr.on() {
 		return spec
 	}
@@ -196,7 +200,7 @@ func (b *TaskBoard) applySandbox(spec claudeheadless.Spec, sr *sandboxRun, l age
 	}
 	spec.DisallowedTools = append(slices.Clone(spec.DisallowedTools), sr.prep.Disallowed...)
 	if sr.grant != nil {
-		spec.AllowedTools = append(slices.Clone(spec.AllowedTools), claudeheadless.SandboxToolNames...)
+		spec.AllowedTools = append(slices.Clone(spec.AllowedTools), harness.ToolNames(l.agent, agentmcp.SandboxToolIDs...)...)
 	}
 	sd := l.def.Sandbox.Normalized()
 	note := llmprompts.HeadlessSandboxNote.Text(b.prompts(), llmprompts.SandboxNoteVars{
@@ -282,8 +286,8 @@ func (sr *sandboxRun) sandboxOutcome(out outcome, lastErr string) outcome {
 		return out
 	}
 	reason := out.out.Reason
-	if !out.out.Reported && !sr.keychain && agentsandbox.IsAuthFailure(lastErr+" "+out.out.LastError) {
-		reason = agentsandbox.AuthReason()
+	if !out.out.Reported && !sr.keychain && sr.authFailed(lastErr+" "+out.out.LastError) {
+		reason = agentsandbox.AuthReason(sr.agent)
 	} else {
 		reason = sr.tracker.BlockedReason(reason)
 	}
@@ -301,63 +305,63 @@ func (b *TaskBoard) sandboxTargetOf(runID string) (sandboxTarget, error) {
 	return v.(sandboxTarget), nil
 }
 
-// FetchRemote implements claudeheadless.SandboxGit: it fetches one remote of the run's repo in the app.
-func (b *TaskBoard) FetchRemote(ctx context.Context, runID, remote string) (claudeheadless.RemoteResult, error) {
+// FetchRemote implements agentmcp.SandboxGit: it fetches one remote of the run's repo in the app.
+func (b *TaskBoard) FetchRemote(ctx context.Context, runID, remote string) (agentmcp.RemoteResult, error) {
 	t, err := b.sandboxTargetOf(runID)
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	mu := b.repoMutex(t.codeRepoID)
 	mu.Lock()
 	defer mu.Unlock()
 	entry, err := b.openRepo(ctx, t.codeRepoID)
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	names, err := entry.Remotes(ctx)
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	if !slices.Contains(names, remote) {
-		return claudeheadless.RemoteResult{}, claudeheadless.ToolError("remote must be one of: " + strings.Join(names, ", "))
+		return agentmcp.RemoteResult{}, agentmcp.ToolError("remote must be one of: " + strings.Join(names, ", "))
 	}
 	res, err := entry.RunRemote(ctx, b.conn, gitsession.RemoteOpParams{Kind: "fetch", Remote: remote}, gitsession.RemoteDeps{Askpass: b.deps.Askpass})
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	return remoteResult(remote, t.branch, res)
 }
 
-// PushBranch implements claudeheadless.SandboxGit: it pushes the run's own task branch.
-func (b *TaskBoard) PushBranch(ctx context.Context, runID string, force bool) (claudeheadless.RemoteResult, error) {
+// PushBranch implements agentmcp.SandboxGit: it pushes the run's own task branch.
+func (b *TaskBoard) PushBranch(ctx context.Context, runID string, force bool) (agentmcp.RemoteResult, error) {
 	t, err := b.sandboxTargetOf(runID)
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	mu := b.repoMutex(t.codeRepoID)
 	mu.Lock()
 	defer mu.Unlock()
 	entry, err := b.openRepo(ctx, t.codeRepoID)
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	head, err := entry.WorktreeHeadRef(ctx, t.worktree)
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	if head != "refs/heads/"+t.branch {
-		return claudeheadless.RemoteResult{}, claudeheadless.ToolError("your worktree is not on " + t.branch)
+		return agentmcp.RemoteResult{}, agentmcp.ToolError("your worktree is not on " + t.branch)
 	}
 	remote := forcePushRemote(ctx, entry, t.branch)
 	if remote == "" {
-		return claudeheadless.RemoteResult{}, claudeheadless.ToolError("the repo has no remote to push to")
+		return agentmcp.RemoteResult{}, agentmcp.ToolError("the repo has no remote to push to")
 	}
 	pf, err := entry.PushPreflightTo(ctx, remote, t.branch, t.branch)
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	if pf.ProtectedBy != nil {
-		return claudeheadless.RemoteResult{}, claudeheadless.ToolError(t.branch + " is a protected branch")
+		return agentmcp.RemoteResult{}, agentmcp.ToolError(t.branch + " is a protected branch")
 	}
 	params := gitsession.RemoteOpParams{Kind: "push", Remote: remote, Branch: t.branch, RemoteBranch: t.branch, SetUpstream: pf.Upstream == nil}
 	if force {
@@ -365,7 +369,7 @@ func (b *TaskBoard) PushBranch(ctx context.Context, runID string, force bool) (c
 	}
 	res, err := entry.RunRemote(ctx, b.conn, params, gitsession.RemoteDeps{Askpass: b.deps.Askpass})
 	if err != nil {
-		return claudeheadless.RemoteResult{}, err
+		return agentmcp.RemoteResult{}, err
 	}
 	out, err := remoteResult(remote, t.branch, res)
 	b.notifyBoard()
@@ -373,9 +377,9 @@ func (b *TaskBoard) PushBranch(ctx context.Context, runID string, force bool) (c
 }
 
 // remoteResult turns a remote op result into the tool result; a failed op is an error with its message.
-func remoteResult(remote, branch string, res gitsession.RemoteOpResult) (claudeheadless.RemoteResult, error) {
+func remoteResult(remote, branch string, res gitsession.RemoteOpResult) (agentmcp.RemoteResult, error) {
 	if res.Error != nil {
-		return claudeheadless.RemoteResult{}, claudeheadless.ToolError(res.Error.Message)
+		return agentmcp.RemoteResult{}, agentmcp.ToolError(res.Error.Message)
 	}
 	var lines []string
 	for _, u := range res.Updates {
@@ -391,7 +395,7 @@ func remoteResult(remote, branch string, res gitsession.RemoteOpResult) (claudeh
 	if len(lines) == 0 {
 		lines = append(lines, "up to date")
 	}
-	return claudeheadless.RemoteResult{Remote: remote, Branch: branch, Output: strings.Join(lines, "\n")}, nil
+	return agentmcp.RemoteResult{Remote: remote, Branch: branch, Output: strings.Join(lines, "\n")}, nil
 }
 
 func short(sha string) string {
@@ -407,7 +411,7 @@ func (b *TaskBoard) noticeSandbox(sink *logSink, sr *sandboxRun) {
 		return
 	}
 	if sup := b.deps.Sandbox.Support(); !sup.Enforced {
-		sink.add(logStdout, agentsandbox.NotEnforcedText())
+		sink.add(logStdout, agentsandbox.NotEnforcedText(sr.agent))
 	}
 	for _, n := range sr.notes {
 		sink.add(logStdout, n)
@@ -422,10 +426,10 @@ func (b *TaskBoard) sandboxSupport() adewire.SandboxSupport {
 		if sup := b.deps.Sandbox.Support(); sup.Enforced {
 			return adewire.SandboxSupport{Enforced: true}
 		} else {
-			return adewire.SandboxSupport{Reason: agentsandbox.NotEnforcedText()}
+			return adewire.SandboxSupport{Reason: agentsandbox.NotEnforcedText(b.deps.Agent.Active())}
 		}
 	}
-	return adewire.SandboxSupport{Reason: agentsandbox.NotEnforcedText()}
+	return adewire.SandboxSupport{Reason: agentsandbox.NotEnforcedText(b.deps.Agent.Active())}
 }
 
 func badgeOf(s repos.AdeRunSandbox) *adewire.RunSandboxBadge {
@@ -463,6 +467,19 @@ func (b *TaskBoard) badgeTasks(tasks []adewire.Task) {
 	}
 }
 
+// runProvider is the provider a stored run ran under, from its session row; the active one when the
+// run has no session.
+func (b *TaskBoard) runProvider(runID string) harness.Provider {
+	if run, err := b.deps.Tasks.GetRun(runID); err == nil && run.SessionID != "" {
+		if rec, err := b.deps.Sessions.Get(run.SessionID); err == nil && rec != nil {
+			if p, err := b.deps.Agent.For(rec.Provider); err == nil {
+				return p
+			}
+		}
+	}
+	return b.deps.Agent.Active()
+}
+
 // RunSandbox returns the stored sandbox of a run: its policy, profile and denials.
 func (b *TaskBoard) RunSandbox(_ context.Context, runID string) (adewire.RunSandboxDetail, error) {
 	if b.deps.RunSandbox == nil {
@@ -480,7 +497,7 @@ func (b *TaskBoard) RunSandbox(_ context.Context, runID string) (adewire.RunSand
 		Write: []string{}, Read: []string{}, Allow: []string{}, Denials: []adewire.SandboxDenial{},
 	}
 	if row.Reason != "" {
-		out.Reason = agentsandbox.NotEnforcedText()
+		out.Reason = agentsandbox.NotEnforcedText(b.runProvider(runID))
 	}
 	var pol agentsandbox.Policy
 	if err := json.Unmarshal([]byte(row.PolicyJSON), &pol); err == nil {

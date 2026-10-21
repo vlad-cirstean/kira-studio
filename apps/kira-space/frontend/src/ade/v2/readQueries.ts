@@ -8,13 +8,14 @@ import type { LogKind } from './wire';
 // staleTime is Infinity and the signals installed per app (`installAdeReadSignals`) invalidate.
 
 export const boardKey = ['adetask', 'board'] as const;
-export const prsKey = ['adetask', 'prs'] as const;
+export const changeRequestsKey = ['adetask', 'changeRequests'] as const;
 export const workflowsKey = ['adetask', 'workflows'] as const;
 export const logKey = (kind: LogKind, id: string) => ['adetask', 'log', kind, id] as const;
 export const backlogKey = ['adetask', 'backlog'] as const;
 export const runSandboxKey = ['ade', 'runSandbox'] as const;
 export const sessionsKey = ['adetask', 'sessions'] as const;
 export const repoNamesKey = ['adetask', 'repoNames'] as const;
+const hostProvidersKey = ['adetask', 'hostProviders'] as const;
 
 export function useBoard() {
   const reader = useAdeReader();
@@ -24,11 +25,11 @@ export function useBoard() {
   });
 }
 
-export function usePrs() {
+export function useChangeRequests() {
   const reader = useAdeReader();
   return useQuery({
-    queryKey: prsKey,
-    queryFn: () => reader.prs(),
+    queryKey: changeRequestsKey,
+    queryFn: () => reader.changeRequests(),
   });
 }
 
@@ -53,6 +54,15 @@ export function useBacklog() {
   return useQuery({
     queryKey: backlogKey,
     queryFn: () => reader.backlog(),
+  });
+}
+
+/** Every registered code host provider; static for the life of the app, so never invalidated. */
+export function useGitHostProviders() {
+  const reader = useAdeReader();
+  return useQuery({
+    queryKey: hostProvidersKey,
+    queryFn: () => reader.hostProviders(),
   });
 }
 

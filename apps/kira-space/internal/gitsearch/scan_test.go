@@ -187,7 +187,7 @@ func TestScan_DefaultsApplyWhenUnset(t *testing.T) {
 // TestScan_CancelledContextStopsPromptlyAndKillsTheChild is the exit criterion's own "a cancelled
 // scan actually kills its child process with no orphan left running": Scan must return promptly
 // once ctx is cancelled, and Process.Close (which readScanChunk calls on cancellation) BLOCKS
-// until the child has actually been reaped (Process's own doc comment) -- so this test returning
+// until the child has been reaped (Process's own doc comment) -- so this test returning
 // at all, well within its own timeout, is itself the proof no orphan git process is left running
 // past this call.
 func TestScan_CancelledContextStopsPromptlyAndKillsTheChild(t *testing.T) {

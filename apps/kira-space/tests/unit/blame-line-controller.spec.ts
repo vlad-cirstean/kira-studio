@@ -1,8 +1,8 @@
-// P76 §12.1 — the one earned unit test for this phase: blameLine.ts's controller (extracted from
+// The one earned unit test: blameLine.ts's controller (extracted from
 // blameAnnotation.ts) holds two rules that have each already produced a real bug once (the file's
 // own comments at the fix sites record both): the `line === lastLine` early return must precede
-// `cancelPending` (5a — otherwise a same-line cursor move cancels its own in-flight request and
-// nothing restarts it), and an ABORTED request must never be cached as a miss (5b — otherwise fast
+// `cancelPending` (otherwise a same-line cursor move cancels its own in-flight request and
+// nothing restarts it), and an ABORTED request must never be cached as a miss (otherwise fast
 // arrowing through lines accumulates permanently blame-less lines). `repo.changed` invalidation
 // interacts with both. Drives the controller end to end with a plain fake cursor and a fake
 // Transport — no Monaco import, per the controller's own `BlameCursorSource` narrowing.

@@ -2,6 +2,7 @@
 import { Button } from '@theme/components/ui/button';
 import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
+import { useAgentInfo } from '@workbench/agent/agentInfo';
 import SettingsShell from '@workbench/components/SettingsShell.vue';
 import PromptsPane from '@workbench/llmPrompts/PromptsPane.vue';
 import { useSettingsDeepLinkReset } from '@workbench/settings/useSettingsDeepLinkReset';
@@ -10,17 +11,16 @@ import { computed } from 'vue';
 import { type Section, sections, useSettingsStore } from '../state/settings';
 import { defaultSettings, type SettingsPatch } from '../state/settingsDomain';
 import AdvancedPane from './settings/AdvancedPane.vue';
+import AgentPane from './settings/AgentPane.vue';
 import AppearancePane from './settings/AppearancePane.vue';
-import ClaudeCodePane from './settings/ClaudeCodePane.vue';
 import GitPane from './settings/GitPane.vue';
 import MemoryPane from './settings/MemoryPane.vue';
 import MobileAccessPane from './settings/MobileAccessPane.vue';
 
-// P100 Part 2: Kira Studio's own workbench/SettingsDialog.vue, the plan's own "small rewrite" —
-// only the sections still relevant to a repo-only workbench (state/settings.ts's own `sections`).
-// P103 Part 2 (§5.5): now a thin composition over SettingsShell.vue plus this app's own panes
-// (workbench/settings/*.vue, extracted verbatim from this file's own former inline
-// `<template v-if>` branches — see SettingsShell.vue's own file-level comment for what stays
+// Kira Studio's own workbench/SettingsDialog.vue — only the sections still relevant to a repo-only
+// workbench (state/settings.ts's own `sections`).
+// Now a thin composition over SettingsShell.vue plus this app's own panes
+// (workbench/settings/*.vue — see SettingsShell.vue's own file-level comment for what stays
 // app-side and why). Everything genuinely app-specific stays here: which three of Settings'
 // sections this dialog edits, the dialog's own width/height, the deep-link reset, and the footer
 // markup (its one small, real difference from Kira Studio's own — see SettingsShell.vue's
@@ -29,12 +29,13 @@ const emit = defineEmits<{ close: [] }>();
 
 const settingsStore = useSettingsStore();
 const promptsExtra = useLlmPromptsShellExtra();
+const { info: agentInfo } = useAgentInfo();
 
 const sectionLabels = computed<Record<Section, string>>(() => ({
   Appearance: t('common.appearance.label'),
   Git: t('common.module.git.label'),
   'Mobile access': t('space.settings.nav.mobileAccess.label'),
-  'Claude Code': t('common.product.claudeCode.label'),
+  Agent: agentInfo.value.productLabel,
   Memory: t('common.module.memory.label'),
   Prompts: t('llmPrompts.nav.label'),
   Advanced: t('common.advanced.label'),
@@ -58,7 +59,8 @@ async function save(patch: SettingsPatch): Promise<void> {
       appearance: defaultSettings.appearance,
       advanced: defaultSettings.advanced,
       git: defaultSettings.git,
-      claudeCode: defaultSettings.claudeCode,
+      agent: defaultSettings.agent,
+      memory: defaultSettings.memory,
       ade: {
         headlessSettingSources: defaultSettings.ade.headlessSettingSources,
         sandboxKeychain: defaultSettings.ade.sandboxKeychain,
@@ -68,7 +70,8 @@ async function save(patch: SettingsPatch): Promise<void> {
       appearance: settingsStore.appearance,
       advanced: settingsStore.advanced,
       git: settingsStore.git,
-      claudeCode: settingsStore.claudeCode,
+      agent: settingsStore.agent,
+      memory: settingsStore.memory,
       ade: {
         headlessSettingSources: settingsStore.ade.headlessSettingSources,
         sandboxKeychain: settingsStore.ade.sandboxKeychain,
@@ -100,8 +103,8 @@ async function save(patch: SettingsPatch): Promise<void> {
         :reset-leaf="s.resetLeaf"
         :register-field-error="s.registerFieldError"
       />
-      <ClaudeCodePane
-        :active="s.activeSection === 'Claude Code'"
+      <AgentPane
+        :active="s.activeSection === 'Agent'"
         :draft="s.draft"
         :is-at-default="s.isAtDefault"
         :reset-leaf="s.resetLeaf"

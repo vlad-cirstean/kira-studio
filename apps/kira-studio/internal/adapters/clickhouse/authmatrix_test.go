@@ -73,18 +73,18 @@ func TestClickHouse_AuthMatrix(t *testing.T) {
 			Expect: testsupport.Outcome{Succeed: true},
 			Then: []testsupport.Scenario{
 				testsupport.ReadFirstPage(testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "kira_test"), testsupport.Seg("table", "customers"))),
-				// §1.4's pin for clickhouse, found running this exact scenario against a real
-				// container: the plan's own draft expected ClickHouse's readonlyCode/tableIsReadOnly
-				// (164/242 -> E_UNSUPPORTED, errors.go:60) here, on the theory that kira_ro's missing
-				// INSERT grant would surface as one of those two. Measured instead: a missing INSERT
-				// grant is a plain authorization refusal — "Not enough privileges ... (ACCESS_DENIED)",
-				// numeric code 497 — which errors.go:64 maps to E_AUTH, the same code a wrong password
-				// produces. So this is not the "correct mapping" case the plan's own draft table named
-				// it as; it is a second instance of the very conflation §1.4 already found in kira's
-				// own system-table read, now pinned rather than asserted as correct. Not fixed here
-				// (§7): a correctly-authenticated, correctly-passworded connection with a missing
-				// GRANT must not be told its password is wrong, and nothing exercised that past
-				// Connect() before this.
+				// The pin for clickhouse, found running this exact scenario against a real
+				// container: ClickHouse's readonlyCode/tableIsReadOnly (164/242 -> E_UNSUPPORTED,
+				// errors.go:60) was expected here, on the theory that kira_ro's missing INSERT
+				// grant would surface as one of those two. Measured instead: a missing INSERT
+				// grant is a plain authorization refusal —
+				// "Not enough privileges ... (ACCESS_DENIED)", numeric code 497 — which
+				// errors.go:64 maps to E_AUTH, the same code a wrong password produces. So this
+				// is not a "correct mapping" case; it is a second instance of the very conflation
+				// already found in kira's own system-table read, now pinned rather than asserted
+				// as correct. Not fixed here: a correctly-authenticated, correctly-passworded
+				// connection with a missing GRANT must not be told its password is wrong, and
+				// nothing exercised that past Connect() before this.
 				testsupport.MutateIsRefused(model.MutationPlan{
 					Path: testsupport.NodePath(f.Config.ID, testsupport.Seg("database", "kira_test"), testsupport.Seg("table", "regions")),
 					Ops: []model.MutationRowOp{{

@@ -22,10 +22,10 @@ var (
 	temporalType = regexp.MustCompile(`^(DATE|DATETIME|TIMESTAMP)$`)
 )
 
-// typeClassFor is read.ts's typeClassFor — F21/D21: SQLite's own five type-affinity rules over
+// typeClassFor is read.ts's typeClassFor — SQLite's own five type-affinity rules over
 // the *declared* type string, plus three sugar cases no affinity rule covers on its own (BOOLEAN,
 // the DATE family, JSON). 'other' for an undeclared or STRICT-table ANY column: the declared type
-// is a hint at best (F21).
+// is a hint at best.
 func typeClassFor(declaredType string) page.TypeClass {
 	base := strings.ToUpper(strings.TrimSpace(declaredType))
 	switch {
@@ -67,7 +67,7 @@ func resolveKeysetColumnMeta(target ReadTarget, name string) (model.ColumnMeta, 
 
 // selectExpr wraps a quoted identifier the way readPage's own SELECT list must, to route around a
 // real modernc.org/sqlite driver behaviour that has nothing to do with SQLite itself: unlike
-// node:sqlite (D21's whole "nothing switches on the declared type" claim held there), this driver's
+// node:sqlite (the whole "nothing switches on the declared type" claim held there), this driver's
 // own Next() unconditionally re-parses a TEXT value into a Go time.Time whenever the column's
 // declared type is DATE/DATETIME/TIMESTAMP and the stored text happens to look like a date —
 // verified directly against the driver's own rows.go, then confirmed against a live query: a
@@ -75,10 +75,10 @@ func resolveKeysetColumnMeta(target ReadTarget, name string) (model.ColumnMeta, 
 // option to disable it (unlike the unrelated, genuinely opt-in _inttotime/_texttotime flags). A
 // CASE expression is not a "simple column reference" in SQLite's own sqlite3_column_decltype()
 // terms, so wrapping every fetched column in one defeats the coercion — a NULL stays NULL, an
-// INTEGER/REAL/BLOB value actually stored in a temporally-declared column (D21's own dynamic-typing
-// point) still comes back as int64/float64/[]byte untouched, and a TEXT value comes back byte for
-// byte, valid-looking date string included. Confirmed empirically (see CLAUDE.md's P58b findings)
-// against all six combinations before this landed, not assumed from reading the driver's source.
+// INTEGER/REAL/BLOB value stored in a temporally-declared column still comes back as
+// int64/float64/[]byte untouched, and a TEXT value comes back byte for byte, valid-looking date
+// string included. Confirmed empirically (see CLAUDE.md's findings) against all six combinations,
+// not assumed from reading the driver's source.
 func selectExpr(ident string) string {
 	return "CASE WHEN typeof(" + ident + ") = 'text' THEN " + ident + " || '' ELSE " + ident + " END"
 }
@@ -138,12 +138,12 @@ func readPage(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, target Re
 	query := adapters.BuildPageSQL(relationSQL, selectList, whereSQL, plan.OrderBySQL, req, questionPlaceholder, addParam)
 	params := *paramsPtr
 
-	// Streamed straight into the builder (P2 R1) rather than materialized into a [][]any and
+	// Streamed straight into the builder rather than materialized into a [][]any and
 	// transposed afterward: BuildKeysetPosition's CellAt is only ever called for the first and last
-	// displayed row (sqltext.go), so those two full-width fetch rows are the only ones worth keeping
-	// around past the row's own AppendRow call. The SQL's own "LIMIT pageSize+1" (D24) guarantees at
-	// most one row ever arrives past req.PageSize, so probing it needs no early cancellation — the
-	// callback just declines to push or track it.
+	// displayed row (sqltext.go), so those two full-width fetch rows are the only ones worth
+	// keeping around past the row's own AppendRow call. The SQL's own "LIMIT pageSize+1" guarantees
+	// at most one row ever arrives past req.PageSize, so probing it needs no early cancellation —
+	// the callback declines to push or track it.
 	builder := page.NewTabularPageBuilder(columns)
 	var collector adapters.KeysetPageCollector
 	var firstRow, lastRow []any
@@ -203,17 +203,17 @@ func countRows(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, target Q
 	return adapters.CountResult{Value: value, Exact: true}, nil
 }
 
-// toCellText is read.ts's D3/D21 value->text codec: it switches on the *value's* own Go type,
-// never the column's declared type — SQLite is dynamically typed (F21), so a TEXT-declared column
+// toCellText is read.ts's value->text codec: it switches on the *value's* own Go type,
+// never the column's declared type — SQLite is dynamically typed, so a TEXT-declared column
 // is free to hold a BLOB value and vice versa. The `0x<hex>` spelling is mysql-family's own
-// convention (D21), not a new one. The time.Time case has no TypeScript counterpart: it exists
+// convention, not a new one. The time.Time case has no TypeScript counterpart: it exists
 // only because of the modernc.org/sqlite decltype coercion selectExpr's own comment documents —
 // readPage's SELECT list already routes around it for the data-grid path, so this branch is reached
 // only via the query console running a user's own raw "SELECT dt FROM t" against a
 // DATE/DATETIME/TIMESTAMP column, which the adapter cannot rewrite (it is the user's own SQL text,
-// not adapter-composed). Reformatted to SQLite's own canonical strftime('%Y-%m-%d %H:%M:%f') shape
-// rather than passed through byte for byte in that one case — a narrow, documented capability trade
-// (docs/ARCHITECTURE.md), not a silent gap.
+// not adapter-composed). Reformatted to SQLite's own canonical strftime('%Y-%m-%d %H:%M:%f')
+// shape rather than passed through byte for byte in that one case — a narrow, documented
+// capability trade (docs/ARCHITECTURE.md), not a silent gap.
 func toCellText(value any) *string {
 	if value == nil {
 		return nil

@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import type { CommitStore } from '@kira/git-core';
 /**
- * `docs/plans/P5.md` W8: §6.4 item 2 — the file tree, its tree/flat toggle, its filter box, and
- * (in this component's own header, per the plan's own placement decision) the merge parent
- * selector. Rendering itself is the only thing this file adds on top of `fileTreeModel.ts`'s pure
- * fold; every piece of "what row goes where" is that module's job, not this one's.
+ * The file tree, its tree/flat toggle, its filter box, and (in this component's own header) the
+ * merge parent selector. Rendering itself is the only thing this file adds on top of
+ * `fileTreeModel.ts`'s pure fold; every piece of "what row goes where" is that module's job, not
+ * this one's.
  *
- * G21 D11 (item 11): one component, one anatomy. The review-only-styling prop G14 D8 added so this
+ * One component, one anatomy. The review-only-styling prop added so this
  * file could render *two different anatomies* (a dimmed flat-mode directory suffix, an inline
  * copy button vs. a right-click "Copy path" menu) depending on caller, in service of a
  * byte-identity guarantee the graph panel's tree needed while it still embedded a diff — is gone.
- * Items 9/10/12/13 already changed the graph tree's icons, status glyph, and click/double-click
- * behaviour; there is no byte-identity guarantee left to protect, so the review anatomy (the row
- * geometry `ReviewView.vue` used to restyle from outside under `skin-kira`, and the
+ * The graph tree's icons, status glyph, and click/double-click behaviour already changed; there is
+ * no byte-identity guarantee left to protect, so the review anatomy (the row geometry
+ * `ReviewView.vue` used to restyle from outside under `skin-kira`, and the
  * dimmed-directory-suffix/context-menu-copy behaviour) is now this component's *only* appearance,
  * everywhere it mounts — `DetailPane.vue`, `StashDetailPane.vue`, `ReviewFilesPane.vue`,
  * `ReviewCommitRow.vue` alike.
@@ -60,33 +60,32 @@ const props = defineProps<{
   parentIndex: number;
   store: CommitStore;
   actions: DetailActions;
-  /** P74 §7.4: the commit these files belong to — enables the row menu's "Go to file"
-   *  (`actions.goToFile({ rev: sha, path, line: 1 })`). Absent (every caller before this phase)
-   *  renders byte-identically: the item simply does not appear, the same "absent, not disabled"
+  /** The commit these files belong to — enables the row menu's "Go to file"
+   *  (`actions.goToFile({ rev: sha, path, line: 1 })`). Absent
+   *  renders byte-identically: the item does not appear, the same "absent, not disabled"
    *  convention `reviewStates` above already uses. */
   sha?: string;
-  /** G11 D16: the review sidebar's Files pane only — a per-path reviewed status, keyed by
+  /** The review sidebar's Files pane only — a per-path reviewed status, keyed by
    *  `FileChange.path`. Absent (the default, every other caller of this component) renders
-   *  byte-identically to before this prop existed: no checkbox, no badge, nothing — `DetailPane.vue`
-   *  and `StashDetailPane.vue` are provably unaffected. */
+   *  byte-identically to before this prop existed: no checkbox, no badge, nothing —
+   *  `DetailPane.vue` and `StashDetailPane.vue` are provably unaffected. */
   reviewStates?: ReadonlyMap<string, ReviewFileStatus>;
-  /** G12 D13: whether this instance renders its own filter/list-mode toolbar. `false` when a
+  /** Whether this instance renders its own filter/list-mode toolbar. `false` when a
    *  panel above it owns one for several trees at once (the review sidebar) — `DetailPane.vue`,
    *  which mounts exactly one tree, leaves this unset and gets today's behaviour byte for byte.
-   *  A real layout fact, not an anatomy fork (G21 D11's own reasoning): the review panel owns one
+   *  A real layout fact, not an anatomy fork: the review panel owns one
    *  toolbar for two panes, the graph and stash panels each own exactly one tree, so the toolbar
-   *  belongs to whichever owns it — unlike the review-styling prop this file used to also carry,
-   *  this one is not something D11 removes. */
+   *  belongs to whichever owns it — unlike the review-styling prop this file used to also carry. */
   showToolbar?: boolean; // default true
 }>();
 
 const emit = defineEmits<{
   /** The file cursor moved (a click, arrow-key nav, or a directory toggle's own side effect) —
-   *  purely a cursor/selection signal now (G21 D13): no caller may infer that anything opened
+   *  purely a cursor/selection signal now: no caller may infer that anything opened
    *  from this alone. `DetailPane.vue`/`StashDetailPane.vue` forward it straight into
    *  `DetailState`/`StashState`'s own `selectFile`, which only moves the highlight. */
   (e: 'selectFile', fileIndex: number): void;
-  /** G21 D13: a file row was opened — a click or arrow-key move (`pinned: false`, navigational:
+  /** A file row was opened — a click or arrow-key move (`pinned: false`, navigational:
    *  the preview-tab convention governs, the next such open replaces it) or a double
    *  click/`Enter` (`pinned: true`, an explicit "keep this" that pins a real, permanent tab).
    *  Always paired with a `selectFile` for the same `fileIndex` when it originates from
@@ -96,10 +95,10 @@ const emit = defineEmits<{
   (e: 'update:listMode', mode: FileListMode): void;
   (e: 'update:filter', text: string): void;
   (e: 'update:parentIndex', index: number): void;
-  /** G11 D16: the reviewed checkbox's own click — toggles path between fully reviewed and
+  /** The reviewed checkbox's own click — toggles path between fully reviewed and
    *  unreviewed (the file-level toggle; per-range toggling lives in the native diff editor now,
-   *  G21 D12 — it used to live in DiffView.vue's own review adornment, already unreachable dead
-   *  code by the time this phase deleted the file). Never emitted when reviewStates is absent. */
+   *  it used to live in DiffView.vue's own review adornment). Never emitted when reviewStates is
+   *  absent. */
   (e: 'toggleReviewed', path: string): void;
 }>();
 
@@ -140,7 +139,7 @@ function collapseDir(path: string): void {
 
 const indexed = computed(() => filterFiles(props.files, props.filter));
 
-// G30 round-1 performance review, finding #6: `tree` depends only on `indexed` (the files/filter),
+// `tree` depends only on `indexed` (the files/filter),
 // never on `collapsedDirs` — split out from `rows` so toggling a single twisty re-runs only the
 // cheap flatten below, not buildFileTree's own full O(n log n) fold (a fresh DirBuilder Map per
 // directory, a sort at every level, a fresh node object per file) over every file in the commit.
@@ -234,9 +233,9 @@ function rowClass(row: FileTreeRow): string {
   );
 }
 
-/** G21 D13: every selection change — a click or an arrow-key move alike — also opens the file,
+/** Every selection change — a click or an arrow-key move alike — also opens the file,
  *  never pinned (the preview-tab convention governs). This is not new behaviour, only
- *  its mechanism: before D12, moving the cursor here already flipped `DetailState.mode` to
+ *  its mechanism: moving the cursor here already flipped `DetailState.mode` to
  *  `'diff'` immediately, showing the (then in-webview) diff — this is that same "select = open a
  *  preview" behaviour, now expressed as a second emit rather than a mode flip, and now something
  *  a double click/`Enter` can additionally *pin*. */
@@ -261,11 +260,12 @@ function onRowClick(index: number): void {
   selectRow(index);
 }
 
-/** G21 D13: the explicit "keep this" gesture — pins a real, permanent tab. Deliberately relies on
+/** The explicit "keep this" gesture — pins a real, permanent tab. Deliberately relies on
  *  the browser firing `click` first (`selectRow` above, via `onRowClick`): a double click opens
  *  the preview and then immediately re-opens the same diff pinned, and the host converts the
- *  existing preview tab into a permanent one rather than opening a second, which is why no click-delay debounce is introduced here (a debounce would add a
- *  visible lag to every single click to serve the rarer gesture). */
+ *  existing preview tab into a permanent one rather than opening a second, which is why no
+ *  click-delay debounce is introduced here (a debounce would add a visible lag to every single
+ *  click to serve the rarer gesture). */
 function onRowDblClick(index: number): void {
   const row = visibleRows.value[index];
   if (!row || row.kind === 'directory') return;
@@ -314,9 +314,9 @@ function statusClass(change: FileChange): string {
   return STATUS_COLOR_CLASS[change.kind];
 }
 
-/** G19 D14: the row's primary leading glyph, replacing the status letter in that role; the letter
- *  itself is kept, demoted to a small secondary chip (SPEC's own wording: kept, not removed).
- *  G-UX D3 (item 3): a real per-language seti-ui icon now, not one shared codicon glyph, rendered
+/** The row's primary leading glyph, replacing the status letter in that role; the letter
+ *  itself is kept, demoted to a small secondary chip.
+ *  A real per-language seti-ui icon now, not one shared codicon glyph, rendered
  *  as a CSS mask (`file-tree-icon`'s own `mask-image`) so `background-color` still drives the
  *  glyph's colour exactly as the codicon it replaces did — see `setiFileIcon.ts`'s own doc
  *  comment for why a mask rather than inline SVG/`v-html`. */
@@ -420,13 +420,12 @@ function reviewCheckboxState(path: string): boolean | 'indeterminate' {
 
 <template>
   <div ref="rootEl" class="flex flex-col min-h-0 flex-1" data-testid="file-tree">
-    <!-- G-UX D7 (item 7): this comment moved from *before* the root `<div>` to *inside* it (same
-         text, new position) — a comment sitting as the root `<div>`'s own template-level sibling
-         defeats Vue's single-root detection for THIS toolchain (Vue 3.5.42 /
+    <!-- A comment sitting as the root `<div>`'s own template-level sibling defeats Vue's
+         single-root detection for THIS toolchain (Vue 3.5.42 /
          @vitejs/plugin-vue 6.0.8: confirmed empirically, not merely suspected), which silently
          drops every attrs-fallthrough class a caller passes — `DetailPane.vue`'s own `class` prop
-         on its `<FileTree>` usage (P110 A15: now `flex-auto min-h-0 border-y
-         border-border`) never reached this component's root at all before this move. -->
+         on its `<FileTree>` usage (now `flex-auto min-h-0 border-y border-border`) never reached
+         this component's root at all. -->
     <!-- P131 Part 2 §5.6: one hoisted AttributeTooltip for every row's data-kira-tip span --
          treeEl always names whichever of the two row containers below is currently mounted. -->
     <AttributeTooltip :container="treeEl" />
@@ -485,7 +484,7 @@ function reviewCheckboxState(path: string): boolean | 'indeterminate' {
           </span>
         </template>
         <template v-else>
-          <!-- P75 §4: leading edge, not trailing — a trailing position shifted row to row with the
+          <!-- Leading edge, not trailing — a trailing position shifted row to row with the
                status column and crowded the pane's scrollbar. A real Checkbox (not a
                toggle button) so the partial state gets a correct `aria-checked="mixed"` for free,
                and `.stop` (not `.prevent` -- reka's own control has no native default to prevent)

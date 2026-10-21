@@ -33,6 +33,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/docker"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/internal/prompts"
@@ -139,12 +140,11 @@ type embeddedWired struct {
 // broker) -> keep-awake -> the windows service handle -> the embedded terminal -> the app-wide
 // event bus, attached to every producer built so far. deps is taken by value, since every call
 // site here is at or after the point main's own deps.Events assignment (the emitter) has already
-// run — each bridge.XxxService{Deps: deps} literal below is exactly the same value copy the
-// original sequential code made in place.
-func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keepAwakeDriver keepawake.Driver, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker, promptRouter *prompts.Router, opts Options) embeddedWired {
-	// M1 §3.3: the DB MCP server's embedded instance — owned by this app's own lifecycle.
+// run.
+func wireEmbeddedServices(deps appcore.Deps, installer harness.MCPInstaller, keepAwakeDriver keepawake.Driver, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker, promptRouter *prompts.Router, agents harness.Selector, opts Options) embeddedWired {
+	// The DB MCP server's embedded instance — owned by this app's own lifecycle.
 	// StartIfEnabled's own failure (a bind conflict) is logged, never fatal.
-	// M2 §5.1/§5.3: the approval broker outlives the server's own start/stop (constructed here, not
+	// The approval broker outlives the server's own start/stop (constructed here, not
 	// inside DbMcpService.startLocked), so the event subscription wired below stays valid across a
 	// restart of the embedded server within one app run.
 	dbMcpApprovals := dbmcp.NewApprovalBroker(time.Now)
@@ -158,9 +158,9 @@ func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keep
 	keepAwakeCtl := keepawake.New(keepAwakeDriver)
 	keepAwakeSvc := &bridge.KeepAwakeService{Deps: deps, Ctl: keepAwakeCtl, Toggle: &keepawake.Toggle{Ctl: keepAwakeCtl}}
 
-	// P92 item 3: hoisted so openNewWindow (defined below, once `app` exists) can be assigned onto
+	// Hoisted so openNewWindow (defined below, once `app` exists) can be assigned onto
 	// it — the title bar's "New window" button reaches this same OpenNewWindow closure the ⇧⌘N
-	// menu command already uses. P128 §2.2: the bound methods live once in windowsvc.Service; this
+	// menu command already uses. The bound methods live once in windowsvc.Service; this
 	// app's own WindowsService only embeds it.
 	windowsSvc := &bridge.WindowsService{Service: &windowsvc.Service{Windows: deps.Repos.Windows}}
 
@@ -173,7 +173,7 @@ func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keep
 		Emit:         func(r scriptruns.Run) { deps.Events.Emit(bridge.ChannelScriptRunsChanged, r) },
 		EmitLog:      func(p scriptruns.LogPush) { deps.Events.Emit(bridge.ChannelScriptRunLog, p) },
 		SmartTimeout: opts.SmartTimeout, ScheduleTimeout: opts.ScheduleTimeout,
-		Prompts: promptRouter, LlmPrompts: deps.Prompts,
+		Prompts: promptRouter, LlmPrompts: deps.Prompts, Agent: agents,
 	}
 	if opts.Clock != nil {
 		runs.Now = opts.Clock.Now
@@ -181,7 +181,7 @@ func wireEmbeddedServices(deps appcore.Deps, installer bridge.McpInstaller, keep
 	if err := runs.Recover(); err != nil {
 		slog.Warn("recover script runs", "scope", "startup", "err", err)
 	}
-	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{Emit: deps.Events, Registry: registry, Scripts: runs}}
+	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{Emit: deps.Events, Registry: registry, Scripts: runs, Agent: agents}}
 	dockerSvc := &bridge.DockerService{BoundService: docker.NewBoundService(deps.Events, dockerOptions(opts)...)}
 	events := bridge.NewEvents(deps.Events)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, DbMcp: dbMcpApprovals})
@@ -208,13 +208,13 @@ type lifecycleWired struct {
 
 // wireLifecycle runs main's own pre-app window-lifecycle block: the window registry -> the
 // close-flush coordinator -> beforeFlush/teardown (today's OnShutdown, minus the ticker Stop,
-// which moves to beforeFlush, run before the flush wait rather than after it — P56 D3/index.ts:156)
+// which moves to beforeFlush, run before the flush wait rather than after it — index.ts:156)
 // -> the quitter built over both.
 func wireLifecycle(windows *shell.WindowRegistry, events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, updateInstaller *appupdate.Installer, runs *scriptruns.Service, sched *scriptruns.Scheduler, repositories *repos.Repos, db *storage.DB) lifecycleWired {
 	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
-	// identity (P8 C2, replacing the single detachWindow/mainWindow pair that only ever worked
-	// because at most one window could exist at a time — F4). beforeFlush detaches every one of
-	// them, not just the most recently created (P2 R1's finding, generalised past one window).
+	// identity (replacing the single detachWindow/mainWindow pair that only ever worked because at
+	// most one window could exist at a time). beforeFlush detaches every one of them, not just the
+	// most recently created.
 
 	// closeFlush routes each window's own "flush before close" ack back to whichever
 	// shell.AttachCloseFlush hook is waiting for it (P8 C6, F8's fix) — a separate handshake from
@@ -233,7 +233,7 @@ func wireLifecycle(windows *shell.WindowRegistry, events *bridge.Events, eventsD
 		updateInstaller.Cancel()
 		eventsDetach()
 		oplogWiring.Stop()
-		// F13 (P108 Part 7): DB MCP stops before connectionsSvc.Shutdown(), not after — its stopFn
+		// DB MCP stops before connectionsSvc.Shutdown(), not after — its stopFn
 		// abandons parked approvals then waits out closeHTTP's graceful drain, so no run_query can
 		// still be mid-flight, dialing a preconnect target on demand, once Shutdown below starts
 		// tearing preconnect down.

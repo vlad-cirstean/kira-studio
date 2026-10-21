@@ -1,4 +1,4 @@
-// P22c D4/D6/§4.3: effectiveSchema is the merge rule three console providers (completion,
+// effectiveSchema is the merge rule three console providers (completion,
 // diagnostics, hover) all depend on to agree with each other — a hand-authored document wins
 // wholesale the moment it has any tables; otherwise the cache fills in; both empty is the empty
 // schema. Three cases, no more: the precedence is never a per-table merge (see the module's own

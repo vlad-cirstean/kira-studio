@@ -94,13 +94,13 @@ func TestRun_CancellationSendsExactlyOneImmediateSIGKILL_EscalationTimerNeverFir
 	}
 }
 
-// TestRun_DescendantIgnoringSIGTERMIsKilledPromptlyAfterCancel is P108 Part 15 F8's own regression
-// proof: a process-group member that ignores SIGTERM (the shell itself honors it and exits
-// quickly, so cmd.Wait returns well before gracefulStopDelay elapses) used to outlive the
-// documented hard timeout entirely — escalate.Stop() cancelled the ONLY pending SIGKILL before it
-// ever fired. A backgrounded subshell traps SIGTERM away and writes an incrementing counter to a
-// file every 20ms; whether that counter keeps moving after Run returns is what distinguishes "the
-// fix's own immediate, unconditional SIGKILL actually reached it" from "it is still running."
+// TestRun_DescendantIgnoringSIGTERMIsKilledPromptlyAfterCancel is the regression proof: a
+// process-group member that ignores SIGTERM (the shell itself honors it and exits quickly, so
+// cmd.Wait returns well before gracefulStopDelay elapses) used to outlive the documented hard
+// timeout entirely — escalate.Stop() cancelled the ONLY pending SIGKILL before it ever fired. A
+// backgrounded subshell traps SIGTERM away and writes an incrementing counter to a file every
+// 20ms; whether that counter keeps moving after Run returns is what distinguishes "the fix's own
+// immediate, unconditional SIGKILL reached it" from "it is still running."
 func TestRun_DescendantIgnoringSIGTERMIsKilledPromptlyAfterCancel(t *testing.T) {
 	oldDelay := gracefulStopDelay
 	gracefulStopDelay = 100 * time.Millisecond
@@ -159,8 +159,8 @@ func TestRun_DescendantIgnoringSIGTERMIsKilledPromptlyAfterCancel(t *testing.T) 
 	}
 }
 
-// TestRun_BackgroundChildHoldingPipesReturnsIncompleteResult is P108 Part 15 F7's own regression
-// proof: a script that exits 0 while a background child it spawned still holds stdout/stderr open
+// TestRun_BackgroundChildHoldingPipesReturnsIncompleteResult is the regression proof: a script that
+// exits 0 while a background child it spawned still holds stdout/stderr open
 // must not turn into a bare Go error and lose the whole transcript — cmd.Wait returns a wrapped
 // exec.ErrWaitDelay once WaitDelay's own deadline stops waiting on that redirection, which is
 // neither a timeout nor a cancellation nor a genuine spawn failure.

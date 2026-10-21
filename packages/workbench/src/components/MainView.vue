@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { useWorkbenchHost } from '../host';
 
-// P103 Part 2 (§5.4): Kira Studio's own workbench/panels/MainView.vue and Kira Space's, unified —
+// Kira Studio's own workbench/panels/MainView.vue and Kira Space's, unified —
 // `views[activeTab.kind]` now resolves through the provided WorkbenchHost instead of a
 // module-level TAB_VIEWS import, so this file no longer needs either app's own tab-kind union.
 //

@@ -70,8 +70,8 @@ export interface RowPlan {
   /** Stamped by the caller (`GraphOrderState`) at build time — what `CommitGrid.vue`'s own
    *  `planRevision` watcher diffs against to know a rebuild landed. */
   readonly revision: number;
-  /** Store rows this plan actually covers — `CommitStore.rowCount` at the moment this plan was
-   *  built (P108 F1). A caller holding a store row from outside this build (a persisted scroll
+  /** Store rows this plan covers — `CommitStore.rowCount` at the moment this plan was
+   *  built. A caller holding a store row from outside this build (a persisted scroll
    *  position, a plan rebuild still in flight) checks it against this bound before trusting
    *  `displayRowOf`/`containingDisplayRow`, since a plan can lag a store that has since grown or
    *  reset (`GraphViewState.#applyChunk` publishes `loadedRows` before its plan rebuild lands). */
@@ -86,7 +86,7 @@ export interface RowPlan {
    *  hiding it. Always resolves for a loaded row. */
   containingDisplayRow(storeRow: number): number;
   groupKeyAt(displayRow: number): string;
-  /** This row's nearest upward link (P93 §2/§6.2) — the display row of the parent that lands
+  /** This row's nearest upward link — the display row of the parent that lands
    *  *above* it, or `-1` when every parent lands below (every row of the checked-out group, and
    *  most rows everywhere else). Populated by `projectLayoutInput`; `-1` for every row until that
    *  runs. */
@@ -107,7 +107,7 @@ const MIN_COLLAPSIBLE = 3;
  *  can never collide with a caller-supplied `TipRef.key`. */
 export const OTHER_GROUP_KEY = '\u0000other';
 
-/** Only `projectLayoutInput` (P93 commit 2, same module) writes `forkParentOf` — every other
+/** Only `projectLayoutInput` (same module) writes `forkParentOf` — every other
  *  reader of `RowPlan` sees it read-only. Kept as a narrow internal protocol rather than a public
  *  `RowPlan` method so `identityRowPlan`'s trivial implementation (whose links never point up)
  *  does not need one at all. */
@@ -185,11 +185,10 @@ class RowPlanImpl implements RowPlan, InternalRowPlan {
   }
 }
 
-/** P93 §5.4: the plan a caller with no tips yet gets (a repo whose `refs.list` has not resolved),
+/** The plan a caller with no tips yet gets (a repo whose `refs.list` has not resolved),
  *  and what "collapse turned off entirely" degenerates to conceptually — one entry per store row,
- *  in store order, no groups, no placeholders. `storeRowAt(d) === d` for every `d`, so it
- *  reproduces the pre-P93 behaviour exactly and every §7 consumer written against `RowPlan` needs
- *  no separate "no plan yet" branch. */
+ *  in store order, no groups, no placeholders. `storeRowAt(d) === d` for every `d`, so every
+ *  consumer written against `RowPlan` needs no separate "no plan yet" branch. */
 export function identityRowPlan(rowCount: number, revision = 0): RowPlan {
   return new IdentityRowPlan(rowCount, revision);
 }
@@ -264,7 +263,7 @@ function rankTips(tips: readonly TipRef[]): Map<string, number> {
   return tipRankBySha;
 }
 
-// Phase 2: one forward pass over store rows computing `priority(row) = min(tipPriority(sha(row)),
+// One forward pass over store rows computing `priority(row) = min(tipPriority(sha(row)),
 // min over children c of row: priority(c))` (this module's own doc comment) and bucketing each
 // row by its rank. `bucketCount` is `tips.length + 1` — one bucket per tip plus the catch-all
 // "other" bucket at `otherRank`.
@@ -318,8 +317,8 @@ interface CollapsedBuckets {
   storeRowToContainingDisplayRow: Int32Array;
 }
 
-// Phase 3, §4.1's contraction: group 0 (bucket index 0, the checked-out branch — or stash, if the
-// caller placed it there, though `App.vue` never does, §3.2) never collapses; every other bucket
+// The contraction: group 0 (bucket index 0, the checked-out branch — or stash, if the
+// caller placed it there, though `App.vue` never does) never collapses; every other bucket
 // collapses when enabled, not manually expanded, and large enough that contracting saves a real
 // row count. `bucket` is already tip-first/oldest-last (store order === arrival order === the
 // forward walk that visits a child before its still-loading parent, assignRowRanks' own
@@ -385,14 +384,14 @@ function collapseBuckets(
 }
 
 /**
- * P93 §3: builds the branch-grouped `RowPlan` for the store's current rows against `tips`
- * (already in priority order — index 0 is the group that never collapses, §4.1). This first cut
- * (commit 1) always renders every group in full; `options.expandedKeys`/`options.collapseEnabled`
- * are threaded through the public signature now (§7's `RowPlan`/`RowPlanOptions` shape does not
- * change again) but contraction itself (§4.1/§4.3) lands in a later commit.
+ * Builds the branch-grouped `RowPlan` for the store's current rows against `tips`
+ * (already in priority order — index 0 is the group that never collapses). This first cut always
+ * renders every group in full; `options.expandedKeys`/`options.collapseEnabled` are threaded
+ * through the public signature now (the `RowPlan`/`RowPlanOptions` shape does not change again)
+ * but contraction itself lands in a later commit.
  *
- * Three phases (P94 pass 3 §4.3): rankTips (tip priority by sha), assignRowRanks (the forward
- * `priority(row)` pass, bucketed by rank), collapseBuckets (§4's contraction into display rows).
+ * Three phases: rankTips (tip priority by sha), assignRowRanks (the forward
+ * `priority(row)` pass, bucketed by rank), collapseBuckets (contraction into display rows).
  */
 export function buildRowPlan(
   store: CommitStore,
@@ -425,10 +424,10 @@ export function buildRowPlan(
 }
 
 /**
- * P93 §4.3/§6.2: re-expresses `base` (a `CommitStore.layoutInput()` slice, in store-row
+ * Re-expresses `base` (a `CommitStore.layoutInput()` slice, in store-row
  * coordinates) as a `LayoutInput` in `plan`'s *display*-row coordinates — the projection that
- * keeps `lanes.ts` itself branch-order-blind (§2's chosen design: it never sees an upward link
- * at all, only ever downward ones, exactly like today).
+ * keeps `lanes.ts` itself branch-order-blind (it never sees an upward link at all, only ever
+ * downward ones, exactly like today).
  *
  * Every real parent link classifies against the two rows' *containing* display rows (a
  * contracted row's own display row is its placeholder's):
@@ -438,8 +437,8 @@ export function buildRowPlan(
  * - **upward** (`parentDisplayRow < displayRow`): dropped from the CSR entirely and recorded as
  *   this row's fork stub instead (`RowPlan.forkParentOf`) — the *nearest* (largest) such target,
  *   since a stub draws one short dashed line, not a fan of them. Never mind lane assignment for
- *   an upward link at all: §2's whole point is that `lanes.ts` stays a one-directional forward
- *   pass unchanged by this module.
+ *   an upward link at all: `lanes.ts` stays a one-directional forward pass unchanged by this
+ *   module.
  * - **internal** (`parentDisplayRow === displayRow`, only possible inside a collapsed
  *   placeholder): dropped — a placeholder's own hidden commits never draw a lane to each other.
  *
@@ -447,7 +446,7 @@ export function buildRowPlan(
  * stays downward and is never deduplicated — each is a distinct future edge, not yet reachable
  * to compare against.
  *
- * Returns a *fresh* `LayoutInput` covering `[0, plan.length)` — a full relayout's input (§5.1),
+ * Returns a *fresh* `LayoutInput` covering `[0, plan.length)` — a full relayout's input,
  * not an incremental append, so `resolvedParentSlots` is always empty here: there is no prior
  * frontier for a "just resolved" slot to patch.
  */

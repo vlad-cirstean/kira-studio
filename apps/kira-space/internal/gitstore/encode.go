@@ -11,15 +11,15 @@ import (
 )
 
 // EncodeChunkFrame builds one gitwire.Frame wrapping chunk as its PackedCommitChunk payload,
-// finished with the "KIG1" file identifier (D1/D12) — the git data plane's own wire bytes for one
+// finished with the "KIG1" file identifier — the git data plane's own wire bytes for one
 // graph.stream chunk.
 //
 // Every uint32 column crosses little-endian, converted in exactly this one place
-// (createUint32VectorLE, below) — F12: the TypeScript receiver reconstructs native typed arrays
+// (createUint32VectorLE, below) — the TypeScript receiver reconstructs native typed arrays
 // (`new Uint32Array(...)`), so the byte order is the encoder's responsibility. No host-endianness
 // fast path (unlike internal/page/encode.go's, which exists because it encodes multi-megabyte
 // result pages): a 500-row commit chunk is a few thousand uint32s, where the fast path would buy
-// microseconds against a host-endianness branch this package would otherwise never need (D12).
+// microseconds against a host-endianness branch this package would otherwise never need.
 func EncodeChunkFrame(chunk PackedChunk) []byte {
 	b := flatbuffers.NewBuilder(estimateChunkSize(chunk))
 

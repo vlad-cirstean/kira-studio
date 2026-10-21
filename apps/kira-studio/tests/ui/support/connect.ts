@@ -3,7 +3,7 @@ import { expect } from '../fixtures';
 import { APP_PATH, DB_PATH } from './postgresFixture';
 import { connectionRow, expandRow, openRowMenu } from './tree';
 
-// P107 I2-25: connectionCreateArgs/connectAndExpand/connectRedis/connectMongo/openConsoleFromMenu
+// connectionCreateArgs/connectAndExpand/connectRedis/connectMongo/openConsoleFromMenu
 // were copied, byte-identically or nearly so, across 8/5/2/2/6 spec files (a genuinely divergent
 // connectAndExpand stays local to cell-editor.spec.ts and leaks.spec.ts — see their own doc
 // comments). One copy here, imported everywhere.
@@ -39,6 +39,7 @@ export function connectionCreateArgs(
     options: {},
     preconnect: null,
     preconnectSidecar: false,
+    preconnectDelaySec: 0,
     autoExplain,
     throttlePerSec: 0,
     ...(mcp

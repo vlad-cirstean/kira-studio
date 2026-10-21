@@ -1,5 +1,5 @@
 /**
- * §7's pre-flight result shapes — pure data, produced by `checkout.ts` / `revert.ts` / `tag.ts`'s
+ * The pre-flight result shapes — pure data, produced by `checkout.ts` / `revert.ts` / `tag.ts`'s
  * classifiers and rendered as-is by the dialogs. `CheckoutPreflight` and `RevertPreflight` are
  * also the two the wire carries (`packages/ipc`'s structural copies); `TagCreatePreflight` never
  * crosses the wire — tag-name validation is cheap enough, and needs nothing but the already-
@@ -42,15 +42,14 @@ export interface CheckoutPreflight {
   /** "clean" = nothing local at all. "cleanCarry" = §7.5's carry case; still no prompt, but the
    *  confirmation copy differs and the UI announces what carried. */
   readonly verdict: 'clean' | 'cleanCarry' | 'blocked';
-  /** Which routes the UI may offer for a `blockedByTracked` verdict. P6 emits `["discard"]` (or
-   *  `[]` when an untracked block is also present — discard cannot clear that, probe P9). P9
-   *  adds `"stashAndCarry"` here rather than in the component (§7.5). G28 D2 adds two more:
+  /** Which routes the UI may offer for a `blockedByTracked` verdict. Emits `["discard"]` (or
+   *  `[]` when an untracked block is also present — discard cannot clear that). Adds
+   *  `"stashAndCarry"` here rather than in the component. Adds two more:
    *  `"autoStash"` (whole-tree `stash push [-u]`, tagged with the CURRENT branch, never popped
    *  back — offered whenever EITHER dirty-blocker kind is present, unlike the two routes above,
    *  which the untracked case suppresses) and `"detachHere"` (offered whenever a
    *  `worktreeConflict` blocker is present for a `switch`-mode request to a branch/remote-branch
-   *  target — composes freely with `"autoStash"` when both blocker kinds are present at once,
-   *  D6). */
+   *  target — composes freely with `"autoStash"` when both blocker kinds are present at once). */
   readonly routes: readonly ('discard' | 'stashAndCarry' | 'autoStash' | 'detachHere')[];
 }
 
@@ -93,8 +92,7 @@ export interface RevertPreflight {
 // P8 — pull and push pre-flight (§7.3/§7.4). Also the two the wire carries.
 // ---------------------------------------------------------------------------------------
 
-/** P9's autostash seam — empty at P8 (`docs/plans/P8.md`'s "Pull: decomposition and the strategy
- *  resolution order" — mirrors `CheckoutPreflight.routes`'s own precedent exactly); P9's
+/** The autostash seam — empty (mirrors `CheckoutPreflight.routes`'s own precedent exactly); the
  *  `buildPullPreflight` offers it whenever `blockers` is non-empty, since `dirtyNonFastForward`
  *  is the only `PullBlocker` there is. */
 export type PullRoute = 'stashAndCarry';
@@ -173,8 +171,8 @@ export interface StashPopPreflight {
 }
 
 /** `stash branch <name> <sha>` gets no pop prediction — checking out the stash's base then
- *  applying it against that same base is clean by construction (§7.6) — but it is still
- *  non-atomic on failure (OQ6: no auto-rollback), which is why this still has a `checkout`
+ *  applying it against that same base is clean by construction — but it is still
+ *  non-atomic on failure (no auto-rollback), which is why this still has a `checkout`
  *  pre-flight nested in it: the branch-creation half can be blocked exactly like any checkout. */
 export interface StashBranchPreflight {
   readonly name: {

@@ -7,17 +7,17 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 )
 
-// TestSubtractOwnWorktree_NFDWorktreePathMatchesNFCOwnRoot is G27 F4's regression guard.
-// subtractOwnWorktree itself is unchanged by this phase — the fix is D5a (Identify composes
-// Root) plus D5c (ParseRefRows composes %(worktreepath)) making both sides of this comparison
+// TestSubtractOwnWorktree_NFDWorktreePathMatchesNFCOwnRoot is the regression guard.
+// subtractOwnWorktree itself is unchanged by this phase — the fix is (Identify composes
+// Root) plus (ParseRefRows composes %(worktreepath)) making both sides of this comparison
 // NFC by the time they reach here, not a new normalization call inside this function. So this
 // test exercises the real pipeline — ParseRefRows over a decomposed %(worktreepath), exactly as
 // git's own readdir-sourced worktree registry could hand it back, then subtractOwnWorktree
-// against a composed ownRoot (exactly as Identify hands it back, D5a) — and asserts the outcome,
-// which is what keeps this test holding if the mechanism ever moves (plan §0.4).
+// against a composed ownRoot (exactly as Identify hands it back) — and asserts the outcome,
+// which is what keeps this test holding if the mechanism ever moves.
 //
-// Byte literals only (D12): no filesystem involved, so the case holds regardless of what this
-// container's own filesystem does with the two forms (P1).
+// Byte literals only: no filesystem involved, so the case holds regardless of what this
+// container's own filesystem does with the two forms.
 func TestSubtractOwnWorktree_NFDWorktreePathMatchesNFCOwnRoot(t *testing.T) {
 	t.Parallel()
 	composedE := string([]byte{0xc3, 0xa9})         // U+00E9, composed "é"

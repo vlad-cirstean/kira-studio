@@ -18,7 +18,7 @@ const (
 )
 
 // IsDynamicReference is the Go twin of packages/api-core/src/http/substitute.ts's own
-// isDynamicReference (P17 D12) — a name is dynamic-shaped if it is `$`-prefixed (Postman's own
+// isDynamicReference — a name is dynamic-shaped if it is `$`-prefixed (Postman's own
 // spelling) or `fake.`-prefixed (this app's additive, permanent alias namespace, never a
 // migration of the former).
 func IsDynamicReference(name string) bool {
@@ -36,8 +36,8 @@ type Reference struct {
 }
 
 // ParsedReference is ParseReference's answer: the bare reference name and its optional transform
-// pipeline, split out of the already-extracted, already-trimmed text between `{{` and `}}` (P17
-// D3). The TS twin is packages/api-core/src/http/substitute.ts's own parseReference — same rules,
+// pipeline, split out of the already-extracted, already-trimmed text between `{{` and `}}`.
+// The TS twin is packages/api-core/src/http/substitute.ts's own parseReference — same rules,
 // pinned by the same corpus.
 type ParsedReference struct {
 	// Name is the bare reference name — what classifyReference, Names, and every downstream
@@ -52,7 +52,7 @@ type ParsedReference struct {
 }
 
 // ParseReference splits inner — the already-extracted, already-trimmed text between `{{` and
-// `}}` — into a bare name and an optional transform pipeline (P17 D3), by the same all-or-nothing
+// `}}` — into a bare name and an optional transform pipeline, by the same all-or-nothing
 // rule the TS twin implements:
 //
 //  1. No `|` at all: today's behaviour exactly — {Name: inner, Pipeline: nil}.
@@ -117,11 +117,11 @@ func Resolve(text string, values map[string]string, secretNames []string) Substi
 }
 
 // urlUnsafeReplacer is the Go twin of packages/api-core/src/http/substitute.ts's own
-// sanitizeUrlSpan (finding 6, v1.2 P14 round 2) — percent-encodes only the characters that would
-// otherwise break url.Parse's RawQuery or the request line itself (a space is what actually turns
+// sanitizeUrlSpan — percent-encodes only the characters that would
+// otherwise break url.Parse's RawQuery or the request line itself (a space is what turns
 // a send into a 400; &/#/= are the query string's own structural delimiters), leaving `{{`/`}}`
-// and the reference name's ordinary characters exactly as typed. P17 D11: `|` joins the set — it
-// is not a legal URL character and a literal `|` in a request line is finding 6's own class.
+// and the reference name's ordinary characters exactly as typed. `|` joins the set — it
+// is not a legal URL character.
 var urlUnsafeReplacer = strings.NewReplacer(
 	" ", "%20", "\t", "%09", "\r", "%0D", "\n", "%0A",
 	"&", "%26", "#", "%23", "=", "%3D", "|", "%7C",
@@ -191,7 +191,7 @@ func resolveWithSanitizer(text string, values map[string]string, secretNames []s
 // resolveOneSpan classifies and resolves one already-parsed `{{...}}` occurrence — the per-span
 // body resolveWithSanitizer's own walk delegates to, pulled out so the walk itself stays under the
 // repo's gocognit threshold. Returns the text to write in the span's place and every Reference the
-// span produces (itself, plus — for a resolved plain value — F6's nested-deferred-secret reports
+// span produces (itself, plus — for a resolved plain value — the nested-deferred-secret reports
 // from nestedDeferredSecretRefs).
 func resolveOneSpan(
 	parsed ParsedReference,
@@ -258,14 +258,14 @@ func resolvePlainOrUnknown(
 	return rendered, refs
 }
 
-// nestedDeferredSecretRefs is F6: a plain value can itself contain a `{{secretName}}` span
+// nestedDeferredSecretRefs: a plain value can itself contain a `{{secretName}}` span
 // verbatim (typed or pasted, e.g. an "auth" variable whose value is "Bearer {{apiKey}}"). Stage 2
 // (ResolveRequest below) rescans this function's own combined output and resolves such a span
 // there — a real second pass across the pipeline as a whole, even though a single
 // resolveWithSanitizer call never re-expands its own output (the "one pass only" line on Resolve
 // above is about that one call). A caller that decides what to reveal from refs alone (curl.ts's
 // Copy-as-curl dialog) must be told about that name too, or its preview disagrees with what Send
-// actually sends. Only meaningful with no pipeline: a transform on the outer reference consumes
+// sends. Only meaningful with no pipeline: a transform on the outer reference consumes
 // the raw text, so any nested `{{...}}` syntax would already be mangled before stage 2 ever sees
 // it. Classification-only — the recursive call is made with a nil values map so nothing here is
 // itself substituted; a genuinely nested *plain* reference still stays unknown, matching the
@@ -286,7 +286,7 @@ func nestedDeferredSecretRefs(value string, pipeline []string, secrets map[strin
 
 // Names returns every distinct {{name}} reference in text, in first-seen order — the same scan
 // with no lookup and no classification. ResolveRequest uses it to decide, before ever querying a
-// secret, whether a field references anything at all. P17 D4: the *bare* name (ParseReference's
+// secret, whether a field references anything at all. The *bare* name (ParseReference's
 // own) — a pre-send "does this field reference anything" check counts `{{token | base64}}` as
 // referencing `token`.
 func Names(text string) []string {
@@ -348,23 +348,22 @@ func referencedFields(url string, headers []httpclient.Header, body httpclient.B
 	return fields
 }
 
-// Resolver is P11 D9/F21's own extraction: the reusable half of stage 2 — fetch every secret
-// reachable from one scope once, then substitute text and accumulate what was actually used. Two
-// protocols share it now (ResolveRequest below, and bridge/grpc.go's own resolution closure via
-// NewResolver), and gain no import of each other's protocol package for it: apivars gains no gRPC
-// import, which is what keeps it protocol-neutral rather than becoming a two-protocol module.
+// Resolver is the reusable half of stage 2 — fetch every secret reachable from one scope once, then
+// substitute text and accumulate what was used. Two protocols share it now (ResolveRequest below,
+// and bridge/grpc.go's own resolution closure via NewResolver), and gain no import of each other's
+// protocol package for it: apivars gains no gRPC import, which is what keeps it protocol-neutral
+// rather than becoming a two-protocol module.
 type Resolver struct {
 	secretValues map[string]string
 	used         []UsedSecret
 	usedSeen     map[string]bool
 }
 
-// UsedSecret is one substituted secret span: the text actually written into the request, and the
-// placeholder it is masked back to (P17 D9, §5 of the plan). Rendered is a secret's plaintext ONLY
+// UsedSecret is one substituted secret span: the text written into the request, and the
+// placeholder it is masked back to. Rendered is a secret's plaintext ONLY
 // when the span carried no pipeline — with one, it is the transformed form (base64, upper-cased,
 // URL-encoded…), which is exactly as sensitive and is what a caller's masking replacer must
-// register instead of the plaintext, or a pipe reopens finding 6/finding 4's exact bug class one
-// encoding later (§5.2).
+// register instead of the plaintext.
 type UsedSecret struct {
 	// Name is the secret's variable name — used for the Debug log (names only, D5) and for
 	// counting distinct secrets (Wire.MaskedSecrets counts names, not entries, D9(e)).
@@ -399,16 +398,16 @@ func (r *Resolver) Any() bool {
 }
 
 // Text resolves every {{name}} reference in text that names one of this scope's secrets, and
-// records each one actually substituted into Used(). A reference that still resolves to
+// records each one substituted into Used(). A reference that still resolves to
 // nothing — a stale id, a typo, a secret whose decrypt failed — is left verbatim; this package
-// never fails a caller over one unresolved reference (D10 mirrors P9 D10's own rule), the server's
+// never fails a caller over one unresolved reference, the server's
 // own response is the honest signal.
 func (r *Resolver) Text(text string) string {
 	return r.text(text, nil)
 }
 
-// URLText is Text's twin for the one field with query-string delimiter syntax to break (finding
-// 6, v1.2 P14 round 2): a secret whose decrypt failed still resolves to nothing and is left
+// URLText is Text's twin for the one field with query-string delimiter syntax to break: a secret
+// whose decrypt failed still resolves to nothing and is left
 // verbatim by Text's own contract above, but for the URL specifically that verbatim span must not
 // inject a raw space/&/#/= into url.Parse's RawQuery or the request line itself.
 func (r *Resolver) URLText(text string) string {
@@ -416,10 +415,10 @@ func (r *Resolver) URLText(text string) string {
 }
 
 func (r *Resolver) text(text string, sanitize func(string) string) string {
-	// P17 D9(b): the rendered text and its placeholder reach this resolver through
+	// The rendered text and its placeholder reach this resolver through
 	// resolveWithSanitizer's own onResolved callback, called from inside the substitution walk —
 	// never through a field on Reference, which is reported outward and must never carry a
-	// secret's rendered form. One entry per distinct (Name, Placeholder) pair (D9(d)): a request
+	// secret's rendered form. One entry per distinct (Name, Placeholder) pair: a request
 	// using both {{token}} and {{token | base64}} records two entries, so both wire forms get
 	// masked — a name-keyed map could not represent this.
 	onResolved := func(ref Reference, rendered, placeholder string) {
@@ -434,10 +433,10 @@ func (r *Resolver) text(text string, sanitize func(string) string) string {
 	return result.Text
 }
 
-// Used is every secret span actually substituted so far, one entry per distinct (Name,
+// Used is every secret span substituted so far, one entry per distinct (Name,
 // Placeholder) pair — what a caller's own masking replacer (bridge/http.go's secretReplacer,
-// shared unchanged by bridge/grpc.go, D10) is built from, so a secret's plaintext or any
-// transformed form of it a pipe produced is never left in a copyable surface unmasked (D9, §5).
+// shared unchanged by bridge/grpc.go) is built from, so a secret's plaintext or any
+// transformed form of it a pipe produced is never left in a copyable surface unmasked.
 // nil when nothing was substituted, matching ResolveRequest's own pre-extraction contract.
 func (r *Resolver) Used() []UsedSecret {
 	if len(r.used) == 0 {
@@ -446,22 +445,20 @@ func (r *Resolver) Used() []UsedSecret {
 	return r.used
 }
 
-// ResolveRequest is D6's stage 2, called from bridge/http.go strictly *after* op.SetCommand
-// (F3) — the URL/headers/body it is given must never feed back into anything logged or persisted.
+// ResolveRequest is the stage 2, called from bridge/http.go strictly *after* op.SetCommand
+// — the URL/headers/body it is given must never feed back into anything logged or persisted.
 // It decrypts every secret variable reachable from collectionID/environmentID
-// (repos.VariablesRepo.SecretsFor already applies D2's environment-over-collection precedence)
-// and resolves every remaining {{name}} reference across the same field list D7 gives stage 1. A
+// (repos.VariablesRepo.SecretsFor already applies the environment-over-collection precedence)
+// and resolves every remaining {{name}} reference across the same field list as stage 1. A
 // reference that still resolves to nothing — a stale id, a typo, a secret whose decrypt failed —
-// is left verbatim; Go never fails a send over one unresolved reference (D10), the server's own
+// is left verbatim; Go never fails a send over one unresolved reference, the server's own
 // response is the honest signal.
 //
-// P11 D9/F21: reimplemented on Resolver above — behaviour-identical (its own tests pass unedited).
-//
-// P9 D6/F11, widened by P17 D9/D10: the fourth return, `used`, is every secret span actually
-// substituted — Resolver.Used()'s own []UsedSecret, one entry per distinct (name, placeholder)
-// pair. bridge/http.go builds a strings.Replacer from it and masks P9's rendered exchange back to
-// each entry's Placeholder, so neither a secret's plaintext nor any transformed form of it a pipe
-// produced is ever left in a copyable surface unmasked (§5).
+// The fourth return, `used`, is every secret span substituted — Resolver.Used()'s own
+// []UsedSecret, one entry per distinct (name, placeholder) pair. bridge/http.go builds a
+// strings.Replacer from it and masks the rendered exchange back to each entry's Placeholder, so
+// neither a secret's plaintext nor any transformed form of it a pipe produced is ever left in a
+// copyable surface unmasked.
 func (s *Service) ResolveRequest(
 	url string, headers []httpclient.Header, body httpclient.Body, collectionID, environmentID string,
 ) (string, []httpclient.Header, httpclient.Body, []UsedSecret, error) {

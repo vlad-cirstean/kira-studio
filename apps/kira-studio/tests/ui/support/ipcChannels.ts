@@ -1,17 +1,18 @@
 // The legacy Electron/Node-engine-sidecar channel-name namespace this test tier still mocks
-// against (P50 D5/D15's own fixture-key convention, kept for continuity with tests/ipc/'s
-// committed fixtures — see mockRuntime.ts's CHANNEL_TO_FQN). Nothing under apps/kira-studio/frontend/src imports
-// this anymore: the real wire protocol today is the generated Wails bindings under
-// apps/kira-studio/frontend/bindings/. This is test-owned infrastructure now, not a live app protocol, which
-// is why it lives here rather than in packages/shared/protocol (P2 R1: it used to live there as
-// packages/shared/protocol/ipc.ts's `IPC` export, importable — misleadingly — as if it still described
-// something real).
+// against (the fixture-key convention, kept for continuity with tests/ipc/'s committed fixtures —
+// see mockRuntime.ts's CHANNEL_TO_FQN). Nothing under apps/kira-studio/frontend/src imports this
+// anymore: the real wire protocol today is the generated Wails bindings under
+// apps/kira-studio/frontend/bindings/. This is test-owned infrastructure now, not a live app
+// protocol, which is why it lives here rather than in packages/shared/protocol (it used to live
+// there as packages/shared/protocol/ipc.ts's `IPC` export, importable — misleadingly — as if it
+// still described something real).
 export const IPC = {
   appInfo: 'kira:app:info',
   settingsGetAll: 'kira:settings:getAll',
   settingsSet: 'kira:settings:set',
   layoutGetAll: 'kira:layout:getAll',
   layoutSet: 'kira:layout:set',
+  layoutChanged: 'kira:layout:changed',
   openSettings: 'kira:menu:openSettings',
   newConnection: 'kira:menu:newConnection',
   toggleProjectPanel: 'kira:menu:toggleProjectPanel',
@@ -44,6 +45,7 @@ export const IPC = {
   connectionsUpdate: 'kira:connections:update',
   connectionsDuplicate: 'kira:connections:duplicate',
   connectionsDelete: 'kira:connections:delete',
+  connectionsReorder: 'kira:connections:reorder',
   connectionsReveal: 'kira:connections:reveal',
   connectionsSecretsStatus: 'kira:connections:secretsStatus',
   connectionsTest: 'kira:connections:test',
@@ -139,7 +141,7 @@ export const IPC = {
   dbMcpStatus: 'kira:dbmcp:status',
   dbMcpSetEnabled: 'kira:dbmcp:setEnabled',
   dbMcpRegenerate: 'kira:dbmcp:regenerate',
-  dbMcpInstallClaudeCode: 'kira:dbmcp:installClaudeCode',
+  dbMcpInstallAgent: 'kira:dbmcp:installAgent',
   dbMcpPendingApprovals: 'kira:dbmcp:approval:pending',
   dbMcpApproveQuery: 'kira:dbmcp:approval:approve',
   dbMcpDenyQuery: 'kira:dbmcp:approval:deny',
@@ -165,6 +167,8 @@ export const IPC = {
   customScriptsRenameCollection: 'kira:customScripts:renameCollection',
   customScriptsDeleteCollection: 'kira:customScripts:deleteCollection',
   customScriptsMove: 'kira:customScripts:move',
+  customScriptsReorder: 'kira:customScripts:reorder',
+  customScriptsReorderCollections: 'kira:customScripts:reorderCollections',
 
   // P87 §10.3: the titlebar keep-awake toggle.
   keepAwakeStatus: 'kira:keepAwake:status',
@@ -211,7 +215,7 @@ export const IPC = {
   opUpdate: 'kira:op:update',
   appMetrics: 'kira:app:metrics',
   dbMcpApproval: 'kira:dbmcp:approval',
-  // P83 §3.2: one terminal's coalesced output and its exit, EmitTo'd to one window — grpcCall's
+  // One terminal's coalesced output and its exit, EmitTo'd to one window — grpcCall's
   // own shape, restated for a byte payload. No FQN_SUFFIX_BY_IPC_KEY entry (it's a push channel,
   // never a bound call) — driven by emitWailsEvent(page, IPC.terminal, …), grpcCall's own
   // precedent above.
@@ -236,19 +240,22 @@ export const IPC = {
   promptsDismiss: 'kira:prompts:dismiss',
   promptsSendTest: 'kira:prompts:sendTest',
   llmPromptsChanged: 'kira:llmPrompts:changed',
+  agentInfo: 'kira:agent:info',
+  agentInfoFor: 'kira:agent:infoFor',
   llmPromptsList: 'kira:llmPrompts:list',
   llmPromptsSave: 'kira:llmPrompts:save',
   llmPromptsPreview: 'kira:llmPrompts:preview',
   scriptRunsGet: 'kira:scriptRuns:get',
   scriptRunsStop: 'kira:scriptRuns:stop',
   scriptRunsResume: 'kira:scriptRuns:resume',
+  scriptRunsResumeCommand: 'kira:scriptRuns:resumeCommand',
   scriptRunsResolveDir: 'kira:scriptRuns:resolveDir',
   scriptRunsPreview: 'kira:scriptRuns:preview',
   scriptRunsStart: 'kira:scriptRuns:start',
   scriptRunsReadLog: 'kira:scriptRuns:readLog',
   scriptRunsMcpServers: 'kira:scriptRuns:mcpServers',
   scriptRunsMcpTools: 'kira:scriptRuns:mcpTools',
-  // P87 §3.2/§10.3: the titlebar keep-awake toggle's own state, Emit'd (not EmitTo) —
+  // The titlebar keep-awake toggle's own state, Emit'd (not EmitTo) —
   // customScriptsChanged's own shape restated. Real wire channel string verbatim
   // (internal/appevent's ChannelKeepAwake), no FQN_SUFFIX_BY_IPC_KEY entry (a push channel, never
   // a bound call) — driven by emitWailsEvent(page, IPC.keepAwake, …), terminal's own precedent.

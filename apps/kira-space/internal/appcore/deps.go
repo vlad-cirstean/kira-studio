@@ -1,8 +1,8 @@
-// Package appcore is Kira Space's own Deps struct — the P100 Part 1 trimmed sibling of Kira
+// Package appcore is Kira Space's own Deps struct — the trimmed sibling of Kira
 // Studio's own apps/kira-studio/internal/appcore, embedded by value into each bound service the
 // same way. Kira Studio's Deps carries eight fields across connections/adapters/variables/mask
 // rules/git; this app has no adapters, no connections, no HTTP variables — Repos, Events and
-// GitRegistry are the whole surface the bridge services embedding Deps actually read.
+// GitRegistry are the whole surface the bridge services embedding Deps read.
 package appcore
 
 import (
@@ -12,10 +12,9 @@ import (
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
-// Emitter is the Go->renderer push seam — repo-root internal/appevent.Emitter (P103 Part 3:
-// identical in both apps, hoisted there). internal/shell implements it over *application.App's
-// Event.Emit/DispatchWailsEvent; bridge stays the only real consumer package, so no bridge file
-// has to import Wails.
+// Emitter is the Go->renderer push seam — repo-root internal/appevent.Emitter (identical in both
+// apps). internal/shell implements it over *application.App's Event.Emit/DispatchWailsEvent;
+// bridge stays the only real consumer package, so no bridge file has to import Wails.
 type Emitter = appevent.Emitter
 
 // Deps is embedded by value into every bound service struct.

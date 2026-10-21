@@ -3,12 +3,12 @@ import type { CommitStore } from '@kira/git-core';
 import type { ReviewDiffMode, ReviewFileStatus } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 /**
- * G11 D16 — the review sidebar's Files pane, and the only new component this phase adds to
+ * The review sidebar's Files pane, and the only new component this phase adds to
  * `packages/git-ui` (which SPEC otherwise freezes). `FileTree` over `ReviewFilesState` instead of
  * `DetailState`: the rebase/squash/amend case SPEC wrote this phase for makes every commit in the
- * Commits tab unfamiliar, so a file-level view of the range is the surface that survives it (F10).
+ * Commits tab unfamiliar, so a file-level view of the range is the surface that survives it.
  *
- * G12 D12: selecting a file no longer opens an in-webview `DiffView` — it opens the host's native
+ * Selecting a file no longer opens an in-webview `DiffView` — it opens the host's native
  * diff editor (`ReviewFilesState.selectFile`'s own `editor.openRangeDiff` call). This component
  * keeps the file list on screen throughout and renders only the Since-review/Full-range toggle
  * and the delta status line as feedback, never a diff body.
@@ -16,7 +16,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
  * `FileTree`'s merge-parent picker never renders here (`parents` is always `[]` — a branch review
  * has no single "commit" with parents to pick between); `store` is still required by that
  * component's own props, so `ReviewView.vue` passes its own `PackedStreamState.store` down, unused
- * by anything this pane actually shows. `list-mode`/`filter` are props now (G12 D13) — `ReviewView`
+ * by anything this pane shows. `list-mode`/`filter` are props now — `ReviewView`
  * owns one toolbar for both the Commits and Files panes, so this component's own toolbar is
  * disabled (`show-toolbar="false"`) rather than duplicated.
  */

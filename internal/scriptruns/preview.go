@@ -11,7 +11,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
@@ -106,6 +107,9 @@ type planned struct {
 	trigger Trigger
 	// resume is the Claude session a resumed smart run continues, resumedFrom the run it continues.
 	resume, resumedFrom string
+	// agent is the provider a smart run runs under, pinned at plan time; provider is its id.
+	agent    harness.Provider
+	provider string
 	// timeout and timeoutText bound a headless normal run.
 	timeout     time.Duration
 	timeoutText string
@@ -113,7 +117,11 @@ type planned struct {
 
 // planOpts tunes plan: claimed says the caller already holds the worktree claim, so the busy
 // check skips it; headless says the run is unattended, so a normal script also needs the branch free.
-type planOpts struct{ claimed, headless bool }
+type planOpts struct {
+	claimed, headless bool
+	// provider pins a resumed smart run to the provider of its conversation; empty means the active one.
+	provider string
+}
 
 func (s *Service) getenv(k string) string {
 	if s.Getenv != nil {
@@ -176,21 +184,26 @@ func (s *Service) plan(args RunArgs, o planOpts) (*planned, error) {
 		return nil, err
 	}
 	pv.Prompt = scripts.Compose(body, rendered)
-	pv.Suffix = claudeheadless.ScriptReport(s.llmPrompts())
-	extra := []string{claudeheadless.FinishStepTool}
+	pv.Suffix = agentmcp.ScriptReport(s.llmPrompts())
+	agent, err := s.agentFor(o.provider)
+	if err != nil {
+		return nil, providerGone(err)
+	}
+	p.agent, p.provider = agent, agent.ID()
+	extraTools := []harness.MCPTool{agentmcp.FinishStep}
 	if args.TaskID != "" {
-		pv.Suffix = claudeheadless.SpaceNote(s.llmPrompts()) + "\n\n" + pv.Suffix
-		extra = append(append(extra, claudeheadless.RunOutcomeTool), claudeheadless.SpaceToolNames...)
+		pv.Suffix = agentmcp.SpaceNote(s.llmPrompts()) + "\n\n" + pv.Suffix
+		extraTools = append(append(extraTools, agentmcp.RunOutcome), agentmcp.SpaceToolIDs...)
 	}
 	p.sent = scripts.PlainText(pv.Prompt) + "\n\n" + pv.Suffix
 	pv.Model, pv.MaxBudgetUSD, pv.Timeout = smart.Model, smart.MaxBudgetUSD, smart.Timeout
-	pv.Tools, pv.Allowed = scripts.ToolArgs(smart, extra)
+	pv.Tools, pv.Allowed = agent.ToolArgs(smart.ToolPolicy(harness.ToolNames(agent, extraTools...)))
 	for _, c := range smart.MCP {
 		pv.MCP = append(pv.MCP, c.Server)
 	}
 	p.mcp = pv.MCP
 	if pv.Blocker == "" {
-		pv.Blocker = s.smartBlocker(pv.MCP)
+		pv.Blocker = s.smartBlocker(agent, pv.MCP)
 	}
 	p.preview = finishPreview(pv, p)
 	return p, nil
@@ -236,7 +249,7 @@ func containsVarName(text, name string) bool {
 }
 
 // smartBlocker answers why a smart run cannot start now: the run cap, or a user MCP server that is gone.
-func (s *Service) smartBlocker(mcp []string) string {
+func (s *Service) smartBlocker(agent harness.Provider, mcp []string) string {
 	s.mu.Lock()
 	running := len(s.smart)
 	s.mu.Unlock()
@@ -246,7 +259,7 @@ func (s *Service) smartBlocker(mcp []string) string {
 	if len(mcp) == 0 {
 		return ""
 	}
-	have, err := claudeheadless.UserServers(s.getenv)
+	have, err := agent.UserMCPServers(s.getenv)
 	if err != nil {
 		return err.Error()
 	}
@@ -256,7 +269,7 @@ func (s *Service) smartBlocker(mcp []string) string {
 			found = found || h.Name == name
 		}
 		if !found {
-			return claudeheadless.ErrServerGone{Name: name}.Error()
+			return harness.ErrServerGone{Name: name, Agent: agent.Label()}.Error()
 		}
 	}
 	return ""

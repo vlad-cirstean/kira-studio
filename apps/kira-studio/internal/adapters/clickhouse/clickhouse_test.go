@@ -1,7 +1,7 @@
-// Package clickhouse_test is the Go analogue of packages/db-fixtures/clickhouse.spec.ts. Not every one of the
-// spec's 47 scenarios has a Go twin — the ones ported are the load-bearing behaviours P58 D12's own
-// "adapter-first-test-first" rule exists to protect, plus the three §5.5 names as carrying the most
-// weight for judging B11 (wide types, big integers, NULL-vs-"null"-vs-NaN).
+// Package clickhouse_test is the Go analogue of packages/db-fixtures/clickhouse.spec.ts. Not every
+// one of the spec's 47 scenarios has a Go twin — the ones ported are the load-bearing behaviours
+// the "adapter-first-test-first" rule exists to protect, plus the three carrying the most weight
+// (wide types, big integers, NULL-vs-"null"-vs-NaN).
 package clickhouse_test
 
 import (
@@ -66,7 +66,7 @@ func opCtx(t *testing.T, name string) *adapters.OpCtx {
 func connectedAdapter(t *testing.T, cfg model.ResolvedConnectionConfig) adapters.Adapter {
 	t.Helper()
 	a := newAdapter(t)
-	// The op's own OpID feeds adapter.go's own nextQueryID ("kira-<opID>-<seq>", D8) — it must be
+	// The op's own OpID feeds adapter.go's own nextQueryID ("kira-<opID>-<seq>") — it must be
 	// unique per Connect() call, not a shared literal: a fixed "connect" here produced a genuine
 	// QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING collision against the real server when two connects'
 	// probes landed close enough in wall-clock time that ClickHouse had not yet cleared the
@@ -305,9 +305,9 @@ func TestClickHouse(t *testing.T) {
 		}
 	})
 
-	// P2 R1: unlike MySQL/MariaDB, ClickHouse's identifier lexer processes backslash escapes the
+	// Unlike MySQL/MariaDB, ClickHouse's identifier lexer processes backslash escapes the
 	// same as a string literal — quoteIdent must double a raw backslash, not just a backtick, or
-	// the generated query never actually reaches this table (a trailing "\`" is read as an escaped
+	// the generated query never reaches this table (a trailing "\`" is read as an escaped
 	// literal backtick, not the identifier's closing quote).
 	t.Run("quoting: a table name containing a raw backslash", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)
@@ -362,10 +362,9 @@ func TestClickHouse(t *testing.T) {
 		}
 	})
 
-	// P26 §3.1(1): Projection/ServerFilter are both declared true in caps.go and, until this phase,
-	// neither had a real-container test at all. Wired through scenarios.go's shared constructors
-	// (P26 §2.2/P26 review F3) rather than hand-rolled, so this scenario also backs Tier 2 via
-	// RunMatrix's own Then slices for the same capability.
+	// Projection/ServerFilter are both declared true in caps.go.
+	// Wired through scenarios.go's shared constructors rather than hand-rolled, so this scenario
+	// also backs Tier 2 via RunMatrix's own Then slices for the same capability.
 	testsupport.RunScenarios(t, connectedAdapter(t, cfg), cfg,
 		testsupport.FilterNarrowsResult(
 			nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
@@ -723,9 +722,9 @@ func TestClickHouse(t *testing.T) {
 		}
 	})
 
-	// The scenario that must not be softened (§5.3's own standard, applied here): a real slow
+	// The scenario that must not be softened: a real slow
 	// query, a real KILL QUERY from a separate side connection's own HTTP request, and — the
-	// assertion that actually matters — system.processes confirms the query is gone afterward, not
+	// assertion that matters — system.processes confirms the query is gone afterward, not
 	// merely that the local call returned.
 	t.Run("cancel, asserted server-side", func(t *testing.T) {
 		a := connectedAdapter(t, cfg)
@@ -771,8 +770,7 @@ func TestClickHouse(t *testing.T) {
 		// statement — checked by query_id, not by matching the query's own SQL text: a LIKE '%...%'
 		// filter on `query` would match this very checking statement's own text (its WHERE clause
 		// literally contains the substring being searched for), producing a permanent false
-		// positive that never clears. Caught by adding temporary debug output during this
-		// milestone's own verification — the KILL QUERY mechanism itself was correct throughout.
+		// positive that never clears.
 		waitForProcessesClean(t, side, "kira-"+op.OpID+"-0", 5*time.Second)
 	})
 }

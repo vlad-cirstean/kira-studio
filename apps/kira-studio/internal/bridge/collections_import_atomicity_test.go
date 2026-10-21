@@ -1,4 +1,3 @@
-// collections_import_atomicity_test.go is P21 round 1 architecture/security finding 10:
 // CollectionsRepo.ImportTree commits the whole collection tree in one transaction, then
 // VariablesRepo.ImportVariables runs as a second, separate one. If the second fails — the
 // realistic case is a `type: "secret"` variable on a machine where secret storage is

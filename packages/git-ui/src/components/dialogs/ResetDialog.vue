@@ -1,19 +1,19 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P10.md` W11: §7.7's confirm step — and, unlike every other dialog in this
- * directory, the confirm step for EVERY reset, not only a hazardous one (judgment call 18:
- * the row menu's "Reset to this commit…" is §7.7's one entry point, and choosing a mode IS the
- * confirmation here — there is no "clean, skip the dialog" fast path to mirror `CheckoutDialog`/
+ * The confirm step — and, unlike every other dialog in this directory,
+ * the confirm step for EVERY reset, not only a hazardous one (the row menu's
+ * "Reset to this commit…" is the one entry point, and choosing a mode IS the confirmation here —
+ * there is no "clean, skip the dialog" fast path to mirror `CheckoutDialog`/
  * `RevertDialog`'s own).
  *
- * OQ11: switching the mode radio never re-requests `preflight.reset` — `OpsState.previewResetMode`
+ * Switching the mode radio never re-requests `preflight.reset` — `OpsState.previewResetMode`
  * recomputes `destroys`/`requiresTypedConfirmation`/`routes`/`verdict` client-side via `core`'s own
  * `classifyReset`, holding `leaving`/`gaining`/`dirty` fixed (they do not depend on `mode` at all).
  *
- * P131 Part 1 §6.1/§6.2: the modal shell is shadcn's `Dialog`/`DialogContent` now, the mode
+ * The modal shell is shadcn's `Dialog`/`DialogContent` now, the mode
  * fieldset's radios are `RadioGroup`/`RadioGroupItem` (still an imperative `selectMode` call via
- * `@update:model-value`, not a plain `v-model`, per OQ11 above), the stash-first checkbox is
- * `Checkbox`+`Label`, and the confirm-token field is `Input`.
+ * `@update:model-value`, not a plain `v-model`), the stash-first checkbox is `Checkbox`+`Label`,
+ * and the confirm-token field is `Input`.
  */
 import { shortSha } from '@kira/git-core';
 import type { ResetMode } from '@kira/git-ipc';

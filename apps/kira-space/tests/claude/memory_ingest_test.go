@@ -20,8 +20,9 @@ const slackExport = `[
 
 // TestMemoryIngestThroughClaude has the real claude call ingest_files on a repo's docs folder and a
 // Slack export, with only the kira-memory server. The runner is the production process: this test
-// binary re-executed as `memory-ingest` (flowharness.Main serves it). Claude calls ingest_status once;
-// the test then waits for the job through the app, because a model polling loop costs tokens for nothing.
+// binary re-executed as `memory-ingest` (flowharness.Main serves it). Claude calls ingest_status
+// once; the test then waits for the job through the app, because a model polling loop costs tokens
+// for nothing.
 func TestMemoryIngestThroughClaude(t *testing.T) {
 	app := newRealApp(t)
 	exe, err := os.Executable()

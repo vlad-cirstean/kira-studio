@@ -63,7 +63,7 @@ func (e *RepoEntry) runOne(ctx context.Context, args []string) ([]byte, error) {
 }
 
 // runAllowingExit is runOne over the same read gate, but classifies through gitclient.Classify
-// only when the resulting ExitCode is outside ok (D14/D15) — used by exactly three G5 callers,
+// only when the resulting ExitCode is outside ok — used by exactly three callers,
 // each with its own reason at the call site for which exit codes are ordinary outcomes rather
 // than failures: merge-tree (0 or 1 — a conflict prediction is a successful prediction),
 // `config --get-regexp` (0 or 1 — no matching config is the common case), and `rev-parse
@@ -155,11 +155,11 @@ func resolveFrom(parents []string, parentIndex int) (*string, error) {
 	return &p, nil
 }
 
-// CommitDetail is commit.detail's own query (D8): the metadata `show` first (its parents are what
+// CommitDetail is commit.detail's own query: the metadata `show` first (its parents are what
 // the other two spawns diff from), then the body/signature `show` and the two diff-tree
 // invocations concurrently — three of the repo's four read slots, the deliberate trade that keeps
-// one detail request fast without letting five concurrent ones spawn fifteen processes (F14).
-// Server-side cached (D7); dropped for this sha:parentIndex, or the whole cache, only on
+// one detail request fast without letting five concurrent ones spawn fifteen processes.
+// Server-side cached; dropped for this sha:parentIndex, or the whole cache, only on
 // refsChanged (entry.go's note).
 func (e *RepoEntry) CommitDetail(ctx context.Context, sha string, parentIndex int) (porcelain.CommitDetail, error) {
 	if cached, ok := e.detail.get(sha, parentIndex); ok {
@@ -210,7 +210,7 @@ func (e *RepoEntry) CommitDetail(ctx context.Context, sha string, parentIndex in
 		return porcelain.CommitDetail{}, err
 	}
 
-	// P124: the parsers return nil for "none" (a root commit, no trailers, no ref); the wire
+	// The parsers return nil for "none" (a root commit, no trailers, no ref); the wire
 	// contract declares all four non-null arrays, and CommitMeta.vue's "Show more" render threw on
 	// `decoration: null`. `files` is the same shape: a commit whose name-status diff reports no
 	// entries leaves it nil, and FileTree.vue's `filterFiles` throws on `files: null`.
@@ -236,15 +236,15 @@ type FileDiffResult struct {
 	Body        porcelain.FileDiffBody `json:"body"`
 
 	// RawPatchBytes is the actual raw patch size the diff-tree spawn produced (or, on a cache hit,
-	// the size recorded when it was first computed) — never marshaled (D2b): it exists only so
+	// the size recorded when it was first computed) — never marshaled: it exists only so
 	// gitrpc's own encoded-result size guard can report the real patch size in a tooLarge body it
 	// constructs after the fact, without re-running the spawn or re-deriving the number.
 	RawPatchBytes int64 `json:"-"`
 }
 
-// FileDiff is commit.fileDiff's own query (D8, D12): resolves baseSha/change from CommitDetail
-// (server-cached already, D7 — never a second `show`/`diff-tree` pair for fields commit.detail
-// just computed), then the per-file patch itself, cached by <baseSha>:<sha>:<path> (D7) since two
+// FileDiff is commit.fileDiff's own query: resolves baseSha/change from CommitDetail
+// (server-cached already, never a second `show`/`diff-tree` pair for fields commit.detail
+// just computed), then the per-file patch itself, cached by <baseSha>:<sha>:<path> since two
 // tree oids and a path determine it forever.
 func (e *RepoEntry) FileDiff(ctx context.Context, sha, path, originalPath string, parentIndex int) (FileDiffResult, error) {
 	detail, err := e.CommitDetail(ctx, sha, parentIndex)
@@ -377,10 +377,10 @@ func looksBinary(content []byte) bool {
 	return bytes.IndexByte(content[:n], 0) >= 0
 }
 
-// Blob is file.read's own query (D10): `<rev>:<path>` through the cat-file batch session, or
+// Blob is file.read's own query: `<rev>:<path>` through the cat-file batch session, or
 // (when path contains a newline, which the batch protocol cannot express at all) the one-shot
 // fallback. Text only — a binary blob is refused rather than encoded, since the only consumer is a
-// read-only text document (D3's own doc comment).
+// read-only text document.
 func (e *RepoEntry) Blob(ctx context.Context, rev, path string) (BlobResult, error) {
 	full := rev + ":" + path
 	session := e.CatFile()
@@ -390,8 +390,8 @@ func (e *RepoEntry) Blob(ctx context.Context, rev, path string) (BlobResult, err
 	var info catfile.ObjectInfo
 	var content []byte
 	var err error
-	// G31 round-2 architecture/security review, finding #2: this used to sniff only `path` for a
-	// newline, not `rev` — but `full` (what actually crosses the batch protocol's stdin) is
+	// This used to sniff only `path` for a
+	// newline, not `rev` — but `full` (what crosses the batch protocol's stdin) is
 	// `rev + ":" + path`, and the persistent cat-file session is one line in, one line out
 	// (catfile/session.go). A newline anywhere in `full` — rev included, and rev is client-
 	// supplied directly via file.read's own FileReadParams.Rev, validRefArg only rejects empty
@@ -426,8 +426,8 @@ func (e *RepoEntry) Blob(ctx context.Context, rev, path string) (BlobResult, err
 type GoToTarget struct {
 	Kind    string `json:"kind"` // "live" | "historical" | "unavailable"
 	AbsPath string `json:"absPath,omitempty"`
-	// Hunks is D4's own drift-hunks handoff — deliberately NOT omitempty: the extension's own D11
-	// wiring checks `hunks !== null` verbatim (an absent field and an explicit null are not
+	// Hunks is the drift-hunks handoff — deliberately NOT omitempty: the extension's own wiring
+	// checks `hunks !== null` verbatim (an absent field and an explicit null are not
 	// interchangeable there the way they are for every other optional field in this phase).
 	// Meaningful only for "live"; present as null on every other arm too, which the webview never
 	// reads.
@@ -437,11 +437,11 @@ type GoToTarget struct {
 	Reason string               `json:"reason,omitempty"` // unavailable: "notInRevision" | "binary" | "tooLarge"
 }
 
-// GoToTarget is "Go to file"'s own decision procedure (D4/D8's own pseudocode), in this order and
-// no other: a bare repo has no checkout at all, so it always takes the historical branch; a path
-// present on disk is live (re-mapped across drift by worktreeDiff, D4); otherwise the object
-// database decides between historical and unavailable. It never consults HEAD, the index, or
-// reachability — only "is there a file on disk" and "is there an object at <rev>:<path>".
+// GoToTarget is "Go to file"'s own decision procedure, in this order and no other: a bare repo has
+// no checkout at all, so it always takes the historical branch; a path present on disk is live
+// (re-mapped across drift by worktreeDiff); otherwise the object database decides between
+// historical and unavailable. It never consults HEAD, the index, or reachability — only "is there
+// a file on disk" and "is there an object at <rev>:<path>".
 func (e *RepoEntry) GoToTarget(ctx context.Context, rev, path string) (GoToTarget, error) {
 	root := e.Summary.Root
 	if e.Summary.IsBare || root == "" {
@@ -460,8 +460,8 @@ func (e *RepoEntry) GoToTarget(ctx context.Context, rev, path string) (GoToTarge
 	return e.historicalOrUnavailable(ctx, rev, path)
 }
 
-// BlameLine is P5's own status-bar query: who last touched path's line in the working tree, right
-// now — never a historical revision (no rev param; §0/§9 of the plan state why), never a cache (no
+// BlameLine is the status-bar query: who last touched path's line in the working tree, right
+// now — never a historical revision (no rev param), never a cache (no
 // stable key exists for a working-tree answer the way one exists for CommitDetail/FileDiff's
 // immutable tree-oid keys). path is resolved against the repo root and rejected with
 // ErrPathEscapesRoot on escape, the identical check GoToTarget already makes for the same reason (a
@@ -497,11 +497,11 @@ func (e *RepoEntry) historicalOrUnavailable(ctx context.Context, rev, path strin
 	}
 }
 
-// worktreeDiff is the drift re-map's own spawn (D4, D8) — deliberately uncached (D7: the answer
+// worktreeDiff is the drift re-map's own spawn — deliberately uncached (the answer
 // changes on every keystroke in the user's own editor). It never errors: a refinement that cannot
 // run (a failed spawn, a patch over MaxPatchBytes, a parse failure) must never turn a working "Go
 // to file" into a failure, so every one of those answers nil hunks — the same "do not re-map"
-// answer as an identical file or a real, on-disk deletion (HasDeletedPostImage, probe P6's own
+// answer as an identical file or a real, on-disk deletion (HasDeletedPostImage, the
 // un-indexed-but-on-disk case).
 func (e *RepoEntry) worktreeDiff(ctx context.Context, rev, path string) []porcelain.DiffHunk {
 	raw, err := e.runOne(ctx, porcelain.WorktreeDiffArgs(rev, path))

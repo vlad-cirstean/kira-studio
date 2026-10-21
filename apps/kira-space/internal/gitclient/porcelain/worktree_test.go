@@ -156,9 +156,9 @@ func TestParseWorktreeList_TruncatedInput(t *testing.T) {
 	}
 }
 
-// TestParseWorktreeList_PathComposesToNFC is G27 D5c/D12's tier-1 positive: `worktree` is an
+// TestParseWorktreeList_PathComposesToNFC is the tier-1 positive: `worktree` is an
 // absolute directory path, so a decomposed spelling in git's own output must come back composed.
-// Byte literals only (D12) -- no test here depends on the host filesystem's own normalization
+// Byte literals only -- no test here depends on the host filesystem's own normalization
 // behaviour.
 func TestParseWorktreeList_PathComposesToNFC(t *testing.T) {
 	t.Parallel()

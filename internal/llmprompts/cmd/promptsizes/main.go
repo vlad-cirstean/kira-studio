@@ -1,11 +1,12 @@
 // Command promptsizes prints the rendered default size of every registry entry: id, characters and
 // estimated tokens (ceil(runes/3), the repo estimate). Run from the repo root.
 //
-//	go run ./internal/llmprompts/cmd/promptsizes [-prefix memory.] [-snapshot f.json] [-compare f.json]
+//	go run ./internal/llmprompts/cmd/promptsizes [-prefix memory.] [-snapshot f.json]
+//	[-compare f.json]
 //
-// -snapshot writes {id: {default, chars, tokens}}. -compare prints before/after sizes per id against
-// a snapshot, then checks that no protected token (actions, numbers, quoted spans, identifiers,
-// field names, negations) was lost; exit 1 on an unexplained loss.
+// -snapshot writes {id: {default, chars, tokens}}. -compare prints before/after sizes per id
+// against a snapshot, then checks that no protected token (actions, numbers, quoted spans,
+// identifiers, field names, negations) was lost; exit 1 on an unexplained loss.
 package main
 
 import (

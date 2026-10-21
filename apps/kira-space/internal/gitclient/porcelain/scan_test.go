@@ -7,10 +7,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 )
 
-// TestLogScanArgs_DiffersFromLogSessionArgsInExactlyOneToken is G23's own exit-criterion item 2
-// (§7.1/§7.4): LogScanArgs and LogSessionArgs must differ in exactly one argv token (the format
-// string) — anything else would mean the two walks are no longer the same walk over the same rev
-// set, breaking upstream probe 11's ordering-identity property.
+// TestLogScanArgs_DiffersFromLogSessionArgsInExactlyOneToken: LogScanArgs and LogSessionArgs must
+// differ in exactly one argv token (the format string) — anything else would mean the two walks are
+// no longer the same walk over the same rev set, breaking upstream probe 11's ordering-identity
+// property.
 func TestLogScanArgs_DiffersFromLogSessionArgsInExactlyOneToken(t *testing.T) {
 	t.Parallel()
 	spec := porcelain.WalkSpec{Scope: "all"}
@@ -149,7 +149,7 @@ func TestParseScanRecord(t *testing.T) {
 	})
 }
 
-// TestScanFormat_FieldCount pins ScanFormat's own %x00 count against ScanFieldCount (F3: NUL, not
+// TestScanFormat_FieldCount pins ScanFormat's own %x00 count against ScanFieldCount (NUL, not
 // %x1f, is the field delimiter now), the same belt-and-suspenders LogFormat/FieldCount already
 // get. %x00 appears in the format STRING as four literal characters ('%','x','0','0'), so this
 // counts substring occurrences rather than the byte itself.

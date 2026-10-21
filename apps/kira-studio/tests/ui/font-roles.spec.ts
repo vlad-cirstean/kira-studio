@@ -10,9 +10,8 @@ import {
 } from './support/mariadbFixture';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
-// docs/HISTORY.md (v1.2 P26) cases 1-2: the two guarantees this phase
-// exists to make true — every genuinely-data surface (F6's 36 sites) resolves --kira-font-data,
-// every chrome surface (F7's "no declaration of its own" majority, riding `body`) resolves
+// The two guarantees — every genuinely-data surface (36 sites) resolves --kira-font-data,
+// every chrome surface (the "no declaration of its own" majority, riding `body`) resolves
 // --kira-font-ui, and the two tokens are not secretly aliased back together.
 
 const CONNECTION_ID = 'conn-font-roles';
@@ -51,6 +50,7 @@ const CONTROL: ControlSnapshot[] = [
       options: {},
       preconnect: null,
       preconnectSidecar: false,
+      preconnectDelaySec: 0,
       autoExplain: false,
       throttlePerSec: 0,
     },
@@ -121,7 +121,7 @@ test('font-roles — data surfaces render in the data font, not the interface fo
   const dataFont = await computedFontFamily(page, '.slick-cell');
   expect(dataFont).not.toBe(uiFont);
 
-  // .view-lines — the SQL console editor (F6#10). Monaco appends its own built-in fallback list
+  // .view-lines — the SQL console editor. Monaco appends its own built-in fallback list
   // after the configured family (unlike CodeMirror, which set the family verbatim), so the
   // computed value is `dataFont` plus extra fallbacks rather than an exact match — the configured
   // font still wins the actual render since it's first in the list.

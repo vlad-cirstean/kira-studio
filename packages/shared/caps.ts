@@ -29,7 +29,7 @@ export interface Caps {
    *  tree shows the containers only (a redis `database`, an s3 `bucket`); the space itself is
    *  navigated in a Browse tab (§8.18). True for redis and s3, false for the other nine. */
   keyBrowser: boolean;
-  /** P63 §4.3: the adapter implements KeyTypes() — a batch of paths answered with each one's
+  /** The adapter implements KeyTypes() — a batch of paths answered with each one's
    *  engine-level value type, in one round trip. True only for redis (Browse's per-key type
    *  icon/badge); false for the other nine, s3 included (an object has no per-item "type" the way
    *  a redis key's TYPE command reports one). */
@@ -73,17 +73,16 @@ export interface Caps {
   // ---- lifecycle
   cancel: boolean; // a cancel stops the in-flight op, server-side or by ctx — ADDED (D4, D5)
 
-  /** P33: this engine's items are *files* — they can be streamed to and from a local path, and
+  /** This engine's items are *files* — they can be streamed to and from a local path, and
    *  the UI may offer an OS file dialog for them. Orthogonal to canInsert/canUpdate: S3 is the
    *  only engine where "add an item" means "pick a file", and the only one with a download at
    *  all. Gates the Download action outright; gates Upload together with canInsert. */
   fileTransfer: boolean;
 
-  /** P43 iter3 D46: the largest page this engine can actually serve in one read, when that is
-   *  below the picker's own ceiling. Absent means "every size the picker offers works". No
-   *  current adapter sets it (rabbitmq did, before it was dropped — see P58 findings), but the
-   *  mechanism stays: the stream toolbar's page-size picker (sizes.ts's pageSizeOptions) already
-   *  filters against it generically for whichever future engine needs a real ceiling. */
+  /** The largest page this engine can serve in one read, when that is below the picker's own
+   *  ceiling. Absent means "every size the picker offers works". No current adapter sets it, but
+   *  the mechanism stays: the stream toolbar's page-size picker (sizes.ts's pageSizeOptions)
+   *  already filters against it generically for whichever future engine needs a real ceiling. */
   maxPageSize?: number;
 }
 

@@ -2,7 +2,7 @@ package enginecache
 
 import "time"
 
-// Nominal, not measured (P13 D19): an entry is four scalars plus a key, the variance between
+// Nominal, not measured: an entry is four scalars plus a key, the variance between
 // entries is noise, and a fixed cost keeps L3 the same ByteLru shape as L2 instead of a separate
 // accounting scheme. ~2048 entries before eviction — well past any realistic browsing session,
 // while still a real bound.

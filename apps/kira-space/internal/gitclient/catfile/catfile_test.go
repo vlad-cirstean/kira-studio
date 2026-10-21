@@ -76,12 +76,11 @@ func TestSession_Check_Missing(t *testing.T) {
 	}
 }
 
-// TestSession_CheckMany_MixOfFoundAndMissing is G30 round-1 performance review, finding #5's own
-// regression guard: CheckMany writes every rev in one request() call and must read back exactly
-// one header per rev, IN ORDER, correctly separating found entries (their own real ObjectInfo)
-// from missing ones (a zero ObjectInfo, matching Check's own "" convention) — not just for an
-// all-found or all-missing batch, but for one that interleaves both, which is where an off-by-one
-// in the response-reading loop would actually surface.
+// TestSession_CheckMany_MixOfFoundAndMissing is the regression guard: CheckMany writes every rev in
+// one request() call and must read back exactly one header per rev, IN ORDER, correctly separating
+// found entries (their own real ObjectInfo) from missing ones (a zero ObjectInfo, matching Check's
+// own "" convention) — not just for an all-found or all-missing batch, but for one that interleaves
+// both, which is where an off-by-one in the response-reading loop would surface.
 func TestSession_CheckMany_MixOfFoundAndMissing(t *testing.T) {
 	skipWithoutGit(t)
 	dir := initRepo(t)
@@ -150,7 +149,7 @@ func TestSession_CheckMany_Empty(t *testing.T) {
 	}
 }
 
-// TestSession_Read_FoundBlob_PathWithSpace is D10's own "guard the existing fix" case (probe P3):
+// TestSession_Read_FoundBlob_PathWithSpace is the "guard the existing fix" case:
 // a space-containing path resolved through the ordinary batch protocol, proving readHeader's
 // suffix-based " missing" recognition does not also misfire on a *found* line whose echoed input
 // happens to contain a space.
@@ -267,11 +266,11 @@ func TestSession_ReadOneShot_Missing(t *testing.T) {
 	}
 }
 
-// TestSession_CheckOneShot_NewlineRev is G31 round-2 architecture/security review finding #2's
-// own regression coverage — Check's counterpart to TestSession_ReadOneShot_NewlinePath above: a
-// newline anywhere in the rev (not just the path half of it) cannot be expressed in the
-// --batch-check protocol either, and must resolve through this one-shot `rev-parse --verify`
-// fallback instead, giving the same OID Check's own batch header line would have.
+// TestSession_CheckOneShot_NewlineRev is regression coverage — Check's counterpart to
+// TestSession_ReadOneShot_NewlinePath above: a newline anywhere in the rev (not just the path half
+// of it) cannot be expressed in the --batch-check protocol either, and must resolve through this
+// one-shot `rev-parse --verify` fallback instead, giving the same OID Check's own batch header line
+// would have.
 func TestSession_CheckOneShot_NewlineRev(t *testing.T) {
 	skipWithoutGit(t)
 	dir := t.TempDir()
@@ -340,7 +339,7 @@ func TestSession_Read_TooLarge_AnsweredFromCheckAlone(t *testing.T) {
 }
 
 // blobReadPanicRunner delegates every `cat-file -s` spawn to the real exec runner and fails the
-// test outright if `cat-file blob` (the actual content read) is ever spawned — F12's own direct
+// test outright if `cat-file blob` (the actual content read) is ever spawned — the direct
 // proof that ReadOneShot's size gate is checked BEFORE any unbounded read starts, the newline-path
 // counterpart to TestSession_Read_TooLarge_AnsweredFromCheckAlone's --batch-check/--batch split.
 type blobReadPanicRunner struct {
@@ -357,7 +356,7 @@ func (r blobReadPanicRunner) Start(ctx context.Context, gitPath string, spec git
 	return r.real.Start(ctx, gitPath, spec)
 }
 
-// TestSession_ReadOneShot_TooLarge_NeverReadsPastTheSizeCheck is F12's own regression guard: the
+// TestSession_ReadOneShot_TooLarge_NeverReadsPastTheSizeCheck is the regression guard: the
 // old design read the WHOLE object via `git show <rev>` and only checked its length afterward —
 // reachable with a client-supplied rev plus a path containing a newline in a hostile repo. The fix
 // checks `cat-file -s <rev>` first, argv-only, so the gate is exact before any unbounded read.
@@ -476,11 +475,11 @@ func TestSession_KilledProcess_FailsQueuedRequestsRatherThanHanging(t *testing.T
 	}
 }
 
-// TestSession_CheckMany_LargeBatchDoesNotDeadlock is G32 round-3 performance review finding #4's
-// own regression proof: CheckMany used to write its entire batch to the child's stdin before
-// reading a single response line back. Past roughly a thousand-plus revs, the child's own stdout
-// pipe back to us fills (nothing has started draining it yet) and git blocks writing further
-// responses; our own write to its stdin then blocks too, since git has stopped reading it —
+// TestSession_CheckMany_LargeBatchDoesNotDeadlock is the regression proof: CheckMany used to write
+// its entire batch to the child's stdin before reading a single response line back. Past roughly a
+// thousand-plus revs, the child's own stdout pipe back to us fills (nothing has started draining
+// it yet) and git blocks writing further responses; our own write to its stdin then blocks too,
+// since git has stopped reading it —
 // deadlock, forever, with no ctx on this path to time it out. A real `git cat-file --batch-check`
 // process is used (not a fake): the pipe buffers this depends on are a real OS/kernel property,
 // not something a fake reader/writer would reproduce.
@@ -569,7 +568,7 @@ func (r *f8Runner) Start(ctx context.Context, gitPath string, spec gitclient.Spe
 	return r.proc, nil
 }
 
-// TestSession_CheckMany_RespErrDoesNotDeadlockOnBlockedWrite is F8's own regression guard: on a
+// TestSession_CheckMany_RespErrDoesNotDeadlockOnBlockedWrite is the regression guard: on a
 // respErr, requestPipelined must call fail() (closing stdin, unblocking the writer) BEFORE
 // draining writeErrCh — waiting on writeErrCh first, as it used to, deadlocks this call itself
 // whenever the writer goroutine is stuck on a full stdin pipe at the same moment readResp fails,
@@ -630,7 +629,7 @@ func (r *f9Runner) Start(ctx context.Context, gitPath string, spec gitclient.Spe
 	return r.batchProc, nil
 }
 
-// TestSession_Read_ReCheckBatchSizeAgainstGate is F9's own regression guard: --batch-check (the
+// TestSession_Read_ReCheckBatchSizeAgainstGate is the regression guard: --batch-check (the
 // outer gate) and --batch (the actual read) are two separate, independently-spawned processes, so
 // a mutable rev (e.g. "HEAD:<path>") can resolve to a DIFFERENT, larger object by the time the
 // second one runs — HEAD moved between the two calls. batchInfo.Size, the --batch process's own

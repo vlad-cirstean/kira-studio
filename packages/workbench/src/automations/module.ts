@@ -35,6 +35,9 @@ export interface ScriptsSeam {
   removeCollection(id: string): Promise<void>;
   /** collectionId null ungroups. */
   move(id: string, collectionId: string | null): Promise<void>;
+  /** Persists one set's order: the ungrouped scripts (null) or one collection's. */
+  reorder(collectionId: string | null, ids: string[]): Promise<void>;
+  reorderCollections(ids: string[]): Promise<void>;
 }
 
 /** The run store's bound calls and push channel (ScriptRunsService), the same in both apps. */
@@ -51,6 +54,8 @@ export interface ScriptRunsSeam {
   start(args: ScriptRunArgs, hash: string): Promise<ScriptRunStarted>;
   /** Continues the Claude session of a smart run a restart ended, as a new run. */
   resume(id: string): Promise<ScriptRunStarted>;
+  /** The terminal command that continues a smart run's conversation. */
+  resumeCommand(runId: string): Promise<string>;
   readLog(id: string, afterSeq: number): Promise<ScriptRunLogPage>;
   onLog(cb: (push: { runId: string; chunks: ScriptRunLogChunk[] }) => void): () => void;
   /** Next fire instants (unix ms) of a cron in a timezone; rejects with the Go validation text. */

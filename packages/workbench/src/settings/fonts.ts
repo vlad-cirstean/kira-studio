@@ -1,6 +1,6 @@
-// P31 D9/F11: document.fonts.check() returns true for a nonexistent family — measured in the
+// document.fonts.check() returns true for a nonexistent family — measured in the
 // built app, it is useless for detecting a fallback. A canvas measurement is the honest test:
-// measure the *primary* family the user actually typed (the first entry — everything after it is
+// measure the *primary* family the user typed (the first entry — everything after it is
 // their own fallback plumbing, not the thing being checked) against a name guaranteed never to
 // exist. Identical widths mean the primary family did not resolve to anything of its own.
 
@@ -40,7 +40,7 @@ export function resolveFontFallback(stack: string): 'serif' | 'monospace' | 'san
   return null;
 }
 
-/** True when the *primary* family in `stack` — the first entry, what the user actually chose —
+/** True when the *primary* family in `stack` — the first entry, what the user chose —
  *  resolves to a real, distinct face. A trailing generic the user added themselves (`, monospace`)
  *  is deliberate fallback plumbing, not evidence the primary choice is missing, so it plays no
  *  part in this check. Never blocks on a missing canvas capability. */
@@ -60,12 +60,12 @@ export interface FontChoice {
   system?: true;
 }
 
-// P28 §1.2: 15 named monospace stacks, macOS-first — system faces, Apple's own developer face,
+// 15 named monospace stacks, macOS-first — system faces, Apple's own developer face,
 // and widely-installed developer fonts. Every stack ends in `monospace` (or `Menlo, monospace`)
-// deliberately: --kira-font-family drives --kira-font-data (P26), which every grid, document/
+// deliberately: --kira-font-family drives --kira-font-data, which every grid, document/
 // key-value view and Monaco editor renders through, so an unresolved stack must still land on
 // a monospace face there rather than the browser's proportional default. `body` moved to the
-// fixed, non-customizable --kira-font-ui in P26 and is no longer affected by this choice at all.
+// fixed, non-customizable --kira-font-ui and is no longer affected by this choice at all.
 export const FONT_CHOICES: readonly FontChoice[] = [
   { family: 'System monospace', stack: 'ui-monospace, Menlo, monospace', system: true },
   { family: 'Menlo', stack: 'Menlo, monospace' },

@@ -287,7 +287,7 @@ const stateLabel = (c: ReviewComment): string =>
           <Button
             variant="dialog"
             size="kira"
-            class="bg-claude text-tone-ink border-transparent"
+            class="bg-agent text-tone-ink border-transparent"
             :disabled="sendTip !== ''"
             :pending="send.isPending.value"
             data-testid="ade-review-send-agent"

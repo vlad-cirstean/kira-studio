@@ -41,7 +41,7 @@ func TestStashUntrackedLsTreeArgs(t *testing.T) {
 
 // TestParseStashList_TwoEntry covers a two-entry stack: stash@{0} (pushed last, no -u, one tracked
 // file) and stash@{1} (pushed first, -u, one tracked file plus an untracked parent) — the "zero or
-// more numstat records, first one carrying a leading \n" framing (probe 12), the three-vs-two
+// more numstat records, first one carrying a leading \n" framing, the three-vs-two
 // parent split (indexSha always present, untrackedSha iff -u), and baseSubject's own batch-resolved
 // join, all against real git 2.43 output.
 func TestParseStashList_TwoEntry(t *testing.T) {
@@ -168,7 +168,7 @@ func TestParseStashList_MalformedHeader(t *testing.T) {
 	}
 }
 
-// TestParseStashList_RenamePathNeverMisdetectedAsHeader is F14's own regression guard, the stack
+// TestParseStashList_RenamePathNeverMisdetectedAsHeader is the regression guard, the stack
 // side of TestParseGlobalStashList_RenamePathNeverMisdetectedAsHeader: a rename's own bare
 // renamed-to path record literally reads "stash@{0}" — isStackStashHeader's own prefix match would
 // otherwise mistake it for the next entry's header, splitting one rename into a phantom extra
@@ -333,7 +333,7 @@ func TestParseGlobalStashList_TwoEntryHeaderShapedPathNeverMisdetected(t *testin
 	}
 }
 
-// TestParseGlobalStashList_RenamePathNeverMisdetectedAsHeader is F14's own regression guard: a
+// TestParseGlobalStashList_RenamePathNeverMisdetectedAsHeader is the regression guard: a
 // rename's own numstat framing is THREE records — "add\tdel\t" (empty path field), then
 // originalPath, then path, both of the latter completely bare (no tabs at all). If either bare
 // path record happens to BE header-shaped (here, a renamed file's own NEW name is exactly 40 hex
@@ -368,7 +368,7 @@ func TestParseGlobalStashList_RenamePathNeverMisdetectedAsHeader(t *testing.T) {
 	}
 }
 
-// TestParseGlobalStashList_SHA256Header is F18's own regression guard: isGlobalStashHeader must
+// TestParseGlobalStashList_SHA256Header is the regression guard: isGlobalStashHeader must
 // recognise a SHA-256 repository's own 64-hex object id, not just SHA-1's 40-hex width (verified
 // against real git --object-format=sha256, a completely different-width id, never just a longer
 // version of the SHA-1 value).

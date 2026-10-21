@@ -56,8 +56,8 @@ func buildQueueDefinition(ctx context.Context, client *sqs.Client, queueURL, nam
 
 	// json.MarshalIndent of a map[string]string sorts keys — matching Object.keys().sort() above
 	// for the rows, but not JS's JSON.stringify(attributes, null, 2) insertion order for this
-	// statement text (P58d §4.2's recorded divergence; tests/ipc/sqs/sqs.fixture.ts freezes this
-	// text against the TypeScript producer, and P58f's generator port will re-derive it).
+	// statement text (the recorded divergence; tests/ipc/sqs/sqs.fixture.ts freezes this text
+	// against the TypeScript producer, and the generator port will re-derive it).
 	statementBytes, err := json.MarshalIndent(attributes, "", "  ")
 	if err != nil {
 		return model.ObjectDefinition{}, mapError(err)

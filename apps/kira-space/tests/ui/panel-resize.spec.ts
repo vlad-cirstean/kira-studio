@@ -124,3 +124,25 @@ test.describe('ade panel handle', () => {
     });
   }
 });
+
+// P312: the left panel width is per module; the flow test (appflow) covers the same scenario in Go.
+test('project panel width is per module', async ({ relaunch }) => {
+  const { window: page } = await relaunch();
+  const panel = page.locator('[data-testid="project-panel"]');
+  const width = async () => (await panel.boundingBox())?.width ?? 0;
+  const modeTab = (mode: string) => page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
+
+  const defaultWidth = await width();
+  const at = await center(page.locator(PROJECT_HANDLE).first());
+  await page.mouse.move(at.x, at.y);
+  await page.mouse.down();
+  await page.mouse.move(at.x + 100, at.y, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(width).toBeGreaterThan(defaultWidth + 90);
+  const gitWidth = await width();
+
+  await modeTab('automations').click();
+  await expect.poll(width).toBeCloseTo(defaultWidth, -1);
+  await modeTab('git').click();
+  await expect.poll(width).toBeCloseTo(gitWidth, -1);
+});

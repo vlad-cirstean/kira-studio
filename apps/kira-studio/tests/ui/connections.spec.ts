@@ -6,20 +6,19 @@ import { acceptConfirm } from './support/dialogs';
 import { IPC } from './support/ipcChannels';
 import { connectionRow } from './support/tree';
 
-// Ported from tests/e2e/connections.spec.ts (P57 D16, per P57-cutover.md §11's
-// connections/secrets finding). No real adapter needed — every scenario here only exercises
-// connection CRUD against `ConnectionsService`'s canned responses, never `connectionsTest`/
-// `Connect`. Two scenarios do not port: "create, wait, relaunch(), still there" and "recolor,
-// wait, relaunch(), still cyan" both asserted real cross-process persistence, which this tier's
-// `relaunch()` cannot prove (tests/ui/fixtures.ts's own header comment) — same category as
-// workbench.spec.ts's five dropped scenarios. The P42 D34 "a connection stored with a retired
+// Ported from tests/e2e/connections.spec.ts. No real adapter needed — every scenario here only
+// exercises connection CRUD against `ConnectionsService`'s canned responses, never
+// `connectionsTest`/`Connect`. Two scenarios do not port: "create, wait, relaunch(), still there"
+// and "recolor, wait, relaunch(), still cyan" both asserted real cross-process persistence, which
+// this tier's `relaunch()` cannot prove (tests/ui/fixtures.ts's own header comment) — same
+// category as workbench.spec.ts's five dropped scenarios. The "a connection stored with a retired
 // colour still renders" scenario is reshaped rather than dropped: the original created it via a
 // raw `window.kira.connectionsCreate(...)` call and relied on the real app's `connectionsChanged`
-// broadcast event to pick it up with no explicit refresh — this tier has no Events.On mock (P57
-// left that data plane covered, but not the control-plane push-event plane), so the retired-colour
+// broadcast event to pick it up with no explicit refresh — this tier has no Events.On mock (that
+// data plane is covered, but not the control-plane push-event plane), so the retired-colour
 // connection is seeded in the boot snapshot instead. That is arguably more faithful to the
-// scenario's own premise anyway: a retired colour can only exist on a row created before the
-// picker changed, i.e. one that was already there at launch, not one created through today's UI.
+// scenario's own premise anyway: a retired colour can only exist on a row created before the picker
+// changed, i.e. one that was already there at launch, not one created through today's UI.
 
 const RETIRED: ConnectionSummary = {
   id: 'conn-retired',
@@ -36,6 +35,7 @@ const RETIRED: ConnectionSummary = {
   options: {},
   preconnect: null,
   preconnectSidecar: false,
+  preconnectDelaySec: 0,
   autoExplain: false,
   throttlePerSec: 0,
   mcpEnabled: false,
@@ -63,6 +63,7 @@ const TEST_PG_BASE = {
   options: {},
   preconnect: null,
   preconnectSidecar: false,
+  preconnectDelaySec: 0,
   autoExplain: false,
   throttlePerSec: 0,
   mcpEnabled: false,
@@ -103,6 +104,7 @@ const URI_CONNECTION: ConnectionSummary = {
   options: {},
   preconnect: null,
   preconnectSidecar: false,
+  preconnectDelaySec: 0,
   autoExplain: false,
   throttlePerSec: 0,
   mcpEnabled: false,
@@ -146,6 +148,7 @@ const CONTROL: ControlSnapshot[] = [
       options: {},
       preconnect: null,
       preconnectSidecar: false,
+      preconnectDelaySec: 0,
       autoExplain: false,
       throttlePerSec: 0,
       mcpEnabled: false,
@@ -177,6 +180,7 @@ const CONTROL: ControlSnapshot[] = [
       options: {},
       preconnect: null,
       preconnectSidecar: false,
+      preconnectDelaySec: 0,
       autoExplain: false,
       throttlePerSec: 0,
       mcpEnabled: false,
@@ -220,6 +224,7 @@ const CONTROL: ControlSnapshot[] = [
         options: {},
         preconnect: null,
         preconnectSidecar: false,
+        preconnectDelaySec: 0,
         autoExplain: false,
         throttlePerSec: 0,
         mcpEnabled: false,
@@ -258,6 +263,7 @@ const CONTROL: ControlSnapshot[] = [
         options: {},
         preconnect: null,
         preconnectSidecar: false,
+        preconnectDelaySec: 0,
         autoExplain: false,
         throttlePerSec: 0,
         mcpEnabled: false,
@@ -289,6 +295,7 @@ const CONTROL: ControlSnapshot[] = [
         options: {},
         preconnect: null,
         preconnectSidecar: false,
+        preconnectDelaySec: 0,
         autoExplain: false,
         throttlePerSec: 0,
         mcpEnabled: false,
@@ -365,10 +372,10 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   await expect(row.locator('[data-testid="tree-rail"]')).toHaveClass(/\bbg-conn-green\b/);
   await expect(row.locator('.status-dot')).toHaveAttribute('data-status', 'disconnected');
 
-  // D9 ("connectionsList never carries a password") is no longer checkable from here: there is
-  // no `window.kira` any more (CLAUDE.md's P57 finding) and no live wire to query — this tier's
+  // "connectionsList never carries a password" is no longer checkable from here: there is
+  // no `window.kira` any more and no live wire to query — this tier's
   // `connectionsList` fixture is data this test itself wrote, so re-reading it back would only
-  // prove the fixture matches itself. The real guarantee now lives at the layer that actually
+  // prove the fixture matches itself. The real guarantee now lives at the layer that
   // implements it: `connectionSummarySchema.omit({ password: true })` (shared/domain/connection.ts)
   // plus the Go-side wire shape it mirrors.
 

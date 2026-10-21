@@ -10,13 +10,12 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )
 
-// TestEnsureKeyConcurrentFirstMintConverges is the M7 finding this repo's own EnsureKey race
-// existed to fix: two callers resolving a connection's key for the first time at once (the MCP
-// render path's MaskSetFor and the grid preview's CorrelationKeyHex, per maskrules.Service) must
-// never both persist — the loser overwriting the winner's already-in-use key would leave whichever
-// caller cached the winner's key tagging with bytes the database no longer agrees are the key.
-// Every concurrent caller must converge on the exact same key, and it must be the one actually
-// stored.
+// TestEnsureKeyConcurrentFirstMintConverges: two callers resolving a connection's key for the
+// first time at once (the MCP render path's MaskSetFor and the grid preview's
+// CorrelationKeyHex, per maskrules.Service) must never both persist — the loser overwriting the
+// winner's already-in-use key would leave whichever caller cached the winner's key tagging with
+// bytes the database no longer agrees are the key. Every concurrent caller must converge on the
+// exact same key, and it must be the one stored.
 func TestEnsureKeyConcurrentFirstMintConverges(t *testing.T) {
 	t.Setenv("KIRA_INSECURE_SECRETS", "1")
 	db := newRepos(t).DB

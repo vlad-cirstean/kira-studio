@@ -42,25 +42,25 @@ export function documentRow(tabId: string, row: number): DocumentRow | null {
 }
 
 // The projection picker's candidate list (ProjectionMenu.vue), the filter/sort autocomplete
-// (views/shared/mongoFieldSample.ts) and the toolbar's Fields tooltip (DocumentView.vue) all need "every
-// top-level field name seen on the loaded page" — a document collection has no catalog to read a
-// field list from (§0 note: "Documents' 'columns' are dynamic per-document fields"), so this is
-// the closest equivalent, shared so those call sites can't drift on how they read a body's field
-// names. `_id` is left out: it is always returned regardless of projection (mongo/read.ts's own
-// comment) and already has its own column, so it is never a real projection choice.
+// (views/shared/mongoFieldSample.ts) and the toolbar's Fields tooltip (DocumentView.vue) all need
+// "every top-level field name seen on the loaded page" — a document collection has no catalog to
+// read a field list from, so this is the closest equivalent, shared so those call sites can't
+// drift on how they read a body's field names. `_id` is left out: it is always returned regardless
+// of projection (mongo/read.ts's own comment) and already has its own column, so it is never a
+// real projection choice.
 //
-// P5 C2: no longer routes through views/shared/document/rows.ts's memoized parse (P27 D33's own
-// reasoning for doing so — "the tree renderer already walks every body on the page" — was true
-// only while DocumentView.vue's own `rows` computed eagerly parsed every row; C2 makes that lazy,
-// so reusing the shared cache here would have made this the one thing silently re-materialising
-// it, on every load, for every row). A plain top-level `JSON.parse` + `Object.keys` per row is
-// transient (nothing retained past this call) instead of building and caching a full recursive
-// DocNode tree per row the way `rowView`'s own `parseDocument` does — this still has to walk every
-// row (there is no smaller correct answer for "every field name on the page"), but it no longer
-// grows `rows.ts`'s `parseCache` to the size of the whole page in the process.
+// No longer routes through views/shared/document/rows.ts's memoized parse (the reasoning for doing
+// so — "the tree renderer already walks every body on the page" — was true only while
+// DocumentView.vue's own `rows` computed eagerly parsed every row; that is now lazy, so reusing
+// the shared cache here would have made this the one thing silently re-materialising it, on every
+// load, for every row). A plain top-level `JSON.parse` + `Object.keys` per row is transient
+// (nothing retained past this call) instead of building and caching a full recursive DocNode tree
+// per row the way `rowView`'s own `parseDocument` does — this still has to walk every row
+// (there is no smaller correct answer for "every field name on the page"), but it no longer grows
+// `rows.ts`'s `parseCache` to the size of the whole page in the process.
 //
-// P163: four computeds plus ProjectionMenu call this per page load, so the result is memoized per
-// page object (setPage freezes and replaces the page, so identity is the page version).
+// Four computeds plus ProjectionMenu call this per page load, so the result is memoized per page
+// object (setPage freezes and replaces the page, so identity is the page version).
 const fieldNamesCache = new WeakMap<DocumentPage, string[]>();
 
 export function fieldNamesOnPage(tabId: string): string[] {

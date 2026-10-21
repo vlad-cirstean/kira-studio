@@ -4,7 +4,7 @@
  */
 import { formatAbsoluteUtc } from '@workbench/behaviour/format';
 
-/** G21 D6b: a representative widest sample `formatAbsoluteUtc` can produce — the format's own
+/** A representative widest sample `formatAbsoluteUtc` can produce — the format's own
  *  shape ("YYYY-MM-DD HH:MM") never varies in length, and `.kira-cell-date`'s own
  *  `font-variant-numeric: tabular-nums` makes which digits appear irrelevant to the rendered
  *  width, so any one concrete timestamp is as "widest" as any other. `Date.UTC` rather than a
@@ -16,9 +16,8 @@ let measureCanvas: HTMLCanvasElement | OffscreenCanvas | undefined;
 /**
  * The pixel width of the widest string `formatAbsoluteUtc` can produce, rendered in `font` (a
  * CSS font shorthand — `CommitGrid.vue` reads this from a live `.kira-cell-date` probe's own
- * computed style). Item 6's second gap (F6): a hard-coded pixel width is only correct at one
- * font size, and G14 already made the type scale follow the host's own settings, so this measures
- * rather than assumes.
+ * computed style). A hard-coded pixel width is only correct at one font size, and the type scale
+ * already follows the host's own settings, so this measures rather than assumes.
  *
  * Bun's own test environment has no DOM — no `document`, no `OffscreenCanvas` (the same reason
  * `rowSvg.ts`'s DOM-construction half is exercised only by the Playwright tier, not here) — so
@@ -37,7 +36,7 @@ export function measureAbsoluteDateWidth(font: string): number {
   // `HTMLCanvasElement | OffscreenCanvas`'s own `getContext('2d')` overloads don't unify cleanly
   // across the union (TS falls back to a generic `RenderingContext`, which lacks `font`/
   // `measureText`) — both real return types share the same 2D-context shape this function
-  // actually uses, so the cast is asserting a real shared interface, not papering over a
+  // uses, so the cast is asserting a real shared interface, not papering over a
   // mismatch.
   const ctx = measureCanvas.getContext('2d') as
     | CanvasRenderingContext2D

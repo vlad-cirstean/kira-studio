@@ -25,11 +25,10 @@ func cfgWithSslmode(sslmode string) model.ResolvedConnectionConfig {
 	}
 }
 
-// P21 round 2 architecture/security finding 7: pgx.ParseConfig already resolves verify-ca
-// correctly from a URI's own ?sslmode=, but this Options-driven override re-read the same value
-// and hit its default: branch, refusing with "unknown sslmode" a config pgx had already gotten
-// right — verify-ca is a standard libpq value (verify the CA chain, not the hostname), common for
-// an internal CA or an IP-addressed host.
+// pgx.ParseConfig already resolves verify-ca correctly from a URI's own ?sslmode=, but this
+// Options-driven override re-read the same value and hit its default: branch, refusing with
+// "unknown sslmode" a config pgx had already gotten right — verify-ca is a standard libpq value
+// (verify the CA chain, not the hostname), common for an internal CA or an IP-addressed host.
 func TestBuildConfig_VerifyCA(t *testing.T) {
 	cfg, err := buildConfig(cfgWithSslmode("verify-ca"), "", nil)
 	if err != nil {
@@ -87,7 +86,7 @@ func TestBuildConfig_ExistingSslmodesUnaffected(t *testing.T) {
 	})
 }
 
-// TestBuildConfig_FallbacksClearedOnOverride is finding F6: pgx.ParseConfig("")'s own default
+// TestBuildConfig_FallbacksClearedOnOverride: pgx.ParseConfig("")'s own default
 // sslmode=prefer builds a TLS-primary + plaintext-fallback pair, each carrying its own Host/Port —
 // buildConfig only ever overrides the primary, so pgconn.ConnectConfig's own retry-on-any-non-auth-
 // error could otherwise silently fall through to an environment-derived host/port or a plaintext

@@ -1,10 +1,10 @@
-// Package localauth is P14's reveal gate: the app's own front door to the operating system's
+// Package localauth is the reveal gate: the app's own front door to the operating system's
 // device-owner authentication (macOS's LocalAuthentication.framework, Touch ID with a
 // system-password fallback), used by internal/connections.Service.Reveal to confirm a person
 // before a saved credential is decrypted for display.
 //
 // Every decision this package makes lives in this file, which carries no build tag, so a plain
-// `go test` on Linux genuinely exercises the whole gate (P7 §1.4's rule, mirrored from
+// `go test` on Linux genuinely exercises the whole gate (mirrored from
 // internal/secrets/cipher.go's probe). evaluate_darwin.go and evaluate_other.go are mechanical,
 // logic-free platform shims that only answer two questions this file asks them: can OS auth run
 // at all right now, and — if so — did it just succeed.
@@ -17,7 +17,7 @@ import (
 )
 
 // Outcome is Authorize's own vocabulary for "was OS authentication itself satisfied" — narrower
-// than connections.RevealResult's four outcomes (P14 D6): "confirmation-required" is Reveal's own
+// than connections.RevealResult's four outcomes: "confirmation-required" is Reveal's own
 // synthesis of Unavailable plus a renderer that hasn't confirmed yet, not something this package
 // needs to name, and a genuine evaluate failure is reported through Authorize's returned error
 // instead of a fourth Outcome value — exactly one caller (Reveal, only on the OS-auth-available
@@ -43,10 +43,10 @@ func (o Outcome) String() string {
 	}
 }
 
-// GraceWindow is D5's fixed, non-sliding grace period: once evaluate() succeeds, a reveal inside
+// GraceWindow is the fixed, non-sliding grace period: once evaluate() succeeds, a reveal inside
 // this window is granted with no further prompt. Fixed from the moment of the grant rather than
 // sliding on every use, so a long editing session can't hold one authentication open indefinitely.
-// F8 is why it exists at all: the real prompt-storm risk is per-dialog-open (open A, reveal,
+// The real prompt-storm risk is per-dialog-open (open A, reveal,
 // close; open B, reveal; reopen A, reveal — three prompts in thirty seconds), not per-keystroke,
 // and that is exactly the friction that gets a security feature disabled.
 const GraceWindow = 5 * time.Minute
@@ -96,7 +96,7 @@ func (a *Authorizer) graceLive() bool {
 // startup" shape secrets.New/cipher.go's New use for their own backend status — so a build that
 // silently landed on the weak (Unavailable, in-app-confirm-only) path says so out loud rather than
 // leaving that discoverable only by pressing "Show password" once. now/evaluate/available are
-// injected for testability (D9) — production wiring is main.go passing time.Now alongside this
+// injected for testability — production wiring is main.go passing time.Now alongside this
 // package's own platform-selected Evaluate/Available.
 func New(now func() time.Time, evaluate EvaluateFunc, available AvailableFunc) *Authorizer {
 	avail := available()
@@ -108,10 +108,10 @@ func New(now func() time.Time, evaluate EvaluateFunc, available AvailableFunc) *
 	return &Authorizer{now: now, evaluate: evaluate, available: available}
 }
 
-// Authorize is P14 D6's table, one reveal request at a time. confirmed is honoured only on the
+// Authorize is the table, one reveal request at a time. confirmed is honoured only on the
 // branch where available() is false (mirrors the comment on bridge.ConnectionsRevealArgs.Confirmed)
-// — on a machine where LocalAuthentication actually works, this argument cannot influence the
-// result, so a renderer cannot skip a real prompt by simply lying about having already shown one.
+// — on a machine where LocalAuthentication works, this argument cannot influence the
+// result, so a renderer cannot skip a real prompt by lying about having already shown one.
 func (a *Authorizer) Authorize(reason string, confirmed bool) (Outcome, error) {
 	if a.graceLive() {
 		return Granted, nil
@@ -148,7 +148,7 @@ func (a *Authorizer) Authorize(reason string, confirmed bool) (Outcome, error) {
 // GateOutcome is Gated's own vocabulary — Authorize's own three outcomes plus the fetch call's,
 // split into GateAuthError/GateFetchError rather than one combined error case because
 // internal/connections.Service.Reveal and internal/apivars.Service.reveal each log a different
-// message for the two (P107 I2-36; connections.RevealResult and apivars.RevealResult's own
+// message for the two (connections.RevealResult and apivars.RevealResult's own
 // four-outcome vocabulary is each caller's own mapping of this).
 type GateOutcome int
 
@@ -160,7 +160,7 @@ const (
 	GateFetchError
 )
 
-// Gated runs P14 D6's whole reveal gate once: authorize(reason, confirmed), pass Cancelled/
+// Gated runs the whole reveal gate once: authorize(reason, confirmed), pass Cancelled/
 // Unavailable straight through, otherwise call fetch and report its own error separately from an
 // Authorize error. Both internal/connections.Service.Reveal and internal/apivars.Service.reveal
 // call this with their own *Authorizer.Authorize method value and their own decrypt/secrets-get

@@ -23,10 +23,9 @@ export const BUILTIN_TOOLS = [
   'Bash',
 ] as const;
 export const DEFAULT_TOOLS: readonly string[] = ['Read', 'Grep', 'Glob'];
-export const SMART_MODELS = ['haiku', 'sonnet', 'opus'] as const;
 // Variables a workflow run has; reserved as param names.
 export const BUILTIN_VARS = ['task', 'jira', 'repo', 'branch', 'base', 'worktree'] as const;
-export const DEFAULT_SMART = { model: 'sonnet', maxBudgetUsd: 1, timeout: '15m' } as const;
+export const DEFAULT_SMART = { maxBudgetUsd: 1, timeout: '15m' } as const;
 
 export const scriptParamTypeSchema = /*#__PURE__*/ z.enum(['text', 'select', 'multiselect']);
 export type ScriptParamType = z.infer<typeof scriptParamTypeSchema>;
@@ -141,7 +140,7 @@ export const scriptDirSchema = /*#__PURE__*/ z.object({
 });
 export type ScriptDir = z.infer<typeof scriptDirSchema>;
 
-// scriptMcpServerSchema mirrors claudeheadless.UserServer — a server of the user's Claude config,
+// scriptMcpServerSchema mirrors agentmcp.UserServer — a server of the user's Claude config,
 // never its args, env or headers.
 export const scriptMcpServerSchema = /*#__PURE__*/ z.object({
   name: z.string(),
@@ -150,7 +149,7 @@ export const scriptMcpServerSchema = /*#__PURE__*/ z.object({
 });
 export type ScriptMcpServer = z.infer<typeof scriptMcpServerSchema>;
 
-// scriptMcpToolSchema mirrors claudeheadless.UserTool.
+// scriptMcpToolSchema mirrors agentmcp.UserTool.
 export const scriptMcpToolSchema = /*#__PURE__*/ z.object({
   name: z.string(),
   description: z.string(),

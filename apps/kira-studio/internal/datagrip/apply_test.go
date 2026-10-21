@@ -140,12 +140,11 @@ func TestApplyPartialFailureLeavesOtherRowsCreated(t *testing.T) {
 	}
 }
 
-// TestLookupPasswordKeepassConfiguredIsUnsupported is this follow-up's own regression case: a
-// project whose security.xml says PROVIDER=KEEPASS now has no backend left to try (the file-based
-// PasswordSafe store was removed per explicit user correction — see this phase's plan doc), and
-// must get a named ReasonCredentialStoreUnsupported refusal rather than being silently folded into
-// ReasonPasswordNotSaved (which would misreport a real, readable-by-DataGrip store as "no
-// password saved") or a bare miss.
+// TestLookupPasswordKeepassConfiguredIsUnsupported is the regression case: a project whose
+// security.xml says PROVIDER=KEEPASS now has no backend left to try (the file-based PasswordSafe
+// store was removed), and must get a named ReasonCredentialStoreUnsupported refusal rather than
+// being silently folded into ReasonPasswordNotSaved (which would misreport a real,
+// readable-by-DataGrip store as "no password saved") or a bare miss.
 func TestLookupPasswordKeepassConfiguredIsUnsupported(t *testing.T) {
 	ds := DataSource{UUID: "dddddddd-0000-0000-0000-000000000001"}
 	_, _, err := lookupPassword(ds, SecurityConfig{Provider: "KEEPASS"})
@@ -197,7 +196,7 @@ func TestApplySecretsUnavailableImportsEveryRowWithNoPassword(t *testing.T) {
 	}
 }
 
-// TestApplySecretsUnavailableNeverLooksUpPassword is the review finding: the Keychain lookup (a
+// TestApplySecretsUnavailableNeverLooksUpPassword: the Keychain lookup (a
 // real macOS authorization panel per row) must never run for a row whose password would only be
 // discarded afterward by the secretsAvailable check — checking secretsAvailable first, before
 // attempting the lookup at all, must skip lookupPasswordFn entirely rather than call it and throw

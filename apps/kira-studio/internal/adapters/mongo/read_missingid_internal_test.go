@@ -8,12 +8,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// TestBuildReadPage_MissingID is F7's own regression: a document with no _id at all (reachable via
+// TestBuildReadPage_MissingID is the regression: a document with no _id at all (reachable via
 // a $project: {_id: 0} view, which this app lists and reads elsewhere) used to fail the whole page
 // outright — doc.Lookup("_id") returns an invalid BSON type IDText can't stringify. Reproduced here
-// directly against buildReadPage (no live server needed): confirmed to fail with a non-nil error
-// against the pre-fix function (which called IDText(doc.Lookup("_id")) unconditionally) via a
-// scoped `git stash` before this fix landed.
+// directly against buildReadPage (no live server needed).
 func TestBuildReadPage_MissingID(t *testing.T) {
 	withID, err := bson.Marshal(bson.D{{Key: "_id", Value: bson.NewObjectID()}, {Key: "name", Value: "a"}})
 	if err != nil {

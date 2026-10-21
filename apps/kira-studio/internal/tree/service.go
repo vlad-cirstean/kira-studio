@@ -1,6 +1,6 @@
 // Package tree is the Go analogue of src/main/tree-service.ts: L1 cache-aside for
 // children/describe/definition over internal/storage/repos.MetadataCacheRepo, backed by the
-// engine when the cache misses, is bypassed, or fails its own validator (P55 §1.6 — a naive
+// engine when the cache misses, is bypassed, or fails its own validator (a naive
 // json.Unmarshal is not a substitute for zod's safeParse, so the model package's explicit
 // validators are what makes the "drop the cached row" path reachable at all).
 package tree
@@ -27,7 +27,7 @@ type Connected interface {
 }
 
 // Backend is the slice of adapter tree operations this service calls through instead of straight
-// into *enginehost.Host (A11's per-consumer-interface discipline — the same shape as
+// into *enginehost.Host (the per-consumer-interface discipline — the same shape as
 // connections.Backend and bridge.Canceller). *adapterhost.Router satisfies this structurally.
 // Return types reuse adapters.TreeChildren/model.ObjectMeta/model.ObjectDefinition rather than
 // tree-local wrapper types: Source ("cache" | "server") is this service's own concern, set after
@@ -101,11 +101,10 @@ func (s *Service) requireConnected(connectionID string) error {
 }
 
 // freshnessFloor is the timestamp a cached payload must be at or after to count as fresh: the
-// moment this connection was most recently established (P24 D1/D2). The second result is false
+// moment this connection was most recently established. The second result is false
 // while the connection is not connected, which means no floor applies at all — every cached
-// payload is servable regardless of age (D5): this is what makes the tree instant on launch and
-// what lets a SQL console over a cached container offer completion with no live connection
-// (P22c F7).
+// payload is servable regardless of age: this is what makes the tree instant on launch and
+// what lets a SQL console over a cached container offer completion with no live connection.
 func (s *Service) freshnessFloor(connectionID string) (string, bool) {
 	st := s.states.StateOf(connectionID)
 	if st.Status != "connected" {
@@ -134,10 +133,10 @@ func (s *Service) getCached(connectionID, path, kind string) (json.RawMessage, b
 	return raw, true
 }
 
-// tryCache is Children/Describe/Definition/SchemaColumns's own shared cache-lookup half (P107
-// I2-10): fetch the raw cached row (already floor-checked by getCached), hand it to unmarshal, and
-// drop the row — never trust it further — the moment it fails to unmarshal or fails its own model
-// validator (P55 §1.6). A single cachedRead[T] covering lookup-through-return doesn't fit here:
+// tryCache is Children/Describe/Definition/SchemaColumns's own shared cache-lookup half: fetch the
+// raw cached row (already floor-checked by getCached), hand it to unmarshal, and drop the row —
+// never trust it further — the moment it fails to unmarshal or fails its own model validator. A
+// single cachedRead[T] covering lookup-through-return doesn't fit here:
 // Children caches only result.Nodes ([]model.TreeNode) while returning a ChildrenResult wrapper,
 // and SchemaColumns nil-defaults its fetched slice before caching it — the cached shape and the
 // method's own return shape diverge per caller, so only the lookup half is shared.
@@ -168,7 +167,7 @@ func (s *Service) resolvePath(connectionID, path string) (model.NodePath, error)
 }
 
 // sinceEpoch returns connectionID's current Since — the reconnect epoch a fetch is about to run
-// against (F7, P108 Part 6). Only meaningful once resolvePath's own requireConnected has already
+// against. Only meaningful once resolvePath's own requireConnected has already
 // confirmed the connection is connected (StateOf's synthetic "disconnected" fallback stamps a
 // fresh nowMillis() on every call, which would never compare equal to itself across two calls).
 func (s *Service) sinceEpoch(connectionID string) int64 {
@@ -176,7 +175,7 @@ func (s *Service) sinceEpoch(connectionID string) int64 {
 }
 
 // putIfSinceUnchanged stores encoded for (connectionID, path, kind) only if the connection's own
-// Since is still what it was when the fetch that produced encoded began (since) — F7: a fetch
+// Since is still what it was when the fetch that produced encoded began (since) — a fetch
 // started just before a reconnect gets its own metadata_cache row's fetchedAt stamped at Put time
 // (metadata_cache.go's Put), which lands *after* the new freshness floor the reconnect just
 // established (freshnessFloor reads this same Since) — without this guard, a listing fetched
@@ -189,7 +188,7 @@ func (s *Service) putIfSinceUnchanged(connectionID, path, kind string, since int
 	_ = s.meta.Put(connectionID, path, kind, encoded)
 }
 
-// cacheAside is Describe/Definition/SchemaColumns's own shared cache-miss path (P113 G7): resolve
+// cacheAside is Describe/Definition/SchemaColumns's own shared cache-miss path: resolve
 // path, capture Since, run load, marshal-and-store the result if the connection's Since hasn't
 // moved on meanwhile, and return it. Children keeps its own logic — a truncated listing is dropped
 // rather than cached, and Children returns a different result shape than Describe/Definition/
@@ -280,9 +279,9 @@ func (s *Service) Definition(connectionID, path string, refresh bool, tabID *str
 	return DefinitionResult{Definition: definition, Source: "server"}, nil
 }
 
-// SchemaColumns is D2's fourth cache kind, "columns" — same cache-aside shape as Children/Describe/
+// SchemaColumns is the fourth cache kind, "columns" — same cache-aside shape as Children/Describe/
 // Definition, sharing their metadata_cache row per (connectionID, path) rather than adding a new
-// one (F8: the cache's 200-row-per-connection budget is shared by all four kinds, keyed by path —
+// one (the cache's 200-row-per-connection budget is shared by all four kinds, keyed by path —
 // a design that wrote one row per relation would evict the tree's own children on a large schema).
 func (s *Service) SchemaColumns(connectionID, path string, refresh bool) (SchemaColumnsResult, error) {
 	if !refresh {
@@ -309,7 +308,7 @@ func (s *Service) SchemaColumns(connectionID, path string, refresh bool) (Schema
 	return SchemaColumnsResult{Relations: relations, Source: "server"}, nil
 }
 
-// KeyTypes is P63 §4.3's per-key type batch. Deliberately uncached, unlike Children/Describe/
+// KeyTypes is the per-key type batch. Deliberately uncached, unlike Children/Describe/
 // Definition/SchemaColumns above: those each answer one node's own metadata, cached per (path,
 // kind) in the metadata_cache table; this answers a caller-chosen batch of up to 200 sibling
 // paths (BrowseView.vue's own visible-range window), which has no single node identity to cache

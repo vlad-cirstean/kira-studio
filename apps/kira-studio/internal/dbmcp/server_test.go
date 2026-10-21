@@ -10,7 +10,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// TestWithPanicRecoveryRecoversAndHidesPanicText guards F7: go-sdk runs every tool handler in its
+// TestWithPanicRecoveryRecoversAndHidesPanicText: go-sdk runs every tool handler in its
 // own goroutine with no recover() of its own, so an unguarded panic (nil deref, index out of
 // range) would kill the whole desktop app. The wrapper must recover, log the stack, and return a
 // generic IsError result that never repeats the panic value — on a masked connection that value

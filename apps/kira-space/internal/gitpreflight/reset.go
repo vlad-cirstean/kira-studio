@@ -1,13 +1,13 @@
-// docs/plans/P10.md §7.7's reset classifier — a direct Go port of @kira/git-core's own
-// preflight/reset.ts, field for field and blocker order for blocker order (D1). Unlike
-// ClassifyCheckout/ClassifyRevert, there is NO dirty-worktree blocker here at all: a dirty tree is
-// exactly what soft/mixed are FOR (probe 1), and hard's destruction of it is `destroys` plus
-// `requiresTypedConfirmation`, an advisory the dialog surfaces, not a refusal. The only real
-// blockers are an in-progress operation (probe 3: git does not refuse a mid-merge reset on its
-// own, so this classifier is the one place that does) and an unresolved target.
+// The reset classifier — a direct Go port of @kira/git-core's own preflight/reset.ts, field for
+// field and blocker order for blocker order. Unlike ClassifyCheckout/ClassifyRevert, there is NO
+// dirty-worktree blocker here at all: a dirty tree is exactly what soft/mixed are FOR, and hard's
+// destruction of it is `destroys` plus `requiresTypedConfirmation`, an advisory the dialog
+// surfaces, not a refusal. The only real blockers are an in-progress operation (git does not
+// refuse a mid-merge reset on its own, so this classifier is the one place that does) and an
+// unresolved target.
 //
 // This classifier is also ported to TypeScript, at packages/git-core/src/preflight/reset.ts
-// (D3/D12) — that copy exists solely for previewResetMode's no-round-trip mode-radio recompute.
+// — that copy exists solely for previewResetMode's no-round-trip mode-radio recompute.
 // This file is the authoritative twin; any change to the classification rules must land in both.
 package gitpreflight
 

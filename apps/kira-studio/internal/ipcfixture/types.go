@@ -7,7 +7,7 @@ import "encoding/json"
 // service's own request/response struct), and json.RawMessage preserves that struct's field order
 // verbatim into the written fixture (write.go's second trap) without this package needing its own
 // copy of every bridge type's shape. omitempty on both matches encoding/json's own behaviour for a
-// TypeScript `undefined`-valued key (JSON.stringify drops it; the Go writer must too, per D5).
+// TypeScript `undefined`-valued key (JSON.stringify drops it; the Go writer must too).
 type ControlSnapshot struct {
 	Channel  string          `json:"channel"`
 	Args     json.RawMessage `json:"args,omitempty"`

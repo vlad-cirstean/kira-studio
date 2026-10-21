@@ -3,12 +3,12 @@ import { shortSha } from '@kira/git-core';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 /**
- * `docs/plans/P6.md` W15: "create tag here" (W14's row menu). Unlike `CheckoutDialog.vue`/
- * `RevertDialog.vue`, this one is not driven by an `OpsState` pending-ref (P6 has no
- * `preflight.tagCreate` endpoint) — `App.vue` opens it directly with the target sha and closes
- * it on `close`; `tagDialogModel.ts` supplies the pure classification either way.
+ * "create tag here" (the row menu). Unlike `CheckoutDialog.vue`/`RevertDialog.vue`, this one is not
+ * driven by an `OpsState` pending-ref (there is no `preflight.tagCreate` endpoint) — `App.vue`
+ * opens it directly with the target sha and closes it on `close`; `tagDialogModel.ts` supplies the
+ * pure classification either way.
  *
- * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
+ * The modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
  * only supplies its own body/footer content.
  */
 

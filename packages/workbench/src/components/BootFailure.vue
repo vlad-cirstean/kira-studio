@@ -4,13 +4,12 @@ import EmptyState from '@theme/components/EmptyState.vue';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 
-// P113 F6: main.ts's own boot-failure fallback, both apps — mounted in place of App.vue when
+// main.ts's own boot-failure fallback, both apps — mounted in place of App.vue when
 // bootstrap()'s own hydrates reject, so a bad DB read or a busy DB shows this instead of a
 // permanently blank window with the rejection only visible in the webview console. Deliberately
 // standalone (no workbench/theme host, no Pinia store reads beyond the two shadcn-vue primitives
 // already safe to use un-hydrated) — the stores that failed to hydrate cannot be trusted to render
-// anything else. `appName` is the one thing kira-space's and kira-studio's own copies (P100 Part 2
-// F2, P108 Part 12 F13) differed in.
+// anything else. `appName` is the one thing kira-space's and kira-studio's own copies differed in.
 defineProps<{ appName: string; message: string }>();
 const emit = defineEmits<{ retry: [] }>();
 </script>

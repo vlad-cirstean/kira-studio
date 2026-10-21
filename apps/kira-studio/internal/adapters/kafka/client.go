@@ -19,20 +19,20 @@ import (
 
 const connectTimeout = 10 * time.Second // client.ts's CONNECT_TIMEOUT_MS
 
-// connect is client.ts's connectKafka (P58e E15/E16). Resolves host/port/credentials from URI or
+// connect is client.ts's connectKafka. Resolves host/port/credentials from URI or
 // fields mode, then kgo.NewClient (no I/O yet) -> Client.Ping (a bounded reachability probe,
 // franz-go's own analogue of client.ts's admin.listTopics({timeout}) probe — "admin.connect()
 // alone proves nothing about broker reachability") -> kadm.NewClient. opts is returned alongside
 // so read.go can build the ephemeral per-browse client from the same seed/security options
-// (P58e E5) without duplicating the resolution logic.
+// without duplicating the resolution logic.
 // resolveTLSOpt is connect's sslmode handling, split out so the vocabulary can be unit-tested
 // without a real broker (connect itself dials via Client.Ping). Ports byte-identically to the
-// original inline switch (P58e E16): every non-'disable' mode verifies by default — deliberately
+// original inline switch: every non-'disable' mode verifies by default — deliberately
 // unlike libpq's own `require` (no verification) — with verify-none/insecure as the explicit
-// opt-out (P21 round 2 architecture/security finding 3: docs/ARCHITECTURE.md's own "sslmode
-// semantics per engine (P21 round 1)" section already documented this escape hatch for Kafka;
-// round 1 added it to redis/mongo but missed kafka, leaving a broker with a self-signed or
-// internal-CA certificate — the case the escape hatch exists for — unable to connect at all).
+// opt-out (docs/ARCHITECTURE.md's own "sslmode semantics per engine (P21 round 1)" section already
+// documented this escape hatch for Kafka; round 1 added it to redis/mongo but missed kafka, leaving
+// a broker with a self-signed or internal-CA certificate — the case the escape hatch exists for —
+// unable to connect at all).
 func resolveTLSOpt(cfg model.ResolvedConnectionConfig) (ssl bool, skipVerify bool, err error) {
 	sslmode, sslEnabled, err := adapters.ParseSSLMode(cfg.Options, "kafka", "require", "prefer", "verify-full", "verify-none", "insecure")
 	if err != nil || !sslEnabled {
@@ -122,27 +122,25 @@ func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 	if ssl {
 		opts = append(opts, kgo.DialTLSConfig(&tls.Config{InsecureSkipVerify: skipVerify})) //nolint:gosec // explicit opt-out via verify-none/insecure, not the default
 	}
-	// P25 §1.4: SASL/PLAIN was configured only when username *and* password were both non-empty —
+	// SASL/PLAIN was configured only when username *and* password were both non-empty —
 	// with only one of the pair present, the whole mechanism was silently dropped and the client
 	// connected anonymously; against a SASL-requiring broker that surfaced as a transport-level
 	// refusal (E_QUERY, "is SASL missing?"), blaming the broker for a credential this app chose not
 	// to send.
 	//
-	// Deviation from the plan's own prescribed fix, found implementing against the real driver:
 	// franz-go's plain.Auth.AsMechanism() (pkg/sasl/plain/plain.go) refuses locally — before ever
 	// contacting the broker — the instant either User or Pass is empty ("PLAIN user and pass must
-	// be non-empty"), an error kafka/errors.go's mapError has no reason to classify as auth. The
-	// plan's own fix only special-cased "password with no username"; reproduced against a real
-	// SASL_PLAINTEXT broker, "username with no password" still surfaced as E_QUERY through that
-	// client-side refusal, not the E_AUTH the plan's own §2.7 matrix asserts for it. Both halves of
-	// a half-filled pair are equally unusable by this mechanism, so both are treated symmetrically.
+	// be non-empty"), an error kafka/errors.go's mapError has no reason to classify as auth.
+	// Reproduced against a real SASL_PLAINTEXT broker, "username with no password" still surfaced
+	// as E_QUERY through that client-side refusal, not E_AUTH. Both halves of a half-filled pair
+	// are equally unusable by this mechanism, so both are treated symmetrically.
 	halfFilledCreds := (username == "") != (password == "")
 	if username != "" && password != "" {
 		opts = append(opts, kgo.SASL(plain.Auth{User: username, Pass: password}.AsMechanism()))
 	}
-	// A half-filled pair no longer fails up front (finding 6): ConnectionDialog.vue pairs
+	// A half-filled pair no longer fails up front: ConnectionDialog.vue pairs
 	// username/password on one row, so a PLAINTEXT broker with a stray, half-typed credential must
-	// still connect anonymously, ignoring it, exactly as it did before P25 §1.4 — dial without SASL
+	// still connect anonymously, ignoring it — dial without SASL
 	// (the branch above skips it for a half-filled pair, same as an empty pair) and let the dial
 	// itself decide.
 	if halfFilledCreds {
@@ -160,17 +158,17 @@ func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(l
 		// Only when the anonymous dial fails the specific way a SASL-requiring broker's own
 		// missing-credential refusal does — franz-go's own *kgo.ErrFirstReadEOF, its "is SASL
 		// missing?" diagnosis (confirmed against a real SASL_PLAINTEXT broker: an anonymous dial
-		// here fails with exactly this) — is the half-filled pair actually likely the reason,
-		// so surface the plan's own clear E_AUTH instead of the raw, confusing broker-side text.
-		// A fully-omitted pair does not get this treatment (§1.3/the matrix's own "neither set"
-		// case): nothing was offered there, so blaming a credential the caller never attempted
-		// would be wrong; here, one half of a pair was actually typed in.
+		// here fails with exactly this) — is the half-filled pair likely the reason,
+		// so surface the clear E_AUTH instead of the raw, confusing broker-side text.
+		// A fully-omitted pair does not get this treatment: nothing was offered there, so blaming
+		// a credential the caller never attempted would be wrong; here, one half of a pair was
+		// typed in.
 		//
-		// round-2 finding 5: ErrFirstReadEOF is constructed at three different call sites inside
-		// franz-go with no way to tell them apart from here, so it can't actually distinguish a
-		// SASL-requiring broker from a TLS misconfiguration or a connection severed for some other
-		// reason — the message below names multiple possibilities rather than asserting SASL
-		// specifically, even though SASL is the scenario this heuristic is scoped to detect.
+		// ErrFirstReadEOF is constructed at three different call sites inside franz-go with no way
+		// to tell them apart from here, so it can't distinguish a SASL-requiring broker from a TLS
+		// misconfiguration or a connection severed for some other reason — the message below names
+		// multiple possibilities rather than asserting SASL specifically, even though SASL is the
+		// scenario this heuristic is scoped to detect.
 		if halfFilledCreds {
 			var firstReadEOF *kgo.ErrFirstReadEOF
 			if errors.As(err, &firstReadEOF) {

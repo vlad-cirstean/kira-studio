@@ -4,9 +4,9 @@ import { type CollectionChoice, moveToCollectionMenu } from '@workbench/lib/coll
 import type { MenuItem } from '@workbench/state/contextMenu';
 import type { CollectionRowVm } from './state/collections';
 
-// P4 D13: the row and background context menus, built with the existing MenuItem type from
+// The row and background context menus, built with the existing MenuItem type from
 // state/contextMenu.ts — a permitted `http/ -> state/` edge, the same one CollectionsPanel.vue
-// already uses. Shortcut ids are the existing tree.* bindings (§3): no new shortcut vocabulary,
+// already uses. Shortcut ids are the existing tree.* bindings: no new shortcut vocabulary,
 // so ProjectTree.vue's own runMenuShortcut dispatch shape works here unchanged.
 //
 // The actions themselves are injected rather than imported, so this module stays free of both the

@@ -9,10 +9,10 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// MaskRulesService is M5's Privacy-tab/header-menu surface (docs/HISTORY.md (v1.7)
-// M5-anonymization-masking.md §4.6) — connections.go's own per-method-args-struct shape (:22-31),
-// each argument validated with ipcerr.BadRequest here; the actual domain validation (a valid kind,
-// a non-empty column name, forcing correlate=false for `number`) lives in maskrules.Service.Upsert.
+// MaskRulesService is the Privacy-tab/header-menu surface — connections.go's own
+// per-method-args-struct shape (:22-31), each argument validated with ipcerr.BadRequest here; the
+// actual domain validation (a valid kind, a non-empty column name, forcing correlate=false for
+// `number`) lives in maskrules.Service.Upsert.
 type MaskRulesService struct {
 	Deps appcore.Deps
 }
@@ -132,9 +132,8 @@ func (s *MaskRulesService) Counts() (map[string]int, error) {
 
 // CorrelationKey returns connectionID's own correlation key, hex-encoded ("" when none is needed)
 // — the one seam that sends the raw key to the renderer, for the grid preview's own local tag
-// computation (§6.3). Not part of the plan's originally named bridge methods; see
-// maskrules.Service.CorrelationKeyHex's own comment for why it exists and why it is scoped this
-// narrowly.
+// computation. See maskrules.Service.CorrelationKeyHex's own comment for why it exists and why it
+// is scoped this narrowly.
 func (s *MaskRulesService) CorrelationKey(args MaskRulesListArgs) (string, error) {
 	if args.ConnectionID == "" {
 		return "", ipcerr.Required("connectionId")

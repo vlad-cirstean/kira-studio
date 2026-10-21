@@ -1,4 +1,4 @@
-// P67 §5.2: "act on a tab whose view may not be mounted yet" (editReferencedRow's own new tab
+// "act on a tab whose view may not be mounted yet" (editReferencedRow's own new tab
 // landing its caret before that tab's SlickGridHost has necessarily mounted, or before its first
 // filtered page has loaded) needs a pending-request pattern. This module imports nothing (a Map
 // and five plain functions), so it closes no cycle with menu.ts, state.ts or the host.

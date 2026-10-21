@@ -102,7 +102,7 @@ test('sqs (frontend, mocked IPC) — flat queue tree, stream tab (batch, Poll-on
   await view.locator('[data-testid="stream-poll"]').click();
   await expect(streamCellEditorPanel).toHaveCount(0);
 
-  // --- P2 R1 regression: SQS has no addressable cursor, so a second Poll's data:read carries
+  // --- Regression: SQS has no addressable cursor, so a second Poll's data:read carries
   //     the identical connectionId/path/pageSize/cursor as the first — without invalidating the
   //     cache first, the second Poll would silently be served the first Poll's now-stale page
   //     instead of ever reaching a fresh ReceiveMessage --------------------------------------

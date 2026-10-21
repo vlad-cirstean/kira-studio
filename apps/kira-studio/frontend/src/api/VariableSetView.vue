@@ -28,15 +28,15 @@ import { mergeDrafts, reconcileOrder, reseedCommitted } from './state/draftMerge
 import { useVariableSetStore, useVariablesStore } from './state/variables';
 import VariableRow from './VariableRow.vue';
 
-// P17 D16: VariablesDialog.vue's own replacement — the exact same per-row draft/blur/reorder
+// VariablesDialog.vue's own replacement — the exact same per-row draft/blur/reorder
 // mechanics, re-hosted in a tab instead of a dialog (DialogFrame), keyed by `tab.id` (MainView.vue
 // keys this component by it, so one instance <-> one tab, same discipline every other tab view
 // already follows). `data-testid="variables-dialog"`/`"variables-filter"`/`"variables-error"` are
 // kept byte-identical to the dialog's own — the row-level testids never changed at all
-// (VariableRow.vue is untouched apart from D14's description cell) — so the existing
+// (VariableRow.vue is untouched apart from the description cell) — so the existing
 // http-variables.spec.ts/api-secret-reveal-isolation.spec.ts regression net passes with no edit.
 //
-// P104 §3: ViewChrome/ViewHeader/RunState inlined at this call site (no library counterpart).
+// ViewChrome/ViewHeader/RunState inlined at this call site (no library counterpart).
 const props = defineProps<{ tab: VariableSetTabRecord }>();
 
 const collectionsStore = useCollectionsStore();
@@ -86,9 +86,9 @@ const error = computed(() => variableSetStore.variableSetError(props.tab.id));
 
 // ---- the row table (VariablesDialog.vue's own mechanics, verbatim but tab-scoped) ----
 
-// F2 (P108 Part 3): valueTouched is the three-state signal commitDraft sends to Upsert's own
-// nil-means-unchanged `value` parameter. A secret row's seeded `value` is always "" (D4/D5's list
-// projection), so without this flag every blur — even one that only renamed or re-described the
+// valueTouched is the three-state signal commitDraft sends to Upsert's own nil-means-unchanged
+// `value` parameter. A secret row's seeded `value` is always "" (the list projection), so without
+// this flag every blur — even one that only renamed or re-described the
 // row — would send that blank seed as a real replacement value and silently wipe the stored
 // secret. Only onUpdateValue (a real edit) and onUpdateSecret's own commit (which always fills
 // draft.value with a genuine plaintext first, revealed or already-plain) ever set it true; a mere
@@ -115,15 +115,15 @@ function equalDraft(a: Draft, b: Draft): boolean {
   );
 }
 
-// P108 F3: every `rows` reload (any row's edit/add/reorder, a restore of another row's history
-// entry, or — P112 — a cross-window refetch) used to reset every draft to the row's own stored
-// `value` — '' for a secret (D4/D5's list projection). A revealed secret's plaintext survives in
+// Every `rows` reload (any row's edit/add/reorder, a restore of another row's history entry,
+// or a cross-window refetch) used to reset every draft to the row's own stored `value` — '' for a
+// secret (the list projection). A revealed secret's plaintext survives in
 // `revealedValues[id]` untouched, but a fresh draft object starts blank; the reveal-mirror watch
 // below only fires when `revealedValues` itself changes, so pressing the eye again re-reveals the
 // same string, `revealedValues[id] = value` is a same-value set, and the watch never fires — the
 // row shows reveal state with an empty field until the grace expiry (up to 5 min). Seeding from
 // `revealedValues[id]` here, same mirror rule the watch uses, keeps the field showing what's
-// actually revealed across any unrelated reload.
+// revealed across any unrelated reload.
 function draftFromRow(row: ApiVariable): Draft {
   const revealed = variableSetStore.revealedValues[row.id];
   return {
@@ -148,7 +148,7 @@ const trailingDraft = reactive<Draft>({
 });
 const order = ref<string[]>([]);
 
-// P112 §6.5: keep a draft that has changed since it was seeded and still differs from what the
+// Keep a draft that has changed since it was seeded and still differs from what the
 // row now is (an in-progress edit); reseed everything else, including after this window's own
 // commit lands (the draft then equals the incoming row again). Order reseeds from the incoming
 // rows too, unless a drag is in progress.
@@ -172,9 +172,9 @@ function syncDrafts(): void {
 
 // Which id's draft currently mirrors a revealed plaintext, and what that plaintext was — so a
 // later grace-window expiry (state/variables.ts's own scheduleRevealExpiry) can re-mask the field
-// it filled in, without clobbering a value the user has since typed themselves (finding 5: a
-// revealed value used to stay legible on screen for the life of the tab, well past the 5-minute
-// auth grace it came from, because closing the tab was the only thing that ever cleared it).
+// it filled in, without clobbering a value the user has since typed themselves (a revealed value
+// used to stay legible on screen for the life of the tab, well past the 5-minute auth grace it came
+// from, because closing the tab was the only thing that ever cleared it).
 const revealMirroredValue: Record<string, string> = {};
 
 watch(variableSetStore.revealedValues, (values) => {
@@ -400,13 +400,13 @@ async function onRemove(id: string): Promise<void> {
   await variableSetStore.deleteVariable(props.tab.id, scope.value, ownerId.value, id);
 }
 
-// P22b D16: FieldRowsTable.vue's own trailing-blank-row watcher, restated for this view's own
+// FieldRowsTable.vue's own trailing-blank-row watcher, restated for this view's own
 // shape — the scroller is `listRef` (this view's own utility-classed div, not `.field-rows-table`),
 // the row class is
 // `.variable-row` (not `.field-row`), and the watched count is `allRealRows` (this view's own
 // real-row list) rather than a `rows` prop. One real difference from FieldRowsTable's own copy:
 // `allRealRows` starts at 0 and is populated *asynchronously* once rowsQuery's own fetch resolves
-// (P112: a useVariableRows observer) — a tab's rows prop, by contrast, is already the real count
+// (a useVariableRows observer) — a tab's rows prop, by contrast, is already the real count
 // the moment this component mounts — so the watcher's very first invocation is that initial load
 // resolving, not a user adding a row, and must not scroll a freshly opened set straight to its own
 // bottom. `hasLoadedOnce` distinguishes the two: false for that first invocation only, true for
@@ -429,9 +429,9 @@ function onHistoryClickFor(row: ApiVariable): void {
   void variableSetStore.openHistoryMenu(props.tab.id, scope.value, ownerId.value, row.id);
 }
 
-// ---- bulk `.env` mode (R11, item 5) ----
+// ---- bulk `.env` mode ----
 //
-// A component-local lens, not tab state (D16's "a lens, not a setting" rule, same as filterQuery
+// A component-local lens, not tab state (the "a lens, not a setting" rule, same as filterQuery
 // above): reopening this tab must never silently resurrect an unapplied text buffer. `v-if` below
 // (not `v-show`) is load-bearing — it means BulkVariablesEditor is freshly mounted every time bulk
 // mode is entered, so its own baseline snapshot is always taken from the rows the table holds *at
@@ -459,7 +459,7 @@ function onBulkClose(): void {
       <span class="ml-auto flex items-center gap-1" />
     </ViewToolbar>
     <div :class="colorMarkClass('band', railColor)" />
-    <!-- P22b D9 (remainder): the standard toolbar bands, rather than the hand-spaced single
+    <!-- The standard toolbar bands, rather than the hand-spaced single
          #toolbar-2 row this view used to build both controls into on its own — the search box
          (the band every other view's own filter/search control lives in), the .env-text toggle in
          the trailing group (every other view's own trailing action group). -->
@@ -524,12 +524,11 @@ function onBulkClose(): void {
         :environment="owningEnvironment"
       />
 
-      <!-- P22b D9: mirrors VariableRow.vue's own grid template exactly (handle, name, value,
+      <!-- Mirrors VariableRow.vue's own grid template exactly (handle, name, value,
            description, secret, history, remove) so the labels sit above their columns; the four
            non-labelled cells are blank placeholders for the columns that carry no header text.
-           grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto] -- same disclosed section 1.2 allowlist
-           gap as .overview-row (VariablesOverviewPanel.vue) and .variable-row (VariableRow.vue) --
-           a pre-existing value relocated, not a new one. -->
+           grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto] -- same allowlist gap as .overview-row
+           (VariablesOverviewPanel.vue) and .variable-row (VariableRow.vue) -->
       <div
         :class="cn(tableHeadRowClass, 'grid gap-1 px-1.5 grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto]')"
       >

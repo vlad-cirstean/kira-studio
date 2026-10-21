@@ -2,7 +2,7 @@ import { t } from '@theme/i18n';
 // Parses one document body — canonical extended JSON, `read.ts`'s `EJSON.stringify(doc, {relaxed:
 // false})` — into a plain, frozen, non-reactive node tree, and formats values back out in Mongo
 // shell form. No `bson` import: every BSON wrapper is recognised by shape against the closed EJSON
-// v2 spec (P27 D13) — the renderer never parses a wire protocol.
+// v2 spec — the renderer never parses a wire protocol.
 //
 // A canonical numeric wrapper's own value is always a JSON *string* (`{"$numberLong":"123"}`), so
 // `JSON.parse` never rounds a BSON integer through a lossy JS `number` the way it would for the SQL
@@ -230,7 +230,7 @@ const WRAPPER_TABLE: readonly WrapperSpec[] = [
  * `null` for a plain object (no known wrapper key). The six types `literal.ts` can construct
  * (ObjectId, ISODate/Date, NumberLong, NumberInt, NumberDecimal) render as constructor calls;
  * Double renders as a bare number, since typing a bare number into the shell already produces one;
- * every other BSON type falls back to its canonical EJSON text verbatim (D14) — round-trippable
+ * every other BSON type falls back to its canonical EJSON text verbatim — round-trippable
  * through `resolveEjsonWrappers`, just not spelled as a constructor this app doesn't offer.
  */
 function detectWrapper(value: Record<string, unknown>): ScalarRender | null {
@@ -377,17 +377,17 @@ function shellNodeText(node: DocNode, depth: number): string {
 /** The editable buffer's text: the document re-serialised as an indented Mongo shell literal —
  *  `ObjectId("…")`, `ISODate("…")`, `NumberLong("…")`, `NumberDecimal("…")`, `NumberInt(…)` for the
  *  six types literal.ts can construct, and the canonical extended-JSON object verbatim for every
- *  other type, so nothing is ever lossy (D14). Falls back to the raw body unchanged when it does
- *  not parse (D22's raw-text case has nothing shell-literal to offer). */
+ *  other type, so nothing is ever lossy. Falls back to the raw body unchanged when it does
+ *  not parse (the raw-text case has nothing shell-literal to offer). */
 export function toShellText(body: string): string {
   const root = parseDocument(body);
   if (!root) return body;
   return shellNodeText(root, 0);
 }
 
-// P22b D11: canonical -> Relaxed Extended JSON v2 — the third copy format the row asks for.
+// Canonical -> Relaxed Extended JSON v2.
 // Reuses this file's own wrapper-shape helpers (isPlainObject/objectKeys/dateMillis) rather than
-// a new BSON dependency (OQ-5): relaxed mode only ever changes number/date representation —
+// a new BSON dependency: relaxed mode only ever changes number/date representation —
 // $numberInt/$numberLong/a finite $numberDouble unwrap to a bare JSON number, and $date becomes
 // an ISO-8601 string — every other wrapper ($oid, $numberDecimal, $binary, $timestamp,
 // $regularExpression, $code, $ref/$id, $minKey/$maxKey) is unchanged in both modes per the spec,
@@ -436,12 +436,12 @@ export function toRelaxedText(body: string): string {
   return JSON.stringify(canonicalToRelaxed(parsed), null, 2);
 }
 
-// Real-interaction fix (reported bug — the normal/default copy action still produced JSON wrapped
-// in Mongo/BSON type annotations, e.g. `{"$date": …}`/`{"$oid": …}`, not actually plain JSON):
+// The normal/default copy action still produced JSON wrapped in Mongo/BSON type annotations,
+// e.g. `{"$date": …}`/`{"$oid": …}`, not plain JSON:
 // unlike canonicalToRelaxed above, this does not stop at "readable per the Extended JSON v2 spec"
 // — Relaxed Extended JSON is *still* Extended JSON (autocomplete.spec.ts's own coverage locks in
 // that `copy-relaxed-json` keeps `$oid` wrapped, "no relaxed variant for ObjectId" per the real
-// spec; interaction.spec.ts and P19 D6/P22b D11 lock in that `copy-as-json` (Canonical Extended
+// spec; interaction.spec.ts locks in that `copy-as-json` (Canonical Extended
 // JSON) round-trips through mongoimport/mongosh, which requires every wrapper to survive intact —
 // so neither of those two, nor Shell mode, is the right thing to change). This resolves every
 // wrapper detectWrapper recognises down to its plain-JSON equivalent instead: ObjectId/RegExp/Code
@@ -527,7 +527,7 @@ export function toPlainJson(body: string): string {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Beautify/Minify for the document editor's shell-literal buffer (P27 D29). `beautify.ts`'s own
+// Beautify/Minify for the document editor's shell-literal buffer. `beautify.ts`'s own
 // JSON scanner can't reindent this text — a shell constructor call (`ObjectId("…")`) isn't valid
 // JSON — so this is a small sibling scanner: the same lossless-raw-slice discipline, plus one more
 // literal kind, a call expression, captured whole and never interpreted. Beautify/Minify reindent
@@ -662,7 +662,7 @@ const shellKeyText = (raw: string): string => JSON.stringify(raw.replace(/^['"]|
 /**
  * Beautify/Minify for the document editor's edit buffer — reindents Mongo shell literal text
  * (JSON plus shell constructor calls) without re-serialising it or touching any value, including
- * a constructor call's own argument (opaque to this scanner, D29). A buffer that fails to parse —
+ * a constructor call's own argument (opaque to this scanner). A buffer that fails to parse —
  * a hand edit gone wrong — reports the same shape `beautify.ts`'s JSON formatter does.
  */
 export function beautifyShellText(text: string, mode: BeautifyMode): BeautifyResult {

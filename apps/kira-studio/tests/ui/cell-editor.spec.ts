@@ -165,11 +165,11 @@ async function selectCell(
 }
 
 // The data grid virtualizes columns the same way the tree virtualizes rows (DataGrid.vue's
-// visibleColumnIndices) — a column not currently scrolled into view simply has no DOM node, so a
+// visibleColumnIndices) — a column not currently scrolled into view has no DOM node, so a
 // wide_table column past the first screenful must be scrolled into view before it can be selected
 // or asserted on.
 //
-// P22 postscript-follow-up: this used to poll `[data-testid="grid-header-cell"]` for the guard —
+// This used to poll `[data-testid="grid-header-cell"]` for the guard —
 // correct against the incumbent engine (DataGrid.vue), which virtualized header columns exactly
 // like data cells, but stale against SlickGrid: `SlickGridHost.vue`'s own `buildColumns` sets
 // `headerCellAttrs` on every `Column` up front, and SlickGrid builds every header cell once per
@@ -179,7 +179,7 @@ async function selectCell(
 // column-virtualized) stayed off-DOM — the real mechanism behind three `cell-editor.spec.ts`
 // failures bisected to before this whole migration started (they never depended on which grid
 // engine was live; only this helper's own guard did). Root-caused and fixed here rather than
-// worked around: poll the data cell itself, the thing that's actually gated on scroll position
+// worked around: poll the data cell itself, the thing that's gated on scroll position
 // under both engines, with `row` (default 0, matching every call site but the two `big_text` ones)
 // naming which row's cell has to exist.
 async function scrollColumnIntoView(
@@ -569,10 +569,10 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
     'Not a valid timestamp for this format.',
   );
 
-  // Every row in the picker explains itself on hover (D28), reading from the same FORMAT_HELP
-  // the trigger's own tooltip uses. P104 moved ContextMenu.vue's own hint off the old
+  // Every row in the picker explains itself on hover, reading from the same FORMAT_HELP
+  // the trigger's own tooltip uses. ContextMenu.vue's own hint moved off the old
   // data-kira-tip DOM-scan onto a real Tooltip/TooltipContent per item, so the row must now
-  // actually be hovered to render its content — same pattern as fake-data.spec.ts/http-raw.spec.ts's
+  // be hovered to render its content — same pattern as fake-data.spec.ts/http-raw.spec.ts's
   // own disabled-control tooltip assertions.
   await page.click('[data-testid="cell-editor-format"]');
   await page.locator('[data-testid="menu-item-format-iso8601"]').hover();
@@ -631,7 +631,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
 
   await selectCell(page, 0, 'sample');
   await panel.waitFor();
-  // 44600e1: selectionTarget() now treats ANY genuine multi-cell range as having no single value
+  // selectionTarget() now treats ANY genuine multi-cell range as having no single value
   // to show — same-column shift-click included — the same as a row/column selection, rather than
   // resolving to its focus end. Only a degenerate one-cell range (the click landing back on the
   // already-selected cell) still counts as "one cell selected".
@@ -658,7 +658,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
 
   // --- scenario 9: an editable cell is genuinely editable, and blurring the editor auto-stages
   // into the SAME pending-change set the grid's own inline (double-click) edit and the toolbar's
-  // Commit/Discard already operate on (P5's stage/preview/commit model — nothing here writes to
+  // Commit/Discard already operate on (the stage/preview/commit model — nothing here writes to
   // the server directly). `formats` has a primary key and this connection is writable, so this
   // cell carries no read-only-reason at all. There is no separate Save button — leaving the
   // editor (or Ctrl+Enter, without needing to leave it) is the stage signal, mirroring
@@ -751,10 +751,10 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   expect(opsAfter).toEqual(opsBaseline);
 
   // --- scenario 11: the editor instance is reused across cells, never re-created --------------
-  // P81: this was a `Date.now()` budget standing in for "someone re-creates the EditorView per
-  // cell" (see git history). MonacoHost creates its editor once in onMounted and disposes it in
+  // This was a `Date.now()` budget standing in for "someone re-creates the EditorView per
+  // cell". MonacoHost creates its editor once in onMounted and disposes it in
   // onUnmounted, so a re-create means a new `.monaco-editor` subtree — the marker below cannot
-  // survive one. The real latency measurement is P12's; this never was one.
+  // survive one.
   const monacoRoot = panel.locator('[data-testid="cell-editor-encoded"] .monaco-editor');
   await monacoRoot.evaluate((el) => el.setAttribute('data-kira-p81-instance', 'pinned'));
   await selectCell(page, 3, 'sample');
@@ -835,7 +835,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
 
   // Fixture row order (0001_seed.sql's own INSERT order, already relied on by the sibling test's
   // scenario 2 loop): 3=base64, 4=hex, 5=epochSeconds.
-  // P42 D23: the old UUID-only detected format (and the generate button it gated) is gone —
+  // The old UUID-only detected format (and the generate button it gated) is gone —
   // row 8's former 'uuid' sample now detects as plain text, exercised by the sibling test's own
   // scenario 3 regression check.
 
@@ -920,7 +920,7 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   await panel.waitFor();
   await expect(page.locator('[data-testid="cell-editor-timestamp-field"]')).toHaveCount(0);
 
-  // --- shape preservation (D16): wide_table.ts_a is a real Postgres timestamptz defaulted to
+  // --- shape preservation: wide_table.ts_a is a real Postgres timestamptz defaulted to
   // now(), so its text comes back in Postgres's own space+microseconds+offset shape, not a
   // literal this fixture chose. Editing only the hour through the field must change only the
   // hour digits, leaving the separator/offset/fractional precision exactly as they were. -----
@@ -1170,6 +1170,72 @@ const PORT_3: PortSnapshot[] = [
   },
 ];
 
+test('cell editor — timestamp controls stay in view at small dock height', async ({ relaunch }) => {
+  test.setTimeout(120_000);
+  const { window: page } = await relaunch({ control: CONTROL_2, stream: PORT_2 });
+  await connectAndExpand(page, { name: 'Format Actions DB', color: 'blue' });
+  await (await findRow(page, FORMATS_PATH)).dblclick();
+  await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
+
+  const dock = page.locator('[data-testid="cell-editor"]');
+  const controls = ['field', 'calendar', 'zone'].map((id) =>
+    page.locator(`[data-testid="cell-editor-timestamp-${id}"]`),
+  );
+  const height = async (testId: string) =>
+    (await page.locator(`[data-testid="${testId}"]`).boundingBox())?.height ?? Number.NaN;
+  const expectControlsInside = async () => {
+    const dockBox = await dock.boundingBox();
+    expect(dockBox).not.toBeNull();
+    for (const control of controls) {
+      await expect(control).toBeInViewport();
+      const box = await control.boundingBox();
+      expect(box).not.toBeNull();
+      expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(
+        (dockBox?.y ?? 0) + (dockBox?.height ?? 0) + 0.5,
+      );
+    }
+  };
+
+  await selectCell(page, 5, 'sample'); // epochSeconds row
+  await expect(controls[0]).toBeVisible();
+  await expectControlsInside();
+  const paneHeight = await height('cell-editor-timestamp-pane');
+  const encodedHeight = await height('cell-editor-encoded');
+
+  // Find bar sits above the pane; 34 + 34 + 20 + 72 fits the default dock, not the 120 minimum.
+  await page.click('[data-testid="cell-editor-search-toggle"]');
+  await expect(page.locator('[data-testid="http-find-input"]')).toBeVisible();
+  await expectControlsInside();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-testid="http-find-bar"]')).toHaveCount(0);
+
+  await page.locator('.cell-splitter').focus();
+  await page.keyboard.press('Home');
+  await expect
+    .poll(async () => (await dock.boundingBox())?.height ?? Number.NaN)
+    .toBeCloseTo(120, 0);
+  await expectControlsInside();
+  expect(Math.abs((await height('cell-editor-timestamp-pane')) - paneHeight)).toBeLessThanOrEqual(
+    1,
+  );
+  expect(await height('cell-editor-encoded')).toBeLessThan(encodedHeight);
+
+  const insideDock = async (testId: string) => {
+    const dockBox = await dock.boundingBox();
+    const box = await page.locator(`[data-testid="${testId}"]`).boundingBox();
+    expect(box?.height ?? -1).toBeGreaterThanOrEqual(0);
+    expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(
+      (dockBox?.y ?? 0) + (dockBox?.height ?? 0) + 0.5,
+    );
+  };
+  await selectCell(page, 3, 'sample'); // base64 row
+  await expect(page.locator('[data-testid="cell-editor-decoded"]')).toBeVisible();
+  await insideDock('cell-editor-decoded');
+  await selectCell(page, 4, 'sample'); // undecodable row
+  await expect(page.locator('[data-testid="cell-editor-decoded-empty"]')).toBeVisible();
+  await insideDock('cell-editor-decoded-empty');
+});
+
 test("cell editor — owned by the view, never shows another tab's cell", async ({
   relaunch,
   consoleErrors,
@@ -1244,8 +1310,8 @@ test("cell editor — owned by the view, never shows another tab's cell", async 
   // backgrounded tab keeps its selection instead of losing it).
   await page.locator(`[data-testid="tab"][data-tab-id="${consoleTabId}"]`).click();
   await expect(panel).toHaveAttribute('data-cell-key', new RegExp(`^${consoleTabId}:`));
-  // D5: the panel's height is a persisted global, not per-tab — it must not visually reset.
-  // P104: reka's SplitterPanel (size-unit="px") converts the shared layoutStore px value to a
+  // The panel's height is a persisted global, not per-tab — it must not visually reset.
+  // reka's SplitterPanel (size-unit="px") converts the shared layoutStore px value to a
   // percentage of each view's own SplitterGroup pixel height (reka-ui/Splitter/utils/units.ts),
   // so a sub-pixel rounding gap between two views with slightly different total heights is
   // expected, not a reset — a real reset would jump back to a whole different height, not <1px.

@@ -18,6 +18,9 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
+	"github.com/kirathecat/kira-studio/internal/harness"
+	"github.com/kirathecat/kira-studio/internal/harness/providers"
+	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
@@ -374,7 +377,7 @@ func (a *realApp) requireCostUnder(t *testing.T) {
 	}
 }
 
-// agentEvent is one ChannelAgentEvent payload (agenthooks.Event on the wire).
+// agentEvent is one ChannelAgentEvent payload (harness.AgentEvent on the wire).
 type agentEvent struct {
 	TerminalID string `json:"terminalId"`
 	Event      string `json:"event"`
@@ -413,12 +416,12 @@ func (a *realApp) waitAgentEvent(t *testing.T, mark int, terminalID, name string
 	return agentEvent{}
 }
 
-// openAgent opens a claude-code terminal the way the renderer does.
+// openAgent opens a agent terminal the way the renderer does.
 func (a *realApp) openAgent(t *testing.T, id, cwd, command string) {
 	t.Helper()
 	if _, err := a.W.Terminal.Open(terminal.OpenArgs{
 		TerminalID: id, WindowKey: window, Cwd: cwd, Cols: 120, Rows: 40,
-		Command: command, LaunchKind: terminal.LaunchKindClaudeCode,
+		Command: command, LaunchKind: terminal.LaunchKindAgent,
 	}); err != nil {
 		t.Fatalf("Terminal.Open %s: %v", id, err)
 	}
@@ -468,3 +471,7 @@ func flowRepo(t *testing.T) string {
 	}
 	return repo
 }
+
+func agentSelector() harness.Selector { return harness.Selector{Registry: providers.New()} }
+
+func newAgentRunner() *memory.AgentRunner { return memory.NewAgentRunner(agentSelector(), nil) }

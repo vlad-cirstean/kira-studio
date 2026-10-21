@@ -176,7 +176,7 @@ function residueNote(hop: HttpTimelineHop): string {
   return t('studio.http.timeline.residue.hint', { duration: formatDuration(residueMs(hop)) });
 }
 
-// D11: a "note" that fires on the common case (a reused connection is the common case) is a
+// A "note" that fires on the common case (a reused connection is the common case) is a
 // caption, not a full-width tinted banner — up to five MessageStrips per hop could push ~180px
 // of banner between a 10px bar and the next hop's caption. Same four sentences, same order, same
 // testids — now text-kira-sm dim caption lines instead of Alert-strip banners.

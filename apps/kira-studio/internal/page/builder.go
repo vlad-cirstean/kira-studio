@@ -284,7 +284,7 @@ type KeyValuePage struct {
 	// column_name could legitimately match (a hash field, a string key's fixed "value" name, an S3
 	// metadata key) — true by default. False for a shape with no real per-entry field concept (a
 	// Redis list/set's synthetic display index, a stream entry id, a generic console reply with no
-	// per-command shape): dbmcp's own renderKeyValuePage (finding #3, M7) refuses to apply mask
+	// per-command shape): dbmcp's own renderKeyValuePage refuses to apply mask
 	// rules to such a page rather than silently pass a real value through under a Field no rule
 	// could ever legitimately match by construction.
 	FieldsAreColumns bool

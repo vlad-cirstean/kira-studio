@@ -1,4 +1,4 @@
-// P60b §3.3: the membership assertion the correctness requirement itself calls for — a word
+// The membership assertion the correctness requirement itself calls for — a word
 // missing from a dialect's keyword set silently changes how sql-tokens.ts's scanner classifies it
 // (Keyword vs. plain Identifier), which several consumers branch on by name. This is the one test
 // that catches that failure mode; nothing else would (it's invisible at runtime until the exact

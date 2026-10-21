@@ -108,7 +108,7 @@ func productsOf(cs []ConfigCandidate) []string {
 	return out
 }
 
-// TestOutlookForKeepassConfiguredIsStoreUnsupported is this follow-up's own regression case: a
+// TestOutlookForKeepassConfiguredIsStoreUnsupported is the regression case: a
 // KEEPASS-configured provider must classify as OutlookStoreUnsupported, not OutlookNotSaved —
 // DataGrip did save a password here, this app just can't read that store any more now that the
 // file-based fallback is gone.

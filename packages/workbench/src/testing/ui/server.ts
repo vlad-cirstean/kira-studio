@@ -58,12 +58,12 @@ export async function serveStatic(
 }
 
 /**
- * A static HTTP server over `apps/kira-studio/frontend/dist`, one per worker (P57 §4.10) — the tests/ui/
+ * A static HTTP server over `apps/kira-studio/frontend/dist`, one per worker — the tests/ui/
  * counterpart to `_electron.launch()`. It serves `index.html` for `/` and every built asset, and
  * deliberately serves nothing under `/wails/`: those requests are either intercepted by
  * `mockRuntime.ts` (the runtime's own `*.js` files, and the one RPC endpoint bound calls POST to)
  * or never issued at all (the bulk-data stream, replaced outright by `mockStream.ts`'s
- * `window._wails.streamFactory`, D14). A `/wails/*` request that reaches this server anyway is a
+ * `window._wails.streamFactory`). A `/wails/*` request that reaches this server anyway is a
  * real bug — a call `mockRuntime.ts`'s route did not intercept — so it answers 501 naming the
  * path, loudly, rather than 404, which would look like nothing more than a missing asset.
  */

@@ -13,13 +13,13 @@ import {
 import { toPlainJson, toRelaxedText, toShellText } from '../shared/document/ejson';
 import { type CopyAllFormat, jsonArrayOf, prettyJson } from './copyAll';
 
-// P19 D9/D10: the console result grid's own menu builders, mirroring views/grid/menu.ts's split
+// The console result grid's own menu builders, mirroring views/grid/menu.ts's split
 // (builders in a plain module, the host only opens them) -- item ids follow that file's own
 // naming (copy, copy-with-header, copy-as-json, copy-rows, copy-rows-tsv, ...) so a reader
 // comparing the two surfaces sees the same vocabulary. Unlike the data grid, a console result is
 // read-only by construction (no edit/delete/paste/duplicate -- every one of those writes, and a
 // console result has no addressable table) and offers no "Copy as INSERT" (no qualified table
-// name to write into, D9).
+// name to write into).
 
 export interface TabularCellMenuContext {
   onError: (message: string) => void;
@@ -126,7 +126,7 @@ export function tabularRangeMenu(ctx: TabularRangeMenuContext): MenuItem[] {
 
 export interface TabularRowMenuContext {
   onError: (message: string) => void;
-  // A1/P21 round 1: a thunk, not a pre-materialized array — grid/menu.ts's own rowMenu() takes
+  // A thunk, not a pre-materialized array — grid/menu.ts's own rowMenu() takes
   // this same shape for the identical reason (headerMenu's columnValues already did): building
   // the menu must not decode every selected row across every column when none of the three items
   // below may ever run. Memoize at the call site if more than one item might run in the same menu
@@ -215,19 +215,19 @@ export interface RowJsonMenuContext {
    *  already run through JSON.stringify). */
   json: string;
   /** Every displayed row's JSON text, in display order -- "all" means what's on screen right now
-   *  (an active find-filter's own subset), never every row the server could return. P21 round 2
-   *  performance finding 2: a thunk, not an already-built array -- building the menu (right-click)
-   *  must never pay for a whole-page decode only "Copy all as JSON" will ever need, the exact
-   *  eager-snapshot cost views/grid/menu.ts's own snapshotsThunk (P21 round 1) already avoids. */
+   *  (an active find-filter's own subset), never every row the server could return. A thunk, not an
+   *  already-built array -- building the menu (right-click) must never pay for a whole-page decode
+   *  only "Copy all as JSON" will ever need, the exact eager-snapshot cost views/grid/menu.ts's own
+   *  snapshotsThunk already avoids. */
   allJson: () => readonly string[];
   onError: (message: string) => void;
 }
 
-// D6: the key-value result branch's own row menu (a Redis pair has no shell/EJSON format of its
-// own -- P22b D11's submenu below is Mongo-only) -- "Copy as JSON" (this row) and "Copy all as
+// The key-value result branch's own row menu (a Redis pair has no shell/EJSON format of its
+// own -- the submenu below is Mongo-only) -- "Copy as JSON" (this row) and "Copy all as
 // JSON" (every displayed row). Both go through copyOrReportError since a clipboard write here can
 // genuinely be rejected and ContextMenu.vue's own `@click` never awaits `run()` --
-// documents/menu.ts's copyOrReportError shape, P13 D9's strip precedent.
+// documents/menu.ts's copyOrReportError shape.
 export function rowAsJsonMenu(ctx: RowJsonMenuContext): MenuItem[] {
   return [
     {
@@ -264,7 +264,7 @@ export interface MongoDocumentRowMenuContext {
   onError: (message: string) => void;
 }
 
-// P22b D11: the Mongo document result's own row menu -- two named-format submenus (mirroring
+// The Mongo document result's own row menu -- two named-format submenus (mirroring
 // console/menu.ts's own tabularRowMenu Copy row(s) ▸ shape above) rather than documents/menu.ts's
 // old flat "Copy as JSON"/"Copy all as JSON" pair. Leaf ids `copy-as-json`/`copy-all-as-json`
 // preserved so existing specs keep passing on a path change with no assertion change.
@@ -340,10 +340,10 @@ export function mongoDocumentRowMenu(ctx: MongoDocumentRowMenuContext): MenuItem
           type: 'item',
           id: 'copy-all-shell',
           label: t('studio.copy.shellMode.label'),
-          // D11's own shape for "all": documents joined by '\n', one compact literal per line --
+          // The shape for "all": documents joined by '\n', one compact literal per line --
           // not a JSON array, and not each document's own multi-line indented form (which would
           // make "joined by \n" meaningless) -- that's what pasting N mongosh literals back into
-          // a shell session actually wants.
+          // a shell session wants.
           run: () =>
             copyOrReportErrorLazy(ctx.allText('shell'), ctx.onError, () =>
               announceApp(t('studio.copy.shellMode.announce')),

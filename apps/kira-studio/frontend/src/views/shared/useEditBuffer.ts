@@ -53,7 +53,7 @@ export function useEditBuffer(opts: EditBufferOptions): EditBuffer {
   // `formattedForDoc` reads 'indented'/'compact' only while the buffer still equals exactly what
   // applyBeautify last produced, and falls back to 'none' the instant doc changes by any other
   // path (a hand edit, a fresh cell, Reset) — never a flag every doc-writing call site must
-  // remember to clear (P24 D22).
+  // remember to clear.
   const formatted = computed<'none' | 'indented' | 'compact'>(() =>
     formattedForDoc.value !== null && formattedForDoc.value === doc.value
       ? formattedMode.value

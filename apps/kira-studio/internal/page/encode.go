@@ -22,7 +22,7 @@ var hostIsLittleEndian = func() bool {
 // EncodePage writes p into b and returns the offset of the wire.Page table wrapping it. Callers
 // must not have a table open on b — building is inner-to-outer, so every Chunk, string,
 // ColumnDescriptor and PagePosition is finished before the page table starts, and the page table
-// before the wire.Page wrapper (P11 §6.1).
+// before the wire.Page wrapper.
 func EncodePage(b *flatbuffers.Builder, p Page) flatbuffers.UOffsetT {
 	var bodyType wire.PageBody
 	var bodyOff flatbuffers.UOffsetT
@@ -199,12 +199,12 @@ func encodePagePosition(b *flatbuffers.Builder, p PagePosition) flatbuffers.UOff
 }
 
 // createUint32Vector writes v as a FlatBuffers [uint] vector — 4-byte aligned by construction,
-// which is what lets the generated TypeScript hand back a zero-copy Uint32Array view (P11 D4).
+// which is what lets the generated TypeScript hand back a zero-copy Uint32Array view.
 //
-// docs/PERF.md §2.7 traced part of the Go-side encode regression to this vector: the generated
+// docs/PERF.md traced part of the Go-side encode regression to this vector: the generated
 // Go runtime has a bulk CreateByteVector for []byte but nothing equivalent for []uint32, so the
 // original implementation went through one PrependUint32 call per element (~400,000 calls at the
-// widest §2.7 fixture). On a little-endian host, v's own memory layout is already byte-identical
+// widest fixture). On a little-endian host, v's own memory layout is already byte-identical
 // to the wire format's little-endian uint32 vector (confirmed against encode.go's WriteUint32,
 // which always writes least-significant-byte first regardless of host), so the fast path
 // reinterprets v as a []byte with unsafe.Slice and reuses CreateByteVector's own single-copy
@@ -270,7 +270,7 @@ func encodeStrategy(s string) wire.Strategy {
 // encodeRedisType maps this package's plain "string"/"set" literals onto the wire enum's
 // string_/set_ members — the schema suffixes those two (wire.fbs) to dodge the reserved-word
 // collision that the plain names cause in generated TypeScript; the wire values these decode to
-// are unaffected (P11 §5's notes).
+// are unaffected.
 func encodeRedisType(s string) wire.RedisType {
 	switch s {
 	case "string":

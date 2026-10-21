@@ -20,13 +20,13 @@ const DefaultSearchLimit = gitsearch.DefaultLimit
 // can refuse them.
 const MaxSearchLimit = DefaultSearchLimit * 10
 
-// handleSearchRun serves search.run: §7.8's git-backed tail scan (D12/D13). search.run carries no
+// handleSearchRun serves search.run: the git-backed tail scan. search.run carries no
 // `range`/`scope` of its own (contract.ts's own doc comment: "the tail scan is commits-only");
 // this resolves and, if needed, lazily opens the connection's current GRAPH walk exactly as
-// graph.loadMore/graph.stream already do when no walk has been opened yet (§10.8), so a client
+// graph.loadMore/graph.stream already do when no walk has been opened yet, so a client
 // that calls search.run before ever touching the graph still gets a real answer over the same rev
 // set the graph would show.
-// handleSearchRun stays on its own hand-rolled dispatch (P107 I2-13), same reason as graph.go's
+// handleSearchRun stays on its own hand-rolled dispatch, same reason as graph.go's
 // own four handlers just above it in the doc: it resolves through c.Walk, not entryFor, and lazily
 // opens the walk rather than erroring on an unheld repo. Only the plain "repoId is required" check
 // is shared, via requireNonEmpty.

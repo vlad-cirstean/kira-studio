@@ -1,8 +1,7 @@
-// P12 D19: split out of tests/unit/go-ts-vocabulary-parity.spec.ts — that file's own remaining
-// describe (tab/op-kind parity) spans both Studio and Api by nature, but these three checks (body
-// modes, content types, Postman code languages) are Api-only, so they move beside the package
-// whose vocabulary they check. Same technique as the file they came from: reading the Go source as
-// plain text rather than generating one side from the other (P2 D10).
+// These three checks (body modes, content types, Postman code languages) are Api-only, so they
+// move beside the package whose vocabulary they check. Same technique as
+// tests/unit/go-ts-vocabulary-parity.spec.ts: reading the Go source as plain text rather than
+// generating one side from the other.
 
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
@@ -15,7 +14,7 @@ import {
 import { ALIAS_TO_FAKE } from '../src/http/dynamic/catalog';
 import { TRANSFORM_NAMES } from '../src/http/transforms';
 
-/** P108 F17: strips a Go `//` line comment from each line before any extractor scans the source —
+/** Strips a Go `//` line comment from each line before any extractor scans the source —
  *  without this, a `}` or a `name = N` pattern inside a comment can end a map body early or satisfy
  *  extractGoIntConst's match instead of the real declaration. None of this file's map/const
  *  declarations put `//` inside a string literal, so a per-line strip is sufficient. */
@@ -26,7 +25,7 @@ function stripGoLineComments(source: string): string {
     .join('\n');
 }
 
-/** P108 F17: finds the `}` that actually closes the map literal opened at `bodyStart` (already past
+/** Finds the `}` that closes the map literal opened at `bodyStart` (already past
  *  its `{`), depth-counting braces and skipping over string-literal contents — `source.indexOf('}',
  *  bodyStart)` stopped at the first `}` at any depth, which a nested struct value or a `}` inside a
  *  quoted string would close early. */
@@ -95,7 +94,7 @@ function extractGoStringMap(source: string, varName: string): Record<string, str
   return out;
 }
 
-// P3 D12: the same silent-drift shape go-ts-vocabulary-parity.spec.ts's own tab/op-kind checks
+// The same silent-drift shape go-ts-vocabulary-parity.spec.ts's own tab/op-kind checks
 // guard, for the request body's own two small vocabularies — the mode strings are duplicated in
 // two languages, and so are the Content-Type-by-code-language values (Go decides what to send;
 // body.ts decides what the caption claims will be sent).
@@ -121,7 +120,7 @@ describe('Go/TS HTTP body vocabulary parity (P3 D12)', () => {
   });
 });
 
-// P4 D17: the Postman translation table lives only in Go, so most of it needs no parity guard.
+// The Postman translation table lives only in Go, so most of it needs no parity guard.
 // One list does. If a fifth code language were ever added on the TypeScript side,
 // internal/postman/body.go's importer would silently stop recognising it — importing that
 // language's bodies as plain `raw` — and its exporter would silently stop emitting it, with
@@ -137,12 +136,12 @@ describe('Go/TS Postman code-language parity (P4 D17)', () => {
   });
 });
 
-// P17 §4.3: the same silent-drift shape as the two describes above, for the six-transform closed
-// vocabulary a `{{name | transform}}` pipe may apply (D7) — apivars/transforms.go's own comment
+// The same silent-drift shape as the two describes above, for the six-transform closed
+// vocabulary a `{{name | transform}}` pipe may apply — apivars/transforms.go's own comment
 // names this exact test as the reason its `transformNames` map literal must keep this shape. A
 // transform added on one side and not the other is a failing test here, rather than a pipeline
 // that resolves in the renderer's live preview and silently falls back to `unknown` (or vice
-// versa) only once a request actually reaches Go's stage 2.
+// versa) only once a request reaches Go's stage 2.
 describe('Go/TS transform vocabulary parity (P17 D7)', () => {
   test('apivars.transformNames (Go) matches TRANSFORM_NAMES (TS)', () => {
     const source = readFileSync(
@@ -154,7 +153,7 @@ describe('Go/TS transform vocabulary parity (P17 D7)', () => {
   });
 });
 
-// P28 D15(c): the Postman \`{{$name}}\` -> \`fake.\` mapping now exists twice — as ALIAS_TO_FAKE here
+// The Postman \`{{$name}}\` -> \`fake.\` mapping now exists twice — as ALIAS_TO_FAKE here
 // (what the app resolves and what the catalogue teaches) and as postman.aliasToFake in Go (what an
 // import rewrites with). Drift is silent in the worst direction: an alias missing from the Go table
 // imports verbatim and then, because this app no longer offers or documents the \`$\` spelling,

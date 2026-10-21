@@ -23,10 +23,10 @@ func walkSpecFrom(entry *gitsession.RepoEntry) (porcelain.WalkSpec, int) {
 	return porcelain.WalkSpec{Scope: repoGraphScope(entry), ExcludeStash: excludeStashFor(entry)}, pageSizeFrom(entry)
 }
 
-// excludeStashFor is G28 D15's own settings-side wiring for the decidable "off" half of
-// kiraSpace.stash.showInGraph (F13: inert since G18) — a server-side read from the repo's own
-// stored settings, so no wire change at all. nil entry (no repo.open has happened yet) reads as
-// false, the setting's own default ("on", today's de-facto behaviour).
+// excludeStashFor is the settings-side wiring for the decidable "off" half of
+// kiraSpace.stash.showInGraph — a server-side read from the repo's own stored settings, so no
+// wire change at all. nil entry (no repo.open has happened yet) reads as false, the setting's own
+// default ("on", today's de-facto behaviour).
 func excludeStashFor(entry *gitsession.RepoEntry) bool {
 	if entry == nil {
 		return false
@@ -55,9 +55,9 @@ func repoGraphScope(entry *gitsession.RepoEntry) string {
 	return "all"
 }
 
-// rangedWalkSpecFrom validates rng's base/branch (D8/F6: `merge-base` takes its revisions as
+// rangedWalkSpecFrom validates rng's base/branch (`merge-base` takes its revisions as
 // separate argv tokens, so a leading "-" is refused rather than trusted to git's own argument
-// parser) and returns the ranged WalkSpec (D2). Scope is left empty and IncludeStash false,
+// parser) and returns the ranged WalkSpec. Scope is left empty and IncludeStash false,
 // deliberately: RevSetArgs never reads Scope for a ranged walk and matchesSpec compares it, so
 // filling it from the extension's injected graph.scope would churn a review walk that ignores
 // scope entirely; a stash is not one of a branch's own commits either.
@@ -71,8 +71,8 @@ func rangedWalkSpecFrom(rng *CommitRangeParams) (porcelain.WalkSpec, error) {
 	return porcelain.WalkSpec{Range: &porcelain.RangeSpec{Base: rng.Base, Branch: rng.Branch}}, nil
 }
 
-// graph.status/graph.loadMore/graph.refresh/graph.stream stay on their own hand-rolled dispatch
-// (P107 I2-13): they resolve through c.Walk/c.WalkFor/c.ReviewWalkFor, not entryFor, and
+// graph.status/graph.loadMore/graph.refresh/graph.stream stay on their own hand-rolled dispatch:
+// they resolve through c.Walk/c.WalkFor/c.ReviewWalkFor, not entryFor, and
 // deliberately tolerate an unheld repo (an unopened walk answers a zero-value result, never
 // ErrRepoNotHeld — see graph.status's own comment below) — handleRepoCall's entryFor gate would
 // turn that into an error these handlers were written specifically to avoid. Only the plain
@@ -85,12 +85,12 @@ func (r *Router) handleGraphStatus(ctx context.Context, c *gitsession.Conn, para
 	if err := requireNonEmpty("graph.status", "repoId", p.RepoID); err != nil {
 		return nil, err
 	}
-	// G31 round-2 architecture/security review, finding #4: normalized once, here, at wire
-	// ingestion — see this file's own resolveWalkRequest, which already normalized ITS internal
-	// c.Entry lookup but left every c.Walk/WalkFor/ReviewWalkFor call in this file using the raw
-	// p.RepoID. Conn's own maps are keyed by entry.Summary.RepoID (NFC, since Identify normalizes),
-	// so a decomposed repoId for a non-ASCII repository path failed ErrRepoNotHeld here even
-	// though commit.detail/file.read (entryFor, detail.go) already normalize and work fine.
+	// Normalized once, here, at wire ingestion — see this file's own resolveWalkRequest, which
+	// already normalized ITS internal c.Entry lookup but left every c.Walk/WalkFor/ReviewWalkFor
+	// call in this file using the raw p.RepoID. Conn's own maps are keyed by entry.Summary.RepoID
+	// (NFC, since Identify normalizes), so a decomposed repoId for a non-ASCII repository path
+	// failed ErrRepoNotHeld here even though commit.detail/file.read (entryFor, detail.go) already
+	// normalize and work fine.
 	p.RepoID = gitpath.CleanNFC(p.RepoID)
 
 	// D10: `range` present -> the review walk's own counters, never the graph's.
@@ -178,11 +178,11 @@ func (r *Router) handleGraphRefresh(_ context.Context, c *gitsession.Conn, param
 }
 
 // resolveWalkRequest is graph.loadMore/graph.stream's shared range-vs-scope resolution: with a
-// `range`, it validates the two ref fields (D8) and peeks the per-repo range-count slot (D9, a
+// `range`, it validates the two ref fields and peeks the per-repo range-count slot (a
 // non-blocking best-effort optimisation — a miss passes nil and logsession runs its own count);
 // without one, it resolves the stored scope/pageSize. entry is looked up once, here, and
 // threaded into both branches — the range branch already needed it for the range-count peek; the
-// non-ranged branch now needs it too, for G18 D6's own per-repo scope/pageSize defaults.
+// non-ranged branch now needs it too, for the per-repo scope/pageSize defaults.
 func resolveWalkRequest(c *gitsession.Conn, repoID string, rng *CommitRangeParams) (porcelain.WalkSpec, int, *int, error) {
 	entry, _ := c.Entry(gitpath.CleanNFC(repoID)) // G27 D6; nil, ok=false when unheld — c.Walk below rejects that case itself.
 
@@ -219,22 +219,22 @@ func (r *Router) handleGraphReportFailure(_ context.Context, c *gitsession.Conn,
 }
 
 // handleGraphStream serves graph.stream: upstream's streamGraph, via gitsession.Walk.Stream
-// (D14) — every emitted StreamChunk is packed to a FlatBuffer (gitstore.EncodeChunkFrame) and
-// handed to rpcstream's emit as the chunk envelope's out-of-band blob (D4/D5). `range` present
-// (D10) streams the review walk instead of the graph's.
+// — every emitted StreamChunk is packed to a FlatBuffer (gitstore.EncodeChunkFrame) and
+// handed to rpcstream's emit as the chunk envelope's out-of-band blob. `range` present
+// streams the review walk instead of the graph's.
 //
-// resumeThroughRow used to be forced nil on this path (D11's own "a ranged walk has no persisted
+// resumeThroughRow used to be forced nil on this path (the "a ranged walk has no persisted
 // cache to resume from" — true, but conflated "nothing PERSISTED across a cold reopen" with
-// "nothing the CLIENT already has in memory"). G32 round-3 performance review, finding #1: Conn.
-// Walk reuses the SAME *Walk (and so the same w.store/w.marks cache) across every graph.stream
-// call for one range spec, exactly like the graph's own non-ranged walk — review.ts's own
-// loadMore does a graph.loadMore (pages the walk) followed immediately by a graph.stream re-open,
-// and that re-open used to always start at row 0, re-sending and re-decoding every row already
-// applied from the walk's own cache, THROWN AWAY AND REBUILT client-side each time (packedStream.
-// ts's own from===0-with-existing-rows reset rule) — quadratic in the number of pages loaded.
-// resumeThroughRow is now honored exactly like the non-ranged path: Walk.Stream's own clamping
-// (a value past what is cached, or with no matching dictionary mark, safely falls back to 0) is
-// what actually makes trusting it safe, not whether the walk happens to be ranged.
+// "nothing the CLIENT already has in memory"). Conn.Walk reuses the SAME *Walk (and so the same
+// w.store/w.marks cache) across every graph.stream call for one range spec, exactly like the
+// graph's own non-ranged walk — review.ts's own loadMore does a graph.loadMore (pages the walk)
+// followed immediately by a graph.stream re-open, and that re-open used to always start at row 0,
+// re-sending and re-decoding every row already applied from the walk's own cache, THROWN AWAY AND
+// REBUILT client-side each time (packedStream.ts's own from===0-with-existing-rows reset rule) —
+// quadratic in the number of pages loaded. resumeThroughRow is now honored exactly like the
+// non-ranged path: Walk.Stream's own clamping (a value past what is cached, or with no matching
+// dictionary mark, safely falls back to 0) is what makes trusting it safe, not whether
+// the walk happens to be ranged.
 func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, params json.RawMessage, emit func(payload any, blob []byte) error) error {
 	var p GraphStreamParams
 	if err := json.Unmarshal(params, &p); err != nil {

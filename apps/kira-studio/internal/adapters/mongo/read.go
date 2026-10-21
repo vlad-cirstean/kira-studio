@@ -14,10 +14,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// idText is read.ts's idText: EJSON.stringify(doc._id, {relaxed:false}) — C3. bson.MarshalExtJSON
-// cannot encode a bare scalar at the top level (only a document, M7.0's own IDText probe finding),
+// idText is read.ts's idText: EJSON.stringify(doc._id, {relaxed:false}). bson.MarshalExtJSON
+// cannot encode a bare scalar at the top level (only a document, the IDText probe finding),
 // so id is wrapped in a one-field document, marshalled, and the wrapper text stripped back off.
-// literal.go's ParseFilterObject/ParseJSON5Literal must accept whatever this emits (§1.5).
+// literal.go's ParseFilterObject/ParseJSON5Literal must accept whatever this emits.
 func IDText(id any) (string, error) {
 	data, err := bson.MarshalExtJSON(bson.D{{Key: "v", Value: id}}, true, false)
 	if err != nil {
@@ -44,10 +44,10 @@ func ejsonStringify(v any, canonical bool) (string, error) {
 // resolved by the caller into db/collection).
 type readReq = adapters.ReadReq
 
-// readSortPlan is readPage's sort/keyset eligibility resolution — the two directions (mongoDirection,
-// the sort's own; scanDirection, what the find() itself issues) diverge only for a "before" keyset
-// scan, which walks toward the boundary from the near side and is reversed back to display order
-// after fetching.
+// readSortPlan is readPage's sort/keyset eligibility resolution — the two directions
+// (mongoDirection, the sort's own; scanDirection, what the find() itself issues) diverge only for a
+// "before" keyset scan, which walks toward the boundary from the near side and is reversed back to
+// display order after fetching.
 type readSortPlan struct {
 	sortTerms     []model.SortTerm
 	idOnlySort    bool
@@ -215,7 +215,7 @@ func buildReadPage(req readReq, plan readSortPlan, docs []bson.Raw, fingerprint 
 	rowCount := len(displayDocs)
 
 	builder := page.NewDocumentPageBuilder(false)
-	// anyMissingID is F7: a document with no _id at all — reachable via a $project: {_id: 0} view,
+	// anyMissingID is a document with no _id at all — reachable via a $project: {_id: 0} view,
 	// which this app lists and reads elsewhere — makes doc.Lookup("_id") return an invalid BSON
 	// type IDText can't stringify, which used to fail this whole page outright. The console's own
 	// docsToPage already treats a missing _id as an empty id string; this matches that, and also
@@ -263,10 +263,10 @@ func buildReadPage(req readReq, plan readSortPlan, docs []bson.Raw, fingerprint 
 
 	var offsetPtr *int
 	if req.Cursor.Mode == "offset" || anyMissingID {
-		// F7's own fallback: a token-based (keyset) cursor that lands here with no known _id has no
-		// true offset to report either — 0 is what a fresh offset-paginated browse would start from,
-		// the same degraded-but-safe restart this adapter already gives up front for any sort this
-		// view can't keyset at all.
+		// A token-based (keyset) cursor that lands here with no known _id has no true offset to
+		// report either — 0 is what a fresh offset-paginated browse would start from, the same
+		// degraded-but-safe restart this adapter already gives up front for any sort this view
+		// can't keyset at all.
 		o := req.Cursor.Offset
 		offsetPtr = &o
 	}
@@ -315,7 +315,7 @@ func readPage(ctx context.Context, db *mongodriver.Database, collectionName stri
 	op.SetCommand("db." + collectionName + ".find(" + filterText + ")")
 
 	// docs is left as bson.Raw — the driver's own wire bytes — rather than decoded into bson.D.
-	// P2 R2 (task #96): the id/body text below only ever re-marshals each document straight back
+	// The id/body text below only ever re-marshals each document straight back
 	// to EJSON (IDText/ejsonStringify), never inspects or mutates a decoded field, so decoding into
 	// bson.D first paid a full reflection-driven tree build only to walk it again on the way back
 	// out. bson.Raw/bson.RawValue have their own codecs (rawEncodeValue/rawValueEncodeValue) that
@@ -387,7 +387,8 @@ func bsonTierIndex(alias string) int {
 
 // typeAliasesAfter/typeAliasesBefore return every $type alias MongoDB's query language accepts that
 // sorts strictly after/before tierAlias's own tier — the widening keysetIDCondition's own $or arm
-// needs, empty when tierAlias is already the outermost tier (never true for a real _id in practice).
+// needs, empty when tierAlias is already the outermost tier (never true for a real _id in
+// practice).
 func typeAliasesAfter(tierAlias string) []string {
 	idx := bsonTierIndex(tierAlias)
 	if idx < 0 {
@@ -447,7 +448,7 @@ func bsonTypeAliasFor(v any) (string, bool) {
 	}
 }
 
-// keysetIDCondition builds one page's own _id boundary condition (F6): a bare {_id:{$gt/$lt:
+// keysetIDCondition builds one page's own _id boundary condition: a bare {_id:{$gt/$lt:
 // boundary}} only ever matches _id values of boundary's own BSON type — MongoDB's query-level
 // comparison type-brackets a non-numeric type this way even though the underlying *sort* itself
 // runs in one global cross-type order (bsonSortTiers above) — so once a page's boundary lands on
@@ -479,9 +480,9 @@ func keysetIDCondition(cmpOp string, boundaryID any) bson.D {
 	}}}
 }
 
-// mergeKeysetIDCondition combines the keyset boundary condition ($gt/$lt boundaryID, F6's own
+// mergeKeysetIDCondition combines the keyset boundary condition ($gt/$lt boundaryID, the
 // type-widened form above) for _id with whatever _id constraint the caller's own filter already
-// carries. P2 R2 (task #94): the previous version only handled an existing operator document (e.g.
+// carries. The previous version only handled an existing operator document (e.g.
 // {"_id": {"$in": [...]}}) — it type-asserted the existing value as bson.D and merged its operators
 // in, but a scalar _id (a single-document lookup, e.g. {"_id": ObjectId("...")}) failed that
 // assertion and was silently discarded when setField then overwrote the _id key outright. Wrapping
@@ -489,8 +490,7 @@ func keysetIDCondition(cmpOp string, boundaryID any) bson.D {
 // dropping anything, and also avoids two conflicting keys under the same _id document if the
 // filter's own operator document already used the same comparison operator the keyset boundary
 // needs. The flatten-into-one-document fast path below only ever fires for a bare (non-widened)
-// idCond — realistically just boundary types with nothing on the widened side (never a real _id) —
-// kept for symmetry with the pre-F6 shape rather than because it is expected to trigger often now.
+// idCond — realistically just boundary types with nothing on the widened side (never a real _id).
 func mergeKeysetIDCondition(baseFilter bson.D, cmpOp string, boundaryID any) bson.D {
 	idCond := keysetIDCondition(cmpOp, boundaryID)
 	if len(idCond) == 1 && idCond[0].Key == "_id" {
@@ -519,7 +519,7 @@ func setField(d bson.D, key string, value any) bson.D {
 	return out
 }
 
-// countRows ports read.ts's countRows (D5): estimatedDocumentCount() by default (Caps.ExactCount
+// countRows ports read.ts's countRows: estimatedDocumentCount() by default (Caps.ExactCount
 // == false), countDocuments() (exact) only when the caller passes a non-empty filter — an
 // unfiltered estimate is what the pager wants by default, but an estimate ignores any filter
 // entirely, so a filtered count must always go through the exact (slow) path.

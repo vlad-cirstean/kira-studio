@@ -9,10 +9,10 @@ import (
 // JSON tags included).
 type WindowBounds = appstorage.WindowBounds
 
-// WindowRecord is one row of the `windows` table (P8 D2/D4) — a durable, shell-minted identity
+// WindowRecord is one row of the `windows` table — a durable, shell-minted identity
 // for one workbench. Bounds is nil until the window has been moved or resized at least once
-// (D10: a freshly minted window with no stored rectangle inherits its cascade position instead).
-// Mode (P22 D12) is the app mode (packages/shared/domain/mode.ts's AppMode) this window was last
+// (a freshly minted window with no stored rectangle inherits its cascade position instead).
+// Mode is the app mode (packages/shared/domain/mode.ts's AppMode) this window was last
 // closed in; a fresh row (no explicit mode column value on INSERT) reads back the migration's own
 // DEFAULT 'studio'.
 type WindowRecord struct {
@@ -22,13 +22,14 @@ type WindowRecord struct {
 	Mode   string        `json:"mode"`
 }
 
-// WindowModes is this app's own mode vocabulary (packages/shared/domain/mode.ts's AppMode) — P91
-// §3: the automations mode (stored as 'terminal' before P242) joined studio/api — windows.mode is unconstrained TEXT (no CHECK constraint, no
-// migration needed), so an older binary reading an unrecognised mode still degrades cleanly through
-// appstorage.WindowModes.Normalize; without an entry here, a window closed in the Automations module
-// would silently reopen in Studio. A mode value stored by a since-removed module degrades to
-// DefaultWindowMode the same way, no migration needed for the same reason (P128 §2.2: the
-// vocabulary stays here, GetMode/SetMode's own bodies hoisted to appstorage.WindowRepo).
+// WindowModes is this app's own mode vocabulary (packages/shared/domain/mode.ts's AppMode) —
+// the automations mode joined studio/api — windows.mode is unconstrained TEXT
+// (no CHECK constraint, no migration needed), so an older binary reading an unrecognised mode still
+// degrades cleanly through appstorage.WindowModes.Normalize; without an entry here, a window
+// closed in the Automations module would silently reopen in Studio. A mode value stored by a
+// since-removed module degrades to DefaultWindowMode the same way, no migration needed
+// for the same reason (the vocabulary stays here, GetMode/SetMode's own bodies hoisted to
+// appstorage.WindowRepo).
 var WindowModes = appstorage.WindowModes{Default: DefaultWindowMode, Valid: []string{"studio", "api", "automations", "docker"}}
 
 // DefaultWindowMode is the app's own default mode — the migration's column DEFAULT and this

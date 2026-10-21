@@ -57,10 +57,11 @@ type Result struct {
 	Complete bool
 }
 
-// DefaultScanBudget is upstream's own SEARCH_SCAN_BUDGET_MS. Checked every 1024 scanned records and while a read blocks.
+// DefaultScanBudget is upstream's own SEARCH_SCAN_BUDGET_MS. Checked every 1024 scanned records and
+// while a read blocks.
 //
 // One Go-specific note: RE2 has no backtracking and is linear in input, so upstream's own
-// probe-10 catastrophic-backtracking hazard (a pathological pattern taking 853ms against a
+// catastrophic-backtracking hazard (a pathological pattern taking 853ms against a
 // 31-character string in JS) cannot occur on this side at all — this budget guards against a very
 // large repository, never against a pathological pattern.
 const DefaultScanBudget = 5 * time.Second
@@ -74,13 +75,13 @@ var errScanBudget = errors.New("gitsearch: scan budget exhausted")
 
 // Scan runs one streaming, cancellable, time-boxed tail scan: Runner.Start -> a 64 KiB read loop
 // (cancellable exactly like logsession.readChunkLocked) -> porcelain.RecordSplitter.Push (NUL-
-// delimited fields, F3) -> porcelain.FieldGrouper.Push (groups into records) ->
+// delimited fields) -> porcelain.FieldGrouper.Push (groups into records) ->
 // porcelain.ParseScanRecord -> Matcher.MatchFields — the same spawn/split/group/classify pieces
-// logsession already composes, built fresh rather than reused (F9: a paused logsession cannot be
+// logsession already composes, built fresh rather than reused (a paused logsession cannot be
 // read from without consuming the paging walk's own records, and its argv differs anyway).
 //
-// Never buffers the whole of stdout (unlike gitclient.Run): upstream probe 5b measured the scan's
-// own output at ~20 MB over 100k commits, and the matcher is a streaming fold that has no reason
+// Never buffers the whole of stdout (unlike gitclient.Run): the scan's own output measured ~20 MB
+// over 100k commits, and the matcher is a streaming fold that has no reason
 // to hold all of it in memory at once.
 func Scan(ctx context.Context, deps Deps, opts Options) (Result, error) {
 	limit := opts.Limit
@@ -98,7 +99,7 @@ func Scan(ctx context.Context, deps Deps, opts Options) (Result, error) {
 	}
 
 	result := Result{Complete: true}
-	// splitter yields NUL-delimited FIELDS (F3: ScanFormat is %x00-delimited, not %x1f), grouper
+	// splitter yields NUL-delimited FIELDS (ScanFormat is %x00-delimited, not %x1f), grouper
 	// finds each record's own boundary by counting to ScanFieldCount — see porcelain.FieldGrouper's
 	// own doc comment for why field and record delimiters being the same byte means a fixed count
 	// is the only way to tell them apart.
@@ -147,9 +148,8 @@ func Scan(ctx context.Context, deps Deps, opts Options) (Result, error) {
 // scanRound is Scan's own loop body — one read of proc's stdout, split into records, each matched
 // and folded into result. Returns whether Scan's loop should read another chunk: false on a clean
 // EOF, a read/split/parse error (returned alongside), or the scan running past deadline (checked
-// every 1024 scanned records, same as the unextracted loop) — that last case leaves result.Complete
-// false, which the caller uses to skip the post-loop flush/Wait and return result immediately, byte
-// for byte as the original inline loop did.
+// every 1024 scanned records) — that last case leaves result.Complete false, which the caller uses
+// to skip the post-loop flush/Wait and return result immediately.
 func scanRound(ctx context.Context, proc gitclient.Process, splitter *porcelain.RecordSplitter, grouper *porcelain.FieldGrouper, opts Options, limit int, deadline time.Time, expired <-chan time.Time, result *Result) (bool, error) {
 	chunk, readErr := readScanChunk(ctx, proc, expired)
 	if len(chunk) > 0 {

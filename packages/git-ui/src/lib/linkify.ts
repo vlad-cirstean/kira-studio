@@ -1,20 +1,18 @@
 /**
- * P5 W7's message-body URL linkification (§6.4). `docs/plans/P5.md`'s own decision: "v1 P5
- * renders URLs as `<a href>` and lets the host's own webview link handling take them" — no
- * `ExternalOpener` port, because the host already opens a webview link natively. Issue references
- * (`#123`) are deliberately left as plain text: without §6.7's repository resolution there is
- * nothing to link them to, and a link that goes nowhere is worse than plain text (recorded as an
- * open item for P12).
+ * The message-body URL linkification. No `ExternalOpener` port, because the host already opens a
+ * webview link natively. Issue references (`#123`) are deliberately left as plain text: without the
+ * repository resolution there is nothing to link them to, and a link that goes nowhere is worse
+ * than plain text.
  *
  * Split in two, matching `refBadges.ts`'s own precedent: `linkifySegments` is pure and unit
  * tested directly (the boundary case worth a test — trailing sentence punctuation is not part of
  * the URL); `appendLinkifiedText` is the thin DOM-construction layer (elements built as DOM,
  * never `innerHTML`) `CommitMeta.vue` calls per line of the message body.
  *
- * P79 finding 4: a URL segment used to build a real `<a href>` — under the Wails desktop app,
+ * A URL segment used to build a real `<a href>` — under the Wails desktop app,
  * which has no anchor-click interception, clicking one navigated the whole app window off the app
  * with no way back, exactly the hazard `CommitMeta.vue`'s PR row was fixed to avoid one component
- * over (P74 §3.3). `appendLinkifiedText` now takes `onOpenExternal` (`undefined` when the host
+ * over. `appendLinkifiedText` now takes `onOpenExternal` (`undefined` when the host
  * cannot open external URLs at all) and builds a `<button>` that calls it, or plain inert text
  * when there is none — the same "button when capable, inert text otherwise" shape the PR row
  * already established, never a raw `<a>` either way.
@@ -74,7 +72,7 @@ const LINKIFY_URL_CLASS = 'bg-transparent border-0 p-0 text-focus cursor-pointer
 /** Appends one line's worth of linkified DOM to `parent` — a text node per plain-text segment,
  *  and per URL segment: a `<button>` (styled via `LINKIFY_URL_CLASS`) calling `onOpenExternal`
  *  when given, or a plain text node (matching `CommitMeta.vue`'s PR row's own inert-text sibling)
- *  when `onOpenExternal` is `undefined` — never a raw `<a href>` (P79 finding 4). */
+ *  when `onOpenExternal` is `undefined` — never a raw `<a href>`. */
 export function appendLinkifiedText(
   parent: HTMLElement,
   text: string,

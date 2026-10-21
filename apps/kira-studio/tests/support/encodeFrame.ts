@@ -12,7 +12,7 @@ import type {
 import * as wire from '@shared/protocol/wire';
 import * as flatbuffers from 'flatbuffers';
 
-// The test-support mirror of internal/page/encode.go + internal/adapterhost/frame.go (P11): shared
+// The test-support mirror of internal/page/encode.go + internal/adapterhost/frame.go: shared
 // by tests/ui/support/mockStream.ts (which needs a template frame with id 0 and forceDefaults, so
 // mockStreamBrowser.js can patch a real id into it per request) and tests/unit/bridge-port.spec.ts
 // (which knows the real id up front and can encode it directly).

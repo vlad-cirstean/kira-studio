@@ -1,8 +1,8 @@
 package secrets
 
 // Scope is the kind of secret a ciphertext was sealed for. It is AES-GCM's additional
-// authenticated data (P29), which is what makes a ciphertext refuse to decrypt anywhere but the
-// kind of column it was written for — P21 round 2 architecture/security finding 10.
+// authenticated data, which is what makes a ciphertext refuse to decrypt anywhere but the
+// kind of column it was written for.
 //
 // These strings are a storage format, not a label: changing one orphans every secret already
 // stored under it, exactly the way changing envelopePrefix does. cipher_test.go freezes them.

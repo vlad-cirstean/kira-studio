@@ -13,7 +13,7 @@ func (a *Adapter) ClassifyStatement(_ context.Context, statement string) (adapte
 	return adapters.ClassifySQL(statement, adapters.SQLiteDialect), nil
 }
 
-// columnsFor is console.ts's own — F5: a column's *declared* origin type ('INTEGER', 'TEXT', "" for
+// columnsFor is console.ts's own — a column's *declared* origin type ('INTEGER', 'TEXT', \"\" for
 // an expression or an untyped column), the same vocabulary pragma_table_xinfo uses. typeClassFor is
 // exactly the read path's function, reused unchanged. execute() never consults the catalog —
 // nullability/PK-ness are unknowable here; console results are always read-only regardless.
@@ -28,9 +28,9 @@ func columnsFor(names, declTypes []string) []page.ColumnDescriptor {
 	return columns
 }
 
-// runOneStatement is console.ts's own — F5: a non-row-returning statement (INSERT/UPDATE/DELETE/
+// runOneStatement is console.ts's own — a non-row-returning statement (INSERT/UPDATE/DELETE/
 // DDL/pragma) is told apart from a SELECT by QueryContext's own zero-column result, the same signal
-// mysqlfamily's console.go uses (MY-1 confirmed it there; verified independently for
+// mysqlfamily's console.go uses (confirmed there; verified independently for
 // modernc.org/sqlite too, not assumed from that unrelated driver's behaviour).
 func runOneStatement(ctx context.Context, conn *sql.Conn, sqlText string, limit page.ResultCap) (page.TabularPage, error) {
 	if err := assertSingleStatement(sqlText); err != nil {
@@ -51,7 +51,7 @@ func runOneStatement(ctx context.Context, conn *sql.Conn, sqlText string, limit 
 		// zero-column signal above is what tells the two apart — but database/sql's *sql.Rows
 		// exposes no RowsAffected count at all (that lives only on the driver.Result ExecContext
 		// returns), so unlike node:sqlite's own `${result.changes} row(s) affected`, this reports a
-		// generic "OK" — the same capability loss B4 already documented for mysql-family, for the
+		// generic "OK" — the same capability loss already documented for mysql-family, for the
 		// same reason: this is a database/sql API shape, not a driver-specific gap.
 		return adapters.SingleStatusPage("OK", "text"), nil
 	}

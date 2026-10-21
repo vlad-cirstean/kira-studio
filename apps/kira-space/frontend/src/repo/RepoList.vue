@@ -14,7 +14,9 @@ import { cn } from '@theme/lib/utils';
 import { copyAndAnnounce } from '@workbench/behaviour/clipboard';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { matchesQuery } from '@workbench/behaviour/match';
+import { useSortableReorder } from '@workbench/behaviour/sortableReorder';
 import { useTreeShortcuts } from '@workbench/behaviour/treeShortcuts';
+import { logError } from '@workbench/bridge/log';
 import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
@@ -25,6 +27,7 @@ import { useCodeReposStore } from '../state/coderepos';
 import { openRepoTerminalTab } from '../state/repoTabs';
 import { useTerminalsStore } from '../state/terminals';
 import { repoWorkspaceKey, useWorkspaceStore } from '../state/workspace';
+import RepoWorktreeRow from './RepoWorktreeRow.vue';
 import { useRepoHeadsStore } from './state/repoHeads';
 import { useRepoLinksStore } from './state/repoLinks';
 import { useReposDialogStore } from './state/reposDialog';
@@ -50,11 +53,11 @@ const reposDialog = useReposDialogStore();
 // Every top-level repo hidden and Show hidden off: the list is empty by choice, not for lack of imports.
 const allHidden = computed(() => visibility.listed.length === 0 && visibility.hasHidden);
 
-// P67b §4.4: a single click opens (if not yet open) or activates (if open) — OQ-2's adopted
-// recommendation. This panel's entire subject is repositories, so a click that only paints a
-// highlight is a dead control; double-click still works, since it is a click first.
+// A single click opens (if not yet open) or activates (if open). This panel's entire subject is
+// repositories, so a click that only paints a highlight is a dead control; double-click still
+// works, since it is a click first.
 //
-// P84 §6.3: an anchor row whose *worktree* is the open workspace must not read as closed — "open"
+// An anchor row whose *worktree* is the open workspace must not read as closed — "open"
 // now also means "some row parented to me is open". Guarded on `id` since worktreeRecordId can
 // return '' for a worktree never opened in this app, and '' would otherwise match every open
 // top-level repo (every anchor's own parentId is '' too).
@@ -132,7 +135,7 @@ async function onHideRepo(id: string): Promise<void> {
   closeRepo(id);
 }
 
-// P107 I2-20: the Rename…/Close/Remove triple onRepoContextMenu and onWorktreeContextMenu below
+// The Rename…/Close/Remove triple onRepoContextMenu and onWorktreeContextMenu below
 // both build — same three items, same handlers, only "which record" differs. Close only renders
 // while `id` isOpen (both callers'); Rename/Remove always render (both callers already gate
 // whether to offer this triple at all before calling — onWorktreeContextMenu only for a worktree
@@ -252,10 +255,10 @@ function terminalTooltip(n: number): string {
   return t('space.repo.panel.terminalOpen.tooltip', { count: n });
 }
 
-// P83 §10.2: a worktree row's own context menu — out of scope for P82 (nothing needed one yet),
-// needed now since without it a terminal could never be opened at a worktree that isn't the active
-// workspace. "Copy path" rides along since the menu must exist anyway and a one-item menu reads
-// like an accident — the same item the repo row already offers above.
+// A worktree row's own context menu — needed now since without it a terminal could never be opened
+// at a worktree that isn't the active workspace. "Copy path" rides along since the menu must exist
+// anyway and a one-item menu reads like an accident — the same item the repo row already offers
+// above.
 function worktreeMenuItems(repo: RepoSummary, wt: WorktreeEntry): MenuItem[] {
   const items: MenuItem[] = [
     {
@@ -357,6 +360,23 @@ const nav = useListNavigation<NavRow>({
     }),
 });
 
+// Drag and Alt+arrows reorder top-level repos; a search shows a subset, so it pauses both.
+useSortableReorder(
+  listEl,
+  () => filteredRepos.value.map((r) => r.id),
+  (from, to) =>
+    void codeReposStore
+      .reorderCodeRepos(from, to)
+      .catch((err) => logError('repoList', 'reorder failed', err)),
+  {
+    draggable: '.repo-entry',
+    handle: '[data-testid="repo-row"]',
+    keyboardHandle: '[data-testid="repo-row"]',
+    keyboard: true,
+    disabled: () => props.search.trim() !== '' || filteredRepos.value.length < 2,
+  },
+);
+
 // F2 renames, Delete removes, Ctrl/Cmd+C copies the name of the focused row.
 const rowRecord = (row: NavRow): { id: string; name: string } | undefined =>
   row.kind === 'repo' ? row.repo : codeReposStore.codeRepoRecordForPath(row.wt.path);
@@ -449,7 +469,7 @@ useTreeShortcuts(nav, {
         <span v-else class="min-w-0 flex-1"
           ><TruncatedText :text="repo.root">{{ repo.name }}</TruncatedText></span
         >
-        <!-- P83 plan §12.4: a repo row's checked-out branch. The name span's own flex-1
+        <!-- A repo row's checked-out branch. The name span's own flex-1
            above keeps it yielding first, so this is what survives on a narrow panel. Same
            size/colour
            pair as `.worktree-badge` below, so a collapsed row's branch and its expanded
@@ -490,70 +510,19 @@ useTreeShortcuts(nav, {
         data-testid="repo-worktrees"
         :aria-label="t('common.module.worktrees.label')"
       >
-        <!-- Children of a twisty row sit one indent level in (`rowIndent(1)`). -->
-        <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on the list. -->
-        <div
+        <RepoWorktreeRow
           v-for="wt in worktreesStore.worktreeEntries(repo.id)"
           :key="wt.path"
-          :class="[
-          cn(
-            rowVariants({
-              layout: 'tree',
-              selected: isActive(worktreeRecordId(wt.path)),
-              muted: !(wt.isCurrent || isOpen(worktreeRecordId(wt.path))),
-            }),
-            'h-row',
-          ),
-          { active: isActive(worktreeRecordId(wt.path)) },
-        ]"
-          :style="rowIndent(1)"
-          data-testid="repo-worktree-row"
-          :data-worktree-path="wt.path"
-          role="option"
-          :data-nav-key="wtKey(wt)"
+          :wt="wt"
+          :color="repo.color"
+          :active="isActive(worktreeRecordId(wt.path))"
+          :dimmed="!(wt.isCurrent || isOpen(worktreeRecordId(wt.path)))"
+          :nav-key="wtKey(wt)"
           :tabindex="nav.tabindexFor(wtKey(wt))"
-          :aria-selected="isActive(worktreeRecordId(wt.path))"
           @focus="activeNavKey = wtKey(wt)"
-          @click.stop="worktreesStore.switchToWorktree(repo.id, wt)"
-          @contextmenu.prevent.stop="onRowContextMenu($event, { key: wtKey(wt), kind: 'worktree', repo, wt })"
-        >
-          <span
-            :class="colorMarkClass('rail', repo.color)"
-            data-testid="repo-worktree-rail"
-            aria-hidden="true"
-          />
-          <CodiconIcon name="git-branch" :size="13" class="shrink-0" />
-          <span class="min-w-0 flex-1"
-            ><TruncatedText :text="wt.path">{{ worktreeLabel(wt) }}</TruncatedText></span
-          >
-          <Tooltip v-if="wt.isMain">
-            <TooltipTrigger as-child>
-              <span class="worktree-badge shrink-0 text-kira-sm text-subtle">{{
-                t('space.ade.basePicker.main.label')
-              }}</span>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('common.mainWorktree.tooltip') }}</TooltipContent>
-          </Tooltip>
-          <Tooltip v-if="terminalsStore.terminalCountAtPath(wt.path) > 0">
-            <TooltipTrigger as-child>
-              <CodiconIcon
-                name="terminal-bash"
-                :size="12"
-                class="shrink-0 text-subtle"
-                data-testid="repo-terminal-indicator"
-              />
-            </TooltipTrigger>
-            <TooltipContent>{{
-              terminalTooltip(terminalsStore.terminalCountAtPath(wt.path))
-            }}</TooltipContent>
-          </Tooltip>
-          <Tooltip v-if="wt.locked">
-            <TooltipTrigger as-child>
-              <CodiconIcon name="lock" :size="12" class="shrink-0 text-subtle" />
-            </TooltipTrigger>
-            <TooltipContent>{{ wt.locked?.reason }}</TooltipContent>
-          </Tooltip>
-        </div>
+          @click="worktreesStore.switchToWorktree(repo.id, wt)"
+          @menu="onRowContextMenu($event, { key: wtKey(wt), kind: 'worktree', repo, wt })"
+        />
         <!-- Same indent as the worktree row above. -->
         <InlineState
           v-if="worktreesStore.worktreesError(repo.id)"

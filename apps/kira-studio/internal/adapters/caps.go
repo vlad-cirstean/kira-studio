@@ -15,7 +15,7 @@ const (
 )
 
 // Caps mirrors shared/caps.ts's Caps exactly — field order follows caps.ts's own declaration
-// order (P58a A2) so the two files diff against each other. MaxPageSize is a pointer with
+// order so the two files diff against each other. MaxPageSize is a pointer with
 // omitempty: a plain int without omitempty would emit "maxPageSize": 0 for the ten adapters that
 // have none, which capsSchema.parse (positive-int) rejects on the TypeScript side while the two
 // coexist.
@@ -50,8 +50,8 @@ type Caps struct {
 }
 
 // RelationalCaps is the four relational engines' own caps value, byte-identical across
-// mariadb/mysql/postgres/sqlite (P34 D10 keeps it declared per engine rather than shared, so a
-// future real divergence has somewhere honest to be said; P107 I2-37 found the four still equal,
+// mariadb/mysql/postgres/sqlite (it stays declared per engine rather than shared, so a
+// future real divergence has somewhere honest to be said; the four are still equal,
 // so each package's own caps var is this value, unmodified).
 var RelationalCaps = Caps{
 	Tabular: true, Documents: false, KeyValue: false, Stream: false,

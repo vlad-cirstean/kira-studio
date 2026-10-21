@@ -2,7 +2,7 @@
 import type { StashEntry } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 /**
- * I2-21: `StashList.vue`'s and `GlobalStashList.vue`'s own row list, selection and row-menu
+ * `StashList.vue`'s and `GlobalStashList.vue`'s own row list, selection and row-menu
  * open/select were byte-identical apart from each row's own label fields (badge/origin/message,
  * `rowModel`) and the menu the write-capable branch builds (`menuFor`).
  * The menu id itself is not dispatched here — each caller's own action set genuinely differs

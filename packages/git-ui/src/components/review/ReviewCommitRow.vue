@@ -2,19 +2,19 @@
 import type { CommitStore } from '@kira/git-core';
 import { TransportError } from '@kira/git-ipc';
 /**
- * `docs/plans/P7.md` W13 — one commit in the review list. Collapsed: a disclosure triangle,
- * subject, short sha (`§6.4`'s "clicking a sha copies it"), author, relative date. Expanded:
- * `FileTree.vue` over this row's own `DetailState` (`ReviewSessionState.expand` fetches
- * `commit.detail` on first expansion and keeps it for the session — this component never fetches
- * anything itself). `→`/`←`/`Enter` toggle expansion (§6.8 step 2, `ReviewView`'s `useListNavigation`); the row's own context menu is
- * copy-sha/copy-message only (`rowMenuModel.ts`'s `buildReadOnlyRowMenu`, not `buildRowMenu` — this
- * row offers no checkout/branch/tag/revert).
+ * One commit in the review list. Collapsed: a disclosure triangle, subject, short sha
+ * ("clicking a sha copies it"), author, relative date. Expanded: `FileTree.vue` over this row's own
+ * `DetailState` (`ReviewSessionState.expand` fetches `commit.detail` on first expansion and keeps
+ * it for the session — this component never fetches anything itself). `→`/`←`/`Enter` toggle
+ * expansion (`ReviewView`'s `useListNavigation`); the row's own context menu is
+ * copy-sha/copy-message only (`rowMenuModel.ts`'s `buildReadOnlyRowMenu`, not `buildRowMenu` —
+ * this row offers no checkout/branch/tag/revert).
  *
- * G12 D12: opening a file no longer renders an in-webview diff overlay at all — `FileTree`'s
- * selection calls `actions.openInEditor` directly (D11 fixed the URI it produces), the same
- * request `DetailPane.vue`'s own tree already uses. D13: `list-mode`/`filter` are props from
- * `ReviewView.vue`'s one panel-level toolbar, not this row's own `DetailState` fields — every
- * row's `FileTree` renders no toolbar of its own (`show-toolbar="false"`).
+ * Opening a file no longer renders an in-webview diff overlay at all — `FileTree`'s selection
+ * calls `actions.openInEditor` directly, the same request `DetailPane.vue`'s own tree already uses.
+ * `list-mode`/`filter` are props from `ReviewView.vue`'s one panel-level toolbar, not this row's
+ * own `DetailState` fields — every row's `FileTree` renders no toolbar of its own
+ * (`show-toolbar="false"`).
  */
 import InlineState from '@theme/components/InlineState.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
@@ -66,9 +66,9 @@ const dateText = computed(() =>
   commit.value ? formatAgeCompact(commit.value.committer.timestamp) : '',
 );
 
-/** G-UX D5 (item 5): the row-action cluster (Open all changes, Open in graph) sits inside this
+/** The row-action cluster (Open all changes, Open in graph) sits inside this
  *  header; a click on it is not a request to expand the row. Guarded here rather than stopped at
- *  each action. P75 §2.3: "Open in graph" is a plain button now (no more `command:` anchor VS
+ *  each action. "Open in graph" is a plain button now (no more `command:` anchor VS
  *  Code's own bubble-phase link interceptor needed to see), but the guard stays — it is still
  *  correct for keeping either action's click from also toggling the row. */
 function onRowClick(event: MouseEvent): void {
@@ -90,7 +90,7 @@ function onContextMenu(event: MouseEvent): void {
   rowMenu.openAt(event, buildReadOnlyRowMenu(), onMenuSelect);
 }
 
-// P108 F9: `props.actions` (the session-level `rowActions` bundle, see this component's own doc
+// `props.actions` (the session-level `rowActions` bundle, see this component's own doc
 // comment above) is reachable on a collapsed row exactly like an expanded one — `props.expansion`
 // is `undefined` until the row has been expanded at least once, so building this menu from
 // `expansion?.actions` left Copy SHA/Copy message disabled (or a no-op) on every never-expanded
@@ -134,7 +134,7 @@ async function revealInGraph(): Promise<void> {
       props.actions.announce(t('git.review.commit.noGraph.error'));
     }
   } catch (err) {
-    // P108 F10: a template handler — Vue's own async-error handling already stops this from
+    // A template handler — Vue's own async-error handling already stops this from
     // becoming a true unhandled rejection, but with no `app.config.errorHandler` set it never
     // reached the user either. `transport-closed` (this row's own host disconnecting mid-request)
     // is ignored outright — nothing left to announce it to once the row is gone.
@@ -143,9 +143,9 @@ async function revealInGraph(): Promise<void> {
   }
 }
 
-// G12 D12: opens the host's diff directly — no in-webview diff mode to flip into. `sha`'s
+// Opens the host's diff directly — no in-webview diff mode to flip into. `sha`'s
 // own parentIndex is this row's current merge-parent selection, exactly what commit.detail was
-// fetched against. G21 D13: `pinned` comes straight from FileTree's own `openFile` emit — a
+// fetched against. `pinned` comes straight from FileTree's own `openFile` emit — a
 // click (or arrow-key move) is `false`, a double click/`Enter` is `true`.
 function onOpenFile(index: number, pinned: boolean): void {
   const exp = props.expansion;
@@ -178,11 +178,10 @@ function onOpenFile(index: number, pinned: boolean): void {
     :data-testid="`review-row-${sha}`"
     @contextmenu="onContextMenu"
   >
-    <!-- G19 D10: the click-to-toggle listener moved here, off the whole row (F10's root cause —
-         a click on any file row inside review-row-body used to bubble straight up and
+    <!-- A click on any file row inside review-row-body used to bubble straight up and
          collapse the very commit it was clicked inside, since nothing along the way ever called
-         stopPropagation()). Only the header itself toggles the row now. -->
-    <!-- W17: hover tint scoped to the header, not the whole row — the expanded body's own
+         stopPropagation(). Only the header itself toggles the row now. -->
+    <!-- Hover tint scoped to the header, not the whole row — the expanded body's own
          diff-deleted-fg text drops below 4.5:1 contrast in the dark theme against the hover tint
          (axe caught it); the header's own background (`bg-bg`, unhovered) is what the body
          already sits on, and that combination passes. -->
@@ -210,16 +209,16 @@ function onOpenFile(index: number, pinned: boolean): void {
           <span class="shrink-0" aria-hidden="true">·</span>
           <span class="overflow-hidden text-ellipsis">{{ dateText }}</span>
           <span class="shrink-0" aria-hidden="true">·</span>
-          <!-- G19 D7: the clickable-sha button and its own "Copy SHA" affordance are gone — the
-               sha renders as plain text; the existing copySha context-menu item (buildReadOnlyRowMenu)
-               already covers this, and F7 found these two affordances genuinely redundant with it. -->
+          <!-- The clickable-sha button and its own "Copy SHA" affordance are gone — the
+               sha renders as plain text; the existing copySha context-menu item
+               (buildReadOnlyRowMenu) already covers this. -->
           <Identifier class="shrink-0" :value="sha" :short="shaLabel" />
         </span>
       </span>
-      <!-- G14 D8 row 2: inline icon actions, right-aligned — revealed on hover/focus-within
-           (below) and always present for the roving-tabindex-focused row. GitLens's own
-           row-action pattern. `data-testid="review-row-actions"` is also a script hook — `onRowClick`'s
-           own `.closest('[data-testid="review-row-actions"]')` guard below reads it. -->
+      <!-- Inline icon actions, right-aligned — revealed on hover/focus-within (below) and
+           always present for the roving-tabindex-focused row. GitLens's own row-action pattern.
+           `data-testid="review-row-actions"` is also a script hook — `onRowClick`'s own
+           `.closest('[data-testid="review-row-actions"]')` guard below reads it. -->
       <span
         data-testid="review-row-actions"
         :class="[
@@ -232,7 +231,7 @@ function onOpenFile(index: number, pinned: boolean): void {
           :label="t('git.commit.openAllChanges.tooltip')"
           @click="openAllChanges"
         />
-        <!-- P75 §2.3: a real button now — no more command: anchor a bubble-phase
+        <!-- A real button now — no more command: anchor a bubble-phase
              link interceptor needed to observe directly, since the reveal is a bridge request.
              onRowClick's own review-row-actions guard above still keeps this click from also
              toggling the row. -->

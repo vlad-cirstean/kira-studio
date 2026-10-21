@@ -7,10 +7,11 @@ import { useTabsStore } from '../state/tabs';
 import { useTerminalsStore } from '../state/terminals';
 import { openTerminalTab } from '../state/terminalTabs';
 
-// P128 §2.4/§2.7: this app's own Automations-module context, provided once in App.vue (alongside
+// This app's own Automations-module context, provided once in App.vue (alongside
 // workbenchHostKey) for the shared AutomationsPanel.vue/AutomationsStart.vue/AutomationsNewTab.vue/
-// TerminalTabView.vue to inject. `'automations' is this app's own module workspace (state/workspace.ts's `visibleWorkspace`
-// reads the mode store for it directly; it never reaches `repoIdOfWorkspace`/`GitPanel`).
+// TerminalTabView.vue to inject. `'automations' is this app's own module workspace
+// (state/workspace.ts's `visibleWorkspace` reads the mode store for it directly; it never reaches
+// `repoIdOfWorkspace`/`GitPanel`).
 export function createAutomationsModule(): AutomationsModuleContext {
   const customScriptsStore = useCustomScriptsStore();
   const settingsStore = useSettingsStore();
@@ -47,6 +48,7 @@ export function createAutomationsModule(): AutomationsModuleContext {
       preview: (args) => control.scriptRunsPreview(args),
       start: (args, hash) => control.scriptRunsStart(args, hash),
       resume: (id) => control.scriptRunsResume(id),
+      resumeCommand: (runId) => control.scriptRunsResumeCommand(runId),
       readLog: (id, afterSeq) => control.scriptRunsReadLog(id, afterSeq),
       onLog: (cb) => control.onScriptRunLog(cb),
       nextFires: (cron, timezone, count) => control.scriptRunsNextFires(cron, timezone, count),
@@ -75,6 +77,8 @@ export function createAutomationsModule(): AutomationsModuleContext {
       renameCollection: (id, name) => customScriptsStore.renameCollection(id, name),
       removeCollection: (id) => customScriptsStore.removeCollection(id),
       move: (id, collectionId) => customScriptsStore.moveScript(id, collectionId),
+      reorder: (collectionId, ids) => customScriptsStore.reorderScripts(collectionId, ids),
+      reorderCollections: (ids) => customScriptsStore.reorderCollections(ids),
     },
   };
 }

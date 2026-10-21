@@ -261,12 +261,12 @@ func listColumns(ctx context.Context, exec queryExec, schema, table string) ([]m
 	return columns, err
 }
 
-// listSchemaColumns is P22c D1's SchemaColumns, F9's schema-wide widening of listColumns above:
+// listSchemaColumns is the SchemaColumns, the schema-wide widening of listColumns above:
 // the same join, minus the relname filter, plus one LEFT JOIN against pg_index to fold in
 // IsPrimaryKey (cheap — a single index lookup, not the full listIndexes/listForeignKeys graph
 // Describe pays for) so a completion source built from this can say "not null, pk" without a
 // second per-relation round trip. Every column here is byte-identical to what listColumns/Describe
-// reports for the same column (P22c §4.1's own conformance requirement).
+// reports for the same column.
 func listSchemaColumns(ctx context.Context, exec queryExec, schema string) ([]model.RelationColumns, error) {
 	byName := map[string]*model.RelationColumns{}
 	var order []string
@@ -355,7 +355,7 @@ type QualifiedName struct {
 }
 
 // getReadTarget is catalog.ts's getReadTarget — the read path's relation shape in one shot,
-// resolved fresh on every uncached read (D10), in the same op, right before the data statement.
+// resolved fresh on every uncached read, in the same op, right before the data statement.
 // Sequential, not concurrent: pgx's *Conn, like node-postgres's Client, does not support
 // concurrent queries on one connection.
 func getReadTarget(ctx context.Context, exec queryExec, schema, relation string) (ReadTarget, error) {
@@ -433,7 +433,7 @@ func queryForeignKeyEdges(ctx context.Context, exec queryExec, relOID, direction
 			meta := model.ForeignKeyMeta{Name: name, OnDelete: mapConstraintAction(onDelete), OnUpdate: mapConstraintAction(onUpdate)}
 			edge := foreignKeyEdge{meta: meta}
 			// Outbound: I am conrelid, so my own columns are conkey (columns) and the other
-			// table is confrelid (ref_*). Inbound (D17): I am confrelid, so my own columns are
+			// table is confrelid (ref_*). Inbound: I am confrelid, so my own columns are
 			// confkey (ref_columns) and the other (referencing) table is conrelid (src_*) — the
 			// mirror image, keeping meta.Columns = mine, referencedSchema/Table = the other table,
 			// for both directions.

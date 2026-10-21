@@ -22,10 +22,10 @@ export interface ControlSnapshot<T = unknown> {
   args?: unknown;
   response?: T;
   error?: { code: string; message: string; details?: unknown };
-  /** P108 Part 12 F4: holds this call's reply until the spec calls the handle's own `release()`
+  /** Holds this call's reply until the spec calls the handle's own `release()`
    *  for this channel — a deterministic alternative to a fixed delay for staging an ordering race
    *  (e.g. another action completing while this call is still in flight), one call this mock
-   *  actually intercepts at a time. Never set by a committed `tests/ipc/**` capture. */
+   *  intercepts at a time. Never set by a committed `tests/ipc/**` capture. */
   hold?: boolean;
 }
 
@@ -37,9 +37,9 @@ export interface ControlLogEntry {
 export interface ControlMockHandle {
   /** Every Call this mock actually answered, in order. */
   log(): ControlLogEntry[];
-  /** P108 Part 12 F4: releases one call on `channel` that was intercepted with `hold: true` and is
+  /** Releases one call on `channel` that was intercepted with `hold: true` and is
    *  waiting to be answered — lets its `route.fulfill` proceed. Safe to call before the held
-   *  request has even reached this mock yet: the release is then just banked and consumed by the
+   *  request has even reached this mock yet: the release is then banked and consumed by the
    *  next hold on that channel instead of being lost, so a spec's own action-then-release ordering
    *  never has to race the network round trip itself. */
   release(channel: string): void;
@@ -55,10 +55,11 @@ interface CallRequestBody {
   };
 }
 
-/** `go list` resolves the on-disk path for whatever version go.mod actually pins, rather than
+/** `go list` resolves the on-disk path for whatever version go.mod pins, rather than
  *  hand-writing a GOPATH-shaped path that would silently go stale on a version bump. `cwd` is each
- *  app's own root (`resolve(__dirname, '../../../')` from its own `tests/ui/support/mockRuntime.ts`) —
- *  passed in rather than computed here for the same reason `server.ts`'s `distDir` is. */
+ *  app's own root (`resolve(__dirname, '../../../')` from its own
+ *  `tests/ui/support/mockRuntime.ts`) — passed in rather than computed here for the same reason
+ *  `server.ts`'s `distDir` is. */
 export function resolveWailsRuntimeJsPath(cwd: string): string {
   const wailsModuleDir = execFileSync(
     'go',
@@ -230,11 +231,11 @@ export async function installControlMocks(
     });
   }
 
-  // Split out of the route handler below (P108 Part 12 F4's own hold/release addition pushed it
-  // one point past biome's cognitive-complexity cap) — the three-way "no snapshot at all" fallback
-  // (app-specific miss hook, then the wildcard table, then a diagnosable fixture-miss error) is a
-  // self-contained decision, not entangled with the request-routing above it or the hold/error/ok
-  // response-writing below it.
+  // Split out of the route handler below (the hold/release addition pushed it one point past
+  // biome's cognitive-complexity cap) — the three-way "no snapshot at all" fallback (app-specific
+  // miss hook, then the wildcard table, then a diagnosable fixture-miss error) is a self-contained
+  // decision, not entangled with the request-routing above it or the hold/error/ok response-writing
+  // below it.
   async function fulfillMissingSnapshot(
     route: Route,
     channel: string,

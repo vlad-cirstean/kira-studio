@@ -1,10 +1,10 @@
-// Package gitpreflight is the pure, server-side half of SPEC's pre-flight engine — G5 builds it
-// with exactly what this phase's own RPCs read (D3): the in-progress classifier, the status folds,
-// the checkout and revert classifiers, and the undo slot. G7/G12/G13 each extend this package with
-// one file of their own; nothing here is a stub for a classifier a later phase owns.
+// Package gitpreflight is the pure, server-side half of the pre-flight engine — built with
+// exactly what the RPCs read: the in-progress classifier, the status folds,
+// the checkout and revert classifiers, and the undo slot. Later phases each extend this package
+// with one file of their own; nothing here is a stub for a classifier a later phase owns.
 //
 // Nothing in this package spawns a process or touches the filesystem — every classifier is a pure
-// function over plain data, which is what makes the phase's densest logic (the checkout/revert
+// function over plain data, which is what makes the densest logic (the checkout/revert
 // matrices, the in-progress precedence table) testable with no repository at all.
 package gitpreflight
 
@@ -33,13 +33,12 @@ type InProgressOperation struct {
 	ConflictedPaths []string `json:"conflictedPaths"`
 	// CanContinue is true only where `git <op> --continue` exists AND v1 offers it — false only for
 	// bisect (nothing to continue) and unmergedOnly (no state file to advance). Rebase was false
-	// here through G25 ("§9's report-only posture", correct only while nothing in the app could
-	// START a rebase); G26 D12 flips it to true, since G26's own restack executor does start one,
-	// and a paused restack with no Continue button would be a dead end whose only exit is a
-	// terminal. This is a visible, deliberate change to a shipped surface (§10.4): a rebase begun
-	// OUTSIDE the app (a `git pull --rebase` conflict, or one started in a terminal) now also offers
-	// Continue and Skip — a strict improvement, since both run git's own documented remedies for
-	// exactly that state.
+	// here, correct only while nothing in the app could START a rebase; it flips to true, since
+	// the restack executor does start one, and a paused restack with no Continue button would be a
+	// dead end whose only exit is a terminal. This is a visible, deliberate change to a shipped
+	// surface: a rebase begun OUTSIDE the app (a `git pull --rebase` conflict, or one started in a
+	// terminal) now also offers Continue and Skip — a strict improvement, since both run git's own
+	// documented remedies for exactly that state.
 	CanContinue bool `json:"canContinue"`
 	CanAbort    bool `json:"canAbort"`
 	// IsSequence: .git/sequencer/ present — a multi-commit revert or cherry-pick mid-run, where
@@ -48,10 +47,10 @@ type InProgressOperation struct {
 	// UnmergedCount: Continue is *enabled* only when this is 0 — kept separate from
 	// len(ConflictedPaths) so a host that caps the path list can never accidentally enable it.
 	UnmergedCount int `json:"unmergedCount"`
-	// CanSkip: true for cherryPick and revert (the two sequencer operations git gives a --skip,
-	// probe P6) and, since G26 D12, rebase too — probe P10's own hint line names
-	// `git rebase --skip` verbatim, and an already-applied commit inside a stack is exactly when it
-	// is wanted (P15's automatic same-patch drop covers only the patch-identical case).
+	// CanSkip: true for cherryPick and revert (the two sequencer operations git gives a --skip)
+	// and rebase too — the hint line names `git rebase --skip` verbatim, and an already-applied
+	// commit inside a stack is exactly when it is wanted (the automatic same-patch drop covers only
+	// the patch-identical case).
 	CanSkip bool `json:"canSkip"`
 }
 
@@ -72,13 +71,13 @@ type InProgressStateFiles struct {
 	RebaseHeadName      *string
 	RebaseOnto          *string
 	SequencerDir        bool
-	// SequencerTodoKind is F2's own re-derived kind: when SequencerDir is set but every *_HEAD file
+	// SequencerTodoKind is the re-derived kind: when SequencerDir is set but every *_HEAD file
 	// is already gone (a paused multi-commit revert/cherry-pick whose current commit was finished
-	// with a plain `git commit` instead of `--continue`), git's own sequencer state machine is still
-	// mid-run — this is InProgressRevert or InProgressCherryPick, read from sequencer/todo's first
-	// pending command (gitops.ReadInProgressStateFiles), the same source git's own wt-status.c
-	// consults for exactly this state. "" when SequencerDir is unset, or its todo does not name
-	// either.
+	// with a plain `git commit` instead of `--continue`), git's own sequencer state machine is
+	// still mid-run — this is InProgressRevert or InProgressCherryPick, read from sequencer/todo's
+	// first pending command (gitops.ReadInProgressStateFiles), the same source git's own
+	// wt-status.c consults for exactly this state. "" when SequencerDir is unset, or its todo does
+	// not name either.
 	SequencerTodoKind InProgressKind
 }
 
@@ -105,21 +104,22 @@ func operationOf(kind InProgressKind, in inProgressInput) *InProgressOperation {
 	}
 }
 
-// ClassifyInProgress implements §7.11's precedence table exactly, ported from
+// ClassifyInProgress implements the precedence table exactly, ported from
 // model/operation.ts's own classifyInProgress: rebase shadows everything else (a rebase stopped
 // on a conflict also leaves the sequencer files a cherry-pick would), then merge, cherry-pick,
 // revert, bisect, and finally a bare "unmerged paths with none of the six state files present"
 // fallback (a resolved-then-reset state, or `git checkout -m`). AUTO_MERGE is deliberately not an
-// input — upstream's probe P4 found it left behind after an aborted cherry-pick, a stale artefact
+// input — upstream's probe found it left behind after an aborted cherry-pick, a stale artefact
 // rather than a state signal.
 func ClassifyInProgress(files InProgressStateFiles, unmergedPaths []string) *InProgressOperation {
 	if files.RebaseMergeDir || files.RebaseApplyDir {
 		if files.RebaseApplyDir && files.RebaseApplyApplying {
-			// F3: rebase-apply/ with an "applying" marker is a plain `git am`, not a rebase at all
+			// rebase-apply/ with an "applying" marker is a plain `git am`, not a rebase at all
 			// — `rebase --continue`/`--abort`/`--skip` all refuse outright ("It looks like 'git am'
 			// is in progress. Cannot rebase."). Report-only: every Can* flag false. A dedicated
-			// `am` InProgressKind would be a git-ipc wire-contract change (Part 17's own boundary,
-			// not yet reviewed) — out of scope here, so this reuses InProgressRebase's own kind with
+			// `am` InProgressKind would be a git-ipc wire-contract change
+			// (not yet reviewed) — out of scope here,
+			// so this reuses InProgressRebase's own kind with
 			// every action gated off rather than widening the union.
 			op := operationOf(InProgressRebase, inProgressInput{
 				otherSha: files.RebaseOnto, headName: files.RebaseHeadName,

@@ -48,12 +48,12 @@ func BranchRevParseArgs(name string) []string {
 	return []string{"rev-parse", "--verify", "refs/heads/" + name}
 }
 
-// BranchConfigRegexpArgs is undo-capture read #2: every local branch.<name>.* config entry, NUL-framed
+// BranchConfigRegexpArgs is undo-capture read: every local branch.<name>.* config entry, NUL-framed
 // (`key\nvalue\0`, so a multi-line value never splits into fake entries) —
 // replayed back through `git config` on undo so .remote/.merge (and anything else set under that
-// prefix) comes back exactly, not just the two keys probe P4 happened to name.
+// prefix) comes back exactly.
 //
-// G32 round-3 architecture/security review, finding #3: this file used to splice name into the
+// This file used to splice name into the
 // pattern unescaped, on the premise that "a branch name containing regex metacharacters only
 // widens the match, never narrows it to miss the real one" — true about a false NEGATIVE, but
 // exactly backwards about the real risk, a false POSITIVE. A legal git branch name may contain

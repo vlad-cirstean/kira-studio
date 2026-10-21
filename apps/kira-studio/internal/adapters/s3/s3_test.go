@@ -1,11 +1,10 @@
-// Ported from packages/db-fixtures/s3.spec.ts, case by case where practical — the spec's own numbering is kept
-// in each test's name so the two can be diffed. §5.4 of docs/HISTORY.md (v1 P58d) names the
-// cases that carry the most weight: the four download scenarios (25-28, the only automated
-// coverage of the temp-file-then-rename contract), a new mid-stream cancellation case extending
-// 26 (the one P58d D3 exists to keep correct), preview() rendering byte-exact text (17), an insert
-// refusing an existing key only on a real 404 (24, P58d D14's tightening), update preserving
-// ContentType/Metadata (20, P58d D13), and count excluding the Body row for an over-limit object
-// written relatively (19, P58d D16). Every mutating case runs against MUTABLE_BUCKET (P58d D23).
+// Ported from packages/db-fixtures/s3.spec.ts, case by case where practical — the spec's own
+// numbering is kept in each test's name so the two can be diffed. The cases that carry the most
+// weight: the four download scenarios (25-28, the only automated coverage of the
+// temp-file-then-rename contract), a new mid-stream cancellation case extending 26, preview()
+// rendering byte-exact text (17), an insert refusing an existing key only on a real 404 (24),
+// update preserving ContentType/Metadata (20), and count excluding the Body row for an over-limit
+// object written relatively (19). Every mutating case runs against MUTABLE_BUCKET.
 package s3_test
 
 import (
@@ -116,7 +115,7 @@ func TestS3_Connect_UnparseableURI(t *testing.T) {
 	}
 }
 
-// P25 §1.5b/§2.1(6): a fields-mode connection naming a nonexistent shared-config profile must be
+// A fields-mode connection naming a nonexistent shared-config profile must be
 // E_AUTH, not E_QUERY — the regression test for awscfg.Resolve routing LoadDefaultConfig's error
 // through MapError instead of stringifying it. Needs no container behaviour LocalStack cannot
 // provide: the failure happens before any request reaches it.
@@ -728,8 +727,8 @@ func TestS3_DownloadObject_AlreadyCancelledLeavesNoFile(t *testing.T) {
 }
 
 // A cancelled download mid-stream leaves no file — the case no probe and no static assertion can
-// reach, and the one §5.4 says extends scenario 26 to cover P58d D3's actual load-bearing claim:
-// an already-cancelled ctx never reaches io.Copy at all, so 26 alone never exercises the
+// reach, and the one that extends scenario 26 to cover the actual load-bearing claim: an
+// already-cancelled ctx never reaches io.Copy at all, so 26 alone never exercises the
 // mid-stream cleanup path.
 func TestS3_DownloadObject_CancelledMidStreamLeavesNoFile(t *testing.T) {
 	fixture := testsupport.StartS3(t)

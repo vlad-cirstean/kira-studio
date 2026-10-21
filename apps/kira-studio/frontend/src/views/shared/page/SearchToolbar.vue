@@ -18,9 +18,9 @@ const props = defineProps<{
   testidPrefix: string;
   kind: 'rows' | 'documents';
   api: PageSearchApi<M>;
-  /** M5 §6.6: the grid's own mask preview state — this component is shared with documents/
+  /** The grid's own mask preview state — this component is shared with documents/
    *  keyvalue, neither of which has a masking concept, so this stays `undefined` (falsy) there.
-   *  Search itself is unaffected either way (it always scans stored values, §6.1's own "not a
+   *  Search itself is unaffected either way (it always scans stored values, the "not a
    *  security boundary" framing) — this only controls whether the one-line note below shows. */
   maskPreviewOn?: boolean;
 }>();
@@ -81,13 +81,13 @@ function startSearch(autoScroll = true): void {
   }
   scanning.value = true;
   foundSoFar.value = 0;
-  // P43 iter2 F24/D33: `runChunkedScan`'s own `done` resolves with the partial match list on
+  // `runChunkedScan`'s own `done` resolves with the partial match list on
   // cancellation (a useful contract on its own — it's how cancel() can be awaited at all) — but a
   // superseded scan's `resolve` still lands on a *later* animation frame, after `startSearch` has
   // already replaced `handle` with a new one. Capturing this call's own handle in `thisHandle` and
   // testing identity (below, both in onProgress and in `.then`) is what keeps a superseded scan's
   // tick or resolution from ever touching `searchState`/`scanning` again — including the
-  // close()/onUnmounted() case, where the "newer handle" is simply `null` (both null it out below).
+  // close()/onUnmounted() case, where the "newer handle" is `null` (both null it out below).
   let thisHandle: SearchHandle<M>;
   try {
     thisHandle = props.api.runSearch(
@@ -98,9 +98,9 @@ function startSearch(autoScroll = true): void {
         wholeWord: wholeWord.value,
         regex: regex.value,
       },
-      // P42 D38: every tick — the priority window's own pre-scan included — publishes into
+      // Every tick — the priority window's own pre-scan included — publishes into
       // searchState itself, not just this toolbar's local counter, so highlighting updates as the
-      // scan runs rather than only once at the end (F29). `pending: true` is what tells
+      // scan runs rather than only once at the end. `pending: true` is what tells
       // matchedRows() (search.ts) not to filter on an answer the scan hasn't finished yet.
       (found, rowsScanned, _totalRows, soFar) => {
         if (handle !== thisHandle) return;
@@ -117,7 +117,7 @@ function startSearch(autoScroll = true): void {
         // at the same match as `soFar` grows underneath it.
         const previousIndex = props.api.searchState[props.tabId]?.index ?? -1;
         const index = rowsScanned === 0 ? -1 : previousIndex;
-        // P21 round 2 performance finding 8: this used to spread `soFar` into a fresh array
+        // This used to spread `soFar` into a fresh array
         // (`[...soFar]`) on every single progress tick — a full copy of the growing, up to
         // MAX_SCAN_MATCHES-entry match array once per animation frame of the scan, for a value
         // scan.ts's own runChunkedScan already documents as "the scanner never mutates a
@@ -137,25 +137,24 @@ function startSearch(autoScroll = true): void {
     scanning.value = false;
     return;
   }
-  // P43 iter3 D41/F36a: seeded now that runSearch has actually started a scan — ticks are
-  // rAF-deferred, so this always lands before the first one — rather than earlier, which would
-  // also clear a still-valid previous match set out from under the grid on a synchronously
-  // thrown regex error above. Without a priority window (keyvalue's own search passes none,
-  // F36a), the first main-pass tick's `rowsScanned` is never 0, so nothing above would otherwise
-  // reset `previousIndex` away from whatever the *previous, completed* query left it at.
+  // Seeded now that runSearch has started a scan — ticks are rAF-deferred, so this always lands
+  // before the first one — rather than earlier, which would also clear a still-valid previous
+  // match set out from under the grid on a synchronously thrown regex error above. Without a
+  // priority window (keyvalue's own search passes none), the first main-pass tick's `rowsScanned`
+  // is never 0, so nothing above would otherwise reset `previousIndex` away from whatever the
+  // *previous, completed* query left it at.
   props.api.searchState[props.tabId] = { matches: [], index: -1, pending: true, found: 0 };
   handle = thisHandle;
   thisHandle.done.then(({ matches, found, matchedRows }) => {
     if (handle !== thisHandle) return;
     scanning.value = false;
-    // P43 iter3 D41/F36: a match the user navigated to mid-scan (D34) survives the scan
-    // finishing, instead of snapping back to the first hit and re-scrolling the viewport out
-    // from under them. During the main pass `soFar` *is* `matches` (scan.ts:84/:88 append into
-    // and resolve the same array), strictly ascending, so an index into the partial list still
-    // identifies the same match in the final one — the bounds check below is belt-and-braces for
-    // an F36a-inherited index, not the mechanism this relies on. autoScroll only fires when the
-    // user never navigated: a user who already moved the viewport themselves has already
-    // answered the question autoScroll exists to ask.
+    // A match the user navigated to mid-scan survives the scan finishing, instead of snapping back
+    // to the first hit and re-scrolling the viewport out from under them. During the main pass
+    // `soFar` *is* `matches` (scan.ts:84/:88 append into and resolve the same array), strictly
+    // ascending, so an index into the partial list still identifies the same match in the final one
+    // — the bounds check below is belt-and-braces for an inherited index, not the mechanism this
+    // relies on. autoScroll only fires when the user never navigated: a user who already moved the
+    // viewport themselves has already answered the question autoScroll exists to ask.
     const navigatedIndex = props.api.searchState[props.tabId]?.index ?? -1;
     const navigated = navigatedIndex >= 0 && navigatedIndex < matches.length;
     const index = navigated ? navigatedIndex : matches.length > 0 ? 0 : -1;
@@ -164,20 +163,20 @@ function startSearch(autoScroll = true): void {
   });
 }
 
-// P21 round 3 performance finding 1: every keystroke used to restart the whole (potentially
-// many-frame) scan. useFindBar debounces the query run (TIMING.search); the toggles
-// (matchCase/wholeWord/regex) stay immediate, since a checkbox click is a single, deliberate
-// action, not a typing stream. `closed` drops a debounced run that lands after the bar closed.
+// Every keystroke used to restart the whole (potentially many-frame) scan. useFindBar debounces
+// the query run (TIMING.search); the toggles (matchCase/wholeWord/regex) stay immediate, since a
+// checkbox click is a single, deliberate action, not a typing stream. `closed` drops a debounced
+// run that lands after the bar closed.
 let closed = false;
 function onQuery(): void {
   if (!closed) startSearch();
 }
 watch([matchCase, wholeWord, regex], () => startSearch());
 
-// P31 D22/D23/F23: paging, Fetch more, a page-size change, Refresh or a WHERE re-run all call
+// Paging, Fetch more, a page-size change, Refresh or a WHERE re-run all call
 // setPage and bump pageVersion.n — without this, searchState[tabId].matches keeps pointing at
 // rows from the page that's gone. Restarting the scan is the only way back to a consistent match
-// list; not auto-scrolling matches a fresh scan's own initial state (D23).
+// list; not auto-scrolling matches a fresh scan's own initial state.
 watch(
   () => {
     const n = props.api.pageVersion.n;

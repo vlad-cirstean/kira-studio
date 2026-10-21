@@ -2,7 +2,7 @@
 // copy-document/copy-id items call toShellText()/parseIdLabel() synchronously, and — before this
 // fix — nothing caught a throw from either (ContextMenu.vue's onItemClick is never awaited by its
 // own @click binding). This module had zero prior test coverage despite detectWrapper() covering
-// every BSON extended-JSON wrapper this app recognises (P27 D13) — exactly the "parser with
+// every BSON extended-JSON wrapper this app recognises — exactly the "parser with
 // several interacting lexical rules" CLAUDE.md's own bar keeps. Confirmed empirically first
 // (a real Mongo-shaped document through every wrapper below, deeply nested) that none of them
 // throws; this file pins that finding so a future wrapper addition/change can't silently regress
@@ -192,7 +192,7 @@ describe("parseIdLabel — DocumentPage.ids' own EJSON text", () => {
   });
 });
 
-// P22b D11: the third copy format — Relaxed Extended JSON only ever changes number/date
+// The third copy format — Relaxed Extended JSON only ever changes number/date
 // representation (spec-defined, not this app's own invention); every other wrapper is byte-
 // identical to canonical. Interacting per-type rules over a recursive walk is exactly
 // CLAUDE.md's "parser with several interacting rules" bar.
@@ -243,12 +243,12 @@ describe('toRelaxedText — canonical -> Relaxed Extended JSON v2', () => {
   });
 });
 
-// Real-interaction fix (reported bug — the normal/default copy button still produced JSON wrapped
-// in Mongo/BSON type annotations, e.g. `{"$date": …}`/`{"$oid": …}`, not actually plain JSON):
-// unlike toRelaxedText above (which deliberately keeps $oid and every other non-numeric/date
-// wrapper, per the real Extended JSON v2 spec — this file's own "no relaxed variant for ObjectId"
-// case just above), toPlainJson resolves every wrapper down to its plain-JSON equivalent, with no
-// `$`-prefixed key surviving anywhere in the result.
+// The normal/default copy button still produced JSON wrapped in Mongo/BSON type annotations,
+// e.g. `{"$date": …}`/`{"$oid": …}`, not plain JSON: unlike toRelaxedText above (which
+// deliberately keeps $oid and every other non-numeric/date wrapper, per the real Extended JSON v2
+// spec — this file's own "no relaxed variant for ObjectId" case just above), toPlainJson resolves
+// every wrapper down to its plain-JSON equivalent, with no `$`-prefixed key surviving anywhere in
+// the result.
 describe('toPlainJson — every BSON wrapper resolves to a plain JSON value, no $-prefixed keys survive', () => {
   test('$oid becomes a plain string', () => {
     expect(toPlainJson('{"_id":{"$oid":"507f1f77bcf86cd799439011"}}')).toBe(

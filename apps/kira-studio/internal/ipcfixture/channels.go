@@ -1,8 +1,8 @@
-// Package ipcfixture is the Go successor to tests/ipc/'s TypeScript fixture generator (P58f D13).
+// Package ipcfixture is the Go successor to tests/ipc/'s TypeScript fixture generator.
 // It drives the real app stack — storage, repos, connections.Service, tree.Service, the bridge
 // services, and a real adapterhost.Router/Dispatcher — against a real adapter container, and
 // either asserts the result against a committed fixture (the default) or writes a fresh one
-// (KIRA_IPC_FIXTURES=write, D15). Six per-adapter *_test.go files share the machinery in this
+// (KIRA_IPC_FIXTURES=write). Six per-adapter *_test.go files share the machinery in this
 // file plus decode.go, write.go and frozen.go.
 package ipcfixture
 

@@ -6,6 +6,7 @@ import InlineState from '@theme/components/InlineState.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
+import { useAgentInfoFor } from '@workbench/agent/agentInfo';
 import { useClaimPrompt } from '@workbench/prompts/promptsQueries';
 import { computed, onMounted, ref } from 'vue';
 import { useAutomationsModule } from '../module';
@@ -31,6 +32,7 @@ const error = ref<string | null>(null);
 const { markSeen } = useSeenRuns();
 onMounted(() => markSeen(props.tab.state.runId));
 
+const { info: runAgent } = useAgentInfoFor(() => run.value?.provider ?? '');
 const claim = useClaimPrompt();
 const isSmart = computed(() => run.value?.kind === 'smart');
 const live = computed(() => run.value?.state === 'running' || run.value?.state === 'waiting');
@@ -42,20 +44,17 @@ const canContinue = computed(
     (run.value.state === 'blocked' || run.value.state === 'failed'),
 );
 
-function shellQuote(s: string): string {
-  return `'${s.replaceAll("'", `'\\''`)}'`;
-}
-
-function continueInTerminal(): void {
+async function continueInTerminal(): Promise<void> {
   const r = run.value;
   if (!r) return;
+  const command = await ctx.runs.resumeCommand(r.id);
   ctx.openTerminalTab({
     cwd: r.cwd,
     launch: {
-      command: `claude --resume ${shellQuote(r.sessionId)}`,
-      label: t('common.product.claudeCode.label'),
+      command,
+      label: runAgent.value.productLabel,
       color: 'none',
-      kind: 'claude-code',
+      kind: 'agent',
     },
   });
 }

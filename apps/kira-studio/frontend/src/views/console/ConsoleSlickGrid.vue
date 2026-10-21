@@ -115,7 +115,7 @@ type KiraColumn = Column<any>;
 
 const GUTTER_FIELD = '__kira_gutter';
 
-// P30 §3 follow-up fix — a console result comes from ad-hoc SQL (a JOIN where both tables have an
+// A console result comes from ad-hoc SQL (a JOIN where both tables have an
 // `id` column, `SELECT 1 AS x, 2 AS x`, ...), so `page.columns[i].name` is routinely NOT unique.
 // Every SlickGrid column needs a unique `id`/`field` regardless — addressing columns by an
 // index-derived field (rather than by `col.name`, as the tabular branch this migrated off of never
@@ -143,7 +143,7 @@ function gutterFormatter(
   return String(dataContext.row + 1);
 }
 
-// §3.5 rule 3 / `-iter2-pacing` D5: NULL and truncated fold onto the cell's own className via
+// NULL and truncated fold onto the cell's own className via
 // `FormatterResultWithText.addClasses` rather than building a child node — mirrors
 // SlickGridHost.vue's own cellFormatter, minus the FK/PK nav and pending-insert branches (a
 // console result has neither).
@@ -162,35 +162,33 @@ function cellFormatter(
   return view.text;
 }
 
-// P42 D19/D20 — the header tooltip has to be written as attributes by hand (SlickGrid's own
-// `Column` shape carries no child markup) — tooltipAttrs (views/shared/page/columns.ts, P107
-// T2-17): the hover controller (`workbench/state/tooltip.ts`) triggers off `data-kira-tip` (the
-// plain, newline-joined text) and only then reads `data-kira-tip-parts` for the structured
-// content, so both attributes are required, not just the structured one.
+// The header tooltip has to be written as attributes by hand (SlickGrid's own
+// `Column` shape carries no child markup) — tooltipAttrs (views/shared/page/columns.ts): the
+// hover controller (`workbench/state/tooltip.ts`) triggers off `data-kira-tip` (the plain,
+// newline-joined text) and only then reads `data-kira-tip-parts` for the structured content,
+// so both attributes are required, not just the structured one.
 
-// Real-interaction fix (reported bug — column widths reset on every subsequent query in the same
-// session): §3.4 used to read "no persisted column widths — always the measured/default width,
-// reset on every remount", by deliberate design — a console result has no tab state the way
-// SlickGridHost.vue's own DataTabState.columnWidths does. That's still true; what changed is where
-// the memory lives. `consoleColumnWidths`/`setConsoleColumnWidths` (state.ts) key it by column
-// *name* on the tab's own runtime record instead — the first time this tab ever measures a given
+// By deliberate design — a console result has no tab state the way SlickGridHost.vue's own
+// DataTabState.columnWidths does. What changed is where the memory lives.
+// `consoleColumnWidths`/`setConsoleColumnWidths` (state.ts) key it by column *name* on the tab's
+// own runtime record instead — the first time this tab ever measures a given
 // column name (this tab's first query, or any later query whose result introduces a column this
 // tab hasn't shown before), the measured width is committed as that name's sticky width for the
 // rest of the session; every subsequent build (`:key="pageKey"` in ConsoleResultGrid.vue remounts
 // this component on every run) reuses it verbatim, exactly like SlickGridHost.vue's own
 // `buildColumns`'s `storedWidths[name] ?? measured[name]` already does for the SQL data view.
 // A manual resize (onColumnsResized, below) is committed the same way. Every column still gets
-// `sortable: false` (no re-query path). P19 F14/D8: the gutter is now focusable/selectable —
+// `sortable: false` (no re-query path). The gutter is now focusable/selectable —
 // `rowSelectColumnIds` (below) needs it to compute a row selection when the active cell lands
-// there; Tab/Left-arrow landing on the gutter is the one side effect (SlickGridHost.vue's own F14
+// there; Tab/Left-arrow landing on the gutter is the one side effect (SlickGridHost.vue's own
 // finding, verbatim).
 function buildColumns(page: TabularPage): KiraColumn[] {
   const cols: KiraColumn[] = [
     gutterColumn(GUTTER_FIELD, gutterFormatter, 'console-result-gutter-cell'),
   ];
-  // Finding 6 (round 2) — indexed, not name-keyed (`initialWidths` would silently collide on a
-  // duplicate column name, e.g. `SELECT 1 AS x, 2 AS x`) — the one remaining name-keyed
-  // assumption in an otherwise fully index-addressed console path (colField(i), P30 §3 follow-up).
+  // Indexed, not name-keyed (`initialWidths` would silently collide on a duplicate column name,
+  // e.g. `SELECT 1 AS x, 2 AS x`) — the one remaining name-keyed assumption in an otherwise fully
+  // index-addressed console path (colField(i)).
   // The session-scoped sticky-width store (below) is the one deliberate exception: it is keyed by
   // name because that is the identity a *later, different* result set's columns must match against
   // to inherit a width at all — a duplicate-named result shares one sticky width across its
@@ -204,10 +202,10 @@ function buildColumns(page: TabularPage): KiraColumn[] {
     const classes = [`tc-${categoryForTypeClass(col.typeClass)}`];
     if (alignmentFor(col) === 'right') classes.push('kira-align-right');
     const tooltip = columnHeaderTooltip(col, col.dataType);
-    // P16 D5: every column here is `sortable: false` (no re-query path, below) and renders no
-    // PK/FK badge, so this reduces to `max(MIN_WIDTH, ceil(headerText + 16))` — the console
-    // grid's header furniture is 16px of padding only, which measuredWidths' own CELL_PADDING
-    // already covered, so this is provably unchanged for every name short enough to matter.
+    // Every column here is `sortable: false` (no re-query path, below) and renders no PK/FK badge,
+    // so this reduces to `max(MIN_WIDTH, ceil(headerText + 16))` — the console grid's header
+    // furniture is 16px of padding only, which measuredWidths' own CELL_PADDING already covered, so
+    // this is provably unchanged for every name short enough to matter.
     const floor = headerAwareMinWidth(col.name, { padding: 16, sortControl: 0, keyBadge: 0 });
     // This tab's own sticky width for this column name wins over a fresh measurement — the first
     // time a name is ever seen in this tab (a brand new session, or a query returning a column
@@ -274,12 +272,12 @@ function onViewportScroll(): void {
   scrollVelocityTracker.recordOffsetSample(el.scrollTop, performance.now());
 }
 
-// P22 Pass B, C1/§5 D10 — the one per-render DOM pass this migration still needs: a row's own
-// `data-row` (SlickGrid writes the *display position* there) is corrected to the *page* row every
-// other subsystem (the cell editor panel, search) addresses a row by. Idempotent by construction:
-// a `.slick-row` already carrying `data-kira-row-tagged` is skipped. F4/D10 — the row div is
-// cloned per frozen pane; only the right (data) pane's clone gets
-// `data-testid="console-result-row"`, matching the incumbent VirtualList's own one-testid-per-row.
+// The one per-render DOM pass this migration still needs: a row's own `data-row` (SlickGrid writes
+// the *display position* there) is corrected to the *page* row every other subsystem (the cell
+// editor panel, search) addresses a row by. Idempotent by construction: a `.slick-row` already
+// carrying `data-kira-row-tagged` is skipped. The row div is cloned per frozen pane; only the right
+// (data) pane's clone gets `data-testid="console-result-row"`, matching the incumbent VirtualList's
+// own one-testid-per-row.
 function tagRenderedRows(): void {
   const root = rootRef.value;
   if (!root || !dataSource) return;
@@ -327,10 +325,9 @@ function fieldAtCol(colIdx: number): string | undefined {
   return c ? String(c.field) : undefined;
 }
 
-// P22 D10 (F17/F18): the console had a selection fill (`kira-cell-selected`, `selectedCellCssClass`
+// The console had a selection fill (`kira-cell-selected`, `selectedCellCssClass`
 // below) but never the four-sided outline every data-grid selection carries — one computation
-// missing, promoted verbatim from views/grid/SlickGridHost.vue to
-// views/shared/slick/selectionEdges.ts rather than restyled or re-derived here.
+// missing.
 function refreshSelEdges(selOverride?: Selection | null): void {
   if (!grid || !dataSource || !page) return;
   const sel = selOverride !== undefined ? selOverride : currentSelection;
@@ -352,20 +349,21 @@ function refreshSelEdges(selOverride?: Selection | null): void {
   });
 }
 
-// P28 D2: the drag-in-progress twin of the fill SlickGrid draws at commit through
+// The drag-in-progress twin of the fill SlickGrid draws at commit through
 // `selectedCellCssClass` (grid options below) — written to that same 'kira-cell-selected' layer key
 // so a commit's real write and this preview's writes replace one another cleanly rather than both
 // existing at once. Bounded by the rendered band, exactly like the edge layer.
 //
-// SlickGridHost.vue has had this since its own "D4 (fix)"; this file never did, which is the whole
+// SlickGridHost.vue has had this; this file never did, which is the whole
 // of the reported "selection highlight appears only on mouse-up". SlickHybridSelectionModel's
 // `handleCellRangeSelected` deliberately no-ops for a CELL-mode `onCellRangeSelecting` call (only
-// the drag-END `onCellRangeSelected` reaches `setSelectedRanges`), and `dragToSelect: true` — needed
-// for the gutter's own row-range drag, which has no such early return and so already painted live —
-// zeroes the stock decorator's border, so a cell-range drag painted nothing at all until mouseup.
+// the drag-END `onCellRangeSelected` reaches `setSelectedRanges`), and `dragToSelect: true` —
+// needed for the gutter's own row-range drag, which has no such early return and so already
+// painted live — zeroes the stock decorator's border, so a cell-range drag painted nothing at all
+// until mouseup.
 // Deliberately never writes `currentSelection`: a drag passing back over its own anchor cell
 // transiently looks like a completed one-cell selection, and the committed
-// `onSelectedRangesChanged` supersedes every layer this writes the moment the drag actually ends.
+// `onSelectedRangesChanged` supersedes every layer this writes the moment the drag ends.
 function onCellRangeSelecting(_e: unknown, args: { range: SlickRange }): void {
   if (!grid || !dataSource || !selectionModel || selectionModel.currentSelectionModeIsRow()) return;
   const posSel = selectionFromRanges([args.range], false, null);
@@ -383,12 +381,11 @@ function onCellRangeSelecting(_e: unknown, args: { range: SlickRange }): void {
   );
 }
 
-// P19 D8: a real SlickHybridSelectionModel, configured identically to SlickGridHost.vue's own
-// (the SPEC row's own framing: "so the query console doesn't reinvent a different selection model
-// than the app's main grid uses") — superseding P43 iter2 D22's one-cell-only finding, which this
-// phase's own row asks to reopen. `currentSelection` is this file's own `rt().selection`
-// equivalent: plain, non-reactive (rule 2), page-row space (never a display position), populated
-// by onSelectedRangesChanged below and read by onCopy/onKeydown/onContextMenu.
+// A real SlickHybridSelectionModel, configured identically to SlickGridHost.vue's own
+// ("so the query console doesn't reinvent a different selection model than the app's main grid
+// uses"). `currentSelection` is this file's own `rt().selection` equivalent: plain, non-reactive
+// (rule 2), page-row space (never a display position), populated by onSelectedRangesChanged below
+// and read by onCopy/onKeydown/onContextMenu.
 let selectionModel: SlickHybridSelectionModel | null = null;
 // One-shot flag consumed by the next onSelectedRangesChanged call — selection.ts's own documented
 // shape (selectionFromRanges' own `pendingKind` parameter).
@@ -397,8 +394,7 @@ let currentSelection: Selection | null = null;
 
 // The translation `selection.ts` deliberately leaves to its caller: a `SlickRange`'s rows are
 // DISPLAY positions, `Selection`'s are PAGE rows — SlickGridHost.vue's own toPageRowSelection,
-// using this file's existing dataSource.getItem(pos).row rather than a second index structure
-// (D8 point 1: "the console already has the translation").
+// using this file's existing dataSource.getItem(pos).row rather than a second index structure.
 function toPageRowSelection(sel: Selection): Selection {
   if (!dataSource) return sel;
   const toPageRow = (pos: number) => dataSource?.getItem(Math.max(0, pos)).row ?? pos;
@@ -425,7 +421,7 @@ function onSelectedRangesChanged(_e: unknown, ranges: SlickRange[]): void {
   refreshSelEdges();
 }
 
-// Real-interaction fix — mirrors SlickGridHost.vue's own onColumnsResized: SlickGrid drags the
+// Mirrors SlickGridHost.vue's own onColumnsResized: SlickGrid drags the
 // handle and persists nothing on its own, so a manual resize is read straight off getColumns() and
 // committed into this tab's session-scoped sticky-width store (state.ts's consoleColumnWidths),
 // the same place buildColumns' own first-measurement commit (above) writes to — a manual resize
@@ -460,7 +456,7 @@ function onGridHeaderClick(_e: unknown, args: OnHeaderClickEventArgs): void {
 // The click handler's other job (unchanged): publishing into the read-only cell-editor dock. The
 // one-cell `kira-cell-selected` bookkeeping this used to carry (selectedRow/selectedField/
 // setCellCssStyles) is gone — `selectedCellCssClass` now makes SlickGrid itself paint the
-// highlight straight off `selectionModel`'s own ranges (D8 point 2).
+// highlight straight off `selectionModel`'s own ranges.
 function onGridClick(_e: SlickEventData, args: OnClickEventArgs): void {
   if (!grid || !dataSource || !page) return;
   if (args.cell === 0) return; // the gutter selects a row via rowSelectColumnIds, not a publish
@@ -671,11 +667,11 @@ function dataSourceState(): GridDataSourceState {
   };
 }
 
-// §3.5: "the highlight is two keyed setCellCssStyles layers" — every match, and (if any) the
-// current one, via views/shared/slick/cssLayers.ts's own searchCellLayers (§3.6 C4) so this isn't
+// "the highlight is two keyed setCellCssStyles layers" — every match, and (if any) the
+// current one, via views/shared/slick/cssLayers.ts's own searchCellLayers so this isn't
 // written a second time from SlickGridHost.vue's own computeSearchHashes. Not clipped to the
 // rendered band (unlike the one-cell selection layer's neighbour — SlickGridHost.vue's own
-// `kira-search` is deliberately unclipped too, D5's own table): a search result is not bounded the
+// `kira-search` is deliberately unclipped too): a search result is not bounded the
 // way a rendered band is. `isVisibleColumn` is always `true` — a console result never reorders or
 // hides a column, unlike the data grid's own column-menu-driven set.
 function refreshSearchLayer(): void {
@@ -698,7 +694,7 @@ function refreshSearchLayer(): void {
   grid.setCellCssStyles('kira-search-current', currentHash);
 }
 
-// The find toolbar's go-to-match (P40 D10) — ConsoleResultGrid.vue delegates here for the tabular
+// The find toolbar's go-to-match — ConsoleResultGrid.vue delegates here for the tabular
 // branch. `rowIndices`' own position lookup (the incumbent VirtualList's approach) has no
 // counterpart here: SlickGrid addresses a row by display *position*, so this goes straight through
 // the same displayPositionOf arithmetic the search layer above uses.
@@ -781,7 +777,7 @@ onMounted(() => {
   eventHandler.subscribe(selectionModel.onSelectedRangesChanged, onSelectedRangesChanged);
   subscribeRangeSelecting(eventHandler, selectionModel, onCellRangeSelecting);
 
-  // P99 §9.3: not useEventListener/useResizeObserver — same declined reasoning as
+  // Not useEventListener/useResizeObserver — same declined reasoning as
   // SlickGridHost.vue's own identical pair: registration order against SlickGrid's internal scroll
   // listener is load-bearing for the velocity sampler this mirrors, and onUnmounted below tears
   // these down in a specific hand-ordered position relative to eventHandler/grid.destroy().
@@ -809,10 +805,10 @@ onUnmounted(() => {
   selectionModel?.destroy();
   selectionModel = null;
   currentSelection = null;
-  // §9.1/F8 (SlickGridHost.vue) — `true` also nulls SlickGrid's own internal element references
-  // and unbinds every listener the library itself registered; the app forgetting this call was
-  // the whole risk (KiraSlickGrid's own `destroy` override additionally fixes the library's
-  // capture-flag `bindAncestorScrollEvents` leak — inherited here for free).
+  // `true` also nulls SlickGrid's own internal element references and unbinds every listener the
+  // library itself registered; the app forgetting this call was the whole risk (KiraSlickGrid's own
+  // `destroy` override additionally fixes the library's capture-flag `bindAncestorScrollEvents`
+  // leak — inherited here for free).
   grid?.destroy(true);
   grid = null;
   dataSource = null;
@@ -845,9 +841,9 @@ watch(
     grid.invalidateAllRows();
     grid.render();
     refreshSearchLayer();
-    // P19 D8 point 1: a selection identifies page rows via a display-position range built under
+    // A selection identifies page rows via a display-position range built under
     // the OLD filter; under the NEW one that same range can silently point at a different row.
-    // Unlike SlickGridHost.vue's own refreshSelectionForFilterChange (which remaps), this just
+    // Unlike SlickGridHost.vue's own refreshSelectionForFilterChange (which remaps), this
     // clears — the same reasoning ConsoleResultGrid.vue's own one-click highlight already uses on
     // a page swap ("a row index into a page that has been replaced identifies nothing").
     selectionModel?.setSelectedRanges([]);
@@ -867,11 +863,11 @@ watch(
 </script>
 
 <template>
-  <!-- §3.7 item 1: type-based cell colour is new for the console — the same class toggle
-       SlickGridHost.vue's own root carries, extending P9's rowColoring setting to console results
-       (this migration's own recommendation; see the plan's §3.7/§12). `.slick-grid-host` is what
-       scopes every rule in slickTheme.css — imported globally by this file, not relied on from
-       SlickGridHost.vue, so a console panel never depends on a data tab having been opened first. -->
+  <!-- Type-based cell colour is new for the console — the same class toggle SlickGridHost.vue's
+       own root carries, extending the rowColoring setting to console results (this migration's
+       own recommendation). `.slick-grid-host` is what scopes every rule in slickTheme.css —
+       imported globally by this file, not relied on from SlickGridHost.vue, so a console panel
+       never depends on a data tab having been opened first. -->
   <div
     class="slick-grid-host relative h-full font-data text-kira-md text-fg"
     :class="{ 'kira-grid--row-coloring': settingsStore.appearance.rowColoring }"

@@ -30,14 +30,13 @@ const confirmDialogStore = useConfirmDialogStore();
 const tabIncognitoStore = useTabIncognitoStore();
 const grpcCallHistoryStore = useGrpcCallHistoryStore();
 
-// P13 D12: extracted out of ResponsePane.vue's own history block, mirroring
-// views/httprequest/ResponseHistoryList.vue's shape exactly — a real toolbar (count + Clear,
-// P12's own clearGrpcHistory finally reachable), rows as a <div> rather than a <button> nested
-// inside a <button> (F20 — invalid HTML the parser silently hoisted the delete control out of),
+// Mirroring views/httprequest/ResponseHistoryList.vue's shape exactly — a real toolbar (count +
+// Clear, the clearGrpcHistory finally reachable), rows as a <div> rather than a <button> nested
+// inside a <button> (invalid HTML the parser silently hoisted the delete control out of),
 // is-viewing highlighting, and formatRelative instead of an absolute clock time.
 //
 // No Compare: HTTP's rides Monaco's diff editor over two response *bodies*; a gRPC call is a
-// message *sequence* with metadata, a genuinely different design left for a future row (§5).
+// message *sequence* with metadata, a genuinely different design left for a future row.
 const props = defineProps<{ tab: GrpcRequestTabRecord }>();
 
 const { query: listQuery, entries } = useGrpcHistoryList(() => props.tab);

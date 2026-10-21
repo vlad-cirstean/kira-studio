@@ -11,10 +11,9 @@ import (
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
-// DefaultPath is review.db's own location under KIRA_SPACE_HOME (P100 Part 1: this app's own
-// home, not Kira Studio's) — a second SQLite file, never a table in kira.db (D2's own rejected
-// alternative: SPEC's stated reason is that its lifecycle — bulk blob content, aggressive
-// TTL/PR-close purges — is nothing like the rest of the app's data).
+// DefaultPath is review.db's own location under KIRA_SPACE_HOME (this app's own home, not Kira
+// Studio's) — a second SQLite file, never a table in kira.db (its lifecycle — bulk blob content,
+// aggressive TTL/PR-close purges — is nothing like the rest of the app's data).
 func DefaultPath() string {
 	return filepath.Join(config.KiraSpaceHome(), "review.db")
 }
@@ -22,7 +21,7 @@ func DefaultPath() string {
 // ErrStoreClosed is returned by every store call made after Close.
 var ErrStoreClosed = errors.New("gitreview: store closed")
 
-// ensureOpen is the lazy-open guard (D3): a Store that never serves a review request never opens
+// ensureOpen is the lazy-open guard: a Store that never serves a review request never opens
 // review.db, never migrates it, and never starts the reaper. A failure here is returned to the
 // caller and NOT memoised — the next request retries, since the common failure (a full or
 // read-only home directory) is transient in a way a broken git binary is not.
@@ -69,7 +68,7 @@ func (s *Store) ensureOpen() error {
 // conn resolves the store's connection, opening it lazily on first use, and returns a stable
 // snapshot of the pointer taken under openMu — never a bare read of s.sqlDB after ensureOpen has
 // already released the lock, which would race Close()'s own write to that field under -race. A
-// query run against the returned *sql.DB after a concurrent Close() simply errors (database/sql's
+// query run against the returned *sql.DB after a concurrent Close() errors (database/sql's
 // own documented behaviour), which is a correctness non-issue at process shutdown, not a data race.
 func (s *Store) conn() (*sql.DB, error) {
 	if err := s.ensureOpen(); err != nil {

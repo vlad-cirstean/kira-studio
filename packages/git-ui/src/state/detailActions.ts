@@ -13,19 +13,18 @@ export interface DetailActions {
    *  since every copy site's feedback is the same live-region text plus its own local ~1.5s
    *  inline confirmation, never a value the caller needs to await. */
   copy(text: string, message: string): void;
-  /** Feeds W10's "Open in editor"/"Go to file" outcome text into the same shared live region
+  /** Feeds the "Open in editor"/"Go to file" outcome text into the same shared live region
    *  `copy`'s own announcements use — kept as a separate method (rather than routing through
    *  `copy`) because these are not clipboard outcomes and should never be confused for one in a
-   *  test asserting which `clipboard.write` calls actually happened. */
+   *  test asserting which `clipboard.write` calls happened. */
   announce(text: string): void;
-  /** "Open in editor" (§6.4/D14a's sibling action) — hands the same two blobs to the host's
-   *  native diff.
+  /** "Open in editor" — hands the same two blobs to the host's native diff.
    *
-   *  G21 D13: `pinned` is required, not optional — the caller (`FileTree.vue`'s `openFile` emit)
+   *  `pinned` is required, not optional — the caller (`FileTree.vue`'s `openFile` emit)
    *  always knows which of the two this is; no default is applied here, so a call site that
-   *  forgets it is a type error, never a silent pin. G21 D12: `fallbackSha` (optional — only
+   *  forgets it is a type error, never a silent pin. `fallbackSha` (optional — only
    *  `StashDetailPane.vue` ever has one to give) carries `entry.untrackedSha` through to
-   *  `editor.openDiff`'s own retry (F12's untracked-stash-file case). */
+   *  `editor.openDiff`'s own retry (the untracked-stash-file case). */
   openInEditor(params: {
     sha: string;
     path: string;
@@ -34,10 +33,10 @@ export interface DetailActions {
     pinned: boolean;
     fallbackSha?: string;
   }): Promise<void>;
-  /** G21 D8 (item 8): "Open all changes" — the bulk call site, always pinned/multi-diff in spirit
-   *  (never regressed by D13's own per-file preview/pin split). One host round trip composes and
+  /** "Open all changes" — the bulk call site, always pinned/multi-diff in spirit
+   *  (never regressed by the per-file preview/pin split). One host round trip composes and
    *  opens every changed file at once; the outcome is returned (not merely fire-and-forget like
-   *  `openInEditor`) so the caller can announce it — item 8's own remaining problem (i), a run
+   *  `openInEditor`) so the caller can announce it — the remaining problem (i), a run
    *  where some files silently fail to open, is what makes an awaited, inspectable result matter
    *  here specifically. */
   /** P75 §1.2: `parentIndex` is optional — a collapsed row has none to give (nothing has been
@@ -47,25 +46,24 @@ export interface DetailActions {
     sha: string;
     parentIndex?: number;
   }): Promise<{ opened: number; failed: number; mode: 'multiDiff' | 'tabs' }>;
-  /** "Go to file" (D14a) — `rev`/`path`/`line` are exactly the algorithm at the top of the plan
-   *  already resolved; this method only makes the request and returns the outcome, it does not
-   *  compute `rev`/`line` itself. No caller remains after G21 D12 deleted `DiffView.vue` (the one
-   *  place that knew which side of the diff the cursor was on) — kept, unreachable, rather than
-   *  torn out along with a contract method (`editor.goToFile`) this phase's own plan never asked
-   *  to remove. */
+  /** "Go to file" — `rev`/`path`/`line` are already resolved; this method only makes the
+   *  request and returns the outcome, it does not compute `rev`/`line` itself. No caller remains
+   *  after `DiffView.vue` was deleted (the one place that knew which side of the diff the cursor
+   *  was on) — kept, unreachable, rather than torn out along with a contract method
+   *  (`editor.goToFile`). */
   goToFile(params: { rev: string; path: string; line: number }): Promise<GoToFileOutcome>;
-  /** P74 §3.3: opens a pull request in the external browser, never in place — the renderer never
-   *  supplies a URL (`pr.openExternal`'s own doc comment); it names the PR by number and the host
+  /** P74 §3.3: opens a change request in the external browser, never in place — the renderer never
+   *  supplies a URL (`changeRequest.openExternal`'s own doc comment); it names the PR by number and the host
    *  composes/opens the URL itself. */
-  openPullRequest(params: { number: number }): Promise<void>;
-  /** P79 finding 4: opens an arbitrary URL found in a commit message body (`linkify.ts`) in the
-   *  external browser. Unlike `openPullRequest`, this URL is genuinely renderer-supplied — it is
+  openChangeRequest(params: { number: number }): Promise<void>;
+  /** Opens an arbitrary URL found in a commit message body (`linkify.ts`) in the
+   *  external browser. Unlike `openChangeRequest`, this URL is genuinely renderer-supplied — it is
    *  the untrusted commit message text itself, not something the host composes — so each host
    *  validates the URL's own shape rather than trusting it outright. */
   openExternalLink(url: string): Promise<void>;
-  /** P75 §2.3: reveals and selects `sha` in the graph — review-row-only today
+  /** Reveals and selects `sha` in the graph — review-row-only today
    *  (`ReviewCommitRow.vue`'s "Open in graph"), implemented in every bundle because
-   *  `DetailActions` is one interface, the same way `openPullRequest` is (P74 §3.3).
+   *  `DetailActions` is one interface, the same way `openChangeRequest` is.
    *  `revealed: false` is a real answer (no pinned graph tab / repo not known to this window),
    *  not a stub — callers announce it. */
   revealInGraph(params: { sha: string }): Promise<{ revealed: boolean }>;
@@ -113,10 +111,11 @@ export function createDetailActions(
       if (!repo) throw new Error('createDetailActions: goToFile called with no active repo');
       return bridge.request('editor.goToFile', { repoId: repo, rev, path, line });
     },
-    async openPullRequest({ number }) {
+    async openChangeRequest({ number }) {
       const repo = repoId();
-      if (!repo) throw new Error('createDetailActions: openPullRequest called with no active repo');
-      await bridge.request('pr.openExternal', { repoId: repo, number });
+      if (!repo)
+        throw new Error('createDetailActions: openChangeRequest called with no active repo');
+      await bridge.request('changeRequest.openExternal', { repoId: repo, number });
     },
     async openExternalLink(url) {
       await bridge.request('link.openExternal', { url });

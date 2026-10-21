@@ -43,12 +43,12 @@ func AheadBehindArgs(branch, upstream string) []string {
 	return []string{"rev-list", "--left-right", "--count", branch + "..." + upstream}
 }
 
-// PullConfigArgs builds the strategy ladder's own single spawn (D18/F16):
+// PullConfigArgs builds the strategy ladder's own single spawn:
 // `git config --null --get-regexp '^(pull\.(rebase|ff)|branch\.<branch>\.rebase)$'`. --null frames
-// records with NUL and separates key from value with a newline (probe P10) — not the space-
+// records with NUL and separates key from value with a newline — not the space-
 // separated form gitops.BranchConfigRegexpArgs' own caller already parses, a different format.
 //
-// P108 Part 15 F5 fix: branch is escaped with regexp.QuoteMeta, the same precedent
+// Branch is escaped with regexp.QuoteMeta, the same precedent
 // BranchConfigRegexpArgs already established (branch.go) — before this fix, an unescaped branch
 // name spliced straight into the pattern either silently matched the wrong key (a branch name
 // containing an ERE metacharacter, e.g. "feat+x", widens or narrows the match unpredictably) or

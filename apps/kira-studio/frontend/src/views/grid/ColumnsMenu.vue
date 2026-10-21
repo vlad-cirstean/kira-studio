@@ -100,7 +100,7 @@ useSortableReorder(
   },
 );
 
-// P104 §3: PopoverPanel's own @close (fired for every dismissal reason: outside click, Escape,
+// PopoverPanel's own @close (fired for every dismissal reason: outside click, Escape,
 // the toggle button) becomes onBeforeUnmount — DataToolbar.vue's Popover mounts this component
 // only while its own columnsOpen is true (v-if), so unmount fires exactly once, for the same set
 // of reasons, and commits whatever's staged in `selected`/`order` regardless of why it closed.
@@ -110,8 +110,8 @@ onBeforeUnmount(() => {
   if (!sameProjection(nextProjection, currentProjection())) {
     void gridViewStore.setProjection(props.tabId, nextProjection);
   }
-  // A columnOrder is only ever stored non-null when it actually diverges from the column set's
-  // own natural order. Comparing only against currentColumnOrder() (as this used to) meant simply
+  // A columnOrder is only ever stored non-null when it diverges from the column set's
+  // own natural order. Comparing only against currentColumnOrder() (as this used to) meant
   // opening the menu and closing it without dragging anything would stage the default order as a
   // "custom" one the first time (currentColumnOrder() starts null, and sameOrder(_, null) is
   // always false) — stamping DataToolbar's Columns button with a "changed" dot for a change that

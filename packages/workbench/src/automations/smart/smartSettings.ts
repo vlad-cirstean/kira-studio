@@ -7,9 +7,10 @@ import {
   type SmartSettings,
 } from '@shared/domain/scripts';
 
-export function defaultSmart(): SmartSettings {
+/** A new smart script's settings; `model` is the active provider's default alias. */
+export function defaultSmart(model: string): SmartSettings {
   return {
-    model: DEFAULT_SMART.model,
+    model,
     maxBudgetUsd: DEFAULT_SMART.maxBudgetUsd,
     timeout: DEFAULT_SMART.timeout,
     tools: [...DEFAULT_TOOLS],

@@ -19,6 +19,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/kirathecat/kira-studio/internal/filelock"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"github.com/kirathecat/kira-studio/internal/memory"
 	"github.com/kirathecat/kira-studio/internal/memory/memfmt"
@@ -70,9 +71,9 @@ type armedJob struct {
 }
 
 // Runner is the scheduler of bulk imports: scan, materialise, extract, finalize. Exactly one runs
-// per memory.db, held by an exclusive flock; it follows the job rows the control side (Engine) writes
-// by polling them, so a pause or cancel from another process takes effect within one tick. All state
-// lives in memory.db, so a halted runner resumes from disk.
+// per memory.db, held by an exclusive flock; it follows the job rows the control side (Engine)
+// writes by polling them, so a pause or cancel from another process takes effect within one tick.
+// All state lives in memory.db, so a halted runner resumes from disk.
 type Runner struct {
 	st       *store
 	ms       *memory.Store
@@ -136,9 +137,9 @@ func NewRunner(ms *memory.Store, opts RunnerOptions) (*Runner, error) {
 func lockPath(ms *memory.Store) string { return filepath.Join(filepath.Dir(ms.Path()), lockFileName) }
 
 // Run takes the store's runner lock and works until ctx ends or the store has been idle for
-// IdleExit. A runner taking the lock resets what a crashed predecessor left mid-flight (running jobs
-// become paused; scanning jobs rescan) and never resumes a job by itself. It returns ErrRunnerBusy
-// when another runner holds the lock.
+// IdleExit. A runner taking the lock resets what a crashed predecessor left mid-flight (running
+// jobs become paused; scanning jobs rescan) and never resumes a job by itself. It returns
+// ErrRunnerBusy when another runner holds the lock.
 func (r *Runner) Run(ctx context.Context) error {
 	lock, ok, err := filelock.TryLock(r.lockPath)
 	if err != nil {
@@ -568,8 +569,8 @@ func (r *Runner) settle(jobID string) error {
 }
 
 func isFatal(err error) bool {
-	return errors.Is(err, memory.ErrClaudeNotFound) || errors.Is(err, memory.ErrClaudeAuth) ||
-		errors.Is(err, memory.ErrClaudeOutdated) || errors.Is(err, memory.ErrClaudeUsageLimit)
+	return errors.Is(err, harness.ErrNotFound) || errors.Is(err, harness.ErrAuth) ||
+		errors.Is(err, harness.ErrOutdated) || errors.Is(err, harness.ErrUsageLimit)
 }
 
 // retry runs op with exponential backoff. Fatal errors, a spent budget and a cancelled context
@@ -584,12 +585,12 @@ func (r *Runner) retry(ctx context.Context, op func() error) error {
 		if err == nil {
 			return nil
 		}
-		if ctx.Err() != nil || isFatal(err) || errors.Is(err, memory.ErrClaudeBudget) {
+		if ctx.Err() != nil || isFatal(err) || errors.Is(err, harness.ErrBudget) {
 			return backoff.Permanent(err)
 		}
 		return err
 	}, bo, func(err error, next time.Duration) {
-		if errors.Is(err, memory.ErrClaudeRateLimited) {
+		if errors.Is(err, harness.ErrRateLimited) {
 			r.cooldown(next)
 		}
 		slog.Warn("memory import: retrying", "scope", "memory", "err", err, "in", next)

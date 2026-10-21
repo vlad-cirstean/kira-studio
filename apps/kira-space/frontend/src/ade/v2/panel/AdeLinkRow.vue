@@ -11,7 +11,7 @@ import { ref } from 'vue';
 import { control } from '../../../bridge/control';
 import AdeChip from '../AdeChip.vue';
 
-// One Jira / GitHub field: chip, link, copy and clear when set, else a paste input. The parent
+// One Jira / host link field: chip, link, copy and clear when set, else a paste input. The parent
 // validates the pasted text and passes the failure back as `error`.
 const props = defineProps<{
   id: string;

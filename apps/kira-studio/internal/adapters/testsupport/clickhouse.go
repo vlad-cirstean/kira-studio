@@ -106,12 +106,13 @@ func startClickHouse() (*ClickHouseFixture, error) {
 	return &ClickHouseFixture{Config: config, ReadOnlyConfig: readOnlyConfig, BaseURL: baseURL, container: container}, nil
 }
 
-// grantClickHouseUsers is idempotent. D35: two unprivileged users, created only after the seed lands — the same
-// root-seeds/app-user-connects split support/mysql.go's own comment explains, which is what makes the
-// cancel assertion and the read-only assertion meaningful: neither is a superuser connection.
-// P26 §3.1(3): kira's own ALTER carries CREATE TABLE and DROP TABLE too (ClickHouse's ALTER
-// privilege does not itself cover object creation/deletion) — needed for the DDL round-trip
-// scratch table this phase's own tests create and drop over this same principal.
+// grantClickHouseUsers is idempotent. Two unprivileged users, created only after the seed lands —
+// the same root-seeds/app-user-connects split support/mysql.go's own comment explains, which is
+// what makes the cancel assertion and the read-only assertion meaningful: neither is a
+// superuser connection.
+// kira's own ALTER carries CREATE TABLE and DROP TABLE too (ClickHouse's ALTER privilege does not
+// itself cover object creation/deletion) — needed for the DDL round-trip scratch table the tests
+// create and drop over this same principal.
 func grantClickHouseUsers(ctx context.Context, baseURL string) error {
 	grants := fmt.Sprintf(`
 		CREATE USER IF NOT EXISTS %[1]s IDENTIFIED WITH plaintext_password BY '%[2]s';
@@ -164,7 +165,7 @@ func AdminStatements(t *testing.T, f *ClickHouseFixture, sql string) {
 
 // firstTopLevelSemicolon mirrors sqlite/query.go's own scanner (comments and quoted literals are
 // skipped over so a semicolon inside a string value never counts) — generalized here to find every
-// boundary rather than just the first, since this fixture's own job (unlike the adapter's B9 guard)
+// boundary rather than just the first, since this fixture's own job (unlike the adapter's guard)
 // is to split a whole seed file into individually-POSTed statements: the ClickHouse HTTP interface
 // has no multi-statement exec at all, unlike mariadb's importFile or node-postgres's own
 // multi-statement query.

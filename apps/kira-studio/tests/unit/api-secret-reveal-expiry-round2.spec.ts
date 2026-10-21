@@ -1,5 +1,5 @@
-// P21 round 2 architecture/security finding 5: round 1 (api-variables-reveal-grace-expiry.spec.ts)
-// pinned that `revealedValues` re-masks itself at the grace window. Two sibling maps did not:
+// api-variables-reveal-grace-expiry.spec.ts pinned that `revealedValues` re-masks itself at the
+// grace window. Two sibling maps did not:
 // `revealedHistoryValues` (a prior secret value revealed from the history popover) and
 // `copyAsCurlDialogState.revealedSecretValues` (the fully-substituted Copy-as-curl command, the
 // more serious of the two — the dialog can sit open on screen indefinitely with a real credential

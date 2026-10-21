@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// LogFormat is upstream's own ten-field format string, %x00-separated (F3, not %x1f): git keeps
+// LogFormat is upstream's own ten-field format string, %x00-separated (not %x1f): git keeps
 // a literal 0x1f inside a hostile author/committer name or email (verified with
 // GIT_AUTHOR_NAME=$'Mal\x1fory'), which would silently shift every field after it in a non-last
 // position — %x1f is only ever safe in the SUBJECT, the one field that is already last. NUL is
@@ -21,18 +21,17 @@ const FieldCount = 10
 // logBaseArgs is the walk's fixed argv prefix, shared by every consumer of LogFormat: decorate=
 // full is load-bearing (short ref names cannot be classified — see parseDecorationToken),
 // topo-order is what makes the graph's lanes meaningful, and -z terminates each record with the
-// same NUL byte LogFormat's own %x00 already uses between fields (F3) — the format's own last
+// same NUL byte LogFormat's own %x00 already uses between fields — the format's own last
 // field carries no trailing delimiter, so -z's automatic per-record NUL lands exactly once, right
 // after it, with no double delimiter and nothing to strip. Field and record boundaries are the
 // same byte here, which is exactly why porcelain.FieldGrouper groups a flat NUL-field stream by a
-// fixed count rather than a distinguishable record delimiter. --decorate-refs-exclude (G32 round-3
-// functional-correctness review, finding #5, the log-decoration half — HeadsRefsArgs' own doc
-// comment covers the refs.list half) drops refs/remotes/<remote>/HEAD, the symbolic pointer every
-// `git clone`d repo carries, from %D before parseDecorationToken ever sees it — without this the
-// default branch's graph row carried a duplicate, phantom "origin/HEAD" badge alongside its real
-// tracking badge.
+// fixed count rather than a distinguishable record delimiter. --decorate-refs-exclude (the
+// log-decoration half — HeadsRefsArgs' own doc comment covers the refs.list half) drops
+// refs/remotes/<remote>/HEAD, the symbolic pointer every `git clone`d repo carries, from %D before
+// parseDecorationToken ever sees it — without this the default branch's graph row carried a
+// duplicate, phantom "origin/HEAD" badge alongside its real tracking badge.
 // format is LogFormat for the paged walk (LogSessionArgs/LogSessionSkipArgs) and ScanFormat for
-// the tail scan (LogScanArgs, H10, P115 Part 2) — the two walks' argv otherwise differ in exactly
+// the tail scan (LogScanArgs) — the two walks' argv otherwise differ in exactly
 // one token, LogScanArgs' own doc comment.
 func logBaseArgs(format string) []string {
 	return []string{
@@ -49,16 +48,14 @@ func RangeToken(r RangeSpec) string {
 }
 
 // RevSetArgs returns the argv fragment selecting spec's rev set — shared by the paged walk, the
-// remaining-count query (`rev-list --count`) and G23's tail scan (LogScanArgs), so all three agree
-// on exactly the same commits in exactly the same order (D8/D21). G3 always passes
-// spec.IncludeStash=false (WalkArgs(spec) is then just `["--all"]` or `["HEAD"]`); G8 supplies
-// real stash shas.
+// remaining-count query (`rev-list --count`) and the tail scan (LogScanArgs), so all three agree
+// on exactly the same commits in exactly the same order.
 //
-// G28 D15/F12/probe P11: `--all` lists EVERY ref under refs/, this app's own `refs/kira/*`
+// `--all` lists EVERY ref under refs/, this app's own `refs/kira/*`
 // namespace included, so the `--all` arm always excludes it first — `--exclude` must PRECEDE the
-// `--all` it modifies (probe P11), and is a harmless no-op when nothing under that prefix exists
+// `--all` it modifies, and is a harmless no-op when nothing under that prefix exists
 // yet. `--exclude=refs/stash` is added ADDITIONALLY when spec.ExcludeStash is set (the decidable
-// "off" half of kiraSpace.stash.showInGraph, D15) — never for the `head` scope or a ranged walk,
+// "off" half of kiraSpace.stash.showInGraph) — never for the `head` scope or a ranged walk,
 // where RevSetArgs does not sweep `--all` at all and an exclusion would be meaningless.
 func RevSetArgs(spec WalkSpec) []string {
 	var args []string
@@ -105,13 +102,13 @@ const ScanFormat = LogFormat + "%x00%b"
 // ScanFieldCount is ScanFormat's own field count.
 const ScanFieldCount = 11
 
-// LogScanArgs is G23's tail-scan argv: the same log vocabulary and the same WalkArgs(spec) call
-// LogSessionArgs makes, with ScanFormat in place of LogFormat — this is what makes upstream probe
-// 11's ordering property hold: the paging walk and the scan are the same --topo-order walk over
-// the same rev set, so the loaded rows are a PREFIX of the scan's sequence and git-ui's
-// buildCommitHits can concatenate the two halves without sorting anything. --decorate=full (and
-// its own --decorate-refs-exclude, logBaseArgs' own doc comment) is kept even though
-// ParseScanRecord discards %D unparsed (D2) — dropping either would change %D's own *content*,
+// LogScanArgs is the tail-scan argv: the same log vocabulary and the same WalkArgs(spec) call
+// LogSessionArgs makes, with ScanFormat in place of LogFormat — this is what makes the ordering
+// property hold: the paging walk and the scan are the same --topo-order walk over the same rev
+// set, so the loaded rows are a PREFIX of the scan's sequence and git-ui's buildCommitHits can
+// concatenate the two halves without sorting anything. --decorate=full (and its own
+// --decorate-refs-exclude, logBaseArgs' own doc comment) is kept even though ParseScanRecord
+// discards %D unparsed — dropping either would change %D's own *content*,
 // and the whole point of this function is that its argv differs from LogSessionArgs' in exactly
 // one token (the format string).
 func LogScanArgs(spec WalkSpec) []string {
@@ -137,7 +134,7 @@ func parseIdentities(fields [][]byte) (author, committer CommitIdentity, err err
 
 // ParseLogRecord parses one LogFormat record, already split into exactly FieldCount fields (a
 // porcelain.FieldGrouper's own output for a streaming caller, or ParseLogRecordFromRaw's for a
-// one-shot buffer — F3: LogFormat's fields are NUL-delimited, so there is no absorb-the-last-field
+// one-shot buffer — LogFormat's fields are NUL-delimited, so there is no absorb-the-last-field
 // splitting left to do here, unlike the old %x1f design).
 func ParseLogRecord(fields [][]byte) (CommitRecord, error) {
 	if len(fields) != FieldCount {
@@ -164,7 +161,7 @@ func ParseLogRecord(fields [][]byte) (CommitRecord, error) {
 }
 
 // ParseLogRecordFromRaw parses ONE ShowMetadataArgs-shaped raw stdout buffer (a single `-z`-
-// terminated LogFormat record) directly, without a separate RecordSplitter pass — F3's NUL-fielded
+// terminated LogFormat record) directly, without a separate RecordSplitter pass — the NUL-fielded
 // framing makes field and record delimiters the same byte, so the old "split on the next single
 // delimiter occurrence, that's one record" contract no longer applies to this format; splitting by
 // a fixed field count is exact instead (splitOneNULRecord).
@@ -186,11 +183,11 @@ type ScanRecord struct {
 }
 
 // ParseScanRecord parses one ScanFormat record, already split into exactly ScanFieldCount NUL-
-// delimited fields (F3). Deliberately leaner than ParseLogRecord: %P and %D are read positionally
+// delimited fields. Deliberately leaner than ParseLogRecord: %P and %D are read positionally
 // and then DROPPED unparsed, because this backend never walks refs/stash — WalkSpec.IncludeStash
-// is false at every call site in this repo (G17 D1) — so there is nothing to filter and no reason
+// is false at every call site in this repo — so there is nothing to filter and no reason
 // to pay parseDecoration per record over a 100k-commit walk. The field INDICES still track
-// LogFormat exactly (G23 D2).
+// LogFormat exactly.
 func ParseScanRecord(fields [][]byte) (ScanRecord, error) {
 	if len(fields) != ScanFieldCount {
 		return ScanRecord{}, fmt.Errorf("porcelain: scan record has %d fields, want %d", len(fields), ScanFieldCount)

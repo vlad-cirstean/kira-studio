@@ -21,16 +21,15 @@ import { openVariableSetTab } from './tabs';
 const collectionsStore = useCollectionsStore();
 const variablesStore = useVariablesStore();
 
-// P17 D20/item 8: a read-only popover over the already-merged data (`overviewRows`) — one panel,
+// A read-only popover over the already-merged data (`overviewRows`) — one panel,
 // reachable from any request tab (HttpRequestView.vue and GrpcRequestView.vue both mount this
 // beside EnvironmentSelect in #toolbar-2), so a user never has to open the collection's or the
 // environment's own tab just to check what a `{{name}}` in front of them resolves to right now.
 //
-// No reveal, at all (D20's own stated line): a secret's plaintext is not in the renderer to begin
-// with (F3), and adding a third reveal surface after the row table and Copy as curl is exactly the
-// surface-count growth P14's two rounds of findings were about. A secret row shows a `secret` chip
-// and nothing else.
-// P71 §3.4: `canEdit` defaults true (every existing caller renders byte-identically) — an
+// No reveal, at all: a secret's plaintext is not in the renderer to begin with, and adding a third
+// reveal surface after the row table and Copy as curl is exactly the surface-count growth the two
+// rounds of findings were about. A secret row shows a `secret` chip and nothing else.
+// `canEdit` defaults true (every existing caller renders byte-identically) — an
 // incognito tab passes false, hiding the two Edit buttons below (the only route out of the tab
 // into a persisting editor) while leaving the panel itself fully readable, as it already is by
 // design.
@@ -124,15 +123,13 @@ function editEnvironmentVariables(): void {
             t('studio.api.variablesOverview.empty')
           }}</InlineState
         >
-        <!-- P22b D9: VariableRow.vue's own grid template, minus the columns a read-only popover
+        <!-- VariableRow.vue's own grid template, minus the columns a read-only popover
              has no use for (handle, secret toggle, history, remove) -- name, value, scope,
              description, in the DOM order below. `description` is the last column specifically
-             because it is the only one of the four that renders conditionally (F13/D9): a missing
-             trailing grid item just leaves its own cell empty rather than shifting `scope` into
+             because it is the only one of the four that renders conditionally: a missing
+             trailing grid item leaves its own cell empty rather than shifting `scope` into
              its place, which an *earlier* optional column would.
-             grid-cols-[1.2fr_2fr_auto_1.5fr] -- an arbitrary value not on the plan's own section
-             1.2 allowlist, flagged for the plan owner (same disclosed gap as B36c's
-             grid-cols-[90px_140px_...] in OperationsPanel.vue): a pre-existing value relocated
+             grid-cols-[1.2fr_2fr_auto_1.5fr] -- an arbitrary value: a pre-existing value relocated
              into Tailwind's own syntax, not a new one. -->
         <div
           v-for="row in filteredRows"

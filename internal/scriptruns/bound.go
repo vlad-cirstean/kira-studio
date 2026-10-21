@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/scripts"
 )
@@ -111,6 +111,26 @@ func (b *Bound) Resume(args IDArgs) (Started, error) {
 	return started, nil
 }
 
+// ResumeCommandArgs names the smart run to continue in a terminal.
+type ResumeCommandArgs struct {
+	RunID string `json:"runId"`
+}
+
+// ResumeCommand is the shell command that continues a smart run's conversation in the agent's TUI.
+func (b *Bound) ResumeCommand(args ResumeCommandArgs) (string, error) {
+	if args.RunID == "" {
+		return "", ipcerr.Required("runId")
+	}
+	cmd, err := b.Svc.ResumeCommand(args.RunID)
+	if IsCallerError(err) {
+		return "", ipcerr.T(ipcerr.CodeNotFound, "backend.core.scriptRun.runNotFound.body", nil)
+	}
+	if err != nil {
+		return "", ipcerr.Wrap(err)
+	}
+	return cmd, nil
+}
+
 type ReadLogArgs struct {
 	ID       string `json:"id"`
 	AfterSeq int    `json:"afterSeq"`
@@ -124,8 +144,8 @@ func (b *Bound) ReadLog(args ReadLogArgs) (LogPage, error) {
 	return ipcerr.InternalResult(b.Svc.Runs.ReadLog(args.ID, args.AfterSeq))
 }
 
-// McpServers lists the MCP servers of the user's Claude config.
-func (b *Bound) McpServers() ([]claudeheadless.UserServer, error) {
+// McpServers lists the MCP servers of the user's agent config.
+func (b *Bound) McpServers() ([]harness.UserServer, error) {
 	return ipcerr.InternalResult(b.Svc.McpServers())
 }
 
@@ -134,7 +154,7 @@ type McpToolsArgs struct {
 }
 
 // McpTools lists the tools of one of those servers.
-func (b *Bound) McpTools(args McpToolsArgs) ([]claudeheadless.UserTool, error) {
+func (b *Bound) McpTools(args McpToolsArgs) ([]harness.UserTool, error) {
 	if args.Server == "" {
 		return nil, ipcerr.Required("server")
 	}

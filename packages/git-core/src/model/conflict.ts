@@ -1,8 +1,7 @@
 /**
- * The two conflict-shaped things P1 reads: an unmerged working-tree entry (status v2's `u`
- * record) and the result of `git merge-tree --write-tree` (§4.4, §7.5, §7.6) — a conflict
- * prediction made without touching the worktree. Turning a prediction into pre-flight policy
- * ("stash-and-carry will conflict in these files") is P6/P8's job; this is the raw mechanism.
+ * The two conflict-shaped things: an unmerged working-tree entry (status v2's `u`
+ * record) and the result of `git merge-tree --write-tree` — a conflict
+ * prediction made without touching the worktree. This is the raw mechanism.
  */
 import type { FileStatusCode } from './status.ts';
 

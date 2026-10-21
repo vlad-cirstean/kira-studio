@@ -2,8 +2,8 @@ package gitpath
 
 import "testing"
 
-// Every input below is an explicit string([]byte{...}) literal (G27 D12): this container's
-// filesystem is byte-transparent (probe P1) and CI runs on Linux, so a test that asked the OS or
+// Every input below is an explicit string([]byte{...}) literal: this container's
+// filesystem is byte-transparent and CI runs on Linux, so a test that asked the OS or
 // even the source file's own encoding to produce an NFD string would prove nothing about macOS
 // and could be silently re-encoded by an editor. Byte literals are the honest alternative.
 func TestNFC(t *testing.T) {

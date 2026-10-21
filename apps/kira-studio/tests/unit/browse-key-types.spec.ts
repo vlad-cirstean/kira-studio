@@ -1,7 +1,7 @@
-// P63 §4.3/§7: ensureKeyTypes' own dedupe/supersede logic — interacting rules over an in-flight
+// ensureKeyTypes' own dedupe/supersede logic — interacting rules over an in-flight
 // set plus a loadSeq guard, the "cache invalidation with interacting rules" case CLAUDE.md's own
-// testing bar names. One test file, not a suite (§7's own scope: a split layout, an icon swap and
-// a lookup table get nothing; this is the one thing in the plan that does).
+// testing bar names. One test file, not a suite (the scope: a split layout, an icon swap and
+// a lookup table get nothing; this is the one thing that does).
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
@@ -13,7 +13,7 @@ import { pinia } from '../../frontend/src/state/pinia';
 setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
-// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// createTabsStore's saveIfChanged now serialises every save through one
 // persistent chain — a real (never-settling in this harness) control.tabsSave triggered
 // incidentally by opening a tab below would otherwise wedge every later spec's own tabsSave
 // assertions for the rest of the process. This spec doesn't test persistence, so give it a

@@ -6,7 +6,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// P28 D15(c): Postman's own `{{$name}}` dynamic-variable spellings, mapped onto the `fake.`
+// Postman's own `{{$name}}` dynamic-variable spellings, mapped onto the `fake.`
 // spellings this app now offers exclusively. Mirrors packages/api-core's own ALIAS_TO_FAKE
 // (src/http/dynamic/catalog.ts) entry for entry; go-ts-api-parity.spec.ts reads this literal as
 // plain text and fails if the two ever drift, the same technique that already guards validBodyModes

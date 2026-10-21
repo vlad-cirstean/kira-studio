@@ -2,14 +2,13 @@ package bridge
 
 import "github.com/kirathecat/kira-studio/internal/shell"
 
-// P100 Part 2: the one file-dialog wire shape this app needs — GitStart.vue's "Import a
-// repository" affordance (frontend state/coderepos.ts's importRepoViaDialog). Kira Studio's own
-// FilesService also has ChooseSave/ChooseOpen (a download's save panel, an open-file picker for a
-// DataGrip project) — this app has neither a download/export feature nor a DataGrip import, so
-// this is trimmed to the one method actually called (CLAUDE.md: "scope left out of a phase stays
-// out entirely" — ChooseSave/ChooseOpen would be unused, untestable dead code here). This is the
-// FilesService shell/app.go's own doc comment flagged as "Part 2's job, if this app ever needs
-// it" — it does.
+// The one file-dialog wire shape this app needs — GitStart.vue's "Import a repository" affordance
+// (frontend state/coderepos.ts's importRepoViaDialog). Kira Studio's own FilesService also has
+// ChooseSave/ChooseOpen (a download's save panel, an open-file picker for a DataGrip project) —
+// this app has neither a download/export feature nor a DataGrip import, so this is trimmed to
+// the one method called (CLAUDE.md: "scope left out of a phase stays out entirely" —
+// ChooseSave/ChooseOpen would be unused, untestable dead code here). This is the FilesService
+// shell/app.go's own doc comment flagged as "Part 2's job, if this app ever needs it" — it does.
 type FilesChooseFolderArgs struct {
 	Title string `json:"title,omitempty"`
 }
@@ -28,7 +27,7 @@ type OpenFilesRequest struct{ Title, FilterName, FilterPattern string }
 type OpenFileRequest struct{ Title, FilterName, FilterPattern string }
 
 // Dialogs is the native-dialog seam — internal/appshell adapts it over repo-root
-// internal/shell.Dialogs (app.Dialog with the main window attached for modality, P103 Part 3;
+// internal/shell.Dialogs (app.Dialog with the main window attached for modality;
 // Kira Studio's own bridge.Dialogs interface, trimmed to the one method this app calls). Returns
 // "" for a cancelled dialog, the only cancel signal Wails gives.
 type Dialogs interface {

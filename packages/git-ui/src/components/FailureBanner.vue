@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * P173: the visible half of every failure the live region already announces. An inline banner,
+ * The visible half of every failure the live region already announces. An inline banner,
  * not a toast: it stays until dismissed or superseded, pushes layout instead of covering grid
  * rows, and needs no toast host in either app. `role="region"` replaces `Alert`'s own
  * `role="alert"` so the shared `sr-only` live region stays the single announcer.

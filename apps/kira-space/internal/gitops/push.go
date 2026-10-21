@@ -8,15 +8,14 @@ import (
 )
 
 // PushArgs builds `git push --porcelain --progress [--set-upstream] <remote>
-// refs/heads/<local>:refs/heads/<remote-side>` (D12). --porcelain (F10/P5): the exact,
+// refs/heads/<local>:refs/heads/<remote-side>`. --porcelain: the exact,
 // tab-separated, locale-independent statement of each ref's outcome and rejection reason,
-// available far below this chapter's 2.38 floor. A fully-qualified refspec on both sides (F14) —
+// available far below this chapter's 2.38 floor. A fully-qualified refspec on both sides —
 // so neither push.default nor a same-named tag can redirect what gets pushed. `localBranch` and
-// `remoteBranch` are deliberately separate params (G32 round-3 functional-correctness review,
-// finding #3): a branch already tracking a differently-named upstream (`git checkout -b feat
-// origin/main`) must push to THAT branch, never silently create a new same-named one — callers
-// resolve `remoteBranch` via gitsession's own resolveUpstreamRemoteBranch, which falls back to
-// `localBranch` for the ordinary first-push case.
+// `remoteBranch` are deliberately separate params: a branch already tracking a differently-named
+// upstream (`git checkout -b feat origin/main`) must push to THAT branch, never silently create
+// a new same-named one — callers resolve `remoteBranch` via gitsession's own
+// resolveUpstreamRemoteBranch, which falls back to `localBranch` for the ordinary first-push case.
 func PushArgs(remote, localBranch, remoteBranch string, setUpstream bool) []string {
 	argv := []string{"push", "--porcelain", "--progress"}
 	if setUpstream {
@@ -25,7 +24,7 @@ func PushArgs(remote, localBranch, remoteBranch string, setUpstream bool) []stri
 	return append(argv, remote, branchRefspec(localBranch, remoteBranch))
 }
 
-// ForcePushArgs builds the force-push family (D12, upstream D48): bare
+// ForcePushArgs builds the force-push family: bare
 // --force-with-lease --force-if-includes by default — an explicit --force-with-lease=<ref>:<sha>
 // is not used here because the residual hazard it would close (a lease satisfied by a background
 // auto-fetch between dialog-open and spawn) is instead closed by gitsession re-reading the remote
@@ -144,11 +143,11 @@ func fromTo(summary string) (from, to *string, ok bool) {
 	return &f, &t, true
 }
 
-// PushUpdates derives RefUpdate[] from a parsed --porcelain block (D13) — the exact statement of
+// PushUpdates derives RefUpdate[] from a parsed --porcelain block — the exact statement of
 // each ref's outcome, straight from git's own machine-readable output. A rejected ('!') or
 // up-to-date ('=') line moved nothing and contributes no entry. A new ('*') or deleted ('-') line
 // carries no sha in the porcelain summary itself, so both ends are reported null — precision
-// nothing downstream reads (F1: RemoteOpResult.updates has no consumer in the migrated UI today).
+// nothing downstream reads (RemoteOpResult.updates has no consumer in the migrated UI today).
 func PushUpdates(statuses []PushStatus) []RefUpdate {
 	var out []RefUpdate
 	for _, s := range statuses {

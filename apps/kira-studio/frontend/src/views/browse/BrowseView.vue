@@ -111,7 +111,7 @@ const filterText = computed({
   set: (v: string) => browseViewStore.setFilter(props.tab.id, v),
 });
 
-// P22b D15: the app's own shared search idiom (HttpRequestView.vue's toggleFieldFilter) replaces
+// The app's own shared search idiom (HttpRequestView.vue's toggleFieldFilter) replaces
 // this file's own always-visible `.filter-field` — `rt.filter`/`filteredNodes`/`countText` below
 // are untouched, only the affordance moves. Component-local, not tab state: a lens, not a setting,
 // same rule fieldFilterOpen already follows.
@@ -159,10 +159,10 @@ const emptyPreviewLabel = computed(() =>
 );
 const emptyPreviewIcon = computed(() => (targetTail.value?.kind === 'bucket' ? 'file' : 'tag'));
 
-// §2.2: a non-tab viewKey, registered once for this tab's whole lifetime — its own resolver reads
+// A non-tab viewKey, registered once for this tab's whole lifetime — its own resolver reads
 // `rt` fresh on every call, so it never needs re-registering as selection changes. `path` reads
 // `rt.selected` directly rather than `selectedNode`/`previewable`: KeyValuePane is only ever
-// mounted while `previewable` holds (below), so a container's own path here is simply never read.
+// mounted while `previewable` holds (below), so a container's own path here is never read.
 const previewKey = `${props.tab.id}::preview`;
 registerKeyValueHost(previewKey, (): KeyValueHost | null => {
   const r = rt.value;
@@ -203,7 +203,7 @@ function keyType(path: string): string | undefined {
   return rt.value?.keyTypes.get(path);
 }
 
-// 7c (P68 review): VirtualList's own `visible-range` emit fires up to once per animation frame
+// VirtualList's own `visible-range` emit fires up to once per animation frame
 // during a scroll fling — each distinct window used to issue its own IPC round trip even though
 // path-level dedup (ensureKeyTypes' own pending/keyTypes checks) only prevents REPEATING work, not
 // the round trip itself. Debounced by the same 150ms already used elsewhere, so a fling settles on
@@ -410,12 +410,13 @@ onMounted(() => {
       </AlertDescription>
     </Alert>
 
-    <!-- Item 4: the reconnect gate used to replace this whole chrome (header, toolbar and
+    <!-- The reconnect gate used to replace this whole chrome (header, toolbar and
            all) — every other view but the grid's DataView.vue did the same, the one inconsistency
            this fixes. The chrome above (and so its toolbar rows) now always renders; only
-           the body — the part that actually needs a live connection — swaps for the gate.
-           P63 §2.1: "the body" is now the whole split (list pane + splitter + detail pane), never
-           just the list — a disconnected connection means neither side has anything live to show. -->
+           the body — the part that needs a live connection — swaps for the gate.
+           "the body" is now the whole split (list pane + splitter + detail pane), never
+           just the list — a disconnected connection means neither side has anything live to show.
+           -->
     <EmptyState
       v-if="needsReconnect"
       data-testid="browse-reconnect"
@@ -433,7 +434,7 @@ onMounted(() => {
     </EmptyState>
     <div v-else class="flex flex-row flex-1 min-h-0">
       <div class="min-w-0 flex flex-col min-h-0" :style="{ flex: `0 1 ${listPane.size.value}px` }">
-        <!-- P63 §3.2: back + breadcrumb + count — navigator-scoped controls, moved out of
+        <!-- Back + breadcrumb + count — navigator-scoped controls, moved out of
                ViewChrome's own toolbar into the pane whose list they act on. Reuses the same
                toolbar utility band (the same 26px in-view band every other toolbar already is)
                rather than inventing a header. -->

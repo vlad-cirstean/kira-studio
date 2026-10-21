@@ -10,21 +10,20 @@ import {
 } from './support/mariadb';
 import { installPassthrough } from './support/passthrough';
 
-// C1b (docs/HISTORY.md (v1 P58b)) — the half of P58a's own C1 that could not
-// run before a second adapter went native: MariaDB (native as of M6.2), proven end to end against a
-// real Go-native adapter in a running app, rather than only in adapterhost's own router unit tests.
-// This sandbox has no real X display (P58a §13), so — as with E2 — this is tests/e2e-real/'s own
-// substitute: a real -tags server Go binary, real bindings and a real MariaDB container, reached
-// over http://127.0.0.1 from a headless browser tab.
+// The half that could not run before a second adapter went native: MariaDB, proven end to end
+// against a real Go-native adapter in a running app, rather than only in adapterhost's own router
+// unit tests.
+// This sandbox has no real X display, so this is tests/e2e-real/'s own substitute: a real -tags
+// server Go binary, real bindings and a real MariaDB container, reached over http://127.0.0.1
+// from a headless browser tab.
 //
 // This file's second test used to prove a coexistence property against a Node child process: first
-// a native kind surviving that child's death alongside a still-Node-served one (checkpoint C1b), then
-// — once Kafka went native in P58e M9.3, the last of the ten kinds to do so — every connection
-// surviving the child's own SIGKILL entirely (checkpoint C2, P58e E21). P58f's own M10 deletes that
-// child (`internal/enginehost/`) outright, which retires the property: there is no child left to
-// kill. What is still worth
-// proving, and covered nowhere else, is that two different Go-native kinds — MariaDB and Kafka —
-// coexist in one session and both keep serving real reads across a `page.reload()`.
+// a native kind surviving that child's death alongside a still-Node-served one, then — once Kafka
+// went native, the last of the ten kinds to do so — every connection surviving the child's own
+// SIGKILL entirely. That child (`internal/enginehost/`) is deleted outright, which retires the
+// property: there is no child left to kill. What is still worth proving, and covered nowhere else,
+// is that two different Go-native kinds — MariaDB and Kafka — coexist in one session and both keep
+// serving real reads across a `page.reload()`.
 
 let maria: MariaFixture | null = null;
 let kafka: KafkaFixture | null = null;
@@ -106,7 +105,7 @@ test('C1b: real MariaDB (native), end to end, keyset paging over big_rows', asyn
   await orderItemsRow.dblclick();
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(3, { timeout: 10_000 });
-  // P22 Pass B's own DOM shape (tests/ui/support/grid.ts's `gridCellSelector` documents this):
+  // The DOM shape (tests/ui/support/grid.ts's `gridCellSelector` documents this):
   // `data-row` is written on the `.slick-row`/`[data-testid="grid-row"]` ancestor, never on the
   // `.slick-cell` itself, and with `frozenColumn: 0` that row element is cloned once per pane, so
   // the cell lookup has to be scoped to the right (non-frozen) pane's row to stay unambiguous.

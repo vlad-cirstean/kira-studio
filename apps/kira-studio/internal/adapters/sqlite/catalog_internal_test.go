@@ -6,10 +6,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// TestPkIsKeysetEligible covers finding F8: SQLite is the one dialect here where PRIMARY KEY does
+// TestPkIsKeysetEligible covers: SQLite is the one dialect here where PRIMARY KEY does
 // not imply NOT NULL, so a nullable PK column would otherwise be trusted as a keyset tiebreaker and
 // silently drop a NULL-keyed row from every keyset page (or hard-fail keysetValueAt on one). Two
-// shapes SQLite itself guarantees can never actually hold NULL are exempted even though
+// shapes SQLite itself guarantees can never hold NULL are exempted even though
 // table_xinfo's own notnull flag is not rewritten to say so.
 func TestPkIsKeysetEligible(t *testing.T) {
 	col := func(name, dataType string, nullable bool) model.ColumnMeta {

@@ -35,6 +35,7 @@ func (s *Service) newRun(p *planned, existing *Run) Run {
 		pv := p.preview
 		run.Model, run.SessionID, run.Prompt = pv.Model, firstNonEmpty(p.resume, uuid.NewString()), p.sent
 		run.ResumedFrom = p.resumedFrom
+		run.Provider = p.provider
 		run.Tools = RunTools{Tools: pv.Tools, AllowedTools: pv.Allowed, McpServers: pv.MCP}
 	} else {
 		run.Command = p.script.Command

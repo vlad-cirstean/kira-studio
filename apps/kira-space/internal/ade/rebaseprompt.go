@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 )
 
@@ -28,5 +28,5 @@ func rebasePromptText(src llmprompts.Source, spec model.AdeRebaseSpec) string {
 
 // rebaseRunPrompt is what the agent receives: the (possibly edited) message and the report suffix.
 func rebaseRunPrompt(src llmprompts.Source, message string) string {
-	return strings.TrimRight(message, "\n") + "\n\n" + claudeheadless.RebaseReport(src)
+	return strings.TrimRight(message, "\n") + "\n\n" + agentmcp.RebaseReport(src)
 }

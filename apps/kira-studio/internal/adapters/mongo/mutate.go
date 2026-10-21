@@ -12,7 +12,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// documentSentinel is mutate.ts's DOCUMENT_SENTINEL (D3): the reserved key for a whole-document
+// documentSentinel is mutate.ts's DOCUMENT_SENTINEL: the reserved key for a whole-document
 // replace, expressed through the existing relational-shaped MutationRowOp rather than widening the
 // shared mutation schema — '$' can never start a real top-level Mongo field name, so it can never
 // collide with genuine data.

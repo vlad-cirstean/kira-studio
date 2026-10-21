@@ -9,7 +9,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
 )
 
@@ -224,7 +224,7 @@ func (b *TaskBoard) releaseClaim(sb model.AdeTaskBranch) {
 }
 
 // Tools implements scriptruns.ADE.
-func (b *TaskBoard) Tools() (claudeheadless.SpaceTools, claudeheadless.Outcomes) { return b, b }
+func (b *TaskBoard) Tools() (agentmcp.SpaceTools, agentmcp.Outcomes) { return b, b }
 
 // launchAutomationHeld launches the step runs a smart script held when the app last quit: no claim
 // survives a restart.
@@ -253,7 +253,7 @@ func (b *TaskBoard) launchAutomationHeld() {
 }
 
 // SandboxGit serves fetch_remote and push_branch to a sandboxed smart run (scriptruns.ADE).
-func (b *TaskBoard) SandboxGit() claudeheadless.SandboxGit { return b }
+func (b *TaskBoard) SandboxGit() agentmcp.SandboxGit { return b }
 
 // SandboxTarget points the sandbox git tools at a branch's worktree for one smart run.
 func (b *TaskBoard) SandboxTarget(runID, branchID, worktree string) (func(), error) {

@@ -1,10 +1,10 @@
-// Ported from packages/db-fixtures/redis.spec.ts (§9.4), case by case where practical — the spec's own
-// numbering is kept in each test's name so the two can be diffed. §5.4 of
-// docs/HISTORY.md (v1 P58c) names the cases that carry the most weight: hash/set/zset
-// paging asserting "some rows, more to come" rather than an exact count where overshoot is
-// possible, the offset-cursor-restarts-the-scan contract, a vanished key being E_QUERY not
-// E_NOT_FOUND, truncated only when the round cap actually cut a scan short, children() of a key
-// leaf marshalling as [] not null, and cancel being a permanent, honest no-op.
+// Ported from packages/db-fixtures/redis.spec.ts, case by case where practical — the spec's own
+// numbering is kept in each test's name so the two can be diffed. docs/HISTORY.md names the cases
+// that carry the most weight: hash/set/zset paging asserting "some rows, more to come" rather
+// than an exact count where overshoot is possible, the offset-cursor-restarts-the-scan contract,
+// a vanished key being E_QUERY not E_NOT_FOUND, truncated only when the round cap cut a scan short,
+// children() of a key leaf marshalling as [] not null, and cancel being a permanent, honest
+// no-op.
 package redis_test
 
 import (
@@ -294,7 +294,7 @@ func TestRedis_Read_Set(t *testing.T) {
 	}
 }
 
-// P2 R1 regression: a set's per-row display index (its only "field" — a member has no natural
+// Regression: a set's per-row display index (its only "field" — a member has no natural
 // key) is a running total carried across pages, not reset to 0 each call. Without the fix, page 2
 // relabels its rows starting at "0" again, duplicating page 1's own labels instead of continuing
 // from where page 1 left off.
@@ -704,7 +704,7 @@ func TestRedis_Console_CollectionReadsStopAtResultCap(t *testing.T) {
 	}
 }
 
-// P26 §3.6(1): Redis is the only adapter whose read-only enforcement is per-command, resolved
+// Redis is the only adapter whose read-only enforcement is per-command, resolved
 // against the server's own COMMAND table (client.go's isReadOnlyCommand, console.go:132) — a
 // genuinely non-obvious mechanism with no container-backed test at all before this (console_test.go
 // is 70 lines of tokenizer unit tests only).
@@ -851,6 +851,17 @@ func consoleRun(a adapters.Adapter, fixture *testsupport.RedisFixture, ctx conte
 	return a.Execute(ctx, model.ConsoleRequest{Path: nodePath(fixture, seg("database", "db0")), Statements: statements}, adapters.NewOpCtx(opID))
 }
 
+func calibratedLoopIterations(t *testing.T, root *goredis.Client, target time.Duration) int64 {
+	t.Helper()
+	const calib = 50_000_000
+	start := time.Now()
+	if err := root.Eval(context.Background(), `local x = 0; for i = 1, tonumber(ARGV[1]) do x = x + i end; return 0`, nil, calib).Err(); err != nil {
+		t.Fatalf("calibration EVAL: %v", err)
+	}
+	elapsed := max(time.Since(start), time.Millisecond)
+	return int64(float64(calib) * target.Seconds() / elapsed.Seconds())
+}
+
 // F9: a reply slower than the read timeout is reported as E_TIMEOUT and never re-sent (a retried
 // script would INCR twice).
 func TestRedis_Console_SlowCommandTimesOutWithoutResend(t *testing.T) {
@@ -862,9 +873,11 @@ func TestRedis_Console_SlowCommandTimesOutWithoutResend(t *testing.T) {
 	const key = "slow:resend:probe"
 	root.Del(context.Background(), key)
 
-	// ~2.5s of Lua busy work (TIME is frozen inside a script, so it cannot be the clock).
-	script := `local x = 0; for i = 1, 250000000 do x = x + i end; return redis.call('INCR', KEYS[1])`
-	_, err := consoleRun(a, fixture, context.Background(), "op-slow", fmt.Sprintf("EVAL %q 1 %s", script, key))
+	// Loop length is calibrated to this server's speed; TIME is frozen inside a script.
+	const target = 3 * time.Second
+	iters := calibratedLoopIterations(t, root, target)
+	script := `local x = 0; for i = 1, tonumber(ARGV[1]) do x = x + i end; return redis.call('INCR', KEYS[1])`
+	_, err := consoleRun(a, fixture, context.Background(), "op-slow", fmt.Sprintf("EVAL %q 1 %s %d", script, key, iters))
 	if code, _ := adapters.CodeOf(err); code != adapters.CodeTimeout {
 		t.Fatalf("err = %v, want E_TIMEOUT", err)
 	}
@@ -873,7 +886,7 @@ func TestRedis_Console_SlowCommandTimesOutWithoutResend(t *testing.T) {
 			break
 		}
 	}
-	time.Sleep(3 * time.Second) // a re-sent script would land a second INCR
+	time.Sleep(target + time.Second) // a re-sent script would land a second INCR
 	if n, err := root.Get(context.Background(), key).Int(); err != nil || n != 1 {
 		t.Fatalf("script ran %d times (err %v), want exactly once", n, err)
 	}

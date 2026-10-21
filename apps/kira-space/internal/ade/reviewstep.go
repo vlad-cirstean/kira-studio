@@ -12,13 +12,13 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/claudeheadless"
+	"github.com/kirathecat/kira-studio/internal/agentmcp"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/internal/runoutcome"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
-// reviewstep.go: the review step (P286). A review step run has no process: it waits in state `review`
+// reviewstep.go: the review step. A review step run has no process: it waits in state `review`
 // while the user comments in the review window. "Send to agent" queues a round, a headless run
 // (purpose `review`) that answers the open comments through reply_review_comment. Finish routes the
 // step on a result the user picks.
@@ -230,7 +230,7 @@ func (b *TaskBoard) reviewCandidates(tc *taskCtx, review model.AdeRun) ([]review
 			continue
 		}
 		r, ok := byStep[s.ID]
-		if !ok || r.State == model.AdeRunRunning || r.State == model.AdeRunPending || b.claudeIDOfSession(r.SessionID) == "" {
+		if !ok || r.State == model.AdeRunRunning || r.State == model.AdeRunPending || b.agentIDOfSession(r.SessionID) == "" {
 			continue
 		}
 		out = append(out, reviewCandidate{run: r, step: s.Name, allowed: s.AllowedTools})
@@ -494,15 +494,15 @@ func (b *TaskBoard) SendReview(ctx context.Context, args adewire.SendReviewArgs)
 			return invalid("%s", i18n.T("backend.space.ade.reviewStep.badTarget.body", nil))
 		}
 		target := cands[pick]
-		claudeID := b.claudeIDOfSession(target.run.SessionID)
-		if busy, err := b.claudeBusy(claudeID); err != nil {
+		agentSessionID := b.agentIDOfSession(target.run.SessionID)
+		if busy, err := b.agentBusy(agentSessionID); err != nil {
 			return err
 		} else if busy {
 			return invalid("%s", i18n.T("backend.space.ade.reviewStep.targetBusy.body", nil))
 		}
 		targetID = target.run.ID
 		spec.AllowedTools = target.allowed
-		launch.ResumeID = claudeID
+		launch.ResumeID = agentSessionID
 		launch.Prompt = llmprompts.AdeReviewFollowupMessage.Text(b.prompts(), b.roundVars(rc, tgt, round, open))
 	case rc.rev.DedicatedClaudeID != "":
 		launch.ResumeID = rc.rev.DedicatedClaudeID
@@ -529,14 +529,14 @@ func (b *TaskBoard) SendReview(ctx context.Context, args adewire.SendReviewArgs)
 	return err
 }
 
-// claudeBusy says a running session already uses the Claude conversation.
-func (b *TaskBoard) claudeBusy(claudeID string) (bool, error) {
+// agentBusy says a running session already uses the agent conversation.
+func (b *TaskBoard) agentBusy(agentSessionID string) (bool, error) {
 	rows, err := b.deps.Sessions.ListTask()
 	if err != nil {
 		return false, err
 	}
 	return slices.ContainsFunc(rows, func(s model.AdeSession) bool {
-		return s.ClaudeSessionID == claudeID && s.State == model.AdeSessionStateRunning
+		return s.AgentSessionID == agentSessionID && s.State == model.AdeSessionStateRunning
 	}), nil
 }
 
@@ -625,17 +625,21 @@ func (b *TaskBoard) startRound(_ context.Context, tc *taskCtx, run model.AdeRun,
 	}()
 	now := b.deps.Now().UnixMilli()
 	launch := run.Launch
-	sessionID, claudeID := b.newID(), cmpNonEmpty(launch.ResumeID, b.newID())
+	sessionID, agentSessionID := b.newID(), cmpNonEmpty(launch.ResumeID, b.newID())
+	agent, err := b.agentForResume(launch.ResumeID)
+	if err != nil {
+		return run, err
+	}
 	if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
 		ID: sessionID, Mode: model.AdeSessionModeHeadless, TaskID: tc.task.ID, BranchID: sb.ID,
-		StepID: run.StepID, RunID: run.ID, Resumes: launch.ResumeID, ClaudeSessionID: claudeID, Cwd: path,
+		StepID: run.StepID, RunID: run.ID, Resumes: launch.ResumeID, AgentSessionID: agentSessionID, Cwd: path, Provider: agent.ID(),
 		State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 	}); err != nil {
 		return run, err
 	}
 	b.notifySessions()
 	if spec.Route == adewire.ReviewSendNew {
-		if err := b.deps.Tasks.SetReviewDedicated(spec.ReviewRunID, claudeID); err != nil {
+		if err := b.deps.Tasks.SetReviewDedicated(spec.ReviewRunID, agentSessionID); err != nil {
 			return run, err
 		}
 	}
@@ -660,8 +664,8 @@ func (b *TaskBoard) startRound(_ context.Context, tc *taskCtx, run model.AdeRun,
 		defer b.wg.Done()
 		defer endRun()
 		b.superviseAgent(runCtx, updated, agentLaunch{
-			def: def, sessionID: sessionID, resume: launch.ResumeID, path: path, worktree: path, prompt: prompt,
-			timeout: parseStepTimeout(def.Timeout), review: &claudeheadless.ReviewGrant{CommentIDs: spec.CommentIDs},
+			def: def, agent: agent, sessionID: sessionID, resume: launch.ResumeID, path: path, worktree: path, prompt: prompt,
+			timeout: parseStepTimeout(def.Timeout), review: &agentmcp.ReviewGrant{CommentIDs: spec.CommentIDs},
 		})
 	}()
 	return updated, nil
@@ -854,7 +858,7 @@ func (b *TaskBoard) resumeReviewRound(ctx context.Context, run model.AdeRun) err
 
 // --- reply and finish ----------------------------------------------------------------------------
 
-// Reply stores an agent's answer to one comment of its round (claudeheadless.ReviewReplier).
+// Reply stores an agent's answer to one comment of its round (agentmcp.ReviewReplier).
 func (b *TaskBoard) Reply(runID string, id int64, reply string, resolved bool) error {
 	run, err := b.deps.Tasks.GetRun(runID)
 	if err != nil {

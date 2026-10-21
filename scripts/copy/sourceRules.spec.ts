@@ -3,6 +3,7 @@ import { type MessageShape, type SourceRule, scanSource } from './sourceRules';
 
 const messages = new Map<string, MessageShape>([
   ['a.greet.label', { placeholders: new Set(['name']), plural: false }],
+  ['a.agent.label', { placeholders: new Set(['product']), plural: false }],
   ['a.files.label', { placeholders: new Set(['count']), plural: true }],
   ['a.plain.label', { placeholders: new Set(), plural: false }],
 ]);
@@ -178,6 +179,9 @@ describe('U71 call-site params', () => {
     expect(rules('a.ts', "export const f = () => t('a.plain.label', { name: 'x' });")).toEqual([
       'U71',
     ]);
+  });
+  test('the agent names are ambient', () => {
+    expect(rules('a.ts', "export const f = () => t('a.agent.label');")).toEqual([]);
   });
   test('plural message needs count', () => {
     expect(rules('a.ts', "export const f = () => t('a.files.label', { n: 1 });")).toEqual(['U71']);

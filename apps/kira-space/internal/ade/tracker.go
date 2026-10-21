@@ -1,5 +1,5 @@
-// Package ade is Kira Space's ADE engine: the task board, the run engine and the Claude Code session
-// tracker, over the shared internal/terminal and internal/agenthooks packages. No
+// Package ade is Kira Space's ADE engine: the task board, the run engine and the Claude Code
+// session tracker, over the shared internal/terminal and internal/harness packages. No
 // apps/kira-space/internal/bridge import (layering_test.go rule); bridge/adetask.go is the one
 // place that turns it into a Wails-bound surface.
 package ade
@@ -17,9 +17,8 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/agenthooks"
+	"github.com/kirathecat/kira-studio/internal/harness"
 	"github.com/kirathecat/kira-studio/internal/terminal"
-	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
 // defaultGrace/defaultPendingTTL are TrackerDeps' own zero-value defaults, applied by NewTracker.
@@ -29,7 +28,6 @@ const (
 	// launchGuardWindow bounds how long an uncomposed intent blocks a repeat launch: it covers the
 	// double-click and the terminal mount round trip, not an abandoned launch.
 	launchGuardWindow = 10 * time.Second
-	defaultClaudeBin  = "claude"
 )
 
 // Sentinel errors Prepare/Compose/Send return — bridge/adetask.go maps each to an invalid-input
@@ -45,8 +43,8 @@ var (
 )
 
 // TrackerDeps is everything Tracker needs from the rest of the app — a plain struct of seams, the
-// same "declare small interfaces, pass funcs" discipline this app's bridge packages already use,
-// so a test can fake each one independently (tracker_test.go passes an in-memory LiveAgents/
+// same "declare small interfaces, pass funcs" discipline this app's bridge packages already
+// use, so a test can fake each one independently (tracker_test.go passes an in-memory LiveAgents/
 // WriteTerminal and a fixed Now).
 type TrackerDeps struct {
 	Store         *repos.AdeSessionsRepo
@@ -54,7 +52,7 @@ type TrackerDeps struct {
 	WriteTerminal func(terminalID string, data []byte) error
 	Now           func() time.Time
 	// OnChange is called whenever a persisted record's own state changes (a new or revived
-	// session, a stop, a claude_session_id update after /clear) — main.go wires it to
+	// session, a stop, a agent_session_id update after /clear) — main.go wires it to
 	// bridge.AdeTaskSessionsChanged, never called with the lock held.
 	OnChange func()
 	// OnStopped is called with a record id after Reconcile marked it stopped (its terminal is gone);
@@ -65,19 +63,21 @@ type TrackerDeps struct {
 	// seconds.
 	Grace      time.Duration
 	PendingTTL time.Duration
-	// ClaudeBin defaults to "claude" when empty. Exists only so ade_test.go's integration test can
-	// point it at an absolute path to a fake script — this container's own login-shell PATH always
-	// resolves a bare "claude" to the real installed CLI ahead of anything a test could prepend
-	// (every /etc/profile.d/*.sh script re-prepends its own bin dir), which would make a hermetic
-	// fake-CLI test impossible without this seam. Production never sets it.
-	ClaudeBin string
+	// Agent resolves the provider of a new launch.
+	Agent harness.Selector
+	// AgentBin defaults to the provider's CLI name when empty. Exists only so ade_test.go's
+	// integration test can point it at an absolute path to a fake script — this container's own
+	// login-shell PATH always resolves a bare "claude" to the real installed CLI ahead of anything
+	// a test could prepend (every /etc/profile.d/*.sh script re-prepends its own bin dir), which
+	// would make a hermetic fake-CLI test impossible without this seam. Production never sets it.
+	AgentBin string
 }
 
 // pendingIntent is one PrepareLaunch call's own record, keyed by the terminalId Prepare mints —
 // consumed exactly once, by the Compose call the renderer's own openTerminalSession triggers.
 type pendingIntent struct {
 	RecordID                          string
-	ClaudeSessionID                   string
+	AgentSessionID                    string
 	Cwd                               string
 	Command                           string // the exact base command Prepare returned; Compose refuses a mismatch
 	Message                           string
@@ -85,6 +85,8 @@ type pendingIntent struct {
 	CreatedAt                         time.Time
 	TaskID, BranchID, StepID, Resumes string
 	Purpose                           string
+	// Provider is the id of the provider that composed Command; its listener hooks the launch.
+	Provider string
 }
 
 // PrepareArgs is Prepare's own argument shape. TaskID is required: the row is keyed to the task,
@@ -94,15 +96,20 @@ type PrepareArgs struct {
 	// Resume is "" for a new session, or an existing ade_sessions.id to resume.
 	Resume  string
 	Message string
-	// Resumes is the Claude session id a new record continues (`claude --resume`), ExtraArgs are
-	// added to the base command, quoted.
+	// Provider is the provider the launch runs under (the conversation it continues, or the one its
+	// grant was rendered for); empty means the active one. Ignored when Resume is set.
+	Provider string
+	// Resumes is the agent session id a new record continues. AddDirs, MCPConfig and AllowedTools
+	// extend the base command.
 	TaskID, BranchID, StepID, Resumes string
-	ExtraArgs                         []string
+	AddDirs                           []string
+	MCPConfig                         string
+	AllowedTools                      []string
 	// Purpose is "" or model.AdeSessionPurposeReview for the task's review agent.
 	Purpose string
 }
 
-// PrepareResult is Prepare's own return shape. SessionID is the Claude session id (stable across
+// PrepareResult is Prepare's own return shape. SessionID is the agent session id (stable across
 // Compose but not across a /clear inside the session); Command is the base launch, without hooks
 // or a prompt — Compose adds both. Cwd is the effective cwd: args.Cwd for a new launch,
 // existing.Cwd for a resume — the caller opens the terminal there, so the PTY and the record
@@ -110,7 +117,7 @@ type PrepareArgs struct {
 type PrepareResult struct {
 	TerminalID string
 	// RecordID is the ade_sessions row id (the handle Send and FocusSession take); SessionID is the
-	// Claude session id.
+	// agent session id.
 	RecordID  string
 	SessionID string
 	Command   string
@@ -119,7 +126,7 @@ type PrepareResult struct {
 
 // Tracker is Kira Space's own agent session tracker (§4.4) — one instance, constructed in main.go
 // and shared by BoundService.ComposeAgent (via Compose), Registry.OnChange (via Reconcile),
-// agenthooks.Manager's OnEvent (via HandleEvent) and AdeTaskService (via Send/Get).
+// the hooks hub's OnEvent (via HandleEvent) and AdeTaskService (via Send/Get).
 type Tracker struct {
 	deps TrackerDeps
 
@@ -138,13 +145,13 @@ type Tracker struct {
 	// Stop/SessionEnd, on the grace-timeout Reconcile that stops a record, and on Close — not on
 	// every event, which would be one DB write per tool call.
 	lastActive map[string]int64
-	// claudeSessionID caches each live record's own current Claude session id, so HandleEvent can
+	// agentSessionID caches each live record's own current agent session id, so HandleEvent can
 	// detect a SessionStart naming a different one (a /clear) without a DB read on every event.
-	claudeSessionID map[string]string
+	agentSessionID map[string]string
 	// fresh marks records Compose inserted (not resumed), so Abort deletes rather than stops them.
 	fresh map[string]bool
 
-	hooks func(terminalID, cwd, command string) (string, []string)
+	hooks func(provider, terminalID, cwd, command string) (string, []string)
 
 	// graceTimers are Compose's pending Reconcile timers, stopped by Close; graceWG waits for a
 	// callback already running.
@@ -162,19 +169,16 @@ func NewTracker(deps TrackerDeps) *Tracker {
 	if deps.PendingTTL <= 0 {
 		deps.PendingTTL = defaultPendingTTL
 	}
-	if deps.ClaudeBin == "" {
-		deps.ClaudeBin = defaultClaudeBin
-	}
 	return &Tracker{
-		deps:            deps,
-		pending:         map[string]pendingIntent{},
-		live:            map[string]string{},
-		byRecord:        map[string]string{},
-		spawnedAt:       map[string]time.Time{},
-		lastActive:      map[string]int64{},
-		claudeSessionID: map[string]string{},
-		fresh:           map[string]bool{},
-		graceTimers:     map[string]*time.Timer{},
+		deps:           deps,
+		pending:        map[string]pendingIntent{},
+		live:           map[string]string{},
+		byRecord:       map[string]string{},
+		spawnedAt:      map[string]time.Time{},
+		lastActive:     map[string]int64{},
+		agentSessionID: map[string]string{},
+		fresh:          map[string]bool{},
+		graceTimers:    map[string]*time.Timer{},
 	}
 }
 
@@ -186,16 +190,16 @@ func (t *Tracker) SetStoppedHandler(fn func(recordID string)) {
 	t.deps.OnStopped = fn
 }
 
-// SetHooks installs the launch-composition callback (agenthooks.Manager.ComposeLaunch) — called
+// SetHooks installs the launch-composition callback (harness.Hooks.Compose) — called
 // once in main.go before any window exists, so Compose never races an unset hooks func with a
 // real launch.
-func (t *Tracker) SetHooks(fn func(terminalID, cwd, command string) (string, []string)) {
+func (t *Tracker) SetHooks(fn func(provider, terminalID, cwd, command string) (string, []string)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.hooks = fn
 }
 
-func (t *Tracker) hooksFn() func(string, string, string) (string, []string) {
+func (t *Tracker) hooksFn() func(string, string, string, string) (string, []string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.hooks
@@ -239,19 +243,23 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	if args.TaskID == "" {
 		return PrepareResult{}, fmt.Errorf("%w: taskId is required", ErrInvalidInput)
 	}
-	if _, err := toolexec.RequireClaude(context.Background(), toolexec.ClaudeDeps{Bin: t.deps.ClaudeBin}); err != nil {
-		return PrepareResult{}, err
-	}
+	agent := t.deps.Agent.Active()
 	now := t.deps.Now()
 
-	var recordID, claudeSessionID, cwd string
+	var recordID, agentSessionID, cwd string
 	if args.Resume == "" {
 		recordID = uuid.NewString()
-		claudeSessionID = uuid.NewString()
+		agentSessionID = uuid.NewString()
 		if args.Resumes != "" {
-			claudeSessionID = args.Resumes
+			agentSessionID = args.Resumes
 		}
 		cwd = args.Cwd
+		if args.Provider != "" {
+			var err error
+			if agent, err = t.deps.Agent.For(args.Provider); err != nil {
+				return PrepareResult{}, err
+			}
+		}
 	} else {
 		existing, err := t.deps.Store.Get(args.Resume)
 		if err != nil {
@@ -267,7 +275,10 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 			return PrepareResult{}, ErrSessionRunning
 		}
 		recordID = existing.ID
-		claudeSessionID = existing.ClaudeSessionID
+		agentSessionID = existing.AgentSessionID
+		if agent, err = t.deps.Agent.For(existing.Provider); err != nil {
+			return PrepareResult{}, err
+		}
 		// Resume always uses the recorded cwd, never args.Cwd — a session must not appear to resume
 		// somewhere it never ran. A missing directory is an error.
 		if info, err := os.Stat(existing.Cwd); err != nil {
@@ -281,20 +292,21 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 		cwd = existing.Cwd
 	}
 
-	claudeBin := t.deps.ClaudeBin
-	command := newCommand(claudeBin, claudeSessionID)
-	if args.Resume != "" || args.Resumes != "" {
-		command = resumeCommand(claudeBin, claudeSessionID)
+	if _, err := agent.Locate(context.Background(), t.deps.AgentBin); err != nil {
+		return PrepareResult{}, err
 	}
-	for _, a := range args.ExtraArgs {
-		command += " " + quotePOSIX(a)
-	}
+	agentBin := cmpNonEmpty(t.deps.AgentBin, agent.Command())
+	command := agent.InteractiveCommand(harness.InteractiveSpec{
+		Bin: agentBin, SessionID: agentSessionID, Resume: args.Resume != "" || args.Resumes != "",
+		AddDirs: args.AddDirs, MCPConfig: args.MCPConfig, AllowedTools: args.AllowedTools,
+	})
 
 	terminalID := uuid.NewString()
 	intent := pendingIntent{
-		RecordID: recordID, ClaudeSessionID: claudeSessionID, Cwd: cwd, Command: command, Message: args.Message,
+		RecordID: recordID, AgentSessionID: agentSessionID, Cwd: cwd, Command: command, Message: args.Message,
 		Resume: args.Resume != "", CreatedAt: now,
 		TaskID: args.TaskID, BranchID: args.BranchID, StepID: args.StepID, Resumes: args.Resumes, Purpose: args.Purpose,
+		Provider: agent.ID(),
 	}
 
 	t.mu.Lock()
@@ -317,7 +329,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	t.releaseExpired(expired)
 	time.AfterFunc(t.deps.PendingTTL, func() { t.expirePending(terminalID) })
 
-	return PrepareResult{TerminalID: terminalID, RecordID: recordID, SessionID: claudeSessionID, Command: command, Cwd: cwd}, nil
+	return PrepareResult{TerminalID: terminalID, RecordID: recordID, SessionID: agentSessionID, Command: command, Cwd: cwd}, nil
 }
 
 // expirePending releases an intent that never composed within PendingTTL, so an abandoned launch's
@@ -354,9 +366,9 @@ func (t *Tracker) hasPending(match func(pendingIntent) bool) bool {
 }
 
 // Compose is BoundService.ComposeAgent's own target (wired in main.go) — internal/terminal.Open
-// calls it for every claude-code launch, composed or not. No intent for terminalID (a claude-code
+// calls it for every agent launch, composed or not. No intent for terminalID (an agent
 // launch not started through Prepare; this app has none today) means hooks-only composition, no
-// record — §4.4's own explicit fallback.
+// record — the explicit fallback.
 func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, error) {
 	t.mu.Lock()
 	intent, ok := t.pending[terminalID]
@@ -370,7 +382,7 @@ func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, er
 		if hooks == nil {
 			return command, nil, nil
 		}
-		composed, env := hooks(terminalID, cwd, command)
+		composed, env := hooks(t.deps.Agent.Active().ID(), terminalID, cwd, command)
 		return composed, env, nil
 	}
 
@@ -382,11 +394,15 @@ func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, er
 	// leave a persisted row for a conversation that never ran.
 	composed, env := command, []string(nil)
 	if hooks := t.hooksFn(); hooks != nil {
-		composed, env = hooks(terminalID, cwd, command)
+		composed, env = hooks(intent.Provider, terminalID, cwd, command)
 	}
 	if intent.Message != "" {
 		// The command can end in a variadic flag (--add-dir a b), which would swallow the prompt.
-		composed += " -- " + quotePOSIX(normalizeMessage(intent.Message))
+		agent, err := t.deps.Agent.For(intent.Provider)
+		if err != nil {
+			return "", nil, err
+		}
+		composed = agent.WithPrompt(composed, normalizeMessage(intent.Message))
 	}
 	if len(composed) > terminal.MaxCommandBytes {
 		return "", nil, fmt.Errorf("%w: command is too long", ErrInvalidInput)
@@ -411,11 +427,11 @@ func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, er
 		}
 	} else {
 		rec := model.AdeSession{
-			ID: intent.RecordID, ClaudeSessionID: intent.ClaudeSessionID, Cwd: intent.Cwd,
+			ID: intent.RecordID, AgentSessionID: intent.AgentSessionID, Cwd: intent.Cwd,
 			State: model.AdeSessionStateRunning, TerminalID: terminalID,
 			StartedAt: now.UnixMilli(), LastActiveAt: now.UnixMilli(),
 			Mode: model.AdeSessionModeTUI, TaskID: intent.TaskID, BranchID: intent.BranchID,
-			StepID: intent.StepID, Resumes: intent.Resumes, Purpose: intent.Purpose,
+			StepID: intent.StepID, Resumes: intent.Resumes, Purpose: intent.Purpose, Provider: intent.Provider,
 		}
 		if err := t.deps.Store.InsertTUI(rec); err != nil {
 			return "", nil, fmt.Errorf("ade: compose: %w", err)
@@ -426,7 +442,7 @@ func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, er
 	t.live[terminalID] = intent.RecordID
 	t.byRecord[intent.RecordID] = terminalID
 	t.spawnedAt[intent.RecordID] = now
-	t.claudeSessionID[intent.RecordID] = intent.ClaudeSessionID
+	t.agentSessionID[intent.RecordID] = intent.AgentSessionID
 	if !intent.Resume {
 		t.fresh[intent.RecordID] = true
 	}
@@ -445,7 +461,7 @@ func (t *Tracker) Compose(terminalID, cwd, command string) (string, []string, er
 }
 
 // Abort is BoundService.AbortAgent's own target: Open failed after Compose, so the terminal never
-// ran. A fresh record is deleted (its Claude session never existed, so a resume would fail); a
+// ran. A fresh record is deleted (its agent session never existed, so a resume would fail); a
 // resumed one goes back to stopped. A terminal Compose tracked nothing for is a no-op.
 func (t *Tracker) Abort(terminalID string) {
 	t.mu.Lock()
@@ -459,7 +475,7 @@ func (t *Tracker) Abort(terminalID string) {
 	delete(t.byRecord, recordID)
 	delete(t.spawnedAt, recordID)
 	delete(t.lastActive, recordID)
-	delete(t.claudeSessionID, recordID)
+	delete(t.agentSessionID, recordID)
 	delete(t.fresh, recordID)
 	if timer := t.graceTimers[recordID]; timer != nil {
 		timer.Stop()
@@ -550,7 +566,7 @@ func (t *Tracker) Reconcile() {
 		} else {
 			flushed[recordID] = now.UnixMilli()
 		}
-		delete(t.claudeSessionID, recordID)
+		delete(t.agentSessionID, recordID)
 		delete(t.fresh, recordID)
 	}
 	t.mu.Unlock()
@@ -576,10 +592,10 @@ func (t *Tracker) Reconcile() {
 	}
 }
 
-// HandleEvent is agenthooks.Options.OnEvent's own target — an event for a terminal this tracker
-// does not know (not live, or already reconciled away) is ignored, never an error: agenthooks has
+// HandleEvent is harness.HookOptions.OnEvent's own target — an event for a terminal this tracker
+// does not know (not live, or already reconciled away) is ignored, never an error: the hooks listener has
 // no notion of ade sessions, and a stray event racing a stop is expected, not a bug.
-func (t *Tracker) HandleEvent(ev agenthooks.Event) {
+func (t *Tracker) HandleEvent(ev harness.AgentEvent) {
 	t.mu.Lock()
 	recordID, ok := t.live[ev.TerminalID]
 	if !ok {
@@ -592,16 +608,16 @@ func (t *Tracker) HandleEvent(ev agenthooks.Event) {
 
 	sessionChanged := false
 	// The id lands in a later shell command line; only a real UUID is trusted.
-	if _, perr := uuid.Parse(ev.SessionID); ev.Event == "SessionStart" && perr == nil && t.claudeSessionID[recordID] != ev.SessionID {
-		t.claudeSessionID[recordID] = ev.SessionID
+	if _, perr := uuid.Parse(ev.SessionID); ev.Event == "SessionStart" && perr == nil && t.agentSessionID[recordID] != ev.SessionID {
+		t.agentSessionID[recordID] = ev.SessionID
 		sessionChanged = true
 	}
 	flushNow := ev.Event == "Stop" || ev.Event == "SessionEnd"
 	t.mu.Unlock()
 
 	if sessionChanged {
-		if err := t.deps.Store.SetClaudeSessionID(recordID, ev.SessionID); err != nil {
-			slog.Warn("ade: handle event: set claude session id", "scope", "ade", "recordId", recordID, "err", err)
+		if err := t.deps.Store.SetAgentSessionID(recordID, ev.SessionID); err != nil {
+			slog.Warn("ade: handle event: set agent session id", "scope", "ade", "recordId", recordID, "err", err)
 		}
 	}
 	if flushNow {

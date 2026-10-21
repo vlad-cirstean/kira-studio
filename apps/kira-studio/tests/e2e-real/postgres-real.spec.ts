@@ -9,12 +9,12 @@ import {
   startPostgres,
 } from './support/postgres';
 
-// E2 (P57-e2e-revisit.md §3.4/§6/§8) — the network-adapter counterpart to E1's file-based anchor.
+// The network-adapter counterpart to E1's file-based anchor.
 // SQLite is a file opened in-process; Postgres exercises the parts of the chain only a network
 // adapter has: credentials typed into the real dialog travelling through `internal/secrets` and
 // back out through `resolve()` into a real driver, a real connection pool, a real server-version
 // handshake over a real TCP connect that is not localhost-with-no-auth. As with E1, this is a
-// *wiring* proof (D5) — rendering/interaction fidelity already has a verified tests/ui/ port
+// *wiring* proof — rendering/interaction fidelity already has a verified tests/ui/ port
 // against a mock built from this same seed data (tests/ui/support/postgresFixture.ts).
 
 let pg: PgFixture | null = null;
@@ -99,7 +99,7 @@ test('real Postgres container round-trips through the real Go bridge', async ({
   // real rows from 0001_seed.sql, not a canned fixture.
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(3, { timeout: 10_000 });
-  // P22 Pass B's own DOM shape (tests/ui/support/grid.ts's `gridCellSelector` documents this):
+  // The DOM shape (tests/ui/support/grid.ts's `gridCellSelector` documents this):
   // `data-row` is written on the `.slick-row`/`[data-testid="grid-row"]` ancestor, never on the
   // `.slick-cell` itself, and with `frozenColumn: 0` that row element is cloned once per pane, so
   // the cell lookup has to be scoped to the right (non-frozen) pane's row to stay unambiguous.
@@ -115,10 +115,10 @@ async function firstGutterNumber(page: Page): Promise<string> {
   return (await page.locator('[data-testid="grid-gutter-cell"]').first().innerText()).trim();
 }
 
-// C1 §7 step 11 — keyset paging (BuildKeysetPosition) against a real 1,000,000-row table, over the
-// real FlatBuffers wire path, forward then back: the pagination mode itself (not just row counts) is
-// asserted, since an adapter that silently fell back to offset paging on a keyset-eligible sort
-// would still show correct rows here, just not via the code path this step exists to prove.
+// Keyset paging (BuildKeysetPosition) against a real 1,000,000-row table, over the real FlatBuffers
+// wire path, forward then back: the pagination mode itself (not just row counts) is asserted, since
+// an adapter that silently fell back to offset paging on a keyset-eligible sort would still show
+// correct rows here.
 test('real Postgres: keyset paging over app.big_rows, forward then back', async ({
   kira,
   consoleErrors,

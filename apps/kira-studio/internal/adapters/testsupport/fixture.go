@@ -10,8 +10,8 @@ import (
 // lazily on the first get() call and reused by every later call in the same process. Stop is
 // called exactly once, from the package's own TestMain after m.Run() returns — never from an
 // individual test's t.Cleanup, which Go's testing package runs the instant the registering test
-// function itself returns, long before the rest of the package's tests run. That is the bug P58a's
-// own findings record (CLAUDE.md): the first StartPostgres implementation wired termination to
+// function itself returns, long before the rest of the package's tests run. That is the bug the
+// findings record (CLAUDE.md): the first StartPostgres implementation wired termination to
 // t.Cleanup and silently restarted a fresh container for every single test instead of reusing one,
 // turning an ~8s suite into ~50s. This type exists so a fourth fixture cannot re-discover it.
 type fixture[T any] struct {

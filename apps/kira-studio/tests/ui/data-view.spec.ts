@@ -106,8 +106,10 @@ const HISTORY_SMALL_IDS = {
 
 // Real captures against a real 1,000,000-row app.big_rows (id, hash=md5(id)) — id/1000/10000-row
 // pages (D/E below) are NOT inlined verbatim: their content is fully deterministic
-// (packages/db-fixtures/support/postgres.ts's own seed, `md5(i::text)`), verified byte-for-byte against the
-// real capture's first/last row (id=1000 -> a9b7ba70783b617e9998dc4dd82eb3c5, id=10000 -> b7a782741f667201b54880c925faec4b,
+// (packages/db-fixtures/support/postgres.ts's own seed, `md5(i::text)`), verified byte-for-byte
+// against the
+// real capture's first/last row (id=1000 -> a9b7ba70783b617e9998dc4dd82eb3c5, id=10000 ->
+// b7a782741f667201b54880c925faec4b,
 // id=999991 -> 0ef26b9d4469882962b1bd35ef7556f4, id=1000000 -> 8155bc545f84d9652f1012ef2bdfb6eb),
 // so recomputing them at test time avoids a multi-thousand-row literal array for content nothing
 // here inspects past a handful of specific ids and the first/last gutter number. Every other page
@@ -1070,10 +1072,9 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await expect.poll(() => firstGutterNumber(page), { timeout: 15_000 }).toBe('1');
   await expect.poll(() => lastGutterNumber(page)).toBe('100');
 
-  // --- P28 D7 reverses P16 D1 (commit d2892f49): the pager is back in DataToolbar, at the
-  // toolbar's reading edge and immediately before the page-size picker it pages through, rather
-  // than alone at the far right. Relative positions, not pixel ones, so a token or spacing change
-  // still cannot break these. ------------------------------------------------------------------
+  // --- The pager is back in DataToolbar, at the toolbar's reading edge and immediately before the
+  // page-size picker it pages through, rather than alone at the far right. Relative positions, not
+  // pixel ones, so a token or spacing change still cannot break these. ----------------------------
   const pagerBox = await page.locator('[data-testid="pager"]').boundingBox();
   const pageSizeBox = await page.locator('[data-testid="page-size-picker"]').boundingBox();
   const searchToggleBox = await page.locator('[data-testid="toolbar-search"]').boundingBox();
@@ -1084,20 +1085,20 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   expect(pagerBox.x).toBeLessThan(searchToggleBox.x);
   await expect(page.locator('[data-testid="pager-next"]')).toBeEnabled();
 
-  // --- P22 D4's own assertion, re-aimed by P28 D7: it exists to prove nothing reserves width
-  // between the toolbar's right-most control and its right edge (the LAW-12 reflow it fixed). The
-  // pager used to be that control; with it moved back to the reading edge, RunState is — it still
-  // renders ahead of #toolbar-end, whose only remaining content is the conditional pending-changes
-  // group. Every control the user reads left-to-right now sits left of it. -----------------------
+  // --- The assertion exists to prove nothing reserves width between the toolbar's right-most
+  // control and its right edge (the reflow it fixed). The pager used to be that control; with it
+  // moved back to the reading edge, RunState is — it still renders ahead of #toolbar-end, whose
+  // only remaining content is the conditional pending-changes group. Every control the user reads
+  // left-to-right now sits left of it. -----------------------
   const dataToolbarBox = await page.locator('[data-testid="data-toolbar"]').boundingBox();
   const runStateBox = await page.locator('[data-testid="run-state"]').first().boundingBox();
   if (!dataToolbarBox || !runStateBox) {
     throw new Error('data-toolbar or run-state has no bounding box');
   }
-  // 16, not P22 D4's own 12: that bound was calibrated against the pager's last IconButton, whose
+  // 16, not the 12: that bound was calibrated against the pager's last IconButton, whose
   // box hugs the toolbar edge, and RunState carries its own trailing padding. The gap measures 14.
-  // Still tight enough to catch the ~76px unconditional reservation P22 D4 existed to fix, which
-  // is the whole point of the assertion.
+  // Still tight enough to catch the ~76px unconditional reservation, which is the whole point
+  // of the assertion.
   expect(
     dataToolbarBox.x + dataToolbarBox.width - (runStateBox.x + runStateBox.width),
   ).toBeLessThanOrEqual(16);
@@ -1270,10 +1271,9 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await expect(columnsDot).toHaveCount(0);
 
   // --- sort: header click asc -> desc -> none, then free-text ORDER BY wins -------------------
-  // P22 Pass B, items 9-11 (a later coordinator round) — a left-click on a header's BODY now
-  // selects the column instead of sorting it; sorting moved to a dedicated arrow control
-  // (`data-testid="grid-header-sort"`) on the right of each header cell. This still exercises the
-  // identical asc -> desc -> none cycle, just via the new control.
+  // A left-click on a header's BODY now selects the column instead of sorting it; sorting moved to
+  // a dedicated arrow control (`data-testid="grid-header-sort"`) on the right of each header cell.
+  // This still exercises the identical asc -> desc -> none cycle, via the new control.
   const idSortArrow =
     '[data-testid="grid-header-cell"][data-column="id"] [data-testid="grid-header-sort"]';
   await page.click(idSortArrow); // -> asc (explicit)
@@ -1339,7 +1339,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await page.click('[data-testid="search-prev"]');
   expect((await stream.ops()).length).toBe(opsBeforeSearch); // zero new PortRequests
 
-  // --- P24: filter mode hides non-matching rows (D1-D13) -------------------------------------
+  // --- Filter mode hides non-matching rows -------------------------------------
   // This page is still pageSize 10, unsorted (id-ascending), no WHERE — ids are plain digit
   // strings and `hash` (big_rows' other column) is always a 32-char md5 hex string that can never
   // equal one of them exactly, so an anchored regex alternation gives a deterministic,
@@ -1453,7 +1453,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await page.click('[data-testid="page-size-10000"]');
   await expect.poll(() => lastGutterNumber(page), { timeout: 15_000 }).toBe('10000');
 
-  // --- P42 D37/D38: viewport-first search — the rows on screen highlight before the full scan
+  // --- Viewport-first search — the rows on screen highlight before the full scan
   // finishes, and the filter toggle waits for a *completed* scan before it hides anything.
   // runChunkedScan's priority window lands in its own animation frame before the ordinary
   // ascending pass starts, so ".search-match" reliably appears first — but exactly how far ahead
@@ -1470,11 +1470,11 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
 
   await expect(page.locator('.search-match')).toBeVisible({ timeout: 2_000 });
 
-  // D38: a filter toggled on mid-scan hides nothing — matchedRows() reads null while pending. Not
+  // A filter toggled on mid-scan hides nothing — matchedRows() reads null while pending. Not
   // asserted directly: the scan (5 rAF-gated chunks, ~80ms) routinely finishes before a Playwright
   // round trip can click the toggle and read the DOM back, so there is no reliable window in which
   // to observe the "still 10000, scan pending" state from here. What's left is the invariant that
-  // actually matters end to end — toggling never leaves the grid on a stale or half-applied
+  // matters end to end — toggling never leaves the grid on a stale or half-applied
   // result, only ever the fully-settled one.
   await filterToggle.click();
   await expect(page.locator('[data-testid="search-count"]')).toContainText('1 of 1', {
@@ -1598,10 +1598,9 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
   const nullCell = gridCell(page, 0, 'label');
   const emptyCell = gridCell(page, 1, 'label');
-  // P22 Pass B, C1/§5 D10, F3: `data-null` is retired in favour of the `.cell-null` marker the
-  // formatter already carries on both engines (nullMarker: a child span under the incumbent, the
-  // cell's own class under SlickGrid, F10) — an implementation-detail rewrite, not a coverage loss
-  // (§7.3).
+  // `data-null` is retired in favour of the `.cell-null` marker the formatter already carries on
+  // both engines (nullMarker: a child span under the incumbent, the cell's own class under
+  // SlickGrid) — an implementation-detail rewrite, not a coverage loss.
   await expect(nullMarker(nullCell)).toHaveCount(1);
   await expect(nullCell).toContainText('NULL');
   await expect(nullMarker(emptyCell)).toHaveCount(0);
@@ -1609,7 +1608,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
 
   // Both errors this test deliberately triggers (the invalid-filter syntax error, the mid-flight
   // cancellation) travel the data-plane WebSocket, not a bound call — unlike a handled
-  // control-plane rejection (CLAUDE.md's P57 finding), neither produces a real HTTP 422 for
+  // control-plane rejection (CLAUDE.md's finding), neither produces a real HTTP 422 for
   // Chromium/WebKit's devtools to log, so this stays a plain empty-array assertion.
   expect(consoleErrors).toEqual([]);
 });

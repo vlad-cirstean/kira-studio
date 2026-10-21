@@ -12,12 +12,13 @@ import {
 } from './engineFixture';
 import { IPC } from './ipcChannels';
 
-// Real captures against a real Postgres container, seeded with packages/db-fixtures/fixtures/0001_seed.sql —
-// via scripts/capture-postgres-tree.ts, not hand-written (P50 D5's discipline: a hand-written tree
-// node once used the wrong `path` shape and was silently rendered rather than rejected). Shared
-// across the remaining tests/e2e/*.spec.ts ports that all open the same connect -> expand ->
-// table-open path against `app.order_items` (a small, 3-row, 4-column table with two FKs and two
-// indexes — enough surface for tree/definition/data-view assertions without a huge fixture).
+// Real captures against a real Postgres container, seeded with
+// packages/db-fixtures/fixtures/0001_seed.sql — via scripts/capture-postgres-tree.ts, not
+// hand-written (a hand-written tree node once used the wrong `path` shape and was silently
+// rendered rather than rejected). Shared across the remaining tests/e2e/*.spec.ts ports that all
+// open the same connect -> expand -> table-open path against `app.order_items` (a small, 3-row,
+// 4-column table with two FKs and two indexes — enough surface for tree/definition/data-view
+// assertions without a huge fixture).
 
 export const ROOT_CHILDREN = [
   {
@@ -90,7 +91,7 @@ export const ORDERS_PATH = `${APP_PATH}/table:orders`;
 // Real capture (scripts/capture-postgres-tree.ts) of database:kira_test/schema:analytics's own
 // children — surfaced a node no hand-written guess would have included: `events_id_seq`, the
 // serial PK's own backing sequence, alongside the `events` table itself (0001_seed.sql's only
-// analytics-schema object) — exactly the class of miss P50 D5's "capture, don't hand-write"
+// analytics-schema object) — exactly the class of miss the "capture, don't hand-write"
 // discipline exists to catch.
 export const ANALYTICS_CHILDREN = [
   { kind: 'table', name: 'events', path: `${ANALYTICS_PATH}/table:events`, hasChildren: false },
@@ -266,11 +267,11 @@ export function orderItemsFixture(connectionId: string): {
   );
 }
 
-// P22c: order_items' own columns, projected into RelationColumns' shape (ObjectMeta's ColumnMeta
-// reused verbatim, D1), plus a second relation (customers) — a real SchemaColumns fetch always
-// returns the WHOLE container in one round trip (D1/F9), so a fixture with only one relation
-// would understate what the cache actually replaces: once any cache exists for a container, it is
-// the sole source of table names for completion (D4's own precedence — no fallback to the tree's
+// order_items' own columns, projected into RelationColumns' shape (ObjectMeta's ColumnMeta
+// reused verbatim), plus a second relation (customers) — a real SchemaColumns fetch always
+// returns the WHOLE container in one round trip, so a fixture with only one relation
+// would understate what the cache replaces: once any cache exists for a container, it is
+// the sole source of table names for completion (no fallback to the tree's
 // relation names once the cache has an answer), so a spec asserting more than one table name must
 // see more than one relation here.
 export const APP_SCHEMA_COLUMNS_RESPONSE = {
@@ -399,8 +400,9 @@ export const COMPOSITE_PK_META = {
 };
 
 /** Real captures of `app.composite_pk`'s starting 3-row state — (1,1)/(1,2)/(2,1), a genuine
- *  2-column PK and no inbound FK (packages/db-fixtures's own reason for choosing this table too, per
- *  packages/db-fixtures/postgres.spec.ts). Callers add their own connect/tree/read/count/mutate snapshots on
+ *  2-column PK and no inbound FK (packages/db-fixtures's own reason for choosing this table too,
+ *  per packages/db-fixtures/postgres.spec.ts). Callers add their own
+ *  connect/tree/read/count/mutate snapshots on
  *  top for whatever sequence their own scenario needs — unlike order_items, mutations.spec.ts and
  *  interaction.spec.ts each drive a different, stateful mutation sequence against it, so there is
  *  no one fixed "the" fixture the way orderItemsFixture() is. */
@@ -844,7 +846,8 @@ export function nullsAndUnicodeFixture(connectionId: string): {
 }
 
 // `app.big_rows`' content is fully deterministic (`id`, `hash=md5(id::text)` —
-// packages/db-fixtures/support/postgres.ts's own seed) — generated here rather than inlined as a 10 000-row
+// packages/db-fixtures/support/postgres.ts's own seed) — generated here rather than inlined as a 10
+// 000-row
 // literal array, the same reasoning tests/ui/data-view.spec.ts's own `bigRowsRows` helper already
 // documents (verified byte-for-byte against a real capture's first/last rows there). Exported
 // (unlike that file-local copy) because tests/ui/budgets.spec.ts and tests/ui/perf.spec.ts both
@@ -857,10 +860,9 @@ export function bigRowsRows(count: number, startId: number): [string, string][] 
 }
 
 /** `app.big_rows` at pageSize=10000, offset=0 — the page `budgets.spec.ts`/`perf.spec.ts` both
- *  scroll. `nextToken` is a real capture (scripts/capture-postgres-tree.ts, P57 M5 leaks/perf/
- *  budgets port) — independently re-verified this session as byte-identical to data-view.spec.ts's
- *  own PAGE_E, confirming the token is a pure function of the page's own content (keyset value +
- *  filter hash), not something that could drift between captures. */
+ *  scroll. `nextToken` is a real capture (scripts/capture-postgres-tree.ts) — byte-identical to
+ *  data-view.spec.ts's own PAGE_E, confirming the token is a pure function of the page's own
+ *  content (keyset value + filter hash), not something that could drift between captures. */
 export function bigRowsHugePage(connectionId: string): PortSnapshot {
   return {
     op: DATA_OP.read,

@@ -10,13 +10,12 @@ import (
 	"time"
 )
 
-// TestRun_CancelKillsGrandchild is G30 round-1 architecture/security review, finding #7: Run set
-// Setpgid and WaitDelay but installed no cmd.Cancel override, so exec.CommandContext's default
-// cancel (Process.Kill(), the DIRECT CHILD ONLY) applied — a child that forked something
-// long-lived left the grandchild running after the parent was killed/timed out. This spawns a
-// shell that forks a background sleep (the "grandchild") and writes its pid to a file, then lets
-// the context deadline fire Run's own cancellation, and proves the grandchild is gone afterward —
-// not just that Run itself returned.
+// TestRun_CancelKillsGrandchild: Run set Setpgid and WaitDelay but installed no cmd.Cancel
+// override, so exec.CommandContext's default cancel (Process.Kill(), the DIRECT CHILD ONLY) applied
+// — a child that forked something long-lived left the grandchild running after the parent was
+// killed/timed out. This spawns a shell that forks a background sleep (the "grandchild") and writes
+// its pid to a file, then lets the context deadline fire Run's own cancellation, and proves the
+// grandchild is gone afterward — not just that Run itself returned.
 func TestRun_CancelKillsGrandchild(t *testing.T) {
 	if _, err := os.Stat("/bin/sh"); err != nil {
 		t.Skip("/bin/sh not available")
@@ -50,13 +49,12 @@ func TestRun_CancelKillsGrandchild(t *testing.T) {
 	t.Fatalf("grandchild pid %d is still alive — Run's cancellation did not reach it", grandchildPid)
 }
 
-// TestRun_CancellationStopsEscalationTimerAfterCleanExit is G31 round-2 architecture/security
-// review, finding #11: cmd.Cancel's own SIGKILL-escalation timer (armed on SIGTERM, to fire after
-// GracefulStopDelay) used to never be stopped once the process actually exited — a clean SIGTERM
-// exit (the overwhelmingly common case, exactly what this test's script does) still left the timer
-// ticking toward a SIGKILL nothing needs. GracefulStopDelay and killGroup are both package vars
-// specifically so this test can shrink the window and observe the escalation directly, rather than
-// relying on an on-demand-unreproducible real pid reuse.
+// TestRun_CancellationStopsEscalationTimerAfterCleanExit: cmd.Cancel's own SIGKILL-escalation timer
+// (armed on SIGTERM, to fire after GracefulStopDelay) used to never be stopped once the process
+// exited — a clean SIGTERM exit (the overwhelmingly common case, exactly what this test's script
+// does) still left the timer ticking toward a SIGKILL nothing needs. GracefulStopDelay and
+// killGroup are both package vars specifically so this test can shrink the window and observe the
+// escalation directly, rather than relying on an on-demand-unreproducible real pid reuse.
 func TestRun_CancellationStopsEscalationTimerAfterCleanExit(t *testing.T) {
 	if _, err := os.Stat("/bin/sh"); err != nil {
 		t.Skip("/bin/sh not available")

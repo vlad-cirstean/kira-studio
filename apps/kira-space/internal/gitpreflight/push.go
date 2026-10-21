@@ -11,11 +11,11 @@ type ProtectedMatch struct {
 	Pattern string
 }
 
-// MatchProtectedBranch is D17's glob matcher, ported verbatim from upstream's
+// MatchProtectedBranch is the glob matcher, ported verbatim from upstream's
 // model/protectedBranch.ts: `*` matches any run of characters except `/` (so `release/*` covers
 // `release/1.2` but not `release/1.2/hotfix` or `releases/1.2`); anything else in the pattern is
 // literal. Case-sensitive — git refnames are. `**` is not a supported glob — it is matched
-// LITERALLY and reported once at warn (the setting is server-owned, D16, so a bad value is entered
+// LITERALLY and reported once at warn (the setting is server-owned, so a bad value is entered
 // in Kira Space's own settings dialog, not somewhere upstream's client-side "settings problem"
 // channel could surface it instead). Returns the first pattern branch matches, or nil.
 func MatchProtectedBranch(branch string, patterns []string) *ProtectedMatch {
@@ -91,16 +91,16 @@ type PushPreflight struct {
 	RemoteTip        *string `json:"remoteTip"`
 	ProtectedBy      *string `json:"protectedBy"`
 	FastForward      bool    `json:"fastForward"`
-	// ResolvedBranch is the branch a force-push actually lands on — the resolved UPSTREAM remote
+	// ResolvedBranch is the branch a force-push lands on — the resolved UPSTREAM remote
 	// branch name (gitsession.resolveUpstreamRemoteBranch's own result), which can differ from the
-	// LOCAL branch name a stacked/renamed branch tracks (F2, P108 Part 16 review). The dialog that
+	// LOCAL branch name a stacked/renamed branch tracks. The dialog that
 	// confirms a protected force-push must gate on and display this name, not the local one, or a
-	// user can never type the name the backend's own ConfirmToken check actually requires.
+	// user can never type the name the backend's own ConfirmToken check requires.
 	ResolvedBranch string `json:"resolvedBranch"`
 }
 
 // ClassifyPushInput is ClassifyPush's own input — gitsession gathers these (the remote-tracking
-// ref's own existence and sha stand in for "upstream" here, F15: "a branch with no upstream, or
+// ref's own existence and sha stand in for "upstream" here, "a branch with no upstream, or
 // one whose remote-tracking ref has been pruned, is the common case" — both collapse to Upstream/
 // RemoteTip being nil for this specific remote+branch pair).
 type ClassifyPushInput struct {

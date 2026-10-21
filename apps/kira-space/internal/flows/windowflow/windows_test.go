@@ -100,7 +100,7 @@ func TestTwoWindowsIsolation(t *testing.T) {
 
 	// Settings are app-wide: one broadcast, not addressed to either window.
 	on := true
-	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{ClaudeCode: &model.ClaudeCodePatch{KeepAwakeWithAgents: &on}}}); err != nil {
+	if _, err := app.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{Agent: &model.AgentPatch{KeepAwakeWithAgents: &on}}}); err != nil {
 		t.Fatal(err)
 	}
 	ev := app.Events.WaitAfter(t, mark, appevent.ChannelSettingsChanged, nil, waitFor)
@@ -170,7 +170,7 @@ func TestFocusSessionAcrossWindows(t *testing.T) {
 	})
 	if _, err := app.W.Terminal.Open(terminal.OpenArgs{
 		TerminalID: launch.TerminalID, Cwd: launch.Cwd, Cols: 100, Rows: 30, WindowKey: "w-a",
-		Command: launch.Command, LaunchKind: terminal.LaunchKindClaudeCode,
+		Command: launch.Command, LaunchKind: terminal.LaunchKindAgent,
 	}); err != nil {
 		t.Fatal(err)
 	}

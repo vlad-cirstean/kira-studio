@@ -18,9 +18,9 @@ function contentTypeIsMultipart(value: string): boolean {
 }
 
 /**
- * D13-D16: a resolved request → a runnable (or, unrevealed, an honestly non-runnable) curl
+ * A resolved request → a runnable (or, unrevealed, an honestly non-runnable) curl
  * command string. Pure and synchronous — every `{{ }}` reference the caller could resolve is
- * already text by the time it arrives, and anything left is emitted verbatim (D10: that is what
+ * already text by the time it arrives, and anything left is emitted verbatim (that is what
  * makes the masked form a real, copyable command with `{{token}}` visibly in it).
  */
 export function toCurl(req: CurlRequest): string {

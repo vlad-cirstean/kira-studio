@@ -1,5 +1,5 @@
 import { SETTINGS } from '@kira/git-core';
-import type { RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
+import type { GitHostInfo, RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
 import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
@@ -15,7 +15,7 @@ function defaultRepoSettingsSnapshot(): RepoSettingsSnapshot {
     'kiraSpace.stash.includeUntracked': SETTINGS['kiraSpace.stash.includeUntracked'].default,
     'kiraSpace.review.baseCandidates': SETTINGS['kiraSpace.review.baseCandidates'].default,
     'kiraSpace.pull.strategy': SETTINGS['kiraSpace.pull.strategy'].default,
-    'kiraSpace.github.enabled': SETTINGS['kiraSpace.github.enabled'].default,
+    'kiraSpace.gitHost.provider': SETTINGS['kiraSpace.gitHost.provider'].default,
     'kiraSpace.worktree.prepareScript': SETTINGS['kiraSpace.worktree.prepareScript'].default,
     'kiraSpace.worktree.basePath': SETTINGS['kiraSpace.worktree.basePath'].default,
     'kiraSpace.checkout.autoStash': SETTINGS['kiraSpace.checkout.autoStash'].default,
@@ -23,19 +23,21 @@ function defaultRepoSettingsSnapshot(): RepoSettingsSnapshot {
 }
 
 /**
- * G18 D13: the per-repo display settings as reactive state, mirroring `StashState`'s own
- * "one instance for the life of the component, reset via `setRepoId`" shape (P9 W13) — a repo's
+ * The per-repo display settings as reactive state, mirroring `StashState`'s own
+ * "one instance for the life of the component, reset via `setRepoId`" shape — a repo's
  * own settings are exactly as reset-on-switch as its stash stack.
  *
  * `repoSettings.changed` naming a different repository than the one tracked is ignored.
  */
 export class RepoSettingsState {
   readonly settings: ShallowRef<RepoSettingsSnapshot>;
+  /** Every registered git host provider, for the settings choice; loaded once by `loadProviders`. */
+  readonly providers: ShallowRef<readonly GitHostInfo[]> = shallowRef([]);
 
   readonly #bridge: BridgeClient;
   #repoId: string | undefined;
   readonly #unsubscribe: () => void;
-  /** F5: one shared generation across `reload()`, `set()` and this event handler — bumped by
+  /** One shared generation across `reload()`, `set()` and this event handler — bumped by
    *  whichever of the three settles or arrives last, so a `reload()` (or a `set()`) left in
    *  flight when a fresher write settles or a live push arrives can never overwrite it with an
    *  older snapshot. Unlike `reload()`/`set()` elsewhere in this file, `set()`'s own result must
@@ -71,7 +73,7 @@ export class RepoSettingsState {
   async reload(): Promise<void> {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
-    // F5: claims this reload as the latest of the three writers of `settings` (this method,
+    // Claims this reload as the latest of the three writers of `settings` (this method,
     // `set()`, the `repoSettings.changed` handler above) before awaiting — a second `reload()`,
     // a `set()` result or a live push that lands first bumps `#generation` further, so THIS
     // reply is recognized as stale once it finally does arrive.
@@ -83,9 +85,9 @@ export class RepoSettingsState {
     this.settings.value = settings;
   }
 
-  /** `RepoSettingsDialog.vue`'s own save path — patches only the field(s) actually changed
+  /** `RepoSettingsDialog.vue`'s own save path — patches only the field(s) changed
    *  (`RepoSettingsPatch`'s own `.partial()` shape) and adopts the server's own resulting
-   *  snapshot as the new value, rather than optimistically applying the patch locally. F5: always
+   *  snapshot as the new value, rather than optimistically applying the patch locally. Always
    *  applies its own result (the user is waiting on it, unlike a background `reload()`) but bumps
    *  `#generation` first, so an in-flight `reload()` started before this call can never land on
    *  top of it afterward. */
@@ -96,6 +98,13 @@ export class RepoSettingsState {
     if (this.#repoId !== repoId) return;
     this.#generation++;
     this.settings.value = settings;
+  }
+
+  /** Loads the provider list the first time it is asked for; a failed load can be retried. */
+  async loadProviders(): Promise<void> {
+    if (this.providers.value.length > 0) return;
+    const { providers } = await this.#bridge.request('gitHost.providers', {});
+    this.providers.value = providers;
   }
 
   dispose(): void {

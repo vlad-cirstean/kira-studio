@@ -1,11 +1,9 @@
 <script setup lang="ts">
-// C5 §6.2: the pinned first tab (a placeholder at C5). C10 §8 replaces this file's content
-// wholesale with the real @kira/git-ui graph mount, read-only (docs/HISTORY.md (v1.5)
-// C10-git-graph-native.md) — modelled on RepoDiffView.vue's own mount lifecycle: mount() on
-// onMounted, unmount() on onUnmounted (a mere tab switch away, not a workspace close — the
-// transport itself outlives that, cached per repo workspace by gitTransportFor, S17 disposes it;
-// each mount holds its own lease over that shared transport, P67b §2.1 — so this mount's own
-// unmount/dispose never tears down the graph tab's peers).
+// The pinned first tab: the real @kira/git-ui graph mount, read-only — modelled on
+// RepoDiffView.vue's own mount lifecycle: mount() on onMounted, unmount() on onUnmounted (a mere
+// tab switch away, not a workspace close — the transport itself outlives that, cached per repo
+// workspace by gitTransportFor; each mount holds its own lease over that shared transport — so
+// this mount's own unmount/dispose never tears down the graph tab's peers).
 //
 // A tab switch away unmounts this view; the transport outlives it and view state restores
 // through TabViewStateStore.
@@ -66,9 +64,9 @@ async function mountGraph(): Promise<void> {
 onMounted(() => void mountGraph());
 
 // A mere tab switch away, not a workspace close — git-ui's own AppRoot/App.vue instance is torn
-// down (this is what ViewStateStore exists for, §8), but the transport itself is cached per repo
-// workspace (gitTransportFor) and outlives it; only closing the workspace disposes it (S17).
-// This mount's own transport is a lease (P67b §2.1) — its dispose(), triggered by App.vue's own
+// down (this is what ViewStateStore exists for), but the transport itself is cached per repo
+// workspace (gitTransportFor) and outlives it; only closing the workspace disposes it.
+// This mount's own transport is a lease — its dispose(), triggered by App.vue's own
 // teardown chain on unmount, releases only this mount's subscriptions, never the shared socket.
 onUnmounted(() => {
   handle?.unmount();

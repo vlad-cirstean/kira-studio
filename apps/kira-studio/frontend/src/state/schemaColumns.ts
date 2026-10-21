@@ -1,6 +1,6 @@
-// P22c D3: the renderer-side store for a container's cached columns — filled on a view's own
-// lifecycle hook (ConsoleView.vue's own onMounted is the only caller today, F11), never from a
-// CompletionSource, never on a keystroke (D5: the language layer never fetches). Lives in state/,
+// The renderer-side store for a container's cached columns — filled on a view's own
+// lifecycle hook (ConsoleView.vue's own onMounted is the only caller today), never from a
+// CompletionSource, never on a keystroke (the language layer never fetches). Lives in state/,
 // not views/, for the same reason state/schemas.ts does: three different view kinds read it, and
 // views/<kind>/* may not import another views/<kind>/* (biome.json).
 import {
@@ -24,7 +24,7 @@ import { useConnectionsStore } from './connections';
 
 const RELATION_CONTAINER_KINDS = new Set(['database', 'schema']);
 
-/** P4: containerPathFor's root branch — a console opened at the connection root (path === '') has
+/** containerPathFor's root branch — a console opened at the connection root (path === '') has
  *  no database:/schema: segment to walk, but it is not scope-less at runtime: every SQL adapter's
  *  Execute resolves an empty path to the connection's own configured database
  *  (internal/adapters/*'s own primary-connection fallback). This resolves the SAME container from
@@ -75,10 +75,10 @@ function rootContainerPathFor(connectionId: string): string | null {
   return encodePath([dbSegment, { kind: 'schema', name: schemaNode.name }]);
 }
 
-/** P22c F1: walks a console/table/etc.'s own path back to the last database:/schema: segment —
+/** Walks a console/table/etc.'s own path back to the last database:/schema: segment —
  *  the exact container completion.ts's own consoleRelationNames already resolves relation names
  *  against, factored out here so the two can never disagree about what "this container" means.
- *  P4: a path with no such segment falls to rootContainerPathFor only when it's the connection
+ *  A path with no such segment falls to rootContainerPathFor only when it's the connection
  *  root itself (path === '') — every other unresolvable path still yields null unchanged. */
 export function containerPathFor(connectionId: string, path: string): string | null {
   let segments: PathSegment[];
@@ -123,8 +123,8 @@ export const useSchemaColumnsStore = defineStore('schemaColumns', () => {
 
   const pendingLoads = new Set<string>();
 
-  // P108 Part 12 F5: bumped by dropSchemaColumns, per connection — the ConsoleView.vue watch below
-  // reads it as a third source so an invalidation actually re-triggers a fetch. `byContainer[key]`
+  // Bumped by dropSchemaColumns, per connection — the ConsoleView.vue watch below reads it as a
+  // third source so an invalidation re-triggers a fetch. `byContainer[key]`
   // alone can't do that: the watch's own source is (connectionId, containerPath), neither of which
   // changes on invalidation, so a plain-object drop with no reactive signal left nothing to re-run
   // ensureSchemaColumns until the tab remounted.
@@ -136,14 +136,14 @@ export const useSchemaColumnsStore = defineStore('schemaColumns', () => {
   }
 
   /** Idempotent, single-flight, fire-and-forget. Called on tab activation; never from a
-   *  CompletionSource, never on a keystroke (D5). Resolves from the Go-side cache with no
-   *  connection when one is cached (P22c F7), and is a no-op when the container is already loaded
+   *  CompletionSource, never on a keystroke. Resolves from the Go-side cache with no
+   *  connection when one is cached, and is a no-op when the container is already loaded
    *  or a fetch for it is already in flight. */
   async function ensureSchemaColumns(connectionId: string, containerPath: string): Promise<void> {
     const key = rowKey(connectionId, containerPath);
     if (state.byContainer[key] || pendingLoads.has(key)) return;
     pendingLoads.add(key);
-    // P108 Part 12 F8: captured before the await, checked after — dropSchemaColumns bumps this on
+    // Captured before the await, checked after — dropSchemaColumns bumps this on
     // every drop (reconnect, explicit Refresh). Without the check, a fetch already in flight when a
     // drop lands writes its now-stale result straight back into byContainer[key] once it resolves,
     // undoing the drop with no further fetch to correct it (the guard above then treats that stale
@@ -157,27 +157,27 @@ export const useSchemaColumnsStore = defineStore('schemaColumns', () => {
       // Same discipline as views/grid/state.ts's own loadMeta: a nicety that warms completion, not
       // something a failure here should block reading rows or opening a console over.
       //
-      // P108 Part 12 F6: deliberately NOT memoized as `[]` (a prior comment here argued a failure
+      // Deliberately NOT memoized as `[]` (a prior comment here argued a failure
       // should be cached the same as a genuinely-empty container, to stop it re-firing on every
       // activation/reconnect) — but `byContainer[key] || pendingLoads.has(key)` above treats `[]`
       // as "loaded", so a TRANSIENT failure (SchemaColumns's own Disconnected-on-cache-miss while a
-      // console restores before its connection finishes connecting, F3/F5) got permanently stuck
-      // empty: every later retry (a reconnect, F5's own generation bump) short-circuited on the
+      // console restores before its connection finishes connecting) got permanently stuck
+      // empty: every later retry (a reconnect, the generation bump) short-circuited on the
       // cached `[]` and never called treeSchemaColumns again. Leaving `byContainer[key]` unset
-      // costs nothing extra: F5 already re-triggers this on every drop/reconnect, and a container
-      // the adapter genuinely, permanently rejects just keeps retrying on the same schedule a
-      // real empty container already gets polled on (once per mount/reconnect) — never on a
-      // keystroke (D5), so there is no tight retry loop to worry about.
+      // costs nothing extra: the generation bump already re-triggers this on every drop/reconnect,
+      // and a container the adapter genuinely, permanently rejects keeps retrying on the same
+      // schedule a real empty container already gets polled on (once per mount/reconnect)
+      // — never on a keystroke, so there is no tight retry loop to worry about.
     } finally {
       pendingLoads.delete(key);
     }
   }
 
   /** The raw cached relations for a container — read by ConsoleView.vue to feed
-   *  sqlCompletionSources' own `cached` parameter (D4) directly, in the shape the completion
+   *  sqlCompletionSources' own `cached` parameter directly, in the shape the completion
    *  source wants (via namespaceFromCached), separately from
-   *  effectiveSchema's DdlSchema-shaped projection below (D6's lint/hover supply). A plain property
-   *  lookup that returns [] on a miss — never a fetch (D5's own guard: nothing exported here can
+   *  effectiveSchema's DdlSchema-shaped projection below (the lint/hover supply). A plain property
+   *  lookup that returns [] on a miss — never a fetch (the guard: nothing exported here can
    *  trigger one). */
   function cachedRelationsFor(
     connectionId: string,
@@ -187,8 +187,8 @@ export const useSchemaColumnsStore = defineStore('schemaColumns', () => {
   }
 
   /** The cached columns projected into the DdlSchema shape the three console language providers
-   *  (completion, diagnostics, hover) already share (D6) — so they can never disagree about what
-   *  the console knows. D4's precedence: a hand-authored document still wins WHOLESALE the moment
+   *  (completion, diagnostics, hover) already share — so they can never disagree about what
+   *  the console knows. The precedence: a hand-authored document still wins WHOLESALE the moment
    *  it declares any table — never merged table-by-table with the cache — since a user who pasted
    *  one deliberately (a read replica they can't introspect, a schema they're designing before it
    *  exists) keeps getting exactly what they get today. The cache only fills the case that was

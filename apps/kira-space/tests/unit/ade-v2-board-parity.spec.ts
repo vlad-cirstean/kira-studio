@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
+import { useClaudeAgentText } from '@workbench/testing/unit/claudeAgentText';
 import { branchTag, taskCell } from '../../frontend/src/ade/v2/board/actions';
 import { baseMarker } from '../../frontend/src/ade/v2/board/baseMarker';
 import { buildBranchGraph } from '../../frontend/src/ade/v2/board/branchGraph';
@@ -10,8 +11,8 @@ import { buildTimeline, type TimelineView } from '../../frontend/src/ade/v2/boar
 import type {
   Board,
   Branch,
+  ChangeRequestsResult,
   Pair,
-  PrsResult,
   ReposResult,
   SessionsResult,
   Workflow,
@@ -94,6 +95,7 @@ function normalizeBoard(raw: Board, sess: SessionsResult): Board {
 }
 
 beforeAll(() => {
+  useClaudeAgentText();
   const rawSessions = loadFixture<SessionsResult>('sessions');
   sessions = { sessions: rawSessions.sessions.filter((s) => s.id !== 'tk01') };
   board = normalizeBoard(loadFixture<Board>('board'), sessions);
@@ -291,7 +293,7 @@ describe('per branch', () => {
 
 describe('branch second line', () => {
   test('context, merged and deployed chips equal the mockup', () => {
-    const prs = loadFixture<PrsResult>('prs');
+    const prs = loadFixture<ChangeRequestsResult>('change-requests');
     for (const t of board.tasks) {
       for (const b of t.branchIds.flatMap((id) => board.branches.filter((x) => x.id === id))) {
         const box = boxOf(t.id);

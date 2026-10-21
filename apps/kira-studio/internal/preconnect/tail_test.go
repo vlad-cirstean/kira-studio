@@ -19,7 +19,7 @@ func TestTailTracker(t *testing.T) {
 		{"unterminated remainder counts as the tail", []string{"partial line, no newline yet"}, "partial line, no newline yet"},
 		{"carriage return newline", []string{"one\r\ntwo\r\n"}, "two"},
 		{"truncated over 200 chars", []string{strings.Repeat("x", 250) + "\n"}, strings.Repeat("x", 200)},
-		// P21 round 2 performance finding 5: a bare '\r' (a progress-bar rewrite) is not a line
+		// A bare '\r' (a progress-bar rewrite) is not a line
 		// separator on its own (splitLines only treats '\r\n' as one) — several of these, each
 		// re-writing the same visual line, must still resolve to a stable, correctly-truncated
 		// value() answer, not something that depends on how the underlying reads happened to be
@@ -39,11 +39,11 @@ func TestTailTracker(t *testing.T) {
 	}
 }
 
-// TestTailTracker_CarryNeverGrowsPastTheCap is P21 round 2 performance finding 5's own regression:
+// TestTailTracker_CarryNeverGrowsPastTheCap is the regression:
 // push used to grow carry without any bound at all for a sidecar whose stderr carries no newline
 // for a long stretch (a bare-\r progress bar, or any tool streaming without newlines) —
-// stderrTailMax was applied only in value(), at read time, bounding nothing that was actually
-// retained. This pushes many chunks with no newline anywhere in them (well past stderrTailMax in
+// stderrTailMax was applied only in value(), at read time, bounding nothing that was retained.
+// This pushes many chunks with no newline anywhere in them (well past stderrTailMax in
 // total) and asserts carry itself never exceeds the cap after any single push — it fails against
 // the pre-fix tailTracker, whose carry would grow to the full, unbounded total instead.
 func TestTailTracker_CarryNeverGrowsPastTheCap(t *testing.T) {

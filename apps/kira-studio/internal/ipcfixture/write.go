@@ -19,7 +19,7 @@ func IsWriteMode() bool {
 
 // mustMarshalNoEscape is every marshal call in this package's own primitive: Go's encoding/json
 // escapes <, > and & by default, which would corrupt the SQL and JSON text these fixtures carry
-// (write.go's first documented trap, P58f §4.3(c)). json.Encoder with SetEscapeHTML(false) is the
+// (write.go's first documented trap). json.Encoder with SetEscapeHTML(false) is the
 // fix; Encoder appends a trailing newline of its own, trimmed here so callers get exactly what
 // json.Marshal would have, minus the escaping.
 func mustMarshalNoEscape(v any) []byte {

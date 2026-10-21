@@ -5,10 +5,10 @@ import { acceptConfirm, cancelConfirm } from './support/dialogs';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
-// P14: confirm-before-reveal for saved credentials. Follows secrets.spec.ts's own pattern (F10) —
+// Confirm-before-reveal for saved credentials. Follows secrets.spec.ts's own pattern —
 // mocking ConnectionsService.Reveal's response per scenario, rather than branching on the host OS
 // or a real LocalAuthentication prompt this tier cannot drive at all (no darwin toolchain, no
-// display — evaluate_darwin.go's own header comment). All four RevealResult outcomes (D6) run
+// display — evaluate_darwin.go's own header comment). All four RevealResult outcomes run
 // here, on any OS, in one file: revealed, cancelled, confirmation-required (the non-macOS/OS-auth-
 // unavailable fallback this sandbox always takes), and error.
 
@@ -27,6 +27,7 @@ const CONN: ConnectionSummary = {
   options: {},
   preconnect: null,
   preconnectSidecar: false,
+  preconnectDelaySec: 0,
   autoExplain: false,
   throttlePerSec: 0,
   mcpEnabled: false,
@@ -78,7 +79,7 @@ async function openEdit(page: import('@playwright/test').Page): Promise<void> {
 }
 
 test('opening Edit… does not fetch or show the secret', async ({ relaunch }) => {
-  // Deliberately no connectionsReveal snapshot at all: F1's whole point is that the plaintext is
+  // Deliberately no connectionsReveal snapshot at all: the whole point is that the plaintext is
   // no longer fetched just by opening the dialog. If openEditDialog ever regresses back to
   // reveal-on-open, this test fails on the unmocked call (a 422 E_FIXTURE_MISS the mock answers
   // any request with no matching snapshot), not just on the password field's own value — the
@@ -192,16 +193,16 @@ test('OS auth unavailable routes through the in-app confirmation', async ({ rela
   expect(revealCalls[2]?.args).toEqual({ id: CONN.id, confirmed: true });
 });
 
-// P108 Part 12 F4: a reveal in flight for the connection being edited must not write (or show)
+// A reveal in flight for the connection being edited must not write (or show)
 // its secret into whatever draft has replaced it by the time the reveal resolves —
 // ConnectionDialog.vue stays mounted across the swap (App.vue's `v-if="connectionDialogStore.open"`
 // never toggles: openCreateDialog Object.assigns a fresh draft into the same store, it doesn't
 // close and reopen the dialog), so nothing but requestReveal's own draft-identity check stands
-// between them. The swap itself is the menu-bar "New Connection" command the finding calls out
+// between them. The swap itself is the menu-bar "New Connection" command
 // (IPC.newConnection, a push event — same path a Cmd+N keypress or File-menu click takes), fired
 // straight at the mock's dispatch hook rather than closing the dialog: a close (or a v-if-gated
 // remount of any kind) would reset revealed/showPassword on its own even under the old, unfixed
-// code, and would prove nothing about the identity-check fix this finding is actually about.
+// code, and would prove nothing about the identity-check fix.
 test("a draft swap while a reveal is in flight does not leak the old draft's secret", async ({
   relaunch,
 }) => {

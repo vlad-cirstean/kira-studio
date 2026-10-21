@@ -15,11 +15,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 )
 
-// These two tests are the manual smoke §6 step 6 asks for, kept as committed regression coverage
+// These two tests are the manual smoke, kept as committed regression coverage
 // (matching handlers_test.go's own convention) rather than a throwaway script: they exercise the
 // real Router.ForConn dispatch — JSON decode through the wire.go param types, the two new switch
 // cases in handlers.go, and op.run's existing generic dispatch — the one layer gitsession's own
-// tests (which call RepoEntry methods directly) never touch. Conn.Open bypasses Discovery (D3:
+// tests (which call RepoEntry methods directly) never touch. Conn.Open bypasses Discovery (
 // darwin-only, so a linux CI container would always see notFound regardless of a real git on
 // PATH) with a raw gitPath, exactly as gitsession's own newQueriesTestEntry does.
 
@@ -94,11 +94,11 @@ func TestPreflightResetAndRunOpReset_OverDispatch(t *testing.T) {
 	}
 }
 
-// TestRunOpReset_RejectsInvalidMode is G30 round-1 architecture/security review, finding #5:
-// op.run's own write path never validated op.mode the way preflight.reset does, so a mode of
-// "keep" (reserved for the undo replay's own ResetKeepArgs — never a user-selectable mode) or any
-// other non-soft/mixed/hard spelling reached `git reset --<mode>` verbatim. Proves it is now
-// refused before any spawn, with HEAD left untouched.
+// TestRunOpReset_RejectsInvalidMode: op.run's own write path never validated op.mode the way
+// preflight.reset does, so a mode of "keep" (reserved for the undo replay's own ResetKeepArgs —
+// never a user-selectable mode) or any other non-soft/mixed/hard spelling reached
+// `git reset --<mode>` verbatim. Proves it is now refused before any spawn,
+// with HEAD left untouched.
 func TestRunOpReset_RejectsInvalidMode(t *testing.T) {
 	dir := t.TempDir()
 	resetSmokeGit(t, dir, "init", "-q", "-b", "main")
@@ -210,8 +210,8 @@ func trimNLReset(s string) string {
 }
 
 // TestPreflightReset_RejectsOptionInjectingTargetPreventsArbitraryFileWrite and
-// TestOpRunReset_RejectsOptionInjectingTargetPreventsArbitraryFileWrite are G32 round-3
-// architecture/security review, finding #4's own regression proof. Both preflight.reset and
+// TestOpRunReset_RejectsOptionInjectingTargetPreventsArbitraryFileWrite are the regression proof.
+// Both preflight.reset and
 // op.run(reset) resolve their own target through gitsession's shared resolveCommit, which runs
 // `git show -s --decorate=full -z --format=<fmt> <target>` — target reaches that argv as a bare,
 // unguarded token. Confirmed empirically against a real git: `--output=<path>` is honoured there

@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
-// resolveProto is the second descriptor source (D4, F1): protocompile over a supplied .proto file
+// resolveProto is the second descriptor source: protocompile over a supplied .proto file
 // plus its import paths — no protoc binary anywhere (this app ships as a signed, sandboxed .app
 // and cannot assume a toolchain on the user's machine). WithStandardImports resolves the
 // well-known types (timestamp/duration/struct/empty/any/wrappers) from the protobuf module's own
