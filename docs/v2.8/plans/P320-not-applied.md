@@ -9,16 +9,15 @@ Base `aee071cc21fdacc788afd85a30ee10f3be5a0116`; line numbers refer to it. Origi
 | kept:directive | 1 | 1 | 0 | 2 |
 | kept:form | 1 | 0 | 0 | 1 |
 | kept:grew | 3 | 7 | 0 | 10 |
-| kept:hedge | 45 | 38 | 0 | 83 |
-| kept:tokens | 4 | 21 | 0 | 25 |
-| kept:width | 75 | 80 | 1 | 156 |
-| pending | 0 | 0 | 598 | 598 |
+| kept:hedge | 45 | 38 | 10 | 93 |
+| kept:tokens | 4 | 21 | 2 | 27 |
+| kept:width | 75 | 80 | 12 | 167 |
 | directive | 120 | 449 | 28 | 597 |
 | generated | 31 | 0 | 0 | 31 |
 | excluded-path | 159 | 130 | 0 | 289 |
-| unchanged | 434 | 340 | 4 | 778 |
+| unchanged | 434 | 340 | 45 | 819 |
 | below-min | 11634 | 7131 | 1611 | 20376 |
-| rewritten | 2354 | 2107 | 55 | 4516 |
+| rewritten | 2354 | 2107 | 589 | 5050 |
 
 ## over-max (56)
 
@@ -101,7 +100,7 @@ Base `aee071cc21fdacc788afd85a30ee10f3be5a0116`; line numbers refer to it. Origi
 - `packages/workbench/src/editor/monarch/decorators.ts:4` 532 chars [No labels, history narration, restated code or listed hedges; all lines within width, so it is returned as is.]: // 0.56.0's TypeScript Monarch has no rule for `@` at all — not in `common`, and not in `symbols`
 - `scripts/commentsweep/scan.ts:1` 574 chars [Nothing to drop; only over-width lines were reflowed.]: // Comment extraction and code-identity helper for scripts/commentsweep (Go does everything else).
 
-## kept:hedge (83)
+## kept:hedge (93)
 
 - `apps/kira-space/frontend/src/state/layout.ts:4` 835 chars [Removed phase/section labels and the dangling "unchanged from before this phase" clause; kept all facts.]: // P100 Part 2: Kira Studio's own state/layout.ts, ported unchanged — Layout is the one shared
 - `apps/kira-space/internal/gitclient/logsession/session.go:242` 533 chars [Removed the internal tracking label "(F2)"; all other facts kept verbatim.]: // failLocked marks the session permanently failed (F2): a split/parse error means the splitter's
@@ -114,10 +113,14 @@ Base `aee071cc21fdacc788afd85a30ee10f3be5a0116`; line numbers refer to it. Origi
 - `apps/kira-studio/frontend/src/api/state/collections.ts:664` 524 chars [Removed internal tracking labels (P8 D14, D2's own); all other facts kept.]: // P8 D14: a scratch tab's response history follows it into the collection, before the tab's
 - `apps/kira-studio/frontend/src/api/state/curl.ts:179` 668 chars [Removed the review-finding label and capitalised the new sentence start; the rest is kept.]: // Finding 5: this dialog's own revealed-secret map used to be dropped only by
 - `apps/kira-studio/frontend/src/api/state/revealExpiry.ts:1` 739 chars [Dropped the review-finding label and the moved-from note; kept the rest.]: // P21 round 2 architecture/security finding 5: every transient "revealed secret plaintext" map in
+- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:299` 981 chars [Removed internal tracking labels and capitalised the sentence starts they led.]: // P30 §3.6 C3 — the decode-window/retention report (P5 C1): the same setVisibleRows +
 - `apps/kira-studio/frontend/src/views/console/format.ts:133` 1098 chars [Removed tracking labels, kept all facts, reflowed the touched lines.]: // P108 Part 11 F9: `stmt.text` never carries its own ';' (D12's own note below) — when a formatted
 - `apps/kira-studio/frontend/src/views/console/lint.ts:141` 897 chars [Removed internal tracking labels D24, D21, D12; kept all facts.]: // D24: the shape check and the method-membership check reuse the exact same regex and the same
 - `apps/kira-studio/frontend/src/views/documents/sortDocument.ts:3` 1603 chars [Dropped the review-finding label and capitalised the new sentence start; everything else is kept.]: // The Mongo dialect of FilterToolbar.vue's ORDER BY box: unlike SQL's free-text sort, Mongo's
+- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:908` 1718 chars [Removed internal tracking labels and section references, keeping the facts they tagged.]: // D4 (fix) — live visual feedback for a cell-range drag. SlickHybridSelectionModel's own
+- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1726` 943 chars [Removed the section-sign references; everything else is a reason or fact and stays.]: // Real-interaction fix (§4a/§4d — "select multiple rows, right-click Copy does not work",
 - `apps/kira-studio/frontend/src/views/grid/pendingChanges.ts:280` 375 chars [No labels or history narration remain and every line fits the width; the one "actually" is kept because it is not on the]: // The row menu's "Revert row(s)" — un-stages a whole row's pending edit and/or pending delete in
+- `apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue:108` 909 chars [Removed the internal tracking label and reflowed the touched first lines; the rest is unchanged.]: // P43 iter2 F25/D34, corrected P43 iter3 F40: `rowsScanned === 0` is scan.ts's own
 - `apps/kira-studio/frontend/src/views/shared/page/columns.ts:262` 1195 chars [Removed phase/pass labels and the dropped-import history note, keeping all facts.]: /**
 - `apps/kira-studio/frontend/src/views/shared/slick/kiraSlickGrid.ts:213` 1841 chars [Dropped the tracking labels and the replaced-from note; kept all facts, though "actually happens here" was kept since it]: /** P22 iter2-pacing D1 — replaces iter2-scroll-gaps' own `chasePending` boolean. `chaseHandle` is
 - `apps/kira-studio/internal/adapterhost/dataframe.go:63` 758 chars [Removed the internal tracking labels; everything else is kept as written.]: // P2 R2: host.go's safeRun (P58 D16) only wraps a call already routed through Host.RunOp — but
@@ -173,6 +176,12 @@ Base `aee071cc21fdacc788afd85a30ee10f3be5a0116`; line numbers refer to it. Origi
 - `packages/api-core/src/http/substitute.ts:305` 881 chars [Removed the review-finding label; "actually resolve" is kept since the "actually" there is not a hedge...]: /**
 - `packages/git-core/src/graph/lanes.ts:180` 324 chars [Removed the internal tracking label; "Step 2" is a code step number and stays.]: // Step 2 (G21 D3b): every OTHER lane also expecting this row is a sibling child converging
 - `packages/git-ipc/src/contract.ts:1850` 487 chars [Removed the leading internal tracking label; the rest states constraints and stays.]: /**
+- `packages/git-ui/src/components/CommitGrid.vue:2` 1088 chars [Removed plan-document reference, section-sign and phase labels, and a clause dangling on a dropped section reference.]: /**
+- `packages/git-ui/src/components/CommitGrid.vue:248` 477 chars [Dropped the W14 label and the plan attribution, keeping the backticked quote and all facts.]: // W14: the row a click or a keyboard move just selected, so the accessibility pass below can
+- `packages/git-ui/src/components/CommitGrid.vue:631` 1539 chars [Removed internal section, phase and ticket labels (and the "own" tied to them); the rest is kept verbatim.]: /**
+- `packages/git-ui/src/components/SearchResults.vue:3` 1339 chars [Removed the plan and tracker labels and capitalised the new sentence starts; everything else stays.]: /**
+- `packages/git-ui/src/components/UncommittedChangesStrip.vue:65` 393 chars [Removed the internal label "W5's", replacing the possessive with "the"; everything else is kept.]: /** `GraphViewState.layout` is driven by `onPlanPublished` callbacks, not a reactive ref (that
+- `packages/git-ui/src/components/review/ReviewCommitRow.vue:106` 1006 chars [Removed internal tracking labels and reflowed the touched lines; the hedge "actually" is kept since it sits inside "neve]: // G14 D8 row action 1 / G21 D8c: "Open all changes" — one awaited `openAllChanges` call rather
 - `packages/git-ui/src/graph/hitTest.ts:1` 1113 chars [Removed plan/phase labels, capitalised the new sentence start, and turned label possessives into "the".]: /**
 - `packages/git-ui/src/lib/columns.ts:315` 945 chars [Removed the tracker label and the section-sign possessive, replacing it with "the".]: // P92 item 2 follow-up: SlickGrid's own column default is `minWidth: 30`
 - `packages/git-ui/src/lib/columns.ts:439` 354 chars [No labels, history narration, restated code or listed hedges; all lines within width, so it is returned verbatim.]: /** SlickGrid's row-height index rebuild calls `getItem` for every loaded row (to hand the item to
@@ -187,7 +196,7 @@ Base `aee071cc21fdacc788afd85a30ee10f3be5a0116`; line numbers refer to it. Origi
 - `packages/workbench/src/behaviour/clipboard.ts:21` 725 chars [Removed two internal tracking labels and kept all facts, capitalising the new sentence start.]: // P107 T1-19: two call sites (documents/menu.ts, resultMenu.ts) each defined their own
 - `packages/workbench/src/editor/monaco.ts:43` 768 chars [Removed the leading internal tracking label; the rest states facts and is kept verbatim.]: // P60a §4.4/dogfooding: `fixedOverflowWidgets: true` alone does NOT reparent a hover/suggest
 
-## kept:tokens (25)
+## kept:tokens (27)
 
 - `apps/kira-space/internal/gitops/conflict.go:120` 546 chars [Removed tracking labels (G26 D12, G5, §9, M5/P11) and kept the facts they tagged.]: // ContinueArgs is the Ordering table's own --continue column: (nil, false) for the two kinds v1
 - `apps/kira-space/internal/gitpreflight/push.go:38` 439 chars [Removed the internal tracking label; everything else is a kept fact.]: // matchProtectedGlob is an explicit segment walk (D17), not path.Match (whose `*` also stops at
@@ -206,6 +215,8 @@ Base `aee071cc21fdacc788afd85a30ee10f3be5a0116`; line numbers refer to it. Origi
 - `packages/git-core/src/model/stash.ts:1` 463 chars [Removed section refs and the widening/addition history, leaving the definition of the entry.]: /**
 - `packages/git-core/src/search/matcher.ts:18` 391 chars [Removed the internal tracking label W10; everything else is kept.]: /** Exactly what `matchRef` reads off a ref — `RefRecord` (core, `refs.list`'s own fixture-free
 - `packages/git-ipc/src/graphChunkCodec.ts:1` 1025 chars [Dropped plan/finding labels and reflowed the lines they touched; the rest is kept.]: /**
+- `packages/git-ui/src/App.vue:979` 802 chars [Removed the W14/W9 tracking labels and the hedges "really" and "actually"; the rest is kept.]: // ---------------------------------------------------------------------------------------
+- `packages/git-ui/src/components/LoadMoreButton.vue:2` 676 chars [Removed section, work-item and plan-line labels, keeping the live-region fact.]: /**
 - `packages/git-ui/src/lib/columns.ts:1` 1134 chars [Dropped plan/work-item labels and the hedge "actually", then reflowed the touched lines.]: /**
 - `packages/git-ui/src/lib/gridKeyboard.ts:122` 558 chars [Removed the tracking label and the hedge "actually" (twice), and reflowed the lines to fit 100 columns.]: // P93 §4.2: arrow/Home/End/Page navigation continues from wherever DOM focus actually is, not
 - `packages/git-ui/src/lib/rowMenuModel.ts:116` 654 chars [Removed plan, section and tracker labels and the hedge "actually"; kept all facts and reflowed.]: /**
@@ -215,7 +226,7 @@ Base `aee071cc21fdacc788afd85a30ee10f3be5a0116`; line numbers refer to it. Origi
 - `packages/shared/domain/connection.ts:138` 532 chars [Removed the leading internal phase/section label and capitalised the next word; everything else is kept.]: // P28 §5.3: commands/sec this connection is paced to; 0 = unlimited. `.default(0)` is
 - `packages/workbench/src/tabs/terminalTabKind.ts:16` 866 chars [Dropped the tracking label and the moved-from note; kept all constraints and reasons, rewrapped to 100 columns.]: /** P113 F6: kira-space's and kira-studio's own `state/tabKinds.ts` each carried this terminal
 
-## kept:width (156)
+## kept:width (167)
 
 - `apps/kira-space/frontend/src/repo/RepoList.vue:279` 387 chars [Removed the internal plan/section label and capitalised the new sentence start.]: // P84 §6.2: once the flat top-level row is gone, Rename/Close/Remove for this record are
 - `apps/kira-space/frontend/src/repo/git/hostHandlers.ts:378` 383 chars [Removed the leading internal tracking label and capitalised the new first word; the rest is kept.]: // P74 §3.3: requests changeRequest.browserUrl over the git socket, then hands the URL (when non-null) to
@@ -271,6 +282,11 @@ Base `aee071cc21fdacc788afd85a30ee10f3be5a0116`; line numbers refer to it. Origi
 - `apps/kira-studio/frontend/src/views/console/state.ts:307` 552 chars [Removed the review-finding label and capitalised the new sentence start; everything else is reasoning or a change-marker]: // P12 round 1 finding #10: routed through the one release path every user-driven removal
 - `apps/kira-studio/frontend/src/views/console/state.ts:352` 678 chars [Removed tracking labels and capitalised the new sentence start; kept all facts.]: // Item (regression pass, task batch P46-4): the expand-all/collapse-all toolbar pair
 - `apps/kira-studio/frontend/src/views/console/state.ts:585` 480 chars [Removed the review-finding label and capitalised the new sentence start; everything else is kept.]: // P12 round 1 finding #5: the same opId/status bookkeeping run() uses, so Explain is cancellable
+- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:497` 817 chars [Removed tracking labels and the changed-from history note, keeping the technical facts.]: // D2 — changed from Pass A's false/false: F1's row-select-on-gutter (§5 D4, C4) requires
+- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:750` 1432 chars [Dropped internal phase/section labels, keeping every fact and rewrapping the touched lines.]: // P22 postscript §14.2's "cell-editor dock panel is sometimes missing its header" investigation
+- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2207` 475 chars [Removed the leading tracking label and capitalised the next word; the quoted literal stays verbatim.]: // P99 §9.3: not useEventListener, here and below — recordOffsetSample's own comment documents
+- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2261` 569 chars [Removed two review-finding labels and reflowed the touched lines to 100 columns.]: // M7 finding #5 (cont'd): refreshMaskFolding() above fixes the synchronous fold, but a
+- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2352` 474 chars [Removed the milestone/section label and the review-finding label; all facts kept.]: // M5 §6.3: "on every pageVersion bump while it is on" — a freshly loaded page has an entirely
 - `apps/kira-studio/frontend/src/views/grid/pendingChanges.ts:331` 979 chars [Dropped the bug-report label lead-in, which the rest of the comment restates, and capitalised the new sentence start.]: // Real-interaction fix (reported bug — invoking the delete shortcut a second time on an already-
 - `apps/kira-studio/frontend/src/views/grid/slick/dataSource.ts:21` 769 chars [Removed the section-reference label; everything else is a kept fact.]: /**
 - `apps/kira-studio/frontend/src/views/grid/state.ts:271` 458 chars [Removed the tracking label and the section-sign reference; the rest is kept.]: // P43 F7/D10: a count taken under the previous WHERE is an answer to a different question, not
@@ -351,6 +367,9 @@ Base `aee071cc21fdacc788afd85a30ee10f3be5a0116`; line numbers refer to it. Origi
 - `packages/api-core/src/http/dotenv.ts:99` 610 chars [Removed two internal tracking labels; everything else kept.]: /**
 - `packages/git-core/src/model/operation.ts:29` 478 chars [Removed the history clause and tracking labels, kept the fact that rebase becomes true once `stack.restack` can start on]: /** True only where `git <op> --continue` exists AND v1 offers it — false only for bisect and
 - `packages/git-ipc/src/contract.ts:1141` 388 chars [Dropped the internal label "D5's own", replacing it with "The"; the rest is kept.]: /** D5's own four-kind actionability union: "ok" ⇒ the host's client is installed, authenticated and
+- `packages/git-ui/src/App.vue:1462` 1127 chars [Removed internal tracking labels and the spec-edit parenthetical; kept all facts.]: /** §6.6's Esc ordering: an open menu, then the search results dropdown, then the detail pane/
+- `packages/git-ui/src/components/CommitGrid.vue:1135` 736 chars [Removed internal tracking labels and capitalised the words that now start sentences; everything else kept.]: // G24 D9: mirrors the `search.searchGeneration` watcher directly above — a third instance of the
+- `packages/git-ui/src/components/StashList.vue:2` 1424 chars [Dropped plan, section, and ticket labels, keeping the facts they tagged; reflowed touched lines to 100 columns.]: /**
 - `packages/git-ui/src/graph/rowSvg.ts:211` 479 chars [Removed the leading tracking label and capitalised the next word.]: /** G-UX (item 1): the HEAD halo — a soft, filled, low-opacity disc behind the checked-out
 - `packages/git-ui/src/icons/setiFileIcon.spec.ts:41` 366 chars [Removed the P7 phase labels and the history-doc reference, keeping the stale-definitions fact and its confirmation.]: // P7 (item 3): `seti-icons@0.0.4`'s own bundled definitions.json is stale for the TypeScript/TSX
 - `packages/git-ui/src/lib/columns.ts:227` 388 chars [Removed the plan labels and kept every fact and reason.]: /** P93 §4.2: "Author/date cells: empty" for a placeholder — a contracted range has no single
@@ -369,610 +388,1515 @@ Base `aee071cc21fdacc788afd85a30ee10f3be5a0116`; line numbers refer to it. Origi
 - `packages/theme/src/components/ui/card/index.ts:11` 307 chars [Removed the leading internal tracking label; the rest is kept verbatim.]: // P263 §2.10. `inset`: a box inside a form, dialog or pane; holds text only, its `bg-field` fill
 - `packages/workbench/src/automations/module.ts:21` 363 chars [Removed the leading internal plan/section label and capitalised the next word.]: // P128 §2.4: the shared automations module's own injected context — AutomationsPanel.vue/
 - `packages/workbench/src/behaviour/panelSearch.ts:4` 731 chars [Removed the two internal phase/section labels and capitalised the sentence start; everything else is a kept reason or fa]: // P104 §3 (PanelShell -> inline composition): the reveal/toggle/type-ahead-redirect behaviour
+- `packages/workbench/src/components/TabStrip.vue:18` 932 chars [Removed two internal tracking labels; reflowed the one line that exceeded 100 columns.]: // P103 Part 2 (§5.4): Kira Studio's own workbench/panels/TabStrip.vue and Kira Space's, unified.
+- `packages/workbench/src/components/TabStrip.vue:210` 395 chars [Removed the two internal section/phase labels; everything else is kept as written.]: <!-- P72 §7: the pinned tab's own fixed leading slot — a sibling of the scrolling tab row,
+- `packages/workbench/src/components/WorkbenchShell.vue:2` 492 chars [Removed internal tracking labels and kept all facts.]: // P264 §2.8: the project panel and the Operations dock resize through ResizeHandle (VueUse
 - `packages/workbench/src/editor/monaco.ts:59` 853 chars [Removed the leading tracking label and capitalised the next word; everything else is kept.]: // D5 (P67c §3.1): every `--vscode-*` custom property Monaco defines is scoped to
 - `packages/workbench/src/editor/monacoEntry.ts:85` 1615 chars [Dropped the leading tracking label, the plan reference clause, and the hedge "actually".]: // D2 (P67c §2.2): `typescript.js`/`javascript.js` share one tokenizer object by reference
 - `packages/workbench/src/state/createTerminalsStore.ts:170` 558 chars [Removed the section-sign and phase labels; all other facts are kept.]: /** Subscribes, then calls TerminalService.Open — terminalId is the tab id, client-supplied, so
 - `scripts/copy/sourceRules.ts:1` 325 chars [Dropped the ticket label and the plan-document reference; kept the rest.]: /**
 
-## pending (598)
+## directive (597)
 
-- `apps/kira-studio/frontend/src/api/EditRawRequestDialog.vue:31` 710 chars: // Round-2 review finding 7 (the same class ImportCurlDialog.vue's own finding 15 fixed for curl
-- `apps/kira-studio/frontend/src/api/ImportCurlDialog.vue:31` 567 chars: // Finding 15: for a large pasted curl command (a big JSON body, say), re-lexing the whole text on
-- `apps/kira-studio/frontend/src/api/ImportReportStrip.vue:10` 949 chars: // P4 D12: the import report is part of the feature, not decoration. Every warning kind is a case
-- `apps/kira-studio/frontend/src/api/VariableHistoryMenu.vue:13` 581 chars: // P5 D13: the per-row history popover — a PopoverContent anchored to the row's own history button
-- `apps/kira-studio/frontend/src/api/VariableRow.vue:56` 557 chars: // D9/§1.4: "not yet revealed, the eye is the reveal action; once revealed, it's a free
-- `apps/kira-studio/frontend/src/api/VariableRow.vue:97` 640 chars: <!-- P22b D9: a grid, not independent flex items -- F13's own finding was that adjacent rows'
-- `apps/kira-studio/frontend/src/api/VariableSetView.vue:31` 758 chars: // P17 D16: VariablesDialog.vue's own replacement — the exact same per-row draft/blur/reorder
-- `apps/kira-studio/frontend/src/api/VariableSetView.vue:89` 776 chars: // F2 (P108 Part 3): valueTouched is the three-state signal commitDraft sends to Upsert's own
-- `apps/kira-studio/frontend/src/api/VariableSetView.vue:118` 825 chars: // P108 F3: every `rows` reload (any row's edit/add/reorder, a restore of another row's history
-- `apps/kira-studio/frontend/src/api/VariableSetView.vue:151` 329 chars: // P112 §6.5: keep a draft that has changed since it was seeded and still differs from what the
-- `apps/kira-studio/frontend/src/api/VariableSetView.vue:173` 478 chars: // Which id's draft currently mirrors a revealed plaintext, and what that plaintext was — so a
-- `apps/kira-studio/frontend/src/api/VariableSetView.vue:403` 927 chars: // P22b D16: FieldRowsTable.vue's own trailing-blank-row watcher, restated for this view's own
-- `apps/kira-studio/frontend/src/api/VariableSetView.vue:432` 500 chars: // ---- bulk `.env` mode (R11, item 5) ----
-- `apps/kira-studio/frontend/src/api/VariableSetView.vue:462` 366 chars: <!-- P22b D9 (remainder): the standard toolbar bands, rather than the hand-spaced single
-- `apps/kira-studio/frontend/src/api/VariableSetView.vue:527` 547 chars: <!-- P22b D9: mirrors VariableRow.vue's own grid template exactly (handle, name, value,
-- `apps/kira-studio/frontend/src/api/VariablesOverviewPanel.vue:24` 1002 chars: // P17 D20/item 8: a read-only popover over the already-merged data (`overviewRows`) — one panel,
-- `apps/kira-studio/frontend/src/api/VariablesOverviewPanel.vue:127` 885 chars: <!-- P22b D9: VariableRow.vue's own grid template, minus the columns a read-only popover
-- `apps/kira-studio/frontend/src/editor/MonacoHost.vue:2` 379 chars: // P60a §3: a drop-in for `CodeMirrorHost.vue` — same prop names, same emits, same exposed
-- `apps/kira-studio/frontend/src/editor/MonacoHost.vue:115` 757 chars: // §4.6: `wrapSelection.ts`'s own selection-wrap handler, ported to Monaco's `onKeyDown` rather
-- `apps/kira-studio/frontend/src/editor/MonacoHost.vue:132` 1040 chars: // §4.7/OQ-1: Select All, Undo and Redo are Monaco's only three core commands built on
+- `apps/kira-space/frontend/src/ade/v2/backlog/AdeBacklogRow.vue:43` 104 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useSemanticElements: the row holds inputs and buttons a button cannot. -->
+- `apps/kira-space/frontend/src/ade/v2/needs/AdeAllSessionRow.vue:45` 104 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useSemanticElements: the row holds a button; a button cannot nest one. -->
+- `apps/kira-space/frontend/src/ade/v2/panel/AdeStepBlock.vue:195` 128 chars [biome-ignore]: <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the header holds nested interactive...
+- `apps/kira-space/frontend/src/ade/v2/plan/AdeBranchRow.vue:141` 99 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useSemanticElements: the row holds block content a button cannot. -->
+- `apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue:106` 120 chars [biome-ignore]: <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the band holds nested interactive r...
+- `apps/kira-space/frontend/src/ade/v2/plan/AdeTaskCard.vue:135` 127 chars [biome-ignore]: <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the keyboard opens the menu from th...
+- `apps/kira-space/frontend/src/ade/v2/plan/AdeTaskCard.vue:144` 106 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useSemanticElements: the header holds block content a button cannot. -->
+- `apps/kira-space/frontend/src/repo/RepoList.vue:426` 129 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on ...
+- `apps/kira-space/frontend/src/repo/RepoSearchRow.vue:68` 125 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on ...
+- `apps/kira-space/frontend/src/repo/RepoSearchRow.vue:106` 125 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on ...
+- `apps/kira-space/frontend/src/repo/RepoTreeRow.vue:74` 125 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on ...
+- `apps/kira-space/frontend/src/repo/RepoWorktreeRow.vue:35` 125 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter, Space and the arrows come from useListNavigation on ...
+- `apps/kira-space/frontend/src/repo/git/transport.ts:34` 586 chars [biome-ignore]: // tsconfig.json maps this specifier onto @wailsio/runtime's real types (see bridge/port.ts's own
+- `apps/kira-space/frontend/src/state/opsDomain.ts:7` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/settingsDomain.ts:34` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/settingsDomain.ts:57` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/settingsDomain.ts:66` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/settingsDomain.ts:91` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/settingsDomain.ts:94` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/settingsDomain.ts:96` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/settingsDomain.ts:129` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/settingsDomain.ts:144` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/settingsDomain.ts:152` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/settingsDomain.ts:158` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/settingsDomain.ts:197` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/tabDomain.ts:15` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/tabDomain.ts:48` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/tabDomain.ts:57` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/tabDomain.ts:67` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/tabDomain.ts:77` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/tabDomain.ts:88` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/tabDomain.ts:93` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/tabDomain.ts:99` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/tabDomain.ts:100` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/tabDomain.ts:105` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/tabDomain.ts:110` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/tabDomain.ts:115` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/tabDomain.ts:120` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/state/tabDomain.ts:125` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-space/frontend/src/views/repo/useDiffEditor.ts:235` 108 chars [biome-ignore]: // biome-ignore lint/style/noNonNullAssertion: checked alongside left above — both null or both set.
+- `apps/kira-space/internal/ade/archive.go:129` 72 chars [//nolint]: //nolint:staticcheck // empty critical section drains in-flight launches
+- `apps/kira-space/internal/ade/launches.go:245` 86 chars [//nolint]: //nolint:nilerr // a run deleted by a workflow switch leaves its conversation takeable
+- `apps/kira-space/internal/codeworkspace/files.go:162` 82 chars [//nolint]: //nolint:gosec // absPath already validated (ValidateRelPath); type checked above.
+- `apps/kira-space/internal/codeworkspace/search.go:332` 86 chars [//nolint]: //nolint:gosec // abs already validated (ValidateRelPath, gate 1); type checked above.
+- `apps/kira-space/internal/flows/mobileflow/phone_test.go:232` 52 chars [//nolint]: //nolint:bodyclose // the reader goroutine closes it
+- `apps/kira-space/internal/flows/mobileflow/terminal_test.go:31` 86 chars [//nolint]: //nolint:bodyclose // a handshake response body is not read after a successful upgrade
+- `apps/kira-space/internal/gitclient/watcher_fsevents_darwin.go:1` 24 chars [//go:]: //go:build darwin && cgo
+- `apps/kira-space/internal/gitclient/watcher_fsnotify.go:1` 26 chars [//go:]: //go:build !darwin || !cgo
+- `apps/kira-space/internal/gitclient/watcher_fsnotify.go:140` 84 chars [//nolint]: //nolint:nilerr // one bad entry (including a missing root) must not abort the walk.
+- `apps/kira-space/internal/gitreview/migrations/embed.go:12` 16 chars [//go:]: //go:embed *.sql
+- `apps/kira-space/internal/gitreview/normalize.go:47` 52 chars [//nolint]: //nolint:errcheck // no-op once Commit has succeeded
+- `apps/kira-space/internal/gitsession/queuefacts.go:276` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/gitsession/queuefacts.go:281` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/lannet/lannet_darwin.go:1` 17 chars [//go:]: //go:build darwin
+- `apps/kira-space/internal/lannet/lannet_linux.go:1` 16 chars [//go:]: //go:build linux
+- `apps/kira-space/internal/lannet/lannet_linux_test.go:1` 16 chars [//go:]: //go:build linux
+- `apps/kira-space/internal/lannet/lannet_other.go:1` 28 chars [//go:]: //go:build !linux && !darwin
+- `apps/kira-space/internal/mobileweb/integration_test.go:82` 50 chars [//nolint]: //nolint:bodyclose // closed by the receiver below
+- `apps/kira-space/internal/mobileweb/integration_test.go:127` 47 chars [//nolint]: //nolint:bodyclose // closed by the defer below
+- `apps/kira-space/internal/storage/migrations/embed.go:13` 16 chars [//go:]: //go:embed *.sql
+- `apps/kira-space/internal/storage/repos/adebacklog.go:67` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/adebacklog.go:109` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/adebacklog.go:168` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/adelogs.go:52` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/adelogs.go:77` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/aderepoconfig.go:123` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/aderepoconfig.go:229` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/aderepoconfig.go:269` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/aderepoconfig.go:302` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/adetask.go:263` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/adetask.go:281` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/adetask.go:350` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/adetask.go:455` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/adetask.go:557` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/adetask.go:722` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/adetask.go:822` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/adetask.go:1061` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/adetask.go:1172` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/coderepos.go:148` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/internal/storage/repos/gitreposettings.go:92` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-space/locator_native.go:1` 18 chars [//go:]: //go:build !server
+- `apps/kira-space/locator_server.go:1` 17 chars [//go:]: //go:build server
+- `apps/kira-space/main.go:29` 216 chars [//go:]: // Any files in frontend/dist are embedded into the binary — empty until Part 2's own frontend
+- `apps/kira-space/main.go:35` 35 chars [//go:]: //go:embed all:frontend/dist-mobile
+- `apps/kira-space/notify_darwin.go:1` 28 chars [//go:]: //go:build darwin && !server
+- `apps/kira-space/notify_other.go:1` 28 chars [//go:]: //go:build !darwin || server
+- `apps/kira-space/tests/e2e-real/fixtures.ts:83` 137 chars [biome-ignore]: // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, eve...
+- `apps/kira-space/tests/e2e-real/fixtures.ts:91` 135 chars [biome-ignore]: // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, eve...
+- `apps/kira-space/tests/mobile/fixtures.ts:19` 137 chars [biome-ignore]: // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, eve...
+- `apps/kira-space/tests/unit/ade-notes-markdown.spec.ts:75` 109 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: TipTap's own JSONContent leaves list content loosely typed
+- `apps/kira-space/tests/unit/blame-line-controller.spec.ts:80` 98 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: matching Transport['request']'s generic shape
+- `apps/kira-space/tests/unit/blame-line-controller.spec.ts:86` 93 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: matching Transport['on']'s generic shape
+- `apps/kira-space/tests/unit/blame-line-controller.spec.ts:90` 97 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: matching Transport['stream']'s generic shape
+- `apps/kira-space/tests/unit/editors-shared-model-refcount.spec.ts:47` 97 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal structural fake, not the real module
+- `apps/kira-space/tests/unit/editors-shared-model-refcount.spec.ts:52` 95 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal structural fake, not the real editor
+- `apps/kira-space/tests/unit/support/mockupV2Oracle.ts:16` 101 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: the oracle's shape is the mockup's own untyped output.
+- `apps/kira-studio/frontend/proto/grid/SlickProto.vue:27` 88 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: same escape hatch SlickGridHost.vue uses.
+- `apps/kira-studio/frontend/src/bridge/port.ts:3` 864 chars [biome-ignore]: // tsconfig.web.json maps this specifier onto @wailsio/runtime's real types (D8) and resolves it
+- `apps/kira-studio/frontend/src/state/settingsDomain.ts:37` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/settingsDomain.ts:51` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/settingsDomain.ts:55` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/settingsDomain.ts:59` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/settingsDomain.ts:98` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/settingsDomain.ts:128` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/settingsDomain.ts:135` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/settingsDomain.ts:159` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:25` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:93` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:98` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:99` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:100` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:109` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:110` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:117` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:125` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:126` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:129` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:137` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:144` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:147` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:149` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:162` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:171` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:172` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:180` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:184` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:185` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:186` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:191` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:196` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:201` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:206` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:211` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:216` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:221` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:226` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:231` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:236` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/state/tabDomain.ts:241` 13 chars [#__PURE__]: /*#__PURE__*/
+- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:111` 236 chars [biome-ignore]: // Column<T>'s own `field` type can't be satisfied by RowHandle's shape (arbitrary db column
+- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:150` 366 chars [biome-ignore]: // See kiraSlickGrid.ts's own comment: Column<T>'s `field` type is a recursive
+- `apps/kira-studio/frontend/src/views/grid/slick/editor.ts:44` 246 chars [biome-ignore]: // Matches slick.editors.ts's own stock editors' generic defaults (Column<T>'s `field` can't be
+- `apps/kira-studio/frontend/src/views/shared/slick/gridHostShared.ts:24` 71 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: see doc comment above.
+- `apps/kira-studio/frontend/src/views/shared/slick/gridHostShared.ts:28` 71 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: see doc comment above.
+- `apps/kira-studio/frontend/src/views/shared/slick/kiraSlickGrid.ts:173` 407 chars [biome-ignore]: // Column<T>'s own `field` type is a recursive PathsToStringProps<T> derived from T's shape —
+- `apps/kira-studio/frontend/src/views/shared/slick/kiraSlickGrid.ts:252` 457 chars [biome-ignore]: // Finding 5 — forwards to `SlickGrid`'s own constructor unchanged (this class has no constructor
+- `apps/kira-studio/internal/adapters/clickhouse/clickhouse_test.go:582` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-studio/internal/adapters/clickhouse/clickhouse_test.go:647` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-studio/internal/adapters/kafka/client.go:123` 76 chars [//nolint]: //nolint:gosec // explicit opt-out via verify-none/insecure, not the default
+- `apps/kira-studio/internal/adapters/mongo/client.go:90` 51 chars [//nolint]: //nolint:gosec // explicit opt-out, not the default
+- `apps/kira-studio/internal/adapters/mysqlfamily/client.go:165` 86 chars [//nolint]: //nolint:gosec // matches client.ts's own rejectUnauthorized:false for these two modes
+- `apps/kira-studio/internal/adapters/mysqlfamily/mysqlfamily_test.go:448` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-studio/internal/adapters/postgres/client.go:103` 86 chars [//nolint]: //nolint:gosec // matches client.ts's own rejectUnauthorized:false for these two modes
+- `apps/kira-studio/internal/adapters/postgres/client.go:117` 94 chars [//nolint]: //nolint:gosec // hostname check is intentionally skipped; chain verification still runs below
+- `apps/kira-studio/internal/adapters/postgres/postgres_test.go:646` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-studio/internal/adapters/postgres/postgres_test.go:684` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-studio/internal/adapters/redis/client.go:94` 51 chars [//nolint]: //nolint:gosec // explicit opt-out, not the default
+- `apps/kira-studio/internal/adapters/sqlite/sqlite_test.go:381` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-studio/internal/datagrip/errors.go:39` 448 chars [//nolint]: // errPasswordNotFound is D12's last bullet and case 18/19: a clean miss (a readable store with no
+- `apps/kira-studio/internal/datagrip/keychain_darwin.go:1` 24 chars [//go:]: //go:build darwin && cgo
+- `apps/kira-studio/internal/datagrip/keychain_other.go:1` 27 chars [//go:]: //go:build !(darwin && cgo)
+- `apps/kira-studio/internal/enginecache/pages.go:4` 88 chars [//nolint]: //nolint:gosec // a cache key, not a security boundary — matches pages.ts's own sha1 use
+- `apps/kira-studio/internal/enginecache/pages.go:87` 14 chars [//nolint]: //nolint:gosec
+- `apps/kira-studio/internal/flowharness/servers/grpc.go:35` 19 chars [//go:]: //go:embed testdata
+- `apps/kira-studio/internal/httpclient/options.go:149` 14 chars [//nolint]: //nolint:gosec
+- `apps/kira-studio/internal/localauth/evaluate_darwin.go:1` 24 chars [//go:]: //go:build darwin && cgo
+- `apps/kira-studio/internal/localauth/evaluate_darwin.go:12` 2933 chars [cgo preamble]: /*
+- `apps/kira-studio/internal/localauth/evaluate_other.go:1` 26 chars [//go:]: //go:build !darwin || !cgo
+- `apps/kira-studio/internal/secrets/keychain_darwin_test.go:1` 24 chars [//go:]: //go:build darwin && cgo
+- `apps/kira-studio/internal/secrets/keyring_darwin.go:1` 24 chars [//go:]: //go:build darwin && cgo
+- `apps/kira-studio/internal/secrets/keyring_nocgo_darwin.go:1` 25 chars [//go:]: //go:build darwin && !cgo
+- `apps/kira-studio/internal/secrets/keyring_other.go:1` 18 chars [//go:]: //go:build !darwin
+- `apps/kira-studio/internal/storage/migrations/embed.go:15` 16 chars [//go:]: //go:embed *.sql
+- `apps/kira-studio/internal/storage/repos/connections.go:206` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-studio/internal/storage/repos/filter_history.go:126` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-studio/internal/storage/repos/filters.go:54` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-studio/internal/storage/repos/history.go:130` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-studio/internal/storage/repos/maskrules.go:181` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-studio/internal/storage/repos/metadata_cache.go:82` 17 chars [//nolint]: //nolint:errcheck
+- `apps/kira-studio/main.go:26` 234 chars [//go:]: // Any files in frontend/dist are embedded into the binary — built by `bun run build` from
+- `apps/kira-studio/notify_darwin.go:1` 28 chars [//go:]: //go:build darwin && !server
+- `apps/kira-studio/notify_other.go:1` 28 chars [//go:]: //go:build !darwin || server
+- `apps/kira-studio/tests/e2e-real/fixtures.ts:96` 137 chars [biome-ignore]: // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, eve...
+- `apps/kira-studio/tests/e2e-real/fixtures.ts:109` 137 chars [biome-ignore]: // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, eve...
+- `apps/kira-studio/tests/e2e-real/fixtures.ts:118` 135 chars [biome-ignore]: // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, eve...
+- `apps/kira-studio/tests/e2e-real/fixtures.ts:125` 135 chars [biome-ignore]: // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, eve...
+- `apps/kira-studio/tests/proto/fixtures.ts:17` 137 chars [biome-ignore]: // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, eve...
+- `apps/kira-studio/tests/proto/fixtures.ts:25` 135 chars [biome-ignore]: // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, eve...
+- `apps/kira-studio/tests/ui/copy-coverage-docker-automations.spec.ts:20` 81 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: contract fixtures are untyped JSON
+- `apps/kira-studio/tests/ui/copy-wording-docker-automations.spec.ts:41` 81 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: contract fixtures are untyped JSON
+- `apps/kira-studio/tests/ui/docker-edit.spec.ts:39` 81 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: contract fixtures are untyped JSON
+- `apps/kira-studio/tests/ui/support/dockerFixture.ts:7` 81 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: contract fixtures are untyped JSON
+- `apps/kira-studio/tests/unit/browse-key-types.spec.ts:42` 96 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
+- `apps/kira-studio/tests/unit/browse-key-types.spec.ts:52` 96 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real bridge signature
+- `apps/kira-studio/tests/unit/browse-key-types.spec.ts:72` 96 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real bridge signature
+- `apps/kira-studio/tests/unit/browse-key-types.spec.ts:90` 96 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real bridge signature
+- `apps/kira-studio/tests/unit/browse-key-types.spec.ts:95` 188 chars [biome-ignore]: // The level changes (and so loadSeq bumps) while the batch above is still in flight.
+- `apps/kira-studio/tests/unit/browse-key-types.spec.ts:109` 96 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real bridge signature
+- `apps/kira-studio/tests/unit/browse-key-types.spec.ts:120` 96 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real bridge signature
+- `apps/kira-studio/tests/unit/console-auto-explain-race.spec.ts:45` 103 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: minimal fake page, real run() only reads kind/rowCount
+- `apps/kira-studio/tests/unit/console-auto-explain-race.spec.ts:54` 100 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
+- `apps/kira-studio/tests/unit/console-auto-explain-race.spec.ts:61` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real data.execute
+- `apps/kira-studio/tests/unit/console-auto-explain-worst.spec.ts:63` 103 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: minimal fake page, real run() only reads kind/rowCount
+- `apps/kira-studio/tests/unit/console-auto-explain-worst.spec.ts:72` 100 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
+- `apps/kira-studio/tests/unit/console-auto-explain-worst.spec.ts:77` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real data.execute
+- `apps/kira-studio/tests/unit/console-overlapping-explain-clobber.spec.ts:26` 100 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
+- `apps/kira-studio/tests/unit/console-overlapping-explain-clobber.spec.ts:37` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real data.execute
+- `apps/kira-studio/tests/unit/console-overlapping-explain-clobber.spec.ts:44` 97 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control.opsCancel
+- `apps/kira-studio/tests/unit/console-result-cap.spec.ts:44` 85 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: minimal fake page, see comment above
+- `apps/kira-studio/tests/unit/console-result-cap.spec.ts:51` 95 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ExecuteResponse
+- `apps/kira-studio/tests/unit/console-result-cap.spec.ts:74` 95 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ExecuteResponse
+- `apps/kira-studio/tests/unit/console-result-cap.spec.ts:80` 181 chars [biome-ignore]: // One "Run all" producing more result sets in a single call than the cap itself.
+- `apps/kira-studio/tests/unit/console-root-completion.spec.ts:28` 98 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
+- `apps/kira-studio/tests/unit/console-run-after-tab-close.spec.ts:30` 98 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: minimal fake page, run() only reads kind/rowCount
+- `apps/kira-studio/tests/unit/console-run-after-tab-close.spec.ts:38` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real data.execute
+- `apps/kira-studio/tests/unit/console-run-after-tab-close.spec.ts:66` 100 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
+- `apps/kira-studio/tests/unit/console-run-after-tab-close.spec.ts:73` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real data.execute
+- `apps/kira-studio/tests/unit/console-run-after-tab-close.spec.ts:79` 97 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control.opsCancel
+- `apps/kira-studio/tests/unit/console-stop-auto-explain.spec.ts:25` 100 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
+- `apps/kira-studio/tests/unit/console-stop-auto-explain.spec.ts:32` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real data.execute
+- `apps/kira-studio/tests/unit/console-stop-auto-explain.spec.ts:39` 97 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control.opsCancel
+- `apps/kira-studio/tests/unit/console-stop-explain-resolves-anyway.spec.ts:40` 100 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
+- `apps/kira-studio/tests/unit/console-stop-explain-resolves-anyway.spec.ts:47` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real data.execute
+- `apps/kira-studio/tests/unit/document-row-height-cache.spec.ts:34` 280 chars [biome-ignore]: // rows.ts's own parseDocument (ejson.ts) is built on JSON.parse, with no exported hook of its
+- `apps/kira-studio/tests/unit/explain-truncated.spec.ts:82` 100 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
+- `apps/kira-studio/tests/unit/explain-truncated.spec.ts:88` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real data.execute
+- `apps/kira-studio/tests/unit/explain-truncated.spec.ts:108` 100 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
+- `apps/kira-studio/tests/unit/explain-truncated.spec.ts:113` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real data.execute
+- `apps/kira-studio/tests/unit/find-ranges-memo.spec.ts:71` 93 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: instrumenting a built-in for one assertion
+- `apps/kira-studio/tests/unit/find-ranges-memo.spec.ts:94` 93 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: instrumenting a built-in for one assertion
+- `apps/kira-studio/tests/unit/find-ranges-memo.spec.ts:122` 93 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: instrumenting a built-in for one assertion
+- `apps/kira-studio/tests/unit/find-ranges-memo.spec.ts:146` 93 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: instrumenting a built-in for one assertion
+- `apps/kira-studio/tests/unit/grid-commit-double-submit.spec.ts:43` 97 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real MutateRequestWire
+- `apps/kira-studio/tests/unit/grid-pending-by-primary-key.spec.ts:68` 75 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: minimal fake of the bridge
+- `apps/kira-studio/tests/unit/grpc-stream-terminal-race.spec.ts:60` 91 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcHistoryList
+- `apps/kira-studio/tests/unit/grpc-stream-terminal-race.spec.ts:72` 86 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real onGrpcCall
+- `apps/kira-studio/tests/unit/grpc-stream-terminal-race.spec.ts:135` 88 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall
+- `apps/kira-studio/tests/unit/grpc-stream-terminal-race.spec.ts:185` 88 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall
+- `apps/kira-studio/tests/unit/grpc-stream-terminal-race.spec.ts:219` 88 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall
+- `apps/kira-studio/tests/unit/grpc-stream-terminal-race.spec.ts:249` 88 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall
+- `apps/kira-studio/tests/unit/grpc-stream-terminal-race.spec.ts:292` 88 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall
+- `apps/kira-studio/tests/unit/grpc-stream-terminal-race.spec.ts:334` 88 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall
+- `apps/kira-studio/tests/unit/schema-ddl-cache.spec.ts:27` 90 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real schemaGet.
+- `apps/kira-studio/tests/unit/schema-ddl-cache.spec.ts:40` 90 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real schemaGet.
+- `apps/kira-studio/tests/unit/schema-ddl-cache.spec.ts:63` 90 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real schemaGet.
+- `apps/kira-studio/tests/unit/schema-ddl-cache.spec.ts:65` 90 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real schemaSet.
+- `apps/kira-studio/tests/unit/schema-ddl-cache.spec.ts:102` 96 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control surface.
+- `apps/kira-studio/tests/unit/schema-ddl-cache.spec.ts:107` 96 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control surface.
+- `apps/kira-studio/tests/unit/schema-ddl-cache.spec.ts:111` 96 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control surface.
+- `apps/kira-studio/tests/unit/schema-ddl-cache.spec.ts:136` 96 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control surface.
+- `apps/kira-studio/tests/unit/schema-ddl-cache.spec.ts:141` 96 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control surface.
+- `apps/kira-studio/tests/unit/schema-ddl-cache.spec.ts:145` 96 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control surface.
+- `apps/kira-studio/tests/unit/sigma-count-refresh.spec.ts:47` 87 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: each module's own runtime record shape
+- `apps/kira-studio/tests/unit/sigma-count-refresh.spec.ts:86` 95 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real CountResponse
+- `apps/kira-studio/tests/unit/sigma-count-refresh.spec.ts:106` 95 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real CountResponse
+- `apps/kira-studio/tests/unit/sigma-count-refresh.spec.ts:113` 95 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real CountResponse
+- `apps/kira-studio/tests/unit/sqs-mutation-never-polls.spec.ts:111` 90 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: minimal fakes, not the real bridge/data
+- `apps/kira-studio/tests/unit/sqs-mutation-never-polls.spec.ts:116` 90 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: minimal fakes, not the real bridge/data
+- `apps/kira-studio/tests/unit/sqs-mutation-never-polls.spec.ts:157` 90 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: minimal fakes, not the real bridge/data
+- `apps/kira-studio/tests/unit/sqs-mutation-never-polls.spec.ts:159` 90 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: minimal fakes, not the real bridge/data
+- `apps/kira-studio/tests/unit/sqs-mutation-never-polls.spec.ts:199` 90 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: minimal fakes, not the real bridge/data
+- `apps/kira-studio/tests/unit/sqs-mutation-never-polls.spec.ts:201` 90 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: minimal fakes, not the real bridge/data
+- `apps/kira-studio/tests/unit/stream-count-honors-filter.spec.ts:87` 93 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real CountResponse
+- `apps/kira-studio/tests/unit/stream-count-honors-filter.spec.ts:110` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
+- `apps/kira-studio/tests/unit/stream-count-honors-filter.spec.ts:128` 93 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real CountResponse
+- `apps/kira-studio/tests/unit/stream-count-honors-filter.spec.ts:153` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
+- `apps/kira-studio/tests/unit/stream-count-honors-filter.spec.ts:163` 93 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real CountResponse
+- `apps/kira-studio/tests/unit/support/connectionRecord.ts:16` 98 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
+- `apps/kira-studio/tests/unit/view-state.spec.ts:66` 98 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
+- `apps/kira-studio/tests/unit/view-state.spec.ts:89` 98 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
+- `apps/kira-studio/tests/unit/view-state.spec.ts:113` 98 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
+- `apps/kira-studio/tests/unit/view-state.spec.ts:131` 98 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
+- `apps/kira-studio/tests/unit/view-state.spec.ts:152` 98 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
+- `apps/kira-studio/tests/unit/view-state.spec.ts:160` 98 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
+- `apps/kira-studio/tests/unit/view-state.spec.ts:179` 98 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
+- `apps/kira-studio/tests/unit/view-state.spec.ts:222` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
+- `apps/kira-studio/tests/unit/view-state.spec.ts:239` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
+- `apps/kira-studio/tests/unit/view-state.spec.ts:263` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
+- `apps/kira-studio/tests/unit/view-state.spec.ts:276` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
+- `apps/kira-studio/tests/unit/view-state.spec.ts:292` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
+- `apps/kira-studio/tests/unit/view-state.spec.ts:312` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
+- `apps/kira-studio/tests/unit/view-state.spec.ts:332` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
+- `apps/kira-studio/tests/unit/view-state.spec.ts:346` 92 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
+- `internal/agentsandbox/enforce_darwin_test.go:1` 17 chars [//go:]: //go:build darwin
+- `internal/agentsandbox/ppid_darwin.go:1` 17 chars [//go:]: //go:build darwin
+- `internal/agentsandbox/ppid_other.go:1` 18 chars [//go:]: //go:build !darwin
+- `internal/agentsandbox/proxy.go:70` 50 chars [//nolint]: //nolint:bodyclose // goproxy writes and closes it
+- `internal/appstorage/leaves.go:94` 17 chars [//nolint]: //nolint:errcheck
+- `internal/appstorage/tabs.go:70` 17 chars [//nolint]: //nolint:errcheck
+- `internal/appstorage/window.go:201` 17 chars [//nolint]: //nolint:errcheck
+- `internal/docker/endpoint.go:158` 81 chars [//nolint]: //nolint:gosec // user-chosen via context SkipTLSVerify / unset DOCKER_TLS_VERIFY
+- `internal/kirapaths/prod.go:1` 21 chars [//go:]: //go:build production
+- `internal/kirapaths/prod_default.go:1` 22 chars [//go:]: //go:build !production
+- `internal/memory/embed/encoder_cgo.go:1` 14 chars [//go:]: //go:build cgo
+- `internal/memory/embed/encoder_nocgo.go:1` 15 chars [//go:]: //go:build !cgo
+- `internal/memory/embed/smoke_test.go:1` 21 chars [//go:]: //go:build embedsmoke
+- `internal/memory/memcheck/run.go:120` 43 chars [//nolint]: //nolint:gosec // a hook must be executable
+- `internal/memory/migrations/embed.go:10` 16 chars [//go:]: //go:embed *.sql
+- `internal/memory/ranking_test.go:17` 38 chars [//go:]: //go:embed testdata/ranking/store.json
+- `internal/memory/ranking_test.go:20` 40 chars [//go:]: //go:embed testdata/ranking/queries.json
+- `internal/metrics/probe_darwin.go:1` 24 chars [//go:]: //go:build darwin && cgo
+- `internal/metrics/probe_darwin.go:5` 2460 chars [cgo preamble]: /*
+- `internal/metrics/probe_darwin_calibration_test.go:1` 24 chars [//go:]: //go:build darwin && cgo
+- `internal/metrics/probe_other.go:1` 26 chars [//go:]: //go:build !darwin || !cgo
+- `internal/metrics/processlist_darwin.go:1` 24 chars [//go:]: //go:build darwin && cgo
+- `internal/metrics/processlist_darwin.go:5` 26 chars [cgo preamble]: /*
+- `internal/metrics/processlist_other.go:1` 26 chars [//go:]: //go:build !darwin || !cgo
+- `internal/metrics/responsible_darwin.go:1` 17 chars [//go:]: //go:build darwin
+- `internal/metrics/responsible_darwin.go:5` 93 chars [cgo preamble]: /*
+- `internal/metrics/responsible_nocgo_darwin.go:1` 25 chars [//go:]: //go:build darwin && !cgo
+- `internal/metrics/responsible_other.go:1` 18 chars [//go:]: //go:build !darwin
+- `internal/metrics/sampler.go:371` 715 chars [//nolint]: // gopsutilProbe is the gopsutil-based per-process probe: NewProcess (an existing-pid check),
+- `internal/metrics/sampler.go:400` 530 chars [//nolint]: // gopsutilCreateTime is process-creation-time alone (gopsutil's CreateTime, a sysctl kern.proc.pid
+- `internal/shell/emitto_native.go:1` 18 chars [//go:]: //go:build !server
+- `internal/shell/emitto_server.go:1` 17 chars [//go:]: //go:build server
+- `internal/startupfail/report.go:78` 57 chars [//nolint]: //nolint:sloglint // forwards the caller's static message
+- `internal/terminal/proc_linux_test.go:1` 16 chars [//go:]: //go:build linux
+- `internal/terminal/proc_other_test.go:1` 17 chars [//go:]: //go:build !linux
+- `internal/terminal/ptmx_nonblocking.go:1` 26 chars [//go:]: //go:build linux || darwin
+- `internal/terminal/session_linux_test.go:1` 16 chars [//go:]: //go:build linux
+- `packages/docker-ui/src/components/ContainerRow.vue:43` 104 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useFocusableInteractive: tabindex falls through from the list's `nav`. -->
+- `packages/docker-ui/src/components/ContainerRow.vue:44` 109 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
+- `packages/docker-ui/src/components/ContainerTable.vue:82` 113 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
+- `packages/docker-ui/src/components/ImageList.vue:45` 115 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
+- `packages/docker-ui/src/components/NetworkList.vue:42` 115 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
+- `packages/docker-ui/src/components/VolumeList.vue:42` 115 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter comes from useListNavigation on the container. -->
+- `packages/git-core/src/search/query.spec.ts:18` 177 chars [biome-ignore]: // biome-ignore lint/suspicious/noTemplateCurlyInString: a literal `${}` pair (two of the metacharacters escap...
+- `packages/git-ipc/src/streamChannel.spec.ts:20` 107 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: matches StreamSocketLike's own cross-project escape hatch.
+- `packages/git-ipc/src/streamChannel.spec.ts:22` 107 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: matches StreamSocketLike's own cross-project escape hatch.
+- `packages/git-ipc/src/streamChannel.spec.ts:24` 107 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: matches StreamSocketLike's own cross-project escape hatch.
+- `packages/git-ipc/src/streamChannel.ts:42` 105 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: cross-project structural type — see interface doc above.
+- `packages/git-ipc/src/streamChannel.ts:44` 105 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: cross-project structural type — see interface doc above.
+- `packages/git-ipc/src/streamChannel.ts:46` 105 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: cross-project structural type — see interface doc above.
+- `packages/git-ipc/src/streamChannel.ts:48` 105 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: cross-project structural type — see interface doc above.
+- `packages/git-ui/src/components/FailureBanner.vue:28` 129 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useSemanticElements: Alert's root is a themed div; role="region" only replaces its...
+- `packages/git-ui/src/components/FileTree.vue:451` 122 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter and Space come from useListNavigation on the containe...
+- `packages/git-ui/src/components/FileTree.vue:452` 106 chars [biome-ignore]: <!-- biome-ignore lint/a11y/noStaticElementInteractions: role is treeitem or option by listMode. -->
+- `packages/git-ui/src/state/review.spec.ts:72` 117 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: the fake only implements the subset of Transport this test driv...
+- `packages/shared/caps.ts:4` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/caps.ts:13` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/caps.ts:93` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/agent.ts:63` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/collections.ts:34` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/collections.ts:37` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/collections.ts:42` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/collections.ts:43` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/collections.ts:53` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/collections.ts:71` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/collections.ts:78` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/collections.ts:82` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/color.ts:8` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/connection.ts:6` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/connection.ts:92` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/connection.ts:97` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/connection.ts:103` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/connection.ts:117` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/connection.ts:235` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/connection.ts:254` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/connection.ts:262` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/dbmcp.ts:6` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/dbmcp.ts:19` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/dbmcp.ts:20` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/dbmcp.ts:30` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/dbmcp.ts:31` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/dbmcp.ts:35` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/dbmcp.ts:50` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/dbmcp.ts:55` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/dbmcp.ts:58` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/dbmcp.ts:63` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/definition.ts:5` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/definition.ts:10` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/definition.ts:13` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/definition.ts:15` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/definition.ts:25` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/definition.ts:40` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/definition.ts:42` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/definition.ts:43` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/definition.ts:53` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/definition.ts:61` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/definition.ts:64` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/definition.ts:66` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/definition.ts:71` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/git.ts:5` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/grpc.ts:166` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/grpc.ts:176` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/grpc.ts:179` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/grpc.ts:182` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/grpc.ts:185` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/grpc.ts:191` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/grpc.ts:198` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/grpc.ts:202` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:11` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:207` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:242` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:248` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:263` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:276` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:278` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:291` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:300` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:315` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:325` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:337` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:373` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:376` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:381` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:382` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:390` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/http.ts:434` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/layout.ts:8` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/layout.ts:12` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/layout.ts:14` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/layout.ts:18` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/layout.ts:19` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/layout.ts:24` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/layout.ts:26` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/layout.ts:27` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/layout.ts:32` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/layout.ts:37` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/llmPrompts.ts:11` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/llmPrompts.ts:23` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/llmPrompts.ts:30` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/llmPrompts.ts:53` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/llmPrompts.ts:60` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/llmPrompts.ts:68` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/llmPrompts.ts:75` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mask.ts:12` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mask.ts:23` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mask.ts:33` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:7` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:11` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:14` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:17` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:28` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:39` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:43` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:61` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:71` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:79` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:82` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:86` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:98` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:104` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:107` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:119` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:125` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:131` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:132` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:141` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:153` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:161` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:169` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:170` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:178` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memory.ts:179` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryDistill.ts:6` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryDistill.ts:13` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryDistill.ts:18` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryDistill.ts:23` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryDistill.ts:37` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryDistill.ts:51` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryDistill.ts:60` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryDistill.ts:68` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryDistill.ts:71` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryImport.ts:5` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryImport.ts:16` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryImport.ts:29` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryImport.ts:32` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryImport.ts:79` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryImport.ts:114` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/memoryImport.ts:120` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mobile.ts:6` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mobile.ts:23` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mobile.ts:34` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mobile.ts:42` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mobile.ts:60` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mobile.ts:73` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mobile.ts:79` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mobile.ts:80` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mobile.ts:84` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mutations.ts:5` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mutations.ts:9` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mutations.ts:10` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mutations.ts:15` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/mutations.ts:16` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/ops.ts:3` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/ops.ts:34` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/ops.ts:41` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/ops.ts:52` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/prompts.ts:5` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/prompts.ts:15` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/queries.ts:4` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/queries.ts:12` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/queries.ts:13` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/queries.ts:15` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/queries.ts:16` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/queries.ts:19` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/queries.ts:26` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/queries.ts:33` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/queries.ts:48` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/queries.ts:49` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/queries.ts:50` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/queries.ts:60` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/repo.ts:7` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/repo.ts:22` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/repo.ts:25` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/repo.ts:27` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/repo.ts:38` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/repo.ts:39` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/repo.ts:52` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/repo.ts:53` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/repo.ts:60` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/repo.ts:70` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/repo.ts:84` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/repo.ts:98` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/repo.ts:108` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/repo.ts:122` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/repo.ts:128` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/runOutcome.ts:4` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/runOutcome.ts:13` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/runOutcome.ts:26` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/schema.ts:7` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scriptRuns.ts:6` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scriptRuns.ts:18` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scriptRuns.ts:22` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scriptRuns.ts:29` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scriptRuns.ts:63` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scriptRuns.ts:70` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scriptRuns.ts:76` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scriptRuns.ts:83` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scriptRuns.ts:91` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scriptRuns.ts:99` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scriptRuns.ts:105` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scriptRuns.ts:114` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scriptRuns.ts:122` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scriptRuns.ts:159` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scripts.ts:8` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scripts.ts:12` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scripts.ts:30` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scripts.ts:34` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scripts.ts:46` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scripts.ts:53` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scripts.ts:64` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scripts.ts:83` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scripts.ts:105` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scripts.ts:114` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scripts.ts:125` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scripts.ts:132` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scripts.ts:134` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scripts.ts:145` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/scripts.ts:153` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/secrets.ts:6` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/secrets.ts:8` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/settings.ts:12` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/settings.ts:27` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/settings.ts:30` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/settings.ts:52` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/settings.ts:58` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tabs.ts:21` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tabs.ts:49` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tabs.ts:79` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:28` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:88` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:94` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:98` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:109` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:111` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:118` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:120` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:122` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:128` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:133` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:134` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:135` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:136` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:137` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:149` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/tree.ts:152` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/treeFilter.ts:8` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/treeFilter.ts:9` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/domain/treeFilter.ts:12` 13 chars [#__PURE__]: /*#__PURE__*/
+- `packages/shared/protocol/page.ts:406` 94 chars [biome-ignore]: // biome-ignore lint/style/noNonNullAssertion: scratches is built from the same `keys`
+- `packages/shared/protocol/page.ts:415` 94 chars [biome-ignore]: // biome-ignore lint/style/noNonNullAssertion: scratches is built from the same `keys`
+- `packages/theme/src/i18n/catalog.go:12` 18 chars [//go:]: //go:embed en.json
+- `packages/theme/src/i18n/types.check.ts:6` 47 chars [@ts-expect-error]: // @ts-expect-error unknown key fails typecheck
+- `packages/theme/src/i18n/types.check.ts:9` 57 chars [@ts-expect-error]: // @ts-expect-error typo in a key segment fails typecheck
+- `packages/theme/src/i18n/types.check.ts:12` 45 chars [@ts-expect-error]: // @ts-expect-error a namespace is not a leaf
+- `packages/workbench/src/automations/ScriptGroupHeader.vue:24` 119 chars [biome-ignore]: <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the header button toggles by keyboa...
+- `packages/workbench/src/bridge/rpc.ts:10` 369 chars [biome-ignore]: // See bridge/port.ts's identical import for why this needs the directive below rather than the
+- `packages/workbench/src/components/FindBar.vue:65` 106 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useSemanticElements: vue-tsc reports <search> as an unresolved component -->
+- `packages/workbench/src/components/OpLogPanel.vue:2` 186 chars [biome-ignore]: // biome-ignore lint/correctness/noUnusedImports: resolves the generic="R extends OpLogRecord" attribute above...
+- `packages/workbench/src/components/OpLogPanel.vue:263` 133 chars [biome-ignore]: <!-- biome-ignore lint/a11y/useKeyWithClickEvents: Enter and Space come from useListNavigation on the list con...
+- `packages/workbench/src/host.ts:96` 398 chars [biome-ignore]: // An InjectionKey carries one concrete type; each app's real WK/R instantiation is narrowed back
+- `packages/workbench/src/testing/ui/contract.ts:25` 96 chars [biome-ignore]: // biome-ignore lint/suspicious/noExplicitAny: fixtures are Go-written JSON with no static shape
+- `packages/workbench/src/testing/ui/fixtures.ts:69` 139 chars [biome-ignore]: // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, eve...
+- `packages/workbench/src/testing/ui/fixtures.ts:78` 137 chars [biome-ignore]: // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, eve...
+- `scripts/check-class-conflicts.ts:274` 87 chars [biome-ignore]: // biome-ignore lint/suspicious/noAssignInExpressions: standard regex-exec-loop idiom
+
+## generated (31)
+
+- `apps/kira-space/internal/gitwire/DecorationRef.go`: 1 comments
+- `apps/kira-space/internal/gitwire/Frame.go`: 1 comments
+- `apps/kira-space/internal/gitwire/PackedCommitChunk.go`: 1 comments
+- `apps/kira-space/internal/gitwire/Payload.go`: 1 comments
+- `apps/kira-space/internal/gitwire/RowDecorations.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/CacheStats.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/Chunk.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/ColumnDescriptor.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/CountResponse.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/DocumentPage.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/EmptyResponse.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/Error.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/ExecuteResponse.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/Frame.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/FrameKind.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/KeyValuePage.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/MutateResponse.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/ObjectDownloadResponse.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/Page.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/PageBody.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/PagePosition.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/Payload.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/PingPayload.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/PreviewResponse.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/ReadResponse.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/RedisType.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/Source.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/Strategy.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/StreamPage.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/TabularPage.go`: 1 comments
+- `apps/kira-studio/internal/page/wire/TypeClass.go`: 1 comments
+
+## excluded-path (289)
+
+- `apps/kira-studio/internal/httpclient/cookiejar/dummy_publicsuffix_test.go`: 1 comments
+- `apps/kira-studio/internal/httpclient/cookiejar/entries.go`: 3 comments
+- `apps/kira-studio/internal/httpclient/cookiejar/example_test.go`: 4 comments
+- `apps/kira-studio/internal/httpclient/cookiejar/internal/ascii/print.go`: 7 comments
+- `apps/kira-studio/internal/httpclient/cookiejar/internal/ascii/print_test.go`: 3 comments
+- `apps/kira-studio/internal/httpclient/cookiejar/jar.go`: 61 comments
+- `apps/kira-studio/internal/httpclient/cookiejar/jar_test.go`: 51 comments
+- `apps/kira-studio/internal/httpclient/cookiejar/punycode.go`: 8 comments
+- `apps/kira-studio/internal/httpclient/cookiejar/punycode_test.go`: 21 comments
+- `apps/kira-studio/tests/ui/global.d.ts`: 18 comments
+- `packages/git-ipc/src/generated/gitwire.ts`: 2 comments
+- `packages/git-ipc/src/generated/gitwire/decoration-ref.ts`: 3 comments
+- `packages/git-ipc/src/generated/gitwire/frame.ts`: 2 comments
+- `packages/git-ipc/src/generated/gitwire/packed-commit-chunk.ts`: 11 comments
+- `packages/git-ipc/src/generated/gitwire/payload.ts`: 2 comments
+- `packages/git-ipc/src/generated/gitwire/row-decorations.ts`: 3 comments
+- `packages/shared/protocol/wire.ts`: 2 comments
+- `packages/shared/protocol/wire/cache-stats.ts`: 2 comments
+- `packages/shared/protocol/wire/chunk.ts`: 9 comments
+- `packages/shared/protocol/wire/column-descriptor.ts`: 4 comments
+- `packages/shared/protocol/wire/count-response.ts`: 2 comments
+- `packages/shared/protocol/wire/document-page.ts`: 5 comments
+- `packages/shared/protocol/wire/empty-response.ts`: 2 comments
+- `packages/shared/protocol/wire/error.ts`: 3 comments
+- `packages/shared/protocol/wire/execute-response.ts`: 3 comments
+- `packages/shared/protocol/wire/frame-kind.ts`: 2 comments
+- `packages/shared/protocol/wire/frame.ts`: 2 comments
+- `packages/shared/protocol/wire/key-value-page.ts`: 5 comments
+- `packages/shared/protocol/wire/mutate-response.ts`: 2 comments
+- `packages/shared/protocol/wire/object-download-response.ts`: 2 comments
+- `packages/shared/protocol/wire/page-body.ts`: 2 comments
+- `packages/shared/protocol/wire/page-position.ts`: 2 comments
+- `packages/shared/protocol/wire/page.ts`: 2 comments
+- `packages/shared/protocol/wire/payload.ts`: 2 comments
+- `packages/shared/protocol/wire/ping-payload.ts`: 2 comments
+- `packages/shared/protocol/wire/preview-response.ts`: 3 comments
+- `packages/shared/protocol/wire/read-response.ts`: 3 comments
+- `packages/shared/protocol/wire/redis-type.ts`: 2 comments
+- `packages/shared/protocol/wire/source.ts`: 2 comments
+- `packages/shared/protocol/wire/strategy.ts`: 2 comments
+- `packages/shared/protocol/wire/stream-page.ts`: 8 comments
+- `packages/shared/protocol/wire/tabular-page.ts`: 5 comments
+- `packages/shared/protocol/wire/type-class.ts`: 2 comments
+- `packages/workbench/env.d.ts`: 6 comments
+- `site/src/env.d.ts`: 1 comments
+
+## unchanged (819)
+
+- `apps/kira-space/frontend/src/ade/queries.ts:14` 411 chars: /** Called once from `main.ts`, app lifetime, no teardown. The shared read upkeep is
+- `apps/kira-space/frontend/src/ade/v2/queries.ts:65` 353 chars: // Board state is push-driven (`kira:adetask:board`, subscribed once in `ade/queries.ts`), so the
+- `apps/kira-space/frontend/src/bridge/control.ts:1` 456 chars: // Thin re-export — Kira Studio's own control.ts, trimmed. bridge/index.ts is the composition
+- `apps/kira-space/frontend/src/repo/RepoConfigForm.vue:127` 310 chars: // Rows are keyed by a client id that follows the env through add and remove, so a row's uncommitted
+- `apps/kira-space/frontend/src/repo/git/hostHandlers.ts:55` 306 chars: /** Consumed once — a later mount of the same segment (switch to Files and back, no new
+- `apps/kira-space/frontend/src/repo/git/hostHandlers.ts:139` 386 chars: /** The underlying git-stream transport's own `request` — the one seam this file needs to reach
+- `apps/kira-space/frontend/src/repo/git/reviewSession.ts:38` 347 chars: /** `review.session.save`'s native answer. `session: null` clears the stored resume point — the
+- `apps/kira-space/frontend/src/repo/state/perRepo.ts:3` 910 chars: /**
+- `apps/kira-space/frontend/src/repo/state/repoHeads.ts:25` 409 chars: /** git-ui's `pickerModel.ts` own helper, mirrored rather than imported — worktreeLabel's own
+- `apps/kira-space/frontend/src/state/repoOpenHold.ts:35` 530 chars: /**
+- `apps/kira-space/frontend/src/state/tabKinds.ts:55` 410 chars: // A repo-file tab's `path` is a plain repository-relative path ('src/main.go'), not an encoded
+- `apps/kira-space/frontend/src/state/tabs.ts:43` 332 chars: // state/workspace.ts imports closeWorkspaceTabs from this file, a two-way call graph — not a
+- `apps/kira-space/frontend/src/state/tabs.ts:57` 399 chars: // Creates workspace `workspaceId`'s pinned graph tab — a plain push that never activates it
+- `apps/kira-space/frontend/src/state/tabs.ts:100` 300 chars: // TabViewStateStore's own write() — git-ui re-serializes its whole PersistedViewState on
+- `apps/kira-space/frontend/src/state/workspace.ts:101` 703 chars: // Closes every one of repoId's own tabs (its pinned graph tab included — closeWorkspaceTabs is
+- `apps/kira-space/frontend/src/views/repo/blameAnnotation.ts:38` 381 chars: /** Attaches the blame layer to an already-mounted, read-only file editor. Call once per mount
+- `apps/kira-space/frontend/src/views/repo/blameLine.ts:62` 341 chars: /** Injected text must be a single line (Monaco's own `InjectedTextOptions.content` doc comment) —
+- `apps/kira-space/frontend/src/views/repo/editors.ts:81` 387 chars: // A remount always recomputes the identical uris for the same tab (they're a pure function of the
+- `apps/kira-space/frontend/src/views/repo/editors.ts:113` 323 chars: /** repo-diff's own dropResources — deliberately named separately from dropRepoFileTab even though
+- `apps/kira-space/frontend/src/views/repo/markdownReading.ts:19` 349 chars: // GitHub's own heading-slug convention (lowercase, spaces to hyphens, strip anything that isn't a
+- `apps/kira-space/frontend/src/views/repo/reviewDecorations.ts:59` 351 chars: /** `repoDiffTabStateSchema.left` — the tab's own leftRev (merge base in `range` mode, the
+- `apps/kira-space/frontend/src/views/repo/useDiffEditor.ts:129` 367 chars: // `liveFile`/`virtualBlob` already opened their own tab (hostHandlers.ts's own
+- `apps/kira-space/internal/ade/integration.go:36` 343 chars: // contains is the one evaluator behind integration and deployment facts. Own commits are
+- `apps/kira-space/internal/ade/paste.go:13` 359 chars: // normalizeMessage prepares message text for either the initial CLI prompt or a forwarded paste:
+- `apps/kira-space/internal/ade/repoconfig.go:358` 370 chars: // SetFolderHidden does not wait for a scan: a flag flipped mid-scan is re-applied to the repos
+- `apps/kira-space/internal/ade/tracker.go:68` 471 chars: // AgentBin defaults to the provider's CLI name when empty. Exists only so ade_test.go's
+- `apps/kira-space/internal/ade/tracker.go:112` 394 chars: // PrepareResult is Prepare's own return shape. SessionID is the agent session id (stable across
+- `apps/kira-space/internal/ade/tracker.go:529` 393 chars: // Reconcile reads the live agent set and stops every tracked record whose terminal is gone and
+- `apps/kira-space/internal/adeflow/watch.go:16` 361 chars: // Watch calls onChange (debounced 200ms, one call per burst) when a *.yaml file in dir is created,
+- `apps/kira-space/internal/agentusage/agentusage.go:1` 364 chars: // Package agentusage keeps the latest agent rate-limit windows (5-hour and weekly) that
+- `apps/kira-space/internal/bridge/agentsessions.go:40` 341 chars: // AgentSessionsChanged is Registry.OnChange's own target (main.go) — a package-level function
+- `apps/kira-space/internal/bridge/codeworkspace.go:574` 452 chars: // StartSearch validates args, compiles the pattern before returning (codeworkspace.ValidatePattern
+- `apps/kira-space/internal/bridge/githost.go:12` 778 chars: // GitHostService opens a change request in the OS browser, never in place: a bare `<a href>` under
+- `apps/kira-space/internal/bridge/githost_test.go:41` 343 chars: // registryKnowing returns a *gitsession.Registry whose Gh has already probed every host in hosts
+- `apps/kira-space/internal/bridge/keepawake.go:65` 378 chars: // KeepAwakeRecompute applies agent.keepAwakeWithAgents against the live session count and
+- `apps/kira-space/internal/bridge/stream.go:3` 477 chars: // StreamSession is the whole of what gitstream.go's ServeGitStream needs from a renderer
+- `apps/kira-space/internal/bridge/update.go:10` 365 chars: // UpdateStatus is the whole wire shape. It deliberately carries no URL and no error string: the
+- `apps/kira-space/internal/buildinfo/buildinfo.go:9` 433 chars: // Version is this app's version string, and the single place it is defined.
+- `apps/kira-space/internal/codeworkspace/files.go:33` 375 chars: // ListFiles lists every tracked-plus-untracked-but-not-ignored file in the session's root
+- `apps/kira-space/internal/codeworkspace/search.go:122` 1037 chars: // matchesOnLine returns up to max non-overlapping matches in line, in order.
+- `apps/kira-space/internal/codeworkspace/search_test.go:13` 350 chars: // scanContent writes content to a fresh temp file and runs scanFile against it — every test below
+- `apps/kira-space/internal/codeworkspace/textpos.go:53` 640 chars: // lineBounds returns [start, end) byte offsets for 0-based row, end excluding the row's own
+- `apps/kira-space/internal/codeworkspace/textpos_test.go:8` 911 chars: // fixture rows, one per rule in textpos.go's own doc comment:
+- `apps/kira-space/internal/codeworkspace/textpos_test.go:49` 304 chars: // Rule 1 — CRLF: the '\r' stays addressable as the line's own last byte; Monaco's line
+- `apps/kira-space/internal/codeworkspace/textpos_test.go:152` 343 chars: // validColumnsFor enumerates every column that sits on a genuine rune boundary within row —
+- `apps/kira-space/internal/flowharness/harness.go:1` 916 chars: // Package flowharness boots Kira Space's real composition root (internal/appwire) over a temporary
+- `apps/kira-space/internal/flowharness/harness.go:121` 320 chars: // Root is the short temp root (not t.TempDir: macOS paths there exceed the 104-byte unix socket
+- `apps/kira-space/internal/flows/harnessflow/provider_test.go:124` 328 chars: // TestSecondProviderRegistered: a provider registered next to claude, and chosen through
+- `apps/kira-space/internal/flows/memoryflow/import_test.go:33` 314 chars: // importApp boots the app with a finalize agent that stores two facts through the real memory-mcp
+- `apps/kira-space/internal/gitclient/catfile/catfile_test.go:616` 384 chars: // f9Runner answers --batch-check and --batch with two INDEPENDENT scripted processes — mirroring
+- `apps/kira-space/internal/gitclient/catfile/session.go:52` 491 chars: // persistentProcess is one lazily-started, long-lived `git cat-file` child, driven one request at
+- `apps/kira-space/internal/gitclient/catfile/session.go:146` 502 chars: // request writes line to the child's stdin and hands its stdout reader to readResp — the whole
+- `apps/kira-space/internal/gitclient/catfile/session.go:364` 411 chars: // Still consumed exactly per readContent's own framing (Size bytes plus the trailing
+- `apps/kira-space/internal/gitclient/catfile/session.go:388` 700 chars: // CheckOneShot is Check's own counterpart to ReadOneShot — a rev the batch protocol cannot
+- `apps/kira-space/internal/gitclient/discovery.go:77` 387 chars: // commandLineToolsInstalled runs `xcode-select -p` — not a git command, so this carries none of
+- `apps/kira-space/internal/gitclient/discovery.go:291` 371 chars: // The caller's own ctx (not probeCtx's 5s sub-timeout above) was cancelled mid-probe — the
+- `apps/kira-space/internal/gitclient/errors.go:78` 370 chars: // notARepoNeedles are the stderr substrings every git subcommand this package spawns uses for
+- `apps/kira-space/internal/gitclient/logsession/session.go:85` 531 chars: // readCount is how many records have been *consumed from the process's own output stream* —
+- `apps/kira-space/internal/gitclient/logsession/session.go:109` 304 chars: // exhaustedLocked is what every caller means by "exhausted": the walk's process drained AND every
+- `apps/kira-space/internal/gitclient/logsession/session.go:284` 316 chars: // spawnOrResumeLocked starts the walk (readCount == 0) or resumes a reclaimed one (via --skip),
+- `apps/kira-space/internal/gitclient/porcelain/blame.go:62` 739 chars: // ParseBlameLine parses exactly one hunk — the shape a `-L <n>,<n>` request always produces. The
+- `apps/kira-space/internal/gitclient/porcelain/blame_test.go:69` 336 chars: // TestParseBlameLine_UnknownAttributeIgnored mirrors TestParseWorktreeList_UnknownAttributeIgnored
+- `apps/kira-space/internal/gitclient/porcelain/diff.go:143` 367 chars: // ParseFileDiffBody parses one file's unified patch (FileDiffArgs' own stdout — always exactly one
+- `apps/kira-space/internal/gitclient/porcelain/diff.go:190` 346 chars: // lfsOrText applies the LFS sniff to a fully-parsed hunk list: exactly one hunk, every line a
+- `apps/kira-space/internal/gitclient/porcelain/diff.go:263` 502 chars: // parseOneHunk parses one hunk's header (already matched, m) plus exactly as many content lines
+- `apps/kira-space/internal/gitclient/porcelain/diff.go:285` 322 chars: // A "\ No newline at end of file" marker always attaches to the line immediately before
+- `apps/kira-space/internal/gitclient/porcelain/fixtures_test.go:27` 308 chars: // repoBuilder drives a deterministic fixture repository: every commit gets the same author/
+- `apps/kira-space/internal/gitclient/porcelain/fixtures_test.go:225` 305 chars: // stashPush runs `git stash push -q <args...>` at a fixed, strictly increasing author/committer
+- `apps/kira-space/internal/gitclient/porcelain/fixtures_test.go:861` 302 chars: // --- workingDiff/renamed.{numstat,nameStatus}.bin: an unstaged rename (via a plain `mv`, never
+- `apps/kira-space/internal/gitclient/porcelain/records.go:22` 371 chars: // maxRemainderBytes bounds how much unterminated data RecordSplitter buffers across Push calls —
+- `apps/kira-space/internal/gitclient/porcelain/records.go:51` 443 chars: // Push appends chunk and returns every complete record that can now be extracted, including ones
+- `apps/kira-space/internal/gitclient/porcelain/records.go:75` 440 chars: // Flush returns whatever bytes remain un-terminated, clearing the splitter's own buffer. git's
+- `apps/kira-space/internal/gitclient/porcelain/records.go:152` 470 chars: // SplitLimitedFields splits b on delim into exactly n fields when at least n-1 delimiters are
+- `apps/kira-space/internal/gitclient/porcelain/refs.go:219` 549 chars: // splitNULRecords groups a for-each-ref stream whose format ends every field with %00. git still
+- `apps/kira-space/internal/gitclient/porcelain/refsnapshot.go:20` 475 chars: // for-each-ref's own --format has no %x1f hex-escape placeholder (that syntax is `git log
+- `apps/kira-space/internal/gitclient/porcelain/stash.go:30` 310 chars: // StashBaseSubjectArgs builds the batch `log --no-walk --format=%H%x1f%s -z <shas...>` spawn that
+- `apps/kira-space/internal/gitclient/porcelain/stash_test.go:270` 352 chars: // TestParseGlobalStashList_ThreeParentUntrackedZeroNumstat covers an untracked-only global entry
+- `apps/kira-space/internal/gitclient/porcelain/stash_test.go:302` 417 chars: // TestParseGlobalStashList_TwoEntryHeaderShapedPathNeverMisdetected proves isGlobalStashHeader's
+- `apps/kira-space/internal/gitclient/porcelain/status.go:138` 337 chars: // ParseStatus parses StatusArgs' own already-NUL-split records. The '2' marker's rename/copy row
+- `apps/kira-space/internal/gitclient/porcelain/workingdiff.go:24` 405 chars: // WorkingNameStatusArgs is NameStatusArgs' working-tree twin: plain `git diff` (never `diff-tree`,
+- `apps/kira-space/internal/gitclient/porcelain/worktree.go:45` 355 chars: // The final split token is always "" (the stream's own closing double-NUL produces two
+- `apps/kira-space/internal/gitclient/porcelain/worktree.go:99` 397 chars: // cutFirstSpace splits "key value" (worktree list's own attribute shape) on the first space —
+- `apps/kira-space/internal/gitclient/porcelain/worktree_test.go:135` 377 chars: // TestParseWorktreeList_TruncatedInput: a process killed mid-write (or a genuinely empty
+- `apps/kira-space/internal/gitclient/repo.go:251` 361 chars: // A linked worktree's own git-dir lives under <commonDir>/worktrees/<name>, distinct from
+- `apps/kira-space/internal/gitclient/repo_test.go:261` 335 chars: // --- Identify() against a real repository --------------------------------------------------
+- `apps/kira-space/internal/gitclient/repo_test.go:463` 406 chars: // argvScriptedRunner scripts a distinct Result per rev-parse/symbolic-ref invocation, keyed on the
+- `apps/kira-space/internal/gitclient/runner.go:25` 366 chars: // Spec is one git invocation, deliberately narrow: Args never includes "git" itself (Runner owns
+- `apps/kira-space/internal/gitclient/runner.go:243` 360 chars: // Wait blocks until the child has exited and its stderr has been fully drained, then reports
+- `apps/kira-space/internal/gitclient/watcher_fsevents_darwin.go:59` 413 chars: // NoDefer is deliberately unset: it is a kernel-side leading-window debounce, and we
+- `apps/kira-space/internal/gitclient/watcher_fsevents_darwin.go:65` 349 chars: // Device MUST stay zero. A nonzero Device switches fsevents internally to
+- `apps/kira-space/internal/gitclient/watcher_fsnotify.go:79` 475 chars: // Close stops fsw and joins the forwarding goroutine. Closing b.stop first — rather than closing
+- `apps/kira-space/internal/gitcred/relay.go:83` 318 chars: // AskFrom enqueues req, publishes it and blocks until a window answers or ctx ends. origin is the
+- `apps/kira-space/internal/githost/github/discovery_test.go:24` 307 chars: // blockOnCtx, when set, blocks Run until it observes ctx.Done() and returns ctx.Err() — the
+- `apps/kira-space/internal/githost/github/errors.go:12` 409 chars: // apiErrorBody is the shape `gh api`'s own JSON error body takes on a non-2xx response — gh prints
+- `apps/kira-space/internal/githost/github/runner_test.go:24` 377 chars: // TestGhHygieneEnv_NeverSetsAGitHubCredential is the exit-criterion regression guard, in code
+- `apps/kira-space/internal/gitops/branch.go:73` 372 chars: // BranchConfigRestoreArgs parses BranchConfigRegexpArgs output into one `config --add` argv per
+- `apps/kira-space/internal/gitops/checkout.go:32` 367 chars: // SwitchCreateTrackingArgs builds `git switch -c <branch> <upstream>` — the executor's route for
+- `apps/kira-space/internal/gitops/conflict.go:132` 341 chars: // AbortArgs is the Ordering table's own --abort column: every kind except unmergedOnly (there is
+- `apps/kira-space/internal/gitops/progress.go:52` 370 chars: // Write feeds chunk into the decoder. Every complete '\r'- or '\n'-terminated line is processed
+- `apps/kira-space/internal/gitops/progress_test.go:51` 384 chars: // The CR-separated update and the LF-terminated "…, done." line are numerically identical here
+- `apps/kira-space/internal/gitops/push_test.go:125` 348 chars: // TestParsePushPorcelain_SetUpstreamAsideIsSkipped is probed directly in this container:
+- `apps/kira-space/internal/gitpreflight/checkout.go:17` 324 chars: // CheckoutBlocker mirrors @kira/git-ipc's own CheckoutBlocker discriminated union, flattened into
+- `apps/kira-space/internal/gitpreflight/checkout.go:153` 449 chars: // A tag or a raw sha always detaches regardless of the requested mode (git itself refuses a
+- `apps/kira-space/internal/gitpreflight/stash.go:48` 398 chars: // ClassifyStashPopInput is ClassifyStashPop's own input — a direct port of
+- `apps/kira-space/internal/gitprepare/doc.go:1` 1764 chars: // Package gitprepare spawns user-authored shell scripts: the worktree prepare script, ADE
+- `apps/kira-space/internal/gitprepare/output.go:272` 451 chars: // reserveDelivery must be called while mu is STILL held, immediately before it is released: when
+- `apps/kira-space/internal/gitprepare/output.go:288` 432 chars: // finishDelivery must be called after mu has been released, with the ticket/reserved values
+- `apps/kira-space/internal/gitprepare/output_test.go:61` 302 chars: // TestSanitizeLine_PlainTextUnaffected: sanitizeLine is only ever called on one already
+- `apps/kira-space/internal/gitreview/comments.go:86` 351 chars: // Comments returns every comment for (repoID, branch) in stored-coordinate order (path, start,
+- `apps/kira-space/internal/gitreview/project.go:73` 400 chars: // mapWithinHunk maps every context line inside h whose OldLine falls in [lo, hi] to its NewLine,
+- `apps/kira-space/internal/gitreview/project_test.go:133` 328 chars: // old 1-4 (offset 0) -> 1-4; the insertion contributes no old-side lines; old 5-9
+- `apps/kira-space/internal/gitreview/ranges.go:13` 302 chars: // Normalize sorts ranges by Start and merges every overlapping or touching pair into the minimal
+- `apps/kira-space/internal/gitreview/resolve.go:98` 357 chars: // upstreamRefShortName strips only the namespace prefix, keeping the remote name: "refs/heads/
+- `apps/kira-space/internal/gitreview/resolve.go:185` 405 chars: // collectCandidates builds the header picker's shortlist, ordered upstream (when it exists at all,
+- `apps/kira-space/internal/gitreview/store.go:206` 348 chars: // Records returns every record for (repoID, branch), keyed by path, WITHOUT reading the content
+- `apps/kira-space/internal/gitreview/store.go:325` 308 chars: // Put replaces one path's record and its ranges in one transaction, creating the session row if
+- `apps/kira-space/internal/gitrpc/handlers.go:150` 303 chars: // requestHandler is one requestHandlers entry's own shape — uniform across every RPC method even
+- `apps/kira-space/internal/gitrpc/handlers_test.go:19` 377 chars: // recordingLocator is a gitclient.Locator fake that records every configuredPath it was asked to
+- `apps/kira-space/internal/gitrpc/reset_test.go:141` 420 chars: // TestPreflightCherryPickAndRunOpCherryPick_OverDispatch exercises preflight.cherryPick and op.run
+- `apps/kira-space/internal/gitrpc/stash.go:43` 341 chars: // mapStashError maps gitsession.ErrStashNotFound — a caller mistake or a genuine race (the stack
+- `apps/kira-space/internal/gitsearch/dialect.go:203` 300 chars: // translateUnicodeEscape handles \uXXXX (exactly four hex digits). Without the `u` flag JS has no
+- `apps/kira-space/internal/gitsearch/literal.go:19` 448 chars: // foldRune is ECMA-262 Canonicalize for a non-unicode-flag RegExp: uppercase the code point, and
+- `apps/kira-space/internal/gitsearch/matcher.go:20` 314 chars: // CommitFields is every field a commit can be searched on — the Go twin of git-core's own
+- `apps/kira-space/internal/gitsearch/matcher.go:34` 911 chars: // MatchFields is a field-for-field port of matchCommitFields — a straight OR over seven tests, the
+- `apps/kira-space/internal/gitsearch/scan.go:205` 316 chars: // A caller cancellation (supersede, or the connection tearing down) — classified
+- `apps/kira-space/internal/gitsession/autofetch.go:117` 529 chars: // markAcquiredNonQuiet records that this entry has now had at least one non-quiet (real) acquirer
+- `apps/kira-space/internal/gitsession/autofetch_test.go:213` 375 chars: // newRepoEntry captures reg.Settings by value at Acquire time (the func value present at that
+- `apps/kira-space/internal/gitsession/autofetch_test.go:226` 337 chars: // The user turns auto-fetch off. The real timer armed above is never awaited — autoFetchTick
+- `apps/kira-space/internal/gitsession/changerequests.go:79` 476 chars: // remoteChecked/setting/provider/repo/resolved cache the one-git-spawn host detection for this
+- `apps/kira-space/internal/gitsession/changerequests.go:344` 373 chars: // hostRepo resolves the host and repository identity of this entry's "origin" remote under the
+- `apps/kira-space/internal/gitsession/changerequests.go:400` 609 chars: // ensureSnapshot is the repo-wide open snapshot, fetched lazily on first need and cached for
+- `apps/kira-space/internal/gitsession/changerequests.go:464` 460 chars: // ResolveCommitChangeRequests is commit.resolveChangeRequests' orchestration: setting off or no
+- `apps/kira-space/internal/gitsession/changerequests.go:501` 467 chars: // ResolveBranchChangeRequest is branch.resolveChangeRequest's orchestration: a snapshot hit on
+- `apps/kira-space/internal/gitsession/changerequests.go:518` 326 chars: // Reading the snapshot cache alone never populates it; ensureSnapshot does. On a cold cache the
+- `apps/kira-space/internal/gitsession/changerequests.go:528` 338 chars: // HeadRef alone is not enough: a fork's change request from a commonly-named branch
+- `apps/kira-space/internal/gitsession/changerequests_test.go:402` 466 chars: // forkSnapshotGhRunner is TestResolveBranchPr_SnapshotForkPrNotBadgedOntoSameNamedLocalBranch's own
+- `apps/kira-space/internal/gitsession/changerequests_test.go:564` 331 chars: // Warm hostRepo's own cache first (a single git spawn, via githubRemoteRunner -- never
+- `apps/kira-space/internal/gitsession/conn_test.go:481` 336 chars: // The "sess exists now" write, on its own goroutine too — bridge's ServeGitStream
+- `apps/kira-space/internal/gitsession/entry.go:256` 327 chars: // The snapshot, per-branch and per-commit host caches turn stale (served while a background
+- `apps/kira-space/internal/gitsession/incremental.go:67` 376 chars: // reviewFileStatus folds a stored record (or its absence) into the wire's ReviewFileStatus — a
+- `apps/kira-space/internal/gitsession/ops.go:37` 498 chars: // validOpArg is ErrInvalidOpArg's own check, called at each prepare* function's own point of use —
+- `apps/kira-space/internal/gitsession/ops.go:268` 442 chars: // stashDrop: undoable, NOT notUndoable like its four stash siblings — undo/slot.ts's own
+- `apps/kira-space/internal/gitsession/ops.go:972` 343 chars: // prepareSequencerVerb is opContinue/opAbort/opSkip's own shared shape: refuse (no write at all)
+- `apps/kira-space/internal/gitsession/ops.go:1064` 873 chars: // captureStashDropUndo is undo-capture for a stash drop (undo/slot.ts's own UNDO_POLICY marks
+- `apps/kira-space/internal/gitsession/ops.go:1121` 312 chars: // runGuardedWriteArgvList is runWriteArgvList with a guard that runs first, inside the same write
+- `apps/kira-space/internal/gitsession/ops_test.go:99` 375 chars: // initStashConflictRepo builds two branches diverging on the same line of the same file: "main"
+- `apps/kira-space/internal/gitsession/ops_test.go:173` 375 chars: // initAutoStashRepo builds "main" and "target" diverging on the same tracked line of f.txt, and
+- `apps/kira-space/internal/gitsession/queries.go:46` 307 chars: // runOne runs one read-only git spawn through the repo's own read gate (e.Repo.Read — the same
+- `apps/kira-space/internal/gitsession/registry.go:80` 374 chars: // Hosts picks each repository's code host — shared off the Registry exactly like Review above
+- `apps/kira-space/internal/gitsession/registry_test.go:15` 343 chars: // --- fakes shared across this package's tests ---------------------------------------------------
+- `apps/kira-space/internal/gitsession/remote.go:400` 317 chars: // ctx (never cancelled by remote.cancel — only opCtx, the spawn's own context, is) is what
+- `apps/kira-space/internal/gitsession/stack.go:773` 380 chars: // restackPrepare is RunRestack's own preflight phase: recompute the preflight FRESH, resolve
+- `apps/kira-space/internal/gitsession/stack.go:950` 391 chars: // connIDOf/connLabelOf: RunRestack takes *Conn (matching RunRemote's own signature) rather than
+- `apps/kira-space/internal/gitsession/stack_test.go:660` 324 chars: // initThreeLevelStack builds main -> feat1 -> feat2 -> feat3, each with its own file so no rebase
+- `apps/kira-space/internal/gitsession/stack_test.go:915` 346 chars: // failOnStackConfigSetRunner wraps a real Runner, injecting a spawn failure for exactly
+- `apps/kira-space/internal/gitsession/stack_test.go:998` 314 chars: // Release the held write once opCtx is cancelled: runRestackSpawn's own Repo.Write call
+- `apps/kira-space/internal/gitsession/stack_test.go:1106` 302 chars: // Without the fix, Check's own response for the malicious query's SECOND line ("missing", for
+- `apps/kira-space/internal/gitsession/stash.go:81` 403 chars: // resolveStashEntry re-reads stash.list and returns the entry matching sha — the fresh read every
+- `apps/kira-space/internal/gitsession/stash_test.go:14` 351 chars: // initGlobalStashTestRepo builds a one-commit repo, then a global-bucket entry (via `stash create`
+- `apps/kira-space/internal/gitsession/viewedsync.go:25` 301 chars: // ViewedSyncPlanResult is ViewedSyncPlan's outcome. Status is "ok" | "disabled" | "unsupported" |
+- `apps/kira-space/internal/gitsession/walk_test.go:145` 321 chars: // pipeProcess simulates a `git log` still running: its stdout delivers exactly one write's worth
+- `apps/kira-space/internal/gitsession/walk_test.go:174` 470 chars: // scriptedWalkRunner delegates everything to a real exec runner EXCEPT the walk's own two exact
+- `apps/kira-space/internal/gitsession/walk_test.go:630` 379 chars: // A different Scope forces pair.graph's own rebuild -- the OLD walk (w1) must be disposed.
+- `apps/kira-space/internal/gitsession/worktree.go:206` 451 chars: // runOneInDir runs a READ-ONLY spawn against an arbitrary directory — not necessarily this
+- `apps/kira-space/internal/gitstore/sha.go:5` 344 chars: // hexToBytes decodes a hex sha into raw bytes. A malformed sha reaching this point would be a
+- `apps/kira-space/internal/gitstore/store.go:47` 351 chars: // clampTimestamp folds a signed unix-seconds value into the wire's uint32 column — clock-skewed
+- `apps/kira-space/internal/mobileweb/routes.go:68` 389 chars: // routes is the complete app-port API. The mux registers exactly these, and a test walks them: a
+- `apps/kira-space/internal/storage/model/adesession.go:18` 314 chars: // AdeSession is one row of `ade_sessions` — a Claude Code session of a task, interactive (tui) or a
+- `apps/kira-space/internal/storage/repos/aderepoconfig.go:257` 341 chars: // ApplyFolderHidden writes the folder's stored hidden flag onto the imported repos whose hidden_rev
+- `apps/kira-space/internal/storage/repos/windows.go:82` 355 chars: // EnsureExists creates a `windows` row for key if one doesn't already exist, ordered after every
+- `apps/kira-space/internal/storage/repos/windows.go:95` 319 chars: // Delete removes one window's row. Kira Studio's own Delete relies on the same statement's
+- `apps/kira-space/main.go:207` 595 chars: // acquireSingleInstance is the app-wide single-instance guard, called before storage.Open: a second
+- `apps/kira-space/playwright.config.ts:47` 340 chars: // Real Go server (-tags server), real SQLite/git/PTY/stream; fake claude/gh. Chromium: the
+- `apps/kira-space/tests/claude/memory_eval_footprint_test.go:42` 339 chars: // renderChecked renders the doc the write-back would write for a file's stored facts through
+- `apps/kira-space/tests/ui/fixtures.ts:28` 691 chars: /**
+- `apps/kira-space/tests/ui/repo-graph-lifecycle.spec.ts:107` 445 chars: // Return to the pinned graph tab — the bug: a dead, shared transport meant this mount's own
+- `apps/kira-space/tests/ui/repo-workspace.spec.ts:305` 432 chars: // Must land before the repo workspace ever opens (ensureWorkspaceShell mounts the pinned graph
+- `apps/kira-space/tests/ui/repo-workspace.spec.ts:741` 567 chars: // terminalId is a client-generated UUID (state/tabs.ts's own crypto.randomUUID()) — unpredictable
+- `apps/kira-space/tests/ui/repo-workspace.spec.ts:1187` 482 chars: // App.vue's `revealAndSelectSha` (search.ts's `activeHit` watcher) auto-expands a collapsed
+- `apps/kira-space/tests/ui/support/graphStreamFixture.ts:94` 391 chars: /** `refs.list`'s own result shape (`gitStreamMock.ts`'s `extraResults` — a plain `result` object,
+- `apps/kira-space/tests/ui/support/graphStreamFixture.ts:148` 476 chars: /** One `graph.stream` chunk, split for the trip through `page.evaluate`'s JSON-only argument
+- `apps/kira-space/tests/ui/support/ipcChannels.ts:1` 489 chars: // The test-owned fixture-key namespace this tier mocks against (Kira Studio's own
+- `apps/kira-space/tests/ui/support/layoutWorkerProbe.ts:3` 345 chars: // Wraps `Worker.prototype.onmessage` so each layout worker reply bumps a counter and, when armed,
+- `apps/kira-space/tests/ui/support/mockRuntime.ts:18` 445 chars: // The real Wails runtime, served under /wails/ — Kira Studio's own tests/ui/support/mockRuntime.ts,
+- `apps/kira-space/tests/ui/support/mockRuntime.ts:374` 369 chars: /**
+- `apps/kira-space/tests/ui/support/types.ts:1` 578 chars: /**
+- `apps/kira-space/tests/ui/support/types.ts:12` 387 chars: /** Exactly what the renderer sends — used by the frontend half to match a request to a
+- `apps/kira-space/tests/unit/blame-line-controller.spec.ts:71` 335 chars: // No automatic abort -> reject wiring here, deliberately: the test drives
+- `apps/kira-studio/frontend/proto/grid/TooltipProxy.vue:14` 381 chars: // The canvas has no DOM per cell, so a transparent proxy sits over the hovered cell and carries
+- `apps/kira-studio/frontend/src/api/BulkVariablesEditor.vue:47` 478 chars: // Seeded once, from the rows the tab held when bulk mode was entered — not a `watch` on `rows`,
+- `apps/kira-studio/frontend/src/api/CollectionsTree.vue:148` 368 chars: // Arrows, Home/End, Right/Left expand and parent, Enter (the row's primary action, the same one
+- `apps/kira-studio/frontend/src/api/state/apiQueries.ts:116` 327 chars: // ---- imperative loaders (non-component code) ----
+- `apps/kira-studio/frontend/src/api/state/draftMerge.ts:60` 365 chars: /** After this window's own successful commit of `sent`: reseeds that row's draft and seed from the
+- `apps/kira-studio/frontend/src/api/state/revealExpiry.ts:12` 316 chars: /** Mirrors internal/localauth.GraceWindow: the reveal gate's own grace is fixed rather than
+- `apps/kira-studio/frontend/src/api/state/revealExpiry.ts:18` 799 chars: /** A keyed expiry scheduler over one reactive `Record<string, string>` map: `schedule(key)` arms
+- `apps/kira-studio/frontend/src/api/state/variableCompletion.ts:84` 512 chars: /** `null` when `offset` is not inside any `{{...}}` reference — closes/never opens the hover.
+- `apps/kira-studio/frontend/src/beautify.ts:237` 366 chars: /** The attribute text after a tag's name, up to its unquoted `>`/`/>` — its own quote-state loop,
+- `apps/kira-studio/frontend/src/bridge/apiControl.ts:49` 508 chars: // model.VariableScope is a named Go string type (unlike, say, model.CollectionItem.Kind, which is
+- `apps/kira-studio/frontend/src/bridge/index.ts:162` 494 chars: // The generated MaskRuleFields.kind is a TS `enum` (wails3's binding generator turns Go's named
+- `apps/kira-studio/frontend/src/bridge/index.ts:309` 431 chars: // Go's SavedQuery is one flat struct with `kind: string` and `body: json.RawMessage` (typed
 - `apps/kira-studio/frontend/src/editor/MonacoHost.vue:145` 355 chars: // `.toLowerCase()`, not a literal character: a real keypress always reports a lowercase
-- `apps/kira-studio/frontend/src/editor/MonacoHost.vue:228` 534 chars: // §4.8 dogfooding finding (P60b): with no `triggerCharacters`, Monaco's own quickSuggestions
-- `apps/kira-studio/frontend/src/editor/MonacoHost.vue:241` 440 chars: // §4.8 dogfooding finding (P60b): a real Ctrl+Space request is
-- `apps/kira-studio/frontend/src/editor/MonacoHost.vue:262` 322 chars: // §4.8: a source's own `snippet` (e.g. the six BSON constructors') already uses
-- `apps/kira-studio/frontend/src/editor/MonacoHost.vue:299` 345 chars: // F8: `supportHtml: false` blocks raw HTML only — Markdown syntax inside `line` (a table/
-- `apps/kira-studio/frontend/src/editor/MonacoHost.vue:412` 362 chars: // §4.4/dogfooding: `fixedOverflowWidgets` alone keeps a widget a DOM descendant of this host
-- `apps/kira-studio/frontend/src/editor/MonacoHost.vue:712` 1408 chars: <!-- A single root, not the preview <pre> and this <div> as two siblings — a multi-root template
-- `apps/kira-studio/frontend/src/project/DataGripImportDialog.vue:28` 421 chars: // P25 D10: a real review step. Nothing is written until "Import N connections" is pressed —
-- `apps/kira-studio/frontend/src/project/ProjectTree.vue:40` 398 chars: // P41 D17: a redis `database` / s3 `bucket` row, on a connection whose caps say its key space is
-- `apps/kira-studio/frontend/src/project/ProjectTree.vue:80` 375 chars: // F3 (P108 Part 12): initTreeSync/initSchemaSync/initSchemaColumnsSync used to be wired from here,
-- `apps/kira-studio/frontend/src/project/ProjectTree.vue:103` 377 chars: // The twisty always expands/collapses. A group row (P19) has no adapter path behind it — it's a
-- `apps/kira-studio/frontend/src/project/SchemaDialog.vue:31` 1142 chars: // P18 (v1.1) D3: the DDL document a user pastes for one connection, staged until Save — the
-- `apps/kira-studio/frontend/src/project/SchemaDialog.vue:58` 512 chars: // P12 round 1 finding #12: `draft` (the editor's own live doc) updates every keystroke, but the
-- `apps/kira-studio/frontend/src/project/SchemaDialog.vue:83` 427 chars: // P12 round 1 finding #3: the reset must happen synchronously, before the `await` below, and the
-- `apps/kira-studio/frontend/src/project/SchemaDialog.vue:91` 370 chars: // P12 round 2 finding #12: the dialog only unmounts on close (ProjectPanel.vue's `v-if`
-- `apps/kira-studio/frontend/src/project/SchemaDialog.vue:109` 356 chars: // D3: a live parse summary — "N tables, M columns" — the only feedback that tells a user their
-- `apps/kira-studio/frontend/src/project/SchemaDialog.vue:120` 405 chars: // P12 round 1 finding #14: SettingsDialog.vue's own pattern (a saveError ref plus a footer strip)
-- `apps/kira-studio/frontend/src/project/SchemaDialog.vue:154` 477 chars: <!-- P4/P60b §6.2: `completionSources` (state/schemas.ts's own sqlKeywordCompletionSourceFor
-- `apps/kira-studio/frontend/src/project/TreeRow.vue:21` 382 chars: // P28 D7: `sticky` is the only difference between a normal row and a band-pinned one — a
-- `apps/kira-studio/frontend/src/project/TreeRow.vue:153` 444 chars: <!-- P31 D25/F25: the twisty is the one control in the app whose entire meaning is already
-- `apps/kira-studio/frontend/src/project/credentialPaste/CredentialPastePanel.vue:23` 355 chars: // The pasted text lives only in this component's refs: never in a store, localStorage, the op log
-- `apps/kira-studio/frontend/src/theme/EngineIcon.vue:15` 1559 chars: // P16 design system: the products' own marks, imported from simple-icons (see NOTICES.md) and
-- `apps/kira-studio/frontend/src/views/browse/BrowseView.vue:114` 341 chars: // P22b D15: the app's own shared search idiom (HttpRequestView.vue's toggleFieldFilter) replaces
-- `apps/kira-studio/frontend/src/views/browse/BrowseView.vue:162` 388 chars: // §2.2: a non-tab viewKey, registered once for this tab's whole lifetime — its own resolver reads
-- `apps/kira-studio/frontend/src/views/browse/BrowseView.vue:206` 466 chars: // 7c (P68 review): VirtualList's own `visible-range` emit fires up to once per animation frame
-- `apps/kira-studio/frontend/src/views/browse/BrowseView.vue:413` 573 chars: <!-- Item 4: the reconnect gate used to replace this whole chrome (header, toolbar and
-- `apps/kira-studio/frontend/src/views/browse/BrowseView.vue:436` 331 chars: <!-- P63 §3.2: back + breadcrumb + count — navigator-scoped controls, moved out of
-- `apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue:34` 1018 chars: // A three-way switch over a console result's own kind (P8) — tabular results render through
-- `apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue:76` 363 chars: // P42 D11: the same head-row/DocumentTree pair the Mongo data tab renders (rowView/rowHeight —
-- `apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue:107` 324 chars: // P104 §3.4: VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
-- `apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue:165` 581 chars: // P42 D39: search state here is keyed by tabId (D9), same as every watcher below — the
-- `apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue:190` 373 chars: // A4/P21 round 1: rows.ts's own parseCache is pruned to the rendered window everywhere else
-- `apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue:197` 385 chars: // Item (regression pass, task batch P46-4): DocumentView.vue's own expand-all/collapse-all pair,
-- `apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue:217` 360 chars: // Local to this one result panel (highlight only) — the actual cross-view selection lives in
-- `apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue:227` 581 chars: // P43 iter2 F20/D27: unlike DataGrid.vue's rt.selection, this panel's "selection" is only ever
-- `apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue:275` 529 chars: // Item (regression pass, task batch P46-4): a document row no longer publishes into the shared
-- `apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue:306` 821 chars: // P2 R2 (task #98): same closure-per-render problem DataGrid.vue found first (P2 R1) — a template
-- `apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue:328` 669 chars: // P19 D6/D11, P22b D11: the document and key-value branches' own row menu — the document branch
-- `apps/kira-studio/frontend/src/views/console/ConsoleResultGrid.vue:340` 456 chars: // P21 round 2 performance finding 2: allJson used to be a materialized array, built eagerly at
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:118` 559 chars: // P30 §3 follow-up fix — a console result comes from ad-hoc SQL (a JOIN where both tables have an
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:146` 303 chars: // §3.5 rule 3 / `-iter2-pacing` D5: NULL and truncated fold onto the cell's own className via
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:165` 449 chars: // P42 D19/D20 — the header tooltip has to be written as attributes by hand (SlickGrid's own
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:171` 1464 chars: // Real-interaction fix (reported bug — column widths reset on every subsequent query in the same
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:191` 770 chars: // Finding 6 (round 2) — indexed, not name-keyed (`initialWidths` would silently collide on a
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:207` 375 chars: // P16 D5: every column here is `sortable: false` (no re-query path, below) and renders no
+- `apps/kira-studio/frontend/src/editor/completion.ts:40` 316 chars: /** A completion source: pure text + cursor offset in, a replacement range and options out (or
+- `apps/kira-studio/frontend/src/editor/findRanges.ts:101` 478 chars: /** Every occurrence of `query` in `doc` under `options`, as `{from, to, class}` ranges — an empty
+- `apps/kira-studio/frontend/src/main.ts:153` 373 chars: /**
+- `apps/kira-studio/frontend/src/state/maskRules.ts:31` 403 chars: // Kept in lockstep with the full list — in the same synchronous write, not re-fetched from
+- `apps/kira-studio/frontend/src/state/schemaColumns.ts:65` 375 chars: // Postgres requires database:X/schema:Y exactly for SchemaColumns (and every other
+- `apps/kira-studio/frontend/src/state/schemas.ts:70` 502 chars: /** SchemaDialog.vue's own Save — writes the saved text straight into the same query cache entry
+- `apps/kira-studio/frontend/src/state/settingsDomain.ts:44` 607 chars: // Neither dataSettingsSchema/cacheSettingsSchema/advancedSettingsSchema/apiSettingsSchema/
+- `apps/kira-studio/frontend/src/state/tabs.ts:140` 458 chars: // Reopening (double-click, "recent tables", …) against a connection that's live right now
+- `apps/kira-studio/frontend/src/state/viewCommands.ts:76` 346 chars: /** Fire-and-forget, matching UploadObjectDialog.vue's own prior `await refresh(...)` call site —
+- `apps/kira-studio/frontend/src/theme/icons.ts:54` 331 chars: // ClickHouse reports a real type wrapped — `Nullable(Int32)`, `LowCardinality(String)`,
+- `apps/kira-studio/frontend/src/theme/icons.ts:63` 358 chars: // mysql-family/read.ts's own typeClassFor() checks this exact pattern first, ahead of its
+- `apps/kira-studio/frontend/src/theme/icons.ts:68` 885 chars: // Every temporal spelling across all four engines: postgres's `timestamptz`/`timetz`/`interval`,
+- `apps/kira-studio/frontend/src/theme/icons.ts:112` 533 chars: // What's left — geometry/geography (already caught above for MySQL's own spelling, but
 - `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:212` 354 chars: // This tab's own sticky width for this column name wins over a fresh measurement — the first
 - `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:225` 377 chars: // measured[i] already carries columns.ts's own MIN_WIDTH floor (measuredWidths' own
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:277` 553 chars: // P22 Pass B, C1/§5 D10 — the one per-render DOM pass this migration still needs: a row's own
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:299` 981 chars: // P30 §3.6 C3 — the decode-window/retention report (P5 C1): the same setVisibleRows +
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:330` 343 chars: // P22 D10 (F17/F18): the console had a selection fill (`kira-cell-selected`, `selectedCellCssClass`
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:355` 1230 chars: // P28 D2: the drag-in-progress twin of the fill SlickGrid draws at commit through
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:386` 560 chars: // P19 D8: a real SlickHybridSelectionModel, configured identically to SlickGridHost.vue's own
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:398` 345 chars: // The translation `selection.ts` deliberately leaves to its caller: a `SlickRange`'s rows are
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:428` 561 chars: // Real-interaction fix — mirrors SlickGridHost.vue's own onColumnsResized: SlickGrid drags the
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:460` 350 chars: // The click handler's other job (unchanged): publishing into the read-only cell-editor dock. The
 - `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:627` 475 chars: // Real-interaction fix (reported bug — right-clicking a column header was selecting/highlighting
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:674` 647 chars: // §3.5: "the highlight is two keyed setCellCssStyles layers" — every match, and (if any) the
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:701` 359 chars: // The find toolbar's go-to-match (P40 D10) — ConsoleResultGrid.vue delegates here for the tabular
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:784` 372 chars: // P99 §9.3: not useEventListener/useResizeObserver — same declined reasoning as
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:812` 363 chars: // §9.1/F8 (SlickGridHost.vue) — `true` also nulls SlickGrid's own internal element references
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:848` 477 chars: // P19 D8 point 1: a selection identifies page rows via a display-position range built under
-- `apps/kira-studio/frontend/src/views/console/ConsoleSlickGrid.vue:870` 485 chars: <!-- §3.7 item 1: type-based cell colour is new for the console — the same class toggle
-- `apps/kira-studio/frontend/src/views/console/ExplainResultView.vue:18` 337 chars: // P18 (v1.1) C12/D17: the plan-result sibling of ConsoleResultGrid.vue, mounted instead of it when
 - `apps/kira-studio/frontend/src/views/console/ExplainResultView.vue:95` 324 chars: // Postgres/MySQL/MariaDB's raw text is one JSON document; ClickHouse's is a JSON plan plus an
-- `apps/kira-studio/frontend/src/views/definition/ConstraintsSection.vue:24` 360 chars: // PK/FK get the same yellow/blue letter badge the Columns section and the SQL grid header use
-- `apps/kira-studio/frontend/src/views/definition/DefinitionView.vue:137` 474 chars: // P22b D14: F21's own finding — a whole DDL document plus columns/indexes/constraints sections is
-- `apps/kira-studio/frontend/src/views/definition/DefinitionView.vue:203` 366 chars: // P23 D8: Open in console was unconditional before this phase, which only ever mattered because
-- `apps/kira-studio/frontend/src/views/definition/DefinitionView.vue:359` 344 chars: <!-- Item 4: the reconnect gate used to replace this whole view chrome (header, toolbar and
-- `apps/kira-studio/frontend/src/views/definition/DefinitionView.vue:389` 485 chars: <!-- P23 D8: the Structure body no longer hard-requires `meta` — Kafka and SQS have no
-- `apps/kira-studio/frontend/src/views/definition/PropertiesSection.vue:9` 395 chars: // P23 D6/D5/D9: one `definition.sections[]` entry — a Kafka topic's Partitions/Configuration, a
+- `apps/kira-studio/frontend/src/views/console/completion.ts:127` 316 chars: // Deliberately not gated on "word non-empty or explicit" the way a generic word-completion
+- `apps/kira-studio/frontend/src/views/console/ddl.ts:164` 449 chars: // One constraint word (`NOT NULL`/`PRIMARY KEY`/`UNIQUE`/`REFERENCES …`) starting at `tail[i]`,
+- `apps/kira-studio/frontend/src/views/console/sqlKeywordCompletion.ts:19` 317 chars: // A type name and a keyword can collide (e.g. `array`, `json` are both a keyword and a common
+- `apps/kira-studio/frontend/src/views/console/sqlSchemaCompletion.ts:105` 324 chars: // Position 2: `<schema>.` — a known schema qualifier's own tables. `defaultSchema`'s own
+- `apps/kira-studio/frontend/src/views/console/state.ts:119` 366 chars: /** Releases everything a result set retains outside its own `{key, rowCount}` record: its page
+- `apps/kira-studio/frontend/src/views/console/state.ts:518` 632 chars: // Cancelled: same discipline as the data grid's stop button — the previous results stay
 - `apps/kira-studio/frontend/src/views/documents/DocumentView.vue:86` 612 chars: // Task: mutate.ts's update op is a whole-document replaceOne({_id}, body) — when a projection is
 - `apps/kira-studio/frontend/src/views/documents/DocumentView.vue:179` 328 chars: /** Expand all/Collapse all and the row context menu's own "every id on this page" (menu.ts's
-- `apps/kira-studio/frontend/src/views/documents/DocumentView.vue:386` 518 chars: <!-- The Mongo dialect of the filter row: one filter box, permanent, never closed — plus a
-- `apps/kira-studio/frontend/src/views/documents/DocumentView.vue:415` 373 chars: <!-- Item 4: the reconnect gate used to replace this whole ViewChrome (header, toolbar and
-- `apps/kira-studio/frontend/src/views/documents/ProjectionMenu.vue:17` 466 chars: // Mirrors views/grid/ColumnsMenu.vue's UI pattern exactly (same header buttons, same list, same
 - `apps/kira-studio/frontend/src/views/documents/ProjectionMenu.vue:25` 303 chars: // A snapshot, not a computed: the picker's checkbox list shouldn't reshuffle under the user's
-- `apps/kira-studio/frontend/src/views/documents/ProjectionMenu.vue:35` 519 chars: // P108 Part 11 F6: the projection the menu opened with, kept apart from `selected` (which the
-- `apps/kira-studio/frontend/src/views/documents/ProjectionMenu.vue:45` 354 chars: // F6: "everything" is only ever what an explicit All press means, never inferred from `selected`
-- `apps/kira-studio/frontend/src/views/documents/ProjectionMenu.vue:65` 367 chars: // P104 §3: PopoverPanel's own close-commits-selection contract, preserved by committing on
 - `apps/kira-studio/frontend/src/views/grid/ColumnsMenu.vue:39` 325 chars: // The drag-reorderable display order — seeded from whatever's stored (filtered/extended to the
-- `apps/kira-studio/frontend/src/views/grid/ColumnsMenu.vue:103` 385 chars: // P104 §3: PopoverPanel's own @close (fired for every dismissal reason: outside click, Escape,
-- `apps/kira-studio/frontend/src/views/grid/ColumnsMenu.vue:113` 505 chars: // A columnOrder is only ever stored non-null when it actually diverges from the column set's
-- `apps/kira-studio/frontend/src/views/grid/DataToolbar.vue:27` 428 chars: // P48 D10: takes `tab` as a prop like every other view's toolbar, rather than reading the
-- `apps/kira-studio/frontend/src/views/grid/DataToolbar.vue:54` 712 chars: // Add is gated on writability alone — never on whether the table has a primary key. A no-PK table
-- `apps/kira-studio/frontend/src/views/grid/DataToolbar.vue:71` 562 chars: // M5 §6.2: rendered only when this tab's connection has at least one masked column — a
-- `apps/kira-studio/frontend/src/views/grid/DataToolbar.vue:130` 999 chars: // P36 D26: the − row button's own gate — ClickHouse is writable (canInsert: true) but has no
-- `apps/kira-studio/frontend/src/views/grid/DataToolbar.vue:149` 466 chars: // P28 D8: a disabled control names the actual condition rather than just going grey —
-- `apps/kira-studio/frontend/src/views/grid/DataToolbar.vue:223` 622 chars: // P31 D38/F35: the Columns button's own corner mark — shown only when the tab's column set
-- `apps/kira-studio/frontend/src/views/grid/DataToolbar.vue:246` 821 chars: // A selected row/cell/range/column at or beyond the page's real row count addresses an appended
-- `apps/kira-studio/frontend/src/views/grid/DataToolbar.vue:281` 547 chars: <!-- P28 D7 reverts P16 D1 (commit d2892f49, which moved this to DataView.vue's #toolbar-end)
-- `apps/kira-studio/frontend/src/views/grid/DataView.vue:77` 468 chars: // P24 D37: the grid was the one view whose header carried no facts at all — every sibling view
-- `apps/kira-studio/frontend/src/views/grid/DataView.vue:93` 301 chars: // P48 step 14: the pending-changes group moved here from DataToolbar.vue so it can land in
-- `apps/kira-studio/frontend/src/views/grid/DataView.vue:112` 323 chars: // P43 F5/D7: commitPending's own rejection (a constraint violation, a type error, a read-only
-- `apps/kira-studio/frontend/src/views/grid/DataView.vue:172` 380 chars: // Item 4 (regression pass, task batch P46-4): this used to call reload() directly, a doomed
-- `apps/kira-studio/frontend/src/views/grid/DataView.vue:343` 346 chars: <!-- P16 design system LAW: work-in-progress is the ring + elapsed time beside the button
-- `apps/kira-studio/frontend/src/views/grid/DataView.vue:367` 321 chars: <!-- M5 §6.4: the one place this view states, in prose, that what's on screen is not the
 - `apps/kira-studio/frontend/src/views/grid/FilterToolbar.vue:63` 746 chars: // Watched as two separate primitive-returning getters, not `watch(tab, ...)` on the whole
 - `apps/kira-studio/frontend/src/views/grid/FilterToolbar.vue:122` 303 chars: // AutocompleteField's own @escape only ever fires once its suggestion dropdown is already closed
-- `apps/kira-studio/frontend/src/views/grid/FkPreviewPopover.vue:19` 300 chars: // P67 §4.3: anchored to the click point through PointPopover, NOT the nav button element. §1.1: that
-- `apps/kira-studio/frontend/src/views/grid/PreviewCommandPanel.vue:35` 379 chars: // F18 (P108 Part 10): the key carries no pending-set version, so a stale cache entry from a
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:138` 796 chars: // P22 spike (§6 D3) — a from-scratch Vue host for SlickGrid, on editor/CodeMirrorHost.vue's own
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:163` 438 chars: // Same P24 D3/D4 split DataGrid.vue's own displayRows/displayRowCount use — kept as a plain,
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:190` 854 chars: // §6 D6 point 2 — structure is per-cell: a plain string for the common case (-> textContent, F6).
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:207` 569 chars: // C9/§5 D9 — the one place a formatter returns DOM, against `-iter2-pacing` D5's measured
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:226` 485 chars: // C11/§5 D11c — the *cheap* precheck only (a Set lookup, not the full `cellNavEntry` a click on
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:236` 368 chars: // M5 §6.2: the one visual affordance keeping a user from misreading the preview as real data —
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:256` 366 chars: // P22 Pass B, C3 — the row-shortcut/copy/paste plumbing needs the same writability/identity
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:282` 818 chars: // Gates whether double-click/Enter starts an inline edit (D8/C8) — the toolbar's own add/preview/
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:295` 481 chars: // P36 D26: deliberately not folded into canEditTable — an engine could offer one of
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:306` 965 chars: // §5 D8 — a `computed` purely to trigger the `editable`-sync watch below via `grid.setOptions`
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:321` 763 chars: // C13/§5 D13 — the two empty states, overlaid as absolutely-positioned siblings over the always-
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:334` 325 chars: // P24 D8: filtering to zero matches is a distinct empty state from "the table is empty" (LAW 15
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:362` 331 chars: // C7/§5 D7 — the current display column order, read fresh (not a computed: nothing here may
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:371` 884 chars: // Thin, tabId/page/order-bound wrappers over rowValues.ts's own pure functions — every call site
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:390` 534 chars: // M5 §6.6: "copy follows display" — row copy must not paste real values while the preview is
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:468` 510 chars: // P42 D19/D20 — headerCellAttrs is a plain static attribute bag (F3), so tooltipAttrs (views/
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:486` 334 chars: /** §6 D6 point 1 — colour and alignment are per-column and static: a `tc-<category>` class plus
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:497` 817 chars: // D2 — changed from Pass A's false/false: F1's row-select-on-gutter (§5 D4, C4) requires
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:533` 469 chars: // P16 D4: a per-column floor that knows what the header actually renders — padding, the sort
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:547` 371 chars: // Clamped to `floor` even for a stored width (found against the real app: a width read
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:591` 639 chars: // M5 §6.2/§6.3: this tab's own folded mask rules (by lowercased column name) and precomputed tag
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:600` 386 chars: // Perf (finding #16, M6): one shared transform instance per (maskRulesByColumn, maskTagCache)
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:606` 574 chars: // P99 §5.5: the sole reactive trigger for a refold — proactively enabled (not deferred to the
 - `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:618` 388 chars: // Re-resolves maskRulesByColumn from this tab's own connection — cheap (state/maskRules.ts's own
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:632` 381 chars: // Rebuilds the tag cache for the CURRENT page against the CURRENT folding — §6.3's own "precompute
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:654` 813 chars: // M7 finding #11: refreshMaskTagCache's own correlationKeyFor call can reject (an IPC failure) —
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:682` 467 chars: // C9 — the `GridDataSourceState` builder itself, factored out once this stopped being the single
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:729` 376 chars: // C9 — the grid root, set at mount for the insert region's own delegated listeners' teardown
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:736` 1201 chars: // P104 §6.4 — AttributeTooltip.vue's own `container` prop: a ref (not a plain let) since
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:750` 1432 chars: // P22 postscript §14.2's "cell-editor dock panel is sometimes missing its header" investigation
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:779` 331 chars: // C11/§5 D11b originally kept a single host-owned FK/PK nav button here (moved on hover) plus a
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:784` 360 chars: // P22 iter2-onset D2 — incremented by every native `scroll` event on the viewport, and read by
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:789` 333 chars: // P107 T2-17: the gesture-onset fix (P22 iter2-onset D1) and its dedupe/seed/lastScrollEventAt
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:795` 518 chars: // §6 D9 — the host's own viewport scroll listener. The test-only scroll-work mark
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:829` 1331 chars: // §6 D2 — the visible-window report drives P5 C1's pruning. KiraSlickGrid.lastRenderedRowBounds is
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:887` 652 chars: // Display row count, not the page's own row count (same fix as onSelectAll/
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:908` 1718 chars: // D4 (fix) — live visual feedback for a cell-range drag. SlickHybridSelectionModel's own
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:971` 739 chars: // C12/§5 D5 — `kira-search`'s own row: "every match", not clipped to the rendered range the way
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1005` 390 chars: // The rendered row *band* (not every render — a sub-row scroll re-renders nothing new, and the
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1026` 468 chars: // D11b originally re-placed a single hover-tracked button here; superseded (item 12, a later
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1117` 1263 chars: // F13 — a click on a `.cell-nav-btn` (a real child of whichever `.slick-cell` it lives in, one
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1162` 379 chars: // D6/§3: exactly one candidate opens the preview directly; more than one opens the same
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1218` 456 chars: // §4 item 7, §5 D2 — the PK/FK badge and the header select zone are the two pieces of header DOM
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1226` 452 chars: // D10 — the fresh-render half of the `data-sort` mirror; `syncSortIndicators`'s own direct
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1242` 1609 chars: // Deliberate redesign, not the original port (items 9-11, a later coordinator round): "left-
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1273` 833 chars: // Item 11's own dedicated sort control — SlickGrid always builds a `.slick-sort-indicator` div
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1300` 356 chars: // F8 — the app's own asc -> desc -> none cycle, mirrored from `sortTerms`/tab.state.sort (D6's own
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1319` 363 chars: // D10 — the direct-write half of the `data-sort` mirror (`onHeaderCellRendered`'s own comment
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1333` 1233 chars: // Deliberate redesign, not the original port (items 9-11, a later coordinator round) — supersedes
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1363` 533 chars: // §4 item 6, §5 D6 — the corner cell selects everything, as a single `range` (never a `row`
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1371` 543 chars: // Display row count, not the page's own row count — `SlickRange` below is position-space, and
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1398` 375 chars: // D3 — SlickGrid drags the handle and persists nothing on its own; this app reads the resulting
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1417` 386 chars: // C4/§5 D4 — `selectionFromRanges`/`rangesFromSelection` (shared/slick/selection.ts) are deliberately
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1457` 1454 chars: // Finding 1 (round 2) — `selectedCellCssClass: 'kira-cell-selected'` makes SlickGrid itself paint
 - `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1503` 325 chars: // `setSelectedRanges([])`/`setSelectedRanges(ranges)` both fire `onSelectedRangesChanged`
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1514` 385 chars: // D4 — the selection model owns the geometry, `rt().selection` owns the meaning. Fires on every
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1531` 450 chars: // D4 — the header select zone's own click semantics (DataGrid.vue's onHeaderSelectClick,
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1577` 955 chars: // P67 §5.3: this tab's own `focusRequest.ts` registry entry — registered in onMounted, called
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1606` 364 chars: // §5 D8 — exactly `startEdit`'s own guards (DataGrid.vue:810-818 mirror: not writable, row
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1631` 604 chars: // C9/§5 D9 — one delegated listener each on the grid root for the insert region's own `<input>`s
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1672` 947 chars: // D3: right-clicking a row already in the selection acts on the whole selection; right-clicking
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1706` 493 chars: // `selectionCovers` now lives in shared/slick/selection.ts (real-interaction fix, §4a/§4d) — moved
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1726` 943 chars: // Real-interaction fix (§4a/§4d — "select multiple rows, right-click Copy does not work",
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1782` 756 chars: // Real-interaction fix (reported bug — right-clicking a column header was selecting/highlighting
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1844` 472 chars: // F14/§4.1 item 1: anchorRow/anchorCol is always the top-left corner now (SlickRange
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1892` 954 chars: // C9/§5 D9 rule 1 — a paste landing on an *existing* staged insert row updates its `values` in
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1911` 470 chars: // F6 — `handleKeyDown` triggers `onKeyDown` first and honours `stopImmediatePropagation`
 - `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1942` 803 chars: // shortcutFor's own matchesShortcut (keys.ts) reads `.code` for any single-letter chord (F12:
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1953` 512 chars: // P21 D5: dispatched through rowMenu() itself (the same builder the row/gutter context menu
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:1981` 738 chars: // Real-interaction fix (reported bug family, §4d's own "all interactions ... should work the
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2031` 663 chars: // M7 finding #5: this component remounts on every tab switch (`:key="activeTab.id"` in
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2042` 686 chars: // Real-interaction fix (§5 D8's own header-height gap, found chasing the header interaction
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2052` 481 chars: // §5 D8 — editor.ts's own `formatterCtx`-style reassigned plain object (its own file-level
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2061` 755 chars: // getCellValue's return type is a compatibility shim only (F1's own insurance, never the real
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2075` 384 chars: // F8 — tristateMultiColumnSort + multiColumnSort: false is exactly this app's own header
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2102` 543 chars: // F3 addendum (real-Mac finding) — SlickGrid's own wheel handler quantizes every
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2109` 1634 chars: // P22 iter2-scroll-gaps D3 — safe, and only safe, now that D2 (kiraSlickGrid.ts's
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2128` 355 chars: // C3/F6 — display-position-correct arrows for free (F6): the app's own onKeydown no longer
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2134` 576 chars: // §5 D8 — bound to canEditTable() at construction; the `editable` watch below (after
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2163` 342 chars: // No grid.onSort subscription any more — see cycleSortFor's own comment: a header body click
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2191` 570 chars: // P22 iter2-onset D1 — seed the sampler's baseline at mount (after the restored scroll position
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2201` 367 chars: // C12 — a tab switch (not a fresh connect) can remount this host onto a tab that already has a
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2207` 475 chars: // P99 §9.3: not useEventListener, here and below — recordOffsetSample's own comment documents
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2218` 632 chars: // C9/§5 D9 — the insert region's own delegated listeners, on the grid root rather than the
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2229` 690 chars: // See `resizeObserver`'s own declaration for why this exists. `el` (`.slick-grid-mount`) is
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2241` 1246 chars: // P67 §5.2/§5.3: registers this tab's own focus-request apply — a pending
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2261` 569 chars: // M7 finding #5 (cont'd): refreshMaskFolding() above fixes the synchronous fold, but a
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2291` 348 chars: // C4 — `grid.destroy()` never calls `this.selectionModel?.destroy()` itself (only its own
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2297` 450 chars: // F8 — `true` also nulls SlickGrid's own ~60 internal element references; its own destroy()
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2306` 432 chars: // Finding 7 (round 2) — `editorCtx` (editor.ts) is a module-level singleton; this mount's own
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2352` 474 chars: // M5 §6.3: "on every pageVersion bump while it is on" — a freshly loaded page has an entirely
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2361` 1048 chars: // C12/§5 D12 — the filter *is* the data source: `matchedRows(tabId)` (via `currentDisplayRows()`,
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2390` 321 chars: // C12/§5 D5 — `kira-search`'s own trigger: a scan publishing a new/updated result, or goNext/
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2402` 679 chars: // C9/§5 D9 — an insert row's own count changes independent of `pageVersion` (Add Row, a discard,
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2423` 626 chars: // P22b D17: the insert is staged at the end of the virtual list, past the loaded page — on
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2436` 356 chars: // §5 D8 — keeps the grid's own `editable` option live across a writability change that happens
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2456` 1352 chars: // M5 §6.2/§6.3: the mask preview toggle itself — `runtime` is a real `reactive()` map (D0's own
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2476` 580 chars: // M7 finding #11: a correlation-key fetch failure must not leave the preview claiming "on"
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2492` 678 chars: // P22 Pass B, C14 — DataGrid.vue's own `selectionTarget()`/publish watch (its own comment: "the
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2509` 576 chars: // M5 §6.5: `rt()?.maskPreview` added so toggling the preview republishes the current selection
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2567` 787 chars: // Same eligibility as the grid's own inline (double-click) edit (D8/C8): writable connection,
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2604` 1035 chars: // D2(c)/D3 — a columnWidths change that did NOT originate from this host's own resize drag
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2628` 388 chars: // C11/§5 D11c — the cheap precheck's own Set membership, recomputed exactly on a meta change
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2638` 412 chars: // C8/§5 D8 addendum, extended at C10 for `p.deletes`: every row this watch has ever seen staged
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2645` 1554 chars: // C5/§5 D5 — the `kira-staged` layer's own trigger: a cell staged or un-staged. C10 extends the
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2672` 748 chars: // C8 — `dataItemColumnValueExtractor` already merges `stagedValue` over the page (D1), so a
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2696` 619 chars: // DataView.vue's own contract (matching DataGrid.vue's identical export): `row` is a *page* row
-- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2715` 709 chars: <!-- C13/§5 D13 — the outer div is now the empty-states' own positioning context
-- `apps/kira-studio/frontend/src/views/grpcrequest/CallHistoryList.vue:33` 636 chars: // P13 D12: extracted out of ResponsePane.vue's own history block, mirroring
-- `apps/kira-studio/frontend/src/views/grpcrequest/GrpcMetadataTable.vue:10` 335 chars: // P107 T2-18: a thin wrapper over FieldRowsTable, same D15/C6 shape RequestHeadersTable.vue uses —
-- `apps/kira-studio/frontend/src/views/grpcrequest/ResponsePane.vue:81` 363 chars: // P108 F18: a stored message cut at the 64 KiB per-message cap carries its own `truncated` flag
-- `apps/kira-studio/frontend/src/views/grpcrequest/ResponsePane.vue:96` 374 chars: // P108 F18: the stored request message's own truncation flag (requestMessageTruncated) had zero
-- `apps/kira-studio/frontend/src/views/grpcrequest/ResponsePane.vue:104` 474 chars: // Round-2 review finding 10: the summary line used to read messages.length — capped at
-- `apps/kira-studio/frontend/src/views/grpcrequest/ResponsePane.vue:168` 375 chars: // Finding 11: the message list is virtualized (below), which needs one known height per row —
-- `apps/kira-studio/frontend/src/views/grpcrequest/ResponsePane.vue:208` 575 chars: // P22b D14: find-in-message — HTTP's own ResponsePane.vue find bar (P16 D11), applied to the one
-- `apps/kira-studio/frontend/src/views/grpcrequest/ResponsePane.vue:228` 340 chars: // Function refs, not a single ref — VirtualList only mounts the rows currently on screen, so the
+- `apps/kira-studio/frontend/src/views/grid/filterCompletion.ts:30` 428 chars: // meta.columns (runtime[tabId].meta, from loadMeta()'s L1-cached kira:tree:describe) is
+- `apps/kira-studio/frontend/src/views/grid/fkPreview.ts:28` 362 chars: /** The popover's own in-flight bookkeeping: `cancelled` is a belt-and-braces drop for a response
+- `apps/kira-studio/frontend/src/views/grid/fkPreview.ts:39` 366 chars: /** One tab-free `data.read` against the FK edge's target, scoped to `filter`
+- `apps/kira-studio/frontend/src/views/grid/focusRequest.ts:47` 345 chars: /** `views/grid/state.ts`'s own `load()` catch arm: a load that produced no page can never satisfy
+- `apps/kira-studio/frontend/src/views/grid/maskPreview.ts:16` 365 chars: /** page.ts's own CellView, plus the one bit cellFormatter needs to draw a masked cell's `#TAG`
+- `apps/kira-studio/frontend/src/views/grid/menu.ts:205` 302 chars: // Flat "<qualified referencing table>.<col(s)>" items, one per meta.referencedBy entry — shown
+- `apps/kira-studio/frontend/src/views/grid/pendingChanges.ts:95` 415 chars: // state.ts registers an accessor for a tab's *full* primary-key column list (rt.meta.primaryKey,
+- `apps/kira-studio/frontend/src/views/grid/pendingChanges.ts:263` 510 chars: // The cell editor's Revert action (CellEditorView.vue's resetBuffer, via SelectedCell.onRevert) —
 - `apps/kira-studio/frontend/src/views/grpcrequest/ResponsePane.vue:493` 324 chars: <!-- Fixed height (not auto-grow) for the same reason .message-header's is — MUST stay
-- `apps/kira-studio/frontend/src/views/httprequest/BinaryBodyPicker.vue:12` 378 chars: // P3 C9/D4: the binary (Postman `file`) body — one whole local file, sent as the entire request
-- `apps/kira-studio/frontend/src/views/httprequest/QueryParamsTable.vue:16` 306 chars: // D9/D15/C6: a derived two-way editor over the URL, never a stored `params` array (D6) — `pairs`
-- `apps/kira-studio/frontend/src/views/httprequest/QueryParamsTable.vue:31` 363 chars: // P22b D7: a query param row has nowhere of its own to carry a description (F10 — there is no
-- `apps/kira-studio/frontend/src/views/httprequest/RawExchangePane.vue:25` 324 chars: /** P16 D11: ResponseFindBar's own painted matches for each of this pane's two documents — the
-- `apps/kira-studio/frontend/src/views/httprequest/RawExchangePane.vue:44` 557 chars: // P18 D8: a stored entry never has a `wire` (P9 D7 nulls it before persisting), which is why the
 - `apps/kira-studio/frontend/src/views/httprequest/RawExchangePane.vue:55` 341 chars: // req.body.codeLanguage is the wire's plain `string` (HttpBodyWire), not the narrow
-- `apps/kira-studio/frontend/src/views/httprequest/RawExchangePane.vue:142` 374 chars: // P16 D11: the two hosts and their docs, exposed for ResponsePane.vue's own find-bar targets
-- `apps/kira-studio/frontend/src/views/httprequest/RawExchangePane.vue:221` 385 chars: <!-- P18 D8: a stored entry's Raw pane, reconstructed from the four stage-1 fields the
-- `apps/kira-studio/frontend/src/views/httprequest/RequestBodyPane.vue:35` 406 chars: // C5/D9: extracted from HttpRequestView.vue's own inline block (P2) — the mode selector, the code-
-- `apps/kira-studio/frontend/src/views/httprequest/RequestBodyPane.vue:52` 411 chars: /** P28 D11: the hoisted find bar's own ranges for whichever of the two text editors is showing.
-- `apps/kira-studio/frontend/src/views/httprequest/RequestBodyPane.vue:60` 448 chars: /** P28 D11: variable ranges first, find ranges second — a match's class wins on overlap, which is
-- `apps/kira-studio/frontend/src/views/httprequest/RequestSettingsPane.vue:22` 417 chars: // P90 §2.6: one row per api settings leaf, in SPEC's own order — a control bound to
-- `apps/kira-studio/frontend/src/views/httprequest/ResponseDiffDialog.vue:103` 517 chars: // Round-2 review finding 8: beautifyJson/beautifyXml run the exact same parse scanJson/scanXml
-- `apps/kira-studio/frontend/src/views/httprequest/ResponseDiffDialog.vue:127` 303 chars: // D12: both bodies are pretty-printed before diffing only when *both* are the same recognised
-- `apps/kira-studio/frontend/src/views/httprequest/ResponseDiffDialog.vue:150` 483 chars: // D12 level 2: the headers table. Reduced to added/removed/changed/unchanged by header *name*
-- `apps/kira-studio/frontend/src/views/httprequest/ResponseDiffDialog.vue:211` 429 chars: // D12 level 3 / P60a §6: the real payoff of Monaco's diff editor — a scroll-locked,
-- `apps/kira-studio/frontend/src/views/httprequest/ResponseDiffDialog.vue:241` 383 chars: // tests/ui's own text-reading seam (P60a §9.1/OQ-3) — both models are static once created (this
-- `apps/kira-studio/frontend/src/views/httprequest/ResponseHistoryList.vue:55` 387 chars: // P18 D6: the list is ≤ HISTORY_PER_SCOPE_LIMIT by construction (Record's own trim), so "the list
-- `apps/kira-studio/frontend/src/views/httprequest/ResponseHistoryList.vue:77` 334 chars: /** D15: the URL is shown on a second line only when it differs from the row above it — within
-- `apps/kira-studio/frontend/src/views/httprequest/ResponsePane.vue:58` 329 chars: // P8 D10: the source swap — a selected history entry's response, or the live one, or none. Every
-- `apps/kira-studio/frontend/src/views/httprequest/ResponsePane.vue:149` 331 chars: // P28 D1 reverses D11's "always shown inline, not tooltip-only": the standing caption under the
-- `apps/kira-studio/frontend/src/views/httprequest/ResponsePane.vue:182` 450 chars: // P16 D12: the response headers pane's own filter — matches name OR value (unlike D14's
-- `apps/kira-studio/frontend/src/views/httprequest/ResponsePane.vue:238` 489 chars: // Paints exactly the matches the bar itself counts and steps through, onto whichever editor(s)
-- `apps/kira-studio/frontend/src/views/httprequest/ResponsePane.vue:338` 1176 chars: <!-- Real-interaction fix (reported bug — the response search bar sat below/at the bottom of
-- `apps/kira-studio/frontend/src/views/httprequest/ResponsePane.vue:505` 347 chars: <!-- `.response-status-row`/`.response-body` stay bare markers (test locators).
-- `apps/kira-studio/frontend/src/views/httprequest/TimelinePane.vue:179` 366 chars: // D11: a "note" that fires on the common case (a reused connection is the common case) is a
-- `apps/kira-studio/frontend/src/views/keyvalue/KeyValueView.vue:5` 581 chars: // MainView.vue keys this component by tab.id — same discipline as every other view.
-- `apps/kira-studio/frontend/src/views/shared/DateTimePicker.vue:9` 448 chars: // P24 D18: the app-owned month grid + clock steppers that replace the bare
-- `apps/kira-studio/frontend/src/views/shared/DateTimePicker.vue:59` 338 chars: // P42 D33a: the label cycles three views of the same navigation, days -> months -> years,
-- `apps/kira-studio/frontend/src/views/shared/DateTimePicker.vue:66` 362 chars: // The visible month is its own state, independent of the selected day — paging doesn't move the
 - `apps/kira-studio/frontend/src/views/shared/DateTimePicker.vue:166` 367 chars: // Pure calendar-day arithmetic, deliberately done in the UTC epoch-day domain regardless of
 - `apps/kira-studio/frontend/src/views/shared/DateTimePicker.vue:223` 352 chars: // The three clock steppers, each a writable computed so <Input type="number"> can v-model
-- `apps/kira-studio/frontend/src/views/shared/EditBufferActions.vue:8` 354 chars: // The one visual form of the three features an edit buffer offers — the `modified` chip, the
-- `apps/kira-studio/frontend/src/views/shared/celleditor/CellEditorDock.vue:13` 475 chars: // Mounted by the view that owns the tab (P26 D1), so one dock <-> one tab, torn down with it.
-- `apps/kira-studio/frontend/src/views/shared/celleditor/CellEditorView.vue:118` 1237 chars: // What `detected` above actually reads — deliberately a separate ref from `doc`, not an alias for
-- `apps/kira-studio/frontend/src/views/shared/celleditor/CellEditorView.vue:223` 1072 chars: // Auto-stages on blur, matching the deleted DataGrid.vue's own inline double-click edit (its
-- `apps/kira-studio/frontend/src/views/shared/celleditor/TimestampPane.vue:28` 530 chars: // P24 D14/D15/D19: the translate pane for the three timestamp formats — the sibling of the
-- `apps/kira-studio/frontend/src/views/shared/celleditor/TimestampPane.vue:65` 576 chars: // The editable field's own text — a plain ref, not a computed off `doc`, so a keystroke that
-- `apps/kira-studio/frontend/src/views/shared/celleditor/TimestampPane.vue:96` 778 chars: // P104: the day cell that stages a pick lives inside PopoverContent, which reka teleports to
-- `apps/kira-studio/frontend/src/views/shared/document/DocumentRow.vue:11` 779 chars: // P48 F10-F12: the Mongo document row's head — down to its five shared data-testids — duplicated
-- `apps/kira-studio/frontend/src/views/shared/document/DocumentTree.vue:20` 444 chars: // P43 iter3 D42/F31: a long scalar value is revealed by scrolling this list sideways rather than
-- `apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue:21` 557 chars: // P3 D15/C6: the one row table behind Params, Headers, urlencoded (C7) and form-data (C8) —
-- `apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue:42` 363 chars: /** P15b D4: when present, the default value cell renders as an AutocompleteField wired for
-- `apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue:47` 362 chars: /** P15b D7 (item 7): when present, the name cell renders as an AutocompleteField over this
-- `apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue:52` 307 chars: /** P22b D2: the value cell's own vocabulary as a function of this row's name — composed with,
-- `apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue:80` 576 chars: // P22b D9: a CSS grid, not independent flex items — F13's own finding was that adjacent rows'
-- `apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue:92` 419 chars: // P16 D13/F11: `index` is the row's position in `rows.value` — i.e. its real write-through index
-- `apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue:110` 514 chars: // P22b D2: composes with templateToken rather than replacing it — a bare position (outside any
-- `apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue:151` 462 chars: // P22b D16: the trailing blank row IS the add affordance (displayRows' own comment above), so the
-- `apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue:168` 1108 chars: // P15b D6 (item 12): arrow-key navigation across this table's rows, one container-level handler —
-- `apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue:203` 363 chars: // Only real text inputs participate — a native select (form-data's kind picker) or a <button> (Choose
-- `apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue:291` 644 chars: <!-- P28 D10: a name is as legal a place for a {{reference}} as a value is
-- `apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue:367` 339 chars: <!-- P22b D9: wrapped in its own single grid cell — FormDataTable's own trailing content
-- `apps/kira-studio/frontend/src/views/shared/page/PagerControls.vue:8` 529 chars: // P48 F4: the first/prev/page-jump/next/last pager DataToolbar.vue and DocumentView.vue each
-- `apps/kira-studio/frontend/src/views/shared/page/PagerControls.vue:28` 424 chars: // A plain `:value="pageDisplay"` fights the user's typing: any unrelated reactive read this
-- `apps/kira-studio/frontend/src/views/shared/page/PagerControls.vue:43` 533 chars: // P21 round 3 functional finding 12: a rejected jump (non-numeric, or < 1) used to leave
-- `apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue:21` 380 chars: /** M5 §6.6: the grid's own mask preview state — this component is shared with documents/
-- `apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue:84` 681 chars: // P43 iter2 F24/D33: `runChunkedScan`'s own `done` resolves with the partial match list on
-- `apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue:101` 371 chars: // P42 D38: every tick — the priority window's own pre-scan included — publishes into
-- `apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue:108` 909 chars: // P43 iter2 F25/D34, corrected P43 iter3 F40: `rowsScanned === 0` is scan.ts's own
-- `apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue:120` 1014 chars: // P21 round 2 performance finding 8: this used to spread `soFar` into a fresh array
-- `apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue:140` 559 chars: // P43 iter3 D41/F36a: seeded now that runSearch has actually started a scan — ticks are
-- `apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue:151` 714 chars: // P43 iter3 D41/F36: a match the user navigated to mid-scan (D34) survives the scan
-- `apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue:167` 367 chars: // P21 round 3 performance finding 1: every keystroke used to restart the whole (potentially
-- `apps/kira-studio/frontend/src/views/shared/page/SearchToolbar.vue:177` 363 chars: // P31 D22/D23/F23: paging, Fetch more, a page-size change, Refresh or a WHERE re-run all call
-- `apps/kira-studio/frontend/src/views/stream/StreamComposeMessage.vue:16` 407 chars: // Item 3/4's "Add message" panel — Kafka gets key/body/headers (kafka/produce.ts's three
-- `apps/kira-studio/frontend/src/workbench/DbMcpApprovalDialog.vue:24` 651 chars: // M2 §5.4/§7.4: a dialog gating run_query in prompt mode. An AI client is blocked while the human decides on ...
-- `apps/kira-studio/frontend/src/workbench/DbMcpApprovalDialog.vue:52` 304 chars: // M3 §6.2/§6.3: the same dialog, one more reason to raise it — title and lede vary by reason,
-- `apps/kira-studio/frontend/src/workbench/DbMcpApprovalDialog.vue:74` 417 chars: // P108 Part 12 F2: takes the request id as an explicit argument, bound in the template from the
-- `apps/kira-studio/frontend/src/workbench/GenerateDataDialog.vue:52` 364 chars: // P15 D11: driven by state/fakeData.ts's own open/close state, mounted in App.vue beside
-- `apps/kira-studio/frontend/src/workbench/GenerateDataDialog.vue:136` 496 chars: // P12 round 1 finding #2: with no plans at all (the tab's page hadn't loaded yet when the dialog
-- `apps/kira-studio/frontend/src/workbench/SettingsDialog.vue:22` 623 chars: // P103 Part 2 (§5.5): the old single-file workbench/SettingsDialog.vue, now a thin composition
-- `apps/kira-studio/frontend/src/workbench/StatusBar.vue:9` 694 chars: // P103 Part 2 (§5.4): Kira Studio's own StatusBar.vue, now a thin composition over the shared bar
-- `apps/kira-studio/frontend/src/workbench/UploadObjectDialog.vue:30` 370 chars: // P33 D17: three entry points as of P41 (the Browse panel's own container rows/toolbar and — until
-- `apps/kira-studio/frontend/src/workbench/UploadObjectDialog.vue:56` 601 chars: // P43 F1/D1: every ancestor `prefix` segment of the container path, joined — not just the last
-- `apps/kira-studio/frontend/src/workbench/WorkbenchShell.vue:14` 601 chars: // P103 Part 2 (§5.4): Kira Studio's own WorkbenchShell.vue, now a thin composition over the shared
-- `apps/kira-studio/frontend/src/workbench/panels/ProjectPanel.vue:51` 359 chars: <!-- P28 D18: the DataGrip import moved to the menu bar (App → Import DataGrip
-- `apps/kira-studio/frontend/src/workbench/settings/AppearancePane.vue:70` 868 chars: <!-- P110 B36: every cell below carries the full computed style of the old shared
-- `apps/kira-studio/frontend/src/workbench/settings/DatabaseMcpPane.vue:114` 347 chars: <!-- M1 §6.2: this leaf (dbMcp.serverEnabled) both persists and starts/stops the embedded
-- `apps/kira-studio/frontend/src/workbench/settings/DatabaseMcpPane.vue:136` 370 chars: <!-- F9: Regenerate must render whenever the server is running, in both branches below —
-- `packages/git-ui/src/App.vue:6` 798 chars: /**
-- `packages/git-ui/src/App.vue:32` 435 chars: // A .vue default export is a *value* — the component object the template instantiates. `import
-- `packages/git-ui/src/App.vue:105` 423 chars: /** G10 D19: a palette command that fired while this webview was cold — see `main.ts`'s own
-- `packages/git-ui/src/App.vue:132` 454 chars: // `docs/plans/P5.md` W7/W11: one `DetailState` for the life of this component, exactly like
-- `packages/git-ui/src/App.vue:148` 340 chars: // P7 (item 2): one `WorkingDetailState` for the life of this component, exactly like `stashState`
-- `packages/git-ui/src/App.vue:156` 335 chars: // `docs/plans/P11.md` W10/W14: one `SearchState` for the life of this component, exactly like
-- `packages/git-ui/src/App.vue:164` 366 chars: // G12 D6: a failed bootstrap() used to leave repoState undefined forever — the whole template is
-- `packages/git-ui/src/App.vue:180` 598 chars: /** P93 §4.4: the collapse-by-default toggle (`AppToolbar.vue`'s own `graph-collapse-toggle`) —
+- `apps/kira-studio/frontend/src/views/shared/celleditor/binary.ts:4` 307 chars: /** `null` means "not decodable as text" — an invalid encoding, or bytes that decode fine but
+- `apps/kira-studio/frontend/src/views/shared/celleditor/binary.ts:41` 386 chars: /** Re-encodes edited plaintext back into the cell's encoding. `previousEncoded` is consulted only
+- `apps/kira-studio/frontend/src/views/shared/document/ejson.ts:76` 465 chars: // One canonical millis value out of a $date wrapper: usually a nested {"$numberLong": "..."}
+- `apps/kira-studio/frontend/src/views/shared/document/rawTree.ts:41` 353 chars: /** After one member/item, consumes its trailing separator: `,` (continuing the loop, and — when
+- `apps/kira-studio/frontend/src/views/shared/document/rawTree.ts:106` 301 chars: /** Parses an object (`grammar.parseKey` present) or array (absent) from `c`, positioned at its
+- `apps/kira-studio/frontend/src/views/shared/keyvalue/mutations.ts:10` 330 chars: // Keyvalue mutates immediately (mirrors views/documents/mutations.ts's discipline exactly) — no
+- `apps/kira-studio/frontend/src/views/shared/keyvalue/mutations.ts:37` 352 chars: // The key this tab was showing is now gone — reload still runs (mirrors deleteDocument's own
+- `apps/kira-studio/frontend/src/views/shared/page/columns.ts:74` 447 chars: /** What a header cell spends before its name gets a pixel — read off slickTheme.css's own rules
+- `apps/kira-studio/frontend/src/views/shared/page/columns.ts:89` 332 chars: /** The flex gap before the PK/FK `.header-key` badge (4) + the badge's own
+- `apps/kira-studio/frontend/src/views/shared/page/columns.ts:158` 385 chars: /** Name-keyed view of `measuredWidths` — correct as long as `page.columns` has no duplicate
+- `apps/kira-studio/frontend/src/views/shared/slick/cssLayers.ts:9` 643 chars: /**
+- `apps/kira-studio/frontend/src/views/shared/slick/dataSource.ts:121` 493 chars: /** A minimal structural stand-in for a pending insert — only `.id` is ever read on this path
+- `apps/kira-studio/frontend/src/views/shared/slick/dataSource.ts:184` 570 chars: /**
+- `apps/kira-studio/frontend/src/views/shared/slick/gridHostShared.ts:14` 746 chars: /** The gutter column definition both hosts build first in their own `buildColumns` — identical
+- `apps/kira-studio/frontend/src/views/shared/slick/gridHostShared.ts:84` 440 chars: /** `grid.onRendered`'s own visible-page-row-band arithmetic — both hosts' own `onGridRendered`
+- `apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts:64` 429 chars: /** max(0, mountedTop − liveScrollTop) + max(0, liveScrollTop + clientHeight − mountedBottom) —
+- `apps/kira-studio/frontend/src/views/shared/slick/scrollVelocity.ts:36` 338 chars: // The dedupe is what makes pulling safe: a scroll event that did not move the vertical offset is
+- `apps/kira-studio/frontend/src/views/shared/slick/selection.ts:146` 343 chars: // Grouped into contiguous runs (one range per run) rather than one range per column —
+- `apps/kira-studio/frontend/src/views/shared/sqlIdent.ts:196` 343 chars: /** False for a bare-safe, non-reserved lowercase identifier — those are inserted unquoted by a
+- `apps/kira-studio/frontend/src/views/shared/typeGlossary.ts:166` 376 chars: // --- Mongo BSON type names (a $jsonSchema validator's own "bsonType" spellings) -------------
+- `apps/kira-studio/frontend/src/views/shared/viewOp.ts:202` 582 chars: // documents/state.ts's and keyvalue/state.ts's own `load()` apply callback opened with this exact
+- `apps/kira-studio/internal/adapterhost/data.go:13` 305 chars: // Dispatcher is rpc.ts + data.ts in Go: one method per DATA_OP string, for a connection this
+- `apps/kira-studio/internal/adapterhost/dataframe.go:207` 321 chars: // internalErrorFrame is respondError's answer for the vanishingly unlikely case that encodeError
+- `apps/kira-studio/internal/adapterhost/frame.go:17` 506 chars: // encodePayload writes payload into b and returns its offset and union tag. payload is always one
+- `apps/kira-studio/internal/adapterhost/host.go:94` 443 chars: // drain pops and sends one event at a time, blocking on ch<-e for as long as the consumer takes —
+- `apps/kira-studio/internal/adapterhost/host.go:325` 362 chars: // quoteIdent's own NUL-byte guard (postgres/mysqlfamily/sqlite/clickhouse read.go)
+- `apps/kira-studio/internal/adapterhost/router.go:365` 355 chars: // Native adapters build their list fields (e.g. ReferencedBy) as `var x []T` and leave
+- `apps/kira-studio/internal/adapterhost/session_test.go:27` 327 chars: // The writer goroutine pulls one frame out and blocks forever trying to send it
+- `apps/kira-studio/internal/adapterhost/session_test.go:56` 362 chars: // The writer goroutine's one-time pull (it then blocks forever inside blockingConn.Send) only
+- `apps/kira-studio/internal/adapters/adapter.go:83` 538 chars: // Execute runs every statement in req.Statements in order over one connection, one op-log row
+- `apps/kira-studio/internal/adapters/adapter.go:91` 300 chars: // DownloadObject streams one object's bytes into req.DestPath. A read — never blocked by the
+- `apps/kira-studio/internal/adapters/adapter.go:150` 313 chars: // OpCtx is the op-scoped half of scheduler/ops.ts's RunOpCtx. Cancellation is not here — that is
+- `apps/kira-studio/internal/adapters/awscfg/config.go:34` 308 chars: // url.Parse is permissive where the TypeScript's `new URL` throws (a malformed string
+- `apps/kira-studio/internal/adapters/classify.go:22` 331 chars: // StatementClassifier is optional adapter surface, deliberately not a method on Adapter: only the
+- `apps/kira-studio/internal/adapters/classify.go:124` 587 chars: // ClassifySQL classifies statement by its leading keyword over comment-stripped text. It is
+- `apps/kira-studio/internal/adapters/classify.go:194` 407 chars: // PRAGMA, SET, USE, BEGIN, COMMIT, ROLLBACK, CALL, DO, EXEC and an empty statement all land
+- `apps/kira-studio/internal/adapters/clickhouse/clickhouse_test.go:694` 335 chars: // Decimal128(20) holds 20 fractional digits; the seed's own literal
+- `apps/kira-studio/internal/adapters/connguard.go:9` 335 chars: // ConnGuard serialises use of one pinned database connection for postgres and mysqlfamily: a
+- `apps/kira-studio/internal/adapters/connguard.go:108` 398 chars: // Release ends an op's use of the connection. The connection stays held until abandoned background
+- `apps/kira-studio/internal/adapters/connset.go:177` 312 chars: // detachLRULocked picks the least-recently-used non-Primary entry to make room, removes it from the
+- `apps/kira-studio/internal/adapters/consolecap.go:8` 364 chars: // DefaultConsoleCap bounds one console batch. 10,000 rows matches the data tab's largest page
+- `apps/kira-studio/internal/adapters/errors.go:257` 365 chars: // SQLDialect names the comment-lexing differences StripSQLComments must honour. The zero value is
+- `apps/kira-studio/internal/adapters/errors.go:335` 434 chars: // SQLQuotingHazard reports the first construct in s whose extent a quote-unaware or ANSI-only
+- `apps/kira-studio/internal/adapters/errors.go:488` 404 chars: // execCommentMarkerLen reports the rune length of a MySQL/MariaDB executable-comment opening
+- `apps/kira-studio/internal/adapters/errors.go:562` 435 chars: // quoteHasBackslash reports whether any quoted run in s (as scanQuote's own doubled-quote
+- `apps/kira-studio/internal/adapters/errors_test.go:79` 346 chars: // A block comment is lexical whitespace to a real SQL parser (confirmed against a real
+- `apps/kira-studio/internal/adapters/guarded.go:29` 449 chars: // View runs fn with the current value while holding the lock. Load's own copy is enough whenever a
+- `apps/kira-studio/internal/adapters/kafka/authmatrix_test.go:158` 449 chars: // Connect only pings for broker reachability and fetches cluster-wide metadata with no
+- `apps/kira-studio/internal/adapters/kafka/caps.go:33` 302 chars: // produce.go's ProduceSync lands canInsert here. A topic's log is immutable, so Kafka never
+- `apps/kira-studio/internal/adapters/kafka/client.go:44` 342 chars: // closeOnError runs call and closes cl when it fails or ctx ends first. franz-go's request wait
+- `apps/kira-studio/internal/adapters/kafka/produce.go:16` 340 chars: // Sentinel keys (mirrors mongo/mutate.ts's $document, sqs/mutate.go's $body/$headers): a new
+- `apps/kira-studio/internal/adapters/mongo/client.go:60` 360 chars: // mongo.Connect (v2) is lazy — it validates and parses options but opens no socket. The real
+- `apps/kira-studio/internal/adapters/mongo/client.go:79` 572 chars: // tlsConfigForSslmode is the pure half of the sslmode switch, split out for unit testing. Unlike
+- `apps/kira-studio/internal/adapters/mongo/console.go:37` 374 chars: // writeConsoleMethods is the read-only guard's classification of MongoConsoleMethods — insertOne
+- `apps/kira-studio/internal/adapters/mongo/console.go:50` 370 chars: // isAggregateWrite reports whether an aggregate() pipeline's first argument contains a $out or
+- `apps/kira-studio/internal/adapters/mongo/definition.go:34` 318 chars: // buildDocumentSchema ports definition.ts's buildDocumentSchema: $jsonSchema renders as the
+- `apps/kira-studio/internal/adapters/mongo/literal.go:85` 386 chars: // skipInsignificant consumes one run of whitespace, a `//` line comment, or a `/* */` block
+- `apps/kira-studio/internal/adapters/mongo/literal.go:211` 362 chars: // jsToString is JS's String(x) over the value shapes ParseValue can hand a constructor argument:
+- `apps/kira-studio/internal/adapters/mongo/literal.go:260` 372 chars: // constructorFn builds the value a shell constructor call resolves to. pos is the constructor
+- `apps/kira-studio/internal/adapters/mongo/mongo_test.go:48` 321 chars: // slowFilter is a $where clause whose JS predicate runs a long busy loop — the one document in
+- `apps/kira-studio/internal/adapters/mongo/read.go:30` 449 chars: // ejsonStringify is EJSON.stringify(v, opts). canonical mirrors the TS call sites exactly: every
+- `apps/kira-studio/internal/adapters/mongo/read.go:122` 546 chars: // req.Projection is the generic ReadRequest field every adapter shares (Adapter rule 7's
+- `apps/kira-studio/internal/adapters/mongo/read.go:415` 370 chars: // bsonTypeAliasFor names the $type alias for boundaryID's own concrete Go type — exactly the
+- `apps/kira-studio/internal/adapters/mysqlfamily/client.go:77` 583 chars: // The driver's own Params field is not a bag of DSN options: go-sql-driver concatenates every
+- `apps/kira-studio/internal/adapters/mysqlfamily/client.go:170` 387 chars: // Same reasoning, keyed on the effective ServerName instead of the connection id: every
+- `apps/kira-studio/internal/adapters/mysqlfamily/client.go:386` 348 chars: // A read-only connection is enforced by the server itself, not just Mutate's own app-level
+- `apps/kira-studio/internal/adapters/mysqlfamily/console.go:26` 325 chars: // numberDBTypes/temporalDBTypes are console.ts's own NUMBER_TYPES/TEMPORAL_TYPES, spelled in
+- `apps/kira-studio/internal/adapters/mysqlfamily/console.go:153` 482 chars: // verifyReadOnlyWrap re-checks server state after every statement of a read-only batch: the wrap
+- `apps/kira-studio/internal/adapters/mysqlfamily/mysqlfamily_test.go:51` 831 chars: // flippingCtx reports ctx.Err() as nil for the first `after` calls, then as context.Canceled for
+- `apps/kira-studio/internal/adapters/postgres/catalog.go:13` 568 chars: // queryExec is catalog.ts's QueryExecutor: every catalog query is routed through it so it stays
+- `apps/kira-studio/internal/adapters/postgres/client.go:187` 369 chars: // verifyChainSkipHostname is sslmode=verify-ca's certificate check, split out of buildConfig so
+- `apps/kira-studio/internal/adapters/postgres/client.go:250` 413 chars: // pgxConnect — pgx.ConnectConfig, the exact function dial calls — is a package-level var (the
+- `apps/kira-studio/internal/adapters/postgres/client.go:270` 348 chars: // A read-only connection is enforced by the server itself, not just Mutate's own app-level
+- `apps/kira-studio/internal/adapters/postgres/client_test.go:182` 373 chars: // TestVerifyChainSkipHostname exercises the real chain-building logic (not only that the field is
+- `apps/kira-studio/internal/adapters/postgres/console.go:104` 456 chars: // pgconn's own CommandTag string is the closest Go equivalent of Postgres's real
+- `apps/kira-studio/internal/adapters/postgres/console.go:207` 478 chars: // verifyReadOnlyWrap re-checks server state after every statement of a read-only batch: the
+- `apps/kira-studio/internal/adapters/postgres/definition.go:175` 375 chars: // fetchSerialSequences resolves each column's nextval(...) sequence via pg_get_serial_sequence.
+- `apps/kira-studio/internal/adapters/postgres/definition.go:308` 457 chars: // buildDefinition is definition.ts's buildDefinition: composes a SourceText from the catalog —
+- `apps/kira-studio/internal/adapters/postgres/errors.go:15` 626 chars: // mapError is errors.ts's mapError. Go's error model has no single ".code" string the way a pg
+- `apps/kira-studio/internal/adapters/postgres/postgres_test.go:32` 387 chars: // TestMain is bun:test's own beforeAll/afterAll-per-file precedent (postgres.spec.ts:68-75): the
+- `apps/kira-studio/internal/adapters/postgres/postgres_test.go:158` 340 chars: // Breaks adapter.go's connect probe (`current_setting('server_encoding')`) for every
+- `apps/kira-studio/internal/adapters/postgres/postgres_test.go:229` 340 chars: // DROP ROLE fails while any privilege is still granted to it (here, just the
+- `apps/kira-studio/internal/adapters/postgres/postgres_test.go:1227` 829 chars: // flippingCtx reports ctx.Err() as nil for the first `after` calls, then as context.Canceled for
+- `apps/kira-studio/internal/adapters/postgres/query.go:44` 372 chars: // runArrayQuery is read.ts's and console.ts's own runQuery({rowMode:'array', ...}) call shape:
+- `apps/kira-studio/internal/adapters/redis/adapter.go:226` 322 chars: // Mutate is index.ts's mutate. SET/DEL only: edit is scoped to string-type keys, delete is
+- `apps/kira-studio/internal/adapters/redis/catalog.go:225` 585 chars: // groupByDB partitions parallel dbIndices/keys slices (index i is one path's own resolved db
+- `apps/kira-studio/internal/adapters/redis/catalog_test.go:111` 385 chars: // fakePipeliner scripts TYPE's own reply per key without a live server — mirrors fakeScanner's
+- `apps/kira-studio/internal/adapters/redis/catalog_test.go:182` 346 chars: // TestGroupByDB_HonoursDBIndexAndOrder covers Adapter.KeyTypes' own routing discipline — every
+- `apps/kira-studio/internal/adapters/redis/client.go:38` 325 chars: // uriWantsTLS is true only for the standard `rediss://` scheme — the universally documented
+- `apps/kira-studio/internal/adapters/redis/client.go:89` 349 chars: // Unlike Postgres's "require" (encrypt only, no verification — a libpq convention this app
+- `apps/kira-studio/internal/adapters/redis/client.go:185` 550 chars: // redisPing — the exact call dial makes to verify the connection — is a package-level var (the
+- `apps/kira-studio/internal/adapters/redis/console_test.go:205` 364 chars: // TestResultToPage_GenericReplyIsNotFieldsAreColumns pins the safe default for every command
+- `apps/kira-studio/internal/adapters/redis/consolebound.go:15` 390 chars: // go-redis reads one RESP reply whole, so a console command that replies with a whole collection
+- `apps/kira-studio/internal/adapters/redis/mutate.go:12` 448 chars: // The reserved sentinels for redis mutations, expressed through the existing relational-shaped
+- `apps/kira-studio/internal/adapters/relational/connstate.go:23` 707 chars: // Disconnect is postgres and mysqlfamily's shared Disconnect body: cancel every query the adapter
+- `apps/kira-studio/internal/adapters/s3/adapter.go:29` 361 chars: // Adapter is index.ts's S3Adapter. Mirrors redis's adapter closely: bucket ~ redis's database,
+- `apps/kira-studio/internal/adapters/s3/caps.go:23` 316 chars: // Stays false for now, as a named follow-up rather than a permanent no — an *object* already
+- `apps/kira-studio/internal/adapters/s3/caps.go:34` 303 chars: // countObject (read.go) answers a single object's own field count via HeadObject, which is
+- `apps/kira-studio/internal/adapters/s3/catalog.go:18` 327 chars: // listBuckets is catalog.ts's listBuckets. scopedBucket (options.bucket) is the escape hatch for
+- `apps/kira-studio/internal/adapters/s3/mutate.go:172` 398 chars: // aclGrantHeaders reads the object's ACL so applyUpdate can re-send it: PutObject replaces the ACL
+- `apps/kira-studio/internal/adapters/sqlmutate.go:181` 327 chars: // ValidateMutationOps ports the per-op validation loop postgres/mysqlfamily/sqlite's mutate() each
+- `apps/kira-studio/internal/adapters/sqlmutate.go:310` 357 chars: // Resolve parses plan.Path, re-fetches the target's live columns/primary key against the
+- `apps/kira-studio/internal/adapters/sqltext.go:121` 320 chars: // NewParamAccumulator returns an addParam closure over its own params slice — the shape
+- `apps/kira-studio/internal/adapters/sqltext.go:164` 402 chars: // BuildKeysetPredicate ports sql-text.ts's buildKeysetPredicate: a row-value comparison for a
+- `apps/kira-studio/internal/adapters/sqs/caps.go:31` 366 chars: // mutate.go's SendMessage/DeleteMessage land both CanInsert and CanDelete here. Unlike Kafka,
+- `apps/kira-studio/internal/adapters/sslmode.go:10` 441 chars: // ParseSSLMode reads Options["sslmode"] and normalizes the shared empty/"disable" convention every
+- `apps/kira-studio/internal/adapters/testsupport/images.go:69` 307 chars: // PostgresServerMajor, MysqlServerMajor, MariaServerMajor, ClickHouseServerMajor, MongoServerMajor
+- `apps/kira-studio/internal/adapters/testsupport/images_test.go:8` 314 chars: // ServerMajor's parsing has several interacting lexical rules (a "-suffix" flavour tag, a
+- `apps/kira-studio/internal/adapters/testsupport/kafka.go:100` 339 chars: // The module's own readiness wait (a log-regex match inside a PostStarts hook, kafka.go's own
+- `apps/kira-studio/internal/adapters/testsupport/kafka_sasl.go:74` 330 chars: // pickFreeHostPort finds a currently-unused TCP port on the loopback interface. A small race
+- `apps/kira-studio/internal/adapters/testsupport/kafka_sasl.go:155` 532 chars: // dub's own env_to_props (docker_utils/dub.py) turns a single '_' into '.' and a
+- `apps/kira-studio/internal/adapters/testsupport/prewarm.go:5` 307 chars: // prewarmers maps a fixture kind's name to a closure over its existing memo (fixture.go's
+- `apps/kira-studio/internal/adapters/testsupport/prewarm.go:23` 391 chars: // Prewarm starts the named fixtures concurrently, so a package that needs several containers pays
+- `apps/kira-studio/internal/adapters/testsupport/redis.go:271` 331 chars: // A []interface{} Values, not a map, deliberately: XAddArgs.Values as a map does not
+- `apps/kira-studio/internal/adapters/testsupport/seed.go:28` 390 chars: // seedBigRows is postgres.ts's start()'s own big_rows population step: filling app.big_rows (an
+- `apps/kira-studio/internal/apivars/resolve.go:372` 320 chars: // Rendered is the exact text this substitution wrote onto the wire — the plaintext when the
+- `apps/kira-studio/internal/apivars/resolve_test.go:91` 578 chars: // newResolveService opens a real (tmpfile-backed) SQLite database through the real migrations —
+- `apps/kira-studio/internal/appwire/appwire.go:1` 349 chars: // Package appwire is Kira Studio's composition root: it builds the 31 bound services, the adapter
+- `apps/kira-studio/internal/appwire/wire.go:56` 572 chars: // wireAdapters runs main's own adapter/cache/connections/tree/oplog/metrics block: the adapter
+- `apps/kira-studio/internal/bridge/collections.go:404` 464 chars: // writeExportFile writes to a renameio temp file next to the target and renames it over the target
+- `apps/kira-studio/internal/bridge/dbmcp.go:137` 340 chars: // dbMcpTokenProviderFor implements dbmcp.TokenProvider's own no-repoID signature with a mint/!mint
+- `apps/kira-studio/internal/bridge/dbmcp.go:191` 310 chars: // helperTokenMatchesRecord reports whether helperPath's own plaintext still verifies against rec —
+- `apps/kira-studio/internal/bridge/dbmcp.go:226` 335 chars: // startIfEnabled is main.go's own boot-time call: a failure (a bind conflict) is logged, never
+- `apps/kira-studio/internal/bridge/dbmcp.go:258` 371 chars: // SetEnabled patches the settings leaf and starts or stops the embedded instance in the same call
+- `apps/kira-studio/internal/bridge/files_test.go:40` 450 chars: // TestWailsFilterTranslation covers the Electron->Wails filter collapse, whose rules do not
+- `apps/kira-studio/internal/bridge/grpc.go:108` 524 chars: // resolveGrpcCallSource is Call's own stage 2: unlike Describe, a call always needs its target and
+- `apps/kira-studio/internal/bridge/grpc.go:381` 359 chars: // GrpcCallEvent is ChannelGrpcCall's own payload (packages/shared/domain/grpc.ts's GrpcCallEvent,
+- `apps/kira-studio/internal/bridge/grpc.go:451` 360 chars: // serverStreamFn — grpcclient.ServerStream, the exact function runServerStream calls — is a
+- `apps/kira-studio/internal/bridge/http_test.go:83` 356 chars: // The real persistence path: Send (http.go) calls maskSecrets before ResponseHistory.Record on
+- `apps/kira-studio/internal/bridge/maskrules.go:42` 514 chars: // MaskRulesChangedEvent is ChannelMaskRulesChanged's own payload — schemaChanged's per-connection
+- `apps/kira-studio/internal/bridge/maskrules.go:54` 348 chars: // broadcastRules re-lists connectionID's own rules and emits them — called after every mutation
+- `apps/kira-studio/internal/bridge/queries.go:12` 340 chars: // QueriesService is 1:1 with src/main/ipc/queries.ts's nine methods, each a typed-struct wrapper
+- `apps/kira-studio/internal/bridge/settings.go:22` 420 chars: // Set ports src/main/ipc/settings.ts verbatim: merge, conditionally re-push the engine's cache
+- `apps/kira-studio/internal/bridge/update.go:10` 354 chars: // UpdateStatus is the whole wire shape. It deliberately carries no URL and no error string: the
+- `apps/kira-studio/internal/buildinfo/buildinfo.go:5` 807 chars: // Version is the app's version string, and the single place it is defined.
+- `apps/kira-studio/internal/connections/service.go:267` 618 chars: // emitListChanged broadcasts the authoritative list after any mutation — the renderer store
+- `apps/kira-studio/internal/connections/service_test.go:253` 435 chars: // serviceWithUnavailableCipher builds a second Service over h's own db/repos, but with a cipher
+- `apps/kira-studio/internal/connections/uri.go:201` 449 chars: // isAllDigits reports whether s is non-empty and every byte is an ASCII digit — a real port
+- `apps/kira-studio/internal/datagrip/apply.go:94` 358 chars: // Checked before ds.HasLocal below, and before any lookup: when this app's own secret
+- `apps/kira-studio/internal/datagrip/apply_test.go:29` 302 chars: // fourSourceProject writes four plain postgres-shaped sources with distinct uuids, hosts and
+- `apps/kira-studio/internal/datagrip/datasources.go:12` 368 chars: // maxProjectFileBytes bounds the read of each project XML file — copied from postman.Parse's own
+- `apps/kira-studio/internal/datagrip/datasources.go:115` 537 chars: // Dir is always ideaDir's own parent, never the raw dir the caller passed in: resolveIdeaDir
+- `apps/kira-studio/internal/datagrip/jdbc.go:306` 304 chars: // credentialQueryKeys names the substrings (case-insensitive) redactQueryCredentials treats a
+- `apps/kira-studio/internal/dbmcp/approval.go:221` 307 chars: // AbandonAll resolves every pending entry as ApprovalAbandoned and empties the queue, leaving the
+- `apps/kira-studio/internal/dbmcp/http.go:105` 348 chars: // ReadHeaderTimeout bounds a slowloris-shaped client; IdleTimeout reclaims a connection
+- `apps/kira-studio/internal/dbmcp/render.go:272` 378 chars: // statementIdentifierWords splits statement into its word-shaped tokens (letters/digits/
+- `apps/kira-studio/internal/dbmcp/render.go:341` 610 chars: // maskColumnRenamedViaAlias reports whether statement projects the masked column name (already
+- `apps/kira-studio/internal/dbmcp/render.go:369` 378 chars: // setOpMovesColumn reports whether a UNION/INTERSECT/EXCEPT in toks (at any paren depth) has
+- `apps/kira-studio/internal/dbmcp/render.go:670` 382 chars: // castTypeNames excludes an ordinary `CAST(x AS numeric(10,2))`/`CAST(x AS varchar(255))` shape
+- `apps/kira-studio/internal/dbmcp/render.go:687` 362 chars: // hasPositionalColumnAliasList reports whether statement contains a FROM-clause column-alias list
+- `apps/kira-studio/internal/dbmcp/render_test.go:664` 365 chars: // End to end through renderPage: the Unicode-escaped-identifier bypass reaches a masked column
+- `apps/kira-studio/internal/dbmcp/server.go:104` 452 chars: // ExplainThreshold is the expensive-query row threshold (advanced.expensiveQueryRows) — read
+- `apps/kira-studio/internal/dbmcp/tools.go:279` 368 chars: // Read once per call, not per use below: ExplainThreshold's own doc comment ("read fresh on
+- `apps/kira-studio/internal/enginecache/cache_test.go:107` 356 chars: // One more entry pushes L3 one over budget: the pre-fix Set-based flip would have promoted
+- `apps/kira-studio/internal/enginecache/generation.go:40` 408 chars: // bumpTarget invalidates one (connectionID, path) target — DropTarget, DropPagesOnly,
+- `apps/kira-studio/internal/enginecache/generation_test.go:74` 354 chars: // A Count in flight when a local mutation runs is the widest realistic window (count queries on
+- `apps/kira-studio/internal/enginecache/pages.go:17` 321 chars: // ReadRequest is the cache-key half of data-ops.ts's ReadRequestWire: the fields normalizedRequest
+- `apps/kira-studio/internal/flowharness/cmd/flowservers/main.go:1` 305 chars: // Command flowservers runs the flow harness's real HTTP, HTTPS and gRPC servers for the browser
+- `apps/kira-studio/internal/flowharness/harness.go:1` 919 chars: // Package flowharness boots Kira Studio's real composition root (internal/appwire) over a temporary
+- `apps/kira-studio/internal/flowharness/main.go:12` 370 chars: // Main is every flow package's TestMain body: os.Exit(flowharness.Main(m)). It captures the real
+- `apps/kira-studio/internal/flows/httpflow/curl_test.go:13` 369 chars: // Same scenario as tests/ui/http-curl.spec.ts "an imported curl sends as written, and copy-as-curl
+- `apps/kira-studio/internal/grpcclient/call.go:28` 736 chars: // maxStoredMessages bounds ServerStream's own in-memory CallResult.Messages accumulator — kept
+- `apps/kira-studio/internal/grpcclient/call.go:247` 383 chars: // openStream is ServerStream's own connect/send phase: dial, attach metadata, unmarshal the
+- `apps/kira-studio/internal/grpcclient/descriptor_cache_test.go:138` 301 chars: // Touch the very first surviving key (keys[5], the oldest that wasn't already evicted just by
+- `apps/kira-studio/internal/grpcclient/descriptor_cache_test.go:170` 356 chars: // TestDescriptorCache_SingleOversizedEntrySurvivesItsOwnPut proves the "always keep at least one"
+- `apps/kira-studio/internal/grpcclient/descriptors.go:31` 313 chars: // MetaPair is one gRPC metadata name/value pair — bridge/grpc.go hands this straight across the
+- `apps/kira-studio/internal/grpcclient/descriptors.go:188` 434 chars: // approxDescriptorBytes sums the encoded size of every file registered in files — an
+- `apps/kira-studio/internal/grpcclient/descriptors.go:280` 339 chars: // order.Len() > 1: always keep at least the entry just inserted, even alone over budget — a
+- `apps/kira-studio/internal/httpclient/client.go:96` 534 chars: // sameRedirectHost mirrors net/http's own shouldCopyHeaderOnRedirect host check
+- `apps/kira-studio/internal/httpclient/client.go:135` 317 chars: // transportErrText renders err without the request URL. net/url.Error quotes the URL with %q,
+- `apps/kira-studio/internal/httpclient/client.go:262` 437 chars: // Send issues exactly one HTTP request and returns exactly one response — no retry, no second
+- `apps/kira-studio/internal/httpclient/cookies.go:37` 356 chars: // mustJar builds a fresh, empty, publicsuffix-backed jar. publicsuffix.List is not optional:
+- `apps/kira-studio/internal/ipcfixture/decode.go:9` 452 chars: // The four LogicalPage variants, ported field-for-field from tests/ipc/support/types.ts. Each
+- `apps/kira-studio/internal/ipcfixture/frozen.go:46` 384 chars: // FreezeNodeDetail returns a copy of nodes with the named node's Detail overridden to detail —
+- `apps/kira-studio/internal/ipcfixture/frozen.go:115` 1026 chars: // FreezeQueueTimestamps is sqs.backend.spec.ts's own freezeQueueTimestamps, ported:
+- `apps/kira-studio/internal/ipcfixture/frozen.go:147` 360 chars: // FrozenHost/FrozenPort/FrozenCreatedAt/FrozenUpdatedAt are the values every committed fixture
+- `apps/kira-studio/internal/ipcfixture/frozen.go:158` 474 chars: // FrozenConnectionSummary is the shape every committed fixture's connectionsList/connectionsConnect
+- `apps/kira-studio/internal/ipcfixture/frozen.go:183` 366 chars: // FrozenEndpoint is what FreezeConnectionSummary substitutes for an sqs (uri-mode) connection's own
+- `apps/kira-studio/internal/ipcfixture/frozen.go:255` 382 chars: // coordinatorPlaceholder is what MaskContinuationTokens substitutes for a kafka consumer group's
+- `apps/kira-studio/internal/ipcfixture/frozen.go:334` 436 chars: // applyStructuralMasks runs MaskContinuationTokens' own cross-field rules on one map — each keys
+- `apps/kira-studio/internal/ipcfixture/frozen.go:469` 309 chars: // The nested {host, port} object inside a kafka group definition's own JSON statements
+- `apps/kira-studio/internal/ipcfixture/harness.go:170` 390 chars: // Recorder is one scenario's worth of ControlSnapshot/PortSnapshot capture (tests/ipc/support/
+- `apps/kira-studio/internal/ipcfixture/harness.go:190` 363 chars: // OverrideLastControlResponse replaces the most recently recorded ControlSnapshot's Response —
+- `apps/kira-studio/internal/ipcfixture/harness.go:379` 513 chars: // DataInvalidate is DATA_OP.invalidate: adapterhost.Dispatcher.Invalidate, wrapped {kind:
+- `apps/kira-studio/internal/ipcfixture/redis_test.go:349` 403 chars: // browseInvalidate()'s cross-tab effect reloads with refresh:true (a hard bypass of the L1
+- `apps/kira-studio/internal/ipcfixture/sqs_test.go:79` 388 chars: // Three real, run-to-run-volatile values, all frozen the same way: the key column is SQS's own
+- `apps/kira-studio/internal/ipcfixture/sqs_test.go:131` 330 chars: // definition/state.ts's own load() only passes refresh:true on an explicit Refresh click — the
+- `apps/kira-studio/internal/ipcfixture/types.go:25` 343 chars: // rawJSON marshals v with HTML-escaping disabled (write.go's first trap — the fixtures contain SQL
+- `apps/kira-studio/internal/localauth/evaluate_darwin.go:80` 312 chars: // authorizeTimeoutSeconds bounds kira_authorize's wait for evaluatePolicy's reply block —
+- `apps/kira-studio/internal/localauth/localauth.go:54` 450 chars: // EvaluateFunc is the platform OS-auth call, injected (rather than called directly) so
+- `apps/kira-studio/internal/mask/mask.go:164` 567 chars: // maskWord masks one word: first grapheme + bullet run when keepHint, an all-bullet run of the
+- `apps/kira-studio/internal/mask/mask.go:227` 420 chars: // maskTextGraphemeCap is textBucketEdges' own top edge. lengthBucket only ever needs to tell "n is
+- `apps/kira-studio/internal/mask/mask.go:234` 389 chars: // boundedGraphemeCount counts value's own grapheme clusters one at a time via uniseg's own
+- `apps/kira-studio/internal/mask/mask.go:283` 307 chars: // plainDecimalRE matches an unsigned plain decimal literal — digits, optionally one `.` and more
+- `apps/kira-studio/internal/mask/mask.go:333` 553 chars: // decadeExponent returns k such that 10^k <= absVal < 10^(k+1), computed by counting digits in
+- `apps/kira-studio/internal/mask/mask_test.go:377` 344 chars: // "élan": e + combining acute (U+0301) + l + a + n is 5 runes but 4 grapheme clusters
+- `apps/kira-studio/internal/mask/mask_test.go:389` 485 chars: // TestMaskWordSingleGraphemeNeverEchoes is the fix TestApplyNeverEchoesOriginalText's fuzzing
+- `apps/kira-studio/internal/mask/parity_test.go:74` 460 chars: // TestMaskFixtureParity is this Go package's own half of the parity pin: every fixture, replayed
+- `apps/kira-studio/internal/mcpauth/helperscript.go:25` 1026 chars: // EnsureHeaderHelperScript writes (or rewrites) the headersHelper script every DB MCP registration
+- `apps/kira-studio/internal/mcpauth/token.go:173` 463 chars: // SaveHelperToken persists plain to path (HelperTokenPathNamed's own path), mode 0600, atomically
+- `apps/kira-studio/internal/oplog/wire_test.go:291` 402 chars: // Immediately after Stop returns — simulating main.go's teardown, which closes the repo and
+- `apps/kira-studio/internal/oplog/wire_test.go:306` 546 chars: // Mirrors main.go's teardown ordering: closing the repo/db right after Stop() must not race a
+- `apps/kira-studio/internal/page/builder.go:79` 554 chars: // Page is any of TabularPage, DocumentPage, KeyValuePage, StreamPage — page.ts's Page union.
+- `apps/kira-studio/internal/page/encode.go:13` 323 chars: // hostIsLittleEndian is evaluated once at init. Every platform this app ships or is built on
+- `apps/kira-studio/internal/page/scratch.go:7` 360 chars: // columnScratch accumulates one column's rows into growable scratch and only copies into
+- `apps/kira-studio/internal/page/scratch_test.go:15` 323 chars: // A run of Latin-1-style bytes (à-ÿ, 0xE0-0xFF) is each individually invalid as a standalone UTF-8
+- `apps/kira-studio/internal/postman/aliases.go:81` 480 chars: // rewriteAliases replaces every `{{$name}}` whose name is in aliasToFake with `{{fake.x.y}}`.
+- `apps/kira-studio/internal/postman/aliases.go:117` 809 chars: // rewriteRequestAliases applies rewriteAliases to every field of an imported request that can
+- `apps/kira-studio/internal/postman/body.go:250` 341 chars: // Same reasoning as formdata's file rows just above: src is attacker-controlled input from an
+- `apps/kira-studio/internal/postman/parse.go:356` 343 chars: // stripRequestAuthOrigin is stripSensitiveOrigin's twin for a request item's own nested
+- `apps/kira-studio/internal/postman/write.go:24` 358 chars: // Write emits t as a v2.1 collection. json.Encoder with SetEscapeHTML(false) is the same
+- `apps/kira-studio/internal/preconnect/supervisor.go:613` 311 chars: // A leading empty PATH element is `.` to /bin/sh — never emit one, whether the
+- `apps/kira-studio/internal/preconnect/supervisor_test.go:378` 335 chars: // This sandbox's minimal container init reparents and reaps orphaned grandchildren more
+- `apps/kira-studio/internal/preconnect/tail.go:8` 552 chars: // tailTracker is a literal port of preconnect.ts's makeTailTracker (`:59-75`). Chunks from a pipe
+- `apps/kira-studio/internal/preconnect/tail_test.go:67` 356 chars: // TestTailTracker_LongUnterminatedLineEventuallyTerminatedStillTruncatesToTheOriginalPrefix proves
+- `apps/kira-studio/internal/queryplan/clickhouse.go:9` 354 chars: // clickhouse.go ports planParsers/clickhouse.ts verbatim: ClickHouse's `EXPLAIN PLAN json = 1,
+- `apps/kira-studio/internal/queryplan/clickhouse.go:69` 645 chars: // chBuilderNode is a pointer-based scratch tree, the same trick sqlite.go's own sqliteBuilderNode
+- `apps/kira-studio/internal/queryplan/issues.go:33` 310 chars: // pushWideScanIssueTo is pushWideScanIssue's own body, taking a bare *[]Issue and label rather
+- `apps/kira-studio/internal/queryplan/metrics.go:21` 323 chars: // formatMetricValue ports metricsFrom's own `Array.isArray(value) ? value.join(', ') :
+- `apps/kira-studio/internal/queryplan/parse.go:10` 326 chars: // ErrTruncated mirrors plan.ts's ExplainTruncatedError — a plan over page.MaxCellBytes arrives
+- `apps/kira-studio/internal/queryplan/parse_test.go:102` 351 chars: // buildTruncatedPage builds the one-page, one-oversized-cell shape every single-cell dialect's
+- `apps/kira-studio/internal/queryplan/plan.go:13` 315 chars: // CostUnit is the unit a dialect's own native cost figure is reported in — never compared across
+- `apps/kira-studio/internal/queryplan/plan.go:51` 377 chars: // Node mirrors planModel.ts's PlanNode, field for field. EstimatedRows is float64, not int:
+- `apps/kira-studio/internal/queryplan/plan.go:88` 666 chars: // Unlike planModel.ts's ScanEstimate (a {node, rows} pair kept so a later pass can push the
+- `apps/kira-studio/internal/queryplan/sqlite.go:49` 591 chars: // sqliteBuilderNode is a pointer-based scratch tree — attachment (a child row arriving, in any
+- `apps/kira-studio/internal/secrets/keyring_other.go:7` 470 chars: // loadOrCreateKey has no non-darwin implementation — the Keychain probe always fails on other
+- `apps/kira-studio/internal/storage/migrations/migrate_rename_test.go:16` 345 chars: // openAt applies every migration up to and including maxVersion, in order — the same
+- `apps/kira-studio/internal/storage/model/cursor.go:8` 321 chars: // PageCursor is protocol/dataOps.ts's PageCursor discriminated union, following the same
+- `apps/kira-studio/internal/storage/model/maskrule.go:3` 342 chars: // MaskKind mirrors internal/mask's own Kind — kept as a separate string type here rather than
+- `apps/kira-studio/internal/storage/model/queries.go:92` 344 chars: // SavedQuery mirrors queries.ts's savedQuerySchema. Body stays json.RawMessage rather than a Go
+- `apps/kira-studio/internal/storage/model/tree_test.go:5` 357 chars: // TestEncodeDecodePathRoundTrip covers the path codec's escaping rules: a segment is
+- `apps/kira-studio/internal/storage/model/uriescape.go:48` 464 chars: // DecodeURIComponent percent-decodes s; '+' is a literal plus, matching JS's decodeURIComponent
+- `apps/kira-studio/internal/storage/model/window.go:38` 359 chars: // NormalizeMode returns mode unchanged if it's one of AppMode's known values, else
+- `apps/kira-studio/internal/storage/repos/collections.go:131` 340 chars: // GetRequest reads one saved request on demand, so the list path never touches request_json. A row
+- `apps/kira-studio/internal/storage/repos/filter_history.go:27` 579 chars: // maxFilterTextBytes caps where_text and the encoded order_by_json — a filter predicate is a line
+- `apps/kira-studio/internal/storage/repos/filter_history_test.go:14` 365 chars: // TestFilterHistoryReRecordMovesNotDuplicates pins the dedupe delete's use of SQLite's NULL-safe
+- `apps/kira-studio/internal/storage/repos/maskkeys.go:95` 305 chars: // Lost the race (another EnsureKey minted first), or connectionID has no row — either way
+- `apps/kira-studio/internal/storage/repos/maskrules.go:92` 581 chars: // Upsert writes one rule on (connection_id, lower(table_name), lower(column_name)) — the unique
+- `apps/kira-studio/internal/storage/repos/metadata_cache_test.go:10` 355 chars: // TestMetadataCacheDifferentKindsShareOneRow pins Put's merge semantics: the unique index is
+- `apps/kira-studio/internal/storage/repos/ops.go:75` 849 chars: // ReconcileInterrupted flips every still-'running' op_log row to 'error' — oplog.Wiring's own
+- `apps/kira-studio/internal/storage/repos/response_history_test.go:210` 364 chars: // Four rows, two per scope, oldest-to-newest by insertion (rowid) order. old-A/old-B (the two
+- `apps/kira-studio/internal/storage/repos/variables.go:37` 415 chars: // NewVariables mirrors NewSecrets: constructed separately from repos.New's aggregate (not because
+- `apps/kira-studio/main.go:80` 353 chars: // The macOS About item is `application.About` in internal/shell/menutemplate.go, and Wails
+- `apps/kira-studio/main.go:149` 333 chars: // postAppDeps is wireWindowsAndMenu's own argument bundle — every piece main built before `app`
+- `apps/kira-studio/main.go:161` 323 chars: // wireWindowsAndMenu runs main's own post-`app` block: the dialog attach point -> the engine
+- `apps/kira-studio/playwright.config.ts:35` 383 chars: // 1 on CI (the first attempt plus one retry) to absorb shared-runner timing noise without
+- `apps/kira-studio/tests/e2e-real/support/passthrough.ts:55` 475 chars: /**
+- `apps/kira-studio/tests/fixtures/explain-plans/loader.ts:78` 342 chars: /** Builds the one-page, one-oversized-cell shape every single-cell dialect's truncated-cell case
+- `apps/kira-studio/tests/ipc/support/types.ts:13` 456 chars: /** Exactly what the renderer sends — used by the frontend half to match a request to a
+- `apps/kira-studio/tests/ui/api-cross-window-sync.spec.ts:179` 383 chars: // CollectionsTree.vue's own onOpen awaits loadSavedRequest before ever opening the tab, so the
+- `apps/kira-studio/tests/ui/api-secret-reveal-isolation.spec.ts:251` 378 chars: // Switch straight to row B's popover — row A's own is unmounted by `v-if`, with no `@close`.
+- `apps/kira-studio/tests/ui/api-ui-consistency.spec.ts:416` 835 chars: // --kira-var-resolved (#4ec9b0) vs --kira-warn (#cca700) vs --kira-syntax-property (#9cdcfe,
+- `apps/kira-studio/tests/ui/api-ui-consistency.spec.ts:452` 384 chars: // Hovering the resolved reference shows its value — through Monaco's own native hover widget
+- `apps/kira-studio/tests/ui/api-ui-consistency.spec.ts:511` 492 chars: // A genuine leave-then-enter, not a teleport from Playwright's own initial (0, 0) mouse position
+- `apps/kira-studio/tests/ui/api-ui-consistency.spec.ts:735` 566 chars: // Real-interaction fix (reported bug — the response search bar sat below/at the bottom of the
+- `apps/kira-studio/tests/ui/autocomplete.spec.ts:400` 786 chars: // A rejected navigator.clipboard.writeText (denied permission, an unfocused window — real on
+- `apps/kira-studio/tests/ui/autocomplete.spec.ts:541` 519 chars: // Each suggestion row's own `.main` div (Monaco's inner label element) carries the data font as
+- `apps/kira-studio/tests/ui/autocomplete.spec.ts:754` 361 chars: // The BSON constructors this position already offered are still there, merged, not replaced —
+- `apps/kira-studio/tests/ui/autocomplete.spec.ts:885` 367 chars: // Beyond the 400ms debounce itself: Monaco's marker decorations don't repaint until the view
+- `apps/kira-studio/tests/ui/budgets.spec.ts:167` 487 chars: // Real capture (scripts/capture-postgres-tree.ts, `children` step against database:kira_test/
+- `apps/kira-studio/tests/ui/budgets.spec.ts:330` 339 chars: // Monaco adds `.visible` to the suggest widget 100 ms after it is on screen (SuggestWidget._show's
+- `apps/kira-studio/tests/ui/budgets.spec.ts:569` 604 chars: // Same chase-pacing rationale as the row-axis loop below: poll instead of a fixed sleep so this
+- `apps/kira-studio/tests/ui/budgets.spec.ts:624` 907 chars: // The off-limits chase/budget mechanism (kiraSlickGrid.ts's own scheduleChase, never touched
+- `apps/kira-studio/tests/ui/budgets.spec.ts:653` 486 chars: // The same ladder as 1a, on the wide-AND-tall shape — 60 columns means every notify's
+- `apps/kira-studio/tests/ui/cell-editor.spec.ts:266` 416 chars: /** Fills, saves, connects (via the tree's own root row) and expands down to `app` — the shared
+- `apps/kira-studio/tests/ui/cell-editor.spec.ts:525` 473 chars: // A different column on the same row is unaffected by the override: its format still tracks
+- `apps/kira-studio/tests/ui/cell-editor.spec.ts:614` 351 chars: // Captured here, not at the very top: scenarios 1-7 legitimately open several new tables
+- `apps/kira-studio/tests/ui/cell-editor.spec.ts:623` 360 chars: // --- scenario 8: selection semantics -----------------------------------------------------
+- `apps/kira-studio/tests/ui/cell-editor.spec.ts:688` 455 chars: // Bug fix: clicking Revert straight from the editor (no deliberate blur first) used to *commit*
+- `apps/kira-studio/tests/ui/cell-editor.spec.ts:712` 367 chars: // Collapse connection 1's root before creating connection 2 — every descendant row (database,
+- `apps/kira-studio/tests/ui/cell-editor.spec.ts:769` 386 chars: // Reused *and* repopulated — the opposite failure mode a bare identity check would miss.
+- `apps/kira-studio/tests/ui/cell-editor.spec.ts:1335` 586 chars: // (8) Closing the tab frees its record — no stale panel, no console error. Close the console
+- `apps/kira-studio/tests/ui/console-format.spec.ts:354` 452 chars: // Put the caret in the SECOND statement — typing left it at the very end (line 3); one Up
+- `apps/kira-studio/tests/ui/console-format.spec.ts:361` 337 chars: // ArrowUp alone preserves the goal column, which (typing left the caret at the very end of
+- `apps/kira-studio/tests/ui/console.spec.ts:430` 373 chars: // The gutter (frozenColumn: 0) renders in a separate left-pane row clone from the data columns
+- `apps/kira-studio/tests/ui/console.spec.ts:615` 487 chars: // Regression test — duplicate column names in an ad-hoc result (routine for a JOIN where both
+- `apps/kira-studio/tests/ui/control-sizing.spec.ts:90` 397 chars: // getComputedStyle's own custom-property value keeps a calc() expression literal (only var()
+- `apps/kira-studio/tests/ui/control-sizing.spec.ts:121` 311 chars: // Every shadcn primitive carries its own transition-colors/transition-all -- which animates
+- `apps/kira-studio/tests/ui/data-view.spec.ts:116` 442 chars: // The real nextToken FIXTURE's own initial pageSize-100 read (BIG_ROWS_FIRST_PAGE) came back
+- `apps/kira-studio/tests/ui/data-view.spec.ts:971` 333 chars: // A real mid-flight cancellation (adapter:cancel raced against this read — see the header
+- `apps/kira-studio/tests/ui/data-view.spec.ts:1004` 321 chars: // The grid is virtualized — only the scrolled-into-view + overscan rows exist in the DOM at any
+- `apps/kira-studio/tests/ui/data-view.spec.ts:1041` 461 chars: // Playwright's clipboard-permission grant (`browserContext.grantPermissions(['clipboard-read'])`)
+- `apps/kira-studio/tests/ui/data-view.spec.ts:1368` 371 chars: // Contrast regression guard: `.search-match-current`'s bright `--kira-search-match-current`
+- `apps/kira-studio/tests/ui/fixtures.ts:54` 365 chars: // Both installs are page.route/addInitScript registrations — they must land before the first
+- `apps/kira-studio/tests/ui/font-roles.spec.ts:99` 534 chars: // getComputedStyle(el).fontFamily is a *serialized* CSSOM value (Chromium drops quotes around a
+- `apps/kira-studio/tests/ui/font-roles.spec.ts:161` 321 chars: // The one assertion that would catch --kira-font-ui accidentally aliased back to the data
+- `apps/kira-studio/tests/ui/http-request-body.spec.ts:26` 346 chars: /** True when some descendant of `view` (a MonacoHost) has a token painted in the given resolved
+- `apps/kira-studio/tests/ui/http-request.spec.ts:306` 307 chars: // A value typed into a description cell survives a tab reload — asserted the same way this file's
+- `apps/kira-studio/tests/ui/interaction.spec.ts:1054` 447 chars: // Mirrors tests/ui/support/tree.ts's openRowMenu: Playwright's own actionability check can trigger
+- `apps/kira-studio/tests/ui/interaction.spec.ts:1226` 477 chars: // Control+click (Meta on macOS): a literal Control+click, unlike a keyboard chord, becomes a
+- `apps/kira-studio/tests/ui/interaction.spec.ts:1643` 379 chars: // Real host key handling (this container is Linux), not the page's own `navigator.userAgent`
+- `apps/kira-studio/tests/ui/mode-switch.spec.ts:157` 359 chars: // 5. ⌘B still collapses/expands the panel in either mode. There is no real Wails window in
+- `apps/kira-studio/tests/ui/mutations.spec.ts:173` 435 chars: // Count sequence (all share one (op, {filter, refresh}) key when refresh matches — see
+- `apps/kira-studio/tests/ui/scroll-trace.spec.ts:121` 383 chars: // 3. start()...scroll a few times...stop() produces the documented per-frame/summary shape.
+- `apps/kira-studio/tests/ui/slick-grid.spec.ts:330` 534 chars: // The pacing invariant is "one render per frame while scroll events keep arriving". wheelFling's
+- `apps/kira-studio/tests/ui/slick-grid.spec.ts:817` 626 chars: // Deterministic onset: a programmatic scrollTop jump from rest delivers one scroll event whose
+- `apps/kira-studio/tests/ui/slick-grid.spec.ts:839` 373 chars: /** The gate itself: frames that rendered while the viewport was measurably moving at a plausible
+- `apps/kira-studio/tests/ui/slick-grid.spec.ts:881` 476 chars: // --- (c) freshVelocitySampleOverride = false reproduces the pre-fix behaviour ------------------
+- `apps/kira-studio/tests/ui/slick-grid.spec.ts:1137` 838 chars: // Regression test — onSelectAll used to build its SlickRange with `p?.rowCount` (the PAGE row
+- `apps/kira-studio/tests/ui/slick-grid.spec.ts:1214` 460 chars: // Filter down to a contiguous 3-row prefix (ids 1-3 of the 100 loaded) — deliberately
+- `apps/kira-studio/tests/ui/slick-grid.spec.ts:1334` 426 chars: // The growth guard: discarding the insert (a shrink) must not scroll anywhere on its own.
+- `apps/kira-studio/tests/ui/slick-grid.spec.ts:1766` 318 chars: // Give the columnWidths echo (patchDataTabState -> the watch under test) a full macrotask to
+- `apps/kira-studio/tests/ui/sql-schema.spec.ts:251` 407 chars: // Table completion after FROM. lang-sql's own schemaCompletionSource returns null for an
+- `apps/kira-studio/tests/ui/support/apiMode.ts:17` 460 chars: /** `base` overrides the default state fields (before `state` itself is applied) — grpc-
+- `apps/kira-studio/tests/ui/support/cellEditorCaptures.ts:784` 479 chars: /** Real captured treeDefinition for app.formats — needed only because test 3's scenario 6 opens
+- `apps/kira-studio/tests/ui/support/clock.ts:31` 636 chars: // `pauseAt` rejects a time at or before what the fake clock already considers "now" — and since
+- `apps/kira-studio/tests/ui/support/connect.ts:62` 305 chars: /** Fills the "add connection" dialog for a Postgres connection through the UI, connects it, and
+- `apps/kira-studio/tests/ui/support/editorText.ts:11` 702 chars: /** `container` is any Locator either wrapping exactly one `MonacoHost` mount (a pane, a dialog
+- `apps/kira-studio/tests/ui/support/editorText.ts:32` 441 chars: /** `ResponseDiffDialog.vue`'s own diff editor — its two sides are plain Monaco sub-editors, not a
+- `apps/kira-studio/tests/ui/support/editorText.ts:48` 667 chars: /** `locator.boundingBox()`, retried: a `{{variable}}` decoration span (`.kira-ed-var` and
+- `apps/kira-studio/tests/ui/support/engineFixture.ts:7` 373 chars: /**
+- `apps/kira-studio/tests/ui/support/engineFixture.ts:51` 321 chars: /** The tabular-page envelope `mariadbFixture.ts`'s and `postgresFixture.ts`'s own `orderItemsPage`
+- `apps/kira-studio/tests/ui/support/engineFixture.ts:85` 435 chars: /** Connect, expand, and open `order_items`'s own describe plus its own reads — mariadbFixture.ts's
+- `apps/kira-studio/tests/ui/support/mockStream.ts:70` 309 chars: /** Always a `res` frame — `ok:true` wrapping the logical response, or `ok:false` wrapping
+- `apps/kira-studio/tests/ui/support/mockStream.ts:178` 303 chars: // Answers workbench/state/engine.ts's initEngineState ping — no spec's fixture array carries a
+- `apps/kira-studio/tests/ui/support/mockStream.ts:211` 393 chars: // Read once, not per call: `installMockStream` runs at least once per test. `bun run format`
+- `apps/kira-studio/tests/ui/support/postgresFixture.ts:209` 513 chars: /** The connect + expand-to-`app`-schema boilerplate every fixture below shares. Exported (not
+- `apps/kira-studio/tests/ui/support/postgresFixture.ts:223` 323 chars: /** A `connectionsDisconnect` snapshot for a connection `connectAndExpandControl` already
+- `apps/kira-studio/tests/ui/support/postgresFixture.ts:242` 330 chars: /** A connectable postgres ConnectionSummary, plus the control/data snapshots to connect it, expand
+- `apps/kira-studio/tests/ui/support/postgresFixture.ts:459` 390 chars: // database:kira_test/schema:app's own children — the full real capture (every table/view/matview/
+- `apps/kira-studio/tests/ui/support/tooltip.ts:10` 333 chars: /** A single hover's own visibility-wait window, tuned empirically against this exact app build
+- `apps/kira-studio/tests/ui/support/tooltip.ts:16` 1822 chars: /** Hovers `trigger` and asserts the real tooltip becomes visible with `text`, well within
+- `apps/kira-studio/tests/ui/support/tree.ts:62` 1238 chars: // findRow's fast path (the row is already in the DOM via overscan) skips the scroll-search
+- `apps/kira-studio/tests/ui/support/tree.ts:160` 530 chars: // A right-click on a row that Playwright still considers not-quite-in-view triggers its own
+- `apps/kira-studio/tests/ui/tooltips.spec.ts:176` 376 chars: // --- scenario 1: an enabled control — hidden before the delay, shown after, hides on leave ---
+- `apps/kira-studio/tests/ui/tooltips.spec.ts:208` 364 chars: // reka's DismissableLayer dismisses only its own (highest) layer per Escape press — with the
+- `apps/kira-studio/tests/ui/tree.spec.ts:168` 303 chars: // The largest single scenario in this tier (sticky band + two-connection scroll handoff +
+- `apps/kira-studio/tests/ui/tree.spec.ts:461` 464 chars: // A pinned row is a real row: its twisty collapses the real schema, and it carries the
+- `apps/kira-studio/tests/ui/tree.spec.ts:478` 386 chars: // schema:app alone (fourteen tables, four folders, thirteen sequences) now outgrows
+- `apps/kira-studio/tests/ui/tree.spec.ts:509` 346 chars: // The first connection's own expanded subtree (schema:app's fourteen tables, four folders, and
+- `apps/kira-studio/tests/ui/tree.spec.ts:538` 657 chars: // Walks forward sibling by sibling from `start`, scrolling each candidate into view before
+- `apps/kira-studio/tests/ui/tree.spec.ts:564` 554 chars: // schema:app now carries fourteen tables (this fixture's real captured content, more than the
+- `apps/kira-studio/tests/unit/api-collections-delete-orphans-cache.spec.ts:183` 323 chars: // The direct child, the nested folder's own child, and the folder itself must all be purged —
+- `apps/kira-studio/tests/unit/api-variables-delete-eviction.spec.ts:110` 357 chars: // Seeds the environments list with the id about to be deleted — TanStack's default structural
+- `apps/kira-studio/tests/unit/grid-staged-value-snapshot.spec.ts:118` 462 chars: // The regression this exact case caught: an earlier version of this fix read `pending` once
+- `apps/kira-studio/tests/unit/grid-staged-value-snapshot.spec.ts:132` 670 chars: // The sharpest form of the same regression: pendingChanges.ts's own `ensure()` creates
+- `apps/kira-studio/tests/unit/grpc-stream-terminal-race.spec.ts:66` 473 chars: // ensureGrpcCallSubscription (state.ts) calls control.onGrpcCall exactly once ever, module-wide
+- `apps/kira-studio/tests/unit/row-range-bounds.spec.ts:91` 378 chars: // 20 columns, 11 visible rows: budgetRows = floor(2200/20) = 110; remaining after baseline+
+- `apps/kira-studio/tests/unit/slick-selection.spec.ts:149` 380 chars: // A user drags from (row 1, col 0) to (row 4, col 0) — a 'range' selection spanning several
+- `apps/kira-studio/tests/unit/sql-cte-shadow.spec.ts:30` 360 chars: // "id" also exists on the base DDL table — a real column name, chosen so a resolution bug
+- `apps/kira-studio/tests/visual/schema-dialog.spec.ts:62` 457 chars: // Monaco auto-focuses on mount, so the empty editor shows a blinking caret — its blink is
+- `internal/agentmcp/doc.go:1` 335 chars: // Package agentmcp serves Kira's MCP tool server for agent runs: the `finish_step` outcome tool,
+- `internal/agentmcp/gittool.go:54` 312 chars: // gitCmd is the exact shape of one allowed read or index command. An option is allowed only when it
+- `internal/agentsandbox/policy.go:184` 313 chars: // guard holds the paths no read or allow entry may cover: the keychain directory, and the agent's
+- `internal/agentsandbox/runtime.go:38` 398 chars: // DiscoverRuntime probes once per provider and app session. The probe is detached from the caller's
+- `internal/appevent/appevent.go:9` 457 chars: // Emitter is the Go->renderer push seam — internal/shell implements it over *application.App's
+- `internal/appsettings/repo.go:57` 377 chars: // Leaf mirrors both apps' own former leaf[T] verbatim: overwrites *dst with the stored value for
+- `internal/appstorage/appstorage.go:16` 532 chars: // OpenAt opens the sqlite file at path (sqlitex.Open's own six-pragma/SetMaxOpenConns(1)/chmod
+- `internal/appstorage/window.go:10` 440 chars: // WindowBounds is a plain screen rectangle, shared by every window's stored geometry — field-for-
+- `internal/appstorage/window.go:192` 355 chars: // EnsureExists creates a `windows` row for key if one doesn't already exist, ordered after every
+- `internal/appupdate/app.go:3` 303 chars: // App names one of the two installable apps — the same two rows scripts/install.sh's own table
+- `internal/appupdate/checker.go:80` 333 chars: // NewChecker builds a Checker over the real network fetch, parameterized only by appName (the
+- `internal/appupdate/checker.go:161` 306 chars: // httpClient is a package-level *http.Client over one *http.Transport, mirroring
+- `internal/appupdate/version.go:9` 353 chars: // devVersions are the three literals a build that is NOT a tagged release can report
+- `internal/embedded/embedded.go:9` 480 chars: // Service is the settings-gated start-once/stop-and-clear lifecycle of an embedded server: a
+- `internal/filelock/filelock.go:9` 366 chars: // TryLock takes an exclusive non-blocking flock on path. syscall.Flock covers darwin (the shipped
+- `internal/flowtest/coverage.go:37` 376 chars: // CheckCoverage fails the test for every name that no flow test source references and no exempt
+- `internal/harness/claude/hooks/agenthooks.go:129` 476 chars: // Compose returns command with " --settings '<hooks.json>'" appended and the three hook env vars a
+- `internal/harness/claude/hooks/config.go:63` 491 chars: // shellSingleQuote wraps s in single quotes for a POSIX shell argument — the command value
+- `internal/harness/harness.go:1` 372 chars: // Package harness is the provider-neutral surface of the coding agent Kira drives. A Provider
+- `internal/keepawake/caffeinate.go:17` 446 chars: // caffeinateArgv is the whole command line, as a pure function so a golden-argv test can assert it
+- `internal/keepawake/caffeinate.go:37` 301 chars: // lookPath is a package-private seam (internal/startupfail/exec.go's realLookPath pattern) —
+- `internal/keepawake/caffeinate.go:56` 323 chars: // Acquire resolves the binary fresh on every call (so a PATH change between launches is picked
+- `internal/keepawake/caffeinate_test.go:36` 584 chars: // TestCaffeinateDriverLifecycle is the one test that catches "release does not actually kill it",
+- `internal/keepawake/toggle.go:16` 308 chars: // Toggle owns the manual keep-awake reason (ReasonManual) on top of a Controller — the half every
+- `internal/kiratime/time.go:7` 463 chars: // jsISOFormat matches JavaScript's Date.prototype.toISOString() byte for byte: UTC, exactly
+- `internal/layeringtest/layeringtest.go:13` 631 chars: // Run enumerates every internal/* package under modulePrefix straight from `go list` and asserts
+- `internal/llmprompts/schema.go:11` 540 chars: // InputSchema is the MCP input schema of tool's argument type T with each property described by
+- `internal/localsock/localsock.go:88` 403 chars: // Serve accepts connections until the listener closes, running handle for each in its own
+- `internal/memory/applydoc.go:40` 393 chars: // ApplyDoc stores a doc's facts as they are: no gate, no reconcile, no Claude call. A fact without
+- `internal/memory/importer/chunk.go:265` 300 chars: // sizeUnits fills u with raw (starting at byte offset at), or with Target-sized pieces of it when
+- `internal/memory/importer/distill.go:165` 392 chars: // Distill chunks the input like an import and extracts facts from each part (three at once). Facts
+- `internal/memory/importer/runner_race_test.go:8` 320 chars: // TestCreateAlwaysFindsRunner: a Create racing a runner's idle exit, its lock probe or its start
+- `internal/metrics/probe_darwin.go:120` 661 chars: // taskinfoFallback is defaultProbe's EPERM path. struct proc_taskinfo carries no process-start
+- `internal/metrics/sampler_test.go:83` 314 chars: // pid 100's next reading goes backwards (a bad probe read, not a real CPU-time decrease);
+- `internal/notify/ordered.go:40` 308 chars: // NextSeq assigns and returns the next emit sequence number. Call it once per state change (an
+- `internal/pairing/pairing.go:140` 378 chars: // Request enqueues (clientID, meta) and blocks the calling goroutine until it is approved,
+- `internal/pairing/pairing.go:185` 466 chars: // Approve resolves requestID as approved and mints one token for that request only. Every other
+- `internal/pairing/pairing.go:330` 347 chars: // Shutdown resolves every queued request as Aborted, unblocking any Request still waiting. A
+- `internal/rpcstream/session.go:1` 799 chars: // Package rpcstream is the protocol-generic half of a correlated-RPC-with-credits frame protocol
+- `internal/rpcstream/session.go:21` 348 chars: // Conn is the whole of what this protocol needs from one renderer connection. Declared here rather
+- `internal/rpcstream/session.go:214` 440 chars: // handleOpen runs one stream's handler. ctx/gate are registered by handleRaw synchronously,
+- `internal/rpcstream/session.go:353` 356 chars: // Serve runs for the life of one connection and returns when the peer's side closes, closing the
+- `internal/rpcstream/session_test.go:13` 350 chars: // internalPipeSession mirrors gitstream_test.go's own pipeSession (package bridge_test) —
+- `internal/shell/closeflush.go:35` 302 chars: // wait registers key as awaiting an ack and returns the channel that closes when one arrives.
+- `internal/shell/quit.go:161` 567 chars: // Flushed is one window's ack, bound as Lifecycle.Flushed (IPC.appFlushed) — fire-and-forget and
+- `internal/shell/quit_test.go:221` 313 chars: // flushThenQuit seeds the pending set before it emits the flush signal — wait for the
+- `internal/shell/wails.go:172` 415 chars: // NewDeferredBrowser is NewDeferredDialogs' counterpart for UpdateService/GitHubService: built
+- `internal/shell/window_test.go:47` 612 chars: // newAttachedWindow builds a fake WindowStore and a real, display-less *application.WebviewWindow
+- `internal/sqlitex/reindex.go:41` 479 chars: // ReorderSortOrder applies a caller-supplied order to one sibling set and rewrites the whole set's
+- `internal/sqlitex/sqlitex.go:57` 896 chars: // escapeDSNPath percent-encodes the three bytes modernc's sqlite3_open_v2 (opened with
+- `internal/sqlitex/sqlitex.go:139` 540 chars: // Migrate runs the forward-only schema_version runner against db: create schema_version if
+- `internal/terminal/bound.go:128` 492 chars: // Open validates args, spawns a new session and returns its resolved shell path. terminalId is
+- `internal/terminal/service.go:104` 480 chars: // OpenWithCoalescedOutput wires p's OnData/OnExit to a fresh coalescing output pump addressed at
+- `internal/terminal/session.go:145` 387 chars: // handleIgnoredSighup keeps shells hangable when the app itself started with SIGHUP ignored (nohup,
+- `internal/terminal/session.go:218` 386 chars: // waitExitCode calls cmd.Wait() exactly once (the session's waiter goroutine — see readLoop) and
+- `internal/testx/apphome.go:10` 361 chars: // RunWithTempHomes points KIRA_HOME and KIRA_SPACE_HOME at fresh dirs under one temp root for the
+- `internal/testx/testx.go:58` 300 chars: // SkipWithoutGit skips the test unless git is on PATH. The shared body behind six per-package
+- `internal/windowsvc/windowsvc.go:16` 306 chars: // Service is the shared bound type — each app's own bridge.WindowsService is
+- `internal/windowsvc/windowsvc.go:23` 304 chars: // OpenNewWindow is main.go's own openNewWindow closure (the ⇧⌘N menu command's action),
+- `packages/api-core/src/http/curl/detect.ts:31` 686 chars: /**
+- `packages/db-fixtures/fixtures/0005_kafka_seed.ts:32` 425 chars: // Belt-and-suspenders: even via the correct in-container listener, the broker's self-managed KRaft
+- `packages/db-fixtures/support/docker.ts:1` 702 chars: // The dev machine's Docker daemon is Colima, not Docker Desktop. Testcontainers needs three
+- `packages/db-fixtures/support/kafka.ts:42` 594 chars: // KafkaContainer's own KRaft defaults (kafka-container.js) set the offsets-topic replication
+- `packages/db-fixtures/support/mariadb.ts:49` 374 chars: // The image ships healthcheck.sh; this is more reliable than a log match. (If a future pinned
+- `packages/db-fixtures/support/mariadb.ts:80` 328 chars: // `database` is required here even though every statement below qualifies its table names —
+- `packages/db-fixtures/support/postgres.ts:35` 367 chars: // @testcontainers/postgresql's own wait strategy (Wait.forAll([forHealthCheck(),
+- `packages/docker-ui/src/testing/ui/dockerMock.ts:37` 302 chars: /**
+- `packages/git-core/src/detail/find.ts:10` 376 chars: /** Looks `path` up in an already-fetched `commit.detail` result — `undefined` (not a throw) when
+- `packages/git-core/src/graph/edges.ts:81` 410 chars: /** Sets a previously-`UNRESOLVED_ROW` target now that the parent has resolved. If
+- `packages/git-core/src/graph/lanes.ts:202` 990 chars: // Step 3a: parent 0 always continues the claimed lane. (An earlier version of this pass
+- `packages/git-core/src/graph/lanes.ts:236` 331 chars: // Step 3b: remaining parents (an octopus merge is this loop running further) always
+- `packages/git-core/src/graph/rowPlan.spec.ts:122` 417 chars: /** Same shape as the ordering fixtures above: `main` (tip row 0) chains 0 -> 1 -> 7 (row 7 the
+- `packages/git-core/src/graph/rowPlan.ts:42` 329 chars: /** Stable group identity — a ref name or a stash key, never re-derived from `sha` (two tips
+- `packages/git-core/src/graph/rowPlan.ts:56` 387 chars: /** A `'commit'` entry's own store row; a `'collapsed'` placeholder's *first* contracted store
+- `packages/git-core/src/graph/types.ts:38` 323 chars: /** A real terminal state, not a placeholder: an edge to a parent outside the loaded range (or
+- `packages/git-core/src/graph/types.ts:50` 437 chars: /** The sentinel a patch record's `toRow`/`toLane` slot carries when *that* field is not
+- `packages/git-core/src/graph/types.ts:90` 361 chars: /** Opaque outside `core/graph/*`: plain, structured-clone-safe data carrying the open-lane
+- `packages/git-core/src/graph/types.ts:114` 460 chars: /** Every edge emitted so far, across every chunk, is numbered from 0 in one global sequence
+- `packages/git-core/src/graph/types.ts:120` 318 chars: /** Store parent-slot index (the same numbering as `LayoutInput.resolvedParentSlots`) -> the
+- `packages/git-core/src/model/reviewRanges.spec.ts:147` 543 chars: // Documents WHY the precondition matters, not a desired behavior: duplicate/overlapping
+- `packages/git-core/src/model/status.ts:111` 369 chars: /** `status --branch`'s header already carries HEAD's identity — deriving it here (rather than a
+- `packages/git-core/src/search/matcher.spec.ts:282` 425 chars: // `matchCommitFields`/`matchRef` return unordered hit lists per row; grouping ("refs group
+- `packages/git-core/src/settings/schema.ts:161` 440 chars: // `as unknown as Settings`: once a `stringArray` key's value type is a literal array tuple
+- `packages/git-core/src/settings/schema.ts:219` 330 chars: /**
+- `packages/git-core/src/store/commitStore.ts:16` 369 chars: /** Clamps a commit timestamp into `Uint32Array` range (1970 .. ~2106). Clock-skewed or
+- `packages/git-core/src/store/commitStore.ts:156` 342 chars: /** Parent slots not yet resolvable to a row, keyed by slot index, value the parent's hex sha
+- `packages/git-core/src/store/commitStore.ts:164` 437 chars: /** Every parent slot resolved since the last `layoutInput()` call, regardless of whether it
+- `packages/git-core/src/store/commitStore.ts:374` 508 chars: /**
+- `packages/git-core/src/store/commitStore.ts:488` 429 chars: /**
+- `packages/git-core/src/testing/packedChunk.ts:4` 354 chars: /** A fixture-only sample instant — `packages/git-ui`'s own `dateFormat.ts` renders it as
+- `packages/git-core/src/testing/packedChunk.ts:31` 374 chars: /** Identity dictionary — default one shared author/committer identity. Pass `[]` with a
+- `packages/git-ipc/src/blobFrame.ts:16` 325 chars: /** Thrown on a blob frame this file cannot make sense of: a header length pointing past the
+- `packages/git-ipc/src/blobFrame.ts:62` 316 chars: /**
+- `packages/git-ipc/src/contract.ts:991` 336 chars: /** Every `WireError.code` the git RPC emits: Go (`internal/ipcerr`, `gitrpc` `mapGitError`,
+- `packages/git-ipc/src/contract.ts:2051` 351 chars: /** Server-composed: the renderer names a PR by number, never a URL (the boundary
+- `packages/git-ipc/src/graphChunkCodec.ts:143` 934 chars: // Every column vector is created unconditionally, even at zero length, so a chunk's empty
+- `packages/git-ipc/src/graphChunkCodec.ts:194` 540 chars: /** A fresh, exactly-sized `ArrayBuffer` copy of a column — never a view over the FlatBuffer
+- `packages/git-ipc/src/streamChannel.ts:26` 881 chars: /**
+- `packages/git-ipc/src/streamChannel.ts:50` 540 chars: // `ArrayBuffer`, not `ArrayBufferLike` — the latter includes `SharedArrayBuffer`, which the DOM
 - `packages/git-ui/src/App.vue:188` 374 chars: /** First-mount-only rehydration target for `CommitGrid.vue`'s own `initialScrollRow` prop (see
-- `packages/git-ui/src/App.vue:231` 316 chars: // P108 F4: a reveal-in-graph paging through the *old* repo's history must not keep running (or
-- `packages/git-ui/src/App.vue:244` 1002 chars: // ---------------------------------------------------------------------------------------
-- `packages/git-ui/src/App.vue:272` 643 chars: /** P108 F10: `main.ts` sets no `app.config.errorHandler`, so a `void`-called (or unawaited)
 - `packages/git-ui/src/App.vue:337` 492 chars: /** Checked-out branch (or detached HEAD) first, then every stash entry, then locals+remotes
-- `packages/git-ui/src/App.vue:402` 452 chars: /** P93 §4.4/§7: the toolbar's collapse-branches toggle — the only place `collapseBranches` writes
-- `packages/git-ui/src/App.vue:417` 1126 chars: // ---------------------------------------------------------------------------------------
-- `packages/git-ui/src/App.vue:429` 540 chars: /** OQ4: a stash node is selectable like a commit, but shows its OWN changes
-- `packages/git-ui/src/App.vue:461` 381 chars: /** F2: extracted so the reconnect handler below (`handleReconnect`) can re-run this fan-out
-- `packages/git-ui/src/App.vue:465` 685 chars: // P108 F2: `applyRepoIdToStates` below runs via `watch(..., { immediate: true })` — its very
-- `packages/git-ui/src/App.vue:488` 451 chars: // P108 F2: the commit/stash context menus resolved against the *old* repo — a genuinely
-- `packages/git-ui/src/App.vue:518` 310 chars: // P7 (item 2): re-fetches the open working-tree pane's own file list on the same signal the
-- `packages/git-ui/src/App.vue:535` 1044 chars: /** §7.8's "selecting a ref scrolls to and highlights the commit it points at" / "selecting a
-- `packages/git-ui/src/App.vue:561` 414 chars: /** G14 D10: "Open in graph" from the review diff toolbar. Opens the target repo first when it is
-- `packages/git-ui/src/App.vue:588` 545 chars: // `SearchState.next()`/`previous()` (`SearchBox.vue`'s `Enter`/`Shift+Enter`, judgment call 6)
-- `packages/git-ui/src/App.vue:633` 954 chars: // ---------------------------------------------------------------------------------------
-- `packages/git-ui/src/App.vue:716` 1003 chars: // ---------------------------------------------------------------------------------------
-- `packages/git-ui/src/App.vue:781` 488 chars: // G28 D13: the global stash section's own header button, the palette's `saveGlobalStash` action,
-- `packages/git-ui/src/App.vue:798` 345 chars: // G25/P76 §9.3: WorktreeDialog.vue's own create-phase seed — same "App.vue owns the state, the
-- `packages/git-ui/src/App.vue:819` 330 chars: /** `WorktreeList.vue`'s own "Switch to this worktree" row action, bubbled through
-- `packages/git-ui/src/App.vue:886` 720 chars: // ---------------------------------------------------------------------------------------
 - `packages/git-ui/src/App.vue:933` 357 chars: // `remoteRow` should always be found (the badge only exists for a decoration on an
-- `packages/git-ui/src/App.vue:979` 802 chars: // ---------------------------------------------------------------------------------------
-- `packages/git-ui/src/App.vue:989` 450 chars: // G-UX D10: captured together, at the moment `loading` *enters* `'refreshing'` — synchronous with
-- `packages/git-ui/src/App.vue:1028` 635 chars: // ---------------------------------------------------------------------------------------
-- `packages/git-ui/src/App.vue:1169` 927 chars: // W15: `kira:layout-complete` used to be marked right here, in the same frame as
-- `packages/git-ui/src/App.vue:1186` 687 chars: // G10 D19: the cold-bootstrap arm — a palette command that fired before this webview had a live
-- `packages/git-ui/src/App.vue:1204` 833 chars: // `docs/plans/P11.md` W7 / `docs/plans/G23-search.md` D12/F11: the four search toggles/scope
-- `packages/git-ui/src/App.vue:1325` 352 chars: // G23 D12/F11: the four search toggles/scope are carried through unchanged since P11 W7
-- `packages/git-ui/src/App.vue:1334` 333 chars: // P93 §4.4: pushed straight to graphOrder, not through setCollapseBranches — that function
-- `packages/git-ui/src/App.vue:1341` 973 chars: // §6.3's "collapsed by default" below `wide`: a persisted `detailOpen: true` from an earlier,
-- `packages/git-ui/src/App.vue:1366` 434 chars: // G12 D7/item 6: falls back to the workspace's own repository, multi-root aware, only when
-- `packages/git-ui/src/App.vue:1373` 422 chars: // P108 F4: `NoRepositoryPanel.vue`'s own onMounted already calls `refreshList()` and can
-- `packages/git-ui/src/App.vue:1395` 438 chars: // ---------------------------------------------------------------------------------------
-- `packages/git-ui/src/App.vue:1409` 306 chars: // P108 F12: `main.ts`'s own `mount()` provides this per instance only for a Kira Space graph tab
-- `packages/git-ui/src/App.vue:1424` 378 chars: // Entering a narrower breakpoint with nothing selected collapses the pane (§6.3's "collapsed by
-- `packages/git-ui/src/App.vue:1462` 1127 chars: /** §6.6's Esc ordering: an open menu, then the search results dropdown, then the detail pane/
-- `packages/git-ui/src/App.vue:1484` 448 chars: /** P7 (item 2): the strip's own click handler — opens the pane (mirrors `openDetail`/a stash
-- `packages/git-ui/src/App.vue:1495` 343 chars: /** P7 (item 2): the working-tree pane's own file-open action — `editor.openWorkingDiff` never
-- `packages/git-ui/src/App.vue:1510` 349 chars: /** G-UX D9: `/`/`Ctrl/Cmd+F` (moved up from `SearchBox.vue`, which used to own this listener for
-- `packages/git-ui/src/App.vue:1557` 548 chars: // P108 F12: Kira Space mounts several git-ui apps into one document — one per graph tab
-- `packages/git-ui/src/App.vue:1570` 558 chars: // The overlay drawer's own "dismissible... on a click outside" (§6.3) — only acted on while the
-- `packages/git-ui/src/App.vue:1581` 455 chars: // P131 Part 2 §5.5: a FileTree row menu (RowContextMenu, DropdownMenu) can open while the
-- `packages/git-ui/src/App.vue:1597` 606 chars: // ---------------------------------------------------------------------------------------
-- `packages/git-ui/src/App.vue:1614` 376 chars: // `exactOptionalPropertyTypes` (tsconfig.base.json) treats an explicit `undefined` differently
-- `packages/git-ui/src/App.vue:1622` 522 chars: // P7 (item 2): the strip's own selection has no row at all, so it must widen this check directly
 - `packages/git-ui/src/App.vue:1663` 482 chars: <!-- Unconditional, present from first paint regardless of which of the four content states
-- `packages/git-ui/src/App.vue:1699` 486 chars: <!-- P108 F8: bootstrap() keeps going after repoState is set — through persisted repo.open,
-- `packages/git-ui/src/App.vue:1904` 362 chars: <!-- P131 Part 2 §5.5: Popover replaces the hand-rolled fixed-position panel + watch
-- `packages/git-ui/src/MountRoot.vue:5` 384 chars: // P131 Part 2 §3.5: git-ui is a separate Vue app (mount()'s own createApp), so neither host app's
-- `packages/git-ui/src/components/AppToolbar.vue:2` 1521 chars: /**
-- `packages/git-ui/src/components/AppToolbar.vue:52` 779 chars: // Plain (not `import type`) imports, for two different reasons. BranchPicker: vue-tsc needs the
-- `packages/git-ui/src/components/AppToolbar.vue:239` 422 chars: /** D50's cancellability table, read into the toolbar's own affordance: only fetch and pull's own
-- `packages/git-ui/src/components/AppToolbar.vue:265` 308 chars: // G10 D17/F15: forwarded so App.vue's palette dispatcher can drive the same affordances a click
-- `packages/git-ui/src/components/AppToolbar.vue:287` 348 chars: <!-- W14 (axe `aria-allowed-role`): `role="toolbar"` is not among the roles the ARIA spec
-- `packages/git-ui/src/components/BranchPicker.vue:2` 1099 chars: /**
-- `packages/git-ui/src/components/BranchPicker.vue:149` 329 chars: // P79: split into two computeds so a tab switch (only ever changing `activeTab`) never re-runs the
-- `packages/git-ui/src/components/BranchPicker.vue:214` 474 chars: // ---------------------------------------------------------------------------------------
-- `packages/git-ui/src/components/BranchPicker.vue:338` 467 chars: // G10 D17/P77 §13: forwarded so App.vue's palette dispatcher can open this panel exactly the way
-- `packages/git-ui/src/components/BranchPicker.vue:349` 374 chars: /** The Popover's own `@update:open` -- fired for every dismissal (trigger click, Escape, outside
-- `packages/git-ui/src/components/BranchPicker.vue:366` 341 chars: /** W20: reka's own close-auto-focus fires after the panel's exit animation, which could steal
-- `packages/git-ui/src/components/BranchPicker.vue:377` 662 chars: /** W20: `close()` unmounts the whole panel, including whatever row button the click just
-- `packages/git-ui/src/components/BranchPicker.vue:390` 1065 chars: // G24 D7 point 4: opening the picker is one of the few user acts allowed to touch the network at
-- `packages/git-ui/src/components/CommitGrid.vue:2` 1088 chars: /**
-- `packages/git-ui/src/components/CommitGrid.vue:59` 524 chars: /** P93 §4.2/§7: the collapse/expand half of the branch-ordered layout — `handleClick`'s own
-- `packages/git-ui/src/components/CommitGrid.vue:72` 310 chars: /** P11 W13: the message column's own in-place highlight source — optional so a caller with
-- `packages/git-ui/src/components/CommitGrid.vue:83` 383 chars: /** G-UX D1 (item 1a): the detail pane's own open/closed state, mirrored from `App.vue`'s
-- `packages/git-ui/src/components/CommitGrid.vue:107` 365 chars: /** `docs/plans/P6.md` W14: a right-click, `Shift+F10`, or the Menu key on a row — `App.vue`
-- `packages/git-ui/src/components/CommitGrid.vue:112` 392 chars: /** `docs/plans/P7.md` W14: a right-click landed on a ref badge (`refBadges.ts`'s
-- `packages/git-ui/src/components/CommitGrid.vue:121` 471 chars: /** `docs/plans/P9.md` W14: the stash counterpart of `refContextMenu` — a right-click landed on
-- `packages/git-ui/src/components/CommitGrid.vue:127` 487 chars: /** P74 §3.3: a click landed on the inline PR badge (`refBadges.ts`'s `data-change-request-number`) —
-- `packages/git-ui/src/components/CommitGrid.vue:152` 343 chars: // P228: grow-only high-water of the lanes' width for this mount (0 until the first lane-aware
-- `packages/git-ui/src/components/CommitGrid.vue:159` 584 chars: /** G21 D6b: the measured pixel width the absolute date format actually needs at the current
-- `packages/git-ui/src/components/CommitGrid.vue:191` 617 chars: /** P93 §7: every translation site in this file's own coordinate conversion — SlickGrid's rows
-- `packages/git-ui/src/components/CommitGrid.vue:202` 428 chars: // Built once per mounted grid (W8): closes over this instance's own LayoutStore/CommitStore
-- `packages/git-ui/src/components/CommitGrid.vue:240` 437 chars: // P79 review fix (Performance, LOW): `false` while a KeepAlive host has backgrounded this mount
-- `packages/git-ui/src/components/CommitGrid.vue:248` 477 chars: // W14: the row a click or a keyboard move just selected, so the accessibility pass below can
-- `packages/git-ui/src/components/CommitGrid.vue:302` 513 chars: /** `undefined` whenever there is nothing to highlight: no `search` prop at all, an empty/invalid
-- `packages/git-ui/src/components/CommitGrid.vue:315` 473 chars: /** G26 D-4.13: `columns.ts`'s own `StackContext.stackInfoFor` — a plain scan over the current
-- `packages/git-ui/src/components/CommitGrid.vue:333` 420 chars: /** P93 §4.2: turns a `RowPlanEntry.groupIndex` into the branch name a placeholder's own "N more
-- `packages/git-ui/src/components/CommitGrid.vue:342` 729 chars: /** P92 item 2: the width the column model must sum to — SlickGrid's own viewport content box, not
-- `packages/git-ui/src/components/CommitGrid.vue:390` 1435 chars: // Regression fix (post-P79-merge): the width `rebuildColumns()` last actually ran against —
-- `packages/git-ui/src/components/CommitGrid.vue:420` 574 chars: // G-UX (item 9): resizeCanvas() BEFORE setColumns() — SlickGrid's own cached canvas width has
-- `packages/git-ui/src/components/CommitGrid.vue:450` 348 chars: /** P93 §4.2: a placeholder's own click/Enter/Space activation — expands its group, session-only
-- `packages/git-ui/src/components/CommitGrid.vue:459` 704 chars: /** G-UX D2 (item 1b): a click on an unselected row opens the detail pane on the FIRST click —
-- `packages/git-ui/src/components/CommitGrid.vue:482` 452 chars: /** P74 §3.3: a click landing on the inline PR badge (`refBadges.ts`'s `data-change-request-number`, always a
-- `packages/git-ui/src/components/CommitGrid.vue:497` 650 chars: /** §6.4: "right-click selects the row [first]", then (P6 W14) opens the shared context menu at the
-- `packages/git-ui/src/components/CommitGrid.vue:536` 452 chars: /** `Shift+F10`/the Menu key (§6.6): opens the same menu `handleContextMenu` does, anchored to
-- `packages/git-ui/src/components/CommitGrid.vue:550` 984 chars: /** P93 §6.2: "clicking a stub scrolls to its parent row" — `hitTest.ts`'s `laneAt` already answers
-- `packages/git-ui/src/components/CommitGrid.vue:588` 665 chars: /** P93 §7: `displayRow` walks display rows (branch-ordered, §3) — arrow-key/Home/End/Page nav
-- `packages/git-ui/src/components/CommitGrid.vue:615` 421 chars: // P94 pass 3 §4.3: everything handleKeyDown's own branches need, built once — plan/toggleGroup/
-- `packages/git-ui/src/components/CommitGrid.vue:631` 1539 chars: /**
-- `packages/git-ui/src/components/CommitGrid.vue:659` 690 chars: // P79 fix (Performance MEDIUM + Functional MEDIUM): every ancestry-affecting signal —
 - `packages/git-ui/src/components/CommitGrid.vue:693` 436 chars: /** `GraphViewState` just published a plan with its layout, synchronously inside the publish: the
-- `packages/git-ui/src/components/CommitGrid.vue:719` 1256 chars: // P79 review fix (Performance, LOW), corrected post-merge regression: a KeepAlive'd host
 - `packages/git-ui/src/components/CommitGrid.vue:733` 334 chars: // `lastRebuiltWidth`'s own doc comment (above `rebuildColumns`): skip a rebuild that would
-- `packages/git-ui/src/components/CommitGrid.vue:749` 894 chars: /**
 - `packages/git-ui/src/components/CommitGrid.vue:775` 362 chars: // No row selected yet (a fresh mount with nothing persisted): row 0, if it exists, is the one
-- `packages/git-ui/src/components/CommitGrid.vue:805` 352 chars: // P93 §4.2: "`aria-expanded="false"` on the row, `aria-label` = the message text" — a
 - `packages/git-ui/src/components/CommitGrid.vue:834` 1927 chars: // Either this row was just explicitly selected (`pendingFocusRow` — always the row div itself,
-- `packages/git-ui/src/components/CommitGrid.vue:865` 949 chars: /** P108 F1: `initialScrollRow` is a persisted *store* row (`viewState.scrollRow`), applied once,
-- `packages/git-ui/src/components/CommitGrid.vue:883` 667 chars: // Still streaming in: more rows may yet cover `row` exactly — keep waiting rather than clamping
-- `packages/git-ui/src/components/CommitGrid.vue:911` 371 chars: // `initialScrollRow` is only ever passed when `App.vue` found real persisted state to
 - `packages/git-ui/src/components/CommitGrid.vue:981` 372 chars: // The constructor above already performed the grid's first render (`explicitInitialization:
-- `packages/git-ui/src/components/CommitGrid.vue:1008` 749 chars: // `stopImmediatePropagation()` only for a key `handleKeyDown` actually claimed — see that
 - `packages/git-ui/src/components/CommitGrid.vue:1021` 368 chars: // `document`, not `host.value`: `focusedRowIndex`'s own doc comment above needs to know when
-- `packages/git-ui/src/components/CommitGrid.vue:1029` 471 chars: // G21 D6b: a font-size/family change (now tracked alongside row-height, readTokens.ts) can
-- `packages/git-ui/src/components/CommitGrid.vue:1045` 374 chars: // `initialScrollRow` (`viewState.scrollRow`) is a persisted store row — translate to the
-- `packages/git-ui/src/components/CommitGrid.vue:1055` 548 chars: // `GraphViewState`'s data changes are driven entirely through `onPlanPublished` (registered in
-- `packages/git-ui/src/components/CommitGrid.vue:1079` 645 chars: // P92 item 2 follow-up: the row count crossing the "needs a vertical scrollbar" threshold is
-- `packages/git-ui/src/components/CommitGrid.vue:1087` 421 chars: // P79 fix (Functional MEDIUM): newly-loaded rows (`graph.loadMore`) can be ancestors of an
-- `packages/git-ui/src/components/CommitGrid.vue:1095` 338 chars: // P108 F1: a plan rebuild does not necessarily accompany the LAST chunk of a load (`loading`
-- `packages/git-ui/src/components/CommitGrid.vue:1120` 332 chars: // P11 W13: mirrors the `generation` watcher directly above — a new `searchGeneration` means the
-- `packages/git-ui/src/components/CommitGrid.vue:1135` 736 chars: // G24 D9: mirrors the `search.searchGeneration` watcher directly above — a third instance of the
-- `packages/git-ui/src/components/CommitGrid.vue:1166` 596 chars: // P79 review fix (Performance, LOW): replays whatever the four watchers above deferred while
-- `packages/git-ui/src/components/CommitGrid.vue:1183` 523 chars: // G-UX D1: the detail pane opening/closing changes the column model itself (compact vs. full),
-- `packages/git-ui/src/components/CommitGrid.vue:1213` 1560 chars: /** `App.vue` (W11) calls this once a refresh's re-walk re-resolves a previously selected sha
-- `packages/git-ui/src/components/CommitGrid.vue:1246` 837 chars: /** G-UX item 2/D10: an auto-refresh's own viewport restore — `App.vue` captures
-- `packages/git-ui/src/components/CommitGrid.vue:1270` 1336 chars: /** `docs/plans/P11.md` W14: `SearchBox.vue`'s second-stage `Escape` (§6.6) asks to move real DOM
 - `packages/git-ui/src/components/CommitGrid.vue:1304` 485 chars: <!-- SlickGrid's own `init()` (`Utils.emptyElement(this._container)`) wipes out whatever was
-- `packages/git-ui/src/components/CommitMeta.vue:2` 1530 chars: /**
-- `packages/git-ui/src/components/CommitMeta.vue:55` 316 chars: /** P74 §4.3: any PR this commit is on (`ChangeRequestState.changeRequestForCommit`, threaded by `DetailPane.v...
-- `packages/git-ui/src/components/CommitMeta.vue:68` 300 chars: /** G-UX (items 6/7): the one "Show more" state for the whole pane now — gates the body, the
-- `packages/git-ui/src/components/CommitMeta.vue:124` 420 chars: /** §6.4: "author and committer with both timestamps when they differ" — read as: show one
-- `packages/git-ui/src/components/CommitMeta.vue:161` 523 chars: /** G24 D12: the one change request row — resolved with a PR (one line per associated PR),
 - `packages/git-ui/src/components/CommitMeta.vue:216` 711 chars: /** Whether the Refs/Signature/PR block has anything to show at all — the common case (no
-- `packages/git-ui/src/components/CommitMeta.vue:241` 356 chars: /** `Co-authored-by`/`Signed-off-by` (§6.4's own two named trailers) parse their `Name <email>`
-- `packages/git-ui/src/components/CommitMeta.vue:266` 350 chars: /** G-UX (item 6): replaces the old copy-message header button — "Open all changes", the exact
-- `packages/git-ui/src/components/CommitMeta.vue:297` 399 chars: /** P74 §4.3: the facts row's own icon — the first PR `changeRequestForCommit` names (ancestry's own
-- `packages/git-ui/src/components/ConflictBanner.vue:2` 1411 chars: /**
-- `packages/git-ui/src/components/DetailPane.vue:2` 1697 chars: /**
-- `packages/git-ui/src/components/EmptyRepositoryPanel.vue:6` 456 chars: /**
-- `packages/git-ui/src/components/FailureBanner.vue:2` 367 chars: /**
-- `packages/git-ui/src/components/FileTree.vue:3` 1265 chars: /**
-- `packages/git-ui/src/components/FileTree.vue:63` 335 chars: /** P74 §7.4: the commit these files belong to — enables the row menu's "Go to file"
-- `packages/git-ui/src/components/FileTree.vue:68` 344 chars: /** G11 D16: the review sidebar's Files pane only — a per-path reviewed status, keyed by
-- `packages/git-ui/src/components/FileTree.vue:73` 630 chars: /** G12 D13: whether this instance renders its own filter/list-mode toolbar. `false` when a
-- `packages/git-ui/src/components/FileTree.vue:84` 365 chars: /** The file cursor moved (a click, arrow-key nav, or a directory toggle's own side effect) —
-- `packages/git-ui/src/components/FileTree.vue:89` 533 chars: /** G21 D13: a file row was opened — a click or arrow-key move (`pinned: false`, navigational:
-- `packages/git-ui/src/components/FileTree.vue:99` 383 chars: /** G11 D16: the reviewed checkbox's own click — toggles path between fully reviewed and
-- `packages/git-ui/src/components/FileTree.vue:143` 391 chars: // G30 round-1 performance review, finding #6: `tree` depends only on `indexed` (the files/filter),
 - `packages/git-ui/src/components/FileTree.vue:182` 364 chars: /** Keeps the keyboard cursor in step with `selectedFile` however it changed — a mouse click on a
-- `packages/git-ui/src/components/FileTree.vue:237` 524 chars: /** G21 D13: every selection change — a click or an arrow-key move alike — also opens the file,
-- `packages/git-ui/src/components/FileTree.vue:264` 515 chars: /** G21 D13: the explicit "keep this" gesture — pins a real, permanent tab. Deliberately relies on
-- `packages/git-ui/src/components/FileTree.vue:317` 542 chars: /** G19 D14: the row's primary leading glyph, replacing the status letter in that role; the letter
-- `packages/git-ui/src/components/FileTree.vue:423` 636 chars: <!-- G-UX D7 (item 7): this comment moved from *before* the root `<div>` to *inside* it (same
-- `packages/git-ui/src/components/FileTree.vue:488` 557 chars: <!-- P75 §4: leading edge, not trailing — a trailing position shifted row to row with the
-- `packages/git-ui/src/components/GlobalStashList.vue:2` 932 chars: /**
-- `packages/git-ui/src/components/LoadMoreButton.vue:2` 676 chars: /**
-- `packages/git-ui/src/components/LoadMoreButton.vue:54` 305 chars: <!-- G16 D9: `remaining > 0` guards against F7's zero-chunk hole — a re-stream that emits no
-- `packages/git-ui/src/components/NoRepositoryPanel.vue:3` 619 chars: /**
-- `packages/git-ui/src/components/NoRepositoryPanel.vue:70` 371 chars: <!-- P108 F4: disabled while any open (this candidate, another candidate, the bootstrap
-- `packages/git-ui/src/components/PullStrategyPicker.vue:2` 955 chars: /**
-- `packages/git-ui/src/components/RefreshButton.vue:2` 1347 chars: /**
-- `packages/git-ui/src/components/RowActionsButton.vue:2` 382 chars: // P113 F7: the row-scoped "More actions" ellipsis icon button, repeated across BranchPicker.vue
-- `packages/git-ui/src/components/SearchBox.vue:89` 339 chars: /** The inline `n of N` indicator mirrors exactly what `Enter`/`Shift+Enter` step through —
-- `packages/git-ui/src/components/SearchBox.vue:102` 334 chars: // ---------------------------------------------------------------------------------------
-- `packages/git-ui/src/components/SearchResults.vue:3` 1339 chars: /**
-- `packages/git-ui/src/components/SearchResults.vue:62` 396 chars: /** P110 A17: `search-option`'s own gap/px are already exactly `rowVariants()`'s own
-- `packages/git-ui/src/components/StackList.vue:2` 1153 chars: /**
-- `packages/git-ui/src/components/StashDetailPane.vue:12` 1079 chars: /**
-- `packages/git-ui/src/components/StashList.vue:2` 1424 chars: /**
-- `packages/git-ui/src/components/StashList.vue:48` 348 chars: /** Bubbled to `BranchPicker.vue` → `App.vue`, which owns `StashDialog.vue`'s branch-mode state —
-- `packages/git-ui/src/components/StashRows.vue:4` 512 chars: /**
-- `packages/git-ui/src/components/TagList.vue:2` 530 chars: /**
-- `packages/git-ui/src/components/TagList.vue:45` 357 chars: /** §7.9: the commit a tag ultimately resolves to — the peeled commit for an annotated tag (whose
-- `packages/git-ui/src/components/UncommittedChangesStrip.vue:59` 338 chars: /** Cheap: the checked-out branch's own HEAD decoration is essentially always within the first
-- `packages/git-ui/src/components/UncommittedChangesStrip.vue:65` 393 chars: /** `GraphViewState.layout` is driven by `onPlanPublished` callbacks, not a reactive ref (that
-- `packages/git-ui/src/components/UndoButton.vue:6` 764 chars: /**
-- `packages/git-ui/src/components/UndoButton.vue:44` 399 chars: <!-- G34 D5: the plan's own icon-only/text split names this call site as icon-only (its `ghost`
-- `packages/git-ui/src/components/WorkingDetailPane.vue:3` 957 chars: /**
-- `packages/git-ui/src/components/WorktreeList.vue:2` 1317 chars: /**
-- `packages/git-ui/src/components/WorktreeList.vue:63` 509 chars: // ---------------------------------------------------------------------------------------
-- `packages/git-ui/src/components/dialogs/BranchDialog.vue:2` 756 chars: /**
-- `packages/git-ui/src/components/dialogs/CheckoutDialog.vue:2` 1819 chars: /**
-- `packages/git-ui/src/components/dialogs/CherryPickDialog.vue:2` 624 chars: /**
-- `packages/git-ui/src/components/dialogs/CherryPickDialog.vue:58` 701 chars: // `classifyCherryPick` files `mainlineRequired` as a `CherryPickBlocker` alongside the real,
-- `packages/git-ui/src/components/dialogs/ForcePushDialog.vue:2` 1454 chars: /**
-- `packages/git-ui/src/components/dialogs/ForcePushDialog.vue:65` 338 chars: // F2 (P108 Part 16 review): the backend's ConfirmToken check (gitsession.RunRemote) gates on the
-- `packages/git-ui/src/components/dialogs/PostCheckoutPullDialog.vue:2` 537 chars: /**
-- `packages/git-ui/src/components/dialogs/PreflightPrediction.vue:2` 496 chars: /**
-- `packages/git-ui/src/components/dialogs/PullDialog.vue:2` 786 chars: /**
-- `packages/git-ui/src/components/dialogs/RenameRefDialog.vue:2` 857 chars: /**
-- `packages/git-ui/src/components/dialogs/RepoSettingsDialog.vue:2` 1662 chars: /**
 - `packages/git-ui/src/components/dialogs/RepoSettingsDialog.vue:70` 523 chars: /** A local, editable draft — reset from the live snapshot every time the dialog opens (the same
-- `packages/git-ui/src/components/dialogs/ResetDialog.vue:2` 1064 chars: /**
-- `packages/git-ui/src/components/dialogs/RevertDialog.vue:5` 469 chars: /**
-- `packages/git-ui/src/components/dialogs/StackDialog.vue:2` 1122 chars: /**
-- `packages/git-ui/src/components/dialogs/StashDialog.vue:2` 1495 chars: /**
-- `packages/git-ui/src/components/dialogs/StashDialog.vue:71` 355 chars: /** G28 D13: set by a STACK row's own "Save to global stash…" action — opens save mode
-- `packages/git-ui/src/components/dialogs/StashDialog.vue:102` 371 chars: /** OQ9: wired from the caller's current changed-files selection when non-empty (`App.vue` passes
 - `packages/git-ui/src/components/dialogs/StashDialog.vue:127` 563 chars: // `[...pathspec.value]` (not `pathspec.value` itself): `ref<readonly string[]>`'s own value is
 - `packages/git-ui/src/components/dialogs/StashDialog.vue:167` 334 chars: // A later keystroke's own preview may have already resolved and been rendered by the time this
-- `packages/git-ui/src/components/dialogs/StashDialog.vue:187` 364 chars: /** Only a genuinely invalid/taken name (or nothing typed yet) blocks the button — a `blocked`
-- `packages/git-ui/src/components/dialogs/StashDialog.vue:211` 553 chars: // ---------------------------------------------------------------------------------------
-- `packages/git-ui/src/components/dialogs/TagDialog.vue:5` 509 chars: /**
-- `packages/git-ui/src/components/dialogs/WorktreeDialog.vue:2` 773 chars: /**
-- `packages/git-ui/src/components/dialogs/WorktreeDialog.vue:45` 382 chars: /** Set by `AppToolbar.vue`'s "Create Worktree…" button, the `createWorktree` palette action, or
-- `packages/git-ui/src/components/dialogs/WorktreeDialog.vue:161` 384 chars: /** G28 D7: closes G25 §9's own named hand-forward — OFFERED, never taken automatically (unlike
-- `packages/git-ui/src/components/review/BaseSelector.vue:4` 751 chars: /**
-- `packages/git-ui/src/components/review/ReviewCommentsPane.vue:4` 534 chars: /**
-- `packages/git-ui/src/components/review/ReviewCommitRow.vue:4` 1118 chars: /**
-- `packages/git-ui/src/components/review/ReviewCommitRow.vue:69` 460 chars: /** G-UX D5 (item 5): the row-action cluster (Open all changes, Open in graph) sits inside this
-- `packages/git-ui/src/components/review/ReviewCommitRow.vue:93` 451 chars: // P108 F9: `props.actions` (the session-level `rowActions` bundle, see this component's own doc
-- `packages/git-ui/src/components/review/ReviewCommitRow.vue:106` 1006 chars: // G14 D8 row action 1 / G21 D8c: "Open all changes" — one awaited `openAllChanges` call rather
-- `packages/git-ui/src/components/review/ReviewCommitRow.vue:137` 368 chars: // P108 F10: a template handler — Vue's own async-error handling already stops this from
-- `packages/git-ui/src/components/review/ReviewCommitRow.vue:146` 354 chars: // G12 D12: opens the host's diff directly — no in-webview diff mode to flip into. `sha`'s
-- `packages/git-ui/src/components/review/ReviewCommitRow.vue:181` 357 chars: <!-- G19 D10: the click-to-toggle listener moved here, off the whole row (F10's root cause —
-- `packages/git-ui/src/components/review/ReviewCommitRow.vue:185` 339 chars: <!-- W17: hover tint scoped to the header, not the whole row — the expanded body's own
-- `packages/git-ui/src/components/review/ReviewCommitRow.vue:213` 304 chars: <!-- G19 D7: the clickable-sha button and its own "Copy SHA" affordance are gone — the
-- `packages/git-ui/src/components/review/ReviewCommitRow.vue:219` 376 chars: <!-- G14 D8 row 2: inline icon actions, right-aligned — revealed on hover/focus-within
-- `packages/git-ui/src/components/review/ReviewCommitRow.vue:235` 306 chars: <!-- P75 §2.3: a real button now — no more command: anchor a bubble-phase
-- `packages/git-ui/src/components/review/ReviewFilesPane.vue:5` 1301 chars: /**
-- `packages/git-ui/src/components/review/ReviewView.vue:6` 1578 chars: /**
-- `packages/git-ui/src/components/review/ReviewView.vue:83` 840 chars: // P108 F6: one target-sequence token, bumped by every `applyTarget` call — the one place every
-- `packages/git-ui/src/components/review/ReviewView.vue:94` 561 chars: /** P108 F10: `main.ts` sets no `app.config.errorHandler`, so a `void`-called (or unawaited) async
 - `packages/git-ui/src/components/review/ReviewView.vue:118` 472 chars: /** Re-runs `setTarget` against the same branch: re-resolves the base and re-streams the range from
-- `packages/git-ui/src/components/review/ReviewView.vue:146` 315 chars: // P108 F7: a retry re-enters here after an earlier run already subscribed and constructed
-- `packages/git-ui/src/components/review/ReviewView.vue:179` 333 chars: // P108 F6: a `review.target` push can land during this await (the `bridge.on('review.target',
-- `packages/git-ui/src/components/review/ReviewView.vue:192` 671 chars: /**
-- `packages/git-ui/src/components/review/ReviewView.vue:224` 445 chars: /** G19 D11b: the write half — one `watch()` over the same fields the snapshot lists, coalesced
-- `packages/git-ui/src/components/review/ReviewView.vue:317` 449 chars: // ---------------------------------------------------------------------------------------
-- `packages/git-ui/src/components/review/ReviewView.vue:336` 456 chars: // ---------------------------------------------------------------------------------------
-- `packages/git-ui/src/components/review/ReviewView.vue:376` 339 chars: // Mirrors `App.vue`'s own first-paint mark (§5.1 — W18's review-view perf metric measures from
-- `packages/git-ui/src/components/review/ReviewView.vue:403` 338 chars: // G12 D13: one panel-level filter/list-mode toolbar, replacing what used to be a separate
-- `packages/git-ui/src/components/review/ReviewView.vue:410` 563 chars: // G19 D11b: the write half of durable persistence — one watch() over the same fields the
-- `packages/theme/src/NumberStepperInput.vue:15` 322 chars: // P110 I2-22 (§3.10): today's InputGroup + InputGroupInput type="number" + two Tooltip-wrapped
-- `packages/theme/src/SwatchRadio.vue:2` 342 chars: // P110 I2-24 (§3.10): the 10-utility swatch label/input/span recipe, carried once instead of 4
-- `packages/theme/src/components/AttributeTooltip.vue:10` 917 chars: // P104 §6.4: the one attribute-driven tooltip residue. SlickGridHost.vue/ConsoleSlickGrid.vue put
-- `packages/theme/src/components/AttributeTooltip.vue:24` 336 chars: /** P42 D19: the structured half of a tooltip — carried in a second attribute (`data-kira-tip-
-- `packages/theme/src/components/AttributeTooltip.vue:46` 687 chars: /** The grid's own header row element(s). Scoping the listener to them (instead of `document`)
-- `packages/theme/src/components/AttributeTooltip.vue:121` 380 chars: <!-- reka's raw PopperAnchor (what a `reference` point normally anchors through, per
-- `packages/theme/src/components/EmptyState.vue:14` 395 chars: // The one empty / unavailable composition. `media` slot replaces the icon (tinted icon). Default
-- `packages/theme/src/components/SearchField.vue:12` 353 chars: // P262 §2.5: the one search/filter text box. Attrs (data-testid, @keydown, @keydown.enter, ...) land
-- `packages/theme/src/components/TooltipAnchorBridge.vue:2` 357 chars: // P104 §6.4: a one-file bridge onto reka-ui's *public* injectTooltipRootContext() -- the one seam
-- `packages/theme/src/components/TooltipIconButton.vue:15` 810 chars: // P113 F2: 152 call sites across 52 files repeated this exact
-- `packages/theme/src/components/TooltipIconButton.vue:54` 632 chars: // fix: a handful of call sites (TimestampPane.vue's calendar trigger, FilterToolbar.vue's history
-- `packages/workbench/src/automations/AutomationsNewTab.vue:7` 408 chars: // P91 §8/§9: the tab strip's own "+" for the Automations module — one plain, unscoped session at the
-- `packages/workbench/src/automations/AutomationsStart.vue:14` 467 chars: // P91 §12: MainView.vue's own fallback when the Automations module has no active tab — the state a
+- `packages/git-ui/src/graph/hitTest.ts:18` 580 chars: /**
+- `packages/git-ui/src/graph/layoutClient.ts:60` 411 chars: /** Vite's own documented module-worker form: a literal `new URL(..., import.meta.url)`
+- `packages/git-ui/src/graph/layoutClient.ts:71` 558 chars: /** The documented fallback above: runs `layoutAppend` on the main thread behind the same
+- `packages/git-ui/src/graph/layoutClient.ts:112` 310 chars: /** What a `submit()` whose response arrived after an intervening `reset()` rejects with — the
+- `packages/git-ui/src/graph/layoutStore.spec.ts:177` 345 chars: // Chunk c (rows [c, c+1)) opens one new unresolved edge of its own (global edge index c) AND
+- `packages/git-ui/src/graph/layoutStore.ts:50` 621 chars: /** Edges whose span exceeds this many rows — or whose target has not resolved yet, treated as
+- `packages/git-ui/src/graph/layoutStore.ts:98` 377 chars: /** Whether `segment` paints inside `row`'s band at all — the vertical run of its lane crossing
+- `packages/git-ui/src/graph/layoutStore.ts:107` 756 chars: /** Decides `#longEdges` membership at the moment a chunk is first appended — an edge still
+- `packages/git-ui/src/graph/layoutStore.ts:152` 388 chars: /** `#longLocalIndices[chunkIndex]` is the set of that chunk's own local edge indices decided
+- `packages/git-ui/src/graph/layoutStore.ts:168` 303 chars: /** Test-observable count of indexed long edges — exposed so `#resolveLong`'s bound ("stays
+- `packages/git-ui/src/graph/layoutStore.ts:195` 314 chars: // Patches name edges in *earlier* chunks (edges.ts's own `patchTarget`: a same-chunk target
+- `packages/git-ui/src/graph/rowSvg.ts:199` 365 chars: /** A filled dot (ordinary/merge's inner dot) vs. an unfilled ring (merge's outer ring, the
+- `packages/git-ui/src/icons/setiFileIcon.ts:43` 503 chars: /** One data URL per distinct icon SVG, built at most once per session — a session realistically
+- `packages/git-ui/src/icons/setiFileIcon.ts:54` 300 chars: // `seti-icons`' shipped `icons.json` strings have no `xmlns` — harmless for `<img>`/inline SVG,
+- `packages/git-ui/src/icons/setiFileIcon.ts:110` 472 chars: /** `path` may be a full repo-relative path — `seti-icons`' own `getDetails` slices from
+- `packages/git-ui/src/lib/columns.ts:25` 355 chars: /** Every field a column's `field:` must name is a valid dotted path into `CommitRecord`
+- `packages/git-ui/src/lib/columns.ts:241` 347 chars: /** `ctx.dateFormat`/`ctx.now` are accessors, not values, so a single `Column[]` array built once
+- `packages/git-ui/src/lib/columns.ts:266` 468 chars: /** The explicit widths `CommitGrid.vue` computes before building columns: `messageWidth` is
+- `packages/git-ui/src/lib/dateFormat.spec.ts:5` 418 chars: /** Bun's own `bun:test` environment has no DOM — no `document`, no `OffscreenCanvas` (the same
+- `packages/git-ui/src/lib/fileTreeModel.ts:123` 468 chars: /** Folds one `DirBuilder` into its final, immutable form: children first (so a chain collapses
+- `packages/git-ui/src/lib/linkify.ts:28` 324 chars: /** Trailing punctuation a sentence commonly puts right after a URL — a period ending the
+- `packages/git-ui/src/lib/menuModel.ts:32` 325 chars: /**
+- `packages/git-ui/src/lib/refBadges.ts:292` 351 chars: /**
+- `packages/git-ui/src/lib/rowAccessibility.ts:13` 368 chars: /** One decoration, in words — reuses `badgeSpecFor`'s own `text` (the same string a sighted user
+- `packages/git-ui/src/lib/searchHighlight.ts:25` 408 chars: // A zero-length match (e.g. an all-optional pattern) would otherwise spin `matchAll` forever
+- `packages/git-ui/src/lib/stashListModel.ts:29` 342 chars: // A label that itself contains ": " must round-trip whole — colonSpace is the FIRST
+- `packages/git-ui/src/state/changeRequests.spec.ts:12` 477 chars: /** A deterministic 40-hex-char sha (`ShaTable`'s own width auto-detect needs a consistent
+- `packages/git-ui/src/state/changeRequests.spec.ts:32` 363 chars: /** A linear chain, tip first: `shas[0]` is the branch tip, `shas[i]`'s parent is `shas[i + 1]`,
+- `packages/git-ui/src/state/changeRequests.ts:367` 338 chars: /** Resolves one branch's own PR record — `BranchPicker.vue`'s `#123` badge and search's Refs
+- `packages/git-ui/src/state/changeRequests.ts:471` 382 chars: // Base cutoff: every row reachable from a resolved `baseRef`'s own tip — excluded from the
+- `packages/git-ui/src/state/detailActions.ts:11` 354 chars: /** Copies `text` via `clipboard.write` and feeds the resulting announcement into the shared
+- `packages/git-ui/src/state/graphOrder.ts:127` 426 chars: /** Called alongside `GraphViewState.reset()` on a repo switch (`App.vue:259`) — clears the
+- `packages/git-ui/src/state/graphView.spec.ts:234` 320 chars: // Now repo A's original loadMore (inside loadAll()'s loop) finally resolves. Its own abort
+- `packages/git-ui/src/state/graphView.ts:476` 304 chars: /** False in grouped mode when `plan` and `layout` differ (a collapse reset, never a rebuild:
+- `packages/git-ui/src/state/ops.ts:709` 321 chars: /** `RevertDialog.vue` calls this once a mainline is picked (`mainlineRequired.length > 0`) so
+- `packages/git-ui/src/state/ops.ts:871` 311 chars: /** `CherryPickDialog.vue` calls this once a mainline is picked, same shape as
+- `packages/git-ui/src/state/ops.ts:1030` 327 chars: /** `StashDialog.vue`'s shared apply/pop confirmation calls this — `false` for Cancel, matching
+- `packages/git-ui/src/state/ops.ts:1365` 531 chars: // -------------------------------------------------------------------------------------
+- `packages/git-ui/src/state/packedStream.ts:26` 302 chars: /** Called instead of applying the chunk when `CommitStore.appendPacked` rejects it (an
+- `packages/git-ui/src/state/pendingSlot.ts:11` 307 chars: /** Sets `pending` and returns a Promise that settles once `resolve()` (or `abandon()`) is
+- `packages/git-ui/src/state/review.ts:403` 359 chars: // Distrust everything and restart from row 0 — the same recovery GraphViewState's own
+- `packages/git-ui/src/state/search.ts:443` 375 chars: /** `loadedRows` changed — coalesces a burst of these (see `LOADED_SCAN_COALESCE_MS`'s own doc
+- `packages/git-ui/src/state/stash.ts:36` 341 chars: /** `null` selects nothing. Otherwise the sha of the entry whose file list `changes` holds —
+- `packages/git-ui/src/state/working.ts:42` 304 chars: /** `selected(true)` requests `working.detail` immediately; `selected(false)` (a real commit/
+- `packages/git-ui/src/state/working.ts:67` 354 chars: /** Re-fetches without changing `selected` — the strip's own count already updates live off
+- `packages/git-ui/src/theme/readTokens.ts:3` 726 chars: /**
+- `packages/shared/caps.ts:59` 771 chars: // `writable` is the coarse "this connection accepts mutate() at all" gate DataToolbar.vue's
+- `packages/shared/domain/grpc.ts:83` 305 chars: // codes.Code.String() (grpc-go), verbatim — GRPC_CODE_NAMES is the renderer's own copy so a
+- `packages/shared/domain/http.ts:250` 320 chars: // The default Content-Type per code sub-language — mirrors Go's contentTypeByCodeLanguage
+- `packages/shared/domain/http.ts:348` 353 chars: // The wire shape sent to HttpService.Send's Options field (bridge/http.go) — optional keys, not
+- `packages/shared/domain/layout.ts:20` 320 chars: // No `visible` field (unlike its project/operations siblings): the cell editor panel's
+- `packages/shared/domain/mask.ts:43` 354 chars: // MaskingRule is the bare {kind, keepHint, correlate} triple internal/mask.Rule carries — never a
+- `packages/shared/domain/mask.ts:88` 522 chars: // maskWord masks one word: first grapheme + bullet run when keepHint, an all-bullet run of the
+- `packages/shared/domain/mask.ts:109` 323 chars: // maskName keeps each whitespace-separated word's first grapheme (when keepHint) plus its own
+- `packages/shared/domain/mask.ts:153` 421 chars: // MASK_TEXT_GRAPHEME_CAP is TEXT_BUCKET_EDGES' own top edge. lengthBucket only ever needs to tell
+- `packages/shared/domain/mask.ts:160` 315 chars: // boundedGraphemeCount mirrors graphemeCount but stops iterating once the count reaches limit. For
+- `packages/shared/domain/mask.ts:180` 659 chars: // NUMERIC_RE is the canonical accept/reject gate for maskNumber, on both sides (mask.go's own
+- `packages/shared/domain/mask.ts:351` 388 chars: // tag computes "#" + crockfordBase32(HMAC-SHA256(key, value))[0:6] — exactly internal/mask's own
+- `packages/shared/domain/mask.ts:362` 428 chars: // apply masks one non-NULL cell — mirrors internal/mask.Masker.Apply exactly, including the
+- `packages/shared/domain/shortcuts.ts:1` 303 chars: // The one table the context menu's displayed shortcut text (formatShortcut) and the local
+- `packages/shared/domain/sqlLex.ts:191` 478 chars: /** Recognises and scans one of the four lexical spans this SQL lexer family agrees on — a line
+- `packages/shared/domain/sqlTokens.ts:251` 337 chars: /** `scanSqlSpan`'s three outcomes, folded into scanLevel's own vocabulary: no span here (`null`),
+- `packages/shared/domain/sqlTokens.ts:263` 545 chars: // Comments are trivia, not structure — dropped here exactly like whitespace, never a sibling in
+- `packages/shared/domain/uri.ts:67` 358 chars: // mongodb+srv is excluded on purpose: formatConnectionUri only ever emits `mongodb://` (it
+- `packages/shared/protocol/events.ts:156` 367 chars: /** `kira:maskRules:changed`'s own payload (internal/bridge/maskrules.go's MaskRulesChangedEvent,
+- `packages/shared/protocol/frame.ts:429` 349 chars: /**
+- `packages/theme/src/icons.ts:1` 307 chars: /** The one concept-to-glyph table for UI icons (codicon names, no `codicon-` prefix). A concept
+- `packages/theme/src/stickyBand.ts:95` 384 chars: // The kept candidates are always a prefix: ancestor indices strictly increase, so a candidate's
+- `packages/theme/src/wrapSelection.ts:13` 481 chars: /** Attach as a plain `keydown` listener on a text `<input>`/`<textarea>`. Wraps the current
+- `packages/workbench/src/behaviour/clipboard.ts:90` 358 chars: /**
+- `packages/workbench/src/behaviour/followTail.ts:7` 354 chars: /**
+- `packages/workbench/src/behaviour/formErrors.ts:17` 317 chars: /**
+- `packages/workbench/src/behaviour/liveRegion.ts:5` 326 chars: /** One polite live region's text. `announce` clears, then sets after `TIMING.reannounce`, so a
+- `packages/workbench/src/behaviour/optimistic.ts:7` 438 chars: /**
+- `packages/workbench/src/behaviour/pendingDecision.ts:25` 344 chars: // Perf: the owning dialog is always-mounted at its app's root (never unmounted per request), so
+- `packages/workbench/src/behaviour/virtualRows.ts:59` 393 chars: // `estimateSize` isn't one of virtual-core's own memo deps (only `count` and the handful listed
+- `packages/workbench/src/behaviour/virtualRows.ts:83` 376 chars: // Scrolls just enough to bring `index` into view -- top-aligned if it's above the viewport,
 - `packages/workbench/src/components/AutocompleteField.vue:29` 443 chars: // A free-text field with identifier/keyword completion (filter, header and URL inputs). The real
-- `packages/workbench/src/components/BootFailure.vue:7` 618 chars: // P113 F6: main.ts's own boot-failure fallback, both apps — mounted in place of App.vue when
 - `packages/workbench/src/components/ConfirmDialog.vue:24` 660 chars: <!-- v-if, not just :open — reka's DialogPortal inserts each open dialog's node at the *end* of
-- `packages/workbench/src/components/ContextMenu.vue:2` 383 chars: // P104 §5: the point-anchored singleton menu, reopened on reka's own DropdownMenuRoot. One shared
-- `packages/workbench/src/components/MainView.vue:5` 672 chars: // P103 Part 2 (§5.4): Kira Studio's own workbench/panels/MainView.vue and Kira Space's, unified —
-- `packages/workbench/src/components/ModeSwitcher.vue:19` 380 chars: <!-- No app title (removed — HideTitle already drops AppKit's own, and a second wordmark read as
-- `packages/workbench/src/components/ModeSwitcher.vue:26` 488 chars: <!-- P15 D9: px-3 (12px) -- the tab chip's own metrics (--kira-h-md/--kira-t-sm, 26px/11px)
-- `packages/workbench/src/components/OpLogPanel.vue:25` 542 chars: // P132 Part 1 (§2.3): hoisted from Kira Studio's own workbench/panels/OperationsPanel.vue —
 - `packages/workbench/src/components/OpLogPanel.vue:57` 331 chars: // `defineProps`' own default values can't reference `emit` (a local, hoisted out of setup()) —
-- `packages/workbench/src/components/OpLogPanel.vue:117` 317 chars: // P104 §3.4: VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
-- `packages/workbench/src/components/OpLogPanel.vue:250` 482 chars: <!--
 - `packages/workbench/src/components/QueryState.vue:12` 348 chars: // The one loading / error / empty shell for bridge data. `pane` fills a panel or view body with an
-- `packages/workbench/src/components/SettingsShell.vue:85` 528 chars: // P17 D1 (both apps, identical reasoning): everything the user touches lives in this draft until
-- `packages/workbench/src/components/SettingsShell.vue:99` 337 chars: // G7 D16: an array-valued leaf (Kira Space's git.protectedBranches) gets its own array object from
-- `packages/workbench/src/components/TabStrip.vue:18` 932 chars: // P103 Part 2 (§5.4): Kira Studio's own workbench/panels/TabStrip.vue and Kira Space's, unified.
-- `packages/workbench/src/components/TabStrip.vue:210` 395 chars: <!-- P72 §7: the pinned tab's own fixed leading slot — a sibling of the scrolling tab row,
-- `packages/workbench/src/components/TabStrip.vue:259` 365 chars: <!-- P105 §11: a focusable close control nested inside the tab's own <button> is invalid
-- `packages/workbench/src/components/TabStrip.vue:333` 653 chars: <!-- P83 §9.1/P91 §8: a third fixed child, after the scrolling tab row, mirroring the pinned
-- `packages/workbench/src/components/TabStrip.vue:341` 587 chars: <!-- P110 I2-20: `.tab-chip`'s hover/attention/close-reveal rules moved into `:class` ternaries
-- `packages/workbench/src/components/TabStripNewButton.vue:6` 475 chars: // P128 §2.3: hoisted from Kira Studio's own WorkbenchShell.vue (the automations module's own "+") and
-- `packages/workbench/src/components/TitleBar.vue:2` 1249 chars: // P103 Part 2 (§5.4): Kira Studio's own workbench/TitleBar.vue and Kira Space's, unified — the bar
-- `packages/workbench/src/components/TitleBar.vue:20` 339 chars: <!-- P1 D2/C8: wails-drag carries --wails-draggable: drag so the bar behaves like a native title
-- `packages/workbench/src/components/TitleBarWindowActions.vue:9` 467 chars: // P116 H7: the keep-awake toggle and "New window" button, hoisted verbatim from Kira Studio's own
-- `packages/workbench/src/components/TreeTwisty.vue:7` 1199 chars: // P110 I2-13: the disclosure-triangle button shared by TreeRow.vue, CollectionRow.vue,
-- `packages/workbench/src/components/UpdateAvailableItem.vue:8` 345 chars: // P119: hoisted from Kira Studio's own StatusBar.vue (same data-testid, same markup) —
-- `packages/workbench/src/components/UpdateDialog.vue:16` 516 chars: // P119: the in-app update flow, replacing Kira Studio's own release-page banner click (§4.6's
-- `packages/workbench/src/components/WorkbenchShell.vue:2` 492 chars: // P264 §2.8: the project panel and the Operations dock resize through ResizeHandle (VueUse
-- `packages/workbench/src/components/WorkbenchShell.vue:58` 486 chars: <!-- flex-1 (was dropped converting the old grid's `flex: 1` to Tailwind classes, collapsing the
 - `packages/workbench/src/components/WorkbenchShell.vue:127` 357 chars: <!-- The old grid template stayed four rows (main/splitops/ops/status) whether or not ops was
 - `packages/workbench/src/components/WorkbenchTitleBar.vue:11` 366 chars: // Both apps' title bar: mode switcher, the two panel toggles, Settings, window actions. Stores and
-- `packages/workbench/src/prompt/TextPromptDialog.vue:12` 787 chars: // P107 T2-19: deliberately NOT built on shadcn-vue's Dialog (declined, real requirement) — its
-- `packages/workbench/src/prompt/TextPromptDialog.vue:34` 347 chars: // P105 §5.2(b): the scrim is a pointer-event shield, not an interactive element — it absorbs a
-- `packages/workbench/src/prompt/TextPromptDialog.vue:43` 431 chars: <!-- P28 D17(c)'s own dialog rung, not a bare low z-index — strictly higher, so unifying every call site
-- `packages/workbench/src/terminal/TerminalHostView.vue:2` 798 chars: // P107 I2-19: TerminalView.vue (Kira Studio) and RepoTerminalView.vue (Kira Space) stayed
+- `packages/workbench/src/editor/monaco.ts:87` 368 chars: // A rejected memoised promise would otherwise stay rejected for the rest of the page's
+- `packages/workbench/src/editor/monacoTheme.ts:215` 388 chars: // No plain-colour shadow token exists in the palette — `--kira-shadow`/`--kira-shadow-dialog`
+- `packages/workbench/src/editor/paintSpans.ts:61` 463 chars: // `base` tiles `[0, textLength)` left to right with no gaps (this function's own doc comment;
+- `packages/workbench/src/editor/paintSpans.ts:81` 394 chars: // Coalesce into the previous run when it ends exactly here and carries the same classes in the
+- `packages/workbench/src/editor/paintSpans.ts:143` 447 chars: /** Renders `text` as syntax-highlighted, `{{variable}}`/find-match-highlighted HTML — the whole of
+- `packages/workbench/src/lib/opLog.ts:20` 541 chars: // The default context-menu items every op-log row gets: Copy command, Copy error, Cancel — exactly
+- `packages/workbench/src/state/createAppUpdateStore.ts:67` 351 chars: // Net: the router shows the update popup once per new version, in one window; **Later**
+- `packages/workbench/src/state/createModeStore.ts:44` 362 chars: // `reactive<M>(...)` itself types as `UnwrapNestedRefs<{ active: M }>`, which TS can't prove
+- `packages/workbench/src/state/createOpLogStore.ts:29` 312 chars: // Vue's own `reactive<T>` return type (`UnwrapNestedRefs<T>`) recomputes a structurally-equal
+- `packages/workbench/src/state/createSettingsStore.ts:59` 444 chars: // `reactive<Se>(...)` itself types as `Reactive<Se>` (Vue's own `UnwrapNestedRefs<Se>`),
+- `packages/workbench/src/state/createTabsStore.ts:71` 307 chars: /** Every generic action the store exposes, before an app's own `extend` adds more — also what
+- `packages/workbench/src/state/createTabsStore.ts:137` 378 chars: /** Runs at the end of a tab's creation (`openTab`'s fresh-record branch, and `duplicateTab`,
+- `packages/workbench/src/state/createTabsStore.ts:142` 387 chars: /** Runs right alongside every `dropAllPagesForTab` call inside `closeTabInternal`/`closeOthers`/
+- `packages/workbench/src/state/createTabsStore.ts:218` 553 chars: // Chains onto whatever save is already in flight (or already queued) rather than firing its
+- `packages/workbench/src/state/createTerminalsStore.ts:152` 394 chars: // A session opened with no view mounted (Kira Space's ADE opens them headlessly and shows one
+- `packages/workbench/src/state/createTerminalsStore.ts:229` 452 chars: /** A pass-through, not an encoding decision: bytes is already the exact byte sequence to send —
+- `packages/workbench/src/state/queryClient.ts:3` 772 chars: // Query key convention: a flat `[domain, ...ids]` tuple — `['schema', connectionId]`,
+- `packages/workbench/src/tabs/types.ts:42` 346 chars: /** True for exactly one kind per app (Kira Space's `repo-graph`) — tabsForWorkspace's own
+- `packages/workbench/src/terminal/terminalRenderer.ts:102` 484 chars: // onData is real text (typed characters, paste, escape sequences) — UTF-8 encoded before it
+- `packages/workbench/src/terminal/terminalRenderer.ts:119` 351 chars: /** Re-measures tabId's own terminal against its current container size and applies it — the
+- `packages/workbench/src/terminal/useTerminalMount.ts:26` 382 chars: /** The caller's own template ref (`<div ref="container" />`) — kept caller-owned, not created
+- `packages/workbench/src/testing/ui/mockRuntime.ts:6` 658 chars: /**
+- `packages/workbench/src/testing/ui/mockRuntime.ts:16` 325 chars: /** One control-channel snapshot — the shape both apps' own `tests/ui/support/types.ts`
+- `packages/workbench/src/testing/ui/mockRuntime.ts:125` 356 chars: /** The exact shape each app's own `internal/bridge` transport writes for a bound method's error —
+- `packages/workbench/src/testing/ui/mockRuntime.ts:151` 413 chars: /** Called with the live call's own args when the direct (channel, canonical-args) lookup finds
+- `packages/workbench/src/testing/ui/mockRuntime.ts:161` 360 chars: /** Called when no snapshot (direct or fallback) answers a channel, before `wildcardDefaults` is
+- `packages/workbench/src/testing/ui/mockRuntime.ts:171` 415 chars: /**
+- `packages/workbench/src/testing/ui/mockRuntime.ts:272` 429 chars: // The runtime bundle's own last line (runtime.js's `loadOptionalScript`) HEADs this once per
+- `packages/workbench/src/testing/ui/mockRuntime.ts:343` 467 chars: /**
+- `packages/workbench/src/testing/unit/fakeSocket.ts:54` 313 chars: // Mirrors stream.js's own `defineHandlerProperty`: an `on<type>` accessor that registers through
+- `packages/workbench/src/testing/unit/restoreAfterEach.ts:3` 1045 chars: // `control` and `data` (bridge/control.ts, bridge/data.ts) are each one shared singleton object
+- `packages/workbench/src/viteAppConfig.ts:7` 354 chars: /** This app's own directory name under `apps/` — also the segment wails3's `-b` bindings
+- `packages/workbench/src/viteAppConfig.ts:40` 480 chars: // Generated with `-b`, the bindings import "/wails/runtime.js" — a path Wails' own
+- `scripts/check-class-conflicts.ts:286` 467 chars: // A default-scale value that shares the SAME utility prefix but a DIFFERENT merge group -- only
 
-Full list (every status, 2440 lines): `.commentsweep/not-applied.md` (untracked work dir); every comment of any size: `.commentsweep/manifest.jsonl`.
