@@ -122,14 +122,19 @@ func newClient(host string) (*client.Client, error) {
 func pullImage(cli *client.Client) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	if _, err := cli.ImageInspect(ctx, Image); err == nil {
+	ii, inspectErr := cli.ImageInspect(ctx, Image)
+	if inspectErr == nil && len(ii.RepoDigests) > 0 {
 		return nil
 	}
+	// docker load drops RepoDigests; re-pulling restores them (layers are cached, so only the manifest moves).
 	pull, err := cli.ImagePull(ctx, Image, client.ImagePullOptions{})
-	if err != nil {
-		return err
+	if err == nil {
+		err = pull.Wait(ctx)
 	}
-	return pull.Wait(ctx)
+	if err != nil && inspectErr == nil {
+		return nil
+	}
+	return err
 }
 
 func labelled(extra map[string]string) map[string]string {
