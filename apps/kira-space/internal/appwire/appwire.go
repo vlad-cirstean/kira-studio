@@ -176,6 +176,7 @@ func Build(opts Options) *Wired {
 	w.Agents = agentSelector(registry, repositories.Settings)
 	w.AgentSvc = &bridge.AgentService{Service: &agentsvc.Service{Agents: w.Agents}}
 	repositories.CustomScripts.Agents = registry
+	repositories.Settings.Agents = registry
 
 	credentialRelay := gitcred.New()
 	w.Windows = shell.NewWindowRegistry()

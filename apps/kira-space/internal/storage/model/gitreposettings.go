@@ -126,6 +126,11 @@ func (p GitRepoSettingsPatch) Validate() error {
 	if p.PullStrategy != nil && !ValidPullStrategy(*p.PullStrategy) {
 		return fmt.Errorf("model: pullStrategy: invalid value %q", *p.PullStrategy)
 	}
+	if p.GitHostProvider != nil {
+		if v := *p.GitHostProvider; v != "auto" && v != "off" && !appsettings.ValidProviderID(v) {
+			return fmt.Errorf("model: gitHostProvider: invalid value %q", v)
+		}
+	}
 	if p.WorktreePrepareTimeout != nil {
 		if _, err := ParsePrepareTimeout(*p.WorktreePrepareTimeout); err != nil {
 			return fmt.Errorf("model: %w", err)

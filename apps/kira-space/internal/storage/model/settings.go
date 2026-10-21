@@ -6,7 +6,7 @@ import (
 	"regexp"
 
 	"github.com/kirathecat/kira-studio/internal/appsettings"
-	"github.com/kirathecat/kira-studio/internal/harness/providers"
+	"github.com/kirathecat/kira-studio/internal/harness"
 )
 
 // Kira Space's own trimmed Settings model (P100 Part 1). Data/Cache/Api/DbMcp are dropped
@@ -381,21 +381,19 @@ func validateMobileSection(m *MobilePatch) error {
 	return nil
 }
 
-var providerRegistry = providers.New()
-
 // validMemoryModel reports whether alias is in provider's catalog. A provider that is not
 // registered passes: its entry is kept and ignored until the provider returns.
-func validMemoryModel(provider, alias string) bool {
-	p, ok := providerRegistry.Get(provider)
+func validMemoryModel(reg *harness.Registry, provider, alias string) bool {
+	p, ok := reg.Get(provider)
 	return !ok || p.Models().Valid(alias)
 }
 
 // CleanMemoryModels drops the entries whose provider id is malformed or whose alias is not in the
-// registered provider's catalog.
-func CleanMemoryModels(models map[string]string) map[string]string {
+// catalog of the provider registered in reg.
+func CleanMemoryModels(reg *harness.Registry, models map[string]string) map[string]string {
 	out := make(map[string]string, len(models))
 	for id, alias := range models {
-		if !appsettings.ValidProviderID(id) || !validMemoryModel(id, alias) {
+		if !appsettings.ValidProviderID(id) || !validMemoryModel(reg, id, alias) {
 			slog.Warn("settings: ignoring memory model", "scope", "settings", "provider", id, "model", alias)
 			continue
 		}
@@ -408,11 +406,21 @@ func validateMemorySection(m *MemoryPatch) error {
 	if m == nil || m.Models == nil {
 		return nil
 	}
-	for id, alias := range *m.Models {
+	for id := range *m.Models {
 		if !appsettings.ValidProviderID(id) {
 			return fmt.Errorf("model: memory.models: invalid provider id %q", id)
 		}
-		if !validMemoryModel(id, alias) {
+	}
+	return nil
+}
+
+// CheckModels checks every patched alias against the catalog of its provider registered in reg.
+func (m *MemoryPatch) CheckModels(reg *harness.Registry) error {
+	if m == nil || m.Models == nil {
+		return nil
+	}
+	for id, alias := range *m.Models {
+		if !validMemoryModel(reg, id, alias) {
 			return fmt.Errorf("model: memory.models.%s: invalid value %q", id, alias)
 		}
 	}
