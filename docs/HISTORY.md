@@ -6665,14 +6665,29 @@ v2.8 P308 made the colored bars in the left panel thicker.
 In the SQL cell editor, the footer controls stay fixed and only the text editor scrolls, because the editor's large minimum height previously scrolled it out of view.
 
 ### v2.8 P310 (Done)
+The SQL column tooltip stacks its sections: header with name and type, `PK`/`NOT NULL` chips, explanation, divider, labeled comment.
+`AttributeTooltip.vue` gains `tags` and `note` parts; the plain `data-kira-tip` path stays unchanged.
+Lint rules U29 and U21 forbid classes on `TooltipContent` and `uppercase`, so the layout sits on a wrapper div and the width cap stays at the primitive `max-w-xs`.
+The UI spec `tooltips.spec.ts` covers the structure.
 
 ### v2.8 P311 (Done)
+The Docker container list scrolled sluggishly because virtual rows were re-created on every range change and each row paid for its own tooltip and nav handler.
+`VirtualList.vue` keys rows by row key and caches handlers; rows split into `ContainerRow.vue` and `ContainerGroupRow.vue` that share one `AttributeTooltip`.
+The `docker-scroll` probe (400 containers) cut frame p95 median from 40-46 ms to 20 ms, a 50-57% drop.
+The spec `row tooltips come from one shared tooltip` guards the shared tooltip.
 
 ### v2.8 P312 (Done)
 Panel sizes are stored per module, not shared across modules; the change applies in studio and the api stays unchanged.
 Panel size storage is re-keyed per module, and the current shared values are migrated.
 
 ### v2.8 P313 (Done)
+One code review round over `a74ece9..e05b483` (base: the v2.6 squash, P305 close-out) found 4 issues, all fixed.
+A duplicate-connection INSERT had misaligned placeholders that put the throttle into `mcp_enabled` (High); a test guards it.
+The dialog Test preconnect script survived app quit; `Shutdown` now cancels it and waits.
+A preconnect script cancelled from the panel now ends `disconnected`.
+`widthUserSet` was persisted in both layout models; it is no longer.
+The performance pass found nothing.
+Raw English supervisor messages in the dialog Test result remain unlocalized, out of scope.
 
 ### v2.8 P314 (Done)
 Users pick the Claude model for memory features (distill, import, summaries) in settings; sonnet is the default.
