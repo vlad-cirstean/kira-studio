@@ -192,6 +192,22 @@ func startKafkaSasl() (*KafkaSaslFixture, error) {
 		return nil, fmt.Errorf("start kafka sasl: %w", err)
 	}
 
+	// The log line precedes the advertised listener serving; see waitKafkaBrokerReady.
+	client, err := kgo.NewClient(
+		kgo.SeedBrokers(fmt.Sprintf("%s:%d", daemonHost, hostPort)),
+		kgo.SASL(plain.Auth{User: kafkaSaslUsername, Pass: kafkaSaslPassword}.AsMechanism()),
+	)
+	if err != nil {
+		_ = container.Terminate(ctx)
+		return nil, fmt.Errorf("kafka sasl readiness client: %w", err)
+	}
+	err = waitKafkaBrokerReady(ctx, client)
+	client.Close()
+	if err != nil {
+		_ = container.Terminate(ctx)
+		return nil, fmt.Errorf("kafka sasl broker not ready: %w", err)
+	}
+
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	cfg := model.ResolvedConnectionConfig{
 		ID: "test-kafka-sasl", SortOrder: 0, CreatedAt: now, UpdatedAt: now,
