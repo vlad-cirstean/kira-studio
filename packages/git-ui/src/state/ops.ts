@@ -271,7 +271,7 @@ export class OpsState {
    *  mirroring `WorktreeState`'s own "domain class holds the list and the read preview" scope) —
    *  this class only layers `busy`/`announcement` on top, the same uniform lifecycle every other
    *  mutating action here gets. Optional so a test can construct `OpsState` without one, mirroring
-   *  `PrState`'s own optional threading through `StackState`/`SearchState`. */
+   *  `ChangeRequestState`'s own optional threading through `StackState`/`SearchState`. */
   readonly #stack: StackState | undefined;
   /** G28 D16: `kiraSpace.checkout.autoStash`'s own read point. Required: an omitted instance
    *  would silently pin the schema default and ignore the user's opt-out (P168 Part 18 F13). */

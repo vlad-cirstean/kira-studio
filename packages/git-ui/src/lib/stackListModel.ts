@@ -1,12 +1,12 @@
 /**
  * G26 D3/F12/F13/F14 — `StackList.vue`'s pure half: the per-row display model (PR badge/track text
- * reused VERBATIM from `PrState.byBranch`/`RefRow`, never re-derived), the stale chip's text, and
+ * reused VERBATIM from `ChangeRequestState.byBranch`/`RefRow`, never re-derived), the stale chip's text, and
  * `parentOf`/`childOf` for `alt+up`/`alt+down` stack navigation. `ClassifyRestack` itself is never
  * ported here (see `contract.ts`'s own doc comment on the nine G26 wire types) — this file only
  * ever presents whatever `stack.list`/`preflight.restack` already returned.
  */
 import type {
-  PrRecord,
+  ChangeRequestRecord,
   RestackPreflight,
   StackBranch,
   StackListResult,
@@ -30,7 +30,7 @@ export interface StackRow {
   readonly aheadText: string;
   readonly checkedOutIn: string | undefined;
   readonly trackText: string | undefined;
-  readonly pr: PrRecord | undefined;
+  readonly pr: ChangeRequestRecord | undefined;
   readonly isOrphan: boolean;
   /** Set only for an orphan row — the one-line remedy `StackList.vue`'s own orphan section shows. */
   readonly orphanReason: string | undefined;
@@ -47,7 +47,7 @@ export function aheadText(branch: StackBranch): string {
 
 function baseRow(
   branch: StackBranch,
-  byBranch: ReadonlyMap<string, PrRecord>,
+  byBranch: ReadonlyMap<string, ChangeRequestRecord>,
 ): Omit<StackRow, 'depth' | 'isOrphan' | 'orphanReason'> {
   return {
     name: branch.name,
@@ -63,12 +63,12 @@ function baseRow(
 }
 
 /** `StackList.vue`'s own per-stack row set, pre-order bottom-to-top (D3's own ordering, passed
- *  through unchanged) — `pr` is `pickBestPr`-ready data, not a rendered badge (unlike
- *  `buildPrBadge`'s own DOM-building shape, which is `CommitGrid`'s canvas-row concern, not a
+ *  through unchanged) — `pr` is `pickBestChangeRequest`-ready data, not a rendered badge (unlike
+ *  `buildChangeRequestBadge`'s own DOM-building shape, which is `CommitGrid`'s canvas-row concern, not a
  *  plain Vue template's). */
 export function buildStackRows(
   summary: StackSummary,
-  byBranch: ReadonlyMap<string, PrRecord>,
+  byBranch: ReadonlyMap<string, ChangeRequestRecord>,
 ): StackRow[] {
   return summary.branches.map((branch) => ({
     ...baseRow(branch, byBranch),
@@ -83,7 +83,7 @@ export function buildStackRows(
  *  (but unresolvable) parent so the row explains itself without a second lookup. */
 export function buildOrphanRows(
   orphans: readonly StackBranch[],
-  byBranch: ReadonlyMap<string, PrRecord>,
+  byBranch: ReadonlyMap<string, ChangeRequestRecord>,
 ): StackRow[] {
   return orphans.map((branch) => ({
     ...baseRow(branch, byBranch),
@@ -96,9 +96,9 @@ export function buildOrphanRows(
   }));
 }
 
-/** `pickBestPr`'s own one-line badge text, e.g. `"#123"` — `StackList.vue`'s own row badge;
+/** `pickBestChangeRequest`'s own one-line badge text, e.g. `"#123"` — `StackList.vue`'s own row badge;
  *  `undefined` when the row has no known PR (F13's "render nothing" rule). */
-export function prBadgeLabel(pr: PrRecord | undefined): string | undefined {
+export function changeRequestBadgeLabel(pr: ChangeRequestRecord | undefined): string | undefined {
   if (pr === undefined) return undefined;
   return `#${pr.number}`;
 }

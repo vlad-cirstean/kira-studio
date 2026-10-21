@@ -18,7 +18,7 @@ import (
 
 // countingGhRunner is this file's own minimal github.Runner fake (F13: no real `gh` anywhere) —
 // every invocation, of any kind, increments calls; D13's own exit criterion is a spawn count of
-// exactly 0 across six methods, then > 0 after one commit.resolvePr.
+// exactly 0 across six methods, then > 0 after one commit.resolveChangeRequests.
 type countingGhRunner struct{ calls int32 }
 
 func (r *countingGhRunner) Run(_ context.Context, _ string, spec github.Spec) (github.Result, error) {
@@ -51,12 +51,12 @@ func activationGit(t *testing.T, dir string, args ...string) {
 	}
 }
 
-// TestActivation_ZeroGhSpawnsUntilResolvePr is D13's own exit criterion 7, verbatim: driving
+// TestActivation_ZeroHostSpawnsUntilResolveChangeRequest is D13's own exit criterion 7, verbatim: driving
 // app.init, repo.open, refs.list, graph.loadMore, status.get and commit.detail against a COUNTING
 // fake github.Runner must produce EXACTLY ZERO spawns of any kind — this feature probes nothing,
-// spawns nothing, and caches nothing until the very first commit.resolvePr/branch.resolvePr a
+// spawns nothing, and caches nothing until the very first commit.resolveChangeRequests/branch.resolveChangeRequest a
 // client actually makes.
-func TestActivation_ZeroGhSpawnsUntilResolvePr(t *testing.T) {
+func TestActivation_ZeroHostSpawnsUntilResolveChangeRequest(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -138,16 +138,16 @@ func TestActivation_ZeroGhSpawnsUntilResolvePr(t *testing.T) {
 	}
 
 	// Now the one call that DOES touch the github provider — spawn count must become > 0.
-	resolveParams, _ := json.Marshal(CommitResolvePrParams{RepoID: repoID, SHA: sha})
-	resolveResultAny, err := handlers.Request(ctx, "commit.resolvePr", resolveParams)
+	resolveParams, _ := json.Marshal(CommitResolveChangeRequestsParams{RepoID: repoID, SHA: sha})
+	resolveResultAny, err := handlers.Request(ctx, "commit.resolveChangeRequests", resolveParams)
 	if err != nil {
-		t.Fatalf("commit.resolvePr: %v", err)
+		t.Fatalf("commit.resolveChangeRequests: %v", err)
 	}
 	if _, ok := resolveResultAny.(ChangeRequestLookup); !ok {
-		t.Fatalf("commit.resolvePr result = %T, want ChangeRequestLookup", resolveResultAny)
+		t.Fatalf("commit.resolveChangeRequests result = %T, want ChangeRequestLookup", resolveResultAny)
 	}
 	if ghRunner.count() == 0 {
-		t.Fatal("commit.resolvePr spawned gh 0 times, want > 0")
+		t.Fatal("commit.resolveChangeRequests spawned gh 0 times, want > 0")
 	}
 }
 
@@ -169,9 +169,9 @@ func trimTrailingNLGh(s string) string {
 	return s
 }
 
-// TestBranchResolvePr_DisabledWhenGithubSettingOff proves the settings.get-driven disabled path
+// TestBranchResolveChangeRequest_DisabledWhenProviderOff proves the settings.get-driven disabled path
 // (D16) spawns nothing at all.
-func TestBranchResolvePr_DisabledWhenGithubSettingOff(t *testing.T) {
+func TestBranchResolveChangeRequest_DisabledWhenProviderOff(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
@@ -202,14 +202,14 @@ func TestBranchResolvePr_DisabledWhenGithubSettingOff(t *testing.T) {
 	}
 	repoID := openResultAny.(RepoOpenResult).Repo.RepoID
 
-	params, _ := json.Marshal(BranchResolvePrParams{RepoID: repoID, Branch: "main"})
-	resultAny, err := handlers.Request(context.Background(), "branch.resolvePr", params)
+	params, _ := json.Marshal(BranchResolveChangeRequestParams{RepoID: repoID, Branch: "main"})
+	resultAny, err := handlers.Request(context.Background(), "branch.resolveChangeRequest", params)
 	if err != nil {
-		t.Fatalf("branch.resolvePr: %v", err)
+		t.Fatalf("branch.resolveChangeRequest: %v", err)
 	}
 	result, ok := resultAny.(ChangeRequestLookup)
 	if !ok || result.Kind != "disabled" {
-		t.Fatalf("branch.resolvePr result = %+v, want disabled", resultAny)
+		t.Fatalf("branch.resolveChangeRequest result = %+v, want disabled", resultAny)
 	}
 	if ghRunner.count() != 0 {
 		t.Fatalf("gh runner invoked %d times for a gitHost.provider=off repo, want 0", ghRunner.count())

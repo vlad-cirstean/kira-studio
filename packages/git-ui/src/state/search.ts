@@ -7,8 +7,8 @@ import { errorText } from '@workbench/bridge/codedError';
 import { type ComputedRef, computed, type ShallowRef, shallowRef, watch } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { createCancellableTimer } from './cancellableTimer.ts';
+import type { ChangeRequestState } from './changeRequests.ts';
 import type { GraphViewState } from './graphView.ts';
-import type { PrState } from './pr.ts';
 import type { RefsState } from './refs.ts';
 
 export type SearchRunResult = ResultOf<'search.run'>;
@@ -227,7 +227,7 @@ export class SearchState {
   /** G24 D11: optional so a caller with nothing to match PRs against (every pre-G24 caller, and
    *  this class's own existing tests) keeps working with `matchRef`'s `pr` arg simply `undefined`
    *  — byte-identical to this seam's pre-G24 behaviour. */
-  readonly #pr: PrState | undefined;
+  readonly #pr: ChangeRequestState | undefined;
   #repoId: string | undefined;
   #tailController: AbortController | undefined;
   readonly #tailTimer = createCancellableTimer(() => this.#runTail(), TIMING.search);
@@ -238,7 +238,12 @@ export class SearchState {
   readonly #unsubscribeRefsChanged: () => void;
   readonly #stopWatchers: readonly (() => void)[];
 
-  constructor(bridge: BridgeClient, refs: RefsState, graph: GraphViewState, pr?: PrState) {
+  constructor(
+    bridge: BridgeClient,
+    refs: RefsState,
+    graph: GraphViewState,
+    pr?: ChangeRequestState,
+  ) {
     this.#bridge = bridge;
     this.#refs = refs;
     this.#graph = graph;
@@ -311,7 +316,7 @@ export class SearchState {
       return { n, exact: loadedExact && tailExact };
     });
     // G24 D7 point 4/D11: entering a scope that can show a ref hit is one of the few user acts
-    // allowed to touch the network at all — warms PrState's own byBranch cache so the very next
+    // allowed to touch the network at all — warms ChangeRequestState's own byBranch cache so the very next
     // keystroke's own synchronous refHits computed already has PR records to match against (F16's
     // own "adds no process and no network round trip to a keystroke"). G32 round-3 performance
     // review, finding #3: unlike BranchPicker.vue's own equivalent warm (capped to what it
@@ -320,7 +325,7 @@ export class SearchState {
     // itself still bounds how many requests are ever in flight at once (PR_ENSURE_SNAPSHOT_
     // CONCURRENCY), and a branch already resolved or already in flight costs nothing on a repeat
     // call. On a repo with very many branches this remains a real, if one-time-per-scope-entry,
-    // cost — see PrState's own class doc comment for what it actually costs a branch with no PR.
+    // cost — see ChangeRequestState's own class doc comment for what it actually costs a branch with no PR.
     watch(this.scope, (scope) => {
       if (scope === 'commits' || this.#pr === undefined) return;
       const names = [...this.#refs.branches.value, ...this.#refs.remoteBranches.value].map(

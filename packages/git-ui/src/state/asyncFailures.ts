@@ -23,7 +23,7 @@ export const ASYNC_FAILURES = {
   },
   refresh: { title: 'git.async.refresh.title', error: 'git.async.refresh.error' },
   revealCommit: { title: 'git.async.revealCommit.title', error: 'git.async.revealCommit.error' },
-  openPullRequest: {
+  openChangeRequest: {
     title: 'git.async.openPullRequest.title',
     error: 'git.async.openPullRequest.error',
   },

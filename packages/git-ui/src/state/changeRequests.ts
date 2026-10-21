@@ -1,5 +1,5 @@
 import type { CommitStore } from '@kira/git-core';
-import type { GhStatus, PrLookupResult, PrRecord } from '@kira/git-ipc';
+import type { ChangeRequestLookup, ChangeRequestRecord, HostStatus } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { TIMING } from '@workbench/behaviour/timing';
 import { type ShallowRef, shallowRef } from 'vue';
@@ -11,28 +11,28 @@ import { createCancellableTimer } from './cancellableTimer.ts';
  *  branches never opens more than a handful of requests at once, large enough that warming a
  *  normal-sized branch list still finishes in one or two batches rather than trickling one at a
  *  time. */
-const PR_ENSURE_SNAPSHOT_CONCURRENCY = 6;
+const CHANGE_REQUEST_ENSURE_SNAPSHOT_CONCURRENCY = 6;
 
 /** §4.2's own budget on `rebuildAncestry`'s breadth-first walk — bounds the cost to the loaded
  *  window rather than the repository: a long-lived `main` whose own tip has a PR would otherwise
  *  walk the entire loaded history on every rebuild. 50,000 rows is well past any window a session
  *  actually loads (`graph.loadMore`'s own default page size is 5,000), so this only ever fires
  *  against a pathological case, never an ordinary one. */
-const PR_ANCESTRY_WALK_BUDGET = 50_000;
+const CHANGE_REQUEST_ANCESTRY_WALK_BUDGET = 50_000;
 
 /** Repos whose last-known PR facts are kept for an instant restore on a tab/repo switch. */
-const PR_REPO_CACHE_CAP = 8;
+const CHANGE_REQUEST_REPO_CACHE_CAP = 8;
 
 interface RepoFacts {
-  readonly bySha: ReadonlyMap<string, readonly PrRecord[]>;
-  readonly byBranch: ReadonlyMap<string, PrRecord>;
-  readonly noBranchPr: ReadonlySet<string>;
+  readonly bySha: ReadonlyMap<string, readonly ChangeRequestRecord[]>;
+  readonly byBranch: ReadonlyMap<string, ChangeRequestRecord>;
+  readonly noBranchChangeRequest: ReadonlySet<string>;
 }
 
 /**
  * G24 D10: the one client-side owner of every GitHub PR fact this app renders — the graph
  * indicator's per-commit lookup, the branch-tip badges/search's per-branch lookup, and the single
- * `GhStatus` the commit-detail pane's failure line (D12) reads. Mirrors `DetailState.select`'s own
+ * `HostStatus` the commit-detail pane's failure line (D12) reads. Mirrors `DetailState.select`'s own
  * abort-and-recheck discipline for the per-commit half; the per-branch half is plain
  * request-then-cache, since a branch's own PR record has no "supersede on reselect" race the way a
  * rapidly-changing commit selection does.
@@ -44,7 +44,7 @@ interface RepoFacts {
  * to know which branches exist to warm.
  *
  * **Cost correction (G32 round-3 performance review, finding #3):** the paragraph this replaces
- * claimed `branch.resolvePr` answers every branch from `RepoEntry`'s own cached bulk snapshot at
+ * claimed `branch.resolveChangeRequest` answers every branch from `RepoEntry`'s own cached bulk snapshot at
  * zero extra GitHub cost — true only for a branch the snapshot already lists as having an open PR.
  * One that doesn't falls through to the server's own per-branch `PullsForBranch` lookup, a real
  * `gh` spawn and REST call. `ensureSnapshot`'s caller is therefore NOT free to warm "every known
@@ -52,36 +52,39 @@ interface RepoFacts {
  * `branchNames` to what actually needs it (e.g. `BranchPicker.vue`'s own rendered/capped sections,
  * not its full branch list), not handed here as a blanket guarantee.
  */
-export class PrState {
+export class ChangeRequestState {
   /** Per-commit PR records, populated only on a resolved `"ok"` answer — `columns.ts`'s own
-   *  `PrContext` reads this by sha. A sha simply absent from this map means "render nothing"
+   *  `ChangeRequestContext` reads this by sha. A sha simply absent from this map means "render nothing"
    *  (not-yet-resolved, in-flight, `disabled`, or `unavailable` all collapse to the same "nothing
    *  in the grid" outcome, D9's own "inert, never noisy" rule) — the grid never needs to
    *  distinguish those four itself. */
-  readonly bySha: ShallowRef<ReadonlyMap<string, readonly PrRecord[]>> = shallowRef(new Map());
+  readonly bySha: ShallowRef<ReadonlyMap<string, readonly ChangeRequestRecord[]>> = shallowRef(
+    new Map(),
+  );
   /** Per-branch PR record — `BranchPicker.vue`'s own `#123` badge and `matchRef`'s own `pr` arm
    *  (via `state/search.ts`) both read this by branch short name. Absent means "no known PR (yet,
    *  or at all)" — same "render nothing" rule as `bySha`. */
-  readonly byBranch: ShallowRef<ReadonlyMap<string, PrRecord>> = shallowRef(new Map());
+  readonly byBranch: ShallowRef<ReadonlyMap<string, ChangeRequestRecord>> = shallowRef(new Map());
   /** P74 §4.2: commits reachable from a PR branch's tip within the loaded graph window, keyed by
-   *  sha. Derived from `byBranch`, never fetched: the value is the branch's own `PrRecord`. Rebuilt
+   *  sha. Derived from `byBranch`, never fetched: the value is the branch's own `ChangeRequestRecord`. Rebuilt
    *  by `rebuildAncestry`, never written any other way. */
-  readonly prByAncestry: ShallowRef<ReadonlyMap<string, PrRecord>> = shallowRef(new Map());
+  readonly changeRequestByAncestry: ShallowRef<ReadonlyMap<string, ChangeRequestRecord>> =
+    shallowRef(new Map());
   /** Bumped on every change to `bySha`/`byBranch` — `CommitGrid.vue`'s own `pr.generation`
    *  watcher (a third instance of the `graphView.generation`/`search.searchGeneration` pattern)
    *  re-renders the message column on this alone. */
   readonly generation: ShallowRef<number> = shallowRef(0);
-  /** The most recent non-`"ok"` `GhStatus` this instance has seen, from either lookup — D12's own
+  /** The most recent non-`"ok"` `HostStatus` this instance has seen, from either lookup — D12's own
    *  "one line of `Status.Reason`" in the commit-detail pane reads this. Never used to decide
    *  what the grid renders (the grid only ever consults `bySha`/`byBranch`). */
-  readonly status: ShallowRef<GhStatus | undefined> = shallowRef(undefined);
-  /** The raw result of the most recently SETTLED `commit.resolvePr` for whichever sha is
+  readonly status: ShallowRef<HostStatus | undefined> = shallowRef(undefined);
+  /** The raw result of the most recently SETTLED `commit.resolveChangeRequests` for whichever sha is
    *  currently selected — `CommitMeta.vue`'s own "Pull request" row (D12) needs the full
    *  discriminated union (`disabled` ⇒ row absent; `unavailable` ⇒ `gh.reason`; `ok` with an empty
    *  list ⇒ "No pull request"; `ok` with entries ⇒ one row each), which `bySha`'s collapsed shape
    *  cannot answer on its own. `undefined` while nothing is selected or a request is still
    *  in-flight/debounced. */
-  readonly selected: ShallowRef<PrLookupResult | undefined> = shallowRef(undefined);
+  readonly selected: ShallowRef<ChangeRequestLookup | undefined> = shallowRef(undefined);
 
   readonly #bridge: BridgeClient;
   #repoId: string | undefined;
@@ -92,15 +95,15 @@ export class PrState {
   }, TIMING.preview);
   #selectController: AbortController | undefined;
   readonly #branchRequests = new Set<string>();
-  /** G31 round-2 performance review, finding #3: branches whose `branch.resolvePr` answer came
-   *  back `"ok"` with no PR at all. `byBranch` only ever holds an actual `PrRecord`, so a
+  /** G31 round-2 performance review, finding #3: branches whose `branch.resolveChangeRequest` answer came
+   *  back `"ok"` with no PR at all. `byBranch` only ever holds an actual `ChangeRequestRecord`, so a
    *  no-PR branch never appeared in it — `ensureSnapshot`'s own dedup filter (`!byBranch.has(name)
    *  && !#branchRequests.has(name)`) then failed both checks forever, and every `BranchPicker.vue`
-   *  open / search-scope change / stack reload re-issued `branch.resolvePr` for every PR-less
+   *  open / search-scope change / stack reload re-issued `branch.resolveChangeRequest` for every PR-less
    *  branch, indefinitely. Tracked separately (rather than widening `byBranch`'s value type) so
    *  every existing `byBranch.value.get(name)` call site keeps meaning "the branch's PR, if any"
    *  with no signature change. */
-  readonly #noBranchPr = new Set<string>();
+  readonly #noBranchChangeRequest = new Set<string>();
   /** Set the first time EITHER lookup answers `"disabled"` for the current repo (gitHost.provider off
    *  off, or no GitHub remote) — every later selection/branch resolve for this same repo then
    *  answers `"disabled"` synchronously, with no request at all, until the repo changes or
@@ -110,7 +113,7 @@ export class PrState {
    *  rather than one debounced no-op per row. */
   #disabledForRepo = false;
   readonly #unsubscribe: () => void;
-  #headIndex: ReadonlyMap<string, readonly PrRecord[]> = new Map();
+  #headIndex: ReadonlyMap<string, readonly ChangeRequestRecord[]> = new Map();
   #headIndexGeneration = -1;
   /** Last-known facts of repos switched away from, oldest first. */
   readonly #repoFacts = new Map<string, RepoFacts>();
@@ -146,8 +149,8 @@ export class PrState {
     if (facts === undefined) return;
     this.bySha.value = facts.bySha;
     this.byBranch.value = facts.byBranch;
-    this.#noBranchPr.clear();
-    for (const name of facts.noBranchPr) this.#noBranchPr.add(name);
+    this.#noBranchChangeRequest.clear();
+    for (const name of facts.noBranchChangeRequest) this.#noBranchChangeRequest.add(name);
     this.generation.value++;
     void this.#revalidateBranches();
   }
@@ -157,10 +160,10 @@ export class PrState {
     this.#repoFacts.set(repoId, {
       bySha: this.bySha.value,
       byBranch: this.byBranch.value,
-      noBranchPr: new Set(this.#noBranchPr),
+      noBranchChangeRequest: new Set(this.#noBranchChangeRequest),
     });
     for (const oldest of this.#repoFacts.keys()) {
-      if (this.#repoFacts.size <= PR_REPO_CACHE_CAP) break;
+      if (this.#repoFacts.size <= CHANGE_REQUEST_REPO_CACHE_CAP) break;
       this.#repoFacts.delete(oldest);
     }
   }
@@ -175,11 +178,11 @@ export class PrState {
   #clear(): void {
     this.#cancelInFlight();
     this.#sha = null;
-    this.#noBranchPr.clear();
+    this.#noBranchChangeRequest.clear();
     this.#disabledForRepo = false;
     this.bySha.value = new Map();
     this.byBranch.value = new Map();
-    this.prByAncestry.value = new Map();
+    this.changeRequestByAncestry.value = new Map();
     this.selected.value = undefined;
     this.status.value = undefined;
     this.generation.value++;
@@ -191,7 +194,7 @@ export class PrState {
   #revalidate(): void {
     this.#cancelInFlight();
     this.#disabledForRepo = false;
-    this.#noBranchPr.clear();
+    this.#noBranchChangeRequest.clear();
     const sha = this.#sha;
     if (sha !== null) void this.#requestCommit(sha);
     void this.#revalidateBranches();
@@ -211,7 +214,7 @@ export class PrState {
         if (name !== undefined) await this.#fetchBranch(name, repoId, generation, true);
       }
     };
-    const workerCount = Math.min(PR_ENSURE_SNAPSHOT_CONCURRENCY, names.length);
+    const workerCount = Math.min(CHANGE_REQUEST_ENSURE_SNAPSHOT_CONCURRENCY, names.length);
     await Promise.all(Array.from({ length: workerCount }, worker));
   }
 
@@ -244,7 +247,7 @@ export class PrState {
     const stillCurrent = (): boolean => this.#repoId === repoId && this.#sha === sha;
     try {
       const result = await this.#bridge.request(
-        'commit.resolvePr',
+        'commit.resolveChangeRequests',
         { repoId, sha },
         controller.signal,
       );
@@ -260,14 +263,14 @@ export class PrState {
     }
   }
 
-  #applyCommitResult(sha: string, result: PrLookupResult): void {
+  #applyCommitResult(sha: string, result: ChangeRequestLookup): void {
     this.selected.value = result;
     if (result.kind === 'ok') {
       const next = new Map(this.bySha.value);
-      next.set(sha, result.prs);
+      next.set(sha, result.changeRequests);
       this.bySha.value = next;
     } else if (result.kind === 'unavailable') {
-      this.status.value = result.gh;
+      this.status.value = result.status;
     } else if (result.kind === 'disabled') {
       this.#markDisabled();
     }
@@ -278,7 +281,7 @@ export class PrState {
     this.#disabledForRepo = true;
     if (this.bySha.value.size > 0) this.bySha.value = new Map();
     if (this.byBranch.value.size > 0) this.byBranch.value = new Map();
-    this.#noBranchPr.clear();
+    this.#noBranchChangeRequest.clear();
   }
 
   /** Warms `byBranch` for every branch in `branchNames` not already cached — see this class's own
@@ -287,7 +290,7 @@ export class PrState {
    *  in `byBranch`, or already in flight, is skipped.
    *
    *  G30 round-1 performance review, finding #1: this used to `Promise.all` every branch at once —
-   *  a repo with hundreds of branches fired hundreds of concurrent `branch.resolvePr` requests,
+   *  a repo with hundreds of branches fired hundreds of concurrent `branch.resolveChangeRequest` requests,
    *  with nothing anywhere in the stack capping it. The server side of this same finding (one bulk
    *  snapshot fetch instead of one GitHub call per branch) already answers "how much this costs
    *  GitHub"; a small worker pool here bounds "how many requests are ever in flight at once",
@@ -302,7 +305,7 @@ export class PrState {
     const toFetch = branchNames.filter(
       (name) =>
         !this.byBranch.value.has(name) &&
-        !this.#noBranchPr.has(name) &&
+        !this.#noBranchChangeRequest.has(name) &&
         !this.#branchRequests.has(name),
     );
     let next = 0;
@@ -314,7 +317,7 @@ export class PrState {
         if (name !== undefined) await this.resolveBranch(name);
       }
     };
-    const workerCount = Math.min(PR_ENSURE_SNAPSHOT_CONCURRENCY, toFetch.length);
+    const workerCount = Math.min(CHANGE_REQUEST_ENSURE_SNAPSHOT_CONCURRENCY, toFetch.length);
     await Promise.all(Array.from({ length: workerCount }, worker));
   }
 
@@ -328,7 +331,7 @@ export class PrState {
     if (this.#disabledForRepo) return;
     if (
       this.byBranch.value.has(branch) ||
-      this.#noBranchPr.has(branch) ||
+      this.#noBranchChangeRequest.has(branch) ||
       this.#branchRequests.has(branch)
     )
       return;
@@ -346,29 +349,29 @@ export class PrState {
     if (repoId === undefined) return;
     this.#branchRequests.add(branch);
     try {
-      const result = await this.#bridge.request('branch.resolvePr', { repoId, branch });
+      const result = await this.#bridge.request('branch.resolveChangeRequest', { repoId, branch });
       if (this.#repoId !== repoId || this.#clearGeneration !== generation) return;
       if (result.kind === 'ok') {
         const previous = this.byBranch.value.get(branch);
-        const first = result.prs[0];
+        const first = result.changeRequests[0];
         if (first !== undefined) {
           const next = new Map(this.byBranch.value);
           next.set(branch, first);
           this.byBranch.value = next;
-          this.#noBranchPr.delete(branch);
+          this.#noBranchChangeRequest.delete(branch);
         } else {
           if (previous !== undefined) {
             const next = new Map(this.byBranch.value);
             next.delete(branch);
             this.byBranch.value = next;
           }
-          this.#noBranchPr.add(branch);
+          this.#noBranchChangeRequest.add(branch);
         }
         if (!revalidating || JSON.stringify(previous) !== JSON.stringify(first)) {
           this.generation.value++;
         }
       } else if (result.kind === 'unavailable') {
-        this.status.value = result.gh;
+        this.status.value = result.status;
       } else if (result.kind === 'disabled') {
         this.#markDisabled();
         this.generation.value++;
@@ -384,11 +387,11 @@ export class PrState {
     }
   }
 
-  /** P74 §4.2: rebuilds `prByAncestry` from the PR records currently in `byBranch` — a bounded
+  /** P74 §4.2: rebuilds `changeRequestByAncestry` from the PR records currently in `byBranch` — a bounded
    *  breadth-first walk over `store`'s own packed parent array, run once per rebuild rather than
    *  once per rendered row. `store` is an explicit argument (this class holds no `CommitStore` of
    *  its own, only `bridge` — the same deviation `ensureSnapshot`'s own doc comment already
-   *  documents, for the same reason: `PrState` has no other way to reach one). Called by
+   *  documents, for the same reason: `ChangeRequestState` has no other way to reach one). Called by
    *  `CommitGrid.vue`'s existing `pr.generation`/`graphView.generation` triggers, before its own
    *  `invalidateRowHeights` — never a separate watcher, so a PR resolution and the ancestry it
    *  feeds always land in the same render pass.
@@ -405,15 +408,15 @@ export class PrState {
    *  exclusion for that one branch — `rowOfBranchTip`'s own doc comment on why an RPC-based
    *  fallback (a `mergeBase` request per PR) was declined in favor of this local-only answer.
    *
-   *  `budget` defaults to `PR_ANCESTRY_WALK_BUDGET` — overridable only so `pr.spec.ts` can prove
+   *  `budget` defaults to `CHANGE_REQUEST_ANCESTRY_WALK_BUDGET` — overridable only so `pr.spec.ts` can prove
    *  the cutoff itself without building a 50,000-row fixture; no production caller passes it. */
-  rebuildAncestry(store: CommitStore, budget = PR_ANCESTRY_WALK_BUDGET): void {
-    const next = new Map<string, PrRecord>();
+  rebuildAncestry(store: CommitStore, budget = CHANGE_REQUEST_ANCESTRY_WALK_BUDGET): void {
+    const next = new Map<string, ChangeRequestRecord>();
     // First-writer-wins queue: every branch tip seeds the walk at once, in `byBranch`'s own
     // iteration order, so a commit reachable from two PR branches keeps whichever branch's own
     // entry happened to iterate first — deterministic per rebuild, never re-decided mid-walk.
     const queue: number[] = [];
-    const recordOfRow = new Map<number, PrRecord>();
+    const recordOfRow = new Map<number, ChangeRequestRecord>();
     for (const record of this.byBranch.value.values()) {
       const row = store.rowOfSha(record.headSha);
       if (row === -1) continue; // The tip is outside the loaded window — contributes nothing.
@@ -474,27 +477,27 @@ export class PrState {
         queue.push(parentRow);
       }
     }
-    this.prByAncestry.value = next;
+    this.changeRequestByAncestry.value = next;
   }
 
   /** P74 §4.2's own lookup order: `bySha` first (an authoritative per-commit answer from GitHub),
-   *  `prByAncestry` second (a derivation, which must never override a real answer), `undefined`
+   *  `changeRequestByAncestry` second (a derivation, which must never override a real answer), `undefined`
    *  otherwise — every consumer already renders that as nothing. Returns the same
-   *  `readonly PrRecord[] | undefined` shape `bySha` itself does, so `CommitGrid.vue`'s `prsFor`
+   *  `readonly ChangeRequestRecord[] | undefined` shape `bySha` itself does, so `CommitGrid.vue`'s `changeRequestsFor`
    *  accessor can call this directly with no reshaping. */
-  prForCommit(sha: string): readonly PrRecord[] | undefined {
+  changeRequestForCommit(sha: string): readonly ChangeRequestRecord[] | undefined {
     const direct = this.bySha.value.get(sha);
     if (direct !== undefined) return direct;
-    const derived = this.prByAncestry.value.get(sha);
+    const derived = this.changeRequestByAncestry.value.get(sha);
     return derived === undefined ? undefined : [derived];
   }
 
   /** The graph badge's lookup: only PRs whose head is exactly `sha` — from `byBranch` and from
    *  `bySha` entries whose `headSha` matches. Never ancestry: a branch's non-tip commits get none. */
-  prsHeadedAt(sha: string): readonly PrRecord[] | undefined {
+  changeRequestsHeadedAt(sha: string): readonly ChangeRequestRecord[] | undefined {
     if (this.#headIndexGeneration !== this.generation.value) {
-      const index = new Map<string, PrRecord[]>();
-      const add = (record: PrRecord): void => {
+      const index = new Map<string, ChangeRequestRecord[]>();
+      const add = (record: ChangeRequestRecord): void => {
         const list = index.get(record.headSha);
         if (list === undefined) index.set(record.headSha, [record]);
         else if (!list.some((r) => r.number === record.number)) list.push(record);

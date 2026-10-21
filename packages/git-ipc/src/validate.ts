@@ -185,7 +185,13 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // P257: 47 -> 48, breaking. 'FileChange' loses 'additions', 'deletions' and 'isBinary'.
 // P286: 48 -> 49, additive. New request 'review.comment.setState'; 'review.comment.add' gains an
 // optional 'kind'; 'ReviewComment' gains 'kind', 'state', 'reply', 'repliedAt' and 'sentAt'.
-export const CONTRACT_VERSION = 49;
+// P318: 49 -> 50, breaking. The PR requests are renamed for any code host: 'commit.resolvePr' ->
+// 'commit.resolveChangeRequests', 'branch.resolvePr' -> 'branch.resolveChangeRequest', 'pr.browserUrl'
+// -> 'changeRequest.browserUrl', 'pr.openExternal' -> 'changeRequest.openExternal'. 'GhStatus',
+// 'PrRecord' and 'PrLookupResult' become 'HostStatus', 'ChangeRequestRecord' and
+// 'ChangeRequestLookup'; the lookup's 'prs' and 'gh' fields become 'changeRequests' and 'status'.
+// 'kiraSpace.github.enabled' (boolean) becomes 'kiraSpace.gitHost.provider' (string).
+export const CONTRACT_VERSION = 50;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -293,10 +299,10 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'repoSettings.set': true,
   'review.session.save': true,
   'review.session.load': true,
-  'commit.resolvePr': true,
-  'branch.resolvePr': true,
-  'pr.browserUrl': true,
-  'pr.openExternal': true,
+  'commit.resolveChangeRequests': true,
+  'branch.resolveChangeRequest': true,
+  'changeRequest.browserUrl': true,
+  'changeRequest.openExternal': true,
   'link.openExternal': true,
   'worktree.list': true,
   'preflight.worktreeAdd': true,

@@ -4,9 +4,9 @@ import {
   aheadText,
   buildOrphanRows,
   buildStackRows,
+  changeRequestBadgeLabel,
   childOf,
   parentOf,
-  prBadgeLabel,
   rowNeedsForcePush,
   staleChipText,
 } from './stackListModel.ts';
@@ -104,11 +104,11 @@ describe('buildOrphanRows — the orphans section', () => {
   });
 });
 
-describe('prBadgeLabel', () => {
+describe('changeRequestBadgeLabel', () => {
   test('undefined with no PR, "#N" with one', () => {
-    expect(prBadgeLabel(undefined)).toBeUndefined();
+    expect(changeRequestBadgeLabel(undefined)).toBeUndefined();
     expect(
-      prBadgeLabel({
+      changeRequestBadgeLabel({
         number: 42,
         title: 't',
         url: 'u',

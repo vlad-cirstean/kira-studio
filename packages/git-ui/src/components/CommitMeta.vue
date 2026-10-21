@@ -20,7 +20,7 @@
  * facts row's SHA button covers the one copy path this pane itself offers.
  */
 import { shortSha } from '@kira/git-core';
-import type { PrLookupResult, PrRecord } from '@kira/git-ipc';
+import type { ChangeRequestLookup, ChangeRequestRecord } from '@kira/git-ipc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import KeyValueList from '@theme/components/KeyValueList.vue';
@@ -37,10 +37,10 @@ import { createOpenExternal } from '@workbench/bridge/openExternal';
 import Identifier from '@workbench/components/Identifier.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, ref, watch } from 'vue';
-import { prBadgeClass } from '../lib/badgeClass.ts';
+import { changeRequestBadgeClass } from '../lib/badgeClass.ts';
+import { changeRequestStateLabel } from '../lib/changeRequestStateLabel.ts';
 import { appendLinkifiedText } from '../lib/linkify.ts';
 import { openAllChangesAnnounced } from '../lib/openAllChangesAnnounced.ts';
-import { prStateLabel } from '../lib/prStateLabel.ts';
 import { buildRefBadges } from '../lib/refBadges.ts';
 import type { CommitDetail } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
@@ -48,14 +48,14 @@ import type { DetailActions } from '../state/detailActions.ts';
 const props = defineProps<{
   detail: CommitDetail | undefined;
   actions: DetailActions;
-  /** G24 D12: the currently selected commit's own PR lookup — `PrState.selected`, threaded in by
+  /** G24 D12: the currently selected commit's own PR lookup — `ChangeRequestState.selected`, threaded in by
    *  `DetailPane.vue`. `undefined` covers both "nothing selected yet" and the in-flight/debounce
    *  window, same as `detail` itself before it resolves. */
-  prResult?: PrLookupResult;
-  /** P74 §4.3: any PR this commit is on (`PrState.prForCommit`, threaded by `DetailPane.vue`) —
-   *  drives the facts-row icon, distinct from `prResult` (this exact commit's own "Pull request"
+  changeRequestResult?: ChangeRequestLookup;
+  /** P74 §4.3: any PR this commit is on (`ChangeRequestState.changeRequestForCommit`, threaded by `DetailPane.vue`) —
+   *  drives the facts-row icon, distinct from `changeRequestResult` (this exact commit's own "Pull request"
    *  row, only ever populated for the selected commit). `undefined` renders no icon. */
-  prForCommit?: readonly PrRecord[];
+  changeRequestForCommit?: readonly ChangeRequestRecord[];
 }>();
 
 const bodyEl = ref<HTMLParagraphElement | null>(null);
@@ -161,20 +161,20 @@ const signatureText = computed<string | undefined>(() => {
  *  `undefined` for both `disabled` and "nothing resolved yet", collapsing them into the same
  *  "no row" template branch below. */
 
-// P110 A14 (§1.3): a lookup map, not string interpolation, so every text-badge-pr-* class
+// P110 A14 (§1.3): a lookup map, not string interpolation, so every text-badge-change-request-* class
 // Tailwind must scan appears as a complete literal below. Replaces the old dynamic
 // `meta-pr-icon--${state}` class, whose own colour rule lived in this file's deleted <style>.
 
-const PR_ICON_CLASS: Readonly<Record<string, string>> = {
+const CHANGE_REQUEST_ICON_CLASS: Readonly<Record<string, string>> = {
   open: 'text-ok',
   draft: 'text-muted-foreground',
   merged: 'text-conn-violet',
   closed: 'text-error',
 };
 
-interface PrDetailView {
-  readonly kind: 'prs' | 'none' | 'unavailable';
-  readonly prs: readonly {
+interface ChangeRequestDetailView {
+  readonly kind: 'changeRequests' | 'none' | 'unavailable';
+  readonly changeRequests: readonly {
     readonly number: number;
     readonly title: string;
     readonly state: string;
@@ -183,23 +183,27 @@ interface PrDetailView {
   readonly reason: string | undefined;
 }
 
-const prDetail = computed<PrDetailView | undefined>(() => {
-  const result = props.prResult;
+const changeRequestDetail = computed<ChangeRequestDetailView | undefined>(() => {
+  const result = props.changeRequestResult;
   if (result === undefined || result.kind === 'disabled') return undefined;
   if (result.kind === 'unavailable') {
-    return { kind: 'unavailable', prs: [], reason: result.gh.reason ?? t('git.pr.noAnswer.hint') };
+    return {
+      kind: 'unavailable',
+      changeRequests: [],
+      reason: result.status.reason ?? t('git.pr.noAnswer.hint'),
+    };
   }
-  if (result.prs.length === 0) {
-    return { kind: 'none', prs: [], reason: undefined };
+  if (result.changeRequests.length === 0) {
+    return { kind: 'none', changeRequests: [], reason: undefined };
   }
   return {
-    kind: 'prs',
+    kind: 'changeRequests',
     reason: undefined,
-    prs: result.prs.map((pr) => ({
-      number: pr.number,
-      title: pr.title,
-      state: pr.state,
-      stateLabel: prStateLabel(pr.state),
+    changeRequests: result.changeRequests.map((cr) => ({
+      number: cr.number,
+      title: cr.title,
+      state: cr.state,
+      stateLabel: changeRequestStateLabel(cr.state),
     })),
   };
 });
@@ -216,7 +220,7 @@ const hasDetails = computed(
   () =>
     (props.detail?.decoration.length ?? 0) > 0 ||
     signatureText.value !== undefined ||
-    prDetail.value !== undefined,
+    changeRequestDetail.value !== undefined,
 );
 
 const COAUTHOR_TOKENS = new Set(['Co-authored-by', 'Signed-off-by']);
@@ -269,9 +273,9 @@ async function openAllChanges(): Promise<void> {
 
 /** P74 §3.3: the "Pull request" row's own external-open action, and (§4.3) the facts-row icon's
  *  — one open path for both, never two. */
-async function openPullRequest(number: number): Promise<void> {
+async function openChangeRequest(number: number): Promise<void> {
   try {
-    await props.actions.openPullRequest({ number });
+    await props.actions.openChangeRequest({ number });
   } catch (err) {
     props.actions.announce(t('git.async.openPullRequest.error', { error: errorText(err) }));
   }
@@ -280,19 +284,19 @@ async function openPullRequest(number: number): Promise<void> {
 /** The message body's own linkified URLs (`renderBody`, above). */
 const openLink = createOpenExternal((url) => props.actions.openExternalLink(url));
 
-/** P74 §4.3: the facts row's own icon — the first PR `prForCommit` names (ancestry's own
+/** P74 §4.3: the facts row's own icon — the first PR `changeRequestForCommit` names (ancestry's own
  *  first-writer-wins already resolved which branch wins when more than one claims a commit;
  *  `bySha`'s own array is realistically always length 1 in practice, never fanned out further
  *  here). `undefined` renders nothing, the same "render nothing" rule every other G24 surface
  *  follows. */
-const prIcon = computed(() => {
-  const first = props.prForCommit?.[0];
+const changeRequestIcon = computed(() => {
+  const first = props.changeRequestForCommit?.[0];
   if (!first) return undefined;
   return {
     number: first.number,
     title: first.title,
     state: first.state,
-    stateLabel: prStateLabel(first.state),
+    stateLabel: changeRequestStateLabel(first.state),
   };
 });
 </script>
@@ -313,24 +317,24 @@ const prIcon = computed(() => {
       <span data-testid="meta-subject" class="min-w-0 text-kira-md text-fg"
         ><TruncatedText :text="detail.subject" /></span
       >
-      <Tooltip v-if="prIcon">
+      <Tooltip v-if="changeRequestIcon">
         <TooltipTrigger as-child>
           <Button
             variant="toolbar"
             size="inline"
-            :class="cn('ml-auto leading-none', PR_ICON_CLASS[prIcon!.state])"
-            :aria-label="t('git.pr.openOnGithub.aria', { number: String(prIcon!.number) })"
-            data-testid="commit-meta-pr-icon"
-            @click="openPullRequest(prIcon!.number)"
+            :class="cn('ml-auto leading-none', CHANGE_REQUEST_ICON_CLASS[changeRequestIcon!.state])"
+            :aria-label="t('git.pr.openOnGithub.aria', { number: String(changeRequestIcon!.number) })"
+            data-testid="commit-meta-change-request-icon"
+            @click="openChangeRequest(changeRequestIcon!.number)"
           >
             <CodiconIcon name="github" :size="13" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>{{
           t('git.pr.summary.tooltip', {
-            number: String(prIcon!.number),
-            title: prIcon!.title,
-            state: prIcon!.stateLabel,
+            number: String(changeRequestIcon!.number),
+            title: changeRequestIcon!.title,
+            state: changeRequestIcon!.stateLabel,
           })
         }}</TooltipContent>
       </Tooltip>
@@ -381,26 +385,32 @@ const prIcon = computed(() => {
             <dt>{{ t('git.commit.signature.label') }}</dt>
             <dd>{{ signatureText }}</dd>
           </template>
-          <template v-if="prDetail">
+          <template v-if="changeRequestDetail">
             <dt>{{ t('git.commit.pullRequest.label') }}</dt>
-            <dd v-if="prDetail.kind === 'prs'" class="flex flex-col gap-0.5">
-              <div v-for="pr in prDetail.prs" :key="pr.number" class="flex items-center gap-0.5">
-                <span :class="prBadgeClass(pr.state)">
-                  {{ pr.stateLabel }}
+            <dd v-if="changeRequestDetail.kind === 'changeRequests'" class="flex flex-col gap-0.5">
+              <div
+                v-for="cr in changeRequestDetail.changeRequests"
+                :key="cr.number"
+                class="flex items-center gap-0.5"
+              >
+                <span :class="changeRequestBadgeClass(cr.state)">
+                  {{ cr.stateLabel }}
                 </span>
                 <Button
                   variant="link"
                   size="inline"
                   class="justify-start text-left whitespace-normal text-graph-sm"
-                  @click="openPullRequest(pr.number)"
+                  @click="openChangeRequest(cr.number)"
                 >
-                  #{{ pr.number }} {{ pr.title }}
+                  #{{ cr.number }} {{ cr.title }}
                 </Button>
               </div>
             </dd>
-            <dd v-else-if="prDetail.kind === 'none'">{{ t('git.commit.noPullRequest.empty') }}</dd>
-            <dd v-else class="text-muted-foreground" data-testid="pr-unavailable">
-              {{ prDetail.reason }}
+            <dd v-else-if="changeRequestDetail.kind === 'none'">{{
+              t('git.commit.noPullRequest.empty')
+            }}</dd>
+            <dd v-else class="text-muted-foreground" data-testid="change-request-unavailable">
+              {{ changeRequestDetail.reason }}
             </dd>
           </template>
         </KeyValueList>

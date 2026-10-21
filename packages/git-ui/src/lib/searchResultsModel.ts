@@ -72,8 +72,8 @@ const FIELD_LABEL_KEYS = {
   sha: 'git.search.field.sha.label',
   refName: 'common.field.name.label',
   tagAnnotation: 'git.search.field.tagMessage.label',
-  prNumber: 'git.search.field.prNumber.label',
-  prTitle: 'git.search.field.prTitle.label',
+  changeRequestNumber: 'git.search.field.prNumber.label',
+  changeRequestTitle: 'git.search.field.prTitle.label',
 } as const satisfies Record<SearchField, MessageKey>;
 
 export function fieldLabel(fields: readonly SearchField[]): string | undefined {

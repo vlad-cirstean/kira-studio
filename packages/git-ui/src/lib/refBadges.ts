@@ -19,11 +19,11 @@
  * W13's Playwright pass rather than here.
  */
 import type { DecorationRef } from '@kira/git-core';
-import type { PrRecord } from '@kira/git-ipc';
+import type { ChangeRequestRecord } from '@kira/git-ipc';
 import { t } from '@theme/i18n';
 import { BADGE_ICONS } from '../icons/index.ts';
-import { prBadgeClass, type RefBadgeVariant, refBadgeClass } from './badgeClass.ts';
-import { prStateLabel } from './prStateLabel.ts';
+import { changeRequestBadgeClass, type RefBadgeVariant, refBadgeClass } from './badgeClass.ts';
+import { changeRequestStateLabel } from './changeRequestStateLabel.ts';
 
 // §6.2: badge text truncates at ~190px (full name in the tooltip); the icon keeps its size.
 /** A Git ref name, not prose. */
@@ -227,7 +227,7 @@ function buildOverflowBadge(overflow: OverflowSpec): HTMLSpanElement {
 // it just never goes through `badgeSpecFor`/`DecorationRef`, since a PR is not a ref decoration.
 // ---------------------------------------------------------------------------------------
 
-const PR_STATE_PRECEDENCE: Readonly<Record<PrRecord['state'], number>> = {
+const PR_STATE_PRECEDENCE: Readonly<Record<ChangeRequestRecord['state'], number>> = {
   open: 0,
   draft: 1,
   merged: 2,
@@ -237,7 +237,9 @@ const PR_STATE_PRECEDENCE: Readonly<Record<PrRecord['state'], number>> = {
 /** D9's own precedence rule: `open > draft > merged > closed`, ties broken by most recently
  *  updated — "which one PR does the graph indicator show when a commit is associated with more
  *  than one" (§10.8's own recommendation). `undefined` for an empty list, never thrown. */
-export function pickBestPr(prs: readonly PrRecord[]): PrRecord | undefined {
+export function pickBestChangeRequest(
+  prs: readonly ChangeRequestRecord[],
+): ChangeRequestRecord | undefined {
   if (prs.length === 0) return undefined;
   return [...prs].sort((a, b) => {
     const precedence = PR_STATE_PRECEDENCE[a.state] - PR_STATE_PRECEDENCE[b.state];
@@ -252,22 +254,22 @@ export function pickBestPr(prs: readonly PrRecord[]): PrRecord | undefined {
  *  P74 §3: never a real `<a href>` — under Wails an anchor click navigates the app's own window
  *  itself rather than opening a browser tab (there is no separate tab to open one in), the same
  *  defect class `CommitMeta.vue`/`BranchPicker.vue`/`StackList.vue`'s own PR links carried before
- *  §3's fix. A `<button data-pr-number>` (click routed through
- *  `CommitGrid.vue`'s own `onClick` delegation to `DetailActions.openPullRequest`, which composes
- *  and opens the URL host-side). The PR's state is carried as a border colour class, never as text (`prBadgeClass`) —
+ *  §3's fix. A `<button data-change-request-number>` (click routed through
+ *  `CommitGrid.vue`'s own `onClick` delegation to `DetailActions.openChangeRequest`, which composes
+ *  and opens the URL host-side). The PR's state is carried as a border colour class, never as text (`changeRequestBadgeClass`) —
  *  width is scarce, and the tooltip already names the state in words. */
-export function buildPrBadge(prs: readonly PrRecord[]): HTMLElement | null {
-  const best = pickBestPr(prs);
+export function buildChangeRequestBadge(prs: readonly ChangeRequestRecord[]): HTMLElement | null {
+  const best = pickBestChangeRequest(prs);
   if (best === undefined) return null;
 
   const badge = document.createElement('button');
-  badge.className = prBadgeClass(best.state);
-  badge.dataset.testid = 'badge-pr';
+  badge.className = changeRequestBadgeClass(best.state);
+  badge.dataset.testid = 'badge-change-request';
   badge.type = 'button';
   // Not a Tab stop inside the roving-tabindex grid; Enter on it would toggle the detail pane.
   badge.tabIndex = -1;
-  badge.dataset.prNumber = String(best.number);
-  const state = prStateLabel(best.state);
+  badge.dataset.changeRequestNumber = String(best.number);
+  const state = changeRequestStateLabel(best.state);
   badge.setAttribute(
     'data-kira-tip',
     prs.length > 1

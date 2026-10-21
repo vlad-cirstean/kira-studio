@@ -176,7 +176,13 @@ package gitrpc
 // (commit.detail, stash.show, working.detail) read --name-status only.
 // P286: 48 -> 49, additive. One new request, review.comment.setState; review.comment.add takes an
 // optional kind; every comment carries kind, state, reply, repliedAt and sentAt.
-const ContractVersion = 49
+// P318: 49 -> 50, breaking. The PR requests are renamed for any code host: commit.resolvePr ->
+// commit.resolveChangeRequests, branch.resolvePr -> branch.resolveChangeRequest, pr.browserUrl ->
+// changeRequest.browserUrl, pr.openExternal -> changeRequest.openExternal. GhStatus, PrRecord and
+// PrLookupResult become HostStatus, ChangeRequestRecord and ChangeRequestLookup; the lookup's prs
+// and gh fields become changeRequests and status. kiraSpace.github.enabled (boolean) becomes
+// kiraSpace.gitHost.provider (string).
+const ContractVersion = 50
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

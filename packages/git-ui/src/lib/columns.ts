@@ -15,11 +15,11 @@
  * so a commit subject containing `<script>` is text by construction.
  */
 import type { CommitRecord, CommitStore, DecorationRef, RowPlan } from '@kira/git-core';
-import type { PrRecord } from '@kira/git-ipc';
+import type { ChangeRequestRecord } from '@kira/git-ipc';
 import { formatAbsoluteUtc, formatAgeCompact } from '@workbench/behaviour/format';
 import type { Column, CustomDataView, Formatter, ItemMetadata } from 'slickgrid';
 import type { ColumnWidths, DateFormat } from '../state/viewState.ts';
-import { buildPrBadge, buildRefBadges, type StackBadgeInfo } from './refBadges.ts';
+import { buildChangeRequestBadge, buildRefBadges, type StackBadgeInfo } from './refBadges.ts';
 import { splitHighlights } from './searchHighlight.ts';
 
 /** Every field a column's `field:` must name is a valid dotted path into `CommitRecord`
@@ -74,18 +74,18 @@ const NO_SEARCH_CONTEXT: MessageSearchContext = { pattern: () => undefined };
 /** G24 D9: the message column's own accessor onto a row's associated PR(s) — a third instance of
  *  `MessageSearchContext`'s own convention, re-read on every render pass rather
  *  than captured once, so `CommitGrid.vue` only ever needs to trigger a re-render (the
- *  `pr.generation` watcher) on a new resolution, never rebuild the column model. `prsFor` returns
+ *  `pr.generation` watcher) on a new resolution, never rebuild the column model. `changeRequestsFor` returns
  *  `undefined` for every "nothing to show" outcome (not-yet-resolved, in-flight, `disabled`,
- *  `unavailable`, or resolved-with-none) — `PrState.bySha`'s own doc comment on why the grid never
+ *  `unavailable`, or resolved-with-none) — `ChangeRequestState.bySha`'s own doc comment on why the grid never
  *  has to distinguish those five itself. */
-export interface PrContext {
-  readonly prsFor: (sha: string) => readonly PrRecord[] | undefined;
+export interface ChangeRequestContext {
+  readonly changeRequestsFor: (sha: string) => readonly ChangeRequestRecord[] | undefined;
 }
 
-const NO_PR_CONTEXT: PrContext = { prsFor: () => undefined };
+const NO_PR_CONTEXT: ChangeRequestContext = { changeRequestsFor: () => undefined };
 
 /** G26 D-4.10/F12: the message column's own accessor onto a branch's stack decoration — a fourth
- *  instance of `MessageSearchContext`/`PrContext`'s own convention, re-read on
+ *  instance of `MessageSearchContext`/`ChangeRequestContext`'s own convention, re-read on
  *  every render pass. `CommitGrid.vue`'s own `stack.generation` watcher (F12's fourth instance)
  *  triggers a re-render on a new `stack.list`, never a column rebuild. `stackInfoFor` returns
  *  `undefined` for every branch that is not a stack member — `refBadges.ts`'s own "render
@@ -145,13 +145,13 @@ export function collapsedMessageText(hiddenCount: number, label: string | undefi
 }
 
 /** The message cell: a decorated row (ref or PR badge) is a 2-row grid, badge line
- *  (`BADGES_ROW_CLASS`, `refBadges.ts` strip then `buildPrBadge`) over the subject; a plain row is one
+ *  (`BADGES_ROW_CLASS`, `refBadges.ts` strip then `buildChangeRequestBadge`) over the subject; a plain row is one
  *  flex line with no empty track. The subject alone ellipsizes. With an active search pattern it
  *  splits via `searchHighlight.ts`'s `splitHighlights` into plain text nodes and `bg-search-match`
  *  spans; `enableHtmlRendering: false` (§5.5) and `textContent` everywhere mean no escaping is needed. */
 function messageFormatter(
   ctx: MessageSearchContext,
-  prCtx: PrContext = NO_PR_CONTEXT,
+  changeRequestCtx: ChangeRequestContext = NO_PR_CONTEXT,
   stackCtx: StackContext = NO_STACK_CONTEXT,
   collapsedCtx: CollapsedRowContext = NO_COLLAPSED_ROW_CONTEXT,
 ): Formatter<CommitRecord> {
@@ -185,8 +185,8 @@ function messageFormatter(
 
     const badges = buildRefBadges(dataContext.decoration, stackCtx.stackInfoFor);
     // G24 D9: the PR badge shares the same row-1 strip, placed after the ref badges.
-    const prs = prCtx.prsFor(dataContext.sha);
-    const prBadge = prs !== undefined ? buildPrBadge(prs) : null;
+    const prs = changeRequestCtx.changeRequestsFor(dataContext.sha);
+    const prBadge = prs !== undefined ? buildChangeRequestBadge(prs) : null;
     if (badges !== null || prBadge !== null) {
       // `rowMetadata` makes the same decoration-or-PR check to give this row the taller height.
       cell.className = CELL_MESSAGE_BADGES_CLASS;
@@ -301,7 +301,7 @@ export function buildColumns(
   dateCtx: DateFormatterContext,
   graphFormatter: Formatter<CommitRecord>,
   searchCtx: MessageSearchContext = NO_SEARCH_CONTEXT,
-  prCtx: PrContext = NO_PR_CONTEXT,
+  changeRequestCtx: ChangeRequestContext = NO_PR_CONTEXT,
   stackCtx: StackContext = NO_STACK_CONTEXT,
   options: BuildColumnsOptions = {},
   collapsedCtx: CollapsedRowContext = NO_COLLAPSED_ROW_CONTEXT,
@@ -340,7 +340,7 @@ export function buildColumns(
       sortable: false,
       focusable: false,
       selectable: false,
-      formatter: messageFormatter(searchCtx, prCtx, stackCtx, collapsedCtx),
+      formatter: messageFormatter(searchCtx, changeRequestCtx, stackCtx, collapsedCtx),
     },
   ];
   if (options.compact) return columns;
@@ -380,12 +380,12 @@ export function buildColumns(
  *  commit could coincidentally match).
  *
  *  P7 (item 1): also `getItemMetadata`'s `height`, now that `CommitGrid.vue` turns on
- *  `enableVariableRowHeight` — `expandedRowHeight`/`prsFor` are optional so every existing caller
+ *  `enableVariableRowHeight` — `expandedRowHeight`/`changeRequestsFor` are optional so every existing caller
  *  of `rowMetadata` that only needs the class behaviour keeps compiling; only `CommitGrid.vue`
  *  passes real ones.
  *
  *  P93 §7: `plan` translates the incoming row (SlickGrid's own display-row indexing) into the
- *  store row every other field here reads — `isSelected`/`prsFor` still take/answer for a STORE
+ *  store row every other field here reads — `isSelected`/`changeRequestsFor` still take/answer for a STORE
  *  row (`SelectionState`'s own coordinate system, §1's "rows are one coordinate system" no longer
  *  true grid-wide but still true for selection), so `rowMetadata` translates once, at its own top,
  *  rather than pushing that onto every caller. */
@@ -394,7 +394,7 @@ interface RowMetadataContext {
   readonly plan: () => RowPlan;
   readonly isSelected: (row: number) => boolean;
   readonly expandedRowHeight?: () => number;
-  readonly prsFor?: (sha: string) => readonly PrRecord[] | undefined;
+  readonly changeRequestsFor?: (sha: string) => readonly ChangeRequestRecord[] | undefined;
 }
 
 /** P7 (item 1): whether row `row` renders a ref/PR badge strip at all — the exact condition
@@ -402,16 +402,16 @@ interface RowMetadataContext {
  *  `CELL_MESSAGE_BADGES_CLASS`), recomputed here cheaply (no DOM: `planBadges`'s own exhaustive
  *  `badgeSpecFor` switch means every decoration kind, `head` included, always produces a visible
  *  badge, so `decoration.length > 0` alone is a complete proxy) rather than calling
- *  `buildRefBadges`/`buildPrBadge` a second time just to check emptiness. */
+ *  `buildRefBadges`/`buildChangeRequestBadge` a second time just to check emptiness. */
 function rowHasBadges(
   ctx: RowMetadataContext,
   row: number,
   decoration: readonly DecorationRef[],
 ): boolean {
   if (decoration.length > 0) return true;
-  if (ctx.prsFor === undefined) return false;
+  if (ctx.changeRequestsFor === undefined) return false;
   const sha = ctx.store.shaAt(row);
-  return (ctx.prsFor(sha)?.length ?? 0) > 0;
+  return (ctx.changeRequestsFor(sha)?.length ?? 0) > 0;
 }
 
 function rowMetadata(ctx: RowMetadataContext, displayRow: number): ItemMetadata | null {

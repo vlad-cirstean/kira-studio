@@ -8,7 +8,7 @@ const PR_STATE_KEYS: Readonly<Record<string, MessageKey>> = {
 };
 
 /** Display word for a pull request state; an unknown state shows as given. */
-export function prStateLabel(state: string): string {
+export function changeRequestStateLabel(state: string): string {
   const key = PR_STATE_KEYS[state];
   return key === undefined ? state : t(key);
 }

@@ -612,15 +612,15 @@ type RepoSettingsChangedPayload struct {
 }
 
 // ---------------------------------------------------------------------------------------
-// G24 — commit.resolvePr / branch.resolvePr (D9/D14). GhStatus/PrRecord/ChangeRequestLookup are direct
+// G24 — commit.resolveChangeRequests / branch.resolveChangeRequest (D9/D14). HostStatus/ChangeRequestRecord/ChangeRequestLookup are direct
 // structural copies of @kira/git-ipc's own types of the same name, kept honest by hand (this repo
 // carries no wireConformance.spec.ts — see this phase's own commit message) the same way
 // gitclient.GitStatus's JSON tags already mirror GitStatus's TS twin.
 // ---------------------------------------------------------------------------------------
 
-// GhStatus mirrors githost.Status field for field — this phase's own D5 four-kind actionability
+// HostStatus mirrors githost.Status field for field — this phase's own D5 four-kind actionability
 // union, crossing the wire unchanged.
-type GhStatus struct {
+type HostStatus struct {
 	Kind    string `json:"kind"`
 	Path    string `json:"path,omitempty"`
 	Version string `json:"version,omitempty"`
@@ -629,12 +629,12 @@ type GhStatus struct {
 	Reason  string `json:"reason,omitempty"`
 }
 
-func ghStatusFrom(s githost.Status) GhStatus {
-	return GhStatus{Kind: s.Kind, Path: s.Path, Version: s.Version, Host: s.Host, Account: s.Account, Reason: s.Reason}
+func hostStatusFrom(s githost.Status) HostStatus {
+	return HostStatus{Kind: s.Kind, Path: s.Path, Version: s.Version, Host: s.Host, Account: s.Account, Reason: s.Reason}
 }
 
-// PrRecord mirrors githost.ChangeRequest field for field, camelCased at the wire.
-type PrRecord struct {
+// ChangeRequestRecord mirrors githost.ChangeRequest field for field, camelCased at the wire.
+type ChangeRequestRecord struct {
 	Number    int    `json:"number"`
 	Title     string `json:"title"`
 	URL       string `json:"url"`
@@ -645,61 +645,61 @@ type PrRecord struct {
 	UpdatedAt int64  `json:"updatedAt"`
 }
 
-func prRecordFrom(p githost.ChangeRequest) PrRecord {
-	return PrRecord{
+func changeRequestRecordFrom(p githost.ChangeRequest) ChangeRequestRecord {
+	return ChangeRequestRecord{
 		Number: p.Number, Title: p.Title, URL: p.URL, State: p.State,
 		HeadRef: p.HeadRef, HeadSha: p.HeadSha, BaseRef: p.BaseRef, UpdatedAt: p.UpdatedAt,
 	}
 }
 
-// ChangeRequestLookup mirrors @kira/git-ipc's own discriminated union (D14) — both commit.resolvePr and
-// branch.resolvePr answer this exact shape.
+// ChangeRequestLookup mirrors @kira/git-ipc's own discriminated union (D14) — both commit.resolveChangeRequests and
+// branch.resolveChangeRequest answer this exact shape.
 type ChangeRequestLookup struct {
-	Kind string     `json:"kind"` // "ok" | "disabled" | "unavailable"
-	PRs  []PrRecord `json:"prs,omitempty"`
-	Gh   *GhStatus  `json:"gh,omitempty"`
+	Kind           string                `json:"kind"` // "ok" | "disabled" | "unavailable"
+	ChangeRequests []ChangeRequestRecord `json:"changeRequests,omitempty"`
+	Status         *HostStatus           `json:"status,omitempty"`
 }
 
-func prLookupResultFrom(r gitsession.ChangeRequestLookup) ChangeRequestLookup {
+func changeRequestLookupFrom(r gitsession.ChangeRequestLookup) ChangeRequestLookup {
 	out := ChangeRequestLookup{Kind: r.Kind}
 	if r.Kind == "ok" {
-		prs := make([]PrRecord, 0, len(r.ChangeRequests))
+		crs := make([]ChangeRequestRecord, 0, len(r.ChangeRequests))
 		for _, p := range r.ChangeRequests {
-			prs = append(prs, prRecordFrom(p))
+			crs = append(crs, changeRequestRecordFrom(p))
 		}
-		out.PRs = prs
+		out.ChangeRequests = crs
 	}
 	if r.Status != nil {
-		gh := ghStatusFrom(*r.Status)
-		out.Gh = &gh
+		status := hostStatusFrom(*r.Status)
+		out.Status = &status
 	}
 	return out
 }
 
-// CommitResolvePrParams is commit.resolvePr's own request.
-type CommitResolvePrParams struct {
+// CommitResolveChangeRequestsParams is commit.resolveChangeRequests's own request.
+type CommitResolveChangeRequestsParams struct {
 	RepoID string `json:"repoId"`
 	SHA    string `json:"sha"`
 }
 
-// BranchResolvePrParams is branch.resolvePr's own request.
-type BranchResolvePrParams struct {
+// BranchResolveChangeRequestParams is branch.resolveChangeRequest's own request.
+type BranchResolveChangeRequestParams struct {
 	RepoID string `json:"repoId"`
 	Branch string `json:"branch"`
 }
 
-// PrBrowserUrlParams is pr.browserUrl's own request (P74 §3.3) — hostHandlers.ts/proxyHandlers.ts
-// answer pr.openExternal by requesting this over the git socket, then handing the URL to the
+// ChangeRequestBrowserUrlParams is changeRequest.browserUrl's own request (P74 §3.3) — hostHandlers.ts/proxyHandlers.ts
+// answer changeRequest.openExternal by requesting this over the git socket, then handing the URL to the
 // host's own browser-open path (never the reverse: the renderer never supplies a URL).
-type PrBrowserUrlParams struct {
+type ChangeRequestBrowserUrlParams struct {
 	RepoID string `json:"repoId"`
 	Number int    `json:"number"`
 }
 
-// PrBrowserUrlResult mirrors @kira/git-ipc's own `{url: string} | {url: null}` — `URL` is a
+// ChangeRequestBrowserUrlResult mirrors @kira/git-ipc's own `{url: string} | {url: null}` — `URL` is a
 // pointer so `null` (github disabled, or no GitHub remote) round-trips as JSON `null` rather than
 // an empty string an href-shaped caller might mistake for a real, if empty, value.
-type PrBrowserUrlResult struct {
+type ChangeRequestBrowserUrlResult struct {
 	URL *string `json:"url"`
 }
 

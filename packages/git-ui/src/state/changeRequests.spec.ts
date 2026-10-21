@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import type { CommitRecord } from '@kira/git-core';
 import { CommitStore } from '@kira/git-core';
-import type { GhStatus } from '@kira/git-ipc';
+import type { HostStatus } from '@kira/git-ipc';
 import { sleep } from '@workbench/testing/unit/async';
 import { BridgeClient } from '../bridge/client.ts';
 import { FakeTransport } from '../testing/fakeTransport.ts';
-import { PrState } from './pr.ts';
+import { ChangeRequestState } from './changeRequests.ts';
 
 const REPO = '/repos/a';
 
@@ -42,32 +42,32 @@ function buildChain(length: number): { store: CommitStore; shas: string[] } {
   return { store, shas };
 }
 
-describe('PrState — per-commit selection debounce', () => {
+describe('ChangeRequestState — per-commit selection debounce', () => {
   test('selecting several shas within the debounce window issues exactly one request, for the last one', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
     transport.calls.length = 0; // setRepoId itself issues no request; keep the assertion focused.
 
-    transport.onRequest = () => ({ kind: 'ok', prs: [] });
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [] });
     pr.select('sha1');
     pr.select('sha2');
     pr.select('sha3');
     await sleep(350);
 
-    const resolveCalls = transport.calls.filter((c) => c.method === 'commit.resolvePr');
+    const resolveCalls = transport.calls.filter((c) => c.method === 'commit.resolveChangeRequests');
     expect(resolveCalls.length).toBe(1);
     expect(resolveCalls[0]?.params).toEqual({ repoId: REPO, sha: 'sha3' });
     pr.dispose();
   });
 });
 
-describe('PrState — stale-response drop', () => {
+describe('ChangeRequestState — stale-response drop', () => {
   test('an older selection’s response landing after a newer one is selected is dropped', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
 
     let resolveFirst: ((v: unknown) => void) | undefined;
@@ -80,7 +80,7 @@ describe('PrState — stale-response drop', () => {
       }
       return Promise.resolve({
         kind: 'ok',
-        prs: [
+        changeRequests: [
           {
             number: 2,
             title: 'new',
@@ -103,13 +103,13 @@ describe('PrState — stale-response drop', () => {
 
     expect(pr.selected.value?.kind).toBe('ok');
     if (pr.selected.value?.kind === 'ok') {
-      expect(pr.selected.value.prs[0]?.headSha).toBe('sha-new');
+      expect(pr.selected.value.changeRequests[0]?.headSha).toBe('sha-new');
     }
 
     // Now let the stale sha-old response land — it must NOT overwrite sha-new's own result.
     resolveFirst?.({
       kind: 'ok',
-      prs: [
+      changeRequests: [
         {
           number: 1,
           title: 'old',
@@ -126,7 +126,7 @@ describe('PrState — stale-response drop', () => {
 
     expect(pr.selected.value?.kind).toBe('ok');
     if (pr.selected.value?.kind === 'ok') {
-      expect(pr.selected.value.prs[0]?.headSha).toBe('sha-new');
+      expect(pr.selected.value.changeRequests[0]?.headSha).toBe('sha-new');
     }
     pr.dispose();
   });
@@ -143,14 +143,14 @@ const PR_ONE = {
   updatedAt: 0,
 };
 
-describe('PrState — refsChanged keeps facts and revalidates', () => {
+describe('ChangeRequestState — refsChanged keeps facts and revalidates', () => {
   test('facts stay while the re-request runs, then the answer swaps in', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
 
-    transport.onRequest = () => ({ kind: 'ok', prs: [PR_ONE] });
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [PR_ONE] });
     pr.select('sha1');
     await sleep(350);
     await pr.resolveBranch('b');
@@ -170,7 +170,7 @@ describe('PrState — refsChanged keeps facts and revalidates', () => {
     expect(pr.byBranch.value.get('b')?.number).toBe(1);
     expect(pr.selected.value?.kind).toBe('ok');
 
-    release?.({ kind: 'ok', prs: [{ ...PR_ONE, number: 2 }] });
+    release?.({ kind: 'ok', changeRequests: [{ ...PR_ONE, number: 2 }] });
     await sleep();
     expect(pr.byBranch.value.get('b')?.number).toBe(2);
     expect(pr.generation.value).toBeGreaterThan(genBefore);
@@ -180,11 +180,11 @@ describe('PrState — refsChanged keeps facts and revalidates', () => {
   test('a revalidated branch that lost its PR leaves byBranch', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
-    transport.onRequest = () => ({ kind: 'ok', prs: [PR_ONE] });
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [PR_ONE] });
     await pr.resolveBranch('b');
-    transport.onRequest = () => ({ kind: 'ok', prs: [] });
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [] });
     transport.emit('repo.changed', { repoId: REPO, kind: 'refsChanged' });
     await sleep();
     expect(pr.byBranch.value.has('b')).toBe(false);
@@ -194,9 +194,9 @@ describe('PrState — refsChanged keeps facts and revalidates', () => {
   test('switching back to a repo shows its last-known facts at once', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
-    transport.onRequest = () => ({ kind: 'ok', prs: [PR_ONE] });
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [PR_ONE] });
     await pr.resolveBranch('b');
 
     pr.setRepoId('/repos/b');
@@ -207,27 +207,27 @@ describe('PrState — refsChanged keeps facts and revalidates', () => {
   });
 });
 
-describe('PrState — prsHeadedAt badges only a PR head', () => {
+describe('ChangeRequestState — changeRequestsHeadedAt badges only a PR head', () => {
   test('a selected non-head commit gets no badge; the head does', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
-    transport.onRequest = () => ({ kind: 'ok', prs: [PR_ONE] });
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [PR_ONE] });
     pr.select('other');
     await sleep(350);
-    expect(pr.prForCommit('other')?.[0]?.number).toBe(1);
-    expect(pr.prsHeadedAt('other')).toBeUndefined();
-    expect(pr.prsHeadedAt('sha1')?.[0]?.number).toBe(1);
+    expect(pr.changeRequestForCommit('other')?.[0]?.number).toBe(1);
+    expect(pr.changeRequestsHeadedAt('other')).toBeUndefined();
+    expect(pr.changeRequestsHeadedAt('sha1')?.[0]?.number).toBe(1);
     pr.dispose();
   });
 });
 
-describe('PrState — a disabled repo never re-requests', () => {
+describe('ChangeRequestState — a disabled repo never re-requests', () => {
   test('once a lookup answers "disabled", every later selection/branch resolve skips the network entirely', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
 
     transport.onRequest = () => ({ kind: 'disabled' });
@@ -251,7 +251,7 @@ describe('PrState — a disabled repo never re-requests', () => {
   test('a repo change clears the disabled memo', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
     transport.onRequest = () => ({ kind: 'disabled' });
     pr.select('sha1');
@@ -259,7 +259,7 @@ describe('PrState — a disabled repo never re-requests', () => {
     expect(pr.selected.value?.kind).toBe('disabled');
 
     pr.setRepoId('/repos/b');
-    transport.onRequest = () => ({ kind: 'ok', prs: [] });
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [] });
     pr.select('sha1');
     await sleep(350);
     expect(pr.selected.value?.kind).toBe('ok');
@@ -267,34 +267,34 @@ describe('PrState — a disabled repo never re-requests', () => {
   });
 });
 
-describe('PrState — unavailable surfaces GhStatus', () => {
+describe('ChangeRequestState — unavailable surfaces HostStatus', () => {
   test('an unavailable resolve sets status but not bySha', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
-    const gh: GhStatus = { kind: 'unauthenticated', reason: 'run `gh auth login`' };
-    transport.onRequest = () => ({ kind: 'unavailable', gh });
+    const status: HostStatus = { kind: 'unauthenticated', reason: 'run `gh auth login`' };
+    transport.onRequest = () => ({ kind: 'unavailable', status });
 
     pr.select('sha1');
     await sleep(350);
 
-    expect(pr.selected.value).toEqual({ kind: 'unavailable', gh });
-    expect(pr.status.value).toEqual(gh);
+    expect(pr.selected.value).toEqual({ kind: 'unavailable', status });
+    expect(pr.status.value).toEqual(status);
     expect(pr.bySha.value.has('sha1')).toBe(false);
     pr.dispose();
   });
 });
 
-describe('PrState — ensureSnapshot warms only uncached branches', () => {
+describe('ChangeRequestState — ensureSnapshot warms only uncached branches', () => {
   test('a branch already in byBranch is not re-requested', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
     transport.onRequest = (_method, params) => ({
       kind: 'ok',
-      prs: [
+      changeRequests: [
         {
           number: 1,
           title: 't',
@@ -309,47 +309,53 @@ describe('PrState — ensureSnapshot warms only uncached branches', () => {
     });
 
     await pr.ensureSnapshot(['main', 'feature']);
-    expect(transport.calls.filter((c) => c.method === 'branch.resolvePr').length).toBe(2);
+    expect(transport.calls.filter((c) => c.method === 'branch.resolveChangeRequest').length).toBe(
+      2,
+    );
 
     await pr.ensureSnapshot(['main', 'feature', 'third']);
-    const resolveCalls = transport.calls.filter((c) => c.method === 'branch.resolvePr');
+    const resolveCalls = transport.calls.filter((c) => c.method === 'branch.resolveChangeRequest');
     expect(resolveCalls.length).toBe(3); // only "third" is new.
     pr.dispose();
   });
 });
 
 // G31 round-2 performance review, finding #3: a branch whose resolvePr answer came back "ok" with
-// no PR at all never landed in byBranch (only a real PrRecord goes in there), so ensureSnapshot's
+// no PR at all never landed in byBranch (only a real ChangeRequestRecord goes in there), so ensureSnapshot's
 // own dedup filter (!byBranch.has(name) && !#branchRequests.has(name)) failed forever and every
 // PR-less branch was re-requested on every ensureSnapshot call, indefinitely.
-describe('PrState — resolveBranch caches a "no PR" answer', () => {
+describe('ChangeRequestState — resolveBranch caches a "no PR" answer', () => {
   test('a branch that resolves to no PR is not re-requested by a later ensureSnapshot', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
-    transport.onRequest = () => ({ kind: 'ok', prs: [] });
+    transport.onRequest = () => ({ kind: 'ok', changeRequests: [] });
 
     await pr.ensureSnapshot(['no-pr-branch']);
-    expect(transport.calls.filter((c) => c.method === 'branch.resolvePr').length).toBe(1);
+    expect(transport.calls.filter((c) => c.method === 'branch.resolveChangeRequest').length).toBe(
+      1,
+    );
     expect(pr.byBranch.value.has('no-pr-branch')).toBe(false);
 
     await pr.ensureSnapshot(['no-pr-branch']);
     await pr.resolveBranch('no-pr-branch');
-    expect(transport.calls.filter((c) => c.method === 'branch.resolvePr').length).toBe(1);
+    expect(transport.calls.filter((c) => c.method === 'branch.resolveChangeRequest').length).toBe(
+      1,
+    );
     pr.dispose();
   });
 });
 
 // G30 round-1 performance review, finding #1: ensureSnapshot used to Promise.all every branch at
-// once — a repo with hundreds of branches fired hundreds of concurrent branch.resolvePr requests
+// once — a repo with hundreds of branches fired hundreds of concurrent branch.resolveChangeRequest requests
 // with nothing capping it anywhere in the stack. Proves the worker-pool bound: with 20 branches to
 // warm and every request left hanging, no more than 6 are ever in flight at once.
-describe('PrState — ensureSnapshot bounds its own fan-out', () => {
-  test('never more than 6 branch.resolvePr requests are in flight at once', async () => {
+describe('ChangeRequestState — ensureSnapshot bounds its own fan-out', () => {
+  test('never more than 6 branch.resolveChangeRequest requests are in flight at once', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
 
     const resolvers: Array<(v: unknown) => void> = [];
@@ -370,12 +376,14 @@ describe('PrState — ensureSnapshot bounds its own fan-out', () => {
       expect(resolvers.length).toBeGreaterThan(0);
       expect(resolvers.length).toBeLessThanOrEqual(6);
       const batch = resolvers.splice(0, resolvers.length);
-      for (const resolve of batch) resolve({ kind: 'ok', prs: [] });
+      for (const resolve of batch) resolve({ kind: 'ok', changeRequests: [] });
       resolvedCount += batch.length;
     }
     await done;
 
-    expect(transport.calls.filter((c) => c.method === 'branch.resolvePr').length).toBe(20);
+    expect(transport.calls.filter((c) => c.method === 'branch.resolveChangeRequest').length).toBe(
+      20,
+    );
     pr.dispose();
   });
 });
@@ -383,16 +391,16 @@ describe('PrState — ensureSnapshot bounds its own fan-out', () => {
 // P74 §4.2/§10: rebuildAncestry's own bounded breadth-first walk — several interacting rules
 // (first-writer-wins, a budget cut-off, a tip the loaded window never reached) whose wrong
 // answers are invisible in a screenshot, CLAUDE.md's own bar for a dedicated test here.
-describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
+describe('ChangeRequestState — rebuildAncestry: bounded ancestry walk', () => {
   test('walks every ancestor from a PR branch tip', async () => {
     const { store, shas } = buildChain(3);
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
     transport.onRequest = () => ({
       kind: 'ok',
-      prs: [
+      changeRequests: [
         {
           number: 1,
           title: 't',
@@ -409,8 +417,8 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
 
     pr.rebuildAncestry(store);
 
-    expect(pr.prByAncestry.value.size).toBe(3);
-    for (const s of shas) expect(pr.prForCommit(s)?.[0]?.number).toBe(1);
+    expect(pr.changeRequestByAncestry.value.size).toBe(3);
+    for (const s of shas) expect(pr.changeRequestForCommit(s)?.[0]?.number).toBe(1);
     pr.dispose();
   });
 
@@ -425,7 +433,7 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
 
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
     transport.onRequest = (_method, params) => {
       const branch = (params as { branch: string }).branch;
@@ -433,7 +441,7 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
       const number = branch === 'branchA' ? 1 : 2;
       return {
         kind: 'ok',
-        prs: [
+        changeRequests: [
           {
             number,
             title: 't',
@@ -455,9 +463,9 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
     pr.rebuildAncestry(store);
 
     // branchA resolved first, so its own PR wins the ancestor both tips share.
-    expect(pr.prForCommit(shared)?.[0]?.number).toBe(1);
-    expect(pr.prForCommit(a)?.[0]?.number).toBe(1);
-    expect(pr.prForCommit(b)?.[0]?.number).toBe(2);
+    expect(pr.changeRequestForCommit(shared)?.[0]?.number).toBe(1);
+    expect(pr.changeRequestForCommit(a)?.[0]?.number).toBe(1);
+    expect(pr.changeRequestForCommit(b)?.[0]?.number).toBe(2);
     pr.dispose();
   });
 
@@ -466,7 +474,7 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
     const outsideSha = sha(999); // never appended to this store.
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
     transport.onRequest = (_method, params) => {
       const branch = (params as { branch: string }).branch;
@@ -474,7 +482,7 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
       const number = branch === 'loaded' ? 1 : 2;
       return {
         kind: 'ok',
-        prs: [
+        changeRequests: [
           {
             number,
             title: 't',
@@ -493,24 +501,24 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
 
     pr.rebuildAncestry(store);
 
-    expect(pr.prByAncestry.value.size).toBe(2); // only the loaded branch's own two rows.
-    expect(pr.prForCommit(shas[0] as string)?.[0]?.number).toBe(1);
-    expect(pr.prForCommit(outsideSha)).toBeUndefined();
+    expect(pr.changeRequestByAncestry.value.size).toBe(2); // only the loaded branch's own two rows.
+    expect(pr.changeRequestForCommit(shas[0] as string)?.[0]?.number).toBe(1);
+    expect(pr.changeRequestForCommit(outsideSha)).toBeUndefined();
     pr.dispose();
   });
 
   test('a budget cutoff stops the walk mid-history', async () => {
-    // `rebuildAncestry`'s own `budget` param (defaulted to PR_ANCESTRY_WALK_BUDGET everywhere
+    // `rebuildAncestry`'s own `budget` param (defaulted to CHANGE_REQUEST_ANCESTRY_WALK_BUDGET everywhere
     // except here) lets this prove the cutoff itself on a 5-row chain instead of building the
     // real 50,000-row fixture the production default would need to exercise the same branch.
     const { store, shas } = buildChain(5);
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
     transport.onRequest = () => ({
       kind: 'ok',
-      prs: [
+      changeRequests: [
         {
           number: 1,
           title: 't',
@@ -527,9 +535,9 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
 
     pr.rebuildAncestry(store, 3);
 
-    expect(pr.prByAncestry.value.size).toBe(3);
-    expect(pr.prForCommit(shas[2] as string)?.[0]?.number).toBe(1); // the last row the budget reaches.
-    expect(pr.prForCommit(shas[3] as string)).toBeUndefined(); // one row past the cutoff.
+    expect(pr.changeRequestByAncestry.value.size).toBe(3);
+    expect(pr.changeRequestForCommit(shas[2] as string)?.[0]?.number).toBe(1); // the last row the budget reaches.
+    expect(pr.changeRequestForCommit(shas[3] as string)).toBeUndefined(); // one row past the cutoff.
     pr.dispose();
   });
 
@@ -559,11 +567,11 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
 
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
     transport.onRequest = () => ({
       kind: 'ok',
-      prs: [
+      changeRequests: [
         {
           number: 1,
           title: 't',
@@ -582,21 +590,21 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
 
     // Only the three commits the branch actually adds — mainTip and everything behind it belongs
     // to main, not to this PR.
-    expect(pr.prByAncestry.value.size).toBe(3);
-    for (const s of [fTip, f2, f1]) expect(pr.prForCommit(s)?.[0]?.number).toBe(1);
-    for (const s of [mainTip, m1, m2]) expect(pr.prForCommit(s)).toBeUndefined();
+    expect(pr.changeRequestByAncestry.value.size).toBe(3);
+    for (const s of [fTip, f2, f1]) expect(pr.changeRequestForCommit(s)?.[0]?.number).toBe(1);
+    for (const s of [mainTip, m1, m2]) expect(pr.changeRequestForCommit(s)).toBeUndefined();
     pr.dispose();
   });
 
-  test('a repo switch clears prByAncestry', async () => {
+  test('a repo switch clears changeRequestByAncestry', async () => {
     const { store, shas } = buildChain(2);
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
     transport.onRequest = () => ({
       kind: 'ok',
-      prs: [
+      changeRequests: [
         {
           number: 1,
           title: 't',
@@ -611,10 +619,10 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
     });
     await pr.resolveBranch('main');
     pr.rebuildAncestry(store);
-    expect(pr.prByAncestry.value.size).toBe(2);
+    expect(pr.changeRequestByAncestry.value.size).toBe(2);
 
     pr.setRepoId('/repos/b');
-    expect(pr.prByAncestry.value.size).toBe(0);
+    expect(pr.changeRequestByAncestry.value.size).toBe(0);
     pr.dispose();
   });
 });
@@ -622,11 +630,11 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
 // F9: resolveBranch used to read `this.#repoId` fresh but never guard against a SAME-repo
 // refsChanged clear, and its own `finally` deleted `#branchRequests`' marker unconditionally —
 // even when a newer request for the same branch name (started after the clear) already owned it.
-describe('PrState — F9: a stale resolveBranch across a same-repo refsChanged clear', () => {
+describe('ChangeRequestState — F9: a stale resolveBranch across a same-repo refsChanged clear', () => {
   test('the stale request neither overwrites the fresh answer nor lets a duplicate concurrent fetch start', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
-    const pr = new PrState(bridge);
+    const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
 
     const resolvers: Array<(v: unknown) => void> = [];
@@ -653,7 +661,7 @@ describe('PrState — F9: a stale resolveBranch across a same-repo refsChanged c
     // A settles FIRST, with a now-stale answer.
     resolvers[0]?.({
       kind: 'ok',
-      prs: [
+      changeRequests: [
         {
           number: 1,
           title: 'stale',
@@ -678,7 +686,7 @@ describe('PrState — F9: a stale resolveBranch across a same-repo refsChanged c
     // B settles — its own answer is the one that actually applies.
     resolvers[1]?.({
       kind: 'ok',
-      prs: [
+      changeRequests: [
         {
           number: 2,
           title: 'fresh',

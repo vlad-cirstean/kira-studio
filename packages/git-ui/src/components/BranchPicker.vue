@@ -49,8 +49,8 @@ import { REF_LIST_SECTION_CAP } from '../lib/refListModel.ts';
 import { remoteNamesFrom } from '../lib/rowMenuModel.ts';
 import { shaLabel } from '../lib/text.ts';
 import { useFieldFocus } from '../lib/useFieldFocus.ts';
+import type { ChangeRequestState } from '../state/changeRequests.ts';
 import type { OpsState } from '../state/ops.ts';
-import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
 import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
@@ -71,10 +71,10 @@ const props = defineProps<{
   stack: StackState;
   /** G24 D9's own branch-tip badge — optional so a caller with nothing to show yet gets a plain,
    *  badge-free picker (mirrors `CommitGrid.vue`'s own `pr` prop). */
-  pr?: PrState;
-  /** P74 §3.3: `AppToolbar.vue`'s own `openPullRequest` — threaded down rather than reimplemented
+  changeRequests?: ChangeRequestState;
+  /** P74 §3.3: `AppToolbar.vue`'s own `openChangeRequest` — threaded down rather than reimplemented
    *  here or in `StackList.vue`. */
-  openPullRequest: (number: number) => void;
+  openChangeRequest: (number: number) => void;
 }>();
 
 /** OQ3: bubbled straight through from `StashList.vue`'s own emit — see that component's own doc
@@ -390,7 +390,7 @@ function closeForCheckout(): void {
 // G24 D7 point 4: opening the picker is one of the few user acts allowed to touch the network at
 // all — warms every visible branch's own PR record in one go. G32 round-3 performance review,
 // finding #3: "visible" used to mean the repo's FULL branch list, not what `model` (above) actually
-// renders — `branch.resolvePr` answers a branch WITH an open PR from its already-cached bulk
+// renders — `branch.resolveChangeRequest` answers a branch WITH an open PR from its already-cached bulk
 // snapshot at no extra cost (D6), but one WITHOUT falls through to its own per-branch `gh api`
 // call, so a repo with hundreds of branches fanned out hundreds of `gh` spawns from one picker
 // open, easily arming GitHub's rate-limit breaker. Scoped to the Branches tab's own visible rows
@@ -406,8 +406,8 @@ const visibleBranchNames = computed<readonly string[]>(() => {
   ];
 });
 watch(visibleBranchNames, (names) => {
-  if (names.length === 0 || !props.pr) return;
-  void props.pr.ensureSnapshot(names);
+  if (names.length === 0 || !props.changeRequests) return;
+  void props.changeRequests.ensureSnapshot(names);
 });
 </script>
 
@@ -479,8 +479,8 @@ watch(visibleBranchNames, (names) => {
               :refs="refs"
               :ops="ops"
               :stack="stack"
-              :pr="pr"
-              :open-pull-request="openPullRequest"
+              :change-requests="changeRequests"
+              :open-change-request="openChangeRequest"
               :local-section="model.branchesLocal"
               :remote-section="model.branchesRemote"
               :active-row-id="activeRowId"
@@ -579,8 +579,8 @@ watch(visibleBranchNames, (names) => {
                 :stacks="model.stacks"
                 :orphans="model.orphans"
                 :ops="ops"
-                :pr="pr"
-                :open-pull-request="openPullRequest"
+                :change-requests="changeRequests"
+                :open-change-request="openChangeRequest"
                 :focused-row-id="activeRowId"
                 @openRestackDialog="(branch) => emit('openRestackDialog', branch)"
                 @openSetParentDialog="(branch) => emit('openSetStackParentDialog', branch)"

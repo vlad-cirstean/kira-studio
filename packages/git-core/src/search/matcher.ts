@@ -36,8 +36,8 @@ export type SearchField =
   | 'tagAnnotation'
   // G24 D11: matchRef's own `pr` arm — a ref's associated PR number/title, client-side only (F9:
   // the wire's SearchMatchField union is commits-only; these two never cross the wire).
-  | 'prNumber'
-  | 'prTitle';
+  | 'changeRequestNumber'
+  | 'changeRequestTitle';
 
 /** Every field a commit can be searched on. `body` is `""` for a loaded row — the column store
  *  holds no commit body at all (hard part 1); only the streamed git tail (`ScanRecord`) ever
@@ -228,7 +228,7 @@ export function searchLoadedCommits(
  * `body` — never a lightweight tag's borrowed commit subject (`ref.annotation` is already
  * `undefined` there; see `parse/refs.ts`). `pr` is G24's own activation of P12's seam (§7.8's own
  * paragraph on the boundary): when the branch this ref names has an associated pull request
- * (`PrState.byBranch`), its number and title are matched too — a `#123`-or-bare-`123` two-form
+ * (`ChangeRequestState.byBranch`), its number and title are matched too — a `#123`-or-bare-`123` two-form
  * number test (upstream §7.8 verbatim) and a plain title match. `pr === undefined` (every P11
  * caller, and a branch with no resolved PR) is byte-identical to this seam's pre-G24 inert
  * behaviour — a strict addition, never a change to the refName/tagAnnotation arms above it.
@@ -250,8 +250,8 @@ export function matchRef(
   }
   if (pr !== undefined) {
     const n = String(pr.number);
-    if (query.pattern.test(n) || query.pattern.test(`#${n}`)) hits.push('prNumber');
-    if (query.pattern.test(pr.title)) hits.push('prTitle');
+    if (query.pattern.test(n) || query.pattern.test(`#${n}`)) hits.push('changeRequestNumber');
+    if (query.pattern.test(pr.title)) hits.push('changeRequestTitle');
   }
   return hits.length === 0 ? NO_FIELDS : hits;
 }

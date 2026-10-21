@@ -55,17 +55,17 @@ export interface DetailActions {
    *  to remove. */
   goToFile(params: { rev: string; path: string; line: number }): Promise<GoToFileOutcome>;
   /** P74 §3.3: opens a pull request in the external browser, never in place — the renderer never
-   *  supplies a URL (`pr.openExternal`'s own doc comment); it names the PR by number and the host
+   *  supplies a URL (`changeRequest.openExternal`'s own doc comment); it names the PR by number and the host
    *  composes/opens the URL itself. */
-  openPullRequest(params: { number: number }): Promise<void>;
+  openChangeRequest(params: { number: number }): Promise<void>;
   /** P79 finding 4: opens an arbitrary URL found in a commit message body (`linkify.ts`) in the
-   *  external browser. Unlike `openPullRequest`, this URL is genuinely renderer-supplied — it is
+   *  external browser. Unlike `openChangeRequest`, this URL is genuinely renderer-supplied — it is
    *  the untrusted commit message text itself, not something the host composes — so each host
    *  validates the URL's own shape rather than trusting it outright. */
   openExternalLink(url: string): Promise<void>;
   /** P75 §2.3: reveals and selects `sha` in the graph — review-row-only today
    *  (`ReviewCommitRow.vue`'s "Open in graph"), implemented in every bundle because
-   *  `DetailActions` is one interface, the same way `openPullRequest` is (P74 §3.3).
+   *  `DetailActions` is one interface, the same way `openChangeRequest` is (P74 §3.3).
    *  `revealed: false` is a real answer (no pinned graph tab / repo not known to this window),
    *  not a stub — callers announce it. */
   revealInGraph(params: { sha: string }): Promise<{ revealed: boolean }>;
@@ -113,10 +113,11 @@ export function createDetailActions(
       if (!repo) throw new Error('createDetailActions: goToFile called with no active repo');
       return bridge.request('editor.goToFile', { repoId: repo, rev, path, line });
     },
-    async openPullRequest({ number }) {
+    async openChangeRequest({ number }) {
       const repo = repoId();
-      if (!repo) throw new Error('createDetailActions: openPullRequest called with no active repo');
-      await bridge.request('pr.openExternal', { repoId: repo, number });
+      if (!repo)
+        throw new Error('createDetailActions: openChangeRequest called with no active repo');
+      await bridge.request('changeRequest.openExternal', { repoId: repo, number });
     },
     async openExternalLink(url) {
       await bridge.request('link.openExternal', { url });

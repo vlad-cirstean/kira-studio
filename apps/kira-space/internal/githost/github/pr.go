@@ -131,7 +131,7 @@ func (c *Client) PullsForBranch(ctx context.Context, repo Repo, branch string) (
 	// G30 round-1 architecture/security review, finding #6: branch is a real branch name — "+",
 	// "%", "&", "#" are all legal in a ref — and reached this query value unescaped. An ordinary
 	// branch like "feature/a+b" silently corrupted the query (decoded server-side as "feature/a
-	// b"), so branch.resolvePr reported "no PR" for a branch that had one. url.QueryEscape both
+	// b"), so branch.resolveChangeRequest reported "no PR" for a branch that had one. url.QueryEscape both
 	// halves of the "owner:branch" value; the literal ":" GitHub's own head= syntax needs stays
 	// outside either escaped piece.
 	path := fmt.Sprintf("repos/%s/pulls?head=%s:%s&state=all&sort=updated&direction=desc&per_page=5",

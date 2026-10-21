@@ -290,14 +290,14 @@ var requestHandlers = map[string]requestHandler{
 	"search.run": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleSearchRun(ctx, c, params)
 	},
-	"commit.resolvePr": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-		return r.handleCommitResolvePr(ctx, c, params)
+	"commit.resolveChangeRequests": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleCommitResolveChangeRequests(ctx, c, params)
 	},
-	"branch.resolvePr": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-		return r.handleBranchResolvePr(ctx, c, params)
+	"branch.resolveChangeRequest": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleBranchResolveChangeRequest(ctx, c, params)
 	},
-	"pr.browserUrl": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-		return r.handlePrBrowserUrl(ctx, c, params)
+	"changeRequest.browserUrl": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleChangeRequestBrowserUrl(ctx, c, params)
 	},
 	"worktree.list": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleWorktreeList(ctx, c, params)

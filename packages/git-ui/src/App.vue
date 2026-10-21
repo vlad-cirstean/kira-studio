@@ -139,8 +139,9 @@ const actions = shallowRef<DetailActions | undefined>(undefined);
 
 // One instance each of refs/pr/stack/repoSettings/ops for the life of this component, reset via
 // `setRepoId` rather than replaced. `createRepoStates` wires `repoSettingsState` into `opsState`
-// (checkout.autoStash) and `prState` into `stackState`.
-const { refsState, prState, stackState, repoSettingsState, opsState } = createRepoStates(bridge);
+// (checkout.autoStash) and `changeRequestState` into `stackState`.
+const { refsState, changeRequestState, stackState, repoSettingsState, opsState } =
+  createRepoStates(bridge);
 // `docs/plans/P9.md` W13: one `StashState` for the life of this component, exactly like
 // `refsState`/`opsState` above — reset via `setRepoId` rather than replaced.
 const stashState = new StashState(bridge);
@@ -156,7 +157,7 @@ const worktreeState = new WorktreeState(bridge);
 // `refsState`/`opsState`/`stashState` above — reset via `setRepoId` rather than replaced. Threads
 // `refsState`/`graphView` in directly (both already exist above), matching the plan's own "threads
 // RefsState and GraphViewState into it".
-const searchState = new SearchState(bridge, refsState, graphView, prState);
+const searchState = new SearchState(bridge, refsState, graphView, changeRequestState);
 // G18 D13: `repoSettingsState` (from `createRepoStates`) backs `RepoSettingsDialog.vue`.
 
 const repoState = shallowRef<RepoState | undefined>(undefined);
@@ -450,10 +451,10 @@ watch(
     // P7 (item 2): selecting any real commit/stash row always clears a working-tree selection —
     // mirrors how selecting a commit already clears `stashState` above.
     workingState.select(false);
-    // G24 D9: PrState.select runs for every selection change, stash entries included — a stash
+    // G24 D9: ChangeRequestState.select runs for every selection change, stash entries included — a stash
     // sha simply resolves to "no PR" (or `disabled`) same as any other commit the server has
     // never heard of as a PR head; no special-casing needed here.
-    prState.select(sha);
+    changeRequestState.select(sha);
   },
 );
 
@@ -480,8 +481,8 @@ function applyRepoIdToStates(repoId: string | undefined): void {
   worktreeState.setRepoId(repoId);
   searchState.setRepoId(repoId);
   repoSettingsState.setRepoId(repoId);
-  prState.setRepoId(repoId);
-  // G26: after prState (StackState.reload calls prState.ensureSnapshot, F13).
+  changeRequestState.setRepoId(repoId);
+  // G26: after changeRequestState (StackState.reload calls changeRequestState.ensureSnapshot, F13).
   stackState.setRepoId(repoId);
   if (repoIdStatesAppliedOnce) {
     // P108 F2: the commit/stash context menus resolved against the *old* repo — a genuinely
@@ -662,10 +663,10 @@ function handleGridContextMenu(detail: { row: number; x: number; y: number }): v
   );
 }
 
-function handleGridOpenPullRequest(number: number): void {
+function handleGridOpenChangeRequest(number: number): void {
   actions.value
-    ?.openPullRequest({ number })
-    .catch((err: unknown) => reportAsyncError(err, ASYNC_FAILURES.openPullRequest));
+    ?.openChangeRequest({ number })
+    .catch((err: unknown) => reportAsyncError(err, ASYNC_FAILURES.openChangeRequest));
 }
 
 // P108 F2: the commit captured when the menu opened, not re-resolved by row — see the doc comment
@@ -858,7 +859,7 @@ const toolbarBindings = computed(() => ({
   worktreeState,
   stackState,
   actions: actions.value,
-  prState,
+  changeRequestState,
   searchOpen: searchOpen.value,
   collapseBranches: collapseBranches.value,
   onStashChanges: () => {
@@ -1645,7 +1646,7 @@ onBeforeUnmount(() => {
   stackState.dispose();
   searchState.dispose();
   repoSettingsState.dispose();
-  prState.dispose();
+  changeRequestState.dispose();
   repoState.value?.dispose();
   bridge.dispose();
 });
@@ -1787,7 +1788,7 @@ onBeforeUnmount(() => {
               :date-format="dateFormat"
               :detail-open="detailOpen"
               :search="searchState"
-              :pr="prState"
+              :change-requests="changeRequestState"
               :stack="stackState"
               v-bind="initialScrollRowProp"
               @update:column-widths="columnWidths = $event"
@@ -1800,7 +1801,7 @@ onBeforeUnmount(() => {
               @context-menu="handleGridContextMenu"
               @ref-context-menu="handleGridRefContextMenu"
               @stash-context-menu="handleStashContextMenu"
-              @open-pull-request="handleGridOpenPullRequest"
+              @open-change-request="handleGridOpenChangeRequest"
             />
             <LoadMoreButton
               :graph-view="graphView"
@@ -1854,7 +1855,7 @@ onBeforeUnmount(() => {
               :detail-state="detailState"
               :store="graphView.store"
               :actions="actions"
-              :pr="prState"
+              :change-requests="changeRequestState"
             />
           </aside>
         </main>
@@ -1893,7 +1894,7 @@ onBeforeUnmount(() => {
               :detail-state="detailState"
               :store="graphView.store"
               :actions="actions"
-              :pr="prState"
+              :change-requests="changeRequestState"
             />
           </aside>
         </div>

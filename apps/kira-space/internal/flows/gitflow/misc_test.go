@@ -223,18 +223,18 @@ func TestNoRemoteAndPr(t *testing.T) {
 	}
 
 	for name, res := range map[string]gitrpc.ChangeRequestLookup{
-		"commit": call[gitrpc.ChangeRequestLookup](t, r.gs, "commit.resolvePr", gitrpc.CommitResolvePrParams{RepoID: id, SHA: sha}),
-		"branch": call[gitrpc.ChangeRequestLookup](t, r.gs, "branch.resolvePr", gitrpc.BranchResolvePrParams{RepoID: id, Branch: "main"}),
+		"commit": call[gitrpc.ChangeRequestLookup](t, r.gs, "commit.resolveChangeRequests", gitrpc.CommitResolveChangeRequestsParams{RepoID: id, SHA: sha}),
+		"branch": call[gitrpc.ChangeRequestLookup](t, r.gs, "branch.resolveChangeRequest", gitrpc.BranchResolveChangeRequestParams{RepoID: id, Branch: "main"}),
 	} {
-		if len(res.PRs) != 0 {
-			t.Fatalf("%s.resolvePr = %+v, want no PRs", name, res)
+		if len(res.ChangeRequests) != 0 {
+			t.Fatalf("%s.resolveChangeRequests = %+v, want no PRs", name, res)
 		}
 	}
 
 	repo.AddRemote("https://gitlab.example.com/team/proj.git")
-	url := call[gitrpc.PrBrowserUrlResult](t, r.gs, "pr.browserUrl", gitrpc.PrBrowserUrlParams{RepoID: id, Number: 7})
+	url := call[gitrpc.ChangeRequestBrowserUrlResult](t, r.gs, "changeRequest.browserUrl", gitrpc.ChangeRequestBrowserUrlParams{RepoID: id, Number: 7})
 	if url.URL != nil {
-		t.Fatalf("pr.browserUrl for a non-GitHub remote = %q, want null", *url.URL)
+		t.Fatalf("changeRequest.browserUrl for a non-GitHub remote = %q, want null", *url.URL)
 	}
 }
 

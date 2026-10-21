@@ -12,9 +12,9 @@ import { cn } from '@theme/lib/utils';
 import InlineEditInput from '@workbench/components/InlineEditInput.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, onBeforeUnmount, ref } from 'vue';
-import { prBadgeClass } from '../lib/badgeClass.ts';
+import { changeRequestBadgeClass } from '../lib/badgeClass.ts';
+import { changeRequestStateLabel } from '../lib/changeRequestStateLabel.ts';
 import type { PickerList } from '../lib/pickerModel.ts';
-import { prStateLabel } from '../lib/prStateLabel.ts';
 import {
   formatTrack,
   localNameForRemoteBranch,
@@ -24,8 +24,8 @@ import {
 import { buildRefMenu, remoteNamesFrom } from '../lib/rowMenuModel.ts';
 import { childOf, parentOf } from '../lib/stackListModel.ts';
 import { useSectionMenu } from '../lib/useSectionMenu.ts';
+import type { ChangeRequestState } from '../state/changeRequests.ts';
 import type { OpsState } from '../state/ops.ts';
-import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
 import type { StackState } from '../state/stack.ts';
 import type { WorktreeCreateSeed } from '../state/worktrees.ts';
@@ -38,8 +38,8 @@ const props = defineProps<{
   refs: RefsState;
   ops: OpsState;
   stack: StackState;
-  pr?: PrState;
-  openPullRequest: (number: number) => void;
+  changeRequests?: ChangeRequestState;
+  openChangeRequest: (number: number) => void;
   localSection: PickerList<RefRow>;
   remoteSection: PickerList<RefRow>;
   activeRowId: string | undefined;
@@ -65,16 +65,16 @@ const knownRemotes = computed(() =>
 );
 
 /** The one PR record known for a branch's own short name, or `undefined`. */
-function prFor(
+function changeRequestFor(
   shortName: string,
 ): { number: number; url: string; title: string; state: string } | undefined {
-  return props.pr?.byBranch.value.get(shortName);
+  return props.changeRequests?.byBranch.value.get(shortName);
 }
 
-function prTooltip(shortName: string): string {
-  const pr = prFor(shortName);
+function changeRequestTooltip(shortName: string): string {
+  const pr = changeRequestFor(shortName);
   if (!pr) return '';
-  return t('common.dashPair.label', { first: pr.title, second: prStateLabel(pr.state) });
+  return t('common.dashPair.label', { first: pr.title, second: changeRequestStateLabel(pr.state) });
 }
 
 async function checkoutBranch(row: RefRow): Promise<void> {
@@ -235,12 +235,12 @@ async function submitRename(from: string, to: string): Promise<void> {
           <span v-if="formatTrack(row.track)" :class="rowMeta">{{ formatTrack(row.track) }}</span>
         </button>
         <button
-          v-if="prFor(row.shortName)"
+          v-if="changeRequestFor(row.shortName)"
           type="button"
-          :class="prBadgeClass(prFor(row.shortName)!.state)"
-          :data-kira-tip="prTooltip(row.shortName)"
-          @click.stop="openPullRequest(prFor(row.shortName)!.number)"
-          >#{{ prFor(row.shortName)!.number }}</button
+          :class="changeRequestBadgeClass(changeRequestFor(row.shortName)!.state)"
+          :data-kira-tip="changeRequestTooltip(row.shortName)"
+          @click.stop="openChangeRequest(changeRequestFor(row.shortName)!.number)"
+          >#{{ changeRequestFor(row.shortName)!.number }}</button
         >
         <RowActionsButton
           @click="rowMenu.openFromButton($event, menuFor(row), (id) => onRefMenuSelect(row, id))"

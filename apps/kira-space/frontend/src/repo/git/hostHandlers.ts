@@ -375,18 +375,22 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       return { session: session as ReviewSessionSnapshot | null };
     },
 
-    // P74 §3.3: requests pr.browserUrl over the git socket, then hands the URL (when non-null) to
+    // P74 §3.3: requests changeRequest.browserUrl over the git socket, then hands the URL (when non-null) to
     // GitHostService.OpenChangeRequestURL — the one Go-side path that ever opens the OS browser. A
-    // null url (github disabled, or no GitHub remote) is a silent no-op: the caller already gated
+    // null url (host off, or no remote on a known code host) is a silent no-op: the caller already gated
     // the button on this very lookup resolving in the first place.
-    'pr.openExternal': async ({ repoId, number }, signal) => {
-      const result = await deps.remoteRequest('pr.browserUrl', { repoId, number }, signal);
+    'changeRequest.openExternal': async ({ repoId, number }, signal) => {
+      const result = await deps.remoteRequest(
+        'changeRequest.browserUrl',
+        { repoId, number },
+        signal,
+      );
       if (result.url !== null) await control.gitHostOpenChangeRequestUrl(result.url);
       return {};
     },
 
     // P79 finding 4: linkify.ts's own message-body URL, opened through LinkService.OpenExternal
-    // — the same "one Go-side path that ever opens the OS browser" shape pr.openExternal above
+    // — the same "one Go-side path that ever opens the OS browser" shape changeRequest.openExternal above
     // uses, except this URL is untrusted renderer-visible content already (the commit message
     // itself), so Go-side validation checks the URL's own shape, never a known-host allowlist.
     // Answered entirely here (no repoId, no socket round trip) rather than forwarded — Go's

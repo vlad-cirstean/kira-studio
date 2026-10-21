@@ -28,9 +28,9 @@ import { FieldError } from '@theme/components/ui/field';
 import { t } from '@theme/i18n';
 import { computed } from 'vue';
 import { openFileAnnounced } from '../lib/openFileAnnounced.ts';
+import type { ChangeRequestState } from '../state/changeRequests.ts';
 import type { DetailState } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
-import type { PrState } from '../state/pr.ts';
 import CommitMeta from './CommitMeta.vue';
 // A .vue default export is a *value* — the component object the template instantiates. `import
 // type` erases it, and Vue then renders <FileTree> as an unknown element with nothing inside it
@@ -44,7 +44,7 @@ const props = defineProps<{
   /** G24 D12: optional so a caller with nothing to show yet (mirrors `CommitGrid.vue`'s own `pr`
    *  prop) gets a detail pane with no "Pull request" row at all — `CommitMeta.vue`'s own
    *  `prDetail` computed already treats `undefined` the same as `disabled`. */
-  pr?: PrState;
+  changeRequests?: ChangeRequestState;
 }>();
 
 const detail = computed(() => props.detailState.detail.value);
@@ -78,8 +78,8 @@ function onOpenFile(index: number, pinned: boolean): void {
       <CommitMeta
         :detail="detail"
         :actions="actions"
-        :pr-result="pr?.selected.value"
-        :pr-for-commit="pr?.prForCommit(detailState.sha.value ?? '')"
+        :change-request-result="changeRequests?.selected.value"
+        :change-request-for-commit="changeRequests?.changeRequestForCommit(detailState.sha.value ?? '')"
       />
       <FileTree
         class="flex-auto min-h-0 border-y border-border"

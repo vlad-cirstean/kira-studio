@@ -222,7 +222,7 @@ describe('matchRef — the pr seam, activated (G24 D11)', () => {
     const compiled = compileOk({ text: '123' });
     const branch = ref({ shortName: 'feature' });
     expect(matchRef(branch, compiled, { number: 123, title: 'does not matter' })).toEqual([
-      'prNumber',
+      'changeRequestNumber',
     ]);
   });
 
@@ -230,22 +230,24 @@ describe('matchRef — the pr seam, activated (G24 D11)', () => {
     const compiled = compileOk({ text: '#123' });
     const branch = ref({ shortName: 'feature' });
     expect(matchRef(branch, compiled, { number: 123, title: 'does not matter' })).toEqual([
-      'prNumber',
+      'changeRequestNumber',
     ]);
   });
 
   test('a title term hits prTitle', () => {
     const compiled = compileOk({ text: 'widget' });
     const branch = ref({ shortName: 'feature' });
-    expect(matchRef(branch, compiled, { number: 1, title: 'Fix the widget' })).toEqual(['prTitle']);
+    expect(matchRef(branch, compiled, { number: 1, title: 'Fix the widget' })).toEqual([
+      'changeRequestTitle',
+    ]);
   });
 
   test('a query matching both the number and the title hits both fields', () => {
     const compiled = compileOk({ text: '42' });
     const branch = ref({ shortName: 'unrelated-name' });
     expect(matchRef(branch, compiled, { number: 42, title: 'issue 42 follow-up' })).toEqual([
-      'prNumber',
-      'prTitle',
+      'changeRequestNumber',
+      'changeRequestTitle',
     ]);
   });
 

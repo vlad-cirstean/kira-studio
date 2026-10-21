@@ -60,9 +60,9 @@ test('a PR badges only the commit its head points at, not the rest of its branch
         },
       },
       'refs.list': buildMultiBranchRefsList(),
-      'commit.resolvePr': {
+      'commit.resolveChangeRequests': {
         kind: 'ok',
-        prs: [
+        changeRequests: [
           {
             number: 42,
             title: 'feature-older',
@@ -83,6 +83,10 @@ test('a PR badges only the commit its head points at, not the rest of its branch
 
   await message(page, NON_TIP_ROW).click();
 
-  await expect(message(page, TIP_ROW).locator('[data-testid="badge-pr"]')).toHaveText('#42');
-  await expect(message(page, NON_TIP_ROW).locator('[data-testid="badge-pr"]')).toHaveCount(0);
+  await expect(message(page, TIP_ROW).locator('[data-testid="badge-change-request"]')).toHaveText(
+    '#42',
+  );
+  await expect(
+    message(page, NON_TIP_ROW).locator('[data-testid="badge-change-request"]'),
+  ).toHaveCount(0);
 });

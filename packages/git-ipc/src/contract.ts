@@ -1134,15 +1134,15 @@ export interface ServerAppInitResult {
 }
 
 // ---------------------------------------------------------------------------------------
-// G24: GitHub PR links (D1/D5/D14) — a structural copy of internal/ghclient.Status/PR, kept honest
+// G24: change-request links (D1/D5/D14) — a structural copy of internal/githost.Status/ChangeRequest, kept honest
 // by hand (this repo carries no wireConformance.spec.ts — see G24's own commit message for why).
 // ---------------------------------------------------------------------------------------
 
-/** D5's own four-kind actionability union: "ok" ⇒ `gh` is installed, authenticated and answered;
- *  "notFound" ⇒ `gh` could not be used at all; "unauthenticated" ⇒ `gh` works but GitHub does not
- *  know who you are; "forbidden" ⇒ `gh` works, GitHub knows who you are, and refused or could not
+/** D5's own four-kind actionability union: "ok" ⇒ the host's client is installed, authenticated and
+ *  answered; "notFound" ⇒ it could not be used at all; "unauthenticated" ⇒ it works but the host does
+ *  not know who you are; "forbidden" ⇒ it works, the host knows who you are, and refused or could not
  *  answer (rate limit, SSO, scope, a 404, or a 5xx — `reason` carries which). */
-export interface GhStatus {
+export interface HostStatus {
   readonly kind: 'ok' | 'notFound' | 'unauthenticated' | 'forbidden';
   readonly path?: string;
   readonly version?: string;
@@ -1151,14 +1151,14 @@ export interface GhStatus {
   readonly reason?: string;
 }
 
-/** One GitHub pull request, trimmed to exactly the fields D4 names as read. `state` is derived
- *  server-side (D4): GitHub's own REST `state` is only ever "open"/"closed" — "merged" and "draft"
- *  are computed from `merged_at`/`draft` before this record is ever built. */
-export interface PrRecord {
+/** One change request (a pull request or merge request), trimmed to exactly the fields D4 names as
+ *  read. `state` is derived server-side (D4): the host's own state is only ever open or closed —
+ *  "merged" and "draft" are computed before this record is ever built. */
+export interface ChangeRequestRecord {
   readonly number: number;
   readonly title: string;
   /** P79 finding 6: never hand this straight to a host/renderer as a clickable link — go through
-   *  `pr.openExternal` instead. */
+   *  `changeRequest.openExternal` instead. */
   readonly url: string;
   readonly state: 'open' | 'draft' | 'merged' | 'closed';
   readonly headRef: string;
@@ -1168,13 +1168,13 @@ export interface PrRecord {
   readonly updatedAt: number;
 }
 
-/** commit.resolvePr / branch.resolvePr's own shared result shape (D14). `"disabled"` covers both
- *  `kiraSpace.gitHost.provider === 'off'` and "no GitHub remote at all" — the grid/badge/detail
+/** commit.resolveChangeRequests / branch.resolveChangeRequest's own shared result shape (D14). `"disabled"` covers both
+ *  `kiraSpace.gitHost.provider === 'off'` and "no remote on a known code host" — the grid/badge/detail
  *  pane render nothing for either, so the two need no further distinction on the wire. */
-export type PrLookupResult =
-  | { readonly kind: 'ok'; readonly prs: readonly PrRecord[] }
+export type ChangeRequestLookup =
+  | { readonly kind: 'ok'; readonly changeRequests: readonly ChangeRequestRecord[] }
   | { readonly kind: 'disabled' }
-  | { readonly kind: 'unavailable'; readonly gh: GhStatus };
+  | { readonly kind: 'unavailable'; readonly status: HostStatus };
 
 export type RepoOpenResult =
   | { readonly kind: 'ok'; readonly repo: RepoSummary }
@@ -2017,39 +2017,39 @@ export type Contract = {
     };
     // ---- G24: GitHub PR links (D9/D14) ------------------------------------------------------
     /** Per-commit PR lookup, driven by the graph indicator and the detail pane's own selection
-     *  (D9): `PrState.select`'s 300ms-debounced, abort-and-recheck request. Answered entirely by
+     *  (D9): `ChangeRequestState.select`'s 300ms-debounced, abort-and-recheck request. Answered entirely by
      *  the Go server */
-    'commit.resolvePr': {
+    'commit.resolveChangeRequests': {
       params: { repoId: string; sha: string };
-      result: PrLookupResult;
+      result: ChangeRequestLookup;
     };
     /** Per-branch PR lookup (D8), upstream's own branch-tip badge plus the reaper's own eager
      *  purge trigger — `state=all` server-side, so this is the one lookup that can report a PR
      *  that has since closed or merged. */
-    'branch.resolvePr': {
+    'branch.resolveChangeRequest': {
       params: { repoId: string; branch: string };
-      result: PrLookupResult;
+      result: ChangeRequestLookup;
     };
     // ---- P74 §3.3: opening a PR in the external browser, never in place -------------------
     /** Server-composed: the renderer names a PR by number, never a URL (the boundary
      *  `GitHostService.OpenChangeRequestURL`'s own host/path check already defends). `null` when
      *  GitHub is disabled or there is no GitHub remote — the same "disabled collapses to nothing"
-     *  posture `PrLookupResult` already takes. Go-served. */
-    'pr.browserUrl': {
+     *  posture `ChangeRequestLookup` already takes. Go-served. */
+    'changeRequest.browserUrl': {
       params: { repoId: string; number: number };
       result: { readonly url: string } | { readonly url: null };
     };
     /** Host-answered (like every `editor.*` request before it, D3.3):
-     *  requests `pr.browserUrl` and hands the URL to the host's own
+     *  requests `changeRequest.browserUrl` and hands the URL to the host's own
      *  browser-open path — never answered by the Go server itself. */
-    'pr.openExternal': {
+    'changeRequest.openExternal': {
       params: { repoId: string; number: number };
       result: Record<string, never>;
     };
     /** P79 finding 4: opens an arbitrary URL `linkify.ts` found in a commit message body, in the
      *  OS browser — `CommitMeta.vue`'s message-body links, unlike the PR row above, cannot be
      *  server-composed (the URL *is* the untrusted renderer-visible content, a commit message).
-     *  Host-answered like `pr.openExternal`, never proxied to the Go server; each host still
+     *  Host-answered like `changeRequest.openExternal`, never proxied to the Go server; each host still
      *  refuses anything that is not a well-formed http(s) URL before its own OS-open call ever
      *  sees it — the same "boundary is the thing being defended" posture, applied to a URL this
      *  process can only validate, never compose. */

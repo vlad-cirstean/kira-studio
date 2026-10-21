@@ -45,9 +45,9 @@ import {
 import { measureAbsoluteDateWidth } from '../lib/dateFormat.ts';
 import { type GridKeyboardDeps, handleGridKeyDown } from '../lib/gridKeyboard.ts';
 import { composeRowLabel } from '../lib/rowAccessibility.ts';
+import type { ChangeRequestState } from '../state/changeRequests.ts';
 import type { GraphOrderState } from '../state/graphOrder.ts';
 import type { GraphViewState } from '../state/graphView.ts';
-import type { PrState } from '../state/pr.ts';
 import type { SearchState } from '../state/search.ts';
 import type { SelectionState } from '../state/selection.ts';
 import type { StackState } from '../state/stack.ts';
@@ -76,7 +76,7 @@ const props = defineProps<{
   search?: SearchState;
   /** G24 D9: the graph indicator's own PR source — optional so a caller with nothing to show yet
    *  gets a plain, badge-free message column, mirroring `search`'s own default. */
-  pr?: PrState;
+  changeRequests?: ChangeRequestState;
   /** G26 D-4.13: the message column's own stack-decoration source — optional so a caller with no
    *  stack view mounted gets plain, undecorated branch badges, mirroring `pr`'s own default. */
   stack?: StackState;
@@ -124,12 +124,12 @@ const emit = defineEmits<{
    *  carries the exact index, and its `sha` field the exact sha), so `App.vue` reads both back
    *  from the store instead of this component re-deriving them from badge text. */
   (e: 'stashContextMenu', detail: { row: number; x: number; y: number }): void;
-  /** P74 §3.3: a click landed on the inline PR badge (`refBadges.ts`'s `data-pr-number`) —
-   *  reported as a plain PR number rather than this component calling `DetailActions.openPullRequest`
+  /** P74 §3.3: a click landed on the inline PR badge (`refBadges.ts`'s `data-change-request-number`) —
+   *  reported as a plain PR number rather than this component calling `DetailActions.openChangeRequest`
    *  itself, mirroring `refContextMenu`/`stashContextMenu`'s own "report, don't act" convention;
    *  `App.vue` is the one place with `actions` at hand. Never fires alongside `openDetail`/
    *  `toggleDetail` — `handleClick`'s own hit-test returns before either would run. */
-  (e: 'openPullRequest', number: number): void;
+  (e: 'openChangeRequest', number: number): void;
 }>();
 
 const MIN_COLUMN_WIDTH = 40;
@@ -364,7 +364,7 @@ function currentColumns(): Column<CommitRecord>[] {
       // G24 D9: `undefined` (not an empty array) is "nothing resolved yet" vs. "resolved, no PR"
       // — `columns.ts`'s own `messageFormatter` already treats both as "render nothing".
       // Badge only the commit a PR's head points at; the detail pane keeps the ancestry answer.
-      prsFor: (sha) => props.pr?.prsHeadedAt(sha),
+      changeRequestsFor: (sha) => props.changeRequests?.changeRequestsHeadedAt(sha),
     },
     { stackInfoFor },
     { compact: props.detailOpen },
@@ -479,16 +479,18 @@ function handleClick(displayRow: number): void {
   else emit('openDetail');
 }
 
-/** P74 §3.3: a click landing on the inline PR badge (`refBadges.ts`'s `data-pr-number`, always a
+/** P74 §3.3: a click landing on the inline PR badge (`refBadges.ts`'s `data-change-request-number`, always a
  *  real `<button>`) opens that PR instead of
  *  selecting the row — the same "hit-test ahead of the ordinary click" shape
  *  `handleContextMenu`'s own `data-ref-kind` check already uses for a right-click. Returns the PR
  *  number when it claimed the click, `undefined` when the click should fall through to
  *  `handleClick` unchanged. */
-function prNumberFromClick(event: MouseEvent | undefined): number | undefined {
+function changeRequestNumberFromClick(event: MouseEvent | undefined): number | undefined {
   const badgeEl =
-    event?.target instanceof Element ? event.target.closest<HTMLElement>('[data-pr-number]') : null;
-  const raw = badgeEl?.dataset.prNumber;
+    event?.target instanceof Element
+      ? event.target.closest<HTMLElement>('[data-change-request-number]')
+      : null;
+  const raw = badgeEl?.dataset.changeRequestNumber;
   return raw !== undefined ? Number(raw) : undefined;
 }
 
@@ -669,9 +671,9 @@ function scheduleAncestryRebuild(): void {
   ancestryRebuildPending = true;
   void nextTick(() => {
     ancestryRebuildPending = false;
-    // P74 §4.2/§4.3: rebuilds the ancestry derivation the detail pane's `prForCommit` reads.
-    if (props.pr) props.pr.rebuildAncestry(props.graphView.store);
-    // A PR resolution can flip a row's height (`rowHasBadges` reads `prsFor`); rebuild the index.
+    // P74 §4.2/§4.3: rebuilds the ancestry derivation the detail pane's `changeRequestForCommit` reads.
+    if (props.changeRequests) props.changeRequests.rebuildAncestry(props.graphView.store);
+    // A PR resolution can flip a row's height (`rowHasBadges` reads `changeRequestsFor`); rebuild the index.
     grid?.invalidateRowHeights();
     grid?.invalidateAllRows();
     grid?.render();
@@ -924,7 +926,7 @@ onMounted(() => {
     isSelected: (row) => props.selection.row.value === row,
     // A row with a ref/PR badge gets the taller height (`rowHasBadges`, columns.ts).
     expandedRowHeight: () => rowHeightPx(tokenReader),
-    prsFor: (sha) => props.pr?.prsHeadedAt(sha),
+    changeRequestsFor: (sha) => props.changeRequests?.changeRequestsHeadedAt(sha),
   });
 
   const instance = new SlickGrid<CommitRecord>(host.value, dataView, currentColumns(), {
@@ -985,9 +987,9 @@ onMounted(() => {
 
   instance.onClick.subscribe((event, args) => {
     const nativeEvent = event.getNativeEvent<MouseEvent>();
-    const prNumber = prNumberFromClick(nativeEvent);
+    const prNumber = changeRequestNumberFromClick(nativeEvent);
     if (prNumber !== undefined) {
-      emit('openPullRequest', prNumber);
+      emit('openChangeRequest', prNumber);
       return;
     }
     if (handleForkStubClick(args.row, args.cell, nativeEvent)) return;
@@ -1084,10 +1086,10 @@ watch(
     scheduleResize();
     // P79 fix (Functional MEDIUM): newly-loaded rows (`graph.loadMore`) can be ancestors of an
     // already-resolved PR tip — without this, they showed no badge until some unrelated PR
-    // resolution happened to bump `pr.generation` again (`prByAncestry` desyncing from the
+    // resolution happened to bump `pr.generation` again (`changeRequestByAncestry` desyncing from the
     // store's own, larger row set). A no-op via `scheduleAncestryRebuild`'s own guard when there
     // is no `pr` source at all.
-    if (props.pr) scheduleAncestryRebuild();
+    if (props.changeRequests) scheduleAncestryRebuild();
   },
 );
 // P108 F1: a plan rebuild does not necessarily accompany the LAST chunk of a load (`loading`
@@ -1112,7 +1114,7 @@ watch(
     }
     // P79 fix (Functional MEDIUM): a restart-at-row-0 re-walk is the other shape of "the loaded
     // window changed" `rebuildAncestry` must track — see the `loadedRows` watcher directly above.
-    if (props.pr) scheduleAncestryRebuild();
+    if (props.changeRequests) scheduleAncestryRebuild();
   },
 );
 // P11 W13: mirrors the `generation` watcher directly above — a new `searchGeneration` means the
@@ -1134,12 +1136,12 @@ watch(
 // same pattern. A new PR resolution never changes how many rows are loaded, same reasoning as
 // `search.searchGeneration`'s own doc comment.
 // P79 fix (Performance MEDIUM): used to call `rebuildAncestry` + a full grid invalidate/render
-// directly, once per fired watcher — `PrState.resolveBranch` bumps `generation` once per
-// individual `branch.resolvePr` response, so warming N branches in one burst (e.g. entering
+// directly, once per fired watcher — `ChangeRequestState.resolveBranch` bumps `generation` once per
+// individual `branch.resolveChangeRequest` response, so warming N branches in one burst (e.g. entering
 // Refs search scope, `search.ts`'s own "warms in full" comment) ran N full rebuilds/re-renders
 // for the same final state. Now only marks the shared dirty flag — see `scheduleAncestryRebuild`.
 watch(
-  () => props.pr?.generation.value,
+  () => props.changeRequests?.generation.value,
   () => {
     if (!graphVisible.value) {
       pendingRebuildOnVisible = true;
@@ -1171,7 +1173,7 @@ watch(
 watch(graphVisible, (visible) => {
   if (!visible || !pendingRebuildOnVisible) return;
   pendingRebuildOnVisible = false;
-  if (props.pr) props.pr.rebuildAncestry(props.graphView.store);
+  if (props.changeRequests) props.changeRequests.rebuildAncestry(props.graphView.store);
   raiseLaneFloor();
   grid?.invalidateRowHeights();
   grid?.invalidateAllRows();

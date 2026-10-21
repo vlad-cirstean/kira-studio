@@ -529,7 +529,7 @@ func (r *singleFlightGhRunner) snapshotCallCount() int {
 
 // TestEnsureSnapshot_SingleFlightOnColdCache is G32 round-3 performance review, finding #6's own
 // regression proof: PR_ENSURE_SNAPSHOT_CONCURRENCY (packages/git-ui/src/state/pr.ts) fires up to 6
-// concurrent branch.resolvePr RPCs at once to warm a branch picker on a cold cache. Before
+// concurrent branch.resolveChangeRequest RPCs at once to warm a branch picker on a cold cache. Before
 // claimSnapshotFetch/finishSnapshotFetch existed, ensureSnapshot's own cache-miss branch had no
 // coordination between concurrent callers at all, so all 6 independently ran their own full
 // OpenPulls fetch. This fires 6 concurrent ensureSnapshot calls, holds the first real fetch open

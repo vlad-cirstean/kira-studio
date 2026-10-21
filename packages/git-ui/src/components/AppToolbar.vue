@@ -39,11 +39,11 @@ import { type MenuSection, sectionsToMenuItems } from '../lib/menuModel.ts';
 import type { PickerTab } from '../lib/pickerModel.ts';
 import { defaultRemoteFor, remoteNamesFrom } from '../lib/rowMenuModel.ts';
 import type { AsyncFailure } from '../state/asyncFailures.ts';
+import type { ChangeRequestState } from '../state/changeRequests.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { GraphViewState } from '../state/graphView.ts';
 import { composeAutoFetchStoppedAnnouncement } from '../state/liveAnnouncements.ts';
 import type { OpsState } from '../state/ops.ts';
-import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
 import type { RepoState } from '../state/repo.ts';
 import type { StackState } from '../state/stack.ts';
@@ -75,7 +75,7 @@ const props = defineProps<{
   actions: DetailActions | undefined;
   /** G24 D9: `BranchPicker.vue`'s own `#123` branch-tip badge source — optional, mirrors every
    *  other G24 prop threaded through this toolbar's own children. */
-  prState?: PrState;
+  changeRequestState?: ChangeRequestState;
   /** Whether `App.vue`'s own search row is currently open — drives the toggle button's `active`
    *  state, the same `active` = "revealed" convention `ReviewView.vue`'s own filter toggle uses. */
   searchOpen: boolean;
@@ -125,8 +125,8 @@ function copy(text: string, message: string): void {
 // P74 §3.3: BranchPicker.vue's own branch-row badge and StackList.vue's own row badge each open
 // a PR the same way CommitMeta.vue's facts-row icon/"Pull request" row do — one action, threaded
 // down rather than reimplemented at either call site.
-function openPullRequest(number: number): void {
-  void props.actions?.openPullRequest({ number });
+function openChangeRequest(number: number): void {
+  void props.actions?.openChangeRequest({ number });
 }
 
 const refreshButtonRef = ref<InstanceType<typeof RefreshButton> | null>(null);
@@ -296,8 +296,8 @@ const stashDisabled = computed(
       :stash="stashState"
       :worktrees="worktreeState"
       :stack="stackState"
-      :pr="prState"
-      :open-pull-request="openPullRequest"
+      :change-requests="changeRequestState"
+      :open-change-request="openChangeRequest"
       @branchFromStash="(entry) => emit('branchFromStash', entry)"
       @saveGlobalStash="emit('saveGlobalStash')"
       @saveEntryToGlobalStash="(entry) => emit('saveEntryToGlobalStash', entry)"

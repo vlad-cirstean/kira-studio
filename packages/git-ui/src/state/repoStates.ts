@@ -1,6 +1,6 @@
 import type { BridgeClient } from '../bridge/client.ts';
+import { ChangeRequestState } from './changeRequests.ts';
 import { OpsState } from './ops.ts';
-import { PrState } from './pr.ts';
 import { RefsState } from './refs.ts';
 import { RepoSettingsState } from './repoSettings.ts';
 import { StackState } from './stack.ts';
@@ -9,9 +9,9 @@ import { StackState } from './stack.ts';
  *  wiring (OpsState reads `repoSettingsState`) production uses. */
 export function createRepoStates(bridge: BridgeClient) {
   const refsState = new RefsState(bridge);
-  const prState = new PrState(bridge);
-  const stackState = new StackState(bridge, prState);
+  const changeRequestState = new ChangeRequestState(bridge);
+  const stackState = new StackState(bridge, changeRequestState);
   const repoSettingsState = new RepoSettingsState(bridge);
   const opsState = new OpsState(bridge, refsState, repoSettingsState, stackState);
-  return { refsState, prState, stackState, repoSettingsState, opsState };
+  return { refsState, changeRequestState, stackState, repoSettingsState, opsState };
 }
