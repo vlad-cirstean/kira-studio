@@ -101,7 +101,7 @@ func (p *Provider) RepoURL(r githost.Repo) string {
 }
 
 func (p *Provider) BranchURL(r githost.Repo, branch string) string {
-	return p.RepoURL(r) + "/tree/" + branch
+	return p.RepoURL(r) + "/tree/" + githost.RefPath(branch)
 }
 
 // pullRequestPath matches /{owner}/{repo}/pull/{number}, owner and repo restricted to the characters

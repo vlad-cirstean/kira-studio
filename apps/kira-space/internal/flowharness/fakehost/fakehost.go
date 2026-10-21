@@ -163,7 +163,7 @@ func (f *Forge) RepoURL(r githost.Repo) string {
 }
 
 func (f *Forge) BranchURL(r githost.Repo, branch string) string {
-	return f.RepoURL(r) + "/-/tree/" + branch
+	return f.RepoURL(r) + "/-/tree/" + githost.RefPath(branch)
 }
 
 var mergeRequestPath = regexp.MustCompile(`^/[\w.-]+/[\w.-]+/-/merge_requests/[0-9]+$`)
