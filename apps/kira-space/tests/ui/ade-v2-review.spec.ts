@@ -174,7 +174,12 @@ reviewTest('a failed fetch from the sync popover shows its error', async ({ rela
 });
 
 reviewTest('the sync button is hidden when the branch has no PR', async ({ relaunch }) => {
-  const plan = { ...adeFixture<object>('viewed-sync-plan'), status: 'noPr', pr: null, files: [] };
+  const plan = {
+    ...adeFixture<object>('viewed-sync-plan'),
+    status: 'noPr',
+    changeRequest: null,
+    files: [],
+  };
   const page = await openReview(relaunch, [{ channel: IPC.adeTaskViewedSyncPlan, response: plan }]);
   await expect(page.locator(t('ade-review-header'))).toBeVisible();
   await expect(page.locator(t('ade-review-sync'))).toHaveCount(0);
