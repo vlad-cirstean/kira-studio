@@ -36,6 +36,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+echo "test-matrix: docker kernel $(docker info --format '{{.KernelVersion}}' 2>/dev/null || echo unknown)"
+
 # --- the matrix (P25 §2.4-§2.9): kind|go package ------------------------------------------------
 # One row per adapter package's own authmatrix_test.go. Images come from testsupport's own constants
 # (the testimages command). A compat-matrix cross product (min/max × auth matrix) is explicitly out

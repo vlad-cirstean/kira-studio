@@ -41,6 +41,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+echo "db-compat: docker kernel $(docker info --format '{{.KernelVersion}}' 2>/dev/null || echo unknown)"
+
 # --- the version table (P16 §3) --------------------------------------------------------------
 POSTGRES_MIN="postgres:14.24-alpine"
 POSTGRES_MAX="postgres:18.6-alpine"
