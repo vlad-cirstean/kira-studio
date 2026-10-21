@@ -9,7 +9,6 @@ import { useRelativeTime } from '@workbench/behaviour/format';
 import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
-import { parseGithub } from '../board/panelFacts';
 import { TONE_SOLID_CLASS } from '../tones';
 import type { BacklogItem } from '../wire';
 
@@ -27,13 +26,18 @@ const ago = useRelativeTime(() => props.item.addedAt);
 const edit = useInlineEdit({ source: () => props.item.text, commit: (text) => emit('edit', text) });
 
 const facts = computed(() => {
-  const gh = parseGithub(props.item.githubUrl);
+  const gh = props.item.hostLink;
   return [
     props.item.jira?.key ?? '',
     gh
-      ? t(gh.kind === 'PR' ? 'space.common.githubPr.label' : 'space.common.githubIssue.label', {
-          ref: gh.ref,
-        })
+      ? t(
+          gh.kind === 'changeRequest'
+            ? 'space.common.githubPr.label'
+            : 'space.common.githubIssue.label',
+          {
+            ref: gh.ref,
+          },
+        )
       : '',
     props.item.notes ? t('space.common.notes.label') : '',
   ]

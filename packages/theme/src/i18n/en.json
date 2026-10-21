@@ -1222,6 +1222,9 @@
       "gitHost": {
         "notChangeRequestUrl": {
           "body": "That isn’t a {changeRequests} link."
+        },
+        "notLink": {
+          "error": "Not a {links}."
         }
       },
       "gitrpc": {
@@ -7383,9 +7386,6 @@
         },
         "field": {
           "label": "{label} link"
-        },
-        "notGithub": {
-          "error": "Not a GitHub PR or issue link."
         },
         "notJira": {
           "error": "Not a Jira key or link."

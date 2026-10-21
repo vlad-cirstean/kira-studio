@@ -10,6 +10,7 @@
         "url": "https://acme.atlassian.net/browse/WEB-311"
       },
       "githubUrl": "",
+      "hostLink": null,
       "workflowId": "bugfix",
       "entryStepId": "release",
       "since": {},
@@ -138,6 +139,7 @@
         "url": "https://acme.atlassian.net/browse/PAY-102"
       },
       "githubUrl": "",
+      "hostLink": null,
       "workflowId": "standard",
       "entryStepId": "plan",
       "since": {},
@@ -245,6 +247,7 @@
         "url": "https://acme.atlassian.net/browse/AUTH-212"
       },
       "githubUrl": "",
+      "hostLink": null,
       "workflowId": "standard",
       "entryStepId": "review",
       "since": {},
@@ -541,6 +544,7 @@
         "url": "https://acme.atlassian.net/browse/API-51"
       },
       "githubUrl": "",
+      "hostLink": null,
       "workflowId": "standard",
       "entryStepId": "plan",
       "since": {},
@@ -753,6 +757,7 @@
         "url": "https://acme.atlassian.net/browse/SRCH-41"
       },
       "githubUrl": "",
+      "hostLink": null,
       "workflowId": "standard",
       "entryStepId": "plan",
       "since": {},
@@ -899,6 +904,7 @@
       "owner": "",
       "jira": null,
       "githubUrl": "",
+      "hostLink": null,
       "workflowId": "bugfix",
       "entryStepId": "repro",
       "since": {},
@@ -961,6 +967,7 @@
       "owner": "",
       "jira": null,
       "githubUrl": "",
+      "hostLink": null,
       "workflowId": "chore",
       "entryStepId": "update",
       "since": {},
@@ -1026,6 +1033,7 @@
         "url": "https://acme.atlassian.net/browse/MOB-17"
       },
       "githubUrl": "",
+      "hostLink": null,
       "workflowId": "standard",
       "entryStepId": "plan",
       "since": {},
@@ -1154,6 +1162,7 @@
         "url": "https://acme.atlassian.net/browse/PAY-130"
       },
       "githubUrl": "",
+      "hostLink": null,
       "workflowId": "standard",
       "entryStepId": "spec",
       "since": {},
@@ -1176,6 +1185,7 @@
         "url": "https://acme.atlassian.net/browse/PAY-121"
       },
       "githubUrl": "",
+      "hostLink": null,
       "workflowId": "standard",
       "entryStepId": "spec",
       "since": {},
@@ -1195,6 +1205,7 @@
       "owner": "sara",
       "jira": null,
       "githubUrl": "",
+      "hostLink": null,
       "workflowId": "",
       "entryStepId": "",
       "since": {},
@@ -1214,6 +1225,7 @@
       "owner": "li",
       "jira": null,
       "githubUrl": "",
+      "hostLink": null,
       "workflowId": "",
       "entryStepId": "",
       "since": {},
@@ -1233,6 +1245,7 @@
       "owner": "",
       "jira": null,
       "githubUrl": "",
+      "hostLink": null,
       "workflowId": "standard",
       "entryStepId": "spec",
       "since": {},

@@ -8,6 +8,7 @@
     "url": "https://acme.atlassian.net/browse/PAY-121"
   },
   "githubUrl": "",
+  "hostLink": null,
   "workflowId": "standard",
   "entryStepId": "spec",
   "since": {},

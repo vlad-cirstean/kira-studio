@@ -76,6 +76,18 @@ func (r *Registry) ChangeRequestLabels() string {
 	return strings.Join(labels, " or ")
 }
 
+// LinkLabels joins "<label> <short> or issue link" per provider with " or ", in registration order:
+// "GitHub PR or issue link".
+func (r *Registry) LinkLabels() string {
+	all := r.All()
+	labels := make([]string, 0, len(all))
+	for _, p := range all {
+		t := p.Terms()
+		labels = append(labels, t.Label+" "+t.ChangeRequestShort+" or issue link")
+	}
+	return strings.Join(labels, " or ")
+}
+
 // ParseLink asks each provider in order.
 func (r *Registry) ParseLink(raw string) (Link, bool) {
 	for _, p := range r.All() {

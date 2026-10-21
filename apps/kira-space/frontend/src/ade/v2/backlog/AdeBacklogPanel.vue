@@ -12,7 +12,7 @@ import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
-import { backlogPatch, parseGithub } from '../board/panelFacts';
+import { backlogPatch } from '../board/panelFacts';
 import AdeNotesEditor from '../notes/AdeNotesEditor.vue';
 import AdeLinkRow from '../panel/AdeLinkRow.vue';
 import { type LinkPatch, useLinkFields } from '../panel/useLinkFields';
@@ -47,10 +47,11 @@ const titleEdit = useInlineEdit({
 });
 
 const links = useLinkFields(
-  () => props.item.githubUrl,
+  () => props.item.hostLink,
   async (patch: LinkPatch) => ((await write(patch)) ? null : error.value),
 );
 const jira = computed(() => props.item.jira);
+const hostLink = computed(() => props.item.hostLink);
 
 function saveNotes(_id: string, value: string): void {
   void write({ notes: value });
@@ -124,9 +125,9 @@ function saveNotes(_id: string, value: string): void {
         <AdeLinkRow
           id="ade-backlog-github"
           :label="t('common.product.github.label')"
-          :chip="links.github.value?.kind ?? ''"
-          :text="links.github.value?.ref ?? ''"
-          :url="parseGithub(item.githubUrl) ? item.githubUrl : ''"
+          :chip="hostLink ? (hostLink.kind === 'changeRequest' ? 'PR' : 'issue') : ''"
+          :text="hostLink?.ref ?? ''"
+          :url="hostLink ? item.githubUrl : ''"
           :placeholder="t('space.ade.backlog.github.placeholder')"
           :error="links.githubError.value"
           @save="links.saveGithub"

@@ -367,6 +367,11 @@ type AdeRunOutcome = RunOutcome & {
   rebase?: RebaseFacts;
   route?: string;
 };
+export interface HostLink {
+  provider: string;
+  kind: 'changeRequest' | 'issue';
+  ref: string;
+}
 export interface Task {
   id: string;
   kind: 'task' | 'review' | 'parked';
@@ -374,6 +379,7 @@ export interface Task {
   owner: string;
   jira: Jira | null;
   githubUrl: string;
+  hostLink: HostLink | null /* githubUrl as a provider recognises it */;
   workflowId: string /* '' = none */;
   entryStepId: string /* the step the task last entered | 'done' | '' without a workflow */;
   since: Record<
@@ -421,11 +427,11 @@ export interface Board {
 export interface RepoPrs {
   codeRepoId: string;
   kind: 'ok' | 'disabled' | 'unavailable';
-  webUrl: string;
 }
 export interface PrsResult {
   repos: RepoPrs[];
   branches: Record<string, PR> /* branchId */;
+  branchUrls: Record<string, string> /* branchId -> web page; absent without a host */;
 }
 
 // ---- backlog (§11.1, O2)
@@ -435,6 +441,7 @@ export interface BacklogItem {
   addedAt: number;
   jira: Jira | null;
   githubUrl: string;
+  hostLink: HostLink | null;
   notes: string;
 }
 export interface BacklogResult {

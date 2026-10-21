@@ -473,7 +473,7 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 	tasks := make([]adewire.Task, 0, len(d.tasks))
 	liveWf := b.liveWorkflows()
 	for _, t := range d.tasks {
-		wt := toWireTask(t, branchByTask[t.ID], d.runs[t.ID], d.reviews)
+		wt := b.toWireTask(t, branchByTask[t.ID], d.runs[t.ID], d.reviews)
 		decorateTask(&wt, t, liveWf)
 		tasks = append(tasks, wt)
 	}
@@ -519,9 +519,9 @@ func (b *TaskBoard) assemble(d boardData, repoIDs []string, results map[string]*
 	}
 }
 
-func toWireTask(t model.AdeTask, branchIDs []string, runs []model.AdeRun, reviews map[string]model.AdeReview) adewire.Task {
+func (b *TaskBoard) toWireTask(t model.AdeTask, branchIDs []string, runs []model.AdeRun, reviews map[string]model.AdeReview) adewire.Task {
 	out := adewire.Task{
-		ID: t.ID, Kind: t.Kind, Title: t.Title, Owner: t.Owner, GithubURL: t.GithubURL, WorkflowID: t.WorkflowID,
+		ID: t.ID, Kind: t.Kind, Title: t.Title, Owner: t.Owner, GithubURL: t.GithubURL, HostLink: b.hostLink(t.GithubURL), WorkflowID: t.WorkflowID,
 		EntryStepID: t.EntryStepID, Since: map[string]int{}, Est: t.Est, Notes: t.Notes, Color: t.Color, CreatedAt: t.CreatedAt,
 		BranchIDs: make([]string, 0, len(branchIDs)), Runs: make([]adewire.Run, 0, len(runs)),
 	}
@@ -602,7 +602,7 @@ func (b *TaskBoard) Prs(ctx context.Context) (adewire.PrsResult, error) {
 		return adewire.PrsResult{}, err
 	}
 	repoIDs, byRepo := branchesByRepo(branches)
-	out := adewire.PrsResult{Repos: make([]adewire.RepoPrs, 0, len(repoIDs)), Branches: map[string]adewire.PR{}}
+	out := adewire.PrsResult{Repos: make([]adewire.RepoPrs, 0, len(repoIDs)), Branches: map[string]adewire.PR{}, BranchURLs: map[string]string{}}
 	var mu sync.Mutex
 	rows := make(map[string]adewire.RepoPrs, len(repoIDs))
 	g, gctx := errgroup.WithContext(ctx)
@@ -617,12 +617,15 @@ func (b *TaskBoard) Prs(ctx context.Context) (adewire.PrsResult, error) {
 				mu.Unlock()
 				return nil
 			}
-			webURL, _ := entry.RepoURL(gctx)
 			kind := "ok"
 			found := map[string]adewire.PR{}
+			urls := map[string]string{}
 			for _, br := range byRepo[id] {
 				if br.Name == "" {
 					continue
+				}
+				if u, ok := entry.BranchURL(gctx, br.Name); ok {
+					urls[br.ID] = u
 				}
 				res := entry.ResolveBranchChangeRequest(gctx, br.Name)
 				if res.Kind != "ok" {
@@ -633,9 +636,12 @@ func (b *TaskBoard) Prs(ctx context.Context) (adewire.PrsResult, error) {
 				}
 			}
 			mu.Lock()
-			rows[id] = adewire.RepoPrs{CodeRepoID: id, Kind: kind, WebURL: webURL}
+			rows[id] = adewire.RepoPrs{CodeRepoID: id, Kind: kind}
 			for k, v := range found {
 				out.Branches[k] = v
+			}
+			for k, v := range urls {
+				out.BranchURLs[k] = v
 			}
 			mu.Unlock()
 			return nil

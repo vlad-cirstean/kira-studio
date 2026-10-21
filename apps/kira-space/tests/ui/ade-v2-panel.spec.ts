@@ -76,10 +76,6 @@ test('name, Jira, GitHub and Not merging write UpdateTask patches', async ({ rel
     patch: { jira: { key: 'PAY-9', url: '' } },
   });
 
-  await page.locator('[data-testid="ade-task-github-input"]').fill('not a link');
-  await page.locator('[data-testid="ade-task-github-save"]').click();
-  await expect(page.locator('[data-testid="ade-task-github-error"]')).toBeVisible();
-  expect(updates(control)).toHaveLength(2);
   await page
     .locator('[data-testid="ade-task-github-input"]')
     .fill('https://github.com/acme/web-app/issues/882');
@@ -115,6 +111,21 @@ test('estimate: unset takes number and unit, set only extends, a backend refusal
   await page.locator('[data-testid="ade-estimate-extend-submit"]').click();
   await expect.poll(() => updates(control)).toHaveLength(2);
   expect(updates(control)[1]?.args).toMatchObject({ taskId: 'T_bill', patch: { est: '3d' } });
+});
+
+test('a refused git host link shows the backend error', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch, [
+    {
+      channel: IPC.adeTaskUpdateTask,
+      error: { code: 'invalid', message: 'Not a GitHub PR or issue link.' },
+    },
+  ]);
+  await openTask(page, 'T_notif');
+  await page.locator('[data-testid="ade-task-github-input"]').fill('not a link');
+  await page.locator('[data-testid="ade-task-github-save"]').click();
+  await expect(page.locator('[data-testid="ade-task-github-error"]')).toContainText(
+    'Not a GitHub PR or issue link.',
+  );
 });
 
 test('a refused estimate shows the backend error', async ({ relaunch }) => {

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { parseGithub } from '@ade/board/panelFacts';
 import { useBacklog } from '@ade/readQueries';
 import type { BacklogItem } from '@ade/wire';
 import CodiconIcon from '@theme/CodiconIcon.vue';
@@ -31,13 +30,18 @@ const canWrite = computed(() => permissions.value.write);
 const ids = computed(() => backlog.data.value?.items.map((i) => i.id) ?? []);
 
 function facts(item: BacklogItem): string {
-  const gh = parseGithub(item.githubUrl);
+  const gh = item.hostLink;
   return [
     item.jira?.key ?? '',
     gh
-      ? t(gh.kind === 'PR' ? 'space.common.githubPr.label' : 'space.common.githubIssue.label', {
-          ref: gh.ref,
-        })
+      ? t(
+          gh.kind === 'changeRequest'
+            ? 'space.common.githubPr.label'
+            : 'space.common.githubIssue.label',
+          {
+            ref: gh.ref,
+          },
+        )
       : '',
   ]
     .filter(Boolean)

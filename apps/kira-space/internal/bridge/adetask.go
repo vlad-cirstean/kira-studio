@@ -10,6 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/harness"
@@ -38,6 +39,8 @@ type AdeTaskService struct {
 	Registry    *terminal.Registry
 	Emit        appcore.Emitter
 	FocusWindow func(key string) bool
+	// Hosts validates pasted issue and change-request links.
+	Hosts *githost.Registry
 	// OpenWindow, CloseWindow and SetWindowTitle serve review windows; func fields like FocusWindow.
 	OpenWindow     func(rec shell.WindowRecord)
 	CloseWindow    func(key string) bool
@@ -353,8 +356,23 @@ func (s *AdeTaskService) Repos(ctx context.Context) (adewire.ReposResult, error)
 
 // --- writes ------------------------------------------------------------------------------------
 
+// validateHostLink refuses a non-empty value no registered provider recognises as an issue or
+// change-request link.
+func (s *AdeTaskService) validateHostLink(raw string) error {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	if _, ok := s.Hosts.ParseLink(raw); ok {
+		return nil
+	}
+	return ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitHost.notLink.error", map[string]string{"links": s.Hosts.LinkLabels()})
+}
+
 func (s *AdeTaskService) CreateTask(ctx context.Context, args adewire.CreateTaskArgs) (adewire.Task, error) {
 	if err := validateCreateTask(args); err != nil {
+		return adewire.Task{}, err
+	}
+	if err := s.validateHostLink(args.GithubURL); err != nil {
 		return adewire.Task{}, err
 	}
 	t, err := s.Engine.CreateTask(ctx, args)
@@ -364,6 +382,11 @@ func (s *AdeTaskService) CreateTask(ctx context.Context, args adewire.CreateTask
 func (s *AdeTaskService) UpdateTask(ctx context.Context, args adewire.UpdateTaskArgs) (adewire.Task, error) {
 	if err := validateUpdateTask(args); err != nil {
 		return adewire.Task{}, err
+	}
+	if args.Patch.GithubURL != nil {
+		if err := s.validateHostLink(*args.Patch.GithubURL); err != nil {
+			return adewire.Task{}, err
+		}
 	}
 	t, err := s.Engine.UpdateTask(ctx, args)
 	return t, adeTaskError(err)
@@ -491,6 +514,11 @@ func (s *AdeTaskService) UpdateBacklogItem(ctx context.Context, args adewire.Upd
 	}
 	if err := validateBacklogPatch(args.Patch); err != nil {
 		return adewire.BacklogItem{}, err
+	}
+	if args.Patch.GithubURL != nil {
+		if err := s.validateHostLink(*args.Patch.GithubURL); err != nil {
+			return adewire.BacklogItem{}, err
+		}
 	}
 	it, err := s.Engine.UpdateBacklogItem(ctx, args)
 	return it, adeTaskError(err)

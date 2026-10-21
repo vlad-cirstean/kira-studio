@@ -51,6 +51,7 @@ export function mkTask(over: Partial<Task> & Pick<Task, 'id'>): Task {
     owner: '',
     jira: null,
     githubUrl: '',
+    hostLink: null,
     workflowId: '',
     entryStepId: '',
     since: {},

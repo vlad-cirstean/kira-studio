@@ -4,7 +4,10 @@
 // Changing a key, type or value set is a contract change.
 package adewire
 
-import "github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+import (
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+)
 
 // StepKind is 'agent' | 'script' | 'review' | 'manual'.
 type StepKind = string
@@ -434,13 +437,15 @@ type ReviewEvent struct {
 }
 
 type Task struct {
-	ID         string `json:"id"`
-	Kind       string `json:"kind"` // 'task' | 'review' | 'parked'
-	Title      string `json:"title"`
-	Owner      string `json:"owner"`
-	Jira       *Jira  `json:"jira"`
-	GithubURL  string `json:"githubUrl"`
-	WorkflowID string `json:"workflowId"`
+	ID        string `json:"id"`
+	Kind      string `json:"kind"` // 'task' | 'review' | 'parked'
+	Title     string `json:"title"`
+	Owner     string `json:"owner"`
+	Jira      *Jira  `json:"jira"`
+	GithubURL string `json:"githubUrl"`
+	// HostLink names GithubURL when a registered provider recognises it.
+	HostLink   *githost.Link `json:"hostLink"`
+	WorkflowID string        `json:"workflowId"`
 	// EntryStepID is the step the task last entered; 'done' when finished, '' without a workflow.
 	EntryStepID string `json:"entryStepId"`
 	// Since is the pass watermark: "<stepId>/<branchId>" -> attempt; runs at or below it are history.
@@ -493,21 +498,23 @@ type Board struct {
 type RepoPrs struct {
 	CodeRepoID string `json:"codeRepoId"`
 	Kind       string `json:"kind"` // 'ok' | 'disabled' | 'unavailable'
-	WebURL     string `json:"webUrl"`
 }
 
 type PrsResult struct {
 	Repos    []RepoPrs     `json:"repos"`
 	Branches map[string]PR `json:"branches"`
+	// BranchURLs maps a branch id to its web page, for branches whose repo has a host.
+	BranchURLs map[string]string `json:"branchUrls"`
 }
 
 type BacklogItem struct {
-	ID        string `json:"id"`
-	Text      string `json:"text"`
-	AddedAt   int64  `json:"addedAt"`
-	Jira      *Jira  `json:"jira"`
-	GithubURL string `json:"githubUrl"`
-	Notes     string `json:"notes"`
+	ID        string        `json:"id"`
+	Text      string        `json:"text"`
+	AddedAt   int64         `json:"addedAt"`
+	Jira      *Jira         `json:"jira"`
+	GithubURL string        `json:"githubUrl"`
+	HostLink  *githost.Link `json:"hostLink"`
+	Notes     string        `json:"notes"`
 }
 
 type BacklogResult struct {

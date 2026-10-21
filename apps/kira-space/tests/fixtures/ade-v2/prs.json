@@ -2,18 +2,15 @@
   "repos": [
     {
       "codeRepoId": "repo-web-app",
-      "kind": "ok",
-      "webUrl": "https://github.com/acme/web-app"
+      "kind": "ok"
     },
     {
       "codeRepoId": "repo-api",
-      "kind": "ok",
-      "webUrl": "https://github.com/acme/api"
+      "kind": "ok"
     },
     {
       "codeRepoId": "repo-mobile",
-      "kind": "disabled",
-      "webUrl": ""
+      "kind": "disabled"
     }
   ],
   "branches": {
@@ -95,5 +92,20 @@
       "state": "Approved",
       "url": "https://github.com/acme/api/pull/216"
     }
+  },
+  "branchUrls": {
+    "b_cart": "https://github.com/acme/web-app/tree/fix/cart-flaky",
+    "b_bill": "https://github.com/acme/web-app/tree/feat/usage-billing",
+    "b_meter": "https://github.com/acme/api/tree/feat/usage-metering",
+    "b_auth": "https://github.com/acme/web-app/tree/feat/oauth-login",
+    "b_authui": "https://github.com/acme/web-app/tree/feat/oauth-login-ui",
+    "b_authcb": "https://github.com/acme/api/tree/feat/oauth-callback",
+    "b_hooks": "https://github.com/acme/api/tree/feat/webhooks",
+    "b_sara": "https://github.com/acme/web-app/tree/sara/payments-refactor",
+    "b_li": "https://github.com/acme/web-app/tree/li/search-schema",
+    "b_search": "https://github.com/acme/web-app/tree/feat/search-index",
+    "b_notif": "https://github.com/acme/web-app/tree/feat/notifications",
+    "b_deps": "https://github.com/acme/web-app/tree/chore/deps-bump",
+    "b_pushapi": "https://github.com/acme/api/tree/feat/push-tokens"
   }
 }

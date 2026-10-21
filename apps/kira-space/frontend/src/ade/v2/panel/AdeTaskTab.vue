@@ -72,10 +72,10 @@ const why = computed(() => statusWhy(task.value, props.card.status, props.card.p
 // ---- links
 const jira = computed(() => task.value.jira);
 const links = useLinkFields(
-  () => task.value.githubUrl,
+  () => task.value.hostLink,
   async (patch) => ((await write(patch)) ? null : fieldError.value),
 );
-const github = links.github;
+const github = computed(() => task.value.hostLink);
 
 // ---- estimate
 async function saveEst(value: string): Promise<void> {
@@ -153,7 +153,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
       <AdeLinkRow
         id="ade-task-github"
         :label="t('common.product.github.label')"
-        :chip="github ? t(github.kind === 'PR' ? 'space.ade.branchPanel.pr.label' : 'space.ade.taskTab.issue.label') : ''"
+        :chip="github ? t(github.kind === 'changeRequest' ? 'space.ade.branchPanel.pr.label' : 'space.ade.taskTab.issue.label') : ''"
         :text="github?.ref ?? ''"
         :url="github ? task.githubUrl : ''"
         :placeholder="t('space.ade.taskTab.githubPlaceholder.placeholder')"

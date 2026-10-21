@@ -29,7 +29,7 @@ import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { ACTION_CLASS, TONE_SOLID_CLASS } from '../tones';
-import type { Deployment, Integration, PR, RepoPrs, Run } from '../wire';
+import type { Deployment, Integration, PR, Run } from '../wire';
 import AdeChangesTab from './AdeChangesTab.vue';
 import AdePanelFrame from './AdePanelFrame.vue';
 import AdeRunOutcome from './AdeRunOutcome.vue';
@@ -139,13 +139,7 @@ const shared = computed(() => {
 
 // ---- Details rows
 const pr = computed((): PR | null => prs.data.value?.branches[branch.value.id] ?? null);
-const repoPrs = computed((): RepoPrs | undefined =>
-  prs.data.value?.repos.find((r) => r.codeRepoId === branch.value.codeRepoId),
-);
-const webUrl = computed(() => repoPrs.value?.webUrl ?? '');
-const branchUrl = computed(() =>
-  webUrl.value && branch.value.name ? `${webUrl.value}/tree/${branch.value.name}` : '',
-);
+const branchUrl = computed(() => prs.data.value?.branchUrls[branch.value.id] ?? '');
 const PR_TONE: Record<string, Tone> = {
   open: 'green',
   merged: 'purple',

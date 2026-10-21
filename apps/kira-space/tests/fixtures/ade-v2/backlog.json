@@ -9,6 +9,7 @@
         "url": "https://acme.atlassian.net/browse/PAY-140"
       },
       "githubUrl": "",
+      "hostLink": null,
       "notes": ""
     },
     {
@@ -17,6 +18,7 @@
       "addedAt": 1789981200000,
       "jira": null,
       "githubUrl": "https://github.com/acme/web-app/issues/882",
+      "hostLink": { "provider": "github", "kind": "issue", "ref": "web-app#882" },
       "notes": ""
     },
     {
@@ -25,6 +27,7 @@
       "addedAt": 1789894800000,
       "jira": null,
       "githubUrl": "",
+      "hostLink": null,
       "notes": ""
     },
     {
@@ -33,6 +36,7 @@
       "addedAt": 1789635600000,
       "jira": null,
       "githubUrl": "",
+      "hostLink": null,
       "notes": ""
     }
   ]
