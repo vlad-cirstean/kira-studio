@@ -222,9 +222,9 @@ func TestNoRemoteAndPr(t *testing.T) {
 		t.Fatalf("fetch without a remote = %+v, want a classified error", res)
 	}
 
-	for name, res := range map[string]gitrpc.PrLookupResult{
-		"commit": call[gitrpc.PrLookupResult](t, r.gs, "commit.resolvePr", gitrpc.CommitResolvePrParams{RepoID: id, SHA: sha}),
-		"branch": call[gitrpc.PrLookupResult](t, r.gs, "branch.resolvePr", gitrpc.BranchResolvePrParams{RepoID: id, Branch: "main"}),
+	for name, res := range map[string]gitrpc.ChangeRequestLookup{
+		"commit": call[gitrpc.ChangeRequestLookup](t, r.gs, "commit.resolvePr", gitrpc.CommitResolvePrParams{RepoID: id, SHA: sha}),
+		"branch": call[gitrpc.ChangeRequestLookup](t, r.gs, "branch.resolvePr", gitrpc.BranchResolvePrParams{RepoID: id, Branch: "main"}),
 	} {
 		if len(res.PRs) != 0 {
 			t.Fatalf("%s.resolvePr = %+v, want no PRs", name, res)

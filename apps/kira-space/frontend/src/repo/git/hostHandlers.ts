@@ -376,12 +376,12 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
     },
 
     // P74 §3.3: requests pr.browserUrl over the git socket, then hands the URL (when non-null) to
-    // GitHubService.OpenPullRequestURL — the one Go-side path that ever opens the OS browser. A
+    // GitHostService.OpenChangeRequestURL — the one Go-side path that ever opens the OS browser. A
     // null url (github disabled, or no GitHub remote) is a silent no-op: the caller already gated
     // the button on this very lookup resolving in the first place.
     'pr.openExternal': async ({ repoId, number }, signal) => {
       const result = await deps.remoteRequest('pr.browserUrl', { repoId, number }, signal);
-      if (result.url !== null) await control.githubOpenPullRequestUrl(result.url);
+      if (result.url !== null) await control.gitHostOpenChangeRequestUrl(result.url);
       return {};
     },
 

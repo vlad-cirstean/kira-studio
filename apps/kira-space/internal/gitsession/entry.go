@@ -6,9 +6,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/catfile"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
@@ -140,11 +140,11 @@ type RepoEntry struct {
 	// (D12: "I have reviewed X" is a fact about the repository and the person, not the window).
 	review *gitreview.Store
 
-	// gh is G24 D6's own three-cache-plus-breaker slot (gh.go); ghClient is the process-wide
-	// *ghclient.Client threaded in by Registry.Acquire from Registry.Gh, mirroring review's own
-	// "shared off the Registry" shape — one GitHub surface, not one per repository.
-	gh       *ghState
-	ghClient *ghclient.Client
+	// host is the three-cache-plus-breaker slot (changerequests.go); hosts is the process-wide
+	// selector threaded in by Registry.Acquire from Registry.Hosts, mirroring review's "shared off
+	// the Registry" shape — one provider set, not one per repository.
+	host  *hostState
+	hosts githost.Selector
 
 	// isOpen is G25 F7's own cross-window query, threaded in from Registry.IsOpen — a plain func,
 	// the same "this package imports only gitclient/gitreview/stdlib, so a cross-entry fact reaches
@@ -172,7 +172,7 @@ type RepoEntry struct {
 func newRepoEntry(
 	summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher,
 	settings func() ([]string, int, string), repoSettingsGet func(string) (model.GitRepoSettings, error),
-	review *gitreview.Store, ghClient *ghclient.Client, isOpen func(string) bool,
+	review *gitreview.Store, hosts githost.Selector, isOpen func(string) bool,
 	skipInitialAutoFetch bool, opLog *oplog.Log,
 ) *RepoEntry {
 	life, lifeStop := context.WithCancel(context.Background())
@@ -193,8 +193,8 @@ func newRepoEntry(
 		settings:        settings,
 		repoSettingsGet: repoSettingsGet,
 		review:          review,
-		gh:              newGhState(),
-		ghClient:        ghClient,
+		host:            newHostState(),
+		hosts:           hosts,
 		isOpen:          isOpen,
 		opLog:           opLog,
 		done:            make(chan struct{}),
@@ -253,12 +253,11 @@ func (e *RepoEntry) note(sig gitclient.Signal) {
 		e.headMu.Lock()
 		e.headStale = true
 		e.headMu.Unlock()
-		// G24 D6/D8: the snapshot/per-branch/per-commit gh caches turn stale (served while a
-		// background refresh runs) and the GitHub-remote detection is dropped — the breaker is
-		// not (D7: "refsChanged does not clear it"). The
-		// bounded, gated eager re-resolve pass (D8) is scheduled AFTER the mark, in its own
-		// goroutine, so it never delays this signal's own fan-out to subscribers.
-		e.gh.markStale()
+		// The snapshot, per-branch and per-commit host caches turn stale (served while a background
+		// refresh runs) and the host detection is dropped; the breaker is not. The bounded, gated
+		// eager re-resolve pass is scheduled AFTER the mark, in its own goroutine, so it never
+		// delays this signal's fan-out to subscribers.
+		e.host.markStale()
 		go e.eagerResolveClosedBranches()
 	}
 	e.mu.Lock()

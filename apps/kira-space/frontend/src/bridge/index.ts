@@ -6,7 +6,7 @@ import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as CustomScriptsService from '@bindings/customscriptsservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as GitCredentialService from '@bindings/gitcredentialservice.js';
-import * as GitHubService from '@bindings/githubservice.js';
+import * as GitHostService from '@bindings/githostservice.js';
 import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
@@ -177,8 +177,8 @@ const spaceControl = {
   onViewFind: (cb: () => void): (() => void) => on(CHANNEL.viewFind, cb),
   onReviewCode: (cb: () => void): (() => void) => on(CHANNEL.reviewCode, cb),
 
-  githubOpenPullRequestUrl: (url: string): Promise<void> =>
-    unwrap(GitHubService.OpenPullRequestURL({ url })),
+  gitHostOpenChangeRequestUrl: (url: string): Promise<void> =>
+    unwrap(GitHostService.OpenChangeRequestURL({ url })),
 
   gitCredentialPending: (): Promise<GitCredentialPrompt[]> =>
     unwrap(GitCredentialService.Pending()).then((r) => trust<GitCredentialPrompt[]>(r ?? [])),

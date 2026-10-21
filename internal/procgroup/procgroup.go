@@ -1,4 +1,4 @@
-// Package procgroup is gitclient/ghclient/gitprepare/toolexec's own shared process-group
+// Package procgroup is gitclient/githost-github/gitprepare/toolexec's own shared process-group
 // termination shape (P113 G10): SIGTERM the whole group, then escalate to SIGKILL after a grace
 // window if it hasn't exited by then. Every one of those packages spawns via os/exec with its own
 // process group (Setsid or Setpgid) precisely so a group signal reaches whatever the direct child

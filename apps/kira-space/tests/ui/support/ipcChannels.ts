@@ -5,7 +5,7 @@
 // bindings under apps/kira-space/frontend/bindings/. See mockRuntime.ts's CHANNEL_TO_FQN for the
 // other half of this mapping.
 export const IPC = {
-  githubOpenPullRequestUrl: 'kira:github:openPullRequestUrl',
+  gitHostOpenChangeRequestUrl: 'kira:githost:openChangeRequestUrl',
   linkOpenExternal: 'kira:link:openExternal',
 
   settingsGetAll: 'kira:settings:getAll',

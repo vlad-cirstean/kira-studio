@@ -40,7 +40,7 @@ func TestFixturesMatchWireTypes(t *testing.T) {
 		"review-target.json":       func() any { return new(ReviewWindowTarget) },
 		"review-agent.json":        func() any { return new(ReviewAgentState) },
 		"review-agent-launch.json": func() any { return new(ReviewAgentLaunch) },
-		"gh-sync-plan.json":        func() any { return new(GhSyncPlan) },
+		"gh-sync-plan.json":        func() any { return new(ViewedSyncPlan) },
 		"gh-sync-result.json":      func() any { return new(GhSyncResult) },
 	}
 

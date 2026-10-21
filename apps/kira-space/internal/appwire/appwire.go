@@ -22,9 +22,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileterm"
@@ -70,8 +70,8 @@ type Options struct {
 	MobileDetect func() (lannet.Network, error)
 	MobileFind   func(lannet.Identity) (lannet.Network, error)
 	MobilePoll   time.Duration
-	// GhLocator resolves the gh CLI; nil means the platform locator.
-	GhLocator ghclient.Locator
+	// GitHosts are the registered code-host providers; nil means the real GitHub provider alone.
+	GitHosts *githost.Registry
 	// TrackerGrace is how long the ADE tracker waits before it reads a spawned TUI session as
 	// stopped; zero means the tracker default.
 	TrackerGrace time.Duration
@@ -125,7 +125,7 @@ type Wired struct {
 	UpdateInstall *appupdate.Installer
 
 	GitCredential  *bridge.GitCredentialService
-	GitHub         *bridge.GitHubService
+	GitHost        *bridge.GitHostService
 	Link           *bridge.LinkService
 	Files          *bridge.FilesService
 	Settings       *bridge.SettingsService
@@ -179,7 +179,7 @@ func Build(opts Options) *Wired {
 
 	credentialRelay := gitcred.New()
 	w.Windows = shell.NewWindowRegistry()
-	git := wireGit(repositories, opts.Locator, opts.GhLocator)
+	git := wireGit(repositories, opts.Locator, opts.GitHosts)
 	w.Git, w.CredentialRelay = git, credentialRelay
 
 	// The tap feeds every window-wide event to the phone event hub, which drops what is not allowlisted.
@@ -218,7 +218,7 @@ func Build(opts Options) *Wired {
 	}
 	w.GitCredential = &bridge.GitCredentialService{Deps: deps, Relay: credentialRelay}
 	w.detachGitCred = bridge.AttachGitCredentialPush(w.GitCredential)
-	w.GitHub = &bridge.GitHubService{Deps: deps, Browser: opts.Browser}
+	w.GitHost = &bridge.GitHostService{Deps: deps, Browser: opts.Browser}
 	w.Link = &bridge.LinkService{Browser: opts.Browser}
 	w.Settings = &bridge.SettingsService{Deps: deps}
 	w.Layout = &bridge.LayoutService{Deps: deps}
@@ -395,7 +395,7 @@ func (w *Wired) StartMobile() { bridge.StartMobileIfEnabled(w.Mobile) }
 func (w *Wired) Bound() []application.Service {
 	return []application.Service{
 		application.NewService(w.GitCredential),
-		application.NewService(w.CodeWorkspace), application.NewService(w.GitHub), application.NewService(w.Link),
+		application.NewService(w.CodeWorkspace), application.NewService(w.GitHost), application.NewService(w.Link),
 		application.NewService(w.Files), application.NewService(w.Settings), application.NewService(w.Layout),
 		application.NewService(w.Tabs), application.NewService(w.CustomScripts), application.NewService(w.ScriptRuns), application.NewService(w.Terminal),
 		application.NewService(w.AdeTask), application.NewService(w.Ops), application.NewService(w.Lifecycle),

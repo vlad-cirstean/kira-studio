@@ -28,7 +28,7 @@ const BRIDGE_PKG = 'github.com/kirathecat/kira-studio/apps/kira-space/internal/b
 // bindings themselves (`grep -rhoE '\$Call\.ByName\("[^"]+"' apps/kira-space/frontend/bindings/…/bridge/*.js`),
 // not retyped from memory — the same discipline Kira Studio's own copy of this table follows.
 const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
-  githubOpenPullRequestUrl: 'GitHubService.OpenPullRequestURL',
+  gitHostOpenChangeRequestUrl: 'GitHostService.OpenChangeRequestURL',
   linkOpenExternal: 'LinkService.OpenExternal',
   settingsGetAll: 'SettingsService.GetAll',
   settingsSet: 'SettingsService.Set',

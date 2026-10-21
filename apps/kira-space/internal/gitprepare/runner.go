@@ -17,7 +17,7 @@ import (
 const DefaultPrepareTimeout = 15 * time.Minute
 
 // gracefulStopDelay is SIGTERM's own grace window before escalating to SIGKILL — mirrors
-// ghclient/runner.go's own constant of the same name and purpose exactly (this package's own
+// githost/github/runner.go's own constant of the same name and purpose exactly (this package's own
 // precedent for "a spawned non-git binary gets a real chance to clean up, then dies for real").
 //
 // A var, not a const (mirrors internal/preconnect/supervisor.go's own killGrace/settleWindow
@@ -80,7 +80,7 @@ var killGroup = procgroup.Kill
 // Setsid puts it in its own session so a group signal reaches whatever it forks, not just the
 // shell itself; a spec.Timeout deadline is layered onto ctx (which is ALSO ctx's own
 // cancellation — either one triggers the same SIGTERM-then-SIGKILL sequence cmd.Cancel/WaitDelay
-// implement, mirroring ghclient/runner.go's own precedent exactly). Output is sanitized, capped and
+// implement, mirroring githost/github/runner.go's own precedent exactly). Output is sanitized, capped and
 // streamed through outputCollector as it arrives — never buffered raw and processed only at exit.
 func (osRunner) Run(ctx context.Context, spec Spec) (Result, error) {
 	if spec.Timeout <= 0 {

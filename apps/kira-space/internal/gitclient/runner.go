@@ -172,7 +172,7 @@ var hygieneEnv = []string{
 // DIRECTORY and GIT_COMMON_DIR retarget the index/object store/shared dir of whatever repo IS
 // used; GIT_NAMESPACE silently prefixes every ref this app reads or writes. Stripped from the base
 // environment before spawning (not merely overridden with an empty value — git does not treat an
-// empty GIT_DIR the same as unset) — the same precaution ghclient's own GH_REPO= clear takes for
+// empty GIT_DIR the same as unset) — the same precaution githost/github's own GH_REPO= clear takes for
 // `gh api`, applied by removal here since these can't be safely neutralised with an empty value.
 var gitRedirectEnvKeys = []string{
 	"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "GIT_NAMESPACE",

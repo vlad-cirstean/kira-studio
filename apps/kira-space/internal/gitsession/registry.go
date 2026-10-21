@@ -1,6 +1,6 @@
 // Package gitsession owns SPEC §6's session model: Registry (a refcounted, per-repo set of shared
 // RepoEntry state) and Conn (one accepted connection's private holds and event delivery). It
-// imports gitclient, gitpreflight, gitreview, ghclient, storage/model, oplog and stdlib only — no
+// imports gitclient, gitpreflight, gitreview, githost, storage/model, oplog and stdlib only — no
 // bridge, no rpcstream — so it stays a domain package internal/layering_test.go's
 // auto-enumerated check covers without an exemption. G11 adds Registry.Review (a *gitreview.Store, D3): the one place this package
 // reaches beyond gitclient's own family, and still nowhere near bridge.
@@ -11,8 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/github"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/providers"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
@@ -75,12 +77,11 @@ type Registry struct {
 	// is (§0.4's "every review.db a test opens lives under t.TempDir()").
 	Review *gitreview.Store
 
-	// Gh is G24 D1's own single GitHub surface — shared off the Registry exactly like Review above
-	// (one process-wide *ghclient.Client, never one per repository); each RepoEntry gets its own
-	// *ghState (the caches/breaker), but every entry shares this one Client. Defaulted below to a
-	// real Discovery+Runner pair; tests override it with a Client built over a fake/counting
-	// ghclient.Runner (F13: gh is never actually installed in this container).
-	Gh *ghclient.Client
+	// Hosts picks each repository's code host — shared off the Registry exactly like Review above
+	// (one process-wide provider set, never one per repository); each RepoEntry gets its own
+	// *hostState (the caches/breaker), but every entry shares these providers. Defaulted below to
+	// the real GitHub provider; tests override it with providers over a fake/counting runner.
+	Hosts githost.Selector
 
 	// OpLog records user-initiated writes (RunOp, UndoRun, RunRemote with a conn, RunRestack).
 	// Nil turns logging off. Set before the first Acquire.
@@ -104,11 +105,8 @@ func NewRegistry(runner gitclient.Runner) *Registry {
 		RepoSettingsSet: func(string, model.GitRepoSettingsPatch) (model.GitRepoSettings, error) {
 			return model.DefaultGitRepoSettings(), nil
 		},
-		Review: gitreview.NewStore(gitreview.DefaultPath()),
-		Gh: ghclient.NewClient(
-			ghclient.NewDiscovery(ghclient.NewPlatformLocator(), ghclient.NewExecRunner(), ghclient.NewRealClock()),
-			ghclient.NewExecRunner(),
-		),
+		Review:  gitreview.NewStore(gitreview.DefaultPath()),
+		Hosts:   githost.Selector{Registry: providers.New(github.Options{})},
 		entries: make(map[string]*slot),
 	}
 }
@@ -169,7 +167,7 @@ func (reg *Registry) acquire(
 	}
 	repo := gitclient.NewRepo(summary, reg.runner, gitPath)
 	entry := newRepoEntry(
-		summary, repo, w, reg.Settings, reg.RepoSettingsGet, reg.Review, reg.Gh, reg.IsOpen,
+		summary, repo, w, reg.Settings, reg.RepoSettingsGet, reg.Review, reg.Hosts, reg.IsOpen,
 		skipInitialAutoFetch, reg.OpLog,
 	)
 	reg.entries[summary.RepoID] = &slot{entry: entry, refs: 1}

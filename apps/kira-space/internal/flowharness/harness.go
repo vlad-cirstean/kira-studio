@@ -30,8 +30,10 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appwire"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/github"
+	githostproviders "github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/providers"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
@@ -52,6 +54,7 @@ type options struct {
 	scheduleTimeout time.Duration
 	clock           scriptruns.Clock
 	noGh            bool
+	gitHosts        []githost.Provider
 	noClaude        bool
 	trackerGrace    time.Duration
 	rebaseTimeout   time.Duration
@@ -66,6 +69,11 @@ type Opt func(*options)
 
 // WithoutGh leaves gh off PATH entirely, system installs included (claude stays the fake).
 func WithoutGh() Opt { return func(o *options) { o.noGh = true } }
+
+// WithGitHost registers an extra code-host provider after GitHub.
+func WithGitHost(p githost.Provider) Opt {
+	return func(o *options) { o.gitHosts = append(o.gitHosts, p) }
+}
 
 // WithoutClaude leaves claude off PATH entirely, system installs included.
 func WithoutClaude() Opt { return func(o *options) { o.noClaude = true } }
@@ -281,9 +289,9 @@ func (a *App) build() {
 		// Same on every OS: flows never depend on the host's real Seatbelt.
 		a.opts.sandbox = &sandboxtest.Fake{Dir: a.t.TempDir(), NotEnforced: true}
 	}
-	var ghLocator ghclient.Locator
+	var ghOptions github.Options
 	if a.opts.noGh {
-		ghLocator = noGhLocator{}
+		ghOptions.Locator = noGhLocator{}
 	}
 	var registry *harness.Registry
 	if a.opts.provider != nil {
@@ -291,7 +299,7 @@ func (a *App) build() {
 	}
 	a.W = appwire.Build(appwire.Options{
 		Providers: registry,
-		GhLocator: ghLocator, TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, Sandbox: a.opts.sandbox, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll,
+		GitHosts:  githostproviders.New(ghOptions, a.opts.gitHosts...), TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, Sandbox: a.opts.sandbox, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll,
 		Repos: r, DB: db, Emitter: a.Events, Browser: a.Browser, Dialogs: a.Dialogs,
 		Locator: gitclient.NewHostLocator(), KeepAwakeDriver: a.KeepAwake,
 		MobileAssets: fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>phone</title>")}},

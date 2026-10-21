@@ -1219,9 +1219,9 @@
           "body": "The workspace was closed. Reopen it and retry."
         }
       },
-      "github": {
-        "notPullRequestUrl": {
-          "body": "That isn’t a GitHub pull request link."
+      "gitHost": {
+        "notChangeRequestUrl": {
+          "body": "That isn’t a {changeRequests} link."
         }
       },
       "gitrpc": {

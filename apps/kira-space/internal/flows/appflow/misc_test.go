@@ -47,7 +47,7 @@ func TestOpenLinks(t *testing.T) {
 	}
 
 	pr := func(url string) error {
-		return app.W.GitHub.OpenPullRequestURL(bridge.GitHubOpenPullRequestURLArgs{URL: url})
+		return app.W.GitHost.OpenChangeRequestURL(bridge.OpenChangeRequestURLArgs{URL: url})
 	}
 	if err := pr("https://github.com/acme/api/pull/12"); err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func TestOpenLinks(t *testing.T) {
 		"https://evil.example/acme/api/pull/12", "https://github.com.evil.example/acme/api/pull/12", "javascript:alert(1)",
 	} {
 		if err := pr(bad); err == nil {
-			t.Errorf("OpenPullRequestURL(%q) succeeded", bad)
+			t.Errorf("OpenChangeRequestURL(%q) succeeded", bad)
 		}
 	}
 

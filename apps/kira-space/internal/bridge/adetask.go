@@ -1001,9 +1001,9 @@ func (s *AdeTaskService) LaunchReviewAgent(ctx context.Context, args adewire.Tas
 }
 
 // GitHubSyncPlan reports what syncing the branch's reviewed files to its PR would do.
-func (s *AdeTaskService) GitHubSyncPlan(ctx context.Context, args adewire.BranchArgs) (adewire.GhSyncPlan, error) {
+func (s *AdeTaskService) GitHubSyncPlan(ctx context.Context, args adewire.BranchArgs) (adewire.ViewedSyncPlan, error) {
 	if err := validateAdeTaskID(args.BranchID, "branchId"); err != nil {
-		return adewire.GhSyncPlan{}, err
+		return adewire.ViewedSyncPlan{}, err
 	}
 	p, err := s.Engine.GitHubSyncPlan(ctx, args.BranchID)
 	return p, adeTaskError(err)

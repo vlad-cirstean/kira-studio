@@ -18,10 +18,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileterm"
@@ -313,13 +313,12 @@ func shutdownTracker(tracker *ade.Tracker, hooks *harness.Hooks) {
 }
 
 // wireGit builds the git runner, discovery (over locator), session registry and router.
-func wireGit(repositories *repos.Repos, locator gitclient.Locator, ghLocator ghclient.Locator) gitWired {
+func wireGit(repositories *repos.Repos, locator gitclient.Locator, hosts *githost.Registry) gitWired {
 	gitRunner := gitclient.NewExecRunner()
 	gitDiscovery := gitclient.NewDiscovery(locator, gitRunner, gitclient.NewRealClock())
 	gitRegistry := gitsession.NewRegistry(gitRunner)
-	if ghLocator != nil {
-		gitRegistry.Gh = ghclient.NewClient(
-			ghclient.NewDiscovery(ghLocator, ghclient.NewExecRunner(), ghclient.NewRealClock()), ghclient.NewExecRunner())
+	if hosts != nil {
+		gitRegistry.Hosts = githost.Selector{Registry: hosts}
 	}
 	opLog := oplog.New()
 	gitRegistry.OpLog = opLog

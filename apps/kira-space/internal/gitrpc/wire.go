@@ -1,9 +1,9 @@
 package gitrpc
 
 import (
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
@@ -612,13 +612,13 @@ type RepoSettingsChangedPayload struct {
 }
 
 // ---------------------------------------------------------------------------------------
-// G24 — commit.resolvePr / branch.resolvePr (D9/D14). GhStatus/PrRecord/PrLookupResult are direct
+// G24 — commit.resolvePr / branch.resolvePr (D9/D14). GhStatus/PrRecord/ChangeRequestLookup are direct
 // structural copies of @kira/git-ipc's own types of the same name, kept honest by hand (this repo
 // carries no wireConformance.spec.ts — see this phase's own commit message) the same way
 // gitclient.GitStatus's JSON tags already mirror GitStatus's TS twin.
 // ---------------------------------------------------------------------------------------
 
-// GhStatus mirrors ghclient.Status field for field — this phase's own D5 four-kind actionability
+// GhStatus mirrors githost.Status field for field — this phase's own D5 four-kind actionability
 // union, crossing the wire unchanged.
 type GhStatus struct {
 	Kind    string `json:"kind"`
@@ -629,11 +629,11 @@ type GhStatus struct {
 	Reason  string `json:"reason,omitempty"`
 }
 
-func ghStatusFrom(s ghclient.Status) GhStatus {
+func ghStatusFrom(s githost.Status) GhStatus {
 	return GhStatus{Kind: s.Kind, Path: s.Path, Version: s.Version, Host: s.Host, Account: s.Account, Reason: s.Reason}
 }
 
-// PrRecord mirrors ghclient.PR field for field, camelCased at the wire.
+// PrRecord mirrors githost.ChangeRequest field for field, camelCased at the wire.
 type PrRecord struct {
 	Number    int    `json:"number"`
 	Title     string `json:"title"`
@@ -645,32 +645,32 @@ type PrRecord struct {
 	UpdatedAt int64  `json:"updatedAt"`
 }
 
-func prRecordFrom(p ghclient.PR) PrRecord {
+func prRecordFrom(p githost.ChangeRequest) PrRecord {
 	return PrRecord{
 		Number: p.Number, Title: p.Title, URL: p.URL, State: p.State,
 		HeadRef: p.HeadRef, HeadSha: p.HeadSha, BaseRef: p.BaseRef, UpdatedAt: p.UpdatedAt,
 	}
 }
 
-// PrLookupResult mirrors @kira/git-ipc's own discriminated union (D14) — both commit.resolvePr and
+// ChangeRequestLookup mirrors @kira/git-ipc's own discriminated union (D14) — both commit.resolvePr and
 // branch.resolvePr answer this exact shape.
-type PrLookupResult struct {
+type ChangeRequestLookup struct {
 	Kind string     `json:"kind"` // "ok" | "disabled" | "unavailable"
 	PRs  []PrRecord `json:"prs,omitempty"`
 	Gh   *GhStatus  `json:"gh,omitempty"`
 }
 
-func prLookupResultFrom(r gitsession.PrLookupResult) PrLookupResult {
-	out := PrLookupResult{Kind: r.Kind}
+func prLookupResultFrom(r gitsession.ChangeRequestLookup) ChangeRequestLookup {
+	out := ChangeRequestLookup{Kind: r.Kind}
 	if r.Kind == "ok" {
-		prs := make([]PrRecord, 0, len(r.PRs))
-		for _, p := range r.PRs {
+		prs := make([]PrRecord, 0, len(r.ChangeRequests))
+		for _, p := range r.ChangeRequests {
 			prs = append(prs, prRecordFrom(p))
 		}
 		out.PRs = prs
 	}
-	if r.Gh != nil {
-		gh := ghStatusFrom(*r.Gh)
+	if r.Status != nil {
+		gh := ghStatusFrom(*r.Status)
 		out.Gh = &gh
 	}
 	return out

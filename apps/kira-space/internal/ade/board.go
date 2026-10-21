@@ -617,18 +617,18 @@ func (b *TaskBoard) Prs(ctx context.Context) (adewire.PrsResult, error) {
 				mu.Unlock()
 				return nil
 			}
-			webURL, _ := entry.RepoWebURL(gctx)
+			webURL, _ := entry.RepoURL(gctx)
 			kind := "ok"
 			found := map[string]adewire.PR{}
 			for _, br := range byRepo[id] {
 				if br.Name == "" {
 					continue
 				}
-				res := entry.ResolveBranchPr(gctx, br.Name)
+				res := entry.ResolveBranchChangeRequest(gctx, br.Name)
 				if res.Kind != "ok" {
 					kind = res.Kind
-				} else if len(res.PRs) > 0 {
-					pr := res.PRs[0]
+				} else if len(res.ChangeRequests) > 0 {
+					pr := res.ChangeRequests[0]
 					found[br.ID] = adewire.PR{Number: pr.Number, Title: pr.Title, State: pr.State, URL: pr.URL}
 				}
 			}
@@ -788,8 +788,8 @@ func (b *TaskBoard) checkPrMerges(ctx context.Context, entry *gitsession.RepoEnt
 			continue
 		}
 		g.Go(func() error {
-			r := entry.ResolveBranchPr(gctx, br.Name)
-			if r.Kind == "ok" && len(r.PRs) > 0 && r.PRs[0].State == "merged" {
+			r := entry.ResolveBranchChangeRequest(gctx, br.Name)
+			if r.Kind == "ok" && len(r.ChangeRequests) > 0 && r.ChangeRequests[0].State == "merged" {
 				mu.Lock()
 				merged[br.ID] = now
 				mu.Unlock()
@@ -797,7 +797,7 @@ func (b *TaskBoard) checkPrMerges(ctx context.Context, entry *gitsession.RepoEnt
 			return nil
 		})
 	}
-	_ = g.Wait() // ResolveBranchPr reports disabled/unavailable instead of erroring
+	_ = g.Wait() // ResolveBranchChangeRequest reports disabled/unavailable instead of erroring
 	return merged
 }
 

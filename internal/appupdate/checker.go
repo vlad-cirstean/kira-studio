@@ -2,12 +2,12 @@
 // installer (install.go), shared by both Kira Studio and Kira Space (P119) — a repo-root package,
 // so it imports nothing under either app's own internal/ (Go's internal/ visibility rule enforces
 // this at compile time). The check itself is one plain net/http GET against GitHub's public
-// releases/latest endpoint, self-contained and dependency-free (no ghclient, no httpclient, no
+// releases/latest endpoint, self-contained and dependency-free (no githost/github, no httpclient, no
 // Wails import — drivable from a plain httptest server, matching the same self-contained shape
 // internal/httpclient states as its own contract).
 //
-// internal/ghclient is deliberately not reused: every ghclient call is gated on a working,
-// authenticated `gh` CLI (ghclient/discovery.go), and an update check that only runs for users
+// internal/githost/github is deliberately not reused: every call of apps/kira-space/internal/githost/github is gated on a working,
+// authenticated `gh` CLI (githost/github/discovery.go), and an update check that only runs for users
 // who have installed and logged into the GitHub CLI is not an update check. internal/httpclient
 // is not reused either — it is the user-facing request builder (redirect recording, wire capture,
 // truncation reporting) for a question this package is not asking.
@@ -32,16 +32,16 @@ const (
 
 	latestReleaseURL = "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/latest"
 
-	requestTimeout = 10 * time.Second // ghclient's own apiTimeout, same reasoning
+	requestTimeout = 10 * time.Second // githost/github's own apiTimeout, same reasoning
 	maxBodyBytes   = 1 << 20          // a releases/latest body is tens of KiB; this is headroom
 
-	// apiVersionHeader restates ghclient/api.go's own unexported constant of the same name — GitHub's
+	// apiVersionHeader restates apps/kira-space/internal/githost/github/api.go's own unexported constant of the same name — GitHub's
 	// REST API version pin, so a future GitHub-side default-version bump can never silently reshape
 	// the decoded fields here.
 	apiVersionHeader = "2022-11-28"
 )
 
-// okInterval/failureInterval mirror ghclient/discovery.go's own okTTL/notOKTTL split: a good
+// okInterval/failureInterval mirror githost/github/discovery.go's own okTTL/notOKTTL split: a good
 // answer is worth holding for a long time, a failure is worth retrying sooner.
 const (
 	okInterval      = 6 * time.Hour

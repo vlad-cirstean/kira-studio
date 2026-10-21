@@ -834,20 +834,20 @@ type ReviewAgentLaunch struct {
 // 'unavailable' | 'headNotFetched'.
 type GhSyncStatus string
 
-type GhSyncFile struct {
+type ViewedSyncFile struct {
 	Path   string `json:"path"`
 	Action string `json:"action"` // 'mark' | 'unmark' | 'alreadyViewed' | 'skip'
 	Reason string `json:"reason"` // '' | 'notReviewed' | 'partial' | 'changedSinceReview' | 'differsFromPrHead' | 'notInPr'
 }
 
-type GhSyncPlan struct {
-	Status   GhSyncStatus `json:"status"`
-	Message  string       `json:"message"`
-	Account  string       `json:"account"`
-	Pr       *PR          `json:"pr"`
-	HeadSha  string       `json:"headSha"`
-	LocalTip string       `json:"localTip"`
-	Files    []GhSyncFile `json:"files"`
+type ViewedSyncPlan struct {
+	Status   GhSyncStatus     `json:"status"`
+	Message  string           `json:"message"`
+	Account  string           `json:"account"`
+	Pr       *PR              `json:"pr"`
+	HeadSha  string           `json:"headSha"`
+	LocalTip string           `json:"localTip"`
+	Files    []ViewedSyncFile `json:"files"`
 }
 
 type GhSyncFailure struct {
