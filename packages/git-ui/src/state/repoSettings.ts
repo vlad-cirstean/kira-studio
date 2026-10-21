@@ -15,7 +15,7 @@ function defaultRepoSettingsSnapshot(): RepoSettingsSnapshot {
     'kiraSpace.stash.includeUntracked': SETTINGS['kiraSpace.stash.includeUntracked'].default,
     'kiraSpace.review.baseCandidates': SETTINGS['kiraSpace.review.baseCandidates'].default,
     'kiraSpace.pull.strategy': SETTINGS['kiraSpace.pull.strategy'].default,
-    'kiraSpace.github.enabled': SETTINGS['kiraSpace.github.enabled'].default,
+    'kiraSpace.gitHost.provider': SETTINGS['kiraSpace.gitHost.provider'].default,
     'kiraSpace.worktree.prepareScript': SETTINGS['kiraSpace.worktree.prepareScript'].default,
     'kiraSpace.worktree.basePath': SETTINGS['kiraSpace.worktree.basePath'].default,
     'kiraSpace.checkout.autoStash': SETTINGS['kiraSpace.checkout.autoStash'].default,

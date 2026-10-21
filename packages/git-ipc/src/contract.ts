@@ -52,11 +52,10 @@ export interface RepoSettingsSnapshot {
   /** P7 W7/D43: Branch review's own candidate base branches (§6.8). */
   readonly 'kiraSpace.review.baseCandidates': readonly string[];
   readonly 'kiraSpace.pull.strategy': 'auto' | 'ff-only' | 'merge' | 'rebase';
-  /** G24 D16: whether the GitHub PR indicator/badges/search-arm/reaper re-resolve are active for
-   *  this repository at all — genuinely per-repo, default true. Off means no
-   *  `gh` probe, no spawn, no cache fill: both commit.resolvePr/branch.resolvePr answer
-   *  `{kind:'disabled'}` outright. */
-  readonly 'kiraSpace.github.enabled': boolean;
+  /** Which git host supplies change-request status: `auto` (detect from origin, the default),
+   *  `off` (no host call, no cache fill: lookups answer `{kind:'disabled'}`) or a provider id.
+   *  An unknown id behaves as `auto`. */
+  readonly 'kiraSpace.gitHost.provider': string;
   /** G25 D10: the worktree prepare script — one command-line string, never a path, never an argv
    *  array. Empty means the feature is off for this repository: no spawn, no shell, ever. Read
    *  ONLY from this table (`source: 'repo'`) — never from `.git/config`, a tracked file, or any
@@ -1170,7 +1169,7 @@ export interface PrRecord {
 }
 
 /** commit.resolvePr / branch.resolvePr's own shared result shape (D14). `"disabled"` covers both
- *  `kiraSpace.github.enabled === false` and "no GitHub remote at all" — the grid/badge/detail
+ *  `kiraSpace.gitHost.provider === 'off'` and "no GitHub remote at all" — the grid/badge/detail
  *  pane render nothing for either, so the two need no further distinction on the wire. */
 export type PrLookupResult =
   | { readonly kind: 'ok'; readonly prs: readonly PrRecord[] }

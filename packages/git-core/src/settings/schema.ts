@@ -42,15 +42,14 @@ export const SETTINGS = {
   // G18 D1/D10: the keys below all moved from per-window settings into a new per-repo
   // table (storage/repos.GitRepoSettingsRepo), edited from git-ui's own RepoSettingsDialog —
   // `source: 'repo'` marks each as server-owned.
-  // G24 D16: whether the GitHub PR indicator/badges/search-arm/reaper re-resolve are active for
-  // this repository at all — default true. Off means no
-  // `gh` probe, no spawn, no cache fill, no badge: both commit.resolvePr/branch.resolvePr answer
-  // {kind:'disabled'} outright.
-  'kiraSpace.github.enabled': {
-    key: 'kiraSpace.github.enabled',
-    type: 'boolean',
-    default: true,
-    description: { key: 'git.settings.githubEnabled.description' },
+  // Which git host supplies change-request status for this repository: `auto` detects it from the
+  // origin remote, `off` makes no host call, no cache fill and no badge (lookups answer
+  // {kind:'disabled'}), anything else is a provider id from `gitHost.providers`.
+  'kiraSpace.gitHost.provider': {
+    key: 'kiraSpace.gitHost.provider',
+    type: 'string',
+    default: 'auto',
+    description: { key: 'git.settings.gitHostProvider.description' },
     source: 'repo',
   },
   'kiraSpace.graph.pageSize': {

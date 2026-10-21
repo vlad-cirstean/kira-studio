@@ -186,7 +186,7 @@ func TestBranchResolvePr_DisabledWhenGithubSettingOff(t *testing.T) {
 	registry.Hosts = githost.Selector{Registry: githost.NewRegistry(github.New(github.Options{Locator: fakeGhLocatorForActivationTest{}, Runner: ghRunner}))}
 	registry.RepoSettingsGet = func(string) (model.GitRepoSettings, error) {
 		s := model.DefaultGitRepoSettings()
-		s.GithubEnabled = false
+		s.GitHostProvider = githost.SettingOff
 		return s, nil
 	}
 	discovery := gitclient.NewDiscovery(alwaysGitLocator{}, runner, gitclient.NewRealClock())
@@ -212,6 +212,6 @@ func TestBranchResolvePr_DisabledWhenGithubSettingOff(t *testing.T) {
 		t.Fatalf("branch.resolvePr result = %+v, want disabled", resultAny)
 	}
 	if ghRunner.count() != 0 {
-		t.Fatalf("gh runner invoked %d times for a github.enabled=false repo, want 0", ghRunner.count())
+		t.Fatalf("gh runner invoked %d times for a gitHost.provider=off repo, want 0", ghRunner.count())
 	}
 }

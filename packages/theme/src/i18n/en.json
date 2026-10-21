@@ -3658,8 +3658,14 @@
         "checkout": {
           "label": "Switching branches"
         },
-        "githubEnabled": {
-          "label": "Show pull request status for this repository"
+        "host": {
+          "label": "Code host"
+        },
+        "hostAuto": {
+          "option": "Detect from remote"
+        },
+        "hostProvider": {
+          "label": "Show status from"
         },
         "includeUntracked": {
           "label": "Check the untracked files option by default in the stash dialog"
@@ -4989,8 +4995,8 @@
       "checkoutAutoStash": {
         "description": "When uncommitted changes block a branch switch, stash them and switch instead of asking. The stash is tagged with the branch you left and is never popped automatically. Off restores the old dialog (discard, stash and carry, or cancel)."
       },
-      "githubEnabled": {
-        "description": "Show pull request status for this repository. Needs the GitHub CLI (gh), installed and signed in. Off stops every gh call and hides every badge."
+      "gitHostProvider": {
+        "description": "Which code host supplies pull request status for this repository. Detect from remote follows the origin remote. Off stops every host call and hides every badge."
       },
       "graphPageSize": {
         "description": "How many commits a single page fetches when you load more."

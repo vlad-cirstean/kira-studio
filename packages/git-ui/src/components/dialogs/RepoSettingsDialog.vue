@@ -111,6 +111,11 @@ const pullStrategyOptions: readonly SelectOption[] = [
   { value: 'rebase', label: 'common.rebase.label' },
 ];
 
+const hostProviderOptions: readonly SelectOption[] = [
+  { value: 'auto', label: 'git.dialog.repoSettings.hostAuto.option' },
+  { value: 'off', label: 'common.off.status' },
+];
+
 function onGraphScopeChange(value: string): void {
   draft['kiraSpace.graph.scope'] = value as RepoSettingsSnapshot['kiraSpace.graph.scope'];
 }
@@ -160,7 +165,7 @@ const pageSizeId = useId();
 const autoStashId = useId();
 const showInGraphId = useId();
 const includeUntrackedId = useId();
-const githubId = useId();
+const hostProviderId = useId();
 const graphScopeId = useId();
 const baseCandidatesId = useId();
 const pullStrategyId = useId();
@@ -197,8 +202,8 @@ async function save(): Promise<void> {
   if (draft['kiraSpace.pull.strategy'] !== current['kiraSpace.pull.strategy']) {
     patch['kiraSpace.pull.strategy'] = draft['kiraSpace.pull.strategy'];
   }
-  if (draft['kiraSpace.github.enabled'] !== current['kiraSpace.github.enabled']) {
-    patch['kiraSpace.github.enabled'] = draft['kiraSpace.github.enabled'];
+  if (draft['kiraSpace.gitHost.provider'] !== current['kiraSpace.gitHost.provider']) {
+    patch['kiraSpace.gitHost.provider'] = draft['kiraSpace.gitHost.provider'];
   }
   if (Object.keys(patch).length > 0) {
     try {
@@ -298,12 +303,23 @@ async function save(): Promise<void> {
         </FieldSet>
 
         <FieldSet>
-          <FieldLegend>{{ t('common.product.github.label') }}</FieldLegend>
-          <Field orientation="horizontal">
-            <Checkbox :id="githubId" v-model="draft['kiraSpace.github.enabled']" />
-            <FieldLabel :for="githubId">{{
-              t('git.dialog.repoSettings.githubEnabled.label')
+          <FieldLegend>{{ t('git.dialog.repoSettings.host.label') }}</FieldLegend>
+          <Field>
+            <FieldLabel :for="hostProviderId">{{
+              t('git.dialog.repoSettings.hostProvider.label')
             }}</FieldLabel>
+            <NativeSelect
+              :id="hostProviderId"
+              :model-value="draft['kiraSpace.gitHost.provider']"
+              variant="bordered"
+              size="kira-lg"
+              class="w-full"
+              @update:model-value="(v) => (draft['kiraSpace.gitHost.provider'] = v as string)"
+            >
+              <option v-for="opt in hostProviderOptions" :key="opt.value" :value="opt.value">
+                {{ t(opt.label) }}
+              </option>
+            </NativeSelect>
           </Field>
         </FieldSet>
 

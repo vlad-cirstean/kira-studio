@@ -101,7 +101,7 @@ export class PrState {
    *  every existing `byBranch.value.get(name)` call site keeps meaning "the branch's PR, if any"
    *  with no signature change. */
   readonly #noBranchPr = new Set<string>();
-  /** Set the first time EITHER lookup answers `"disabled"` for the current repo (github.enabled
+  /** Set the first time EITHER lookup answers `"disabled"` for the current repo (gitHost.provider off
    *  off, or no GitHub remote) — every later selection/branch resolve for this same repo then
    *  answers `"disabled"` synchronously, with no request at all, until the repo changes or
    *  refsChanged clears it (a remote could have been added since). Not required for correctness

@@ -317,10 +317,7 @@ func (s *hostState) snapshotPut(crs []githost.ChangeRequest) {
 // hostSetting reads this entry's host setting; a live change must take effect on the very next
 // lookup, so there is no caching of its own.
 func (e *RepoEntry) hostSetting() string {
-	if !e.RepoSettings().GithubEnabled {
-		return githost.SettingOff
-	}
-	return githost.SettingAuto
+	return e.RepoSettings().GitHostProvider
 }
 
 // hostRepo resolves the host and repository identity of this entry's "origin" remote under the

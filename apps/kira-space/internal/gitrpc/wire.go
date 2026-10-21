@@ -561,8 +561,8 @@ type RepoSettingsSnapshot struct {
 	StashIncludeUntracked bool     `json:"kiraSpace.stash.includeUntracked"`
 	ReviewBaseCandidates  []string `json:"kiraSpace.review.baseCandidates"`
 	PullStrategy          string   `json:"kiraSpace.pull.strategy"`
-	// GithubEnabled is G24 D16's own eighth leaf — genuinely per-repo, default true.
-	GithubEnabled bool `json:"kiraSpace.github.enabled"`
+	// GitHostProvider is "auto", "off" or a provider id; default "auto".
+	GitHostProvider string `json:"kiraSpace.gitHost.provider"`
 	// WorktreePrepareScript/WorktreeBasePath are G25 D10/D16's own ninth and tenth leaves.
 	WorktreePrepareScript string `json:"kiraSpace.worktree.prepareScript"`
 	WorktreeBasePath      string `json:"kiraSpace.worktree.basePath"`
@@ -588,7 +588,7 @@ type RepoSettingsPatchWire struct {
 	StashIncludeUntracked *bool     `json:"kiraSpace.stash.includeUntracked,omitempty"`
 	ReviewBaseCandidates  *[]string `json:"kiraSpace.review.baseCandidates,omitempty"`
 	PullStrategy          *string   `json:"kiraSpace.pull.strategy,omitempty"`
-	GithubEnabled         *bool     `json:"kiraSpace.github.enabled,omitempty"`
+	GitHostProvider       *string   `json:"kiraSpace.gitHost.provider,omitempty"`
 	// WorktreePrepareScript is decoded only so repoSettings.set can refuse it (json.Unmarshal drops
 	// unknown keys silently, which would report success). Never written from the wire (P172).
 	WorktreePrepareScript *string `json:"kiraSpace.worktree.prepareScript,omitempty"`

@@ -17,10 +17,9 @@ type GitRepoSettings struct {
 	StashIncludeUntracked bool     `json:"stashIncludeUntracked"`
 	ReviewBaseCandidates  []string `json:"reviewBaseCandidates"`
 	PullStrategy          string   `json:"pullStrategy"`
-	// GithubEnabled is G24 D16's own eighth leaf: off means no gh probe, no spawn, no cache fill, no
-	// badge, no search PR arm, no reaper re-resolve — both commit.resolvePr/branch.resolvePr answer
-	// {kind:'disabled'} outright. Genuinely per-repo, default true.
-	GithubEnabled bool `json:"githubEnabled"`
+	// GitHostProvider is "auto" (detect from origin), "off" (no host call, no cache fill, no badge:
+	// lookups answer {kind:'disabled'}) or a provider id. An unknown id behaves as "auto".
+	GitHostProvider string `json:"gitHostProvider"`
 	// WorktreePrepareScript is G25 D10's own ninth leaf (kiraSpace.worktree.prepareScript): one
 	// command-line string, never a path, never an argv array. "" means the feature is off — no
 	// spawn, no shell, ever — the only value this leaf is EVER read from is this table; it must
@@ -52,7 +51,7 @@ func DefaultGitRepoSettings() GitRepoSettings {
 		StashIncludeUntracked:  false,
 		ReviewBaseCandidates:   []string{"main", "master"},
 		PullStrategy:           "auto",
-		GithubEnabled:          true,
+		GitHostProvider:        "auto",
 		WorktreePrepareScript:  "",
 		WorktreePrepareTimeout: DefaultPrepareTimeout,
 		WorktreeBasePath:       "",
@@ -70,7 +69,7 @@ type GitRepoSettingsPatch struct {
 	StashIncludeUntracked *bool     `json:"stashIncludeUntracked,omitempty"`
 	ReviewBaseCandidates  *[]string `json:"reviewBaseCandidates,omitempty"`
 	PullStrategy          *string   `json:"pullStrategy,omitempty"`
-	GithubEnabled         *bool     `json:"githubEnabled,omitempty"`
+	GitHostProvider       *string   `json:"gitHostProvider,omitempty"`
 	// WorktreePrepareScript/WorktreeBasePath: G25 D10's two new leaves.
 	WorktreePrepareScript *string `json:"worktreePrepareScript,omitempty"`
 	WorktreeBasePath      *string `json:"worktreeBasePath,omitempty"`

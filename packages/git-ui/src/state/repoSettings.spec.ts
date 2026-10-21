@@ -14,7 +14,7 @@ function defaultSnapshot(): RepoSettingsSnapshot {
     'kiraSpace.stash.includeUntracked': SETTINGS['kiraSpace.stash.includeUntracked'].default,
     'kiraSpace.review.baseCandidates': SETTINGS['kiraSpace.review.baseCandidates'].default,
     'kiraSpace.pull.strategy': SETTINGS['kiraSpace.pull.strategy'].default,
-    'kiraSpace.github.enabled': SETTINGS['kiraSpace.github.enabled'].default,
+    'kiraSpace.gitHost.provider': SETTINGS['kiraSpace.gitHost.provider'].default,
     'kiraSpace.worktree.prepareScript': SETTINGS['kiraSpace.worktree.prepareScript'].default,
     'kiraSpace.worktree.basePath': SETTINGS['kiraSpace.worktree.basePath'].default,
     'kiraSpace.checkout.autoStash': SETTINGS['kiraSpace.checkout.autoStash'].default,
@@ -85,27 +85,27 @@ describe('RepoSettingsState', () => {
   // G24 D16's own settings round trip: default true, set false, the server's own resulting
   // snapshot is adopted — the same "patch, don't replace" shape every other leaf above already
   // exercises, applied to the eighth key.
-  test('github.enabled round-trips: default true, set false, adopts the result', async () => {
+  test('gitHost.provider round-trips: default auto, set off, adopts the result', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
     const state = new RepoSettingsState(bridge);
-    expect(state.settings.value['kiraSpace.github.enabled']).toBe(true);
+    expect(state.settings.value['kiraSpace.gitHost.provider']).toBe('auto');
 
     transport.onRequest = () => defaultSnapshot();
     state.setRepoId('/repos/a');
     await sleep();
-    expect(state.settings.value['kiraSpace.github.enabled']).toBe(true);
+    expect(state.settings.value['kiraSpace.gitHost.provider']).toBe('auto');
 
     transport.onRequest = (method, params) => {
       expect(method).toBe('repoSettings.set');
       expect(params).toEqual({
         repoId: '/repos/a',
-        patch: { 'kiraSpace.github.enabled': false },
+        patch: { 'kiraSpace.gitHost.provider': 'off' },
       });
-      return { ...defaultSnapshot(), 'kiraSpace.github.enabled': false };
+      return { ...defaultSnapshot(), 'kiraSpace.gitHost.provider': 'off' };
     };
-    await state.set({ 'kiraSpace.github.enabled': false });
-    expect(state.settings.value['kiraSpace.github.enabled']).toBe(false);
+    await state.set({ 'kiraSpace.gitHost.provider': 'off' });
+    expect(state.settings.value['kiraSpace.gitHost.provider']).toBe('off');
     state.dispose();
   });
 

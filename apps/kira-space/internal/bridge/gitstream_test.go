@@ -149,7 +149,7 @@ func TestRepoSettingsSetTouchesRestrictedField_CoversEveryPatchField(t *testing.
 		"StashShowInGraph":      false,
 		"StashIncludeUntracked": false,
 		"ReviewBaseCandidates":  false,
-		"GithubEnabled":         false,
+		"GitHostProvider":       false,
 	}
 
 	patchType := reflect.TypeOf(gitrpc.RepoSettingsPatchWire{})

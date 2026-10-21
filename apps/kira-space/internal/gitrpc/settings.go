@@ -26,7 +26,7 @@ func repoSettingsSnapshotFrom(s model.GitRepoSettings) RepoSettingsSnapshot {
 		StashIncludeUntracked: s.StashIncludeUntracked,
 		ReviewBaseCandidates:  candidates,
 		PullStrategy:          s.PullStrategy,
-		GithubEnabled:         s.GithubEnabled,
+		GitHostProvider:       s.GitHostProvider,
 		WorktreePrepareScript: s.WorktreePrepareScript,
 		WorktreeBasePath:      s.WorktreeBasePath,
 		CheckoutAutoStash:     s.CheckoutAutoStash,
@@ -55,7 +55,7 @@ func (p RepoSettingsPatchWire) toModel() model.GitRepoSettingsPatch {
 		StashIncludeUntracked: p.StashIncludeUntracked,
 		ReviewBaseCandidates:  p.ReviewBaseCandidates,
 		PullStrategy:          p.PullStrategy,
-		GithubEnabled:         p.GithubEnabled,
+		GitHostProvider:       p.GitHostProvider,
 		WorktreeBasePath:      worktreeBasePath,
 		CheckoutAutoStash:     p.CheckoutAutoStash,
 	}
