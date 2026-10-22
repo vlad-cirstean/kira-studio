@@ -587,7 +587,7 @@ func TestPostmanImportCollectionAndEnvironment(t *testing.T) {
 	var kinds []string
 	for _, c := range apiChanges(t, app, mark) {
 		for _, ch := range c {
-			kinds = append(kinds, string(ch.Kind))
+			kinds = append(kinds, ch.Kind)
 		}
 	}
 	sort.Strings(kinds)
