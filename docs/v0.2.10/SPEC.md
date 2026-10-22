@@ -18,3 +18,7 @@ First phase `P322` (highest in `docs/HISTORY.md` is `P321`). Branch `v0.2.10`. P
 ### P322
 
 Added `llmprompts.RequireNonEmpty` (minLength/minItems). Wrapped 16 tool schemas: 5 dbmcp, 6 agentmcp, 5 memory. `run_query`/`explain_query` `path` now schema-required; handler refuses empty path on postgres, mysql, mariadb, mongodb. `finish_step` refuses empty `reason` on not-ok or `needs_input`. Flow test asserts the schema rejection over HTTP. Budgets raised: `dbmcp.instructions` 1500, `finish_step` reason 80. Real `claude` tests not run.
+
+### P323
+
+Approval dialog now `2xl` fixed-height. New `ApprovalStatement.vue`: read-only `MonacoHost` (new `forceWrap` prop), `formatConsoleText` via `computedAsync` (worker over `INLINE_CHARS`), Formatted / As sent toggle hidden when nothing formats. `consoleLanguageFor` moved to `format.ts`. Deny keeps initial focus via `data-dialog-initial`. UI specs `dbmcp-approval`, `copy-coverage`, `prompts` pass.

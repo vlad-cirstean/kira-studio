@@ -2632,6 +2632,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - A client disconnect stops the approval wait via ctx, with no external expiry ticker.
 - The approval UI is workbench/DbMcpApprovalDialog.vue, an always-mounted modal at App.vue's root, beside Studio's other always-mounted dialogs such as ConnectionDialog, DataGripImportDialog, ApiDialogs and ConfirmDialog.
 - The shared packages/workbench/src/components/ConfirmDialog.vue cites DbMcpApprovalDialog's teleport-ordering precedent in its own comment.
+- The dialog shows the statement in a read-only MonacoHost (ApprovalStatement.vue), formatted by formatConsoleText, with an "As sent" toggle for the verbatim text. Word wrap is always on, so no clause sits off screen.
 - An approval prompt's Reason is either "permission" or "heavy". At most one prompt is raised per call when both apply; the stricter reason (permission) wins the label, and the plan evidence rides along.
 
 ### EXPLAIN (M3)
