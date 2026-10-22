@@ -30,7 +30,9 @@ export function useKeyValueActions(
   );
 
   // A reload leaves a staged draft and the published cell stale: a later Save could overwrite newer data.
+  let selectedRow: number | null = null;
   watch(gate.page, () => {
+    selectedRow = null;
     objectDraft.value = null;
     objectSave.error.value = null;
     cellSelectionStore.clearSelectedCellFor(viewKey());
@@ -38,6 +40,10 @@ export function useKeyValueActions(
 
   async function saveObjectEdit(): Promise<void> {
     if (objectDraft.value === null || !gate.keyName.value) return;
+    if (gate.stale.value) {
+      objectSave.error.value = t('studio.common.connectionLost.error');
+      return;
+    }
     if (await objectSave.run(objectDraft.value)) objectDraft.value = null;
   }
 
@@ -47,6 +53,7 @@ export function useKeyValueActions(
     const p = gate.page.value;
     const h = gate.host.value;
     if (!row || !p) return;
+    selectedRow = i;
     const column: ColumnDescriptor = {
       name: p.redisType === 'string' ? 'value' : row.field,
       dataType: p.redisType === 'object' ? 's3 object field' : `redis ${p.redisType}`,
@@ -67,6 +74,7 @@ export function useKeyValueActions(
       value: row.value,
       truncated: row.isTruncated,
       hasPrimaryKey: true,
+      stale: gate.stale.value,
       ...(isEditableBodyRow
         ? {
             onEdit: (newValue: string) => {
@@ -80,6 +88,11 @@ export function useKeyValueActions(
     };
     cellSelectionStore.publishSelectedCell(selected);
   }
+
+  // Republish the selected row at a drop or reconnect so the dock's Save follows the stale state.
+  watch(gate.stale, () => {
+    if (selectedRow !== null) selectRow(selectedRow);
+  });
 
   function editObjectBody(): void {
     if (!gate.objectEditGate.value.editable) return;
@@ -111,6 +124,10 @@ export function useKeyValueActions(
       tone: 'danger',
     });
     if (!confirmed) return;
+    if (gate.stale.value) {
+      keyValueViewStore.setActionError(viewKey(), t('studio.common.connectionLost.error'));
+      return;
+    }
     const h = gate.host.value;
     if (!h?.connectionId) return;
     try {
@@ -137,7 +154,7 @@ export function useKeyValueActions(
   function onUpload(): void {
     const h = gate.host.value;
     if (h?.connectionId)
-      objectStoreStore.openUploadDialog(h.connectionId, pathParent(h.path) ?? '');
+      objectStoreStore.openUploadDialog(h.connectionId, pathParent(h.path) ?? '', h.gateTabId);
   }
 
   return {

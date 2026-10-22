@@ -9,6 +9,8 @@ import { useTabsStore } from '../../../state/tabs';
 // non-tab viewKey (BrowseView.vue's own `${tab.id}::preview`) registers one explicitly, backed by
 // its own runtime fields (browse/state.ts).
 export interface KeyValueHost {
+  /** Tab whose reconnect gate and stale stamp govern this view: itself, or the owning browse tab. */
+  gateTabId: string;
   connectionId: string | null;
   path: string;
   pageIndex: number;
@@ -35,6 +37,7 @@ function resolveTabHost(viewKey: string): KeyValueHost | null {
   const tab = tabsStore.findKeyValueTab(viewKey);
   if (!tab) return null;
   return {
+    gateTabId: viewKey,
     connectionId: tab.connectionId,
     path: tab.path,
     pageIndex: tab.state.pageIndex,

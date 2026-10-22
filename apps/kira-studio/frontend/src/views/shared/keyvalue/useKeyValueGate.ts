@@ -38,9 +38,18 @@ export function useKeyValueGate(viewKey: () => string) {
   const targetTail = computed(() => pathTail(host.value?.path ?? ''));
   const keyName = computed(() => targetTail.value?.name ?? '');
 
-  const canUpdate = computed(() => !!caps.value?.canUpdate && !connRecord.value?.readOnly);
-  const canDelete = computed(() => !!caps.value?.canDelete && !connRecord.value?.readOnly);
-  const canInsert = computed(() => !!caps.value?.canInsert && !connRecord.value?.readOnly);
+  // Shown page outlived its connection: kept, read-only, behind StaleDataStrip.
+  const stale = computed(() => keyValueViewStore.isStale(viewKey()));
+
+  const canUpdate = computed(
+    () => !!caps.value?.canUpdate && !connRecord.value?.readOnly && !stale.value,
+  );
+  const canDelete = computed(
+    () => !!caps.value?.canDelete && !connRecord.value?.readOnly && !stale.value,
+  );
+  const canInsert = computed(
+    () => !!caps.value?.canInsert && !connRecord.value?.readOnly && !stale.value,
+  );
   const canDownload = computed(() => !!caps.value?.fileTransfer);
 
   // An S3 object page lists exactly what read.ts pushed; there is nothing to paginate.
@@ -66,8 +75,11 @@ export function useKeyValueGate(viewKey: () => string) {
   });
 
   const objectEditGate = computed<ObjectEditGate>(() => {
+    if (stale.value) {
+      return { editable: false, reason: t('studio.common.connectionLost.tooltip') };
+    }
     if (!canUpdate.value) {
-      return { editable: false, reason: writeDisabledReason(caps.value?.canUpdate) };
+      return { editable: false, reason: writeDisabledReason(caps.value?.canUpdate, stale.value) };
     }
     const bodyRow = objectBodyRow.value;
     if (bodyRow === null) {
@@ -94,7 +106,7 @@ export function useKeyValueGate(viewKey: () => string) {
 
   const editTitle = computed(() => {
     if (isSingleObjectPage.value) return objectEditGate.value.reason;
-    if (!canUpdate.value) return writeDisabledReason(caps.value?.canUpdate);
+    if (!canUpdate.value) return writeDisabledReason(caps.value?.canUpdate, stale.value);
     if (!editableType.value) return t('studio.keyValue.editTypeUnsupported.tooltip');
     return t('studio.keyValue.editValue.label');
   });
@@ -104,13 +116,13 @@ export function useKeyValueGate(viewKey: () => string) {
       : !canUpdate.value || !editableType.value,
   );
   const addTitle = computed(() => {
-    if (!canInsert.value) return writeDisabledReason(caps.value?.canInsert);
+    if (!canInsert.value) return writeDisabledReason(caps.value?.canInsert, stale.value);
     return t(
       isSingleObjectPage.value ? 'studio.keyValue.upload.tooltip' : 'studio.keyValue.add.tooltip',
     );
   });
   const deleteTitle = computed(() => {
-    if (!canDelete.value) return writeDisabledReason(caps.value?.canDelete);
+    if (!canDelete.value) return writeDisabledReason(caps.value?.canDelete, stale.value);
     return t(
       isSingleObjectPage.value
         ? 'studio.keyValue.deleteObject.tooltip'
@@ -127,6 +139,7 @@ export function useKeyValueGate(viewKey: () => string) {
     host,
     rt,
     page,
+    stale,
     connRecord,
     targetTail,
     keyName,

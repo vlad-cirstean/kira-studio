@@ -21,6 +21,7 @@ import type { KeyValueTabRecord } from '../../../state/tabDomain';
 import EngineIcon from '../../../theme/EngineIcon.vue';
 import CellEditorDock from '../celleditor/CellEditorDock.vue';
 import { usePublishEditDirty } from '../editDirty';
+import StaleDataStrip from '../StaleDataStrip.vue';
 import { refreshOrReconnect, useConnectionGate } from '../useConnectionGate';
 import KeyValueRowsTable from './KeyValueRowsTable.vue';
 import KeyValueToolbar from './KeyValueToolbar.vue';
@@ -185,7 +186,7 @@ onUnmounted(() => {
     <div class="flex flex-1 min-h-0 flex-col">
       <div class="flex min-h-0 flex-1 flex-col">
         <EmptyState
-          v-if="needsReconnect"
+          v-if="needsReconnect && !gate.page.value"
           data-testid="keyvalue-reconnect"
           icon="plug"
           :title="t('studio.common.disconnected.empty')"
@@ -201,6 +202,12 @@ onUnmounted(() => {
           </Button>
         </EmptyState>
         <template v-else>
+          <StaleDataStrip
+            v-if="tab && gate.stale.value"
+            testid="keyvalue-stale"
+            :reconnecting="reconnecting"
+            @reconnect="onReconnectAndLoad"
+          />
           <KeyValueToolbar
             ref="toolbar"
             :view-key="viewKey"
@@ -252,6 +259,7 @@ onUnmounted(() => {
                 size="kira"
                 data-testid="keyvalue-object-edit-save"
                 :pending="actions.objectSaving.value"
+                :disabled="gate.stale.value"
                 @click="actions.saveObjectEdit"
               >
                 {{ t('common.action.save.label') }}

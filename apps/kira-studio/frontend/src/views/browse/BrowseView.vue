@@ -40,7 +40,9 @@ import {
   unregisterKeyValueHost,
 } from '../shared/keyvalue/host';
 import KeyValuePane from '../shared/keyvalue/KeyValuePane.vue';
+import StaleDataStrip from '../shared/StaleDataStrip.vue';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
+import { writeDisabledReason } from '../shared/writeGate';
 import { menuForNode } from './menu';
 import { useBrowseViewStore } from './state';
 
@@ -61,6 +63,11 @@ const { needsReconnect, reconnecting, onReconnectAndLoad } = useConnectionGate(
 
 const rt = computed(() => browseViewStore.runtime[props.tab.id]);
 const loading = computed(() => rt.value?.status === 'loading');
+
+// Shown level outlived its connection: kept, read-only, behind StaleDataStrip.
+const stale = computed(() => browseViewStore.isStale(props.tab.id));
+const hasNodes = computed(() => (rt.value?.nodes.length ?? 0) > 0);
+const showGate = computed(() => needsReconnect.value && !hasNodes.value);
 
 // P41 D14: '' in session state means "the tab's own container path".
 const currentLevelPath = computed(() =>
@@ -168,6 +175,7 @@ registerKeyValueHost(previewKey, (): KeyValueHost | null => {
   const r = rt.value;
   if (!r?.selected) return null;
   return {
+    gateTabId: props.tab.id,
     connectionId: props.tab.connectionId,
     path: r.selected,
     pageIndex: r.previewPageIndex,
@@ -242,7 +250,7 @@ function onRowKeydown(e: KeyboardEvent, node: TreeNode): void {
 // instead of by tree row.
 function onRowContextMenu(e: MouseEvent, node: TreeNode): void {
   if (!props.tab.connectionId) return;
-  nav.contextMenu(node, e, menuForNode(props.tab.id, props.tab.connectionId, node));
+  nav.contextMenu(node, e, menuForNode(props.tab.id, props.tab.connectionId, node, stale.value));
 }
 
 // P33 D3: the same caps.fileTransfer + canInsert + not-read-only gate uploadMenuItem applies,
@@ -253,9 +261,12 @@ const canUpload = computed(() => {
   const record = connectionsStore.connectionRecord(props.tab.connectionId);
   return !!caps?.fileTransfer && !!caps.canInsert && !record?.readOnly;
 });
+const uploadTitle = computed(() =>
+  stale.value ? writeDisabledReason(true, true) : t('studio.browse.upload.label'),
+);
 function onUploadClick(): void {
-  if (!props.tab.connectionId) return;
-  objectStoreStore.openUploadDialog(props.tab.connectionId, currentLevelPath.value);
+  if (!props.tab.connectionId || stale.value) return;
+  objectStoreStore.openUploadDialog(props.tab.connectionId, currentLevelPath.value, props.tab.id);
 }
 
 const { single: rowHeight } = useRowHeight();
@@ -288,7 +299,7 @@ const nav = useListNavigation<TreeNode>({
     contextMenuStore.openContextMenuAt(
       rect.left,
       rect.bottom,
-      menuForNode(props.tab.id, connectionId, node),
+      menuForNode(props.tab.id, connectionId, node, stale.value),
       { onRestoreFocus: () => void nav.focusKey(node.path) },
     );
   },
@@ -300,7 +311,8 @@ function viaMenu(id: ShortcutId): (path: string) => void {
   return (path) => {
     const connectionId = props.tab.connectionId;
     const node = rt.value?.nodes.find((n) => n.path === path);
-    if (connectionId && node) runMenuShortcut(menuForNode(props.tab.id, connectionId, node), id);
+    if (connectionId && node)
+      runMenuShortcut(menuForNode(props.tab.id, connectionId, node, stale.value), id);
   };
 }
 useTreeShortcuts(nav, {
@@ -367,7 +379,10 @@ onMounted(() => {
       <TooltipIconButton
         v-if="canUpload"
         icon="cloud-upload"
-        :label="t('studio.browse.upload.label')"
+        :label="uploadTitle"
+        :aria-label="t('studio.browse.upload.label')"
+        disabled-trigger
+        :disabled="stale"
         data-testid="browse-upload"
         @click="onUploadClick"
       />
@@ -390,6 +405,12 @@ onMounted(() => {
         /></div
       >
     </div>
+    <StaleDataStrip
+      v-if="stale && !showGate"
+      testid="browse-stale"
+      :reconnecting="reconnecting"
+      @reconnect="onReconnectAndLoad"
+    />
     <Alert
       strip
       v-if="rt?.status === 'error' && rt.error"
@@ -418,7 +439,7 @@ onMounted(() => {
            just the list — a disconnected connection means neither side has anything live to show.
            -->
     <EmptyState
-      v-if="needsReconnect"
+      v-if="showGate"
       data-testid="browse-reconnect"
       icon="plug"
       :title="t('studio.common.disconnected.empty')"

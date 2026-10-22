@@ -52,7 +52,7 @@ async function onOpen(): Promise<void> {
 }
 
 async function onSave(): Promise<void> {
-  if (!(await submit())) return;
+  if (props.disabled || !(await submit())) return;
   if (await run()) open.value = false;
 }
 
@@ -118,6 +118,7 @@ defineExpose({ dirty: computed(() => open.value && (name.value !== '' || value.v
             size="kira-lg"
             data-testid="keyvalue-add-save"
             :pending="pending"
+            :disabled="disabled"
             @click="onSave"
             >{{
               t('common.action.save.label')
