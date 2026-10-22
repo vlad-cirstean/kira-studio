@@ -1,5 +1,5 @@
 import { t } from '@theme/i18n';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import type { StreamTabRecord } from '../../state/tabDomain';
 import { getPage, pageVersion, streamRow } from './page';
@@ -41,11 +41,17 @@ export function useStreamGate(tab: () => StreamTabRecord) {
   // Caps are static per adapter; the connection's read-only flag narrows them here.
   // Shown page outlived its connection: kept, read-only, behind StaleDataStrip.
   const stale = computed(() => streamViewStore.isStale(tab().id));
+  // Caps clear on disconnect; the last live ones keep Send/Delete visible (disabled) behind the strip.
+  const lastCaps = ref(caps.value);
+  watch(caps, (c) => {
+    if (c) lastCaps.value = c;
+  });
+  const shownCaps = computed(() => caps.value ?? lastCaps.value);
   const canInsertCaps = computed(
-    () => (caps.value?.canInsert ?? false) && !connRecord.value?.readOnly,
+    () => (shownCaps.value?.canInsert ?? false) && !connRecord.value?.readOnly,
   );
   const canDeleteCaps = computed(
-    () => (caps.value?.canDelete ?? false) && !connRecord.value?.readOnly,
+    () => (shownCaps.value?.canDelete ?? false) && !connRecord.value?.readOnly,
   );
   const canInsert = computed(() => canInsertCaps.value && !stale.value);
   const canDelete = computed(() => canDeleteCaps.value && !stale.value);
