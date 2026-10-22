@@ -375,7 +375,12 @@ func TestPostmanImportSendExport(t *testing.T) {
 		t.Error("the export carries the secret variable's value")
 	}
 
-	res2, err := app.W.Collections.Import(bridge.CollectionsImportArgs{Paths: []string{exported}})
+	app.Dialogs.QueueOpenFile(exported)
+	again, err := app.W.Files.ChooseOpen(bridge.FilesChooseOpenArgs{})
+	if err != nil || again.File == nil {
+		t.Fatal(err)
+	}
+	res2, err := app.W.Collections.Import(bridge.CollectionsImportArgs{Paths: []string{again.File.Path}})
 	if err != nil || len(res2.Files) != 1 || res2.Files[0].Collection == nil {
 		t.Fatalf("re-import = %+v (%v)", res2, err)
 	}
