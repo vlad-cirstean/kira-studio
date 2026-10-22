@@ -79,19 +79,9 @@ func Options(sec SecurityOptions, w WindowRecord, primaryWorkArea *application.R
 		Name:             w.Key,
 		Permissions:      sec.Permissions,
 		EnableFileDrop:   false,
-		// Deliberately NOT `Frameless: true` — Frameless would hide the traffic-light window
-		// controls (effectiveMacWindowButtonStates) and oblige the app to draw its own, which
-		// the custom title bar (TitleBar.vue) never asked for. Both `MacTitleBarHidden` and
-		// `MacTitleBarHiddenInset` keep AppKit's controls with `FullSizeContent: true` — the
-		// Electron `titleBarStyle: 'hidden'`/`'hiddenInset'` shape this design wants — but only
-		// `Hidden` has `UseToolbar: false`. `HiddenInset`'s `UseToolbar: true` was the
-		// source of this session's whole title-bar saga: it puts AppKit into its NSToolbar-based
-		// unified-title-bar layout, which reserves noticeably more vertical space for the
-		// traffic-light cluster than this app's own CSS bar assumed — no CSS height this app
-		// picked, 28px through 36px, ever matched it, because the mismatch was never a
-		// wrong number, it was the wrong layout mode entirely. Hidden's plain (non-toolbar) title
-		// bar uses the standard macOS title-bar height instead, which is what
-		// theme/tokens.css's `--kira-titlebar-h` is now sized to match.
+		// Not `Frameless`: it hides the traffic-light controls and the app would draw its own.
+		// `UseToolbar` with `MacToolbarStyleUnifiedCompact` gives the compact unified title bar
+		// that `--kira-titlebar-h` (theme/tokens.css) is sized to match.
 		Mac: application.MacWindow{
 			WebviewPreferences: sec.Webview,
 			TitleBar: application.MacTitleBar{
