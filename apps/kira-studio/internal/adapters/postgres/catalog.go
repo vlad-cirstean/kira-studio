@@ -150,7 +150,7 @@ func listRelationsAndFunctions(ctx context.Context, exec queryExec, databaseSegm
 			var detail *string
 			// Postgres uses -1 for "never analysed" — render nothing, never the raw -1.
 			if (kind == "table" || kind == "matview") && rowEstimate != nil && *rowEstimate >= 0 {
-				d := "~" + adapters.AbbreviateCount(*rowEstimate) + " rows"
+				d := "~" + adapters.AbbreviateCount(*rowEstimate)
 				detail = &d
 			}
 			nodes = append(nodes, model.TreeNode{

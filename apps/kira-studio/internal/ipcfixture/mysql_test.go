@@ -59,7 +59,7 @@ func TestFixture_MySQL(t *testing.T) {
 	// sampled estimate, confirmed to differ between separate, identically-seeded containers for
 	// the million-row table — frozen for the fixture; every other table's estimate is exact.
 	rec.OverrideLastControlResponse(tree.ChildrenResult{
-		Nodes: FreezeNodeDetail(dbChildren.Nodes, "big_rows", "~1M rows"), Source: dbChildren.Source, Truncated: dbChildren.Truncated,
+		Nodes: FreezeNodeDetail(dbChildren.Nodes, "big_rows", "~1M"), Source: dbChildren.Source, Truncated: dbChildren.Truncated,
 	})
 	orderItemsNode := nodeByName(dbChildren.Nodes, "order_items")
 	if orderItemsNode == nil {

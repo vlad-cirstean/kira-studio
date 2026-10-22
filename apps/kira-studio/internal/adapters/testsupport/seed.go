@@ -28,7 +28,7 @@ const bigRowsCount = 1_000_000
 // seedBigRows is postgres.ts's start()'s own big_rows population step: filling app.big_rows (an
 // empty table by the time seedDatabase returns — its CREATE TABLE is the only statement the seed
 // SQL itself carries for it) with a million rows and ANALYZE-ing it, so reltuples is populated for
-// the tree's own "~N rows" detail and the table has real data for the paging acceptance cases.
+// the tree's own "~N" detail and the table has real data for the paging acceptance cases.
 func seedBigRows(ctx context.Context, uri string) error {
 	conn, err := pgx.Connect(ctx, uri)
 	if err != nil {

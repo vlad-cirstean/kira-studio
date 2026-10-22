@@ -177,7 +177,7 @@ const APP_CHILDREN_WITH_SCROLL_GRID = (() => {
     name: 'scroll_grid',
     path: SCROLL_GRID_PATH,
     hasChildren: false,
-    detail: '~5K rows',
+    detail: '~5K',
   });
   return withScrollGrid;
 })();

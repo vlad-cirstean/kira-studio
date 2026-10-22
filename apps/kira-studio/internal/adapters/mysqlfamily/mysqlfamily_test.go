@@ -129,7 +129,7 @@ func TestMySQL(t *testing.T) {
 	runFamilySuite(t, "mysql", fixture.Config, testsupport.VersionPattern("MySQL", testsupport.MysqlServerMajor()))
 }
 
-var bigRowsDetail = regexp.MustCompile(`^~[\d.]+[A-Za-z]* rows$`)
+var bigRowsDetail = regexp.MustCompile(`^~[\d.]+[A-Za-z]*$`)
 
 // runFamilySuite is the ~27 scenarios packages/db-fixtures/mariadb.spec.ts and packages/db-fixtures/mysql.spec.ts share.
 func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfig, versionRE *regexp.Regexp) {
@@ -385,7 +385,7 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 		for _, n := range objects.Nodes {
 			if n.Name == "big_rows" && (n.Detail == nil || !bigRowsDetail.MatchString(*n.Detail)) {
-				t.Errorf("big_rows detail = %v, want a \"~N rows\" estimate", n.Detail)
+				t.Errorf("big_rows detail = %v, want a \"~N\" estimate", n.Detail)
 			}
 		}
 	})

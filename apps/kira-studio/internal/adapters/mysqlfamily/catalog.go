@@ -118,7 +118,7 @@ func listTablesAndRoutines(ctx context.Context, exec queryExec, database string)
 		}
 		var detail *string
 		if kind == "table" && tableRows != nil {
-			d := "~" + adapters.AbbreviateCount(*tableRows) + " rows"
+			d := "~" + adapters.AbbreviateCount(*tableRows)
 			detail = &d
 		}
 		nodes = append(nodes, model.TreeNode{

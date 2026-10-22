@@ -26,7 +26,7 @@ import (
 
 var (
 	regexpPGVersion = testsupport.VersionPattern("PostgreSQL", testsupport.PostgresServerMajor())
-	bigRowsDetail   = regexp.MustCompile(`^~[\d.]+[A-Za-z]* rows$`)
+	bigRowsDetail   = regexp.MustCompile(`^~[\d.]+[A-Za-z]*$`)
 )
 
 // TestMain is bun:test's own beforeAll/afterAll-per-file precedent (postgres.spec.ts:68-75): the
@@ -444,7 +444,7 @@ func TestPostgres_RowEstimateNeverAnalysed(t *testing.T) {
 			t.Errorf("order_items detail = %q, want nil (never analysed)", *n.Detail)
 		}
 		if n.Name == "big_rows" && (n.Detail == nil || !bigRowsDetail.MatchString(*n.Detail)) {
-			t.Errorf("big_rows detail = %v, want a \"~N rows\" estimate", n.Detail)
+			t.Errorf("big_rows detail = %v, want a \"~N\" estimate", n.Detail)
 		}
 	}
 }

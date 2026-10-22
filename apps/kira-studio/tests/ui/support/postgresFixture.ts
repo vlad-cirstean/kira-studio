@@ -474,7 +474,7 @@ export const APP_CHILDREN = [
     name: 'big_rows',
     path: `${APP_PATH}/table:big_rows`,
     hasChildren: false,
-    detail: '~1M rows',
+    detail: '~1M',
   },
   {
     kind: 'table',
