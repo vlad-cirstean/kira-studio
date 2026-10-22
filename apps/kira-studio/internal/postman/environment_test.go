@@ -23,7 +23,7 @@ func TestParseFile(t *testing.T) {
 		want    *Environment
 		wantCol string
 	}{
-		X, wantErr: "v2.0.0"},
+		{name: "collection v2.0 refused", in: open("v2_0.json"), wantErr: "v2.0.0"},
 		{name: "collection classified", in: open("no_schema.json"), wantCol: "set"},
 		{
 			name: "environment",
