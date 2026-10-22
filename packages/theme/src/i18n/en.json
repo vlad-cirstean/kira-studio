@@ -10477,11 +10477,17 @@
     },
     "dbMcp": {
       "approval": {
+        "asSent": {
+          "option": "As sent"
+        },
         "ddl": {
           "body": "{connection} ({kind}) wants to run a schema-changing (DDL) statement through the database MCP server."
         },
         "estimate": {
           "body": "Estimated {count} row read, threshold {threshold}. | Estimated {count} rows read, threshold {threshold}."
+        },
+        "formatted": {
+          "option": "Formatted"
         },
         "heavy": {
           "body": "{connection} ({kind}) wants to run a query estimated to read {count} row, over your threshold of {threshold}. | {connection} ({kind}) wants to run a query estimated to read {count} rows, over your threshold of {threshold}."
@@ -10491,6 +10497,9 @@
         },
         "read": {
           "body": "{connection} ({kind}) wants to run a read statement through the database MCP server."
+        },
+        "statementView": {
+          "aria": "Statement view"
         },
         "unknown": {
           "body": "{connection} ({kind}) wants to run a statement this app couldn’t classify through the database MCP server."
