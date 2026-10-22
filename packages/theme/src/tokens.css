@@ -96,7 +96,7 @@
      --kira-bar-h — each bar can diverge later by pointing its own token at a literal
      instead, without touching the others. */
   --kira-bar-h: 34px;
-  --kira-titlebar-h: var(--kira-bar-h);
+  --kira-titlebar-h: 38px;
   --kira-tabbar-h: var(--kira-bar-h);
   --kira-statusbar-h: 20px;
   --kira-titlebar-inset-left: 78px;

@@ -94,7 +94,14 @@ func Options(sec SecurityOptions, w WindowRecord, primaryWorkArea *application.R
 		// theme/tokens.css's `--kira-titlebar-h` is now sized to match.
 		Mac: application.MacWindow{
 			WebviewPreferences: sec.Webview,
-			TitleBar:           application.MacTitleBarHidden,
+			TitleBar: application.MacTitleBar{
+				AppearsTransparent:   true,
+				HideTitle:            true,
+				FullSizeContent:      true,
+				UseToolbar:           true,
+				HideToolbarSeparator: true,
+				ToolbarStyle:         application.MacToolbarStyleUnifiedCompact,
+			},
 		},
 	}
 
