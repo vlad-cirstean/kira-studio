@@ -1,6 +1,7 @@
 import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import { expect, test } from './fixtures';
 import { contract } from './support/contract';
+import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
 // Contract dbmcp. Backend half: dbmcpflow TestDbMcpApprovalFlow. A write from an AI client parks on
@@ -25,9 +26,14 @@ test('contract: a pending write shows its statement and Approve answers by reque
   });
 
   await emitPrompts(page, [routed('dbmcp', snap.pending.requestId)]);
-  await expect(page.locator('[data-testid="db-mcp-approval-statement"]')).toContainText(
-    snap.pending.statement,
-  );
+  const statement = page.locator('[data-testid="db-mcp-approval-statement"]');
+  const formatted = await editorText(statement);
+  expect(formatted).toContain('\n');
+  expect(formatted.replace(/\s+/g, ' ').trim()).toBe(snap.pending.statement);
+  await page.click('[data-testid="db-mcp-approval-view-as-sent"]');
+  await expect.poll(() => editorText(statement)).toBe(snap.pending.statement);
+  const box = await page.locator('[data-testid="db-mcp-approval-dialog"]').boundingBox();
+  expect(box?.width).toBeGreaterThan(600);
   await page.click('[data-testid="db-mcp-approval-approve"]');
   await expect
     .poll(() => control.log().find((e) => e.channel === IPC.dbMcpApproveQuery)?.args)
