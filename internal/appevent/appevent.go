@@ -60,7 +60,9 @@ const (
 	ChannelCodeSearch             = "kira:code:search"
 	// The seven below are P116's own hoist — Kira Studio's native-menu/window-chrome channels that
 	// Kira Space now wires too (window-chrome-parity G1-G5/G7), byte-identical strings on both sides.
-	ChannelOpenSettings       = "kira:menu:openSettings"
+	ChannelOpenSettings = "kira:menu:openSettings"
+	// P328: App menu > Check for Updates…, shared by both apps via shell.AppMenuHead.
+	ChannelCheckForUpdates    = "kira:menu:checkForUpdates"
 	ChannelToggleProjectPanel = "kira:menu:toggleProjectPanel"
 	ChannelTabNext            = "kira:menu:tabNext"
 	ChannelTabPrev            = "kira:menu:tabPrev"

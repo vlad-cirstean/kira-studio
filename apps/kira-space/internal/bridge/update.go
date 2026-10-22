@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
@@ -9,7 +10,7 @@ import (
 
 // UpdateStatus is the whole wire shape. It deliberately carries no URL and no error string: the
 // renderer never supplies or receives a URL (internal/appupdate's own security note), and a
-// failed check is silence, not a surface. InstallLogPath is a display path only, read by the
+// failed poll is silence, not a surface (Check reports one). InstallLogPath is a display path only, read by the
 // in-app dialog on a failed install — never sent back as, or accepted as, a URL.
 type UpdateStatus struct {
 	UpdateAvailable bool   `json:"updateAvailable"`
@@ -18,10 +19,10 @@ type UpdateStatus struct {
 	InstallLogPath  string `json:"installLogPath"`
 }
 
-// UpdateService is P119's whole surface: Status (polled by the renderer), InstallUpdate (the
-// dialog's Update button) and CancelInstall (its Cancel button while installing) — Kira Studio's
-// own bridge.UpdateService, identical body (Go's internal/ rule keeps this a copy, not a shared
-// type).
+// UpdateService is P119's whole surface: Status (polled by the renderer), Check (the menu's
+// forced check), InstallUpdate (the dialog's Update button) and CancelInstall (its Cancel button
+// while installing) — Kira Studio's own bridge.UpdateService, identical body (Go's internal/ rule
+// keeps this a copy, not a shared type).
 type UpdateService struct {
 	Checker   *appupdate.Checker
 	Installer *appupdate.Installer
@@ -44,7 +45,20 @@ func (s *UpdateService) Status(ctx context.Context) (UpdateStatus, error) {
 	return toWireUpdateStatus(s.Checker.Status(ctx), s.Installer.DisplayLogPath()), nil
 }
 
-// InstallUpdate re-checks availability (cached — no forced fetch), stages the update through the
+// Check fetches now, bypassing the cache, and reports a failed check, which Status keeps silent.
+// A dev build has nothing to compare against, so it answers the not-a-release-build error.
+func (s *UpdateService) Check(ctx context.Context) (UpdateStatus, error) {
+	res, err := s.Checker.Check(ctx)
+	switch {
+	case errors.Is(err, appupdate.ErrNotReleaseBuild):
+		return UpdateStatus{}, ipcerr.T(ipcerr.CodeConflict, "backend.core.appUpdate.notRelease.body", nil)
+	case err != nil:
+		return UpdateStatus{}, ipcerr.T(ipcerr.CodeUnavailable, "backend.core.appUpdate.checkFailed.body", map[string]string{"cause": err.Error()})
+	}
+	return toWireUpdateStatus(res, s.Installer.DisplayLogPath()), nil
+}
+
+// InstallUpdate re-checks availability (cached; Check is the forced fetch), stages the update through the
 // detached installer, then quits so the installer can swap the bundle into place. A dev build's
 // Status is never UpdateAvailable, so a dev build can never reach Stage.
 func (s *UpdateService) InstallUpdate(ctx context.Context) error {

@@ -7,6 +7,7 @@ import type { VariableScope } from '../domain/variables';
  *  `kira:engine:state` and `kira:port` are absent — both are dead channels retired by D6/D3. */
 export const CHANNEL = {
   openSettings: 'kira:menu:openSettings',
+  checkForUpdates: 'kira:menu:checkForUpdates',
   newConnection: 'kira:menu:newConnection',
   newRequest: 'kira:menu:newRequest',
   importPostman: 'kira:menu:importPostman',

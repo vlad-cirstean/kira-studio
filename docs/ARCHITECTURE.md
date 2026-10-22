@@ -193,7 +193,7 @@ whatever sandbox a session happens to be in),
 - The forwarding interim rule held only while a Node-served kind could exist beside a Go-native one; P58f M10 deleted that seam along with the Node engine child.
 - The renderer must load no remote content, open no window, and navigate nowhere but its own base URL. Under Wails only the code-level half holds: the renderer contains no such call, but no navigation policy is left to stop one (Electron's shell also enforced it).
 - The shell can open a second window via Window → New Window (⇧⌘N, P8), but only from a Go-side menu command, never from a renderer-initiated call; JavaScriptCanOpenWindowsAutomatically is Disabled and the renderer never calls window.open or an equivalent.
-- P66/P119 update-availability check and install are Go-side: internal/appupdate fetches GitHub release metadata itself, and InstallUpdate stages the update through its own detached installer. The renderer calls only two nullary methods (Status, InstallUpdate) and sends or receives no URL.
+- P66/P119 update-availability check and install are Go-side: internal/appupdate fetches GitHub release metadata itself, and InstallUpdate stages the update through its own detached installer. The renderer calls only nullary methods (Status, Check, InstallUpdate, CancelInstall) and sends or receives no URL. Check bypasses the cache and surfaces a failed check; a poll keeps failure silent.
 
 ## Adapter contract
 
@@ -1542,7 +1542,7 @@ packaged app does not), where the identical application code runs unchanged over
 - The install script prints 'staged <dmg path>' to fd 3 and closes it once the disk image is mounted and copying has started. Stage reads that line and returns, and the app quits only then, because the swap into /Applications needs the app's bundle closed. The script then waits for the pid to exit, replaces the bundle, relaunches, and cleans up.
 - Cancel (effective only while idle before hand-off) and the 15-minute backstop timeout signal the whole process group via internal/procgroup.Kill, never just the script's pid, so children like hdiutil and cp are not orphaned.
 - Every install run appends to ~/Library/Logs/<app name>/install.log, truncated once past 1 MiB, and UpdateStatus.installLogPath gives the dialog this path to show on a failed install.
-- The renderer never sends or receives a URL: UpdateService.Status, InstallUpdate and CancelInstall are all nullary, and Go decides where the script comes from and what it does.
+- The renderer never sends or receives a URL: UpdateService.Status, Check, InstallUpdate and CancelInstall are all nullary, and Go decides where the script comes from and what it does.
 - scripts/verify-packaging.sh check S10 (scoped to apps/, packages/, internal/) enforces that no app code downloads a release asset itself, and only scripts/install.sh may. S11 pins the one raw.githubusercontent.com reference and the two sides' shared contract marker.
 - Self-update runs a shell script downloaded at click time with the user's privileges from the main branch of a public repo, so anyone who can push to main can change what every user's Update click runs. Branch protection on main is therefore a security boundary; TLS and the contract marker guard transport and compatibility, not authorship.
 

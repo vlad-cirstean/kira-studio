@@ -508,6 +508,9 @@
         "canceled": {
           "body": "The update was cancelled."
         },
+        "checkFailed": {
+          "body": "Couldn’t check for updates ({cause})."
+        },
         "downloadFailed": {
           "body": "Couldn’t download the installer ({cause})."
         },
@@ -856,6 +859,9 @@
       }
     },
     "menu": {
+      "checkForUpdates": {
+        "label": "Check for Updates…"
+      },
       "closeTab": {
         "label": "Close Tab"
       },
@@ -1807,6 +1813,9 @@
       },
       "cancel": {
         "label": "Cancel"
+      },
+      "checkForUpdates": {
+        "label": "Check for updates"
       },
       "checkOut": {
         "label": "Check out"
@@ -13358,6 +13367,9 @@
         "label": "Update {version}",
         "tooltip": "Version {latest} is available (you have {current})"
       },
+      "checking": {
+        "status": "Checking for updates…"
+      },
       "dialog": {
         "title": "{app} update"
       },
@@ -13372,6 +13384,9 @@
       },
       "installing": {
         "body": "Downloading and verifying {app} {version}. {app} quits once the new version is ready."
+      },
+      "upToDate": {
+        "body": "{app} {current} is the latest version."
       },
       "versions": {
         "body": "{app} {latest} is available. You have {current}."

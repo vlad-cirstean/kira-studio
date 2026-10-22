@@ -15,6 +15,7 @@ import (
 // under their own names here so no call site anywhere in this package has to change.
 const (
 	ChannelOpenSettings           = appevent.ChannelOpenSettings
+	ChannelCheckForUpdates        = appevent.ChannelCheckForUpdates
 	ChannelNewConnection          = "kira:menu:newConnection"
 	ChannelNewRequest             = "kira:menu:newRequest"
 	ChannelImportPostman          = "kira:menu:importPostman"

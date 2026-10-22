@@ -1,6 +1,7 @@
 import { t } from '@theme/i18n';
 import { runCommand } from '@workbench/shortcuts/commands';
 import type { PaletteCommand } from '@workbench/shortcuts/palette';
+import { useAppUpdateStore } from '../state/appUpdate';
 import { useLayoutStore } from '../state/layout';
 import { useSettingsStore } from '../state/settings';
 import { useTabsStore } from '../state/tabs';
@@ -10,8 +11,14 @@ export function spacePaletteCommands(): () => PaletteCommand[] {
   const layoutStore = useLayoutStore();
   const tabsStore = useTabsStore();
   const settingsStore = useSettingsStore();
+  const appUpdateStore = useAppUpdateStore();
 
   return () => [
+    {
+      id: 'check-for-updates',
+      label: t('common.action.checkForUpdates.label'),
+      run: () => void appUpdateStore.checkForUpdates(),
+    },
     {
       id: 'open-settings',
       label: t('common.action.openSettings.label'),

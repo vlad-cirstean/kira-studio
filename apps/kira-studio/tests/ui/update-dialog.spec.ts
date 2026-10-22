@@ -1,6 +1,8 @@
+import { CHANNEL } from '@shared/protocol/events';
 import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 
 // The status-bar update-available item and the modal update dialog it opens, replacing
 // the update-banner (release-page-link) behavior. Default boot answers "no update"
@@ -112,4 +114,60 @@ test('a failed install shows the error and re-enables Try again', async ({ relau
   const install = window.locator('[data-testid="update-dialog-install"]');
   await expect(install).toBeEnabled();
   await expect(install).toHaveText('Retry');
+});
+
+test('menu check, up to date: shows the latest-version text, Close closes', async ({ kira }) => {
+  const { window } = kira;
+
+  await emitWailsEvent(window, CHANNEL.checkForUpdates, undefined);
+
+  await expect(window.locator('[data-testid="update-dialog-up-to-date"]')).toHaveText(
+    'Kira Studio 0.0.0-dev is the latest version.',
+  );
+  await window.click('[data-testid="update-dialog-close"]');
+  await expect(window.locator('[data-testid="update-dialog"]')).toHaveCount(0);
+});
+
+test('menu check failing shows the error, Retry checks again', async ({ relaunch }) => {
+  const { window, control } = await relaunch({
+    control: [
+      {
+        channel: IPC.updateCheck,
+        error: { code: 'E_CONFLICT', message: 'Updates are available only in release builds.' },
+      },
+    ],
+  });
+
+  await emitWailsEvent(window, CHANNEL.checkForUpdates, undefined);
+
+  const error = window.locator('[data-testid="update-dialog-check-error"]');
+  await expect(error).toContainText('Updates are available only in release builds.');
+  await window.click('[data-testid="update-dialog-retry"]');
+  await expect
+    .poll(() => control.log().filter((e) => e.channel === IPC.updateCheck).length)
+    .toBe(2);
+});
+
+test('menu check finding an update shows it without a second popup', async ({ relaunch }) => {
+  const { window, control } = await relaunch({
+    control: [
+      {
+        channel: IPC.updateCheck,
+        response: {
+          updateAvailable: true,
+          currentVersion: '1.2.0',
+          latestVersion: '1.3.0',
+          installLogPath: '/tmp/kira-studio-update.log',
+        },
+      },
+    ],
+  });
+
+  await emitWailsEvent(window, CHANNEL.checkForUpdates, undefined);
+
+  await expect(window.locator('[data-testid="update-dialog-versions"]')).toHaveText(
+    'Kira Studio 1.3.0 is available. You have 1.2.0.',
+  );
+  await expect(window.locator('[data-testid="update-dialog-install"]')).toBeVisible();
+  expect(control.log().some((e) => e.channel === IPC.promptsRaise)).toBe(false);
 });

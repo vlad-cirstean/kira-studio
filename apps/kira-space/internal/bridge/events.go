@@ -75,6 +75,7 @@ const (
 // channels of the same name, hoisted to repo-root internal/appevent.
 const (
 	ChannelOpenSettings       = appevent.ChannelOpenSettings
+	ChannelCheckForUpdates    = appevent.ChannelCheckForUpdates
 	ChannelToggleProjectPanel = appevent.ChannelToggleProjectPanel
 	ChannelTabNext            = appevent.ChannelTabNext
 	ChannelTabPrev            = appevent.ChannelTabPrev

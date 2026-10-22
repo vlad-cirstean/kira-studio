@@ -22,10 +22,13 @@ import type { AppUpdateStore } from '../state/createAppUpdateStore';
 // only ever exists while open.
 const props = defineProps<{ store: AppUpdateStore }>();
 
-type DialogState = 'idle' | 'installing' | 'error';
+type DialogState = 'idle' | 'installing' | 'checking' | 'checkFailed' | 'upToDate' | 'error';
 
 const state = computed<DialogState>(() => {
   if (props.store.installing) return 'installing';
+  if (props.store.checking) return 'checking';
+  if (props.store.checkError) return 'checkFailed';
+  if (props.store.checkRequested && !props.store.available) return 'upToDate';
   if (props.store.installError) return 'error';
   return 'idle';
 });
@@ -66,6 +69,23 @@ function onEscapeOrOutside(e: Event): void {
             }}
           </p>
         </template>
+        <p
+          v-else-if="state === 'checking'"
+          class="m-0 flex items-center gap-2"
+          role="status"
+          data-testid="update-dialog-checking"
+        >
+          <Spinner :size="13" label="" />
+          {{ t('workbench.update.checking.status') }}
+        </p>
+        <FieldError v-else-if="state === 'checkFailed'" data-testid="update-dialog-check-error">
+          {{ store.checkError }}
+        </FieldError>
+        <p v-else-if="state === 'upToDate'" class="m-0" data-testid="update-dialog-up-to-date">
+          {{
+            t('workbench.update.upToDate.body', { app: store.appName, current: store.currentVersion })
+          }}
+        </p>
         <template v-else>
           <p class="m-0" data-testid="update-dialog-versions">
             {{
@@ -93,6 +113,35 @@ function onEscapeOrOutside(e: Event): void {
             @click="store.cancelInstall()"
           >
             {{ t('common.action.cancel.label') }}
+          </Button>
+        </template>
+        <template v-else-if="state === 'checking'" />
+        <template v-else-if="state === 'checkFailed'">
+          <Button
+            variant="dialog"
+            size="kira-lg"
+            data-testid="update-dialog-close"
+            @click="store.later()"
+          >
+            {{ t('common.action.close.label') }}
+          </Button>
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="update-dialog-retry"
+            @click="store.checkForUpdates()"
+          >
+            {{ t('common.action.retry.label') }}
+          </Button>
+        </template>
+        <template v-else-if="state === 'upToDate'">
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="update-dialog-close"
+            @click="store.later()"
+          >
+            {{ t('common.action.close.label') }}
           </Button>
         </template>
         <template v-else>
