@@ -49,6 +49,10 @@ export const opLogRecordSchema = /*#__PURE__*/ z.object({
 });
 export type OpLogRecord = z.infer<typeof opLogRecordSchema>;
 
+// P328: who started the op — the user through the UI, or an MCP client's tool call.
+export const opSourceSchema = /*#__PURE__*/ z.enum(['user', 'mcp']);
+export type OpSource = z.infer<typeof opSourceSchema>;
+
 export const opRecordSchema = /*#__PURE__*/ opLogRecordSchema.extend({
   connectionId: z.string().nullable(),
   tabId: z.string().nullable(),
@@ -66,5 +70,6 @@ export const opRecordSchema = /*#__PURE__*/ opLogRecordSchema.extend({
   path: z.string().nullable().optional(),
   // P307 Part 2: a preconnect op's configured wait in ms (live only, absent otherwise).
   delayMs: z.number().optional(),
+  source: opSourceSchema,
 });
 export type OpRecord = z.infer<typeof opRecordSchema>;
