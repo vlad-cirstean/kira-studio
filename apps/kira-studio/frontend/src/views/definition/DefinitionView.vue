@@ -31,6 +31,7 @@ import ResponseFindBar, {
   type FindBarHost,
   type FindBarTarget,
 } from '../shared/ResponseFindBar.vue';
+import StaleDataStrip from '../shared/StaleDataStrip.vue';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import ColumnsSection from './ColumnsSection.vue';
@@ -55,6 +56,7 @@ const { needsReconnect, reconnecting, onReconnectAndLoad } = useConnectionGate(
 
 const rt = computed(() => definitionViewStore.runtime[props.tab.id]);
 const loading = computed(() => rt.value?.status === 'loading');
+const stale = computed(() => definitionViewStore.isStale(props.tab.id));
 
 function onRefresh(): void {
   refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () =>
@@ -360,8 +362,14 @@ const breadcrumb = computed(() => {
          all) — every other view but the grid's DataView.vue did the same, the one inconsistency
          this fixes. The chrome above always renders; only the body — the part that needs
          a live connection — swaps for the gate. -->
+    <StaleDataStrip
+      v-if="stale"
+      testid="definition-stale"
+      :reconnecting="reconnecting"
+      @reconnect="onReconnectAndLoad"
+    />
     <EmptyState
-      v-if="needsReconnect"
+      v-if="needsReconnect && !rt?.definition"
       data-testid="definition-reconnect"
       icon="plug"
       :title="t('studio.common.disconnected.empty')"
