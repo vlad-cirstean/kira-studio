@@ -114,6 +114,12 @@ const buffer = useEditBuffer({
   onRevert: () => selectedCell.value.onRevert?.(),
 });
 const { doc, isDirty, formatted, beautifyFailure, writeDoc } = buffer;
+// A staged cell republishes with its staged value as `original()`, so the buffer reads clean;
+// Revert must stay enabled to un-stage it.
+const actionsBuffer = {
+  ...buffer,
+  isDirty: computed(() => isDirty.value || selectedCell.value.original !== undefined),
+};
 
 // What `detected` above reads — deliberately a separate ref from `doc`, not an alias for
 // it, and deliberately not updated on every keystroke either. `doc` also receives byte-level
@@ -448,7 +454,11 @@ const statusLine = computed(() => {
 
         <template v-if="!viewerMode">
           <CellGenerateMenu :disabled="!isEditable" @apply="applyGenerator" />
-          <EditBufferActions :buffer="buffer" testid-prefix="cell-editor" :show-bytes="false" />
+          <EditBufferActions
+            :buffer="actionsBuffer"
+            testid-prefix="cell-editor"
+            :show-bytes="false"
+          />
           <TooltipIconButton
             icon="diff"
             :label="t('git.menu.stashShow.label')"
