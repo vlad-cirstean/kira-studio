@@ -23,6 +23,7 @@ import type { ConsoleTabRecord } from '../../state/tabDomain';
 import EngineIcon from '../../theme/EngineIcon.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
+import StaleDataStrip from '../shared/StaleDataStrip.vue';
 import { useConnectionGate } from '../shared/useConnectionGate';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleResultStrip from './ConsoleResultStrip.vue';
@@ -47,6 +48,9 @@ const { needsReconnect, onReconnectAndLoad } = useConnectionGate(() => props.tab
 
 const rt = computed(() => consoleViewStore.runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
+const hasResults = computed(() => (rt.value?.results.length ?? 0) > 0);
+// Result pages outlived their connection: kept, behind StaleDataStrip.
+const stale = computed(() => consoleViewStore.isStale(props.tab.id));
 
 const targetTail = computed(() => pathTail(props.tab.path));
 const runState = useRunState(() => props.tab.id);
@@ -425,10 +429,16 @@ onUnmounted(() => {
         </div>
 
         <div
-          v-if="rt && rt.results.length > 0"
+          v-if="rt && hasResults"
           class="flex-1 basis-3/5 min-h-0 flex flex-col"
           data-testid="console-results"
         >
+          <StaleDataStrip
+            v-if="stale && hasResults"
+            testid="console-stale"
+            :reconnecting="starting"
+            @reconnect="onReconnectAndLoad"
+          />
           <ConsoleResultStrip
             :tab-id="tab.id"
             @expand-all="onExpandAllResults"
