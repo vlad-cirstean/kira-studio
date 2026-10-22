@@ -1039,6 +1039,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - PostgreSQL/MariaDB/MySQL/SQLite table writes (add row, delete row, cell edit) are staged in a per-tab pending-change set; nothing reaches the database until Commit, and Preview command renders the exact statements first.
 - A staged edit or delete is keyed by its row's primary key, not page position, so it survives paging, sort, filter, projection and Refresh; staging needs the table's full primary key in the page, otherwise the cell is not editable.
 - Each staged entry keeps the key it was staged under, so a primary-key edit still addresses the original row and an off-page entry still commits; the toolbar counts all staged entries and names how many are off the current page.
+- Each staged edit keeps the page value from when it was first staged, so the preview's Changes view diffs before and after (shared `MonacoDiff`, `valueDiffSides`) even after the row leaves the page.
 - Only closing the tab or a successful commit clears the pending-change set.
 - ClickHouse tables get add-row only, staged the same way, because there is no addressable row to update/delete (a MergeTree PRIMARY KEY is a sparse index).
 - MongoDB/Redis/Kafka/SQS/S3 write immediately, gated per adapter by canInsert/canUpdate/canDelete capability, with no staging or preview.
