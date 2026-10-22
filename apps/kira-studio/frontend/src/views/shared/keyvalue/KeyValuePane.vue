@@ -49,6 +49,7 @@ const connectionGate = props.tab
     )
   : null;
 const needsReconnect = computed(() => connectionGate?.needsReconnect.value ?? false);
+const reconnecting = computed(() => connectionGate?.reconnecting.value ?? false);
 function onReconnectAndLoad(): Promise<boolean> {
   return connectionGate ? connectionGate.onReconnectAndLoad() : Promise.resolve(false);
 }
@@ -193,6 +194,7 @@ onUnmounted(() => {
             variant="dialog-primary"
             size="kira-lg"
             data-testid="keyvalue-reconnect-load"
+            :pending="reconnecting"
             @click="onReconnectAndLoad"
           >
             {{ t('studio.common.reconnectAndLoad.label') }}

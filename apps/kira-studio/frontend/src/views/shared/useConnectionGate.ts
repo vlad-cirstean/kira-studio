@@ -1,5 +1,5 @@
 import type { ConnectionStatus } from '@shared/domain/connection';
-import { type ComputedRef, computed } from 'vue';
+import { type ComputedRef, computed, type Ref, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useTabsStore } from '../../state/tabs';
 
@@ -16,6 +16,7 @@ export function useConnectionGate(
 ): {
   connectionStatus: ComputedRef<ConnectionStatus>;
   needsReconnect: ComputedRef<boolean>;
+  reconnecting: Ref<boolean>;
   onReconnectAndLoad(): Promise<boolean>;
 } {
   const connectionStatus = computed<ConnectionStatus>(() => {
@@ -37,19 +38,25 @@ export function useConnectionGate(
   // only run once it did; every existing caller (a template `@click` binding, or an
   // `await onReconnectAndLoad()` that never inspected the old `void` return) is unaffected by the
   // new return value.
+  const reconnecting = ref(false);
   async function onReconnectAndLoad(): Promise<boolean> {
     const connectionId = tab().connectionId;
     if (!connectionId) return false;
-    if (connectionStatus.value !== 'connected') {
-      await useConnectionsStore().connectConnection(connectionId);
+    reconnecting.value = true;
+    try {
+      if (connectionStatus.value !== 'connected') {
+        await useConnectionsStore().connectConnection(connectionId);
+      }
+      if (connectionStatus.value !== 'connected') return false;
+      useTabsStore().markHydrated(tab().id);
+      await onLoad?.();
+      return true;
+    } finally {
+      reconnecting.value = false;
     }
-    if (connectionStatus.value !== 'connected') return false;
-    useTabsStore().markHydrated(tab().id);
-    await onLoad?.();
-    return true;
   }
 
-  return { connectionStatus, needsReconnect, onReconnectAndLoad };
+  return { connectionStatus, needsReconnect, reconnecting, onReconnectAndLoad };
 }
 
 // A one-shot, non-reactive counterpart to the gate above — for a call site

@@ -58,7 +58,7 @@ const props = defineProps<{ tab: DocumentTabRecord }>();
 
 documentRowsStore.registerDocumentRows(props.tab.id, (row) => documentRow(props.tab.id, row));
 
-const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
+const { needsReconnect, reconnecting, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
   () => documentViewStore.load(props.tab.id),
 );
@@ -426,6 +426,7 @@ onUnmounted(() => {
         variant="dialog-primary"
         size="kira-lg"
         data-testid="document-reconnect-load"
+        :pending="reconnecting"
         @click="onReconnectAndLoad"
       >
         {{ t('studio.common.reconnectAndLoad.label') }}

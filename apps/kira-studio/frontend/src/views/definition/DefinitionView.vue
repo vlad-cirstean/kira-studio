@@ -48,7 +48,7 @@ const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
 const definitionViewStore = useDefinitionViewStore();
 
-const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
+const { needsReconnect, reconnecting, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
   () => definitionViewStore.load(props.tab.id),
 );
@@ -370,6 +370,7 @@ const breadcrumb = computed(() => {
         variant="dialog-primary"
         size="kira-lg"
         data-testid="definition-reconnect-load"
+        :pending="reconnecting"
         @click="onReconnectAndLoad"
       >
         {{ t('studio.common.reconnectAndLoad.label') }}

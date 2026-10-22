@@ -35,7 +35,7 @@ const railColor = computed(() => (connRecord.value ? (connRecord.value.color ?? 
 const targetTail = computed(() => pathTail(props.tab.path));
 
 // A batch tab (SQS) never auto-loads on reconnect: only an explicit Poll reads.
-const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
+const { needsReconnect, reconnecting, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
   () => {
     if (!isBatch.value) return streamViewStore.load(props.tab.id);
@@ -134,6 +134,7 @@ onUnmounted(() => {
             variant="dialog-primary"
             size="kira-lg"
             data-testid="stream-reconnect-load"
+            :pending="reconnecting"
             @click="onReconnectAndLoad"
           >
             {{ t('studio.common.reconnectAndLoad.label') }}

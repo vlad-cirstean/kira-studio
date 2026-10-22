@@ -44,7 +44,7 @@ const connectionsStore = useConnectionsStore();
 const gridViewStore = useGridViewStore();
 const props = defineProps<{ tab: DataTabRecord }>();
 
-const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
+const { needsReconnect, reconnecting, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
   () => gridViewStore.load(props.tab.id),
 );
@@ -333,6 +333,7 @@ function onCloseSearch(): void {
             variant="dialog-primary"
             size="kira-lg"
             data-testid="reconnect-load"
+            :pending="reconnecting"
             @click="onReconnectAndLoad"
           >
             {{ t('studio.common.reconnectAndLoad.label') }}

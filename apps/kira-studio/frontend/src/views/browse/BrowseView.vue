@@ -54,7 +54,7 @@ const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
 const browseViewStore = useBrowseViewStore();
 
-const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
+const { needsReconnect, reconnecting, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
   () => browseViewStore.load(props.tab.id),
 );
@@ -427,6 +427,7 @@ onMounted(() => {
         variant="dialog-primary"
         size="kira-lg"
         data-testid="browse-reconnect-load"
+        :pending="reconnecting"
         @click="onReconnectAndLoad"
       >
         {{ t('studio.common.reconnectAndLoad.label') }}
