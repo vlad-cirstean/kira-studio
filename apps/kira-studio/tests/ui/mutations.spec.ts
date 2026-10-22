@@ -1,7 +1,7 @@
 import { DATA_OP } from '@shared/protocol/dataOps';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
-import { editorText } from './support/editorText';
+import { diffEditorText, editorText } from './support/editorText';
 import { cellText, gridCell, gutterCell } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
@@ -262,6 +262,26 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   expect(await cellText(page, 0, 'name')).toBe('edited via UI');
   await expect(page.locator('[data-testid="toolbar-commit-changes"]')).toBeVisible();
   await expect(page.locator('[data-testid="toolbar-discard-changes"]')).toBeVisible();
+
+  // --- scenario 1b: preview diffs a staged edit --------------------------------------------
+  await page.click('[data-testid="toolbar-preview-command"]');
+  const diffPanel = page.locator('[data-testid="preview-command-panel"]');
+  await expect(diffPanel).toBeVisible();
+  await expect(diffPanel.locator('[data-testid="preview-command-view-changes"]')).toHaveAttribute(
+    'data-state',
+    'on',
+  );
+  const diffItems = diffPanel.locator('[data-testid="pending-diff-item"]');
+  await expect(diffItems).toHaveCount(1);
+  await expect(diffItems).toHaveAttribute('data-column', 'name');
+  expect(await diffEditorText(diffPanel.locator('[data-testid="pending-diff"]'))).toEqual({
+    original: originalName,
+    modified: 'edited via UI',
+  });
+  await diffPanel.locator('[data-testid="preview-command-view-sql"]').click();
+  await expect(diffPanel.locator('[data-testid="pending-diff"]')).toHaveCount(0);
+  await page.click('[data-testid="preview-command-close"]');
+  await expect(diffPanel).toHaveCount(0);
 
   // --- scenario 2: discard reverts every pending change -------------------------------------
   await page.click('[data-testid="toolbar-discard-changes"]');
