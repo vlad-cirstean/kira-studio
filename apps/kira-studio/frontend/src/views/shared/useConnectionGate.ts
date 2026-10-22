@@ -4,6 +4,17 @@ import { useConnectionsStore } from '../../state/connections';
 import { useTabsStore } from '../../state/tabs';
 
 /**
+ * §8.4: a restored tab shows only the reconnect button until pressed — nothing loads automatically.
+ * Reads reactive stores, so it is reactive inside a `computed`.
+ */
+export function tabNeedsReconnect(tabId: string, connectionId: string | null): boolean {
+  const status = connectionId
+    ? (useConnectionsStore().states[connectionId]?.status ?? 'disconnected')
+    : 'disconnected';
+  return !useTabsStore().isHydrated(tabId) || status !== 'connected';
+}
+
+/**
  * The reconnect gate, once — grid/documents/keyvalue/stream/definition/console each wrote out
  * the same connectionStatus/needsReconnect/onReconnectAndLoad trio. `onLoad` is the
  * one thing that genuinely varies per view: stream passes a closure carrying its `isBatch` check
@@ -26,10 +37,7 @@ export function useConnectionGate(
       : 'disconnected';
   });
 
-  // §8.4: a restored tab shows only the reconnect button until pressed — nothing loads automatically.
-  const needsReconnect = computed(
-    () => !useTabsStore().isHydrated(tab().id) || connectionStatus.value !== 'connected',
-  );
+  const needsReconnect = computed(() => tabNeedsReconnect(tab().id, tab().connectionId));
 
   // Returns whether the tab ended up connected. Go's ConnectionsService.Connect
   // never rejects for a bad connection (a wrong password, an unreachable host) — it resolves with

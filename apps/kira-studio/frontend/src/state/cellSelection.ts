@@ -37,6 +37,9 @@ export interface SelectedCell {
    *  when the selection itself moves) so the dock can't go on offering Save for a row the grid
    *  would refuse it for — `pendingChanges.ts`'s own `stageEdit` already refuses it silently. */
   pendingDelete?: boolean;
+  /** The shown data outlived its connection (useStaleDataStore) — `readOnlyReasonFor` returns
+   *  `'connection-lost'` first. */
+  stale?: boolean;
   /** Set only by a publisher that can genuinely stage a write for this exact cell — today only
    *  `DataGrid.vue`, closing over `stageEdit(tabId, row, columnName, newValue)`, and
    *  `KeyValueView.vue`, for an S3 object's own editable `Body` row. `StreamView.vue` and

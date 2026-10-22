@@ -38,6 +38,7 @@ import {
   STUDIO_TAB_KIND_MODE,
   type StreamTabRecord,
   type StreamTabState,
+  type StudioTabKind,
 } from './tabDomain';
 import { useTabIncognitoStore } from './tabIncognito';
 import { TAB_KINDS } from './tabKinds';
@@ -60,6 +61,9 @@ export interface RecentTableEntry {
 }
 
 const RECENT_TABLES_LIMIT = 20;
+
+// Kinds whose fetched page survives a connection drop (read-only behind StaleDataStrip).
+const KEEPS_DATA_ON_DROP = new Set<StudioTabKind>(['data']);
 
 // P99 §5.2: split out of tabs — a genuinely separate concern (the P16 design system's Empty.html
 // "Recent tables" list) from the tab collection/activation store below, with exactly one external
@@ -186,15 +190,15 @@ export const useTabsStore = createTabsStore({
     // pre-disconnect rows until the moment something happened to try reading it again. Regating
     // here puts every open tab of the connection behind the Reconnect gate the instant the
     // connection itself says it is gone, matching what the engine already did with its own cache.
-    // Only the page bytes are freed — the runtime record (count, selection, find toolbar,
-    // actionError) stays, so the tab that comes back on reconnect is still the same tab, not a
-    // blank one.
+    // Page bytes are freed except for KEEPS_DATA_ON_DROP kinds, which keep showing them read-only
+    // behind StaleDataStrip. The runtime record (count, selection, find toolbar, actionError)
+    // stays, so the tab that comes back on reconnect is still the same tab, not a blank one.
     control.onConnectionState((state) => {
       if (state.status !== 'disconnected' && state.status !== 'error') return;
       for (const t of actions.tabs.value) {
         if (t.connectionId !== state.connectionId) continue;
         unmarkHydrated(t.id);
-        actions.dropPageStoresForTab(t.id);
+        if (!KEEPS_DATA_ON_DROP.has(t.kind)) actions.dropPageStoresForTab(t.id);
       }
     });
 

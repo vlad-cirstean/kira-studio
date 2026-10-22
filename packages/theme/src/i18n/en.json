@@ -9807,6 +9807,9 @@
         }
       },
       "readOnly": {
+        "connectionLost": {
+          "label": "Connection lost"
+        },
         "generated": {
           "hint": "The server computes this column’s value. An edit here would be refused at commit.",
           "label": "Generated column"
@@ -9890,6 +9893,10 @@
       },
       "columns": {
         "label": "Columns"
+      },
+      "connectionLost": {
+        "description": "Connection lost. The data shown was fetched earlier and is read-only until you reconnect.",
+        "tooltip": "Connection lost. Reconnect to edit"
       },
       "connectionReadOnly": {
         "tooltip": "Connection is read-only"

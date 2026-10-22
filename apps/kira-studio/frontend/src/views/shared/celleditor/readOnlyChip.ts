@@ -4,6 +4,8 @@ import type { ReadOnlyReason } from './state';
 
 export function readOnlyChipText(reason: ReadOnlyReason | null): string {
   switch (reason) {
+    case 'connection-lost':
+      return t('studio.cellEditor.readOnly.connectionLost.label');
     case 'masked':
       return t('studio.cellEditor.readOnly.masked.label');
     case 'connection-read-only':
@@ -23,6 +25,8 @@ export function readOnlyChipText(reason: ReadOnlyReason | null): string {
 
 export function readOnlyChipTitle(reason: ReadOnlyReason | null): string | undefined {
   switch (reason) {
+    case 'connection-lost':
+      return t('studio.common.connectionLost.tooltip');
     case 'masked':
       return t('studio.cellEditor.readOnly.masked.hint');
     case 'value-truncated':
