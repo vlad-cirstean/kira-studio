@@ -150,10 +150,10 @@ whatever sandbox a session happens to be in),
 - The gRPC stack is the largest single dependency the app has taken, about 14.2 MB of binary (linux/amd64, no flags), the same order as pgx, mongo-driver/v2, both AWS SDK clients and franz-go combined (about 13.5 MB).
 - Every gRPC descriptor source gets its own private *protoregistry.Files, never protoregistry.GlobalFiles, because GlobalFiles panics on a duplicate file path, which is realistic when two users' .proto files declare the same package.
 - The Git module transport was moved entirely to Kira Space as of v1.9 P100 and is no longer part of Kira Studio's stack.
-- The MCP server for internal/dbmcp uses github.com/modelcontextprotocol/go-sdk v1.7.0 over the SDK's Streamable HTTP transport, not stdio.
+- The MCP server for internal/dbmcp uses github.com/modelcontextprotocol/go-sdk v1.8.0 over the SDK's Streamable HTTP transport, not stdio.
 - The official MCP go-sdk was chosen as the protocol org's reference implementation at stable v1; mark3labs/mcp-go (second implementation) and hand-rolled JSON-RPC framing were declined, since CLAUDE.md's library-first rule finds nothing hand-rolling would earn.
 - The MCP server uses Streamable HTTP rather than stdio because it is one long-running process serving many concurrent clients and tool calls, not a process spawned per client; the SDK's auth.RequireBearerToken middleware gates every request.
-- mcp.AddTool[In, Out] derives each MCP tool's input schema from a Go struct's tags, so every tool's schema has exactly one source.
+- mcp.AddTool[In, Out] derives each MCP tool's input schema from a Go struct's tags, so every tool's schema has exactly one source. A tool argument the handler needs carries no `omitempty` (schema-required). A string or array that must be non-empty also goes through `llmprompts.RequireNonEmpty`. go-sdk rejects either before the handler runs.
 - The repo-map MCP server was removed in v1.9 P97.
 - Local embeddings (P210, Kira Space memory) use ONNX Runtime 1.29.1 via yalue/onnxruntime_go v1.36.0, gomlx/go-huggingface v0.4.13 (hftokenizer + hub downloader), and model Snowflake arctic-embed-s int8 (Apache-2.0).
 - Embedding inference cgo-dlopens a bundled libonnxruntime and runs in a memory-embed worker subprocess; vectors are stored as BLOBs in memory.db and search is done in Go.
