@@ -19,7 +19,7 @@ import {
 } from './support/cellEditorCaptures';
 import { primaryChord } from './support/chord';
 import { connectionCreateArgs } from './support/connect';
-import { editorText as sharedEditorText } from './support/editorText';
+import { diffEditorText, editorText as sharedEditorText } from './support/editorText';
 import { gridCell, gridCellSelector, gridScroller } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import type { ControlLogEntry } from './support/mockRuntime';
@@ -707,7 +707,32 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await page.keyboard.press(await primaryChord(page, 'Enter'));
   await expect(gridCell(page, 0, 'sample')).toHaveClass(/pending-edit/);
   expect(await cellText(page, 0, 'sample')).toBe('"edited via ctrl-enter"');
+
+  // Show changes diffs the buffer against the stored value, also after reselecting the staged cell
+  // (the base then comes from SelectedCell.original).
+  const diffToggle = page.locator('[data-testid="cell-editor-diff-toggle"]');
+  const diffPane = page.locator('[data-testid="cell-editor-diff"]');
+  const expectStagedDiff = async (): Promise<void> => {
+    await expect(diffToggle).toBeEnabled();
+    await diffToggle.click();
+    await expect(diffPane).toBeVisible();
+    await expect(page.locator('[data-testid="cell-editor-encoded"]')).toBeHidden();
+    const sides = await diffEditorText(diffPane);
+    expect(sides.modified.trimEnd()).toBe('"edited via ctrl-enter"');
+    expect(JSON.parse(sides.original)).toEqual(JSON.parse(originalSample));
+    await diffToggle.click();
+    await expect(diffPane).toBeHidden();
+    await expect(page.locator('[data-testid="cell-editor-encoded"]')).toBeVisible();
+  };
+  await expectStagedDiff();
+  await selectCell(page, 1, 'sample');
+  await selectCell(page, 0, 'sample');
+  expect((await editorText(page)).trimEnd()).toBe('"edited via ctrl-enter"');
+  await expectStagedDiff();
+
   await page.click('[data-testid="toolbar-discard-changes"]');
+  await expect(diffToggle).toBeDisabled();
+  expect(await editorText(page)).toBe(originalSample);
 
   // Collapse connection 1's root before creating connection 2 — every descendant row (database,
   // schema, table) shares the exact same `data-path` values connection 2 will render, and
