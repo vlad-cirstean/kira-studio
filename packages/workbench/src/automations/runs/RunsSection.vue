@@ -51,7 +51,10 @@ function toggle(run: ScriptRun): void {
 </script>
 
 <template>
-  <section class="flex min-h-0 shrink-0 flex-col border-t border-border" data-testid="runs-section">
+  <section
+    :class="cn('flex min-h-0 flex-col border-t border-border', open && 'max-h-1/2')"
+    data-testid="runs-section"
+  >
     <SectionHeading
       :label="t('automations.runs.title.label')"
       collapsible
@@ -60,7 +63,7 @@ function toggle(run: ScriptRun): void {
       data-testid="runs-toggle"
       @toggle="open = !open"
     />
-    <div v-if="open" class="flex max-h-[50vh] min-h-0 flex-col overflow-y-auto">
+    <div v-if="open" class="flex min-h-0 flex-col overflow-y-auto">
       <PanelBar>
         <SecondaryTabs
           variant="segmented"
