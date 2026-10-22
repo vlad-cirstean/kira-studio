@@ -107,7 +107,7 @@ export function partitionChildren(nodes: TreeNode[]): {
 // instead. Not a bare `NodeKind` entry the way `table`/`topic` are: `database` is shared
 // by five engines that must stay expand-only (postgres/mysql-family/sqlite/clickhouse/mongo), so
 // the cut needs the connection's own capability, not the kind alone.
-export function isLeafKind(kind: NodeKind, keyBrowser = false): boolean {
+function isLeafKind(kind: NodeKind, keyBrowser = false): boolean {
   if (keyBrowser && (kind === 'database' || kind === 'bucket')) return true;
   return kind === 'view' || kind === 'matview' || kind === 'topic';
 }
