@@ -6,7 +6,6 @@ import PickerTrigger from '@theme/components/PickerTrigger.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
-import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import {
   Tooltip,
   TooltipContent,
@@ -14,8 +13,6 @@ import {
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
-import { rowVariants } from '@theme/lib/rowVariants';
-import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import { formatBytes } from '@workbench/behaviour/format';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -34,6 +31,7 @@ import { sqlDialectFor } from '../sqlIdent';
 import { typeDescription } from '../typeGlossary';
 import { useEditBuffer } from '../useEditBuffer';
 import { decodeToText, encodeFromText } from './binary';
+import CellGenerateMenu from './CellGenerateMenu.vue';
 import { describeValue, detectFormat, type FormatGuess } from './detect';
 import {
   beautifyFor,
@@ -45,7 +43,7 @@ import {
   formatHelp,
   formatLabel,
 } from './formats';
-import { GENERATORS, type Generator } from './generate';
+import type { Generator } from './generate';
 import { readOnlyChipText, readOnlyChipTitle } from './readOnlyChip';
 import { useCellEditorFormatStore } from './state';
 import TimestampPane from './TimestampPane.vue';
@@ -328,13 +326,10 @@ function openFormatMenu(e: MouseEvent): void {
   contextMenuStore.openContextMenu(e, rows);
 }
 
-const generatePanelOpen = ref(false);
-const generateAnchorRef = ref<HTMLElement | null>(null);
 function applyGenerator(gen: Generator): void {
   if (!isEditable.value) return;
   doc.value = gen.run(effectiveFormat.value);
   saveEdit();
-  generatePanelOpen.value = false;
 }
 
 const targetLabel = computed(() => {
@@ -436,40 +431,7 @@ const statusLine = computed(() => {
         </Tooltip>
 
         <template v-if="!viewerMode">
-          <Popover :open="generatePanelOpen" @update:open="generatePanelOpen = $event">
-            <span ref="generateAnchorRef" class="relative shrink-0">
-              <TooltipIconButton
-                icon="sparkle"
-                :label="t('studio.cellEditor.generate.tooltip')"
-                disabled-trigger
-                :disabled="!isEditable"
-                data-testid="cell-editor-generate"
-                @click="generatePanelOpen = !generatePanelOpen"
-              />
-              <PopoverAnchor :reference="generateAnchorRef ?? undefined" />
-            </span>
-            <PopoverContent
-              align="start"
-              class="w-56 gap-0 p-0"
-              data-testid="cell-editor-generate-popover"
-            >
-              <div class="flex flex-col gap-px p-1">
-                <Tooltip v-for="gen in GENERATORS" :key="gen.id">
-                  <TooltipTrigger as-child>
-                    <button
-                      type="button"
-                      :class="cn(rowVariants(), 'w-full border-0 bg-transparent text-left font-ui')"
-                      :data-testid="`cell-editor-generate-${gen.id}`"
-                      @click="applyGenerator(gen)"
-                    >
-                      {{ t(gen.labelKey) }}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>{{ t(gen.hintKey) }}</TooltipContent>
-                </Tooltip>
-              </div>
-            </PopoverContent>
-          </Popover>
+          <CellGenerateMenu :disabled="!isEditable" @apply="applyGenerator" />
           <EditBufferActions :buffer="buffer" testid-prefix="cell-editor" :show-bytes="false" />
         </template>
       </span>
