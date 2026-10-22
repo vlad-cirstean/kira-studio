@@ -110,11 +110,11 @@ type listChildrenArgs struct {
 	Refresh      bool   `json:"refresh,omitempty"`
 }
 
-func (s *Server) listChildren(_ context.Context, _ *mcp.CallToolRequest, args listChildrenArgs) (*mcp.CallToolResult, any, error) {
+func (s *Server) listChildren(ctx context.Context, _ *mcp.CallToolRequest, args listChildrenArgs) (*mcp.CallToolResult, any, error) {
 	if _, res, out, err, done := s.resolveReadGated(args.ConnectionID); done {
 		return res, out, err
 	}
-	result, err := s.cfg.Tree.Children(args.ConnectionID, args.Path, args.Refresh)
+	result, err := s.cfg.Tree.Children(ctx, args.ConnectionID, args.Path, args.Refresh)
 	if err != nil {
 		return toolError(err)
 	}
@@ -132,11 +132,11 @@ type describeTableArgs struct {
 // describeTable is gated on Caps().Describe only in the sense that an adapter which cannot serve
 // it already answers E_UNSUPPORTED in its own words (kafka/s3/sqs/redis) — surfaced verbatim by
 // toolError rather than an invented message here (§4.3).
-func (s *Server) describeTable(_ context.Context, _ *mcp.CallToolRequest, args describeTableArgs) (*mcp.CallToolResult, any, error) {
+func (s *Server) describeTable(ctx context.Context, _ *mcp.CallToolRequest, args describeTableArgs) (*mcp.CallToolResult, any, error) {
 	if _, res, out, err, done := s.resolveReadGated(args.ConnectionID); done {
 		return res, out, err
 	}
-	result, err := s.cfg.Tree.Describe(args.ConnectionID, args.Path, args.Refresh, nil)
+	result, err := s.cfg.Tree.Describe(ctx, args.ConnectionID, args.Path, args.Refresh, nil)
 	if err != nil {
 		return toolError(err)
 	}
@@ -151,11 +151,11 @@ type describeSchemaArgs struct {
 	Refresh      bool   `json:"refresh,omitempty"`
 }
 
-func (s *Server) describeSchema(_ context.Context, _ *mcp.CallToolRequest, args describeSchemaArgs) (*mcp.CallToolResult, any, error) {
+func (s *Server) describeSchema(ctx context.Context, _ *mcp.CallToolRequest, args describeSchemaArgs) (*mcp.CallToolResult, any, error) {
 	if _, res, out, err, done := s.resolveReadGated(args.ConnectionID); done {
 		return res, out, err
 	}
-	result, err := s.cfg.Tree.SchemaColumns(args.ConnectionID, args.Path, args.Refresh)
+	result, err := s.cfg.Tree.SchemaColumns(ctx, args.ConnectionID, args.Path, args.Refresh)
 	if err != nil {
 		return toolError(err)
 	}

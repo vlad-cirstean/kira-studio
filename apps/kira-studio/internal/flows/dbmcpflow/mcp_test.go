@@ -251,6 +251,48 @@ func noClaude(t *testing.T) harness.MCPInstaller {
 	})
 }
 
+// P328: an op records who started it. run_query over MCP is "mcp"; a tree call through the
+// bridge is "user".
+func TestDbMcpOpsCarrySource(t *testing.T) {
+	f := newFixture(t)
+	sess, err := f.connect(t, f.token(t))
+	if err != nil {
+		t.Fatalf("connect with the helper token: %v", err)
+	}
+	defer sess.Close()
+
+	if res := runQuery(t, sess, f.connID, "select body from notes order by id"); res.IsError {
+		t.Fatalf("run_query = %q", text(res))
+	}
+	if _, err := f.app.W.Tree.Children(bridge.TreeChildrenArgs{ConnectionID: f.connID, Path: "", Refresh: true}); err != nil {
+		t.Fatalf("Tree.Children: %v", err)
+	}
+
+	var rows []model.OpRecord
+	testx.WaitUntil(t, 10*time.Second, func() bool {
+		recent, err := f.app.W.Ops.Recent(bridge.OpsRecentArgs{Limit: 50})
+		if err != nil {
+			t.Fatalf("Ops.Recent: %v", err)
+		}
+		rows = rows[:0]
+		for _, r := range recent {
+			if (r.Kind == "execute" || r.Kind == "children") && r.Status != "running" {
+				rows = append(rows, r)
+			}
+		}
+		return len(rows) == 2
+	})
+	bySource := map[string]string{}
+	for _, r := range rows {
+		bySource[r.Kind] = r.Source
+	}
+	if bySource["execute"] != "mcp" || bySource["children"] != "user" {
+		t.Fatalf("op sources = %v, want execute=mcp children=user", bySource)
+	}
+	// Contract ops-source: tests/ui/operations.spec.ts renders these rows' source column.
+	f.app.Contract(t, "ops-source", "OpsService.Recent", rows, flowharness.Mask("id", "startedAt", "durationMs", "connectionId"))
+}
+
 func TestInstallAgentWithoutCli(t *testing.T) {
 	app := flowharness.New(t)
 	app.W.DbMcp.Installer = noClaude(t)

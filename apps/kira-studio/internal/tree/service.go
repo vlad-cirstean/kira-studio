@@ -212,7 +212,7 @@ func cacheAside[T any](s *Service, connectionID, path, kind string, load func(no
 
 // Children ports tree-service.ts:82-108, including P43 iter2 D22 (a truncated listing is never
 // cached) and P43 iter3 D38 (a truncated refresh drops any older complete row for the same path).
-func (s *Service) Children(connectionID, path string, refresh bool) (ChildrenResult, error) {
+func (s *Service) Children(ctx context.Context, connectionID, path string, refresh bool) (ChildrenResult, error) {
 	if !refresh {
 		if nodes, ok := tryCache(s, connectionID, path, "children", func(raw json.RawMessage) ([]model.TreeNode, bool) {
 			var nodes []model.TreeNode
@@ -226,7 +226,7 @@ func (s *Service) Children(connectionID, path string, refresh bool) (ChildrenRes
 		return ChildrenResult{}, err
 	}
 	since := s.sinceEpoch(connectionID)
-	result, err := s.backend.Children(context.Background(), connectionID, nodePath)
+	result, err := s.backend.Children(ctx, connectionID, nodePath)
 	if err != nil {
 		return ChildrenResult{}, wrapErr(err)
 	}
@@ -242,7 +242,7 @@ func (s *Service) Children(connectionID, path string, refresh bool) (ChildrenRes
 // Describe ports tree-service.ts:110-128. `tabId` tags the resulting op-log row so the requesting
 // tab's RunState can find its own duration — a cache hit makes no engine call and so tags
 // nothing, which is correct: there is no duration to show for work that never happened.
-func (s *Service) Describe(connectionID, path string, refresh bool, tabID *string) (DescribeResult, error) {
+func (s *Service) Describe(ctx context.Context, connectionID, path string, refresh bool, tabID *string) (DescribeResult, error) {
 	if !refresh {
 		if meta, ok := tryCache(s, connectionID, path, "describe", func(raw json.RawMessage) (model.ObjectMeta, bool) {
 			var meta model.ObjectMeta
@@ -252,7 +252,7 @@ func (s *Service) Describe(connectionID, path string, refresh bool, tabID *strin
 		}
 	}
 	meta, err := cacheAside(s, connectionID, path, "describe", func(nodePath model.NodePath) (model.ObjectMeta, error) {
-		return s.backend.Describe(context.Background(), connectionID, nodePath, tabID)
+		return s.backend.Describe(ctx, connectionID, nodePath, tabID)
 	})
 	if err != nil {
 		return DescribeResult{}, err
@@ -261,7 +261,7 @@ func (s *Service) Describe(connectionID, path string, refresh bool, tabID *strin
 }
 
 // Definition ports tree-service.ts:130-148.
-func (s *Service) Definition(connectionID, path string, refresh bool, tabID *string) (DefinitionResult, error) {
+func (s *Service) Definition(ctx context.Context, connectionID, path string, refresh bool, tabID *string) (DefinitionResult, error) {
 	if !refresh {
 		if def, ok := tryCache(s, connectionID, path, "definition", func(raw json.RawMessage) (model.ObjectDefinition, bool) {
 			var def model.ObjectDefinition
@@ -271,7 +271,7 @@ func (s *Service) Definition(connectionID, path string, refresh bool, tabID *str
 		}
 	}
 	definition, err := cacheAside(s, connectionID, path, "definition", func(nodePath model.NodePath) (model.ObjectDefinition, error) {
-		return s.backend.Definition(context.Background(), connectionID, nodePath, tabID)
+		return s.backend.Definition(ctx, connectionID, nodePath, tabID)
 	})
 	if err != nil {
 		return DefinitionResult{}, err
@@ -283,7 +283,7 @@ func (s *Service) Definition(connectionID, path string, refresh bool, tabID *str
 // Definition, sharing their metadata_cache row per (connectionID, path) rather than adding a new
 // one (the cache's 200-row-per-connection budget is shared by all four kinds, keyed by path —
 // a design that wrote one row per relation would evict the tree's own children on a large schema).
-func (s *Service) SchemaColumns(connectionID, path string, refresh bool) (SchemaColumnsResult, error) {
+func (s *Service) SchemaColumns(ctx context.Context, connectionID, path string, refresh bool) (SchemaColumnsResult, error) {
 	if !refresh {
 		if rels, ok := tryCache(s, connectionID, path, "columns", func(raw json.RawMessage) ([]model.RelationColumns, bool) {
 			var rels []model.RelationColumns
@@ -293,7 +293,7 @@ func (s *Service) SchemaColumns(connectionID, path string, refresh bool) (Schema
 		}
 	}
 	relations, err := cacheAside(s, connectionID, path, "columns", func(nodePath model.NodePath) ([]model.RelationColumns, error) {
-		relations, err := s.backend.SchemaColumns(context.Background(), connectionID, nodePath)
+		relations, err := s.backend.SchemaColumns(ctx, connectionID, nodePath)
 		if err != nil {
 			return nil, err
 		}
@@ -313,7 +313,7 @@ func (s *Service) SchemaColumns(connectionID, path string, refresh bool) (Schema
 // kind) in the metadata_cache table; this answers a caller-chosen batch of up to 200 sibling
 // paths (BrowseView.vue's own visible-range window), which has no single node identity to cache
 // against and would otherwise grow one cache row per distinct window instead of per node.
-func (s *Service) KeyTypes(connectionID string, paths []string) ([]string, error) {
+func (s *Service) KeyTypes(ctx context.Context, connectionID string, paths []string) ([]string, error) {
 	if err := s.requireConnected(connectionID); err != nil {
 		return nil, err
 	}
@@ -325,7 +325,7 @@ func (s *Service) KeyTypes(connectionID string, paths []string) ([]string, error
 		}
 		nodePaths[i] = nodePath
 	}
-	types, err := s.backend.KeyTypes(context.Background(), connectionID, nodePaths)
+	types, err := s.backend.KeyTypes(ctx, connectionID, nodePaths)
 	if err != nil {
 		return nil, wrapErr(err)
 	}

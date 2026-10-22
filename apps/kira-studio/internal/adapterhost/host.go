@@ -188,6 +188,7 @@ type opStartPayload struct {
 	StartedAt    string  `json:"startedAt"`
 	Incognito    bool    `json:"incognito"`
 	DelayMs      int     `json:"delayMs,omitempty"`
+	Source       string  `json:"source"`
 }
 
 type opEndPayload struct {
@@ -259,7 +260,7 @@ func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, 
 	startedAt := kiratime.NowISO()
 	h.emitJSON(oplog.EventOpStart, opStartPayload{
 		OpID: opID, ConnectionID: spec.ConnectionID, TabID: spec.TabID, Kind: spec.Kind, StartedAt: startedAt,
-		Incognito: spec.Incognito, DelayMs: spec.DelayMs,
+		Incognito: spec.Incognito, DelayMs: spec.DelayMs, Source: OpSourceOf(ctx),
 	})
 
 	op := adapters.NewOpCtx(opID)

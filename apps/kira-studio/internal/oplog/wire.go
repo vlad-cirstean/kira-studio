@@ -64,6 +64,8 @@ type inFlightOp struct {
 	incognito bool
 	// delayMs is P307 Part 2: a preconnect op's configured wait (0 = none), carried onto its records.
 	delayMs int
+	// source is P328: "user" or "mcp", carried onto every record of the op.
+	source string
 }
 
 // Wiring is the Go analogue of oplog.ts's wireOplog, split into New/Start/Stop (P54 D14): New
@@ -172,14 +174,18 @@ func (w *Wiring) handleOpStart(payload json.RawMessage, inFlight map[string]inFl
 		StartedAt    string  `json:"startedAt"`
 		Incognito    bool    `json:"incognito"`
 		DelayMs      int     `json:"delayMs"`
+		Source       string  `json:"source"`
 	}
 	if err := json.Unmarshal(payload, &evt); err != nil || !model.ValidOpKind(evt.Kind) {
 		return
 	}
+	if !model.ValidOpSource(evt.Source) {
+		evt.Source = "user"
+	}
 
 	rec := inFlightOp{
 		connectionID: evt.ConnectionID, tabID: evt.TabID, kind: evt.Kind, startedAt: evt.StartedAt,
-		incognito: evt.Incognito, delayMs: evt.DelayMs,
+		incognito: evt.Incognito, delayMs: evt.DelayMs, source: evt.Source,
 	}
 	inFlight[evt.OpID] = rec
 
@@ -188,7 +194,7 @@ func (w *Wiring) handleOpStart(payload json.RawMessage, inFlight map[string]inFl
 	// it runs and simply gone (never having existed on disk) once it completes.
 	if !evt.Incognito {
 		if err := w.ops.Append(model.OpAppend{
-			ID: evt.OpID, ConnectionID: rec.connectionID, TabID: rec.tabID, Kind: rec.kind, StartedAt: rec.startedAt,
+			ID: evt.OpID, ConnectionID: rec.connectionID, TabID: rec.tabID, Kind: rec.kind, StartedAt: rec.startedAt, Source: rec.source,
 		}); err != nil {
 			slog.Warn("append failed", "scope", "oplog", "opId", evt.OpID, "err", err)
 			return
@@ -198,7 +204,7 @@ func (w *Wiring) handleOpStart(payload json.RawMessage, inFlight map[string]inFl
 	w.updates.Emit(model.OpRecord{
 		ID: evt.OpID, ConnectionID: rec.connectionID, TabID: rec.tabID, StartedAt: rec.startedAt,
 		DurationMs: nil, Kind: rec.kind, Status: "running", Rows: nil, Command: nil, Error: nil,
-		DelayMs: delayPtr(rec.delayMs),
+		DelayMs: delayPtr(rec.delayMs), Source: rec.source,
 	})
 }
 
@@ -260,8 +266,9 @@ func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlig
 	if ok {
 		record.ConnectionID, record.TabID, record.StartedAt, record.Kind = started.connectionID, started.tabID, started.startedAt, started.kind
 		record.DelayMs = delayPtr(started.delayMs)
+		record.Source = started.source
 	} else {
-		record.StartedAt, record.Kind = kiratime.NowISO(), "test"
+		record.StartedAt, record.Kind, record.Source = kiratime.NowISO(), "test", "user"
 	}
 	w.updates.Emit(record)
 

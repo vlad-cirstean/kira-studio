@@ -53,9 +53,9 @@ type ConnectionsReader interface {
 // MetadataReader is dbmcp's own consumer-declared interface over *tree.Service — list_children/
 // describe_table/describe_schema's own backend.
 type MetadataReader interface {
-	Children(connectionID, path string, refresh bool) (tree.ChildrenResult, error)
-	Describe(connectionID, path string, refresh bool, tabID *string) (tree.DescribeResult, error)
-	SchemaColumns(connectionID, path string, refresh bool) (tree.SchemaColumnsResult, error)
+	Children(ctx context.Context, connectionID, path string, refresh bool) (tree.ChildrenResult, error)
+	Describe(ctx context.Context, connectionID, path string, refresh bool, tabID *string) (tree.DescribeResult, error)
+	SchemaColumns(ctx context.Context, connectionID, path string, refresh bool) (tree.SchemaColumnsResult, error)
 }
 
 // QueryRunner is dbmcp's own consumer-declared interface over *adapterhost.Router's Execute and
@@ -273,7 +273,7 @@ func withPanicRecovery[In any](s *Server, name string, h func(context.Context, *
 		}()
 		ctx, cancel := bindRequestCancellation(ctx)
 		defer cancel()
-		return h(ctx, req, in)
+		return h(adapterhost.WithOpSource(ctx, adapterhost.OpSourceMCP), req, in)
 	}
 }
 

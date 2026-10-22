@@ -449,14 +449,16 @@ filter_history(id, connection_id, path, where_text, order_by_json, used_at)
                                                        -- 20/path, 4,000/connection, 4 KiB/row (P23)
 metadata_cache(connection_id, path, kind, payload_json, fetched_at, etag)
 op_log(id, connection_id, tab_id, started_at, duration_ms, kind, status, rows,
-       command, error, stored_bytes, command_truncated, path)
+       command, error, stored_bytes, command_truncated, path, source)
                                                        -- rotated, capped (P23: stored_bytes/
                                                        -- command_truncated added by migration 15);
                                                        -- path (TEXT, migration 0027, P108 Part 11
                                                        -- F5) is the console database/schema an
                                                        -- op actually ran against, NULL for every
                                                        -- non-console-execute op kind and for every
-                                                       -- pre-existing row
+                                                       -- pre-existing row;
+                                                       -- source (TEXT, migration 0043, P328) is
+                                                       -- 'user' or 'mcp', default 'user'
 custom_scripts(id, name, command, working_dir, dir_mode, kind, params_json, smart_json, use_ade_dir, schedule_json,
                color, collection_id, sort_order, created_at, updated_at)
                                                        -- P85, migration 0024; scripts, one row
@@ -558,6 +560,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - Studio's kira.db migration high-water mark is 0037 (0037_p242_recurring_scripts.sql: custom_scripts.schedule_json, script_runs rebuilt with waiting/skipped states).
 - Migration 0020 added connections.mcp_enabled (deny-by-default MCP exposure); 0021 added mcp_read_mode/mcp_write_mode/mcp_ddl_mode plus mcp_description; 0022 added mcp_auto_explain (auto-force-EXPLAIN on run_query); 0023 created connection_mask_rules and connections.mask_correlation_key.
 - Migration 0027_p108part11_op_log_path.sql added op_log.path TEXT, the console path an op actually ran against.
+- Op source rides the RunOp ctx (`adapterhost.WithOpSource`), set by dbmcp's tool wrapper; connection lifecycle ops are always `user`, since MCP's connect is a shared, deduplicated attempt with its own ctx.
 - Migrations are forward-only numbered SQL files in apps/kira-studio/internal/storage/migrations/, applied on startup.
 - Table access is hand-written database/sql in apps/kira-studio/internal/storage/repos/; there is no ORM (the Drizzle dependency went out with the Electron shell).
 - Every row read from settings, ui_layout and connections is decoded through the model types in internal/storage/model/ before use, so a hand-edited or stale-shape row fails loudly instead of propagating zero values into the UI.
