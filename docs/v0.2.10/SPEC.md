@@ -14,7 +14,8 @@ First phase `P322` (highest in `docs/HISTORY.md` is `P321`). Branch `v0.2.10`. P
 | P327 | Cell editor before/after diff. Highlight the change between the original and the edited value in the cell editor, as a code-style diff. | Done |
 | P328 | Fixes and small features bundle (one Opus plan, one Sonnet implementer). (a) Connection tree: where an element count shows, drop the word "rows" and keep only the number. (b) Partitioned tables collapse into their parent by default; partitions show only after the user expands it. (c) Operations panel: show whether an operation came from the user or from MCP. (d) Add a Check for updates button. (e) Go to PK/FK button: the filter box value is cleaner, no backticks around columns and no quotes around numbers. (f) Postman collection importer: accept more than one collection, and import environments as well. | Done |
 | P329 | Code review, one round (Opus reviewer covering architecture, correctness, performance; then a Sonnet fixer) over everything changed since the last review session (v2.8 P319 close-out base `d61472b`, scope: P320 sweep and P322-P328). Runs last. | Done |
-| P330 | Close chapter v0.2.10 (fold per `CLAUDE.md`). Hold until user says to close. | Todo |
+| P330 | Code review, round 2 (user asked for one more round; Opus reviewer covering architecture, correctness, performance; then a Sonnet fixer) over everything changed since the same base as P329 (v2.8 P319 close-out base `d61472b`), including P329 round 1 fixer commits as unreviewed code. Runs last before close. | Todo |
+| P331 | Close chapter v0.2.10 (fold per `CLAUDE.md`). Hold until user says to close. | Todo |
 
 ## Results
 
