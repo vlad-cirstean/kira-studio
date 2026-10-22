@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { useTemplateRef } from 'vue';
@@ -8,11 +14,19 @@ import EditBufferActions from '../shared/EditBufferActions.vue';
 import type { EditBuffer } from '../shared/useEditBuffer';
 
 // The JSON editor with its buffer actions and Save / Cancel, for a new or an edited document.
-const props = defineProps<{ buffer: EditBuffer; testidPrefix: string; saving: boolean }>();
+const props = defineProps<{
+  buffer: EditBuffer;
+  testidPrefix: string;
+  saving: boolean;
+  /** Set while a save must be refused (e.g. connection lost): disables Save, shown as its tooltip. */
+  saveDisabledReason?: string;
+}>();
 const emit = defineEmits<{ save: []; cancel: [] }>();
 
 const rootEl = useTemplateRef<HTMLElement>('rootEl');
-useShortcut(rootEl, ['form.save'], () => emit('save'));
+useShortcut(rootEl, ['form.save'], () => {
+  if (!props.saveDisabledReason) emit('save');
+});
 </script>
 
 <template>
@@ -25,16 +39,24 @@ useShortcut(rootEl, ['form.save'], () => emit('save'));
         :show-compact="false"
       />
       <span class="flex-1 min-w-0"></span>
-      <Button
-        variant="toolbar-primary"
-        size="kira"
-        :pending="saving"
-        :data-testid="`${testidPrefix}-save`"
-        @click="emit('save')"
-        >{{
-          t('common.action.save.label')
-        }}</Button
-      >
+      <Tooltip :disabled="!saveDisabledReason">
+        <TooltipTrigger as-child>
+          <TooltipDisabledTrigger>
+            <Button
+              variant="toolbar-primary"
+              size="kira"
+              :pending="saving"
+              :disabled="!!saveDisabledReason"
+              :data-testid="`${testidPrefix}-save`"
+              @click="emit('save')"
+              >{{
+                t('common.action.save.label')
+              }}</Button
+            >
+          </TooltipDisabledTrigger>
+        </TooltipTrigger>
+        <TooltipContent v-if="saveDisabledReason">{{ saveDisabledReason }}</TooltipContent>
+      </Tooltip>
       <Button
         variant="toolbar"
         size="kira"

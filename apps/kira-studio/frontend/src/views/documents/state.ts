@@ -4,6 +4,7 @@ import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { data } from '../../bridge/data';
 import { pinia } from '../../state/pinia';
+import { useStaleDataStore } from '../../state/staleData';
 import type { DocumentTabState } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { registerTabCount, registerTabReload } from '../../state/viewCommands';
@@ -95,6 +96,7 @@ export const useDocumentViewStore = defineStore('documentView', () => {
       tabNoun: 'document tab',
       apply: (page) => {
         setPage(tabId, page);
+        useStaleDataStore().stamp(tabId, tab.connectionId as string);
         applyPagePosition(rt, page);
       },
       onFailure: (superseded) => {
@@ -235,8 +237,15 @@ export const useDocumentViewStore = defineStore('documentView', () => {
     useTabsStore().patchDocumentTabState(tabId, { expanded });
   }
 
+  /** Shown page is stale: connection gone, or read under another connection session. */
+  function isStale(tabId: string): boolean {
+    const connectionId = useTabsStore().findDocumentTab(tabId)?.connectionId;
+    return connectionId ? useStaleDataStore().isStale(tabId, tabId, connectionId) : false;
+  }
+
   return {
     runtime,
+    isStale,
     load,
     reload,
     runCount,
