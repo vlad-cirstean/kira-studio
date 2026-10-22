@@ -3,6 +3,7 @@ package llmprompts
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -52,6 +53,29 @@ func InputSchema[T any](src Source, tool ID, vars map[string]any) *jsonschema.Sc
 	}
 	for name := range nested {
 		panic(fmt.Sprintf("llmprompts: %s has nested argument entries under %q without a property", tool, name))
+	}
+	return sch
+}
+
+// RequireNonEmpty sets minLength 1 (string) or minItems 1 (array) on each named top-level property.
+// A name not in sch.Required, or not a string/array, panics: both are programming errors.
+func RequireNonEmpty(sch *jsonschema.Schema, props ...string) *jsonschema.Schema {
+	for _, name := range props {
+		prop := sch.Properties[name]
+		if prop == nil {
+			panic(fmt.Sprintf("llmprompts: RequireNonEmpty: no property %q", name))
+		}
+		if !slices.Contains(sch.Required, name) {
+			panic(fmt.Sprintf("llmprompts: RequireNonEmpty: property %q is not required", name))
+		}
+		switch prop.Type {
+		case "string":
+			prop.MinLength = jsonschema.Ptr(1)
+		case "array":
+			prop.MinItems = jsonschema.Ptr(1)
+		default:
+			panic(fmt.Sprintf("llmprompts: RequireNonEmpty: property %q has type %q, want string or array", name, prop.Type))
+		}
 	}
 	return sch
 }

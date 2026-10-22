@@ -83,6 +83,22 @@ func (s *Server) resolveReadGated(connectionID string) (summary model.Connection
 	return summary, nil, nil, nil, false
 }
 
+// databasePathKinds pick the database from the path's first segment; an empty path silently runs on
+// the connection's primary database (mongodb: fails).
+var databasePathKinds = map[string]bool{"postgres": true, "mysql": true, "mariadb": true, "mongodb": true}
+
+// needsDatabasePath returns an error message when summary's kind needs a database path and path has none.
+func needsDatabasePath(summary model.ConnectionSummary, path string) string {
+	if !databasePathKinds[summary.Kind] {
+		return ""
+	}
+	p, err := model.DecodePath(summary.ID, path)
+	if err != nil || (len(p.Segments) > 0 && p.Segments[0].Kind == "database") {
+		return ""
+	}
+	return fmt.Sprintf("path is required for connection %q (%s): pass a database path from list_children with this connectionId", summary.Name, summary.Kind)
+}
+
 // --- list_children — replacing the fixed-name list_databases/list_schemas SPEC first named:
 // the adapter layer's metadata primitive is one lazy level (Adapter.Children), and the levels
 // differ per kind, so one tool that returns the node's own `kind` is strictly more
@@ -156,7 +172,7 @@ const (
 type runQueryArgs struct {
 	ConnectionID string `json:"connectionId"`
 	SQL          string `json:"sql"`
-	Path         string `json:"path,omitempty"`
+	Path         string `json:"path"`
 	MaxRows      int    `json:"maxRows,omitempty"`
 }
 
@@ -259,6 +275,10 @@ func (s *Server) resolveVerdict(ctx context.Context, args runQueryArgs) (rv quer
 	rv.summary, err = s.resolveEnabled(args.ConnectionID)
 	if err != nil {
 		res, out, err = errResult(err.Error())
+		return rv, res, out, err, true
+	}
+	if msg := needsDatabasePath(rv.summary, args.Path); msg != "" {
+		res, out, err = errResult(msg)
 		return rv, res, out, err, true
 	}
 
@@ -398,7 +418,7 @@ const queueFullMessage = "too many queries are already waiting for approval; ret
 type explainQueryArgs struct {
 	ConnectionID string `json:"connectionId"`
 	SQL          string `json:"sql"`
-	Path         string `json:"path,omitempty"`
+	Path         string `json:"path"`
 	IncludeRaw   bool   `json:"includeRaw,omitempty"`
 }
 
@@ -420,6 +440,9 @@ func (s *Server) explainQuery(ctx context.Context, _ *mcp.CallToolRequest, args 
 	summary, err := s.resolveEnabled(args.ConnectionID)
 	if err != nil {
 		return errResult(err.Error())
+	}
+	if msg := needsDatabasePath(summary, args.Path); msg != "" {
+		return errResult(msg)
 	}
 
 	// §7: unsupported kinds are refused before connecting — nothing this call can do will succeed.

@@ -108,7 +108,7 @@ func text(res *mcp.CallToolResult) string {
 
 func runQuery(t *testing.T, sess *mcp.ClientSession, connID, sqlText string) *mcp.CallToolResult {
 	t.Helper()
-	res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"connectionId": connID, "sql": sqlText}})
+	res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"connectionId": connID, "sql": sqlText, "path": ""}})
 	if err != nil {
 		t.Fatalf("run_query %q: %v", sqlText, err)
 	}
@@ -154,6 +154,10 @@ func TestDbMcpApprovalFlow(t *testing.T) {
 	if read := runQuery(t, sess, f.connID, "select body from notes order by id"); read.IsError || !strings.Contains(text(read), "two") {
 		t.Fatalf("read run_query = %q, want rows without approval", text(read))
 	}
+	noPath, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"connectionId": f.connID, "sql": "select 1"}})
+	if err != nil || !noPath.IsError || !strings.Contains(text(noPath), "missing properties") || !strings.Contains(text(noPath), `"path"`) {
+		t.Fatalf("run_query without path = %q (%v), want a schema rejection naming path", text(noPath), err)
+	}
 	if snap := f.app.W.DbMcp.PendingApprovals(); snap.Pending != nil {
 		t.Fatalf("a read queued an approval: %+v", snap)
 	}
@@ -166,7 +170,7 @@ func TestDbMcpApprovalFlow(t *testing.T) {
 	call := func() chan outcome {
 		ch := make(chan outcome, 1)
 		go func() {
-			res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"connectionId": f.connID, "sql": write}})
+			res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"connectionId": f.connID, "sql": write, "path": ""}})
 			ch <- outcome{res, err}
 		}()
 		return ch

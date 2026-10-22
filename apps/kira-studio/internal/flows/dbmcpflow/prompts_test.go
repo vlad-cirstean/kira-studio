@@ -49,7 +49,7 @@ func TestDbMcpApprovalRoutes(t *testing.T) {
 	const write = "insert into notes (body) values ('three')"
 	done := make(chan *mcp.CallToolResult, 1)
 	go func() {
-		res, _ := sess.CallTool(ctx, &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"connectionId": f.connID, "sql": write}})
+		res, _ := sess.CallTool(ctx, &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"connectionId": f.connID, "sql": write, "path": ""}})
 		done <- res
 	}()
 
@@ -79,7 +79,7 @@ func TestDbMcpApprovalRoutes(t *testing.T) {
 	// A request abandoned by its client withdraws the popup too.
 	abandon, cancel := context.WithCancel(ctx)
 	go func() {
-		_, _ = sess.CallTool(abandon, &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"connectionId": f.connID, "sql": write}})
+		_, _ = sess.CallTool(abandon, &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"connectionId": f.connID, "sql": write, "path": ""}})
 	}()
 	f.pending(t)
 	f.dbmcpEntries(t, 1)

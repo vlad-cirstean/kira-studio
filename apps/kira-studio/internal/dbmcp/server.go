@@ -228,27 +228,27 @@ func (s *Server) buildMCPServer() *mcp.Server {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "list_children",
 		Description: llmprompts.DbmcpToolListChildren.Text(src, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[listChildrenArgs](src, llmprompts.DbmcpToolListChildren.ID(), nil),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[listChildrenArgs](src, llmprompts.DbmcpToolListChildren.ID(), nil), "connectionId"),
 	}, withPanicRecovery(s, "list_children", s.listChildren))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "describe_table",
 		Description: llmprompts.DbmcpToolDescribeTable.Text(src, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[describeTableArgs](src, llmprompts.DbmcpToolDescribeTable.ID(), nil),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[describeTableArgs](src, llmprompts.DbmcpToolDescribeTable.ID(), nil), "connectionId", "path"),
 	}, withPanicRecovery(s, "describe_table", s.describeTable))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "describe_schema",
 		Description: llmprompts.DbmcpToolDescribeSchema.Text(src, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[describeSchemaArgs](src, llmprompts.DbmcpToolDescribeSchema.ID(), nil),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[describeSchemaArgs](src, llmprompts.DbmcpToolDescribeSchema.ID(), nil), "connectionId", "path"),
 	}, withPanicRecovery(s, "describe_schema", s.describeSchema))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "run_query",
 		Description: llmprompts.DbmcpToolRunQuery.Text(src, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[runQueryArgs](src, llmprompts.DbmcpToolRunQuery.ID(), map[string]any{"maxRows": llmprompts.LimitVars{Default: runQueryDefaultMaxRows, Max: runQueryMaxMaxRows}}),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[runQueryArgs](src, llmprompts.DbmcpToolRunQuery.ID(), map[string]any{"maxRows": llmprompts.LimitVars{Default: runQueryDefaultMaxRows, Max: runQueryMaxMaxRows}}), "connectionId", "sql"),
 	}, withPanicRecovery(s, "run_query", s.runQuery))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "explain_query",
 		Description: llmprompts.DbmcpToolExplainQuery.Text(src, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[explainQueryArgs](src, llmprompts.DbmcpToolExplainQuery.ID(), nil),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[explainQueryArgs](src, llmprompts.DbmcpToolExplainQuery.ID(), nil), "connectionId", "sql"),
 	}, withPanicRecovery(s, "explain_query", s.explainQuery))
 
 	return srv
