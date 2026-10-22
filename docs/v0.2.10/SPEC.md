@@ -11,7 +11,7 @@ First phase `P322` (highest in `docs/HISTORY.md` is `P321`). Branch `v0.2.10`. P
 | P325 Part 2 | Keep fetched data when a connection drops: Documents, KeyValue (tab and browse preview) and Browse. Same banner, Reconnect and write lockout; immediate writes refused from stale data. | Done |
 | P325 Part 3 | Keep fetched data when a connection drops: Stream, Definition and Console result grids. Same banner and Reconnect; Stream writes locked; Definition and Console have no write path on shown data. | Done |
 | P326 | Pending changes show a real diff. In the SQL data view, a pending edit currently shows the new value as one long string; show before and after as a diff, like code. | Done |
-| P327 | Cell editor before/after diff. Highlight the change between the original and the edited value in the cell editor, as a code-style diff. | Todo |
+| P327 | Cell editor before/after diff. Highlight the change between the original and the edited value in the cell editor, as a code-style diff. | Done |
 | P328 | Code review, one round (Opus reviewer covering architecture, correctness, performance; then a Sonnet fixer) over everything changed since the last review session (v2.8 P319 close-out base `d61472b`, scope: P320 sweep and P322-P327). Runs last. | Todo |
 | P329 | Close chapter v0.2.10 (fold per `CLAUDE.md`). Hold until user says to close. | Todo |
 
@@ -44,3 +44,7 @@ Stream, Definition and Console stamp on load/run (`stream/state.ts`, `definition
 ### P326
 
 `PromptDiff` moved to `packages/workbench/src/editor/MonacoDiff.vue` with `language` prop and `hideUnchangedRegions`. New `valueDiffSides` (`celleditor/valueDiff.ts`, reused by P327). `PendingEdit.original` captured at first stage, dropped in `discardCellEdit`; `editedCells` getter. `PreviewCommandPanel`: Changes (cell list plus diff) and SQL tabs, tabs only with edits; SQL fetched only when shown. UI spec scenario 1b in `mutations.spec`; listed UI specs pass (40), unit spec passes. No backend half: no IPC or Go change. Deviations: popover stays `w-120` (U15 allows no wider); tab labels and panel title reuse existing keys (check C3 rejects duplicate text), `previewCommand.title` kept for Generate data; cell list is `ul`/`li` (biome rejects `role` on `div`). Real-render screenshot not taken.
+
+### P327
+
+Cell editor Show changes toggle (`cell-editor-diff-toggle`) diffs buffer against stored value via shared `MonacoDiff` and `valueDiffSides`. `SelectedCell.original` from new `stagedOriginal` getter; grid publish watch gains staged-value source, so stage or discard republishes. New `useCellDiff.ts`; Generate popover moved to `CellGenerateMenu.vue` (view 579 lines). UI spec scenario 9 extended; listed UI specs pass (40), unit spec passes, screenshot taken (fits, side by side). No backend half: no IPC or Go change. Deviations: republish made the buffer read clean after blur-stage, disabling Revert and breaking scenario 6b, so Revert and Modified chip now also key on `SelectedCell.original` (own `fix:` commit); spec trims trailing newline from the Ctrl+Enter value.
