@@ -1,5 +1,6 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
+import type { EditorLanguageId } from '@shared/domain/editor';
 import { splitSqlStatements } from '@shared/domain/sqlSplit';
 import { errorText } from '@workbench/bridge/codedError';
 import { beautifyShellText } from '../shared/document/ejson';
@@ -12,6 +13,14 @@ import { findMatchingParen, MONGO_STATEMENT_RE, splitTopLevelArgs } from './mong
  *  kafka/sqs/s3 have no console at all. */
 export function canFormatConsole(kind: ConnectionKind | undefined): boolean {
   return kind === 'mongodb' || sqlDialectFor(kind) !== undefined;
+}
+
+/** The editor language a console of this kind uses. */
+export function consoleLanguageFor(kind: ConnectionKind | undefined): EditorLanguageId {
+  if (kind === 'mongodb') return 'mongo';
+  if (kind === 'redis') return 'redis';
+  if (sqlDialectFor(kind) !== undefined) return 'sql';
+  return 'plain';
 }
 
 type SqlFormatterModule = typeof import('./sqlFormatterEntry');

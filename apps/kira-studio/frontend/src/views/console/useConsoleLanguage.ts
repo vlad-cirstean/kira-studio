@@ -8,6 +8,7 @@ import { ddlSchemaFor, schemaQueryOptions } from '../../state/schemas';
 import type { ConsoleTabRecord } from '../../state/tabDomain';
 import { lexOptionsFor, type SqlDialect, sqlDialectFor } from '../shared/sqlIdent';
 import { consoleCompletionSources } from './completion';
+import { consoleLanguageFor } from './format';
 import { consoleLintSource } from './lint';
 import { sqlHoverSource } from './sqlHover';
 
@@ -30,12 +31,7 @@ export function useConsoleLanguage(tab: Ref<ConsoleTabRecord>) {
     };
   }
 
-  const language = computed<EditorLanguageId>(() => {
-    if (connectionKind.value === 'mongodb') return 'mongo';
-    if (connectionKind.value === 'redis') return 'redis';
-    if (dialect.value !== undefined) return 'sql';
-    return 'plain';
-  });
+  const language = computed<EditorLanguageId>(() => consoleLanguageFor(connectionKind.value));
 
   const ddlQuery = useQuery(() => ({
     ...schemaQueryOptions(tab.value.connectionId ?? ''),
