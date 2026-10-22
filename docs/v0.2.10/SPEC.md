@@ -1,6 +1,6 @@
-# v2.10
+# v0.2.10
 
-First phase `P322` (highest in `docs/HISTORY.md` is `P321`). Branch `v2.10`. Phases run top to bottom.
+First phase `P322` (highest in `docs/HISTORY.md` is `P321`). Branch `v0.2.10`. Phases run top to bottom.
 
 | # | Phase | Status |
 |---|-------|--------|
@@ -11,6 +11,6 @@ First phase `P322` (highest in `docs/HISTORY.md` is `P321`). Branch `v2.10`. Pha
 | P326 | Pending changes show a real diff. In the SQL data view, a pending edit currently shows the new value as one long string; show before and after as a diff, like code. | Todo |
 | P327 | Cell editor before/after diff. Highlight the change between the original and the edited value in the cell editor, as a code-style diff. | Todo |
 | P328 | Code review, one round (Opus reviewer covering architecture, correctness, performance; then a Sonnet fixer) over everything changed since the last review session (v2.8 P319 close-out base `d61472b`, scope: P320 sweep and P322-P327). Runs last. | Todo |
-| P329 | Close chapter v2.10 (fold per `CLAUDE.md`). Hold until user says to close. | Todo |
+| P329 | Close chapter v0.2.10 (fold per `CLAUDE.md`). Hold until user says to close. | Todo |
 
 ## Results
