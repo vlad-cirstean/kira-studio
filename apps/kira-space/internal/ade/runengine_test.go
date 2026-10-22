@@ -157,7 +157,7 @@ func fakeFinish(cfgPath, status, summary string) error {
 	if err != nil {
 		return err
 	}
-	res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "finish_step", Arguments: map[string]any{"status": status, "summary": summary}})
+	res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "finish_step", Arguments: map[string]any{"status": status, "summary": summary, "reason": summary}})
 	if err != nil {
 		return err
 	}
