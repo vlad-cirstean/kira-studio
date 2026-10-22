@@ -16,6 +16,7 @@ import { t } from '@theme/i18n';
 import { useEventListener } from '@vueuse/core';
 import { formatBytes } from '@workbench/behaviour/format';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
+import MonacoDiff from '@workbench/editor/MonacoDiff.vue';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
@@ -47,6 +48,7 @@ import type { Generator } from './generate';
 import { readOnlyChipText, readOnlyChipTitle } from './readOnlyChip';
 import { useCellEditorFormatStore } from './state';
 import TimestampPane from './TimestampPane.vue';
+import { useCellDiff } from './useCellDiff';
 import { validateFormat } from './validate';
 
 const cellEditorFormatStore = useCellEditorFormatStore();
@@ -256,9 +258,23 @@ function closePanel(): void {
   cellSelectionStore.clearSelectedCellFor(selectedCell.value.tabId);
 }
 
+const {
+  available: diffAvailable,
+  shown: diffShown,
+  sides: diffSides,
+  toggle: toggleDiff,
+  close: closeDiff,
+} = useCellDiff(() => selectedCell.value, doc, isDirty);
+
+// Find targets the main editor, absent in the diff view, so the two are exclusive.
 const findOpen = ref(false);
 function toggleFind(): void {
+  closeDiff();
   findOpen.value = !findOpen.value;
+}
+function onToggleDiff(): void {
+  findOpen.value = false;
+  toggleDiff();
 }
 function closeFind(): void {
   findOpen.value = false;
@@ -433,6 +449,15 @@ const statusLine = computed(() => {
         <template v-if="!viewerMode">
           <CellGenerateMenu :disabled="!isEditable" @apply="applyGenerator" />
           <EditBufferActions :buffer="buffer" testid-prefix="cell-editor" :show-bytes="false" />
+          <TooltipIconButton
+            icon="diff"
+            :label="t('git.menu.stashShow.label')"
+            :pressed="diffShown"
+            disabled-trigger
+            :disabled="!diffAvailable"
+            data-testid="cell-editor-diff-toggle"
+            @click="onToggleDiff"
+          />
         </template>
       </span>
 
@@ -467,70 +492,75 @@ const statusLine = computed(() => {
     </ViewToolbar>
 
     <div ref="editorBodyEl" class="flex-1 min-h-0 flex flex-col overflow-hidden">
-      <div :class="encodedClass" data-testid="cell-editor-encoded">
-        <MonacoHost
-          ref="encodedHostRef"
-          :doc="doc"
-          :language="language"
-          :sql-dialect="sqlDialect"
-          :readonly="!isEditable"
-          :lint-source="cellLintSource"
-          :range-highlights="docHighlights"
-          @update:doc="onMainDocInput"
-        />
+      <div v-if="diffShown" class="flex-1 min-h-0" data-testid="cell-editor-diff-pane">
+        <MonacoDiff data-testid="cell-editor-diff" v-bind="diffSides" />
       </div>
-
-      <!-- Hex/base64: the same bytes as editable plaintext, kept in lockstep with the encoded box
-           above in both directions (encode<->decode, see onDecodedInput). -->
-      <template v-if="showDecodedPane">
-        <div
-          class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm leading-4 py-0.5 px-2"
-        >
-          <CodiconIcon name="symbol-string" :size="13" />
-          <span>{{ t('studio.cellEditor.decoded.label') }}</span>
-        </div>
-        <div
-          v-if="decodedDoc !== null"
-          class="flex-1 basis-5/12 min-h-0"
-          data-testid="cell-editor-decoded"
-        >
+      <template v-else>
+        <div :class="encodedClass" data-testid="cell-editor-encoded">
           <MonacoHost
-            :doc="decodedDoc"
-            language="plain"
+            ref="encodedHostRef"
+            :doc="doc"
+            :language="language"
+            :sql-dialect="sqlDialect"
             :readonly="!isEditable"
-            @update:doc="onDecodedInput"
+            :lint-source="cellLintSource"
+            :range-highlights="docHighlights"
+            @update:doc="onMainDocInput"
           />
         </div>
-        <Alert
-          v-else
-          variant="info"
-          class="flex-1 basis-5/12 min-h-0 overflow-auto items-center text-subtle"
-          data-testid="cell-editor-decoded-empty"
-        >
-          <AlertDescription>
-            {{
-              t('studio.cellEditor.decoded.invalid.hint', { format: formatLabel(effectiveFormat) })
-            }}
-          </AlertDescription>
-        </Alert>
-      </template>
 
-      <!-- The three timestamp formats: TimestampPane owns its own readings, zone switch, editable
-           field and calendar entirely — this file only decides whether to show it. -->
-      <template v-else-if="isTimestampFormat">
-        <div
-          class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm leading-4 py-0.5 px-2"
-        >
-          <CodiconIcon name="calendar" :size="13" />
-          <span>{{ t('studio.cellEditor.timestamp.title') }}</span>
-        </div>
-        <TimestampPane
-          class="shrink-0"
-          :doc="doc"
-          :format="effectiveFormat"
-          :readonly="!isEditable"
-          @update:doc="writeDoc($event)"
-        />
+        <!-- Hex/base64: the same bytes as editable plaintext, kept in lockstep with the encoded box
+             above in both directions (encode<->decode, see onDecodedInput). -->
+        <template v-if="showDecodedPane">
+          <div
+            class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm leading-4 py-0.5 px-2"
+          >
+            <CodiconIcon name="symbol-string" :size="13" />
+            <span>{{ t('studio.cellEditor.decoded.label') }}</span>
+          </div>
+          <div
+            v-if="decodedDoc !== null"
+            class="flex-1 basis-5/12 min-h-0"
+            data-testid="cell-editor-decoded"
+          >
+            <MonacoHost
+              :doc="decodedDoc"
+              language="plain"
+              :readonly="!isEditable"
+              @update:doc="onDecodedInput"
+            />
+          </div>
+          <Alert
+            v-else
+            variant="info"
+            class="flex-1 basis-5/12 min-h-0 overflow-auto items-center text-subtle"
+            data-testid="cell-editor-decoded-empty"
+          >
+            <AlertDescription>
+              {{
+                t('studio.cellEditor.decoded.invalid.hint', { format: formatLabel(effectiveFormat) })
+              }}
+            </AlertDescription>
+          </Alert>
+        </template>
+
+        <!-- The three timestamp formats: TimestampPane owns its own readings, zone switch, editable
+             field and calendar entirely — this file only decides whether to show it. -->
+        <template v-else-if="isTimestampFormat">
+          <div
+            class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm leading-4 py-0.5 px-2"
+          >
+            <CodiconIcon name="calendar" :size="13" />
+            <span>{{ t('studio.cellEditor.timestamp.title') }}</span>
+          </div>
+          <TimestampPane
+            class="shrink-0"
+            :doc="doc"
+            :format="effectiveFormat"
+            :readonly="!isEditable"
+            @update:doc="writeDoc($event)"
+          />
+        </template>
       </template>
     </div>
 
