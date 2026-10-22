@@ -46,6 +46,7 @@ async function load(): Promise<void> {
     props.entry.columns,
     props.entry.referencedColumns,
     props.ctx.rowValues,
+    props.ctx.numericColumns,
   );
   // Defensive only: the caller (SlickGridHost's onGridClick) never opens this popover for an edge
   // whose filter can't be built (cellNavEntry already filters those out) — this can't happen on a

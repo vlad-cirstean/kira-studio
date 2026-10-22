@@ -105,6 +105,7 @@ import {
   type NavColumns,
   navColumnsFor,
   navValuesFor,
+  numericNavColumns,
   rowsForSelection,
   cellNavEntry as rvCellNavEntry,
   columnValuesFor as rvColumnValuesFor,
@@ -1114,6 +1115,7 @@ function onGridClick(e: SlickEventData, args: OnClickEventArgs): void {
       connectionId,
       dialect: currentDialect(),
       rowValues: navValuesFor(props.tabId, getPage(props.tabId), order, navColumns, handle.row),
+      numericColumns: numericNavColumns(getPage(props.tabId), navColumns),
     };
     const edges = fkEdgesFor(meta, columnName);
     const openPreview = (fk: ForeignKeyMeta, openInNewTab: () => void): void => {
@@ -1730,6 +1732,7 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
       meta: rt()?.meta ?? null,
       connectionId: t?.connectionId ?? '',
       rowValues: rawSnap.values,
+      numericColumns: numericNavColumns(p, navColumns),
     }),
   );
 }

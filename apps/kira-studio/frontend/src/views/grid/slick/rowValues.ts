@@ -184,6 +184,17 @@ export function navColumnsFor(meta: ObjectMeta | null): NavColumns {
   return { fk, pk, valueNames: [...valueNames] };
 }
 
+/** Nav columns the page types as numbers (page `typeClass`): an FK filter writes their values
+ *  bare, not as string literals. */
+export function numericNavColumns(page: TabularPage | null, navColumns: NavColumns): Set<string> {
+  const out = new Set<string>();
+  if (!page) return out;
+  for (const name of navColumns.valueNames) {
+    if (page.columns.find((c) => c.name === name)?.typeClass === 'number') out.add(name);
+  }
+  return out;
+}
+
 /** rowSnapshot(row) narrowed to navColumns.valueNames, memoised per row for one render/hover via
  *  the optional cache the caller passes — a table with no FK and no inbound reference (the common
  *  case) never builds one at all, since valueNames is then empty. */
@@ -238,6 +249,7 @@ export function cellNavEntry(
     connectionId,
     dialect,
     rowValues: navValuesFor(tabId, page, order, navColumns, row, navCache),
+    numericColumns: numericNavColumns(page, navColumns),
   };
   const fkItems = foreignKeyNavItems(name, meta, fkCtx).filter(
     (i) => i.type === 'item' && !i.disabled,
