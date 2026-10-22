@@ -208,7 +208,9 @@ function cellFormatter(
     input.className = 'cell-input';
     input.dataset.testid = 'grid-cell-insert-input';
     input.value = view.isNull ? '' : view.text;
-    if (pendingChangesStore.isCommitting(props.tabId)) input.readOnly = true;
+    if (pendingChangesStore.isCommitting(props.tabId) || gridViewStore.isStale(props.tabId)) {
+      input.readOnly = true;
+    }
     // The server computes generated columns; the insert paths already skip them (P36 D28).
     if (isGeneratedColumn(String(columnDef.field))) {
       input.readOnly = true;
@@ -257,7 +259,8 @@ function isWritable(): boolean {
   if (!t?.connectionId) return false;
   return (
     !connectionsStore.connectionRecord(t.connectionId)?.readOnly &&
-    !pendingChangesStore.isCommitting(props.tabId)
+    !pendingChangesStore.isCommitting(props.tabId) &&
+    !gridViewStore.isStale(props.tabId)
   );
 }
 function caps() {
@@ -280,7 +283,8 @@ function maskPreviewOn(): boolean {
 // below), `SelectedCell.onEdit`/`onRevert` (the publication watch further down, which reads
 // `canEditTable()` directly), `cellFormatter`'s insert-row `<input>` branch (no insert row can
 // exist while masked, since it is add-row's own isWritable in DataToolbar.vue that gets one too),
-// and `onPaste` (`if (!canEditTable()) return;`, above).
+// and `onPaste` (`if (!canEditTable()) return;`, above). A stale page (connection lost, or read
+// under another session) locks the same paths through isWritable(); staged edits survive.
 function canEditTable(): boolean {
   return isWritable() && hasPrimaryKey() && !!caps()?.canUpdate && !maskPreviewOn();
 }
@@ -2389,13 +2393,13 @@ watch(canEditTableReactive, (editable) => {
 });
 // Insert inputs are plain DOM the formatter built before the commit started.
 watch(
-  () => pendingChangesStore.isCommitting(props.tabId),
-  (committing) => {
+  () => pendingChangesStore.isCommitting(props.tabId) || gridViewStore.isStale(props.tabId),
+  (locked) => {
     for (const input of gridRootEl?.querySelectorAll<HTMLInputElement>(
       'input[data-testid="grid-cell-insert-input"]',
     ) ?? []) {
       const column = input.closest<HTMLElement>('.slick-cell[data-column]')?.dataset.column ?? '';
-      input.readOnly = committing || isGeneratedColumn(column);
+      input.readOnly = locked || isGeneratedColumn(column);
     }
   },
 );
@@ -2469,6 +2473,7 @@ watch(
       return t ? isDeleted(t.row) : false;
     },
     () => pendingChangesStore.isCommitting(props.tabId),
+    () => gridViewStore.isStale(props.tabId),
   ],
   () => {
     const p = getPage(props.tabId);
@@ -2511,6 +2516,7 @@ watch(
       // way onBeforeEditCell below blocks the grid's own inline edit.
       generated: column.generated,
       pendingDelete: isDeleted(targetRow),
+      stale: gridViewStore.isStale(props.tabId),
       // Same eligibility as the grid's own inline (double-click) edit: writable connection,
       // a primary key to identify the row, and the row isn't already staged for delete. Stages into
       // the exact same pending-change set the inline editor already feeds, so the panel's save and

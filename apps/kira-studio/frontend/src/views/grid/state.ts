@@ -6,6 +6,7 @@ import { defineStore } from 'pinia';
 import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { pinia } from '../../state/pinia';
+import { useStaleDataStore } from '../../state/staleData';
 import type { DataTabState } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import {
@@ -156,6 +157,7 @@ export const useGridViewStore = defineStore('gridView', () => {
       tabNoun: 'data tab',
       apply: (page) => {
         setPage(tabId, page);
+        useStaleDataStore().stamp(tabId, tab.connectionId as string);
         rt.status = 'idle';
         rt.opId = null;
         rt.hasMore = page.position.hasMore;
@@ -304,8 +306,15 @@ export const useGridViewStore = defineStore('gridView', () => {
     ensureRuntime(tabId).settledWidths = { key, widths };
   }
 
+  /** Shown page is stale: connection gone, or read under another connection session. */
+  function isStale(tabId: string): boolean {
+    const connectionId = useTabsStore().findDataTab(tabId)?.connectionId;
+    return connectionId ? useStaleDataStore().isStale(tabId, tabId, connectionId) : false;
+  }
+
   return {
     runtime,
+    isStale,
     settledWidthsFor,
     setSettledWidths,
     load,
