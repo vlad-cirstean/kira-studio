@@ -2948,6 +2948,7 @@ repo's CI runs.
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **MCP `run_query` read verdicts run under `READ ONLY` wrap, which does not stop every side effect (P329).** A statement classified read runs in `BEGIN READ ONLY` (Postgres) or `START TRANSACTION READ ONLY` (MySQL/MariaDB) unless writes are allowed. Postgres still permits `pg_terminate_backend`, `pg_cancel_backend` and `dblink_exec`; MySQL/MariaDB still permits `GET_LOCK` and writes to temporary tables. SQLite and ClickHouse get no per-request wrap: no write-capable function is reachable from a read there.
 - **MongoDB 8.x/9.x servers are unverified in CI.** Every 8.x/9.x image exits at startup on runner kernels
   6.19-7.0.13 (SERVER-125742; SERVER-136848 for Ubuntu). Test and db-compat max pin `mongo:7.0.45`. Restore an
   8.x/9.x max once runner kernels leave that range. 7.0 support ends 2027-08-31.

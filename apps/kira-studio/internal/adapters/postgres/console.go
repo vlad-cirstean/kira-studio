@@ -208,13 +208,13 @@ func parseUint32(s string) (uint32, error) {
 // more spellings than it lists (parse_bool prefixes, quoted names, set_config(), ABORT then RESET).
 // The wrap must still be an open transaction (TxStatus 'T') with both the transaction and the
 // session default read-only. On a violation, roll back and re-assert the session default.
-func verifyReadOnlyWrap(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery) error {
+func verifyReadOnlyWrap(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery, connReadOnly bool) error {
 	if conn.PgConn().TxStatus() == 'T' {
 		res, err := runRaw(ctx, conn, "SELECT current_setting('transaction_read_only'), current_setting('default_transaction_read_only')", nil, op, track, page.ResultCap{})
 		if err != nil {
 			return err
 		}
-		if len(res.rows) == 1 && len(res.rows[0]) == 2 && res.rows[0][0] != nil && *res.rows[0][0] == "on" && res.rows[0][1] != nil && *res.rows[0][1] == "on" {
+		if len(res.rows) == 1 && len(res.rows[0]) == 2 && res.rows[0][0] != nil && *res.rows[0][0] == "on" && (!connReadOnly || res.rows[0][1] != nil && *res.rows[0][1] == "on") {
 			return nil
 		}
 	}
@@ -222,8 +222,10 @@ func verifyReadOnlyWrap(ctx context.Context, conn *trackedConn, op *adapters.OpC
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
 	defer cancel()
 	_, _ = conn.Exec(cleanupCtx, "ROLLBACK")
-	if _, err := conn.Exec(cleanupCtx, "SET default_transaction_read_only = on"); err != nil {
-		return mapError(err)
+	if connReadOnly {
+		if _, err := conn.Exec(cleanupCtx, "SET default_transaction_read_only = on"); err != nil {
+			return mapError(err)
+		}
 	}
 	return adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.readOnly.body", nil, nil)
 }
@@ -236,7 +238,7 @@ func verifyReadOnlyWrap(ctx context.Context, conn *trackedConn, op *adapters.OpC
 // Wrapping the whole batch in an explicit BEGIN READ ONLY transaction closes every angle
 // tried against a real server except that one specific statement, which
 // AssertNoTransactionEscalation rejects outright before anything runs.
-func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string, limit page.ResultCap) ([]page.Page, error) {
+func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery, readOnly, connReadOnly bool, statements []string, limit page.ResultCap) ([]page.Page, error) {
 	if len(statements) == 0 {
 		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.noStatements.body", nil, nil)
 	}
@@ -275,7 +277,7 @@ func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track T
 		results = append(results, result)
 		limit = adapters.RemainingCap(limit, result.bytes)
 		if readOnly {
-			if err := verifyReadOnlyWrap(ctx, conn, op, track); err != nil {
+			if err := verifyReadOnlyWrap(ctx, conn, op, track, connReadOnly); err != nil {
 				return nil, err
 			}
 		}

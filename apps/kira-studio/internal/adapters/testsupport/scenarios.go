@@ -238,3 +238,25 @@ func DownloadRoundTrips(path model.NodePath) Scenario {
 		},
 	}
 }
+
+// ReadOnlyRequestRefusesWrite asserts ConsoleRequest.ReadOnly makes Execute reject writeSQL on a
+// connection that is not read-only, and still runs a read afterward — gated on c.SQL.
+func ReadOnlyRequestRefusesWrite(path model.NodePath, writeSQL, readSQL string) Scenario {
+	return Scenario{
+		Name:     "execute: per-request read-only refuses a write",
+		Requires: func(c adapters.Caps) bool { return c.SQL },
+		Run: func(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig) {
+			t.Helper()
+			if _, err := a.Execute(context.Background(), model.ConsoleRequest{
+				Path: path, Statements: []string{writeSQL}, ReadOnly: true,
+			}, adapters.NewOpCtx("scenario-readonly-request-write")); err == nil {
+				t.Fatal("Execute(write, ReadOnly): want an error, got nil")
+			}
+			if _, err := a.Execute(context.Background(), model.ConsoleRequest{
+				Path: path, Statements: []string{readSQL}, ReadOnly: true,
+			}, adapters.NewOpCtx("scenario-readonly-request-read")); err != nil {
+				t.Fatalf("Execute(read, ReadOnly): %v", err)
+			}
+		},
+	}
+}

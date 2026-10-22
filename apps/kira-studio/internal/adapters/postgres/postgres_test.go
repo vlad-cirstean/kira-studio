@@ -1611,6 +1611,15 @@ func TestPostgres_ExecuteStopsAtResultCap(t *testing.T) {
 	)
 }
 
+// MCP read verdicts run read-only even on a writable connection.
+func TestPostgres_ExecuteReadOnlyRequestRefusesWrite(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+	testsupport.RunScenarios(t, connectedAdapter(t, fixture), fixture.Config,
+		testsupport.ReadOnlyRequestRefusesWrite(nodePath(fixture, seg("database", "kira_test")),
+			"CREATE TABLE kira_ro_probe (id int)", "SELECT 1"),
+	)
+}
+
 // 29. execute: a failing statement rejects the whole call — earlier statements already landed.
 func TestPostgres_ExecuteFailingStatementRejectsBatch(t *testing.T) {
 	fixture := testsupport.StartPostgres(t)

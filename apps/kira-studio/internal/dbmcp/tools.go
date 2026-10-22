@@ -220,6 +220,9 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		Path:         args.Path,
 		Statements:   []string{args.SQL},
 		Cap:          page.ResultCap{Rows: rv.maxRows},
+		// A read verdict can still carry a writing function (SELECT f()); unless writes are
+		// allowed outright, the adapter's read-only wrap backstops the classifier.
+		ReadOnly: rv.class == adapters.ClassRead && rv.modes.write != "allow",
 	})
 	if err != nil {
 		// A Postgres/MySQL driver error routinely embeds the offending value (a
