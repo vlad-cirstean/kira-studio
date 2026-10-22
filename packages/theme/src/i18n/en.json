@@ -11007,9 +11007,15 @@
         }
       },
       "previewCommand": {
+        "cells": {
+          "aria": "Edited cells"
+        },
         "empty": "No pending changes",
-        "label": "Preview the SQL for pending changes",
-        "title": "Preview SQL"
+        "label": "Preview pending changes",
+        "title": "Preview SQL",
+        "view": {
+          "aria": "Pending changes view"
+        }
       },
       "primaryKey": {
         "status": "PK {names}"
