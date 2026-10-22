@@ -57,3 +57,26 @@ Cell editor Show changes toggle (`cell-editor-diff-toggle`) diffs buffer against
 Verification: Go postman, storage, tree, dbmcp, oplog, appupdate, both apps' flow suites; postgres, sqlite, mysqlfamily, clickhouse conformance; ipcfixture; `test:ipc:fe:studio` (7); `test:ui:studio` 582 passed; `test:ui:space` 664 passed, 1 timing flake (`graph-blank-rows`) green on rerun; screenshots regenerated; typecheck, lint, vet clean.
 
 Deviations: item (d) landed as one commit (Go and frontend together; the hook rejects unused i18n keys otherwise). Tree nav columns use `numericNavColumns` in place of a `NavColumns` field. Item (e) quoted-name test case skipped; `interaction.spec` line 376 keeps `"name" = '...'` (mock serves filter-by-value). Pre-existing fixes: fakeagent failure now sends `reason` (`termflow` `TestSmartScript`); `llm-prompts.json` hash regenerated; stale `space agents board` screenshot label expectation (`Make CI green 3/6`).
+
+### P329
+
+Round 1 fixed all nine findings.
+
+1. MCP reads on writable connections: `ConsoleRequest.ReadOnly` set by dbmcp when verdict is read and write mode is not `allow`. Postgres and MySQL/MariaDB route it into their existing read-only wrap; conformance scenario `ReadOnlyRequestRefusesWrite` passes on real Postgres, MySQL 8.4, MariaDB 11.4. Postgres `READ ONLY` leftovers recorded in `docs/ARCHITECTURE.md` Known open items.
+2. Classifier: `DESCRIBE`/`DESC ANALYZE` and MariaDB `ANALYZE <DML>` classify as the target. 7 cases in `classify_test.go`.
+3. Stale strip hidden when nothing loaded (Definition, Documents, Stream). 2 new specs in `view-connection-drop.spec.ts`.
+4. Console strip is reconnect-only and restamps results after connect; no rerun. 1 new spec.
+5. `checkError` cleared in `later()` and `openUpdateDialog()`. 1 new spec.
+6. Runs section: `max-h-1/2` against the panel, not the viewport. Rendered screenshot reviewed. New `automations-runs-layout.spec.ts`.
+7. S3 Browse gates: new `s3Fixture.ts` and `browse-s3-connection-drop.spec.ts`, 3 tests.
+8. `Service.ConnectContext` carries ctx values, not cancellation; dbmcp uses it. Test in `connections/service_test.go`.
+9. Title bar comments in `window.go` and `tokens.css` cut to current constraint.
+
+Deviations:
+
+- SQLite and ClickHouse get no per-request read-only wrap; exposure negligible.
+- MySQL/MariaDB expose no per-transaction read-only flag to read back. On a writable connection, verify trusts the open transaction.
+- S3 fixture hand-built, renderer-only; no backend half since the gates are renderer-only.
+- Console reconnect-only chosen over rerun (a rerun could repeat a write).
+
+Verification: `go test ./...`, `typecheck`, `lint:go`, `lint:dead`, `test:ui:studio`, `test:ui:space`, `test:visual:studio`, `test:visual:space` pass. 4 timing specs failed once under concurrent load and passed rerun alone. No baseline changed.
