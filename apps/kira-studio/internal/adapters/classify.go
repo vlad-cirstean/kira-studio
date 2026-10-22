@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"context"
+	"regexp"
 	"strings"
 )
 
@@ -170,9 +171,15 @@ func ClassifySQL(statement string, d SQLDialect) OpClass {
 			return ClassWrite
 		}
 		return ClassRead
-	case sqlReadKeywords[keyword]:
+	case keyword == "ANALYZE":
+		// MariaDB's ANALYZE [FORMAT=JSON] <stmt> executes <stmt>; Postgres/MySQL ANALYZE <table> is DDL.
+		if target, ok := mariadbAnalyzeTarget(strings.TrimSpace(stripped[len(fields[0]):])); ok {
+			return ClassifySQL(target, d)
+		}
+		return ClassDDL
+	case sqlReadKeywords[keyword] && keyword != "DESCRIBE" && keyword != "DESC":
 		return ClassRead
-	case keyword == "EXPLAIN":
+	case keyword == "EXPLAIN" || keyword == "DESCRIBE" || keyword == "DESC":
 		rest := strings.TrimSpace(stripped[len(fields[0]):])
 		hasAnalyze, target, ok := ExplainAnalyzeTarget(rest)
 		if !ok {
@@ -181,7 +188,7 @@ func ClassifySQL(statement string, d SQLDialect) OpClass {
 			return ClassUnknown
 		}
 		if hasAnalyze {
-			// EXPLAIN ANALYZE (bare or Postgres's `EXPLAIN (ANALYZE, ...)` form) genuinely runs
+			// EXPLAIN/DESCRIBE ANALYZE (bare or Postgres's `EXPLAIN (ANALYZE, ...)` form) genuinely runs
 			// the statement — classify what follows.
 			return ClassifySQL(target, d)
 		}
@@ -198,4 +205,17 @@ func ClassifySQL(statement string, d SQLDialect) OpClass {
 		// express no data intent here.
 		return ClassUnknown
 	}
+}
+
+var (
+	mariadbAnalyzeFormat = regexp.MustCompile(`(?i)^FORMAT\s*=\s*\w+\s+`)
+	mariadbAnalyzeVerbs  = map[string]bool{"SELECT": true, "UPDATE": true, "DELETE": true, "INSERT": true, "REPLACE": true, "WITH": true}
+)
+
+// mariadbAnalyzeTarget returns the statement a MariaDB ANALYZE [FORMAT=...] prefix executes, when
+// the remainder starts with a DML verb.
+func mariadbAnalyzeTarget(rest string) (string, bool) {
+	rest = mariadbAnalyzeFormat.ReplaceAllString(rest, "")
+	f := strings.Fields(rest)
+	return rest, len(f) > 0 && mariadbAnalyzeVerbs[strings.ToUpper(f[0])]
 }
