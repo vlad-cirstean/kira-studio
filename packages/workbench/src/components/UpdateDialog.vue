@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Spinner from '@theme/components/Spinner.vue';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
@@ -54,7 +55,12 @@ function onEscapeOrOutside(e: Event): void {
 
       <DialogBody>
         <template v-if="state === 'installing'">
-          <p class="m-0">
+          <p
+            class="m-0 flex items-center gap-2"
+            role="status"
+            data-testid="update-dialog-installing"
+          >
+            <Spinner :size="13" label="" />
             {{
               t('workbench.update.installing.body', { app: store.appName, version: store.latestVersion })
             }}
