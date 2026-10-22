@@ -9896,6 +9896,7 @@
       },
       "connectionLost": {
         "description": "Connection lost. The data shown was fetched earlier and is read-only until you reconnect.",
+        "error": "Can’t save. The connection was lost.",
         "tooltip": "Connection lost. Reconnect to edit"
       },
       "connectionReadOnly": {

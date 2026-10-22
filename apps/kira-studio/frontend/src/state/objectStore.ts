@@ -21,11 +21,14 @@ export const useObjectStoreStore = defineStore('objectStore', () => {
     connectionId: null as string | null,
     /** The bucket or prefix path a successful upload lands the new object under. */
     containerPath: '',
+    /** Tab the dialog was opened from, when its stale state should gate the upload; null from the tree. */
+    tabId: null as string | null,
   });
 
-  function openUploadDialog(connectionId: string, containerPath: string): void {
+  function openUploadDialog(connectionId: string, containerPath: string, tabId?: string): void {
     state.connectionId = connectionId;
     state.containerPath = containerPath;
+    state.tabId = tabId ?? null;
     state.open = true;
   }
 
@@ -34,7 +37,7 @@ export const useObjectStoreStore = defineStore('objectStore', () => {
   // prefix rows (project/menus.ts) and the Browse panel's own container rows (views/browse/menu.ts),
   // which sit on opposite sides of the project/ -> views/ layering rule, so the item itself lives
   // here rather than in either caller.
-  function uploadMenuItem(connectionId: string, containerPath: string): MenuItem[] {
+  function uploadMenuItem(connectionId: string, containerPath: string, tabId?: string): MenuItem[] {
     const connectionsStore = useConnectionsStore();
     const caps = connectionsStore.states[connectionId]?.caps;
     const record = connectionsStore.connectionRecord(connectionId);
@@ -45,7 +48,7 @@ export const useObjectStoreStore = defineStore('objectStore', () => {
         id: 'upload-file',
         label: t('studio.browse.upload.label'),
         icon: 'cloud-upload',
-        run: () => openUploadDialog(connectionId, containerPath),
+        run: () => openUploadDialog(connectionId, containerPath, tabId),
       },
     ];
   }

@@ -21,6 +21,7 @@ import { formatBytes } from '@workbench/behaviour/format';
 import { computed, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { useObjectStoreStore } from '../state/objectStore';
+import { useStaleDataStore } from '../state/staleData';
 import { useTabsStore } from '../state/tabs';
 import { browseInvalidate } from '../state/viewCommands';
 
@@ -86,6 +87,11 @@ async function onUpload(): Promise<void> {
   const connectionId = objectStoreStore.connectionId;
   const file = chosenFile.value;
   if (!connectionId || !file || !key.value.trim()) return;
+  const originTab = objectStoreStore.tabId;
+  if (originTab && useStaleDataStore().isStale(originTab, originTab, connectionId)) {
+    error.value = t('studio.common.connectionLost.error');
+    return;
+  }
   await runUpload(connectionId, file);
 }
 

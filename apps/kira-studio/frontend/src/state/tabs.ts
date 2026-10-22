@@ -63,7 +63,7 @@ export interface RecentTableEntry {
 const RECENT_TABLES_LIMIT = 20;
 
 // Kinds whose fetched page survives a connection drop (read-only behind StaleDataStrip).
-const KEEPS_DATA_ON_DROP = new Set<StudioTabKind>(['data']);
+const KEEPS_DATA_ON_DROP = new Set<StudioTabKind>(['data', 'document', 'keyvalue']);
 
 // P99 §5.2: split out of tabs — a genuinely separate concern (the P16 design system's Empty.html
 // "Recent tables" list) from the tab collection/activation store below, with exactly one external
