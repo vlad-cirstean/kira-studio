@@ -5,6 +5,7 @@ import { compareNatural } from '@workbench/behaviour/match';
 import { defineStore } from 'pinia';
 import { reactive, toRaw } from 'vue';
 import { data } from '../../bridge/data';
+import { nullCellText } from '../shared/page/cellText';
 import { cell, getPage, pageVersion } from './page';
 
 // Renderer-only, in-memory, per tab — never persisted (not tabs.state_json, not settings,
@@ -18,6 +19,15 @@ type RowKey = Record<string, string | null>;
 interface PendingEdit {
   key: RowKey; // the row's primary key when it was staged — a PK-column edit still addresses the original row
   changes: Record<string, string | null>;
+  original: Record<string, string | null>; // page value per column when first staged; edits off the current page keep it
+}
+
+export interface PendingCellDiff {
+  id: string;
+  keyLabel: string;
+  column: string;
+  before: string | null;
+  after: string | null;
 }
 
 interface PendingDelete {
@@ -245,10 +255,40 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
     const p = ensure(tabId);
     if (p.deletes.has(entry.id)) return; // a row marked for delete is not independently editable
     const existing = p.edits.get(entry.id);
+    const original = { ...(existing?.original ?? {}) };
+    if (!(column in original)) {
+      const col = getPage(tabId)?.columns.findIndex((c) => c.name === column) ?? -1;
+      const view = col >= 0 ? cell(tabId, row, col) : null;
+      original[column] = view && !view.isNull ? view.text : null;
+    }
     p.edits.set(entry.id, {
       key: entry.key,
       changes: { ...(existing?.changes ?? {}), [column]: value },
+      original,
     });
+  }
+
+  /** One entry per staged (row, column) edit, in staging order, for the preview's Changes view. */
+  function editedCells(tabId: string): PendingCellDiff[] {
+    const out: PendingCellDiff[] = [];
+    const p = pendingState[tabId];
+    if (!p) return out;
+    for (const [rowId, edit] of p.edits) {
+      const keyLabel = Object.keys(edit.key)
+        .sort(compareNatural)
+        .map((name) => `${name} = ${edit.key[name] ?? nullCellText()}`)
+        .join(', ');
+      for (const [column, after] of Object.entries(edit.changes)) {
+        out.push({
+          id: `${rowId}\u0000${column}`,
+          keyLabel,
+          column,
+          before: edit.original[column] ?? null,
+          after,
+        });
+      }
+    }
+    return out;
   }
 
   // Every stage/discard function refuses while this tab's commit is in flight: a change staged
@@ -273,8 +313,9 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
     const existing = entry ? p?.edits.get(entry.id) : undefined;
     if (!entry || !existing || !(column in existing.changes)) return;
     const { [column]: _discarded, ...rest } = existing.changes;
+    const { [column]: _original, ...restOriginal } = existing.original;
     if (Object.keys(rest).length === 0) p?.edits.delete(entry.id);
-    else p?.edits.set(entry.id, { key: existing.key, changes: rest });
+    else p?.edits.set(entry.id, { key: existing.key, changes: rest, original: restOriginal });
   }
 
   // The row menu's "Revert row(s)" — un-stages a whole row's pending edit and/or pending delete in
@@ -449,6 +490,7 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
     hasRowChange,
     pendingOnPage,
     offPageCount,
+    editedCells,
     stageEdit,
     discardCellEdit,
     discardRowChange,
