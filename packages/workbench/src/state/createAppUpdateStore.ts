@@ -100,6 +100,7 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
 
     // The status-bar item's own click — ignores dismissal, always reopens.
     function openUpdateDialog(): void {
+      checkError.value = null;
       dialogOpen.value = true;
     }
 
@@ -117,6 +118,8 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
 
     function later(): void {
       if (installing.value) return;
+      // A closed dialog drops its check outcome, so a later open shows the current state.
+      checkError.value = null;
       if (!available.value) {
         dialogOpen.value = false;
         checkRequested.value = false;

@@ -171,3 +171,30 @@ test('menu check finding an update shows it without a second popup', async ({ re
   await expect(window.locator('[data-testid="update-dialog-install"]')).toBeVisible();
   expect(control.log().some((e) => e.channel === IPC.promptsRaise)).toBe(false);
 });
+
+test('a failed menu check does not stick to the dialog once an update is available', async ({
+  relaunch,
+}) => {
+  const { window } = await relaunch({
+    control: [
+      {
+        channel: IPC.updateStatus,
+        response: {
+          updateAvailable: true,
+          currentVersion: '1.2.0',
+          latestVersion: '1.3.0',
+          installLogPath: '/tmp/kira-studio-update.log',
+        },
+      },
+      { channel: IPC.updateCheck, error: { code: 'E_CONFLICT', message: 'Offline.' } },
+    ],
+  });
+  await emitWailsEvent(window, CHANNEL.checkForUpdates, undefined);
+  await expect(window.locator('[data-testid="update-dialog-check-error"]')).toBeVisible();
+  await window.locator('[data-testid="update-dialog-close"]').click();
+  await expect(window.locator('[data-testid="update-dialog"]')).toHaveCount(0);
+
+  await window.click('[data-testid="update-available"]');
+  await expect(window.locator('[data-testid="update-dialog-install"]')).toBeVisible();
+  await expect(window.locator('[data-testid="update-dialog-check-error"]')).toHaveCount(0);
+});
