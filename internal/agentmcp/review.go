@@ -34,7 +34,7 @@ func (s *Server) addReviewTool(srv *mcp.Server) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "reply_review_comment",
 		Description: llmprompts.HeadlessToolReplyReviewComment.Text(s.prompts, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[reviewReplyArgs](s.prompts, llmprompts.HeadlessToolReplyReviewComment.ID(), nil),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[reviewReplyArgs](s.prompts, llmprompts.HeadlessToolReplyReviewComment.ID(), nil), "reply"),
 	}, func(_ context.Context, req *mcp.CallToolRequest, args reviewReplyArgs) (*mcp.CallToolResult, any, error) {
 		var g Grant
 		var ok bool

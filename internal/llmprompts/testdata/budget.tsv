@@ -72,7 +72,7 @@ headless.sandbox.note	331
 headless.tool.finish_step	78
 headless.tool.finish_step.arg.status	86
 headless.tool.finish_step.arg.summary	67
-headless.tool.finish_step.arg.reason	78
+headless.tool.finish_step.arg.reason	80
 headless.tool.finish_step.arg.conflictedFiles	48
 headless.tool.finish_step.arg.lastGitError	30
 headless.tool.finish_step.arg.tried	32

@@ -83,7 +83,7 @@ func TestFinishStepServer(t *testing.T) {
 		t.Fatalf("connect: %v", err)
 	}
 	call := func(s *mcp.ClientSession, status string) *mcp.CallToolResult {
-		res, err := s.CallTool(context.Background(), &mcp.CallToolParams{Name: "finish_step", Arguments: map[string]any{"status": status, "summary": "s-" + status}})
+		res, err := s.CallTool(context.Background(), &mcp.CallToolParams{Name: "finish_step", Arguments: map[string]any{"status": status, "summary": "s-" + status, "reason": "r"}})
 		if err != nil { // the schema enum refuses an unknown status before the handler runs
 			return &mcp.CallToolResult{IsError: true}
 		}
@@ -315,7 +315,7 @@ func TestFinishStepStatusEnum(t *testing.T) {
 		t.Fatal(err)
 	}
 	call := func(status string) bool {
-		res, err := s.CallTool(context.Background(), &mcp.CallToolParams{Name: "finish_step", Arguments: map[string]any{"status": status, "summary": "x"}})
+		res, err := s.CallTool(context.Background(), &mcp.CallToolParams{Name: "finish_step", Arguments: map[string]any{"status": status, "summary": "x", "reason": "r"}})
 		return err == nil && !res.IsError
 	}
 	if call("done") || call("bogus") {

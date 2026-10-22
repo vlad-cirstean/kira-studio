@@ -315,7 +315,7 @@ func (s *Server) addGitTool(srv *mcp.Server) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "git",
 		Description: llmprompts.HeadlessToolGit.Text(s.prompts, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[gitArgs](s.prompts, llmprompts.HeadlessToolGit.ID(), nil),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[gitArgs](s.prompts, llmprompts.HeadlessToolGit.ID(), nil), "worktree", "args"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, a gitArgs) (*mcp.CallToolResult, any, error) {
 		var g Grant
 		var ok bool

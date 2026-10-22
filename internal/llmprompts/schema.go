@@ -68,13 +68,17 @@ func RequireNonEmpty(sch *jsonschema.Schema, props ...string) *jsonschema.Schema
 		if !slices.Contains(sch.Required, name) {
 			panic(fmt.Sprintf("llmprompts: RequireNonEmpty: property %q is not required", name))
 		}
+		// jsonschema-go types a slice ["null","array"]; null would skip minItems, so pin it to array.
+		if prop.Type == "" && len(prop.Types) == 2 && slices.Contains(prop.Types, "null") && slices.Contains(prop.Types, "array") {
+			prop.Type, prop.Types = "array", nil
+		}
 		switch prop.Type {
 		case "string":
 			prop.MinLength = jsonschema.Ptr(1)
 		case "array":
 			prop.MinItems = jsonschema.Ptr(1)
 		default:
-			panic(fmt.Sprintf("llmprompts: RequireNonEmpty: property %q has type %q, want string or array", name, prop.Type))
+			panic(fmt.Sprintf("llmprompts: RequireNonEmpty: property %q has type %q %q, want string or array", name, prop.Type, prop.Types))
 		}
 	}
 	return sch

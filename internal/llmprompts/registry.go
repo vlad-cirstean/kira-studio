@@ -827,7 +827,7 @@ var (
 		`How the step ended. {{range .Results}}{{.ID}} ({{if .OK}}ok{{else}}not ok{{end}}{{if .Description}}: {{.Description}}{{end}}). {{end}}needs_input when the user must decide.`,
 		StatusVars{Results: []ResultVar{{ID: "done", OK: true}, {ID: "failed"}}})
 	_ = arg(HeadlessToolFinishStep.id, "summary", bothApps, NextCall, `One line: what was done, what failed, or the question for the user.`, NoVars{})
-	_ = arg(HeadlessToolFinishStep.id, "reason", bothApps, NextCall, `Why it failed, or what you need. Give it when status is failed or needs_input.`, NoVars{})
+	_ = arg(HeadlessToolFinishStep.id, "reason", bothApps, NextCall, `Why it failed, or what you need. Required when status is not ok or needs_input.`, NoVars{})
 	_ = arg(HeadlessToolFinishStep.id, "conflictedFiles", bothApps, NextCall, `Files that still conflict, relative to the repo.`, NoVars{})
 	_ = arg(HeadlessToolFinishStep.id, "lastGitError", bothApps, NextCall, `Last git error output you saw.`, NoVars{})
 	_ = arg(HeadlessToolFinishStep.id, "tried", bothApps, NextCall, `What you tried before giving up.`, NoVars{})
