@@ -229,7 +229,7 @@ test('space agents board', async ({ relaunch, consoleErrors }) => {
   await expect(win.locator('[data-testid="ade-task"]').first()).toBeVisible();
   await expect(
     win.locator('[data-testid="ade-card"][data-task-id="T_search"] [data-testid="ade-step-label"]'),
-  ).toHaveText('Implement 3/5');
+  ).toHaveText('Make CI green 3/6');
 
   await captureShot(win, { id: 'space-agents-board', detail: { x: 290, y: 180 }, consoleErrors });
 });
