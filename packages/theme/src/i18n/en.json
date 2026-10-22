@@ -881,7 +881,7 @@
         "label": "Import DataGrip Connections…"
       },
       "importPostman": {
-        "label": "Import Postman Collection…"
+        "label": "Import from Postman…"
       },
       "newConnection": {
         "label": "New Connection"
@@ -1609,6 +1609,9 @@
           },
           "disabledBody": {
             "body": "{count} request bodies are switched off in Postman. They are kept, and this app will send them."
+          },
+          "disabledVariables": {
+            "body": "{count} disabled variables were skipped."
           },
           "graphqlBody": {
             "body": "{count} {format} bodies were imported as JSON bodies carrying the same query."
@@ -9308,13 +9311,13 @@
           "body": "{count} gRPC request was skipped. Postman collections can’t represent gRPC requests. | {count} gRPC requests were skipped. Postman collections can’t represent gRPC requests."
         },
         "import": {
-          "title": "Import Postman collection"
+          "title": "Import from Postman"
         },
         "newFolder": {
           "label": "New folder"
         },
         "postmanFilter": {
-          "label": "Postman collection"
+          "label": "Postman export"
         },
         "requestGone": {
           "error": "This request no longer exists."
@@ -9497,6 +9500,12 @@
         "title": "Import curl command"
       },
       "importReport": {
+        "environment": {
+          "description": "Imported environment “{name}”: {variables}."
+        },
+        "failed": {
+          "error": "Couldn’t import {file}: {detail}"
+        },
         "folders": {
           "label": "{count} folder | {count} folders"
         },
@@ -9505,6 +9514,9 @@
         },
         "summary": {
           "description": "Imported “{name}”: {requests}, {folders}."
+        },
+        "variables": {
+          "label": "{count} variable | {count} variables"
         }
       },
       "reveal": {

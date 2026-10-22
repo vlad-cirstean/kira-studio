@@ -20,30 +20,76 @@ const collectionsStore = useCollectionsStore();
 //
 // Alert with the `warn`/`note` tone variants, dynamic per warning count — the same tone
 // vocabulary RawExchangePane.vue's own dynamic-tone strip uses.
-const report = computed(() => collectionsStore.report);
+const result = computed(() => collectionsStore.importResult);
 
-const tone = computed(() => ((report.value?.warnings.length ?? 0) > 0 ? 'warn' : 'info'));
-
-const summary = computed(() => {
-  const r = report.value;
-  if (!r) return '';
-  return t('studio.api.importReport.summary.description', {
-    name: r.name,
-    requests: t('studio.api.importReport.requests.label', { count: r.requests }),
-    folders: t('studio.api.importReport.folders.label', { count: r.folders }),
-  });
+const tone = computed(() => {
+  const files = result.value?.files ?? [];
+  if (files.some((f) => f.kind === '')) return 'error';
+  const warned = files.some((f) => (f.collection ?? f.environment)?.warnings.length);
+  return warned ? 'warn' : 'info';
 });
+
+interface FileLine {
+  key: string;
+  kind: string;
+  text: string;
+  warnings: { kind: string; detail: string }[];
+}
+
+const lines = computed<FileLine[]>(() =>
+  (result.value?.files ?? []).map((f) => {
+    if (f.collection) {
+      const r = f.collection;
+      return {
+        key: f.path,
+        kind: 'collection',
+        text: t('studio.api.importReport.summary.description', {
+          name: r.name,
+          requests: t('studio.api.importReport.requests.label', { count: r.requests }),
+          folders: t('studio.api.importReport.folders.label', { count: r.folders }),
+        }),
+        warnings: r.warnings,
+      };
+    }
+    if (f.environment) {
+      const r = f.environment;
+      return {
+        key: f.path,
+        kind: 'environment',
+        text: t('studio.api.importReport.environment.description', {
+          name: r.name,
+          variables: t('studio.api.importReport.variables.label', { count: r.variables }),
+        }),
+        warnings: r.warnings,
+      };
+    }
+    return {
+      key: f.path,
+      kind: 'failed',
+      text: t('studio.api.importReport.failed.error', { file: f.fileName, detail: f.error ?? '' }),
+      warnings: [],
+    };
+  }),
+);
 </script>
 
 <template>
-  <Alert v-if="report" :variant="tone" strip data-testid="import-report">
-    <div class="flex min-w-0 flex-col gap-0.5">
-      <div data-testid="import-report-summary">{{ summary }}</div>
-      <ul v-if="report.warnings.length > 0" class="m-0 flex flex-col gap-0.5 pl-2">
-        <li v-for="warning in report.warnings" :key="warning.kind" :data-kind="warning.kind">
-          {{ warning.detail }}
-        </li>
-      </ul>
+  <Alert v-if="result" :variant="tone" strip data-testid="import-report">
+    <div class="flex min-w-0 flex-col gap-1">
+      <div
+        v-for="line in lines"
+        :key="line.key"
+        class="flex min-w-0 flex-col gap-0.5"
+        data-testid="import-report-file"
+        :data-kind="line.kind"
+      >
+        <div data-testid="import-report-summary">{{ line.text }}</div>
+        <ul v-if="line.warnings.length > 0" class="m-0 flex flex-col gap-0.5 pl-2">
+          <li v-for="warning in line.warnings" :key="warning.kind" :data-kind="warning.kind">
+            {{ warning.detail }}
+          </li>
+        </ul>
+      </div>
     </div>
     <AlertAction>
       <TooltipIconButton

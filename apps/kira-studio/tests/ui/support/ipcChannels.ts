@@ -35,6 +35,7 @@ export const IPC = {
 
   filesChooseSave: 'kira:files:chooseSave',
   filesChooseOpen: 'kira:files:chooseOpen',
+  filesChooseOpenMany: 'kira:files:chooseOpenMany',
   filesChooseFolder: 'kira:files:chooseFolder',
 
   datagripScan: 'kira:datagrip:scan',

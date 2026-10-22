@@ -1312,3 +1312,52 @@ func (r *VariablesRepo) ImportVariables(collectionID string, vars []postman.Vari
 	}
 	return nil
 }
+
+// ImportEnvironment writes a Postman environment as one environment row plus its variables, in
+// one transaction: a secret that cannot be encrypted leaves nothing behind.
+func (r *VariablesRepo) ImportEnvironment(name string, vars []postman.Variable) (model.Environment, error) {
+	if name == "" {
+		return model.Environment{}, fmt.Errorf("repos/variables: name is required")
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return model.Environment{}, fmt.Errorf("repos/variables: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	order, err := sqlitex.NextSortOrder(tx, "api_environments", "")
+	if err != nil {
+		return model.Environment{}, fmt.Errorf("repos/variables: next environment order: %w", err)
+	}
+	now := kiratime.NowISO()
+	env := model.Environment{ID: uuid.NewString(), Name: name, SortOrder: order, Color: "none"}
+	if _, err := tx.Exec(
+		`INSERT INTO api_environments (id, name, sort_order, is_active, description, color, created_at, updated_at)
+		 VALUES (?, ?, ?, 0, '', ?, ?, ?)`,
+		env.ID, env.Name, env.SortOrder, env.Color, now, now,
+	); err != nil {
+		return model.Environment{}, fmt.Errorf("repos/variables: insert environment: %w", err)
+	}
+	position := 0
+	for _, v := range vars {
+		if v.Name == "" {
+			continue
+		}
+		storedValue, storedSecret, err := r.encryptFor(v.Value, v.Secret)
+		if err != nil {
+			return model.Environment{}, err
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO api_variables (id, collection_id, environment_id, name, value, is_secret, secret_value, sort_order, description, created_at, updated_at)
+			 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			uuid.NewString(), env.ID, v.Name, storedValue, boolToInt(v.Secret), storedSecret, position, v.Description, now, now,
+		); err != nil {
+			return model.Environment{}, fmt.Errorf("repos/variables: insert imported variable: %w", err)
+		}
+		position++
+	}
+	if err := tx.Commit(); err != nil {
+		return model.Environment{}, fmt.Errorf("repos/variables: commit: %w", err)
+	}
+	return env, nil
+}

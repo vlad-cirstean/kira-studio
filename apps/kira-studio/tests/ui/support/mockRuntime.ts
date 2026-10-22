@@ -51,6 +51,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   lifecycleQuitStatus: 'LifecycleService.QuitStatus',
   filesChooseSave: 'FilesService.ChooseSave',
   filesChooseOpen: 'FilesService.ChooseOpen',
+  filesChooseOpenMany: 'FilesService.ChooseOpenMany',
   filesChooseFolder: 'FilesService.ChooseFolder',
   datagripScan: 'DataGripService.Scan',
   datagripImport: 'DataGripService.Import',

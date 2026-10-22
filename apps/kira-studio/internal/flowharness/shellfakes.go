@@ -36,11 +36,14 @@ type Dialogs struct {
 	mu      sync.Mutex
 	saves   []string
 	opens   []string
+	manys   [][]string
 	folders []string
 	// Save, Open and Folder record every request, in order.
-	Save   []bridge.SaveFileRequest
-	Open   []bridge.OpenFileRequest
-	Folder []bridge.OpenDirectoryRequest
+	Save []bridge.SaveFileRequest
+	Open []bridge.OpenFileRequest
+	// OpenMany records every OpenFiles request.
+	OpenMany []bridge.OpenFilesRequest
+	Folder   []bridge.OpenDirectoryRequest
 }
 
 // QueueSaveFile queues the path the next SaveFile returns.
@@ -48,6 +51,13 @@ func (d *Dialogs) QueueSaveFile(path string) { d.push(&d.saves, path) }
 
 // QueueOpenFile queues the path the next OpenFile returns.
 func (d *Dialogs) QueueOpenFile(path string) { d.push(&d.opens, path) }
+
+// QueueOpenFiles queues the paths the next OpenFiles returns.
+func (d *Dialogs) QueueOpenFiles(paths ...string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.manys = append(d.manys, paths)
+}
 
 // QueueDirectory queues the path the next OpenDirectory returns.
 func (d *Dialogs) QueueDirectory(path string) { d.push(&d.folders, path) }
@@ -79,6 +89,18 @@ func (d *Dialogs) OpenFile(req bridge.OpenFileRequest) (string, error) {
 	defer d.mu.Unlock()
 	d.Open = append(d.Open, req)
 	return pop(&d.opens), nil
+}
+
+func (d *Dialogs) OpenFiles(req bridge.OpenFilesRequest) ([]string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.OpenMany = append(d.OpenMany, req)
+	if len(d.manys) == 0 {
+		return nil, nil
+	}
+	p := d.manys[0]
+	d.manys = d.manys[1:]
+	return p, nil
 }
 
 func (d *Dialogs) OpenDirectory(req bridge.OpenDirectoryRequest) (string, error) {

@@ -31,6 +31,10 @@ type ChosenFile struct {
 	Name string `json:"name"`
 	Size int64  `json:"size"`
 }
+type FilesChooseOpenManyResult struct {
+	Canceled bool         `json:"canceled"`
+	Files    []ChosenFile `json:"files"`
+}
 type FilesChooseOpenResult struct {
 	Canceled bool        `json:"canceled"`
 	File     *ChosenFile `json:"file"`
@@ -41,6 +45,9 @@ type FilesChooseOpenResult struct {
 // filter", which is how D8's `*` case is expressed.
 type SaveFileRequest struct{ Directory, Filename string }
 type OpenFileRequest struct{ Title, FilterName, FilterPattern string }
+
+// OpenFilesRequest is OpenFileRequest for a multi-select panel.
+type OpenFilesRequest struct{ Title, FilterName, FilterPattern string }
 
 // OpenDirectoryRequest is P25 D13's folder picker — a "no filters" version of OpenFileRequest,
 // its own type since a filter makes no sense for a directory chooser.
@@ -53,6 +60,8 @@ type OpenDirectoryRequest struct{ Title string }
 type Dialogs interface {
 	SaveFile(req SaveFileRequest) (string, error)
 	OpenFile(req OpenFileRequest) (string, error)
+	// OpenFiles returns no paths for a cancelled dialog.
+	OpenFiles(req OpenFilesRequest) ([]string, error)
 	// OpenDirectory is P25 D13: the same OpenFile panel with CanChooseFiles(false)/
 	// CanChooseDirectories(true) (Wails v3 beta.16's OpenFileDialogStruct already supports this —
 	// no new native mechanism).
@@ -106,6 +115,30 @@ func (s *FilesService) ChooseOpen(args FilesChooseOpenArgs) (FilesChooseOpenResu
 		Canceled: false,
 		File:     &ChosenFile{Path: path, Name: filepath.Base(path), Size: info.Size()},
 	}, nil
+}
+
+// ChooseOpenMany is ChooseOpen with several selections allowed.
+func (s *FilesService) ChooseOpenMany(args FilesChooseOpenArgs) (FilesChooseOpenManyResult, error) {
+	req := OpenFilesRequest{Title: args.Title}
+	if name, pattern, ok := wailsFilter(args.Filters); ok {
+		req.FilterName, req.FilterPattern = name, pattern
+	}
+	paths, err := s.Dialogs.OpenFiles(req)
+	if err != nil {
+		return FilesChooseOpenManyResult{}, ipcerr.InternalErr(err)
+	}
+	if len(paths) == 0 {
+		return FilesChooseOpenManyResult{Canceled: true}, nil
+	}
+	files := make([]ChosenFile, 0, len(paths))
+	for _, path := range paths {
+		info, err := os.Stat(path)
+		if err != nil {
+			return FilesChooseOpenManyResult{}, ipcerr.T(ipcerr.CodeInternal, "backend.studio.file.readFailed.error", map[string]string{"path": path, "detail": err.Error()})
+		}
+		files = append(files, ChosenFile{Path: path, Name: filepath.Base(path), Size: info.Size()})
+	}
+	return FilesChooseOpenManyResult{Files: files}, nil
 }
 
 // FilesChooseFolderArgs / FilesChooseFolderResult are P25 D13's folder picker — ChooseOpen's own

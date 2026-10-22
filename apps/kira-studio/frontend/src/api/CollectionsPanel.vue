@@ -65,7 +65,7 @@ function onNewCollection(): void {
 }
 
 function onImport(): void {
-  void collectionsStore.importCollection();
+  void collectionsStore.importPostman();
 }
 
 // The palette's Variables… entry — opens the tab for
@@ -152,7 +152,7 @@ onUnmounted(() => {
         />
         <!-- The Postman import moved to the menu bar (App → Import Postman Collection…)
            and to the command palette entry it already had. collectionsState.busy still gates
-           re-entry inside importCollection() itself, so a second import cannot start while one
+           re-entry inside importPostman() itself, so a second import cannot start while one
            is running. -->
         <!-- P5 D3/D11: the environments dialog's own entry point — environments exist
            independently of collections, so this lives in the panel's header, not the tree. -->

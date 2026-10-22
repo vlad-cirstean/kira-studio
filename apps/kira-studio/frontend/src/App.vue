@@ -116,7 +116,7 @@ onMounted(() => {
     }),
     control.onImportPostman(() => {
       modeStore.setMode('api');
-      void collectionsStore.importCollection();
+      void collectionsStore.importPostman();
     }),
     control.onImportDataGrip(() => {
       modeStore.setMode('studio');

@@ -9,6 +9,7 @@ import * as VariablesService from '@bindings/variablesservice.js';
 // args/results reference it rather than restating it, so the renderer types against it through
 // vite.config.ts's existing @bindings-internal alias.
 import type * as WailsStorageModels from '@bindings-internal/storage/model/models.js';
+import type { ImportResult } from '@shared/domain/collections';
 import type { PaletteColor } from '@shared/domain/color';
 import type {
   GrpcCallEvent,
@@ -222,8 +223,8 @@ export const apiControl = {
     unwrap(CollectionsService.Delete({ id, target })),
   collectionsMoveItem: (itemId: string, collectionId: string): Promise<void> =>
     unwrap(CollectionsService.MoveItem({ itemId, collectionId })),
-  collectionsImport: (path: string): Promise<WailsModels.ImportReport> =>
-    unwrap(CollectionsService.Import({ path })),
+  collectionsImport: (paths: string[]): Promise<ImportResult> =>
+    unwrap(CollectionsService.Import({ paths })).then((r) => trust<ImportResult>(r)),
   // P5 D16: ExportReport.secretCount is what lets the panel say "N secret values were not
   // written" once, rather than that being a fact only discoverable by opening the file.
   collectionsExport: (collectionId: string, path: string): Promise<WailsModels.ExportReport> =>

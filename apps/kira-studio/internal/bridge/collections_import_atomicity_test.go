@@ -66,12 +66,12 @@ func TestImport_RollsBackTheCollectionWhenImportVariablesFails(t *testing.T) {
 	}}
 
 	path := writeTempCollection(t, importCollectionWithSecretVariable)
-	_, err = svc.Import(CollectionsImportArgs{Path: path})
-	if err == nil {
-		t.Fatal("Import: expected an error from the failing cipher, got nil")
+	res, err := svc.Import(CollectionsImportArgs{Paths: []string{path}})
+	if err != nil {
+		t.Fatalf("Import: %v", err)
 	}
-	if !strings.Contains(err.Error(), errFailingCipher.Error()) {
-		t.Fatalf("Import err = %v, want it to name the cipher failure", err)
+	if len(res.Files) != 1 || res.Files[0].Error == nil || !strings.Contains(*res.Files[0].Error, errFailingCipher.Error()) {
+		t.Fatalf("Import files = %+v, want one entry naming the cipher failure", res.Files)
 	}
 
 	collections, items, err := collectionsRepo.List()

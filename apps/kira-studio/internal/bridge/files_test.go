@@ -32,6 +32,8 @@ func (d *recordingDialogs) OpenFile(req bridge.OpenFileRequest) (string, error) 
 	return d.openRes, d.openErr
 }
 
+func (d *recordingDialogs) OpenFiles(bridge.OpenFilesRequest) ([]string, error) { return nil, nil }
+
 func (d *recordingDialogs) OpenDirectory(req bridge.OpenDirectoryRequest) (string, error) {
 	d.openDirReq = req
 	return d.openDirRes, d.openDirErr

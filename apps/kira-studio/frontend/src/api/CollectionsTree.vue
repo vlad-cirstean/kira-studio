@@ -90,7 +90,7 @@ const actions: CollectionMenuActions = {
       },
       () => announceApp(t('studio.common.copiedUrl.announce')),
     ),
-  importCollection: () => void collectionsStore.importCollection(),
+  importPostman: () => void collectionsStore.importPostman(),
   importCurl: () => importCurlStore.openImportCurlDialog(),
   exportCollection: (row) => void collectionsStore.exportCollection(row.id, row.name),
   variables: (row) => openVariableSetTab('collection', row.id, row.name),
