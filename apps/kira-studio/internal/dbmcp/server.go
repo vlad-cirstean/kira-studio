@@ -47,7 +47,7 @@ type TokenProvider func() (rec mcpauth.Record, plain string, minted bool, err er
 type ConnectionsReader interface {
 	List() ([]model.ConnectionSummary, error)
 	StateOf(connectionID string) model.ConnectionState
-	Connect(connectionID string) (model.ConnectionState, error)
+	ConnectContext(ctx context.Context, connectionID string) (model.ConnectionState, error)
 }
 
 // MetadataReader is dbmcp's own consumer-declared interface over *tree.Service — list_children/

@@ -305,7 +305,7 @@ func (s *Server) resolveVerdict(ctx context.Context, args runQueryArgs) (rv quer
 	// setting, so it was a duplicate repo read (settings.GetAll()) for no correctness benefit.
 	rv.threshold = s.cfg.ExplainThreshold()
 
-	state, cerr := s.connectForQuery(args.ConnectionID)
+	state, cerr := s.connectForQuery(ctx, args.ConnectionID)
 	if cerr != nil {
 		res, out, err = toolError(cerr)
 		return rv, res, out, err, true
@@ -463,7 +463,7 @@ func (s *Server) explainQuery(ctx context.Context, _ *mcp.CallToolRequest, args 
 		return errResult(fmt.Sprintf("connection %q's MCP permissions deny read statements; change them in the connection's MCP tab", summary.Name))
 	}
 
-	state, err := s.connectForQuery(args.ConnectionID)
+	state, err := s.connectForQuery(ctx, args.ConnectionID)
 	if err != nil {
 		return toolError(err)
 	}

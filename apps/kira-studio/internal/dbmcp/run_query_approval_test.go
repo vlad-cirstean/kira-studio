@@ -32,7 +32,7 @@ func (f *fakeConnsMutable) StateOf(string) model.ConnectionState {
 	return model.ConnectionState{Status: "connected"}
 }
 
-func (f *fakeConnsMutable) Connect(string) (model.ConnectionState, error) {
+func (f *fakeConnsMutable) ConnectContext(context.Context, string) (model.ConnectionState, error) {
 	return model.ConnectionState{Status: "connected"}, nil
 }
 

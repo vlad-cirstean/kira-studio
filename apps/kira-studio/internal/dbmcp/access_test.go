@@ -1,6 +1,7 @@
 package dbmcp
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -20,7 +21,7 @@ func (f *fakeConnsReader) List() ([]model.ConnectionSummary, error) { return nil
 
 func (f *fakeConnsReader) StateOf(string) model.ConnectionState { return f.state }
 
-func (f *fakeConnsReader) Connect(string) (model.ConnectionState, error) {
+func (f *fakeConnsReader) ConnectContext(context.Context, string) (model.ConnectionState, error) {
 	f.connectCalls++
 	return f.connectState, f.connectErr
 }
@@ -34,7 +35,7 @@ func TestConnectForQuerySkipsReconnectWhenAlreadyConnected(t *testing.T) {
 	conns := &fakeConnsReader{state: model.ConnectionState{ConnectionID: "c1", Status: "connected"}}
 	s := &Server{cfg: Config{Conns: conns}}
 
-	state, err := s.connectForQuery("c1")
+	state, err := s.connectForQuery(context.Background(), "c1")
 	if err != nil {
 		t.Fatalf("connectForQuery returned err = %v, want nil", err)
 	}
@@ -56,7 +57,7 @@ func TestConnectForQueryConnectsWhenNotConnected(t *testing.T) {
 	}
 	s := &Server{cfg: Config{Conns: conns}}
 
-	state, err := s.connectForQuery("c1")
+	state, err := s.connectForQuery(context.Background(), "c1")
 	if err != nil {
 		t.Fatalf("connectForQuery returned err = %v, want nil", err)
 	}

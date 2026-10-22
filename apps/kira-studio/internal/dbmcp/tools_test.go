@@ -18,7 +18,7 @@ type fakeConnsList struct {
 
 func (f *fakeConnsList) List() ([]model.ConnectionSummary, error) { return f.summaries, nil }
 func (f *fakeConnsList) StateOf(string) model.ConnectionState     { return model.ConnectionState{} }
-func (f *fakeConnsList) Connect(string) (model.ConnectionState, error) {
+func (f *fakeConnsList) ConnectContext(context.Context, string) (model.ConnectionState, error) {
 	return model.ConnectionState{}, nil
 }
 
