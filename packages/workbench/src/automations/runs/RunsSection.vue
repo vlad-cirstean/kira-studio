@@ -60,7 +60,7 @@ function toggle(run: ScriptRun): void {
       data-testid="runs-toggle"
       @toggle="open = !open"
     />
-    <div v-if="open" class="flex max-h-72 min-h-0 flex-col overflow-y-auto">
+    <div v-if="open" class="flex max-h-[50vh] min-h-0 flex-col overflow-y-auto">
       <PanelBar>
         <SecondaryTabs
           variant="segmented"
