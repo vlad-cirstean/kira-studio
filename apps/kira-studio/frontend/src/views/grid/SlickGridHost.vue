@@ -2474,6 +2474,14 @@ watch(
     },
     () => pendingChangesStore.isCommitting(props.tabId),
     () => gridViewStore.isStale(props.tabId),
+    // Staging or discarding the selected cell republishes, so the dock's value and diff base follow it.
+    () => {
+      const p = getPage(props.tabId);
+      const t = selectionTarget();
+      if (!p || !t) return undefined;
+      const column = p.columns[pageColumnIndexFor(p, currentOrder(), t.col)];
+      return column ? pendingChangesStore.stagedValue(props.tabId, t.row, column.name) : undefined;
+    },
   ],
   () => {
     const p = getPage(props.tabId);
@@ -2509,6 +2517,9 @@ watch(
       column,
       row: targetRow,
       value: view.isNull ? null : view.text,
+      original: masked
+        ? undefined
+        : pendingChangesStore.stagedOriginal(props.tabId, targetRow, column.name),
       truncated: view.truncated,
       masked,
       hasPrimaryKey: hasPrimaryKey(),

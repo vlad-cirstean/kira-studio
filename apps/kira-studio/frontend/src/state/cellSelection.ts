@@ -17,6 +17,9 @@ export interface SelectedCell {
   row: number;
   /** The decoded server text. `null` means SQL NULL — an empty string is `''` (D14). */
   value: string | null;
+  /** Stored value under a staged edit of this cell; absent when nothing is staged. The cell editor
+   *  diffs its buffer against it. */
+  original?: string | null;
   /** The engine cut this value at MAX_CELL_BYTES; the rest was never fetched (D14). */
   truncated: boolean;
   /** True when `value` is the grid's own mask-preview redaction, not the stored value —

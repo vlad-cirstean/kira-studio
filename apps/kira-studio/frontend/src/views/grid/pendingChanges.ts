@@ -193,6 +193,12 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
     return entry ? pendingState[tabId]?.edits.get(entry.id)?.changes[column] : undefined;
   }
 
+  function stagedOriginal(tabId: string, row: number, column: string): string | null | undefined {
+    const entry = rowKeyOf(tabId, row);
+    const edit = entry ? pendingState[tabId]?.edits.get(entry.id) : undefined;
+    return edit && column in edit.changes ? (edit.original[column] ?? null) : undefined;
+  }
+
   // Non-reactive twins for dataSource.ts's per-cell/per-row hot path (see rawPendingFor above):
   // pending state is read through toRaw, and a tab with nothing staged returns before any key work.
   function rawStagedValue(tabId: string, row: number, column: string): string | null | undefined {
@@ -485,6 +491,7 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
     pageHasFullPrimaryKey,
     isPendingDelete,
     stagedValue,
+    stagedOriginal,
     rawStagedValue,
     rawRowChange,
     hasRowChange,
