@@ -39,8 +39,16 @@ export function useStreamGate(tab: () => StreamTabRecord) {
   // The UI reads Caps, not connection.kind, to decide what to offer; kind only picks wording.
   const isKafka = computed(() => connRecord.value?.kind === 'kafka');
   // Caps are static per adapter; the connection's read-only flag narrows them here.
-  const canInsert = computed(() => (caps.value?.canInsert ?? false) && !connRecord.value?.readOnly);
-  const canDelete = computed(() => (caps.value?.canDelete ?? false) && !connRecord.value?.readOnly);
+  // Shown page outlived its connection: kept, read-only, behind StaleDataStrip.
+  const stale = computed(() => streamViewStore.isStale(tab().id));
+  const canInsertCaps = computed(
+    () => (caps.value?.canInsert ?? false) && !connRecord.value?.readOnly,
+  );
+  const canDeleteCaps = computed(
+    () => (caps.value?.canDelete ?? false) && !connRecord.value?.readOnly,
+  );
+  const canInsert = computed(() => canInsertCaps.value && !stale.value);
+  const canDelete = computed(() => canDeleteCaps.value && !stale.value);
   const isReadOnlyBatch = computed(() => isBatch.value && (connRecord.value?.readOnly ?? false));
 
   const redriveLimit = computed(() => page.value?.maxReceiveCount ?? null);
@@ -59,6 +67,9 @@ export function useStreamGate(tab: () => StreamTabRecord) {
     page,
     isBatch,
     isKafka,
+    stale,
+    canInsertCaps,
+    canDeleteCaps,
     canInsert,
     canDelete,
     isReadOnlyBatch,

@@ -126,6 +126,15 @@ const hasSelectedRow = computed(
   () => rt.value?.selectedRow !== null && rt.value?.selectedRow !== undefined,
 );
 
+const deleteLabel = computed(() => {
+  if (gate.stale.value) return t('studio.common.connectionLost.tooltip');
+  return t(
+    hasSelectedRow.value
+      ? 'studio.stream.deleteSelected.tooltip'
+      : 'studio.stream.selectFirst.tooltip',
+  );
+});
+
 // SQS-only Delete targets the selected row; the context menu stays copy-only for every engine.
 async function onDeleteMessage(): Promise<void> {
   const selectedRow = rt.value?.selectedRow;
@@ -142,6 +151,10 @@ async function onDeleteMessage(): Promise<void> {
     tone: 'danger',
   });
   if (!confirmed) return;
+  if (gate.stale.value) {
+    streamViewStore.setActionError(props.tab.id, t('studio.common.connectionLost.error'));
+    return;
+  }
   try {
     await deleteSqsMessage(props.tab.id, row.key);
     streamViewStore.setActionError(props.tab.id, null);
@@ -280,9 +293,11 @@ async function onDeleteMessage(): Promise<void> {
     <div class="flex items-center gap-1.5 min-w-0">
       <div class="relative">
         <TooltipIconButton
-          v-if="gate.canInsert.value"
+          v-if="gate.canInsertCaps.value"
           :icon="ICON.add"
-          :label="t(isKafka ? 'studio.stream.produce.label' : 'studio.stream.send.label')"
+          :label="gate.stale.value ? t('studio.common.connectionLost.tooltip') : t(isKafka ? 'studio.stream.produce.label' : 'studio.stream.send.label')"
+          disabled-trigger
+          :disabled="gate.stale.value"
           :aria-label="t('studio.stream.addMessage.aria')"
           ref="addMessageTriggerEl"
           data-testid="stream-add-message"
@@ -306,12 +321,12 @@ async function onDeleteMessage(): Promise<void> {
         </Popover>
       </div>
       <TooltipIconButton
-        v-if="gate.canDelete.value"
+        v-if="gate.canDeleteCaps.value"
         :icon="ICON.delete"
-        :label="t(hasSelectedRow ? 'studio.stream.deleteSelected.tooltip' : 'studio.stream.selectFirst.tooltip')"
+        :label="deleteLabel"
         :aria-label="t('studio.stream.deleteMessage.aria')"
         disabled-trigger
-        :disabled="!hasSelectedRow"
+        :disabled="!hasSelectedRow || gate.stale.value"
         data-testid="stream-delete-message"
         @click="onDeleteMessage"
       />

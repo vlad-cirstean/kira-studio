@@ -13,6 +13,7 @@ import { computed, onMounted, onUnmounted } from 'vue';
 import type { StreamTabRecord } from '../../state/tabDomain';
 import EngineIcon from '../../theme/EngineIcon.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
+import StaleDataStrip from '../shared/StaleDataStrip.vue';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import StreamFilterRow from './StreamFilterRow.vue';
 import StreamRowsTable from './StreamRowsTable.vue';
@@ -101,6 +102,12 @@ onUnmounted(() => {
         <StreamToolbar :tab="tab" @refresh="onRefresh" />
         <StreamFilterRow v-if="isKafka" :tab="tab" />
 
+        <StaleDataStrip
+          v-if="gate.stale.value"
+          testid="stream-stale"
+          :reconnecting="reconnecting"
+          @reconnect="onReconnectAndLoad"
+        />
         <Alert v-if="isBatch" variant="warn" strip data-testid="stream-poll-warning">
           <AlertDescription v-if="isReadOnlyBatch">
             {{ t('studio.stream.pollWarningReadOnly.description', { duration: hideDuration }) }}
@@ -125,7 +132,7 @@ onUnmounted(() => {
         </Alert>
 
         <EmptyState
-          v-if="needsReconnect"
+          v-if="needsReconnect && !page"
           data-testid="stream-reconnect"
           icon="plug"
           :title="t('studio.common.disconnected.empty')"

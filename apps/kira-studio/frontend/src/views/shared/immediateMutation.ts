@@ -16,7 +16,7 @@ export function createImmediateMutator<
   findTab(tabId: string): T | null;
   reload(tabId: string): Promise<void>;
   /** Backstop behind the gated UI: refuses a write whose shown data outlived its connection. */
-  isStale?(tabId: string): boolean;
+  isStale(tabId: string): boolean;
 }): (
   tabId: string,
   ops: MutationRowOp[],
@@ -25,7 +25,7 @@ export function createImmediateMutator<
   return async (tabId, ops, after) => {
     const tab = opts.findTab(tabId);
     if (!tab?.connectionId) return;
-    if (opts.isStale?.(tabId)) throw new Error(t('studio.common.connectionLost.error'));
+    if (opts.isStale(tabId)) throw new Error(t('studio.common.connectionLost.error'));
     await data.mutate({
       opId: crypto.randomUUID(),
       tabId,

@@ -12,6 +12,7 @@ import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import PanelHeader from '@workbench/components/PanelHeader.vue';
 import { computed, ref } from 'vue';
 import { produceKafkaMessage, sendSqsMessage } from './mutations';
+import { useStreamViewStore } from './state';
 
 // The "Add message" panel — Kafka gets key/body/headers (kafka/produce.ts's three
 // sentinel fields); SQS gets body/headers but no key (SendMessage has no key concept on this
@@ -30,7 +31,10 @@ const body = ref('');
 const headers = ref('');
 
 const isKafka = computed(() => props.kind === 'kafka');
-const canSubmit = computed(() => body.value.trim() !== '' && !send.pending.value);
+const streamViewStore = useStreamViewStore();
+const canSubmit = computed(
+  () => body.value.trim() !== '' && !send.pending.value && !streamViewStore.isStale(props.tabId),
+);
 
 const send = useAsyncAction(() => {
   const headersValue = headers.value.trim() === '' ? null : headers.value;

@@ -130,6 +130,7 @@ function onCellClick(i: number, column: CellColumn): void {
     value,
     truncated: isBody && (row?.isTruncated ?? false),
     hasPrimaryKey: true,
+    stale: streamViewStore.isStale(props.tab.id),
   };
   cellSelectionStore.publishSelectedCell(selected);
 }

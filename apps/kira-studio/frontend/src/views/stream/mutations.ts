@@ -11,6 +11,7 @@ import { useStreamViewStore } from './state';
 const mutate = createImmediateMutator({
   findTab: (tabId: string) => useTabsStore().findStreamTab(tabId),
   reload: (tabId: string) => useStreamViewStore(pinia).reload(tabId),
+  isStale: (tabId: string) => useStreamViewStore(pinia).isStale(tabId),
 });
 
 export async function produceKafkaMessage(
