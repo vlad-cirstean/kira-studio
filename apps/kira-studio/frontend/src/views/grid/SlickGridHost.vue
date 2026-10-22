@@ -72,7 +72,6 @@ import {
 } from '../shared/slick/gridHostShared';
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
 import { createScrollVelocityTracker } from '../shared/slick/scrollVelocity';
-import { computeSelEdgeHashes, SEL_EDGE_LAYER_KEYS } from '../shared/slick/selectionEdges';
 import { attachScrollProbes, createHybridSelectionModel } from '../shared/slick/selectionModel';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import FkPreviewPopover from './FkPreviewPopover.vue';
@@ -867,32 +866,6 @@ function fieldAtDisplayCol(displayCol: number): string | undefined {
   return c ? String(c.field) : undefined;
 }
 
-// P22 D10: moved to views/shared/slick/selectionEdges.ts, verbatim, so
-// views/console/ConsoleSlickGrid.vue can share it (F17/F18) — see that file's own header comment.
-function refreshSelEdges(selOverride?: Selection | null): void {
-  if (!grid || !dataSource) return;
-  const sel = selOverride !== undefined ? selOverride : (rt()?.selection ?? null);
-  // Display row count, not the page's own row count (same fix as onSelectAll/
-  // onHeaderSelectClick's own `displayRowCount`) — `pos` (a display position) is compared
-  // against the display-row bounds, correct with or without an active filter; comparing the
-  // underlying *page* row against `pageRowCount - 1` was not — under a filter the last row
-  // rendered can have a page-row index far short of `pageRowCount - 1` (or the filter
-  // can even exclude the true first/last page row), so the bottom (and top) selection-perimeter
-  // line would fail to draw at all. Only consulted for a 'column' selection's own top/bottom test.
-  const displayRowCount = currentDisplayRows()?.length ?? getPage(props.tabId)?.rowCount ?? 0;
-  const hashes = computeSelEdgeHashes(
-    sel,
-    grid.lastRenderedRowBounds,
-    (pos) => dataSource?.getItem(pos).row ?? pos,
-    fieldAtDisplayCol,
-    displayRowCount,
-    grid.getColumns().length - 1, // minus the gutter
-  );
-  SEL_EDGE_LAYER_KEYS.forEach((key, i) => {
-    grid?.setCellCssStyles(key, hashes[i] as EdgeHash);
-  });
-}
-
 // D4 (fix) — live visual feedback for a cell-range drag. SlickHybridSelectionModel's own
 // `handleCellRangeSelected` intentionally no-ops for a CELL-mode `onCellRangeSelecting` call
 // (only `onCellRangeSelected`, at drag end, calls `setSelectedRanges` — §4.1 item 3's own
@@ -918,7 +891,6 @@ function onCellRangeSelecting(_e: unknown, args: { range: SlickRange }): void {
   if (!grid || !dataSource || !selectionModel || selectionModel.currentSelectionModeIsRow()) return;
   const posSel = selectionFromRanges([args.range], false, null);
   const pageSel = posSel ? toPageRowSelection(posSel) : null;
-  refreshSelEdges(pageSel);
   const ds = dataSource;
   grid.setCellCssStyles(
     'kira-cell-selected',
@@ -957,8 +929,8 @@ function refreshStagedLayer(): void {
 }
 
 // `kira-search`'s own row: "every match", not clipped to the rendered range the way
-// `kira-sel-edges`/`kira-staged` are (a rectangle's perimeter, or a handful of staged rows, are
-// cheap to re-walk on every render-band change; a search result is neither bounded that way, so
+// `kira-staged` is (a handful of staged rows is
+// cheap to re-walk on every render-band change; a search result is not bounded that way, so
 // this only recomputes on the result or current match changing, plus a live filter shifting every
 // match's own display position, both watched below). With 10 000 matches active, a selection
 // change must still land inside the same 150ms sandbox bound this file's other cost gates use;
@@ -1007,7 +979,6 @@ function onGridRendered(): void {
 
   if (band.start !== lastCssLayerBand.start || band.end !== lastCssLayerBand.end) {
     lastCssLayerBand = { start: band.start, end: band.end };
-    refreshSelEdges();
     refreshStagedLayer();
   }
   // Places an always-visible button per nav-eligible rendered cell (see
@@ -1373,7 +1344,6 @@ function onSelectAll(): void {
   if (!entry || !all) return;
   entry.selection = toPageRowSelection(all);
   selectAllActive.value = true;
-  refreshSelEdges();
 }
 
 function onHeaderClick(_e: unknown, args: OnHeaderClickEventArgs): void {
@@ -1486,9 +1456,8 @@ function refreshSelectionForFilterChange(): void {
   const colCount = grid.getColumns().length - 1; // minus the gutter
   pendingSelectionKind = visibleSel?.kind === 'column' ? 'column' : null;
   // `setSelectedRanges([])`/`setSelectedRanges(ranges)` both fire `onSelectedRangesChanged`
-  // (below), which re-derives `rt().selection` from the ranges just pushed and refreshes the
-  // perimeter-fill layer — no need to assign `runtimeEntry.selection` or call `refreshSelEdges`
-  // here too, only to push the geometry.
+  // (below), which re-derives `rt().selection` from the ranges just pushed — no need to assign
+  // `runtimeEntry.selection` here too, only to push the geometry.
   selectionModel.setSelectedRanges(
     visibleSel
       ? rangesFromSelection(toPositionSelection(visibleSel), displayRowCount, colCount)
@@ -1509,8 +1478,6 @@ function onSelectedRangesChanged(_e: unknown, ranges: SlickRange[]): void {
   pendingSelectionKind = null;
   const posSel = selectionFromRanges(ranges, rowMode, kind);
   runtimeEntry.selection = posSel ? toPageRowSelection(posSel) : null;
-  // C5/§5 D5 — the perimeter layer's other trigger, beside a rendered-band change (onGridRendered).
-  refreshSelEdges();
 }
 
 // The header select zone's own click semantics (DataGrid.vue's onHeaderSelectClick, content —

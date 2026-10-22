@@ -4,9 +4,8 @@ import { GUTTER_WIDTH } from '../page/columns';
 import type { EdgeHash } from './cssLayers';
 import type { Selection } from './selection';
 
-// The remainder of the move (see selectionEdges.ts's own header comment): five more pieces
-// views/console/ConsoleSlickGrid.vue and views/grid/SlickGridHost.vue still carried as
-// separate, byte-identical (or near-identical) copies. Same rule as selectionEdges.ts: pure
+// Pieces views/console/ConsoleSlickGrid.vue and views/grid/SlickGridHost.vue shared as
+// byte-identical (or near-identical) copies. Pure
 // functions/callbacks only, no reference to either host's own `grid`/`dataSource` module-scope
 // `let`s — biome.json's own views/<kind>/* boundary is why this lives here rather than being
 // imported cross-kind.
@@ -45,9 +44,8 @@ export function gutterColumn(
   };
 }
 
-/** The drag-in-progress fill preview — the live twin of
- *  `computeSelEdgeHashes`' perimeter, same "every caller hands in its own rendered-bounds/
- *  page-row/field mapping" shape. `fieldAtDisplayCol` returning `undefined` (SlickGridHost.vue's
+/** The drag-in-progress fill preview. Every caller hands in its own rendered-bounds/
+ *  page-row/field mapping. `fieldAtDisplayCol` returning `undefined` (SlickGridHost.vue's
  *  own case, whose columns can be reordered/hidden) skips that cell rather than writing a
  *  `undefined` field key — a no-op for ConsoleSlickGrid.vue's own `colField`, which never returns
  *  undefined. */
