@@ -108,9 +108,9 @@ duplicated here; this file only points at them.
   (commits, findings files, plans) must be enough to see exactly where it stopped and pick back up
   — never a state where recovering means re-deriving work an interrupted subagent already did but
   never wrote down.
-- **Arm a wakeup on every usage-limit stop.** Limits are unreadable here. On a limit message, call
-  `send_later` for the reset time (else 60 minutes) with "resume from `SPEC.md`, `plans/`, git log".
-  Cancel it when done.
+- **Only after a usage-limit message, set a wakeup.** Never set one otherwise. Limits are unreadable
+  here. Call `send_later` for the reset time (else 60 minutes) with "resume from `SPEC.md`, `plans/`,
+  git log". Cancel it when done.
 - **A failing test, lint finding, typecheck error, or any other code-quality/hook check gets fixed
   on the spot, pre-existing or not.** "Pre-existing" justifies skipping root-cause investigation of
   whether *this phase* caused it, never skipping the fix itself. Confirm it predates the phase (e.g.
