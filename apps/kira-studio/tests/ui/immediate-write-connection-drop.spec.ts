@@ -5,6 +5,7 @@ import {
 } from '../ipc/redis/redis.fixture';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { disconnectConnection } from './support/connect';
 import { IPC } from './support/ipcChannels';
 import {
   DB_PATH as MONGO_DB_PATH,
@@ -57,11 +58,6 @@ const REDIS_CONTROL: ControlSnapshot[] = [
 const SESSION_NS = `${REDIS_DB0}/namespace:session`;
 const SESSION_KEY = `${SESSION_NS}/key:session%3Aabc`;
 
-async function disconnect(page: import('@playwright/test').Page): Promise<void> {
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-disconnect"]');
-}
-
 test('documents keep rows and the open editor read-only after a drop', async ({ relaunch }) => {
   const { window: page, stream } = await relaunch({
     control: MONGO_CONTROL,
@@ -94,7 +90,7 @@ test('documents keep rows and the open editor read-only after a drop', async ({ 
   await page.locator('[data-testid="document-edit"]').first().click();
   await expect(page.locator('[data-testid="document-edit-save"]')).toBeEnabled();
 
-  await disconnect(page);
+  await disconnectConnection(page);
 
   await expect(page.locator('[data-testid="document-stale"]')).toBeVisible();
   await expect(page.locator('[data-testid="document-reconnect"]')).toHaveCount(0);
@@ -121,7 +117,7 @@ test('a key/value tab keeps its value read-only after a drop', async ({ relaunch
     timeout: 15_000,
   });
 
-  await disconnect(page);
+  await disconnectConnection(page);
 
   await expect(page.locator('[data-testid="keyvalue-stale"]')).toBeVisible();
   await expect(view.locator('[data-testid="keyvalue-row"]').first()).toContainText('token-abc');
@@ -151,7 +147,7 @@ test('browse keeps the level and preview read-only after a drop', async ({ relau
     timeout: 15_000,
   });
 
-  await disconnect(page);
+  await disconnectConnection(page);
 
   await expect(page.locator('[data-testid="browse-stale"]')).toBeVisible();
   await expect(page.locator('[data-testid="browse-reconnect"]')).toHaveCount(0);

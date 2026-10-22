@@ -161,3 +161,9 @@ export async function openConsoleFromMenu(page: Page, path: string): Promise<voi
   await openRowMenu(page, path);
   await page.click('[data-testid="menu-item-open-console"]');
 }
+
+/** Disconnects the connection whose root row is shown, through the tree menu. */
+export async function disconnectConnection(page: Page): Promise<void> {
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-disconnect"]');
+}
