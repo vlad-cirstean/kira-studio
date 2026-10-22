@@ -621,6 +621,12 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
     }
   }
 
+  /** Marks shown results current for the connection's present session (reconnect; no rerun). */
+  function restamp(tabId: string): void {
+    const connectionId = useTabsStore().findConsoleTab(tabId)?.connectionId;
+    if (connectionId) useStaleDataStore().stamp(tabId, connectionId);
+  }
+
   /** Shown results are stale: connection gone, or produced under another connection session. */
   function isStale(tabId: string): boolean {
     const connectionId = useTabsStore().findConsoleTab(tabId)?.connectionId;
@@ -630,6 +636,7 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
   return {
     runtime,
     isStale,
+    restamp,
     toggleSearchOpen,
     setSearchOpen,
     isResultDocExpanded,

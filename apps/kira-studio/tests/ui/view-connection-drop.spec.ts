@@ -179,3 +179,68 @@ test('console results stay selectable after a drop and a new run clears the stri
   await expect(view.locator('[data-testid="console-stale"]')).toHaveCount(0);
   await expect(grid.first()).toContainText('10');
 });
+
+// A restored tab was never loaded: it shows only the reconnect gate, never the stale strip.
+function restoredTab(kind: string, connectionId: string, path: string, state: object) {
+  return { id: `tab-restored-${kind}`, connectionId, path, kind, order: 0, active: true, state };
+}
+
+test('a restored stream tab shows the reconnect gate without the stale strip', async ({
+  relaunch,
+}) => {
+  const control: ControlSnapshot[] = [
+    ...(kafkaControl as ControlSnapshot[]),
+    {
+      channel: IPC.tabsList,
+      response: [restoredTab('stream', 'test-kafka', KAFKA_TOPIC_PATH, {})],
+    },
+  ];
+  const { window: page } = await relaunch({ control, stream: kafkaPorts });
+  const view = page.locator(`[data-testid="stream-view"][data-path="${KAFKA_TOPIC_PATH}"]`);
+  await expect(view.locator('[data-testid="stream-reconnect"]')).toBeVisible();
+  await expect(view.locator('[data-testid="stream-stale"]')).toHaveCount(0);
+});
+
+test('a restored definition tab shows the reconnect gate without the stale strip', async ({
+  relaunch,
+}) => {
+  const control: ControlSnapshot[] = [
+    {
+      channel: IPC.connectionsList,
+      response: [postgresConnectionSummary(PG_ID, 'View Drop DB', 'green')],
+    },
+    { channel: IPC.tabsList, response: [restoredTab('definition', PG_ID, ORDER_ITEMS_PATH, {})] },
+  ];
+  const { window: page } = await relaunch({ control, stream: PG_FIXTURE.port });
+  const view = page.locator('[data-testid="definition-view"]');
+  await expect(view.locator('[data-testid="definition-reconnect"]')).toBeVisible();
+  await expect(view.locator('[data-testid="definition-stale"]')).toHaveCount(0);
+});
+
+test('console reconnect clears the strip and keeps the results without rerunning', async ({
+  relaunch,
+}) => {
+  const port = [
+    ...PG_FIXTURE.port,
+    executeSnap(PG_ID, ['SELECT 10 AS a'], [numberPage('a', '10')]),
+  ];
+  const { window: page, stream } = await relaunch({ control: PG_CONTROL_BASE, stream: port });
+  await connectAndExpand(page, 'View Drop DB', 'green');
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const view = page.locator('[data-testid="console-view"]');
+  await typeInto(view, page, 'SELECT 10 AS a;');
+  await page.click('[data-testid="console-run-statement"]');
+  const grid = view.locator('[data-testid="console-result-grid"]');
+  await expect(grid.first()).toContainText('10');
+  const runs = async () => (await stream.ops()).filter((o) => o.op === DATA_OP.execute).length;
+  const before = await runs();
+
+  await disconnectConnection(page);
+  await expect(view.locator('[data-testid="console-stale"]')).toBeVisible();
+  await expect(view.locator('[data-testid="console-stale-reconnect"]')).toHaveText('Reconnect');
+
+  await view.locator('[data-testid="console-stale-reconnect"]').click();
+  await expect(view.locator('[data-testid="console-stale"]')).toHaveCount(0);
+  await expect(grid.first()).toContainText('10');
+  expect(await runs()).toBe(before);
+});

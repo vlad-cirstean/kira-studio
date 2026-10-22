@@ -44,7 +44,12 @@ const props = defineProps<{ tab: ConsoleTabRecord }>();
 const tabRef = computed(() => props.tab);
 
 // A console tab hydrates without loading anything, so no onLoad is passed.
-const { needsReconnect, onReconnectAndLoad } = useConnectionGate(() => props.tab);
+const { needsReconnect, reconnecting, onReconnectAndLoad } = useConnectionGate(() => props.tab);
+
+// Results are read-only output: reconnecting only restores the session, never reruns a statement.
+async function onStaleReconnect(): Promise<void> {
+  if (await onReconnectAndLoad()) consoleViewStore.restamp(props.tab.id);
+}
 
 const rt = computed(() => consoleViewStore.runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
@@ -436,8 +441,9 @@ onUnmounted(() => {
           <StaleDataStrip
             v-if="stale && hasResults"
             testid="console-stale"
-            :reconnecting="starting"
-            @reconnect="onReconnectAndLoad"
+            reconnect-only
+            :reconnecting="reconnecting"
+            @reconnect="onStaleReconnect"
           />
           <ConsoleResultStrip
             :tab-id="tab.id"

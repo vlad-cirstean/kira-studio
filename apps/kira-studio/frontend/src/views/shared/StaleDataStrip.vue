@@ -3,7 +3,7 @@ import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 
-defineProps<{ reconnecting: boolean; testid: string }>();
+defineProps<{ reconnecting: boolean; testid: string; reconnectOnly?: boolean }>();
 defineEmits<{ reconnect: [] }>();
 </script>
 
@@ -18,7 +18,9 @@ defineEmits<{ reconnect: [] }>();
         :pending="reconnecting"
         @click="$emit('reconnect')"
       >
-        {{ t('studio.common.reconnectAndLoad.label') }}
+        {{
+          t(reconnectOnly ? 'studio.common.reconnect.label' : 'studio.common.reconnectAndLoad.label')
+        }}
       </Button>
     </AlertAction>
   </Alert>

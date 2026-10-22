@@ -363,7 +363,7 @@ const breadcrumb = computed(() => {
          this fixes. The chrome above always renders; only the body — the part that needs
          a live connection — swaps for the gate. -->
     <StaleDataStrip
-      v-if="stale"
+      v-if="stale && rt?.definition"
       testid="definition-stale"
       :reconnecting="reconnecting"
       @reconnect="onReconnectAndLoad"

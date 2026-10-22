@@ -103,7 +103,7 @@ onUnmounted(() => {
         <StreamFilterRow v-if="isKafka" :tab="tab" />
 
         <StaleDataStrip
-          v-if="gate.stale.value"
+          v-if="gate.stale.value && page"
           testid="stream-stale"
           :reconnecting="reconnecting"
           @reconnect="onReconnectAndLoad"

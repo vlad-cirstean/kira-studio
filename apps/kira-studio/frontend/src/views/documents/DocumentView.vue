@@ -365,7 +365,7 @@ onUnmounted(() => {
     <DocumentFilterRow :tab="tab" />
 
     <StaleDataStrip
-      v-if="stale"
+      v-if="stale && hasPage"
       testid="document-stale"
       :reconnecting="reconnecting"
       @reconnect="onReconnectAndLoad"
