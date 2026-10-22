@@ -122,7 +122,7 @@ func Build(svc *memory.Service, opts Options) *mcp.Server {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "memory_history",
 		Description: llmprompts.MemoryToolMemoryHistory.Text(src, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[historyInput](src, llmprompts.MemoryToolMemoryHistory.ID(), nil),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[historyInput](src, llmprompts.MemoryToolMemoryHistory.ID(), nil), "id"),
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, recovering("memory_history", func(ctx context.Context, _ *mcp.CallToolRequest, in historyInput) (*mcp.CallToolResult, memory.History, error) {
 		h, err := svc.History(ctx, in.ID)
@@ -135,9 +135,9 @@ func Build(svc *memory.Service, opts Options) *mcp.Server {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "memory_context",
 		Description: llmprompts.MemoryToolMemoryContext.Text(src, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[contextInput](src, llmprompts.MemoryToolMemoryContext.ID(), map[string]any{
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[contextInput](src, llmprompts.MemoryToolMemoryContext.ID(), map[string]any{
 			"limit": llmprompts.LimitVars{Default: memory.DefaultContextLimit, Max: memory.MaxContextLimit},
-		}),
+		}), "id"),
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, recovering("memory_context", func(ctx context.Context, _ *mcp.CallToolRequest, in contextInput) (*mcp.CallToolResult, memory.Context, error) {
 		c, err := svc.Context(ctx, in.ID, in.Limit)
@@ -180,6 +180,7 @@ func storeSchema(src llmprompts.Source) *jsonschema.Schema {
 		"items":  llmprompts.MaxVars{Max: memory.MaxItems},
 		"groups": llmprompts.MaxVars{Max: memory.MaxGroups},
 	})
+	llmprompts.RequireNonEmpty(sch, "items")
 	enum := func(prop *jsonschema.Schema, values ...string) {
 		for _, v := range values {
 			prop.Enum = append(prop.Enum, v)
@@ -197,6 +198,7 @@ func searchSchema(src llmprompts.Source) *jsonschema.Schema {
 	sch := llmprompts.InputSchema[searchInput](src, llmprompts.MemoryToolSearchMemories.ID(), map[string]any{
 		"limit": llmprompts.LimitVars{Default: memory.DefaultSearchLimit, Max: memory.MaxSearchLimit},
 	})
+	llmprompts.RequireNonEmpty(sch, "query")
 	enum := func(prop *jsonschema.Schema, values ...string) {
 		for _, v := range values {
 			prop.Items.Enum = append(prop.Items.Enum, v)
