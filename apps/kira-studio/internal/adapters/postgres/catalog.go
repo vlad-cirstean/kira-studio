@@ -133,7 +133,7 @@ func listRelationsAndFunctions(ctx context.Context, exec queryExec, databaseSegm
 	        obj_description(c.oid, 'pg_class') AS comment
 	 FROM pg_class c
 	 JOIN pg_namespace n ON n.oid = c.relnamespace
-	 WHERE n.nspname = $1 AND c.relkind = ANY('{r,p,v,m,S}')
+	 WHERE n.nspname = $1 AND c.relkind = ANY('{r,p,v,m,S}') AND NOT c.relispartition
 	 ORDER BY CASE c.relkind WHEN 'r' THEN 0 WHEN 'p' THEN 0 WHEN 'v' THEN 1
 	                         WHEN 'm' THEN 2 WHEN 'S' THEN 3 END, c.relname`,
 		[]any{schema}, func(rows pgx.Rows) error {
@@ -160,9 +160,9 @@ func listRelationsAndFunctions(ctx context.Context, exec queryExec, databaseSegm
 					model.PathSegment{Kind: "schema", Name: schema},
 					model.PathSegment{Kind: kind, Name: name},
 				),
-				// P19 D5: every relation is a leaf — a table/view/matview's columns moved into
-				// the definition view, and a sequence never had children.
-				HasChildren: false, Detail: detail,
+				// P19 D5: a relation is a leaf — columns moved into the definition view — except
+				// a partitioned table, whose partitions nest under it.
+				HasChildren: relkind == "p", Detail: detail,
 			})
 			return nil
 		})
@@ -189,6 +189,43 @@ func listRelationsAndFunctions(ctx context.Context, exec queryExec, databaseSegm
 				model.PathSegment{Kind: "function", Name: name},
 			),
 			HasChildren: false, Detail: &detail,
+		})
+		return nil
+	})
+	return nodes, err
+}
+
+// listPartitions lists a table's declarative partitions. A partition keeps its own schema in its
+// path so Describe/Read resolve it like any table; legacy inheritance children stay top-level.
+func listPartitions(ctx context.Context, exec queryExec, databaseSegment, schema, table string) ([]model.TreeNode, error) {
+	nodes := []model.TreeNode{}
+	err := exec(ctx, `SELECT c.relname, n.nspname, c.relkind, c.reltuples::bigint
+	 FROM pg_inherits i
+	 JOIN pg_class c ON c.oid = i.inhrelid
+	 JOIN pg_namespace n ON n.oid = c.relnamespace
+	 WHERE c.relispartition
+	   AND i.inhparent = (SELECT pc.oid FROM pg_class pc
+	                        JOIN pg_namespace pn ON pn.oid = pc.relnamespace
+	                       WHERE pn.nspname = $1 AND pc.relname = $2)
+	 ORDER BY c.relname`, []any{schema, table}, func(rows pgx.Rows) error {
+		var name, partSchema, relkind string
+		var rowEstimate *int64
+		if err := rows.Scan(&name, &partSchema, &relkind, &rowEstimate); err != nil {
+			return err
+		}
+		var detail *string
+		if rowEstimate != nil && *rowEstimate >= 0 {
+			d := "~" + adapters.AbbreviateCount(*rowEstimate)
+			detail = &d
+		}
+		nodes = append(nodes, model.TreeNode{
+			Kind: "table", Name: name,
+			Path: databasePath(
+				model.PathSegment{Kind: "database", Name: databaseSegment},
+				model.PathSegment{Kind: "schema", Name: partSchema},
+				model.PathSegment{Kind: "table", Name: name},
+			),
+			HasChildren: relkind == "p", Detail: detail,
 		})
 		return nil
 	})

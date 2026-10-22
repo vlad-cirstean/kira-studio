@@ -449,6 +449,66 @@ func TestPostgres_RowEstimateNeverAnalysed(t *testing.T) {
 	}
 }
 
+// P328: a declarative partition lists under its partitioned table, not at schema level.
+func TestPostgres_PartitionsNestUnderParent(t *testing.T) {
+	fixture := testsupport.StartPostgres(t)
+	a := connectedAdapter(t, fixture)
+	ctx := context.Background()
+
+	side, err := pgx.Connect(ctx, fixture.URI)
+	if err != nil {
+		t.Fatalf("side connect: %v", err)
+	}
+	defer side.Close(context.Background())
+	// TestPostgres_TreeEnumeration enumerates the schema set; a leaked schema must not break it.
+	t.Cleanup(func() { _, _ = side.Exec(context.Background(), "DROP SCHEMA IF EXISTS p328 CASCADE") })
+	for _, stmt := range []string{
+		"CREATE SCHEMA p328",
+		"CREATE TABLE p328.events (id int, at date) PARTITION BY RANGE (at)",
+		"CREATE TABLE p328.events_2024 PARTITION OF p328.events FOR VALUES FROM ('2024-01-01') TO ('2025-01-01')",
+		"CREATE TABLE p328.events_2025 PARTITION OF p328.events FOR VALUES FROM ('2025-01-01') TO ('2026-01-01')",
+		"CREATE TABLE p328.plain (id int)",
+	} {
+		if _, err := side.Exec(ctx, stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+
+	schema, err := a.Children(ctx, nodePath(fixture, seg("database", "kira_test"), seg("schema", "p328")), adapters.NewOpCtx("op-p328-1"))
+	if err != nil {
+		t.Fatalf("Children(schema): %v", err)
+	}
+	if got := childNames(t, schema); !reflect.DeepEqual(got, []string{"events", "plain"}) {
+		t.Fatalf("schema children = %v, want [events plain] (no partitions)", got)
+	}
+	for _, n := range schema.Nodes {
+		if want := n.Name == "events"; n.HasChildren != want {
+			t.Errorf("%s HasChildren = %v, want %v", n.Name, n.HasChildren, want)
+		}
+	}
+
+	parts, err := a.Children(ctx, nodePath(fixture, seg("database", "kira_test"), seg("schema", "p328"), seg("table", "events")), adapters.NewOpCtx("op-p328-2"))
+	if err != nil {
+		t.Fatalf("Children(events): %v", err)
+	}
+	if got := childNames(t, parts); !reflect.DeepEqual(got, []string{"events_2024", "events_2025"}) {
+		t.Fatalf("events children = %v, want both partitions in name order", got)
+	}
+	for _, n := range parts.Nodes {
+		if want := "database:kira_test/schema:p328/table:" + n.Name; n.Path != want {
+			t.Errorf("partition path = %q, want %q", n.Path, want)
+		}
+	}
+
+	plain, err := a.Children(ctx, nodePath(fixture, seg("database", "kira_test"), seg("schema", "p328"), seg("table", "plain")), adapters.NewOpCtx("op-p328-3"))
+	if err != nil {
+		t.Fatalf("Children(plain): %v", err)
+	}
+	if len(plain.Nodes) != 0 {
+		t.Errorf("plain table children = %v, want []", childNames(t, plain))
+	}
+}
+
 // 7. cancel, asserted server-side.
 func TestPostgres_Cancel(t *testing.T) {
 	fixture := testsupport.StartPostgres(t)

@@ -173,17 +173,22 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 
 	objectSegment := segments[2]
 	if len(segments) == 3 {
-		// Children returns [] for a leaf, never an error.
-		// table/view/matview are leaves too now — their columns moved into the definition view,
-		// and catalog.go's own hasChildren:false for relations is what keeps the tree from ever
-		// showing a twisty here in the first place.
+		// A table lists its declarative partitions ([] when none). view/matview columns moved
+		// into the definition view, so every other kind is a leaf and returns [], never an error.
+		if objectSegment.Kind == "table" {
+			nodes, err := listPartitions(ctx, exec, databaseSegment.Name, schemaSegment.Name, objectSegment.Name)
+			if err != nil {
+				return adapters.TreeChildren{}, err
+			}
+			return adapters.TreeChildren{Nodes: nodes}, nil
+		}
 		return adapters.LeafChildren(objectSegment.Kind, leafObjectKinds)
 	}
 
 	return adapters.TreeChildren{}, adapters.Contract("unrecognized path depth", nil)
 }
 
-var leafObjectKinds = map[string]bool{"sequence": true, "function": true, "table": true, "view": true, "matview": true}
+var leafObjectKinds = map[string]bool{"sequence": true, "function": true, "view": true, "matview": true}
 
 // Describe is index.ts's describe.
 func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectMeta, error) {
