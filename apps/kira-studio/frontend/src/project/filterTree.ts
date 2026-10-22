@@ -5,7 +5,7 @@ import { t } from '@theme/i18n';
 import { compareNatural, matchesQuery } from '@workbench/behaviour/match';
 import { useConnectionsStore } from '../state/connections';
 import { isVisible, toSets } from './filter';
-import { isLeafKind, labelForKind } from './grouping';
+import { isLeafNode, labelForKind } from './grouping';
 import { rowKey, useTreeStore } from './state/tree';
 
 // The dialog's model, derived from the same treeStore.children cache the tree renders from — no
@@ -81,9 +81,7 @@ export function nodeRows(
   const rootChildren = treeStore.children[rowKey(connectionId, '')] ?? [];
 
   const childrenOf = (node: TreeNode): TreeNode[] | undefined =>
-    isLeafKind(node.kind, keyBrowser)
-      ? undefined
-      : treeStore.children[rowKey(connectionId, node.path)];
+    isLeafNode(node, keyBrowser) ? undefined : treeStore.children[rowKey(connectionId, node.path)];
 
   // Whether `node` or anything cached beneath it matches the name filter — used only when a
   // filter is active, to decide which branches survive and are force-expanded (D17).
@@ -135,7 +133,7 @@ export function nodeRows(
         name: node.name,
         kind: node.kind,
         depth,
-        hasChildren: !isLeafKind(node.kind, keyBrowser) && node.hasChildren,
+        hasChildren: !isLeafNode(node, keyBrowser) && node.hasChildren,
         childCount: children?.length ?? 0,
         state,
         kindHidden,

@@ -13,6 +13,7 @@ import {
   DB_PATH,
   ORDER_ITEMS_PATH,
   ORDERS_PATH,
+  orderItemsFixture,
   postgresConnectionSummary,
   WIDE_TABLE_PATH,
 } from './support/postgresFixture';
@@ -848,4 +849,75 @@ test('a failing tree menu action reports on the row and the error popover opens 
   await expect(popover).toBeVisible();
   await popover.getByRole('button', { name: 'Close' }).click();
   await expect(popover).toHaveCount(0);
+});
+
+// P328: a table whose adapter reports hasChildren (a Postgres partitioned table) expands lazily
+// to its partitions, one level deeper; double-click still opens its data tab.
+test('a partitioned table expands to its partitions on demand and still opens its data tab', async ({
+  relaunch,
+}) => {
+  const fixture = orderItemsFixture(CONNECTION_ID);
+  const partitions = ['order_items_2024', 'order_items_2025'].map((name) => ({
+    kind: 'table',
+    name,
+    path: `${APP_PATH}/table:${name}`,
+    hasChildren: false,
+  }));
+  const control: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: connectionCreateArgs('Tree DB', 'blue', { mcp: true }),
+      response: CONNECTION_SUMMARY,
+    },
+    ...fixture.control.map((snap) => {
+      const args = snap.args as { path?: string } | undefined;
+      if (snap.channel !== IPC.treeChildren || args?.path !== APP_PATH) return snap;
+      const response = snap.response as { nodes: { path: string }[] };
+      return {
+        ...snap,
+        response: {
+          ...response,
+          nodes: response.nodes.map((n) =>
+            n.path === ORDER_ITEMS_PATH ? { ...n, hasChildren: true } : n,
+          ),
+        },
+      };
+    }),
+    {
+      channel: IPC.treeChildren,
+      args: { connectionId: CONNECTION_ID, path: ORDER_ITEMS_PATH, refresh: false },
+      response: { nodes: partitions, source: 'server', truncated: false },
+    },
+  ];
+  const { window: page } = await relaunch({ control, stream: fixture.port });
+
+  await page.click('[data-testid="add-connection"]');
+  await page.click('[data-testid="connection-kind-postgres"]');
+  await page.fill('[data-testid="connection-name"]', 'Tree DB');
+  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
+  await page.fill('[data-testid="connection-port"]', '5432');
+  await page.fill('[data-testid="connection-database"]', 'kira_test');
+  await page.fill('[data-testid="connection-username"]', 'postgres');
+  await page.click('[data-testid="color-blue"]');
+  await page.click('[data-testid="connection-save"]');
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+
+  const parent = await findRow(page, ORDER_ITEMS_PATH);
+  const partitionRow = page.locator(
+    `[data-testid="tree-row"][data-path="${APP_PATH}/table:order_items_2024"]`,
+  );
+  await expect(partitionRow).toHaveCount(0);
+
+  const parentLevel = Number(await parent.getAttribute('aria-level'));
+  await expandRow(page, ORDER_ITEMS_PATH);
+  await expect(partitionRow).toHaveCount(1);
+  await expect(partitionRow).toHaveAttribute('aria-level', String(parentLevel + 1));
+
+  await parent.dblclick();
+  await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
 });

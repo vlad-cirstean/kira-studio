@@ -95,11 +95,11 @@ export function partitionChildren(nodes: TreeNode[]): {
   return { ungrouped, groups };
 }
 
-// Kinds whose rows no longer expand in the tree, whatever a cached TreeNode's `hasChildren` says
-// — a table's columns moved into the definition view, and the adapters that produce these
-// kinds already stopped emitting column children, but a cached L1 payload can still carry
-// `hasChildren: true` until the connection's next reconnect. `topic` is included for the same
-// reason: its partitions moved into the definition view too.
+// Kinds whose rows never expand in the tree, whatever a cached TreeNode's `hasChildren` says
+// — a view's/matview's columns moved into the definition view, and the adapters already stopped
+// emitting column children, but a cached L1 payload can still carry `hasChildren: true` until the
+// connection's next reconnect. `topic` is included for the same reason: its partitions moved
+// into the definition view too. `table` is not here: see isLeafNode.
 //
 // `keyBrowser`, true only for a connection whose Caps say so (redis/s3), adds `database`/
 // `bucket` to the same stale-cache guard — the adapters already report `hasChildren: false` for
@@ -109,5 +109,14 @@ export function partitionChildren(nodes: TreeNode[]): {
 // the cut needs the connection's own capability, not the kind alone.
 export function isLeafKind(kind: NodeKind, keyBrowser = false): boolean {
   if (keyBrowser && (kind === 'database' || kind === 'bucket')) return true;
-  return kind === 'table' || kind === 'view' || kind === 'matview' || kind === 'topic';
+  return kind === 'view' || kind === 'matview' || kind === 'topic';
+}
+
+/** A table expands only when the adapter says so: a Postgres partitioned table lists its
+ *  partitions. view/matview/topic stay leaves whatever a cached node says (P19 D5). */
+export function isLeafNode(
+  node: Pick<TreeNode, 'kind' | 'hasChildren'>,
+  keyBrowser = false,
+): boolean {
+  return node.kind === 'table' ? !node.hasChildren : isLeafKind(node.kind, keyBrowser);
 }
