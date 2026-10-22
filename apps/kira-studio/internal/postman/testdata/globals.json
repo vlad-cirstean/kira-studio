@@ -1,0 +1,6 @@
+{
+  "id": "5b2d1c58-0000-4000-8000-000000000002",
+  "name": "Workspace Globals",
+  "values": [{ "key": "a", "value": "1", "enabled": true }],
+  "_postman_variable_scope": "globals"
+}
