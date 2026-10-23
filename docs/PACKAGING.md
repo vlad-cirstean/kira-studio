@@ -100,6 +100,8 @@ builds and runs a `Kira Studio.dev.app` from `build/darwin/Info.dev.plist` witho
 from Wails' template default of `12.0.0`, and matches the build's `MACOSX_DEPLOYMENT_TARGET`/`CGO_*`
 flags and the README's macOS 14+ product claim. The template hardcodes `12.0.0`, so a
 `wails3 task common:update:build-assets` run reverts both plists — re-narrow them after regenerating.
+Kira Space's plists also carry a generated document-type block (P332); rerun
+`go run ./apps/kira-space/tools/gendoctypes` after the regeneration.
 The floor is 14 rather than 13 because Go 1.27 builds its own objects for macOS 13 minimum: a lower
 `-mmacosx-version-min` only earns a linker warning that the object file was built for a newer macOS
 than is being linked.
@@ -295,7 +297,7 @@ frameworks. On Linux that leaves two doors, and neither was opened here:
 Consequently `scripts/verify-packaging.sh` degrades honestly off macOS: with no bundle it prints one
 "skipped A1/A3/A5/N2" note and one "skipped A4/N3" note and passes on the static checks alone,
 and even with a bundle it would skip A1/A3/A5/N2 for want of `codesign`/`PlistBuddy`. **A green
-`verify:packaging` on Linux proves only the static checks (S1/S2/S5/S6/S7/S8/S10/S11/S12), not that
+`verify:packaging` on Linux proves only the static checks (S1/S2/S5/S6/S7/S8/S10/S11/S12/S13), not that
 any bundle is correct.** The static checks run over committed files, so they mean something even without a bundle. A1/A3/A5/N2
 need the real `.app`.
 
@@ -477,6 +479,8 @@ P29 added three more static checks, guarding §2.1/§2.2's own findings against 
 - **S12** (P210) — the bundled ONNX Runtime version agrees: `internal/memory/embed/paths.go`'s
   `ORTVersion` equals `scripts/fetch-onnxruntime.sh`'s `ORT_VERSION`, and `create:app:bundle` in
   `apps/kira-space/build/darwin/Taskfile.yml` references `libonnxruntime.<version>.dylib`.
+- **S13** (P332) — Kira Space's two Info plists match `go run ./apps/kira-space/tools/gendoctypes
+  --check`: the generated document-type and imported-UTI block equals `internal/filetypes`.
 
 There is no publish provider, no update feed, no `latest-mac.yml`, and no `.blockmap` — the last of
 those was an electron-builder differential-update artifact that has no equivalent here, so it is absent
