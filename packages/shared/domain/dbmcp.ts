@@ -90,3 +90,53 @@ export const dbMcpPendingResponseSchema = /*#__PURE__*/ z.object({
   isError: z.boolean(),
 });
 export type DbMcpPendingResponse = z.infer<typeof dbMcpPendingResponseSchema>;
+
+// run_query's JSON result as the AI client receives it: internal/dbmcp/render.go's tabularResult,
+// documentResult, keyValueResult, streamResult and the "empty" object. A parser for the response
+// preview, not a second renderer; unknown fields are dropped, never re-serialised.
+const nullableText = /*#__PURE__*/ z.string().nullable();
+const runQueryEnvelope = {
+  rowCount: z.number(),
+  returned: z.number(),
+  truncated: z.boolean().optional(),
+  plan: z.unknown().optional(),
+  additionalStatementResults: z.number().optional(),
+  note: z.string().optional(),
+};
+export const dbMcpRunQueryResultSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
+  z.object({
+    ...runQueryEnvelope,
+    kind: z.literal('tabular'),
+    columns: z.array(z.object({ name: z.string(), dataType: z.string(), typeClass: z.string() })),
+    rows: z.array(z.array(nullableText)),
+    truncatedCells: z.number(),
+  }),
+  z.object({
+    ...runQueryEnvelope,
+    kind: z.literal('document'),
+    documents: z.array(z.object({ id: nullableText, body: nullableText })),
+  }),
+  z.object({
+    ...runQueryEnvelope,
+    kind: z.literal('keyvalue'),
+    redisType: z.string(),
+    ttlMs: z.number().optional(),
+    memoryBytes: z.number().optional(),
+    entries: z.array(z.object({ field: nullableText, value: nullableText })),
+  }),
+  z.object({
+    ...runQueryEnvelope,
+    kind: z.literal('stream'),
+    messages: z.array(
+      z.object({
+        key: nullableText,
+        timestamp: nullableText,
+        headers: nullableText,
+        attrs: nullableText,
+        body: nullableText,
+      }),
+    ),
+  }),
+  z.object({ ...runQueryEnvelope, kind: z.literal('empty') }),
+]);
+export type DbMcpRunQueryResult = z.infer<typeof dbMcpRunQueryResultSchema>;

@@ -151,6 +151,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   dbMcpRegenerate: 'DbMcpService.Regenerate',
   dbMcpInstallAgent: 'DbMcpService.InstallAgent',
   dbMcpPendingApprovals: 'DbMcpService.PendingApprovals',
+  dbMcpPendingResponse: 'DbMcpService.PendingResponse',
   dbMcpApproveQuery: 'DbMcpService.ApproveQuery',
   dbMcpDenyQuery: 'DbMcpService.DenyQuery',
 

@@ -10605,6 +10605,47 @@
       },
       "heavyConfirm": {
         "title": "Run this heavy query?"
+      },
+      "preview": {
+        "lede": {
+          "body": "{connection} ({kind}) ran this statement. Check its result before the AI gets it."
+        },
+        "masked": {
+          "tooltip": "A masking rule applies to this column"
+        },
+        "ran": {
+          "body": "This statement already ran. Withhold hides the result from the AI; it does not undo the change."
+        },
+        "redisType": {
+          "status": "Type {type}"
+        },
+        "send": {
+          "label": "Send to AI"
+        },
+        "summary": {
+          "status": "{returned} of {count} rows returned"
+        },
+        "truncated": {
+          "status": "Cut off at the row limit"
+        },
+        "truncatedCells": {
+          "status": "{count} cell shortened | {count} cells shortened"
+        },
+        "ttl": {
+          "status": "TTL {ms} ms"
+        },
+        "unreadable": {
+          "hint": "This result is not in a shape that can be shown as a table. The raw text is exactly what the AI receives."
+        },
+        "view": {
+          "aria": "Result view"
+        },
+        "withhold": {
+          "label": "Withhold"
+        }
+      },
+      "responseReview": {
+        "title": "Review result before sending"
       }
     },
     "definition": {

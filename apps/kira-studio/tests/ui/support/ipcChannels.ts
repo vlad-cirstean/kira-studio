@@ -144,6 +144,7 @@ export const IPC = {
   dbMcpRegenerate: 'kira:dbmcp:regenerate',
   dbMcpInstallAgent: 'kira:dbmcp:installAgent',
   dbMcpPendingApprovals: 'kira:dbmcp:approval:pending',
+  dbMcpPendingResponse: 'kira:dbmcp:approval:response',
   dbMcpApproveQuery: 'kira:dbmcp:approval:approve',
   dbMcpDenyQuery: 'kira:dbmcp:approval:deny',
 
