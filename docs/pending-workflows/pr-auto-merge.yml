@@ -1,0 +1,41 @@
+name: PR auto-merge
+
+# P330: a chapter PR squash-merges once every check the main ruleset requires has passed
+# (docs/PACKAGING.md §7). Merging as github-actions starts no further workflow; release-on-merge.yml
+# handles that.
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  auto-merge:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'chapter/v') &&
+      !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+    steps:
+      - name: Refuse a malformed or already-released version
+        run: |
+          set -eu
+          printf '%s\n' "$HEAD_REF" | grep -Eq '^chapter/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' \
+            || { echo "head '$HEAD_REF' is not chapter/vX.Y.Z" >&2; exit 1; }
+          TAG="${HEAD_REF#chapter/}"
+          if gh api "repos/$GH_REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "tag $TAG already exists: rename the branch to the next version" >&2
+            exit 1
+          fi
+      - name: Enable squash auto-merge
+        run: gh pr merge "$PR" --auto --squash

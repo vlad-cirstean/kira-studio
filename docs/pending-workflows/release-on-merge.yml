@@ -1,0 +1,72 @@
+name: Release on merge
+
+# P330: tags a merged chapter PR's squash commit (vX.Y.Z from chapter/vX.Y.Z) and dispatches
+# release.yml (docs/PACKAGING.md §7). Auto-merge merges as github-actions, and GitHub starts no
+# workflow from that merge's events, so pull_request: closed alone would miss it. Four entry points
+# share one idempotent script: workflow_run (PR CI green, then wait for the merge), closed (a human
+# merge), an hourly sweep (whatever both missed), and a manual dispatch.
+on:
+  workflow_run:
+    workflows: [PR]
+    types: [completed]
+  pull_request:
+    types: [closed]
+    branches: [main]
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Merged PR number; empty sweeps PRs merged in the last 48h
+        required: false
+        type: string
+
+permissions: {}
+
+# One at a time: two entry points can fire for one merge.
+concurrency:
+  group: release-on-merge
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: >-
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'pull_request') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged &&
+       github.event.pull_request.head.repo.full_name == github.repository) ||
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          sparse-checkout: scripts
+          persist-credentials: false
+      - name: Tag and dispatch the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || inputs.pr }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -eu
+          case "$EVENT" in
+            workflow_run)
+              [ -n "$PR_NUMBER" ] || { echo "run has no PR; nothing to release"; exit 0; }
+              sh scripts/release-on-merge.sh pr "$PR_NUMBER" --head-sha "$HEAD_SHA" --wait 600 ;;
+            pull_request)
+              sh scripts/release-on-merge.sh pr "$PR_NUMBER" ;;
+            *)
+              if [ -n "$PR_NUMBER" ]; then
+                sh scripts/release-on-merge.sh pr "$PR_NUMBER"
+              else
+                sh scripts/release-on-merge.sh sweep
+              fi ;;
+          esac

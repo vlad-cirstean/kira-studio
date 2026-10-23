@@ -1,0 +1,25 @@
+P330: CI runs on pull_request only; main is reached only through a PR. Also silences actionlint SC2046 on the docker save line.
+diff --git a/.github/workflows/pr.yml b/.github/workflows/pr.yml
+index 5f1478e92..1ccbd4a59 100644
+--- a/.github/workflows/pr.yml
++++ b/.github/workflows/pr.yml
+@@ -1,8 +1,6 @@
+ name: PR
+ 
+ on:
+-  push:
+-    branches: [main]
+   pull_request:
+     branches: [main]
+   workflow_dispatch:
+@@ -215,7 +213,9 @@ jobs:
+         run: sh scripts/go-test-split.sh containers
+       - name: Save pulled Testcontainers images (always() so a partial pull from a failed run still seeds the next one)
+         if: always() && steps.docker-cache.outputs.cache-hit != 'true'
+-        run: docker save $(docker images --filter dangling=false --format '{{.Repository}}:{{.Tag}}') -o ~/docker-images.tar
++        run: |
++          # shellcheck disable=SC2046
++          docker save $(docker images --filter dangling=false --format '{{.Repository}}:{{.Tag}}') -o ~/docker-images.tar
+       - name: Cache pulled Testcontainers images
+         if: always() && steps.docker-cache.outputs.cache-hit != 'true'
+         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
