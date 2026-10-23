@@ -254,3 +254,19 @@ func (b *BoundService) UpdateContainer(args UpdateArgs) (UpdateResult, error) {
 func (b *BoundService) RecreateContainer(args RecreateArgs) (RecreateResult, error) {
 	return b.m.recreateContainer(args)
 }
+
+// RestoreState checks the engine now and returns whether a restart left containers to restore.
+func (b *BoundService) RestoreState() (RestoreState, error) {
+	return b.m.restore.stateNow(context.Background()), nil
+}
+
+// RestoreContainers starts the chosen containers of the pending restore: standalone ones first,
+// then each Compose project in depends_on order.
+func (b *BoundService) RestoreContainers(args RestoreArgs) (RestoreResult, error) {
+	return b.m.restore.restoreContainers(context.Background(), args)
+}
+
+// RestoreDismiss drops the pending restore without starting anything.
+func (b *BoundService) RestoreDismiss(args RestoreDismissArgs) error {
+	return b.m.restore.dismiss(context.Background(), args.EngineID)
+}

@@ -224,23 +224,37 @@ func (r *restoreTracker) tick(ctx context.Context) {
 
 	now := nowMs()
 	next, changed := reconcile(prev, o, now, r.t)
-	if changed {
-		if err := r.store.SaveRestore(next); err != nil {
-			slog.Warn("save docker restore snapshot", "scope", "docker", "err", err)
-			changed = false
-		}
+	if changed || prev == nil {
+		changed = r.save(next)
 	}
 	r.mu.Lock()
 	r.reachable, r.unreachableSince = true, 0
-	if changed || prev == nil {
+	if changed {
 		r.snaps[engineID] = &next
 	}
-	st := buildState(&next, o, now, r.t)
+	r.mu.Unlock()
+	r.publish(&next, o, now)
+}
+
+// save persists next; false means the cache must keep the old snapshot so the next tick retries.
+func (r *restoreTracker) save(next RestoreSnapshot) bool {
+	if err := r.store.SaveRestore(next); err != nil {
+		slog.Warn("save docker restore snapshot", "scope", "docker", "err", err)
+		return false
+	}
+	return true
+}
+
+// publish records the engine's wire state and pushes it when it differs from the last push.
+func (r *restoreTracker) publish(s *RestoreSnapshot, o observation, now int64) {
+	r.mu.Lock()
+	st := buildState(s, o, now, r.t)
 	r.annotateLocked(&st)
 	r.cur, r.curObs = st, o
 	key := stateKey(st)
-	emit := key != r.lastKey[engineID] && (r.lastKey[engineID] != "" || st.State == statePending)
-	r.lastKey[engineID] = key
+	last := r.lastKey[o.EngineID]
+	emit := key != last && (last != "" || st.State == statePending)
+	r.lastKey[o.EngineID] = key
 	r.mu.Unlock()
 	if emit {
 		r.m.Emit.Emit(ChannelRestore, st)
@@ -286,12 +300,12 @@ func (r *restoreTracker) snapshot(engineID string) *RestoreSnapshot {
 // observe turns the container list into observations, inspecting only what the list cannot say:
 // restart policy and --rm for containers about to be snapshotted, FinishedAt in the no-bridge fallback.
 func (r *restoreTracker) observe(ctx context.Context, cli *client.Client, items []container.Summary, prev *RestoreSnapshot, o observation) []obsContainer {
-	known := map[string]struct{}{}
+	known := map[string]string{}
 	noBridgeOutage := false
 	if prev != nil {
 		noBridgeOutage = prev.BootID == "" && o.BootID == "" && o.UnreachableSince > 0
 		for _, e := range prev.Entries {
-			known[e.ID] = struct{}{}
+			known[e.ID] = e.RestartPolicy
 		}
 	}
 	live := map[string]struct{}{}
@@ -305,7 +319,8 @@ func (r *restoreTracker) observe(ctx context.Context, cli *client.Client, items 
 		origin, _ := originOf(s.Labels, c.Name)
 		c.Excluded = restoreExcluded(origin)
 		live[c.ID] = struct{}{}
-		_, isKnown := known[c.ID]
+		policy, isKnown := known[c.ID]
+		c.Policy = policy
 		switch {
 		case c.Running && !c.Excluded && !isKnown:
 			r.mu.Lock()
