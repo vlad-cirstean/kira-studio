@@ -29,6 +29,7 @@ Decisions (user, 2026-10-23):
 - New workflow: on `workflow_run` of `pr.yml` with conclusion `failure`, `gh run rerun --failed` while `run_attempt < 3`. Never retry `cancelled`.
 - New workflow, on PR merged into `main` from `chapter/v<semver>`: derive tag from head ref, fail if tag exists, create tag at the merge SHA, dispatch `release.yml` with a `tag` input. `release.yml` keeps the manual tag-push trigger.
 - `release.yml`: add `workflow_dispatch` with `tag` input; build/publish use that tag, not `GITHUB_REF_NAME`.
+- Cache warming on `main` replaces the plan's D3 (release-saved caches): after each merge to `main`, a small job on `main` restores or builds the shared caches (Go modules and build caches per job kind, bun, wails3, bindings, tsbuildinfo, Playwright browsers) and saves them under `main`, so every PR restores from there. Dependency installs and compiles only, no tests. Started from the release-on-merge flow (a `GITHUB_TOKEN` merge starts no workflows, so it needs the same triggers).
 - Document the GitHub settings the user must apply: allow auto-merge, ruleset on `main` requiring the `pr.yml` checks, ruleset restricting branch names.
 - `CLAUDE.md`: chapter branch `chapter/v<version>`; user gives version at chapter start, else last tag with patch plus 1; chapter close phase also opens the PR; replace "No per-phase PRs" accordingly.
 - `docs/DEV_ENVIRONMENT.md` and `docs/PACKAGING.md` §7: release flow.
