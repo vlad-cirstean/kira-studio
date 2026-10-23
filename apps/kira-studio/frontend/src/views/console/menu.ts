@@ -2,15 +2,8 @@ import { t } from '@theme/i18n';
 import { copyOrReportError, copyOrReportErrorLazy } from '@workbench/behaviour/clipboard';
 import { announceApp } from '@workbench/behaviour/liveRegion';
 import type { MenuItem } from '@workbench/state/contextMenu';
-import {
-  columnsToTsv,
-  disambiguateNames,
-  type RowSnapshot,
-  rowsToCsv,
-  rowsToJson,
-  rowsToTsv,
-} from '../shared/clipboardFormats';
 import { toPlainJson, toRelaxedText, toShellText } from '../shared/document/ejson';
+import type { CopyFormat } from '../shared/slick/selectionCopy';
 import { type CopyAllFormat, jsonArrayOf, prettyJson } from './copyAll';
 
 // The console result grid's own menu builders, mirroring views/grid/menu.ts's split
@@ -21,11 +14,15 @@ import { type CopyAllFormat, jsonArrayOf, prettyJson } from './copyAll';
 // console result has no addressable table) and offers no "Copy as INSERT" (no qualified table
 // name to write into).
 
-export interface TabularCellMenuContext {
+interface TabularMenuContext {
   onError: (message: string) => void;
+  /** What the menu's selection copies as `format`; built lazily by the host, so building the menu
+   *  never reads a cell. */
+  copy: (format: CopyFormat) => string;
+}
+
+export interface TabularCellMenuContext extends TabularMenuContext {
   columnName: string;
-  isNull: boolean;
-  text: string;
 }
 
 // D9's 'cell' row: Copy / Copy with header / Copy as JSON, the same three the data grid's own
@@ -38,7 +35,7 @@ export function tabularCellMenu(ctx: TabularCellMenuContext): MenuItem[] {
       label: t('common.action.copy.label'),
       icon: 'copy',
       run: () =>
-        copyOrReportError(ctx.isNull ? '' : ctx.text, ctx.onError, () =>
+        copyOrReportError(ctx.copy('tsv'), ctx.onError, () =>
           announceApp(t('studio.copy.cell.announce')),
         ),
     },
@@ -48,7 +45,7 @@ export function tabularCellMenu(ctx: TabularCellMenuContext): MenuItem[] {
       label: t('studio.copy.withHeader.label'),
       icon: 'copy',
       run: () =>
-        copyOrReportError(`${ctx.columnName}\n${ctx.isNull ? '' : ctx.text}`, ctx.onError, () =>
+        copyOrReportError(`${ctx.columnName}\n${ctx.copy('tsv')}`, ctx.onError, () =>
           announceApp(t('studio.copy.withHeader.announce')),
         ),
     },
@@ -58,38 +55,15 @@ export function tabularCellMenu(ctx: TabularCellMenuContext): MenuItem[] {
       label: t('common.action.copyAsJson.label'),
       icon: 'copy',
       run: () =>
-        copyOrReportError(JSON.stringify(ctx.isNull ? null : ctx.text), ctx.onError, () =>
+        copyOrReportError(ctx.copy('json'), ctx.onError, () =>
           announceApp(t('common.copy.copiedJson.announce')),
         ),
     },
   ];
 }
 
-export interface TabularRangeMenuContext {
-  onError: (message: string) => void;
-  rows: readonly number[];
-  cols: readonly number[];
-  /** column names in the same order as `cols`, for the CSV/JSON forms' own header row. */
-  columnNames: readonly string[];
-  cellAt: (row: number, col: number) => { text: string; isNull: boolean };
-}
-
-function rangeSnapshots(ctx: TabularRangeMenuContext): RowSnapshot[] {
-  // P108 Part 11 F7: ctx.columnNames comes straight from page.columns' own names, which a console
-  // result can repeat — disambiguated for the same reason ConsoleSlickGrid.vue's rowSnapshotFor is.
-  const names = disambiguateNames(ctx.columnNames);
-  return ctx.rows.map((row) => {
-    const values: Record<string, string | null> = {};
-    ctx.cols.forEach((col, i) => {
-      const dc = ctx.cellAt(row, col);
-      values[names[i] as string] = dc.isNull ? null : dc.text;
-    });
-    return { columns: names, values };
-  });
-}
-
 // D9's 'range' row: Copy (TSV, the same text ⌘C already produces) · Copy as CSV · Copy as JSON.
-export function tabularRangeMenu(ctx: TabularRangeMenuContext): MenuItem[] {
+export function tabularRangeMenu(ctx: TabularMenuContext): MenuItem[] {
   return [
     {
       type: 'item',
@@ -97,7 +71,7 @@ export function tabularRangeMenu(ctx: TabularRangeMenuContext): MenuItem[] {
       label: t('common.action.copy.label'),
       icon: 'copy',
       run: () =>
-        copyOrReportError(columnsToTsv(ctx.rows, ctx.cols, ctx.cellAt), ctx.onError, () =>
+        copyOrReportError(ctx.copy('tsv'), ctx.onError, () =>
           announceApp(t('studio.copy.selection.announce')),
         ),
     },
@@ -107,7 +81,7 @@ export function tabularRangeMenu(ctx: TabularRangeMenuContext): MenuItem[] {
       label: t('studio.copy.asCsv.label'),
       icon: 'copy',
       run: () =>
-        copyOrReportError(rowsToCsv(rangeSnapshots(ctx)), ctx.onError, () =>
+        copyOrReportError(ctx.copy('csv'), ctx.onError, () =>
           announceApp(t('studio.copy.csv.announce')),
         ),
     },
@@ -117,26 +91,16 @@ export function tabularRangeMenu(ctx: TabularRangeMenuContext): MenuItem[] {
       label: t('common.action.copyAsJson.label'),
       icon: 'copy',
       run: () =>
-        copyOrReportError(rowsToJson(rangeSnapshots(ctx)), ctx.onError, () =>
+        copyOrReportError(ctx.copy('json'), ctx.onError, () =>
           announceApp(t('common.copy.copiedJson.announce')),
         ),
     },
   ];
 }
 
-export interface TabularRowMenuContext {
-  onError: (message: string) => void;
-  // A thunk, not a pre-materialized array — grid/menu.ts's own rowMenu() takes
-  // this same shape for the identical reason (headerMenu's columnValues already did): building
-  // the menu must not decode every selected row across every column when none of the three items
-  // below may ever run. Memoize at the call site if more than one item might run in the same menu
-  // instance (grid/menu.ts's snapshotsThunk is the reference shape).
-  snapshots: () => RowSnapshot[];
-}
-
 // D9's 'row' row: Copy rows ▸ TSV/CSV/JSON. No INSERT -- a console result comes from ad-hoc SQL
 // with no addressable table to write into.
-export function tabularRowMenu(ctx: TabularRowMenuContext): MenuItem[] {
+export function tabularRowMenu(ctx: TabularMenuContext): MenuItem[] {
   return [
     {
       type: 'submenu',
@@ -149,7 +113,7 @@ export function tabularRowMenu(ctx: TabularRowMenuContext): MenuItem[] {
           id: 'copy-rows-tsv',
           label: t('studio.copy.format.tsv.label'),
           run: () =>
-            copyOrReportError(rowsToTsv(ctx.snapshots()), ctx.onError, () =>
+            copyOrReportError(ctx.copy('tsv'), ctx.onError, () =>
               announceApp(t('studio.copy.tsv.announce')),
             ),
         },
@@ -158,7 +122,7 @@ export function tabularRowMenu(ctx: TabularRowMenuContext): MenuItem[] {
           id: 'copy-rows-csv',
           label: t('studio.copy.format.csv.label'),
           run: () =>
-            copyOrReportError(rowsToCsv(ctx.snapshots()), ctx.onError, () =>
+            copyOrReportError(ctx.copy('csv'), ctx.onError, () =>
               announceApp(t('studio.copy.csv.announce')),
             ),
         },
@@ -167,7 +131,7 @@ export function tabularRowMenu(ctx: TabularRowMenuContext): MenuItem[] {
           id: 'copy-rows-json',
           label: t('studio.copy.format.json.label'),
           run: () =>
-            copyOrReportError(rowsToJson(ctx.snapshots()), ctx.onError, () =>
+            copyOrReportError(ctx.copy('json'), ctx.onError, () =>
               announceApp(t('common.copy.copiedJson.announce')),
             ),
         },
@@ -176,16 +140,12 @@ export function tabularRowMenu(ctx: TabularRowMenuContext): MenuItem[] {
   ];
 }
 
-export interface TabularColumnMenuContext {
-  onError: (message: string) => void;
+export interface TabularColumnMenuContext extends TabularMenuContext {
   columnName: string;
-  rows: readonly number[];
-  col: number;
-  cellAt: (row: number, col: number) => { text: string; isNull: boolean };
 }
 
-// D9's 'column' row: Copy column (the exact TSV ⌘C already produces for a one-column selection)
-// and Copy column name.
+// D9's 'column' row: Copy column (the exact TSV ⌘C produces for the selected columns) and Copy
+// column name.
 export function tabularColumnMenu(ctx: TabularColumnMenuContext): MenuItem[] {
   return [
     {
@@ -194,7 +154,7 @@ export function tabularColumnMenu(ctx: TabularColumnMenuContext): MenuItem[] {
       label: t('studio.copy.column.label'),
       icon: 'copy',
       run: () =>
-        copyOrReportError(columnsToTsv(ctx.rows, [ctx.col], ctx.cellAt), ctx.onError, () =>
+        copyOrReportError(ctx.copy('tsv'), ctx.onError, () =>
           announceApp(t('studio.copy.column.announce')),
         ),
     },

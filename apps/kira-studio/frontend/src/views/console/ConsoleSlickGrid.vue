@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { TabularPage } from '@shared/protocol/page';
+import { t } from '@theme/i18n';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
+import { announceApp } from '@workbench/behaviour/liveRegion';
 import { useRowHeight } from '@workbench/lib/rowHeight';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -18,12 +20,7 @@ import { useCellSelectionStore } from '../../state/cellSelection';
 import { useSettingsStore } from '../../state/settings';
 import { classesFrom } from '../../theme/cellClass';
 import { categoryForTypeClass } from '../../theme/icons';
-import {
-  columnsToTsv,
-  disambiguateNames,
-  type RowSnapshot,
-  rowsToTsv,
-} from '../shared/clipboardFormats';
+import { disambiguateNames, type RowSnapshot } from '../shared/clipboardFormats';
 import { nullCellText, truncatedCellTip } from '../shared/page/cellText';
 import {
   alignmentFor,
@@ -59,8 +56,10 @@ import { createScrollVelocityTracker } from '../shared/slick/scrollVelocity';
 import {
   rangesFromSelection,
   type Selection,
+  selectionCovers,
   selectionFromRanges,
 } from '../shared/slick/selection';
+import { type CopyFormat, type CopySource, selectionText } from '../shared/slick/selectionCopy';
 import { attachScrollProbes, createHybridSelectionModel } from '../shared/slick/selectionModel';
 import '../shared/slick/slickTheme.css';
 import 'slickgrid/dist/styles/css/slick.grid.css';
@@ -448,17 +447,32 @@ function cellAt(row: number, col: number): { text: string; isNull: boolean } {
   return cell(props.pageKey, row, col);
 }
 
-function rowSnapshotFor(row: number): RowSnapshot {
-  if (!page) return { columns: [], values: {} };
-  // P108 Part 11 F7: a console result can repeat a column name (self-joins, `SELECT 1 AS x, 2 AS
-  // x`) — disambiguated so `values` never loses an occurrence to a same-named later one.
-  const names = disambiguateNames(page.columns.map((c) => c.name));
-  const values: Record<string, string | null> = {};
-  page.columns.forEach((_col, i) => {
-    const dc = cellAt(row, i);
-    values[names[i] as string] = dc.isNull ? null : dc.text;
-  });
-  return { columns: names, values };
+// Keyboard copy and every Copy menu item read through this one source. Row snapshots memoize per
+// source, so a menu's items share one pass over the selected rows.
+function copySource(): CopySource {
+  // A console result can repeat a column name (self-joins, `SELECT 1 AS x, 2 AS x`) -- disambiguated
+  // so `values` never loses an occurrence to a same-named later one.
+  const names = disambiguateNames(page?.columns.map((c) => c.name) ?? []);
+  const snapshots = new Map<number, RowSnapshot>();
+  return {
+    cellAt,
+    rowSnapshot: (row) => {
+      let snap = snapshots.get(row);
+      if (!snap) {
+        const values: Record<string, string | null> = {};
+        names.forEach((name, i) => {
+          const dc = cellAt(row, i);
+          values[name] = dc.isNull ? null : dc.text;
+        });
+        snap = { columns: names, values };
+        snapshots.set(row, snap);
+      }
+      return snap;
+    },
+    columnName: (col) => page?.columns[col]?.name ?? '',
+    rowsInSpan: visibleRowsInSpan,
+    allRows: rowsForColumnOps,
+  };
 }
 
 // D9's own column-scoped rule — views/shared/slick/rowVisibility.ts's own pure functions (P107
@@ -472,35 +486,37 @@ function visibleRowsInSpan(r0: number, r1: number): number[] {
   return sharedVisibleRowsInSpan(matchedRows(props.tabId), r0, r1);
 }
 
-// D9: ⌘/Ctrl+C over the current selection, format-aware per kind — the same four branches
-// SlickGridHost.vue's own onCopy has, minus the pending-changes-aware rowSnapshot (a console
-// result has none) and minus Copy as INSERT (no addressable table).
+// D9: ⌘/Ctrl+C over the current selection.
 function onCopy(): void {
   const sel = currentSelection;
   if (!sel || !page) return;
-  if (sel.kind === 'cell') {
-    const dc = cellAt(sel.row, sel.col);
-    void copyOrReportError(dc.isNull ? '' : dc.text, onCopyError);
-    return;
-  }
-  if (sel.kind === 'range') {
-    const cols = Array.from({ length: sel.col - sel.anchorCol + 1 }, (_, i) => sel.anchorCol + i);
-    void copyOrReportError(
-      columnsToTsv(visibleRowsInSpan(sel.anchorRow, sel.row), cols, cellAt),
-      onCopyError,
-    );
-    return;
-  }
-  if (sel.kind === 'row') {
-    void copyOrReportError(rowsToTsv(sel.rows.map(rowSnapshotFor)), onCopyError);
-    return;
-  }
-  void copyOrReportError(columnsToTsv(rowsForColumnOps(), sel.cols, cellAt), onCopyError);
+  void copyOrReportError(selectionText(sel, 'tsv', copySource()), onCopyError, () =>
+    announceApp(t('studio.copy.selection.announce')),
+  );
 }
 
-// D9: right-click opens the menu that matches whatever's currently selected (a range/column
-// selection covering the clicked cell), falling back to a plain single-cell menu otherwise — the
-// gutter opens the row menu for the clicked row (or the current row selection, if it's in it).
+// Right-click acts on what is shown selected: the current selection when it covers the hit, else
+// the hit itself, which becomes the selection first (the data grid's rule).
+function menuTarget(hitCell: number, pageRow: number): Selection {
+  const sel = currentSelection;
+  const idx: DisplayRowIndex = {
+    displayRows: matchedRows(props.tabId),
+    pageRowCount: page?.rowCount ?? 0,
+  };
+  const pos = displayPositionOf(idx, pageRow);
+  if (hitCell === 0) {
+    if (sel?.kind === 'row' && sel.rows.includes(pageRow)) return sel;
+    grid?.setActiveCell(pos, 0, false, false, false);
+    return { kind: 'row', rows: [pageRow] };
+  }
+  const displayCol = hitCell - 1;
+  if (sel && selectionCovers(sel, pageRow, displayCol)) return sel;
+  if (sel?.kind === 'cell' && sel.row === pageRow && sel.col === displayCol) return sel;
+  grid?.setActiveCell(pos, hitCell, false, false, false);
+  return { kind: 'cell', row: pageRow, col: displayCol };
+}
+
+// D9: right-click opens the menu that matches the selection it acts on (see menuTarget).
 function onGridContextMenu(e: SlickEventData): void {
   if (!grid || !dataSource || !page) return;
   e.preventDefault();
@@ -508,83 +524,34 @@ function onGridContextMenu(e: SlickEventData): void {
   if (!hit) return;
   const nativeLike = e as unknown as MouseEvent;
   const pageRow = dataSource.getItem(hit.row).row;
-
-  if (hit.cell === 0) {
-    const sel = currentSelection;
-    const rows = sel?.kind === 'row' && sel.rows.includes(pageRow) ? sel.rows : [pageRow];
-    // A1/P21 round 1: lazy and memoized, matching grid/menu.ts's own rowMenu() fix — building the
-    // menu must not decode every selected row across every column before the user has picked one
-    // of the three items that actually need it.
-    let cachedSnapshots: RowSnapshot[] | null = null;
-    contextMenuStore.openContextMenu(
-      nativeLike,
-      tabularRowMenu({
-        onError: onCopyError,
-        snapshots: () => (cachedSnapshots ??= rows.map(rowSnapshotFor)),
-      }),
-    );
-    return;
-  }
-
-  const field = fieldAtCol(hit.cell);
+  const field = hit.cell === 0 ? null : fieldAtCol(hit.cell);
   const pageCol = field ? colIndexFromField(field) : -1;
-  if (pageCol < 0) return;
-  const column = page.columns[pageCol];
-  if (!column) return;
-  const displayCol = hit.cell - 1;
-  const sel = currentSelection;
-
-  if (
-    sel?.kind === 'range' &&
-    displayCol >= sel.anchorCol &&
-    displayCol <= sel.col &&
-    pageRow >= sel.anchorRow &&
-    pageRow <= sel.row
-  ) {
-    const cols = Array.from({ length: sel.col - sel.anchorCol + 1 }, (_, i) => sel.anchorCol + i);
-    contextMenuStore.openContextMenu(
-      nativeLike,
-      tabularRangeMenu({
-        onError: onCopyError,
-        rows: visibleRowsInSpan(sel.anchorRow, sel.row),
-        cols,
-        columnNames: cols.map((c) => page?.columns[c]?.name ?? ''),
-        cellAt,
-      }),
-    );
-    return;
+  if (hit.cell !== 0 && pageCol < 0) return;
+  const target = menuTarget(hit.cell, pageRow);
+  const src = copySource();
+  const ctx = {
+    onError: onCopyError,
+    copy: (format: CopyFormat) => selectionText(target, format, src),
+  };
+  const columnName = page.columns[pageCol]?.name ?? '';
+  switch (target.kind) {
+    case 'row':
+      contextMenuStore.openContextMenu(nativeLike, tabularRowMenu(ctx));
+      break;
+    case 'range':
+      contextMenuStore.openContextMenu(nativeLike, tabularRangeMenu(ctx));
+      break;
+    case 'column':
+      contextMenuStore.openContextMenu(nativeLike, tabularColumnMenu({ ...ctx, columnName }));
+      break;
+    case 'cell':
+      contextMenuStore.openContextMenu(nativeLike, tabularCellMenu({ ...ctx, columnName }));
+      break;
   }
-  if (sel?.kind === 'column' && sel.cols.includes(displayCol)) {
-    contextMenuStore.openContextMenu(
-      nativeLike,
-      tabularColumnMenu({
-        onError: onCopyError,
-        columnName: column.name,
-        rows: rowsForColumnOps(),
-        col: displayCol,
-        cellAt,
-      }),
-    );
-    return;
-  }
-
-  const dc = cellAt(pageRow, pageCol);
-  contextMenuStore.openContextMenu(
-    nativeLike,
-    tabularCellMenu({
-      onError: onCopyError,
-      columnName: column.name,
-      isNull: dc.isNull,
-      text: dc.text,
-    }),
-  );
 }
 
-// Real-interaction fix (reported bug — right-clicking a column header was selecting/highlighting
-// it as a side effect of opening the menu, mirrored from SlickGridHost.vue's own identical fix):
-// tabularColumnMenu()'s items close over `displayCol`/`column` directly and read no live
-// selection, so pushing a column range through the selection model here was never functionally
-// necessary — it only ever painted a highlight and discarded whatever the user had selected.
+// A header right-click never changes the selection (it only opens the column menu), so it copies
+// the clicked column, not the current selection.
 function onGridHeaderContextMenu(e: SlickEventData, args: { column: KiraColumn }): void {
   if (!grid || !page) return;
   if (args.column.id === GUTTER_FIELD) return;
@@ -593,14 +560,14 @@ function onGridHeaderContextMenu(e: SlickEventData, args: { column: KiraColumn }
   if (displayCol < 0) return;
   const column = page.columns[displayCol];
   if (!column) return;
+  const src = copySource();
+  const target: Selection = { kind: 'column', cols: [displayCol] };
   contextMenuStore.openContextMenu(
     e as unknown as MouseEvent,
     tabularColumnMenu({
       onError: onCopyError,
       columnName: column.name,
-      rows: rowsForColumnOps(),
-      col: displayCol,
-      cellAt,
+      copy: (format) => selectionText(target, format, src),
     }),
   );
 }
