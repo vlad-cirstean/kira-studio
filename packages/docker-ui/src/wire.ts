@@ -6,6 +6,7 @@ export const DOCKER_CHANNEL = {
   stats: 'kira:docker:stats',
   logs: 'kira:docker:logs',
   exec: 'kira:docker:exec',
+  restore: 'kira:docker:restore',
 } as const;
 
 type EndpointSource = 'selected' | 'env' | 'context' | 'default' | 'probe';
@@ -362,4 +363,30 @@ export interface DockerRecreateResult {
   name: string;
   oldId: string;
   warnings: string[];
+}
+
+type DockerRestoreStatus = 'restorable' | 'waiting' | 'back' | 'gone';
+
+export interface DockerRestoreItem {
+  id: string;
+  name: string;
+  image: string;
+  composeProject: string;
+  composeService: string;
+  status: DockerRestoreStatus;
+  /** The last Restore failure for this container. */
+  error?: string;
+}
+
+export interface DockerRestoreState {
+  state: 'none' | 'pending';
+  engineId: string;
+  context: string;
+  detectedAt: number;
+  bootAt: number;
+  items: DockerRestoreItem[];
+}
+
+export interface DockerRestoreResult {
+  items: Array<{ id: string; name: string; ok: boolean; error: string }>;
 }

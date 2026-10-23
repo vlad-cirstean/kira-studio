@@ -25,6 +25,7 @@ import ContainerList from './ContainerList.vue';
 import EndpointChip from './EndpointChip.vue';
 import ImageList from './ImageList.vue';
 import NetworkList from './NetworkList.vue';
+import RestoreBanner from './RestoreBanner.vue';
 import VolumeList from './VolumeList.vue';
 
 const ui = useDockerUiStore();
@@ -123,6 +124,7 @@ async function refresh(): Promise<void> {
       <SearchField v-model="ui.search" data-testid="tree-search" />
     </PanelBar>
     <template v-if="ok">
+      <RestoreBanner />
       <PanelBar>
         <SecondaryTabs
           :model-value="ui.section"

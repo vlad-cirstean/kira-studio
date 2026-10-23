@@ -16,6 +16,7 @@ import { useDocker } from './context';
 import type {
   DockerDiskUsage,
   DockerRecreateArgs,
+  DockerRestoreState,
   DockerStatus,
   DockerUpdateArgs,
   InspectKind,
@@ -23,6 +24,8 @@ import type {
 } from './wire';
 
 const STATUS_KEY = ['docker', 'status'] as const;
+/** Outside ['docker'] so refresh and live-sync invalidation do not run an engine check each time. */
+const RESTORE_KEY = ['docker-restore'] as const;
 
 export function useDockerStatus() {
   const { control } = useDocker();
@@ -277,6 +280,46 @@ export function useContainerAction() {
   };
 }
 
+/** The restart-restore state; the engine is checked on mount, pushes keep it current. */
+export function useRestoreState() {
+  const { control } = useDocker();
+  return useQuery({
+    queryKey: RESTORE_KEY,
+    queryFn: () => control.restoreState(),
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+}
+
+/** Re-reads the restore state after an action so the banner follows what the engine now holds. */
+function useSettleRestore() {
+  const { control } = useDocker();
+  const qc = useQueryClient();
+  return async () => {
+    qc.setQueryData<DockerRestoreState>(RESTORE_KEY, await control.restoreState());
+    void qc.invalidateQueries({ queryKey: ['docker'] });
+  };
+}
+
+export function useRestoreContainers() {
+  const { control } = useDocker();
+  const settle = useSettleRestore();
+  return useMutation({
+    mutationFn: (args: { engineId: string; ids: string[] }) =>
+      control.restoreContainers(args.engineId, args.ids),
+    onSettled: settle,
+  });
+}
+
+export function useDismissRestore() {
+  const { control } = useDocker();
+  const settle = useSettleRestore();
+  return useMutation({
+    mutationFn: (engineId: string) => control.restoreDismiss(engineId),
+    onSettled: settle,
+  });
+}
+
 function invalidateKinds(qc: ReturnType<typeof useQueryClient>, kinds: readonly ResourceKind[]) {
   const wanted = new Set<string>();
   for (const k of kinds) {
@@ -313,6 +356,7 @@ export function useDockerLiveSync() {
     offs = [
       control.onChanged((e) => invalidateKinds(qc, e.kinds)),
       control.onStatus((s) => qc.setQueryData<DockerStatus>(STATUS_KEY, s)),
+      control.onRestore((s) => qc.setQueryData<DockerRestoreState>(RESTORE_KEY, s)),
     ];
     control.watch().catch(liveSyncBestEffort);
   }

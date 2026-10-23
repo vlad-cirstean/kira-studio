@@ -16,6 +16,8 @@ import {
   type DockerRecreateArgs,
   type DockerRecreateResult,
   type DockerRegistryLink,
+  type DockerRestoreResult,
+  type DockerRestoreState,
   type DockerStatsEvent,
   type DockerStatus,
   type DockerUpdateArgs,
@@ -46,6 +48,9 @@ export interface DockerBindings {
   Start(a: { id: string }): Promise<void>;
   Stop(a: { id: string }): Promise<void>;
   Restart(a: { id: string }): Promise<void>;
+  RestoreState(): Promise<unknown>;
+  RestoreContainers(a: { engineId: string; ids: string[] }): Promise<unknown>;
+  RestoreDismiss(a: { engineId: string }): Promise<void>;
   Watch(a: { windowKey: string }): Promise<void>;
   Unwatch(a: { windowKey: string }): Promise<void>;
   StatsSubscribe(a: { windowKey: string; ids: string[] }): Promise<void>;
@@ -91,6 +96,9 @@ export interface DockerControl {
   start(id: string): Promise<void>;
   stop(id: string): Promise<void>;
   restart(id: string): Promise<void>;
+  restoreState(): Promise<DockerRestoreState>;
+  restoreContainers(engineId: string, ids: string[]): Promise<DockerRestoreResult>;
+  restoreDismiss(engineId: string): Promise<void>;
   watch(): Promise<void>;
   unwatch(): Promise<void>;
   statsSubscribe(ids: string[]): Promise<void>;
@@ -101,6 +109,7 @@ export interface DockerControl {
   onStatus(cb: (s: DockerStatus) => void): () => void;
   onStats(cb: (e: DockerStatsEvent) => void): () => void;
   onLogs(cb: (e: DockerLogsEvent) => void): () => void;
+  onRestore(cb: (s: DockerRestoreState) => void): () => void;
   /** Exec sessions through the terminal stack: `terminalOpen`'s id is looked up in `execContainers`. */
   exec: TerminalsControl;
 }
@@ -156,6 +165,10 @@ export function createDockerControl(
     start: (id) => unwrap(b.Start({ id })),
     stop: (id) => unwrap(b.Stop({ id })),
     restart: (id) => unwrap(b.Restart({ id })),
+    restoreState: () => unwrap(b.RestoreState()).then((r) => trust<DockerRestoreState>(r)),
+    restoreContainers: (engineId, ids) =>
+      unwrap(b.RestoreContainers({ engineId, ids })).then((r) => trust<DockerRestoreResult>(r)),
+    restoreDismiss: (engineId) => unwrap(b.RestoreDismiss({ engineId })),
     watch: () => unwrap(b.Watch({ windowKey })),
     unwatch: () => unwrap(b.Unwatch({ windowKey })),
     statsSubscribe: (ids) => unwrap(b.StatsSubscribe({ windowKey, ids })),
@@ -166,6 +179,7 @@ export function createDockerControl(
     onStatus: (cb) => on<DockerStatus>(DOCKER_CHANNEL.status, cb),
     onStats: (cb) => on<DockerStatsEvent>(DOCKER_CHANNEL.stats, cb),
     onLogs: (cb) => on<DockerLogsEvent>(DOCKER_CHANNEL.logs, cb),
+    onRestore: (cb) => on<DockerRestoreState>(DOCKER_CHANNEL.restore, cb),
     exec,
   };
 }

@@ -3217,6 +3217,37 @@
         "option": "Yes"
       }
     },
+    "restore": {
+      "banner": {
+        "body": "Docker restarted. {count} container was running before. | Docker restarted. {count} containers were running before.",
+        "review": {
+          "label": "Review containers"
+        },
+        "starting": {
+          "status": "{count} is starting on its own | {count} are starting on their own"
+        }
+      },
+      "dialog": {
+        "back": {
+          "title": "Already running"
+        },
+        "description": "Docker restarted. Choose which containers to start again.",
+        "gone": {
+          "body": "Deleted. Not recreated.",
+          "title": "Deleted"
+        },
+        "project": {
+          "label": "Compose project {name}"
+        },
+        "submit": {
+          "label": "Restore {count} container | Restore {count} containers"
+        },
+        "title": "Restore containers",
+        "waiting": {
+          "label": "Starting on its own"
+        }
+      }
+    },
     "section": {
       "containers": {
         "label": "Containers"
