@@ -45,9 +45,9 @@ var sqlDDLKeywords = map[string]bool{
 }
 
 // sqlReadKeywords is ClassifySQL's plain-read vocabulary, matched against the statement's leading
-// keyword only.
+// keyword only. DESCRIBE/DESC stay out: they can wrap ANALYZE, so the EXPLAIN case below owns them.
 var sqlReadKeywords = map[string]bool{
-	"SHOW": true, "DESCRIBE": true, "DESC": true, "VALUES": true, "TABLE": true,
+	"SHOW": true, "VALUES": true, "TABLE": true,
 }
 
 // sqlAnalyzeKeyword and sqlIntoKeyword are single-word sqlWordBoundaryContainsAny vocabularies,
@@ -177,7 +177,7 @@ func ClassifySQL(statement string, d SQLDialect) OpClass {
 			return ClassifySQL(target, d)
 		}
 		return ClassDDL
-	case sqlReadKeywords[keyword] && keyword != "DESCRIBE" && keyword != "DESC":
+	case sqlReadKeywords[keyword]:
 		return ClassRead
 	case keyword == "EXPLAIN" || keyword == "DESCRIBE" || keyword == "DESC":
 		rest := strings.TrimSpace(stripped[len(fields[0]):])
