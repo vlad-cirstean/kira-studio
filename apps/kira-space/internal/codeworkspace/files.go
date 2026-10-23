@@ -198,78 +198,77 @@ func ReadFile(absPath, relPath string) (FileContent, error) {
 	return limit, nil
 }
 
+// languageByExt maps a lower-case extension to its Monaco language id. vue and svelte color with
+// the HTML grammar (no Monaco grammar exists for either, §9.4).
+var languageByExt = map[string]string{
+	"ts":       "typescript",
+	"tsx":      "typescript",
+	"mts":      "typescript",
+	"cts":      "typescript",
+	"js":       "javascript",
+	"jsx":      "javascript",
+	"mjs":      "javascript",
+	"cjs":      "javascript",
+	"vue":      "html",
+	"svelte":   "html",
+	"json":     "json",
+	"jsonc":    "json",
+	"java":     "java",
+	"py":       "python",
+	"go":       "go",
+	"rs":       "rust",
+	"html":     "html",
+	"htm":      "html",
+	"css":      "css",
+	"scss":     "scss",
+	"less":     "less",
+	"md":       "markdown",
+	"markdown": "markdown",
+	"yaml":     "yaml",
+	"yml":      "yaml",
+	"xml":      "xml",
+	"sh":       "shell",
+	"bash":     "shell",
+	"zsh":      "shell",
+	"sql":      "sql",
+	"ini":      "ini",
+	"cfg":      "ini",
+	"toml":     "ini",
+	"graphql":  "graphql",
+	"gql":      "graphql",
+	"proto":    "protobuf",
+	"kt":       "kotlin",
+	"kts":      "kotlin",
+	"swift":    "swift",
+	"c":        "c",
+	"h":        "c",
+	"cc":       "cpp",
+	"cpp":      "cpp",
+	"cxx":      "cpp",
+	"hpp":      "cpp",
+	"hh":       "cpp",
+	"hxx":      "cpp",
+	"m":        "objective-c",
+	"mm":       "objective-c",
+	"rb":       "ruby",
+	"php":      "php",
+	"pl":       "perl",
+	"pm":       "perl",
+	"lua":      "lua",
+}
+
 // languageFor resolves this app's own language id from relPath's extension only ("never sniffed")
 // — the exact vocabulary registered as a Monarch contribution, plus 'plaintext' for
 // everything else. Independent of views/repo/language.ts (frontend-side, by design — "different
 // sets for different purposes... pretending otherwise would drag one to the other's shape");
 // this is a second, intentionally small copy that exists only to answer this one wire field.
 func languageFor(relPath string) string {
-	ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(relPath), "."))
-	base := strings.ToLower(filepath.Base(relPath))
-	if base == "dockerfile" {
+	if strings.ToLower(filepath.Base(relPath)) == "dockerfile" {
 		return "dockerfile"
 	}
-	switch ext {
-	case "ts", "tsx", "mts", "cts":
-		return "typescript"
-	case "js", "jsx", "mjs", "cjs":
-		return "javascript"
-	case "vue", "svelte":
-		// §9.4: no Monaco grammar exists for either — both color with the HTML grammar.
-		return "html"
-	case "json", "jsonc":
-		return "json"
-	case "java":
-		return "java"
-	case "py":
-		return "python"
-	case "go":
-		return "go"
-	case "rs":
-		return "rust"
-	case "html", "htm":
-		return "html"
-	case "css":
-		return "css"
-	case "scss":
-		return "scss"
-	case "less":
-		return "less"
-	case "md", "markdown":
-		return "markdown"
-	case "yaml", "yml":
-		return "yaml"
-	case "xml":
-		return "xml"
-	case "sh", "bash", "zsh":
-		return "shell"
-	case "sql":
-		return "sql"
-	case "ini", "cfg", "toml":
-		return "ini"
-	case "graphql", "gql":
-		return "graphql"
-	case "proto":
-		return "protobuf"
-	case "kt", "kts":
-		return "kotlin"
-	case "swift":
-		return "swift"
-	case "c", "h":
-		return "c"
-	case "cc", "cpp", "cxx", "hpp", "hh", "hxx":
-		return "cpp"
-	case "m", "mm":
-		return "objective-c"
-	case "rb":
-		return "ruby"
-	case "php":
-		return "php"
-	case "pl", "pm":
-		return "perl"
-	case "lua":
-		return "lua"
-	default:
-		return "plaintext"
+	ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(relPath), "."))
+	if lang, ok := languageByExt[ext]; ok {
+		return lang
 	}
+	return "plaintext"
 }
