@@ -2582,7 +2582,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - Docker exec uses TerminalHostView with storeId 'docker-exec'; the Terminal tab opens no session until New session is clicked.
 - Per-container CPU and RAM show in the engine overview table, the container header and a Stats view; the side list shows none.
 - Docker endpoint resolution order (endpoint.go): selected UI context, DOCKER_HOST, DOCKER_CONTEXT/currentContext (TLS contexts included), default socket, then socket probe (Desktop, Colima, OrbStack).
-- Docker streams are per window (windowKey); they end on WindowOpenerDeps.OnWindowClosing, service shutdown and quit, and run only while the module is visible.
+- Docker streams are per window (windowKey); they end on WindowOpenerDeps.OnWindowClosing, service shutdown and quit, and run only while the module is visible. One exception: the restore tracker (P334).
 - Stats share one engine stream per container across windows.
 - ModeDef.tabStrip: false hides the tab strip.
 - Storage metrics (P252) are on demand only: DiskUsage (/system/df, verbose) and ContainerSize (inspect Size) are bound methods, and singleflight dedupes concurrent calls.
@@ -2605,6 +2605,13 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - Flow tests set WithHubAPI to a fake.
 - The registry button opens through LinkService.OpenExternal (Studio binds it again, 30 services); docker-ui takes openExternal in its context options.
 - Container size lives in the Stats tab, which also opens for stopped containers.
+- Restore after engine restart (P334): the tracker is a backend loop owned by Manager (restore*.go), independent of windows. Ticks 15 s while the engine answers, 30 s while it does not. Remote endpoints (tcp, ssh) tick only while a window watches.
+- Boot identity: Info.ID keys the snapshot. The default bridge network ID marks the boot: new on every daemon start, kept under live-restore (measured on dockerd 29.9.2).
+- Snapshot rules: never written while the engine is unreachable. A stopped container leaves after a 30 s grace. Pending is frozen until Restore clears it or Dismiss. Testcontainers, buildx, kind, kubernetes, swarm and `--rm` containers are never snapshotted.
+- Storage: tables docker_restore_engines and docker_restore_containers (migration 0044). Snapshots not updated for 30 days are pruned at start. internal/docker sees only the RestoreStore interface.
+- Restore is click-only. A Compose project starts as one unit in depends_on order (service_healthy waits up to 60 s). Deleted containers are listed, never recreated. Boot-time restore is out of scope.
+- Channel kira:docker:restore; query key ['docker-restore'] sits outside ['docker']. The banner shows only inside the Docker module.
+- Flow seams: docker.WithRestoreTiming, docker.WithBootProbe, flowharness.BootGen (simulates a daemon restart). A real dockerd restart runs only with KIRA_FLOW_DOCKER_RESTART=1.
 - UI styling: start uses text-ok and stop text-error module-wide; selected rows use neutral bg-select; left-panel section tabs are the git module's ToggleGroup.
 
 ## Database MCP server (v1.7)
@@ -3237,6 +3244,9 @@ Performance:
 - **The graph keeps its pre-refresh scroll offset after an auto refresh (P203).** A new tip is off screen until scrolled or remounted.
 - **`ui-timing` budgets fail in the WebKit sandbox even on an idle host (P250, P264, P266, P267, P277).** Two Studio tests fail (`budgets.spec.ts` interactions, `perf.spec.ts` scroll); the rest of `ui-timing` passes. Measured idle (load below 2, no leftover process): scroll work p50 17-18 ms vs 16, `perf.spec.ts` scroll frame p95 89-96 ms vs 80, tab switch p95 up to 363 ms vs 300, cached tree expand p95 58 ms vs 50, console keystroke p50 55 ms vs 50. Cause: this host's WebKit runs JS work 1.8x and DOM work 2.9x slower than Chromium on the same host. The same code passes in Chromium with margin. Profiling found no hot-path work left to cut (SlickGrid render, keystroke and tree paths are already batched), so no `perf` change landed. Budgets are never loosened. Delete once the project passes on the CI runner, a Mac or a faster host.
 - **Docker: remote `tcp://` without TLS is allowed (P200),** flagged `secure: false` in the UI. Exec sessions stay in the Terminal tab's chip list after the container stops; close the chip by hand.
+- **Docker restore: the bridge-ID boot marker is unverified on Docker Desktop, Colima and OrbStack (P334).** Measured on Linux dockerd only. Check on a Mac: restart the VM with containers running, open Docker, expect the banner. Delete once confirmed.
+- **Docker restore: engines without a default bridge network (P334)** detect a restart only when this session saw the outage. No launch-time detection.
+- **Docker restore: a restart while Kira Studio was closed, then a deliberate CLI stop, is offered for restore (P334).** Indistinguishable from a casualty. Click-only, so harmless.
 - **Visual baseline of the ADE workflow graph shows the Preview placeholder (P271).** The finish note is rendered by `LlmPromptsService.Preview`, unmocked in that spec. The PNG does not show the real note text.
 - **Visual baselines are recorded in the dev sandbox (P227, P229, P242, P245, P247, P264, P266).** Accepted by the user. 13 Studio, 4 Space Settings, 3 git-module and 1 ADE workflow graph PNGs; the suites pass there. CI render may drift (0.6-1% on 13 specs before the P264 re-record); if the CI job disagrees, regenerate there and check each diff is the expected change only.
 - **The phone sees desktop worktree paths (P231 B-4).** Board `branches[].worktree` is a local path served to paired phones. Open user decision; delete once decided.
