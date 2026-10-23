@@ -14,6 +14,8 @@ Decisions (user, 2026-10-23):
 |---|---|---|
 | P330 | Branch naming, PR automation, release on merge | Todo |
 | P331 | Fix the release workflow | Todo |
+| P332 | Kira Space as default app for code and data files | Todo |
+| P333 | DB MCP: prominent target database and response preview | Todo |
 
 ## P330: Branch naming, PR automation, release on merge
 
@@ -31,3 +33,16 @@ Decisions (user, 2026-10-23):
 ## P331: Fix the release workflow
 
 Release failed repeatedly on 2026-10-23 (v0.2.11: 4 attempts; ci-gate timed out at 2400s). Earlier failures: v0.2.7, v0.2.8 first run, v0.2.1, plus the mongo kernel 6.19 gate (closed PR #5). Planner reads those run logs and root-causes each. After P330, the ci-gate cause is gone; confirm no other cause remains.
+
+## P332: Kira Space as default app for code and data files
+
+- Kira Space settings: option to make Kira Space the default app for common code and data extensions (planner proposes the extension list and groups).
+- A file opened from outside the app (Finder, `open`, double-click) opens in a new window.
+- Packaging side (file associations in the bundle `Info.plist`/`build/config.yml`) and the in-app setting (e.g. LaunchServices default handler) are both in scope; planner states what macOS allows without prompts and what it cannot do from a Linux sandbox.
+
+## P333: DB MCP: prominent target database and response preview
+
+- The approval UI shows which database the query will run on as prominently as the query itself: connection name, kind, database, environment/read-only state, large and unmissable.
+- New setting: show a response preview. When on, the approval step shows exactly what the AI will receive for the query, as a table, with table masking already applied.
+- Scope: `DbMcpApprovalDialog.vue` and the MCP request path in `apps/kira-studio`. Planner decides whether this splits into Part 1 (target prominence) and Part 2 (preview setting); a split keeps the number per `CLAUDE.md`.
+- Preview must run the same code path as the real answer, never a parallel reimplementation. Planner states how a preview can run without a double-execution side effect (read-only verdict only, or run once and hold the result for the approved send).
