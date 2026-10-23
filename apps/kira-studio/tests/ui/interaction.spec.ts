@@ -555,7 +555,7 @@ const PORT: PortSnapshot[] = [
   },
   {
     op: DATA_OP.read,
-    payload: readPayload(ORDERS_PATH, { filter: `"customer_id" = '1'` }),
+    payload: readPayload(ORDERS_PATH, { filter: `customer_id = 1` }),
     response: {
       kind: 'read',
       page: {
@@ -602,7 +602,7 @@ const PORT: PortSnapshot[] = [
   },
   {
     op: DATA_OP.read,
-    payload: readPayload(ORDERS_PATH, { filter: `"id" = '1'` }),
+    payload: readPayload(ORDERS_PATH, { filter: `id = 1` }),
     response: {
       kind: 'read',
       page: {
@@ -649,7 +649,7 @@ const PORT: PortSnapshot[] = [
   },
   {
     op: DATA_OP.read,
-    payload: readPayload(CUSTOMERS_PATH, { filter: `"id" = '1'` }),
+    payload: readPayload(CUSTOMERS_PATH, { filter: `id = 1` }),
     response: {
       kind: 'read',
       page: {
@@ -747,7 +747,7 @@ const PORT: PortSnapshot[] = [
   },
   {
     op: DATA_OP.read,
-    payload: readPayload(EMPLOYEES_PATH, { filter: `"manager_id" = '1'` }),
+    payload: readPayload(EMPLOYEES_PATH, { filter: `manager_id = 1` }),
     response: {
       kind: 'read',
       page: {
@@ -797,7 +797,7 @@ const PORT: PortSnapshot[] = [
   },
   {
     op: DATA_OP.read,
-    payload: readPayload(PRODUCTS_PATH, { filter: `"id" = '1'` }),
+    payload: readPayload(PRODUCTS_PATH, { filter: `id = 1` }),
     response: {
       kind: 'read',
       page: {
@@ -846,7 +846,7 @@ const PORT: PortSnapshot[] = [
   // the pageSize-100 reads above, one per case §7 exercises ---------------------------------------
   {
     op: DATA_OP.read,
-    payload: previewPayload(CUSTOMERS_PATH, `"id" = '1'`),
+    payload: previewPayload(CUSTOMERS_PATH, `id = 1`),
     response: {
       kind: 'read',
       page: {
@@ -893,7 +893,7 @@ const PORT: PortSnapshot[] = [
   },
   {
     op: DATA_OP.read,
-    payload: previewPayload(PRODUCTS_PATH, `"id" = '1'`),
+    payload: previewPayload(PRODUCTS_PATH, `id = 1`),
     response: {
       kind: 'read',
       page: {
@@ -940,7 +940,7 @@ const PORT: PortSnapshot[] = [
   },
   {
     op: DATA_OP.read,
-    payload: previewPayload(ORDERS_PATH, `"id" = '1'`),
+    payload: previewPayload(ORDERS_PATH, `id = 1`),
     response: {
       kind: 'read',
       page: {
@@ -989,7 +989,7 @@ const PORT: PortSnapshot[] = [
   // customers comes back empty (an orphaned FK value, or the row deleted since the page loaded).
   {
     op: DATA_OP.read,
-    payload: previewPayload(CUSTOMERS_PATH, `"id" = '2'`),
+    payload: previewPayload(CUSTOMERS_PATH, `id = 2`),
     response: {
       kind: 'read',
       page: {

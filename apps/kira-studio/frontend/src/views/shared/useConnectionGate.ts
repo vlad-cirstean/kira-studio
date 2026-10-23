@@ -1,7 +1,18 @@
 import type { ConnectionStatus } from '@shared/domain/connection';
-import { type ComputedRef, computed } from 'vue';
+import { type ComputedRef, computed, type Ref, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useTabsStore } from '../../state/tabs';
+
+/**
+ * §8.4: a restored tab shows only the reconnect button until pressed — nothing loads automatically.
+ * Reads reactive stores, so it is reactive inside a `computed`.
+ */
+export function tabNeedsReconnect(tabId: string, connectionId: string | null): boolean {
+  const status = connectionId
+    ? (useConnectionsStore().states[connectionId]?.status ?? 'disconnected')
+    : 'disconnected';
+  return !useTabsStore().isHydrated(tabId) || status !== 'connected';
+}
 
 /**
  * The reconnect gate, once — grid/documents/keyvalue/stream/definition/console each wrote out
@@ -16,6 +27,7 @@ export function useConnectionGate(
 ): {
   connectionStatus: ComputedRef<ConnectionStatus>;
   needsReconnect: ComputedRef<boolean>;
+  reconnecting: Ref<boolean>;
   onReconnectAndLoad(): Promise<boolean>;
 } {
   const connectionStatus = computed<ConnectionStatus>(() => {
@@ -25,10 +37,7 @@ export function useConnectionGate(
       : 'disconnected';
   });
 
-  // §8.4: a restored tab shows only the reconnect button until pressed — nothing loads automatically.
-  const needsReconnect = computed(
-    () => !useTabsStore().isHydrated(tab().id) || connectionStatus.value !== 'connected',
-  );
+  const needsReconnect = computed(() => tabNeedsReconnect(tab().id, tab().connectionId));
 
   // Returns whether the tab ended up connected. Go's ConnectionsService.Connect
   // never rejects for a bad connection (a wrong password, an unreachable host) — it resolves with
@@ -37,19 +46,25 @@ export function useConnectionGate(
   // only run once it did; every existing caller (a template `@click` binding, or an
   // `await onReconnectAndLoad()` that never inspected the old `void` return) is unaffected by the
   // new return value.
+  const reconnecting = ref(false);
   async function onReconnectAndLoad(): Promise<boolean> {
     const connectionId = tab().connectionId;
     if (!connectionId) return false;
-    if (connectionStatus.value !== 'connected') {
-      await useConnectionsStore().connectConnection(connectionId);
+    reconnecting.value = true;
+    try {
+      if (connectionStatus.value !== 'connected') {
+        await useConnectionsStore().connectConnection(connectionId);
+      }
+      if (connectionStatus.value !== 'connected') return false;
+      useTabsStore().markHydrated(tab().id);
+      await onLoad?.();
+      return true;
+    } finally {
+      reconnecting.value = false;
     }
-    if (connectionStatus.value !== 'connected') return false;
-    useTabsStore().markHydrated(tab().id);
-    await onLoad?.();
-    return true;
   }
 
-  return { connectionStatus, needsReconnect, onReconnectAndLoad };
+  return { connectionStatus, needsReconnect, reconnecting, onReconnectAndLoad };
 }
 
 // A one-shot, non-reactive counterpart to the gate above — for a call site

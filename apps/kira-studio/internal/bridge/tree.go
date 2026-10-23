@@ -1,6 +1,8 @@
 package bridge
 
 import (
+	"context"
+
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
@@ -20,7 +22,7 @@ func (s *TreeService) Children(args TreeChildrenArgs) (tree.ChildrenResult, erro
 	if args.ConnectionID == "" {
 		return tree.ChildrenResult{}, ipcerr.Required("connectionId")
 	}
-	return s.Deps.Tree.Children(args.ConnectionID, args.Path, args.Refresh)
+	return s.Deps.Tree.Children(context.Background(), args.ConnectionID, args.Path, args.Refresh)
 }
 
 // TreeDescribeArgs is shared by Describe and Definition — both take the same four arguments.
@@ -35,14 +37,14 @@ func (s *TreeService) Describe(args TreeDescribeArgs) (tree.DescribeResult, erro
 	if args.ConnectionID == "" {
 		return tree.DescribeResult{}, ipcerr.Required("connectionId")
 	}
-	return s.Deps.Tree.Describe(args.ConnectionID, args.Path, args.Refresh, args.TabID)
+	return s.Deps.Tree.Describe(context.Background(), args.ConnectionID, args.Path, args.Refresh, args.TabID)
 }
 
 func (s *TreeService) Definition(args TreeDescribeArgs) (tree.DefinitionResult, error) {
 	if args.ConnectionID == "" {
 		return tree.DefinitionResult{}, ipcerr.Required("connectionId")
 	}
-	return s.Deps.Tree.Definition(args.ConnectionID, args.Path, args.Refresh, args.TabID)
+	return s.Deps.Tree.Definition(context.Background(), args.ConnectionID, args.Path, args.Refresh, args.TabID)
 }
 
 // SchemaColumns is P22c D3 — Args reuses TreeDescribeArgs (TabID unused: a schema-wide fetch is
@@ -51,7 +53,7 @@ func (s *TreeService) SchemaColumns(args TreeDescribeArgs) (tree.SchemaColumnsRe
 	if args.ConnectionID == "" {
 		return tree.SchemaColumnsResult{}, ipcerr.Required("connectionId")
 	}
-	return s.Deps.Tree.SchemaColumns(args.ConnectionID, args.Path, args.Refresh)
+	return s.Deps.Tree.SchemaColumns(context.Background(), args.ConnectionID, args.Path, args.Refresh)
 }
 
 // TreeKeyTypesArgs is P63 §4.3's per-key type batch — Paths is capped client-side at 200
@@ -66,7 +68,7 @@ func (s *TreeService) KeyTypes(args TreeKeyTypesArgs) ([]string, error) {
 	if args.ConnectionID == "" {
 		return nil, ipcerr.Required("connectionId")
 	}
-	return s.Deps.Tree.KeyTypes(args.ConnectionID, args.Paths)
+	return s.Deps.Tree.KeyTypes(context.Background(), args.ConnectionID, args.Paths)
 }
 
 // TreeInvalidateArgs's Path nil drops the whole connection; non-nil drops one node.

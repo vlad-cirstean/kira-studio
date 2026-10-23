@@ -4,6 +4,7 @@ import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { data } from '../../../bridge/data';
 import { pinia } from '../../../state/pinia';
+import { useStaleDataStore } from '../../../state/staleData';
 import { registerTabReload } from '../../../state/viewCommands';
 import { runPagedLoad } from '../page/load';
 import { createPageNavigation } from '../page/navigation';
@@ -114,6 +115,7 @@ export const useKeyValueViewStore = defineStore('keyValueView', () => {
       tabNoun: 'key/value tab',
       apply: (page) => {
         setPage(viewKey, page);
+        useStaleDataStore().stamp(viewKey, host.connectionId as string);
         applyPagePosition(rt, page);
       },
       onFailure: (superseded) => {
@@ -165,8 +167,22 @@ export const useKeyValueViewStore = defineStore('keyValueView', () => {
     await load(viewKey, { mode: 'offset', offset: 0 }, prevIndex);
   }
 
+  /** Shown page is stale: connection gone, or read under another connection session. A preview
+   *  pane is also stale when its owning browse tab is. */
+  function isStale(viewKey: string): boolean {
+    const host = keyValueHost(viewKey);
+    if (!host?.connectionId) return false;
+    const staleStore = useStaleDataStore();
+    if (staleStore.isStale(viewKey, host.gateTabId, host.connectionId)) return true;
+    return (
+      host.gateTabId !== viewKey &&
+      staleStore.isStale(host.gateTabId, host.gateTabId, host.connectionId)
+    );
+  }
+
   return {
     runtime,
+    isStale,
     load,
     reload,
     runCount,

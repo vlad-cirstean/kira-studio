@@ -778,6 +778,13 @@ func (s *Service) fillFromStored(in Input, existingID string) (Input, error) {
 // of it — threaded through to attemptConnect below. Refuses outright once Shutdown has run — see
 // Shutdown's own doc comment for why.
 func (s *Service) Connect(id string) (model.ConnectionState, error) {
+	return s.ConnectContext(context.Background(), id)
+}
+
+// ConnectContext is Connect with the caller's context values (such as adapterhost.WithOpSource)
+// carried into the attempt. Its cancellation is not: the attempt is shared with other waiters and
+// ends only through abortInFlight.
+func (s *Service) ConnectContext(parent context.Context, id string) (model.ConnectionState, error) {
 	for {
 		s.mu.Lock()
 		if s.closed {
@@ -801,7 +808,7 @@ func (s *Service) Connect(id string) (model.ConnectionState, error) {
 		// teardown is still running and may delete the connection.
 		return prev.state, prev.err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.WithoutCancel(parent))
 	a := &attempt{done: make(chan struct{}), cancel: cancel}
 	s.inFlight[id] = a
 	s.mu.Unlock()

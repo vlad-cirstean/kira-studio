@@ -33,7 +33,7 @@ const SCHEMA_CHILDREN = [
   table('customers', '~1.2k rows'),
   table('order_items', '~9.8k rows'),
   table('orders', '~3.4k rows'),
-  table('products', '~240 rows'),
+  table('products', '~240'),
 ];
 
 export const col = (

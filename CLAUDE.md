@@ -46,7 +46,8 @@ duplicated here; this file only points at them.
 - The **main session runs on Sonnet and orchestrates only** — it doesn't implement, edit code, or
   fix findings directly. Its job: spawn the right subagents in order, carry context between them,
   and track progress. The actual writing always happens in a subagent.
-- Each phase (the current chapter's `docs/v<chapter>/SPEC.md` phasing table) needs an
+- Each phase (the current chapter's `docs/v<chapter>/SPEC.md` phasing table; except the chapter
+  close phase, see "Closing a chapter") needs an
   Opus-authored plan committed under that chapter's `plans/` before implementation starts — spawn
   an **Opus subagent** (`Agent` tool, `model: "opus"`) whose only job is writing that plan. No plan
   there means no implementing straight from the spec; get the plan written and committed first.
@@ -108,6 +109,8 @@ duplicated here; this file only points at them.
   (commits, findings files, plans) must be enough to see exactly where it stopped and pick back up
   — never a state where recovering means re-deriving work an interrupted subagent already did but
   never wrote down.
+- **Set a limit-reset wakeup only when the user says so.** Never on own initiative. Use `send_later`
+  for the reset time with "resume from `SPEC.md`, `plans/`, git log". Cancel it when done.
 - **A failing test, lint finding, typecheck error, or any other code-quality/hook check gets fixed
   on the spot, pre-existing or not.** "Pre-existing" justifies skipping root-cause investigation of
   whether *this phase* caused it, never skipping the fix itself. Confirm it predates the phase (e.g.
@@ -153,15 +156,19 @@ duplicated here; this file only points at them.
   `P294`). Before opening a new chapter, read the highest `P` in `docs/HISTORY.md` and in an open
   chapter's `SPEC.md`, if one exists, and continue from there. v1.5's `C` lettering and v1.7's `M` lettering predate this rule and
   stay as shipped, never renumbered; every chapter from here on uses `P`.
-- **Closing a chapter folds it.** The chapter's last phase runs
-  `go run ./scripts/docshistory fold --runs docs/history-runs --out - --jobs 1 --max-usd <cap> <ch>`
-  (distills each phase through `ingest_files`, costs tokens, resumable), reads the verify report,
-  runs `repoint --runs docs/history-runs`, commits, then `git rm -r docs/<ch>/ docs/history-runs/`.
-  That phase marks its own row Done and writes its Result in the commit before the fold, so its
-  entry folds closed. Between chapters no `docs/v*/` exists. Open the next with `docs/v<new>/SPEC.md`
+- **Closing a chapter folds it, by hand.** The chapter's last phase closes it; the Sonnet implementer
+  writes the close itself, never with `scripts/docshistory` or any tool. Close phase is exempt from
+  the Opus-plan rule: one Sonnet implementer does it directly, no planner, no plan file. In the commit before the
+  fold, mark the row Done and write its Result in `SPEC.md`, so its entry folds closed. Then write the
+  `<!-- chapter <ch> -->` block in `docs/HISTORY.md`. Copy the previous chapter block's format: header
+  `Source: docs/<ch>/ at <commit>. N phases.` with the true row count, then one `### <ch> <id> (Done)`
+  heading per `SPEC.md` row in table order, distilled from each row's Result. Fix links to the chapter
+  by hand. Commit. Then `git rm -r docs/<ch>/` (and `docs/history-runs/` if it exists) and commit.
+  Between chapters no `docs/v*/` exists. Open the next with `docs/v<new>/SPEC.md`
   (intro: first `P` is highest plus one, branch name) and `plans/`.
   Data a test or script reads at runtime never lives under `docs/v*/`; it goes in its reader's `testdata/`.
-  Move any found first, own phase. Never hand-edit `docs/HISTORY.md`.
+  Move any found first, own phase. Hand-writing the close entry is the standard close; any other
+  edit to `docs/HISTORY.md` stays forbidden.
 - **Splitting a phase keeps its number — it doesn't consume a new one, when an agent is the one
   deciding to split it.** A subagent (an Opus planning pass finding the scope is really two
   pieces, or anyone else in the loop) that decides a `SPEC.md` row needs splitting renames it

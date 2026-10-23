@@ -98,3 +98,49 @@ func TestChecker_Status_CacheIntervals(t *testing.T) {
 		t.Fatalf("Status() = %+v, want UpdateAvailable with LatestVersion %q", result, testTag)
 	}
 }
+
+// TestChecker_Check_BypassesCache: Check fetches inside okInterval, surfaces the fetch error Status
+// hides (Status keeps the last good result), and a dev build never fetches.
+func TestChecker_Check_BypassesCache(t *testing.T) {
+	var calls int32
+	failing := false
+	c := &Checker{
+		running: "1.0.0",
+		now:     time.Now,
+		fetch: func(ctx context.Context, userAgent string) (release, error) {
+			atomic.AddInt32(&calls, 1)
+			if failing {
+				return release{}, errors.New("boom")
+			}
+			return testRelease(), nil
+		},
+	}
+
+	c.Status(context.Background())
+	if _, err := c.Check(context.Background()); err != nil {
+		t.Fatalf("Check() error = %v, want nil", err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 2 {
+		t.Fatalf("fetch called %d times, want 2 (Check must bypass the cache)", got)
+	}
+
+	failing = true
+	if _, err := c.Check(context.Background()); err == nil {
+		t.Fatal("Check() error = nil, want the fetch error")
+	}
+	if res := c.Status(context.Background()); !res.UpdateAvailable || res.LatestVersion != testTag {
+		t.Fatalf("Status() after a failed Check = %+v, want the last good result", res)
+	}
+
+	var devCalls int32
+	dev := &Checker{running: "dev", now: time.Now, fetch: func(context.Context, string) (release, error) {
+		atomic.AddInt32(&devCalls, 1)
+		return testRelease(), nil
+	}}
+	if _, err := dev.Check(context.Background()); !errors.Is(err, ErrNotReleaseBuild) {
+		t.Fatalf("dev Check() error = %v, want ErrNotReleaseBuild", err)
+	}
+	if devCalls != 0 {
+		t.Fatalf("dev build fetched %d times, want 0", devCalls)
+	}
+}

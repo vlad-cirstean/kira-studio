@@ -32,7 +32,7 @@ func (f *fakeConnsMutable) StateOf(string) model.ConnectionState {
 	return model.ConnectionState{Status: "connected"}
 }
 
-func (f *fakeConnsMutable) Connect(string) (model.ConnectionState, error) {
+func (f *fakeConnsMutable) ConnectContext(context.Context, string) (model.ConnectionState, error) {
 	return model.ConnectionState{Status: "connected"}, nil
 }
 
@@ -53,14 +53,16 @@ func (f *fakeConnsMutable) setReadMode(mode string) {
 type fakeQueryRunner struct {
 	class    adapters.OpClass
 	executed atomic.Int32
+	readOnly atomic.Bool
 }
 
 func (f *fakeQueryRunner) ClassifyStatement(context.Context, string, string) (adapters.OpClass, error) {
 	return f.class, nil
 }
 
-func (f *fakeQueryRunner) Execute(context.Context, adapterhost.ExecuteRequestWire) (adapterhost.ExecuteResponse, error) {
+func (f *fakeQueryRunner) Execute(_ context.Context, req adapterhost.ExecuteRequestWire) (adapterhost.ExecuteResponse, error) {
 	f.executed.Add(1)
+	f.readOnly.Store(req.ReadOnly)
 	return adapterhost.ExecuteResponse{}, nil
 }
 
@@ -139,5 +141,28 @@ func TestRunQueryRefusesApprovedWriteAfterPermissionRevokedMidWait(t *testing.T)
 
 	if n := qr.executed.Load(); n != 0 {
 		t.Fatalf("Execute was called %d times, want 0 — the statement must never run once permissions were revoked", n)
+	}
+}
+
+func TestRunQueryReadVerdictRequestsReadOnlyUnlessWritesAllowed(t *testing.T) {
+	for _, tc := range []struct {
+		write string
+		want  bool
+	}{{"prompt", true}, {"deny", true}, {"allow", false}} {
+		conns := &fakeConnsMutable{summary: model.ConnectionSummary{
+			ID: "c1", Name: "conn", McpEnabled: true,
+			McpReadMode: "allow", McpWriteMode: tc.write, McpDdlMode: "deny",
+		}}
+		qr := &fakeQueryRunner{class: adapters.ClassRead}
+		s := &Server{cfg: Config{
+			Conns: conns, Query: qr, Approvals: NewApprovalBroker(time.Now), MaskRules: fakeMaskRulesNone{},
+			ExplainThreshold: func() int { return 1000 },
+		}}
+		if _, _, err := s.runQuery(context.Background(), nil, runQueryArgs{ConnectionID: "c1", SQL: "SELECT 1"}); err != nil {
+			t.Fatalf("write=%s: %v", tc.write, err)
+		}
+		if qr.executed.Load() != 1 || qr.readOnly.Load() != tc.want {
+			t.Errorf("write=%s: executed=%d readOnly=%v, want 1/%v", tc.write, qr.executed.Load(), qr.readOnly.Load(), tc.want)
+		}
 	}
 }

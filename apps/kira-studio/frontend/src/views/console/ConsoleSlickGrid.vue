@@ -35,7 +35,7 @@ import {
   tooltipAttrs,
 } from '../shared/page/columns';
 import { setVisibleRows } from '../shared/page/visibleRows';
-import { type EdgeHash, searchCellLayers } from '../shared/slick/cssLayers';
+import { searchCellLayers } from '../shared/slick/cssLayers';
 import {
   createGridDataSource,
   type DisplayRowIndex,
@@ -61,7 +61,6 @@ import {
   type Selection,
   selectionFromRanges,
 } from '../shared/slick/selection';
-import { computeSelEdgeHashes, SEL_EDGE_LAYER_KEYS } from '../shared/slick/selectionEdges';
 import { attachScrollProbes, createHybridSelectionModel } from '../shared/slick/selectionModel';
 import '../shared/slick/slickTheme.css';
 import 'slickgrid/dist/styles/css/slick.grid.css';
@@ -299,54 +298,17 @@ function tagRenderedRows(): void {
 // VirtualList's `visible-range` emit, now driven from grid.onRendered/lastRenderedRowBounds the
 // way SlickGridHost.vue's own onGridRendered does — the *rendered* (overscanned) band, not the
 // narrower strictly-visible one, so a row still inside the runway keeps its decode cache alive.
-// P22 D10 (F17/F18) — the perimeter layer's other trigger, beside a selection commit
-// (onSelectedRangesChanged below): a rendered-band change needs the same repaint SlickGridHost.vue's
-// own onGridRendered gives it, or scrolling a committed selection into view would leave the newly
-// rendered rows with the fill but no perimeter. Guarded on the band actually changing, same reason
-// SlickGridHost.vue's own lastCssLayerBand exists — recomputing on every render frame the band
-// hasn't moved would be pure waste.
-let lastSelEdgeBand = { start: 0, end: -1 };
-
 function onGridRendered(): void {
   if (!grid || !dataSource) return;
   const band = renderedPageRowBand(grid, dataSource);
   if (!band) return;
   setVisibleRows(props.tabId, band.lo, band.hi + 1);
   setVisibleWindow(props.pageKey, band.lo, band.hi + 1);
-
-  if (band.start !== lastSelEdgeBand.start || band.end !== lastSelEdgeBand.end) {
-    lastSelEdgeBand = { start: band.start, end: band.end };
-    refreshSelEdges();
-  }
 }
 
 function fieldAtCol(colIdx: number): string | undefined {
   const c = grid?.getColumns()[colIdx];
   return c ? String(c.field) : undefined;
-}
-
-// The console had a selection fill (`kira-cell-selected`, `selectedCellCssClass`
-// below) but never the four-sided outline every data-grid selection carries — one computation
-// missing.
-function refreshSelEdges(selOverride?: Selection | null): void {
-  if (!grid || !dataSource || !page) return;
-  const sel = selOverride !== undefined ? selOverride : currentSelection;
-  const displayRowCount = matchedRows(props.tabId)?.length ?? page.rowCount;
-  const displayColCount = grid.getColumns().length - 1; // minus the gutter
-  const hashes = computeSelEdgeHashes(
-    sel,
-    grid.lastRenderedRowBounds,
-    (pos) => dataSource?.getItem(pos).row ?? pos,
-    (displayCol) =>
-      page && displayCol >= 0 && displayCol < page.columns.length
-        ? colField(displayCol)
-        : undefined,
-    displayRowCount,
-    displayColCount,
-  );
-  SEL_EDGE_LAYER_KEYS.forEach((key, i) => {
-    grid?.setCellCssStyles(key, hashes[i] as EdgeHash);
-  });
 }
 
 // The drag-in-progress twin of the fill SlickGrid draws at commit through
@@ -368,7 +330,6 @@ function onCellRangeSelecting(_e: unknown, args: { range: SlickRange }): void {
   if (!grid || !dataSource || !selectionModel || selectionModel.currentSelectionModeIsRow()) return;
   const posSel = selectionFromRanges([args.range], false, null);
   const pageSel = posSel ? toPageRowSelection(posSel) : null;
-  refreshSelEdges(pageSel);
   const ds = dataSource;
   grid.setCellCssStyles(
     'kira-cell-selected',
@@ -418,7 +379,6 @@ function onSelectedRangesChanged(_e: unknown, ranges: SlickRange[]): void {
   pendingSelectionKind = null;
   const posSel = selectionFromRanges(ranges, rowMode, kind);
   currentSelection = posSel ? toPageRowSelection(posSel) : null;
-  refreshSelEdges();
 }
 
 // Mirrors SlickGridHost.vue's own onColumnsResized: SlickGrid drags the

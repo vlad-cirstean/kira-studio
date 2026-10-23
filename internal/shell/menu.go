@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -103,10 +104,11 @@ func EditMenu() []Item {
 }
 
 // AppMenuHead is the App section's own identical opening, before each app's own items begin
-// (P107 I2-7) — About, then a separator.
+// (P107 I2-7) — About, Check for Updates…, then a separator.
 func AppMenuHead() []Item {
 	return []Item{
 		{Kind: ItemRole, Role: application.About},
+		{Kind: ItemEmit, Label: i18n.T("backend.menu.checkForUpdates.label", nil), Channel: appevent.ChannelCheckForUpdates},
 		{Kind: ItemSeparator},
 	}
 }

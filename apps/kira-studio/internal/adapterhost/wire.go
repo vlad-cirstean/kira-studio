@@ -181,6 +181,8 @@ type ExecuteRequestWire struct {
 	Statements   []string `json:"statements"`
 	// Cap is set by Go callers only (dbmcp); zero means adapters.DefaultConsoleCap.
 	Cap page.ResultCap `json:"-"`
+	// ReadOnly is set by Go callers only (dbmcp); see model.ConsoleRequest.ReadOnly.
+	ReadOnly bool `json:"-"`
 }
 
 func (r ExecuteRequestWire) Validate() error {

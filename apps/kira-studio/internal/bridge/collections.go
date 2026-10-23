@@ -316,41 +316,143 @@ func importWarningDetail(kind string, n int) string {
 		return i18n.T("backend.studio.collection.import.disabledBody.body", map[string]string{"count": c})
 	case postman.WarnMalformedItem:
 		return i18n.T("backend.studio.collection.import.malformedItem.body", map[string]string{"count": c})
+	case postman.WarnDisabledVariables:
+		return i18n.T("backend.studio.collection.import.disabledVariables.body", map[string]string{"count": c})
 	}
 	return ""
 }
 
 type CollectionsImportArgs struct {
-	Path string `json:"path"`
+	Paths []string `json:"paths"`
 }
 
-// Import parses the file at path and writes it as rows in one transaction. Only the path crosses
-// the bridge — never the file's bytes (F16).
-func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportReport, error) {
-	if args.Path == "" {
-		return ImportReport{}, ipcerr.Required("path")
+// EnvironmentImportReport is what one imported environment file answers with.
+type EnvironmentImportReport struct {
+	EnvironmentID string          `json:"environmentId"`
+	Name          string          `json:"name"`
+	Variables     int             `json:"variables"`
+	Warnings      []ImportWarning `json:"warnings"`
+}
+
+// ImportFileResult is one picked file's outcome. Kind is "collection" or "environment", "" when the
+// file failed (Error then carries the reason).
+type ImportFileResult struct {
+	Path        string                   `json:"path"`
+	FileName    string                   `json:"fileName"`
+	Kind        string                   `json:"kind"`
+	Collection  *ImportReport            `json:"collection"`
+	Environment *EnvironmentImportReport `json:"environment"`
+	Error       *string                  `json:"error"`
+}
+
+// ImportResult lists one entry per path, in the order given.
+type ImportResult struct {
+	Files []ImportFileResult `json:"files"`
+}
+
+// Import parses each file and writes it: a collection as rows in one transaction, an environment as
+// one environment row. Files are independent — a failed one is reported in its own entry and the
+// rest still import. Only paths cross the bridge, never file bytes (F16).
+func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportResult, error) {
+	if len(args.Paths) == 0 {
+		return ImportResult{}, ipcerr.Required("paths")
 	}
-	f, err := os.Open(args.Path)
+	result := ImportResult{Files: make([]ImportFileResult, 0, len(args.Paths))}
+	var changes []ApiDataChange
+	treeChanged, envsChanged := false, false
+	for _, path := range args.Paths {
+		entry := ImportFileResult{Path: path, FileName: filepath.Base(path)}
+		file, err := s.importFile(path)
+		switch {
+		case err != nil:
+			msg := importErrorMessage(err)
+			entry.Error = &msg
+		case file.collection != nil:
+			entry.Kind, entry.Collection = "collection", file.collection
+		default:
+			entry.Kind, entry.Environment = "environment", file.environment
+		}
+		treeChanged = treeChanged || file.treeCommitted
+		envsChanged = envsChanged || file.environment != nil
+		result.Files = append(result.Files, entry)
+	}
+	if treeChanged {
+		changes = append(changes, treeChange())
+	}
+	if envsChanged {
+		changes = append(changes, environmentsChange())
+	}
+	if len(changes) > 0 {
+		emitApiData(s.Deps.Events, changes...)
+	}
+	return result, nil
+}
+
+// importErrorMessage is the user-facing text of a coded error, or the plain error text.
+func importErrorMessage(err error) string {
+	var coded *ipcerr.Error
+	if errors.As(err, &coded) {
+		return coded.Message
+	}
+	return err.Error()
+}
+
+// importedFile is what one importFile call wrote. treeCommitted stays true when a collection
+// committed and a later step failed, so other windows still see the partial state (P112).
+type importedFile struct {
+	collection    *ImportReport
+	environment   *EnvironmentImportReport
+	treeCommitted bool
+}
+
+func (s *CollectionsService) importFile(path string) (importedFile, error) {
+	f, err := os.Open(path)
 	if err != nil {
-		return ImportReport{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.file.readFailed.error",
-			map[string]string{"path": args.Path, "detail": err.Error()})
+		return importedFile{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.file.readFailed.error",
+			map[string]string{"path": path, "detail": err.Error()})
 	}
 	defer f.Close()
 
-	tree, err := postman.Parse(f)
+	parsed, err := postman.ParseFile(f)
 	if err != nil {
 		// A refusal here is about the file's own content (D10's version gate, or JSON that is not
-		// a collection at all), which is the user's to fix — not an internal failure.
-		return ImportReport{}, ipcerr.BadRequest(err.Error())
+		// a Postman export at all), which is the user's to fix — not an internal failure.
+		return importedFile{}, ipcerr.BadRequest(err.Error())
 	}
+	if parsed.Environment != nil {
+		report, err := s.importEnvironment(parsed.Environment)
+		return importedFile{environment: report}, err
+	}
+	return s.importCollection(parsed.Collection)
+}
+
+func (s *CollectionsService) importEnvironment(env *postman.Environment) (*EnvironmentImportReport, error) {
+	created, err := s.Deps.Repos.Variables.ImportEnvironment(env.Name, env.Variables)
+	if err != nil {
+		return nil, ipcerr.InternalErr(err)
+	}
+	report := &EnvironmentImportReport{
+		EnvironmentID: created.ID, Name: created.Name, Variables: len(env.Variables),
+		Warnings: []ImportWarning{},
+	}
+	if env.Disabled > 0 {
+		report.Warnings = append(report.Warnings, ImportWarning{
+			Kind: postman.WarnDisabledVariables, Count: env.Disabled,
+			Detail: importWarningDetail(postman.WarnDisabledVariables, env.Disabled),
+		})
+	}
+	return report, nil
+}
+
+func (s *CollectionsService) importCollection(tree *postman.Tree) (importedFile, error) {
 	collection, err := s.Deps.Repos.Collections.ImportTree(tree)
 	if err != nil {
-		return ImportReport{}, ipcerr.InternalErr(err)
+		return importedFile{}, ipcerr.InternalErr(err)
 	}
-	// P112: ImportTree committed here, on every path below — success, rollback success (net-zero
+	// ImportTree committed from here on, on every path below — success, rollback success (net-zero
 	// change, one harmless refetch) and rollback failure (the partially imported collection stays
 	// visible, and other windows must see it too).
-	defer emitApiData(s.Deps.Events, treeChange())
+	out := importedFile{treeCommitted: true}
 	// A second call, deliberately — encrypting a secret variable needs VariablesRepo's
 	// own Cipher, which CollectionsRepo does not have (the module boundary). See
 	// VariablesRepo.ImportVariables' own comment for why this cannot join ImportTree's transaction.
@@ -363,22 +465,19 @@ func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportReport, e
 	// one statement) keeps what's on disk matching the reported outcome.
 	if len(tree.Variables) > 0 {
 		if err := s.Deps.Repos.Variables.ImportVariables(collection.ID, tree.Variables); err != nil {
-			// A failed compensating Delete used to only be logged — the returned error
-			// still just named ImportVariables' own failure, so the renderer reported "import
-			// failed" while the collection ImportTree already committed stayed in the tree,
-			// visible in the panel, with nothing telling the user it was there. Folding the delete
-			// failure into the returned error message lets the UI say so.
+			// Folding a failed compensating delete into the returned error lets the UI say the
+			// collection is still there.
 			if delErr := s.Deps.Repos.Collections.Delete(collection.ID, "collection"); delErr != nil {
 				slog.Error("rolling back a collection import after ImportVariables failed",
 					"scope", "bridge/collections", "collectionId", collection.ID, "importVariablesErr", err, "deleteErr", delErr)
-				return ImportReport{}, ipcerr.T(ipcerr.CodeInternal, "backend.studio.collection.importRollbackFailed.error",
+				return out, ipcerr.T(ipcerr.CodeInternal, "backend.studio.collection.importRollbackFailed.error",
 					map[string]string{"detail": err.Error(), "name": collection.Name, "rollbackDetail": delErr.Error()})
 			}
-			return ImportReport{}, ipcerr.InternalErr(err)
+			return out, ipcerr.InternalErr(err)
 		}
 	}
 
-	report := ImportReport{
+	report := &ImportReport{
 		CollectionID: collection.ID, Name: collection.Name,
 		Folders: tree.Report.Folders, Requests: tree.Report.Requests,
 		Warnings: []ImportWarning{},
@@ -392,7 +491,8 @@ func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportReport, e
 			Kind: kind, Count: count, Detail: importWarningDetail(kind, count),
 		})
 	}
-	return report, nil
+	out.collection = report
+	return out, nil
 }
 
 type CollectionsExportArgs struct {

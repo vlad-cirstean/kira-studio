@@ -1,16 +1,22 @@
 <script setup lang="ts">
+import type { EditorLanguageId } from '@shared/domain/editor';
 import { KIRA_EDITOR_THEME, loadMonaco } from '@workbench/editor/monaco';
+import { monacoLanguageIdFor } from '@workbench/editor/monacoLanguages';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 
 type DiffEditor = import('monaco-editor').editor.IStandaloneDiffEditor;
+type Monaco = Awaited<ReturnType<typeof loadMonaco>>;
 type Model = import('monaco-editor').editor.ITextModel;
 
-// Side-by-side diff of the default text (left) against the draft (right). Both sides are
-// read-only; editing happens on the Edit tab.
-const props = defineProps<{ original: string; modified: string }>();
+// Read-only Monaco diff of two texts. Inline below Monaco's width breakpoint.
+const props = withDefaults(
+  defineProps<{ original: string; modified: string; language?: EditorLanguageId }>(),
+  { language: 'plain' },
+);
 
 const root = ref<HTMLElement | null>(null);
 let diff: DiffEditor | null = null;
+let mod: Monaco | null = null;
 let originalModel: Model | null = null;
 let modifiedModel: Model | null = null;
 
@@ -21,10 +27,12 @@ function syncDebugText(): void {
 }
 
 onMounted(async () => {
-  const mod = await loadMonaco();
+  const loaded = await loadMonaco();
   if (!root.value) return;
-  originalModel = mod.editor.createModel(props.original, 'plaintext');
-  modifiedModel = mod.editor.createModel(props.modified, 'plaintext');
+  mod = loaded;
+  const languageId = monacoLanguageIdFor(props.language);
+  originalModel = mod.editor.createModel(props.original, languageId);
+  modifiedModel = mod.editor.createModel(props.modified, languageId);
   diff = mod.editor.createDiffEditor(root.value, {
     theme: KIRA_EDITOR_THEME,
     readOnly: true,
@@ -37,6 +45,7 @@ onMounted(async () => {
     minimap: { enabled: false },
     scrollBeyondLastLine: false,
     wordWrap: 'on',
+    hideUnchangedRegions: { enabled: true },
   });
   diff.setModel({ original: originalModel, modified: modifiedModel });
   syncDebugText();
@@ -47,7 +56,17 @@ onUnmounted(() => {
   originalModel?.dispose();
   modifiedModel?.dispose();
   diff = null;
+  mod = null;
 });
+
+watch(
+  () => props.language,
+  () => {
+    const languageId = monacoLanguageIdFor(props.language);
+    if (mod && originalModel) mod.editor.setModelLanguage(originalModel, languageId);
+    if (mod && modifiedModel) mod.editor.setModelLanguage(modifiedModel, languageId);
+  },
+);
 
 watch(
   () => [props.original, props.modified],

@@ -13,7 +13,7 @@ var abbreviateUnits = []struct {
 	{1_000, "K"},
 }
 
-// AbbreviateCount mirrors @shared/format's abbreviateCount for the adapters' own "~N rows"/"N
+// AbbreviateCount mirrors @shared/format's abbreviateCount for the adapters' own "~N"/"N
 // keys"/"N partitions" detail strings.
 func AbbreviateCount(n int64) string {
 	sign := ""

@@ -96,7 +96,7 @@ func addIngestTools(srv *mcp.Server, opts Options) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "ingest_status",
 		Description: llmprompts.MemoryToolIngestStatus.Text(src, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[ingestStatusInput](src, llmprompts.MemoryToolIngestStatus.ID(), nil),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[ingestStatusInput](src, llmprompts.MemoryToolIngestStatus.ID(), nil), "id"),
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, recovering("ingest_status", func(_ context.Context, _ *mcp.CallToolRequest, in ingestStatusInput) (*mcp.CallToolResult, importer.JobDetail, error) {
 		d, err := opts.Ingest.JobWithFacts(in.ID)
@@ -121,7 +121,7 @@ func ingestFiles(ctx context.Context, opts Options, in ingestInput) (*mcp.CallTo
 	case in.Text != "":
 		return nil, ingestOutput{}, badIngest("to store text call store_memory, or save it to a file and ingest that")
 	case in.Origin == "" || in.Scope == "":
-		return nil, ingestOutput{}, badIngest("origin and scope are required")
+		return nil, ingestOutput{}, badIngest("origin and scope are required unless distill is true")
 	}
 	if n := len(in.Paths); n < 1 || n > maxIngestPaths {
 		return nil, ingestOutput{}, badIngest("send 1 to %d paths", maxIngestPaths)

@@ -107,6 +107,9 @@ const (
 	// WarnDisabledBody covers D7's last row: Postman keeps a disabled body and does not send it;
 	// this app has no equivalent and will send it.
 	WarnDisabledBody = "disabled_body"
+	// WarnDisabledVariables counts environment values Postman marks disabled: the app has no
+	// per-variable enabled flag, so they are skipped rather than applied.
+	WarnDisabledVariables = "disabled_variables"
 )
 
 // Report is what Parse counted. The per-kind messages are UI text and live at the bridge, not

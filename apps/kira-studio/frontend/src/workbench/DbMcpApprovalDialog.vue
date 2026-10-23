@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { RoutedPrompt } from '@shared/domain/prompts';
-import CodeBlock from '@theme/components/CodeBlock.vue';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
@@ -16,6 +15,7 @@ import { formatCount } from '@workbench/behaviour/format';
 import { usePendingDecision } from '@workbench/behaviour/pendingDecision';
 import { computed } from 'vue';
 import { useDbMcpStore } from '../state/dbmcp';
+import ApprovalStatement from './ApprovalStatement.vue';
 
 // P246: mounted by PromptHost for the routed `dbmcp` entry whose ref is the pending request.
 const props = defineProps<{ entry: RoutedPrompt; more: number }>();
@@ -51,7 +51,7 @@ const classBody = computed(() => {
 
 // The same dialog, one more reason to raise it — title and lede vary by reason,
 // everything else (Deny focused on mount, Escape denies, the countdown, the queue count, the
-// statement <pre>) stays exactly as shipped. A heavy query and a write are the same keyboard
+// statement viewer) stays exactly as shipped. A heavy query and a write are the same keyboard
 // interaction.
 const dialogTitle = computed(() =>
   dbMcpStore.approval.pending?.reason === 'heavy'
@@ -92,7 +92,7 @@ async function onApprove(requestId: string): Promise<void> {
     :open="true"
     @update:open="(v) => !v && onDeny(dbMcpStore.approval.pending!.requestId)"
   >
-    <DialogContent size="lg" data-testid="db-mcp-approval-dialog">
+    <DialogContent size="2xl" fixed-height data-testid="db-mcp-approval-dialog">
       <DialogHeader>
         <DialogTitle>{{ dialogTitle }}</DialogTitle>
       </DialogHeader>
@@ -102,9 +102,10 @@ async function onApprove(requestId: string): Promise<void> {
           {{ heavyLede }}
         </p>
         <p v-else class="m-0 whitespace-pre-wrap">{{ classBody }}</p>
-        <CodeBlock class="max-h-56 overflow-auto" data-testid="db-mcp-approval-statement">{{
-          dbMcpStore.approval.pending.statement
-        }}</CodeBlock>
+        <ApprovalStatement
+          :kind="dbMcpStore.approval.pending.kind"
+          :statement="dbMcpStore.approval.pending.statement"
+        />
 
         <div
           v-if="dbMcpStore.approval.pending.plan"
@@ -144,7 +145,7 @@ async function onApprove(requestId: string): Promise<void> {
 
       <DialogFooter>
         <Button
-          ref="denyButton"
+          data-dialog-initial
           variant="dialog"
           size="kira-lg"
           data-testid="db-mcp-approval-deny"

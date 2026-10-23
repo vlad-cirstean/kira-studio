@@ -92,7 +92,7 @@ func TestFixture_MariaDB(t *testing.T) {
 	// The cache-hit transition is not itself part of the committed fixture (packages/db-fixtures/ structurally
 	// cannot reach it either, F2) — probed directly against tree.Service, not through the Recorder
 	// (which would otherwise append a second, uncommitted treeChildren snapshot).
-	dbChildrenSecond, err := app.Tree.Children(cfg.ID, dbNode.Path, false)
+	dbChildrenSecond, err := app.Tree.Children(context.Background(), cfg.ID, dbNode.Path, false)
 	if err != nil {
 		t.Fatalf("db children (second): %v", err)
 	}

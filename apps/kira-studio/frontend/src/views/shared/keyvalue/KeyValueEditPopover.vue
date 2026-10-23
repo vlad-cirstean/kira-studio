@@ -46,7 +46,7 @@ function onOpen(): void {
 }
 
 async function onSave(): Promise<void> {
-  if (!props.keyName) return;
+  if (!props.keyName || props.disabled) return;
   if (await run()) open.value = false;
 }
 
@@ -98,6 +98,7 @@ defineExpose({
             size="kira-lg"
             data-testid="keyvalue-edit-save"
             :pending="pending"
+            :disabled="disabled"
             @click="onSave"
             >{{
               t('common.action.save.label')

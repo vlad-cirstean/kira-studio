@@ -45,6 +45,7 @@ const PAGE_SIZE_ITEMS = PAGE_SIZE_OPTIONS.map((o) => ({
 }));
 
 const rt = computed(() => gridViewStore.runtime[props.tab.id]);
+const stale = computed(() => gridViewStore.isStale(props.tab.id));
 
 const caps = computed(() => {
   const connectionId = props.tab.connectionId;
@@ -65,6 +66,7 @@ const isWritable = computed(
     !!caps.value?.writable &&
     !connectionsStore.connectionRecord(props.tab.connectionId)?.readOnly &&
     !rt.value?.maskPreview &&
+    !stale.value &&
     !pendingChangesStore.isCommitting(props.tab.id),
 );
 
@@ -95,6 +97,7 @@ const maskPreviewTooltip = computed(() => {
 });
 const addRowTooltip = computed(() => {
   if (isWritable.value) return t('studio.grid.addRow.label');
+  if (stale.value) return t('studio.common.connectionLost.tooltip');
   return t(
     rt.value?.maskPreview
       ? 'studio.grid.maskedEdit.tooltip'
@@ -153,6 +156,7 @@ const canDeleteRows = computed(
 // key a property of the table, and an empty selection the one the user can act on right now.
 const deleteRowTooltip = computed(() => {
   if (canDeleteRows.value) return t('studio.grid.deleteRows.aria');
+  if (stale.value) return t('studio.common.connectionLost.tooltip');
   if (rt.value?.maskPreview) return t('studio.grid.maskedEdit.tooltip');
   if (!isWritable.value) return t('studio.common.connectionReadOnly.tooltip');
   if (!caps.value?.canDelete) return t('studio.grid.deleteUnsupported.tooltip');
@@ -168,10 +172,13 @@ const canGenerateData = computed(
     canGenerateDataFor(
       caps.value,
       connectionsStore.connectionRecord(props.tab.connectionId)?.readOnly,
-    ) && !rt.value?.maskPreview,
+    ) &&
+    !rt.value?.maskPreview &&
+    !stale.value,
 );
 const generateDataTooltip = computed(() => {
   if (canGenerateData.value) return t('studio.shortcuts.palette.generateData.label');
+  if (stale.value) return t('studio.common.connectionLost.tooltip');
   if (rt.value?.maskPreview) return t('studio.grid.maskedEdit.tooltip');
   if (connectionsStore.connectionRecord(props.tab.connectionId)?.readOnly)
     return t('studio.common.connectionReadOnly.tooltip');

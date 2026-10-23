@@ -97,6 +97,7 @@ export const IPC = {
 
   // P119: Kira Studio's own three update channels — same values as its own ipcChannels.ts.
   updateStatus: 'kira:update:status',
+  updateCheck: 'kira:update:check',
   updateInstall: 'kira:update:install',
   updateCancelInstall: 'kira:update:cancelInstall',
 

@@ -827,7 +827,7 @@ var (
 		`How the step ended. {{range .Results}}{{.ID}} ({{if .OK}}ok{{else}}not ok{{end}}{{if .Description}}: {{.Description}}{{end}}). {{end}}needs_input when the user must decide.`,
 		StatusVars{Results: []ResultVar{{ID: "done", OK: true}, {ID: "failed"}}})
 	_ = arg(HeadlessToolFinishStep.id, "summary", bothApps, NextCall, `One line: what was done, what failed, or the question for the user.`, NoVars{})
-	_ = arg(HeadlessToolFinishStep.id, "reason", bothApps, NextCall, `Why it failed, or what you need. Give it when status is failed or needs_input.`, NoVars{})
+	_ = arg(HeadlessToolFinishStep.id, "reason", bothApps, NextCall, `Why it failed, or what you need. Required when status is not ok or needs_input.`, NoVars{})
 	_ = arg(HeadlessToolFinishStep.id, "conflictedFiles", bothApps, NextCall, `Files that still conflict, relative to the repo.`, NoVars{})
 	_ = arg(HeadlessToolFinishStep.id, "lastGitError", bothApps, NextCall, `Last git error output you saw.`, NoVars{})
 	_ = arg(HeadlessToolFinishStep.id, "tried", bothApps, NextCall, `What you tried before giving up.`, NoVars{})
@@ -1148,7 +1148,7 @@ var DbmcpInstructions = define(Entry{
 	TitleKey:   "llmPrompts.entry.dbmcpInstructions.title",
 	PurposeKey: "llmPrompts.entry.dbmcpInstructions.description",
 	UsedByKey:  "llmPrompts.entry.dbmcpInstructions.usedBy.body",
-	Default:    "Read and query the databases configured in this Kira Studio app. Only connections the user exposed are visible; start with `list_connections`. Walk structure with `list_children`, passing back a `path` it returned. Levels differ per engine; do not assume a database or schema level exists. `describe_schema` returns every relation's columns in one call, cheaper than one `describe_table` per table. `run_query` runs one statement through the app's SQL console path, under the connection's own permissions; results are capped and say so when truncated. Every query appears in the user's Operations panel. Each `list_connections` entry's `permissions` object names its read/write/DDL mode (deny, allow or prompt) and its `description`, when set, says what the connection is for — read both before calling `run_query`. Run `explain_query` before an expensive-looking query. `run_query` plans it anyway on connections whose owner turned auto-explain on. A connection with masked columns lists them in `list_connections`' own `maskedColumns` field, as \"table.column: kind\" — a masked cell's value is redacted (never the real value), and a trailing `#TAG` is an opaque correlation token, never a literal part of the value: equal values always share a tag, but the tag is short enough that two distinct values can rarely share one too, so treat a tag match as a strong hint toward equality, not proof of it.",
+	Default:    "Read and query the databases configured in this Kira Studio app. Only connections the user exposed are visible; start with `list_connections`. Walk structure with `list_children`, passing back a `path` it returned. Levels differ per engine; do not assume a database or schema level exists. `run_query` and `explain_query` need the database's `path` on engines with several databases. `describe_schema` returns every relation's columns in one call, cheaper than one `describe_table` per table. `run_query` runs one statement through the app's SQL console path, under the connection's own permissions; results are capped and say so when truncated. Every query appears in the user's Operations panel. Each `list_connections` entry's `permissions` object names its read/write/DDL mode (deny, allow or prompt) and its `description`, when set, says what the connection is for — read both before calling `run_query`. Run `explain_query` before an expensive-looking query. `run_query` plans it anyway on connections whose owner turned auto-explain on. A connection with masked columns lists them in `list_connections`' own `maskedColumns` field, as \"table.column: kind\" — a masked cell's value is redacted (never the real value), and a trailing `#TAG` is an opaque correlation token, never a literal part of the value: equal values always share a tag, but the tag is short enough that two distinct values can rarely share one too, so treat a tag match as a strong hint toward equality, not proof of it.",
 }, NoVars{})
 
 // DbmcpToolListConnections describes the list_connections tool.
@@ -1202,7 +1202,7 @@ var DbmcpToolRunQuery = define(Entry{
 var (
 	_ = arg(DbmcpToolRunQuery.id, "connectionId", studioApp, NextCall, `Connection id from list_connections.`, NoVars{})
 	_ = arg(DbmcpToolRunQuery.id, "sql", studioApp, NextCall, `One statement; not a script.`, NoVars{})
-	_ = arg(DbmcpToolRunQuery.id, "path", studioApp, NextCall, `Encoded database path, from list_children. Required for engines with more than one database; ignored by engines with one.`, NoVars{})
+	_ = arg(DbmcpToolRunQuery.id, "path", studioApp, NextCall, `Encoded database path from list_children. Required on postgres, mysql, mariadb and mongodb; pass "" on other engines.`, NoVars{})
 	_ = arg(DbmcpToolRunQuery.id, "maxRows", studioApp, NextCall, `Rows to return, 1-{{.Max}}. Default {{.Default}}. Reading stops at this many rows; rowCount is then a lower bound.`, LimitVars{Default: 200, Max: 2000})
 )
 
@@ -1215,6 +1215,6 @@ var DbmcpToolExplainQuery = define(Entry{
 var (
 	_ = arg(DbmcpToolExplainQuery.id, "connectionId", studioApp, NextCall, `Connection id from list_connections.`, NoVars{})
 	_ = arg(DbmcpToolExplainQuery.id, "sql", studioApp, NextCall, `One SELECT or WITH statement. Not executed: EXPLAIN always runs without ANALYZE.`, NoVars{})
-	_ = arg(DbmcpToolExplainQuery.id, "path", studioApp, NextCall, `Encoded database path, from list_children. Required for engines with more than one database; ignored by engines with one.`, NoVars{})
+	_ = arg(DbmcpToolExplainQuery.id, "path", studioApp, NextCall, `Encoded database path from list_children. Required on postgres, mysql, mariadb and mongodb; pass "" on other engines.`, NoVars{})
 	_ = arg(DbmcpToolExplainQuery.id, "includeRaw", studioApp, NextCall, `Also return the server's raw EXPLAIN text. Default false: can be tens of kilobytes; the parsed plan is the point.`, NoVars{})
 )

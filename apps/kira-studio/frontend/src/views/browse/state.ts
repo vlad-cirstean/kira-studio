@@ -5,6 +5,7 @@ import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
 import { control } from '../../bridge/control';
 import { pinia } from '../../state/pinia';
+import { useStaleDataStore } from '../../state/staleData';
 import { useTabsStore } from '../../state/tabs';
 import { registerBrowseInvalidate, registerTabReload } from '../../state/viewCommands';
 import { classifyLoadError, createRuntimeStore } from '../shared/viewOp';
@@ -113,6 +114,7 @@ export const useBrowseViewStore = defineStore('browseView', () => {
       // nothing no writer ever used").
       rt.nodes = markRaw(result.nodes);
       rt.truncated = result.truncated;
+      useStaleDataStore().stamp(tabId, tab.connectionId);
       rt.status = 'idle';
     } catch (err) {
       if (rt.loadSeq !== seq) return; // superseded by a newer load
@@ -270,8 +272,15 @@ export const useBrowseViewStore = defineStore('browseView', () => {
     }
   }
 
+  /** Shown level is stale: connection gone, or listed under another connection session. */
+  function isStale(tabId: string): boolean {
+    const connectionId = useTabsStore().findBrowseTab(tabId)?.connectionId;
+    return connectionId ? useStaleDataStore().isStale(tabId, tabId, connectionId) : false;
+  }
+
   return {
     runtime,
+    isStale,
     load,
     reload,
     descend,

@@ -7,6 +7,7 @@ import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { useConnectionsStore } from '../../state/connections';
 import { pinia } from '../../state/pinia';
+import { useStaleDataStore } from '../../state/staleData';
 import type { StreamTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { registerTabReload } from '../../state/viewCommands';
@@ -143,6 +144,7 @@ export const useStreamViewStore = defineStore('streamView', () => {
       tabNoun: 'stream tab',
       apply: (page) => {
         setPage(tabId, page);
+        useStaleDataStore().stamp(tabId, connectionId);
         rt.status = 'idle';
         rt.opId = null;
         rt.rowCount = page.rowCount;
@@ -316,8 +318,15 @@ export const useStreamViewStore = defineStore('streamView', () => {
     ensureRuntime(tabId).selectedRow = row;
   }
 
+  /** Shown page is stale: connection gone, or read under another connection session. */
+  function isStale(tabId: string): boolean {
+    const connectionId = useTabsStore().findStreamTab(tabId)?.connectionId;
+    return connectionId ? useStaleDataStore().isStale(tabId, tabId, connectionId) : false;
+  }
+
   return {
     runtime,
+    isStale,
     load,
     reload,
     runCount,

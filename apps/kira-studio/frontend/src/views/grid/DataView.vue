@@ -23,6 +23,7 @@ import type { DataTabRecord } from '../../state/tabDomain';
 import EngineIcon from '../../theme/EngineIcon.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
+import StaleDataStrip from '../shared/StaleDataStrip.vue';
 import { ancestorPathPrefix } from '../shared/targetPath';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import DataToolbar from './DataToolbar.vue';
@@ -30,6 +31,7 @@ import FilterToolbar from './FilterToolbar.vue';
 import { canGenerateDataFor } from './fakeData/generate';
 import { flushOpenEdit } from './openEdit';
 import PreviewCommandPanel from './PreviewCommandPanel.vue';
+import { getPage, pageVersion } from './page';
 import { usePendingChangesStore } from './pendingChanges';
 import SlickGridHost from './SlickGridHost.vue';
 import { type Match, pageSearchApi } from './search';
@@ -44,12 +46,19 @@ const connectionsStore = useConnectionsStore();
 const gridViewStore = useGridViewStore();
 const props = defineProps<{ tab: DataTabRecord }>();
 
-const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
+const { needsReconnect, reconnecting, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
   () => gridViewStore.load(props.tab.id),
 );
 
 const rt = computed(() => gridViewStore.runtime[props.tab.id]);
+
+// Shown page outlived its connection: kept, read-only, behind StaleDataStrip.
+const stale = computed(() => gridViewStore.isStale(props.tab.id));
+const hasPage = computed(() => {
+  void pageVersion.n;
+  return !!getPage(props.tab.id);
+});
 
 const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
 
@@ -84,7 +93,9 @@ const isWritable = computed(() => !!caps.value?.writable && !connRecord.value?.r
 // M5 §6.4: the grid-writable-badge's own reason — masked reads as read-only, since it is (the
 // preview toggle can't be on while anything is pending, so this never has to distinguish "masked
 // but would otherwise be writable" from "genuinely read-only" for the badge's one-word purpose).
-const effectivelyWritable = computed(() => isWritable.value && !rt.value?.maskPreview);
+const effectivelyWritable = computed(
+  () => isWritable.value && !rt.value?.maskPreview && !stale.value,
+);
 const primaryKeyLabel = computed(() => {
   const names = rt.value?.meta?.columns.filter((c) => c.isPrimaryKey).map((c) => c.name) ?? [];
   return names.length ? t('studio.grid.primaryKey.status', { names: names.join(', ') }) : null;
@@ -113,7 +124,7 @@ const previewAnchorRef = ref<HTMLElement | null>(null);
 // @click. The staged set already survives a failure (clearPending only runs on success); what was
 // missing was telling the user why.
 async function onCommit(): Promise<void> {
-  if (!props.tab.connectionId) return;
+  if (!props.tab.connectionId || stale.value) return;
   // An open inline edit stages here, before the plan is built and the store starts refusing edits.
   flushOpenEdit(props.tab.id);
   try {
@@ -153,7 +164,12 @@ function onStop(): void {
 function onGenerateData(): void {
   // M5 §6.4: the same lockout DataToolbar.vue's own Generate button applies — this is the
   // command-palette/keyboard-shortcut path to the identical action, and must not bypass it.
-  if (!canGenerateDataFor(caps.value, connRecord.value?.readOnly) || rt.value?.maskPreview) return;
+  if (
+    !canGenerateDataFor(caps.value, connRecord.value?.readOnly) ||
+    rt.value?.maskPreview ||
+    stale.value
+  )
+    return;
   fakeDataStore.openGenerateDataDialog(props.tab.id);
 }
 
@@ -272,11 +288,11 @@ function onCloseSearch(): void {
             <div ref="previewAnchorRef" class="relative">
               <TooltipIconButton
                 icon="eye"
-                :label="isWritable ? t('studio.grid.previewCommand.label') : t('studio.common.connectionReadOnly.tooltip')"
+                :label="stale ? t('studio.common.connectionLost.tooltip') : isWritable ? t('studio.grid.previewCommand.label') : t('studio.common.connectionReadOnly.tooltip')"
                 :aria-label="t('studio.grid.previewCommand.label')"
                 disabled-trigger
                 data-testid="toolbar-preview-command"
-                :disabled="!isWritable || committing"
+                :disabled="!isWritable || committing || stale"
                 @click="previewOpen = !previewOpen"
               />
               <PopoverAnchor :reference="previewAnchorRef ?? undefined" />
@@ -288,16 +304,17 @@ function onCloseSearch(): void {
             :label="t('studio.grid.discardPending.label')"
             disabled-trigger
             data-testid="toolbar-discard-changes"
-            :disabled="!isWritable || committing"
+            :disabled="committing || (!isWritable && !stale)"
             @click="onDiscard"
           />
           <TooltipIconButton
             icon="save"
-            :label="t('studio.grid.commitPending.label')"
+            :label="stale ? t('studio.common.connectionLost.tooltip') : t('studio.grid.commitPending.label')"
+            :aria-label="t('studio.grid.commitPending.label')"
             disabled-trigger
             variant="toolbar-primary"
             data-testid="toolbar-commit-changes"
-            :disabled="!isWritable || committing"
+            :disabled="!isWritable || committing || stale"
             @click="onCommit"
           />
         </template>
@@ -324,7 +341,7 @@ function onCloseSearch(): void {
     <div class="flex flex-1 min-h-0 flex-col">
       <div class="flex min-h-0 flex-1 flex-col">
         <EmptyState
-          v-if="needsReconnect"
+          v-if="needsReconnect && !hasPage"
           data-testid="reconnect-panel"
           icon="plug"
           :title="t('studio.common.disconnected.empty')"
@@ -333,12 +350,19 @@ function onCloseSearch(): void {
             variant="dialog-primary"
             size="kira-lg"
             data-testid="reconnect-load"
+            :pending="reconnecting"
             @click="onReconnectAndLoad"
           >
             {{ t('studio.common.reconnectAndLoad.label') }}
           </Button>
         </EmptyState>
         <template v-else>
+          <StaleDataStrip
+            v-if="stale"
+            testid="grid-stale"
+            :reconnecting="reconnecting"
+            @reconnect="onReconnectAndLoad"
+          />
           <!-- Work-in-progress is the ring + elapsed time beside the button
                that started it (RunState, above), never a bar across the top of the view —
                "never a spinner that replaces the previous page" still holds, it no longer needs a

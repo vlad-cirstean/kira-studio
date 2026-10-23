@@ -1,3 +1,4 @@
+import { t } from '@theme/i18n';
 import { useAsyncAction } from '@workbench/behaviour/asyncAction';
 import { computed, ref, watch } from 'vue';
 import { beautifyShellText, toShellText } from '../shared/document/ejson';
@@ -9,7 +10,11 @@ import { useDocumentViewStore } from './state';
 
 const NEW_DOCUMENT_TEMPLATE = '{\n  \n}';
 
-export function useDocumentEdit(tabId: () => string, isEditable: (row: number) => boolean) {
+export function useDocumentEdit(
+  tabId: () => string,
+  isEditable: (row: number) => boolean,
+  isStale: () => boolean,
+) {
   const documentViewStore = useDocumentViewStore();
 
   const creatingNew = ref(false);
@@ -50,6 +55,10 @@ export function useDocumentEdit(tabId: () => string, isEditable: (row: number) =
 
   async function commitCreate(): Promise<void> {
     if (saving.value) return;
+    if (isStale()) {
+      documentViewStore.setActionError(tabId(), t('studio.common.connectionLost.error'));
+      return;
+    }
     if (await createAction.run()) {
       documentViewStore.setActionError(tabId(), null);
       creatingNew.value = false;
@@ -75,6 +84,10 @@ export function useDocumentEdit(tabId: () => string, isEditable: (row: number) =
   async function commitEdit(): Promise<void> {
     const id = editingId.value;
     if (id === null || saving.value) return;
+    if (isStale()) {
+      documentViewStore.setActionError(tabId(), t('studio.common.connectionLost.error'));
+      return;
+    }
     if (await editAction.run(id)) {
       documentViewStore.setActionError(tabId(), null);
       editingRow.value = null;

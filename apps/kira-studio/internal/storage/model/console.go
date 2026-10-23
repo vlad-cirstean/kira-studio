@@ -11,6 +11,9 @@ type ConsoleRequest struct {
 	// Cap bounds each statement's result; zero fields mean the adapters.DefaultConsoleCap. Go
 	// callers only (dbmcp), never set from the renderer.
 	Cap page.ResultCap
+	// ReadOnly forces the adapter's read-only wrap even when the connection is not read-only. Go
+	// callers only (dbmcp), for statements classified read.
+	ReadOnly bool
 }
 
 // MongoConsoleMethods mirrors domain/console.ts's MONGO_CONSOLE_METHODS — the ten shell methods

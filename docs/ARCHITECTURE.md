@@ -150,10 +150,10 @@ whatever sandbox a session happens to be in),
 - The gRPC stack is the largest single dependency the app has taken, about 14.2 MB of binary (linux/amd64, no flags), the same order as pgx, mongo-driver/v2, both AWS SDK clients and franz-go combined (about 13.5 MB).
 - Every gRPC descriptor source gets its own private *protoregistry.Files, never protoregistry.GlobalFiles, because GlobalFiles panics on a duplicate file path, which is realistic when two users' .proto files declare the same package.
 - The Git module transport was moved entirely to Kira Space as of v1.9 P100 and is no longer part of Kira Studio's stack.
-- The MCP server for internal/dbmcp uses github.com/modelcontextprotocol/go-sdk v1.7.0 over the SDK's Streamable HTTP transport, not stdio.
+- The MCP server for internal/dbmcp uses github.com/modelcontextprotocol/go-sdk v1.8.0 over the SDK's Streamable HTTP transport, not stdio.
 - The official MCP go-sdk was chosen as the protocol org's reference implementation at stable v1; mark3labs/mcp-go (second implementation) and hand-rolled JSON-RPC framing were declined, since CLAUDE.md's library-first rule finds nothing hand-rolling would earn.
 - The MCP server uses Streamable HTTP rather than stdio because it is one long-running process serving many concurrent clients and tool calls, not a process spawned per client; the SDK's auth.RequireBearerToken middleware gates every request.
-- mcp.AddTool[In, Out] derives each MCP tool's input schema from a Go struct's tags, so every tool's schema has exactly one source.
+- mcp.AddTool[In, Out] derives each MCP tool's input schema from a Go struct's tags, so every tool's schema has exactly one source. A tool argument the handler needs carries no `omitempty` (schema-required). A string or array that must be non-empty also goes through `llmprompts.RequireNonEmpty`. go-sdk rejects either before the handler runs.
 - The repo-map MCP server was removed in v1.9 P97.
 - Local embeddings (P210, Kira Space memory) use ONNX Runtime 1.29.1 via yalue/onnxruntime_go v1.36.0, gomlx/go-huggingface v0.4.13 (hftokenizer + hub downloader), and model Snowflake arctic-embed-s int8 (Apache-2.0).
 - Embedding inference cgo-dlopens a bundled libonnxruntime and runs in a memory-embed worker subprocess; vectors are stored as BLOBs in memory.db and search is done in Go.
@@ -193,7 +193,7 @@ whatever sandbox a session happens to be in),
 - The forwarding interim rule held only while a Node-served kind could exist beside a Go-native one; P58f M10 deleted that seam along with the Node engine child.
 - The renderer must load no remote content, open no window, and navigate nowhere but its own base URL. Under Wails only the code-level half holds: the renderer contains no such call, but no navigation policy is left to stop one (Electron's shell also enforced it).
 - The shell can open a second window via Window → New Window (⇧⌘N, P8), but only from a Go-side menu command, never from a renderer-initiated call; JavaScriptCanOpenWindowsAutomatically is Disabled and the renderer never calls window.open or an equivalent.
-- P66/P119 update-availability check and install are Go-side: internal/appupdate fetches GitHub release metadata itself, and InstallUpdate stages the update through its own detached installer. The renderer calls only two nullary methods (Status, InstallUpdate) and sends or receives no URL.
+- P66/P119 update-availability check and install are Go-side: internal/appupdate fetches GitHub release metadata itself, and InstallUpdate stages the update through its own detached installer. The renderer calls only nullary methods (Status, Check, InstallUpdate, CancelInstall) and sends or receives no URL. Check bypasses the cache and surfaces a failed check; a poll keeps failure silent.
 
 ## Adapter contract
 
@@ -258,6 +258,7 @@ whatever sandbox a session happens to be in),
 - PostgreSQL is Go-native (apps/kira-studio/internal/adapters/postgres/, pgx/v5) and served in-process by adapterhost.Router through the loaders registry; no Node engine child exists any more (deleted P58f).
 - The Go Postgres port keeps keyset-on-PK pagination and pg_cancel_backend on a side connection using the tracked backend pid; only the hosting process and query-context handling changed.
 - In the Postgres adapter, never pass the caller-side op cancellation context.Context to pgx's Query/Exec, because pgx honours context cancellation and races its own cancel request against the explicit pg_cancel_backend call; use adapters.RunWithAbortRace (internal/adapters/abort.go).
+- Postgres declarative partitions list as children of their partitioned parent (`pg_inherits`, `relispartition`), not at schema level. A partition path uses its own schema.
 - MariaDB and MySQL are Go-native (apps/kira-studio/internal/adapters/mysqlfamily/, github.com/go-sql-driver/mysql); mysqlfamily/ holds the single Adapter implementation, while mariadb/ and mysql/ each hold only their own Profile (server label, ApplyEngineOptions).
 - In mysqlfamily, never pass the op's own context to the driver, because cancelling the context passed to QueryContext/ExecContext closes the underlying connection outright (driver: bad connection on the next statement); use adapters.RunWithAbortRace with a background context and an explicit KILL QUERY <threadId> on a side connection (query.go).
 - The Go MySQL-family adapter lost the query console's "N row(s) affected" status text (a generic "OK" shows instead), because go-sql-driver/mysql's QueryContext path, which the console's multi-statement runner needs, has no RowsAffected().
@@ -448,14 +449,16 @@ filter_history(id, connection_id, path, where_text, order_by_json, used_at)
                                                        -- 20/path, 4,000/connection, 4 KiB/row (P23)
 metadata_cache(connection_id, path, kind, payload_json, fetched_at, etag)
 op_log(id, connection_id, tab_id, started_at, duration_ms, kind, status, rows,
-       command, error, stored_bytes, command_truncated, path)
+       command, error, stored_bytes, command_truncated, path, source)
                                                        -- rotated, capped (P23: stored_bytes/
                                                        -- command_truncated added by migration 15);
                                                        -- path (TEXT, migration 0027, P108 Part 11
                                                        -- F5) is the console database/schema an
                                                        -- op actually ran against, NULL for every
                                                        -- non-console-execute op kind and for every
-                                                       -- pre-existing row
+                                                       -- pre-existing row;
+                                                       -- source (TEXT, migration 0043, P328) is
+                                                       -- 'user' or 'mcp', default 'user'
 custom_scripts(id, name, command, working_dir, dir_mode, kind, params_json, smart_json, use_ade_dir, schedule_json,
                color, collection_id, sort_order, created_at, updated_at)
                                                        -- P85, migration 0024; scripts, one row
@@ -557,6 +560,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - Studio's kira.db migration high-water mark is 0037 (0037_p242_recurring_scripts.sql: custom_scripts.schedule_json, script_runs rebuilt with waiting/skipped states).
 - Migration 0020 added connections.mcp_enabled (deny-by-default MCP exposure); 0021 added mcp_read_mode/mcp_write_mode/mcp_ddl_mode plus mcp_description; 0022 added mcp_auto_explain (auto-force-EXPLAIN on run_query); 0023 created connection_mask_rules and connections.mask_correlation_key.
 - Migration 0027_p108part11_op_log_path.sql added op_log.path TEXT, the console path an op actually ran against.
+- Op source rides the RunOp ctx (`adapterhost.WithOpSource`), set by dbmcp's tool wrapper; connection lifecycle ops are always `user`, since MCP's connect is a shared, deduplicated attempt with its own ctx.
 - Migrations are forward-only numbered SQL files in apps/kira-studio/internal/storage/migrations/, applied on startup.
 - Table access is hand-written database/sql in apps/kira-studio/internal/storage/repos/; there is no ORM (the Drizzle dependency went out with the Electron shell).
 - Every row read from settings, ui_layout and connections is decoded through the model types in internal/storage/model/ before use, so a hand-edited or stale-shape row fails loudly instead of propagating zero values into the UI.
@@ -916,6 +920,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - An HTTP request body is one of six modes in httpBodyModeSchema (packages/shared/domain/http.ts): none, raw, code, urlencoded, formdata, file; there is no GraphQL mode.
 - GraphQL support was deleted entirely by a product decision (no query/variables state, no GraphQL StreamLanguage, no server-side envelope builder); raw is plain text only and JavaScript/JSON/HTML/XML became the top-level code mode with its own codeLanguage field.
 - On Postman import (internal/postman/body.go), a raw body with options.raw.language absent or "text" becomes raw; one of the four known languages becomes code with that codeLanguage; an unrecognised language degrades to plain raw instead of failing, with the original language kept in origin_json.
+- A Postman environment export imports as an app environment (secrets encrypted, disabled values skipped, globals refused). CollectionsService.Import takes several paths and imports each file independently, reporting one entry per file.
 - On Postman export, language "text" is written explicitly for raw bodies, so Postman shows the Text sub-selector instead of relying on a default this app does not control.
 - A Postman graphql body imports as code/json carrying the GraphQL-over-HTTP envelope ({query, variables, operationName}), because refusing the file, skipping the item or importing as none would yield a request that silently does nothing instead of staying runnable.
 - An untouched imported graphql body round-trips losslessly (export re-emits mode graphql verbatim); once the user edits it, it exports as raw with language json, and the import report says so.
@@ -1035,14 +1040,16 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - In the diff, A is always the chronologically older of the two selected entries, never by click order; a binary body on either side withholds only the body level, with summary and headers still shown and the reason stated inline.
 - Session restore never auto-reconnects: previous tabs reopen but their connections do not, and a restored tab shows only a centred "Reconnect & load" button until pressed.
 - The reconnect gate is built on components/ui/empty's Empty, driven by the shared useConnectionGate composable (needsReconnect/onReconnectAndLoad in views/shared/useConnectionGate.ts), used by every view kind including Browse tabs.
+- A view with shown data keeps it on a connection drop or session change, read-only behind views/shared/StaleDataStrip.vue; state/staleData.ts (useStaleDataStore) stamps each read with ConnectionState.since, and KEEPS_DATA_ON_DROP in state/tabs.ts lists kinds whose page survives the drop. All seven data views are covered: SQL data view, Documents, KeyValue (tab and Browse preview), Browse, Stream, Definition and Console results. Definition and Console results have no write path, so the strip is their only change. SQS Poll is a fresh read, not a stale-data action. Immediate-write mutators require `isStale` and refuse a stale write (createImmediateMutator).
 - PostgreSQL/MariaDB/MySQL/SQLite table writes (add row, delete row, cell edit) are staged in a per-tab pending-change set; nothing reaches the database until Commit, and Preview command renders the exact statements first.
 - A staged edit or delete is keyed by its row's primary key, not page position, so it survives paging, sort, filter, projection and Refresh; staging needs the table's full primary key in the page, otherwise the cell is not editable.
 - Each staged entry keeps the key it was staged under, so a primary-key edit still addresses the original row and an off-page entry still commits; the toolbar counts all staged entries and names how many are off the current page.
+- Each staged edit keeps the page value from when it was first staged, so the preview's Changes view diffs before and after (shared `MonacoDiff`, `valueDiffSides`) even after the row leaves the page.
 - Only closing the tab or a successful commit clears the pending-change set.
 - ClickHouse tables get add-row only, staged the same way, because there is no addressable row to update/delete (a MergeTree PRIMARY KEY is a sparse index).
 - MongoDB/Redis/Kafka/SQS/S3 write immediately, gated per adapter by canInsert/canUpdate/canDelete capability, with no staging or preview.
 - The fake-data generator (P15) calls data.mutate directly with MutationRowOp[] batches built from per-column recipe plans, bypassing the pending-change set, because that store renders one un-virtualized DOM row per staged insert, which is wrong for thousands of rows.
-- The cell editor is a panel mounted by whichever view owns the tab (grid, documents, key/value, stream, console), not a global singleton; it appears only while the tab has a selected cell, and views like definition tabs never mount it.
+- The cell editor is a panel mounted by whichever view owns the tab (grid, documents, key/value, stream, console), not a global singleton; it appears only while the tab has a selected cell, and views like definition tabs never mount it. Its Show changes toggle diffs the buffer against the stored value (`SelectedCell.original` under a staged edit), using the shared `MonacoDiff` and `valueDiffSides`.
 - Redis and S3 are navigated only in a dedicated browse tab, one lazy level per screen over SCAN/ListObjectsV2, never as a recursive tree; their project-tree node is a leaf, and only the Up button and breadcrumb move between levels.
 - The grid, document, key/value and console-result views share the createPageSearch factory and runChunkedScan scanner (views/shared/page/) rather than separate find logic.
 - A chunked scan can take an optional priority window (rows currently on screen) scanned first, so find on a large loaded dataset highlights visible matches before continuing the ascending pass in the background.
@@ -1536,7 +1543,7 @@ packaged app does not), where the identical application code runs unchanged over
 - The install script prints 'staged <dmg path>' to fd 3 and closes it once the disk image is mounted and copying has started. Stage reads that line and returns, and the app quits only then, because the swap into /Applications needs the app's bundle closed. The script then waits for the pid to exit, replaces the bundle, relaunches, and cleans up.
 - Cancel (effective only while idle before hand-off) and the 15-minute backstop timeout signal the whole process group via internal/procgroup.Kill, never just the script's pid, so children like hdiutil and cp are not orphaned.
 - Every install run appends to ~/Library/Logs/<app name>/install.log, truncated once past 1 MiB, and UpdateStatus.installLogPath gives the dialog this path to show on a failed install.
-- The renderer never sends or receives a URL: UpdateService.Status, InstallUpdate and CancelInstall are all nullary, and Go decides where the script comes from and what it does.
+- The renderer never sends or receives a URL: UpdateService.Status, Check, InstallUpdate and CancelInstall are all nullary, and Go decides where the script comes from and what it does.
 - scripts/verify-packaging.sh check S10 (scoped to apps/, packages/, internal/) enforces that no app code downloads a release asset itself, and only scripts/install.sh may. S11 pins the one raw.githubusercontent.com reference and the two sides' shared contract marker.
 - Self-update runs a shell script downloaded at click time with the user's privileges from the main branch of a public repo, so anyone who can push to main can change what every user's Update click runs. Branch protection on main is therefore a security boundary; TLS and the contract marker guard transport and compatibility, not authorship.
 
@@ -2632,6 +2639,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - A client disconnect stops the approval wait via ctx, with no external expiry ticker.
 - The approval UI is workbench/DbMcpApprovalDialog.vue, an always-mounted modal at App.vue's root, beside Studio's other always-mounted dialogs such as ConnectionDialog, DataGripImportDialog, ApiDialogs and ConfirmDialog.
 - The shared packages/workbench/src/components/ConfirmDialog.vue cites DbMcpApprovalDialog's teleport-ordering precedent in its own comment.
+- The dialog shows the statement in a read-only MonacoHost (ApprovalStatement.vue), formatted by formatConsoleText, with an "As sent" toggle for the verbatim text. Word wrap is always on, so no clause sits off screen.
 - An approval prompt's Reason is either "permission" or "heavy". At most one prompt is raised per call when both apply; the stricter reason (permission) wins the label, and the plan evidence rides along.
 
 ### EXPLAIN (M3)
@@ -2940,6 +2948,7 @@ repo's CI runs.
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **MCP `run_query` read verdicts run under `READ ONLY` wrap, which does not stop every side effect (P329).** A statement classified read runs in `BEGIN READ ONLY` (Postgres) or `START TRANSACTION READ ONLY` (MySQL/MariaDB) unless writes are allowed. Postgres still permits `pg_terminate_backend`, `pg_cancel_backend` and `dblink_exec`; MySQL/MariaDB still permits `GET_LOCK` and writes to temporary tables. SQLite and ClickHouse get no per-request wrap: no write-capable function is reachable from a read there.
 - **MongoDB 8.x/9.x servers are unverified in CI.** Every 8.x/9.x image exits at startup on runner kernels
   6.19-7.0.13 (SERVER-125742; SERVER-136848 for Ubuntu). Test and db-compat max pin `mongo:7.0.45`. Restore an
   8.x/9.x max once runner kernels leave that range. 7.0 support ends 2027-08-31.

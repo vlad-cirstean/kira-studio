@@ -35,6 +35,7 @@ export const IPC = {
 
   filesChooseSave: 'kira:files:chooseSave',
   filesChooseOpen: 'kira:files:chooseOpen',
+  filesChooseOpenMany: 'kira:files:chooseOpenMany',
   filesChooseFolder: 'kira:files:chooseFolder',
 
   datagripScan: 'kira:datagrip:scan',
@@ -147,6 +148,7 @@ export const IPC = {
   dbMcpDenyQuery: 'kira:dbmcp:approval:deny',
 
   updateStatus: 'kira:update:status',
+  updateCheck: 'kira:update:check',
   updateInstall: 'kira:update:install',
   updateCancelInstall: 'kira:update:cancelInstall',
 

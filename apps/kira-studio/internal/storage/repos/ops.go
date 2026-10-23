@@ -37,8 +37,8 @@ const (
 var opLogByteBudget = 32 * 1024 * 1024
 
 const (
-	opsInsertSQL = `INSERT INTO op_log (id, connection_id, tab_id, started_at, duration_ms, kind, status, rows, command, error)
-		 VALUES (?, ?, ?, ?, NULL, ?, 'running', NULL, NULL, NULL)`
+	opsInsertSQL = `INSERT INTO op_log (id, connection_id, tab_id, started_at, duration_ms, kind, status, rows, command, error, source)
+		 VALUES (?, ?, ?, ?, NULL, ?, 'running', NULL, NULL, NULL, ?)`
 	opsUpdateSQL = `UPDATE op_log SET status = ?, duration_ms = ?, rows = ?, command = ?, error = ?, stored_bytes = ?, command_truncated = ?, path = ? WHERE id = ?`
 )
 
@@ -60,11 +60,14 @@ type OpsRepo struct {
 // Append inserts a new running op row (ops.ts's appendOp). stored_bytes/command_truncated take
 // their column defaults (0) — a running op has no command or error yet.
 func (r *OpsRepo) Append(op model.OpAppend) error {
+	if op.Source == "" {
+		op.Source = "user"
+	}
 	var err error
 	if r.insert != nil {
-		_, err = r.insert.Exec(op.ID, op.ConnectionID, op.TabID, op.StartedAt, op.Kind)
+		_, err = r.insert.Exec(op.ID, op.ConnectionID, op.TabID, op.StartedAt, op.Kind, op.Source)
 	} else {
-		_, err = r.DB.Exec(opsInsertSQL, op.ID, op.ConnectionID, op.TabID, op.StartedAt, op.Kind)
+		_, err = r.DB.Exec(opsInsertSQL, op.ID, op.ConnectionID, op.TabID, op.StartedAt, op.Kind, op.Source)
 	}
 	if err != nil {
 		return fmt.Errorf("repos/ops: append %s: %w", op.ID, err)
@@ -135,7 +138,7 @@ func (r *OpsRepo) Finish(opID string, patch *model.OpFinish) (commandTruncated b
 // one) — an unrecognised kind or status is simply dropped, logged, like any other bad row.
 func (r *OpsRepo) Recent(limit int) ([]model.OpRecord, error) {
 	rows, err := r.DB.Query(`
-		SELECT id, connection_id, tab_id, started_at, duration_ms, kind, status, rows, command, error, command_truncated, path
+		SELECT id, connection_id, tab_id, started_at, duration_ms, kind, status, rows, command, error, command_truncated, path, source
 		  FROM op_log
 		 ORDER BY started_at DESC, rowid DESC
 		 LIMIT ?
@@ -155,7 +158,7 @@ func (r *OpsRepo) Recent(limit int) ([]model.OpRecord, error) {
 			commandTruncated    int
 			path                sql.NullString
 		)
-		if err := rows.Scan(&o.ID, &connectionID, &tabID, &o.StartedAt, &durationMs, &o.Kind, &o.Status, &opRows, &command, &opErr, &commandTruncated, &path); err != nil {
+		if err := rows.Scan(&o.ID, &connectionID, &tabID, &o.StartedAt, &durationMs, &o.Kind, &o.Status, &opRows, &command, &opErr, &commandTruncated, &path, &o.Source); err != nil {
 			return nil, fmt.Errorf("repos/ops: scan: %w", err)
 		}
 		if !model.ValidOpKind(o.Kind) {
@@ -165,6 +168,10 @@ func (r *OpsRepo) Recent(limit int) ([]model.OpRecord, error) {
 		if !model.ValidOpStatus(o.Status) {
 			slog.Warn("dropping op_log row: unrecognised status", "scope", "storage/ops", "id", o.ID, "status", o.Status)
 			continue
+		}
+		if !model.ValidOpSource(o.Source) {
+			slog.Warn("coercing op_log row: unrecognised source", "scope", "storage/ops", "id", o.ID, "source", o.Source)
+			o.Source = "user"
 		}
 		if connectionID.Valid {
 			o.ConnectionID = &connectionID.String

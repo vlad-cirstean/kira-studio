@@ -282,19 +282,20 @@ func TestPostmanImportSendExport(t *testing.T) {
 	// and export asks for a save path".
 	const sc = "api-postman"
 	pathOpts := []flowharness.ContractOption{flowharness.Replace(dir, "<tmp>"), flowharness.Replace(srv.URL, "<http>")}
-	app.Dialogs.QueueOpenFile(imported)
-	chosen, err := app.W.Files.ChooseOpen(bridge.FilesChooseOpenArgs{})
-	if err != nil || chosen.File == nil {
-		t.Fatalf("ChooseOpen = %+v (%v)", chosen, err)
+	app.Dialogs.QueueOpenFiles(imported)
+	chosen, err := app.W.Files.ChooseOpenMany(bridge.FilesChooseOpenArgs{})
+	if err != nil || len(chosen.Files) != 1 {
+		t.Fatalf("ChooseOpenMany = %+v (%v)", chosen, err)
 	}
-	app.Contract(t, sc, "FilesService.ChooseOpen", chosen, append(pathOpts, flowharness.Mask("size"))...)
-	importArgs := bridge.CollectionsImportArgs{Path: chosen.File.Path}
+	app.Contract(t, sc, "FilesService.ChooseOpenMany", chosen, append(pathOpts, flowharness.Mask("size"))...)
+	importArgs := bridge.CollectionsImportArgs{Paths: []string{chosen.Files[0].Path}}
 	app.Contract(t, sc, "args:CollectionsService.Import", importArgs, pathOpts...)
-	rep, err := app.W.Collections.Import(importArgs)
-	if err != nil {
-		t.Fatal(err)
+	res, err := app.W.Collections.Import(importArgs)
+	if err != nil || len(res.Files) != 1 || res.Files[0].Collection == nil {
+		t.Fatalf("Import = %+v (%v)", res, err)
 	}
-	app.Contract(t, sc, "CollectionsService.Import", rep, pathOpts...)
+	app.Contract(t, sc, "CollectionsService.Import", res, pathOpts...)
+	rep := *res.Files[0].Collection
 	if rep.Name != "Flow Orders" || rep.Folders != 1 || rep.Requests != 4 {
 		t.Errorf("report = %+v, want Flow Orders with 1 folder and 4 requests", rep)
 	}
@@ -379,10 +380,11 @@ func TestPostmanImportSendExport(t *testing.T) {
 	if err != nil || again.File == nil {
 		t.Fatal(err)
 	}
-	rep2, err := app.W.Collections.Import(bridge.CollectionsImportArgs{Path: again.File.Path})
-	if err != nil {
-		t.Fatal(err)
+	res2, err := app.W.Collections.Import(bridge.CollectionsImportArgs{Paths: []string{again.File.Path}})
+	if err != nil || len(res2.Files) != 1 || res2.Files[0].Collection == nil {
+		t.Fatalf("re-import = %+v (%v)", res2, err)
 	}
+	rep2 := *res2.Files[0].Collection
 	if rep2.CollectionID == rep.CollectionID {
 		t.Fatal("re-import reused the collection")
 	}
@@ -504,5 +506,92 @@ func TestMoveRequest(t *testing.T) {
 		if it.ID == item.ID && it.CollectionID != to.ID {
 			t.Fatalf("item in %s after the move, want %s", it.CollectionID, to.ID)
 		}
+	}
+}
+
+func TestPostmanImportCollectionAndEnvironment(t *testing.T) {
+	app := flowharness.New(t)
+	dir := t.TempDir()
+	write := func(name, body string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	collection := write("collection.json", `{"info":{"name":"Multi","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},"item":[{"name":"Ping","request":{"method":"GET","url":"https://example.test/ping"}}]}`)
+	env, err := os.ReadFile(filepath.Join("testdata", "environment.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	environment := write("environment.json", string(env))
+	bad := write("bad.json", `{"hello":"world"}`)
+
+	// Contract api-postman-multi, read by tests/ui/collections.spec.ts "Postman import of a
+	// collection, an environment and a bad file".
+	const sc = "api-postman-multi"
+	pathOpts := []flowharness.ContractOption{flowharness.Replace(dir, "<tmp>")}
+	app.Dialogs.QueueOpenFiles(collection, environment, bad)
+	chosen, err := app.W.Files.ChooseOpenMany(bridge.FilesChooseOpenArgs{})
+	if err != nil || len(chosen.Files) != 3 {
+		t.Fatalf("ChooseOpenMany = %+v (%v)", chosen, err)
+	}
+	app.Contract(t, sc, "FilesService.ChooseOpenMany", chosen, append(pathOpts, flowharness.Mask("size"))...)
+	paths := make([]string, len(chosen.Files))
+	for i, f := range chosen.Files {
+		paths[i] = f.Path
+	}
+	args := bridge.CollectionsImportArgs{Paths: paths}
+	app.Contract(t, sc, "args:CollectionsService.Import", args, pathOpts...)
+	mark := app.Events.Mark()
+	res, err := app.W.Collections.Import(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.Contract(t, sc, "CollectionsService.Import", res, pathOpts...)
+
+	if len(res.Files) != 3 {
+		t.Fatalf("files = %+v, want one entry per path", res.Files)
+	}
+	if res.Files[0].Kind != "collection" || res.Files[0].Collection == nil || res.Files[0].Collection.Requests != 1 {
+		t.Errorf("collection entry = %+v", res.Files[0])
+	}
+	envEntry := res.Files[1]
+	if envEntry.Kind != "environment" || envEntry.Environment == nil || envEntry.Environment.Variables != 4 ||
+		len(envEntry.Environment.Warnings) != 1 || envEntry.Environment.Warnings[0].Kind != postman.WarnDisabledVariables {
+		t.Errorf("environment entry = %+v, want 4 variables and a disabled-variables warning", envEntry)
+	}
+	if res.Files[2].Kind != "" || res.Files[2].Error == nil {
+		t.Errorf("bad file entry = %+v, want a failure", res.Files[2])
+	}
+
+	if got := tree(t, app, res.Files[0].Collection.CollectionID); len(got) != 1 {
+		t.Errorf("collection tree = %q, want the one request", got)
+	}
+	envs, err := app.W.Variables.ListEnvironments()
+	if err != nil || len(envs) != 1 || envs[0].Name != "Staging" {
+		t.Fatalf("environments = %+v (%v), want Staging", envs, err)
+	}
+	vars, err := app.W.Variables.List(bridge.VariablesScopeArgs{Scope: model.VariableScopeEnvironment, OwnerID: envs[0].ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.Contract(t, sc, "VariablesService.List", vars, flowharness.Mask("ownerId", "sortOrder"))
+	got := map[string]model.Variable{}
+	for _, v := range vars {
+		got[v.Name] = v
+	}
+	if len(got) != 4 || got["token"].Value != "" || !got["token"].IsSecret || got["host"].Value != "https://staging.example.test" || got["legacy"].Name != "" {
+		t.Errorf("variables = %+v, want 4 with a blank-listed secret and the disabled one skipped", got)
+	}
+	var kinds []string
+	for _, c := range apiChanges(t, app, mark) {
+		for _, ch := range c {
+			kinds = append(kinds, ch.Kind)
+		}
+	}
+	sort.Strings(kinds)
+	if strings.Join(kinds, ",") != "environments,tree" {
+		t.Errorf("change events = %v, want one tree and one environments change", kinds)
 	}
 }

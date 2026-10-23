@@ -22,6 +22,8 @@ type OpRecord struct {
 	// DelayMs (P307 Part 2): a preconnect op's configured wait, so the panel can count it down. Live
 	// only, never stored in op_log.
 	DelayMs *int `json:"delayMs,omitempty"`
+	// Source (P328): who started the op, "user" or "mcp".
+	Source string `json:"source"`
 }
 
 // OpAppend is ops.ts's AppendOpInput.
@@ -31,6 +33,7 @@ type OpAppend struct {
 	TabID        *string
 	Kind         string
 	StartedAt    string
+	Source       string
 }
 
 // OpFinish is ops.ts's FinishOpPatch.
@@ -67,6 +70,11 @@ var opKinds = map[string]bool{
 var opStatuses = map[string]bool{
 	"running": true, "ok": true, "error": true, "cancelled": true,
 }
+
+var opSources = map[string]bool{"user": true, "mcp": true}
+
+// ValidOpSource mirrors ops.ts's opSourceSchema.
+func ValidOpSource(v string) bool { return opSources[v] }
 
 // ValidOpKind mirrors ops.ts's opKindSchema.
 func ValidOpKind(v string) bool { return opKinds[v] }

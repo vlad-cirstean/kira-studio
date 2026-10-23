@@ -10,6 +10,7 @@ import { useDocumentViewStore } from './state';
 const mutate = createImmediateMutator({
   findTab: (tabId: string) => useTabsStore().findDocumentTab(tabId),
   reload: (tabId: string) => useDocumentViewStore(pinia).reload(tabId),
+  isStale: (tabId: string) => useDocumentViewStore(pinia).isStale(tabId),
 });
 
 export async function saveDocumentEdit(

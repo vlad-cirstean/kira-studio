@@ -72,7 +72,6 @@ import {
 } from '../shared/slick/gridHostShared';
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
 import { createScrollVelocityTracker } from '../shared/slick/scrollVelocity';
-import { computeSelEdgeHashes, SEL_EDGE_LAYER_KEYS } from '../shared/slick/selectionEdges';
 import { attachScrollProbes, createHybridSelectionModel } from '../shared/slick/selectionModel';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import FkPreviewPopover from './FkPreviewPopover.vue';
@@ -106,6 +105,7 @@ import {
   type NavColumns,
   navColumnsFor,
   navValuesFor,
+  numericNavColumns,
   rowsForSelection,
   cellNavEntry as rvCellNavEntry,
   columnValuesFor as rvColumnValuesFor,
@@ -209,7 +209,9 @@ function cellFormatter(
     input.className = 'cell-input';
     input.dataset.testid = 'grid-cell-insert-input';
     input.value = view.isNull ? '' : view.text;
-    if (pendingChangesStore.isCommitting(props.tabId)) input.readOnly = true;
+    if (pendingChangesStore.isCommitting(props.tabId) || gridViewStore.isStale(props.tabId)) {
+      input.readOnly = true;
+    }
     // The server computes generated columns; the insert paths already skip them (P36 D28).
     if (isGeneratedColumn(String(columnDef.field))) {
       input.readOnly = true;
@@ -258,7 +260,8 @@ function isWritable(): boolean {
   if (!t?.connectionId) return false;
   return (
     !connectionsStore.connectionRecord(t.connectionId)?.readOnly &&
-    !pendingChangesStore.isCommitting(props.tabId)
+    !pendingChangesStore.isCommitting(props.tabId) &&
+    !gridViewStore.isStale(props.tabId)
   );
 }
 function caps() {
@@ -281,7 +284,8 @@ function maskPreviewOn(): boolean {
 // below), `SelectedCell.onEdit`/`onRevert` (the publication watch further down, which reads
 // `canEditTable()` directly), `cellFormatter`'s insert-row `<input>` branch (no insert row can
 // exist while masked, since it is add-row's own isWritable in DataToolbar.vue that gets one too),
-// and `onPaste` (`if (!canEditTable()) return;`, above).
+// and `onPaste` (`if (!canEditTable()) return;`, above). A stale page (connection lost, or read
+// under another session) locks the same paths through isWritable(); staged edits survive.
 function canEditTable(): boolean {
   return isWritable() && hasPrimaryKey() && !!caps()?.canUpdate && !maskPreviewOn();
 }
@@ -867,32 +871,6 @@ function fieldAtDisplayCol(displayCol: number): string | undefined {
   return c ? String(c.field) : undefined;
 }
 
-// P22 D10: moved to views/shared/slick/selectionEdges.ts, verbatim, so
-// views/console/ConsoleSlickGrid.vue can share it (F17/F18) — see that file's own header comment.
-function refreshSelEdges(selOverride?: Selection | null): void {
-  if (!grid || !dataSource) return;
-  const sel = selOverride !== undefined ? selOverride : (rt()?.selection ?? null);
-  // Display row count, not the page's own row count (same fix as onSelectAll/
-  // onHeaderSelectClick's own `displayRowCount`) — `pos` (a display position) is compared
-  // against the display-row bounds, correct with or without an active filter; comparing the
-  // underlying *page* row against `pageRowCount - 1` was not — under a filter the last row
-  // rendered can have a page-row index far short of `pageRowCount - 1` (or the filter
-  // can even exclude the true first/last page row), so the bottom (and top) selection-perimeter
-  // line would fail to draw at all. Only consulted for a 'column' selection's own top/bottom test.
-  const displayRowCount = currentDisplayRows()?.length ?? getPage(props.tabId)?.rowCount ?? 0;
-  const hashes = computeSelEdgeHashes(
-    sel,
-    grid.lastRenderedRowBounds,
-    (pos) => dataSource?.getItem(pos).row ?? pos,
-    fieldAtDisplayCol,
-    displayRowCount,
-    grid.getColumns().length - 1, // minus the gutter
-  );
-  SEL_EDGE_LAYER_KEYS.forEach((key, i) => {
-    grid?.setCellCssStyles(key, hashes[i] as EdgeHash);
-  });
-}
-
 // D4 (fix) — live visual feedback for a cell-range drag. SlickHybridSelectionModel's own
 // `handleCellRangeSelected` intentionally no-ops for a CELL-mode `onCellRangeSelecting` call
 // (only `onCellRangeSelected`, at drag end, calls `setSelectedRanges` — §4.1 item 3's own
@@ -918,7 +896,6 @@ function onCellRangeSelecting(_e: unknown, args: { range: SlickRange }): void {
   if (!grid || !dataSource || !selectionModel || selectionModel.currentSelectionModeIsRow()) return;
   const posSel = selectionFromRanges([args.range], false, null);
   const pageSel = posSel ? toPageRowSelection(posSel) : null;
-  refreshSelEdges(pageSel);
   const ds = dataSource;
   grid.setCellCssStyles(
     'kira-cell-selected',
@@ -957,8 +934,8 @@ function refreshStagedLayer(): void {
 }
 
 // `kira-search`'s own row: "every match", not clipped to the rendered range the way
-// `kira-sel-edges`/`kira-staged` are (a rectangle's perimeter, or a handful of staged rows, are
-// cheap to re-walk on every render-band change; a search result is neither bounded that way, so
+// `kira-staged` is (a handful of staged rows is
+// cheap to re-walk on every render-band change; a search result is not bounded that way, so
 // this only recomputes on the result or current match changing, plus a live filter shifting every
 // match's own display position, both watched below). With 10 000 matches active, a selection
 // change must still land inside the same 150ms sandbox bound this file's other cost gates use;
@@ -1007,7 +984,6 @@ function onGridRendered(): void {
 
   if (band.start !== lastCssLayerBand.start || band.end !== lastCssLayerBand.end) {
     lastCssLayerBand = { start: band.start, end: band.end };
-    refreshSelEdges();
     refreshStagedLayer();
   }
   // Places an always-visible button per nav-eligible rendered cell (see
@@ -1139,6 +1115,7 @@ function onGridClick(e: SlickEventData, args: OnClickEventArgs): void {
       connectionId,
       dialect: currentDialect(),
       rowValues: navValuesFor(props.tabId, getPage(props.tabId), order, navColumns, handle.row),
+      numericColumns: numericNavColumns(getPage(props.tabId), navColumns),
     };
     const edges = fkEdgesFor(meta, columnName);
     const openPreview = (fk: ForeignKeyMeta, openInNewTab: () => void): void => {
@@ -1373,7 +1350,6 @@ function onSelectAll(): void {
   if (!entry || !all) return;
   entry.selection = toPageRowSelection(all);
   selectAllActive.value = true;
-  refreshSelEdges();
 }
 
 function onHeaderClick(_e: unknown, args: OnHeaderClickEventArgs): void {
@@ -1486,9 +1462,8 @@ function refreshSelectionForFilterChange(): void {
   const colCount = grid.getColumns().length - 1; // minus the gutter
   pendingSelectionKind = visibleSel?.kind === 'column' ? 'column' : null;
   // `setSelectedRanges([])`/`setSelectedRanges(ranges)` both fire `onSelectedRangesChanged`
-  // (below), which re-derives `rt().selection` from the ranges just pushed and refreshes the
-  // perimeter-fill layer — no need to assign `runtimeEntry.selection` or call `refreshSelEdges`
-  // here too, only to push the geometry.
+  // (below), which re-derives `rt().selection` from the ranges just pushed — no need to assign
+  // `runtimeEntry.selection` here too, only to push the geometry.
   selectionModel.setSelectedRanges(
     visibleSel
       ? rangesFromSelection(toPositionSelection(visibleSel), displayRowCount, colCount)
@@ -1509,8 +1484,6 @@ function onSelectedRangesChanged(_e: unknown, ranges: SlickRange[]): void {
   pendingSelectionKind = null;
   const posSel = selectionFromRanges(ranges, rowMode, kind);
   runtimeEntry.selection = posSel ? toPageRowSelection(posSel) : null;
-  // C5/§5 D5 — the perimeter layer's other trigger, beside a rendered-band change (onGridRendered).
-  refreshSelEdges();
 }
 
 // The header select zone's own click semantics (DataGrid.vue's onHeaderSelectClick, content —
@@ -1759,6 +1732,7 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
       meta: rt()?.meta ?? null,
       connectionId: t?.connectionId ?? '',
       rowValues: rawSnap.values,
+      numericColumns: numericNavColumns(p, navColumns),
     }),
   );
 }
@@ -2422,13 +2396,13 @@ watch(canEditTableReactive, (editable) => {
 });
 // Insert inputs are plain DOM the formatter built before the commit started.
 watch(
-  () => pendingChangesStore.isCommitting(props.tabId),
-  (committing) => {
+  () => pendingChangesStore.isCommitting(props.tabId) || gridViewStore.isStale(props.tabId),
+  (locked) => {
     for (const input of gridRootEl?.querySelectorAll<HTMLInputElement>(
       'input[data-testid="grid-cell-insert-input"]',
     ) ?? []) {
       const column = input.closest<HTMLElement>('.slick-cell[data-column]')?.dataset.column ?? '';
-      input.readOnly = committing || isGeneratedColumn(column);
+      input.readOnly = locked || isGeneratedColumn(column);
     }
   },
 );
@@ -2502,6 +2476,15 @@ watch(
       return t ? isDeleted(t.row) : false;
     },
     () => pendingChangesStore.isCommitting(props.tabId),
+    () => gridViewStore.isStale(props.tabId),
+    // Staging or discarding the selected cell republishes, so the dock's value and diff base follow it.
+    () => {
+      const p = getPage(props.tabId);
+      const t = selectionTarget();
+      if (!p || !t) return undefined;
+      const column = p.columns[pageColumnIndexFor(p, currentOrder(), t.col)];
+      return column ? pendingChangesStore.stagedValue(props.tabId, t.row, column.name) : undefined;
+    },
   ],
   () => {
     const p = getPage(props.tabId);
@@ -2537,6 +2520,9 @@ watch(
       column,
       row: targetRow,
       value: view.isNull ? null : view.text,
+      original: masked
+        ? undefined
+        : pendingChangesStore.stagedOriginal(props.tabId, targetRow, column.name),
       truncated: view.truncated,
       masked,
       hasPrimaryKey: hasPrimaryKey(),
@@ -2544,6 +2530,7 @@ watch(
       // way onBeforeEditCell below blocks the grid's own inline edit.
       generated: column.generated,
       pendingDelete: isDeleted(targetRow),
+      stale: gridViewStore.isStale(props.tabId),
       // Same eligibility as the grid's own inline (double-click) edit: writable connection,
       // a primary key to identify the row, and the row isn't already staged for delete. Stages into
       // the exact same pending-change set the inline editor already feeds, so the panel's save and

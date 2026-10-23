@@ -33,7 +33,7 @@ func TestExplainQueryRefusesApprovedReadAfterReadModeDeniedMidWait(t *testing.T)
 	}
 	resCh := make(chan outcome, 1)
 	go func() {
-		res, _, _ := s.explainQuery(context.Background(), nil, explainQueryArgs{ConnectionID: "c1", SQL: "SELECT * FROM t"})
+		res, _, _ := s.explainQuery(context.Background(), nil, explainQueryArgs{ConnectionID: "c1", SQL: "SELECT * FROM t", Path: "database:app"})
 		if res == nil || !res.IsError || len(res.Content) == 0 {
 			resCh <- outcome{isErr: res != nil && res.IsError}
 			return

@@ -1,0 +1,12 @@
+{
+  "id": "5b2d1c58-0000-4000-8000-000000000001",
+  "name": "Staging",
+  "values": [
+    { "key": "host", "value": "https://staging.example.test", "type": "default", "enabled": true },
+    { "key": "token", "value": "s3cret", "type": "secret", "enabled": true },
+    { "key": "retries", "value": 3, "enabled": true },
+    { "key": "legacy", "value": "old", "type": "default", "enabled": false },
+    { "key": "implicit", "value": "on" }
+  ],
+  "_postman_variable_scope": "environment"
+}

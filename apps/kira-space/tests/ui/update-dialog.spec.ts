@@ -1,6 +1,8 @@
+import { CHANNEL } from '@shared/protocol/events';
 import { emitPrompts, routed } from '@workbench/testing/ui/prompts';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 
 // The status-bar update-available item and the modal update dialog it opens — Kira Studio's
 // own tests/ui/update-dialog.spec.ts, trimmed to this app's own first three cases (the error state
@@ -80,4 +82,16 @@ test('Update click installs: control log shows the install call', async ({ relau
   await expect
     .poll(() => control.log().some((entry) => entry.channel === IPC.updateInstall))
     .toBe(true);
+});
+
+test('menu check, up to date: shows the latest-version text, Close closes', async ({ kira }) => {
+  const { window } = kira;
+
+  await emitWailsEvent(window, CHANNEL.checkForUpdates, undefined);
+
+  await expect(window.locator('[data-testid="update-dialog-up-to-date"]')).toHaveText(
+    'Kira Space 0.0.0-dev is the latest version.',
+  );
+  await window.click('[data-testid="update-dialog-close"]');
+  await expect(window.locator('[data-testid="update-dialog"]')).toHaveCount(0);
 });

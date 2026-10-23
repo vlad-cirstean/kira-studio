@@ -1,6 +1,7 @@
 package dbmcp
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -50,11 +51,11 @@ func capsOf(state model.ConnectionState) (adapters.Caps, bool) {
 // the adapter, drop its cached metadata and re-run the pre-connect script on every already-open
 // connection. A failure is returned as-is, not retried — its own error state text is what the
 // caller sees (connectStateError below).
-func (s *Server) connectForQuery(connectionID string) (model.ConnectionState, error) {
+func (s *Server) connectForQuery(ctx context.Context, connectionID string) (model.ConnectionState, error) {
 	if state := s.cfg.Conns.StateOf(connectionID); state.Status == "connected" {
 		return state, nil
 	}
-	return s.cfg.Conns.Connect(connectionID)
+	return s.cfg.Conns.ConnectContext(ctx, connectionID)
 }
 
 // connectStateError formats a non-connected ConnectionState as run_query's connect-failure text:

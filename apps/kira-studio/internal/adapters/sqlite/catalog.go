@@ -194,7 +194,7 @@ func listTablesAndViews(exec QueryExecutor, schema string) ([]model.TreeNode, er
 		var detail *string
 		if kind == "table" {
 			if n, ok := estimates[row.name]; ok {
-				d := "~" + adapters.AbbreviateCount(n) + " rows"
+				d := "~" + adapters.AbbreviateCount(n)
 				detail = &d
 			}
 		}

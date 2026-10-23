@@ -96,6 +96,21 @@ func AssertWritable(readOnly bool) error {
 	return nil
 }
 
+// ReadOnlyViolation is the refusal when a statement escapes a read-only wrap: the connection's own
+// read-only mode, or a per-request one (an MCP read on a writable connection).
+func ReadOnlyViolation(connReadOnly bool) error {
+	if connReadOnly {
+		return T(CodeUnsupported, "backend.studio.adapter.readOnly.body", nil, nil)
+	}
+	return T(CodeUnsupported, "backend.studio.adapter.readOnlyRequest.body", nil, nil)
+}
+
+// OpenTransaction is the refusal of a per-request read-only wrap while the shared connection holds
+// a user transaction the wrap would commit or roll back.
+func OpenTransaction() error {
+	return T(CodeUnsupported, "backend.studio.adapter.openTransaction.body", nil, nil)
+}
+
 var (
 	sqlReadWrite = regexp.MustCompile(`(?i)READ\s+WRITE`)
 	// sqlReadOnlyVarOff catches a statement that names any of the three read-only-mode GUCs/session

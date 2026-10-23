@@ -10,6 +10,7 @@
     "kind": "preconnect",
     "path": null,
     "rows": null,
+    "source": "user",
     "startedAt": "<time>",
     "status": "running",
     "tabId": null

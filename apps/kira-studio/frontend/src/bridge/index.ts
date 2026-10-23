@@ -100,6 +100,10 @@ const studioControl = {
   filesChooseOpen: (
     args?: WailsModels.FilesChooseOpenArgs,
   ): Promise<WailsModels.FilesChooseOpenResult> => unwrap(FilesService.ChooseOpen(args ?? {})),
+  filesChooseOpenMany: (
+    args?: WailsModels.FilesChooseOpenArgs,
+  ): Promise<WailsModels.FilesChooseOpenManyResult> =>
+    unwrap(FilesService.ChooseOpenMany(args ?? {})),
 
   connectionsList: (): Promise<ConnectionSummary[]> =>
     unwrap(ConnectionsService.List()).then((r) => trust<ConnectionSummary[]>(r ?? [])),

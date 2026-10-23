@@ -1,4 +1,5 @@
 import { decodePath, encodePath, pathParent } from '@shared/domain/tree';
+import { t } from '@theme/i18n';
 import { data } from '../../../bridge/data';
 import { pinia } from '../../../state/pinia';
 import { useTabsStore } from '../../../state/tabs';
@@ -21,6 +22,7 @@ const VALUE_SENTINEL = '$value';
 const mutate = createImmediateMutator({
   findTab: keyValueHost,
   reload: (viewKey: string) => useKeyValueViewStore(pinia).reload(viewKey),
+  isStale: (viewKey: string) => useKeyValueViewStore(pinia).isStale(viewKey),
 });
 
 export async function saveValueEdit(
@@ -58,6 +60,9 @@ export async function addKey(
 ): Promise<void> {
   const host = keyValueHost(viewKey);
   if (!host?.connectionId) return;
+  if (useKeyValueViewStore(pinia).isStale(viewKey)) {
+    throw new Error(t('studio.common.connectionLost.error'));
+  }
   await data.mutate({
     opId: crypto.randomUUID(),
     tabId: viewKey,

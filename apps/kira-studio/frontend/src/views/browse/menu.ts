@@ -18,7 +18,12 @@ import { useBrowseViewStore } from './state';
 // `refresh(parent)`'s tree-row refresh becomes a local level reload — there is no longer a parent
 // tree row to refresh, only this panel's own currently loaded level.
 
-function containerRowMenu(tabId: string, connectionId: string, node: TreeNode): MenuItem[] {
+function containerRowMenu(
+  tabId: string,
+  connectionId: string,
+  node: TreeNode,
+  stale: boolean,
+): MenuItem[] {
   return [
     {
       type: 'item',
@@ -42,7 +47,7 @@ function containerRowMenu(tabId: string, connectionId: string, node: TreeNode): 
     },
     // Gates itself on caps.fileTransfer/canInsert — a no-op list for redis's own 'namespace' rows
     // (P33 D3), the same as project/menus.ts's own namespaceMenu-vs-prefixMenu split used to be.
-    ...useObjectStoreStore().uploadMenuItem(connectionId, node.path),
+    ...(stale ? [] : useObjectStoreStore().uploadMenuItem(connectionId, node.path, tabId)),
   ];
 }
 
@@ -65,7 +70,12 @@ function keyRowMenu(connectionId: string, node: TreeNode): MenuItem[] {
 // P17's S3 object leaf, moved verbatim: open/open-in-new-tab/copy-name plus P33's Download and
 // Delete, each gated on the connection's own caps/read-only state rather than shown permanently
 // disabled.
-function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): MenuItem[] {
+function objectRowMenu(
+  tabId: string,
+  connectionId: string,
+  node: TreeNode,
+  stale: boolean,
+): MenuItem[] {
   const connectionsStore = useConnectionsStore();
   const caps = connectionsStore.states[connectionId]?.caps;
   const record = connectionsStore.connectionRecord(connectionId);
@@ -99,6 +109,8 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
       label: t('common.action.delete.label'),
       icon: 'trash',
       danger: true,
+      disabled: stale,
+      ...(stale ? { hint: t('studio.common.connectionLost.tooltip') } : {}),
       shortcut: 'tree.delete',
       // P43 F6/D8: this runs inside contextMenu.ts's own `void item.run()` — an unhandled
       // rejection there is guaranteed, not merely possible, so the catch belongs here.
@@ -115,6 +127,10 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
           }))
         )
           return;
+        if (useBrowseViewStore().isStale(tabId)) {
+          useBrowseViewStore().setActionError(tabId, t('studio.common.connectionLost.error'));
+          return;
+        }
         try {
           await useObjectStoreStore().deleteObject(connectionId, node.path, null);
           await useBrowseViewStore().reload(tabId);
@@ -129,9 +145,14 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
   return items;
 }
 
-export function menuForNode(tabId: string, connectionId: string, node: TreeNode): MenuItem[] {
-  if (node.hasChildren) return containerRowMenu(tabId, connectionId, node);
+export function menuForNode(
+  tabId: string,
+  connectionId: string,
+  node: TreeNode,
+  stale: boolean,
+): MenuItem[] {
+  if (node.hasChildren) return containerRowMenu(tabId, connectionId, node, stale);
   return node.kind === 'object'
-    ? objectRowMenu(tabId, connectionId, node)
+    ? objectRowMenu(tabId, connectionId, node, stale)
     : keyRowMenu(connectionId, node);
 }

@@ -30,6 +30,7 @@ function opRecord(overrides: Record<string, unknown>): Record<string, unknown> {
     rows: 3,
     command: 'select 1',
     error: null,
+    source: 'user',
     ...overrides,
   };
 }
@@ -349,4 +350,24 @@ test('contract: a delayed pre-connect row counts down before the connect', async
   await page.clock.runFor(1000);
   await expect(note).toHaveCount(0);
   await expect(elapsed).toHaveText('0:01');
+});
+
+// P328: the source column tells MCP tool calls from the user's own ops. Backend half:
+// TestDbMcpOpsCarrySource.
+test('contract: an op shows whether the user or MCP ran it', async ({ relaunch }) => {
+  const ops = contract<Record<string, unknown>[]>('ops-source', 'OpsService.Recent');
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.connectionsList, response: [] },
+      { channel: IPC.opsRecent, response: ops },
+    ],
+  });
+
+  await page.click('[data-testid="toggle-operations-panel"]');
+  await expect(page.locator('[data-testid="op-row"]')).toHaveCount(2);
+  const sources = page.locator('[data-testid="op-source-cell"]');
+  await expect(sources).toHaveCount(2);
+  const byKind = Object.fromEntries(ops.map((o, i) => [o.kind as string, i]));
+  await expect(sources.nth(byKind.execute)).toHaveText('MCP');
+  await expect(sources.nth(byKind.children)).toHaveText('User');
 });

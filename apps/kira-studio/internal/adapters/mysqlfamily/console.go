@@ -155,12 +155,17 @@ const errTxCharacteristics = 1568
 // screening alone cannot be complete (implicit commits, comment-lexer drift, SET SESSION flips that
 // take effect only once the wrap ends). On a violation, roll back and re-assert the session
 // default. A probe that succeeds outside a transaction only arms the next transaction read-only.
-func verifyReadOnlyWrap(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery) error {
+func verifyReadOnlyWrap(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery, connReadOnly bool) error {
 	_, err := runRaw(ctx, conn, "SET TRANSACTION READ ONLY", op, track, page.ResultCap{})
 	var myErr *mysql.MySQLError
 	inTx := errors.As(err, &myErr) && myErr.Number == errTxCharacteristics
 	if err != nil && !inTx {
 		return err
+	}
+	// MySQL exposes no per-transaction flag to read back; on a writable connection (per-request
+	// wrap) an open transaction is the invariant, since an implicit commit makes the probe succeed.
+	if inTx && !connReadOnly {
+		return nil
 	}
 	if inTx {
 		vars, err := runRaw(ctx, conn, "SHOW SESSION VARIABLES WHERE Variable_name IN ('transaction_read_only', 'tx_read_only')", op, track, page.ResultCap{})
@@ -175,10 +180,29 @@ func verifyReadOnlyWrap(ctx context.Context, conn Entry, op *adapters.OpCtx, tra
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
 	defer cancel()
 	_, _ = conn.ExecContext(cleanupCtx, "ROLLBACK")
-	if _, err := conn.ExecContext(cleanupCtx, "SET SESSION TRANSACTION READ ONLY"); err != nil {
+	// A writable connection must not keep the next-transaction read-only flag the probe armed.
+	reassert := "SET TRANSACTION READ WRITE"
+	if connReadOnly {
+		reassert = "SET SESSION TRANSACTION READ ONLY"
+	}
+	if _, err := conn.ExecContext(cleanupCtx, reassert); err != nil {
 		return mapError(err)
 	}
-	return adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.readOnly.body", nil, nil)
+	return adapters.ReadOnlyViolation(connReadOnly)
+}
+
+// refuseOpenTransaction probes for an open transaction on a writable connection. The probe arms the
+// next transaction read-only when it succeeds; the wrap's START TRANSACTION READ ONLY consumes that.
+func refuseOpenTransaction(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery) error {
+	_, err := runRaw(ctx, conn, "SET TRANSACTION READ ONLY", op, track, page.ResultCap{})
+	if err == nil {
+		return nil
+	}
+	var myErr *mysql.MySQLError
+	if errors.As(err, &myErr) && myErr.Number == errTxCharacteristics {
+		return adapters.OpenTransaction()
+	}
+	return err
 }
 
 // sessionReadOnly reports whether every variable row (MariaDB lists both spellings) is ON, and at
@@ -208,12 +232,18 @@ func sessionReadOnly(p page.TabularPage) bool {
 // end the wrap (COMMIT through a comment-lexer gap, an implicit commit) or flip the session default
 // for what follows, so verifyReadOnlyWrap re-checks after every statement;
 // AssertNoTransactionEscalation is the cheap first line of defense.
-func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string, limit page.ResultCap) ([]page.Page, error) {
+func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery, readOnly, connReadOnly bool, statements []string, limit page.ResultCap) ([]page.Page, error) {
 	if len(statements) == 0 {
 		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.noStatements.body", nil, nil)
 	}
-	if readOnly {
+	if readOnly && connReadOnly {
 		if err := adapters.AssertNoTransactionEscalation(statements, adapters.MySQLDialect); err != nil {
+			return nil, err
+		}
+	}
+	// START TRANSACTION implicitly commits an open user transaction; refuse before it runs.
+	if readOnly && !connReadOnly {
+		if err := refuseOpenTransaction(ctx, conn, op, track); err != nil {
 			return nil, err
 		}
 	}
@@ -228,6 +258,11 @@ func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQue
 			return err
 		}, conn.waitInFlight, func(err error) error { return mapError(err) })
 		if err != nil {
+			if !connReadOnly {
+				cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
+				defer cancel()
+				_, _ = conn.ExecContext(cleanupCtx, "SET TRANSACTION READ WRITE")
+			}
 			return nil, err
 		}
 		defer cleanup()
@@ -245,7 +280,7 @@ func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQue
 		pages[i] = p
 		limit = adapters.RemainingCap(limit, p.Size())
 		if readOnly {
-			if err := verifyReadOnlyWrap(ctx, conn, op, track); err != nil {
+			if err := verifyReadOnlyWrap(ctx, conn, op, track, connReadOnly); err != nil {
 				return nil, err
 			}
 		}

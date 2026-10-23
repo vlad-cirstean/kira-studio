@@ -14,6 +14,8 @@ import { queryClient } from './queryClient';
 
 export interface AppUpdateControl {
   updateStatus(): Promise<AppUpdateStatus>;
+  /** Forced check: bypasses the Go cache and rejects when the check fails. */
+  updateCheck(): Promise<AppUpdateStatus>;
   updateInstall(): Promise<void>;
   updateCancelInstall(): Promise<void>;
   /** P246: asks the prompt router to show the update popup in one window. */
@@ -64,13 +66,27 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
     );
     const installing = computed(() => installMutation.isPending.value);
 
+    // A menu/palette check: opens the dialog to show progress, the result or the failure.
+    const checkRequested = ref(false);
+    const checkError = ref<string | null>(null);
+    const checkMutation = useMutation(
+      {
+        mutationKey: ['appUpdate', 'check'],
+        mutationFn: control.updateCheck,
+        onSuccess: (s) => queryClient.setQueryData(['appUpdate'], s),
+      },
+      queryClient,
+    );
+    const checking = computed(() => checkMutation.isPending.value);
+
     // Net: the router shows the update popup once per new version, in one window; **Later**
     // silences that version until a newer one appears. Skipped while installing — the dialog stays
     // open through its own installing state even if another window's poll lands in between.
     // `dialogOpen` is only the status-bar item's own local open.
     watch([available, latestVersion, dismissedVersion], ([isAvailable, latest, dismissed]) => {
       if (installing.value) return;
-      if (isAvailable && latest !== dismissed) {
+      // The open dialog already shows the update (a manual check); no second popup.
+      if (isAvailable && latest !== dismissed && !dialogOpen.value) {
         // Best effort: the status-bar item still opens the dialog.
         fireAndForget(control.promptsRaiseUpdate(latest), 'appUpdate');
       } else if (dismissed === latest) {
@@ -84,11 +100,31 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
 
     // The status-bar item's own click — ignores dismissal, always reopens.
     function openUpdateDialog(): void {
+      checkError.value = null;
       dialogOpen.value = true;
+    }
+
+    async function checkForUpdates(): Promise<void> {
+      if (installing.value) return;
+      checkRequested.value = true;
+      dialogOpen.value = true;
+      checkError.value = null;
+      try {
+        await checkMutation.mutateAsync();
+      } catch (err) {
+        checkError.value = errorText(err);
+      }
     }
 
     function later(): void {
       if (installing.value) return;
+      // A closed dialog drops its check outcome, so a later open shows the current state.
+      checkError.value = null;
+      if (!available.value) {
+        dialogOpen.value = false;
+        checkRequested.value = false;
+        return;
+      }
       dismissedVersion.value = latestVersion.value;
       dialogOpen.value = false;
       // The popup is already hidden here; a stale one in another window closes with its own Later.
@@ -124,7 +160,11 @@ export function createAppUpdateStore(control: AppUpdateControl, appName: string)
       dialogOpen,
       installing,
       installError,
+      checkRequested,
+      checking,
+      checkError,
       initAppUpdate,
+      checkForUpdates,
       openUpdateDialog,
       later,
       install,

@@ -451,7 +451,7 @@ useEventListener(bodyEl, 'contextmenu', (e: MouseEvent) => {
 </script>
 
 <template>
-  <div data-testid="automations-panel">
+  <div class="h-full" data-testid="automations-panel">
     <div ref="rootEl" class="flex h-full flex-col">
       <PanelHeader>
         {{ t('common.module.automations.label') }}

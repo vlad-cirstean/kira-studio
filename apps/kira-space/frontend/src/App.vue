@@ -81,6 +81,7 @@ let unsubscribe: Array<() => void> = [];
 
 onMounted(() => {
   unsubscribe = [
+    control.onCheckForUpdates(() => void appUpdateStore.checkForUpdates()),
     control.onOpenSettings(() => {
       settingsStore.settingsOpen = true;
     }),

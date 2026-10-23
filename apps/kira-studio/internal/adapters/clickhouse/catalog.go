@@ -108,7 +108,7 @@ func listTablesAndViews(ctx context.Context, h *Handle, queryID string, op *adap
 		var detail *string
 		if kind == "table" && row.TotalRows != nil {
 			if n, perr := strconv.ParseInt(*row.TotalRows, 10, 64); perr == nil {
-				d := "~" + adapters.AbbreviateCount(n) + " rows"
+				d := "~" + adapters.AbbreviateCount(n)
 				detail = &d
 			}
 		}

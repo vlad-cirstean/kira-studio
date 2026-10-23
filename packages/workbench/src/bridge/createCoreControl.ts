@@ -106,6 +106,7 @@ export interface CoreBindings {
   };
   update: {
     Status(): Promise<unknown>;
+    Check(): Promise<unknown>;
     InstallUpdate(): Promise<void>;
     CancelInstall(): Promise<void>;
   };
@@ -197,6 +198,7 @@ export interface CoreControl<S, L, T, P, M> {
 
   // P116 H5's own ten — see this file's header comment.
   onOpenSettings: (cb: () => void) => () => void;
+  onCheckForUpdates: (cb: () => void) => () => void;
   onToggleProjectPanel: (cb: () => void) => () => void;
   onToggleOperationsPanel: (cb: () => void) => () => void;
   onTabNext: (cb: () => void) => () => void;
@@ -221,6 +223,7 @@ export interface CoreControl<S, L, T, P, M> {
 
   // P119's own three — see this file's header comment.
   updateStatus: () => Promise<AppUpdateStatus>;
+  updateCheck: () => Promise<AppUpdateStatus>;
   updateInstall: () => Promise<void>;
   updateCancelInstall: () => Promise<void>;
 
@@ -304,6 +307,7 @@ export function createCoreControl<S, L, T, P, M>(b: CoreBindings): CoreControl<S
     onTerminal: (cb: (event: TerminalEvent) => void): (() => void) => on(CHANNEL.terminal, cb),
 
     onOpenSettings: (cb: () => void): (() => void) => on(CHANNEL.openSettings, cb),
+    onCheckForUpdates: (cb: () => void): (() => void) => on(CHANNEL.checkForUpdates, cb),
     onToggleProjectPanel: (cb: () => void): (() => void) => on(CHANNEL.toggleProjectPanel, cb),
     onToggleOperationsPanel: (cb: () => void): (() => void) =>
       on(CHANNEL.toggleOperationsPanel, cb),
@@ -336,6 +340,8 @@ export function createCoreControl<S, L, T, P, M>(b: CoreBindings): CoreControl<S
 
     updateStatus: (): Promise<AppUpdateStatus> =>
       unwrap(b.update.Status()).then((r) => trust<AppUpdateStatus>(r)),
+    updateCheck: (): Promise<AppUpdateStatus> =>
+      unwrap(b.update.Check()).then((r) => trust<AppUpdateStatus>(r)),
     updateInstall: (): Promise<void> => unwrap(b.update.InstallUpdate()),
     updateCancelInstall: (): Promise<void> => unwrap(b.update.CancelInstall()),
 

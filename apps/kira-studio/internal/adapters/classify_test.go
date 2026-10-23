@@ -78,6 +78,13 @@ func TestClassifySQL(t *testing.T) {
 		{"show is read", "SHOW TABLES", adapters.ClassRead},
 		{"describe is read", "DESCRIBE t", adapters.ClassRead},
 		{"desc is read", "DESC t", adapters.ClassRead},
+		{"describe analyze delete is a write", "DESCRIBE ANALYZE DELETE o FROM orders o JOIN users u ON u.id = o.user_id", adapters.ClassWrite},
+		{"desc analyze select is a read", "DESC ANALYZE SELECT * FROM t", adapters.ClassRead},
+		{"mariadb analyze delete is a write", "ANALYZE DELETE FROM t", adapters.ClassWrite},
+		{"mariadb analyze format json update is a write", "ANALYZE FORMAT=JSON UPDATE t SET x = 1", adapters.ClassWrite},
+		{"mariadb analyze select is a read", "ANALYZE SELECT * FROM t", adapters.ClassRead},
+		{"analyze table stays ddl", "ANALYZE TABLE t", adapters.ClassDDL},
+		{"analyze bare table stays ddl", "ANALYZE t", adapters.ClassDDL},
 		{"values is read", "VALUES (1, 2)", adapters.ClassRead},
 		{"table is read", "TABLE t", adapters.ClassRead},
 

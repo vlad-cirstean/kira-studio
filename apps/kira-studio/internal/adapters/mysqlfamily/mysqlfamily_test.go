@@ -129,7 +129,7 @@ func TestMySQL(t *testing.T) {
 	runFamilySuite(t, "mysql", fixture.Config, testsupport.VersionPattern("MySQL", testsupport.MysqlServerMajor()))
 }
 
-var bigRowsDetail = regexp.MustCompile(`^~[\d.]+[A-Za-z]* rows$`)
+var bigRowsDetail = regexp.MustCompile(`^~[\d.]+[A-Za-z]*$`)
 
 // runFamilySuite is the ~27 scenarios packages/db-fixtures/mariadb.spec.ts and packages/db-fixtures/mysql.spec.ts share.
 func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfig, versionRE *regexp.Regexp) {
@@ -385,7 +385,7 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 		for _, n := range objects.Nodes {
 			if n.Name == "big_rows" && (n.Detail == nil || !bigRowsDetail.MatchString(*n.Detail)) {
-				t.Errorf("big_rows detail = %v, want a \"~N rows\" estimate", n.Detail)
+				t.Errorf("big_rows detail = %v, want a \"~N\" estimate", n.Detail)
 			}
 		}
 	})
@@ -583,6 +583,12 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 			nodePath(cfg.ID, seg("database", "kira_test"), seg("table", "customers")),
 			[]string{"name"},
 		),
+		testsupport.ReadOnlyRequestRefusesWrite(nodePath(cfg.ID, seg("database", "kira_test")),
+			"INSERT INTO customers (name) VALUES ('ro-probe')", "SELECT 1"),
+		testsupport.ReadOnlyRequestKeepsOpenTransaction(nodePath(cfg.ID, seg("database", "kira_test")),
+			"CREATE TEMPORARY TABLE kira_ro_tx (x int) ENGINE=InnoDB", "START TRANSACTION", "INSERT INTO kira_ro_tx VALUES (1)", "SELECT count(*) FROM kira_ro_tx"),
+		testsupport.ReadOnlyRequestAllowsBackslashRead(nodePath(cfg.ID, seg("database", "kira_test")),
+			`SELECT 'a1' REGEXP '\\d+'`, `SELECT 'a_b' LIKE 'a\\_b'`, `SELECT 'read write'`),
 		testsupport.ConsoleResultCap(nodePath(cfg.ID, seg("database", "kira_test")), func(n int) string {
 			return fmt.Sprintf("WITH RECURSIVE s(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM s WHERE n < %d) SELECT n FROM s", n)
 		}),

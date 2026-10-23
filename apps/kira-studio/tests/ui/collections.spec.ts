@@ -289,17 +289,33 @@ test('collections — import reports what it did, and no file contents cross the
   const CONTROL: ControlSnapshot[] = [
     { channel: IPC.collectionsList, response: TREE },
     {
-      channel: IPC.filesChooseOpen,
+      channel: IPC.filesChooseOpenMany,
       response: {
         canceled: false,
-        file: {
-          path: '/Users/someone/Orders.postman_collection.json',
-          name: 'Orders.postman_collection.json',
-          size: 4_200_000,
-        },
+        files: [
+          {
+            path: '/Users/someone/Orders.postman_collection.json',
+            name: 'Orders.postman_collection.json',
+            size: 4_200_000,
+          },
+        ],
       },
     },
-    { channel: IPC.collectionsImport, response: REPORT },
+    {
+      channel: IPC.collectionsImport,
+      response: {
+        files: [
+          {
+            path: '/Users/someone/Orders.postman_collection.json',
+            fileName: 'Orders.postman_collection.json',
+            kind: 'collection',
+            collection: REPORT,
+            environment: null,
+            error: null,
+          },
+        ],
+      },
+    },
   ];
   const { window: page, control } = await relaunch({ control: CONTROL });
   await openHttpMode(page);
@@ -325,7 +341,7 @@ test('collections — import reports what it did, and no file contents cross the
   const importCalls = control.log().filter((e) => e.channel === IPC.collectionsImport);
   expect(importCalls).toHaveLength(1);
   expect(importCalls[0].args).toEqual({
-    path: '/Users/someone/Orders.postman_collection.json',
+    paths: ['/Users/someone/Orders.postman_collection.json'],
   });
   // And nothing else in the whole call log is file-sized either.
   for (const entry of control.log()) {
@@ -491,10 +507,10 @@ test('collections — Postman import builds the contract tree and export asks fo
     'api-postman',
     'CollectionsService.List',
   );
-  const report = contract<{ name: string; requests: number; folders: number }>(
-    'api-postman',
-    'CollectionsService.Import',
-  );
+  const result = contract<{
+    files: { collection: { name: string; requests: number; folders: number } }[];
+  }>('api-postman', 'CollectionsService.Import');
+  const report = result.files[0].collection;
   const importArgs = contract('api-postman', 'args:CollectionsService.Import');
   const exportArgs = contract<{ collectionId: string }>(
     'api-postman',
@@ -502,8 +518,11 @@ test('collections — Postman import builds the contract tree and export asks fo
   );
   const CONTROL: ControlSnapshot[] = [
     { channel: IPC.collectionsList, response: tree },
-    { channel: IPC.filesChooseOpen, response: contract('api-postman', 'FilesService.ChooseOpen') },
-    { channel: IPC.collectionsImport, response: report },
+    {
+      channel: IPC.filesChooseOpenMany,
+      response: contract('api-postman', 'FilesService.ChooseOpenMany'),
+    },
+    { channel: IPC.collectionsImport, response: result },
     { channel: IPC.filesChooseSave, response: contract('api-postman', 'FilesService.ChooseSave') },
     {
       channel: IPC.collectionsExport,
@@ -529,6 +548,46 @@ test('collections — Postman import builds the contract tree and export asks fo
     .poll(() => control.log().filter((e) => e.channel === IPC.collectionsExport))
     .toHaveLength(1);
   expect(control.log().find((e) => e.channel === IPC.collectionsExport)?.args).toEqual(exportArgs);
+});
+
+// Contract api-postman-multi. Backend half: apiflow.TestPostmanImportCollectionAndEnvironment stores
+// the same fixture.
+test('collections — Postman import of a collection, an environment and a bad file', async ({
+  relaunch,
+}) => {
+  const result = contract<{ files: { kind: string }[] }>(
+    'api-postman-multi',
+    'CollectionsService.Import',
+  );
+  const CONTROL: ControlSnapshot[] = [
+    {
+      channel: IPC.filesChooseOpenMany,
+      response: contract('api-postman-multi', 'FilesService.ChooseOpenMany'),
+    },
+    { channel: IPC.collectionsImport, response: result },
+  ];
+  const { window: page, control } = await relaunch({ control: CONTROL });
+  await openHttpMode(page);
+
+  await emitWailsEvent(page, CHANNEL.importPostman, undefined);
+
+  const files = page.locator('[data-testid="import-report-file"]');
+  await expect(files).toHaveCount(3);
+  await expect(files.nth(0)).toHaveAttribute('data-kind', 'collection');
+  await expect(files.nth(0)).toContainText('Imported “Multi”: 1 request, 0 folders.');
+  await expect(files.nth(1)).toHaveAttribute('data-kind', 'environment');
+  await expect(files.nth(1)).toContainText('Imported environment “Staging”: 4 variables.');
+  await expect(files.nth(1).locator('li[data-kind="disabled_variables"]')).toContainText(
+    '1 disabled variables were skipped.',
+  );
+  await expect(files.nth(2)).toHaveAttribute('data-kind', 'failed');
+  await expect(files.nth(2)).toContainText(
+    'Couldn’t import bad.json: postman: not a Postman collection or environment',
+  );
+  const importCalls = control.log().filter((e) => e.channel === IPC.collectionsImport);
+  expect(importCalls[0].args).toEqual(
+    contract('api-postman-multi', 'args:CollectionsService.Import'),
+  );
 });
 
 // Contract api-restart. Backend half: apiflow.TestRestartKeepsApiState stores the post-restart state.

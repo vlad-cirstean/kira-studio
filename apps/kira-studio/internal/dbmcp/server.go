@@ -47,15 +47,15 @@ type TokenProvider func() (rec mcpauth.Record, plain string, minted bool, err er
 type ConnectionsReader interface {
 	List() ([]model.ConnectionSummary, error)
 	StateOf(connectionID string) model.ConnectionState
-	Connect(connectionID string) (model.ConnectionState, error)
+	ConnectContext(ctx context.Context, connectionID string) (model.ConnectionState, error)
 }
 
 // MetadataReader is dbmcp's own consumer-declared interface over *tree.Service — list_children/
 // describe_table/describe_schema's own backend.
 type MetadataReader interface {
-	Children(connectionID, path string, refresh bool) (tree.ChildrenResult, error)
-	Describe(connectionID, path string, refresh bool, tabID *string) (tree.DescribeResult, error)
-	SchemaColumns(connectionID, path string, refresh bool) (tree.SchemaColumnsResult, error)
+	Children(ctx context.Context, connectionID, path string, refresh bool) (tree.ChildrenResult, error)
+	Describe(ctx context.Context, connectionID, path string, refresh bool, tabID *string) (tree.DescribeResult, error)
+	SchemaColumns(ctx context.Context, connectionID, path string, refresh bool) (tree.SchemaColumnsResult, error)
 }
 
 // QueryRunner is dbmcp's own consumer-declared interface over *adapterhost.Router's Execute and
@@ -228,27 +228,27 @@ func (s *Server) buildMCPServer() *mcp.Server {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "list_children",
 		Description: llmprompts.DbmcpToolListChildren.Text(src, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[listChildrenArgs](src, llmprompts.DbmcpToolListChildren.ID(), nil),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[listChildrenArgs](src, llmprompts.DbmcpToolListChildren.ID(), nil), "connectionId"),
 	}, withPanicRecovery(s, "list_children", s.listChildren))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "describe_table",
 		Description: llmprompts.DbmcpToolDescribeTable.Text(src, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[describeTableArgs](src, llmprompts.DbmcpToolDescribeTable.ID(), nil),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[describeTableArgs](src, llmprompts.DbmcpToolDescribeTable.ID(), nil), "connectionId", "path"),
 	}, withPanicRecovery(s, "describe_table", s.describeTable))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "describe_schema",
 		Description: llmprompts.DbmcpToolDescribeSchema.Text(src, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[describeSchemaArgs](src, llmprompts.DbmcpToolDescribeSchema.ID(), nil),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[describeSchemaArgs](src, llmprompts.DbmcpToolDescribeSchema.ID(), nil), "connectionId", "path"),
 	}, withPanicRecovery(s, "describe_schema", s.describeSchema))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "run_query",
 		Description: llmprompts.DbmcpToolRunQuery.Text(src, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[runQueryArgs](src, llmprompts.DbmcpToolRunQuery.ID(), map[string]any{"maxRows": llmprompts.LimitVars{Default: runQueryDefaultMaxRows, Max: runQueryMaxMaxRows}}),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[runQueryArgs](src, llmprompts.DbmcpToolRunQuery.ID(), map[string]any{"maxRows": llmprompts.LimitVars{Default: runQueryDefaultMaxRows, Max: runQueryMaxMaxRows}}), "connectionId", "sql"),
 	}, withPanicRecovery(s, "run_query", s.runQuery))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "explain_query",
 		Description: llmprompts.DbmcpToolExplainQuery.Text(src, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[explainQueryArgs](src, llmprompts.DbmcpToolExplainQuery.ID(), nil),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[explainQueryArgs](src, llmprompts.DbmcpToolExplainQuery.ID(), nil), "connectionId", "sql"),
 	}, withPanicRecovery(s, "explain_query", s.explainQuery))
 
 	return srv
@@ -273,7 +273,7 @@ func withPanicRecovery[In any](s *Server, name string, h func(context.Context, *
 		}()
 		ctx, cancel := bindRequestCancellation(ctx)
 		defer cancel()
-		return h(ctx, req, in)
+		return h(adapterhost.WithOpSource(ctx, adapterhost.OpSourceMCP), req, in)
 	}
 }
 

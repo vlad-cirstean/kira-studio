@@ -5,7 +5,7 @@ import type {
   CollectionSummary,
   GrpcSavedRequest,
   HttpSavedRequest,
-  ImportReport,
+  ImportResult,
 } from '@shared/domain/collections';
 import { defaultGrpcSavedRequest, defaultHttpSavedRequest } from '@shared/domain/collections';
 import { useMutation, useQuery } from '@tanstack/vue-query';
@@ -97,7 +97,7 @@ interface CollectionsState {
   /** The row key whose label is currently an inline rename input, if any. */
   renamingKey: string | null;
   busy: boolean;
-  report: ImportReport | null;
+  importResult: ImportResult | null;
   /** D16: "N secret values were not written to the file" — set after an export that stripped at
    *  least one, shown alongside the import report strip. */
   exportWarning: string | null;
@@ -121,7 +121,7 @@ export const useCollectionsStore = defineStore('collections', () => {
     search: '',
     renamingKey: null,
     busy: false,
-    report: null,
+    importResult: null,
     exportWarning: null,
     error: null,
   });
@@ -719,20 +719,21 @@ export const useCollectionsStore = defineStore('collections', () => {
 
   // ---- import (D11/D12) ----
 
-  /** Opens the native file dialog and imports the chosen path. **Only the path crosses the bridge**
+  /** Opens the native file dialog and imports the chosen files (collections and environments, each
+   *  independent). **Only the paths cross the bridge**
    *  — Go opens the file (F16: a 10-50 MB collection through the control plane is 20-100 serial
    *  round trips, and above 64 MiB an unattributable refusal). Returns false when cancelled. */
-  async function importCollection(): Promise<boolean> {
+  async function importPostman(): Promise<boolean> {
     // A real re-entry guard. Until this, the only thing stopping a second concurrent
     // import was the panel button disabling itself while `busy` — and that button has moved to the
     // menu bar, which has no such state. Two overlapping imports would interleave their
     // afterTreeListChange()/report writes.
     if (state.busy) return false;
-    const chosen = await control.filesChooseOpen({
+    const chosen = await control.filesChooseOpenMany({
       title: t('studio.api.collections.import.title'),
       filters: [{ name: t('studio.api.collections.postmanFilter.label'), extensions: ['json'] }],
     });
-    if (chosen.canceled || !chosen.file) return false;
+    if (chosen.canceled || !chosen.files?.length) return false;
 
     // D11: the panel's header action is disabled with a spinner for the duration rather than joining
     // the op log — that machinery is per tab (ViewChrome + useRunState) and an import started from
@@ -740,10 +741,22 @@ export const useCollectionsStore = defineStore('collections', () => {
     state.busy = true;
     state.error = null;
     try {
-      const report = await control.collectionsImport(chosen.file.path);
-      state.report = { ...report, warnings: report.warnings ?? [] };
-      expandedSet.add(collectionKey(report.collectionId));
-      state.selected = collectionKey(report.collectionId);
+      const result = await control.collectionsImport(chosen.files.map((f) => f.path));
+      state.importResult = {
+        files: result.files.map((f) => ({
+          ...f,
+          collection: f.collection && { ...f.collection, warnings: f.collection.warnings ?? [] },
+          environment: f.environment && {
+            ...f.environment,
+            warnings: f.environment.warnings ?? [],
+          },
+        })),
+      };
+      const first = result.files.find((f) => f.collection)?.collection;
+      if (first) {
+        expandedSet.add(collectionKey(first.collectionId));
+        state.selected = collectionKey(first.collectionId);
+      }
       return true;
     } catch (err) {
       // This used to let the error propagate uncaught, and (since it ran only in the
@@ -761,7 +774,7 @@ export const useCollectionsStore = defineStore('collections', () => {
   }
 
   function dismissReport(): void {
-    state.report = null;
+    state.importResult = null;
   }
 
   function dismissExportWarning(): void {
@@ -868,7 +881,7 @@ export const useCollectionsStore = defineStore('collections', () => {
     submitSaveDialog,
     saveRequest,
     saveGrpcRequest,
-    importCollection,
+    importPostman,
     dismissReport,
     dismissExportWarning,
     dismissError,

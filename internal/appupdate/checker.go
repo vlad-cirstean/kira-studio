@@ -17,10 +17,13 @@ package appupdate
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"regexp"
 	"sync"
 	"time"
 
@@ -104,10 +107,51 @@ func (c *Checker) Status(ctx context.Context) Result {
 		return c.result
 	}
 
+	res, _ := c.fetchLatest(ctx)
+	return res
+}
+
+// ErrNotReleaseBuild: a dev build never checks.
+var ErrNotReleaseBuild = errors.New("appupdate: not a release build")
+
+// Check fetches now, whatever the cache holds, and returns the fetch error Status hides. It shares
+// Status's single-flight, so a poll already in flight is joined, not doubled.
+func (c *Checker) Check(ctx context.Context) (Result, error) {
+	if !isReleaseBuild(c.running) {
+		return Result{CurrentVersion: c.running}, ErrNotReleaseBuild
+	}
+	return c.fetchLatest(ctx)
+}
+
+var statusErrRe = regexp.MustCompile(`unexpected status (\d+)$`)
+
+// FailureCause maps a failed check to a short, URL-free reason for the user.
+func FailureCause(err error) string {
+	var netErr net.Error
+	switch {
+	case errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &netErr) && netErr.Timeout()):
+		return "timed out"
+	case errors.As(err, new(*net.OpError)) || errors.As(err, new(*net.DNSError)):
+		return "offline"
+	}
+	if m := statusErrRe.FindStringSubmatch(err.Error()); m != nil {
+		return "unexpected status " + m[1]
+	}
+	return "unknown error"
+}
+
+type fetched struct {
+	result Result
+	err    error
+}
+
+func (c *Checker) fetchLatest(ctx context.Context) (Result, error) {
 	v, _, _ := c.group.Do("latest", func() (any, error) {
-		return c.refresh(ctx), nil
+		res, err := c.refresh(ctx)
+		return fetched{res, err}, nil
 	})
-	return v.(Result)
+	f := v.(fetched)
+	return f.result, f.err
 }
 
 // dueForCheck reports whether the cached answer is stale enough to warrant a real network call —
@@ -128,7 +172,7 @@ func (c *Checker) dueForCheck() bool {
 // refresh performs the real fetch and updates the cache. On error the previous result is left in
 // place — only checkedAt and lastOK move — so a transient failure never blanks out a result a
 // prior successful check already produced.
-func (c *Checker) refresh(ctx context.Context) Result {
+func (c *Checker) refresh(ctx context.Context) (Result, error) {
 	rel, err := c.fetch(ctx, c.userAgent)
 
 	c.mu.Lock()
@@ -137,11 +181,11 @@ func (c *Checker) refresh(ctx context.Context) Result {
 	if err != nil {
 		c.lastOK = false
 		slog.Debug("appupdate: check failed", "scope", "appupdate", "err", err)
-		return c.result
+		return c.result, err
 	}
 	c.lastOK = true
 	c.result = buildResult(c.running, rel)
-	return c.result
+	return c.result, nil
 }
 
 // buildResult turns a decoded release into this package's Result, skipping a draft or prerelease

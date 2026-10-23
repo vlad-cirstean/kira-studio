@@ -28,9 +28,9 @@ export interface CollectionMenuActions {
   moveTo(row: CollectionRowVm, collectionId: string): void;
   moveToNewCollection(row: CollectionRowVm): void;
   copyUrl(row: CollectionRowVm): void;
-  importCollection(): void;
+  importPostman(): void;
   /** P7 D12: the background menu's own "Import from curl…" item — opens the paste-a-curl-command
-   *  dialog, always into a fresh tab (never row-scoped, unlike importCollection above). */
+   *  dialog, always into a fresh tab (never row-scoped, unlike importPostman above). */
   importCurl(): void;
   exportCollection(row: CollectionRowVm): void;
   /** P5 D11, re-homed to a tab by P17 D16: the collection row's own "Variables…" item — opens
@@ -200,7 +200,7 @@ export function backgroundMenu(actions: CollectionMenuActions): MenuItem[] {
       id: 'import-collection',
       label: t('studio.api.common.importCollection.label'),
       icon: 'cloud-download',
-      run: () => actions.importCollection(),
+      run: () => actions.importPostman(),
     },
     {
       type: 'item',

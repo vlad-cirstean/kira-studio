@@ -51,6 +51,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   lifecycleQuitStatus: 'LifecycleService.QuitStatus',
   filesChooseSave: 'FilesService.ChooseSave',
   filesChooseOpen: 'FilesService.ChooseOpen',
+  filesChooseOpenMany: 'FilesService.ChooseOpenMany',
   filesChooseFolder: 'FilesService.ChooseFolder',
   datagripScan: 'DataGripService.Scan',
   datagripImport: 'DataGripService.Import',
@@ -154,6 +155,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   dbMcpDenyQuery: 'DbMcpService.DenyQuery',
 
   updateStatus: 'UpdateService.Status',
+  updateCheck: 'UpdateService.Check',
   updateInstall: 'UpdateService.InstallUpdate',
   updateCancelInstall: 'UpdateService.CancelInstall',
 
@@ -389,6 +391,12 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // the honest default for a dev-server run under Playwright, which never reports a tagged release
   // version.
   [IPC.updateStatus]: JSON.stringify({
+    updateAvailable: false,
+    currentVersion: '0.0.0-dev',
+    latestVersion: '',
+    installLogPath: '',
+  }),
+  [IPC.updateCheck]: JSON.stringify({
     updateAvailable: false,
     currentVersion: '0.0.0-dev',
     latestVersion: '',

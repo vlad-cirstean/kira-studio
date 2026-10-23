@@ -11,10 +11,10 @@ import VarText from '@theme/components/VarText.vue';
 import { type MessageKey, t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
 import { errorText } from '@workbench/bridge/codedError';
+import MonacoDiff from '@workbench/editor/MonacoDiff.vue';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useLlmPromptDraftsStore } from '../state/llmPromptDrafts';
 import PromptArgumentField from './PromptArgumentField.vue';
-import PromptDiff from './PromptDiff.vue';
 import PromptEditor from './PromptEditor.vue';
 import PromptTitle from './PromptTitle.vue';
 import { llmPromptKindKey, llmPromptVarKey, useLlmPromptPreview } from './queries';
@@ -170,7 +170,7 @@ const literal = computed(() => props.view.vars.length === 0);
     </div>
 
     <div v-else-if="tab === 'changes'" class="h-80" data-testid="llm-prompt-diff">
-      <PromptDiff :original="view.defaultText" :modified="text" />
+      <MonacoDiff :original="view.defaultText" :modified="text" />
     </div>
 
     <CodeBlock v-else data-testid="llm-prompt-preview" class="text-kira-md">

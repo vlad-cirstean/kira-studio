@@ -185,12 +185,7 @@ test('DB MCP approval dialog', async ({ relaunch }) => {
   await emitPrompts(page, [routed('dbmcp', snap.pending.requestId)]);
   const dialog = loc(page, 'db-mcp-approval-dialog');
   await expect(dialog).toBeVisible();
-  await expectCatalogText(dialog, {
-    allow: [
-      ...ALLOW,
-      new RegExp(snap.pending.statement.slice(0, 10).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
-    ],
-  });
+  await expectCatalogText(dialog, { allow: ALLOW });
 });
 
 test('HTTP request view, every tab, empty response', async ({ relaunch }) => {

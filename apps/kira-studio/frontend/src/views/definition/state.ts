@@ -5,6 +5,7 @@ import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { control } from '../../bridge/control';
 import { useConnectionsStore } from '../../state/connections';
+import { useStaleDataStore } from '../../state/staleData';
 import { useTabsStore } from '../../state/tabs';
 import { createRuntimeStore } from '../shared/viewOp';
 
@@ -76,8 +77,15 @@ export const useDefinitionViewStore = defineStore('definitionView', () => {
     rt.definition = definitionResult.value.definition;
     rt.source = definitionResult.value.source;
     rt.meta = describeResult.status === 'fulfilled' ? (describeResult.value?.meta ?? null) : null;
+    useStaleDataStore().stamp(tabId, tab.connectionId);
     rt.status = 'idle';
   }
 
-  return { runtime, load };
+  /** Shown definition is stale: connection gone, or read under another connection session. */
+  function isStale(tabId: string): boolean {
+    const connectionId = findTab(tabId)?.connectionId;
+    return connectionId ? useStaleDataStore().isStale(tabId, tabId, connectionId) : false;
+  }
+
+  return { runtime, isStale, load };
 });

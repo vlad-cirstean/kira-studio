@@ -130,9 +130,9 @@ func (s *Server) addSpaceTools(srv *mcp.Server) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "declare_repos",
 		Description: llmprompts.HeadlessToolDeclareRepos.Text(s.prompts, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[declareArgs](s.prompts, llmprompts.HeadlessToolDeclareRepos.ID(), map[string]any{
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[declareArgs](s.prompts, llmprompts.HeadlessToolDeclareRepos.ID(), map[string]any{
 			"repos": llmprompts.MaxVars{Max: maxDeclareRepos},
-		}),
+		}), "repos"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args declareArgs) (*mcp.CallToolResult, TaskInfo, error) {
 		task, bad := s.spaceTask(req)
 		if bad != nil {
@@ -150,7 +150,7 @@ func (s *Server) addSpaceTools(srv *mcp.Server) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "request_branch",
 		Description: llmprompts.HeadlessToolRequestBranch.Text(s.prompts, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[requestBranchArgs](s.prompts, llmprompts.HeadlessToolRequestBranch.ID(), nil),
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[requestBranchArgs](s.prompts, llmprompts.HeadlessToolRequestBranch.ID(), nil), "repo", "name"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args requestBranchArgs) (*mcp.CallToolResult, BranchInfo, error) {
 		task, bad := s.spaceTask(req)
 		if bad != nil {
@@ -165,9 +165,9 @@ func (s *Server) addSpaceTools(srv *mcp.Server) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "branch_status",
 		Description: llmprompts.HeadlessToolBranchStatus.Text(s.prompts, llmprompts.NoVars{}),
-		InputSchema: llmprompts.InputSchema[branchStatusArgs](s.prompts, llmprompts.HeadlessToolBranchStatus.ID(), map[string]any{
+		InputSchema: llmprompts.RequireNonEmpty(llmprompts.InputSchema[branchStatusArgs](s.prompts, llmprompts.HeadlessToolBranchStatus.ID(), map[string]any{
 			"waitSeconds": llmprompts.MaxVars{Max: maxWaitSeconds},
-		}),
+		}), "repo"),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args branchStatusArgs) (*mcp.CallToolResult, BranchInfo, error) {
 		task, bad := s.spaceTask(req)
 		if bad != nil {

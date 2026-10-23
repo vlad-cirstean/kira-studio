@@ -60,6 +60,14 @@ func TestUpdateRefusedInDevBuild(t *testing.T) {
 	}
 }
 
+func TestCheckForUpdatesRefusedInDevBuild(t *testing.T) {
+	app := flowharness.New(t)
+	var ie *ipcerr.Error
+	if _, err := app.W.Update.Check(context.Background()); !errors.As(err, &ie) || ie.Code != "E_CONFLICT" || ie.Message != "Updates are available only in release builds." {
+		t.Fatalf("Check in a dev build = %v, want the coded notRelease error", err)
+	}
+}
+
 func TestDataGripScan(t *testing.T) {
 	app := flowharness.New(t)
 	var ie *ipcerr.Error

@@ -139,6 +139,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
 
   // P119: the in-app update dialog's three bound calls.
   updateStatus: 'UpdateService.Status',
+  updateCheck: 'UpdateService.Check',
   updateInstall: 'UpdateService.InstallUpdate',
   updateCancelInstall: 'UpdateService.CancelInstall',
 
@@ -329,6 +330,12 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // P119: no update available by default — same shape as Kira Studio's own WILDCARD_DEFAULTS
   // entry, so every other existing Space spec keeps booting unchanged.
   [IPC.updateStatus]: JSON.stringify({
+    updateAvailable: false,
+    currentVersion: '0.0.0-dev',
+    latestVersion: '',
+    installLogPath: '',
+  }),
+  [IPC.updateCheck]: JSON.stringify({
     updateAvailable: false,
     currentVersion: '0.0.0-dev',
     latestVersion: '',

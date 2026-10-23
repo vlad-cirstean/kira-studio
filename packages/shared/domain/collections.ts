@@ -134,6 +134,28 @@ export interface ImportWarning {
   detail: string;
 }
 
+/** One imported Postman environment file (CollectionsService.Import). */
+export interface EnvironmentImportReport {
+  environmentId: string;
+  name: string;
+  variables: number;
+  warnings: ImportWarning[];
+}
+
+/** One picked file's outcome: `kind` is '' (and `error` set) when the file failed. */
+export interface ImportFileResult {
+  path: string;
+  fileName: string;
+  kind: 'collection' | 'environment' | '';
+  collection: ImportReport | null;
+  environment: EnvironmentImportReport | null;
+  error: string | null;
+}
+
+export interface ImportResult {
+  files: ImportFileResult[];
+}
+
 export interface ImportReport {
   collectionId: string;
   name: string;

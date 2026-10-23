@@ -295,12 +295,12 @@ func TestSqlite(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Children: %v", err)
 		}
-		bigRowsDetail := regexp.MustCompile(`^~[\d.]+[A-Za-z]* rows$`)
+		bigRowsDetail := regexp.MustCompile(`^~[\d.]+[A-Za-z]*$`)
 		for _, n := range objects.Nodes {
 			switch n.Name {
 			case "big_rows":
 				if n.Detail == nil || !bigRowsDetail.MatchString(*n.Detail) {
-					t.Errorf("big_rows detail = %v, want a \"~N rows\" estimate", n.Detail)
+					t.Errorf("big_rows detail = %v, want a \"~N\" estimate", n.Detail)
 				}
 			case "wide_table":
 				if n.Detail != nil {

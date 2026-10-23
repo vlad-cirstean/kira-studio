@@ -3,6 +3,7 @@ import { fireAndForget } from '@workbench/bridge/fireAndForget';
 import { runCommand } from '@workbench/shortcuts/commands';
 import type { PaletteCommand } from '@workbench/shortcuts/palette';
 import { openApiRequestTab, openGrpcRequestTab } from '../api/tabs';
+import { useAppUpdateStore } from '../state/appUpdate';
 import { useConnectionDialogStore } from '../state/connections';
 import { useLayoutStore } from '../state/layout';
 import { useModeStore } from '../state/mode';
@@ -14,6 +15,7 @@ export function studioPaletteCommands(): () => PaletteCommand[] {
   const layoutStore = useLayoutStore();
   const tabsStore = useTabsStore();
   const settingsStore = useSettingsStore();
+  const appUpdateStore = useAppUpdateStore();
 
   // Deliberately small and 1:1 with already-reachable actions — every global shortcut this
   // phase adds (the palette's own toggle excluded), plus the handful of other one-click actions
@@ -86,6 +88,11 @@ export function studioPaletteCommands(): () => PaletteCommand[] {
       id: 'api.importCurl',
       label: t('studio.api.common.importCurl.label'),
       run: () => runCommand('api.importCurl'),
+    },
+    {
+      id: 'check-for-updates',
+      label: t('common.action.checkForUpdates.label'),
+      run: () => void appUpdateStore.checkForUpdates(),
     },
     {
       id: 'open-settings',

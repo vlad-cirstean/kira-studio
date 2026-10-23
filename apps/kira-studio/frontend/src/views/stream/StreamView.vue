@@ -13,6 +13,7 @@ import { computed, onMounted, onUnmounted } from 'vue';
 import type { StreamTabRecord } from '../../state/tabDomain';
 import EngineIcon from '../../theme/EngineIcon.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
+import StaleDataStrip from '../shared/StaleDataStrip.vue';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import StreamFilterRow from './StreamFilterRow.vue';
 import StreamRowsTable from './StreamRowsTable.vue';
@@ -35,7 +36,7 @@ const railColor = computed(() => (connRecord.value ? (connRecord.value.color ?? 
 const targetTail = computed(() => pathTail(props.tab.path));
 
 // A batch tab (SQS) never auto-loads on reconnect: only an explicit Poll reads.
-const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
+const { needsReconnect, reconnecting, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
   () => {
     if (!isBatch.value) return streamViewStore.load(props.tab.id);
@@ -101,6 +102,12 @@ onUnmounted(() => {
         <StreamToolbar :tab="tab" @refresh="onRefresh" />
         <StreamFilterRow v-if="isKafka" :tab="tab" />
 
+        <StaleDataStrip
+          v-if="gate.stale.value && page"
+          testid="stream-stale"
+          :reconnecting="reconnecting"
+          @reconnect="onReconnectAndLoad"
+        />
         <Alert v-if="isBatch" variant="warn" strip data-testid="stream-poll-warning">
           <AlertDescription v-if="isReadOnlyBatch">
             {{ t('studio.stream.pollWarningReadOnly.description', { duration: hideDuration }) }}
@@ -125,7 +132,7 @@ onUnmounted(() => {
         </Alert>
 
         <EmptyState
-          v-if="needsReconnect"
+          v-if="needsReconnect && !page"
           data-testid="stream-reconnect"
           icon="plug"
           :title="t('studio.common.disconnected.empty')"
@@ -134,6 +141,7 @@ onUnmounted(() => {
             variant="dialog-primary"
             size="kira-lg"
             data-testid="stream-reconnect-load"
+            :pending="reconnecting"
             @click="onReconnectAndLoad"
           >
             {{ t('studio.common.reconnectAndLoad.label') }}

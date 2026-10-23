@@ -407,9 +407,9 @@ func toWireApprovalSnapshot(snap dbmcp.ApprovalSnapshot) DbMcpApprovalSnapshot {
 			RequestID: snap.Pending.RequestID, ConnectionID: snap.Pending.ConnectionID,
 			ConnectionName: snap.Pending.ConnectionName, Kind: snap.Pending.Kind,
 			// Statement carries the full text, uncapped (a byte cap that elided the middle let a
-			// hidden clause sit entirely inside the omitted span; the dialog's own `.statement` is
-			// a fixed-height scroll container (DbMcpApprovalDialog.vue), so nothing here bounds the
-			// DOM by hiding text a human is being asked to approve).
+			// hidden clause sit entirely inside the omitted span; the dialog's read-only editor
+			// (ApprovalStatement.vue) scrolls and wraps, so nothing here bounds the DOM by hiding
+			// text a human is being asked to approve).
 			Class: string(snap.Pending.Class), Statement: snap.Pending.Statement,
 			ExpiresAtMs: snap.Pending.ExpiresAt.UnixMilli(),
 			Reason:      string(snap.Pending.Reason),

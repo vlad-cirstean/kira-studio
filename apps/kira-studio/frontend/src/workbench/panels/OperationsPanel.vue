@@ -32,6 +32,7 @@ const consoleViewStore = useConsoleViewStore();
 const columns = computed<OpLogColumn[]>(() => [
   { id: 'time', label: t('common.field.time.label'), width: '90px' },
   { id: 'connection', label: t('studio.common.nodeKind.connection.label'), width: '140px' },
+  { id: 'source', label: t('common.field.source.label'), width: '60px' },
   { id: 'tab', label: t('common.key.tab.label'), width: '40px' },
   { id: 'kind', label: t('common.field.kind.label'), width: '80px' },
   { id: 'status', label: t('common.field.status.label'), width: '90px' },
@@ -180,6 +181,14 @@ function preconnectNote(record: OpRecord, now: number): string | null {
         />
         <span class="truncate min-w-0">{{ displayValue(connectionFor(record)?.name) }}</span>
       </span>
+      <span
+        v-else-if="column.id === 'source'"
+        class="truncate min-w-0"
+        data-testid="op-source-cell"
+        >{{
+          record.source === 'mcp' ? t('common.mcp.label') : t('common.user.label')
+        }}</span
+      >
       <span v-else-if="column.id === 'tab'" class="truncate min-w-0" data-testid="op-tab-cell">{{
         tabTitleFor(record)
       }}</span>

@@ -189,11 +189,24 @@ func statusIDs(results []ResultSpec) []string {
 	return append(ids, finishStatusNeed)
 }
 
+// needsReason reports whether status is needs_input or a not-ok result, which must say why.
+func needsReason(results []ResultSpec, status string) bool {
+	if status == finishStatusNeed {
+		return true
+	}
+	for _, r := range resultsOrImplicit(results) {
+		if r.ID == status {
+			return !r.OK
+		}
+	}
+	return false
+}
+
 // finishSchema is finish_step's input schema with status restricted to the run's results.
 func (s *Server) finishSchema(results []ResultSpec) (*jsonschema.Schema, error) {
-	sch := llmprompts.InputSchema[finishArgs](s.prompts, llmprompts.HeadlessToolFinishStep.ID(), map[string]any{
+	sch := llmprompts.RequireNonEmpty(llmprompts.InputSchema[finishArgs](s.prompts, llmprompts.HeadlessToolFinishStep.ID(), map[string]any{
 		"status": llmprompts.StatusVars{Results: FinishVars(resultsOrImplicit(results)).Results},
-	})
+	}), "summary")
 	status := sch.Properties["status"]
 	if status == nil {
 		return nil, errors.New("agentmcp: finish_step schema has no status")
@@ -280,6 +293,9 @@ func (s *Server) finishStep(_ context.Context, req *mcp.CallToolRequest, args fi
 	}
 	if allowed := statusIDs(g.Results); !slices.Contains(allowed, args.Status) {
 		return toolError(fmt.Sprintf("status must be one of: %s", strings.Join(allowed, ", "))), nil, nil
+	}
+	if needsReason(g.Results, args.Status) && strings.TrimSpace(args.Reason) == "" {
+		return toolError(fmt.Sprintf("reason is required when status is %q.", args.Status)), nil, nil
 	}
 	if msg := checkFinish(args); msg != "" {
 		return toolError(msg), nil, nil

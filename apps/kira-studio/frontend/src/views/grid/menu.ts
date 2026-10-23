@@ -14,7 +14,7 @@ import {
   rowsToTsv,
   tsvField,
 } from '../shared/clipboardFormats';
-import { quoteIdent, quoteLiteral, type SqlDialect } from '../shared/sqlIdent';
+import { identNeedsQuoting, quoteIdent, quoteLiteral, type SqlDialect } from '../shared/sqlIdent';
 import { requestCellFocus } from './focusRequest';
 import { usePendingChangesStore } from './pendingChanges';
 import { useGridViewStore } from './state';
@@ -60,13 +60,17 @@ export function qualifiedNameForPath(connectionId: string, path: string): string
     .join('.');
 }
 
+const PLAIN_NUMBER_RE = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
+
 export interface FkNavContext {
   connectionId: string;
   dialect: SqlDialect | undefined;
   rowValues: Record<string, string | null>;
+  /** Source-row columns the page types as numbers: their values go bare into the filter. */
+  numericColumns: ReadonlySet<string>;
 }
 
-// Builds "<refCol> = '<val>' AND ..." for a (possibly composite) FK edge against the
+// Builds "<refCol> = <val> AND ..." for a (possibly composite) FK edge against the
 // *target* table's own columns, sourcing values from this row via the edge's own columns. Shared
 // by both directions (meta.foreignKeys and meta.referencedBy) since both use the same "my
 // columns, their referencedPath/referencedColumns" convention regardless of which populated them.
@@ -80,14 +84,17 @@ export function foreignKeyValueFilter(
   columns: string[],
   referencedColumns: string[],
   rowValues: Record<string, string | null>,
+  numericColumns: ReadonlySet<string>,
 ): string | null {
   const parts: string[] = [];
   for (let i = 0; i < columns.length; i++) {
-    const value = rowValues[columns[i] as string];
+    const source = columns[i] as string;
+    const value = rowValues[source];
     if (value === undefined || value === null) return null;
-    parts.push(
-      `${quoteIdent(dialect, referencedColumns[i] as string)} = ${quoteLiteral(dialect, value)}`,
-    );
+    const ref = referencedColumns[i] as string;
+    const column = identNeedsQuoting(dialect, ref) ? quoteIdent(dialect, ref) : ref;
+    const bare = numericColumns.has(source) && PLAIN_NUMBER_RE.test(value);
+    parts.push(`${column} = ${bare ? value : quoteLiteral(dialect, value)}`);
   }
   return parts.join(' AND ');
 }
@@ -100,6 +107,7 @@ function navigateForeignKey(entry: ForeignKeyMeta, ctx: FkNavContext): void {
     entry.columns,
     entry.referencedColumns,
     ctx.rowValues,
+    ctx.numericColumns,
   );
   if (filter === null) return;
   const opened = useTabsStore().openDataTab(ctx.connectionId, entry.referencedPath, {
@@ -127,6 +135,7 @@ async function editReferencedRow(entry: ForeignKeyMeta, ctx: FkNavContext): Prom
     entry.columns,
     entry.referencedColumns,
     ctx.rowValues,
+    ctx.numericColumns,
   );
   if (filter === null) return;
   const opened = useTabsStore().openDataTab(ctx.connectionId, entry.referencedPath, {
@@ -151,8 +160,13 @@ function fkNavItem(idPrefix: string, entry: ForeignKeyMeta, ctx: FkNavContext): 
         : `${label}.${entry.referencedColumns.join(', ')}`,
     icon: idPrefix === 'go-to-referenced' ? 'arrow-right' : 'references',
     disabled:
-      foreignKeyValueFilter(ctx.dialect, entry.columns, entry.referencedColumns, ctx.rowValues) ===
-      null,
+      foreignKeyValueFilter(
+        ctx.dialect,
+        entry.columns,
+        entry.referencedColumns,
+        ctx.rowValues,
+        ctx.numericColumns,
+      ) === null,
     run: () => navigateForeignKey(entry, ctx),
   };
 }
@@ -181,8 +195,13 @@ function fkEditItem(entry: ForeignKeyMeta, ctx: FkNavContext): MenuItem {
     label: t('studio.grid.menu.editReferenced.label', { table: label }),
     icon: 'edit',
     disabled:
-      foreignKeyValueFilter(ctx.dialect, entry.columns, entry.referencedColumns, ctx.rowValues) ===
-      null,
+      foreignKeyValueFilter(
+        ctx.dialect,
+        entry.columns,
+        entry.referencedColumns,
+        ctx.rowValues,
+        ctx.numericColumns,
+      ) === null,
     run: () => void editReferencedRow(entry, ctx),
   };
 }
@@ -268,6 +287,7 @@ export interface CellMenuContext {
    *  masked or truncated *display* value must not end up as a filter or FK-join literal, where it
    *  would either match nothing (masked/truncated) or describe the wrong row entirely. */
   rowValues: Record<string, string | null>;
+  numericColumns: ReadonlySet<string>;
 }
 
 // D4: Copy / Copy with header / Copy as JSON / Paste / Edit / Set NULL / Filter by this value / Go
@@ -291,6 +311,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
     connectionId: ctx.connectionId,
     dialect: ctx.dialect,
     rowValues: ctx.rowValues,
+    numericColumns: ctx.numericColumns,
   };
   // P7 D4: always-present array, empty sub-arrays disappear on their own — same shape as
   // rowMenu()'s always-present copy-rows submenu below, no extra "anything to show" branch.

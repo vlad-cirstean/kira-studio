@@ -176,7 +176,13 @@ async function onTogglePreview(): Promise<void> {
 
 async function onGenerate(): Promise<void> {
   const active = tab.value;
-  if (!active?.connectionId || running.value || noUsableColumns.value) return;
+  if (
+    !active?.connectionId ||
+    running.value ||
+    noUsableColumns.value ||
+    gridViewStore.isStale(active.id)
+  )
+    return;
   runError.value = null;
   committedRows.value = 0;
   await runGenerate({ connectionId: active.connectionId, path: active.path, id: active.id });
@@ -437,7 +443,7 @@ function onSequenceStartChange(index: number, start: number): void {
             variant="dialog-primary"
             size="kira-lg"
             data-testid="generate-data-submit"
-            :disabled="rowCount < 1 || noUsableColumns"
+            :disabled="rowCount < 1 || noUsableColumns || (!!tabId && gridViewStore.isStale(tabId))"
             @click="onGenerate"
           >
             {{ t('studio.generateData.submit.label') }}

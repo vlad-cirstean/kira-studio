@@ -1,5 +1,5 @@
 import { t } from '@theme/i18n';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import type { StreamTabRecord } from '../../state/tabDomain';
 import { getPage, pageVersion, streamRow } from './page';
@@ -39,8 +39,22 @@ export function useStreamGate(tab: () => StreamTabRecord) {
   // The UI reads Caps, not connection.kind, to decide what to offer; kind only picks wording.
   const isKafka = computed(() => connRecord.value?.kind === 'kafka');
   // Caps are static per adapter; the connection's read-only flag narrows them here.
-  const canInsert = computed(() => (caps.value?.canInsert ?? false) && !connRecord.value?.readOnly);
-  const canDelete = computed(() => (caps.value?.canDelete ?? false) && !connRecord.value?.readOnly);
+  // Shown page outlived its connection: kept, read-only, behind StaleDataStrip.
+  const stale = computed(() => streamViewStore.isStale(tab().id));
+  // Caps clear on disconnect; the last live ones keep Send/Delete visible (disabled) behind the strip.
+  const lastCaps = ref(caps.value);
+  watch(caps, (c) => {
+    if (c) lastCaps.value = c;
+  });
+  const shownCaps = computed(() => caps.value ?? lastCaps.value);
+  const canInsertCaps = computed(
+    () => (shownCaps.value?.canInsert ?? false) && !connRecord.value?.readOnly,
+  );
+  const canDeleteCaps = computed(
+    () => (shownCaps.value?.canDelete ?? false) && !connRecord.value?.readOnly,
+  );
+  const canInsert = computed(() => canInsertCaps.value && !stale.value);
+  const canDelete = computed(() => canDeleteCaps.value && !stale.value);
   const isReadOnlyBatch = computed(() => isBatch.value && (connRecord.value?.readOnly ?? false));
 
   const redriveLimit = computed(() => page.value?.maxReceiveCount ?? null);
@@ -59,6 +73,9 @@ export function useStreamGate(tab: () => StreamTabRecord) {
     page,
     isBatch,
     isKafka,
+    stale,
+    canInsertCaps,
+    canDeleteCaps,
     canInsert,
     canDelete,
     isReadOnlyBatch,

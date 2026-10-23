@@ -16,6 +16,7 @@ import type { CellFormat } from './formats';
 // stageEdit would refuse (silently, for a pending delete) the exact same write.
 export type ReadOnlyReason =
   | 'masked'
+  | 'connection-lost'
   | 'connection-read-only'
   | 'value-truncated'
   | 'generated-column'
@@ -47,6 +48,7 @@ export const useCellEditorFormatStore = defineStore('cellEditorFormat', () => {
    *  cell is genuinely editable in the grid (P5 D2) — the panel itself stays read-only regardless
    *  (D4), but no chip is shown for it. */
   function readOnlyReasonFor(cell: SelectedCell): ReadOnlyReason | null {
+    if (cell.stale) return 'connection-lost';
     if (cell.masked) return 'masked';
     const record = useConnectionsStore().connectionRecord(cell.connectionId);
     if (record?.readOnly) return 'connection-read-only';

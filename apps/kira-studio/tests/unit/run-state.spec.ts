@@ -31,6 +31,7 @@ function record(partial: Partial<OpRecord> & Pick<OpRecord, 'id' | 'tabId' | 'st
     rows: null,
     command: null,
     error: null,
+    source: 'user',
     ...partial,
   };
 }

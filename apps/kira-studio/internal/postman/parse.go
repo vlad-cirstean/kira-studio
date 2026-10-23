@@ -36,6 +36,15 @@ const maxCollectionBytes = 64 << 20
 // "not a JSON object with an info block", and D10's version gate — everything else degrades and
 // is reported.
 func Parse(r io.Reader) (*Tree, error) {
+	doc, err := readDocument(r)
+	if err != nil {
+		return nil, err
+	}
+	return parseCollection(doc)
+}
+
+// readDocument reads one bounded JSON object, the shared first step of Parse and ParseFile.
+func readDocument(r io.Reader) (map[string]json.RawMessage, error) {
 	limited := io.LimitReader(r, maxCollectionBytes+1)
 	data, err := io.ReadAll(limited)
 	if err != nil {
@@ -48,6 +57,10 @@ func Parse(r io.Reader) (*Tree, error) {
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("postman: not a JSON object: %w", err)
 	}
+	return doc, nil
+}
+
+func parseCollection(doc map[string]json.RawMessage) (*Tree, error) {
 	info := decodeObject(doc["info"])
 	if info == nil {
 		return nil, fmt.Errorf("postman: not a Postman collection: no info block")

@@ -13,14 +13,6 @@ export interface CellClassFlags {
   isNull?: boolean;
   /** Part of the current selection (single cell, range, row, or column). */
   selected?: boolean;
-  /** This edge sits on the selection's own outer perimeter — the neighbour in that
-   *  direction isn't selected, or there isn't one. Four independent flags, since a selection is
-   *  a rectangle (or, for a row/column selection, effectively one): only its outer boundary gets
-   *  a border, never a seam shared with a selected neighbour (the doubled-border bug). */
-  selEdgeTop?: boolean;
-  selEdgeRight?: boolean;
-  selEdgeBottom?: boolean;
-  selEdgeLeft?: boolean;
   /** Matched by an in-progress search, but not the current match. */
   searchMatch?: boolean;
   /** The current (focused) search match. */
@@ -37,10 +29,6 @@ const FLAG_CLASS_NAMES: { [K in keyof CellClassFlags]-?: string } = {
   alignRight: 'align-right',
   isNull: 'null',
   selected: 'selected',
-  selEdgeTop: 'sel-t',
-  selEdgeRight: 'sel-r',
-  selEdgeBottom: 'sel-b',
-  selEdgeLeft: 'sel-l',
   searchMatch: 'search-match',
   searchMatchCurrent: 'search-match-current',
   pendingEdit: 'pending-edit',
@@ -59,9 +47,7 @@ function cellClass(flags: CellClassFlags): Record<string, boolean> {
 
 /** {@link cellClass}'s own keys, as a plain array — the shape `setCellCssStyles` (a lone class
  *  name per keyed layer, never a `:class` object) and a search/pending-edit one-off classname
- *  lookup both want. Shared by views/grid/SlickGridHost.vue's own search/pending-edit hashes and
- *  views/shared/slick/selectionEdges.ts's perimeter computation — one definition rather
- *  than two identical two-line copies. */
+ *  lookup both want. */
 export function classesFrom(flags: CellClassFlags): string[] {
   return Object.keys(cellClass(flags));
 }

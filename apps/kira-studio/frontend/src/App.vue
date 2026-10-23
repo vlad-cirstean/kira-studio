@@ -103,6 +103,7 @@ function closeActiveTab(): void {
 
 onMounted(() => {
   unsubscribe = [
+    control.onCheckForUpdates(() => void appUpdateStore.checkForUpdates()),
     control.onOpenSettings(() => {
       settingsStore.settingsOpen = true;
     }),
@@ -115,7 +116,7 @@ onMounted(() => {
     }),
     control.onImportPostman(() => {
       modeStore.setMode('api');
-      void collectionsStore.importCollection();
+      void collectionsStore.importPostman();
     }),
     control.onImportDataGrip(() => {
       modeStore.setMode('studio');

@@ -44,7 +44,10 @@ type fakeBackend struct {
 	// disconnectGate, when non-nil, blocks Disconnect until closed: a real adapter's slow teardown.
 	disconnectGate chan struct{}
 	throttleCalls  []throttleCall
+	connectCtxVal  any
 }
+
+type ctxKey struct{}
 
 type throttleCall struct {
 	connectionID string
@@ -58,6 +61,7 @@ func newFakeBackend() *fakeBackend {
 func (b *fakeBackend) Connect(ctx context.Context, cfg model.ResolvedConnectionConfig) (connections.ConnectResult, error) {
 	b.mu.Lock()
 	b.lastConfig = cfg
+	b.connectCtxVal = ctx.Value(ctxKey{})
 	b.mu.Unlock()
 	n := b.connectN.Add(1)
 	switch cfg.Name {
@@ -559,6 +563,26 @@ func TestRemoveWhileConnectingAbortsTheInFlightAttemptAndLeavesNoStateEntry(t *t
 // TestConnectAfterDisconnectStartsFreshAttempt is P168 Part 2 F4: a Connect arriving while a
 // cancelled attempt is still unwinding must not join it and return its stale "disconnected"; and
 // Disconnect must not return before that attempt finished.
+func TestConnectContextCarriesValuesButNotCancellation(t *testing.T) {
+	h := newHarness(t)
+	created := mustCreate(t, h.svc, fieldsInput("ctx-conn"))
+
+	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), ctxKey{}, "mcp"))
+	cancel()
+	state, err := h.svc.ConnectContext(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("ConnectContext: %v", err)
+	}
+	if state.Status != "connected" {
+		t.Fatalf("status = %q, want connected despite a cancelled caller ctx", state.Status)
+	}
+	h.backend.mu.Lock()
+	defer h.backend.mu.Unlock()
+	if h.backend.connectCtxVal != "mcp" {
+		t.Fatalf("backend ctx value = %v, want mcp", h.backend.connectCtxVal)
+	}
+}
+
 func TestConnectAfterDisconnectStartsFreshAttempt(t *testing.T) {
 	h := newHarness(t)
 	created := mustCreate(t, h.svc, fieldsInput("stubborn-conn"))

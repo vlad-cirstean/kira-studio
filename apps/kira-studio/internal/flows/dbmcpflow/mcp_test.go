@@ -108,7 +108,7 @@ func text(res *mcp.CallToolResult) string {
 
 func runQuery(t *testing.T, sess *mcp.ClientSession, connID, sqlText string) *mcp.CallToolResult {
 	t.Helper()
-	res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"connectionId": connID, "sql": sqlText}})
+	res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"connectionId": connID, "sql": sqlText, "path": ""}})
 	if err != nil {
 		t.Fatalf("run_query %q: %v", sqlText, err)
 	}
@@ -154,6 +154,10 @@ func TestDbMcpApprovalFlow(t *testing.T) {
 	if read := runQuery(t, sess, f.connID, "select body from notes order by id"); read.IsError || !strings.Contains(text(read), "two") {
 		t.Fatalf("read run_query = %q, want rows without approval", text(read))
 	}
+	noPath, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"connectionId": f.connID, "sql": "select 1"}})
+	if err != nil || !noPath.IsError || !strings.Contains(text(noPath), "missing properties") || !strings.Contains(text(noPath), `"path"`) {
+		t.Fatalf("run_query without path = %q (%v), want a schema rejection naming path", text(noPath), err)
+	}
 	if snap := f.app.W.DbMcp.PendingApprovals(); snap.Pending != nil {
 		t.Fatalf("a read queued an approval: %+v", snap)
 	}
@@ -166,7 +170,7 @@ func TestDbMcpApprovalFlow(t *testing.T) {
 	call := func() chan outcome {
 		ch := make(chan outcome, 1)
 		go func() {
-			res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"connectionId": f.connID, "sql": write}})
+			res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"connectionId": f.connID, "sql": write, "path": ""}})
 			ch <- outcome{res, err}
 		}()
 		return ch
@@ -245,6 +249,48 @@ func noClaude(t *testing.T) harness.MCPInstaller {
 			return nil
 		},
 	})
+}
+
+// P328: an op records who started it. run_query over MCP is "mcp"; a tree call through the
+// bridge is "user".
+func TestDbMcpOpsCarrySource(t *testing.T) {
+	f := newFixture(t)
+	sess, err := f.connect(t, f.token(t))
+	if err != nil {
+		t.Fatalf("connect with the helper token: %v", err)
+	}
+	defer sess.Close()
+
+	if res := runQuery(t, sess, f.connID, "select body from notes order by id"); res.IsError {
+		t.Fatalf("run_query = %q", text(res))
+	}
+	if _, err := f.app.W.Tree.Children(bridge.TreeChildrenArgs{ConnectionID: f.connID, Path: "", Refresh: true}); err != nil {
+		t.Fatalf("Tree.Children: %v", err)
+	}
+
+	var rows []model.OpRecord
+	testx.WaitUntil(t, 10*time.Second, func() bool {
+		recent, err := f.app.W.Ops.Recent(bridge.OpsRecentArgs{Limit: 50})
+		if err != nil {
+			t.Fatalf("Ops.Recent: %v", err)
+		}
+		rows = rows[:0]
+		for _, r := range recent {
+			if (r.Kind == "execute" || r.Kind == "children") && r.Status != "running" {
+				rows = append(rows, r)
+			}
+		}
+		return len(rows) == 2
+	})
+	bySource := map[string]string{}
+	for _, r := range rows {
+		bySource[r.Kind] = r.Source
+	}
+	if bySource["execute"] != "mcp" || bySource["children"] != "user" {
+		t.Fatalf("op sources = %v, want execute=mcp children=user", bySource)
+	}
+	// Contract ops-source: tests/ui/operations.spec.ts renders these rows' source column.
+	f.app.Contract(t, "ops-source", "OpsService.Recent", rows, flowharness.Mask("id", "startedAt", "durationMs", "connectionId"))
 }
 
 func TestInstallAgentWithoutCli(t *testing.T) {

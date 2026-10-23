@@ -166,8 +166,16 @@ func TestDefaultBounds(t *testing.T) {
 func TestOptions_CustomTitleBarPosture(t *testing.T) {
 	opts := shell.Options(shell.Harden(), shell.WindowRecord{Key: "main"}, nil, shell.Config{WindowTitle: "Shell Test"})
 
-	if opts.Mac.TitleBar != application.MacTitleBarHidden {
-		t.Errorf("Mac.TitleBar = %+v, want MacTitleBarHidden", opts.Mac.TitleBar)
+	wantTitleBar := application.MacTitleBar{
+		AppearsTransparent:   true,
+		HideTitle:            true,
+		FullSizeContent:      true,
+		UseToolbar:           true,
+		HideToolbarSeparator: true,
+		ToolbarStyle:         application.MacToolbarStyleUnifiedCompact,
+	}
+	if opts.Mac.TitleBar != wantTitleBar {
+		t.Errorf("Mac.TitleBar = %+v, want %+v", opts.Mac.TitleBar, wantTitleBar)
 	}
 	if opts.Frameless {
 		t.Error("Frameless = true, want false — Frameless hides the macOS traffic lights (F2)")

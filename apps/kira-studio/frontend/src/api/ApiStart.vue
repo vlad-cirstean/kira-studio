@@ -19,7 +19,7 @@ const importCurlStore = useImportCurlStore();
 // an existing collection is the other thing someone arriving here wants to do. The primary
 // button's `new-request-start` testid is untouched — two existing specs click it.
 function onImport(): void {
-  void collectionsStore.importCollection();
+  void collectionsStore.importPostman();
 }
 
 // P7 D12: a third front-door button — pasting a curl command is the other common way someone

@@ -176,7 +176,7 @@ func TestSchemaMismatchDropsRow(t *testing.T) {
 		t.Fatalf("seed bad row: %v", err)
 	}
 
-	result, err := h.svc.Children("c1", path, false)
+	result, err := h.svc.Children(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("Children: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestTruncatedRefreshDropsOlderCompleteRow(t *testing.T) {
 		t.Fatalf("seed complete row: %v", err)
 	}
 
-	if _, err := h.svc.Children("c1", path, true); err != nil {
+	if _, err := h.svc.Children(context.Background(), "c1", path, true); err != nil {
 		t.Fatalf("Children (truncated refresh): %v", err)
 	}
 	if got, _, _ := h.repos.Metadata.Get("c1", path, "children"); got != nil {
@@ -213,7 +213,7 @@ func TestTruncatedRefreshDropsOlderCompleteRow(t *testing.T) {
 
 	// The next ordinary (non-refresh) load must go to the server, not serve the dropped row.
 	before := requestCount(t, h, "adapter:children")
-	if _, err := h.svc.Children("c1", path, false); err != nil {
+	if _, err := h.svc.Children(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("Children (post-drop): %v", err)
 	}
 	if requestCount(t, h, "adapter:children") != before+1 {
@@ -230,7 +230,7 @@ func TestSchemaColumnsMissThenCacheHit(t *testing.T) {
 	h.seedConnection(t, "c1", "Conn One")
 	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}, {Kind: "schema", Name: "s1"}})
 
-	result, err := h.svc.SchemaColumns("c1", path, false)
+	result, err := h.svc.SchemaColumns(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("SchemaColumns: %v", err)
 	}
@@ -241,7 +241,7 @@ func TestSchemaColumnsMissThenCacheHit(t *testing.T) {
 		t.Fatalf("backend calls after first load = %d, want 1", got)
 	}
 
-	result, err = h.svc.SchemaColumns("c1", path, false)
+	result, err = h.svc.SchemaColumns(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("SchemaColumns (cached): %v", err)
 	}
@@ -258,13 +258,13 @@ func TestSchemaColumnsCacheHitNeedsNoConnection(t *testing.T) {
 	h.seedConnection(t, "c1", "Conn One")
 	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
 
-	if _, err := h.svc.SchemaColumns("c1", path, false); err != nil {
+	if _, err := h.svc.SchemaColumns(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("warm the cache: %v", err)
 	}
 
 	// F7's own property: a cache hit is served before the connection is even checked.
 	h.fake.status["c1"] = "disconnected"
-	result, err := h.svc.SchemaColumns("c1", path, false)
+	result, err := h.svc.SchemaColumns(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("SchemaColumns while disconnected: %v", err)
 	}
@@ -278,10 +278,10 @@ func TestSchemaColumnsRefreshBypassesCache(t *testing.T) {
 	h.seedConnection(t, "c1", "Conn One")
 	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
 
-	if _, err := h.svc.SchemaColumns("c1", path, false); err != nil {
+	if _, err := h.svc.SchemaColumns(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("warm the cache: %v", err)
 	}
-	result, err := h.svc.SchemaColumns("c1", path, true)
+	result, err := h.svc.SchemaColumns(context.Background(), "c1", path, true)
 	if err != nil {
 		t.Fatalf("SchemaColumns (refresh): %v", err)
 	}
@@ -302,7 +302,7 @@ func TestSchemaColumnsInvalidPayloadDroppedAndRefetched(t *testing.T) {
 		t.Fatalf("seed bad row: %v", err)
 	}
 
-	result, err := h.svc.SchemaColumns("c1", path, false)
+	result, err := h.svc.SchemaColumns(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("SchemaColumns: %v", err)
 	}
@@ -319,13 +319,13 @@ func TestSchemaColumnsInvalidateClears(t *testing.T) {
 	h.seedConnection(t, "c1", "Conn One")
 	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
 
-	if _, err := h.svc.SchemaColumns("c1", path, false); err != nil {
+	if _, err := h.svc.SchemaColumns(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("warm the cache: %v", err)
 	}
 	if err := h.svc.Invalidate("c1", nil); err != nil {
 		t.Fatalf("Invalidate: %v", err)
 	}
-	result, err := h.svc.SchemaColumns("c1", path, false)
+	result, err := h.svc.SchemaColumns(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("SchemaColumns (post-invalidate): %v", err)
 	}
@@ -343,10 +343,10 @@ func TestChildrenAndSchemaColumnsShareOneRow(t *testing.T) {
 	h.seedConnection(t, "c1", "Conn One")
 	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
 
-	if _, err := h.svc.Children("c1", path, false); err != nil {
+	if _, err := h.svc.Children(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("Children: %v", err)
 	}
-	if _, err := h.svc.SchemaColumns("c1", path, false); err != nil {
+	if _, err := h.svc.SchemaColumns(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("SchemaColumns: %v", err)
 	}
 
@@ -361,14 +361,14 @@ func TestChildrenAndSchemaColumnsShareOneRow(t *testing.T) {
 	}
 
 	// Both kinds must still read back correctly out of that one shared row.
-	childrenResult, err := h.svc.Children("c1", path, false)
+	childrenResult, err := h.svc.Children(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("Children (after sharing the row): %v", err)
 	}
 	if childrenResult.Source != "cache" {
 		t.Errorf("Children Source = %q, want cache", childrenResult.Source)
 	}
-	columnsResult, err := h.svc.SchemaColumns("c1", path, false)
+	columnsResult, err := h.svc.SchemaColumns(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("SchemaColumns (after sharing the row): %v", err)
 	}
@@ -390,7 +390,7 @@ func TestFreshCacheHitIsServedWhileConnected(t *testing.T) {
 	h.seedConnection(t, "c1", "Conn One")
 	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
 
-	result, err := h.svc.Children("c1", path, false)
+	result, err := h.svc.Children(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("Children (miss): %v", err)
 	}
@@ -401,7 +401,7 @@ func TestFreshCacheHitIsServedWhileConnected(t *testing.T) {
 		t.Fatalf("backend calls after first load = %d, want 1", got)
 	}
 
-	result, err = h.svc.Children("c1", path, false)
+	result, err = h.svc.Children(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("Children (cached): %v", err)
 	}
@@ -421,14 +421,14 @@ func TestPayloadOlderThanTheConnectionIsRefetched(t *testing.T) {
 	h.seedConnection(t, "c1", "Conn One")
 	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
 
-	if _, err := h.svc.Children("c1", path, false); err != nil {
+	if _, err := h.svc.Children(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("seed payload: %v", err)
 	}
 	before := requestCount(t, h, "adapter:children")
 
 	h.advanceSince(t, "c1") // the connection is (re-)established after the payload above was written
 
-	result, err := h.svc.Children("c1", path, false)
+	result, err := h.svc.Children(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("Children: %v", err)
 	}
@@ -448,13 +448,13 @@ func TestRefetchRewritesFreshnessAndTheNextReadHits(t *testing.T) {
 	h.seedConnection(t, "c1", "Conn One")
 	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
 
-	if _, err := h.svc.Children("c1", path, false); err != nil {
+	if _, err := h.svc.Children(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("seed payload: %v", err)
 	}
 	h.advanceSince(t, "c1")
 	before := requestCount(t, h, "adapter:children")
 
-	result, err := h.svc.Children("c1", path, false)
+	result, err := h.svc.Children(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("Children (stale, re-fetches): %v", err)
 	}
@@ -465,7 +465,7 @@ func TestRefetchRewritesFreshnessAndTheNextReadHits(t *testing.T) {
 		t.Fatalf("backend calls after re-fetch = %d, want %d", got, before+1)
 	}
 
-	result, err = h.svc.Children("c1", path, false)
+	result, err = h.svc.Children(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("Children (should be fresh now): %v", err)
 	}
@@ -485,14 +485,14 @@ func TestStalePayloadIsStillServedWhileDisconnected(t *testing.T) {
 	h.seedConnection(t, "c1", "Conn One")
 	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
 
-	if _, err := h.svc.Children("c1", path, false); err != nil {
+	if _, err := h.svc.Children(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("seed payload: %v", err)
 	}
 	h.advanceSince(t, "c1") // would make it stale if anything were still connected
 
 	h.fake.status["c1"] = "disconnected"
 	before := requestCount(t, h, "adapter:children")
-	result, err := h.svc.Children("c1", path, false)
+	result, err := h.svc.Children(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("Children while disconnected: %v", err)
 	}
@@ -512,13 +512,13 @@ func TestStalePayloadIsNotDropped(t *testing.T) {
 	h.seedConnection(t, "c1", "Conn One")
 	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
 
-	if _, err := h.svc.Children("c1", path, false); err != nil {
+	if _, err := h.svc.Children(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("seed payload: %v", err)
 	}
 	h.advanceSince(t, "c1")
 
 	h.backend.childrenErr = errors.New("boom")
-	if _, err := h.svc.Children("c1", path, false); err == nil {
+	if _, err := h.svc.Children(context.Background(), "c1", path, false); err == nil {
 		t.Fatal("Children: want an error from the failing backend, got nil")
 	}
 	h.backend.childrenErr = nil
@@ -541,10 +541,10 @@ func TestRefreshingOneKindDoesNotFreshenAnother(t *testing.T) {
 	h.seedConnection(t, "c1", "Conn One")
 	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
 
-	if _, err := h.svc.Children("c1", path, false); err != nil {
+	if _, err := h.svc.Children(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("seed children: %v", err)
 	}
-	if _, err := h.svc.SchemaColumns("c1", path, false); err != nil {
+	if _, err := h.svc.SchemaColumns(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("seed columns: %v", err)
 	}
 	h.advanceSince(t, "c1") // both kinds are now stale, sharing one row
@@ -552,7 +552,7 @@ func TestRefreshingOneKindDoesNotFreshenAnother(t *testing.T) {
 	childrenBefore := requestCount(t, h, "adapter:children")
 	columnsBefore := requestCount(t, h, "adapter:schemaColumns")
 
-	result, err := h.svc.Children("c1", path, false)
+	result, err := h.svc.Children(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("Children: %v", err)
 	}
@@ -565,7 +565,7 @@ func TestRefreshingOneKindDoesNotFreshenAnother(t *testing.T) {
 
 	// columns must STILL read as stale — a row-level fetched_at would have been stamped by the
 	// children write above (same row) and wrongly made this look freshly fetched too.
-	colResult, err := h.svc.SchemaColumns("c1", path, false)
+	colResult, err := h.svc.SchemaColumns(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("SchemaColumns: %v", err)
 	}
@@ -597,7 +597,7 @@ func TestPreP24RowIsStaleWhenConnectedAndServedWhenNot(t *testing.T) {
 	// Disconnected: served regardless of the missing fetchedAt (D5 — no floor at all).
 	h.fake.status["c1"] = "disconnected"
 	before := requestCount(t, h, "adapter:children")
-	result, err := h.svc.Children("c1", path, false)
+	result, err := h.svc.Children(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("Children while disconnected: %v", err)
 	}
@@ -612,7 +612,7 @@ func TestPreP24RowIsStaleWhenConnectedAndServedWhenNot(t *testing.T) {
 	// against any real epoch.
 	h.fake.status["c1"] = "connected"
 	h.fake.since["c1"] = time.Now().UnixMilli()
-	result, err = h.svc.Children("c1", path, false)
+	result, err = h.svc.Children(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("Children while connected: %v", err)
 	}
@@ -631,16 +631,16 @@ func TestInvalidateDropsEveryKindOnTheRow(t *testing.T) {
 	h.seedConnection(t, "c1", "Conn One")
 	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
 
-	if _, err := h.svc.Children("c1", path, false); err != nil {
+	if _, err := h.svc.Children(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("seed children: %v", err)
 	}
-	if _, err := h.svc.Describe("c1", path, false, nil); err != nil {
+	if _, err := h.svc.Describe(context.Background(), "c1", path, false, nil); err != nil {
 		t.Fatalf("seed describe: %v", err)
 	}
-	if _, err := h.svc.Definition("c1", path, false, nil); err != nil {
+	if _, err := h.svc.Definition(context.Background(), "c1", path, false, nil); err != nil {
 		t.Fatalf("seed definition: %v", err)
 	}
-	if _, err := h.svc.SchemaColumns("c1", path, false); err != nil {
+	if _, err := h.svc.SchemaColumns(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("seed columns: %v", err)
 	}
 
@@ -648,28 +648,28 @@ func TestInvalidateDropsEveryKindOnTheRow(t *testing.T) {
 		t.Fatalf("Invalidate: %v", err)
 	}
 
-	childrenResult, err := h.svc.Children("c1", path, false)
+	childrenResult, err := h.svc.Children(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("Children (post-invalidate): %v", err)
 	}
 	if childrenResult.Source != "server" {
 		t.Errorf("children Source = %q, want server after Invalidate", childrenResult.Source)
 	}
-	describeResult, err := h.svc.Describe("c1", path, false, nil)
+	describeResult, err := h.svc.Describe(context.Background(), "c1", path, false, nil)
 	if err != nil {
 		t.Fatalf("Describe (post-invalidate): %v", err)
 	}
 	if describeResult.Source != "server" {
 		t.Errorf("describe Source = %q, want server after Invalidate", describeResult.Source)
 	}
-	definitionResult, err := h.svc.Definition("c1", path, false, nil)
+	definitionResult, err := h.svc.Definition(context.Background(), "c1", path, false, nil)
 	if err != nil {
 		t.Fatalf("Definition (post-invalidate): %v", err)
 	}
 	if definitionResult.Source != "server" {
 		t.Errorf("definition Source = %q, want server after Invalidate", definitionResult.Source)
 	}
-	columnsResult, err := h.svc.SchemaColumns("c1", path, false)
+	columnsResult, err := h.svc.SchemaColumns(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("SchemaColumns (post-invalidate): %v", err)
 	}
@@ -687,13 +687,13 @@ func TestInvalidateConnectionDropsEveryPath(t *testing.T) {
 	path1 := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
 	path2 := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "other"}})
 
-	if _, err := h.svc.Children("c1", path1, false); err != nil {
+	if _, err := h.svc.Children(context.Background(), "c1", path1, false); err != nil {
 		t.Fatalf("seed c1/path1: %v", err)
 	}
-	if _, err := h.svc.Children("c1", path2, false); err != nil {
+	if _, err := h.svc.Children(context.Background(), "c1", path2, false); err != nil {
 		t.Fatalf("seed c1/path2: %v", err)
 	}
-	if _, err := h.svc.Children("c2", path1, false); err != nil {
+	if _, err := h.svc.Children(context.Background(), "c2", path1, false); err != nil {
 		t.Fatalf("seed c2/path1: %v", err)
 	}
 
@@ -701,14 +701,14 @@ func TestInvalidateConnectionDropsEveryPath(t *testing.T) {
 		t.Fatalf("Invalidate: %v", err)
 	}
 
-	r1, err := h.svc.Children("c1", path1, false)
+	r1, err := h.svc.Children(context.Background(), "c1", path1, false)
 	if err != nil {
 		t.Fatalf("Children c1/path1 (post-invalidate): %v", err)
 	}
 	if r1.Source != "server" {
 		t.Errorf("c1/path1 Source = %q, want server after connection-wide Invalidate", r1.Source)
 	}
-	r2, err := h.svc.Children("c1", path2, false)
+	r2, err := h.svc.Children(context.Background(), "c1", path2, false)
 	if err != nil {
 		t.Fatalf("Children c1/path2 (post-invalidate): %v", err)
 	}
@@ -717,7 +717,7 @@ func TestInvalidateConnectionDropsEveryPath(t *testing.T) {
 	}
 
 	before := requestCount(t, h, "adapter:children")
-	r3, err := h.svc.Children("c2", path1, false)
+	r3, err := h.svc.Children(context.Background(), "c2", path1, false)
 	if err != nil {
 		t.Fatalf("Children c2/path1 (should be untouched): %v", err)
 	}
@@ -743,7 +743,7 @@ func TestFetchRacingAReconnectIsNotCachedAsFresh(t *testing.T) {
 	// Simulates a reconnect landing while this fetch's own backend call is still in flight — the
 	// epoch changes after Children captured it but before Children returns.
 	h.backend.childrenMidFlight = func() { h.advanceSince(t, "c1") }
-	result, err := h.svc.Children("c1", path, false)
+	result, err := h.svc.Children(context.Background(), "c1", path, false)
 	if err != nil {
 		t.Fatalf("Children (racing a reconnect): %v", err)
 	}
@@ -760,7 +760,7 @@ func TestFetchRacingAReconnectIsNotCachedAsFresh(t *testing.T) {
 	// still go to the server — a cache hit here would mean the race's own stale result got served
 	// back as fresh.
 	before := requestCount(t, h, "adapter:children")
-	if _, err := h.svc.Children("c1", path, false); err != nil {
+	if _, err := h.svc.Children(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("Children (post-race): %v", err)
 	}
 	if got := requestCount(t, h, "adapter:children"); got != before+1 {
@@ -776,12 +776,12 @@ func TestExplicitRefreshBeatsAFreshPayload(t *testing.T) {
 	h.seedConnection(t, "c1", "Conn One")
 	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
 
-	if _, err := h.svc.Children("c1", path, false); err != nil {
+	if _, err := h.svc.Children(context.Background(), "c1", path, false); err != nil {
 		t.Fatalf("seed payload: %v", err)
 	}
 	before := requestCount(t, h, "adapter:children")
 
-	result, err := h.svc.Children("c1", path, true)
+	result, err := h.svc.Children(context.Background(), "c1", path, true)
 	if err != nil {
 		t.Fatalf("Children (refresh): %v", err)
 	}

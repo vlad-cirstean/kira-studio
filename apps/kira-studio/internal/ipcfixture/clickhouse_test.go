@@ -51,7 +51,7 @@ func TestFixture_ClickHouse(t *testing.T) {
 
 	dbChildren := rec.TreeChildren(t, cfg.ID, dbNode.Path, false)
 	frozenNodes := FreezeInnerIDNode(dbChildren.Nodes, dbNode.Path)
-	frozenNodes = FreezeNodeDetail(frozenNodes, "big_rows", "~1M rows")
+	frozenNodes = FreezeNodeDetail(frozenNodes, "big_rows", "~1M")
 	rec.OverrideLastControlResponse(tree.ChildrenResult{
 		Nodes: frozenNodes, Source: dbChildren.Source, Truncated: dbChildren.Truncated,
 	})

@@ -11,7 +11,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { colorMarkClass, connTextClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
-import { formatBytes } from '@workbench/behaviour/format';
 import { useListNavigation } from '@workbench/behaviour/listNavigation';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { errorText } from '@workbench/bridge/codedError';
@@ -32,9 +31,9 @@ import { type DocumentRowView, useDocumentRowsStore } from '../shared/document/r
 import SearchFilterNotice from '../shared/page/SearchFilterNotice.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { setVisibleRows } from '../shared/page/visibleRows';
+import StaleDataStrip from '../shared/StaleDataStrip.vue';
 import { ancestorPathPrefix } from '../shared/targetPath';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
-import { writeDisabledReason } from '../shared/writeGate';
 import DocumentEditor from './DocumentEditor.vue';
 import DocumentFilterRow from './DocumentFilterRow.vue';
 import DocumentToolbar from './DocumentToolbar.vue';
@@ -45,6 +44,7 @@ import RowActionButton from './RowActionButton.vue';
 import { type Match, matchedRows, pageSearchApi } from './search';
 import { useDocumentViewStore } from './state';
 import { useDocumentEdit } from './useDocumentEdit';
+import { useDocumentGate } from './useDocumentGate';
 import { useDocumentSearchMatches } from './useDocumentSearchMatches';
 import { useRowTip } from './useRowTip';
 
@@ -58,7 +58,7 @@ const props = defineProps<{ tab: DocumentTabRecord }>();
 
 documentRowsStore.registerDocumentRows(props.tab.id, (row) => documentRow(props.tab.id, row));
 
-const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
+const { needsReconnect, reconnecting, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
   () => documentViewStore.load(props.tab.id),
 );
@@ -66,52 +66,20 @@ const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
 const rt = computed(() => documentViewStore.runtime[props.tab.id]);
 const _running = computed(() => rt.value?.status === 'loading');
 
-const caps = computed(() => {
-  const connectionId = props.tab.connectionId;
-  return connectionId ? (connectionsStore.states[connectionId]?.caps ?? null) : null;
-});
-
-const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
-const canInsert = computed(() => !!caps.value?.canInsert && !connRecord.value?.readOnly);
-const canDelete = computed(() => !!caps.value?.canDelete && !connRecord.value?.readOnly);
-const insertTitle = computed(() =>
-  canInsert.value ? t('studio.documents.add.label') : writeDisabledReason(caps.value?.canInsert),
-);
-const deleteTitle = computed(() =>
-  canDelete.value ? t('common.action.delete.label') : writeDisabledReason(caps.value?.canDelete),
-);
+const {
+  caps,
+  connRecord,
+  stale,
+  hasPage,
+  saveDisabledReason,
+  canInsert,
+  canDelete,
+  insertTitle,
+  deleteTitle,
+  editGateFor,
+} = useDocumentGate(() => props.tab);
 
 const targetTail = computed(() => pathTail(props.tab.path));
-
-// Task: mutate.ts's update op is a whole-document replaceOne({_id}, body) — when a projection is
-// active the fetched (and therefore edited) body holds only the projected fields, so committing
-// it would silently drop every field the projection hid. Editing is refused outright rather than
-// attempting a partial merge, since "which fields the user meant to keep" isn't recoverable from
-// a projected body alone; the fix is clearing the projection first.
-// A truncated body is a prefix of the document: a hand-closed buffer would replace the whole
-// document with it, so truncated rows are never editable.
-function editGateFor(row: number): { editable: boolean; label: string } {
-  if (!caps.value?.canUpdate) {
-    return { editable: false, label: t('studio.documents.gate.noUpdate.tooltip') };
-  }
-  if (connRecord.value?.readOnly) {
-    return { editable: false, label: t('studio.common.connectionReadOnly.tooltip') };
-  }
-  void pageVersion.n;
-  if (documentRow(props.tab.id, row)?.isTruncated) {
-    return {
-      editable: false,
-      label: t('studio.documents.gate.truncated.tooltip', { size: formatBytes(64 * 1024) }),
-    };
-  }
-  if (props.tab.state.projection !== null) {
-    return {
-      editable: false,
-      label: t('studio.documents.gate.projection.tooltip'),
-    };
-  }
-  return { editable: true, label: t('common.action.edit.label') };
-}
 
 const connectionColor = computed(
   () => connectionsStore.connectionRecord(props.tab.connectionId)?.color,
@@ -141,6 +109,7 @@ const {
 } = useDocumentEdit(
   () => props.tab.id,
   (row) => editGateFor(row).editable,
+  () => stale.value,
 );
 const { isSearchMatch, isCurrentSearchMatch, previewSegments } = useDocumentSearchMatches(
   () => props.tab.id,
@@ -308,6 +277,10 @@ function onRowContextMenu(e: MouseEvent, row: number): void {
 
 async function onDeleteRow(id: string): Promise<void> {
   if (!(await confirmDeleteDocument(id))) return;
+  if (stale.value) {
+    documentViewStore.setActionError(props.tab.id, t('studio.common.connectionLost.error'));
+    return;
+  }
   deleteDocument(props.tab.id, id)
     .then(() => documentViewStore.setActionError(props.tab.id, null))
     .catch((err: unknown) => {
@@ -391,6 +364,12 @@ onUnmounted(() => {
          used to have neither. -->
     <DocumentFilterRow :tab="tab" />
 
+    <StaleDataStrip
+      v-if="stale && hasPage"
+      testid="document-stale"
+      :reconnecting="reconnecting"
+      @reconnect="onReconnectAndLoad"
+    />
     <Alert
       strip
       v-if="rt?.status === 'error' && rt.error"
@@ -417,7 +396,7 @@ onUnmounted(() => {
          this fixes. The chrome above (and so its toolbar rows) now always renders; only the body
          — the part that needs a live connection — swaps for the gate. -->
     <EmptyState
-      v-if="needsReconnect"
+      v-if="needsReconnect && !hasPage"
       data-testid="document-reconnect"
       icon="plug"
       :title="t('studio.common.disconnected.empty')"
@@ -426,6 +405,7 @@ onUnmounted(() => {
         variant="dialog-primary"
         size="kira-lg"
         data-testid="document-reconnect-load"
+        :pending="reconnecting"
         @click="onReconnectAndLoad"
       >
         {{ t('studio.common.reconnectAndLoad.label') }}
@@ -441,6 +421,7 @@ onUnmounted(() => {
           :buffer="newBuffer"
           testid-prefix="document-new"
           :saving="saving"
+          :save-disabled-reason="saveDisabledReason"
           @save="commitCreate"
           @cancel="cancelCreate"
         />
@@ -550,6 +531,7 @@ onUnmounted(() => {
                       :buffer="editBuffer"
                       testid-prefix="document-edit"
                       :saving="saving"
+                      :save-disabled-reason="saveDisabledReason"
                       @save="commitEdit"
                       @cancel="cancelEdit"
                     />

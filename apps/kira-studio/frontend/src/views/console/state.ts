@@ -9,6 +9,7 @@ import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { useConnectionsStore } from '../../state/connections';
 import { useSettingsStore } from '../../state/settings';
+import { useStaleDataStore } from '../../state/staleData';
 import type { ConsoleTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { useDocumentRowsStore } from '../shared/document/rows';
@@ -511,6 +512,7 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
       rt.results.push(...newResults);
       evictOldestResults(rt, newResults.length);
       rt.activeKey = newResults[0]?.key ?? rt.activeKey;
+      useStaleDataStore().stamp(tabId, tab.connectionId);
       rt.status = 'idle';
       rt.opId = null;
     } catch (err) {
@@ -606,6 +608,7 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
         useSettingsStore().advanced.expensiveQueryRows,
       );
       pushPlanResult(tabId, statement, plan);
+      useStaleDataStore().stamp(tabId, tab.connectionId);
       rt.status = 'idle';
       rt.opId = null;
       return { ok: true };
@@ -618,8 +621,22 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
     }
   }
 
+  /** Marks shown results current for the connection's present session (reconnect; no rerun). */
+  function restamp(tabId: string): void {
+    const connectionId = useTabsStore().findConsoleTab(tabId)?.connectionId;
+    if (connectionId) useStaleDataStore().stamp(tabId, connectionId);
+  }
+
+  /** Shown results are stale: connection gone, or produced under another connection session. */
+  function isStale(tabId: string): boolean {
+    const connectionId = useTabsStore().findConsoleTab(tabId)?.connectionId;
+    return connectionId ? useStaleDataStore().isStale(tabId, tabId, connectionId) : false;
+  }
+
   return {
     runtime,
+    isStale,
+    restamp,
     toggleSearchOpen,
     setSearchOpen,
     isResultDocExpanded,

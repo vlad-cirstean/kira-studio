@@ -17,7 +17,7 @@ import { useConnectionsStore } from '../../state/connections';
 import { useSchemaColumnsStore } from '../../state/schemaColumns';
 import { reloadTabsForTarget } from '../../state/viewCommands';
 import { isVisible, toSets, type VisibilitySets } from '../filter';
-import { isLeafKind, labelForGroup, partitionChildren } from '../grouping';
+import { isLeafNode, labelForGroup, partitionChildren } from '../grouping';
 
 export interface TreeRowVm {
   key: string;
@@ -390,7 +390,10 @@ export const useTreeStore = defineStore('tree', () => {
         await expand(connectionId, ancestor);
       }
     }
-    const key = rowKey(connectionId, path);
+    // A Postgres partition's path sits beside its parent, not under it, so its row may not render.
+    const lastAncestor = rowKey(connectionId, ancestor);
+    const rendered = treeState.children[lastAncestor]?.some((n) => n.path === path);
+    const key = rendered === false ? lastAncestor : rowKey(connectionId, path);
     treeState.selected = key;
     treeState.pendingScrollKey = key;
   }
@@ -496,11 +499,12 @@ export const useTreeStore = defineStore('tree', () => {
   ): boolean {
     const k = rowKey(connectionId, node.path);
     const selfMatches = query ? matchesQuery(node.name, query) : false;
-    // P19 D5: a table/view/matview is a leaf regardless of what a cached node's own hasChildren
+    // P19 D5: a view/matview is a leaf regardless of what a cached node's own hasChildren
     // says — its columns moved into the definition view, but an L1 payload cached before this
-    // phase can still carry `hasChildren: true` until the connection's next reconnect. P41 adds
+    // phase can still carry `hasChildren: true` until the connection's next reconnect. A table
+    // expands only when hasChildren says so (P328 partitions). P41 adds
     // database/bucket for a keyBrowser connection, same reasoning (F12).
-    const leaf = isLeafKind(node.kind, view.keyBrowser);
+    const leaf = isLeafNode(node, view.keyBrowser);
     const childNodes = leaf ? undefined : treeState.children[k];
     const naturallyExpanded = !leaf && treeState.expanded.has(k);
 

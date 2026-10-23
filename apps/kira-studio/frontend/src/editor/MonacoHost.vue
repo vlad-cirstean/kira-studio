@@ -55,6 +55,8 @@ const props = defineProps<{
    *  pure lookup itself here. */
   hoverSource?: (doc: string, offset: number) => ConsoleHoverInfo | null;
   singleLine?: boolean;
+  /** Wraps regardless of the appearance setting. */
+  forceWrap?: boolean;
   rangeHighlights?: (doc: string) => readonly RangeHighlight[];
   autoCloseBrackets?: boolean;
   keepSelectionOnExternalSync?: boolean;
@@ -109,6 +111,7 @@ let wrapDisposable: MonacoDisposable | null = null;
 
 function resolveWordWrap(): 'on' | 'off' {
   if (props.singleLine) return 'off';
+  if (props.forceWrap) return 'on';
   return settingsStore.appearance.wordWrap ? 'on' : 'off';
 }
 

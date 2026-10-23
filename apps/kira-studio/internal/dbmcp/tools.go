@@ -83,6 +83,22 @@ func (s *Server) resolveReadGated(connectionID string) (summary model.Connection
 	return summary, nil, nil, nil, false
 }
 
+// databasePathKinds pick the database from the path's first segment; an empty path silently runs on
+// the connection's primary database (mongodb: fails).
+var databasePathKinds = map[string]bool{"postgres": true, "mysql": true, "mariadb": true, "mongodb": true}
+
+// needsDatabasePath returns an error message when summary's kind needs a database path and path has none.
+func needsDatabasePath(summary model.ConnectionSummary, path string) string {
+	if !databasePathKinds[summary.Kind] {
+		return ""
+	}
+	p, err := model.DecodePath(summary.ID, path)
+	if err != nil || (len(p.Segments) > 0 && p.Segments[0].Kind == "database") {
+		return ""
+	}
+	return fmt.Sprintf("path is required for connection %q (%s): pass a database path from list_children with this connectionId", summary.Name, summary.Kind)
+}
+
 // --- list_children — replacing the fixed-name list_databases/list_schemas SPEC first named:
 // the adapter layer's metadata primitive is one lazy level (Adapter.Children), and the levels
 // differ per kind, so one tool that returns the node's own `kind` is strictly more
@@ -94,11 +110,11 @@ type listChildrenArgs struct {
 	Refresh      bool   `json:"refresh,omitempty"`
 }
 
-func (s *Server) listChildren(_ context.Context, _ *mcp.CallToolRequest, args listChildrenArgs) (*mcp.CallToolResult, any, error) {
+func (s *Server) listChildren(ctx context.Context, _ *mcp.CallToolRequest, args listChildrenArgs) (*mcp.CallToolResult, any, error) {
 	if _, res, out, err, done := s.resolveReadGated(args.ConnectionID); done {
 		return res, out, err
 	}
-	result, err := s.cfg.Tree.Children(args.ConnectionID, args.Path, args.Refresh)
+	result, err := s.cfg.Tree.Children(ctx, args.ConnectionID, args.Path, args.Refresh)
 	if err != nil {
 		return toolError(err)
 	}
@@ -116,11 +132,11 @@ type describeTableArgs struct {
 // describeTable is gated on Caps().Describe only in the sense that an adapter which cannot serve
 // it already answers E_UNSUPPORTED in its own words (kafka/s3/sqs/redis) — surfaced verbatim by
 // toolError rather than an invented message here (§4.3).
-func (s *Server) describeTable(_ context.Context, _ *mcp.CallToolRequest, args describeTableArgs) (*mcp.CallToolResult, any, error) {
+func (s *Server) describeTable(ctx context.Context, _ *mcp.CallToolRequest, args describeTableArgs) (*mcp.CallToolResult, any, error) {
 	if _, res, out, err, done := s.resolveReadGated(args.ConnectionID); done {
 		return res, out, err
 	}
-	result, err := s.cfg.Tree.Describe(args.ConnectionID, args.Path, args.Refresh, nil)
+	result, err := s.cfg.Tree.Describe(ctx, args.ConnectionID, args.Path, args.Refresh, nil)
 	if err != nil {
 		return toolError(err)
 	}
@@ -135,11 +151,11 @@ type describeSchemaArgs struct {
 	Refresh      bool   `json:"refresh,omitempty"`
 }
 
-func (s *Server) describeSchema(_ context.Context, _ *mcp.CallToolRequest, args describeSchemaArgs) (*mcp.CallToolResult, any, error) {
+func (s *Server) describeSchema(ctx context.Context, _ *mcp.CallToolRequest, args describeSchemaArgs) (*mcp.CallToolResult, any, error) {
 	if _, res, out, err, done := s.resolveReadGated(args.ConnectionID); done {
 		return res, out, err
 	}
-	result, err := s.cfg.Tree.SchemaColumns(args.ConnectionID, args.Path, args.Refresh)
+	result, err := s.cfg.Tree.SchemaColumns(ctx, args.ConnectionID, args.Path, args.Refresh)
 	if err != nil {
 		return toolError(err)
 	}
@@ -156,7 +172,7 @@ const (
 type runQueryArgs struct {
 	ConnectionID string `json:"connectionId"`
 	SQL          string `json:"sql"`
-	Path         string `json:"path,omitempty"`
+	Path         string `json:"path"`
 	MaxRows      int    `json:"maxRows,omitempty"`
 }
 
@@ -204,6 +220,9 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		Path:         args.Path,
 		Statements:   []string{args.SQL},
 		Cap:          page.ResultCap{Rows: rv.maxRows},
+		// A read verdict can still carry a writing function (SELECT f()); unless writes are
+		// allowed outright, the adapter's read-only wrap backstops the classifier.
+		ReadOnly: rv.class == adapters.ClassRead && rv.modes.write != "allow",
 	})
 	if err != nil {
 		// A Postgres/MySQL driver error routinely embeds the offending value (a
@@ -261,6 +280,10 @@ func (s *Server) resolveVerdict(ctx context.Context, args runQueryArgs) (rv quer
 		res, out, err = errResult(err.Error())
 		return rv, res, out, err, true
 	}
+	if msg := needsDatabasePath(rv.summary, args.Path); msg != "" {
+		res, out, err = errResult(msg)
+		return rv, res, out, err, true
+	}
 
 	rv.modes = modesOf(rv.summary)
 	if rv.modes.read == "deny" && rv.modes.write == "deny" && rv.modes.ddl == "deny" {
@@ -282,7 +305,7 @@ func (s *Server) resolveVerdict(ctx context.Context, args runQueryArgs) (rv quer
 	// setting, so it was a duplicate repo read (settings.GetAll()) for no correctness benefit.
 	rv.threshold = s.cfg.ExplainThreshold()
 
-	state, cerr := s.connectForQuery(args.ConnectionID)
+	state, cerr := s.connectForQuery(ctx, args.ConnectionID)
 	if cerr != nil {
 		res, out, err = toolError(cerr)
 		return rv, res, out, err, true
@@ -398,7 +421,7 @@ const queueFullMessage = "too many queries are already waiting for approval; ret
 type explainQueryArgs struct {
 	ConnectionID string `json:"connectionId"`
 	SQL          string `json:"sql"`
-	Path         string `json:"path,omitempty"`
+	Path         string `json:"path"`
 	IncludeRaw   bool   `json:"includeRaw,omitempty"`
 }
 
@@ -421,6 +444,9 @@ func (s *Server) explainQuery(ctx context.Context, _ *mcp.CallToolRequest, args 
 	if err != nil {
 		return errResult(err.Error())
 	}
+	if msg := needsDatabasePath(summary, args.Path); msg != "" {
+		return errResult(msg)
+	}
 
 	// §7: unsupported kinds are refused before connecting — nothing this call can do will succeed.
 	if !queryplan.Supported(summary.Kind) {
@@ -437,7 +463,7 @@ func (s *Server) explainQuery(ctx context.Context, _ *mcp.CallToolRequest, args 
 		return errResult(fmt.Sprintf("connection %q's MCP permissions deny read statements; change them in the connection's MCP tab", summary.Name))
 	}
 
-	state, err := s.connectForQuery(args.ConnectionID)
+	state, err := s.connectForQuery(ctx, args.ConnectionID)
 	if err != nil {
 		return toolError(err)
 	}

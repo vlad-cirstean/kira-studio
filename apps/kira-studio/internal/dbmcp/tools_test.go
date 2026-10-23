@@ -18,7 +18,7 @@ type fakeConnsList struct {
 
 func (f *fakeConnsList) List() ([]model.ConnectionSummary, error) { return f.summaries, nil }
 func (f *fakeConnsList) StateOf(string) model.ConnectionState     { return model.ConnectionState{} }
-func (f *fakeConnsList) Connect(string) (model.ConnectionState, error) {
+func (f *fakeConnsList) ConnectContext(context.Context, string) (model.ConnectionState, error) {
 	return model.ConnectionState{}, nil
 }
 
@@ -28,17 +28,17 @@ type fakeTree struct {
 	calls int
 }
 
-func (f *fakeTree) Children(string, string, bool) (tree.ChildrenResult, error) {
+func (f *fakeTree) Children(context.Context, string, string, bool) (tree.ChildrenResult, error) {
 	f.calls++
 	return tree.ChildrenResult{}, nil
 }
 
-func (f *fakeTree) Describe(string, string, bool, *string) (tree.DescribeResult, error) {
+func (f *fakeTree) Describe(context.Context, string, string, bool, *string) (tree.DescribeResult, error) {
 	f.calls++
 	return tree.DescribeResult{}, nil
 }
 
-func (f *fakeTree) SchemaColumns(string, string, bool) (tree.SchemaColumnsResult, error) {
+func (f *fakeTree) SchemaColumns(context.Context, string, string, bool) (tree.SchemaColumnsResult, error) {
 	f.calls++
 	return tree.SchemaColumnsResult{}, nil
 }

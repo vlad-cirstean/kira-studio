@@ -1,0 +1,116 @@
+{
+  "CollectionsService.Import": {
+    "files": [
+      {
+        "collection": {
+          "collectionId": "<id:1>",
+          "folders": 0,
+          "name": "Multi",
+          "requests": 1,
+          "warnings": []
+        },
+        "environment": null,
+        "error": null,
+        "fileName": "collection.json",
+        "kind": "collection",
+        "path": "<tmp>/collection.json"
+      },
+      {
+        "collection": null,
+        "environment": {
+          "environmentId": "<id:2>",
+          "name": "Staging",
+          "variables": 4,
+          "warnings": [
+            {
+              "count": 1,
+              "detail": "1 disabled variables were skipped.",
+              "kind": "disabled_variables"
+            }
+          ]
+        },
+        "error": null,
+        "fileName": "environment.json",
+        "kind": "environment",
+        "path": "<tmp>/environment.json"
+      },
+      {
+        "collection": null,
+        "environment": null,
+        "error": "postman: not a Postman collection or environment",
+        "fileName": "bad.json",
+        "kind": "",
+        "path": "<tmp>/bad.json"
+      }
+    ]
+  },
+  "FilesService.ChooseOpenMany": {
+    "canceled": false,
+    "files": [
+      {
+        "name": "collection.json",
+        "path": "<tmp>/collection.json",
+        "size": 0
+      },
+      {
+        "name": "environment.json",
+        "path": "<tmp>/environment.json",
+        "size": 0
+      },
+      {
+        "name": "bad.json",
+        "path": "<tmp>/bad.json",
+        "size": 0
+      }
+    ]
+  },
+  "VariablesService.List": [
+    {
+      "description": "",
+      "id": "<id:3>",
+      "isSecret": false,
+      "name": "host",
+      "ownerId": "<masked>",
+      "scope": "environment",
+      "sortOrder": 0,
+      "value": "https://staging.example.test"
+    },
+    {
+      "description": "",
+      "id": "<id:4>",
+      "isSecret": true,
+      "name": "token",
+      "ownerId": "<masked>",
+      "scope": "environment",
+      "sortOrder": 0,
+      "value": ""
+    },
+    {
+      "description": "",
+      "id": "<id:5>",
+      "isSecret": false,
+      "name": "retries",
+      "ownerId": "<masked>",
+      "scope": "environment",
+      "sortOrder": 0,
+      "value": "3"
+    },
+    {
+      "description": "",
+      "id": "<id:6>",
+      "isSecret": false,
+      "name": "implicit",
+      "ownerId": "<masked>",
+      "scope": "environment",
+      "sortOrder": 0,
+      "value": "on"
+    }
+  ],
+  "args:CollectionsService.Import": {
+    "paths": [
+      "<tmp>/collection.json",
+      "<tmp>/environment.json",
+      "<tmp>/bad.json"
+    ]
+  }
+}

@@ -6,7 +6,6 @@ import PickerTrigger from '@theme/components/PickerTrigger.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
-import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import {
   Tooltip,
   TooltipContent,
@@ -14,11 +13,10 @@ import {
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
-import { rowVariants } from '@theme/lib/rowVariants';
-import { cn } from '@theme/lib/utils';
 import { useEventListener } from '@vueuse/core';
 import { formatBytes } from '@workbench/behaviour/format';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
+import MonacoDiff from '@workbench/editor/MonacoDiff.vue';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
@@ -34,6 +32,7 @@ import { sqlDialectFor } from '../sqlIdent';
 import { typeDescription } from '../typeGlossary';
 import { useEditBuffer } from '../useEditBuffer';
 import { decodeToText, encodeFromText } from './binary';
+import CellGenerateMenu from './CellGenerateMenu.vue';
 import { describeValue, detectFormat, type FormatGuess } from './detect';
 import {
   beautifyFor,
@@ -45,10 +44,11 @@ import {
   formatHelp,
   formatLabel,
 } from './formats';
-import { GENERATORS, type Generator } from './generate';
+import type { Generator } from './generate';
 import { readOnlyChipText, readOnlyChipTitle } from './readOnlyChip';
 import { useCellEditorFormatStore } from './state';
 import TimestampPane from './TimestampPane.vue';
+import { useCellDiff } from './useCellDiff';
 import { validateFormat } from './validate';
 
 const cellEditorFormatStore = useCellEditorFormatStore();
@@ -114,6 +114,12 @@ const buffer = useEditBuffer({
   onRevert: () => selectedCell.value.onRevert?.(),
 });
 const { doc, isDirty, formatted, beautifyFailure, writeDoc } = buffer;
+// A staged cell republishes with its staged value as `original()`, so the buffer reads clean;
+// Revert must stay enabled to un-stage it.
+const actionsBuffer = {
+  ...buffer,
+  isDirty: computed(() => isDirty.value || selectedCell.value.original !== undefined),
+};
 
 // What `detected` above reads — deliberately a separate ref from `doc`, not an alias for
 // it, and deliberately not updated on every keystroke either. `doc` also receives byte-level
@@ -258,9 +264,23 @@ function closePanel(): void {
   cellSelectionStore.clearSelectedCellFor(selectedCell.value.tabId);
 }
 
+const {
+  available: diffAvailable,
+  shown: diffShown,
+  sides: diffSides,
+  toggle: toggleDiff,
+  close: closeDiff,
+} = useCellDiff(() => selectedCell.value, doc, isDirty);
+
+// Find targets the main editor, absent in the diff view, so the two are exclusive.
 const findOpen = ref(false);
 function toggleFind(): void {
+  closeDiff();
   findOpen.value = !findOpen.value;
+}
+function onToggleDiff(): void {
+  findOpen.value = false;
+  toggleDiff();
 }
 function closeFind(): void {
   findOpen.value = false;
@@ -328,13 +348,10 @@ function openFormatMenu(e: MouseEvent): void {
   contextMenuStore.openContextMenu(e, rows);
 }
 
-const generatePanelOpen = ref(false);
-const generateAnchorRef = ref<HTMLElement | null>(null);
 function applyGenerator(gen: Generator): void {
   if (!isEditable.value) return;
   doc.value = gen.run(effectiveFormat.value);
   saveEdit();
-  generatePanelOpen.value = false;
 }
 
 const targetLabel = computed(() => {
@@ -436,41 +453,21 @@ const statusLine = computed(() => {
         </Tooltip>
 
         <template v-if="!viewerMode">
-          <Popover :open="generatePanelOpen" @update:open="generatePanelOpen = $event">
-            <span ref="generateAnchorRef" class="relative shrink-0">
-              <TooltipIconButton
-                icon="sparkle"
-                :label="t('studio.cellEditor.generate.tooltip')"
-                disabled-trigger
-                :disabled="!isEditable"
-                data-testid="cell-editor-generate"
-                @click="generatePanelOpen = !generatePanelOpen"
-              />
-              <PopoverAnchor :reference="generateAnchorRef ?? undefined" />
-            </span>
-            <PopoverContent
-              align="start"
-              class="w-56 gap-0 p-0"
-              data-testid="cell-editor-generate-popover"
-            >
-              <div class="flex flex-col gap-px p-1">
-                <Tooltip v-for="gen in GENERATORS" :key="gen.id">
-                  <TooltipTrigger as-child>
-                    <button
-                      type="button"
-                      :class="cn(rowVariants(), 'w-full border-0 bg-transparent text-left font-ui')"
-                      :data-testid="`cell-editor-generate-${gen.id}`"
-                      @click="applyGenerator(gen)"
-                    >
-                      {{ t(gen.labelKey) }}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>{{ t(gen.hintKey) }}</TooltipContent>
-                </Tooltip>
-              </div>
-            </PopoverContent>
-          </Popover>
-          <EditBufferActions :buffer="buffer" testid-prefix="cell-editor" :show-bytes="false" />
+          <CellGenerateMenu :disabled="!isEditable" @apply="applyGenerator" />
+          <EditBufferActions
+            :buffer="actionsBuffer"
+            testid-prefix="cell-editor"
+            :show-bytes="false"
+          />
+          <TooltipIconButton
+            icon="diff"
+            :label="t('git.menu.stashShow.label')"
+            :pressed="diffShown"
+            disabled-trigger
+            :disabled="!diffAvailable"
+            data-testid="cell-editor-diff-toggle"
+            @click="onToggleDiff"
+          />
         </template>
       </span>
 
@@ -505,70 +502,75 @@ const statusLine = computed(() => {
     </ViewToolbar>
 
     <div ref="editorBodyEl" class="flex-1 min-h-0 flex flex-col overflow-hidden">
-      <div :class="encodedClass" data-testid="cell-editor-encoded">
-        <MonacoHost
-          ref="encodedHostRef"
-          :doc="doc"
-          :language="language"
-          :sql-dialect="sqlDialect"
-          :readonly="!isEditable"
-          :lint-source="cellLintSource"
-          :range-highlights="docHighlights"
-          @update:doc="onMainDocInput"
-        />
+      <div v-if="diffShown" class="flex-1 min-h-0" data-testid="cell-editor-diff-pane">
+        <MonacoDiff data-testid="cell-editor-diff" v-bind="diffSides" />
       </div>
-
-      <!-- Hex/base64: the same bytes as editable plaintext, kept in lockstep with the encoded box
-           above in both directions (encode<->decode, see onDecodedInput). -->
-      <template v-if="showDecodedPane">
-        <div
-          class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm leading-4 py-0.5 px-2"
-        >
-          <CodiconIcon name="symbol-string" :size="13" />
-          <span>{{ t('studio.cellEditor.decoded.label') }}</span>
-        </div>
-        <div
-          v-if="decodedDoc !== null"
-          class="flex-1 basis-5/12 min-h-0"
-          data-testid="cell-editor-decoded"
-        >
+      <template v-else>
+        <div :class="encodedClass" data-testid="cell-editor-encoded">
           <MonacoHost
-            :doc="decodedDoc"
-            language="plain"
+            ref="encodedHostRef"
+            :doc="doc"
+            :language="language"
+            :sql-dialect="sqlDialect"
             :readonly="!isEditable"
-            @update:doc="onDecodedInput"
+            :lint-source="cellLintSource"
+            :range-highlights="docHighlights"
+            @update:doc="onMainDocInput"
           />
         </div>
-        <Alert
-          v-else
-          variant="info"
-          class="flex-1 basis-5/12 min-h-0 overflow-auto items-center text-subtle"
-          data-testid="cell-editor-decoded-empty"
-        >
-          <AlertDescription>
-            {{
-              t('studio.cellEditor.decoded.invalid.hint', { format: formatLabel(effectiveFormat) })
-            }}
-          </AlertDescription>
-        </Alert>
-      </template>
 
-      <!-- The three timestamp formats: TimestampPane owns its own readings, zone switch, editable
-           field and calendar entirely — this file only decides whether to show it. -->
-      <template v-else-if="isTimestampFormat">
-        <div
-          class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm leading-4 py-0.5 px-2"
-        >
-          <CodiconIcon name="calendar" :size="13" />
-          <span>{{ t('studio.cellEditor.timestamp.title') }}</span>
-        </div>
-        <TimestampPane
-          class="shrink-0"
-          :doc="doc"
-          :format="effectiveFormat"
-          :readonly="!isEditable"
-          @update:doc="writeDoc($event)"
-        />
+        <!-- Hex/base64: the same bytes as editable plaintext, kept in lockstep with the encoded box
+             above in both directions (encode<->decode, see onDecodedInput). -->
+        <template v-if="showDecodedPane">
+          <div
+            class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm leading-4 py-0.5 px-2"
+          >
+            <CodiconIcon name="symbol-string" :size="13" />
+            <span>{{ t('studio.cellEditor.decoded.label') }}</span>
+          </div>
+          <div
+            v-if="decodedDoc !== null"
+            class="flex-1 basis-5/12 min-h-0"
+            data-testid="cell-editor-decoded"
+          >
+            <MonacoHost
+              :doc="decodedDoc"
+              language="plain"
+              :readonly="!isEditable"
+              @update:doc="onDecodedInput"
+            />
+          </div>
+          <Alert
+            v-else
+            variant="info"
+            class="flex-1 basis-5/12 min-h-0 overflow-auto items-center text-subtle"
+            data-testid="cell-editor-decoded-empty"
+          >
+            <AlertDescription>
+              {{
+                t('studio.cellEditor.decoded.invalid.hint', { format: formatLabel(effectiveFormat) })
+              }}
+            </AlertDescription>
+          </Alert>
+        </template>
+
+        <!-- The three timestamp formats: TimestampPane owns its own readings, zone switch, editable
+             field and calendar entirely — this file only decides whether to show it. -->
+        <template v-else-if="isTimestampFormat">
+          <div
+            class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm leading-4 py-0.5 px-2"
+          >
+            <CodiconIcon name="calendar" :size="13" />
+            <span>{{ t('studio.cellEditor.timestamp.title') }}</span>
+          </div>
+          <TimestampPane
+            class="shrink-0"
+            :doc="doc"
+            :format="effectiveFormat"
+            :readonly="!isEditable"
+            @update:doc="writeDoc($event)"
+          />
+        </template>
       </template>
     </div>
 
