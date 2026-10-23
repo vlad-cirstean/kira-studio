@@ -16,6 +16,9 @@ Decisions (user, 2026-10-23):
 | P331 | Fix the release workflow | Todo |
 | P332 | Kira Space as default app for code and data files | Todo |
 | P333 | DB MCP: prominent target database and response preview | Todo |
+| P334 | Docker: restore running containers after an engine/VM restart | Todo |
+| P335 | Code review round 1 | Todo |
+| P336 | Code review round 2 | Todo |
 
 ## P330: Branch naming, PR automation, release on merge
 
@@ -46,3 +49,16 @@ Release failed repeatedly on 2026-10-23 (v0.2.11: 4 attempts; ci-gate timed out 
 - New setting: show a response preview. When on, the approval step shows exactly what the AI will receive for the query, as a table, with table masking already applied.
 - Scope: `DbMcpApprovalDialog.vue` and the MCP request path in `apps/kira-studio`. Planner decides whether this splits into Part 1 (target prominence) and Part 2 (preview setting); a split keeps the number per `CLAUDE.md`.
 - Preview must run the same code path as the real answer, never a parallel reimplementation. Planner states how a preview can run without a double-execution side effect (read-only verdict only, or run once and hold the result for the approved send).
+
+## P334: Docker: restore running containers after an engine/VM restart
+
+- Snapshot the running container set (ID, name, image, Compose project and service, Docker context) while the engine is healthy. Skip ephemeral origins (`testcontainers`, `buildx`, `kind`).
+- Detect an engine/VM restart: the `internal/docker/events.go` stream drops (`unavailable`) then recovers (`ok`). Confirm it is a restart, not a socket blip or context switch, via engine boot identity (daemon ID, system time) and container `StartedAt`; planner picks the exact signals.
+- Never let the post-restart empty state overwrite the snapshot. Keep "last known running" until the user restores or dismisses.
+- After a restart, offer to start the containers the engine did not bring back itself (restart policy `always`/`unless-stopped` already does). Compose projects start together. Also compare snapshot with the running set at app launch for a restart that happened while Kira was closed.
+- Deleted containers are listed as gone, not recreated. Boot-time restore (login item/helper) is out of scope.
+- Planner decides the DB home of the snapshot, whether restore is click-only or automatic (default click-only unless told otherwise), and tests (`dockerflow` flow test plus UI spec).
+
+## P335, P336: Code review rounds
+
+Per `CLAUDE.md` "Code review": one Opus reviewer per round (architecture/security, correctness, performance), findings file under `plans/` committed before any fixer, then one sequential Sonnet fixer committing per logical group. Scope: everything changed since the last review session, base commit stated in the findings file. Round 2 covers the full diff since that same base, including round 1 fixes.
