@@ -314,7 +314,7 @@ func (a *App) build() {
 		},
 	})
 	a.W.BindShell(appwire.ShellHooks{
-		OpenWindow: a.WindowMgr.OpenWindow, OpenNewWindow: a.WindowMgr.openNew,
+		OpenWindow: a.WindowMgr.OpenWindow, OpenNewWindow: a.WindowMgr.openNew, OpenNewWindowKeyed: a.WindowMgr.openKeyed,
 		CloseWindow: a.WindowMgr.CloseWindow, FocusWindow: a.WindowMgr.FocusWindow,
 		SetWindowTitle: a.WindowMgr.SetWindowTitle,
 	})
