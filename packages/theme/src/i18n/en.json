@@ -1517,6 +1517,9 @@
         "objectKeyExpected": {
           "body": "Expected an object key at position {position}."
         },
+        "openTransaction": {
+          "body": "The connection has an open transaction. Commit or roll it back first."
+        },
         "pageTokenMismatch": {
           "body": "The page token doesn’t match the current filter, sort, projection or page size."
         },
@@ -1528,6 +1531,9 @@
         },
         "readOnly": {
           "body": "This connection is read-only."
+        },
+        "readOnlyRequest": {
+          "body": "This read was run as read-only and tried to write."
         },
         "redisBlockTimeout": {
           "body": "{command} needs a finite block timeout of at most {seconds} seconds."

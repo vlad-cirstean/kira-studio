@@ -227,7 +227,7 @@ func verifyReadOnlyWrap(ctx context.Context, conn *trackedConn, op *adapters.OpC
 			return mapError(err)
 		}
 	}
-	return adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.readOnly.body", nil, nil)
+	return adapters.ReadOnlyViolation(connReadOnly)
 }
 
 // execute is console.ts's execute. readOnly closes the gap client.go's own
@@ -242,10 +242,14 @@ func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track T
 	if len(statements) == 0 {
 		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.noStatements.body", nil, nil)
 	}
-	if readOnly {
+	if readOnly && connReadOnly {
 		if err := adapters.AssertNoTransactionEscalation(statements, adapters.PostgresDialect); err != nil {
 			return nil, err
 		}
+	}
+	// A per-request wrap on a writable connection would run inside, then roll back, a user transaction.
+	if readOnly && !connReadOnly && conn.PgConn().TxStatus() != 'I' {
+		return nil, adapters.OpenTransaction()
 	}
 	op.SetCommand(adapters.JoinConsoleStatements(statements, "--"))
 

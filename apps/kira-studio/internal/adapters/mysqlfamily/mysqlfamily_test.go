@@ -585,6 +585,10 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		),
 		testsupport.ReadOnlyRequestRefusesWrite(nodePath(cfg.ID, seg("database", "kira_test")),
 			"INSERT INTO customers (name) VALUES ('ro-probe')", "SELECT 1"),
+		testsupport.ReadOnlyRequestKeepsOpenTransaction(nodePath(cfg.ID, seg("database", "kira_test")),
+			"CREATE TEMPORARY TABLE kira_ro_tx (x int) ENGINE=InnoDB", "START TRANSACTION", "INSERT INTO kira_ro_tx VALUES (1)", "SELECT count(*) FROM kira_ro_tx"),
+		testsupport.ReadOnlyRequestAllowsBackslashRead(nodePath(cfg.ID, seg("database", "kira_test")),
+			`SELECT 'a1' REGEXP '\\d+'`, `SELECT 'a_b' LIKE 'a\\_b'`, `SELECT 'read write'`),
 		testsupport.ConsoleResultCap(nodePath(cfg.ID, seg("database", "kira_test")), func(n int) string {
 			return fmt.Sprintf("WITH RECURSIVE s(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM s WHERE n < %d) SELECT n FROM s", n)
 		}),

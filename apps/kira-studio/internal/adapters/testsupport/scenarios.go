@@ -260,3 +260,68 @@ func ReadOnlyRequestRefusesWrite(path model.NodePath, writeSQL, readSQL string) 
 		},
 	}
 }
+
+// ReadOnlyRequestKeepsOpenTransaction asserts a ReadOnly request on a writable connection refuses
+// while the shared connection holds a user transaction, and leaves that transaction's write pending
+// (rolled back only by the user's own ROLLBACK). setupSQL creates the connection-scoped table
+// countSQL counts; beginSQL opens the transaction, writeSQL adds one row. Gated on c.SQL.
+func ReadOnlyRequestKeepsOpenTransaction(path model.NodePath, setupSQL, beginSQL, writeSQL, countSQL string) Scenario {
+	return Scenario{
+		Name:     "execute: per-request read-only refuses inside an open transaction",
+		Requires: func(c adapters.Caps) bool { return c.SQL },
+		Run: func(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig) {
+			t.Helper()
+			run := func(sql string, readOnly bool) ([]page.Page, error) {
+				return a.Execute(context.Background(), model.ConsoleRequest{
+					Path: path, Statements: []string{sql}, ReadOnly: readOnly,
+				}, adapters.NewOpCtx("scenario-readonly-request-open-tx"))
+			}
+			count := func() string {
+				t.Helper()
+				pages, err := run(countSQL, false)
+				if err != nil {
+					t.Fatalf("Execute(%s): %v", countSQL, err)
+				}
+				p := pages[0].(page.TabularPage)
+				return page.CellText(p.Chunks[0], 0)
+			}
+			for _, sql := range []string{setupSQL, beginSQL, writeSQL} {
+				if _, err := run(sql, false); err != nil {
+					t.Fatalf("Execute(%s): %v", sql, err)
+				}
+			}
+			t.Cleanup(func() { _, _ = run("ROLLBACK", false) })
+			if _, err := run("SELECT 1", true); err == nil {
+				t.Fatal("Execute(read, ReadOnly) inside an open transaction: want an error, got nil")
+			}
+			if got := count(); got != "1" {
+				t.Fatalf("count after refused read = %s, want 1 (transaction write still pending)", got)
+			}
+			if _, err := run("ROLLBACK", false); err != nil {
+				t.Fatalf("ROLLBACK: %v", err)
+			}
+			if got := count(); got != "0" {
+				t.Fatalf("count after ROLLBACK = %s, want 0 (transaction still open for the user)", got)
+			}
+		},
+	}
+}
+
+// ReadOnlyRequestAllowsBackslashRead asserts an ordinary read whose text holds a backslash or
+// READ WRITE literal passes under ReadOnly on a writable connection — gated on c.SQL.
+func ReadOnlyRequestAllowsBackslashRead(path model.NodePath, readSQLs ...string) Scenario {
+	return Scenario{
+		Name:     "execute: per-request read-only allows reads with backslash literals",
+		Requires: func(c adapters.Caps) bool { return c.SQL },
+		Run: func(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig) {
+			t.Helper()
+			for _, sql := range readSQLs {
+				if _, err := a.Execute(context.Background(), model.ConsoleRequest{
+					Path: path, Statements: []string{sql}, ReadOnly: true,
+				}, adapters.NewOpCtx("scenario-readonly-request-backslash")); err != nil {
+					t.Errorf("Execute(%s, ReadOnly): %v", sql, err)
+				}
+			}
+		},
+	}
+}

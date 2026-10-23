@@ -188,7 +188,21 @@ func verifyReadOnlyWrap(ctx context.Context, conn Entry, op *adapters.OpCtx, tra
 	if _, err := conn.ExecContext(cleanupCtx, reassert); err != nil {
 		return mapError(err)
 	}
-	return adapters.T(adapters.CodeUnsupported, "backend.studio.adapter.readOnly.body", nil, nil)
+	return adapters.ReadOnlyViolation(connReadOnly)
+}
+
+// refuseOpenTransaction probes for an open transaction on a writable connection. The probe arms the
+// next transaction read-only when it succeeds; the wrap's START TRANSACTION READ ONLY consumes that.
+func refuseOpenTransaction(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery) error {
+	_, err := runRaw(ctx, conn, "SET TRANSACTION READ ONLY", op, track, page.ResultCap{})
+	if err == nil {
+		return nil
+	}
+	var myErr *mysql.MySQLError
+	if errors.As(err, &myErr) && myErr.Number == errTxCharacteristics {
+		return adapters.OpenTransaction()
+	}
+	return err
 }
 
 // sessionReadOnly reports whether every variable row (MariaDB lists both spellings) is ON, and at
@@ -222,8 +236,14 @@ func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQue
 	if len(statements) == 0 {
 		return nil, adapters.T(adapters.CodeQuery, "backend.studio.adapter.noStatements.body", nil, nil)
 	}
-	if readOnly {
+	if readOnly && connReadOnly {
 		if err := adapters.AssertNoTransactionEscalation(statements, adapters.MySQLDialect); err != nil {
+			return nil, err
+		}
+	}
+	// START TRANSACTION implicitly commits an open user transaction; refuse before it runs.
+	if readOnly && !connReadOnly {
+		if err := refuseOpenTransaction(ctx, conn, op, track); err != nil {
 			return nil, err
 		}
 	}
@@ -238,6 +258,11 @@ func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQue
 			return err
 		}, conn.waitInFlight, func(err error) error { return mapError(err) })
 		if err != nil {
+			if !connReadOnly {
+				cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
+				defer cancel()
+				_, _ = conn.ExecContext(cleanupCtx, "SET TRANSACTION READ WRITE")
+			}
 			return nil, err
 		}
 		defer cleanup()

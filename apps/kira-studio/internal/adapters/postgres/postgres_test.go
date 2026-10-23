@@ -1617,6 +1617,10 @@ func TestPostgres_ExecuteReadOnlyRequestRefusesWrite(t *testing.T) {
 	testsupport.RunScenarios(t, connectedAdapter(t, fixture), fixture.Config,
 		testsupport.ReadOnlyRequestRefusesWrite(nodePath(fixture, seg("database", "kira_test")),
 			"CREATE TABLE kira_ro_probe (id int)", "SELECT 1"),
+		testsupport.ReadOnlyRequestKeepsOpenTransaction(nodePath(fixture, seg("database", "kira_test")),
+			"CREATE TEMP TABLE kira_ro_tx (x int)", "BEGIN", "INSERT INTO kira_ro_tx VALUES (1)", "SELECT count(*) FROM kira_ro_tx"),
+		testsupport.ReadOnlyRequestAllowsBackslashRead(nodePath(fixture, seg("database", "kira_test")),
+			`SELECT 'a1' ~ '\d+'`, `SELECT 'a_b' LIKE 'a\_b'`, `SELECT E'\n'`, `SELECT 'read write'`),
 	)
 }
 
