@@ -333,3 +333,143 @@ func helperToken(t *testing.T, app *flowharness.App) string {
 	}
 	return plain
 }
+
+type callOutcome struct {
+	res *mcp.CallToolResult
+	err error
+}
+
+func callAsync(sess *mcp.ClientSession, connID, sqlText string) chan callOutcome {
+	ch := make(chan callOutcome, 1)
+	go func() {
+		res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: "run_query", Arguments: map[string]any{"connectionId": connID, "sql": sqlText, "path": ""}})
+		ch <- callOutcome{res, err}
+	}()
+	return ch
+}
+
+func (f *fixture) setPreview(t *testing.T, on bool) bridge.SettingsSetArgs {
+	t.Helper()
+	args := bridge.SettingsSetArgs{Patch: model.SettingsPatch{DbMcp: &model.DbMcpPatch{PreviewResponses: &on}}}
+	if _, err := f.app.W.Settings.Set(args); err != nil {
+		t.Fatal(err)
+	}
+	return args
+}
+
+func (f *fixture) maskColumn(t *testing.T, column string) {
+	t.Helper()
+	_, err := f.app.W.MaskRules.Upsert(bridge.MaskRulesUpsertArgs{ConnectionID: f.connID, Fields: model.MaskRuleFields{TableName: "notes", ColumnName: column, Kind: "redact"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (f *fixture) answer(t *testing.T, approve bool, id string) {
+	t.Helper()
+	args := bridge.DbMcpApprovalArgs{RequestID: id}
+	var err error
+	if approve {
+		_, err = f.app.W.DbMcp.ApproveQuery(args)
+	} else {
+		_, err = f.app.W.DbMcp.DenyQuery(args)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func wait(t *testing.T, ch chan callOutcome) *mcp.CallToolResult {
+	t.Helper()
+	select {
+	case out := <-ch:
+		if out.err != nil || out.res == nil {
+			t.Fatalf("run_query = %+v, want a tool result", out)
+		}
+		return out.res
+	case <-time.After(30 * time.Second):
+		t.Fatal("run_query did not return")
+		return nil
+	}
+}
+
+// With dbMcp.previewResponses on, a run_query result that already ran is held until the user sends
+// or withholds it. Contract dbmcp-preview: tests/ui/dbmcp-preview.spec.ts renders it.
+func TestDbMcpResponsePreview(t *testing.T) {
+	f := newFixture(t)
+	sess, err := f.connect(t, f.token(t))
+	if err != nil {
+		t.Fatalf("connect with the helper token: %v", err)
+	}
+	defer sess.Close()
+
+	const read = "select id, body from notes order by id"
+	setArgs := f.setPreview(t, true)
+	f.app.Contract(t, "dbmcp-preview", "args:SettingsService.Set", setArgs)
+	f.maskColumn(t, "body")
+
+	done := callAsync(sess, f.connID, read)
+	req := f.pending(t)
+	if req.Stage != "response" || req.Response == nil || req.Class != "read" || req.Statement != read {
+		t.Fatalf("pending = %+v, want a response-stage read of the statement", req)
+	}
+	held, err := f.app.W.DbMcp.PendingResponse(bridge.DbMcpApprovalArgs{RequestID: req.RequestID})
+	if err != nil || held.IsError || req.Response.Bytes != len(held.Text) {
+		t.Fatalf("PendingResponse = %+v (%v), want the %d held bytes", held, err, req.Response.Bytes)
+	}
+	if strings.Contains(held.Text, "one") || strings.Contains(held.Text, "two") || !strings.Contains(held.Text, "[redacted]") {
+		t.Fatalf("held text = %q, want the masked rows", held.Text)
+	}
+	replace := flowharness.Replace(f.dbPath, "/data/mcp.db")
+	f.app.Contract(t, "dbmcp-preview", "DbMcpService.PendingApprovals", bridge.DbMcpApprovalSnapshot{Pending: &req}, flowharness.Mask("expiresAtMs"), replace)
+	f.app.Contract(t, "dbmcp-preview", "DbMcpService.PendingResponse", held)
+	f.app.Contract(t, "dbmcp-preview", "args:DbMcpService.ApproveQuery", bridge.DbMcpApprovalArgs{RequestID: req.RequestID})
+	f.answer(t, true, req.RequestID)
+	if sent := wait(t, done); sent.IsError || text(sent) != held.Text {
+		t.Fatalf("sent = %q, want the held bytes %q", text(sent), held.Text)
+	}
+	if _, err := f.app.W.DbMcp.PendingResponse(bridge.DbMcpApprovalArgs{RequestID: req.RequestID}); err == nil {
+		t.Fatal("PendingResponse still answers after the request resolved")
+	}
+
+	done = callAsync(sess, f.connID, read)
+	f.answer(t, false, f.pending(t).RequestID)
+	withheld := wait(t, done)
+	if !withheld.IsError || !strings.Contains(text(withheld), "withheld") || strings.Contains(text(withheld), "[redacted]") {
+		t.Fatalf("withheld read = %q, want an error with no rows", text(withheld))
+	}
+
+	done = callAsync(sess, f.connID, "insert into notes (body) values ('three')")
+	if q := f.pending(t); q.Stage != "query" {
+		t.Fatalf("first request = %+v, want the query stage", q)
+	} else {
+		f.answer(t, true, q.RequestID)
+	}
+	testx.WaitUntil(t, 10*time.Second, func() bool {
+		p := f.app.W.DbMcp.PendingApprovals().Pending
+		return p != nil && p.Stage == "response"
+	})
+	f.answer(t, false, f.pending(t).RequestID)
+	if w := wait(t, done); !w.IsError || !strings.Contains(text(w), "ran") {
+		t.Fatalf("withheld write = %q, want an error saying it ran", text(w))
+	}
+	if n := f.noteCount(t); n != 3 {
+		t.Fatalf("withheld write left %d rows, want 3 (the write ran)", n)
+	}
+
+	done = callAsync(sess, f.connID, read)
+	req = f.pending(t)
+	f.maskColumn(t, "id")
+	f.answer(t, true, req.RequestID)
+	if w := wait(t, done); !w.IsError || !strings.Contains(text(w), "masking rules") || strings.Contains(text(w), "[redacted]") {
+		t.Fatalf("read after a rule change = %q, want it withheld for the changed masking rules", text(w))
+	}
+
+	f.setPreview(t, false)
+	if live := runQuery(t, sess, f.connID, read); live.IsError || !strings.Contains(text(live), "[redacted]") {
+		t.Fatalf("read with preview off = %q, want rows straight away", text(live))
+	}
+	if snap := f.app.W.DbMcp.PendingApprovals(); snap.Pending != nil {
+		t.Fatalf("preview off still queued %+v", snap.Pending)
+	}
+}
