@@ -14,7 +14,7 @@ First phase `P322` (highest in `docs/HISTORY.md` is `P321`). Branch `v0.2.10`. P
 | P327 | Cell editor before/after diff. Highlight the change between the original and the edited value in the cell editor, as a code-style diff. | Done |
 | P328 | Fixes and small features bundle (one Opus plan, one Sonnet implementer). (a) Connection tree: where an element count shows, drop the word "rows" and keep only the number. (b) Partitioned tables collapse into their parent by default; partitions show only after the user expands it. (c) Operations panel: show whether an operation came from the user or from MCP. (d) Add a Check for updates button. (e) Go to PK/FK button: the filter box value is cleaner, no backticks around columns and no quotes around numbers. (f) Postman collection importer: accept more than one collection, and import environments as well. | Done |
 | P329 | Code review, one round (Opus reviewer covering architecture, correctness, performance; then a Sonnet fixer) over everything changed since the last review session (v2.8 P319 close-out base `d61472b`, scope: P320 sweep and P322-P328). Runs last. | Done |
-| P330 | Code review, round 2 (user asked for one more round; Opus reviewer covering architecture, correctness, performance; then a Sonnet fixer) over everything changed since the same base as P329 (v2.8 P319 close-out base `d61472b`), including P329 round 1 fixer commits as unreviewed code. Runs last before close. | Todo |
+| P330 | Code review, round 2 (user asked for one more round; Opus reviewer covering architecture, correctness, performance; then a Sonnet fixer) over everything changed since the same base as P329 (v2.8 P319 close-out base `d61472b`), including P329 round 1 fixer commits as unreviewed code. Runs last before close. | Done |
 | P331 | Close chapter v0.2.10 (fold per `CLAUDE.md`). Hold until user says to close. | Todo |
 
 ## Results
@@ -81,3 +81,16 @@ Deviations:
 - Console reconnect-only chosen over rerun (a rerun could repeat a write).
 
 Verification: `go test ./...`, `typecheck`, `lint:go`, `lint:dead`, `test:ui:studio`, `test:ui:space`, `test:visual:studio`, `test:visual:space` pass. 4 timing specs failed once under concurrent load and passed rerun alone. No baseline changed.
+
+### P330
+
+Round 2 fixed all four findings.
+
+1. MCP read refuses on a writable connection with an open transaction: Postgres checks `TxStatus`, MySQL/MariaDB use the 1568 probe before `START TRANSACTION READ ONLY`. The user's transaction is never committed or rolled back. New message `openTransaction`. Scenario `ReadOnlyRequestKeepsOpenTransaction` on real Postgres, MySQL 8.4, MariaDB 11.4.
+2. `AssertNoTransactionEscalation` runs only on read-only connections. Per-request violation uses its own message `readOnlyRequest` (`adapters.ReadOnlyViolation`). Scenario `ReadOnlyRequestAllowsBackslashRead` covers `~ '\d+'`, `LIKE 'a\_b'`, `E'\n'`, a `read write` literal.
+3. Failed update check sends a short cause (`appupdate.FailureCause`: timed out, offline, unexpected status N, unknown error); raw error logged with `slog`. Applied to both app bridges, which share the code.
+4. `DESCRIBE`/`DESC` removed from `sqlReadKeywords` and the name guard dropped; the EXPLAIN case owns them.
+
+Deviations: finding 3 also touched `apps/kira-space/internal/bridge/update.go`, same leak. MySQL wrap resets the armed read-only flag if `START TRANSACTION` fails. No UI suite run: no frontend code changed, update dialog specs mock the IPC error.
+
+Verification: `go test ./...` passes (ClickHouse and Kafka timed out once under concurrent container load, green alone), `typecheck`, `lint:go`, `lint:dead` clean.
