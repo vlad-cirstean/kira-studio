@@ -16,6 +16,7 @@ import { usePendingDecision } from '@workbench/behaviour/pendingDecision';
 import { computed } from 'vue';
 import { useDbMcpStore } from '../state/dbmcp';
 import ApprovalStatement from './ApprovalStatement.vue';
+import ApprovalTarget from './ApprovalTarget.vue';
 
 // P246: mounted by PromptHost for the routed `dbmcp` entry whose ref is the pending request.
 const props = defineProps<{ entry: RoutedPrompt; more: number }>();
@@ -98,6 +99,12 @@ async function onApprove(requestId: string): Promise<void> {
       </DialogHeader>
 
       <DialogBody>
+        <ApprovalTarget
+          :connection-name="dbMcpStore.approval.pending.connectionName"
+          :kind="dbMcpStore.approval.pending.kind"
+          :target="dbMcpStore.approval.pending.target"
+          :statement-class="dbMcpStore.approval.pending.class"
+        />
         <p v-if="dbMcpStore.approval.pending.reason === 'heavy'" class="m-0 whitespace-pre-wrap">
           {{ heavyLede }}
         </p>

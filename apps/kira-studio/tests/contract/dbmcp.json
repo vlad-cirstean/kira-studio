@@ -9,7 +9,14 @@
       "plan": null,
       "reason": "permission",
       "requestId": "<id:2>",
-      "statement": "insert into notes (body) values ('three')"
+      "statement": "insert into notes (body) values ('three')",
+      "target": {
+        "color": "teal",
+        "database": "/data/mcp.db",
+        "host": "",
+        "path": [],
+        "readOnly": false
+      }
     },
     "queued": 0
   },

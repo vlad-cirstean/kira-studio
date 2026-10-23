@@ -179,10 +179,13 @@ func TestDbMcpApprovalFlow(t *testing.T) {
 	denied := call()
 	req := f.pending(t)
 	// Contract dbmcp: tests/ui/dbmcp-approval.spec.ts renders this request in the approval dialog.
-	f.app.Contract(t, "dbmcp", "DbMcpService.PendingApprovals", bridge.DbMcpApprovalSnapshot{Pending: &req}, flowharness.Mask("expiresAtMs"))
+	f.app.Contract(t, "dbmcp", "DbMcpService.PendingApprovals", bridge.DbMcpApprovalSnapshot{Pending: &req}, flowharness.Mask("expiresAtMs"), flowharness.Replace(f.dbPath, "/data/mcp.db"))
 	f.app.Contract(t, "dbmcp", "args:DbMcpService.ApproveQuery", bridge.DbMcpApprovalArgs{RequestID: req.RequestID})
 	if req.Statement != write || req.ConnectionID != f.connID || req.Class == "" {
 		t.Fatalf("pending approval = %+v, want the write statement on the connection", req)
+	}
+	if tg := req.Target; tg.Color != "teal" || tg.ReadOnly || tg.Database != f.dbPath || tg.Host != "" || len(tg.Path) != 0 {
+		t.Fatalf("approval target = %+v, want teal, writable, the fixture file, no host, no path", tg)
 	}
 	if _, err := f.app.W.DbMcp.DenyQuery(bridge.DbMcpApprovalArgs{RequestID: req.RequestID}); err != nil {
 		t.Fatal(err)

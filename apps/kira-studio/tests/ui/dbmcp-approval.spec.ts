@@ -10,10 +10,14 @@ import { IPC } from './support/ipcChannels';
 test('contract: a pending write shows its statement and Approve answers by request id', async ({
   relaunch,
 }) => {
-  const snap = contract<{ pending: { requestId: string; statement: string } }>(
-    'dbmcp',
-    'DbMcpService.PendingApprovals',
-  );
+  const snap = contract<{
+    pending: {
+      requestId: string;
+      statement: string;
+      connectionName: string;
+      target: { database: string };
+    };
+  }>('dbmcp', 'DbMcpService.PendingApprovals');
   const approve = contract<{ requestId: string }>('dbmcp', 'args:DbMcpService.ApproveQuery');
   const { window: page, control } = await relaunch({
     control: [
@@ -27,6 +31,20 @@ test('contract: a pending write shows its statement and Approve answers by reque
 
   await emitPrompts(page, [routed('dbmcp', snap.pending.requestId)]);
   const statement = page.locator('[data-testid="db-mcp-approval-statement"]');
+  const name = page.locator('[data-testid="db-mcp-approval-target-name"]');
+  await expect(name).toHaveText(snap.pending.connectionName);
+  await expect(page.locator('[data-testid="db-mcp-approval-target-kind"]')).toHaveText('SQLite');
+  await expect(page.locator('[data-testid="db-mcp-approval-target-database"]')).toHaveText(
+    snap.pending.target.database,
+  );
+  const nameBox = await name.boundingBox();
+  const statementBox = await statement.boundingBox();
+  expect(nameBox?.y).toBeLessThan(statementBox?.y ?? 0);
+  const fontSize = (loc: typeof name) =>
+    loc.evaluate((el) => Number.parseFloat(getComputedStyle(el).fontSize));
+  expect(await fontSize(name)).toBeGreaterThan(
+    await fontSize(page.locator('[data-testid="db-mcp-approval-dialog"] p').first()),
+  );
   const formatted = await editorText(statement);
   expect(formatted).toContain('\n');
   expect(formatted.replace(/\s+/g, ' ').trim()).toBe(snap.pending.statement);

@@ -377,7 +377,8 @@ func (s *Server) awaitApproval(ctx context.Context, args runQueryArgs, summary m
 	outcome := s.cfg.Approvals.Request(ctx, ApprovalRequest{
 		ConnectionID: args.ConnectionID, ConnectionName: summary.Name, Kind: summary.Kind,
 		Class: class, Statement: args.SQL, Reason: reason,
-		Plan: approvalPlanFrom(plan, threshold),
+		Target: targetOf(summary, args.Path),
+		Plan:   approvalPlanFrom(plan, threshold),
 	})
 	switch outcome {
 	case ApprovalApproved:

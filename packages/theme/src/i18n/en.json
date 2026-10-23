@@ -10578,6 +10578,15 @@
         "statementView": {
           "aria": "Statement view"
         },
+        "target": {
+          "aria": "Target database",
+          "defaultDatabase": {
+            "label": "Default database"
+          },
+          "unclassified": {
+            "label": "Unclassified"
+          }
+        },
         "unknown": {
           "body": "{connection} ({kind}) wants to run a statement this app couldn’t classify through the database MCP server."
         },

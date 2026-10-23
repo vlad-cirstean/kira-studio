@@ -379,6 +379,23 @@ func toWireApprovalPlan(p *dbmcp.ApprovalPlan) *DbMcpApprovalPlan {
 	}
 }
 
+// DbMcpApprovalTarget is dbmcp.ApprovalTarget's wire projection; Path is never nil.
+type DbMcpApprovalTarget struct {
+	Color    string              `json:"color"`
+	ReadOnly bool                `json:"readOnly"`
+	Host     string              `json:"host"`
+	Database string              `json:"database"`
+	Path     []model.PathSegment `json:"path"`
+}
+
+func toWireApprovalTarget(t dbmcp.ApprovalTarget) DbMcpApprovalTarget {
+	path := t.Path
+	if path == nil {
+		path = []model.PathSegment{}
+	}
+	return DbMcpApprovalTarget{Color: t.Color, ReadOnly: t.ReadOnly, Host: t.Host, Database: t.Database, Path: path}
+}
+
 // DbMcpApprovalRequest is dbmcp.ApprovalRequest's wire projection — an absolute deadline (epoch
 // ms) instead of a time.Time, so a client-side countdown never drifts from the server's own clock.
 type DbMcpApprovalRequest struct {
@@ -390,8 +407,9 @@ type DbMcpApprovalRequest struct {
 	Statement      string `json:"statement"`
 	ExpiresAtMs    int64  `json:"expiresAtMs"`
 	// Reason is M3's own "permission" | "heavy" — every M2-era request is "permission" (M3 §6.2).
-	Reason string             `json:"reason"`
-	Plan   *DbMcpApprovalPlan `json:"plan"`
+	Reason string              `json:"reason"`
+	Plan   *DbMcpApprovalPlan  `json:"plan"`
+	Target DbMcpApprovalTarget `json:"target"`
 }
 
 // DbMcpApprovalSnapshot is dbmcp.ApprovalSnapshot's wire projection.
@@ -414,6 +432,7 @@ func toWireApprovalSnapshot(snap dbmcp.ApprovalSnapshot) DbMcpApprovalSnapshot {
 			ExpiresAtMs: snap.Pending.ExpiresAt.UnixMilli(),
 			Reason:      string(snap.Pending.Reason),
 			Plan:        toWireApprovalPlan(snap.Pending.Plan),
+			Target:      toWireApprovalTarget(snap.Pending.Target),
 		}
 	}
 	return out

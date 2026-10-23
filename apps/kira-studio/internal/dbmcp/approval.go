@@ -2,12 +2,14 @@ package dbmcp
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/notify"
 	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
@@ -68,6 +70,39 @@ type ApprovalPlan struct {
 	IssuesOmitted     int
 }
 
+// ApprovalTarget names the database a request would act on, so the dialog can show it prominently.
+type ApprovalTarget struct {
+	Color    string
+	ReadOnly bool
+	// Host is "host:port", "host", or "" (URI mode or file kinds).
+	Host string
+	// Database is the configured database (SQLite: the file path); "" when unset.
+	Database string
+	// Path is the decoded run_query/explain_query path; empty when the call passed none.
+	Path []model.PathSegment
+}
+
+// targetOf projects a connection summary and the call's encoded path. A path that fails to decode
+// yields an empty Path: the gate already accepted it, so this never fails.
+func targetOf(summary model.ConnectionSummary, path string) ApprovalTarget {
+	t := ApprovalTarget{Color: summary.Color, ReadOnly: summary.ReadOnly}
+	if summary.Host != nil && *summary.Host != "" {
+		t.Host = *summary.Host
+		if summary.Port != nil {
+			t.Host += ":" + strconv.Itoa(*summary.Port)
+		}
+	}
+	if summary.Database != nil {
+		t.Database = *summary.Database
+	}
+	if path != "" {
+		if np, err := model.DecodePath(summary.ID, path); err == nil {
+			t.Path = np.Segments
+		}
+	}
+	return t
+}
+
 // ApprovalRequest is one queued query — what the dialog renders. RequestID, EnqueuedAt and
 // ExpiresAt are minted by Request, never by the caller.
 type ApprovalRequest struct {
@@ -77,6 +112,7 @@ type ApprovalRequest struct {
 	Kind           string
 	Class          adapters.OpClass
 	Statement      string
+	Target         ApprovalTarget
 	EnqueuedAt     time.Time
 	ExpiresAt      time.Time
 	// Reason is M2's own "permission" for every M2-era call site — M3's runQuery/explainQuery are
