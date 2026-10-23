@@ -60,6 +60,8 @@ type Options struct {
 	Clock           scriptruns.Clock
 	// DockerHubAPI replaces the Docker Hub base URL the image registry check calls (flow-test seam); empty keeps the default.
 	DockerHubAPI string
+	// DockerExtra appends docker options (flow-test seams for the restore tracker).
+	DockerExtra []docker.Option
 	// Providers is the agent harness registry; nil means providers.New() (a flow-test seam).
 	Providers *harness.Registry
 }

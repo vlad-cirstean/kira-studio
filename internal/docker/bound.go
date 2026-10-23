@@ -2,6 +2,7 @@ package docker
 
 import (
 	"context"
+	"time"
 
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
@@ -20,11 +21,25 @@ type Option func(*Manager)
 // WithHubAPI points the Docker Hub repository check at base (a flow-test seam).
 func WithHubAPI(base string) Option { return func(m *Manager) { m.HubAPI = base } }
 
+// WithRestoreStore enables the restore tracker over store.
+func WithRestoreStore(store RestoreStore) Option { return func(m *Manager) { m.restoreStore = store } }
+
+// WithRestoreTiming sets the tracker's tick, stop grace and restart-policy wait (a flow-test seam).
+func WithRestoreTiming(tick, grace, policyWait time.Duration) Option {
+	return func(m *Manager) { m.restoreTiming = restoreTiming{tick: tick, grace: grace, policyWait: policyWait} }
+}
+
+// WithBootProbe replaces the engine boot marker read (a flow-test seam).
+func WithBootProbe(p BootProbe) Option { return func(m *Manager) { m.bootProbe = p } }
+
 // NewBoundService builds the service over the real process environment.
 func NewBoundService(emit appevent.Emitter, opts ...Option) *BoundService {
 	m := NewManager(emit)
 	for _, o := range opts {
 		o(m)
+	}
+	if m.restoreStore != nil {
+		m.restore = newRestoreTracker(m)
 	}
 	return &BoundService{m: m}
 }
@@ -34,6 +49,10 @@ func NewBoundService(emit appevent.Emitter, opts ...Option) *BoundService {
 func CloseWindowBound(b *BoundService, windowKey string) {
 	b.m.closeWindow(windowKey)
 }
+
+// StartRestoreBound starts the restore tracker, which then runs without any window until shutdown.
+// A package function for the same reason as CloseWindowBound.
+func StartRestoreBound(b *BoundService) { b.m.restore.start() }
 
 // ServiceShutdown ends every stream at app quit. Wails calls it on each registered service and
 // leaves it out of the bindings.

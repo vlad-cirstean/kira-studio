@@ -182,7 +182,8 @@ func wireEmbeddedServices(deps appcore.Deps, installer harness.MCPInstaller, kee
 		slog.Warn("recover script runs", "scope", "startup", "err", err)
 	}
 	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{Emit: deps.Events, Registry: registry, Scripts: runs, Agent: agents}}
-	dockerSvc := &bridge.DockerService{BoundService: docker.NewBoundService(deps.Events, dockerOptions(opts)...)}
+	dockerSvc := &bridge.DockerService{BoundService: docker.NewBoundService(deps.Events, dockerOptions(opts, deps.Repos.DockerRestore)...)}
+	docker.StartRestoreBound(dockerSvc.BoundService)
 	events := bridge.NewEvents(deps.Events)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, DbMcp: dbMcpApprovals})
 
@@ -274,9 +275,10 @@ func newPromptRouter(windows *shell.WindowRegistry, repositories *repos.Repos, e
 	})
 }
 
-func dockerOptions(opts Options) []docker.Option {
-	if opts.DockerHubAPI == "" {
-		return nil
+func dockerOptions(opts Options, restore docker.RestoreStore) []docker.Option {
+	out := []docker.Option{docker.WithRestoreStore(restore)}
+	if opts.DockerHubAPI != "" {
+		out = append(out, docker.WithHubAPI(opts.DockerHubAPI))
 	}
-	return []docker.Option{docker.WithHubAPI(opts.DockerHubAPI)}
+	return append(out, opts.DockerExtra...)
 }
