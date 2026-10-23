@@ -17,8 +17,9 @@ Decisions (user, 2026-10-23):
 | P332 | Kira Space as default app for code and data files | Todo |
 | P333 | DB MCP: prominent target database and response preview | Todo |
 | P334 | Docker: restore running containers after an engine/VM restart | Todo |
-| P335 | Code review round 1 | Todo |
-| P336 | Code review round 2 | Todo |
+| P335 | SQL grid: context-menu "Copy as" with multiple rows selected | Todo |
+| P336 | Code review round 1 | Todo |
+| P337 | Code review round 2 | Todo |
 
 ## P330: Branch naming, PR automation, release on merge
 
@@ -60,6 +61,10 @@ Release failed repeatedly on 2026-10-23 (v0.2.11: 4 attempts; ci-gate timed out 
 - Deleted containers are listed as gone, not recreated. Boot-time restore (login item/helper) is out of scope.
 - Planner decides the DB home of the snapshot, whether restore is click-only or automatic (default click-only unless told otherwise), and tests (`dockerflow` flow test plus UI spec).
 
-## P335, P336: Code review rounds
+## P335: SQL grid: context-menu "Copy as" with multiple rows selected
+
+With several rows selected, the keyboard copy shortcut puts the rows on the clipboard, but right click > "Copy as" puts nothing there. Planner reproduces it first (UI spec, real clipboard read), finds why the menu path differs from the shortcut path, and fixes it so both share one code path. Backend-or-UI split per the new-feature test rule applies only if a bound call is involved.
+
+## P336, P337: Code review rounds
 
 Per `CLAUDE.md` "Code review": one Opus reviewer per round (architecture/security, correctness, performance), findings file under `plans/` committed before any fixer, then one sequential Sonnet fixer committing per logical group. Scope: everything changed since the last review session, base commit stated in the findings file. Round 2 covers the full diff since that same base, including round 1 fixes.
