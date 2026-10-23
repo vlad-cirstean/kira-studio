@@ -13,7 +13,7 @@ Decisions (user, 2026-10-23):
 | Phase | Title | Status |
 |---|---|---|
 | P330 | Branch naming, PR automation, release on merge | Done |
-| P331 | Fix the release workflow | Todo |
+| P331 | Fix the release workflow | Done |
 | P332 | Kira Space as default app for code and data files | Todo |
 | P333 | DB MCP: prominent target database and response preview | Todo |
 | P334 | Docker: restore running containers after an engine/VM restart | Todo |
@@ -40,6 +40,8 @@ Result: Remote branches `v0.2.10`, `v2.0`, `v2.6`, `v2.8` copied to `chapter/<na
 ## P331: Fix the release workflow
 
 Release failed repeatedly on 2026-10-23 (v0.2.11: 4 attempts; ci-gate timed out at 2400s). Earlier failures: v0.2.7, v0.2.8 first run, v0.2.1, plus the mongo kernel 6.19 gate (closed PR #5). Planner reads those run logs and root-causes each. After P330, the ci-gate cause is gone; confirm no other cause remains.
+
+Result: Root causes from run logs. v0.2.1: stale S3/SQS auth test (`d7efbe03f`). v0.2.1 and v0.2.7: timing-dependent Redis and Kafka tests (rewritten in `5d2c3d482`, green since). v0.2.8: `mongo:8.3` refuses kernel 6.19 (pinned to `mongo:7.0.45`, PR #5). v0.2.7, v0.2.8, v0.2.11: `ci-gate` (removed by P330). v0.2.11 gate hung on a slow apt mirror in `pr.yml` setup; that stays out of scope (`pr.yml`/`cache-warm.yml` only, no own row yet). No failure in `build` or `publish`. Three `release.yml` gaps fixed: F1 `tag` refuses a non-prerelease tag whose commit is not on `main` (compare API); F2 `tag` refuses an already-published release before any runner starts; F3 `publish` refuses a tag moved since `tag` resolved it. Staged as one combined `release.yml` patch (P330 plus P331) in `docs/pending-changes/`; `docs/PACKAGING.md` §7 updated. Checks: `git apply --check` passes for both patches; actionlint 1.7.7 clean on the applied tree with `docs/pending-workflows/*`; `ci-gate` count 0 in `release.yml`; `GITHUB_REF_NAME`/`github.sha` hits only in `run-name`, `concurrency`, `tag` env; `check-docs` passes. Guard bodies run against the real repo: `v0.2.11` exits 0, `v0.2.8` exits 1 (published), prerelease skips compare, off-main commit (`behind`) exits 1, moved-tag step exits 1 on a wrong sha and 0 on the real one. User still applies both patches and the pending workflows; `v0.2.11` has a tag and no release (recommend skip, v0.2.12 ships a superset). Also added `docs/pending-changes/delete-old-branches.sh`: run locally to delete remote `v0.2.10`, `v2.0`, `v2.6`, `v2.8` after verifying each matches `chapter/<name>`; delete the script afterwards.
 
 ## P332: Kira Space as default app for code and data files
 
