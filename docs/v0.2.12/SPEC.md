@@ -12,7 +12,7 @@ Decisions (user, 2026-10-23):
 
 | Phase | Title | Status |
 |---|---|---|
-| P330 | Branch naming, PR automation, release on merge | Todo |
+| P330 | Branch naming, PR automation, release on merge | Done |
 | P331 | Fix the release workflow | Todo |
 | P332 | Kira Space as default app for code and data files | Todo |
 | P333 | DB MCP: prominent target database and response preview | Todo |
@@ -34,6 +34,8 @@ Decisions (user, 2026-10-23):
 - Document the GitHub settings the user must apply: allow auto-merge, ruleset on `main` requiring the `pr.yml` checks, ruleset restricting branch names.
 - `CLAUDE.md`: chapter branch `chapter/v<version>`; user gives version at chapter start, else last tag with patch plus 1; chapter close phase also opens the PR; replace "No per-phase PRs" accordingly.
 - `docs/DEV_ENVIRONMENT.md` and `docs/PACKAGING.md` §7: release flow.
+
+Result: Remote branches `v0.2.10`, `v2.0`, `v2.6`, `v2.8` copied to `chapter/<name>` at identical shas. Rename API and branch delete return 403 through the session proxy, so the four old names remain on the remote; delete them by hand. `.githooks/pre-push` runs `scripts/check-push-refs.sh` first and refuses any branch but `main` and `chapter/vX.Y.Z` (no `claude/*` exemption); hook table passes and a `--dry-run` push to a bogus branch is refused. `scripts/release-on-merge.sh` added, `scripts/release-ci-gate.sh` deleted. Workflows staged: patches for `pr.yml` (drop push; also SC2046 fix) and `release.yml` (tag input, `tag` job, no `ci-gate`), new `pr-auto-merge.yml`, `pr-rerun-flaky.yml`, `release-on-merge.yml`, `cache-warm.yml` under `docs/pending-workflows/`. actionlint 1.7.7 clean on the applied result; shellcheck clean on both scripts; `cache-warm.yml` cache keys match `pr.yml` and the setup action. `CLAUDE.md`, `DEV_ENVIRONMENT.md`, `PACKAGING.md` §7 and `ARCHITECTURE.md` updated. User still applies the staged files and the GitHub settings in `docs/PACKAGING.md` §7 "Repository settings"; first-use checks (bot rerun raising `workflow_run`, tag creation on a workflow-changing commit, docker tar size) stay open until the v0.2.12 merge.
 
 ## P331: Fix the release workflow
 
