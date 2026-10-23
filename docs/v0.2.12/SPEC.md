@@ -14,7 +14,7 @@ Decisions (user, 2026-10-23):
 |---|---|---|
 | P330 | Branch naming, PR automation, release on merge | Done |
 | P331 | Fix the release workflow | Done |
-| P332 | Kira Space as default app for code and data files | Todo |
+| P332 | Kira Space as default app for code and data files | Done |
 | P333 | DB MCP: prominent target database and response preview | Todo |
 | P334 | Docker: restore running containers after an engine/VM restart | Todo |
 | P335 | SQL grid: context-menu "Copy as" with multiple rows selected | Todo |
@@ -48,6 +48,8 @@ Result: Root causes from run logs. v0.2.1: stale S3/SQS auth test (`d7efbe03f`).
 - Kira Space settings: option to make Kira Space the default app for common code and data extensions (planner proposes the extension list and groups).
 - A file opened from outside the app (Finder, `open`, double-click) opens in a new window.
 - Packaging side (file associations in the bundle `Info.plist`/`build/config.yml`) and the in-app setting (e.g. LaunchServices default handler) are both in scope; planner states what macOS allows without prompts and what it cannot do from a Linux sandbox.
+
+Result: Shipped in five commits. `internal/filetypes` is the one vocabulary (41 code, 14 data extensions); `tools/gendoctypes` renders the Viewer document types, `LSItemContentTypes` and imported UTIs into both plists (`--check` is verify-packaging S13). Finder opens arrive as `ApplicationOpenedWithFile`, coalesce 300 ms in `openedfiles`, and open one keyed new window that pulls its targets once (`OpenedFilesService.Pending`); a path inside an imported repo opens as a repo-file tab, any other as a new read-only `local-file` tab in the general workspace (`OpenedFilesService.Read`). `RepoFileView` and `LocalFileView` share `useReadonlyFileViewer`. Settings > File types drives `filehandlers.Registry` (macOS cgo `NSWorkspace`; `Unsupported` elsewhere); migration 0045 `file_handler_previous` stores the previous handler for restore, and a gone app reports `unrestored`. Deviations: per-extension toggles are `Switch`, not `Checkbox` (check-ui-primitives U28 forbids Checkbox in settings panes); `saved_at` is INTEGER ms (conventions N7); `Registry` gained `Supported()`; `filehandlers` takes a `PreviousStore` interface so it does not import repos; added proper nouns Finder, Get Info, Open with, Change All to the copy checker; the `TestHarnessBootsWithDefaultSettings` bound-service count (stale since group 2) is now 28. Checks: `go vet`, `go build -tags server`, `GOOS=darwin CGO_ENABLED=0` build of the leaf packages, all `apps/kira-space` Go tests, `bun run test:flows:space`, contracts stable at `-count=2`, full `typecheck` and lint, `bun test` for space unit (170 pass), `test:ui:space` 671 passed, verify-packaging passes. Not verifiable here: the cgo `registry_darwin.go` never compiled (no macOS toolchain), LaunchServices registration, any system prompt on set, per-UTI resolution. User runs the Mac checks listed in `ARCHITECTURE.md` Known open items.
 
 ## P333: DB MCP: prominent target database and response preview
 
