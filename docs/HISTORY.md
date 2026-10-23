@@ -6739,6 +6739,111 @@ The comment cleanup requires building a comment-extraction tool.
 ### v2.8 P321 (Done)
 <!-- /chapter v2.8 -->
 
+<!-- chapter v0.2.10 -->
+## v0.2.10
+Source: docs/v0.2.10/ at 103446cf90d8. 12 phases.
+
+### v0.2.10 P322 (Done)
+MCP tool parameters that are required in practice are now required in the tool input schema, so the AI builds the request correctly the first time.
+`llmprompts.RequireNonEmpty` (minLength/minItems) wraps 16 tool schemas: 5 dbmcp, 6 agentmcp, 5 memory.
+`run_query` and `explain_query` `path` is schema-required; the handler refuses an empty path on postgres, mysql, mariadb and mongodb.
+`finish_step` refuses an empty `reason` on a not-ok result or `needs_input`.
+A flow test asserts the schema rejection over HTTP.
+Budgets were raised: `dbmcp.instructions` 1500, `finish_step` reason 80.
+
+### v0.2.10 P323 (Done)
+The SQL approval dialog is now `2xl` with a fixed height.
+New `ApprovalStatement.vue` shows the statement in a read-only `MonacoHost` (new `forceWrap` prop), formatted by `formatConsoleText` via `computedAsync` (worker over `INLINE_CHARS`).
+A Formatted / As sent toggle is hidden when nothing formats.
+`consoleLanguageFor` moved to `format.ts`.
+Deny keeps initial focus via `data-dialog-initial`.
+
+### v0.2.10 P324 (Done)
+Grid selection no longer draws a border; the fill alone marks selection. `selectionEdges.ts`, `refreshSelEdges` in both Slick hosts, the `sel-*` flags and the box-shadow CSS were removed.
+The proto grid in `frontend/proto` still draws edges and was left as a prototype.
+`useConnectionGate` exposes `reconnecting`; 6 Reconnect-and-load buttons show a `pending` spinner. The console refresh icon button has no `pending` support and is unchanged.
+The Automations Runs panel root is `h-full` and the runs list cap went from `max-h-72` to `max-h-[50vh]`.
+`UpdateDialog` shows a `Spinner` in the installing state.
+
+### v0.2.10 P325 Part 1 (Done)
+Fetched data stays visible and selectable when a connection drops; a banner with Reconnect shows, and stale data cannot be edited or committed.
+New `state/staleData.ts` (`useStaleDataStore`: `stamp`, `isStale`, cleanup on tab close), `tabNeedsReconnect` in `useConnectionGate.ts`, `views/shared/StaleDataStrip.vue`, `writeDisabledReason(…, stale)` and a `connection-lost` dock reason.
+`KEEPS_DATA_ON_DROP` in `tabs.ts` holds `'data'`.
+The grid stamps each read; `gridViewStore.isStale` gates `DataView`, `DataToolbar`, `SlickGridHost` (edit, paste, menus, insert inputs, dock) and `GenerateDataDialog`.
+Staged edits survive a drop; Discard stays enabled.
+The strip `description` copy is two sentences because check C6 rejects lowercase after the dash.
+
+### v0.2.10 P325 Part 2 (Done)
+Documents, KeyValue (tab and browse preview) and Browse keep data on a drop, read-only behind `StaleDataStrip`.
+`KEEPS_DATA_ON_DROP` adds `'document'` and `'keyvalue'`. Each `load` stamps and each store has `isStale`. `KeyValueHost.gateTabId` ties the preview to the browse tab.
+`createImmediateMutator` takes `isStale` and throws `studio.common.connectionLost.error`; documents and keyvalue wire it, and `addKey` checks itself.
+Open editors, popovers and the object draft keep their buffer with Save disabled; delete confirms re-check stale.
+The upload dialog refuses when its origin tab is stale. The browse container Upload item is omitted and object Delete is disabled.
+New `useDocumentGate.ts` keeps files under the N10 length limit.
+Error copy is "Can’t save. The connection was lost." because check C6 rejects lowercase after a colon.
+The Browse spec uses Redis, so toolbar Upload and object-row Delete are not covered (no S3 fixture).
+
+### v0.2.10 P325 Part 3 (Done)
+Stream, Definition and Console stamp on load or run (`stream/state.ts`, `definition/state.ts`, `console/state.ts`, each with `isStale`); `'stream'` and `'console'` join `KEEPS_DATA_ON_DROP`.
+`StaleDataStrip` shows in `StreamView`, `DefinitionView` and `ConsoleView` (above the result strip). Reconnect gates show only with nothing loaded.
+Stream: `useStreamGate` adds `stale`, `canInsertCaps` and `canDeleteCaps`. Send/Produce and Delete stay visible but disabled while stale; compose submit and Delete re-check stale. Caps clear on drop, so the gate keeps the last live caps.
+`createImmediateMutator` `isStale` is now required.
+Definition and Console have no write path on shown data.
+The stream `SelectedCell` has no `stale` field: the dock is viewer mode and shows no chip. Console `explain` also stamps.
+`docs/ARCHITECTURE.md` was updated.
+
+### v0.2.10 P326 (Done)
+Pending changes in the SQL data view show a before/after diff like code.
+`PromptDiff` moved to `packages/workbench/src/editor/MonacoDiff.vue` with a `language` prop and `hideUnchangedRegions`. New `valueDiffSides` in `celleditor/valueDiff.ts`.
+`PendingEdit.original` is captured at first stage and dropped in `discardCellEdit`; `editedCells` getter added.
+`PreviewCommandPanel` has Changes (cell list plus diff) and SQL tabs, shown only with edits; SQL is fetched only when shown.
+No backend half: no IPC or Go change.
+The popover stays `w-120` because U15 allows no wider. Tab labels and panel title reuse existing keys because check C3 rejects duplicate text; `previewCommand.title` stays for Generate data. The cell list is `ul`/`li` because biome rejects `role` on `div`.
+
+### v0.2.10 P327 (Done)
+The cell editor has a Show changes toggle (`cell-editor-diff-toggle`) that diffs the buffer against the stored value via shared `MonacoDiff` and `valueDiffSides`.
+`SelectedCell.original` comes from the new `stagedOriginal` getter; the grid publish watch gains a staged-value source, so stage or discard republishes.
+New `useCellDiff.ts`; the Generate popover moved to `CellGenerateMenu.vue`.
+No backend half: no IPC or Go change.
+Republish made the buffer read clean after blur-stage, which disabled Revert and broke scenario 6b. Revert and the Modified chip now also key on `SelectedCell.original` (own `fix:` commit).
+
+### v0.2.10 P328 (Done)
+Tree row estimate shows only the number.
+Postgres partitions list under their partitioned table; the tree expands it, collapsed by default.
+The op log records source (user or MCP) and the Operations panel shows it, in both apps.
+Check for updates: `appupdate` checker, both app bridges, menu and palette entries, `UpdateDialog` manual mode. Dev builds refuse (`TestCheckForUpdatesRefusedInDevBuild` in each app).
+Go to PK/FK writes a plain filter: no backticks, no quotes around numbers (`numericNavColumns` in `rowValues.ts`, used in place of a `NavColumns` field). The quoted-name test case was skipped; `interaction.spec` keeps `"name" = '...'` because the mock serves filter-by-value.
+The Postman parser reads environment exports and globals, classified by shape. `Import` takes several paths, collections and environments in one report (`ImportEnvironment` in the variables repo), atomic per file. Contracts `api-postman*.json`; ImportReportStrip shows environments.
+Item (d) landed as one commit because the hook rejects unused i18n keys otherwise.
+Pre-existing fixes: fakeagent failure now sends `reason` (`termflow` `TestSmartScript`); `llm-prompts.json` hash regenerated; stale `space agents board` screenshot label expectation.
+
+### v0.2.10 P329 (Done)
+Code review round 1 fixed all nine findings.
+MCP reads on writable connections set `ConsoleRequest.ReadOnly` when the verdict is read and write mode is not `allow`. Postgres and MySQL/MariaDB route it into their existing read-only wrap; scenario `ReadOnlyRequestRefusesWrite` passes on real Postgres, MySQL 8.4 and MariaDB 11.4. Postgres `READ ONLY` leftovers are in `docs/ARCHITECTURE.md` Known open items.
+The classifier treats `DESCRIBE`/`DESC ANALYZE` and MariaDB `ANALYZE <DML>` as the target.
+The stale strip is hidden when nothing is loaded (Definition, Documents, Stream). The Console strip is reconnect-only and restamps results after connect; it does not rerun, because a rerun could repeat a write.
+`checkError` clears in `later()` and `openUpdateDialog()`.
+Runs section uses `max-h-1/2` against the panel, not the viewport.
+New `s3Fixture.ts` and `browse-s3-connection-drop.spec.ts` cover S3 Browse gates; the fixture is hand-built and renderer-only.
+`Service.ConnectContext` carries ctx values, not cancellation; dbmcp uses it.
+Title bar comments in `window.go` and `tokens.css` were cut to the current constraint.
+SQLite and ClickHouse get no per-request read-only wrap; exposure is negligible. MySQL/MariaDB expose no per-transaction read-only flag to read back, so on a writable connection verify trusts the open transaction.
+
+### v0.2.10 P330 (Done)
+Code review round 2 fixed all four findings.
+An MCP read on a writable connection with an open transaction is refused: Postgres checks `TxStatus`, MySQL/MariaDB use the 1568 probe before `START TRANSACTION READ ONLY`. The user's transaction is never committed or rolled back. New message `openTransaction`; scenario `ReadOnlyRequestKeepsOpenTransaction`.
+`AssertNoTransactionEscalation` runs only on read-only connections. A per-request violation uses its own message `readOnlyRequest` (`adapters.ReadOnlyViolation`). Scenario `ReadOnlyRequestAllowsBackslashRead` covers `~ '\d+'`, `LIKE 'a\_b'`, `E'\n'` and a `read write` literal.
+A failed update check sends a short cause (`appupdate.FailureCause`: timed out, offline, unexpected status N, unknown error); the raw error is logged with `slog`. This also fixed the same leak in `apps/kira-space/internal/bridge/update.go`.
+`DESCRIBE`/`DESC` were removed from `sqlReadKeywords` and the name guard dropped; the EXPLAIN case owns them.
+The MySQL wrap resets the armed read-only flag if `START TRANSACTION` fails.
+
+### v0.2.10 P331 (Done)
+The chapter was folded by hand at user instruction; `scripts/docshistory` was not run.
+`chapterRe` in `scripts/docshistory/units.go` rejects `v0.2.10` and `versionKey` would sort it before `v1`; the tool fix is out of scope.
+`docs/history-runs/` never existed. No runtime data lived under `docs/v0.2.10/`.
+The P323 row status was fixed from Todo to Done.
+<!-- /chapter v0.2.10 -->
+
 ## Fixes outside chapters
 
 ### Release container tests (fix/release-container-tests)
