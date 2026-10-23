@@ -15,7 +15,7 @@ Decisions (user, 2026-10-23):
 | P330 | Branch naming, PR automation, release on merge | Done |
 | P331 | Fix the release workflow | Done |
 | P332 | Kira Space as default app for code and data files | Done |
-| P333 | DB MCP: prominent target database and response preview | Todo |
+| P333 | DB MCP: prominent target database and response preview | Done |
 | P334 | Docker: restore running containers after an engine/VM restart | Todo |
 | P335 | SQL grid: context-menu "Copy as" with multiple rows selected | Todo |
 | P336 | Code review round 1 | Todo |
@@ -57,6 +57,8 @@ Result: Shipped in five commits. `internal/filetypes` is the one vocabulary (41 
 - New setting: show a response preview. When on, the approval step shows exactly what the AI will receive for the query, as a table, with table masking already applied.
 - Scope: `DbMcpApprovalDialog.vue` and the MCP request path in `apps/kira-studio`. Planner decides whether this splits into Part 1 (target prominence) and Part 2 (preview setting); a split keeps the number per `CLAUDE.md`.
 - Preview must run the same code path as the real answer, never a parallel reimplementation. Planner states how a preview can run without a double-execution side effect (read-only verdict only, or run once and hold the result for the approved send).
+
+Result: Shipped in six commit groups, no split. Every approval request carries an `ApprovalTarget` (connection colour, read-only flag, host, effective database or file path, statement class); `ApprovalTarget.vue` renders it as a banner above the query for both stages. New setting `dbMcp.previewResponses` (default off, Settings > Database MCP). When on, `run_query` executes after the query-stage approval, then holds the exact result in a second response-stage request; Send returns the same result value untouched, so the preview is the real code path and runs once. Withhold, timeout, abandon and a full queue return an app-authored error with no row data. Execution comes before review because pre-running would defeat the query gate and a transaction held across a human wait keeps locks (and Redis, Kafka, SQS, S3 cannot roll back); a withheld write has already run and the dialog says so. Snapshots carry only `{isError, bytes}`; `DbMcpService.PendingResponse` serves the text. `ApprovalResponse.vue` parses the held bytes into a virtualised shadcn Table (masked columns marked) with an As sent tab; it never re-renders. Approve re-checks the mask set (`mask.Set.Equal`) and withholds if rules changed during review. The setting read fails closed. Go-sdk v1.8.0 assumption resolved: a plain handler error becomes an `IsError` text result carrying `err.Error()`, so the preview shows what the client gets. Only `run_query` is reviewed. Checks: `go test -race` for dbmcp, bridge, mask, dbmcpflow; all flow tests at `-count=2` and contracts stable; `bun run test:ui:studio` 596 passed; `bun run test:claude:studio` passed (preview off by default); full pre-commit hook on every commit. Out of scope: explain/describe/list review, per-connection setting, undo of a withheld write, editing the result, prompt registry changes. User still: checks the banner on a Mac in light and dark themes, compares the preview table to what Claude quotes, and raises `MCP_TOOL_TIMEOUT` if needed (two stages can hold a call up to 4 minutes).
 
 ## P334: Docker: restore running containers after an engine/VM restart
 
