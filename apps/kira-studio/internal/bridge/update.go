@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
@@ -52,7 +53,8 @@ func (s *UpdateService) Check(ctx context.Context) (UpdateStatus, error) {
 	case errors.Is(err, appupdate.ErrNotReleaseBuild):
 		return UpdateStatus{}, ipcerr.T(ipcerr.CodeConflict, "backend.core.appUpdate.notRelease.body", nil)
 	case err != nil:
-		return UpdateStatus{}, ipcerr.T(ipcerr.CodeUnavailable, "backend.core.appUpdate.checkFailed.body", map[string]string{"cause": err.Error()})
+		slog.Warn("appupdate: manual check failed", "scope", "appupdate", "err", err)
+		return UpdateStatus{}, ipcerr.T(ipcerr.CodeUnavailable, "backend.core.appUpdate.checkFailed.body", map[string]string{"cause": appupdate.FailureCause(err)})
 	}
 	return toWireUpdateStatus(res, s.Installer.DisplayLogPath()), nil
 }

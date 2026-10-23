@@ -21,7 +21,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"regexp"
 	"sync"
 	"time"
 
@@ -119,6 +121,23 @@ func (c *Checker) Check(ctx context.Context) (Result, error) {
 		return Result{CurrentVersion: c.running}, ErrNotReleaseBuild
 	}
 	return c.fetchLatest(ctx)
+}
+
+var statusErrRe = regexp.MustCompile(`unexpected status (\d+)$`)
+
+// FailureCause maps a failed check to a short, URL-free reason for the user.
+func FailureCause(err error) string {
+	var netErr net.Error
+	switch {
+	case errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &netErr) && netErr.Timeout()):
+		return "timed out"
+	case errors.As(err, new(*net.OpError)) || errors.As(err, new(*net.DNSError)):
+		return "offline"
+	}
+	if m := statusErrRe.FindStringSubmatch(err.Error()); m != nil {
+		return "unexpected status " + m[1]
+	}
+	return "unknown error"
 }
 
 type fetched struct {
