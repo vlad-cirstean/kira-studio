@@ -159,10 +159,6 @@ export function asRepoFileTab(tab: TabRecord | null | undefined): RepoFileTabRec
   return tab && tab.kind === 'repo-file' ? tab : null;
 }
 
-export function asLocalFileTab(tab: TabRecord | null | undefined): LocalFileTabRecord | null {
-  return tab && tab.kind === 'local-file' ? tab : null;
-}
-
 export function asRepoDiffTab(tab: TabRecord | null | undefined): RepoDiffTabRecord | null {
   return tab && tab.kind === 'repo-diff' ? tab : null;
 }
