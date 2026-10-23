@@ -207,56 +207,82 @@ func reconcile(prev *RestoreSnapshot, o observation, now int64, t restoreTiming)
 	s := *prev
 	s.Entries = append([]RestoreEntry(nil), prev.Entries...)
 	s.Context, s.Host = o.Context, o.Host
-	changed := false
-
 	if s.State == statePending {
-		if o.BootID != "" && o.BootID != s.BootID {
-			s.BootID, s.BootAt, changed = o.BootID, o.BootAt, true
-		}
-		if !hasOpen(itemStatuses(s, o, now, t)) {
-			return rebuildTracking(o, now), true
-		}
-		if changed {
-			s.UpdatedAt = now
-		}
-		return s, changed
+		return reconcilePending(s, o, now, t)
 	}
-
-	bootChanged := s.BootID != "" && o.BootID != "" && s.BootID != o.BootID
-	outage := s.BootID == "" && o.BootID == "" && o.UnreachableSince > 0
-	if bootChanged || outage {
-		cand := s
-		if bootChanged {
-			cand.BootID, cand.BootAt = o.BootID, o.BootAt
-		} else {
-			cand.BootAt = now
-			cand.Entries = outageEntries(s.Entries, o, t)
-		}
-		if hasOpen(itemStatuses(cand, o, now, t)) {
-			cand.State, cand.DetectedAt, cand.UpdatedAt = statePending, now, now
-			return cand, true
-		}
+	if cand, ok := detectRestart(s, o, now, t); ok {
+		return cand, true
 	}
+	changed := false
 	if o.BootID != "" && o.BootID != s.BootID {
 		s.BootID, s.BootAt, changed = o.BootID, o.BootAt, true
 	}
+	if updateEntries(&s, o, now, t) {
+		changed = true
+	}
+	if changed {
+		s.UpdatedAt = now
+	}
+	return s, changed
+}
 
+// reconcilePending keeps a pending snapshot frozen: it follows a further restart and clears once nothing is open.
+func reconcilePending(s RestoreSnapshot, o observation, now int64, t restoreTiming) (RestoreSnapshot, bool) {
+	changed := false
+	if o.BootID != "" && o.BootID != s.BootID {
+		s.BootID, s.BootAt, changed = o.BootID, o.BootAt, true
+	}
+	if !hasOpen(itemStatuses(s, o, now, t)) {
+		return rebuildTracking(o, now), true
+	}
+	if changed {
+		s.UpdatedAt = now
+	}
+	return s, changed
+}
+
+// detectRestart returns the pending snapshot when the boot marker moved (or, without a bridge, an
+// outage was observed) and something is left to restore.
+func detectRestart(s RestoreSnapshot, o observation, now int64, t restoreTiming) (RestoreSnapshot, bool) {
+	bootChanged := s.BootID != "" && o.BootID != "" && s.BootID != o.BootID
+	outage := s.BootID == "" && o.BootID == "" && o.UnreachableSince > 0
+	if !bootChanged && !outage {
+		return s, false
+	}
+	if bootChanged {
+		s.BootID, s.BootAt = o.BootID, o.BootAt
+	} else {
+		s.BootAt = now
+		s.Entries = outageEntries(s.Entries, o, t)
+	}
+	if !hasOpen(itemStatuses(s, o, now, t)) {
+		return s, false
+	}
+	s.State, s.DetectedAt, s.UpdatedAt = statePending, now, now
+	return s, true
+}
+
+// updateEntries is the steady-state pass: refresh running entries, age out stopped ones past
+// grace, add new running containers. It reports whether anything changed.
+func updateEntries(s *RestoreSnapshot, o observation, now int64, t restoreTiming) bool {
+	changed := false
 	byID, _ := o.index()
 	known := make(map[string]struct{}, len(s.Entries))
 	kept := s.Entries[:0]
 	for _, e := range s.Entries {
 		known[e.ID] = struct{}{}
 		c, ok := byID[e.ID]
-		if ok && c.Running {
+		switch {
+		case ok && c.Running:
 			if e.StoppedSeenAt != 0 {
 				e.StoppedSeenAt, changed = 0, true
 			}
 			if e.Name != c.Name {
 				e.Name, changed = c.Name, true
 			}
-		} else if e.StoppedSeenAt == 0 {
+		case e.StoppedSeenAt == 0:
 			e.StoppedSeenAt, changed = now, true
-		} else if now-e.StoppedSeenAt >= t.grace.Milliseconds() {
+		case now-e.StoppedSeenAt >= t.grace.Milliseconds():
 			changed = true
 			continue
 		}
@@ -272,9 +298,8 @@ func reconcile(prev *RestoreSnapshot, o observation, now int64, t restoreTiming)
 	}
 	if changed {
 		sortEntries(s.Entries)
-		s.UpdatedAt = now
 	}
-	return s, changed
+	return changed
 }
 
 // outageEntries keeps the entries an observed outage can explain: still running, missing, or
