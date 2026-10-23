@@ -9114,6 +9114,42 @@
           "description": "Long lines wrap instead of scrolling, in the file viewer."
         }
       },
+      "fileTypes": {
+        "description": "Make Kira Space the app that opens code and data files from Finder. It opens them read-only. Turning a switch off gives each type back to the app that had it.",
+        "ext": {
+          "toggle": {
+            "label": "Open .{ext} files with Kira Space"
+          }
+        },
+        "extensions": {
+          "label": "{count} file types"
+        },
+        "group": {
+          "code": {
+            "label": "Source code"
+          },
+          "data": {
+            "label": "Data files"
+          }
+        },
+        "handler": {
+          "unavailable": {
+            "label": "Not registered"
+          }
+        },
+        "some": {
+          "status": "Kira Space opens {count} of these types"
+        },
+        "unregistered": {
+          "body": "The system does not know these file types yet. Run Kira Space once from the apps folder, then reopen this pane."
+        },
+        "unrestored": {
+          "body": "Kira Space couldn’t give back {exts} because the previous app is gone. In Finder, choose Get Info on a file of that type, then choose an app under Open with and click Change All."
+        },
+        "unsupported": {
+          "body": "Changing default apps works only in the installed macOS app."
+        }
+      },
       "git": {
         "fetchInterval": {
           "description": "Zero disables background fetching. It never prompts for a credential. After a credential or remote error it stops until the next explicit fetch, and network errors retry with backoff.",
@@ -9240,6 +9276,9 @@
         }
       },
       "nav": {
+        "fileTypes": {
+          "label": "File types"
+        },
         "mobileAccess": {
           "label": "Mobile access"
         }

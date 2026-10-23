@@ -15,6 +15,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/filehandlers"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
@@ -38,7 +39,7 @@ var mobileAssets embed.FS
 
 // Startup order: the argv shims (askpass, memory-mcp, memory-embed) -> config.EnsureLayout ->
 // logging.Init/Sweep -> storage.Open (migrates) -> repos.New -> appwire.Build (terminal registry,
-// ADE tracker with the Claude Code hooks, task board, keep-awake, the 27 bound services) ->
+// ADE tracker with the Claude Code hooks, task board, keep-awake, the 28 bound services) ->
 // application.New (the bound services plus the git stream registration) -> the menu -> the
 // startup window list, opened -> app.Run(). No adapters, connections, HTTP/gRPC or DB MCP:
 // not this app's module.
@@ -101,6 +102,7 @@ func main() {
 		Repos: repositories, DB: db, Emitter: rawEmitter, Browser: browserOpener,
 		Dialogs: appshell.NewDialogs(rawDialogs), Locator: platformLocator(),
 		KeepAwakeDriver: keepawake.NewPlatformDriver(), MobileAssets: mobileAssetsFS,
+		FileHandlers: filehandlers.NewRegistry(),
 	})
 	windows, quitter := wired.Windows, wired.Quitter
 

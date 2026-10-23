@@ -19,25 +19,26 @@ import (
 // persisted history of every Claude Code session it has spawned or resumed
 // (migrations/0004_p129_ade_sessions.sql).
 type Repos struct {
-	Settings        *SettingsRepo
-	Windows         *WindowsRepo
-	MobileDevices   *MobileDevicesRepo
-	MobileNetwork   *MobileTrustedNetworkRepo
-	GitRepoSettings *GitRepoSettingsRepo
-	CodeRepos       *CodeReposRepo
-	Layout          *LayoutRepo
-	Tabs            *TabsRepo
-	AdeSessions     *AdeSessionsRepo
-	AdeReview       *AdeReviewWindowsRepo
-	AdeViewedSync   *AdeViewedSyncRepo
-	AdeTasks        *AdeTaskRepo
-	AdeBacklog      *AdeBacklogRepo
-	AdeRepoConfig   *AdeRepoConfigRepo
-	AdeFacts        *AdeFactsRepo
-	AdeLogs         *AdeLogsRepo
-	AdeRunSandbox   *AdeRunSandboxRepo
-	CustomScripts   *scripts.Repo
-	ScriptRuns      *scriptruns.Repo
+	Settings            *SettingsRepo
+	Windows             *WindowsRepo
+	MobileDevices       *MobileDevicesRepo
+	MobileNetwork       *MobileTrustedNetworkRepo
+	GitRepoSettings     *GitRepoSettingsRepo
+	FileHandlerPrevious *FileHandlerPreviousRepo
+	CodeRepos           *CodeReposRepo
+	Layout              *LayoutRepo
+	Tabs                *TabsRepo
+	AdeSessions         *AdeSessionsRepo
+	AdeReview           *AdeReviewWindowsRepo
+	AdeViewedSync       *AdeViewedSyncRepo
+	AdeTasks            *AdeTaskRepo
+	AdeBacklog          *AdeBacklogRepo
+	AdeRepoConfig       *AdeRepoConfigRepo
+	AdeFacts            *AdeFactsRepo
+	AdeLogs             *AdeLogsRepo
+	AdeRunSandbox       *AdeRunSandboxRepo
+	CustomScripts       *scripts.Repo
+	ScriptRuns          *scriptruns.Repo
 
 	stmts []*sql.Stmt // every prepared statement below, for Close.
 }
@@ -60,26 +61,27 @@ func New(db *sql.DB) (*Repos, error) {
 	}
 
 	return &Repos{
-		Settings:        &SettingsRepo{DB: db, selectAll: settingsSelectAll},
-		Windows:         &WindowsRepo{DB: db},
-		MobileDevices:   &MobileDevicesRepo{DB: db},
-		MobileNetwork:   &MobileTrustedNetworkRepo{DB: db},
-		GitRepoSettings: &GitRepoSettingsRepo{DB: db},
-		CodeRepos:       &CodeReposRepo{DB: db},
-		Layout:          &LayoutRepo{DB: db, selectAll: layoutSelectAll},
-		Tabs:            &TabsRepo{DB: db, selectAll: tabsSelectAll},
-		AdeSessions:     &AdeSessionsRepo{DB: db},
-		AdeReview:       &AdeReviewWindowsRepo{DB: db},
-		AdeViewedSync:   &AdeViewedSyncRepo{DB: db},
-		AdeTasks:        &AdeTaskRepo{DB: db},
-		AdeBacklog:      &AdeBacklogRepo{DB: db},
-		AdeRepoConfig:   &AdeRepoConfigRepo{DB: db},
-		AdeFacts:        &AdeFactsRepo{DB: db},
-		AdeLogs:         &AdeLogsRepo{DB: db},
-		AdeRunSandbox:   &AdeRunSandboxRepo{DB: db},
-		CustomScripts:   &scripts.Repo{DB: db},
-		ScriptRuns:      &scriptruns.Repo{DB: db},
-		stmts:           []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll},
+		Settings:            &SettingsRepo{DB: db, selectAll: settingsSelectAll},
+		Windows:             &WindowsRepo{DB: db},
+		MobileDevices:       &MobileDevicesRepo{DB: db},
+		MobileNetwork:       &MobileTrustedNetworkRepo{DB: db},
+		GitRepoSettings:     &GitRepoSettingsRepo{DB: db},
+		FileHandlerPrevious: &FileHandlerPreviousRepo{DB: db},
+		CodeRepos:           &CodeReposRepo{DB: db},
+		Layout:              &LayoutRepo{DB: db, selectAll: layoutSelectAll},
+		Tabs:                &TabsRepo{DB: db, selectAll: tabsSelectAll},
+		AdeSessions:         &AdeSessionsRepo{DB: db},
+		AdeReview:           &AdeReviewWindowsRepo{DB: db},
+		AdeViewedSync:       &AdeViewedSyncRepo{DB: db},
+		AdeTasks:            &AdeTaskRepo{DB: db},
+		AdeBacklog:          &AdeBacklogRepo{DB: db},
+		AdeRepoConfig:       &AdeRepoConfigRepo{DB: db},
+		AdeFacts:            &AdeFactsRepo{DB: db},
+		AdeLogs:             &AdeLogsRepo{DB: db},
+		AdeRunSandbox:       &AdeRunSandboxRepo{DB: db},
+		CustomScripts:       &scripts.Repo{DB: db},
+		ScriptRuns:          &scriptruns.Repo{DB: db},
+		stmts:               []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll},
 	}, nil
 }
 

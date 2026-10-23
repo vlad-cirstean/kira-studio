@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appwire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/filehandlers"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/github"
@@ -56,6 +57,7 @@ type options struct {
 	noGh            bool
 	gitHosts        []githost.Provider
 	noClaude        bool
+	fileHandlers    filehandlers.Registry
 	trackerGrace    time.Duration
 	rebaseTimeout   time.Duration
 	mobilePoll      time.Duration
@@ -66,6 +68,10 @@ type options struct {
 
 // Opt tweaks New.
 type Opt func(*options)
+
+// WithFileHandlers swaps the default-app seam for a fake; without it the build reports default
+// apps as unsupported.
+func WithFileHandlers(r filehandlers.Registry) Opt { return func(o *options) { o.fileHandlers = r } }
 
 // WithoutGh leaves gh off PATH entirely, system installs included (claude stays the fake).
 func WithoutGh() Opt { return func(o *options) { o.noGh = true } }
@@ -301,7 +307,7 @@ func (a *App) build() {
 		Providers: registry,
 		GitHosts:  githostproviders.New(ghOptions, a.opts.gitHosts...), TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, Sandbox: a.opts.sandbox, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll,
 		Repos: r, DB: db, Emitter: a.Events, Browser: a.Browser, Dialogs: a.Dialogs,
-		Locator: gitclient.NewHostLocator(), KeepAwakeDriver: a.KeepAwake,
+		Locator: gitclient.NewHostLocator(), KeepAwakeDriver: a.KeepAwake, FileHandlers: a.opts.fileHandlers,
 		MobileAssets: fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>phone</title>")}},
 		MobileIsLAN:  func(ip netip.Addr) bool { return ip.IsLoopback() },
 		MobileDetect: func() (lannet.Network, error) { return loopbackNetwork(), nil },

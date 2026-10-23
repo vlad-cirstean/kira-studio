@@ -72,6 +72,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   codeWorkspaceReorderRepos: 'CodeWorkspaceService.ReorderRepos',
   codeWorkspaceListFiles: 'CodeWorkspaceService.ListFiles',
   codeWorkspaceReadFile: 'CodeWorkspaceService.ReadFile',
+  fileHandlersStatus: 'FileHandlersService.Status',
+  fileHandlersSet: 'FileHandlersService.Set',
   openedFilesPending: 'OpenedFilesService.Pending',
   openedFilesRead: 'OpenedFilesService.Read',
   codeWorkspaceOpenWorkspace: 'CodeWorkspaceService.OpenWorkspace',

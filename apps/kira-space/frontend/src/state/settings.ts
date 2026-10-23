@@ -10,6 +10,7 @@ import { defaultSettings, type Settings, type SettingsPatch } from './settingsDo
 export const sections = [
   'Appearance',
   'Git',
+  'File types',
   'Mobile access',
   'Agent',
   'Memory',

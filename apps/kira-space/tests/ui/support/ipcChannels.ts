@@ -139,6 +139,8 @@ export const IPC = {
   codeWorkspaceReorderRepos: 'kira:codeWorkspace:reorderRepos',
   codeWorkspaceListFiles: 'kira:codeWorkspace:listFiles',
   codeWorkspaceReadFile: 'kira:codeWorkspace:readFile',
+  fileHandlersStatus: 'kira:fileHandlers:status',
+  fileHandlersSet: 'kira:fileHandlers:set',
   openedFilesPending: 'kira:openedFiles:pending',
   openedFilesRead: 'kira:openedFiles:read',
   codeWorkspaceOpenWorkspace: 'kira:codeWorkspace:openWorkspace',

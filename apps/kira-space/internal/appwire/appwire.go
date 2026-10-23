@@ -1,4 +1,4 @@
-// Package appwire is Kira Space's composition root: it builds the 27 bound services, the git router
+// Package appwire is Kira Space's composition root: it builds the 28 bound services, the git router
 // and socket, the ADE tracker and board, and their teardown. main and the flow-test harness
 // (internal/flowharness) both call Build, so a test cannot wire differently from production. It
 // sits above internal/bridge in the layering, like internal/appshell.
@@ -22,6 +22,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/filehandlers"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
@@ -63,6 +64,8 @@ type Options struct {
 	// Locator resolves git.gitPath; main passes the platform locator.
 	Locator         gitclient.Locator
 	KeepAwakeDriver keepawake.Driver
+	// FileHandlers is the default-app seam; nil means this build cannot change defaults.
+	FileHandlers filehandlers.Registry
 	// MobileAssets is the embedded phone build, already rooted at its index.
 	MobileAssets fs.FS
 	// MobileIsLAN, MobileDetect, MobileFind and MobilePoll are the phone server's network seams;
@@ -127,36 +130,37 @@ type Wired struct {
 	Metrics       *metrics.Ticker
 	UpdateInstall *appupdate.Installer
 
-	GitCredential  *bridge.GitCredentialService
-	GitHost        *bridge.GitHostService
-	Link           *bridge.LinkService
-	Files          *bridge.FilesService
-	Settings       *bridge.SettingsService
-	Layout         *bridge.LayoutService
-	Tabs           *bridge.TabsService
-	CustomScripts  *bridge.CustomScriptsService
-	ScriptRuns     *bridge.ScriptRunsService
-	runs           *scriptruns.Service
-	sched          *scriptruns.Scheduler
-	Terminal       *bridge.TerminalService
-	AdeTask        *bridge.AdeTaskService
-	Ops            *bridge.OpsService
-	Lifecycle      *bridge.LifecycleService
-	KeepAwake      *bridge.KeepAwakeService
-	Mobile         *bridge.MobileAccessService
-	Memory         *bridge.MemoryService
-	MemoryImport   *bridge.MemoryImportService
-	MemoryDistill  *bridge.MemoryDistillService
-	WindowsSvc     *bridge.WindowsService
-	PromptsSvc     *bridge.PromptsService
-	LlmPromptsSvc  *bridge.LlmPromptsService
-	Update         *bridge.UpdateService
-	CodeWorkspace  *bridge.CodeWorkspaceService
-	OpenedFiles    *openedfiles.Service
-	OpenedFilesSvc *bridge.OpenedFilesService
-	AgentNotifySvc *bridge.AgentNotifyService
-	AgentUsage     *agentusage.Service
-	AgentUsageSvc  *bridge.AgentUsageService
+	GitCredential   *bridge.GitCredentialService
+	GitHost         *bridge.GitHostService
+	Link            *bridge.LinkService
+	Files           *bridge.FilesService
+	Settings        *bridge.SettingsService
+	Layout          *bridge.LayoutService
+	Tabs            *bridge.TabsService
+	CustomScripts   *bridge.CustomScriptsService
+	ScriptRuns      *bridge.ScriptRunsService
+	runs            *scriptruns.Service
+	sched           *scriptruns.Scheduler
+	Terminal        *bridge.TerminalService
+	AdeTask         *bridge.AdeTaskService
+	Ops             *bridge.OpsService
+	Lifecycle       *bridge.LifecycleService
+	KeepAwake       *bridge.KeepAwakeService
+	Mobile          *bridge.MobileAccessService
+	Memory          *bridge.MemoryService
+	MemoryImport    *bridge.MemoryImportService
+	MemoryDistill   *bridge.MemoryDistillService
+	WindowsSvc      *bridge.WindowsService
+	PromptsSvc      *bridge.PromptsService
+	LlmPromptsSvc   *bridge.LlmPromptsService
+	Update          *bridge.UpdateService
+	CodeWorkspace   *bridge.CodeWorkspaceService
+	OpenedFiles     *openedfiles.Service
+	OpenedFilesSvc  *bridge.OpenedFilesService
+	FileHandlersSvc *bridge.FileHandlersService
+	AgentNotifySvc  *bridge.AgentNotifyService
+	AgentUsage      *agentusage.Service
+	AgentUsageSvc   *bridge.AgentUsageService
 	// Agents resolves the active agent provider per call.
 	Agents   harness.Selector
 	AgentSvc *bridge.AgentService
@@ -224,6 +228,13 @@ func Build(opts Options) *Wired {
 	}
 	w.OpenedFiles = openedfiles.New(repositories.CodeRepos)
 	w.OpenedFilesSvc = &bridge.OpenedFilesService{Files: w.OpenedFiles}
+	handlersRegistry := opts.FileHandlers
+	if handlersRegistry == nil {
+		handlersRegistry = filehandlers.Unsupported{}
+	}
+	w.FileHandlersSvc = &bridge.FileHandlersService{Handlers: &filehandlers.Service{
+		Registry: handlersRegistry, Previous: repositories.FileHandlerPrevious,
+	}}
 	w.GitCredential = &bridge.GitCredentialService{Deps: deps, Relay: credentialRelay}
 	w.detachGitCred = bridge.AttachGitCredentialPush(w.GitCredential)
 	w.GitHost = &bridge.GitHostService{Deps: deps, Browser: opts.Browser}
@@ -412,6 +423,7 @@ func (w *Wired) Bound() []application.Service {
 		application.NewService(w.MemoryImport), application.NewService(w.MemoryDistill), application.NewService(w.WindowsSvc), application.NewService(w.Update),
 		application.NewService(w.AgentNotifySvc), application.NewService(w.AgentUsageSvc),
 		application.NewService(w.PromptsSvc), application.NewService(w.LlmPromptsSvc), application.NewService(w.AgentSvc), application.NewService(w.OpenedFilesSvc),
+		application.NewService(w.FileHandlersSvc),
 	}
 }
 
