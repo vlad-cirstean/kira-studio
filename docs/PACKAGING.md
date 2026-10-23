@@ -404,14 +404,17 @@ repo the macOS job bills at 10x, about 190 billed minutes in total.
    `info.version` in its own checkout — no pre-tag version-bump commit is needed — and from there
    each reaches its own binary, About dialog and bundle `Info.plist` (see "Where the version comes
    from"); it asserts both writes landed before building.
-2. `tag` resolves the tag to a commit; then `build (macOS)`, `test-matrix (Linux)` and
+2. `tag` resolves the tag to a commit and refuses a tag that already has a published release, and
+   a non-prerelease tag whose commit is not on `main`; then `build (macOS)`, `test-matrix (Linux)` and
    `db-compat (Linux, min|max)` start together at that commit. `build` restores the setup action's
    caches from `main` and saves none; `cache-warm.yml` is what fills `main`'s caches. It runs
    `bun run package:studio` and `bun run package:space`, names each `.dmg`
    (`kira-studio-macos-arm64.dmg`, `kira-space-macos-arm64.dmg`), runs `verify:packaging` and the
    bundle and disk image assert, hashes both images and uploads them as artifact `release-dmgs`.
-   `lint` and `typecheck` do not rerun here; the `main` ruleset made PR CI pass before the merge.
-3. `publish` (ubuntu) runs only when every job above passed. It re-checks the artifact hashes, refuses
+   `lint` and `typecheck` do not rerun here; `main` takes only PR merges, which the ruleset gates on
+   PR CI, and `tag` refuses any other commit.
+3. `publish` (ubuntu) runs only when every job above passed. It first refuses a tag that moved since
+   `tag` resolved it, re-checks the artifact hashes, refuses
    a tag that already has a published release, creates a draft with both images, verifies each
    asset (`state`, `size`, `sha256` digest), then publishes with one API call. A failed job leaves
    no release and no draft; a failure after the draft exists deletes it.
@@ -423,6 +426,8 @@ repo the macOS job bills at 10x, about 190 billed minutes in total.
 Recovery:
 
 - Flaky job: "Re-run failed jobs".
+- Tag moved after a failed run: start a new run (`gh workflow run release.yml -f tag=vX.Y.Z`).
+  Rerunning the old run's failed jobs is refused.
 - No release started: `gh workflow run release-on-merge.yml -f pr=<n>`, or
   `gh workflow run release.yml -f tag=vX.Y.Z` when the tag exists.
 - Tag creation refused: run the commands the job log prints.
