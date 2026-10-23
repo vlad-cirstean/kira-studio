@@ -5,7 +5,7 @@ First phase `P322` (highest in `docs/HISTORY.md` is `P321`). Branch `v0.2.10`. P
 | # | Phase | Status |
 |---|-------|--------|
 | P322 | MCP required params enforced at the schema level. Parameters such as `database` that a tool needs must be required in the MCP tool input schema (and rejected with a clear error otherwise) so the AI builds the request correctly the first time. Audit every MCP tool (`dbmcp`, `agentmcp`, memory tools) for params that are optional in the schema but required in practice. | Done |
-| P323 | SQL approval dialog. When the user approves an SQL command from the agent, show it formatted with syntax highlighting, in a much larger dialog. | Todo |
+| P323 | SQL approval dialog. When the user approves an SQL command from the agent, show it formatted with syntax highlighting, in a much larger dialog. | Done |
 | P324 | UI polish bundle (simple changes, one Sonnet implementer, no separate plan). (a) Selection styling: selecting a cell, row or similar drops the border; the background change alone marks the selection. (b) Working indicators on Connect, Reconnect and Load buttons: show progress while a DB connection or load takes a while. (c) Automations: the Runs panel takes only half of the available space. (d) Update dialog: add a loading indicator (spinner, not a progress bar) to the installing state in `UpdateDialog.vue`, which has only text now. | Done |
 | P325 Part 1 | Keep fetched data when a connection drops: shared stale-data foundation (stale predicate, session stamps, drop banner) plus the SQL data view. Data stays visible and selectable; banner plus Reconnect; stale data cannot be edited or committed. | Done |
 | P325 Part 2 | Keep fetched data when a connection drops: Documents, KeyValue (tab and browse preview) and Browse. Same banner, Reconnect and write lockout; immediate writes refused from stale data. | Done |
@@ -15,7 +15,7 @@ First phase `P322` (highest in `docs/HISTORY.md` is `P321`). Branch `v0.2.10`. P
 | P328 | Fixes and small features bundle (one Opus plan, one Sonnet implementer). (a) Connection tree: where an element count shows, drop the word "rows" and keep only the number. (b) Partitioned tables collapse into their parent by default; partitions show only after the user expands it. (c) Operations panel: show whether an operation came from the user or from MCP. (d) Add a Check for updates button. (e) Go to PK/FK button: the filter box value is cleaner, no backticks around columns and no quotes around numbers. (f) Postman collection importer: accept more than one collection, and import environments as well. | Done |
 | P329 | Code review, one round (Opus reviewer covering architecture, correctness, performance; then a Sonnet fixer) over everything changed since the last review session (v2.8 P319 close-out base `d61472b`, scope: P320 sweep and P322-P328). Runs last. | Done |
 | P330 | Code review, round 2 (user asked for one more round; Opus reviewer covering architecture, correctness, performance; then a Sonnet fixer) over everything changed since the same base as P329 (v2.8 P319 close-out base `d61472b`), including P329 round 1 fixer commits as unreviewed code. Runs last before close. | Done |
-| P331 | Close chapter v0.2.10 (fold per `CLAUDE.md`). Hold until user says to close. | Todo |
+| P331 | Close chapter v0.2.10 (fold per `CLAUDE.md`). Hold until user says to close. | Done |
 
 ## Results
 
@@ -94,3 +94,7 @@ Round 2 fixed all four findings.
 Deviations: finding 3 also touched `apps/kira-space/internal/bridge/update.go`, same leak. MySQL wrap resets the armed read-only flag if `START TRANSACTION` fails. No UI suite run: no frontend code changed, update dialog specs mock the IPC error.
 
 Verification: `go test ./...` passes (ClickHouse and Kafka timed out once under concurrent container load, green alone), `typecheck`, `lint:go`, `lint:dead` clean.
+
+### P331
+
+Chapter folded by hand at user instruction; `scripts/docshistory` not run. `chapterRe` in `scripts/docshistory/units.go` rejects `v0.2.10` and `versionKey` would sort it before `v1`; tool fix out of scope. `docs/history-runs/` never existed. No runtime data under `docs/v0.2.10/`. P323 row status fixed from Todo to Done.
