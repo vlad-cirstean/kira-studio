@@ -1012,6 +1012,12 @@
       "dbMcpNamed": {
         "title": "Approve this query · {name}"
       },
+      "dbMcpResponse": {
+        "title": "Review this result"
+      },
+      "dbMcpResponseNamed": {
+        "title": "Review this result · {name}"
+      },
       "gitCredential": {
         "title": "Git needs a credential"
       },

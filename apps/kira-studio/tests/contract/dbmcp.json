@@ -9,6 +9,8 @@
       "plan": null,
       "reason": "permission",
       "requestId": "<id:2>",
+      "response": null,
+      "stage": "query",
       "statement": "insert into notes (body) values ('three')",
       "target": {
         "color": "teal",

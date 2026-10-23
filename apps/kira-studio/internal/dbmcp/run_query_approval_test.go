@@ -86,6 +86,7 @@ func TestRunQueryRefusesApprovedWriteAfterPermissionRevokedMidWait(t *testing.T)
 	s := &Server{cfg: Config{
 		Conns: conns, Query: qr, Approvals: approvals, MaskRules: fakeMaskRulesNone{},
 		ExplainThreshold: func() int { return 1000 },
+		PreviewResponses: func() bool { return false },
 	}}
 
 	type outcome struct {
@@ -157,6 +158,7 @@ func TestRunQueryReadVerdictRequestsReadOnlyUnlessWritesAllowed(t *testing.T) {
 		s := &Server{cfg: Config{
 			Conns: conns, Query: qr, Approvals: NewApprovalBroker(time.Now), MaskRules: fakeMaskRulesNone{},
 			ExplainThreshold: func() int { return 1000 },
+			PreviewResponses: func() bool { return false },
 		}}
 		if _, _, err := s.runQuery(context.Background(), nil, runQueryArgs{ConnectionID: "c1", SQL: "SELECT 1"}); err != nil {
 			t.Fatalf("write=%s: %v", tc.write, err)

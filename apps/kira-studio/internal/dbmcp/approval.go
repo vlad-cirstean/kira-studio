@@ -52,6 +52,24 @@ const (
 	ApprovalReasonHeavy      ApprovalReason = "heavy"
 )
 
+// ApprovalStage says what the human is asked: whether a statement may run (query) or whether the
+// result of a statement that already ran may reach the AI client (response).
+type ApprovalStage string
+
+const (
+	ApprovalStageQuery    ApprovalStage = "query"
+	ApprovalStageResponse ApprovalStage = "response"
+)
+
+// ApprovalResponse is the held run_query result a response-stage request asks about. Text is the
+// exact TextContent the client receives on Send; it stays out of queue snapshots (which fan out to
+// every window) and is fetched by request id through ResponseFor.
+type ApprovalResponse struct {
+	Text    string
+	IsError bool
+	Bytes   int
+}
+
 // ApprovalPlanIssue is one Issue as the dialog renders it — plan evidence, never the whole tree.
 type ApprovalPlanIssue struct {
 	Severity string
@@ -113,8 +131,12 @@ type ApprovalRequest struct {
 	Class          adapters.OpClass
 	Statement      string
 	Target         ApprovalTarget
-	EnqueuedAt     time.Time
-	ExpiresAt      time.Time
+	// Stage defaults to ApprovalStageQuery when empty.
+	Stage ApprovalStage
+	// Response is set only for ApprovalStageResponse.
+	Response   *ApprovalResponse
+	EnqueuedAt time.Time
+	ExpiresAt  time.Time
 	// Reason is M2's own "permission" for every M2-era call site — M3's runQuery/explainQuery are
 	// the first callers to pass ApprovalReasonHeavy or a non-nil Plan.
 	Reason ApprovalReason
@@ -186,6 +208,9 @@ func (b *ApprovalBroker) Request(ctx context.Context, req ApprovalRequest) Appro
 		return ApprovalQueueFull
 	}
 	now := b.now()
+	if req.Stage == "" {
+		req.Stage = ApprovalStageQuery
+	}
 	req.RequestID = uuid.NewString()
 	req.EnqueuedAt = now
 	req.ExpiresAt = now.Add(ApprovalTimeout)
@@ -220,6 +245,22 @@ func (b *ApprovalBroker) Request(ctx context.Context, req ApprovalRequest) Appro
 		}
 		return <-entry.result
 	}
+}
+
+// ResponseFor returns the held result of requestID, true only while that id is queued with stage
+// response.
+func (b *ApprovalBroker) ResponseFor(requestID string) (ApprovalResponse, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for _, e := range b.queue.Snapshot() {
+		if e.req.RequestID == requestID {
+			if e.req.Stage != ApprovalStageResponse || e.req.Response == nil {
+				return ApprovalResponse{}, false
+			}
+			return *e.req.Response, true
+		}
+	}
+	return ApprovalResponse{}, false
 }
 
 // Approve resolves requestID as approved. Deny resolves it as denied. Both report
@@ -281,9 +322,13 @@ func (b *ApprovalBroker) openPrompt(req ApprovalRequest) {
 	if b.Prompts == nil {
 		return
 	}
-	title := i18n.T("backend.prompt.dbMcp.title", nil)
+	key, namedKey := "backend.prompt.dbMcp.title", "backend.prompt.dbMcpNamed.title"
+	if req.Stage == ApprovalStageResponse {
+		key, namedKey = "backend.prompt.dbMcpResponse.title", "backend.prompt.dbMcpResponseNamed.title"
+	}
+	title := i18n.T(key, nil)
 	if req.ConnectionName != "" {
-		title = i18n.T("backend.prompt.dbMcpNamed.title", map[string]string{"name": req.ConnectionName})
+		title = i18n.T(namedKey, map[string]string{"name": req.ConnectionName})
 	}
 	b.Prompts.Open(prompts.Prompt{
 		ID: prompts.ID(prompts.KindDbMcp, req.RequestID), Kind: prompts.KindDbMcp, Ref: req.RequestID,

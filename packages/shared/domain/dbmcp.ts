@@ -70,6 +70,10 @@ export const dbMcpApprovalSchema = /*#__PURE__*/ z.object({
   reason: /*#__PURE__*/ z.enum(['permission', 'heavy']),
   plan: dbMcpApprovalPlanSchema.nullable(),
   target: dbMcpApprovalTargetSchema,
+  // query: may the statement run. response: it already ran; may its result go to the AI client.
+  // The result text itself comes from dbMcpPendingResponseSchema, never the snapshot.
+  stage: /*#__PURE__*/ z.enum(['query', 'response']),
+  response: /*#__PURE__*/ z.object({ isError: z.boolean(), bytes: z.number() }).nullable(),
 });
 export type DbMcpApproval = z.infer<typeof dbMcpApprovalSchema>;
 
@@ -78,3 +82,11 @@ export const dbMcpApprovalSnapshotSchema = /*#__PURE__*/ z.object({
   queued: z.number(),
 });
 export type DbMcpApprovalSnapshot = z.infer<typeof dbMcpApprovalSnapshotSchema>;
+
+// bridge/dbmcp.go's DbMcpPendingResponse: the exact text the AI client receives if the user sends.
+export const dbMcpPendingResponseSchema = /*#__PURE__*/ z.object({
+  requestId: z.string(),
+  text: z.string(),
+  isError: z.boolean(),
+});
+export type DbMcpPendingResponse = z.infer<typeof dbMcpPendingResponseSchema>;

@@ -203,11 +203,22 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		return res, out, err
 	}
 
+	res, out, err, set, executed := s.executeAndRender(ctx, args, rv, plan)
+	if !executed || !s.cfg.PreviewResponses() {
+		return res, out, err
+	}
+	return s.reviewResponse(ctx, args, rv, set, res, out, err)
+}
+
+// executeAndRender masks, executes and renders. executed is false when the call failed before
+// Execute ran (no data was fetched, so nothing is held for review); set is the mask set the render
+// used.
+func (s *Server) executeAndRender(ctx context.Context, args runQueryArgs, rv queryResolution, plan *queryplan.Plan) (res *mcp.CallToolResult, out any, err error, set maskset, executed bool) {
 	// M5 §4.3: resolved before Execute, so a key-store failure fails the call before the query runs,
 	// not after — wasted adapter work on a call that cannot be rendered anyway.
-	set, err := s.cfg.MaskRules.MaskSetFor(args.ConnectionID)
+	set, err = s.cfg.MaskRules.MaskSetFor(args.ConnectionID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, err, set, false
 	}
 	var mk *maskset
 	if !set.Empty() {
@@ -231,12 +242,15 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		// at a time (SELECT email::int FROM customers LIMIT 1 OFFSET n). Scoped to masked
 		// connections only; an unmasked connection keeps full error detail for debuggability.
 		if mk != nil {
-			return maskedToolError(err)
+			res, out, err = maskedToolError(err)
+			return res, out, err, set, true
 		}
-		return toolError(err)
+		res, out, err = toolError(err)
+		return res, out, err, set, true
 	}
 	if len(resp.Pages) == 0 {
-		return jsonResult(map[string]any{"kind": "empty", "rowCount": 0, "returned": 0})
+		res, out, err = jsonResult(map[string]any{"kind": "empty", "rowCount": 0, "returned": 0})
+		return res, out, err, set, true
 	}
 	rendered, err := renderPage(resp.Pages[0], rv.maxRows, summaryOf(plan, rv.threshold), mk, args.SQL)
 	if err != nil {
@@ -245,9 +259,10 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		// error. Anything else here is a genuine internal render fault.
 		var refused *maskingRefusedError
 		if errors.As(err, &refused) {
-			return errResult(refused.Error())
+			res, out, err = errResult(refused.Error())
+			return res, out, err, set, true
 		}
-		return nil, nil, err
+		return nil, nil, err, set, true
 	}
 	// Finding #12, M6: a `;`-separated args.SQL can make the adapter execute more than one
 	// statement, each with its own page — surface that rather than silently rendering only
@@ -256,7 +271,68 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 	if len(resp.Pages) > 1 {
 		result = withAdditionalStatementResultsNote(rendered, len(resp.Pages)-1)
 	}
-	return jsonResult(result)
+	res, out, err = jsonResult(result)
+	return res, out, err, set, true
+}
+
+// reviewResponse holds the result of a statement that already ran until the user sends or
+// withholds it. Only an approval returns the held result, untouched; every other outcome returns
+// an app-authored error with no row data.
+func (s *Server) reviewResponse(ctx context.Context, args runQueryArgs, rv queryResolution, rendered maskset, res *mcp.CallToolResult, out any, err error) (*mcp.CallToolResult, any, error) {
+	name := rv.summary.Name
+	// go-sdk v1.8.0 (mcp/server.go toolForErr): a regular handler error reaches the client as an
+	// IsError text result carrying err.Error(), so the preview of a bare Go error matches the wire.
+	held := ApprovalResponse{IsError: true}
+	if res != nil {
+		held.IsError = res.IsError
+		held.Text = resultText(res)
+	} else if err != nil {
+		held.Text = err.Error()
+	}
+	held.Bytes = len(held.Text)
+
+	outcome := s.cfg.Approvals.Request(ctx, ApprovalRequest{
+		ConnectionID: args.ConnectionID, ConnectionName: name, Kind: rv.summary.Kind,
+		Class: rv.class, Statement: args.SQL, Reason: ApprovalReasonPermission,
+		Target: targetOf(rv.summary, args.Path), Stage: ApprovalStageResponse, Response: &held,
+	})
+	switch outcome {
+	case ApprovalApproved:
+		// The review can take up to 2 minutes: exposure or masking rules may have changed since the
+		// result was rendered.
+		if _, rerr := s.resolveEnabled(args.ConnectionID); rerr != nil {
+			return errResult(fmt.Sprintf("query against %q ran, but its result was withheld: %s", name, rerr.Error()))
+		}
+		now, merr := s.cfg.MaskRules.MaskSetFor(args.ConnectionID)
+		if merr != nil {
+			return errResult(fmt.Sprintf("query against %q ran, but its masking rules could not be re-checked and its result was withheld", name))
+		}
+		if !now.Equal(rendered) {
+			return errResult(fmt.Sprintf("masking rules for %q changed while its result was in review; run the query again", name))
+		}
+		return res, out, err
+	case ApprovalDenied:
+		return errResult(fmt.Sprintf("query against %q ran, but the user withheld its result", name))
+	case ApprovalTimedOut:
+		return errResult(fmt.Sprintf("query against %q ran, but its result got no review within 2 minutes and was withheld", name))
+	case ApprovalAbandoned:
+		return errResult(fmt.Sprintf("the database MCP server stopped before the result of the query against %q was reviewed", name))
+	case ApprovalQueueFull:
+		return errResult("query ran; " + queueFullMessage)
+	default:
+		return errResult(fmt.Sprintf("query against %q ran, but its result was not approved", name))
+	}
+}
+
+// resultText is the concatenated TextContent of res — the bytes the client receives.
+func resultText(res *mcp.CallToolResult) string {
+	var b strings.Builder
+	for _, c := range res.Content {
+		if tc, ok := c.(*mcp.TextContent); ok {
+			b.WriteString(tc.Text)
+		}
+	}
+	return b.String()
 }
 
 // queryResolution is resolveVerdict's own bundle — everything runQuery needs from the resolve/
