@@ -46,7 +46,8 @@ duplicated here; this file only points at them.
 - The **main session runs on Sonnet and orchestrates only** — it doesn't implement, edit code, or
   fix findings directly. Its job: spawn the right subagents in order, carry context between them,
   and track progress. The actual writing always happens in a subagent.
-- Each phase (the current chapter's `docs/v<chapter>/SPEC.md` phasing table) needs an
+- Each phase (the current chapter's `docs/v<chapter>/SPEC.md` phasing table; except the chapter
+  close phase, see "Closing a chapter") needs an
   Opus-authored plan committed under that chapter's `plans/` before implementation starts — spawn
   an **Opus subagent** (`Agent` tool, `model: "opus"`) whose only job is writing that plan. No plan
   there means no implementing straight from the spec; get the plan written and committed first.
@@ -156,7 +157,8 @@ duplicated here; this file only points at them.
   chapter's `SPEC.md`, if one exists, and continue from there. v1.5's `C` lettering and v1.7's `M` lettering predate this rule and
   stay as shipped, never renumbered; every chapter from here on uses `P`.
 - **Closing a chapter folds it, by hand.** The chapter's last phase closes it; the Sonnet implementer
-  writes the close itself, never with `scripts/docshistory` or any tool. In the commit before the
+  writes the close itself, never with `scripts/docshistory` or any tool. Close phase is exempt from
+  the Opus-plan rule: one Sonnet implementer does it directly, no planner, no plan file. In the commit before the
   fold, mark the row Done and write its Result in `SPEC.md`, so its entry folds closed. Then write the
   `<!-- chapter <ch> -->` block in `docs/HISTORY.md`. Copy the previous chapter block's format: header
   `Source: docs/<ch>/ at <commit>. N phases.` with the true row count, then one `### <ch> <id> (Done)`
