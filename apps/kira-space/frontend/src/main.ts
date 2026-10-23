@@ -25,6 +25,7 @@ import { useLayoutStore } from './state/layout';
 import { useMobileAccessStore } from './state/mobileAccess';
 import { useMobileTerminalsStore } from './state/mobileTerminals';
 import { useModeStore } from './state/mode';
+import { openPendingFiles } from './state/openedFiles';
 import { useOpsStore } from './state/ops';
 import { pinia } from './state/pinia';
 import { ensureWorkspaceShell } from './state/repoTabs';
@@ -152,6 +153,9 @@ async function mountShell(): Promise<void> {
         : (workspaceStore.openRepos[0] as string),
     );
   }
+
+  // Files Finder opened into this window; after the fall-forward so the last one wins focus.
+  if (!reviewTarget) await openPendingFiles();
 
   const app = createApp(App);
   app.use(i18n);

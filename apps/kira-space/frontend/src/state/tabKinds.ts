@@ -7,14 +7,23 @@ import { scriptRunTabKind } from '@workbench/tabs/scriptRunTabKind';
 import { terminalTabKind } from '@workbench/tabs/terminalTabKind';
 import { parseStateWith, type TabKindRegistry } from '@workbench/tabs/types';
 import { useRepoLinksStore } from '../repo/state/repoLinks';
-import { dropRepoDiffTab, dropRepoFileTab, dropRepoMultiDiffTab } from '../views/repo/editors';
+import {
+  dropLocalFileTab,
+  dropRepoDiffTab,
+  dropRepoFileTab,
+  dropRepoMultiDiffTab,
+} from '../views/repo/editors';
 import { useCodeReposStore } from './coderepos';
 import {
   asRepoFileTab,
+  defaultLocalFileTabState,
   defaultRepoDiffTabState,
   defaultRepoFileTabState,
   defaultRepoGraphTabState,
   defaultRepoMultiDiffTabState,
+  type LocalFileTabRecord,
+  type LocalFileTabState,
+  localFileTabStateSchema,
   type RepoDiffTabRecord,
   type RepoDiffTabState,
   type RepoFileTabRecord,
@@ -122,6 +131,19 @@ export const TAB_KINDS: TabKindRegistry<SpaceTabKind, TabRecord, TabIcon, Palett
       dropResources: (tabId) => dropRepoFileTab(tabId),
       menuExtras: () => [],
       parseState: parseStateWith(repoFileTabStateSchema),
+    },
+    // An externally opened file outside every imported repository (`path` is absolute): the title
+    // is the basename. No rail colour: no repository behind it.
+    'local-file': {
+      mode: SPACE_TAB_KIND_MODE['local-file'],
+      title: repoFileTitle,
+      icon: (tab) => ({ filePath: tab.path }),
+      railColor: () => undefined,
+      defaultState: (): LocalFileTabState => defaultLocalFileTabState(),
+      duplicateState: (tab: LocalFileTabRecord): LocalFileTabState => ({ ...tab.state }),
+      dropResources: (tabId) => dropLocalFileTab(tabId),
+      menuExtras: () => [],
+      parseState: parseStateWith(localFileTabStateSchema),
     },
     // A HEAD-vs-worktree diff, opened from "Open changes" — read-only, mirroring 'repo-file''s
     // shape exactly. No badge, no pinned: a read-only tab.

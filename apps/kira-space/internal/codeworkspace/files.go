@@ -251,6 +251,24 @@ func languageFor(relPath string) string {
 		return "graphql"
 	case "proto":
 		return "protobuf"
+	case "kt", "kts":
+		return "kotlin"
+	case "swift":
+		return "swift"
+	case "c", "h":
+		return "c"
+	case "cc", "cpp", "cxx", "hpp", "hh", "hxx":
+		return "cpp"
+	case "m", "mm":
+		return "objective-c"
+	case "rb":
+		return "ruby"
+	case "php":
+		return "php"
+	case "pl", "pm":
+		return "perl"
+	case "lua":
+		return "lua"
 	default:
 		return "plaintext"
 	}

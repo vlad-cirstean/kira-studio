@@ -2,6 +2,7 @@ import { requestReveal } from '../views/repo/reveal';
 import {
   asRepoDiffTab,
   asRepoFileTab,
+  defaultLocalFileTabState,
   defaultRepoDiffTabState,
   defaultRepoFileTabState,
   defaultRepoMultiDiffTabState,
@@ -9,7 +10,7 @@ import {
 } from './tabDomain';
 import { type OpenTabResult, tabsForWorkspace, useTabsStore } from './tabs';
 import { openTerminalTab, type TerminalLaunch } from './terminalTabs';
-import { repoWorkspaceKey, useWorkspaceStore } from './workspace';
+import { GENERAL_WORKSPACE, repoWorkspaceKey, useWorkspaceStore } from './workspace';
 
 // P91 §6: moved to state/terminalTabs.ts, which openTerminalTab below now shares with the
 // Automations module's own (non-repo-scoped) opener — re-exported so no importer of this module
@@ -80,6 +81,16 @@ export function openRepoFileTab(
   // updates persisted state, which RepoFileView.vue reads on mount, not on an existing mount.
   if (opts.reveal) requestReveal(result.id, opts.reveal);
   return result;
+}
+
+// A file opened from Finder that sits outside every imported repository: a read-only tab in the
+// general workspace, deduped by absolute path.
+export function openLocalFileTab(path: string): OpenTabResult {
+  return useTabsStore().openTab('local-file', null, path, defaultLocalFileTabState, {
+    reuse: true,
+    workspaceId: GENERAL_WORKSPACE,
+    preview: false,
+  });
 }
 
 // "Open changes" opens a permanent tab, never the preview slot — a single tree click

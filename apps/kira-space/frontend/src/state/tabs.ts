@@ -2,6 +2,7 @@ import { createTabsStore } from '@workbench/state/createTabsStore';
 import { control } from '../bridge/control';
 import {
   defaultRepoGraphTabState,
+  type LocalFileTabState,
   type RepoFileTabState,
   type RepoGraphTabState,
   type TabRecord,
@@ -97,6 +98,10 @@ export const useTabsStore = createTabsStore({
       actions.patchTabState(id, 'repo-file', patch, { skipUnchanged: true });
     }
 
+    function patchLocalFileTabState(id: string, patch: Partial<LocalFileTabState>): void {
+      actions.patchTabState(id, 'local-file', patch, { skipUnchanged: true });
+    }
+
     // TabViewStateStore's own write() — git-ui re-serializes its whole PersistedViewState on
     // nearly every interaction (scroll, selection, column resize), so this skips a save when the
     // value is reference-unchanged, the same posture patchRepoFileTabState's own revealLine
@@ -128,6 +133,7 @@ export const useTabsStore = createTabsStore({
       createPinnedRepoGraphTab,
       closeWorkspaceTabs: closeWorkspaceTabsAction,
       patchRepoFileTabState,
+      patchLocalFileTabState,
       patchRepoGraphTabState,
       activateNextTab,
       activatePrevTab,

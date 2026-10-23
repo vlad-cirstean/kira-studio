@@ -13,6 +13,7 @@ import * as LifecycleService from '@bindings/lifecycleservice.js';
 import * as LinkService from '@bindings/linkservice.js';
 import * as LlmPromptsService from '@bindings/llmpromptsservice.js';
 import * as MobileAccessService from '@bindings/mobileaccessservice.js';
+import * as OpenedFilesService from '@bindings/openedfilesservice.js';
 import * as OpsService from '@bindings/opsservice.js';
 import * as PromptsService from '@bindings/promptsservice.js';
 import * as ScriptRunsService from '@bindings/scriptrunsservice.js';
@@ -38,6 +39,7 @@ import type {
   DiffContent,
   FileContent,
   FileListing,
+  OpenedFileTarget,
   RepoSummary,
   SearchRequest,
 } from '@shared/domain/repo';
@@ -266,6 +268,14 @@ const spaceControl = {
     ).then((r) => trust<FileListing>({ ...r, paths: r.paths ?? [], status: r.status ?? {} })),
   codeWorkspaceReadFile: (id: string, path: string): Promise<FileContent> =>
     unwrap(CodeWorkspaceService.ReadFile({ id, path })).then((r) => trust<FileContent>(r)),
+
+  // External opens: the files this window was opened for (once), and a standalone file's content.
+  openedFilesPending: (): Promise<OpenedFileTarget[]> =>
+    unwrap(OpenedFilesService.Pending({ windowKey })).then((r) =>
+      trust<OpenedFileTarget[]>(r ?? []),
+    ),
+  openedFilesRead: (path: string): Promise<FileContent> =>
+    unwrap(OpenedFilesService.Read({ path })).then((r) => trust<FileContent>(r)),
 
   // C6 §7/§8.5: the index lifecycle (fire-and-forget — a failed start/stop must never block
   // opening or leaving a workspace) plus the diff read.

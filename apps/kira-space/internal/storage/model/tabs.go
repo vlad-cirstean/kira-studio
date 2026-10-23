@@ -31,6 +31,7 @@ type TabRecord struct {
 var RenderableTabKinds = map[string]bool{
 	"repo-graph":      true,
 	"repo-file":       true,
+	"local-file":      true,
 	"repo-diff":       true,
 	"repo-multi-diff": true,
 	"terminal":        true,

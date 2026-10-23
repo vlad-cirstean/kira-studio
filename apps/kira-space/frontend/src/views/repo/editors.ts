@@ -110,6 +110,11 @@ export function dropRepoFileTab(tabId: string): void {
   entries.delete(tabId);
 }
 
+/** local-file's own dropResources: same body as dropRepoFileTab, named per kind like the others. */
+export function dropLocalFileTab(tabId: string): void {
+  dropRepoFileTab(tabId);
+}
+
 /** repo-diff's own dropResources — deliberately named separately from dropRepoFileTab even though
  *  the body is identical (both dispose every cached model uri this entry owns): tabKinds.ts wires
  *  one name per kind, and a shared name would obscure that a diff tab's two models are unrelated

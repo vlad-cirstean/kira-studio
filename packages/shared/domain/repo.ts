@@ -44,6 +44,14 @@ export const fileContentSchema = /*#__PURE__*/ z.object({
 });
 export type FileContent = z.infer<typeof fileContentSchema>;
 
+// One file an external open (Finder, a default-app double-click) brought to a window: `repoId` and
+// `relPath` when it lies in an imported repository, else `path` (absolute) alone.
+export interface OpenedFileTarget {
+  path: string;
+  repoId: string;
+  relPath: string;
+}
+
 // One side of a HEAD-vs-worktree diff — the same four-value classification
 // fileContentSchema already uses for the worktree side, so the diff view reuses one vocabulary
 // rather than inventing a second. No status field on the diff as a whole: the two sides already
