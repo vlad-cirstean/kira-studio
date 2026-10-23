@@ -12586,6 +12586,10 @@
         "noToken": {
           "hint": "This server restarted since it was last enabled; its registration command needs a fresh token to show again."
         },
+        "preview": {
+          "description": "Holds each query result until you send it on. Masking is already applied to what you see. A write has already run by the time its result shows; withholding hides the result, it does not undo the change.",
+          "label": "Review results before the AI gets them"
+        },
         "regenerate": {
           "label": "Regenerate token"
         },

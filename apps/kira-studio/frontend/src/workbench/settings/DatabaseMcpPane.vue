@@ -40,6 +40,9 @@ function tokenExpired(expiresAt: string): boolean {
 // Instant-action settings (bypassing draft/Save) report a rejected call here, so the switch that
 // snaps back is not the only trace of the failure. One error line serves all three actions.
 const toggle = useAsyncAction((enabled: boolean) => dbMcpStore.setDbMcpEnabled(enabled));
+const preview = useAsyncAction((enabled: boolean) =>
+  settingsStore.patchSettings({ dbMcp: { previewResponses: enabled } }),
+);
 const regenerate = useAsyncAction(() => dbMcpStore.regenerateDbMcpToken());
 const install = useAsyncAction(() => dbMcpStore.installDbMcpAgent());
 const connectionToggle = useAsyncAction((id: string, enabled: boolean) =>
@@ -51,12 +54,14 @@ const dbMcpInstalling = install.pending;
 const actionError = computed(
   () =>
     toggle.error.value ??
+    preview.error.value ??
     regenerate.error.value ??
     install.error.value ??
     connectionToggle.error.value,
 );
 function clearActionErrors(): void {
   toggle.error.value = null;
+  preview.error.value = null;
   regenerate.error.value = null;
   install.error.value = null;
   connectionToggle.error.value = null;
@@ -64,6 +69,10 @@ function clearActionErrors(): void {
 async function onToggleDbMcpEnabled(enabled: boolean): Promise<void> {
   clearActionErrors();
   await toggle.run(enabled);
+}
+async function onTogglePreviewResponses(enabled: boolean): Promise<void> {
+  clearActionErrors();
+  await preview.run(enabled);
 }
 async function onRegenerateDbMcpToken(): Promise<void> {
   clearActionErrors();
@@ -107,6 +116,7 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
 // P110 I2-26: `for`/`id` preserves the old label-wraps-control implicit association (see
 // FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
 const dbMcpEnabledId = useId();
+const dbMcpPreviewId = useId();
 </script>
 
 <template>
@@ -126,6 +136,21 @@ const dbMcpEnabledId = useId();
       <FieldContent>
         <Label :for="dbMcpEnabledId">{{ t('studio.settings.dbMcp.enable.label') }}</Label>
         <FieldDescription>{{ t('studio.settings.dbMcp.enable.description') }}</FieldDescription>
+      </FieldContent>
+    </Field>
+
+    <!-- Meaningful before the server starts, so always visible. Instant like the toggle above. -->
+    <Field orientation="horizontal" class="items-start">
+      <Switch
+        :id="dbMcpPreviewId"
+        :model-value="settingsStore.dbMcp.previewResponses"
+        :disabled="preview.pending.value"
+        data-testid="settings-db-mcp-preview"
+        @update:model-value="(v) => onTogglePreviewResponses(v === true)"
+      />
+      <FieldContent>
+        <Label :for="dbMcpPreviewId">{{ t('studio.settings.dbMcp.preview.label') }}</Label>
+        <FieldDescription>{{ t('studio.settings.dbMcp.preview.description') }}</FieldDescription>
       </FieldContent>
     </Field>
 

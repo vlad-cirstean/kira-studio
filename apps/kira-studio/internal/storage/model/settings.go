@@ -33,6 +33,8 @@ type AdvancedSettings struct {
 // (internal/bridge/dbmcp.go owns the actual start/stop side effect).
 type DbMcpSettings struct {
 	ServerEnabled bool `json:"serverEnabled"`
+	// PreviewResponses holds each run_query result for the user's review before the AI client gets it.
+	PreviewResponses bool `json:"previewResponses"`
 }
 
 // ApiSettings mirrors packages/shared/domain/settings.ts's apiSettingsSchema — the
@@ -84,7 +86,7 @@ func DefaultSettings() Settings {
 			MaxRedirects:     10,
 			DisableCookieJar: true,
 		},
-		DbMcp: DbMcpSettings{ServerEnabled: false},
+		DbMcp: DbMcpSettings{ServerEnabled: false, PreviewResponses: false},
 		Agent: appsettings.DefaultAgent(),
 	}
 }
@@ -121,7 +123,8 @@ type ApiPatch struct {
 
 // DbMcpPatch mirrors DbMcpSettings' own `.partial()` shape (M1 §6.2).
 type DbMcpPatch struct {
-	ServerEnabled *bool `json:"serverEnabled,omitempty"`
+	ServerEnabled    *bool `json:"serverEnabled,omitempty"`
+	PreviewResponses *bool `json:"previewResponses,omitempty"`
 }
 
 type SettingsPatch struct {
