@@ -155,15 +155,18 @@ duplicated here; this file only points at them.
   `P294`). Before opening a new chapter, read the highest `P` in `docs/HISTORY.md` and in an open
   chapter's `SPEC.md`, if one exists, and continue from there. v1.5's `C` lettering and v1.7's `M` lettering predate this rule and
   stay as shipped, never renumbered; every chapter from here on uses `P`.
-- **Closing a chapter folds it.** The chapter's last phase runs
-  `go run ./scripts/docshistory fold --runs docs/history-runs --out - --jobs 1 --max-usd <cap> <ch>`
-  (distills each phase through `ingest_files`, costs tokens, resumable), reads the verify report,
-  runs `repoint --runs docs/history-runs`, commits, then `git rm -r docs/<ch>/ docs/history-runs/`.
-  That phase marks its own row Done and writes its Result in the commit before the fold, so its
-  entry folds closed. Between chapters no `docs/v*/` exists. Open the next with `docs/v<new>/SPEC.md`
+- **Closing a chapter folds it, by hand.** The chapter's last phase closes it; the Sonnet implementer
+  writes the close itself, never with `scripts/docshistory` or any tool. In the commit before the
+  fold, mark the row Done and write its Result in `SPEC.md`, so its entry folds closed. Then write the
+  `<!-- chapter <ch> -->` block in `docs/HISTORY.md`. Copy the previous chapter block's format: header
+  `Source: docs/<ch>/ at <commit>. N phases.` with the true row count, then one `### <ch> <id> (Done)`
+  heading per `SPEC.md` row in table order, distilled from each row's Result. Fix links to the chapter
+  by hand. Commit. Then `git rm -r docs/<ch>/` (and `docs/history-runs/` if it exists) and commit.
+  Between chapters no `docs/v*/` exists. Open the next with `docs/v<new>/SPEC.md`
   (intro: first `P` is highest plus one, branch name) and `plans/`.
   Data a test or script reads at runtime never lives under `docs/v*/`; it goes in its reader's `testdata/`.
-  Move any found first, own phase. Never hand-edit `docs/HISTORY.md`.
+  Move any found first, own phase. Hand-writing the close entry is the standard close; any other
+  edit to `docs/HISTORY.md` stays forbidden.
 - **Splitting a phase keeps its number — it doesn't consume a new one, when an agent is the one
   deciding to split it.** A subagent (an Opus planning pass finding the scope is really two
   pieces, or anyone else in the loop) that decides a `SPEC.md` row needs splitting renames it
