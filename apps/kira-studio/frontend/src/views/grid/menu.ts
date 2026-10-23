@@ -6,14 +6,9 @@ import { copyAndAnnounce } from '@workbench/behaviour/clipboard';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { maskRulesFor, removeMaskRule, upsertMaskRule } from '../../state/maskRules';
 import { useTabsStore } from '../../state/tabs';
-import {
-  type RowSnapshot,
-  rowsToCsv,
-  rowsToInsert,
-  rowsToJson,
-  rowsToTsv,
-  tsvField,
-} from '../shared/clipboardFormats';
+import type { RowSnapshot } from '../shared/clipboardFormats';
+import type { Selection } from '../shared/slick/selection';
+import { type CopyFormat, rowsText } from '../shared/slick/selectionCopy';
 import { identNeedsQuoting, quoteIdent, quoteLiteral, type SqlDialect } from '../shared/sqlIdent';
 import { requestCellFocus } from './focusRequest';
 import { usePendingChangesStore } from './pendingChanges';
@@ -257,10 +252,12 @@ export interface CellMenuContext {
   row: number;
   columnName: string;
   /** Display text — the masking-aware wrapper's own value (M5 §6.6: copy follows display). Used
-   *  only by Copy/Copy with header/Copy as JSON below; never for the filter or FK literals (F6,
+   *  only by Copy with header below; never for the filter or FK literals (F6,
    *  P108 Part 10) — see `rowValues`. */
   isNull: boolean;
   text: string;
+  /** What this cell copies as `format`: the same text the keyboard copy writes. */
+  copy: (format: CopyFormat) => string;
   dialect: SqlDialect | undefined;
   canEdit: boolean;
   /** P36 D26: separate from canEdit — an engine can offer update without delete (or vice versa). */
@@ -331,11 +328,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       // behavior branches on selection kind (cell/range/row/column) in a way one menu row can't
       // express, so this is tagged for its printed key without being dispatched through here.
       shortcut: 'grid.copy',
-      // F5 (P108 Part 10): through tsvField, same as SlickGridHost.vue's own onCopy cell-kind
-      // branch — the same "copy this one cell" action must produce the same clipboard text
-      // regardless of which of the two paths (keyboard vs. this menu item) ran it.
-      run: () =>
-        void copyAndAnnounce(ctx.isNull ? '' : tsvField(ctx.text), t('studio.copy.cell.announce')),
+      run: () => void copyAndAnnounce(ctx.copy('tsv'), t('studio.copy.cell.announce')),
     },
     {
       type: 'item',
@@ -353,11 +346,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       id: 'copy-as-json',
       label: t('common.action.copyAsJson.label'),
       icon: 'copy',
-      run: () =>
-        void copyAndAnnounce(
-          JSON.stringify(ctx.isNull ? null : ctx.text),
-          t('common.copy.copiedJson.announce'),
-        ),
+      run: () => void copyAndAnnounce(ctx.copy('json'), t('common.copy.copiedJson.announce')),
     },
     {
       type: 'item',
@@ -424,6 +413,9 @@ export interface RowMenuContext {
   // F3/P21 round 1: Copy row(s) ▸ INSERT needs the dialect to quote both identifiers and literals
   // correctly — undefined for a connection with no SQL surface (that submenu item never runs there).
   dialect: SqlDialect | undefined;
+  /** Kind of the selection this menu acts on. ⌘C is printed on Copy rows ▸ TSV only for `'row'`,
+   *  the one kind where ⌘C copies whole rows. */
+  selectionKind?: Selection['kind'];
 }
 
 // A1/P21 round 1: memoized once per rowMenu() call so the four Copy row(s) submenu items share one
@@ -462,23 +454,27 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
           type: 'item',
           id: 'copy-rows-tsv',
           label: t('studio.copy.format.tsv.label'),
-          // Display-only (P21 D5) — the row-selection branch of DataGrid.vue's onCopy already
-          // produces this exact TSV output on Cmd/Ctrl+C.
-          shortcut: 'grid.copy',
-          run: () => void copyAndAnnounce(rowsToTsv(snapshots()), t('studio.copy.tsv.announce')),
+          // Display-only (P21 D5): ⌘C on a row selection writes this exact text.
+          shortcut: ctx.selectionKind === 'row' ? 'grid.copy' : undefined,
+          run: () =>
+            void copyAndAnnounce(rowsText(snapshots(), 'tsv'), t('studio.copy.tsv.announce')),
         },
         {
           type: 'item',
           id: 'copy-rows-csv',
           label: t('studio.copy.format.csv.label'),
-          run: () => void copyAndAnnounce(rowsToCsv(snapshots()), t('studio.copy.csv.announce')),
+          run: () =>
+            void copyAndAnnounce(rowsText(snapshots(), 'csv'), t('studio.copy.csv.announce')),
         },
         {
           type: 'item',
           id: 'copy-rows-json',
           label: t('studio.copy.format.json.label'),
           run: () =>
-            void copyAndAnnounce(rowsToJson(snapshots()), t('common.copy.copiedJson.announce')),
+            void copyAndAnnounce(
+              rowsText(snapshots(), 'json'),
+              t('common.copy.copiedJson.announce'),
+            ),
         },
         {
           type: 'item',
@@ -486,7 +482,10 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
           label: t('studio.copy.insert.label'),
           run: () =>
             void copyAndAnnounce(
-              rowsToInsert(ctx.qualifiedName, snapshots(), ctx.dialect),
+              rowsText(snapshots(), 'insert', {
+                qualifiedName: ctx.qualifiedName,
+                dialect: ctx.dialect,
+              }),
               t('studio.copy.insert.announce'),
             ),
         },
