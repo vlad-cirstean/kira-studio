@@ -54,6 +54,9 @@ func CloseWindowBound(b *BoundService, windowKey string) {
 // A package function for the same reason as CloseWindowBound.
 func StartRestoreBound(b *BoundService) { b.m.restore.start() }
 
+// StopRestoreBound ends the restore tracker; app teardown calls it before the store's DB closes.
+func StopRestoreBound(b *BoundService) { b.m.restore.stop() }
+
 // ServiceShutdown ends every stream at app quit. Wails calls it on each registered service and
 // leaves it out of the bindings.
 func (b *BoundService) ServiceShutdown() error {

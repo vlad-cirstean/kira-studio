@@ -9,12 +9,15 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
+
+	"github.com/kirathecat/kira-studio/internal/docker"
 )
 
 const (
@@ -252,5 +255,29 @@ func sweep(host string) {
 				_, _ = cli.VolumeRemove(ctx, v.Name, client.VolumeRemoveOptions{Force: true})
 			}
 		}
+	}
+}
+
+// BootGen simulates daemon restarts for the restore tracker: a real restart would kill the engine
+// every other test shares. Bump gives the probe a new boot id and boot time.
+type BootGen struct {
+	gen atomic.Int64
+	at  atomic.Int64
+}
+
+// Bump makes the next probe report a new daemon life.
+func (b *BootGen) Bump() {
+	b.at.Store(time.Now().UnixMilli())
+	b.gen.Add(1)
+}
+
+// Probe wraps the production probe, appending the generation to the boot id.
+func (b *BootGen) Probe() docker.BootProbe {
+	return func(ctx context.Context, cli *client.Client) (string, int64, error) {
+		id, at, err := docker.BridgeBootProbe(ctx, cli)
+		if err != nil || b.gen.Load() == 0 {
+			return id, at, err
+		}
+		return fmt.Sprintf("%s#%d", id, b.gen.Load()), b.at.Load(), nil
 	}
 }

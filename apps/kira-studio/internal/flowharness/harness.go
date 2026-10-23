@@ -31,6 +31,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/docker"
 	"github.com/kirathecat/kira-studio/internal/flowtest"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/scriptruns"
@@ -54,6 +55,7 @@ type options struct {
 	scheduleTimeout time.Duration
 	clock           scriptruns.Clock
 	dockerHubAPI    string
+	dockerExtra     []docker.Option
 }
 
 // Opt tweaks New.
@@ -70,6 +72,11 @@ func WithClock(c scriptruns.Clock) Opt { return func(o *options) { o.clock = c }
 
 // WithDockerHubAPI points the Docker image registry check at base instead of Docker Hub.
 func WithDockerHubAPI(base string) Opt { return func(o *options) { o.dockerHubAPI = base } }
+
+// WithDockerOptions appends options to the Docker service (restore tracker timing and boot probe).
+func WithDockerOptions(opts ...docker.Option) Opt {
+	return func(o *options) { o.dockerExtra = append(o.dockerExtra, opts...) }
+}
 
 // App is one booted Kira Studio.
 type App struct {
@@ -173,7 +180,7 @@ func (a *App) build() {
 		Authorizer: localauth.New(time.Now, a.OSAuth.evaluate, a.OSAuth.isAvailable),
 		Emitter:    a.Events, Browser: a.Browser, Dialogs: a.Dialogs, KeepAwakeDriver: a.KeepAwake, McpInstaller: a.McpInstaller,
 		AppName: "Kira Studio", Version: "flowtest", SmartTimeout: a.opts.smartTimeout,
-		ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, DockerHubAPI: a.opts.dockerHubAPI,
+		ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, DockerHubAPI: a.opts.dockerHubAPI, DockerExtra: a.opts.dockerExtra,
 	})
 	if err != nil {
 		a.t.Fatalf("appwire.Build: %v", err)

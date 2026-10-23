@@ -21,7 +21,8 @@ const (
 // It is a flow-test seam; "" means the engine has no default bridge.
 type BootProbe func(ctx context.Context, cli *client.Client) (id string, at int64, err error)
 
-func bridgeBootProbe(ctx context.Context, cli *client.Client) (string, int64, error) {
+// BridgeBootProbe is the production boot marker: the default bridge network.
+func BridgeBootProbe(ctx context.Context, cli *client.Client) (string, int64, error) {
 	res, err := cli.NetworkInspect(ctx, "bridge", client.NetworkInspectOptions{})
 	if err != nil {
 		if cerrdefs.IsNotFound(err) {
@@ -69,7 +70,7 @@ type restoreTracker struct {
 func newRestoreTracker(m *Manager) *restoreTracker {
 	probe := m.bootProbe
 	if probe == nil {
-		probe = bridgeBootProbe
+		probe = BridgeBootProbe
 	}
 	return &restoreTracker{
 		m: m, store: m.restoreStore, t: m.restoreTiming, probe: probe, kickCh: make(chan struct{}, 1),
