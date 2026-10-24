@@ -33,6 +33,17 @@ const CONTROL: ControlSnapshot[] = [
     response: { paths: ['a.ts', 'c.ts'], status: { 'c.ts': 'M' }, truncated: false },
   },
   {
+    channel: IPC.codeWorkspaceReadFile,
+    args: { id: PORT_REPO.id, path: 'a.ts' },
+    response: {
+      kind: 'found',
+      text: 'export const a = 1;\nexport const b = 2;\n',
+      bytes: 40,
+      limitBytes: 8 * 1024 * 1024,
+      language: 'typescript',
+    },
+  },
+  {
     channel: IPC.codeWorkspaceReadDiff,
     args: { id: PORT_REPO.id, path: 'c.ts' },
     response: {
@@ -54,10 +65,10 @@ const CONTROL: ControlSnapshot[] = [
   },
 ];
 
-async function boot(relaunch: Relaunch): Promise<Page> {
+async function boot(relaunch: Relaunch, extra: Record<string, unknown> = {}): Promise<Page> {
   const page = await openPortGraph(relaunch, {
     chunks: singleRowChunks(manyRows(300)),
-    results: { 'refs.list': refsAtTip(manyRowShas(0)) },
+    results: { 'refs.list': refsAtTip(manyRowShas(0)), ...extra },
     control: CONTROL,
   });
   await expect(row(page, 0)).toBeVisible();
@@ -118,6 +129,30 @@ test('opening a diff and returning keeps the graph mounted with scroll and selec
   await expect(selected.first()).toBeVisible();
   await expect(page.locator('[data-testid="boot-error"]')).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+test('"Open in graph" from a file scrolls the hidden graph to the commit once shown', async ({
+  relaunch,
+}) => {
+  const page = await boot(relaunch, {
+    'blame.line': {
+      sha: manyRowShas(250),
+      author: 'Fake Author',
+      summary: 'Row 250',
+      authorTimeSeconds: 1_700_000_000,
+    },
+  });
+  await page.locator('[data-testid="git-panel-tab-files"]').click();
+  await treeRow(page, 'a.ts').click();
+  const editor = page.locator('[data-testid="repo-file-editor"]');
+  await expect(editor).toBeVisible();
+  await editor.locator('.view-lines').click();
+  await page.keyboard.press('ArrowDown');
+  await page.locator('[data-testid="blame-status"]').click();
+
+  await expect(page.locator('[data-testid="repo-graph-host"]')).toBeVisible();
+  await expect(page.locator(`${grid} .slick-row[aria-selected="true"]`).first()).toBeInViewport();
+  await expect.poll(() => viewport(page).evaluate((el) => el.scrollTop)).toBeGreaterThan(5000);
 });
 
 test('switching to the ADE module and back keeps the graph mounted', async ({ relaunch }) => {
