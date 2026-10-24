@@ -322,13 +322,18 @@ func (b *ApprovalBroker) openPrompt(req ApprovalRequest) {
 	if b.Prompts == nil {
 		return
 	}
-	key, namedKey := "backend.prompt.dbMcp.title", "backend.prompt.dbMcpNamed.title"
-	if req.Stage == ApprovalStageResponse {
-		key, namedKey = "backend.prompt.dbMcpResponse.title", "backend.prompt.dbMcpResponseNamed.title"
-	}
-	title := i18n.T(key, nil)
-	if req.ConnectionName != "" {
-		title = i18n.T(namedKey, map[string]string{"name": req.ConnectionName})
+	named := req.ConnectionName != ""
+	response := req.Stage == ApprovalStageResponse
+	var title string
+	switch {
+	case response && named:
+		title = i18n.T("backend.prompt.dbMcpResponseNamed.title", map[string]string{"name": req.ConnectionName})
+	case response:
+		title = i18n.T("backend.prompt.dbMcpResponse.title", nil)
+	case named:
+		title = i18n.T("backend.prompt.dbMcpNamed.title", map[string]string{"name": req.ConnectionName})
+	default:
+		title = i18n.T("backend.prompt.dbMcp.title", nil)
 	}
 	b.Prompts.Open(prompts.Prompt{
 		ID: prompts.ID(prompts.KindDbMcp, req.RequestID), Kind: prompts.KindDbMcp, Ref: req.RequestID,
