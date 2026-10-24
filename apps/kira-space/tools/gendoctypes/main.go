@@ -13,6 +13,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/google/renameio/v2"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/filetypes"
 )
 
@@ -48,7 +49,7 @@ func main() {
 			drift = true
 			continue
 		}
-		if err := os.WriteFile(path, []byte(out), 0o644); err != nil {
+		if err := renameio.WriteFile(path, []byte(out), 0o644); err != nil {
 			fatal(err)
 		}
 	}

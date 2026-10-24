@@ -61,14 +61,14 @@ func (r *restoreTracker) pendingFor(engineID string) (RestoreSnapshot, error) {
 	defer r.mu.Unlock()
 	s := r.snaps[r.curObs.EngineID]
 	if !r.reachable || s == nil || r.curObs.EngineID != engineID || s.State != statePending {
-		return RestoreSnapshot{}, ipcerr.New(string(ipcerr.CodeConflict), "no restore is pending for this engine")
+		return RestoreSnapshot{}, ipcerr.T(ipcerr.CodeConflict, "backend.core.docker.restore.notPending.body", nil)
 	}
 	return *s, nil
 }
 
 func (r *restoreTracker) restoreContainers(ctx context.Context, args RestoreArgs) (RestoreResult, error) {
 	if r == nil {
-		return RestoreResult{}, ipcerr.New(string(ipcerr.CodeConflict), "no restore is pending for this engine")
+		return RestoreResult{}, ipcerr.T(ipcerr.CodeConflict, "backend.core.docker.restore.notPending.body", nil)
 	}
 	r.tick(ctx)
 	snap, err := r.pendingFor(args.EngineID)
@@ -87,7 +87,7 @@ func (r *restoreTracker) restoreContainers(ctx context.Context, args RestoreArgs
 	picked := map[string]bool{}
 	for _, id := range args.IDs {
 		if !open[id] {
-			return RestoreResult{}, ipcerr.BadRequest(fmt.Sprintf("container %s is not restorable", id))
+			return RestoreResult{}, ipcerr.T(ipcerr.CodeBadRequest, "backend.core.docker.restore.notRestorable.body", map[string]string{"id": id})
 		}
 		picked[id] = true
 	}
@@ -128,7 +128,7 @@ func (r *restoreTracker) restoreContainers(ctx context.Context, args RestoreArgs
 // dismiss drops the pending restore and starts tracking the running set again.
 func (r *restoreTracker) dismiss(ctx context.Context, engineID string) error {
 	if r == nil {
-		return ipcerr.New(string(ipcerr.CodeConflict), "no restore is pending for this engine")
+		return ipcerr.T(ipcerr.CodeConflict, "backend.core.docker.restore.notPending.body", nil)
 	}
 	r.tick(ctx)
 	if _, err := r.pendingFor(engineID); err != nil {
