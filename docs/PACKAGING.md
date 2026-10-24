@@ -395,7 +395,7 @@ The bundle assertion lives only in `release.yml`'s own "Assert packaged bundle a
 after each merge and saves what `pr.yml` restores: Go modules, the four Go build kinds
 (`macos`, `checks`, `go-rest`, `go-ct`), bun, the `wails3` CLI, bindings, tsbuildinfo, the
 golangci-lint binary, both Playwright browser sets and the Testcontainers images (on a miss only).
-It installs and compiles, no tests: `go test -run '^$' -exec /bin/true` builds test binaries and runs
+It installs and compiles, no tests: `go test -run '^$' -exec true` builds test binaries and runs
 nothing. Cost: about 30-55 runner-minutes in parallel per merge, free on a public repo. On a private
 repo the macOS job bills at 10x, about 190 billed minutes in total.
 
