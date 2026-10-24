@@ -17,7 +17,7 @@ Decisions (user, 2026-10-23):
 | P332 | Kira Space as default app for code and data files | Done |
 | P333 | DB MCP: prominent target database and response preview | Done |
 | P334 | Docker: restore running containers after an engine/VM restart | Done |
-| P335 | SQL grid: context-menu "Copy as" with multiple rows selected | Todo |
+| P335 | SQL grid: context-menu "Copy as" with multiple rows selected | Done |
 | P336 | Code review round 1 | Todo |
 | P337 | Code review round 2 | Todo |
 
@@ -74,6 +74,8 @@ Result: Shipped in nine commits, no split. Backend tracker (`internal/docker/res
 ## P335: SQL grid: context-menu "Copy as" with multiple rows selected
 
 With several rows selected, the keyboard copy shortcut puts the rows on the clipboard, but right click > "Copy as" puts nothing there. Planner reproduces it first (UI spec, real clipboard read), finds why the menu path differs from the shortcut path, and fixes it so both share one code path. Backend-or-UI split per the new-feature test rule applies only if a bound call is involved.
+
+Result: Root cause: console `onGridContextMenu` had no `row` case on a body hit. A gutter row selection plus right-click on a cell fell through to the single-cell menu, so every Copy item wrote one cell (NULL wrote ''). Keyboard and menu each decided "what does this selection copy" separately. New `views/shared/slick/selectionCopy.ts` (`selectionText`, `rowsText`) is the one path. Both grids' ⌘C go through `selectionText`; console menu builders take a `copy(format)` callback over it; data grid cell menu uses it and `rowMenu` uses `rowsText`. Console right-click acts on the selection when it covers the hit, else selects the hit first. Console `copy-column` copies every selected column; console cell copy now quotes through `tsvField`. Keyboard copy announces and reports a rejection in both grids. Data grid prints ⌘C on Copy rows ▸ TSV only for a row selection. New `tests/ui/grid-copy-menu.spec.ts` runs on Chromium (`ui-clipboard`, real clipboard) and WebKit (`ui`, pass-through `writeText` recorder). Proven on base: console fails at `menuCopy(cellAt(0, 0), 'copy-rows-tsv', 'copy-rows')` (no `menu-item-copy-rows` in the cell menu), data grid fails at `menu-item-copy-rows-tsv-shortcut` count 0 on a range; both pass after. Checks: pre-commit hooks clean on all commits; `lint:dead` clean; `grid-row-menu-lazy-snapshot.spec.ts` 4 pass unchanged; `bun run test:ui:studio` 606 passed on the clean rerun. First full run: 600 passed, 2 failed (`cell-editor.spec.ts:333` timeout, `http-history.spec.ts:28` "Page crashed", both WebKit under load, neither file touched); both pass in isolation and the full project passes on rerun with nothing else running. CI: the `ui-clipboard` step is staged in `docs/pending-changes/.github__workflows__pr.yml.patch` (`ui-extra`); the `ui` shards already run the spec on WebKit.
 
 ## P336, P337: Code review rounds
 
