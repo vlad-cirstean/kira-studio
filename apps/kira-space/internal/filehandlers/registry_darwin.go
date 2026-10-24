@@ -15,6 +15,7 @@ package filehandlers
 #include <stdlib.h>
 #include <string.h>
 
+// The cgo calls run on Go-owned threads with no autorelease pool, so each C entry point makes its own.
 static char *kira_dup(NSString *s) {
 	return s ? strdup([s UTF8String]) : NULL;
 }
@@ -23,16 +24,18 @@ static char *kira_dup(NSString *s) {
 // usable text type: no declared type (an app never registered with LaunchServices sees a dynamic
 // one), or one that does not conform to public.text (ts resolves to MPEG-2 video).
 static int kira_resolve(const char *ext, char **uti) {
-	UTType *t = [UTType typeWithFilenameExtension:[NSString stringWithUTF8String:ext]];
-	if (t == nil) {
-		*uti = NULL;
-		return 1;
+	@autoreleasepool {
+		UTType *t = [UTType typeWithFilenameExtension:[NSString stringWithUTF8String:ext]];
+		if (t == nil) {
+			*uti = NULL;
+			return 1;
+		}
+		*uti = kira_dup(t.identifier);
+		if (t.isDynamic || ![t conformsToType:UTTypeText]) {
+			return 1;
+		}
+		return 0;
 	}
-	*uti = kira_dup(t.identifier);
-	if (t.isDynamic || ![t conformsToType:UTTypeText]) {
-		return 1;
-	}
-	return 0;
 }
 
 static NSString *kira_app_name(NSBundle *b, NSURL *url) {
@@ -44,47 +47,53 @@ static NSString *kira_app_name(NSBundle *b, NSURL *url) {
 
 // kira_default returns 1 and fills the out strings (malloc'd) when an app opens uti, else 0.
 static int kira_default(const char *uti, char **path, char **bundleID, char **name) {
-	UTType *t = [UTType typeWithIdentifier:[NSString stringWithUTF8String:uti]];
-	if (t == nil) return 0;
-	NSURL *url = [[NSWorkspace sharedWorkspace] URLForApplicationToOpenContentType:t];
-	if (url == nil) return 0;
-	NSBundle *b = [NSBundle bundleWithURL:url];
-	*path = kira_dup(url.path);
-	*bundleID = kira_dup(b.bundleIdentifier);
-	*name = kira_dup(kira_app_name(b, url));
-	return 1;
+	@autoreleasepool {
+		UTType *t = [UTType typeWithIdentifier:[NSString stringWithUTF8String:uti]];
+		if (t == nil) return 0;
+		NSURL *url = [[NSWorkspace sharedWorkspace] URLForApplicationToOpenContentType:t];
+		if (url == nil) return 0;
+		NSBundle *b = [NSBundle bundleWithURL:url];
+		*path = kira_dup(url.path);
+		*bundleID = kira_dup(b.bundleIdentifier);
+		*name = kira_dup(kira_app_name(b, url));
+		return 1;
+	}
 }
 
 // kira_set blocks on the completion handler. Returns 0 ok, 1 the system refused (*msg set),
 // 2 the app is gone or not a loadable bundle, 3 timed out.
 static int kira_set(const char *uti, const char *appPath, double timeoutSeconds, char **msg) {
-	UTType *t = [UTType typeWithIdentifier:[NSString stringWithUTF8String:uti]];
-	NSURL *url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:appPath]];
-	if (t == nil || [NSBundle bundleWithURL:url] == nil) return 2;
-	__block int result = 0;
-	__block NSString *text = nil;
-	dispatch_semaphore_t sem = dispatch_semaphore_create(0);
-	[[NSWorkspace sharedWorkspace] setDefaultApplicationAtURL:url
-	                                        toOpenContentType:t
-	                                        completionHandler:^(NSError *error) {
-		if (error != nil) {
-			result = 1;
-			text = error.localizedDescription;
+	@autoreleasepool {
+		UTType *t = [UTType typeWithIdentifier:[NSString stringWithUTF8String:uti]];
+		NSURL *url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:appPath]];
+		if (t == nil || [NSBundle bundleWithURL:url] == nil) return 2;
+		__block int result = 0;
+		__block NSString *text = nil;
+		dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+		[[NSWorkspace sharedWorkspace] setDefaultApplicationAtURL:url
+		                                        toOpenContentType:t
+		                                        completionHandler:^(NSError *error) {
+			if (error != nil) {
+				result = 1;
+				text = error.localizedDescription;
+			}
+			dispatch_semaphore_signal(sem);
+		}];
+		if (dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeoutSeconds * NSEC_PER_SEC))) != 0) {
+			return 3;
 		}
-		dispatch_semaphore_signal(sem);
-	}];
-	if (dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeoutSeconds * NSEC_PER_SEC))) != 0) {
-		return 3;
+		if (result != 0) *msg = kira_dup(text);
+		return result;
 	}
-	if (result != 0) *msg = kira_dup(text);
-	return result;
 }
 
 static void kira_self(char **path, char **bundleID, char **name) {
-	NSBundle *b = [NSBundle mainBundle];
-	*path = kira_dup(b.bundleURL.path);
-	*bundleID = kira_dup(b.bundleIdentifier);
-	*name = kira_dup(kira_app_name(b, b.bundleURL));
+	@autoreleasepool {
+		NSBundle *b = [NSBundle mainBundle];
+		*path = kira_dup(b.bundleURL.path);
+		*bundleID = kira_dup(b.bundleIdentifier);
+		*name = kira_dup(kira_app_name(b, b.bundleURL));
+	}
 }
 */
 import "C"
