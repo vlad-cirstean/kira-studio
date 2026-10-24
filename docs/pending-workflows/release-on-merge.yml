@@ -23,9 +23,11 @@ on:
 
 permissions: {}
 
-# One at a time: two entry points can fire for one merge.
+# One at a time per PR: two entry points can fire for one merge. A single global group let a newer
+# pending run cancel an older one, so a merge's own run could be dropped. The script is idempotent
+# per tag, and release.yml's release-<tag> group serializes the dispatch.
 concurrency:
-  group: release-on-merge
+  group: release-on-merge-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
   cancel-in-progress: false
 
 jobs:
