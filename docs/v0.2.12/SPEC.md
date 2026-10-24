@@ -20,6 +20,7 @@ Decisions (user, 2026-10-23):
 | P335 | SQL grid: context-menu "Copy as" with multiple rows selected | Done |
 | P336 | Code review round 1 | Done |
 | P337 | Code review round 2 | Done |
+| P338 | DB MCP: focus the Kira DB window when an approval appears | Todo |
 
 ## P330: Branch naming, PR automation, release on merge
 
@@ -84,3 +85,10 @@ Per `CLAUDE.md` "Code review": one Opus reviewer per round (architecture/securit
 Result P336: Round 1 found 3 Medium, 6 Low; all fixed in six commits. Docker restore tracker: unchanged snapshots refresh `updated_at` once a day on a reachable tick, so the 30-day prune keys on last seen; `publish` always emits when the engine differs from the last push (context switch clears the banner); a fallback-resolved client (default/probe source) drops after 3 failed ticks and re-resolves; a dependent of a dependency that failed to start in the same restore fails with "dependency X did not start". `RestoreDialog.vue` renders rejected Restore/Dismiss errors. `ApprovalResponse.vue` sets `gcTime: 0`; declined the rest of L4: the desktop `createQueryClient` already sets `staleTime: Infinity` and `refetchOnWindowFocus: false`, and check-ui-primitives U53 forbids restating them. Kira Space `turnOff` restores from a saved row of any extension sharing the UTI and deletes them all; macOS cgo entry points wrapped in `@autoreleasepool` (not compilable here). `release-on-merge.yml` concurrency keyed by PR number, falling back to run id, in `docs/pending-workflows/`. Tests: reconcile touch subtest, `TestPublishEmitsOnEngineSwitch`, `TestFileHandlersSharedTypeRestoresFromSibling` (fake gained `Share`), UI spec for a rejected Restore. Checks: `go test -race` on `internal/docker`, `dockerflow`, `appflow` pass; `bun run test:ui:studio` 607 passed; pre-commit and pre-push hooks clean.
 
 Result P337: Round 2 found 1 Medium, 1 Low; both fixed in one commit (`filehandlers.go`, entangled). `turnOn` now clears every saved row of the type, then saves the current non-self handler unconditionally, so a Finder change no longer leaves a stale row that `turnOff` restores (single extension and shared type). Vocabulary resolved once per `Set` (`utiIndex`), not per extension on turn-off. Test: `TestFileHandlersStaleRowReplacedWhenFinderChangedHandler` (fails on base). Checks: `go test -race` appflow pass; pre-commit hooks clean.
+
+## P338: DB MCP: focus the Kira DB window when an approval appears
+
+- User ask (2026-10-24): when a DB MCP approval dialog appears, the Kira DB window must come to the front and take focus. On macOS this moves the desktop (Space) to the one holding the Kira DB app.
+- Covers both approval stages (query, response preview from P333). Kira DB may be hidden, minimized, on another Space, or in the background behind other apps.
+- Planner decides the mechanism (Wails window show/unminimise/focus, macOS app activation across Spaces), where the call lives (backend on request enqueue vs frontend on event), and a setting only if a real need appears. Windows and Linux behavior stated plainly.
+- Lands after review rounds P336-P337; it is unreviewed code and the planner and implementer must keep the diff small.
