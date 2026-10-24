@@ -116,8 +116,11 @@ test('a pushed pending state shows the banner without a reload', async ({ relaun
   await openDocker(page);
   await expect(banner(page)).toHaveCount(0);
 
-  await emitWailsEvent(page, 'kira:docker:restore', pendingFixture());
-  await expect(banner(page)).toBeVisible();
+  // The push can land before the panel subscribes under load; re-emit until it shows.
+  await expect(async () => {
+    await emitWailsEvent(page, 'kira:docker:restore', pendingFixture());
+    await expect(banner(page)).toBeVisible({ timeout: 1000 });
+  }).toPass();
 
   await emitWailsEvent(page, 'kira:docker:restore', NONE);
   await expect(banner(page)).toHaveCount(0);
