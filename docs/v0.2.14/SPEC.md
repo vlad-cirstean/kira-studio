@@ -6,7 +6,7 @@ Branch `chapter/v0.2.14`. First `P` is 340 (highest in HISTORY is P339).
 |---|---|---|
 | P340 | Docker restore-containers dialog redesign; Redis + S3 folder nav fix | Done |
 | P341 | Remove "keychain access for sandboxed agents" option and alternative token-injection paths | Done |
-| P342 | Git graph keeps state and does not reload from scratch after opening a diff | Todo |
+| P342 | Git graph keeps state and does not reload from scratch after opening a diff | Done |
 
 ## P340
 
@@ -27,4 +27,4 @@ Result: Done. Profiles always render the keychain-on branch: `Policy.Keychain`/`
 
 Git graph reloads entirely from scratch after opening a diff (or similar tab switch). Visually distracting; loses graph state (scroll, selection, expansion). Keep state across tab switches and refresh in place. Planner root-causes: tab unmount/remount, store reset, or refetch.
 
-Result: _pending_
+Result: Done. Root cause: MainView rendered only the active tab, so RepoGraphView unmounted on every tab switch and remounted with a fresh git-ui app and re-walk. Fix: opt-in `TabKindDef.keepMounted` (set on `repo-graph`); MainView keeps visited kept tabs mounted with v-show until the tab closes; RepoGraphView takes `active` and drives `MountHandle.setVisible` (sync on hide, post on show). Viewport scroll survives display:none without a CommitGrid change. Also fixed a RepoDiffView null deref when unmounted during `mount()` await. New spec `repo-graph-keep-state.spec.ts` (3 cases); lifecycle spec and ARCHITECTURE.md updated. test:ui:space 673 pass, visual 19 pass, test:ui:studio 611 pass; perf.spec p95<80ms is timing-flaky and fails on the base commit too.
