@@ -99,14 +99,6 @@ const lists = computed(() =>
               ? t('space.ade.sandbox.popover.networkOn.status')
               : t('space.ade.sandbox.popover.networkOff.status')
           }}</span>
-          <span class="text-muted-foreground">{{
-            t('space.ade.sandbox.popover.keychain.label')
-          }}</span>
-          <span data-testid="ade-run-sandbox-keychain">{{
-            d.keychain
-              ? t('space.ade.sandbox.popover.keychainOn.status')
-              : t('space.common.status.blocked.status')
-          }}</span>
         </div>
         <div class="flex flex-col gap-0.5" data-testid="ade-run-sandbox-denials">
           <span class="text-kira-sm text-muted-foreground">{{

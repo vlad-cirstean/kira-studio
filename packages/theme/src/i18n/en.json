@@ -8112,12 +8112,6 @@
           "enforced": {
             "status": "Enforced by macOS"
           },
-          "keychain": {
-            "label": "Keychain"
-          },
-          "keychainOn": {
-            "status": "Allowed"
-          },
           "network": {
             "label": "Network access"
           },
@@ -9095,10 +9089,6 @@
         },
         "notifyRunEnded": {
           "label": "When a background ADE run ends"
-        },
-        "sandboxKeychain": {
-          "description": "Lets sandboxed agents read the macOS keychain so {agent} can sign in. Off by default. Without it, set a token from {command} setup-token. Applies on macOS only.",
-          "label": "Keychain access for sandboxed agents"
         },
         "usage": {
           "description": "Shows the 5-hour and weekly limits that {product} sessions started from Kira Space report. {product} hands the numbers to a status-line hook on this Mac. Nothing is sent anywhere, and no login or token is read. Applies to sessions started after you change it. Available on {agent} subscription plans only.",

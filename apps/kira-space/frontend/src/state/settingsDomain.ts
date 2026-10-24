@@ -119,7 +119,6 @@ const adeSettingsSchema = /*#__PURE__*/ z.object({
     .max(ADE_SPAN_DAY_SHARE_RANGE.max)
     .default(0.5),
   headlessSettingSources: z.enum(['user', 'all']).default('all'),
-  sandboxKeychain: z.boolean().default(false),
 });
 
 // The shared agent.provider leaf plus this app's agent leaves. P188: keep this Mac awake while any
@@ -172,7 +171,6 @@ const settingsSchema = /*#__PURE__*/ z.object({
     workdayHours: 6,
     spanDayShare: 0.5,
     headlessSettingSources: 'all',
-    sandboxKeychain: false,
   }),
   agent: appAgentSettingsSchema.default({
     provider: DEFAULT_AGENT_PROVIDER,
@@ -233,7 +231,6 @@ export const defaultSettings: Settings = {
     workdayHours: 6,
     spanDayShare: 0.5,
     headlessSettingSources: 'all',
-    sandboxKeychain: false,
   },
   agent: {
     provider: DEFAULT_AGENT_PROVIDER,
