@@ -78,8 +78,8 @@ func TestSandboxStepDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(d.Write) != 1 || d.Write[0] != real || !d.Network || d.Keychain {
-		t.Fatalf("detail = %+v, want the worktree %s, network on, keychain off", d, real)
+	if len(d.Write) != 1 || d.Write[0] != real || !d.Network {
+		t.Fatalf("detail = %+v, want the worktree %s, network on", d, real)
 	}
 	mustContain(t, "profile", d.Profile, "(version 1)", real)
 	args := fakeFile(t, f.app, "api-1.args")
@@ -162,14 +162,6 @@ func TestSandboxDenial(t *testing.T) {
 	}
 	f.app.Contract(t, sbScenario, "AdeTaskService.RunSandbox#denied", detail, sbMask)
 	f.app.Contract(t, sbScenario, "AdeTaskService.Run#denied", run, sbMask)
-}
-
-func TestSandboxAuth(t *testing.T) {
-	fake := &sandboxtest.Fake{}
-	f := newSandboxFx(t, fake, []fakeagent.Action{{Name: "fail", Stderr: "Invalid API key · Please run /login"}}, sbStep("one", ""))
-	f.start(t, "feat/api-sb")
-	run := waitRun(t, f.app, f.taskID, "one", "failed")
-	mustContain(t, "note", run.Note, "Claude can’t sign in because the sandbox blocks the keychain")
 }
 
 func TestSandboxNotEnforced(t *testing.T) {

@@ -47,9 +47,7 @@ type Service struct {
 	// LlmPrompts resolves the report suffixes and server texts; nil means the registry defaults.
 	LlmPrompts llmprompts.Source
 	// Sandbox confines smart runs in dir mode worktree (P287); nil = no sandbox, as in Studio.
-	// SandboxKeychain reads the keychain setting per run.
-	Sandbox         agentsandbox.Enforcer
-	SandboxKeychain func() bool
+	Sandbox agentsandbox.Enforcer
 	// ScheduleTimeout, when positive, replaces every headless run's own timeout (a flow test).
 	ScheduleTimeout time.Duration
 

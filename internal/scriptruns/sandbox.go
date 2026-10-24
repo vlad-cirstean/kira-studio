@@ -25,9 +25,7 @@ type smartSandbox struct {
 	tracker agentsandbox.Tracker
 	tools   bool
 	release func()
-	// authFailed reads a sign-in failure in the agent's output.
-	authFailed func(string) bool
-	agent      agentsandbox.Namer
+	agent   agentsandbox.Namer
 }
 
 // prepareSandbox returns nil when the run is not confined.
@@ -40,9 +38,6 @@ func (s *Service) prepareSandbox(ctx context.Context, p *planned, runID string, 
 		Scratch: filepath.Join(s.Home, "sandbox", runID), Cache: filepath.Join(s.Home, "sandbox-cache"),
 		ConfigDir: filepath.Join(s.Home, "automations-mcp"), Ports: []int{port},
 	}
-	if s.SandboxKeychain != nil {
-		in.Keychain = s.SandboxKeychain()
-	}
 	agent := p.agent
 	rt := agentsandbox.DiscoverRuntime(ctx, agent, "")
 	pol, _, err := agentsandbox.ResolvePolicy(in, rt)
@@ -54,7 +49,7 @@ func (s *Service) prepareSandbox(ctx context.Context, p *planned, runID string, 
 		_ = os.RemoveAll(pol.Scratch)
 		return nil, err
 	}
-	return &smartSandbox{policy: pol, prep: prep, tools: p.preview.ADE != nil, authFailed: agent.IsAuthFailure, agent: agent, release: func() { s.Sandbox.Release(runID) }}, nil
+	return &smartSandbox{policy: pol, prep: prep, tools: p.preview.ADE != nil, agent: agent, release: func() { s.Sandbox.Release(runID) }}, nil
 }
 
 func (sb *smartSandbox) cleanup() {
@@ -113,10 +108,6 @@ func (s *Service) watchSandbox(sb *smartSandbox, runID string, sink *logSink, pi
 // outcome maps a failed run to its sandbox cause (plan 6.3, 6.4).
 func (sb *smartSandbox) outcome(out runoutcome.Outcome) runoutcome.Outcome {
 	if sb == nil || out.Status != runoutcome.StatusFailed {
-		return out
-	}
-	if !out.Reported && !sb.policy.Keychain && sb.authFailed(out.LastError) {
-		out.Reason = agentsandbox.AuthReason(sb.agent)
 		return out
 	}
 	out.Reason = sb.tracker.BlockedReason(out.Reason)

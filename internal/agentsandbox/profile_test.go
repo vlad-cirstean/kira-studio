@@ -77,11 +77,6 @@ func TestProfileGolden(t *testing.T) {
 			p.Network, p.Ports = false, []int{4100, 4200}
 			return p, rt
 		},
-		"keychain_on": func() (Policy, Runtime) {
-			p := basePolicy()
-			p.Keychain = true
-			return p, rt
-		},
 		"rebase_stack": func() (Policy, Runtime) {
 			p := basePolicy()
 			a, b := p.Write[0], "/Users/ada/src/app-wt/feat2"

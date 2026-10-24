@@ -21,8 +21,6 @@ func NotEnforcedText(a Namer) string {
 // Namer names the agent in sandbox texts; a harness provider satisfies it.
 type Namer interface {
 	Label() string
-	ProductLabel() string
-	Command() string
 }
 
 // Support says whether profiles are enforced on this OS.

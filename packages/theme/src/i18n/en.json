@@ -1157,9 +1157,6 @@
           "body": "That run no longer exists."
         },
         "sandbox": {
-          "auth": {
-            "body": "{agent} can’t sign in because the sandbox blocks the keychain. Turn on keychain access in the {product} settings, or run {command} setup-token and export the token from your shell profile."
-          },
           "blocked": {
             "body": "Sandbox blocked {op} {target}."
           },

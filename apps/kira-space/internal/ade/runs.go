@@ -852,7 +852,7 @@ func (b *TaskBoard) endAgentRun(ctx context.Context, run model.AdeRun, l agentLa
 		an := runoutcome.AgentOf(agent)
 		code := exit.Code
 		o := runoutcome.ForProcess(agentEnd(an, exit, runErr, def.Timeout)).WithLastError(sink.lastStderr())
-		end := sbx.sandboxOutcome(fromOutcome(model.AdeRunFailed, o), sink.lastStderr())
+		end := sbx.sandboxOutcome(fromOutcome(model.AdeRunFailed, o))
 		end.out.ExitCode = &code
 		f, ok := b.takeFinish(run.ID)
 		var report *agentmcp.Finish
@@ -865,10 +865,10 @@ func (b *TaskBoard) endAgentRun(ctx context.Context, run model.AdeRun, l agentLa
 	resumeLost := l.resume != "" && agent.ResumeLost(sink.lastStderr())
 	an := runoutcome.AgentOf(agent)
 	if l.smart != nil {
-		b.completeRun(run, sessionID, sbx.sandboxOutcome(b.smartOutcome(an, run.ID, exit, runErr, res, l.smart, def.Results, sink.lastStderr(), resumeLost), sink.lastStderr()))
+		b.completeRun(run, sessionID, sbx.sandboxOutcome(b.smartOutcome(an, run.ID, exit, runErr, res, l.smart, def.Results, sink.lastStderr(), resumeLost)))
 		return
 	}
-	complete(sbx.sandboxOutcome(b.agentOutcome(an, run.ID, exit, runErr, def, sink.lastStderr(), resumeLost), sink.lastStderr()))
+	complete(sbx.sandboxOutcome(b.agentOutcome(an, run.ID, exit, runErr, def, sink.lastStderr(), resumeLost)))
 }
 
 // roundTools adds the reply tool to a review round's allowed tools.

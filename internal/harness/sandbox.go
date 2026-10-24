@@ -10,8 +10,6 @@ type Sandboxed interface {
 	// APIHosts is the network allowlist of a run with the network off: exact hosts and domain
 	// suffixes (each also matches its subdomains).
 	APIHosts(getenv func(string) string) (exact, suffixes []string)
-	// IsAuthFailure reports whether a stderr or result text reads as a failed sign-in.
-	IsAuthFailure(text string) bool
 }
 
 // SandboxNeeds are absolute paths unless noted.
