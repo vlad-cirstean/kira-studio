@@ -2989,6 +2989,7 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **MongoDB 8.x/9.x servers are unverified in CI.** Every 8.x/9.x image exits at startup on runner kernels
   6.19-7.0.13 (SERVER-125742; SERVER-136848 for Ubuntu). Test and db-compat max pin `mongo:7.0.45`. Restore an
   8.x/9.x max once runner kernels leave that range. 7.0 support ends 2027-08-31.
+- **Sandboxed OAuth token refresh is unverified on a real Mac (P341).** The profile still denies `file-write*` under `~/Library/Keychains`. The legacy file keychain writes `login.keychain-db` in-process, so a `claude` refresh of an expired token from a sandboxed run may fail. `setup-token` is gone, so no supported workaround exists. Check: `DEV_ENVIRONMENT.md` Mac checklist step 9. If refresh fails, allow writes on the login keychain file literals (db, journal, lock) only.
 - **The sandbox profile leaves some macOS services open (P287).** The profile allows by default and lists
   denies, so a launchd or XPC service that acts for the agent (for example `launchctl submit`) is not closed
   beyond the listed denies.
