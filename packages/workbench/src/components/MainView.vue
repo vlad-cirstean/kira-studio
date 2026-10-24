@@ -11,6 +11,9 @@ import { useWorkbenchHost } from '../host';
 // it's App-composition content, not a tab-kind concern — and arrives through the `#empty` slot
 // instead, each app passing whatever component its own workspace-switch logic already resolves.
 const host = useWorkbenchHost();
+// A shell showing something else over this view (full-layout module): kept views stay mounted
+// but inactive, the rest unmount.
+const props = defineProps<{ suspended?: boolean }>();
 
 // Kinds with `keepMounted` stay mounted (v-show) from first activation until the tab closes.
 const activeTab = computed(() => {
@@ -44,13 +47,13 @@ const keptTabs = computed(() => host.tabs.tabs.filter((t) => visited.value.inclu
     v-show="tab.id === activeTab?.id"
     :key="tab.id"
     :tab="tab"
-    :active="tab.id === activeTab?.id"
+    :active="!props.suspended && tab.id === activeTab?.id"
   />
   <component
     :is="host.views[activeTab.kind]"
-    v-if="activeTab && !host.kinds[activeTab.kind]?.keepMounted"
+    v-if="activeTab && !props.suspended && !host.kinds[activeTab.kind]?.keepMounted"
     :key="activeTab.id"
     :tab="activeTab"
   />
-  <slot v-if="!activeTab" name="empty" />
+  <slot v-if="!activeTab && !props.suspended" name="empty" />
 </template>

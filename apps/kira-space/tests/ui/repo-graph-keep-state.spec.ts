@@ -120,6 +120,21 @@ test('opening a diff and returning keeps the graph mounted with scroll and selec
   expect(errors).toEqual([]);
 });
 
+test('switching to the ADE module and back keeps the graph mounted', async ({ relaunch }) => {
+  const page = await boot(relaunch);
+  await tag(page);
+  const before = { init: await count(page, 'app.init'), stream: await count(page, 'graph.stream') };
+
+  await page.locator('[data-testid="mode-tab"][data-mode="ade"]').click();
+  await expect(page.locator('[data-testid="repo-graph-host"]')).toBeHidden();
+  await page.locator('[data-testid="mode-tab"][data-mode="git"]').click();
+
+  await expect(row(page, 0)).toBeVisible();
+  await expect(page.locator(grid)).toHaveAttribute('data-p342', 'kept');
+  expect(await count(page, 'app.init')).toBe(before.init);
+  expect(await count(page, 'graph.stream')).toBe(before.stream);
+});
+
 test('a refresh while the graph is hidden updates in place', async ({ relaunch }) => {
   const page = await boot(relaunch);
   await tag(page);
