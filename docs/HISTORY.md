@@ -6844,6 +6844,72 @@ The chapter was folded by hand at user instruction; `scripts/docshistory` was no
 The P323 row status was fixed from Todo to Done.
 <!-- /chapter v0.2.10 -->
 
+<!-- chapter v0.2.12 -->
+## v0.2.12
+Source: docs/v0.2.12/ at caaacdf05ed6. 10 phases.
+
+### v0.2.12 P330 (Done)
+Chapter branches are `chapter/v<semver>`. `.githooks/pre-push` runs `scripts/check-push-refs.sh` and refuses any branch but `main` and `chapter/vX.Y.Z`; tag pushes pass; no `claude/*` exemption.
+Remote `v0.2.10`, `v2.0`, `v2.6`, `v2.8` were copied to `chapter/<name>`; the proxy returned 403 on rename and delete, so the old names stay until deleted by hand.
+`scripts/release-on-merge.sh` added; `scripts/release-ci-gate.sh` deleted.
+Workflows staged, not pushed (OAuth scope): patches for `pr.yml` (drop `push: main`, SC2046) and `release.yml` (`workflow_dispatch` tag input, `tag` job, no `ci-gate`), new `pr-auto-merge.yml`, `pr-rerun-flaky.yml`, `release-on-merge.yml`, `cache-warm.yml` under `docs/pending-workflows/`.
+`CLAUDE.md`, `DEV_ENVIRONMENT.md`, `PACKAGING.md` §7 and `ARCHITECTURE.md` updated.
+First-use checks stay open until the merge: bot rerun raising `workflow_run`, tag creation on a workflow-changing commit, docker tar size.
+
+### v0.2.12 P331 (Done)
+Release failures root-caused from run logs: stale S3/SQS auth test (v0.2.1), timing-dependent Redis and Kafka tests (v0.2.1, v0.2.7; rewritten), `mongo:8.3` on kernel 6.19 (pinned to `mongo:7.0.45`), and `ci-gate` (removed by P330). The v0.2.11 gate hung on a slow apt mirror in `pr.yml` setup; out of scope.
+Three `release.yml` guards: `tag` refuses a non-prerelease tag whose commit is not on `main`, `tag` refuses an already-published release, `publish` refuses a tag moved since `tag` resolved it.
+Staged as one combined `release.yml` patch in `docs/pending-changes/`. `delete-old-branches.sh` staged there too.
+`v0.2.11` has a tag and no release; recommend skip.
+
+### v0.2.12 P332 (Done)
+Kira Space can be the default app for code and data files.
+`internal/filetypes` is the one vocabulary (41 code, 14 data extensions); `tools/gendoctypes` renders both plists (`--check` is verify-packaging S13).
+Finder opens arrive as `ApplicationOpenedWithFile`, coalesce 300 ms in `openedfiles`, and open a keyed new window. A repo path opens as a repo-file tab, any other as a read-only `local-file` tab.
+Settings > File types drives `filehandlers.Registry` (macOS cgo `NSWorkspace`; `Unsupported` elsewhere). Migration 0045 `file_handler_previous` stores the previous handler for restore.
+Per-extension toggles are `Switch` (check-ui-primitives U28).
+Not verifiable on Linux: the cgo `registry_darwin.go`, LaunchServices registration, per-UTI resolution. Mac checks live in `ARCHITECTURE.md` Known open items.
+
+### v0.2.12 P333 (Done)
+DB MCP approval shows its target. Each request carries an `ApprovalTarget` (connection colour, read-only flag, host, effective database or file path, statement class); `ApprovalTarget.vue` renders it as a banner for both stages.
+New setting `dbMcp.previewResponses` (default off). When on, `run_query` executes after query approval, then holds the exact result in a response-stage request; Send returns that same value, so the preview runs once on the real code path.
+Withhold, timeout, abandon and a full queue return an app-authored error with no row data. A withheld write has already run and the dialog says so.
+`ApprovalResponse.vue` shows a virtualised table (masked columns marked) and an As sent tab. Approve re-checks the mask set (`mask.Set.Equal`) and withholds if rules changed.
+Only `run_query` is reviewed. User checks the banner in light and dark, compares the preview to what Claude quotes, and raises `MCP_TOOL_TIMEOUT` if needed (two stages can hold a call 4 minutes).
+
+### v0.2.12 P334 (Done)
+Docker restore after an engine/VM restart. Backend tracker (`internal/docker/restore*.go`) runs from app start: 15 s tick while the engine answers, 30 s otherwise.
+Restart signal is (Info.ID, default bridge network ID); the bridge ID changes on every daemon start and survives live-restore.
+Snapshot excludes testcontainers, buildx, kind, kubernetes, swarm and `--rm`; an unreachable engine never writes; a stopped container leaves after 30 s grace. Stored in migration 0044, pruned at 30 days.
+Restore is click-only: standalone containers first, then each Compose project in `depends_on` order, waiting up to 60 s on `service_healthy`. Deleted containers list as gone.
+Bound calls `RestoreState`, `RestoreContainers`, `RestoreDismiss`; push channel `kira:docker:restore`; banner inside the Docker module only.
+`TestRestoreRealDaemonRestart` passed against the sandbox dockerd. User checks Docker Desktop, Colima and OrbStack on a Mac. Open limits in `ARCHITECTURE.md`.
+
+### v0.2.12 P335 (Done)
+Root cause: console `onGridContextMenu` had no `row` case on a body hit, so a row selection plus right-click fell through to the single-cell menu.
+New `views/shared/slick/selectionCopy.ts` (`selectionText`, `rowsText`) is the one path for keyboard and menu copy in both grids. Console right-click acts on the selection when it covers the hit, else selects the hit first.
+`tests/ui/grid-copy-menu.spec.ts` runs on Chromium (`ui-clipboard`, real clipboard) and WebKit (pass-through recorder); proven failing on base.
+The `ui-clipboard` CI step is staged in `docs/pending-changes/.github__workflows__pr.yml.patch`.
+
+### v0.2.12 P336 (Done)
+Code review round 1: 3 Medium, 6 Low, all fixed in six commits.
+Docker restore: unchanged snapshots refresh `updated_at` once a day so the prune keys on last seen; context switch clears the banner; a fallback-resolved client re-resolves after 3 failed ticks; a dependent of a failed dependency fails with "dependency X did not start".
+`ApprovalResponse.vue` sets `gcTime: 0`. `turnOff` restores from a saved row of any extension sharing the UTI. macOS cgo entry points wrapped in `@autoreleasepool` (uncompiled here). `release-on-merge.yml` concurrency keyed by PR number.
+
+### v0.2.12 P337 (Done)
+Code review round 2: 1 Medium, 1 Low, fixed in one commit.
+`filehandlers.turnOn` clears every saved row of the type, then saves the current non-self handler, so a Finder change no longer leaves a stale row that `turnOff` restores. Vocabulary resolved once per `Set`.
+
+### v0.2.12 P338 (Done)
+A DB MCP approval brings the Kira DB window forward. `prompts.Deps.RaiseOnOpen` (per kind) makes `Router.Open` start `RevealKind` when the window is unfocused, at most once per kind per 2 s, never on close.
+Studio raises only `dbmcp`, gated by `dbMcp.focusOnApproval` (default on, Settings > Database MCP). `WindowRegistry.Focus` calls `App.Show` first on darwin only.
+`unhide_darwin.go` is uncompiled here. Mac checks are in `ARCHITECTURE.md` Known open items "Approval focus is unverified on macOS (P338)".
+
+### v0.2.12 P339 (Done)
+The chapter was folded by hand; `scripts/docshistory` was not run.
+`docs/history-runs/` never existed. No runtime data lived under `docs/v0.2.12/`. No references to the chapter directory existed outside it.
+<!-- /chapter v0.2.12 -->
+
 ## Fixes outside chapters
 
 ### Release container tests (fix/release-container-tests)
