@@ -12,7 +12,7 @@ import type { DateFormat, ViewStateStore } from './state/viewState.ts';
 
 export interface MountHandle {
   unmount(): void;
-  /** `false` while backgrounded (a KeepAlive deactivate) lets
+  /** `false` while backgrounded (host hidden but kept mounted) lets
    *  `CommitGrid.vue`'s own generation-triggered rebuild defer to a single catch-up on the next
    *  `true`, instead of paying that cost once per missed bump against a grid nobody can see. Only
    *  meaningful for `view: "graph"` — a no-op call for a `"review"` mount, which has no
@@ -55,8 +55,8 @@ export interface MountOptions {
    *  `'relative'` default — the shape every call site (and every test that constructs
    *  `MountOptions` without this field) already gets for free. Not reactive: this is the value as
    *  of this webview's cold mount, not a live prop — a later change to the app-wide setting reaches
-   *  an already-mounted graph on its next remount (a closed tab, or a KeepAlive `:max` eviction,
-   *  `RepoGraphView.vue`), not while it stays cached. */
+   *  an already-mounted graph on its next remount (a closed and reopened tab,
+   *  `RepoGraphView.vue`), not while it stays mounted. */
   readonly dateFormat?: DateFormat;
   /** P173: only meaningful when `view === "graph"` — opens the host's Operations log. Absent where
    *  the host has none; the failure banner then names it in text instead. */

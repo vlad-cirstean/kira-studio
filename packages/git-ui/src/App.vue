@@ -1400,7 +1400,7 @@ function breakpointFor(width: number): Breakpoint {
 
 const rootEl = ref<HTMLDivElement | null>(null);
 // `main.ts`'s own `mount()` provides this per instance only for a Kira Space graph tab
-// (a `KeepAlive`d sibling among possibly several) — always `true` everywhere else
+// (a kept-mounted sibling among possibly several) — always `true` everywhere else
 // (this package's own tests), so `onDocumentKeydown` below behaves exactly as before
 // wherever only one instance ever exists.
 const graphVisible = useGraphVisible();
@@ -1549,7 +1549,7 @@ useEventListener(
 
 function onDocumentKeydown(event: KeyboardEvent): void {
   // Kira Space mounts several git-ui apps into one document — one per graph tab
-  // (`KeepAlive`d while hidden) plus the review sidebar (`v-show`). Every instance's own
+  // (kept mounted, v-show, while hidden) plus the review sidebar (`v-show`). Every instance's own
   // `document`-level listener otherwise fires for every keydown regardless of which one is
   // visible or focused. Handle it here only when the key landed inside this
   // instance's own DOM, or — for a shortcut typed with focus elsewhere entirely (the host chrome,

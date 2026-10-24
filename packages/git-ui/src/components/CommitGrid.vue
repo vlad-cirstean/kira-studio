@@ -236,8 +236,8 @@ let previousSelectedRow = -1;
 // keep retrying forever. See `applyInitialScrollRow` below.
 let initialScrollApplied = false;
 
-// `false` while a KeepAlive host has backgrounded this mount
-// (RepoGraphView.vue's own onDeactivated, via main.ts's `setVisible`) — the four generation
+// `false` while a kept-mounted host is hidden
+// (RepoGraphView.vue's `active` prop, via main.ts's `setVisible`) — the four generation
 // watchers below skip their own rebuild while hidden, marking one owed instead of doing it once
 // per missed bump against a grid nobody can see; the catch-up watch further down replays it once,
 // combined, the moment this flips back to visible.
@@ -715,8 +715,8 @@ function scheduleResize(): void {
   if (resizeRaf !== 0) return;
   resizeRaf = requestAnimationFrame(() => {
     resizeRaf = 0;
-    // A KeepAlive'd host
-    // (RepoGraphView.vue) shrinks this grid's container to 0×0 on deactivate — the ResizeObserver
+    // A kept-mounted host
+    // (RepoGraphView.vue, v-show) shrinks this grid's container to 0×0 on hide — the ResizeObserver
     // above fires for that transition too, and without a guard `resizeCanvas()`/`rebuildColumns()`
     // would do a full layout pass against a grid nobody can see. The original fix inferred "nobody
     // can see this" from a 0×0 read, which also matched a real host's transient 0×0 during initial
@@ -724,7 +724,7 @@ function scheduleResize(): void {
     // once the host settles at its true size unchanged from that reading, so the grid's columns
     // never got laid out at all. `graphVisible` (already threaded through for the four generation
     // watchers above) is the actual signal for "backgrounded", not a proxy for it: `RepoGraphView
-    // .vue`'s `onDeactivated` sets it `false` synchronously, before the resulting 0×0 resize ever
+    // .vue`'s `active` watch sets it `false` synchronously, before the resulting 0×0 resize ever
     // reaches this async callback (`graphVisibility.ts`), and it stays `true` through every plain
     // mount/resize — including one that happens to observe 0×0 before its real layout settles — so
     // gating on it here skips exactly the intended case and no other.
