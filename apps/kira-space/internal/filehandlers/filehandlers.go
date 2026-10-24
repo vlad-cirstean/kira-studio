@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sort"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/filetypes"
 )
@@ -143,11 +144,12 @@ func (s *Service) Set(args SetArgs) (SetResult, error) {
 		}
 	}
 	self := s.Registry.Self()
+	idx := s.utiIndex()
 	if args.On {
-		return res, s.turnOn(self, args.Exts)
+		return res, s.turnOn(self, idx, args.Exts)
 	}
 	for _, ext := range args.Exts {
-		restored, err := s.turnOff(self, ext)
+		restored, err := s.turnOff(self, idx, ext)
 		if err != nil {
 			return res, err
 		}
@@ -158,7 +160,31 @@ func (s *Service) Set(args SetArgs) (SetResult, error) {
 	return res, nil
 }
 
-func (s *Service) turnOn(self App, exts []string) error {
+// utiIndex resolves the whole vocabulary once per call; dynamic extensions are left out.
+func (s *Service) utiIndex() map[string]string {
+	idx := map[string]string{}
+	for _, e := range filetypes.All() {
+		if uti, dynamic := s.Registry.Resolve(e.Ext); !dynamic {
+			idx[e.Ext] = uti
+		}
+	}
+	return idx
+}
+
+// sharing returns every extension that resolves to uti, ext included. LaunchServices keys the
+// default by type, so a row saved for one of them restores them all.
+func sharing(idx map[string]string, ext, uti string) []string {
+	out := []string{ext}
+	for e, u := range idx {
+		if e != ext && u == uti {
+			out = append(out, e)
+		}
+	}
+	sort.Strings(out[1:])
+	return out
+}
+
+func (s *Service) turnOn(self App, idx map[string]string, exts []string) error {
 	// Read every current handler before the first write: extensions sharing one type would
 	// otherwise see Kira Space as the handler and skip saving the app it replaced.
 	type target struct {
@@ -167,25 +193,27 @@ func (s *Service) turnOn(self App, exts []string) error {
 	}
 	var targets []target
 	for _, ext := range exts {
-		uti, dynamic := s.Registry.Resolve(ext)
-		if dynamic {
+		uti, ok := idx[ext]
+		if !ok {
 			continue
 		}
 		cur, err := s.Registry.Default(uti)
 		if err != nil {
 			cur = App{}
 		}
-		targets = append(targets, target{ext: ext, uti: uti, current: cur})
-	}
-	for _, t := range targets {
-		if isSelf(self, t.current) {
-			continue
+		if !isSelf(self, cur) {
+			targets = append(targets, target{ext: ext, uti: uti, current: cur})
 		}
-		_, saved, err := s.Previous.Get(t.ext)
-		if err != nil {
+	}
+	// A handler that is not Kira Space is the app being replaced, so every saved row for the type
+	// is stale. Clear them all before saving, or a sibling's row would win on restore.
+	for _, t := range targets {
+		if err := s.deleteRows(sharing(idx, t.ext, t.uti)); err != nil {
 			return err
 		}
-		if !saved && t.current.Path != "" {
+	}
+	for _, t := range targets {
+		if t.current.Path != "" {
 			if err := s.Previous.Put(t.ext, t.current.Path, t.current.BundleID); err != nil {
 				return err
 			}
@@ -197,26 +225,11 @@ func (s *Service) turnOn(self App, exts []string) error {
 	return nil
 }
 
-// sharing returns every extension that resolves to uti, ext included. LaunchServices keys the
-// default by type, so a row saved for one of them restores them all.
-func (s *Service) sharing(ext, uti string) []string {
-	out := []string{ext}
-	for _, e := range filetypes.All() {
-		if e.Ext == ext {
-			continue
-		}
-		if u, dynamic := s.Registry.Resolve(e.Ext); !dynamic && u == uti {
-			out = append(out, e.Ext)
-		}
-	}
-	return out
-}
-
 // turnOff reports whether ext is off Kira Space afterwards. It restores from the saved row of ext
 // or, failing that, of an extension sharing its type.
-func (s *Service) turnOff(self App, ext string) (bool, error) {
-	uti, dynamic := s.Registry.Resolve(ext)
-	if dynamic {
+func (s *Service) turnOff(self App, idx map[string]string, ext string) (bool, error) {
+	uti, ok := idx[ext]
+	if !ok {
 		return true, nil
 	}
 	cur, _ := s.Registry.Default(uti)
@@ -224,7 +237,7 @@ func (s *Service) turnOff(self App, ext string) (bool, error) {
 		prevPath string
 		saved    []string
 	)
-	for _, e := range s.sharing(ext, uti) {
+	for _, e := range sharing(idx, ext, uti) {
 		p, ok, err := s.Previous.Get(e)
 		if err != nil {
 			return false, err

@@ -131,3 +131,45 @@ func TestFileHandlersSharedTypeRestoresFromSibling(t *testing.T) {
 		t.Fatalf("off yaml = %+v, %v, handler %+v, want restored from yml's row", res, err, fake.HandlerOf("yaml"))
 	}
 }
+
+func TestFileHandlersStaleRowReplacedWhenFinderChangedHandler(t *testing.T) {
+	editor := filehandlers.App{Path: "/Applications/Example Editor.app", BundleID: "com.example.Editor", Name: "Example Editor"}
+	other := filehandlers.App{Path: "/Applications/Other.app", BundleID: "com.example.Other", Name: "Other"}
+	fake := flowharness.NewFakeHandlers()
+	fake.Install(editor)
+	fake.Install(other)
+	fake.Share("yml", "yaml")
+	fake.Declare("py", editor)
+	fake.Declare("yaml", editor)
+	fake.Declare("yml", filehandlers.App{})
+	app := flowharness.New(t, flowharness.WithFileHandlers(fake))
+	set := func(ext string, on bool) {
+		t.Helper()
+		if res, err := app.W.FileHandlersSvc.Set(filehandlers.SetArgs{Exts: []string{ext}, On: on}); err != nil || len(res.Unrestored) != 0 {
+			t.Fatalf("Set %s on=%v = %+v, %v", ext, on, res, err)
+		}
+	}
+	finder := func(ext string) {
+		t.Helper()
+		uti, _ := fake.Resolve(ext)
+		if err := fake.SetDefault(uti, other.Path); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	set("py", true)
+	finder("py")
+	set("py", true)
+	set("py", false)
+	if got := fake.HandlerOf("py"); got != other {
+		t.Fatalf("py handler = %+v, want the app set in Finder", got)
+	}
+
+	set("yaml", true)
+	finder("yaml")
+	set("yml", true)
+	set("yaml", false)
+	if got := fake.HandlerOf("yaml"); got != other {
+		t.Fatalf("yaml handler = %+v, want the app set in Finder, not a stale row", got)
+	}
+}
