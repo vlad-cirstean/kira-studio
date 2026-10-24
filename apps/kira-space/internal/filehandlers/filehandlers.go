@@ -197,29 +197,63 @@ func (s *Service) turnOn(self App, exts []string) error {
 	return nil
 }
 
-// turnOff reports whether ext is off Kira Space afterwards.
+// sharing returns every extension that resolves to uti, ext included. LaunchServices keys the
+// default by type, so a row saved for one of them restores them all.
+func (s *Service) sharing(ext, uti string) []string {
+	out := []string{ext}
+	for _, e := range filetypes.All() {
+		if e.Ext == ext {
+			continue
+		}
+		if u, dynamic := s.Registry.Resolve(e.Ext); !dynamic && u == uti {
+			out = append(out, e.Ext)
+		}
+	}
+	return out
+}
+
+// turnOff reports whether ext is off Kira Space afterwards. It restores from the saved row of ext
+// or, failing that, of an extension sharing its type.
 func (s *Service) turnOff(self App, ext string) (bool, error) {
 	uti, dynamic := s.Registry.Resolve(ext)
 	if dynamic {
 		return true, nil
 	}
 	cur, _ := s.Registry.Default(uti)
-	prevPath, saved, err := s.Previous.Get(ext)
-	if err != nil {
-		return false, err
+	var (
+		prevPath string
+		saved    []string
+	)
+	for _, e := range s.sharing(ext, uti) {
+		p, ok, err := s.Previous.Get(e)
+		if err != nil {
+			return false, err
+		}
+		if ok {
+			if prevPath == "" {
+				prevPath = p
+			}
+			saved = append(saved, e)
+		}
 	}
 	if !isSelf(self, cur) {
-		// A Finder change already moved it; the saved row is stale.
-		if saved {
-			return true, s.Previous.Delete(ext)
-		}
-		return true, nil
+		// A Finder change already moved it; the saved rows are stale.
+		return true, s.deleteRows(saved)
 	}
-	if !saved {
+	if len(saved) == 0 {
 		return false, nil
 	}
 	if err := s.Registry.SetDefault(uti, prevPath); err != nil {
 		return false, nil
 	}
-	return true, s.Previous.Delete(ext)
+	return true, s.deleteRows(saved)
+}
+
+func (s *Service) deleteRows(exts []string) error {
+	for _, e := range exts {
+		if err := s.Previous.Delete(e); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -110,3 +110,24 @@ func TestFileHandlersUnsupportedByDefault(t *testing.T) {
 		t.Fatal("Set succeeded on an unsupported build")
 	}
 }
+
+func TestFileHandlersSharedTypeRestoresFromSibling(t *testing.T) {
+	editor := filehandlers.App{Path: "/Applications/Example Editor.app", BundleID: "com.example.Editor", Name: "Example Editor"}
+	fake := flowharness.NewFakeHandlers()
+	fake.Install(editor)
+	fake.Share("yml", "yaml")
+	fake.Declare("yaml", editor)
+	fake.Declare("yml", filehandlers.App{})
+	app := flowharness.New(t, flowharness.WithFileHandlers(fake))
+
+	if _, err := app.W.FileHandlersSvc.Set(filehandlers.SetArgs{Exts: []string{"yml"}, On: true}); err != nil {
+		t.Fatalf("Set on yml: %v", err)
+	}
+	if e := stateOf(handlerStatus(t, app), "yaml"); e.State != filehandlers.StateSelf {
+		t.Fatalf("yaml = %+v, want self through the shared type", e)
+	}
+	res, err := app.W.FileHandlersSvc.Set(filehandlers.SetArgs{Exts: []string{"yaml"}, On: false})
+	if err != nil || len(res.Unrestored) != 0 || fake.HandlerOf("yaml") != editor {
+		t.Fatalf("off yaml = %+v, %v, handler %+v, want restored from yml's row", res, err, fake.HandlerOf("yaml"))
+	}
+}

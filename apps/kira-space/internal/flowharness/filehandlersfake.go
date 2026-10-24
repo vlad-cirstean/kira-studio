@@ -12,6 +12,7 @@ import (
 type FakeHandlers struct {
 	mu        sync.Mutex
 	declared  map[string]bool
+	shared    map[string]string // ext -> ext whose type it shares
 	defaults  map[string]filehandlers.App
 	installed map[string]filehandlers.App
 	self      filehandlers.App
@@ -21,12 +22,24 @@ type FakeHandlers struct {
 func NewFakeHandlers() *FakeHandlers {
 	self := filehandlers.App{Path: "/Applications/Kira Space.app", BundleID: "com.kirathecat.kira-space", Name: "Kira Space"}
 	return &FakeHandlers{
-		declared: map[string]bool{}, defaults: map[string]filehandlers.App{},
+		declared: map[string]bool{}, shared: map[string]string{}, defaults: map[string]filehandlers.App{},
 		installed: map[string]filehandlers.App{self.Path: self}, self: self,
 	}
 }
 
-func fakeUTI(ext string) string { return "test.uti." + ext }
+func (f *FakeHandlers) uti(ext string) string {
+	if with, ok := f.shared[ext]; ok {
+		ext = with
+	}
+	return "test.uti." + ext
+}
+
+// Share makes ext resolve to the same type as with (yml and yaml); both must be Declare'd.
+func (f *FakeHandlers) Share(ext, with string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.shared[ext] = with
+}
 
 // Declare makes ext resolve to a real type, handled by app (zero App means no handler).
 func (f *FakeHandlers) Declare(ext string, app filehandlers.App) {
@@ -34,7 +47,7 @@ func (f *FakeHandlers) Declare(ext string, app filehandlers.App) {
 	defer f.mu.Unlock()
 	f.declared[ext] = true
 	if app.Path != "" {
-		f.defaults[fakeUTI(ext)] = app
+		f.defaults[f.uti(ext)] = app
 	}
 }
 
@@ -56,7 +69,7 @@ func (f *FakeHandlers) Uninstall(app filehandlers.App) {
 func (f *FakeHandlers) HandlerOf(ext string) filehandlers.App {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.defaults[fakeUTI(ext)]
+	return f.defaults[f.uti(ext)]
 }
 
 func (f *FakeHandlers) Supported() bool { return true }
@@ -64,7 +77,7 @@ func (f *FakeHandlers) Supported() bool { return true }
 func (f *FakeHandlers) Resolve(ext string) (string, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return fakeUTI(ext), !f.declared[ext]
+	return f.uti(ext), !f.declared[ext]
 }
 
 func (f *FakeHandlers) Default(uti string) (filehandlers.App, error) {
