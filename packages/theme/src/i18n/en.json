@@ -12652,6 +12652,10 @@
           "description": "Deny by default. Only connections checked here are visible to an MCP client through this server.",
           "label": "Exposed connections"
         },
+        "focus": {
+          "description": "When a query or result waits for approval, show the window and switch to its desktop.",
+          "label": "Bring Kira Studio forward for approvals"
+        },
         "masked": {
           "status": "{count} masked column | {count} masked columns"
         },

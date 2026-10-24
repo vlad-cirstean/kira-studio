@@ -43,6 +43,9 @@ const toggle = useAsyncAction((enabled: boolean) => dbMcpStore.setDbMcpEnabled(e
 const preview = useAsyncAction((enabled: boolean) =>
   settingsStore.patchSettings({ dbMcp: { previewResponses: enabled } }),
 );
+const focus = useAsyncAction((enabled: boolean) =>
+  settingsStore.patchSettings({ dbMcp: { focusOnApproval: enabled } }),
+);
 const regenerate = useAsyncAction(() => dbMcpStore.regenerateDbMcpToken());
 const install = useAsyncAction(() => dbMcpStore.installDbMcpAgent());
 const connectionToggle = useAsyncAction((id: string, enabled: boolean) =>
@@ -55,6 +58,7 @@ const actionError = computed(
   () =>
     toggle.error.value ??
     preview.error.value ??
+    focus.error.value ??
     regenerate.error.value ??
     install.error.value ??
     connectionToggle.error.value,
@@ -62,6 +66,7 @@ const actionError = computed(
 function clearActionErrors(): void {
   toggle.error.value = null;
   preview.error.value = null;
+  focus.error.value = null;
   regenerate.error.value = null;
   install.error.value = null;
   connectionToggle.error.value = null;
@@ -73,6 +78,10 @@ async function onToggleDbMcpEnabled(enabled: boolean): Promise<void> {
 async function onTogglePreviewResponses(enabled: boolean): Promise<void> {
   clearActionErrors();
   await preview.run(enabled);
+}
+async function onToggleFocusOnApproval(enabled: boolean): Promise<void> {
+  clearActionErrors();
+  await focus.run(enabled);
 }
 async function onRegenerateDbMcpToken(): Promise<void> {
   clearActionErrors();
@@ -117,6 +126,7 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
 // FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
 const dbMcpEnabledId = useId();
 const dbMcpPreviewId = useId();
+const dbMcpFocusId = useId();
 </script>
 
 <template>
@@ -151,6 +161,20 @@ const dbMcpPreviewId = useId();
       <FieldContent>
         <Label :for="dbMcpPreviewId">{{ t('studio.settings.dbMcp.preview.label') }}</Label>
         <FieldDescription>{{ t('studio.settings.dbMcp.preview.description') }}</FieldDescription>
+      </FieldContent>
+    </Field>
+
+    <Field orientation="horizontal" class="items-start">
+      <Switch
+        :id="dbMcpFocusId"
+        :model-value="settingsStore.dbMcp.focusOnApproval"
+        :disabled="focus.pending.value"
+        data-testid="settings-db-mcp-focus"
+        @update:model-value="(v) => onToggleFocusOnApproval(v === true)"
+      />
+      <FieldContent>
+        <Label :for="dbMcpFocusId">{{ t('studio.settings.dbMcp.focus.label') }}</Label>
+        <FieldDescription>{{ t('studio.settings.dbMcp.focus.description') }}</FieldDescription>
       </FieldContent>
     </Field>
 
