@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Spinner from '@theme/components/Spinner.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import {
@@ -90,14 +91,26 @@ const errors = computed(() => {
   return out;
 });
 
+const callError = computed(() => (restore.error.value ?? dismiss.error.value)?.message);
+
 async function submit(): Promise<void> {
-  const res = await restore.mutateAsync({ engineId: props.state.engineId, ids: chosen.value });
-  if (res.items.every((i) => i.ok)) emit('close');
+  dismiss.reset();
+  try {
+    const res = await restore.mutateAsync({ engineId: props.state.engineId, ids: chosen.value });
+    if (res.items.every((i) => i.ok)) emit('close');
+  } catch {
+    // Surfaced through `callError`.
+  }
 }
 
 async function dismissAll(): Promise<void> {
-  await dismiss.mutateAsync(props.state.engineId);
-  emit('close');
+  restore.reset();
+  try {
+    await dismiss.mutateAsync(props.state.engineId);
+    emit('close');
+  } catch {
+    // Surfaced through `callError`.
+  }
 }
 </script>
 
@@ -203,6 +216,9 @@ async function dismissAll(): Promise<void> {
             >
           </ul>
         </FieldSet>
+        <Alert v-if="callError" variant="error" data-testid="docker-restore-call-error">
+          <AlertDescription>{{ callError }}</AlertDescription>
+        </Alert>
       </DialogBody>
 
       <DialogFooter>

@@ -139,3 +139,23 @@ test('unchecking the project row drops both members from the call', async ({ rel
   const sent = docker.calls('RestoreContainers')[0]?.args as { ids: string[] };
   expect(sent.ids).toEqual(['id-solo']);
 });
+
+test('a rejected Restore call shows its error in the dialog', async ({ relaunch }) => {
+  const { page, state } = await setupDocker(relaunch, {
+    handlers: {
+      RestoreContainers: () => ({
+        error: { code: 'E_CONFLICT', message: 'No restore is pending for this engine.' },
+      }),
+    },
+  });
+  state.restore = pendingFixture();
+  await openDocker(page);
+  await openDialog(page);
+
+  await page.locator('[data-testid="docker-restore-submit"]').click();
+
+  await expect(page.locator('[data-testid="docker-restore-call-error"]')).toContainText(
+    'No restore is pending for this engine.',
+  );
+  await expect(page.locator('[data-testid="docker-restore-dialog"]')).toBeVisible();
+});
