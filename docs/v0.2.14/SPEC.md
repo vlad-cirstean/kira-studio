@@ -6,6 +6,7 @@ Branch `chapter/v0.2.14`. First `P` is 340 (highest in HISTORY is P339).
 |---|---|---|
 | P340 | Docker restore-containers dialog redesign; Redis + S3 folder nav fix | Todo |
 | P341 | Remove "keychain access for sandboxed agents" option and alternative token-injection paths | Todo |
+| P342 | Git graph keeps state and does not reload from scratch after opening a diff | Todo |
 
 ## P340
 
@@ -19,5 +20,11 @@ Result: _pending_
 ## P341
 
 Remove the "keychain access for sandboxed agents" option. Harness needs keychain access to work, so the option has no purpose. Remove the alternative token-injection mechanisms too. Planner enumerates every setting, UI, backend path and doc touching it.
+
+Result: _pending_
+
+## P342
+
+Git graph reloads entirely from scratch after opening a diff (or similar tab switch). Visually distracting; loses graph state (scroll, selection, expansion). Keep state across tab switches and refresh in place. Planner root-causes: tab unmount/remount, store reset, or refetch.
 
 Result: _pending_
