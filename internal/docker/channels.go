@@ -7,4 +7,5 @@ const (
 	ChannelStats   = "kira:docker:stats"
 	ChannelLogs    = "kira:docker:logs"
 	ChannelExec    = "kira:docker:exec"
+	ChannelRestore = "kira:docker:restore"
 )

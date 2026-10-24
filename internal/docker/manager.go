@@ -71,9 +71,14 @@ type Manager struct {
 	selected string
 
 	events *eventsWatcher
-	stats  *statsHub
-	logs   *logRegistry
-	execs  *execRegistry
+	// restore is nil without a RestoreStore.
+	restore       *restoreTracker
+	restoreStore  RestoreStore
+	restoreTiming restoreTiming
+	bootProbe     BootProbe
+	stats         *statsHub
+	logs          *logRegistry
+	execs         *execRegistry
 
 	// containerd caches whether the engine uses the containerd image store; reset with the client.
 	containerd *bool
@@ -92,7 +97,7 @@ func NewManager(emit appevent.Emitter) *Manager {
 }
 
 func newManager(emit appevent.Emitter, env resolveEnv) *Manager {
-	m := &Manager{Emit: emit, env: env, HubAPI: DefaultHubAPI}
+	m := &Manager{Emit: emit, env: env, HubAPI: DefaultHubAPI, restoreTiming: defaultRestoreTiming}
 	m.events = newEventsWatcher(m)
 	m.logs = newLogRegistry()
 	m.execs = newExecRegistry()
@@ -109,6 +114,7 @@ func (m *Manager) useContext(ctx context.Context, name string) Status {
 	m.mu.Unlock()
 	m.stopStreams()
 	m.events.restart()
+	m.restore.contextChanged()
 	st := m.status(ctx, false)
 	m.Emit.Emit(ChannelStatus, st)
 	m.Emit.Emit(ChannelChanged, ChangedEvent{Kinds: allKinds})
@@ -132,6 +138,7 @@ func (m *Manager) closeWindow(windowKey string) {
 
 // shutdown ends every stream and drops the client.
 func (m *Manager) shutdown() {
+	m.restore.stop()
 	m.events.shutdown()
 	m.stopStreams()
 	m.mu.Lock()
@@ -165,6 +172,32 @@ func (m *Manager) resetLocked() {
 		m.cli = nil
 		m.containerd = nil
 	}
+}
+
+// dropFallbackClient drops the cached client when it came from the default or probe fallback, so the
+// next call re-resolves once an engine socket appears. It reports whether it dropped.
+func (m *Manager) dropFallbackClient() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.cli == nil || (m.endpoint.Source != sourceDefault && m.endpoint.Source != sourceProbe) {
+		return false
+	}
+	m.resetLocked()
+	return true
+}
+
+// endpointRemote reports whether the endpoint is tcp:// or ssh://, without building a client.
+func (m *Manager) endpointRemote() bool {
+	m.mu.Lock()
+	cli, ep, selected := m.cli, m.endpoint, m.selected
+	m.mu.Unlock()
+	if cli == nil {
+		var err error
+		if ep, _, err = resolveEndpoint(m.env, selected); err != nil {
+			return false
+		}
+	}
+	return ep.Remote
 }
 
 func (m *Manager) selectedContext() string {

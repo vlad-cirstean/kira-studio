@@ -149,7 +149,11 @@ duplicated here; this file only points at them.
   just the latest chapter. Find that session in git (the last commit of a prior review's findings or
   fixes, e.g. P108's close-out `771512bc`) and diff from there. State the base commit in the review's
   findings file. Consecutive rounds each cover the full diff since that same base; a round-1 fixer's commits are unreviewed code in round 2.
-- No per-phase PRs. One feature branch per chapter.
+- **One branch and one PR per chapter; no per-phase PRs.** Branch `chapter/v<version>`, tag
+  `v<version>`. The user names the version at chapter start; otherwise take the latest tag and add 1
+  to its patch. Work and push only on the chapter branch, never a `claude/*` session branch:
+  `.githooks/pre-push` refuses any branch but `main` and `chapter/v<semver>`. The merged PR tags and
+  releases itself (`docs/PACKAGING.md` §7).
 - **Every chapter uses `P` phase numbers, one running sequence across the whole repo, not
   per-chapter.** v1.1/v1.2/v1.4/v1.6/v1.8/v1.9 continue one counter (v1.6 topped out at `P70`; v1.8
   starts at `P71`, v1.9 at `P96`, v2.0 at `P126`, v2.1 at `P185`, v2.2 at `P210`, v2.5 at `P271`, v2.6 at
@@ -164,8 +168,9 @@ duplicated here; this file only points at them.
   `Source: docs/<ch>/ at <commit>. N phases.` with the true row count, then one `### <ch> <id> (Done)`
   heading per `SPEC.md` row in table order, distilled from each row's Result. Fix links to the chapter
   by hand. Commit. Then `git rm -r docs/<ch>/` (and `docs/history-runs/` if it exists) and commit.
+  Push, then open the PR from `chapter/v<version>` to `main` (command in `docs/DEV_ENVIRONMENT.md`). It auto-merges once CI passes.
   Between chapters no `docs/v*/` exists. Open the next with `docs/v<new>/SPEC.md`
-  (intro: first `P` is highest plus one, branch name) and `plans/`.
+  (intro: first `P` is highest plus one, branch `chapter/v<new>`) and `plans/`.
   Data a test or script reads at runtime never lives under `docs/v*/`; it goes in its reader's `testdata/`.
   Move any found first, own phase. Hand-writing the close entry is the standard close; any other
   edit to `docs/HISTORY.md` stays forbidden.

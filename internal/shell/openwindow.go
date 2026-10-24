@@ -119,7 +119,11 @@ func OpenWindow(d WindowOpenerDeps, rec WindowRecord) {
 
 // OpenNewWindow is the *New Window* (⇧⌘N) menu command (D8): a fresh workbench, ordered after
 // every existing one, cascaded from whichever window is currently focused (D10).
-func OpenNewWindow(d WindowOpenerDeps) {
+func OpenNewWindow(d WindowOpenerDeps) { OpenNewWindowKeyed(d, uuid.NewString()) }
+
+// OpenNewWindowKeyed is OpenNewWindow under a caller-chosen key, so state registered for that key
+// beforehand (files an external open brought) is there before the page boots.
+func OpenNewWindowKeyed(d WindowOpenerDeps, key string) {
 	records, err := d.Repo.List()
 	if err != nil {
 		slog.Error("list windows", "scope", "window", "err", err)
@@ -132,7 +136,7 @@ func OpenNewWindow(d WindowOpenerDeps) {
 		}
 	}
 	bounds := CascadeFrom(d.App.Window.Current())
-	rec := WindowRecord{Key: uuid.NewString(), Order: order, Bounds: bounds}
+	rec := WindowRecord{Key: key, Order: order, Bounds: bounds}
 	if err := d.Repo.Create(rec); err != nil {
 		slog.Error("create window", "scope", "window", "err", err)
 		return

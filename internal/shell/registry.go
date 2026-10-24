@@ -152,6 +152,7 @@ func (r *WindowRegistry) Focus(key string) bool {
 	if !ok || e.win == nil {
 		return false
 	}
+	unhideApp()
 	e.win.Show()
 	e.win.UnMinimise()
 	e.win.Focus()

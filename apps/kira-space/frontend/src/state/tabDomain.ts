@@ -15,6 +15,7 @@ import { z } from 'zod';
 const spaceTabKindSchema = /*#__PURE__*/ z.enum([
   'repo-graph',
   'repo-file',
+  'local-file',
   'repo-diff',
   'repo-multi-diff',
   'terminal',
@@ -25,6 +26,7 @@ export type SpaceTabKind = z.infer<typeof spaceTabKindSchema>;
 export const SPACE_RENDERABLE_TAB_KINDS: readonly SpaceTabKind[] = [
   'repo-graph',
   'repo-file',
+  'local-file',
   'repo-diff',
   'repo-multi-diff',
   'terminal',
@@ -34,6 +36,7 @@ export const SPACE_RENDERABLE_TAB_KINDS: readonly SpaceTabKind[] = [
 export const SPACE_TAB_KIND_MODE: Record<SpaceTabKind, TabScope> = {
   'repo-graph': 'repo',
   'repo-file': 'repo',
+  'local-file': 'repo',
   'repo-diff': 'repo',
   'repo-multi-diff': 'repo',
   terminal: 'repo',
@@ -60,6 +63,14 @@ export const repoFileTabStateSchema = /*#__PURE__*/ z.object({
   rev: z.string().nullable().default(null),
 });
 export type RepoFileTabState = z.infer<typeof repoFileTabStateSchema>;
+
+// An externally opened file outside any imported repository: `path` is the absolute path and the
+// tab lives in GENERAL_WORKSPACE. No `rev`, no blame: nothing but the file on disk.
+export const localFileTabStateSchema = /*#__PURE__*/ z.object({
+  revealLine: z.number().int().min(1).nullable().default(null),
+  markdownReading: z.boolean().default(false),
+});
+export type LocalFileTabState = z.infer<typeof localFileTabStateSchema>;
 
 // C11 §7.5: a review diff's own target — which branch this review is against, that branch's tip
 // at review-open time, and the left side's display label.
@@ -109,6 +120,11 @@ const tabRecordSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
   }),
   /*#__PURE__*/ z.object({
     ...tabRecordBase,
+    kind: z.literal('local-file'),
+    state: localFileTabStateSchema,
+  }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
     kind: z.literal('repo-diff'),
     state: repoDiffTabStateSchema,
   }),
@@ -131,6 +147,7 @@ const tabRecordSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
 export type TabRecord = z.infer<typeof tabRecordSchema>;
 export type RepoGraphTabRecord = Extract<TabRecord, { kind: 'repo-graph' }>;
 export type RepoFileTabRecord = Extract<TabRecord, { kind: 'repo-file' }>;
+export type LocalFileTabRecord = Extract<TabRecord, { kind: 'local-file' }>;
 export type RepoDiffTabRecord = Extract<TabRecord, { kind: 'repo-diff' }>;
 export type RepoMultiDiffTabRecord = Extract<TabRecord, { kind: 'repo-multi-diff' }>;
 
@@ -155,6 +172,10 @@ export function defaultRepoFileTabState(
   rev: string | null = null,
 ): RepoFileTabState {
   return { revealLine, markdownReading: false, rev };
+}
+
+export function defaultLocalFileTabState(): LocalFileTabState {
+  return { revealLine: null, markdownReading: false };
 }
 
 /**

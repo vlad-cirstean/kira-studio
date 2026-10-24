@@ -105,6 +105,8 @@ type WindowManager struct {
 	Focused    []string
 	Titles     map[string]string
 	NewWindows int
+	// OpenedKeyed records the keys of windows opened for an external file open.
+	OpenedKeyed []string
 	// Known is the set of window keys Close and Focus report true for.
 	Known map[string]bool
 }
@@ -140,6 +142,14 @@ func (w *WindowManager) SetWindowTitle(key, title string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.Titles[key] = title
+}
+
+// openKeyed records a keyed window open and marks the key known.
+func (w *WindowManager) openKeyed(key string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.OpenedKeyed = append(w.OpenedKeyed, key)
+	w.Known[key] = true
 }
 
 // openNew counts OpenNewWindow invocations into NewWindows.

@@ -158,6 +158,17 @@ if ! grep -q "libonnxruntime\.$ORT_GO_VERSION\.dylib" apps/kira-space/build/darw
   fail "ONNX Runtime not bundled" "apps/kira-space/build/darwin/Taskfile.yml's create:app:bundle does not reference libonnxruntime.$ORT_GO_VERSION.dylib"
 fi
 
+# --- S13: Kira Space's document types match the file-type vocabulary (P332) --------------------
+# Both Info plists carry a generated CFBundleDocumentTypes/UTImportedTypeDeclarations block; the
+# generator's --check exits non-zero when it drifts from apps/kira-space/internal/filetypes.
+if command -v go >/dev/null 2>&1; then
+  if ! go run ./apps/kira-space/tools/gendoctypes --check; then
+    fail "document types out of date" "Kira Space's Info plists differ from internal/filetypes — run 'go run ./apps/kira-space/tools/gendoctypes'"
+  fi
+else
+  note "skipped S13 — go not on PATH"
+fi
+
 if command -v shellcheck >/dev/null 2>&1; then
   if ! shellcheck -s sh scripts/install.sh; then
     fail "shellcheck failed" "shellcheck -s sh scripts/install.sh reported issues — see above"

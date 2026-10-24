@@ -144,6 +144,7 @@ export const IPC = {
   dbMcpRegenerate: 'kira:dbmcp:regenerate',
   dbMcpInstallAgent: 'kira:dbmcp:installAgent',
   dbMcpPendingApprovals: 'kira:dbmcp:approval:pending',
+  dbMcpPendingResponse: 'kira:dbmcp:approval:response',
   dbMcpApproveQuery: 'kira:dbmcp:approval:approve',
   dbMcpDenyQuery: 'kira:dbmcp:approval:deny',
 
@@ -196,6 +197,9 @@ export const IPC = {
   dockerNetworks: 'kira:docker:networks',
   dockerRecreateContainer: 'kira:docker:recreateContainer',
   dockerRestart: 'kira:docker:restart',
+  dockerRestoreContainers: 'kira:docker:restoreContainers',
+  dockerRestoreDismiss: 'kira:docker:restoreDismiss',
+  dockerRestoreState: 'kira:docker:restoreState',
   dockerStart: 'kira:docker:start',
   dockerStatsSubscribe: 'kira:docker:statsSubscribe',
   dockerStatsUnsubscribe: 'kira:docker:statsUnsubscribe',

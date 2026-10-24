@@ -12,6 +12,7 @@
 package mask
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base32"
@@ -484,6 +485,26 @@ type Set struct {
 
 // Empty reports whether this Set carries no rules at all.
 func (s Set) Empty() bool { return len(s.Rules) == 0 }
+
+// Equal reports whether o carries the same rules and correlation key.
+func (s Set) Equal(o Set) bool {
+	if len(s.Rules) != len(o.Rules) {
+		return false
+	}
+	for col, r := range s.Rules {
+		if or, ok := o.Rules[col]; !ok || or != r {
+			return false
+		}
+	}
+	return bytes.Equal(s.Masker.keyBytes(), o.Masker.keyBytes())
+}
+
+func (m *Masker) keyBytes() []byte {
+	if m == nil {
+		return nil
+	}
+	return m.key
+}
 
 // RuleFor looks up column case-insensitively.
 func (s Set) RuleFor(column string) (Rule, bool) {

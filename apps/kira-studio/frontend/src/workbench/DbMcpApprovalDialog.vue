@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RoutedPrompt } from '@shared/domain/prompts';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import {
   Dialog,
@@ -15,7 +16,9 @@ import { formatCount } from '@workbench/behaviour/format';
 import { usePendingDecision } from '@workbench/behaviour/pendingDecision';
 import { computed } from 'vue';
 import { useDbMcpStore } from '../state/dbmcp';
+import ApprovalResponse from './ApprovalResponse.vue';
 import ApprovalStatement from './ApprovalStatement.vue';
+import ApprovalTarget from './ApprovalTarget.vue';
 
 // P246: mounted by PromptHost for the routed `dbmcp` entry whose ref is the pending request.
 const props = defineProps<{ entry: RoutedPrompt; more: number }>();
@@ -53,11 +56,17 @@ const classBody = computed(() => {
 // everything else (Deny focused on mount, Escape denies, the countdown, the queue count, the
 // statement viewer) stays exactly as shipped. A heavy query and a write are the same keyboard
 // interaction.
-const dialogTitle = computed(() =>
-  dbMcpStore.approval.pending?.reason === 'heavy'
+const isResponse = computed(() => dbMcpStore.approval.pending?.stage === 'response');
+const dialogTitle = computed(() => {
+  if (isResponse.value) return t('studio.dbMcp.responseReview.title');
+  return dbMcpStore.approval.pending?.reason === 'heavy'
     ? t('studio.dbMcp.heavyConfirm.title')
-    : t('studio.dbMcp.approveConfirm.title'),
-);
+    : t('studio.dbMcp.approveConfirm.title');
+});
+const alreadyRan = computed(() => {
+  const pending = dbMcpStore.approval.pending;
+  return isResponse.value && !!pending && pending.class !== 'read';
+});
 
 const heavyLede = computed(() => {
   const plan = dbMcpStore.approval.pending?.plan;
@@ -98,42 +107,74 @@ async function onApprove(requestId: string): Promise<void> {
       </DialogHeader>
 
       <DialogBody>
-        <p v-if="dbMcpStore.approval.pending.reason === 'heavy'" class="m-0 whitespace-pre-wrap">
-          {{ heavyLede }}
-        </p>
-        <p v-else class="m-0 whitespace-pre-wrap">{{ classBody }}</p>
-        <ApprovalStatement
+        <ApprovalTarget
+          :connection-name="dbMcpStore.approval.pending.connectionName"
           :kind="dbMcpStore.approval.pending.kind"
-          :statement="dbMcpStore.approval.pending.statement"
+          :target="dbMcpStore.approval.pending.target"
+          :statement-class="dbMcpStore.approval.pending.class"
         />
+        <template v-if="dbMcpStore.approval.pending.stage === 'response'">
+          <p class="m-0 whitespace-pre-wrap">
+            {{
+              t('studio.dbMcp.preview.lede.body', {
+                connection: dbMcpStore.approval.pending.connectionName,
+                kind: dbMcpStore.approval.pending.kind,
+              })
+            }}
+          </p>
+          <ApprovalStatement
+            compact
+            :kind="dbMcpStore.approval.pending.kind"
+            :statement="dbMcpStore.approval.pending.statement"
+          />
+          <Alert v-if="alreadyRan" variant="warn" data-testid="db-mcp-preview-ran">
+            <AlertDescription>{{ t('studio.dbMcp.preview.ran.body') }}</AlertDescription>
+          </Alert>
+          <ApprovalResponse
+            :request-id="dbMcpStore.approval.pending.requestId"
+            :connection-id="dbMcpStore.approval.pending.connectionId"
+          />
+        </template>
+        <template v-else>
+          <p v-if="dbMcpStore.approval.pending.reason === 'heavy'" class="m-0 whitespace-pre-wrap">
+            {{ heavyLede }}
+          </p>
+          <p v-else class="m-0 whitespace-pre-wrap">{{ classBody }}</p>
+          <ApprovalStatement
+            :kind="dbMcpStore.approval.pending.kind"
+            :statement="dbMcpStore.approval.pending.statement"
+          />
 
-        <div
-          v-if="dbMcpStore.approval.pending.plan"
-          class="flex flex-col gap-1"
-          data-testid="db-mcp-approval-plan"
-        >
-          <FieldDescription data-testid="db-mcp-approval-plan-rows">
-            <template v-if="dbMcpStore.approval.pending.plan.estimatedRowsRead !== null">
-              {{
-                t('studio.dbMcp.approval.estimate.body', {
-                  count: dbMcpStore.approval.pending.plan.estimatedRowsRead,
-                  threshold: formatCount(dbMcpStore.approval.pending.plan.thresholdRows),
-                })
-              }}
-            </template>
-            <template v-else>{{ t('studio.console.plan.noEstimate.body') }}</template>
-          </FieldDescription>
-          <FieldDescription
-            v-for="(issue, i) in dbMcpStore.approval.pending.plan.issues"
-            :key="i"
-            data-testid="db-mcp-approval-plan-issue"
+          <div
+            v-if="dbMcpStore.approval.pending.plan"
+            class="flex flex-col gap-1"
+            data-testid="db-mcp-approval-plan"
           >
-            <strong>{{ issue.severity }}</strong> {{ issue.message }}
-          </FieldDescription>
-          <FieldDescription v-if="dbMcpStore.approval.pending.plan.issuesOmitted > 0">
-            {{ t('common.more.label', { count: dbMcpStore.approval.pending.plan.issuesOmitted }) }}
-          </FieldDescription>
-        </div>
+            <FieldDescription data-testid="db-mcp-approval-plan-rows">
+              <template v-if="dbMcpStore.approval.pending.plan.estimatedRowsRead !== null">
+                {{
+                  t('studio.dbMcp.approval.estimate.body', {
+                    count: dbMcpStore.approval.pending.plan.estimatedRowsRead,
+                    threshold: formatCount(dbMcpStore.approval.pending.plan.thresholdRows),
+                  })
+                }}
+              </template>
+              <template v-else>{{ t('studio.console.plan.noEstimate.body') }}</template>
+            </FieldDescription>
+            <FieldDescription
+              v-for="(issue, i) in dbMcpStore.approval.pending.plan.issues"
+              :key="i"
+              data-testid="db-mcp-approval-plan-issue"
+            >
+              <strong>{{ issue.severity }}</strong> {{ issue.message }}
+            </FieldDescription>
+            <FieldDescription v-if="dbMcpStore.approval.pending.plan.issuesOmitted > 0">
+              {{
+                t('common.more.label', { count: dbMcpStore.approval.pending.plan.issuesOmitted })
+              }}
+            </FieldDescription>
+          </div>
+        </template>
 
         <FieldDescription data-testid="db-mcp-approval-expires">{{
           t('common.expiresIn.status', { seconds: remainingSeconds })
@@ -148,18 +189,20 @@ async function onApprove(requestId: string): Promise<void> {
           data-dialog-initial
           variant="dialog"
           size="kira-lg"
-          data-testid="db-mcp-approval-deny"
+          :data-testid="isResponse ? 'db-mcp-preview-withhold' : 'db-mcp-approval-deny'"
           @click="onDeny(dbMcpStore.approval.pending!.requestId)"
         >
-          {{ t('common.action.deny.label') }}
+          {{
+            isResponse ? t('studio.dbMcp.preview.withhold.label') : t('common.action.deny.label')
+          }}
         </Button>
         <Button
           variant="dialog-primary"
           size="kira-lg"
-          data-testid="db-mcp-approval-approve"
+          :data-testid="isResponse ? 'db-mcp-preview-send' : 'db-mcp-approval-approve'"
           @click="onApprove(dbMcpStore.approval.pending!.requestId)"
         >
-          {{ t('common.action.approve.label') }}
+          {{ isResponse ? t('studio.dbMcp.preview.send.label') : t('common.action.approve.label') }}
         </Button>
       </DialogFooter>
     </DialogContent>

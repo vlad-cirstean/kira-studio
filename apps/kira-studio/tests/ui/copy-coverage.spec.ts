@@ -55,7 +55,10 @@ const PALETTE = /^(red|amber|green|cyan|blue|magenta|grey)$/;
 const BYTES = /^[\d.,]+ (B|KB|MB|GB)$/;
 const BACKEND_NOTE = /^Composed from catalog metadata:/;
 
-const ALLOW: RegExp[] = [...PG_ALLOW, NAMES, BYTES];
+// The DB MCP review fixtures (dbmcp.json, dbmcp-preview.json): connection name, file, columns.
+const DBMCP_FIXTURE = /^(notes db|\/data\/mcp\.db|id|body)$/;
+
+const ALLOW: RegExp[] = [...PG_ALLOW, NAMES, BYTES, DBMCP_FIXTURE];
 const loc = (page: Page, testid: string) => page.locator(`[data-testid="${testid}"]`);
 
 test('title bar, mode switcher and status bar', async ({ relaunch }) => {
@@ -185,6 +188,30 @@ test('DB MCP approval dialog', async ({ relaunch }) => {
   await emitPrompts(page, [routed('dbmcp', snap.pending.requestId)]);
   const dialog = loc(page, 'db-mcp-approval-dialog');
   await expect(dialog).toBeVisible();
+  await expectCatalogText(dialog, { allow: ALLOW });
+});
+
+test('DB MCP response review dialog', async ({ relaunch }) => {
+  const snap = contract<{ pending: { requestId: string } }>(
+    'dbmcp-preview',
+    'DbMcpService.PendingApprovals',
+  );
+  const { window: page } = await relaunch({
+    control: [
+      {
+        channel: IPC.dbMcpPendingApprovals,
+        response: { ...snap, pending: { ...snap.pending, expiresAtMs: Date.now() + 60_000 } },
+      },
+      {
+        channel: IPC.dbMcpPendingResponse,
+        response: contract('dbmcp-preview', 'DbMcpService.PendingResponse'),
+      },
+    ],
+  });
+  await setPseudoLocale(page);
+  await emitPrompts(page, [routed('dbmcp', snap.pending.requestId)]);
+  const dialog = loc(page, 'db-mcp-approval-dialog');
+  await expect(loc(page, 'db-mcp-preview-table')).toBeVisible();
   await expectCatalogText(dialog, { allow: ALLOW });
 });
 

@@ -151,6 +151,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   dbMcpRegenerate: 'DbMcpService.Regenerate',
   dbMcpInstallAgent: 'DbMcpService.InstallAgent',
   dbMcpPendingApprovals: 'DbMcpService.PendingApprovals',
+  dbMcpPendingResponse: 'DbMcpService.PendingResponse',
   dbMcpApproveQuery: 'DbMcpService.ApproveQuery',
   dbMcpDenyQuery: 'DbMcpService.DenyQuery',
 
@@ -226,6 +227,9 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   dockerNetworks: 'DockerService.Networks',
   dockerRecreateContainer: 'DockerService.RecreateContainer',
   dockerRestart: 'DockerService.Restart',
+  dockerRestoreContainers: 'DockerService.RestoreContainers',
+  dockerRestoreDismiss: 'DockerService.RestoreDismiss',
+  dockerRestoreState: 'DockerService.RestoreState',
   dockerStart: 'DockerService.Start',
   dockerStatsSubscribe: 'DockerService.StatsSubscribe',
   dockerStatsUnsubscribe: 'DockerService.StatsUnsubscribe',

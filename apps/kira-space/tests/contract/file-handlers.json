@@ -1,0 +1,1078 @@
+{
+  "FileHandlersService.Set#unrestored": {
+    "unrestored": [
+      "yaml"
+    ]
+  },
+  "FileHandlersService.Status#before": {
+    "groups": [
+      {
+        "extensions": [
+          {
+            "ext": "ts",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.ts"
+          },
+          {
+            "ext": "tsx",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.tsx"
+          },
+          {
+            "ext": "mts",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.mts"
+          },
+          {
+            "ext": "cts",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cts"
+          },
+          {
+            "ext": "js",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.js"
+          },
+          {
+            "ext": "jsx",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.jsx"
+          },
+          {
+            "ext": "mjs",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.mjs"
+          },
+          {
+            "ext": "cjs",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cjs"
+          },
+          {
+            "ext": "vue",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.vue"
+          },
+          {
+            "ext": "svelte",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.svelte"
+          },
+          {
+            "ext": "py",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.py"
+          },
+          {
+            "ext": "go",
+            "handler": null,
+            "state": "none",
+            "uti": "test.uti.go"
+          },
+          {
+            "ext": "rs",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.rs"
+          },
+          {
+            "ext": "java",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.java"
+          },
+          {
+            "ext": "kt",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.kt"
+          },
+          {
+            "ext": "kts",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.kts"
+          },
+          {
+            "ext": "swift",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.swift"
+          },
+          {
+            "ext": "c",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.c"
+          },
+          {
+            "ext": "h",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.h"
+          },
+          {
+            "ext": "cpp",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cpp"
+          },
+          {
+            "ext": "cc",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cc"
+          },
+          {
+            "ext": "cxx",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cxx"
+          },
+          {
+            "ext": "hpp",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.hpp"
+          },
+          {
+            "ext": "m",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.m"
+          },
+          {
+            "ext": "mm",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.mm"
+          },
+          {
+            "ext": "rb",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.rb"
+          },
+          {
+            "ext": "php",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.php"
+          },
+          {
+            "ext": "pl",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.pl"
+          },
+          {
+            "ext": "lua",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.lua"
+          },
+          {
+            "ext": "sh",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.sh"
+          },
+          {
+            "ext": "bash",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.bash"
+          },
+          {
+            "ext": "zsh",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.zsh"
+          },
+          {
+            "ext": "sql",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.sql"
+          },
+          {
+            "ext": "graphql",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.graphql"
+          },
+          {
+            "ext": "gql",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.gql"
+          },
+          {
+            "ext": "proto",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.proto"
+          },
+          {
+            "ext": "css",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.css"
+          },
+          {
+            "ext": "scss",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.scss"
+          },
+          {
+            "ext": "less",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.less"
+          },
+          {
+            "ext": "md",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.md"
+          },
+          {
+            "ext": "markdown",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.markdown"
+          }
+        ],
+        "id": "code"
+      },
+      {
+        "extensions": [
+          {
+            "ext": "json",
+            "handler": {
+              "bundleId": "com.example.Editor",
+              "name": "Example Editor",
+              "path": "/Applications/Example Editor.app"
+            },
+            "state": "other",
+            "uti": "test.uti.json"
+          },
+          {
+            "ext": "jsonc",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.jsonc"
+          },
+          {
+            "ext": "jsonl",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.jsonl"
+          },
+          {
+            "ext": "ndjson",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.ndjson"
+          },
+          {
+            "ext": "yaml",
+            "handler": {
+              "bundleId": "com.example.Editor",
+              "name": "Example Editor",
+              "path": "/Applications/Example Editor.app"
+            },
+            "state": "other",
+            "uti": "test.uti.yaml"
+          },
+          {
+            "ext": "yml",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.yml"
+          },
+          {
+            "ext": "toml",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.toml"
+          },
+          {
+            "ext": "xml",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.xml"
+          },
+          {
+            "ext": "csv",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.csv"
+          },
+          {
+            "ext": "tsv",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.tsv"
+          },
+          {
+            "ext": "ini",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.ini"
+          },
+          {
+            "ext": "cfg",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cfg"
+          },
+          {
+            "ext": "conf",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.conf"
+          },
+          {
+            "ext": "log",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.log"
+          }
+        ],
+        "id": "data"
+      }
+    ],
+    "supported": true
+  },
+  "FileHandlersService.Status#off": {
+    "groups": [
+      {
+        "extensions": [
+          {
+            "ext": "ts",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.ts"
+          },
+          {
+            "ext": "tsx",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.tsx"
+          },
+          {
+            "ext": "mts",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.mts"
+          },
+          {
+            "ext": "cts",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cts"
+          },
+          {
+            "ext": "js",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.js"
+          },
+          {
+            "ext": "jsx",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.jsx"
+          },
+          {
+            "ext": "mjs",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.mjs"
+          },
+          {
+            "ext": "cjs",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cjs"
+          },
+          {
+            "ext": "vue",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.vue"
+          },
+          {
+            "ext": "svelte",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.svelte"
+          },
+          {
+            "ext": "py",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.py"
+          },
+          {
+            "ext": "go",
+            "handler": {
+              "bundleId": "com.kirathecat.kira-space",
+              "name": "Kira Space",
+              "path": "/Applications/Kira Space.app"
+            },
+            "state": "self",
+            "uti": "test.uti.go"
+          },
+          {
+            "ext": "rs",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.rs"
+          },
+          {
+            "ext": "java",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.java"
+          },
+          {
+            "ext": "kt",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.kt"
+          },
+          {
+            "ext": "kts",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.kts"
+          },
+          {
+            "ext": "swift",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.swift"
+          },
+          {
+            "ext": "c",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.c"
+          },
+          {
+            "ext": "h",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.h"
+          },
+          {
+            "ext": "cpp",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cpp"
+          },
+          {
+            "ext": "cc",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cc"
+          },
+          {
+            "ext": "cxx",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cxx"
+          },
+          {
+            "ext": "hpp",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.hpp"
+          },
+          {
+            "ext": "m",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.m"
+          },
+          {
+            "ext": "mm",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.mm"
+          },
+          {
+            "ext": "rb",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.rb"
+          },
+          {
+            "ext": "php",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.php"
+          },
+          {
+            "ext": "pl",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.pl"
+          },
+          {
+            "ext": "lua",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.lua"
+          },
+          {
+            "ext": "sh",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.sh"
+          },
+          {
+            "ext": "bash",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.bash"
+          },
+          {
+            "ext": "zsh",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.zsh"
+          },
+          {
+            "ext": "sql",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.sql"
+          },
+          {
+            "ext": "graphql",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.graphql"
+          },
+          {
+            "ext": "gql",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.gql"
+          },
+          {
+            "ext": "proto",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.proto"
+          },
+          {
+            "ext": "css",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.css"
+          },
+          {
+            "ext": "scss",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.scss"
+          },
+          {
+            "ext": "less",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.less"
+          },
+          {
+            "ext": "md",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.md"
+          },
+          {
+            "ext": "markdown",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.markdown"
+          }
+        ],
+        "id": "code"
+      },
+      {
+        "extensions": [
+          {
+            "ext": "json",
+            "handler": {
+              "bundleId": "com.example.Editor",
+              "name": "Example Editor",
+              "path": "/Applications/Example Editor.app"
+            },
+            "state": "other",
+            "uti": "test.uti.json"
+          },
+          {
+            "ext": "jsonc",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.jsonc"
+          },
+          {
+            "ext": "jsonl",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.jsonl"
+          },
+          {
+            "ext": "ndjson",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.ndjson"
+          },
+          {
+            "ext": "yaml",
+            "handler": {
+              "bundleId": "com.kirathecat.kira-space",
+              "name": "Kira Space",
+              "path": "/Applications/Kira Space.app"
+            },
+            "state": "self",
+            "uti": "test.uti.yaml"
+          },
+          {
+            "ext": "yml",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.yml"
+          },
+          {
+            "ext": "toml",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.toml"
+          },
+          {
+            "ext": "xml",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.xml"
+          },
+          {
+            "ext": "csv",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.csv"
+          },
+          {
+            "ext": "tsv",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.tsv"
+          },
+          {
+            "ext": "ini",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.ini"
+          },
+          {
+            "ext": "cfg",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cfg"
+          },
+          {
+            "ext": "conf",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.conf"
+          },
+          {
+            "ext": "log",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.log"
+          }
+        ],
+        "id": "data"
+      }
+    ],
+    "supported": true
+  },
+  "FileHandlersService.Status#on": {
+    "groups": [
+      {
+        "extensions": [
+          {
+            "ext": "ts",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.ts"
+          },
+          {
+            "ext": "tsx",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.tsx"
+          },
+          {
+            "ext": "mts",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.mts"
+          },
+          {
+            "ext": "cts",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cts"
+          },
+          {
+            "ext": "js",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.js"
+          },
+          {
+            "ext": "jsx",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.jsx"
+          },
+          {
+            "ext": "mjs",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.mjs"
+          },
+          {
+            "ext": "cjs",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cjs"
+          },
+          {
+            "ext": "vue",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.vue"
+          },
+          {
+            "ext": "svelte",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.svelte"
+          },
+          {
+            "ext": "py",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.py"
+          },
+          {
+            "ext": "go",
+            "handler": {
+              "bundleId": "com.kirathecat.kira-space",
+              "name": "Kira Space",
+              "path": "/Applications/Kira Space.app"
+            },
+            "state": "self",
+            "uti": "test.uti.go"
+          },
+          {
+            "ext": "rs",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.rs"
+          },
+          {
+            "ext": "java",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.java"
+          },
+          {
+            "ext": "kt",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.kt"
+          },
+          {
+            "ext": "kts",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.kts"
+          },
+          {
+            "ext": "swift",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.swift"
+          },
+          {
+            "ext": "c",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.c"
+          },
+          {
+            "ext": "h",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.h"
+          },
+          {
+            "ext": "cpp",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cpp"
+          },
+          {
+            "ext": "cc",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cc"
+          },
+          {
+            "ext": "cxx",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cxx"
+          },
+          {
+            "ext": "hpp",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.hpp"
+          },
+          {
+            "ext": "m",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.m"
+          },
+          {
+            "ext": "mm",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.mm"
+          },
+          {
+            "ext": "rb",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.rb"
+          },
+          {
+            "ext": "php",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.php"
+          },
+          {
+            "ext": "pl",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.pl"
+          },
+          {
+            "ext": "lua",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.lua"
+          },
+          {
+            "ext": "sh",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.sh"
+          },
+          {
+            "ext": "bash",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.bash"
+          },
+          {
+            "ext": "zsh",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.zsh"
+          },
+          {
+            "ext": "sql",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.sql"
+          },
+          {
+            "ext": "graphql",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.graphql"
+          },
+          {
+            "ext": "gql",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.gql"
+          },
+          {
+            "ext": "proto",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.proto"
+          },
+          {
+            "ext": "css",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.css"
+          },
+          {
+            "ext": "scss",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.scss"
+          },
+          {
+            "ext": "less",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.less"
+          },
+          {
+            "ext": "md",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.md"
+          },
+          {
+            "ext": "markdown",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.markdown"
+          }
+        ],
+        "id": "code"
+      },
+      {
+        "extensions": [
+          {
+            "ext": "json",
+            "handler": {
+              "bundleId": "com.kirathecat.kira-space",
+              "name": "Kira Space",
+              "path": "/Applications/Kira Space.app"
+            },
+            "state": "self",
+            "uti": "test.uti.json"
+          },
+          {
+            "ext": "jsonc",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.jsonc"
+          },
+          {
+            "ext": "jsonl",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.jsonl"
+          },
+          {
+            "ext": "ndjson",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.ndjson"
+          },
+          {
+            "ext": "yaml",
+            "handler": {
+              "bundleId": "com.kirathecat.kira-space",
+              "name": "Kira Space",
+              "path": "/Applications/Kira Space.app"
+            },
+            "state": "self",
+            "uti": "test.uti.yaml"
+          },
+          {
+            "ext": "yml",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.yml"
+          },
+          {
+            "ext": "toml",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.toml"
+          },
+          {
+            "ext": "xml",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.xml"
+          },
+          {
+            "ext": "csv",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.csv"
+          },
+          {
+            "ext": "tsv",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.tsv"
+          },
+          {
+            "ext": "ini",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.ini"
+          },
+          {
+            "ext": "cfg",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.cfg"
+          },
+          {
+            "ext": "conf",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.conf"
+          },
+          {
+            "ext": "log",
+            "handler": null,
+            "state": "unavailable",
+            "uti": "test.uti.log"
+          }
+        ],
+        "id": "data"
+      }
+    ],
+    "supported": true
+  },
+  "FileHandlersService.Status#unsupported": {
+    "groups": [],
+    "supported": false
+  }
+}

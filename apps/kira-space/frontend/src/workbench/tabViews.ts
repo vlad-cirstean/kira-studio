@@ -2,6 +2,7 @@ import ScriptRunView from '@workbench/automations/runs/ScriptRunView.vue';
 import TerminalTabView from '@workbench/terminal/TerminalTabView.vue';
 import type { Component } from 'vue';
 import type { SpaceTabKind } from '../state/tabDomain';
+import LocalFileTabView from '../views/repo/LocalFileView.vue';
 import RepoDiffTabView from '../views/repo/RepoDiffView.vue';
 import RepoFileTabView from '../views/repo/RepoFileView.vue';
 import RepoGraphTabView from '../views/repo/RepoGraphView.vue';
@@ -19,6 +20,7 @@ import RepoMultiDiffTabView from '../views/repo/RepoMultiDiffView.vue';
 export const TAB_VIEWS: Record<SpaceTabKind, Component> = {
   'repo-graph': RepoGraphTabView,
   'repo-file': RepoFileTabView,
+  'local-file': LocalFileTabView,
   'repo-diff': RepoDiffTabView,
   'repo-multi-diff': RepoMultiDiffTabView,
   terminal: TerminalTabView,

@@ -60,8 +60,18 @@ type Options struct {
 	Clock           scriptruns.Clock
 	// DockerHubAPI replaces the Docker Hub base URL the image registry check calls (flow-test seam); empty keeps the default.
 	DockerHubAPI string
+	// DockerExtra appends docker options (flow-test seams for the restore tracker).
+	DockerExtra []docker.Option
 	// Providers is the agent harness registry; nil means providers.New() (a flow-test seam).
 	Providers *harness.Registry
+	// WindowFocus replaces the registry's focus state and raise (a flow-test seam); nil keeps the registry.
+	WindowFocus WindowFocus
+}
+
+// WindowFocus is the part of the window registry a prompt raise reads and drives.
+type WindowFocus interface {
+	Focused(key string) bool
+	Focus(key string) bool
 }
 
 // Wired is the built object graph.
@@ -184,7 +194,7 @@ func Build(opts Options) (*Wired, error) {
 
 	w := &Wired{}
 	windows := shell.NewWindowRegistry()
-	promptRouter := newPromptRouter(windows, repositories, opts.Emitter, w.reopenWindow)
+	promptRouter := newPromptRouter(windows, repositories, opts, w.reopenWindow)
 	windows.OnChange = promptRouter.Reroute
 
 	installer := opts.McpInstaller
@@ -193,7 +203,7 @@ func Build(opts Options) (*Wired, error) {
 	}
 	embedded := wireEmbeddedServices(deps, installer, opts.KeepAwakeDriver, connectionsSvc, oplogWiring, metricsTicker, promptRouter, agents, opts)
 	lifecycle := wireLifecycle(windows, embedded.events, embedded.eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
-		embedded.dbMcpSvc, embedded.keepAwakeSvc, embedded.terminalSvc, updateInstaller, embedded.runs, embedded.sched, repositories, db)
+		embedded.dbMcpSvc, embedded.keepAwakeSvc, embedded.terminalSvc, embedded.dockerSvc, updateInstaller, embedded.runs, embedded.sched, repositories, db)
 	embedded.sched.Start()
 
 	live := func() shell.QuitStatus {

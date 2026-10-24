@@ -25,6 +25,7 @@ func TestExplainQueryRefusesApprovedReadAfterReadModeDeniedMidWait(t *testing.T)
 	s := &Server{cfg: Config{
 		Conns: conns, Query: qr, Approvals: approvals, MaskRules: fakeMaskRulesNone{},
 		ExplainThreshold: func() int { return 1000 },
+		PreviewResponses: func() bool { return false },
 	}}
 
 	type outcome struct {

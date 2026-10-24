@@ -199,6 +199,10 @@ test('settings dialog, every pane', async ({ relaunch }) => {
     control: [
       { channel: IPC.memoryMcpStatus, response: status },
       {
+        channel: IPC.fileHandlersStatus,
+        response: contract('file-handlers', 'FileHandlersService.Status#off'),
+      },
+      {
         channel: IPC.memoryCheckHook,
         response: contract('memory-settings', 'MemoryService.CheckHook'),
       },
@@ -216,7 +220,15 @@ test('settings dialog, every pane', async ({ relaunch }) => {
     ...fixtureData(),
     ...[agent.productLabel, ...agent.models.map((m) => m.label)].map((v) => new RegExp(`^${v}$`)),
   ];
-  for (const section of ['Appearance', 'Git', 'Mobile access', 'Agent', 'Memory', 'Advanced']) {
+  for (const section of [
+    'Appearance',
+    'Git',
+    'File types',
+    'Mobile access',
+    'Agent',
+    'Memory',
+    'Advanced',
+  ]) {
     await page.locator(t(`settings-section-${section}`)).click();
     await expectCatalogText(page.locator(t('settings-dialog')), { allow });
   }

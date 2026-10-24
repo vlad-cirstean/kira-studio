@@ -50,7 +50,20 @@ needs.
 2. Merge the chapter branch to `main`, or run the "Pages" workflow by hand on `main`. The
    `github-pages` environment accepts deployments from `main` only, by default. A run from another
    branch fails unless that branch is added under Settings > Environments > github-pages.
+   Since P330, `release-on-merge.yml` also dispatches it after each chapter merge (an auto-merge
+   starts no push run).
 3. Open `https://vlad-cirstean.github.io/kira-studio/`.
+
+## Branches, chapter PR, release (P330)
+
+- `.githooks/pre-push` runs `scripts/check-push-refs.sh` first. It refuses a push to any branch but
+  `main` and `chapter/v<major>.<minor>.<patch>`. Tags and deletes pass. A session handed a
+  `claude/*` working branch pushes to the chapter branch instead: `git push origin HEAD:chapter/vX.Y.Z`.
+- Next version when the user names none: `git fetch --tags origin && git tag -l 'v*' --sort=-v:refname | head -1`, patch plus 1.
+- `gh pr create` uses GraphQL, which returns 403 in cloud sessions. Open the chapter PR over REST:
+  `gh api repos/vlad-cirstean/kira-studio/pulls -f head=chapter/vX.Y.Z -f base=main -f title=vX.Y.Z -f body='…'`.
+- After that, nothing is manual: `pr-auto-merge.yml` squash-merges once the required checks pass, and
+  `release-on-merge.yml` tags and releases. Flow and recovery: `docs/PACKAGING.md` §7.
 
 ## Presentation screenshots and site check (P280)
 

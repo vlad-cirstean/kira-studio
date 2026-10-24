@@ -10,7 +10,7 @@ import { sqlDialectFor } from '../views/shared/sqlIdent';
 import { INLINE_CHARS } from '../workers/parse/client';
 import { useParseWorker } from '../workers/parse/useParseWorker';
 
-const props = defineProps<{ kind: string; statement: string }>();
+const props = defineProps<{ kind: string; statement: string; compact?: boolean }>();
 
 const parse = useParseWorker();
 const connectionKind = computed(() => connectionKindSchema.safeParse(props.kind).data);
@@ -54,7 +54,7 @@ const items = computed<SecondaryTabItem[]>(() => [
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col gap-1.5">
+  <div :class="compact ? 'flex shrink-0 flex-col gap-1.5' : 'flex min-h-0 flex-1 flex-col gap-1.5'">
     <SecondaryTabs
       v-if="canToggle"
       v-model="view"
@@ -64,7 +64,11 @@ const items = computed<SecondaryTabItem[]>(() => [
       :aria-label="t('studio.dbMcp.approval.statementView.aria')"
     />
     <div
-      class="min-h-40 flex-1 overflow-hidden rounded-kira border border-border"
+      :class="
+        compact
+          ? 'h-24 overflow-hidden rounded-kira border border-border'
+          : 'min-h-40 flex-1 overflow-hidden rounded-kira border border-border'
+      "
       data-testid="db-mcp-approval-statement"
     >
       <MonacoHost

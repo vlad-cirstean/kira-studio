@@ -2,6 +2,7 @@ package docker
 
 import (
 	"context"
+	"time"
 
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
@@ -20,11 +21,25 @@ type Option func(*Manager)
 // WithHubAPI points the Docker Hub repository check at base (a flow-test seam).
 func WithHubAPI(base string) Option { return func(m *Manager) { m.HubAPI = base } }
 
+// WithRestoreStore enables the restore tracker over store.
+func WithRestoreStore(store RestoreStore) Option { return func(m *Manager) { m.restoreStore = store } }
+
+// WithRestoreTiming sets the tracker's tick, stop grace and restart-policy wait (a flow-test seam).
+func WithRestoreTiming(tick, grace, policyWait time.Duration) Option {
+	return func(m *Manager) { m.restoreTiming = restoreTiming{tick: tick, grace: grace, policyWait: policyWait} }
+}
+
+// WithBootProbe replaces the engine boot marker read (a flow-test seam).
+func WithBootProbe(p BootProbe) Option { return func(m *Manager) { m.bootProbe = p } }
+
 // NewBoundService builds the service over the real process environment.
 func NewBoundService(emit appevent.Emitter, opts ...Option) *BoundService {
 	m := NewManager(emit)
 	for _, o := range opts {
 		o(m)
+	}
+	if m.restoreStore != nil {
+		m.restore = newRestoreTracker(m)
 	}
 	return &BoundService{m: m}
 }
@@ -34,6 +49,13 @@ func NewBoundService(emit appevent.Emitter, opts ...Option) *BoundService {
 func CloseWindowBound(b *BoundService, windowKey string) {
 	b.m.closeWindow(windowKey)
 }
+
+// StartRestoreBound starts the restore tracker, which then runs without any window until shutdown.
+// A package function for the same reason as CloseWindowBound.
+func StartRestoreBound(b *BoundService) { b.m.restore.start() }
+
+// StopRestoreBound ends the restore tracker; app teardown calls it before the store's DB closes.
+func StopRestoreBound(b *BoundService) { b.m.restore.stop() }
 
 // ServiceShutdown ends every stream at app quit. Wails calls it on each registered service and
 // leaves it out of the bindings.
@@ -234,4 +256,20 @@ func (b *BoundService) UpdateContainer(args UpdateArgs) (UpdateResult, error) {
 // original if any step fails.
 func (b *BoundService) RecreateContainer(args RecreateArgs) (RecreateResult, error) {
 	return b.m.recreateContainer(args)
+}
+
+// RestoreState checks the engine now and returns whether a restart left containers to restore.
+func (b *BoundService) RestoreState() (RestoreState, error) {
+	return b.m.restore.stateNow(context.Background()), nil
+}
+
+// RestoreContainers starts the chosen containers of the pending restore: standalone ones first,
+// then each Compose project in depends_on order.
+func (b *BoundService) RestoreContainers(args RestoreArgs) (RestoreResult, error) {
+	return b.m.restore.restoreContainers(context.Background(), args)
+}
+
+// RestoreDismiss drops the pending restore without starting anything.
+func (b *BoundService) RestoreDismiss(args RestoreDismissArgs) error {
+	return b.m.restore.dismiss(context.Background(), args.EngineID)
 }

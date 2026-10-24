@@ -18,6 +18,9 @@ const approval = (requestId: string) => ({
   expiresAtMs: Date.now() + 60_000,
   reason: 'permission',
   plan: null,
+  target: { color: 'none', readOnly: false, host: '', database: '', path: [] },
+  stage: 'query',
+  response: null,
 });
 
 // The router's approval entry (flows/dbmcpflow TestDbMcpApprovalRoutes, contract dbmcp-route), with

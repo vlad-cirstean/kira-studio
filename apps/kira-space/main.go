@@ -15,6 +15,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/filehandlers"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
@@ -24,6 +25,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/startupfail"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 // Any files in frontend/dist are embedded into the binary — empty until Part 2's own frontend
@@ -37,7 +39,7 @@ var mobileAssets embed.FS
 
 // Startup order: the argv shims (askpass, memory-mcp, memory-embed) -> config.EnsureLayout ->
 // logging.Init/Sweep -> storage.Open (migrates) -> repos.New -> appwire.Build (terminal registry,
-// ADE tracker with the Claude Code hooks, task board, keep-awake, the 20 bound services) ->
+// ADE tracker with the Claude Code hooks, task board, keep-awake, the 28 bound services) ->
 // application.New (the bound services plus the git stream registration) -> the menu -> the
 // startup window list, opened -> app.Run(). No adapters, connections, HTTP/gRPC or DB MCP:
 // not this app's module.
@@ -100,6 +102,7 @@ func main() {
 		Repos: repositories, DB: db, Emitter: rawEmitter, Browser: browserOpener,
 		Dialogs: appshell.NewDialogs(rawDialogs), Locator: platformLocator(),
 		KeepAwakeDriver: keepawake.NewPlatformDriver(), MobileAssets: mobileAssetsFS,
+		FileHandlers: filehandlers.NewRegistry(),
 	})
 	windows, quitter := wired.Windows, wired.Quitter
 
@@ -154,6 +157,7 @@ func main() {
 		Cfg:       shell.Config{AppName: "Kira Space", WindowTitle: "Kira Space"},
 		Ephemeral: func(key string) bool { ok, _ := repositories.AdeReview.IsReviewKey(key); return ok },
 	}
+	winDeps.OnWindowClosing = append(winDeps.OnWindowClosing, wired.OpenedFiles.Forget)
 	openNew := func() { shell.OpenNewWindow(winDeps) }
 	// OpenNewWindow is the title bar's "New window" button (P116 G6) — the same action the ⇧⌘N
 	// menu command below ties to.
@@ -162,7 +166,13 @@ func main() {
 			rec.Bounds = shell.CascadeFrom(app.Window.Current())
 			shell.OpenWindow(winDeps, rec)
 		},
-		OpenNewWindow: openNew,
+		OpenNewWindow:      openNew,
+		OpenNewWindowKeyed: func(key string) { shell.OpenNewWindowKeyed(winDeps, key) },
+	})
+	// Finder opens (Open With, a default-app double-click) arrive as one event per file, on cold
+	// start as well as while running; the coalescer turns a multi-file open into one window.
+	app.Event.OnApplicationEvent(events.Common.ApplicationOpenedWithFile, func(e *application.ApplicationEvent) {
+		wired.OpenedFiles.Add(e.Context().Filename())
 	})
 	shell.AttachReopen(app, func() { shell.ReopenWindows(winDeps) })
 	wired.SetReopen(func() { shell.ReopenWindows(winDeps) })

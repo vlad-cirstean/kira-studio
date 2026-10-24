@@ -61,6 +61,7 @@ func NewDbMcpService(deps appcore.Deps, installer harness.MCPInstaller, approval
 				Approvals:        s.Approvals,
 				MaskRules:        s.Deps.MaskRules,
 				ExplainThreshold: s.explainThreshold,
+				PreviewResponses: s.previewResponses,
 				Logger:           slog.Default(),
 				Prompts:          s.Deps.Prompts,
 			})
@@ -223,6 +224,17 @@ func (s *DbMcpService) explainThreshold() int {
 	return settings.Advanced.ExpensiveQueryRows
 }
 
+// previewResponses is dbmcp.Config.PreviewResponses' real backend, read fresh on every call. A
+// read failure fails closed (true): sending unreviewed data is the unsafe direction.
+func (s *DbMcpService) previewResponses() bool {
+	settings, err := s.Deps.Repos.Settings.GetAll()
+	if err != nil {
+		slog.Warn("db mcp: read preview setting, holding results for review", "scope", "dbmcp", "err", err)
+		return true
+	}
+	return settings.DbMcp.PreviewResponses
+}
+
 // startIfEnabled is main.go's own boot-time call: a failure (a bind conflict) is logged, never
 // fatal — the app boots regardless.
 //
@@ -379,6 +391,29 @@ func toWireApprovalPlan(p *dbmcp.ApprovalPlan) *DbMcpApprovalPlan {
 	}
 }
 
+// DbMcpApprovalTarget is dbmcp.ApprovalTarget's wire projection; Path is never nil.
+type DbMcpApprovalTarget struct {
+	Color    string              `json:"color"`
+	ReadOnly bool                `json:"readOnly"`
+	Host     string              `json:"host"`
+	Database string              `json:"database"`
+	Path     []model.PathSegment `json:"path"`
+}
+
+func toWireApprovalTarget(t dbmcp.ApprovalTarget) DbMcpApprovalTarget {
+	path := t.Path
+	if path == nil {
+		path = []model.PathSegment{}
+	}
+	return DbMcpApprovalTarget{Color: t.Color, ReadOnly: t.ReadOnly, Host: t.Host, Database: t.Database, Path: path}
+}
+
+// DbMcpApprovalResponse is the held result's metadata.
+type DbMcpApprovalResponse struct {
+	IsError bool `json:"isError"`
+	Bytes   int  `json:"bytes"`
+}
+
 // DbMcpApprovalRequest is dbmcp.ApprovalRequest's wire projection — an absolute deadline (epoch
 // ms) instead of a time.Time, so a client-side countdown never drifts from the server's own clock.
 type DbMcpApprovalRequest struct {
@@ -390,14 +425,27 @@ type DbMcpApprovalRequest struct {
 	Statement      string `json:"statement"`
 	ExpiresAtMs    int64  `json:"expiresAtMs"`
 	// Reason is M3's own "permission" | "heavy" — every M2-era request is "permission" (M3 §6.2).
-	Reason string             `json:"reason"`
-	Plan   *DbMcpApprovalPlan `json:"plan"`
+	Reason string              `json:"reason"`
+	Plan   *DbMcpApprovalPlan  `json:"plan"`
+	Target DbMcpApprovalTarget `json:"target"`
+	// Stage is "query" (may this statement run) or "response" (may its result go to the client).
+	Stage string `json:"stage"`
+	// Response is set only for stage "response". It carries metadata only: the result text can be
+	// MB-sized and snapshots fan out to every window, so PendingResponse serves the text.
+	Response *DbMcpApprovalResponse `json:"response"`
 }
 
 // DbMcpApprovalSnapshot is dbmcp.ApprovalSnapshot's wire projection.
 type DbMcpApprovalSnapshot struct {
 	Pending *DbMcpApprovalRequest `json:"pending"`
 	Queued  int                   `json:"queued"`
+}
+
+func toWireApprovalResponse(r *dbmcp.ApprovalResponse) *DbMcpApprovalResponse {
+	if r == nil {
+		return nil
+	}
+	return &DbMcpApprovalResponse{IsError: r.IsError, Bytes: r.Bytes}
 }
 
 func toWireApprovalSnapshot(snap dbmcp.ApprovalSnapshot) DbMcpApprovalSnapshot {
@@ -414,6 +462,9 @@ func toWireApprovalSnapshot(snap dbmcp.ApprovalSnapshot) DbMcpApprovalSnapshot {
 			ExpiresAtMs: snap.Pending.ExpiresAt.UnixMilli(),
 			Reason:      string(snap.Pending.Reason),
 			Plan:        toWireApprovalPlan(snap.Pending.Plan),
+			Target:      toWireApprovalTarget(snap.Pending.Target),
+			Stage:       string(snap.Pending.Stage),
+			Response:    toWireApprovalResponse(snap.Pending.Response),
 		}
 	}
 	return out
@@ -447,4 +498,24 @@ func (s *DbMcpService) DenyQuery(args DbMcpApprovalArgs) (DbMcpApprovalSnapshot,
 	}
 	s.Approvals.Deny(args.RequestID)
 	return toWireApprovalSnapshot(s.Approvals.Pending()), nil
+}
+
+// DbMcpPendingResponse is the held run_query result a response-stage request asks about.
+type DbMcpPendingResponse struct {
+	RequestID string `json:"requestId"`
+	Text      string `json:"text"`
+	IsError   bool   `json:"isError"`
+}
+
+// PendingResponse returns the exact text the AI client receives if the user sends the result of
+// requestID. NotFound once the request resolved, or when it is not a response-stage request.
+func (s *DbMcpService) PendingResponse(args DbMcpApprovalArgs) (DbMcpPendingResponse, error) {
+	if args.RequestID == "" {
+		return DbMcpPendingResponse{}, ipcerr.Required("requestId")
+	}
+	r, ok := s.Approvals.ResponseFor(args.RequestID)
+	if !ok {
+		return DbMcpPendingResponse{}, ipcerr.NotFoundNamed("result under review")
+	}
+	return DbMcpPendingResponse{RequestID: args.RequestID, Text: r.Text, IsError: r.IsError}, nil
 }

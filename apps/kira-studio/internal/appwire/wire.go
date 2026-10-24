@@ -30,7 +30,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
-	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/docker"
 	"github.com/kirathecat/kira-studio/internal/harness"
@@ -182,7 +181,8 @@ func wireEmbeddedServices(deps appcore.Deps, installer harness.MCPInstaller, kee
 		slog.Warn("recover script runs", "scope", "startup", "err", err)
 	}
 	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{Emit: deps.Events, Registry: registry, Scripts: runs, Agent: agents}}
-	dockerSvc := &bridge.DockerService{BoundService: docker.NewBoundService(deps.Events, dockerOptions(opts)...)}
+	dockerSvc := &bridge.DockerService{BoundService: docker.NewBoundService(deps.Events, dockerOptions(opts, deps.Repos.DockerRestore)...)}
+	docker.StartRestoreBound(dockerSvc.BoundService)
 	events := bridge.NewEvents(deps.Events)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, DbMcp: dbMcpApprovals})
 
@@ -210,7 +210,7 @@ type lifecycleWired struct {
 // close-flush coordinator -> beforeFlush/teardown (today's OnShutdown, minus the ticker Stop,
 // which moves to beforeFlush, run before the flush wait rather than after it — index.ts:156)
 // -> the quitter built over both.
-func wireLifecycle(windows *shell.WindowRegistry, events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, updateInstaller *appupdate.Installer, runs *scriptruns.Service, sched *scriptruns.Scheduler, repositories *repos.Repos, db *storage.DB) lifecycleWired {
+func wireLifecycle(windows *shell.WindowRegistry, events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, dockerSvc *bridge.DockerService, updateInstaller *appupdate.Installer, runs *scriptruns.Service, sched *scriptruns.Scheduler, repositories *repos.Repos, db *storage.DB) lifecycleWired {
 	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
 	// identity (replacing the single detachWindow/mainWindow pair that only ever worked because at
 	// most one window could exist at a time). beforeFlush detaches every one of them, not just the
@@ -244,6 +244,7 @@ func wireLifecycle(windows *shell.WindowRegistry, events *bridge.Events, eventsD
 		// controller's release is independent of the PTY registry terminal.ShutdownBound(terminalSvc.BoundService) stops.
 		bridge.StopKeepAwake(keepAwakeSvc)
 		terminal.ShutdownBound(terminalSvc.BoundService)
+		docker.StopRestoreBound(dockerSvc.BoundService)
 		sched.Close()
 		runs.Close()
 		if err := repositories.Close(); err != nil {
@@ -262,21 +263,48 @@ func wireLifecycle(windows *shell.WindowRegistry, events *bridge.Events, eventsD
 
 // newPromptRouter builds the popup router over the window registry (P246): lists broadcast, a
 // reveal reaches one window, and advanced.notifyPrompts gates the OS notifications.
-func newPromptRouter(windows *shell.WindowRegistry, repositories *repos.Repos, emit appevent.Emitter, reopen func()) *prompts.Router {
-	return prompts.New(prompts.Deps{
-		Windows: windows, App: "Studio", Reopen: reopen,
+func newPromptRouter(windows *shell.WindowRegistry, repositories *repos.Repos, opts Options, reopen func()) *prompts.Router {
+	emit := opts.Emitter
+	var win prompts.Windows = windows
+	if opts.WindowFocus != nil {
+		win = focusWindows{WindowRegistry: windows, focus: opts.WindowFocus}
+	}
+	d := prompts.Deps{
+		Windows: win, App: "Studio", Reopen: reopen,
 		Emit:   func(l []prompts.Routed) { emit.Emit(bridge.ChannelPromptsChanged, l) },
 		Reveal: func(key, id string) { emit.EmitTo(key, bridge.ChannelPromptsReveal, map[string]string{"id": id}) },
 		Enabled: func() bool {
 			s, err := repositories.Settings.GetAll()
 			return err != nil || s.Advanced.NotifyPrompts
 		},
-	})
+		// A read error raises: showing the approval is the harmless direction.
+		RaiseOnOpen: func(k prompts.Kind) bool {
+			if k != prompts.KindDbMcp {
+				return false
+			}
+			s, err := repositories.Settings.GetAll()
+			return err != nil || s.DbMcp.FocusOnApproval
+		},
+	}
+	if opts.Clock != nil {
+		d.Now = opts.Clock.Now
+	}
+	return prompts.New(d)
 }
 
-func dockerOptions(opts Options) []docker.Option {
-	if opts.DockerHubAPI == "" {
-		return nil
+// focusWindows swaps the registry's focus state and raise for a test seam.
+type focusWindows struct {
+	*shell.WindowRegistry
+	focus WindowFocus
+}
+
+func (f focusWindows) Focused(key string) bool { return f.focus.Focused(key) }
+func (f focusWindows) Focus(key string) bool   { return f.focus.Focus(key) }
+
+func dockerOptions(opts Options, restore docker.RestoreStore) []docker.Option {
+	out := []docker.Option{docker.WithRestoreStore(restore)}
+	if opts.DockerHubAPI != "" {
+		out = append(out, docker.WithHubAPI(opts.DockerHubAPI))
 	}
-	return []docker.Option{docker.WithHubAPI(opts.DockerHubAPI)}
+	return append(out, opts.DockerExtra...)
 }

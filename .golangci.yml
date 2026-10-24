@@ -42,6 +42,10 @@ linters:
       # Vendored Go stdlib net/http/cookiejar, kept verbatim for resync (see cookiejar/jar.go).
       - path: internal/httpclient/cookiejar/(jar|punycode|example_test)\.go
         linters: [gocognit, gocyclo, gocritic, bodyclose]
+      # gocritic reads cgo's rewritten `_Cgo_ptr(p) == _Cgo_ptr(p)` nil guards as identical operands.
+      - path: registry_darwin\.go
+        text: dupSubExpr
+        linters: [gocritic]
 
 # Guard for P139: gofmt drift landed silently until pre-push began running this.
 formatters:

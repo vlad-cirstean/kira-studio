@@ -2,12 +2,14 @@ package dbmcp
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/notify"
 	"github.com/kirathecat/kira-studio/internal/prompts"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
@@ -50,6 +52,24 @@ const (
 	ApprovalReasonHeavy      ApprovalReason = "heavy"
 )
 
+// ApprovalStage says what the human is asked: whether a statement may run (query) or whether the
+// result of a statement that already ran may reach the AI client (response).
+type ApprovalStage string
+
+const (
+	ApprovalStageQuery    ApprovalStage = "query"
+	ApprovalStageResponse ApprovalStage = "response"
+)
+
+// ApprovalResponse is the held run_query result a response-stage request asks about. Text is the
+// exact TextContent the client receives on Send; it stays out of queue snapshots (which fan out to
+// every window) and is fetched by request id through ResponseFor.
+type ApprovalResponse struct {
+	Text    string
+	IsError bool
+	Bytes   int
+}
+
 // ApprovalPlanIssue is one Issue as the dialog renders it — plan evidence, never the whole tree.
 type ApprovalPlanIssue struct {
 	Severity string
@@ -68,6 +88,39 @@ type ApprovalPlan struct {
 	IssuesOmitted     int
 }
 
+// ApprovalTarget names the database a request would act on, so the dialog can show it prominently.
+type ApprovalTarget struct {
+	Color    string
+	ReadOnly bool
+	// Host is "host:port", "host", or "" (URI mode or file kinds).
+	Host string
+	// Database is the configured database (SQLite: the file path); "" when unset.
+	Database string
+	// Path is the decoded run_query/explain_query path; empty when the call passed none.
+	Path []model.PathSegment
+}
+
+// targetOf projects a connection summary and the call's encoded path. A path that fails to decode
+// yields an empty Path: the gate already accepted it, so this never fails.
+func targetOf(summary model.ConnectionSummary, path string) ApprovalTarget {
+	t := ApprovalTarget{Color: summary.Color, ReadOnly: summary.ReadOnly}
+	if summary.Host != nil && *summary.Host != "" {
+		t.Host = *summary.Host
+		if summary.Port != nil {
+			t.Host += ":" + strconv.Itoa(*summary.Port)
+		}
+	}
+	if summary.Database != nil {
+		t.Database = *summary.Database
+	}
+	if path != "" {
+		if np, err := model.DecodePath(summary.ID, path); err == nil {
+			t.Path = np.Segments
+		}
+	}
+	return t
+}
+
 // ApprovalRequest is one queued query — what the dialog renders. RequestID, EnqueuedAt and
 // ExpiresAt are minted by Request, never by the caller.
 type ApprovalRequest struct {
@@ -77,8 +130,13 @@ type ApprovalRequest struct {
 	Kind           string
 	Class          adapters.OpClass
 	Statement      string
-	EnqueuedAt     time.Time
-	ExpiresAt      time.Time
+	Target         ApprovalTarget
+	// Stage defaults to ApprovalStageQuery when empty.
+	Stage ApprovalStage
+	// Response is set only for ApprovalStageResponse.
+	Response   *ApprovalResponse
+	EnqueuedAt time.Time
+	ExpiresAt  time.Time
 	// Reason is M2's own "permission" for every M2-era call site — M3's runQuery/explainQuery are
 	// the first callers to pass ApprovalReasonHeavy or a non-nil Plan.
 	Reason ApprovalReason
@@ -150,6 +208,9 @@ func (b *ApprovalBroker) Request(ctx context.Context, req ApprovalRequest) Appro
 		return ApprovalQueueFull
 	}
 	now := b.now()
+	if req.Stage == "" {
+		req.Stage = ApprovalStageQuery
+	}
 	req.RequestID = uuid.NewString()
 	req.EnqueuedAt = now
 	req.ExpiresAt = now.Add(ApprovalTimeout)
@@ -184,6 +245,22 @@ func (b *ApprovalBroker) Request(ctx context.Context, req ApprovalRequest) Appro
 		}
 		return <-entry.result
 	}
+}
+
+// ResponseFor returns the held result of requestID, true only while that id is queued with stage
+// response.
+func (b *ApprovalBroker) ResponseFor(requestID string) (ApprovalResponse, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for _, e := range b.queue.Snapshot() {
+		if e.req.RequestID == requestID {
+			if e.req.Stage != ApprovalStageResponse || e.req.Response == nil {
+				return ApprovalResponse{}, false
+			}
+			return *e.req.Response, true
+		}
+	}
+	return ApprovalResponse{}, false
 }
 
 // Approve resolves requestID as approved. Deny resolves it as denied. Both report
@@ -245,9 +322,18 @@ func (b *ApprovalBroker) openPrompt(req ApprovalRequest) {
 	if b.Prompts == nil {
 		return
 	}
-	title := i18n.T("backend.prompt.dbMcp.title", nil)
-	if req.ConnectionName != "" {
+	named := req.ConnectionName != ""
+	response := req.Stage == ApprovalStageResponse
+	var title string
+	switch {
+	case response && named:
+		title = i18n.T("backend.prompt.dbMcpResponseNamed.title", map[string]string{"name": req.ConnectionName})
+	case response:
+		title = i18n.T("backend.prompt.dbMcpResponse.title", nil)
+	case named:
 		title = i18n.T("backend.prompt.dbMcpNamed.title", map[string]string{"name": req.ConnectionName})
+	default:
+		title = i18n.T("backend.prompt.dbMcp.title", nil)
 	}
 	b.Prompts.Open(prompts.Prompt{
 		ID: prompts.ID(prompts.KindDbMcp, req.RequestID), Kind: prompts.KindDbMcp, Ref: req.RequestID,

@@ -130,7 +130,10 @@ whatever sandbox a session happens to be in),
 - 'Edit this record' (editReferencedRow in views/grid/menu.ts) opens a new pre-filtered tab on the referenced table and puts the caret on its first non-key column in edit mode via a pending-focus handshake (views/grid/focusRequest.ts); it reuses the ordinary data tab since no second editor exists.
 - A multi-candidate FK click still opens the right-click ContextMenu, with each item opening the preview for its own edge; the PK-side 'Referenced by' button/submenu is unchanged and has no preview because it names multiple tables.
 - views/console/ConsoleSlickGrid.vue hosts the query console's tabular results (~300 lines) over shared layers: views/shared/slick/kiraSlickGrid.ts, views/shared/slick/dataSource.ts (CustomDataView bridge), slickTheme.css, views/shared/page/columns.ts and theme/cellClass.ts.
-- The console grid host has no selection-range model, sort, editor, context menu, clipboard, FK nav or persisted column widths, because a console result has no use for them.
+- The console grid host has no sort, editor, FK nav or persisted column widths, because a console result has no use for them. It has the same selection model (cell, range, row, column) and Copy menus as the data grid, minus INSERT and every write item.
+- Both grids copy through views/shared/slick/selectionCopy.ts (`selectionText`, `rowsText`), so ⌘C and every Copy menu item write the same text for a selection. Right-click acts on the selection when it covers the hit; otherwise it selects the hit first. Both functions stay synchronous because WebKit grants `writeText` only inside the user gesture.
+- The data grid prints ⌘C on Copy rows ▸ TSV only for a row selection; on a range or column selection ⌘C copies cells while the item copies whole rows.
+- tests/ui/grid-copy-menu.spec.ts reads the real clipboard on Chromium (Playwright project `ui-clipboard`) and runs on WebKit (`ui`) against a pass-through `writeText` recorder, because WebKit refuses an ungestured `readText()`.
 - The grid no longer uses @tanstack/vue-virtual because SlickGrid's native virtualization replaced it; the dependency is still used by other list views through packages/workbench/src/behaviour/virtualRows.ts and treeVirtualRows.ts.
 - kiraSlickGrid.ts positions columns through --sg-l<i>/--sg-r<i> custom properties on the grid root plus one shared append-only sheet, never SlickGrid's per-grid <style>, because WebKit rebuilds every element's style on a sheet removal or rule mutation (~55 ms per mount on the test page).
 - CommitGrid.vue uses plain SlickGrid and keeps the per-grid style sheet.
@@ -556,7 +559,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 ```
 
 - P100 dropped git_clients, git_repo_settings and code_repos from Studio's kira.db (0026_p100_drop_git_tables.sql) when the git module was extracted into Kira Space, a separate app with its own kira.db and its own copies of these tables.
-- Kira Space runs its own migration sequence in apps/kira-space/internal/storage/migrations/, separate from Studio's, with high-water mark 0032 (0032_p259_repo_hidden.sql adds code_repos.hidden and ade_folders.hidden).
+- Kira Space runs its own migration sequence in apps/kira-space/internal/storage/migrations/, separate from Studio's, with high-water mark 0045 (0045_p332_file_handler_previous.sql adds file_handler_previous).
 - Studio's kira.db migration high-water mark is 0037 (0037_p242_recurring_scripts.sql: custom_scripts.schedule_json, script_runs rebuilt with waiting/skipped states).
 - Migration 0020 added connections.mcp_enabled (deny-by-default MCP exposure); 0021 added mcp_read_mode/mcp_write_mode/mcp_ddl_mode plus mcp_description; 0022 added mcp_auto_explain (auto-force-EXPLAIN on run_query); 0023 created connection_mask_rules and connections.mask_correlation_key.
 - Migration 0027_p108part11_op_log_path.sql added op_log.path TEXT, the console path an op actually ran against.
@@ -1545,7 +1548,7 @@ packaged app does not), where the identical application code runs unchanged over
 - Every install run appends to ~/Library/Logs/<app name>/install.log, truncated once past 1 MiB, and UpdateStatus.installLogPath gives the dialog this path to show on a failed install.
 - The renderer never sends or receives a URL: UpdateService.Status, Check, InstallUpdate and CancelInstall are all nullary, and Go decides where the script comes from and what it does.
 - scripts/verify-packaging.sh check S10 (scoped to apps/, packages/, internal/) enforces that no app code downloads a release asset itself, and only scripts/install.sh may. S11 pins the one raw.githubusercontent.com reference and the two sides' shared contract marker.
-- Self-update runs a shell script downloaded at click time with the user's privileges from the main branch of a public repo, so anyone who can push to main can change what every user's Update click runs. Branch protection on main is therefore a security boundary; TLS and the contract marker guard transport and compatibility, not authorship.
+- Self-update runs a shell script downloaded at click time with the user's privileges from the main branch of a public repo, so anyone who can push to main can change what every user's Update click runs. Branch protection on main is therefore a security boundary; TLS and the contract marker guard transport and compatibility, not authorship. Since P330 a chapter PR from this repo squash-merges itself once `pr.yml`'s required checks pass, with no review, so push access to a `chapter/v*` branch is the same boundary.
 
 ## Git module (v1.3), Kira Space's own app as of P100
 
@@ -1778,6 +1781,15 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - In the reading pane, same-page #anchor links still scroll to their heading (a heading_open renderer override assigns GitHub-style slug ids, numbered on collision); other links stay inert, with the target shown in the link's title attribute via a link_open override.
 - Opening external links from the markdown reading pane is out of scope: OpenURL (pkg/application) validates nothing and a markdown file's links are untrusted. LinkService.OpenExternal (bridge/link.go) now exists, but the reading pane deliberately does not use it.
 - Fenced code blocks in the markdown reading view have no syntax highlighting and render as themed monospace, because Monaco's editor.colorize() is async per block and this is a reading view, not a second editor.
+
+### External file opens and default app (P332)
+
+- Kira Space is a Viewer for code and data files. `apps/kira-space/internal/filetypes` is the one extension vocabulary (41 code, 14 data); the generated `CFBundleDocumentTypes` (role Viewer, `LSHandlerRank` Alternate), `LSItemContentTypes` and `UTImportedTypeDeclarations` blocks in both plists come from it (`tools/gendoctypes`, markers `kira:doctypes:begin/end`, `--check` is verify-packaging S13). Excluded: html, txt, rtf, extensionless names, sqlite/db, ipynb, parquet, xlsx. `ts` resolves to MPEG-2 video on macOS; the registry reports a non-text type unavailable.
+- Wails emits `ApplicationOpenedWithFile` once per file, cold start included. `openedfiles.Coalescer` batches adds (300 ms after the last) into one new window. `Resolve` follows symlinks, then maps a path inside an imported repo (longest root wins) to `{repoId, relPath}`, else keeps the absolute path. The window pulls its targets once through `OpenedFilesService.Pending(windowKey)`; `Forget` runs on window close.
+- A path outside every repo opens a `local-file` tab in the general workspace, read through `OpenedFilesService.Read`, which accepts only an absolute, clean path with a supported extension. `RepoFileView` and `LocalFileView` share `useReadonlyFileViewer`.
+- The File types settings pane writes LaunchServices through `filehandlers.Registry` (`NSWorkspace setDefaultApplicationAtURL:toOpenContentType:`; macOS cgo build only, `Unsupported` elsewhere and in `-tags server`). Status re-reads live state on every call; nothing is applied on launch. The previous handler is stored per extension in `file_handler_previous` before the first switch; switching off restores it, and a gone app leaves the extension on Kira Space and reports it as `unrestored`.
+- Kira Space has 28 bound services.
+- Not supported: Linux and Windows (no package; the single-instance lock drops a second process's argv), folders dropped on the Dock icon, editing or live reload of an opened file, a table view for data files, auto-importing an un-imported repo that contains the opened file.
 
 ### Git graph in the native workspace (C10)
 
@@ -2240,9 +2252,13 @@ answers. Bound as `PromptsService` (`List`, `MainWindow`, `Claim`, `Raise`, `Dis
 - Prompt notifications are per kind, with id prompt:<kind> and thread kira-prompts; sent on open when the target window is not focused, with a count title when several wait, and removed when the last of the kind closes.
 - Prompt notifications are gated by advanced.notifyPrompts, which defaults to on.
 - Clicking a prompt notification calls RevealKind: reopen a window when none is open, focus the target, push reveal. Answering in the app removes the note. Notifications have no action buttons.
+- Deps.RaiseOnOpen (per kind; nil means never) brings a prompt's window forward on open: Open starts RevealKind in a goroutine after releasing its locks, because Focus blocks on the main thread. Studio raises only `dbmcp`, gated by dbMcp.focusOnApproval. Space passes none.
+- A raise is skipped when the target window already has focus, fires at most once per kind per 2 s (the macOS Space-switch animation, when IsFocused may still read false), and never fires on Close, Claim or Reroute. A request resolved before the goroutine runs makes RevealKind a no-op.
+- shell.WindowRegistry.Focus calls App.Show first on darwin only (unhide after Cmd+H); on Windows and Linux App.Show re-shows every window, so it is skipped there. A window Studio hid on last close comes back through Show.
+- Platform behaviour of a raise. macOS: unhide, un-minimise, show, activate; macOS switches to the window's Space under the default Mission Control setting "When switching to an application, switch to a Space with open windows". Windows: best effort; foreground lock usually refuses SetForegroundWindow from a background app and the taskbar button flashes; a window on another virtual desktop is not switched to. Linux: best effort; gtk_window_present, Wayland compositors usually show "is ready" instead of focusing, workspace switch depends on the window manager.
 - The notification sink is internal/desknotify (Sink, WailsSink), shared with internal/agentnotify; it is Darwin only, like P238.
 - The stream no longer carries credential.request or credential.provide (contract 47); the relay snapshot kira:git:credential plus GitCredentialService.Provide is the only path for Git credentials.
-- Prompt routing is tested by flows/promptflow in both apps, dbmcpflow TestDbMcpApprovalRoutes, Space gitflow TestCredentialRoutes, mobileflow TestMobilePairingRoutes, tests/ui/prompts.spec.ts and tests/e2e-real/prompts-two-windows-real.spec.ts; the recording sink is internal/flowtest/notifysink.
+- Prompt routing is tested by flows/promptflow in both apps, dbmcpflow TestDbMcpApprovalRoutes and TestDbMcpApprovalFocus, Space gitflow TestCredentialRoutes, mobileflow TestMobilePairingRoutes, tests/ui/prompts.spec.ts and tests/e2e-real/prompts-two-windows-real.spec.ts; the recording sink is internal/flowtest/notifysink.
 
 ### Agent usage limits (P239, P316)
 
@@ -2573,7 +2589,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - Docker exec uses TerminalHostView with storeId 'docker-exec'; the Terminal tab opens no session until New session is clicked.
 - Per-container CPU and RAM show in the engine overview table, the container header and a Stats view; the side list shows none.
 - Docker endpoint resolution order (endpoint.go): selected UI context, DOCKER_HOST, DOCKER_CONTEXT/currentContext (TLS contexts included), default socket, then socket probe (Desktop, Colima, OrbStack).
-- Docker streams are per window (windowKey); they end on WindowOpenerDeps.OnWindowClosing, service shutdown and quit, and run only while the module is visible.
+- Docker streams are per window (windowKey); they end on WindowOpenerDeps.OnWindowClosing, service shutdown and quit, and run only while the module is visible. One exception: the restore tracker (P334).
 - Stats share one engine stream per container across windows.
 - ModeDef.tabStrip: false hides the tab strip.
 - Storage metrics (P252) are on demand only: DiskUsage (/system/df, verbose) and ContainerSize (inspect Size) are bound methods, and singleflight dedupes concurrent calls.
@@ -2596,6 +2612,13 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - Flow tests set WithHubAPI to a fake.
 - The registry button opens through LinkService.OpenExternal (Studio binds it again, 30 services); docker-ui takes openExternal in its context options.
 - Container size lives in the Stats tab, which also opens for stopped containers.
+- Restore after engine restart (P334): the tracker is a backend loop owned by Manager (restore*.go), independent of windows. Ticks 15 s while the engine answers, 30 s while it does not. Remote endpoints (tcp, ssh) tick only while a window watches.
+- Boot identity: Info.ID keys the snapshot. The default bridge network ID marks the boot: new on every daemon start, kept under live-restore (measured on dockerd 29.9.2).
+- Snapshot rules: never written while the engine is unreachable. A stopped container leaves after a 30 s grace. Pending is frozen until Restore clears it or Dismiss. Testcontainers, buildx, kind, kubernetes, swarm and `--rm` containers are never snapshotted.
+- Storage: tables docker_restore_engines and docker_restore_containers (migration 0044). Snapshots not updated for 30 days are pruned at start. internal/docker sees only the RestoreStore interface.
+- Restore is click-only. A Compose project starts as one unit in depends_on order (service_healthy waits up to 60 s). Deleted containers are listed, never recreated. Boot-time restore is out of scope.
+- Channel kira:docker:restore; query key ['docker-restore'] sits outside ['docker']. The banner shows only inside the Docker module.
+- Flow seams: docker.WithRestoreTiming, docker.WithBootProbe, flowharness.BootGen (simulates a daemon restart). A real dockerd restart runs only with KIRA_FLOW_DOCKER_RESTART=1.
 - UI styling: start uses text-ok and stop text-error module-wide; selected rows use neutral bg-select; left-panel section tabs are the git module's ToggleGroup.
 
 ## Database MCP server (v1.7)
@@ -2641,6 +2664,19 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - The shared packages/workbench/src/components/ConfirmDialog.vue cites DbMcpApprovalDialog's teleport-ordering precedent in its own comment.
 - The dialog shows the statement in a read-only MonacoHost (ApprovalStatement.vue), formatted by formatConsoleText, with an "As sent" toggle for the verbatim text. Word wrap is always on, so no clause sits off screen.
 - An approval prompt's Reason is either "permission" or "heavy". At most one prompt is raised per call when both apply; the stricter reason (permission) wins the label, and the plan evidence rides along.
+- Every approval request carries a Target (ApprovalTarget): connection colour, read-only flag, host, configured database (SQLite: the file), and the decoded run_query/explain_query path. The dialog opens with ApprovalTarget.vue, a banner above the lede and statement, so the human sees which database the call acts on.
+- A request has a Stage: "query" (may the statement run) or "response" (it ran; may its result reach the AI client). Both share one FIFO queue, one timeout and one dialog, and the title names the stage.
+- Setting dbMcp.previewResponses (default off, Settings > Database MCP) raises a response-stage request after run_query executes. The handler goroutine holds the final result, so the AI client stays blocked, and only Send returns that same result value untouched.
+- The preview runs after execution, never before approval, for three reasons: a pre-run would defeat the query gate, a heavy read would pay its cost twice, and a rollback transaction held across a human wait would keep database locks for up to 120 s (Redis, Kafka, SQS and S3 have no rollback at all). A write has therefore already run when its result shows; Withhold hides the result, it does not undo the change, and the dialog says so.
+- Every exit after Execute is reviewed: success, empty, adapter error, masked error, masking refusal, internal Go error. Exits before Execute carry only app-authored text and are not.
+- The held bytes are the TextContent of the result the client would get. Masking happens once, in render.go. The UI parses those bytes into a table (ApprovalResponse.vue) and shows them verbatim on the As sent tab. It never re-renders or re-masks.
+- The text stays out of queue snapshots, which fan out to every window and can be MB-sized. Snapshots carry only isError and bytes; DbMcpService.PendingResponse(requestId) serves the text while the request is queued.
+- Withhold, timeout, abandon and a full queue return an app-authored error with no row data. Approve first re-checks MCP exposure and compares the current mask set with the one used to render (mask.Set.Equal); a change withholds the result so a rule added during review cannot be bypassed.
+- The setting is read fresh per call (bridge previewResponses). A read failure fails closed (review on), since sending unreviewed data is the unsafe direction.
+- go-sdk v1.8.0 (mcp/server.go toolForErr) wraps a regular handler error as an IsError text result carrying err.Error(); only a *jsonrpc.Error becomes a protocol error. A bare Go error from run_query therefore reaches the client as that text, and the preview shows the same text.
+- Only run_query is reviewed, as the only tool that returns row data. explain_query, describe_* and list_* are unchanged. There is no per-connection preview setting, no undo for a withheld write and no editing of the result before sending.
+- Both stages and heavy-read prompts raise the Studio window when it is not focused (P338), gated by dbMcp.focusOnApproval (default on, read fresh per open; a read error raises). A stray key landing after the raise can only deny: the dialog focuses Deny on mount and Escape denies.
+- Two stages can hold one call for up to 4 minutes. A client with a shorter MCP tool timeout ends the call as abandoned and the result is discarded.
 
 ### EXPLAIN (M3)
 
@@ -2671,7 +2707,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 
 - The sections array in state/settings.ts has eight entries: Appearance, Data, Cache, Api, Scripts, Claude Code, Database MCP, Advanced.
 - 'Database MCP' is its own settings section and is the app's only embedded-MCP-server settings pane, since P97 removed the repo-map one.
-- The Database MCP settings section holds the enable toggle, the registration command and Install button, the token-expiry line, and a read-only Exposed connections glance.
+- The Database MCP settings section holds the enable toggle, the "Review results before the AI gets them" toggle (dbMcp.previewResponses, an instant action that bypasses draft/Save), the "Bring Kira Studio forward for approvals" toggle (dbMcp.focusOnApproval, instant, default on), the registration command and Install button, the token-expiry line, and a read-only Exposed connections glance.
 - The Exposed connections glance shows per-row read/write/DDL modes, auto-explain, and M5's masked-column count, and has no second editor.
 - In project/ConnectionDialog.vue, DetailTab has five values: 'General', 'Advanced', 'Pre-connect', 'MCP', 'Privacy'.
 - All permission and description editing happens in the MCP tab of the connection dialog, and all mask-rule editing happens in the Privacy tab.
@@ -2948,6 +2984,7 @@ repo's CI runs.
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **The macOS default-app switch is unverified on a real Mac (P332).** No Mac was available: the cgo registry, the document types in LaunchServices, whether a system prompt appears when setting a content-type default, and the UTI of each imported row are untested. Check: install the DMG, run it once from `/Applications`, then `lsregister -dump` lists both document types, Open With lists Kira Space, and the pane's switch changes `mdls -name kMDItemContentType` output.
 - **MCP `run_query` read verdicts run under `READ ONLY` wrap, which does not stop every side effect (P329).** A statement classified read runs in `BEGIN READ ONLY` (Postgres) or `START TRANSACTION READ ONLY` (MySQL/MariaDB) unless writes are allowed. Postgres still permits `pg_terminate_backend`, `pg_cancel_backend` and `dblink_exec`; MySQL/MariaDB still permits `GET_LOCK` and writes to temporary tables. SQLite and ClickHouse get no per-request wrap: no write-capable function is reachable from a read there.
 - **MongoDB 8.x/9.x servers are unverified in CI.** Every 8.x/9.x image exits at startup on runner kernels
   6.19-7.0.13 (SERVER-125742; SERVER-136848 for Ubuntu). Test and db-compat max pin `mongo:7.0.45`. Restore an
@@ -2988,6 +3025,13 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   one-time OS permission; a dev build run outside a bundle cannot post (Wails checks the bundle id).
   The darwin sink compiles only with cgo on a Mac. Linux and `-tags server` builds post nothing.
   Delete once checked on a signed Mac build.
+- **Approval focus is unverified on macOS (P338).** Compiled and flow-tested with a fake window
+  seam only; `internal/shell/unhide_darwin.go` needs cgo on a Mac to compile. Wails calls
+  `activateIgnoringOtherApps:`, deprecated since macOS 14. Checks on a signed build, with a write
+  connection set to prompt: window on another Space; full-screen; another app full-screen; minimised;
+  hidden with Cmd+H; last window closed; preview on raises both stages; five requests at once switch
+  once; deny and timeout leave focus alone; setting off raises nothing. Record the macOS version and
+  the result with Mission Control "switch to a Space" off. Delete once checked.
 - **Mobile agents web is unverified on a real phone (P212).** Covered by Go tests and Playwright
   WebKit/Chromium emulation only. Unchecked: the iOS soft keyboard with xterm (the compose row exists
   for it), the attach WebSocket surviving a backgrounded tab, and touch drag on a real device (tests
@@ -3215,6 +3259,9 @@ Performance:
 - **The graph keeps its pre-refresh scroll offset after an auto refresh (P203).** A new tip is off screen until scrolled or remounted.
 - **`ui-timing` budgets fail in the WebKit sandbox even on an idle host (P250, P264, P266, P267, P277).** Two Studio tests fail (`budgets.spec.ts` interactions, `perf.spec.ts` scroll); the rest of `ui-timing` passes. Measured idle (load below 2, no leftover process): scroll work p50 17-18 ms vs 16, `perf.spec.ts` scroll frame p95 89-96 ms vs 80, tab switch p95 up to 363 ms vs 300, cached tree expand p95 58 ms vs 50, console keystroke p50 55 ms vs 50. Cause: this host's WebKit runs JS work 1.8x and DOM work 2.9x slower than Chromium on the same host. The same code passes in Chromium with margin. Profiling found no hot-path work left to cut (SlickGrid render, keystroke and tree paths are already batched), so no `perf` change landed. Budgets are never loosened. Delete once the project passes on the CI runner, a Mac or a faster host.
 - **Docker: remote `tcp://` without TLS is allowed (P200),** flagged `secure: false` in the UI. Exec sessions stay in the Terminal tab's chip list after the container stops; close the chip by hand.
+- **Docker restore: the bridge-ID boot marker is unverified on Docker Desktop, Colima and OrbStack (P334).** Measured on Linux dockerd only. Check on a Mac: restart the VM with containers running, open Docker, expect the banner. Delete once confirmed.
+- **Docker restore: engines without a default bridge network (P334)** detect a restart only when this session saw the outage. No launch-time detection.
+- **Docker restore: a restart while Kira Studio was closed, then a deliberate CLI stop, is offered for restore (P334).** Indistinguishable from a casualty. Click-only, so harmless.
 - **Visual baseline of the ADE workflow graph shows the Preview placeholder (P271).** The finish note is rendered by `LlmPromptsService.Preview`, unmocked in that spec. The PNG does not show the real note text.
 - **Visual baselines are recorded in the dev sandbox (P227, P229, P242, P245, P247, P264, P266).** Accepted by the user. 13 Studio, 4 Space Settings, 3 git-module and 1 ADE workflow graph PNGs; the suites pass there. CI render may drift (0.6-1% on 13 specs before the P264 re-record); if the CI job disagrees, regenerate there and check each diff is the expected change only.
 - **The phone sees desktop worktree paths (P231 B-4).** Board `branches[].worktree` is a local path served to paired phones. Open user decision; delete once decided.

@@ -4,6 +4,7 @@ import * as AgentService from '@bindings/agentservice.js';
 import * as AgentUsageService from '@bindings/agentusageservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as CustomScriptsService from '@bindings/customscriptsservice.js';
+import * as FileHandlersService from '@bindings/filehandlersservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as GitCredentialService from '@bindings/gitcredentialservice.js';
 import * as GitHostService from '@bindings/githostservice.js';
@@ -13,6 +14,7 @@ import * as LifecycleService from '@bindings/lifecycleservice.js';
 import * as LinkService from '@bindings/linkservice.js';
 import * as LlmPromptsService from '@bindings/llmpromptsservice.js';
 import * as MobileAccessService from '@bindings/mobileaccessservice.js';
+import * as OpenedFilesService from '@bindings/openedfilesservice.js';
 import * as OpsService from '@bindings/opsservice.js';
 import * as PromptsService from '@bindings/promptsservice.js';
 import * as ScriptRunsService from '@bindings/scriptrunsservice.js';
@@ -37,7 +39,10 @@ import type {
   CodeSearchEvent,
   DiffContent,
   FileContent,
+  FileHandlersSetResult,
+  FileHandlersStatus,
   FileListing,
+  OpenedFileTarget,
   RepoSummary,
   SearchRequest,
 } from '@shared/domain/repo';
@@ -266,6 +271,23 @@ const spaceControl = {
     ).then((r) => trust<FileListing>({ ...r, paths: r.paths ?? [], status: r.status ?? {} })),
   codeWorkspaceReadFile: (id: string, path: string): Promise<FileContent> =>
     unwrap(CodeWorkspaceService.ReadFile({ id, path })).then((r) => trust<FileContent>(r)),
+
+  // External opens: the files this window was opened for (once), and a standalone file's content.
+  openedFilesPending: (): Promise<OpenedFileTarget[]> =>
+    unwrap(OpenedFilesService.Pending({ windowKey })).then((r) =>
+      trust<OpenedFileTarget[]>(r ?? []),
+    ),
+  openedFilesRead: (path: string): Promise<FileContent> =>
+    unwrap(OpenedFilesService.Read({ path })).then((r) => trust<FileContent>(r)),
+
+  // Default app for code and data files: the live handler of every associated extension, and the
+  // switch that makes Kira Space (or the previous app) the default for some of them.
+  fileHandlersStatus: (): Promise<FileHandlersStatus> =>
+    unwrap(FileHandlersService.Status()).then((r) => trust<FileHandlersStatus>(r)),
+  fileHandlersSet: (exts: string[], on: boolean): Promise<FileHandlersSetResult> =>
+    unwrap<{ unrestored: string[] | null }>(FileHandlersService.Set({ exts, on })).then((r) =>
+      trust<FileHandlersSetResult>({ unrestored: r.unrestored ?? [] }),
+    ),
 
   // C6 §7/§8.5: the index lifecycle (fire-and-forget — a failed start/stop must never block
   // opening or leaving a workspace) plus the diff read.

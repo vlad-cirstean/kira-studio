@@ -44,6 +44,45 @@ export const fileContentSchema = /*#__PURE__*/ z.object({
 });
 export type FileContent = z.infer<typeof fileContentSchema>;
 
+// One file an external open (Finder, a default-app double-click) brought to a window: `repoId` and
+// `relPath` when it lies in an imported repository, else `path` (absolute) alone.
+export interface OpenedFileTarget {
+  path: string;
+  repoId: string;
+  relPath: string;
+}
+
+// Who opens one associated extension: Kira Space (`self`), another app (`other`), nobody (`none`),
+// or a type the system does not know yet (`unavailable`, an app never registered with the OS).
+export type FileHandlerState = 'self' | 'other' | 'none' | 'unavailable';
+
+export interface FileHandlerApp {
+  path: string;
+  bundleId: string;
+  name: string;
+}
+
+export interface FileHandlerExt {
+  ext: string;
+  uti: string;
+  state: FileHandlerState;
+  handler: FileHandlerApp | null;
+}
+
+export interface FileHandlerGroup {
+  id: string;
+  extensions: FileHandlerExt[];
+}
+
+export interface FileHandlersStatus {
+  supported: boolean;
+  groups: FileHandlerGroup[];
+}
+
+export interface FileHandlersSetResult {
+  unrestored: string[];
+}
+
 // One side of a HEAD-vs-worktree diff — the same four-value classification
 // fileContentSchema already uses for the worktree side, so the diff view reuses one vocabulary
 // rather than inventing a second. No status field on the diff as a whole: the two sides already

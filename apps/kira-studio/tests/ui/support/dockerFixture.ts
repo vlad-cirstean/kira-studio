@@ -162,7 +162,18 @@ export async function setupDocker(
   opts: { status?: unknown; handlers?: Record<string, (args: unknown) => unknown> } = {},
 ) {
   const { window: page, control } = await relaunch({ control: [] });
-  const state = { status: opts.status ?? OK_STATUS, containers: seedContainers() };
+  const state = {
+    status: opts.status ?? OK_STATUS,
+    containers: seedContainers(),
+    restore: {
+      state: 'none',
+      engineId: '',
+      context: '',
+      detectedAt: 0,
+      bootAt: 0,
+      items: [],
+    } as unknown,
+  };
   const docker = await installDockerMocks(page, {
     bridgePkg: BRIDGE_PKG,
     handlers: {
@@ -184,6 +195,9 @@ export async function setupDocker(
         const c = state.containers.find((x) => x.id === (a as { id: string }).id);
         if (c) c.state = 'exited';
       },
+      RestoreState: () => state.restore,
+      RestoreContainers: () => ({ items: [] }),
+      RestoreDismiss: () => undefined,
       ExecOpen: () => contract('docker-exec', 'DockerService.ExecOpen'),
       ...opts.handlers,
     },

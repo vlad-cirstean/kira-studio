@@ -1,0 +1,164 @@
+name: Cache warm
+run-name: Cache warm ${{ inputs.merge_sha }}
+
+# P330: pr.yml has no push trigger, so nothing else saves caches in main's scope, the one scope every
+# PR run restores. release-on-merge.yml dispatches this once per merge (a merge by github-actions
+# starts no workflow). Each job copies one pr.yml job's setup inputs and cache keys exactly, then
+# installs and compiles: no lint, no tests. `go test -exec /bin/true` builds test binaries and runs
+# nothing; -exec is part of Go's test-result cache key, so no false pass reaches a PR run.
+on:
+  workflow_dispatch:
+    inputs:
+      merge_sha:
+        description: Merge commit that asked for this warm (run title and dedup only; jobs build main's head)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# A newer merge supersedes: it warms a newer main.
+concurrency:
+  group: cache-warm
+  cancel-in-progress: true
+
+jobs:
+  # Mirrors pr.yml `checks (macOS)`. Keep the package list in step with it.
+  macos:
+    name: warm checks (macOS)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup
+        with:
+          go-cache: macos
+      - run: bun run build:studio
+      - run: bun run build:space
+      - name: Cache golangci-lint binary (same key as pr.yml)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/go/bin/golangci-lint
+          key: golangci-lint-${{ runner.os }}-${{ hashFiles('scripts/install-golangci-lint.sh', 'go.mod') }}
+      - run: sh scripts/install-golangci-lint.sh
+      - run: go build ./...
+      - name: Compile the darwin test packages (nothing runs)
+        run: |
+          go test -run '^$' -exec /bin/true \
+            ./apps/kira-studio/internal/secrets/... \
+            ./internal/metrics/... \
+            ./apps/kira-studio/internal/localauth/... \
+            ./apps/kira-space/internal/gitclient \
+            ./apps/kira-studio/internal/datagrip/...
+
+  # Mirrors pr.yml `checks (Linux)`: its only Go is lint:rules' checkprompts.
+  checks-linux:
+    name: warm checks (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup
+        with:
+          go-cache: checks
+          gtk: "true"
+      - name: Cache tsbuildinfo (same key as pr.yml)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: node_modules/.cache/tsbuildinfo
+          key: tsbuildinfo-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: |
+            tsbuildinfo-${{ hashFiles('bun.lock') }}-
+      - run: bun run typecheck
+      - run: go build -o /dev/null ./internal/llmprompts/cmd/checkprompts
+
+  # Mirrors pr.yml `go (Linux)`.
+  go-rest:
+    name: warm go (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup
+        with:
+          go-cache: go-rest
+          gtk: "true"
+      - run: bun run build:studio
+      - run: bun run build:space
+      - run: sh scripts/go-test-split.sh rest -run '^$' -exec /bin/true
+
+  # Mirrors pr.yml `go-containers (Linux)`.
+  go-containers:
+    name: warm go-containers (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Placeholder frontend/dist (as in pr.yml)
+        run: |
+          mkdir -p apps/kira-space/frontend/dist apps/kira-space/frontend/dist-mobile apps/kira-studio/frontend/dist
+          touch apps/kira-space/frontend/dist/.keep apps/kira-space/frontend/dist-mobile/.keep apps/kira-studio/frontend/dist/.keep
+      - uses: ./.github/actions/setup
+        with:
+          bun: "false"
+          bindings: "false"
+          go-cache: go-ct
+          gtk: "true"
+      - run: sh scripts/go-test-split.sh containers -run '^$' -exec /bin/true
+      - name: Look up the Testcontainers image cache
+        id: docker-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/docker-images.tar
+          key: docker-${{ runner.os }}-${{ hashFiles('apps/kira-studio/internal/adapters/testsupport/*.go') }}
+          lookup-only: true
+      - name: Pull and pack the images (miss only)
+        if: steps.docker-cache.outputs.cache-hit != 'true'
+        run: |
+          sh scripts/pull-test-images.sh
+          # shellcheck disable=SC2046
+          docker save $(docker images --filter dangling=false --format '{{.Repository}}:{{.Tag}}') -o ~/docker-images.tar
+          du -h ~/docker-images.tar
+      - if: steps.docker-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/docker-images.tar
+          key: docker-${{ runner.os }}-${{ hashFiles('apps/kira-studio/internal/adapters/testsupport/*.go') }}
+
+  # Mirrors the browser caches of pr.yml `ui` (webkit) and `ui-extra` (webkit plus chromium).
+  # System libraries (--with-deps) are apt packages, not in the cached path, so not installed here.
+  playwright:
+    name: warm Playwright browsers (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup
+        with:
+          bindings: "false"
+      - id: webkit
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-webkit-${{ hashFiles('bun.lock') }}
+          lookup-only: true
+      - id: both
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-webkit-chromium-${{ hashFiles('bun.lock') }}
+          lookup-only: true
+      - if: steps.webkit.outputs.cache-hit != 'true' || steps.both.outputs.cache-hit != 'true'
+        run: bunx playwright install webkit
+      - if: steps.webkit.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-webkit-${{ hashFiles('bun.lock') }}
+      - if: steps.both.outputs.cache-hit != 'true'
+        run: bunx playwright install chromium
+      - if: steps.both.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-webkit-chromium-${{ hashFiles('bun.lock') }}

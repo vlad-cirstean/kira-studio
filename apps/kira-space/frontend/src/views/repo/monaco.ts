@@ -33,6 +33,11 @@ export function repoFileUri(mod: MonacoModule, repoId: string, path: string): st
   return repoFileUriObject(mod, repoId, path).toString();
 }
 
+// An externally opened file outside any repository: its absolute path under the file scheme.
+export function localFileUri(mod: MonacoModule, path: string): string {
+  return mod.Uri.file(path).toString();
+}
+
 // P74 §7.3: a repo-file tab pinned to a revision (`repoFileTabStateSchema.rev`) — keyed by `rev`
 // exactly as repoRevisionDiffUris keys its own two sides below, so a historical read of `path`
 // never collides with the live worktree model already cached at repoFileUri's own URI.

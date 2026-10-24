@@ -48,4 +48,7 @@ dev_mode:
 
 # File Associations
 # More information at: https://v3.wails.io/noit/done/yet
+# Left empty on purpose: document types come from `go run ./apps/kira-space/tools/gendoctypes`
+# (P332), which owns the kira:doctypes block in both Info plists. `common:update:build-assets`
+# drops that block; rerun the generator after it.
 fileAssociations:

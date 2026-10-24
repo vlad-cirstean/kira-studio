@@ -100,6 +100,8 @@ builds and runs a `Kira Studio.dev.app` from `build/darwin/Info.dev.plist` witho
 from Wails' template default of `12.0.0`, and matches the build's `MACOSX_DEPLOYMENT_TARGET`/`CGO_*`
 flags and the README's macOS 14+ product claim. The template hardcodes `12.0.0`, so a
 `wails3 task common:update:build-assets` run reverts both plists — re-narrow them after regenerating.
+Kira Space's plists also carry a generated document-type block (P332); rerun
+`go run ./apps/kira-space/tools/gendoctypes` after the regeneration.
 The floor is 14 rather than 13 because Go 1.27 builds its own objects for macOS 13 minimum: a lower
 `-mmacosx-version-min` only earns a linker warning that the object file was built for a newer macOS
 than is being linked.
@@ -295,7 +297,7 @@ frameworks. On Linux that leaves two doors, and neither was opened here:
 Consequently `scripts/verify-packaging.sh` degrades honestly off macOS: with no bundle it prints one
 "skipped A1/A3/A5/N2" note and one "skipped A4/N3" note and passes on the static checks alone,
 and even with a bundle it would skip A1/A3/A5/N2 for want of `codesign`/`PlistBuddy`. **A green
-`verify:packaging` on Linux proves only the static checks (S1/S2/S5/S6/S7/S8/S10/S11/S12), not that
+`verify:packaging` on Linux proves only the static checks (S1/S2/S5/S6/S7/S8/S10/S11/S12/S13), not that
 any bundle is correct.** The static checks run over committed files, so they mean something even without a bundle. A1/A3/A5/N2
 need the real `.app`.
 
@@ -353,63 +355,86 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
 
 ## 7. CI, releases, install and update
 
-**Status:** applied. `.github/workflows/` holds the two workflows described below (`pr.yml`,
-`release.yml` — `db-compat.yml` and `test-matrix.yml` existed at one point but were folded into
-`release.yml`'s own jobs, see `docs/ARCHITECTURE.md`). Each of the original workflows spent time in
-a staging directory — a `p58-pending-ci-workflows/` plan folder (v1 P58), then
-`p1{6,9}-pending-ci-workflow/` plan folders (v1.1; both in `docs/HISTORY.md`) — waiting for a session whose GitHub token carried
-the `workflow` OAuth scope; all of those directories are gone.
+**Status:** applied. `.github/workflows/` holds `pr.yml`, `pr-auto-merge.yml`, `pr-rerun-flaky.yml`,
+`release-on-merge.yml`, `release.yml`, `cache-warm.yml` and `pages.yml`
+(`db-compat.yml` and `test-matrix.yml` existed at one point but were folded into `release.yml`'s own
+jobs, see `docs/ARCHITECTURE.md`). P330's files are staged under `docs/pending-changes/` and
+`docs/pending-workflows/` until a session with the `workflow` scope applies them. Whoever applies
+them deletes this line in the same commit.
 
-**`pr.yml`** (named `CI` until it was renamed to match what it actually gates — push/PR to `main`,
-plus `workflow_dispatch`):
+**`pr.yml`** (trigger: `pull_request` to `main` plus `workflow_dispatch`; no push, so `main` is reached
+only through a PR). No job `needs` another; every job starts at once:
 
 | Job | Runner | What it does |
 |---|---|---|
-| `checks` | `macos-15` (pinned, not `macos-latest`) | `bun install --frozen-lockfile`, `sh scripts/setup.sh` (which installs the `wails3` pinned in `go.mod` and regenerates bindings), then `lint`, `typecheck`, `build:studio`, `go build ./...`, `go test` against the five darwin-only packages, `verify:packaging` |
-| `wails-linux-cli` | `ubuntu-latest`, needs `checks` | builds and caches the Linux `wails3` CLI once, shared by `ui` and `container-tests` so they don't race to rebuild it |
-| `ui` | `ubuntu-latest`, needs `[checks, wails-linux-cli]` | Playwright WebKit plus Chromium and their system libraries, `bun run test:ui:studio`, `test:ipc:fe:studio`, `test:visual:studio`; uploads `playwright-report/` on failure |
-| `container-tests` | `ubuntu-latest`, needs `[checks, wails-linux-cli]` | `bun run test:unit`, then `bun run test:go` against real Testcontainers (Docker is available here, unlike `checks`) |
+| `checks (macOS)` | `macos-15` (pinned, not `macos-latest`) | cgo-aware `go vet`/build (catches darwin build-tag breaks) and the darwin&&cgo-only test packages |
+| `checks (Linux)` | `ubuntu-latest` | lint, typecheck, frontend builds, `lint:dead`, `verify:packaging` and the bun unit tests |
+| `ui (Linux, shard N/4)` | `ubuntu-latest` | Playwright `ui` project in 4 shards, fail-fast off |
+| `ui-extra (Linux)` | `ubuntu-latest` | ipc-frontend (chromium), visual (webkit), then ui-timing alone on an idle machine |
+| `go (Linux)` | `ubuntu-latest` | Go packages that start no container, plus every package the container split does not name |
+| `go-containers (Linux)` | `ubuntu-latest` | Go packages that start Testcontainers; no bun, bindings or real frontend build |
 
-There is no `package-smoke` job any more — the bundle assertion it used to do now lives only in
-`release.yml`'s own "Assert packaged bundle and disk image" step, since that checks the actual
-tagged release build rather than a merge-to-main run that could sit at a different commit.
+The bundle assertion lives only in `release.yml`'s own "Assert packaged bundle and disk image" step.
 
-`checks`' own `test:go` step (on `macos-15`, no Docker) only ever exercises the driver-independent
-half of `apps/kira-studio/internal/adapters/*/*_test.go` — every Testcontainers-backed test skips itself with a
-named `DockerUnavailableMessage` when no Docker daemon answers, rather than failing. The real,
-full-coverage run of that same `test:go` needs a runner with Docker, which is what `container-tests`
-is for. This split predates P58f and is unaffected by it: `packages/db-fixtures/`'s per-engine specs used to be
-the ones needing Docker-on-Linux (Electron-hosted macOS runners have neither Docker nor nested
-virtualization); P58f D1 moved that coverage into `apps/kira-studio/internal/adapters/*/*_test.go`
-(`docs/ARCHITECTURE.md`'s Testing section) without changing which runner exercises it.
+**Chapter PR to release (P330).**
 
-**Cutting a release** (`release.yml`, on tags matching `v*.*.*`, P119 one tag for both apps, P295 direct publish):
+1. The close phase pushes `chapter/vX.Y.Z` and opens the PR to `main`.
+2. `pr-auto-merge.yml` refuses a malformed head or an existing tag, then enables squash auto-merge.
+3. `pr.yml` runs. `pr-rerun-flaky.yml` reruns failed jobs while `run_attempt < 3`, only for the
+   PR's current head, never a cancelled run.
+4. Once the ruleset's required checks pass, GitHub merges.
+5. `release-on-merge.yml` tags the squash commit (`merge_commit_sha`) as `vX.Y.Z`, dispatches
+   `pages.yml` and `cache-warm.yml` (once per merge, deduplicated by the warm run's title), and
+   dispatches `release.yml -f tag=vX.Y.Z`. A merge made with `GITHUB_TOKEN` starts no workflow
+   except `workflow_dispatch` and `repository_dispatch`. So it has four entry points into one
+   idempotent script: `workflow_run` of `PR` (waits for the merge), `pull_request: closed` (a human
+   merge), an hourly sweep (whatever both missed), and a manual dispatch.
 
-1. `git tag vX.Y.Z && git push origin vX.Y.Z`. Pushing the tag is manual; nothing creates or pushes
-   tags. The `build` job writes the tag (minus its `v`) into both apps' `build/config.yml`
+**Main cache warming (P330).** `pr.yml` has no push trigger, and PR runs save caches into their own
+`refs/pull/N/merge` scope, which no other PR or release restores. `cache-warm.yml` runs on `main`
+after each merge and saves what `pr.yml` restores: Go modules, the four Go build kinds
+(`macos`, `checks`, `go-rest`, `go-ct`), bun, the `wails3` CLI, bindings, tsbuildinfo, the
+golangci-lint binary, both Playwright browser sets and the Testcontainers images (on a miss only).
+It installs and compiles, no tests: `go test -run '^$' -exec /bin/true` builds test binaries and runs
+nothing. Cost: about 30-55 runner-minutes in parallel per merge, free on a public repo. On a private
+repo the macOS job bills at 10x, about 190 billed minutes in total.
+
+**Cutting a release** (`release.yml`, on tags matching `v*.*.*` or dispatched with a `tag` input, P119 one tag for both apps, P295 direct publish):
+
+1. `release-on-merge.yml` creates the tag. A manual `git tag vX.Y.Z <sha> && git push origin vX.Y.Z`
+   still works and starts `release.yml` through its tag trigger. The `build` job writes the tag (minus its `v`) into both apps' `build/config.yml`
    `info.version` in its own checkout — no pre-tag version-bump commit is needed — and from there
    each reaches its own binary, About dialog and bundle `Info.plist` (see "Where the version comes
    from"); it asserts both writes landed before building.
-2. Five jobs start together, none `needs` another: `ci-gate` (waits for a green `pr.yml` run on the
-   tagged sha, or dispatches one if none exists; `scripts/release-ci-gate.sh`), `build (macOS)`,
-   `test-matrix (Linux)` and `db-compat (Linux, min|max)`. `build` restores the setup action's caches
-   from `main` and saves none (tag-scoped caches are never restored by a later tag). It runs
+2. `tag` resolves the tag to a commit and refuses a tag that already has a published release, and
+   a non-prerelease tag whose commit is not on `main`; then `build (macOS)`, `test-matrix (Linux)` and
+   `db-compat (Linux, min|max)` start together at that commit. `build` restores the setup action's
+   caches from `main` and saves none; `cache-warm.yml` is what fills `main`'s caches. It runs
    `bun run package:studio` and `bun run package:space`, names each `.dmg`
    (`kira-studio-macos-arm64.dmg`, `kira-space-macos-arm64.dmg`), runs `verify:packaging` and the
    bundle and disk image assert, hashes both images and uploads them as artifact `release-dmgs`.
-   `lint` and `typecheck` do not rerun here; `ci-gate` proves PR CI ran them on this sha.
-3. `publish` (ubuntu) runs only when every job above passed. It re-checks the artifact hashes, refuses
+   `lint` and `typecheck` do not rerun here; `main` takes only PR merges, which the ruleset gates on
+   PR CI, and `tag` refuses any other commit.
+3. `publish` (ubuntu) runs only when every job above passed. It first refuses a tag that moved since
+   `tag` resolved it, re-checks the artifact hashes, refuses
    a tag that already has a published release, creates a draft with both images, verifies each
-   asset (`state`, `size`, `sha256` digest), then publishes with one API call. A failed gate leaves
+   asset (`state`, `size`, `sha256` digest), then publishes with one API call. A failed job leaves
    no release and no draft; a failure after the draft exists deletes it.
 4. The release is public at once and `/releases/latest` serves it. The §4 real-hardware checks run
    after publish against the published assets. A failure found there means a fixed next patch tag
    (the updater offers only strictly newer versions); optionally delete the bad release so
    `/releases/latest` falls back to the previous one. Installed copies are not downgraded.
 
-Failed gate: flaky, use "Re-run failed jobs" (artifacts of the first attempt stay available). Real
-failure: delete the tag (`git push --delete origin vX.Y.Z`), fix, tag again. PR CI red on the sha:
-rerun or fix PR CI first, then rerun the release's failed jobs.
+Recovery:
+
+- Flaky job: "Re-run failed jobs".
+- Tag moved after a failed run: start a new run (`gh workflow run release.yml -f tag=vX.Y.Z`).
+  Rerunning the old run's failed jobs is refused.
+- No release started: `gh workflow run release-on-merge.yml -f pr=<n>`, or
+  `gh workflow run release.yml -f tag=vX.Y.Z` when the tag exists.
+- Tag creation refused: run the commands the job log prints.
+- Real failure: delete the tag (`git push --delete origin vX.Y.Z`); the fix ships as the next
+  chapter (patch plus 1).
 
 **No *silent* auto-update — P119 adds a real one, gated on an explicit click.** SPEC.md defers
 *silent* auto-update past v1 (§1's deferred list, §3's app-identity line); a user-initiated
@@ -454,6 +479,8 @@ P29 added three more static checks, guarding §2.1/§2.2's own findings against 
 - **S12** (P210) — the bundled ONNX Runtime version agrees: `internal/memory/embed/paths.go`'s
   `ORTVersion` equals `scripts/fetch-onnxruntime.sh`'s `ORT_VERSION`, and `create:app:bundle` in
   `apps/kira-space/build/darwin/Taskfile.yml` references `libonnxruntime.<version>.dylib`.
+- **S13** (P332) — Kira Space's two Info plists match `go run ./apps/kira-space/tools/gendoctypes
+  --check`: the generated document-type and imported-UTI block equals `internal/filetypes`.
 
 There is no publish provider, no update feed, no `latest-mac.yml`, and no `.blockmap` — the last of
 those was an electron-builder differential-update artifact that has no equivalent here, so it is absent
@@ -483,8 +510,8 @@ notarization (SPEC.md §1/§3), then a SPEC.md scope change reversing "no silent
 update feed and background-updater wiring — P119's click-triggered install is a deliberately
 different, smaller thing than this.
 
-**Whether the release workflow has actually run:** *no — the first tag pushed will be the first real
-exercise of `release.yml`.*
+**Whether the release workflow has actually run:** yes, by tag push since v0.2.x. The dispatch path
+first runs at the v0.2.12 merge.
 
 **The on-demand DB compatibility suite is outside `pr.yml`, but gates `release.yml`.**
 `scripts/db-compat.sh` (`bun run test:compat`, P16) runs the same per-engine conformance packages
@@ -505,6 +532,30 @@ auth/config tier) is the same shape and made the same move, for the same reason 
 push access without the `workflow` OAuth scope, which GitHub requires for any commit touching
 `.github/workflows/*.yml`. A session with that scope applied them; both staging directories are
 gone.
+
+### Repository settings (user-applied)
+
+1. Apply the staged workflows onto `chapter/v0.2.12` from a Mac session, before the chapter closes.
+   Run `git apply docs/pending-changes/.github__workflows__pr.yml.patch docs/pending-changes/.github__workflows__release.yml.patch`.
+   Copy `docs/pending-workflows/*.yml` to `.github/workflows/`. Delete every applied pending file
+   in the same commit, then push.
+2. Ruleset "Protected branches" (`refs/heads/main`): add **Require status checks to pass**, source
+   GitHub Actions. Add these checks: `checks (macOS)`, `checks (Linux)`, `ui (Linux, shard 1/4)`,
+   `ui (Linux, shard 2/4)`, `ui (Linux, shard 3/4)`, `ui (Linux, shard 4/4)`, `ui-extra (Linux)`,
+   `go (Linux)`, `go-containers (Linux)`. Leave "Require branches to be up to date" off. Keep the
+   squash-only and PR rules. **Do this before step 3.** With no required checks, auto-merge merges
+   the moment it is enabled.
+3. Settings, General, Pull Requests: enable **Allow auto-merge**. Squash stays allowed.
+4. New branch ruleset "Branch names", enforcement Active. Target: include all branches (`~ALL`),
+   exclude `refs/heads/main` and `refs/heads/chapter/v*`. Rule: **Restrict creations**. The
+   "Restrict branch names" metadata rule (regex) needs GitHub Enterprise. Use it if the UI offers it:
+   `^(main|chapter/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))$`. Otherwise
+   fnmatch cannot express semver, and the hook is the exact check. Existing legacy branches stay
+   untouched. Apply after the `chapter/v2.0`, `v2.6`, `v2.8` and `v0.2.10` renames.
+5. Leave the "Protected tags" ruleset disabled. Its "Restrict creations" would block the workflow's
+   tag. If it is ever enabled, it needs GitHub Actions as a bypass actor.
+6. Settings, Actions, General, Workflow permissions: default read stays. Every job declares its own.
+   "Allow GitHub Actions to create and approve pull requests" is not needed.
 
 ## 8. Kira Space packaging
 

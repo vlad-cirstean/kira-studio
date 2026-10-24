@@ -65,6 +65,12 @@ func (w *eventsWatcher) unwatch(windowKey string) {
 	}
 }
 
+func (w *eventsWatcher) watching() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return len(w.windows) > 0
+}
+
 func (w *eventsWatcher) shutdown() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -94,6 +100,7 @@ func (w *eventsWatcher) run(ctx context.Context) {
 				sleepCtx(ctx, eventsRetryWait)
 				continue
 			}
+			w.m.restore.kick()
 			w.m.Emit.Emit(ChannelChanged, ChangedEvent{Kinds: allKinds})
 			failed = false
 		}
@@ -151,6 +158,9 @@ func (w *eventsWatcher) stream(ctx context.Context) error {
 		case msg := <-res.Messages:
 			if noisyAction(string(msg.Action)) {
 				continue
+			}
+			if msg.Type == "container" && (msg.Action == "start" || msg.Action == "die" || msg.Action == "destroy") {
+				w.m.restore.kick()
 			}
 			pending[string(msg.Type)] = struct{}{}
 			if tick == nil {

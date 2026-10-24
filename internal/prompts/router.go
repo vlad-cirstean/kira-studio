@@ -35,7 +35,12 @@ type Deps struct {
 	// App is "Studio" or "Space".
 	App string
 	Now func() time.Time
+	// RaiseOnOpen reports whether opening a prompt of kind k brings its window to the front; nil means never.
+	RaiseOnOpen func(k Kind) bool
 }
+
+// raiseQuiet spans the macOS Space-switch animation, when IsFocused may still read false.
+const raiseQuiet = 2 * time.Second
 
 type entry struct {
 	Prompt
@@ -51,6 +56,7 @@ type Router struct {
 	entries map[string]*entry
 	sink    desknotify.Sink
 	shown   map[Kind]bool
+	raised  map[Kind]time.Time
 
 	// sinkMu orders OS calls the way the state changes happened; taken under mu, released after the calls.
 	sinkMu sync.Mutex
@@ -60,7 +66,7 @@ func New(d Deps) *Router {
 	if d.Now == nil {
 		d.Now = time.Now
 	}
-	r := &Router{d: d, entries: map[string]*entry{}, shown: map[Kind]bool{}}
+	r := &Router{d: d, entries: map[string]*entry{}, shown: map[Kind]bool{}, raised: map[Kind]time.Time{}}
 	if d.Emit != nil {
 		r.em.Subscribe(d.Emit)
 	}
@@ -201,12 +207,22 @@ func (r *Router) Open(p Prompt) {
 	e := &entry{Prompt: p}
 	r.entries[p.ID] = e
 	var n note
-	if r.sink != nil && r.enabled() && !r.d.Windows.Focused(r.target(e)) {
+	focused := r.d.Windows.Focused(r.target(e))
+	if r.sink != nil && r.enabled() && !focused {
 		count, _ := r.kindLocked(p.Kind)
 		n.send = r.noteFor(p.Kind, p.Title, count)
 		r.shown[p.Kind] = true
 	}
+	raise := false
+	if now := r.d.Now(); !focused && r.d.RaiseOnOpen != nil && r.d.RaiseOnOpen(p.Kind) && now.Sub(r.raised[p.Kind]) >= raiseQuiet {
+		r.raised[p.Kind] = now
+		raise = true
+	}
 	r.commit(n)
+	if raise {
+		// Focus blocks on the main thread; callers of Open may hold their own locks.
+		go r.RevealKind(p.Kind)
+	}
 }
 
 // Close withdraws a popup; an absent id is a no-op.

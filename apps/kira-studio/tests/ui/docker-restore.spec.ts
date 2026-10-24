@@ -1,0 +1,161 @@
+import { expect, test } from './fixtures';
+import { contract } from './support/contract';
+import { openDocker, setupDocker } from './support/dockerFixture';
+import { emitWailsEvent } from './support/mockRuntime';
+
+type Json = Record<string, unknown>;
+
+const NONE = { state: 'none', engineId: '', context: '', detectedAt: 0, bootAt: 0, items: [] };
+const pendingFixture = () => contract<Json>('docker-restore', 'DockerService.RestoreState#pending');
+const argsFixture = () => contract<Json>('docker-restore', 'args:DockerService.RestoreContainers');
+const resultFixture = () => contract<Json>('docker-restore', 'DockerService.RestoreContainers');
+
+const banner = (page: import('@playwright/test').Page) =>
+  page.locator('[data-testid="docker-restore-banner"]');
+
+async function openDialog(page: import('@playwright/test').Page): Promise<void> {
+  await page.locator('[data-testid="docker-restore-review"]').click();
+  await expect(page.locator('[data-testid="docker-restore-dialog"]')).toBeVisible();
+}
+
+test('a pending restore shows the banner; Review lists projects, running and deleted containers', async ({
+  relaunch,
+}) => {
+  const { page, state } = await setupDocker(relaunch);
+  state.restore = pendingFixture();
+  await openDocker(page);
+
+  await expect(banner(page)).toContainText('5 containers were running before');
+  await openDialog(page);
+
+  const project = page.locator('[data-testid="docker-restore-project"][data-project="shop-run"]');
+  await expect(project).toHaveCount(1);
+  await expect(project.locator('[data-testid="docker-restore-member"]')).toHaveCount(2);
+  await expect(
+    page.locator('[data-testid="docker-restore-row"][data-id="id-solo"] [data-slot="checkbox"]'),
+  ).toHaveAttribute('data-state', 'checked');
+
+  await page.locator('[data-testid="docker-restore-back-toggle"]').click();
+  await expect(
+    page.locator('[data-testid="docker-restore-row"][data-id="id-keeper"][data-status="back"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-testid="docker-restore-row"][data-id="id-doomed"][data-status="gone"]'),
+  ).toContainText('Not recreated');
+});
+
+test('Restore sends the contract args and clears the banner', async ({ relaunch }) => {
+  const { page, docker, state } = await setupDocker(relaunch, {
+    handlers: {
+      RestoreContainers: () => {
+        state.restore = NONE;
+        return resultFixture();
+      },
+    },
+  });
+  state.restore = pendingFixture();
+  await openDocker(page);
+  await openDialog(page);
+
+  await page.locator('[data-testid="docker-restore-submit"]').click();
+
+  await expect(banner(page)).toHaveCount(0);
+  expect(docker.calls('RestoreContainers')[0]?.args).toEqual(argsFixture());
+});
+
+test('a failed container shows its error inline and keeps the dialog open', async ({
+  relaunch,
+}) => {
+  const { page, state } = await setupDocker(relaunch, {
+    handlers: {
+      RestoreContainers: () => ({
+        items: [
+          { id: 'id-solo', name: 'kira-flow-solo', ok: false, error: 'port is already allocated' },
+          { id: 'id-web', name: 'kira-flow-shop-a-web', ok: true, error: '' },
+          { id: 'id-db', name: 'kira-flow-shop-b-db', ok: true, error: '' },
+        ],
+      }),
+    },
+  });
+  state.restore = pendingFixture();
+  await openDocker(page);
+  await openDialog(page);
+
+  await page.locator('[data-testid="docker-restore-submit"]').click();
+
+  await expect(page.locator('[data-testid="docker-restore-error"]')).toContainText(
+    'port is already allocated',
+  );
+  await expect(page.locator('[data-testid="docker-restore-dialog"]')).toBeVisible();
+});
+
+test('Dismiss calls RestoreDismiss with the engine id and clears the banner', async ({
+  relaunch,
+}) => {
+  const { page, docker, state } = await setupDocker(relaunch, {
+    handlers: {
+      RestoreDismiss: () => {
+        state.restore = NONE;
+      },
+    },
+  });
+  state.restore = pendingFixture();
+  await openDocker(page);
+  await openDialog(page);
+
+  await page.locator('[data-testid="docker-restore-dismiss"]').click();
+
+  await expect(banner(page)).toHaveCount(0);
+  expect(docker.calls('RestoreDismiss')[0]?.args).toEqual({
+    engineId: (pendingFixture() as { engineId: string }).engineId,
+  });
+});
+
+test('a pushed pending state shows the banner without a reload', async ({ relaunch }) => {
+  const { page } = await setupDocker(relaunch);
+  await openDocker(page);
+  await expect(banner(page)).toHaveCount(0);
+
+  await emitWailsEvent(page, 'kira:docker:restore', pendingFixture());
+  await expect(banner(page)).toBeVisible();
+
+  await emitWailsEvent(page, 'kira:docker:restore', NONE);
+  await expect(banner(page)).toHaveCount(0);
+});
+
+test('unchecking the project row drops both members from the call', async ({ relaunch }) => {
+  const { page, docker, state } = await setupDocker(relaunch);
+  state.restore = pendingFixture();
+  await openDocker(page);
+  await openDialog(page);
+
+  await page
+    .locator('[data-testid="docker-restore-project"] [data-slot="checkbox"]')
+    .first()
+    .click();
+  await page.locator('[data-testid="docker-restore-submit"]').click();
+
+  await expect.poll(() => docker.calls('RestoreContainers').length).toBe(1);
+  const sent = docker.calls('RestoreContainers')[0]?.args as { ids: string[] };
+  expect(sent.ids).toEqual(['id-solo']);
+});
+
+test('a rejected Restore call shows its error in the dialog', async ({ relaunch }) => {
+  const { page, state } = await setupDocker(relaunch, {
+    handlers: {
+      RestoreContainers: () => ({
+        error: { code: 'E_CONFLICT', message: 'No restore is pending for this engine.' },
+      }),
+    },
+  });
+  state.restore = pendingFixture();
+  await openDocker(page);
+  await openDialog(page);
+
+  await page.locator('[data-testid="docker-restore-submit"]').click();
+
+  await expect(page.locator('[data-testid="docker-restore-call-error"]')).toContainText(
+    'No restore is pending for this engine.',
+  );
+  await expect(page.locator('[data-testid="docker-restore-dialog"]')).toBeVisible();
+});

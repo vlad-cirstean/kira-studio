@@ -10,7 +10,7 @@ import { buttonVariants } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useDebounceFn } from '@vueuse/core';
-import { copyText, readClipboardText } from '@workbench/behaviour/clipboard';
+import { copyAndAnnounce, readClipboardText } from '@workbench/behaviour/clipboard';
 import { TIMING } from '@workbench/behaviour/timing';
 import { errorText } from '@workbench/bridge/codedError';
 import { useRowHeight } from '@workbench/lib/rowHeight';
@@ -42,13 +42,7 @@ import { useSettingsStore } from '../../state/settings';
 import { useTabsStore } from '../../state/tabs';
 import { classesFrom } from '../../theme/cellClass';
 import { categoryForTypeClass } from '../../theme/icons';
-import {
-  columnsToTsv,
-  parseDelimited,
-  type RowSnapshot,
-  rowsToTsv,
-  tsvField,
-} from '../shared/clipboardFormats';
+import { parseDelimited, type RowSnapshot } from '../shared/clipboardFormats';
 import { nullCellText, truncatedCellTip } from '../shared/page/cellText';
 import {
   alignmentFor,
@@ -123,6 +117,7 @@ import {
   selectionCovers,
   selectionFromRanges,
 } from '../shared/slick/selection';
+import { type CopySource, selectionText } from '../shared/slick/selectionCopy';
 import { getPage, pageVersion, setVisibleWindow } from './page';
 import { parseTextSortTerms } from './sortTerms';
 import { type Selection, useGridViewStore } from './state';
@@ -1656,6 +1651,7 @@ function onGutterContextMenu(row: number, e: MouseEvent): void {
       canEdit: canEditTable(),
       canDelete: canDeleteRows(),
       dialect: currentDialect(),
+      selectionKind: 'row',
     }),
   );
 }
@@ -1700,6 +1696,7 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
         canEdit: canEditTable(),
         canDelete: canDeleteRows(),
         dialect: currentDialect(),
+        selectionKind: priorSel.kind,
       }),
     );
     return;
@@ -1721,6 +1718,7 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
       columnName: name,
       isNull: dc.isNull,
       text: dc.text,
+      copy: (format) => selectionText({ kind: 'cell', row, col: displayCol }, format, copySource()),
       dialect: currentDialect(),
       canEdit: canEditTable(),
       canDelete: canDeleteRows(),
@@ -1785,39 +1783,27 @@ function onGridHeaderContextMenu(e: SlickEventData, args: { column: KiraColumn }
   onHeaderContextMenuHandler(displayCol, e as unknown as MouseEvent);
 }
 
+// Keyboard copy and every Copy menu item read through this one source.
+function copySource(): CopySource {
+  const order = currentOrder();
+  return {
+    cellAt: displayCell,
+    rowSnapshot,
+    columnName: (col) => order[col] ?? '',
+    rowsInSpan: (r0, r1) => visibleRowsInSpan(currentDisplayRows(), r0, r1),
+    allRows: () => rowsForColumnOps(getPage(props.tabId)?.rowCount ?? 0),
+    insertTarget: { qualifiedName: qualifiedName(), dialect: currentDialect() },
+  };
+}
+
 // D1: local, DOM-focus-scoped copy/paste — never a native Electron accelerator.
 function onCopy(): void {
   const sel = rt()?.selection;
-  const p = getPage(props.tabId);
-  if (!sel || !p) return;
-  if (sel.kind === 'cell') {
-    // F5 (P108 Part 10): through tsvField, same as every other copy kind below — a single-cell
-    // copy and a one-cell range copy of the same cell must produce the same clipboard text.
-    const dc = displayCell(sel.row, sel.col);
-    void copyText(dc.isNull ? '' : tsvField(dc.text));
-    return;
-  }
-  if (sel.kind === 'range') {
-    // anchorRow/anchorCol is always the top-left corner now (SlickRange
-    // normalises), so this needs no min/max sort the way the incumbent's own drag-anchor did.
-    // Only the rows visible under the current filter within the
-    // span, same rule already applies to the column-selection branch below — a range
-    // used to copy every page row between its two corners even while the filter hid some of them.
-    const cols = Array.from({ length: sel.col - sel.anchorCol + 1 }, (_, i) => sel.anchorCol + i);
-    void copyText(
-      columnsToTsv(
-        visibleRowsInSpan(currentDisplayRows(), sel.anchorRow, sel.row),
-        cols,
-        displayCell,
-      ),
-    );
-    return;
-  }
-  if (sel.kind === 'row') {
-    void copyText(rowsToTsv(sel.rows.map(rowSnapshot)));
-    return;
-  }
-  void copyText(columnsToTsv(rowsForColumnOps(p.rowCount), sel.cols, displayCell));
+  if (!sel || !getPage(props.tabId)) return;
+  void copyAndAnnounce(
+    selectionText(sel, 'tsv', copySource()),
+    t('studio.copy.selection.announce'),
+  );
 }
 
 // D13: TSV-if-tab-else-CSV, applied column-by-column from the selection's anchor across the
@@ -1925,6 +1911,7 @@ function onKeydown(e: SlickEventData): void {
         canEdit: canEditTable(),
         canDelete: canDeleteRows(),
         dialect: currentDialect(),
+        selectionKind: 'row',
       }),
       duplicateShortcut,
     );
@@ -1956,6 +1943,7 @@ function onKeydown(e: SlickEventData): void {
         canEdit: canEditTable(),
         canDelete: canDeleteRows(),
         dialect: currentDialect(),
+        selectionKind: sel.kind,
       }),
       deleteShortcut,
     );

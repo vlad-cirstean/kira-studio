@@ -1,0 +1,21 @@
+{
+  "OpenedFilesService.Pending": [
+    {
+      "path": "",
+      "relPath": "src/a.go",
+      "repoId": "<id:1>"
+    },
+    {
+      "path": "<work>/notes/b.json",
+      "relPath": "",
+      "repoId": ""
+    }
+  ],
+  "OpenedFilesService.Read": {
+    "bytes": 9,
+    "kind": "found",
+    "language": "json",
+    "limitBytes": 8388608,
+    "text": "{\"k\": 1}\n"
+  }
+}

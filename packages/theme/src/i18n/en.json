@@ -649,6 +649,14 @@
         },
         "notFound": {
           "body": "That Docker item no longer exists."
+        },
+        "restore": {
+          "notPending": {
+            "body": "No restore is pending for this engine."
+          },
+          "notRestorable": {
+            "body": "Container {id} can’t be restored."
+          }
         }
       },
       "link": {
@@ -1011,6 +1019,12 @@
       },
       "dbMcpNamed": {
         "title": "Approve this query · {name}"
+      },
+      "dbMcpResponse": {
+        "title": "Review this result"
+      },
+      "dbMcpResponseNamed": {
+        "title": "Review this result · {name}"
       },
       "gitCredential": {
         "title": "Git needs a credential"
@@ -3209,6 +3223,37 @@
       },
       "yes": {
         "option": "Yes"
+      }
+    },
+    "restore": {
+      "banner": {
+        "body": "Docker restarted. {count} container was running before. | Docker restarted. {count} containers were running before.",
+        "review": {
+          "label": "Review containers"
+        },
+        "starting": {
+          "status": "{count} is starting on its own | {count} are starting on their own"
+        }
+      },
+      "dialog": {
+        "back": {
+          "title": "Already running"
+        },
+        "description": "Docker restarted. Choose which containers to start again.",
+        "gone": {
+          "body": "Deleted. Not recreated.",
+          "title": "Deleted"
+        },
+        "project": {
+          "label": "Compose project {name}"
+        },
+        "submit": {
+          "label": "Restore {count} container | Restore {count} containers"
+        },
+        "title": "Restore containers",
+        "waiting": {
+          "label": "Starting on its own"
+        }
       }
     },
     "section": {
@@ -9114,6 +9159,42 @@
           "description": "Long lines wrap instead of scrolling, in the file viewer."
         }
       },
+      "fileTypes": {
+        "description": "Make Kira Space the app that opens code and data files from Finder. It opens them read-only. Turning a switch off gives each type back to the app that had it.",
+        "ext": {
+          "toggle": {
+            "label": "Open .{ext} files with Kira Space"
+          }
+        },
+        "extensions": {
+          "label": "{count} file types"
+        },
+        "group": {
+          "code": {
+            "label": "Source code"
+          },
+          "data": {
+            "label": "Data files"
+          }
+        },
+        "handler": {
+          "unavailable": {
+            "label": "Not registered"
+          }
+        },
+        "some": {
+          "status": "Kira Space opens {count} of these types"
+        },
+        "unregistered": {
+          "body": "The system does not know these file types yet. Run Kira Space once from the apps folder, then reopen this pane."
+        },
+        "unrestored": {
+          "body": "Kira Space couldn’t give back {exts} because the previous app is gone. In Finder, choose Get Info on a file of that type, then choose an app under Open with and click Change All."
+        },
+        "unsupported": {
+          "body": "Changing default apps works only in the installed macOS app."
+        }
+      },
       "git": {
         "fetchInterval": {
           "description": "Zero disables background fetching. It never prompts for a credential. After a credential or remote error it stops until the next explicit fetch, and network errors retry with backoff.",
@@ -9240,6 +9321,9 @@
         }
       },
       "nav": {
+        "fileTypes": {
+          "label": "File types"
+        },
         "mobileAccess": {
           "label": "Mobile access"
         }
@@ -10539,6 +10623,15 @@
         "statementView": {
           "aria": "Statement view"
         },
+        "target": {
+          "aria": "Target database",
+          "defaultDatabase": {
+            "label": "Default database"
+          },
+          "unclassified": {
+            "label": "Unclassified"
+          }
+        },
         "unknown": {
           "body": "{connection} ({kind}) wants to run a statement this app couldn’t classify through the database MCP server."
         },
@@ -10551,6 +10644,47 @@
       },
       "heavyConfirm": {
         "title": "Run this heavy query?"
+      },
+      "preview": {
+        "lede": {
+          "body": "{connection} ({kind}) ran this statement. Check its result before the AI gets it."
+        },
+        "masked": {
+          "tooltip": "A masking rule applies to this column"
+        },
+        "ran": {
+          "body": "This statement already ran. Withhold hides the result from the AI; it does not undo the change."
+        },
+        "redisType": {
+          "status": "Type {type}"
+        },
+        "send": {
+          "label": "Send to AI"
+        },
+        "summary": {
+          "status": "{returned} of {count} rows returned"
+        },
+        "truncated": {
+          "status": "Cut off at the row limit"
+        },
+        "truncatedCells": {
+          "status": "{count} cell shortened | {count} cells shortened"
+        },
+        "ttl": {
+          "status": "TTL {ms} ms"
+        },
+        "unreadable": {
+          "hint": "This result is not in a shape that can be shown as a table. The raw text is exactly what the AI receives."
+        },
+        "view": {
+          "aria": "Result view"
+        },
+        "withhold": {
+          "label": "Withhold"
+        }
+      },
+      "responseReview": {
+        "title": "Review result before sending"
       }
     },
     "definition": {
@@ -12526,6 +12660,10 @@
           "description": "Deny by default. Only connections checked here are visible to an MCP client through this server.",
           "label": "Exposed connections"
         },
+        "focus": {
+          "description": "When a query or result waits for approval, show the window and switch to its desktop.",
+          "label": "Bring Kira Studio forward for approvals"
+        },
         "masked": {
           "status": "{count} masked column | {count} masked columns"
         },
@@ -12537,6 +12675,10 @@
         },
         "noToken": {
           "hint": "This server restarted since it was last enabled; its registration command needs a fresh token to show again."
+        },
+        "preview": {
+          "description": "Holds each query result until you send it on. Masking is already applied to what you see. A write has already run by the time its result shows; withholding hides the result, it does not undo the change.",
+          "label": "Review results before the AI gets them"
         },
         "regenerate": {
           "label": "Regenerate token"

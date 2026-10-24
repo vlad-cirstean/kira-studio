@@ -107,6 +107,10 @@ type Config struct {
 	// backends and adds no new service dependency. Required — a silently-defaulted threshold would
 	// make every heavy-query verdict wrong in a way nothing surfaces.
 	ExplainThreshold func() int
+	// PreviewResponses reports whether run_query results are held for the user's review before the
+	// client gets them (dbMcp.previewResponses) — read fresh on every call. Required for the same
+	// reason as ExplainThreshold: a silently-defaulted switch would send unreviewed data.
+	PreviewResponses func() bool
 	// Prompts resolves the editable instruction and tool texts; nil means the registry defaults.
 	Prompts llmprompts.Source
 	// Logger receives every operational log line. A nil Logger falls back to slog.Default().
@@ -169,6 +173,9 @@ func New(cfg Config) (*Server, error) {
 	}
 	if cfg.ExplainThreshold == nil {
 		return nil, fmt.Errorf("dbmcp: Config.ExplainThreshold is required")
+	}
+	if cfg.PreviewResponses == nil {
+		return nil, fmt.Errorf("dbmcp: Config.PreviewResponses is required")
 	}
 
 	// plain/minted served the old in-memory-plaintext gate (F8) — cfg.Token() (bridge's

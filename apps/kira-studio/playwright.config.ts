@@ -66,6 +66,16 @@ export default defineConfig({
     // by title (`grep`/`grepInvert`, not a file move) rather than the whole 110s file, since the
     // other 15 tests in it carry no wall-clock assertion of their own and gain nothing from running
     // serially.
+    // P335: grid-copy-menu.spec.ts reads the real clipboard, which only Chromium allows. The same
+    // file also runs in `ui` (WebKit) against a pass-through recorder (support/clipboard.ts).
+    {
+      name: 'ui-clipboard',
+      testDir: './tests/ui',
+      testMatch: ['grid-copy-menu.spec.ts'],
+      use: { browserName: 'chromium' },
+      fullyParallel: true,
+      workers: '100%',
+    },
     {
       name: 'ui-timing',
       testDir: './tests/ui',

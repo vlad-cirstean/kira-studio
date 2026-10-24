@@ -30,7 +30,12 @@ import type {
   ConnectionSummary,
 } from '@shared/domain/connection';
 import type { DataGripPreview, DataGripReport } from '@shared/domain/datagrip';
-import type { DbMcpApprovalSnapshot, DbMcpInstallResult, DbMcpStatus } from '@shared/domain/dbmcp';
+import type {
+  DbMcpApprovalSnapshot,
+  DbMcpInstallResult,
+  DbMcpPendingResponse,
+  DbMcpStatus,
+} from '@shared/domain/dbmcp';
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type { Layout } from '@shared/domain/layout';
 import type { MaskRule, MaskRuleFields } from '@shared/domain/mask';
@@ -298,6 +303,8 @@ const studioControl = {
     unwrap(DbMcpService.InstallAgent()).then((r) => trust<DbMcpInstallResult>(r)),
   dbMcpPendingApprovals: (): Promise<DbMcpApprovalSnapshot> =>
     unwrap(DbMcpService.PendingApprovals()).then((r) => trust<DbMcpApprovalSnapshot>(r)),
+  dbMcpPendingResponse: (requestId: string): Promise<DbMcpPendingResponse> =>
+    unwrap(DbMcpService.PendingResponse({ requestId })).then((r) => trust<DbMcpPendingResponse>(r)),
   dbMcpApproveQuery: (requestId: string): Promise<DbMcpApprovalSnapshot> =>
     unwrap(DbMcpService.ApproveQuery({ requestId })).then((r) => trust<DbMcpApprovalSnapshot>(r)),
   dbMcpDenyQuery: (requestId: string): Promise<DbMcpApprovalSnapshot> =>

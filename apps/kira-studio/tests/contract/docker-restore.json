@@ -1,0 +1,130 @@
+{
+  "DockerService.RestoreContainers": {
+    "items": [
+      {
+        "error": "",
+        "id": "id-solo",
+        "name": "kira-flow-solo",
+        "ok": true
+      },
+      {
+        "error": "",
+        "id": "id-db",
+        "name": "kira-flow-shop-b-db",
+        "ok": true
+      },
+      {
+        "error": "",
+        "id": "id-web",
+        "name": "kira-flow-shop-a-web",
+        "ok": true
+      }
+    ]
+  },
+  "DockerService.RestoreState#pending": {
+    "bootAt": 0,
+    "context": "<masked>",
+    "detectedAt": 0,
+    "engineId": "<masked>",
+    "items": [
+      {
+        "composeProject": "",
+        "composeService": "",
+        "id": "id-doomed",
+        "image": "mirror.gcr.io/library/alpine:3.20",
+        "name": "kira-flow-doomed",
+        "status": "gone"
+      },
+      {
+        "composeProject": "",
+        "composeService": "",
+        "id": "id-keeper",
+        "image": "mirror.gcr.io/library/alpine:3.20",
+        "name": "kira-flow-keeper",
+        "status": "back"
+      },
+      {
+        "composeProject": "",
+        "composeService": "",
+        "id": "id-solo",
+        "image": "mirror.gcr.io/library/alpine:3.20",
+        "name": "kira-flow-solo",
+        "status": "restorable"
+      },
+      {
+        "composeProject": "shop-run",
+        "composeService": "web",
+        "id": "id-web",
+        "image": "mirror.gcr.io/library/alpine:3.20",
+        "name": "kira-flow-shop-a-web",
+        "status": "restorable"
+      },
+      {
+        "composeProject": "shop-run",
+        "composeService": "db",
+        "id": "id-db",
+        "image": "mirror.gcr.io/library/alpine:3.20",
+        "name": "kira-flow-shop-b-db",
+        "status": "restorable"
+      }
+    ],
+    "state": "pending"
+  },
+  "args:DockerService.RestoreContainers": {
+    "engineId": "<masked>",
+    "ids": [
+      "id-solo",
+      "id-web",
+      "id-db"
+    ]
+  },
+  "event:kira:docker:restore": {
+    "bootAt": 0,
+    "context": "<masked>",
+    "detectedAt": 0,
+    "engineId": "<masked>",
+    "items": [
+      {
+        "composeProject": "",
+        "composeService": "",
+        "id": "id-doomed",
+        "image": "mirror.gcr.io/library/alpine:3.20",
+        "name": "kira-flow-doomed",
+        "status": "gone"
+      },
+      {
+        "composeProject": "",
+        "composeService": "",
+        "id": "id-keeper",
+        "image": "mirror.gcr.io/library/alpine:3.20",
+        "name": "kira-flow-keeper",
+        "status": "back"
+      },
+      {
+        "composeProject": "",
+        "composeService": "",
+        "id": "id-solo",
+        "image": "mirror.gcr.io/library/alpine:3.20",
+        "name": "kira-flow-solo",
+        "status": "restorable"
+      },
+      {
+        "composeProject": "shop-run",
+        "composeService": "web",
+        "id": "id-web",
+        "image": "mirror.gcr.io/library/alpine:3.20",
+        "name": "kira-flow-shop-a-web",
+        "status": "restorable"
+      },
+      {
+        "composeProject": "shop-run",
+        "composeService": "db",
+        "id": "id-db",
+        "image": "mirror.gcr.io/library/alpine:3.20",
+        "name": "kira-flow-shop-b-db",
+        "status": "restorable"
+      }
+    ],
+    "state": "pending"
+  }
+}
