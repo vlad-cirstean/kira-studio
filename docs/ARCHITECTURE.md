@@ -2168,9 +2168,10 @@ and `docs/HISTORY.md (v2.0)`.
 - The engine side of the sandbox is in ade.sandbox.go (prepareSandbox, watchSandbox, sandboxOutcome).
 - The sandbox profile starts with (allow default) then denies and re-allows; the last matching rule wins.
 - Profile reads are restricted through file-read-data, never file-read-metadata, because realpath of ancestors must work.
-- The profile denies file writes outside the policy, keychain, AppleEvents, LaunchServices, the SSH agent socket, signals to other processes, and ~/.claude config and extension writes.
+- The profile denies file writes outside the policy, keychain writes, AppleEvents, LaunchServices, the SSH agent socket, signals to other processes, and ~/.claude config and extension writes.
 - Git rules: the worktree is read-write except its .git file; the linked gitdir is read-write except gitdir, commondir, locked, config.worktree; common objects are append-only; the run's own branch ref, lock and reflog are writable.
 - The rest of the git common dir is read-only, so branch, worktree, tag, stash, remote-ref, config and hook writes fail with EPERM; allow entries never open these because the protections come last.
+- Sandboxed agents always read the macOS keychain; the CLI signs in from it. Keychain writes stay denied (P341).
 - A step without a sandbox block defaults to access write with network on.
 - The sandbox covers headless agents from superviseAgent (steps, review rounds, rebase runs with every stack worktree writable) and scriptruns smart runs in dir mode worktree.
 - The sandbox does not cover TUI sessions and Take over, script steps, setup scripts, folder-mode automations, or memory claude calls.
@@ -2183,9 +2184,8 @@ and `docs/HISTORY.md (v2.0)`.
 - With network off, Seatbelt allows loopback only; HTTPS_PROXY points at an in-app goproxy CONNECT proxy that passes the Claude API hosts, chaining an upstream proxy from the environment.
 - One shared /usr/bin/log stream child runs while a sandboxed run is live; events map to a run by pid ancestry (Handler.OnStart gives the root pid).
 - Tracker keeps the first 50 distinct denials and counts all of them.
-- A failed run with denials gets reason 'Sandbox blocked <op> <path>.'; a sign-in failure with the keychain denied gets the token hint; denial and notice lines go to the run log on stdout.
+- A failed run with denials gets reason 'Sandbox blocked <op> <path>.'; denial and notice lines go to the run log on stdout.
 - Sandbox data is stored in table ade_run_sandbox (migration 0037): access, enforced, resolved policy JSON, profile, denials; AdeTaskService.Run.sandbox carries the badge and RunSandbox returns the detail.
-- Setting ade.sandboxKeychain defaults to false.
 - fetch_remote and push_branch run in the app, unsandboxed (TaskBoard implements agentmcp.SandboxGit via Grant.Sandbox).
 - push_branch pushes the run's branch to the same-named remote branch (RemoteOpParams.RemoteBranch), refuses protected branches, and is refused for read steps.
 - request_branch remains the way to create a branch and its worktree.

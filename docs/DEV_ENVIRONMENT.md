@@ -530,8 +530,7 @@ The sandbox (P287) enforces on macOS only. The sandbox session cannot run Seatbe
    write and `git commit` allowed; write outside, `git branch`, `git worktree add`, `git update-ref`, `git tag`,
    object delete and `.git` file write denied; home file read denied, `read` folder allowed; direct connect
    with network off denied; the watcher reports the `git branch` denial within 5 s.
-2. Make the CLI sign in without the keychain: turn on **Keychain access for sandboxed agents** in Settings,
-   Claude Code, or export `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` in the shell profile.
+2. Sign in to `claude` on the Mac. Sandboxed runs read the login keychain.
 3. `bun run test:claude:space -run 'TestAdeSandbox' -count=1`. Expect `a.txt` in the worktree, no branch `x` or
    `y`, at least one denial recorded, and a run `done` or `failed` with a reason naming the ref path. The
    read-only test must leave the file unchanged.
@@ -548,7 +547,9 @@ The sandbox (P287) enforces on macOS only. The sandbox session cannot run Seatbe
 8. MCP config read (P292 round 2): the profile allows reading a run's MCP config files by regex. Run an ADE step
    with an MCP server under the sandbox; it must start and list its tools. Other files in the same temp dir stay
    unreadable.
-9. If everything passes, delete the "unverified on a real Mac (P287)" item from `docs/ARCHITECTURE.md`.
+9. Token refresh (P341): run an ADE step after the OAuth token expires. It must still sign in; the refresh
+   happens under the sandbox, where keychain file writes stay denied. Record a failure as a Known open item.
+10. If everything passes, delete the "unverified on a real Mac (P287)" item from `docs/ARCHITECTURE.md`.
 
 ## Load, disk and test scope (P236-P251)
 
