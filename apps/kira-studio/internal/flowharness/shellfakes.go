@@ -210,3 +210,41 @@ func mkdirs(paths ...string) error {
 	}
 	return nil
 }
+
+// WindowFocus records window raises in order and keeps the focus state a raise sets.
+type WindowFocus struct {
+	mu      sync.Mutex
+	keys    []string
+	focused map[string]bool
+}
+
+func (w *WindowFocus) Focused(key string) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.focused[key]
+}
+
+func (w *WindowFocus) Focus(key string) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.focused == nil {
+		w.focused = map[string]bool{}
+	}
+	w.keys = append(w.keys, key)
+	w.focused[key] = true
+	return true
+}
+
+// Blur clears every window's focus, like the user switching to another app.
+func (w *WindowFocus) Blur() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.focused = nil
+}
+
+// Keys returns a copy of the raised window keys, oldest first.
+func (w *WindowFocus) Keys() []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return append([]string(nil), w.keys...)
+}

@@ -93,6 +93,7 @@ type App struct {
 	KeepAwake    *KeepAwakeDriver
 	McpInstaller *McpInstaller
 	OSAuth       *OSAuth
+	Focus        *WindowFocus
 
 	mu         sync.Mutex
 	newWindows int
@@ -109,7 +110,7 @@ func New(t *testing.T, opts ...Opt) *App {
 		t: t, Home: filepath.Join(root, "home"), KiraHome: filepath.Join(root, "kira"),
 		BinDir: filepath.Join(root, "bin"), FakeDir: filepath.Join(root, "fake"),
 		Events: flowtest.NewEvents(), Dialogs: &Dialogs{}, Browser: &Browser{}, KeepAwake: &KeepAwakeDriver{},
-		McpInstaller: &McpInstaller{}, OSAuth: &OSAuth{},
+		McpInstaller: &McpInstaller{}, OSAuth: &OSAuth{}, Focus: &WindowFocus{},
 	}
 	for _, opt := range opts {
 		opt(&a.opts)
@@ -180,7 +181,7 @@ func (a *App) build() {
 		Authorizer: localauth.New(time.Now, a.OSAuth.evaluate, a.OSAuth.isAvailable),
 		Emitter:    a.Events, Browser: a.Browser, Dialogs: a.Dialogs, KeepAwakeDriver: a.KeepAwake, McpInstaller: a.McpInstaller,
 		AppName: "Kira Studio", Version: "flowtest", SmartTimeout: a.opts.smartTimeout,
-		ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, DockerHubAPI: a.opts.dockerHubAPI, DockerExtra: a.opts.dockerExtra,
+		ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, DockerHubAPI: a.opts.dockerHubAPI, DockerExtra: a.opts.dockerExtra, WindowFocus: a.Focus,
 	})
 	if err != nil {
 		a.t.Fatalf("appwire.Build: %v", err)

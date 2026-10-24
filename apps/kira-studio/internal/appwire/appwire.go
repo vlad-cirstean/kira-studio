@@ -64,6 +64,14 @@ type Options struct {
 	DockerExtra []docker.Option
 	// Providers is the agent harness registry; nil means providers.New() (a flow-test seam).
 	Providers *harness.Registry
+	// WindowFocus replaces the registry's focus state and raise (a flow-test seam); nil keeps the registry.
+	WindowFocus WindowFocus
+}
+
+// WindowFocus is the part of the window registry a prompt raise reads and drives.
+type WindowFocus interface {
+	Focused(key string) bool
+	Focus(key string) bool
 }
 
 // Wired is the built object graph.
@@ -186,7 +194,7 @@ func Build(opts Options) (*Wired, error) {
 
 	w := &Wired{}
 	windows := shell.NewWindowRegistry()
-	promptRouter := newPromptRouter(windows, repositories, opts.Emitter, w.reopenWindow)
+	promptRouter := newPromptRouter(windows, repositories, opts, w.reopenWindow)
 	windows.OnChange = promptRouter.Reroute
 
 	installer := opts.McpInstaller

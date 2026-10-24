@@ -1,0 +1,9 @@
+{
+  "args:SettingsService.Set": {
+    "patch": {
+      "dbMcp": {
+        "focusOnApproval": false
+      }
+    }
+  }
+}

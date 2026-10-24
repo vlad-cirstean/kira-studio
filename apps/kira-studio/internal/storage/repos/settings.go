@@ -57,6 +57,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	appsettings.Leaf(stored, "api.disableCookieJar", &result.Api.DisableCookieJar)
 	appsettings.Leaf(stored, "dbMcp.serverEnabled", &result.DbMcp.ServerEnabled)
 	appsettings.Leaf(stored, "dbMcp.previewResponses", &result.DbMcp.PreviewResponses)
+	appsettings.Leaf(stored, "dbMcp.focusOnApproval", &result.DbMcp.FocusOnApproval)
 	result.Agent = appsettings.ReadAgent(stored)
 	return result, nil
 }
@@ -123,7 +124,10 @@ func upsertDbMcpSection(tx *sql.Tx, dm *model.DbMcpPatch) error {
 	if err := appsettings.UpsertOptional(tx, "dbMcp.serverEnabled", dm.ServerEnabled); err != nil {
 		return err
 	}
-	return appsettings.UpsertOptional(tx, "dbMcp.previewResponses", dm.PreviewResponses)
+	if err := appsettings.UpsertOptional(tx, "dbMcp.previewResponses", dm.PreviewResponses); err != nil {
+		return err
+	}
+	return appsettings.UpsertOptional(tx, "dbMcp.focusOnApproval", dm.FocusOnApproval)
 }
 
 // Set validates the patch, writes only the leaves the caller actually patched in one transaction

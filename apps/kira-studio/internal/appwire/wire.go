@@ -30,7 +30,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
-	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/docker"
 	"github.com/kirathecat/kira-studio/internal/harness"
@@ -264,17 +263,43 @@ func wireLifecycle(windows *shell.WindowRegistry, events *bridge.Events, eventsD
 
 // newPromptRouter builds the popup router over the window registry (P246): lists broadcast, a
 // reveal reaches one window, and advanced.notifyPrompts gates the OS notifications.
-func newPromptRouter(windows *shell.WindowRegistry, repositories *repos.Repos, emit appevent.Emitter, reopen func()) *prompts.Router {
-	return prompts.New(prompts.Deps{
-		Windows: windows, App: "Studio", Reopen: reopen,
+func newPromptRouter(windows *shell.WindowRegistry, repositories *repos.Repos, opts Options, reopen func()) *prompts.Router {
+	emit := opts.Emitter
+	var win prompts.Windows = windows
+	if opts.WindowFocus != nil {
+		win = focusWindows{WindowRegistry: windows, focus: opts.WindowFocus}
+	}
+	d := prompts.Deps{
+		Windows: win, App: "Studio", Reopen: reopen,
 		Emit:   func(l []prompts.Routed) { emit.Emit(bridge.ChannelPromptsChanged, l) },
 		Reveal: func(key, id string) { emit.EmitTo(key, bridge.ChannelPromptsReveal, map[string]string{"id": id}) },
 		Enabled: func() bool {
 			s, err := repositories.Settings.GetAll()
 			return err != nil || s.Advanced.NotifyPrompts
 		},
-	})
+		// A read error raises: showing the approval is the harmless direction.
+		RaiseOnOpen: func(k prompts.Kind) bool {
+			if k != prompts.KindDbMcp {
+				return false
+			}
+			s, err := repositories.Settings.GetAll()
+			return err != nil || s.DbMcp.FocusOnApproval
+		},
+	}
+	if opts.Clock != nil {
+		d.Now = opts.Clock.Now
+	}
+	return prompts.New(d)
 }
+
+// focusWindows swaps the registry's focus state and raise for a test seam.
+type focusWindows struct {
+	*shell.WindowRegistry
+	focus WindowFocus
+}
+
+func (f focusWindows) Focused(key string) bool { return f.focus.Focused(key) }
+func (f focusWindows) Focus(key string) bool   { return f.focus.Focus(key) }
 
 func dockerOptions(opts Options, restore docker.RestoreStore) []docker.Option {
 	out := []docker.Option{docker.WithRestoreStore(restore)}

@@ -129,6 +129,7 @@ const dbMcpSettingsSchema = /*#__PURE__*/ z.object({
   serverEnabled: z.boolean().default(false),
   // Hold each run_query result for the user's review before the AI client gets it.
   previewResponses: z.boolean().default(false),
+  focusOnApproval: z.boolean().default(true),
 });
 
 // `.default(...)` on every new section is load-bearing: an older kira.db has a settings
@@ -153,7 +154,11 @@ const settingsSchema = /*#__PURE__*/ z.object({
     maxRedirects: 10,
     disableCookieJar: true,
   }),
-  dbMcp: dbMcpSettingsSchema.default({ serverEnabled: false, previewResponses: false }),
+  dbMcp: dbMcpSettingsSchema.default({
+    serverEnabled: false,
+    previewResponses: false,
+    focusOnApproval: true,
+  }),
   agent: agentSettingsSchema.default({ provider: DEFAULT_AGENT_PROVIDER }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
@@ -201,6 +206,7 @@ export const defaultSettings: Settings = {
   dbMcp: {
     serverEnabled: false,
     previewResponses: false,
+    focusOnApproval: true,
   },
   agent: {
     provider: DEFAULT_AGENT_PROVIDER,

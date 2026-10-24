@@ -48,9 +48,9 @@ type fixture struct {
 	dbPath string
 }
 
-func newFixture(t *testing.T) *fixture {
+func newFixture(t *testing.T, opts ...flowharness.Opt) *fixture {
 	t.Helper()
-	app := flowharness.New(t)
+	app := flowharness.New(t, opts...)
 	dbPath := filepath.Join(t.TempDir(), "mcp.db")
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
