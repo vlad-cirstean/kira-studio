@@ -51,8 +51,7 @@ func Profile(p Policy, rt Runtime) string {
 		for _, f := range shellRC {
 			allowRead = append(allowRead, lit(filepath.Join(h, f)))
 		}
-		allowRead = append(allowRead, sub(filepath.Join(h, ".kira-memory")))
-		allowRead = append(allowRead, sub(filepath.Join(h, "Library", "Keychains")))
+		allowRead = append(allowRead, sub(filepath.Join(h, ".kira-memory")), sub(filepath.Join(h, "Library", "Keychains")))
 	}
 	allowRead = append(allowRead, subs(rt.PathPrefixes)...)
 	if rt.Agent.InstallPrefix != "" {
