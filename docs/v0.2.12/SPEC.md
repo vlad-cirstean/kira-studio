@@ -20,7 +20,7 @@ Decisions (user, 2026-10-23):
 | P335 | SQL grid: context-menu "Copy as" with multiple rows selected | Done |
 | P336 | Code review round 1 | Done |
 | P337 | Code review round 2 | Done |
-| P338 | DB MCP: focus the Kira DB window when an approval appears | Todo |
+| P338 | DB MCP: focus the Kira DB window when an approval appears | Done |
 
 ## P330: Branch naming, PR automation, release on merge
 
@@ -92,3 +92,5 @@ Result P337: Round 2 found 1 Medium, 1 Low; both fixed in one commit (`filehandl
 - Covers both approval stages (query, response preview from P333). Kira DB may be hidden, minimized, on another Space, or in the background behind other apps.
 - Planner decides the mechanism (Wails window show/unminimise/focus, macOS app activation across Spaces), where the call lives (backend on request enqueue vs frontend on event), and a setting only if a real need appears. Windows and Linux behavior stated plainly.
 - Lands after review rounds P336-P337; it is unreviewed code and the planner and implementer must keep the diff small.
+
+Result P338: `prompts.Deps.RaiseOnOpen` (per kind) makes `Router.Open` start `RevealKind` in a goroutine when the target window is unfocused, at most once per kind per 2 s, never on close. Both stages and heavy prompts go through `Open`, so all raise. Studio raises only `dbmcp`, gated by `dbMcp.focusOnApproval` (default on, Settings > Database MCP switch, `settings-db-mcp-focus`). `WindowRegistry.Focus` calls `App.Show` first on darwin only (unhide after Cmd+H; `unhide_darwin.go`, `unhide_other.go`). Seams: `appwire.Options.WindowFocus`, flowharness `WindowFocus` fake (`App.Focus`); router `Now` follows `Options.Clock`. Tests: `TestDbMcpApprovalFocus` (burst, close, both stages, setting off, contract `dbmcp-focus`), UI spec `dbmcp-focus.spec.ts`. Mac manual checks pending for user: list in ARCHITECTURE Known open items "Approval focus is unverified on macOS (P338)". `GOOS=darwin` vet cannot run here (Wails darwin needs cgo), so `unhide_darwin.go` is uncompiled.

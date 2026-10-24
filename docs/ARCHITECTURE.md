@@ -2252,9 +2252,13 @@ answers. Bound as `PromptsService` (`List`, `MainWindow`, `Claim`, `Raise`, `Dis
 - Prompt notifications are per kind, with id prompt:<kind> and thread kira-prompts; sent on open when the target window is not focused, with a count title when several wait, and removed when the last of the kind closes.
 - Prompt notifications are gated by advanced.notifyPrompts, which defaults to on.
 - Clicking a prompt notification calls RevealKind: reopen a window when none is open, focus the target, push reveal. Answering in the app removes the note. Notifications have no action buttons.
+- Deps.RaiseOnOpen (per kind; nil means never) brings a prompt's window forward on open: Open starts RevealKind in a goroutine after releasing its locks, because Focus blocks on the main thread. Studio raises only `dbmcp`, gated by dbMcp.focusOnApproval. Space passes none.
+- A raise is skipped when the target window already has focus, fires at most once per kind per 2 s (the macOS Space-switch animation, when IsFocused may still read false), and never fires on Close, Claim or Reroute. A request resolved before the goroutine runs makes RevealKind a no-op.
+- shell.WindowRegistry.Focus calls App.Show first on darwin only (unhide after Cmd+H); on Windows and Linux App.Show re-shows every window, so it is skipped there. A window Studio hid on last close comes back through Show.
+- Platform behaviour of a raise. macOS: unhide, un-minimise, show, activate; macOS switches to the window's Space under the default Mission Control setting "When switching to an application, switch to a Space with open windows". Windows: best effort; foreground lock usually refuses SetForegroundWindow from a background app and the taskbar button flashes; a window on another virtual desktop is not switched to. Linux: best effort; gtk_window_present, Wayland compositors usually show "is ready" instead of focusing, workspace switch depends on the window manager.
 - The notification sink is internal/desknotify (Sink, WailsSink), shared with internal/agentnotify; it is Darwin only, like P238.
 - The stream no longer carries credential.request or credential.provide (contract 47); the relay snapshot kira:git:credential plus GitCredentialService.Provide is the only path for Git credentials.
-- Prompt routing is tested by flows/promptflow in both apps, dbmcpflow TestDbMcpApprovalRoutes, Space gitflow TestCredentialRoutes, mobileflow TestMobilePairingRoutes, tests/ui/prompts.spec.ts and tests/e2e-real/prompts-two-windows-real.spec.ts; the recording sink is internal/flowtest/notifysink.
+- Prompt routing is tested by flows/promptflow in both apps, dbmcpflow TestDbMcpApprovalRoutes and TestDbMcpApprovalFocus, Space gitflow TestCredentialRoutes, mobileflow TestMobilePairingRoutes, tests/ui/prompts.spec.ts and tests/e2e-real/prompts-two-windows-real.spec.ts; the recording sink is internal/flowtest/notifysink.
 
 ### Agent usage limits (P239, P316)
 
@@ -2671,6 +2675,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - The setting is read fresh per call (bridge previewResponses). A read failure fails closed (review on), since sending unreviewed data is the unsafe direction.
 - go-sdk v1.8.0 (mcp/server.go toolForErr) wraps a regular handler error as an IsError text result carrying err.Error(); only a *jsonrpc.Error becomes a protocol error. A bare Go error from run_query therefore reaches the client as that text, and the preview shows the same text.
 - Only run_query is reviewed, as the only tool that returns row data. explain_query, describe_* and list_* are unchanged. There is no per-connection preview setting, no undo for a withheld write and no editing of the result before sending.
+- Both stages and heavy-read prompts raise the Studio window when it is not focused (P338), gated by dbMcp.focusOnApproval (default on, read fresh per open; a read error raises). A stray key landing after the raise can only deny: the dialog focuses Deny on mount and Escape denies.
 - Two stages can hold one call for up to 4 minutes. A client with a shorter MCP tool timeout ends the call as abandoned and the result is discarded.
 
 ### EXPLAIN (M3)
@@ -2702,7 +2707,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 
 - The sections array in state/settings.ts has eight entries: Appearance, Data, Cache, Api, Scripts, Claude Code, Database MCP, Advanced.
 - 'Database MCP' is its own settings section and is the app's only embedded-MCP-server settings pane, since P97 removed the repo-map one.
-- The Database MCP settings section holds the enable toggle, the "Review results before the AI gets them" toggle (dbMcp.previewResponses, an instant action that bypasses draft/Save), the registration command and Install button, the token-expiry line, and a read-only Exposed connections glance.
+- The Database MCP settings section holds the enable toggle, the "Review results before the AI gets them" toggle (dbMcp.previewResponses, an instant action that bypasses draft/Save), the "Bring Kira Studio forward for approvals" toggle (dbMcp.focusOnApproval, instant, default on), the registration command and Install button, the token-expiry line, and a read-only Exposed connections glance.
 - The Exposed connections glance shows per-row read/write/DDL modes, auto-explain, and M5's masked-column count, and has no second editor.
 - In project/ConnectionDialog.vue, DetailTab has five values: 'General', 'Advanced', 'Pre-connect', 'MCP', 'Privacy'.
 - All permission and description editing happens in the MCP tab of the connection dialog, and all mask-rule editing happens in the Privacy tab.
@@ -3020,6 +3025,13 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   one-time OS permission; a dev build run outside a bundle cannot post (Wails checks the bundle id).
   The darwin sink compiles only with cgo on a Mac. Linux and `-tags server` builds post nothing.
   Delete once checked on a signed Mac build.
+- **Approval focus is unverified on macOS (P338).** Compiled and flow-tested with a fake window
+  seam only; `internal/shell/unhide_darwin.go` needs cgo on a Mac to compile. Wails calls
+  `activateIgnoringOtherApps:`, deprecated since macOS 14. Checks on a signed build, with a write
+  connection set to prompt: window on another Space; full-screen; another app full-screen; minimised;
+  hidden with Cmd+H; last window closed; preview on raises both stages; five requests at once switch
+  once; deny and timeout leave focus alone; setting off raises nothing. Record the macOS version and
+  the result with Mission Control "switch to a Space" off. Delete once checked.
 - **Mobile agents web is unverified on a real phone (P212).** Covered by Go tests and Playwright
   WebKit/Chromium emulation only. Unchecked: the iOS soft keyboard with xterm (the compose row exists
   for it), the attach WebSocket surviving a backgrounded tab, and touch drag on a real device (tests
