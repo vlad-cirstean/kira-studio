@@ -32,6 +32,7 @@ const props = defineProps<{ requestId: string; connectionId: string }>();
 const response = useQuery({
   queryKey: computed(() => ['dbMcpPendingResponse', props.requestId] as const),
   queryFn: () => control.dbMcpPendingResponse(props.requestId),
+  gcTime: 0, // MB-sized text, immutable per request id: drop on close
 });
 const maskRules = useQuery({
   queryKey: computed(() => maskRulesQueryKey(props.connectionId)),
