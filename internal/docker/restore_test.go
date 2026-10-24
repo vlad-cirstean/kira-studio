@@ -120,6 +120,18 @@ func TestReconcile(t *testing.T) {
 		}
 	})
 
+	t.Run("unchanged snapshot refreshes updated_at once a day so prune keys on last seen", func(t *testing.T) {
+		prev := tracking("b1", ent("a", "a"))
+		prev.UpdatedAt = 1000 * sec
+		if _, ch := reconcile(prev, obs("b1", run("a", "a")), 1000*sec+3600*sec, tm); ch {
+			t.Fatal("touched within a day")
+		}
+		s, ch := reconcile(prev, obs("b1", run("a", "a")), 1000*sec+25*3600*sec, tm)
+		if !ch || s.UpdatedAt != 1000*sec+25*3600*sec {
+			t.Fatalf("got %+v changed=%v", s, ch)
+		}
+	})
+
 	t.Run("no bridge: observed outage offers entries that stopped inside it", func(t *testing.T) {
 		in, before := ent("a", "a"), ent("b", "b")
 		o := obs("", stopped("a", "a"), stopped("b", "b"))
@@ -136,4 +148,26 @@ func TestReconcile(t *testing.T) {
 			t.Fatalf("no outage seen, got %+v", s)
 		}
 	})
+}
+
+func TestPublishEmitsOnEngineSwitch(t *testing.T) {
+	rec := &recorder{}
+	r := newRestoreTracker(&Manager{Emit: rec})
+	none := func(engine string) {
+		r.publish(&RestoreSnapshot{EngineID: engine}, observation{EngineID: engine}, 0)
+	}
+	count := func() int { rec.mu.Lock(); defer rec.mu.Unlock(); return len(rec.events) }
+	none("a")
+	none("a")
+	if count() != 0 {
+		t.Fatalf("idle engine emitted %d", count())
+	}
+	none("b")
+	if count() != 1 {
+		t.Fatalf("switch must emit once, got %d", count())
+	}
+	none("b")
+	if count() != 1 {
+		t.Fatalf("repeat none emitted, got %d", count())
+	}
 }

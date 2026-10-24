@@ -174,6 +174,18 @@ func (m *Manager) resetLocked() {
 	}
 }
 
+// dropFallbackClient drops the cached client when it came from the default or probe fallback, so the
+// next call re-resolves once an engine socket appears. It reports whether it dropped.
+func (m *Manager) dropFallbackClient() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.cli == nil || (m.endpoint.Source != sourceDefault && m.endpoint.Source != sourceProbe) {
+		return false
+	}
+	m.resetLocked()
+	return true
+}
+
 // endpointRemote reports whether the endpoint is tcp:// or ssh://, without building a client.
 func (m *Manager) endpointRemote() bool {
 	m.mu.Lock()

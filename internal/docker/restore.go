@@ -220,8 +220,8 @@ func reconcile(prev *RestoreSnapshot, o observation, now int64, t restoreTiming)
 	if updateEntries(&s, o, now, t) {
 		changed = true
 	}
-	if changed {
-		s.UpdatedAt = now
+	if changed || now-s.UpdatedAt >= restoreTouchEvery.Milliseconds() {
+		s.UpdatedAt, changed = now, true
 	}
 	return s, changed
 }
@@ -235,8 +235,8 @@ func reconcilePending(s RestoreSnapshot, o observation, now int64, t restoreTimi
 	if !hasOpen(itemStatuses(s, o, now, t)) {
 		return rebuildTracking(o, now), true
 	}
-	if changed {
-		s.UpdatedAt = now
+	if changed || now-s.UpdatedAt >= restoreTouchEvery.Milliseconds() {
+		s.UpdatedAt, changed = now, true
 	}
 	return s, changed
 }

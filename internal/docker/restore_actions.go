@@ -99,14 +99,16 @@ func (r *restoreTracker) restoreContainers(ctx context.Context, args RestoreArgs
 	}
 
 	res := RestoreResult{Items: make([]RestoreResultItem, 0, len(sel))}
+	failed := map[string]bool{}
 	for _, e := range orderRestore(sel) {
 		it := RestoreResultItem{ID: e.ID, Name: e.Name}
-		err := r.waitDependencies(ctx, e, snap.Entries)
+		err := r.waitDependencies(ctx, e, snap.Entries, failed)
 		if err == nil {
 			err = r.m.start(ctx, e.ID)
 		}
 		if err != nil {
 			it.Error = err.Error()
+			failed[e.ID] = true
 		} else {
 			it.OK = true
 		}
@@ -233,17 +235,22 @@ func orderProject(es []RestoreEntry) []RestoreEntry {
 	return es
 }
 
-// waitDependencies blocks until every service_healthy dependency of e that has a healthcheck is healthy.
-func (r *restoreTracker) waitDependencies(ctx context.Context, e RestoreEntry, all []RestoreEntry) error {
+// waitDependencies fails when a dependency of e failed to start in this restore, then blocks until
+// every service_healthy dependency that has a healthcheck is healthy. A dependency outside the
+// selection passes through.
+func (r *restoreTracker) waitDependencies(ctx context.Context, e RestoreEntry, all []RestoreEntry, failed map[string]bool) error {
 	if e.ComposeProject == "" {
 		return nil
 	}
 	for svc, cond := range dependsOn(e.ComposeDependsOn) {
-		if cond != "service_healthy" {
-			continue
-		}
 		for _, d := range all {
 			if d.ComposeProject != e.ComposeProject || d.ComposeService != svc {
+				continue
+			}
+			if failed[d.ID] {
+				return fmt.Errorf("dependency %s did not start", d.Name)
+			}
+			if cond != "service_healthy" {
 				continue
 			}
 			if err := r.waitHealthy(ctx, d); err != nil {

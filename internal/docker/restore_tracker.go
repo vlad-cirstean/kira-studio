@@ -14,6 +14,9 @@ import (
 
 const (
 	restorePruneAfter = 30 * 24 * time.Hour
+	// restoreTouchEvery refreshes updated_at of an unchanged snapshot on a reachable tick, so
+	// prune keys on last seen, not last changed.
+	restoreTouchEvery = 24 * time.Hour
 	labelComposeDeps  = "com.docker.compose.depends_on"
 )
 
@@ -59,9 +62,11 @@ type restoreTracker struct {
 	mu               sync.Mutex
 	snaps            map[string]*RestoreSnapshot // by Info.ID; DB is read on first sight only
 	lastKey          map[string]string           // last emitted state per engine
+	lastEngine       string                      // engine of the last publish; a switch always emits
 	errs             map[string]string           // container ID -> last Restore failure
 	inspected        map[string]inspectedFacts   // restart policy and --rm per live container
 	unreachableSince int64
+	failStreak       int
 	reachable        bool
 	cur              RestoreState
 	curObs           observation
@@ -174,12 +179,23 @@ func (r *restoreTracker) tickGated(ctx context.Context) {
 	r.tick(ctx)
 }
 
+// restoreResolveAfter is the failed-tick count after which a fallback-resolved client is re-resolved.
+const restoreResolveAfter = 3
+
 func (r *restoreTracker) markDown() {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.reachable = false
 	if r.unreachableSince == 0 {
 		r.unreachableSince = nowMs()
+	}
+	r.failStreak++
+	retry := r.failStreak >= restoreResolveAfter
+	if retry {
+		r.failStreak = 0
+	}
+	r.mu.Unlock()
+	if retry {
+		r.m.dropFallbackClient()
 	}
 }
 
@@ -229,7 +245,7 @@ func (r *restoreTracker) tick(ctx context.Context) {
 		changed = r.save(next)
 	}
 	r.mu.Lock()
-	r.reachable, r.unreachableSince = true, 0
+	r.reachable, r.unreachableSince, r.failStreak = true, 0, 0
 	if changed {
 		r.snaps[engineID] = &next
 	}
@@ -255,6 +271,10 @@ func (r *restoreTracker) publish(s *RestoreSnapshot, o observation, now int64) {
 	key := stateKey(st)
 	last := r.lastKey[o.EngineID]
 	emit := key != last && (last != "" || st.State == statePending)
+	if r.lastEngine != "" && r.lastEngine != o.EngineID {
+		emit = true
+	}
+	r.lastEngine = o.EngineID
 	r.lastKey[o.EngineID] = key
 	r.mu.Unlock()
 	if emit {
