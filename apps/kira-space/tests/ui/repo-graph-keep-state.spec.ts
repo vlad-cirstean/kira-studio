@@ -203,7 +203,9 @@ test('a date-format change applies to the already-mounted graph', async ({ relau
   await expect(page.locator(grid)).toHaveAttribute('data-p342', 'kept');
 });
 
-test('a refresh while the graph is hidden updates in place', async ({ relaunch }) => {
+test('a refresh while the graph is hidden defers to one in-place refresh on show', async ({
+  relaunch,
+}) => {
   const page = await boot(relaunch);
   await tag(page);
   await openDiff(page);
@@ -213,10 +215,13 @@ test('a refresh while the graph is hidden updates in place', async ({ relaunch }
 
   await freezeClock(page);
   await gitStreamEmit(page, 'repo.changed', { repoId: PORT_REPO.repoId, kind: 'refsChanged' });
+  await gitStreamEmit(page, 'repo.changed', { repoId: PORT_REPO.repoId, kind: 'refsChanged' });
   await runCoalesceWindow(page);
-  await expect.poll(() => count(page, 'graph.refresh'), { timeout: 1000 }).toBe(refresh + 1);
+  expect(await count(page, 'graph.refresh')).toBe(refresh);
 
   await repoTab(page, 'repo-graph').click();
+  await runCoalesceWindow(page);
+  await expect.poll(() => count(page, 'graph.refresh'), { timeout: 2000 }).toBe(refresh + 1);
   await expect(page.locator(grid)).toHaveAttribute('data-p342', 'kept');
   await expect(row(page, 0)).toBeVisible();
   expect(await count(page, 'app.init')).toBe(init);

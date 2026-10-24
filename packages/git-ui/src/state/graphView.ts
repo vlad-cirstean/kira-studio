@@ -105,6 +105,7 @@ export class GraphViewState {
     void this.#runAutoRefresh();
   }, AUTO_REFRESH_COALESCE_MS);
   #autoRefreshPending = false;
+  #suspended = false;
   #lastAutoRefreshAt = 0;
 
   /** `order` is the `GraphOrderState` — optional, since not every host of this class needs
@@ -440,10 +441,23 @@ export class GraphViewState {
    *  absorbs further arrivals for free (the same "leading window" shape the server's own watcher
    *  debounce already uses). */
   #scheduleAutoRefresh(): void {
+    if (this.#suspended) {
+      this.#autoRefreshPending = true;
+      return;
+    }
     if (this.#autoRefreshTimer.pending) return;
     const sinceLastRefresh = Date.now() - this.#lastAutoRefreshAt;
     const delay = Math.max(AUTO_REFRESH_COALESCE_MS, AUTO_REFRESH_MIN_GAP_MS - sinceLastRefresh);
     this.#autoRefreshTimer.start(delay);
+  }
+
+  /** A backgrounded (hidden, kept-mounted) host defers auto-refresh: signals collapse into one
+   *  pending run that starts when the host shows again. */
+  setSuspended(suspended: boolean): void {
+    this.#suspended = suspended;
+    if (suspended || !this.#autoRefreshPending) return;
+    this.#autoRefreshPending = false;
+    this.#scheduleAutoRefresh();
   }
 
   async #runAutoRefresh(): Promise<void> {

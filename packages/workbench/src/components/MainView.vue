@@ -15,7 +15,9 @@ const host = useWorkbenchHost();
 // but inactive, the rest unmount.
 const props = defineProps<{ suspended?: boolean }>();
 
-// Kinds with `keepMounted` stay mounted (v-show) from first activation until the tab closes.
+// Kinds with `keepMounted` stay mounted (v-show) from first activation until the tab closes or
+// `KEPT_MAX` more recently used ones displace it (an evicted view cold-mounts on next activation).
+const KEPT_MAX = 4;
 const activeTab = computed(() => {
   const id = host.tabs.activeIdByWorkspace[host.activeWorkspace.value];
   return id ? (host.tabs.tabs.find((t) => t.id === id) ?? null) : null;
@@ -25,9 +27,9 @@ const visited = ref<string[]>([]);
 watch(
   activeTab,
   (tab) => {
-    if (tab && host.kinds[tab.kind]?.keepMounted && !visited.value.includes(tab.id)) {
-      visited.value.push(tab.id);
-    }
+    if (!tab || !host.kinds[tab.kind]?.keepMounted) return;
+    // Most recently used last; the head is the eviction candidate.
+    visited.value = [...visited.value.filter((id) => id !== tab.id), tab.id].slice(-KEPT_MAX);
   },
   { immediate: true },
 );

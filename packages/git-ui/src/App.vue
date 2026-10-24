@@ -122,6 +122,8 @@ const connectionState = bridge.connectionState;
 // alongside `graphView.reset()` in `handleRepoOpened` below.
 const graphOrder = new GraphOrderState();
 const graphView = new GraphViewState(bridge, undefined, graphOrder);
+// Hidden kept mount: no background re-walk or relayout until shown.
+watch(useGraphVisible(), (visible) => graphView.setSuspended(!visible), { immediate: true });
 // A fresh CommitStore for the life of this component (graphView is never swapped out from under
 // it — a repo switch resets the same GraphViewState instance rather than replacing it, matching
 // CommitGrid.vue's own documented assumption), so this can be constructed once, directly.
