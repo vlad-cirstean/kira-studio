@@ -74,13 +74,10 @@ test('bug 2 regression: a cold repo open reaches the graph with no boot-retry cl
   await expect(page.locator('[data-testid="boot-retry"]')).toHaveCount(0);
 });
 
-// Opening a file (or anything that unmounts RepoGraphView.vue, e.g. closing the tab or an LRU
-// eviction past KEEP_ALIVE_MAX still unmounts it the same way) tore down the ONE shared Transport
-// every mount in the repo workspace shared — gitTransportFor's own cache handed back the same
-// now-dead object, so returning to the pinned graph tab (or switching the panel to Review, sharing
-// that same transport) hit a boot error instead of remounting live. The fix
-// (repo/git/transport.ts's per-mount lease) makes each mount's own dispose() release only its own
-// subscriptions, never the shared socket.
+// Opening a file hid the graph tab's view; the shared transport must stay live so returning to the
+// pinned graph tab (or switching the panel to Review, sharing that same transport) never hits a
+// boot error. Each mount holds a per-mount lease (repo/git/transport.ts), so one mount's dispose()
+// releases only its own subscriptions, never the shared socket.
 test('bug 1 regression: opening a file and returning to the graph tab keeps the graph (and Review) alive', async ({
   relaunch,
 }) => {
@@ -92,15 +89,10 @@ test('bug 1 regression: opening a file and returning to the graph tab keeps the 
   await expect(page.locator('[data-testid="repo-graph-host"]')).toBeVisible();
   await expect(connectionStateIn(page, 'repo-graph-host')).toHaveText('connected');
 
-  // Open a file from the tree — RepoGraphView.vue is now KeepAlive-included
-  // (MainView.vue), so this deactivates it rather than unmounting it; a deactivated component's
-  // DOM moves to Vue's internal storage container, outside the live document tree, so it's still
-  // unreachable here exactly as a genuine unmount would be (verified empirically, not assumed:
-  // a standalone Chromium + WebKit repro confirmed `document.querySelector`/a Playwright locator
-  // both return zero matches for a deactivated component's host element).
+  // Open a file from the tree — MainView keeps RepoGraphView.vue mounted but hidden (v-show).
   await treeRow(page, 'a.ts').click();
   await expect(page.locator('[data-testid="repo-file-editor"]')).toBeVisible();
-  await expect(page.locator('[data-testid="repo-graph-host"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="repo-graph-host"]')).toBeHidden();
 
   // Return to the pinned graph tab — the bug: a dead, shared transport meant this mount's own
   // bootstrap() hung forever (a request sent over a closed socket never resolves), so
