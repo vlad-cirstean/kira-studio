@@ -47,11 +47,10 @@ needs.
 `.github/workflows/pages.yml` (P280, GitHub Pages deploy) is live. Remaining steps to go live:
 
 1. In GitHub: Settings > Pages > Build and deployment > Source = GitHub Actions.
-2. Merge the chapter branch to `main`, or run the "Pages" workflow by hand on `main`. The
-   `github-pages` environment accepts deployments from `main` only, by default. A run from another
-   branch fails unless that branch is added under Settings > Environments > github-pages.
-   Since P330, `release-on-merge.yml` also dispatches it after each chapter merge (an auto-merge
-   starts no push run).
+2. Pages deploys only via the dispatch `release-on-merge.yml` sends after each chapter merge, or
+   by hand: run the "Pages" workflow on `main`. The `github-pages` environment accepts deployments
+   from `main` only, by default. A run from another branch fails unless that branch is added under
+   Settings > Environments > github-pages.
 3. Open `https://vlad-cirstean.github.io/kira-studio/`.
 
 ## Branches, chapter PR, release (P330)
