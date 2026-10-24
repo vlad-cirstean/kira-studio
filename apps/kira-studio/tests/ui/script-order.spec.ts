@@ -70,15 +70,36 @@ async function open(page: Page): Promise<void> {
   await expect(page.locator('[data-testid="automations-panel"]')).toBeVisible();
 }
 
-async function drag(page: Page, from: Locator, to: Locator): Promise<void> {
+// Sortable swaps from its own sampling of the pointer and, once a target is its last one, wants more
+// travel than the approach gave. `landed` asserts the dragged row reached its slot; when it did not,
+// the pointer leaves the target and re-enters it, as a hand would.
+async function drag(
+  page: Page,
+  from: Locator,
+  to: Locator,
+  landed?: () => Promise<void>,
+): Promise<void> {
   const src = await from.boundingBox();
   const dst = await to.boundingBox();
   if (!src || !dst) throw new Error('row has no box');
-  await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
+  const home = { x: src.x + src.width / 2, y: src.y + src.height / 2 };
+  const drop = { x: dst.x + dst.width / 2, y: dst.y + dst.height * 0.25 };
+  await page.mouse.move(home.x, home.y);
   await page.mouse.down();
-  await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2 + 10, { steps: 5 });
-  await page.mouse.move(dst.x + dst.width / 2, dst.y + dst.height * 0.25, { steps: 15 });
+  await page.mouse.move(home.x, home.y + 10, { steps: 5 });
+  await page.mouse.move(drop.x, drop.y, { steps: 15 });
   await page.waitForTimeout(300);
+  if (landed) {
+    await expect(async () => {
+      try {
+        await landed();
+      } catch (err) {
+        await page.mouse.move(home.x, home.y, { steps: 5 });
+        await page.mouse.move(drop.x, drop.y, { steps: 15 });
+        throw err;
+      }
+    }).toPass({ timeout: 15_000 });
+  }
   await page.mouse.up();
 }
 
@@ -120,7 +141,9 @@ test('drag reorders ungrouped scripts, a collection own scripts and the collecti
       ids: ['t2', 't1'],
     });
 
-  await drag(page, header(page, 'col-y'), header(page, 'col-x'));
+  await drag(page, header(page, 'col-y'), header(page, 'col-x'), () =>
+    expect(page.locator('[data-group-entry]').first()).toHaveClass(/opacity-50/, { timeout: 500 }),
+  );
   await expect.poll(() => groupIds(page)).toEqual(['col-y', 'col-x']);
   expect(calls(control, IPC.customScriptsReorderCollections)).toEqual([
     {
