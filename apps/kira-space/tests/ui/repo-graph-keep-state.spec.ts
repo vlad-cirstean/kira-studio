@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import { expect, test } from './fixtures';
 import { freezeClock, runCoalesceWindow } from './support/clock';
 import { gitStreamEmit, gitStreamRequests } from './support/gitStreamMock';
@@ -65,11 +66,15 @@ const CONTROL: ControlSnapshot[] = [
   },
 ];
 
-async function boot(relaunch: Relaunch, extra: Record<string, unknown> = {}): Promise<Page> {
+async function boot(
+  relaunch: Relaunch,
+  extra: Record<string, unknown> = {},
+  control: ControlSnapshot[] = CONTROL,
+): Promise<Page> {
   const page = await openPortGraph(relaunch, {
     chunks: singleRowChunks(manyRows(300)),
     results: { 'refs.list': refsAtTip(manyRowShas(0)), ...extra },
-    control: CONTROL,
+    control,
   });
   await expect(row(page, 0)).toBeVisible();
   await expect
@@ -168,6 +173,34 @@ test('switching to the ADE module and back keeps the graph mounted', async ({ re
   await expect(page.locator(grid)).toHaveAttribute('data-p342', 'kept');
   expect(await count(page, 'app.init')).toBe(before.init);
   expect(await count(page, 'graph.stream')).toBe(before.stream);
+});
+
+test('a date-format change applies to the already-mounted graph', async ({ relaunch }) => {
+  const page = await boot(relaunch, {}, [
+    ...CONTROL,
+    {
+      channel: IPC.settingsSet,
+      response: {
+        ...defaultSettings,
+        appearance: { ...defaultSettings.appearance, dateFormat: 'absolute' },
+      },
+    },
+  ]);
+  await tag(page);
+  const detail = page.locator('[data-testid="detail-region"]');
+  await expect(async () => {
+    await page.keyboard.press('Escape');
+    await expect(detail).toHaveCount(0, { timeout: 1000 });
+  }).toPass();
+  const date = row(page, 0).locator('.kira-cell-date').first();
+  const relative = await date.innerText();
+
+  await page.locator('[data-testid="open-settings"]').click();
+  await page.locator('[data-testid="settings-date-format"]').selectOption('absolute');
+  await page.locator('[data-testid="settings-save"]').click();
+
+  await expect(date).not.toHaveText(relative);
+  await expect(page.locator(grid)).toHaveAttribute('data-p342', 'kept');
 });
 
 test('a refresh while the graph is hidden updates in place', async ({ relaunch }) => {

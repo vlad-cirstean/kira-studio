@@ -23,11 +23,15 @@ const props = defineProps<{ tab: RepoGraphTabRecord; active?: boolean }>();
 const errorMessage = ref('');
 const container = ref<HTMLElement | null>(null);
 let handle: MountHandle | null = null;
+let stopSync: (() => void) | undefined;
+
+const currentRepoHead = () =>
+  repoHeadOf(useCodeReposStore().codeRepoRecord(repoIdOfTab(props.tab)));
 
 async function mountGraph(): Promise<void> {
   const settingsStore = useSettingsStore();
   const layoutStore = useLayoutStore();
-  const repoHead = repoHeadOf(useCodeReposStore().codeRepoRecord(repoIdOfTab(props.tab)));
+  const repoHead = currentRepoHead();
   const repoId = repoIdOfTab(props.tab);
   if (!repoId) {
     errorMessage.value = noRepositoryMessage();
@@ -46,8 +50,7 @@ async function mountGraph(): Promise<void> {
     transport: gitTransportFor(repoId),
     viewState: new TabViewStateStore(props.tab.id, parsePersistedViewState),
     view: 'graph', // never 'review' — the C11 boundary (§9): this excludes the whole review layer.
-    // P72 §9.1: Kira Studio's own app-wide appearance.dateFormat — read once here, at mount time,
-    // not reactively (main.ts's own MountOptions.dateFormat doc comment).
+    // P72 §9.1: app-wide appearance.dateFormat; later changes go through handle.update below.
     dateFormat: settingsStore.appearance.dateFormat,
     repoHead,
     pendingUiAction: pendingReveal ? { action: 'revealCommit', target: pendingReveal } : null,
@@ -58,6 +61,10 @@ async function mountGraph(): Promise<void> {
   });
   // Covers a hide that landed while loadGitUi() was in flight.
   handle.setVisible?.(props.active !== false);
+  stopSync = watch(
+    () => [settingsStore.appearance.dateFormat, currentRepoHead()] as const,
+    ([dateFormat, head]) => handle?.update?.({ dateFormat, repoHead: head }),
+  );
 }
 
 // Hide reaches git-ui before display:none applies (CommitGrid's resize guard keys off it).
@@ -83,6 +90,7 @@ onMounted(() => void mountGraph());
 // closing the workspace disposes it. This mount's own transport is a lease — its dispose(), triggered by App.vue's own
 // teardown chain on unmount, releases only this mount's subscriptions, never the shared socket.
 onUnmounted(() => {
+  stopSync?.();
   handle?.unmount();
   handle = null;
 });

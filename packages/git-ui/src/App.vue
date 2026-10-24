@@ -105,8 +105,8 @@ const props = defineProps<{
    *  Mirrors `ui.action`'s own shape — this is the extension's own cold-boot document, not the
    *  wire. */
   pendingUiAction?: { action: UiActionKind; target?: { repoId: string; sha: string } } | null;
-  /** P72 §9.1: Kira Space's own app-wide `appearance.dateFormat`, read once at mount time — see
-   *  `main.ts`'s own `MountOptions.dateFormat` doc comment (not reactive). Preferred over
+  /** P72 §9.1: Kira Space's own app-wide `appearance.dateFormat`, mount value, then live through
+   *  `MountHandle.update` — see `main.ts`'s own `MountOptions.dateFormat`. Preferred over
    *  `app.init`'s `dateFormat` and the persisted value whenever present. */
   dateFormat?: DateFormat;
   /** P173: opens the host's Operations log (`MountOptions.onShowOperations`); absent where the host has none. */
@@ -168,6 +168,12 @@ const columnWidths = ref<ColumnWidths>(DEFAULT_COLUMN_WIDTHS);
 // Drawn graph column width reported by CommitGrid; differs from the persisted one when lanes need more.
 const gridGraphWidth = ref(DEFAULT_COLUMN_WIDTHS.graph);
 const dateFormat = ref<DateFormat>(props.dateFormat ?? 'relative');
+watch(
+  () => props.dateFormat,
+  (v) => {
+    if (v) dateFormat.value = v;
+  },
+);
 const detailWidth = ref(DEFAULT_DETAIL_WIDTH);
 const scrollRow = ref(0);
 /** G-UX D9: the graph search row's own open/closed state — closed by default, toggled by `/`/
