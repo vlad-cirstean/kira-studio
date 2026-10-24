@@ -54,7 +54,7 @@ jobs:
   # Mirrors pr.yml `checks (Linux)`: its only Go is lint:rules' checkprompts.
   checks-linux:
     name: warm checks (Linux)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -75,7 +75,7 @@ jobs:
   # Mirrors pr.yml `go (Linux)`.
   go-rest:
     name: warm go (Linux)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -90,7 +90,7 @@ jobs:
   # Mirrors pr.yml `go-containers (Linux)`.
   go-containers:
     name: warm go-containers (Linux)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -129,7 +129,7 @@ jobs:
   # System libraries (--with-deps) are apt packages, not in the cached path, so not installed here.
   playwright:
     name: warm Playwright browsers (Linux)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
