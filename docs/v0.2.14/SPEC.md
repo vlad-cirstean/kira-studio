@@ -5,7 +5,7 @@ Branch `chapter/v0.2.14`. First `P` is 340 (highest in HISTORY is P339).
 | Phase | Title | Status |
 |---|---|---|
 | P340 | Docker restore-containers dialog redesign; Redis + S3 folder nav fix | Done |
-| P341 | Remove "keychain access for sandboxed agents" option and alternative token-injection paths | Todo |
+| P341 | Remove "keychain access for sandboxed agents" option and alternative token-injection paths | Done |
 | P342 | Git graph keeps state and does not reload from scratch after opening a diff | Todo |
 
 ## P340
@@ -21,7 +21,7 @@ Result: Done. Docker: banner action moved out of `AlertAction` (absolute, 72px r
 
 Remove the "keychain access for sandboxed agents" option. Harness needs keychain access to work, so the option has no purpose. Remove the alternative token-injection mechanisms too. Planner enumerates every setting, UI, backend path and doc touching it.
 
-Result: _pending_
+Result: Done. Profiles always render the keychain-on branch: `Policy.Keychain`/`Input.Keychain` gone, no `SecurityServer` mach-lookup deny, `~/Library/Keychains` readable, writes still denied; policy guard unchanged. Auth-failure path removed (`AuthReason`, `IsAuthFailure`, `authFailed`, `setup-token` hint, i18n `backend.space.ade.sandbox.auth`); `Namer` narrowed to `Label()`. Setting `ade.sandboxKeychain` removed across model, repo, wire, appwire, scriptruns, ADE board, settings pane, popover row and i18n; migration 0046 deletes the stale row. Docs: ARCHITECTURE, DEV_ENVIRONMENT Mac checklist, site agents and settings pages. Tests: `TestSandboxAuth`, the keychain switch UI test and `keychain_on` golden deleted; goldens and `ade-sandbox.json` contract regenerated. Checks green: `lint`, `lint:go`, `lint:dead`, `typecheck`, `test:unit`, Go tests for `internal/...` and `apps/kira-space/...` (flows included), full `test:ui:space` (670), `test:visual:space` (19), real `claude` `TestAdeSandbox*`. Fixed pre-existing: all other space visual baselines were 4px short of the current render; rebaselined with the sandbox popover. Open risk (Mac checklist step 9): token refresh writes the keychain, and sandboxed runs deny keychain file writes. A run after the OAuth token expires may fail to sign in; unverified on a real Mac. Record a failure as a Known open item.
 
 ## P342
 
