@@ -1,40 +1,77 @@
 name: Release
+run-name: Release ${{ inputs.tag || github.ref_name }}
 
 on:
   push:
     tags: ['v*.*.*']
+  # release-on-merge.yml dispatches this; a tag it creates with GITHUB_TOKEN starts no workflow.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release, vX.Y.Z
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
-# P295 graph: ci-gate, build (macOS), test-matrix and both db-compat halves start together; only
-# publish waits for all of them. publish creates a draft, verifies both assets, then publishes in
-# one API call, so a failed gate leaves no release and no half-uploaded one is ever visible.
-# Tag-scoped caches are never restored by a later tag, so no job here saves a cache (cache-save: false).
+# P330 graph: `tag` resolves the tag to a commit (seconds); build (macOS), test-matrix and both
+# db-compat halves then start together at that commit; only publish waits for all of them. publish
+# creates a draft, verifies both assets, then publishes in one API call, so a failed job leaves no
+# release and no half-uploaded one is ever visible. No job here saves a cache: cache-warm.yml owns
+# main's caches, and every job here restores them.
+# P331: `tag` refuses an already-published release and a non-prerelease tag off main before any
+# runner starts; publish refuses a tag that moved after `tag` resolved it.
 jobs:
-  # PR CI already ran lint and typecheck on this sha; this proves it went green (or runs it).
-  ci-gate:
-    name: ci-gate (PR CI)
+  # The one place the tag is read: every later job checks out this commit and uses this name.
+  tag:
+    name: resolve tag
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      actions: write
-      contents: read
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      sha: ${{ steps.resolve.outputs.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          sparse-checkout: scripts
-      - run: sh scripts/release-ci-gate.sh "$GITHUB_SHA" "$GITHUB_REF_NAME"
+      - id: resolve
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -eu
+          printf '%s\n' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' || { echo "bad tag '$TAG'" >&2; exit 1; }
+          read -r TYPE SHA <<EOF
+          $(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq '.object.type + " " + .object.sha')
+          EOF
+          if [ "$TYPE" = tag ]; then SHA="$(gh api "repos/$GH_REPO/git/tags/$SHA" --jq .object.sha)"; fi
+          printf '%s\n' "$SHA" | grep -Eq '^[0-9a-f]{40}$' || { echo "tag $TAG resolved to '$SHA'" >&2; exit 1; }
+          if gh api "repos/$GH_REPO/releases/tags/$TAG" --jq .draft 2>/dev/null | grep -qx false; then
+            echo "release $TAG is already published; not overwriting" >&2
+            exit 1
+          fi
+          # Replaces the dropped PR CI wait: main takes only PR merges, so a main commit passed PR CI.
+          case "$TAG" in
+            *-*) echo "prerelease $TAG: main ancestry not required" ;;
+            *)
+              STATUS="$(gh api "repos/$GH_REPO/compare/$SHA...main" --jq .status)"
+              case "$STATUS" in
+                ahead | identical) ;;
+                *) echo "tag $TAG at $SHA is not on main (compare: $STATUS); only a merged commit ships" >&2; exit 1 ;;
+              esac
+              ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "releasing $TAG at $SHA"
 
   # Packages both apps. Signing is ad-hoc only (docs/PACKAGING.md §6), so there is no notarisation wait.
   build:
     name: build (macOS)
+    needs: tag
     runs-on: macos-15
     timeout-minutes: 30
     outputs:
@@ -42,14 +79,18 @@ jobs:
       space-sha256: ${{ steps.sums.outputs.space }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.tag.outputs.sha }}
 
       # P119: one tag versions both apps. Each app's build/config.yml info.version is the one place
       # its build reads a version; from there it is linked into the binary and stamped into
       # Info.plist, and verify:packaging's A5 asserts both bundles carry it.
       - name: Set both apps' version from the release tag
+        env:
+          RELEASE_TAG: ${{ needs.tag.outputs.tag }}
         run: |
           set -eu
-          TAG="${GITHUB_REF_NAME#v}"
+          TAG="${RELEASE_TAG#v}"
           printf '%s' "$TAG" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' || { echo "bad version '$TAG'" >&2; exit 1; }
           for CONFIG in apps/kira-studio/build/config.yml apps/kira-space/build/config.yml; do
             perl -i -pe 's/^(  version: )"[^"]*"/$1"'"$TAG"'"/' "$CONFIG"
@@ -119,10 +160,13 @@ jobs:
   # release is the only CI entry point for it. Restores main's go-ct build cache, saves nothing.
   test-matrix:
     name: test-matrix (Linux)
+    needs: tag
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.tag.outputs.sha }}
       - uses: ./.github/actions/setup
         with:
           bun: "false"
@@ -135,6 +179,7 @@ jobs:
   # never sets KIRA_COMPAT_IMAGE_*. min and max run as two parallel jobs.
   db-compat:
     name: db-compat (Linux, ${{ matrix.extreme }})
+    needs: tag
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -143,6 +188,8 @@ jobs:
         extreme: [min, max]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.tag.outputs.sha }}
       - uses: ./.github/actions/setup
         with:
           bun: "false"
@@ -154,7 +201,7 @@ jobs:
   # Draft, upload, verify, publish. Skipped whenever any gate fails.
   publish:
     name: publish
-    needs: [ci-gate, build, test-matrix, db-compat]
+    needs: [tag, build, test-matrix, db-compat]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -163,8 +210,22 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
-      TAG: ${{ github.ref_name }}
+      TAG: ${{ needs.tag.outputs.tag }}
     steps:
+      # A rerun of failed jobs reuses `tag`'s outputs; a tag moved since then would get the old build.
+      - name: Refuse a tag that moved after this run resolved it
+        env:
+          SHA: ${{ needs.tag.outputs.sha }}
+        run: |
+          set -eu
+          read -r TYPE NOW <<EOF
+          $(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq '.object.type + " " + .object.sha')
+          EOF
+          if [ "$TYPE" = tag ]; then NOW="$(gh api "repos/$GH_REPO/git/tags/$NOW" --jq .object.sha)"; fi
+          if [ "$NOW" != "$SHA" ]; then
+            echo "tag $TAG moved from $SHA to $NOW after this run started; start a new run: gh workflow run release.yml -f tag=$TAG" >&2
+            exit 1
+          fi
       - name: Download the disk images and check their hashes
         env:
           STUDIO_SHA: ${{ needs.build.outputs.studio-sha256 }}
