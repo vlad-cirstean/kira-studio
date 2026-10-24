@@ -4,7 +4,7 @@ run-name: Cache warm ${{ inputs.merge_sha }}
 # P330: pr.yml has no push trigger, so nothing else saves caches in main's scope, the one scope every
 # PR run restores. release-on-merge.yml dispatches this once per merge (a merge by github-actions
 # starts no workflow). Each job copies one pr.yml job's setup inputs and cache keys exactly, then
-# installs and compiles: no lint, no tests. `go test -exec /bin/true` builds test binaries and runs
+# installs and compiles: no lint, no tests. `go test -exec true` builds test binaries and runs
 # nothing; -exec is part of Go's test-result cache key, so no false pass reaches a PR run.
 on:
   workflow_dispatch:
@@ -44,7 +44,7 @@ jobs:
       - run: go build ./...
       - name: Compile the darwin test packages (nothing runs)
         run: |
-          go test -run '^$' -exec /bin/true \
+          go test -run '^$' -exec true \
             ./apps/kira-studio/internal/secrets/... \
             ./internal/metrics/... \
             ./apps/kira-studio/internal/localauth/... \
@@ -85,7 +85,7 @@ jobs:
           gtk: "true"
       - run: bun run build:studio
       - run: bun run build:space
-      - run: sh scripts/go-test-split.sh rest -run '^$' -exec /bin/true
+      - run: sh scripts/go-test-split.sh rest -run '^$' -exec true
 
   # Mirrors pr.yml `go-containers (Linux)`.
   go-containers:
@@ -104,7 +104,7 @@ jobs:
           bindings: "false"
           go-cache: go-ct
           gtk: "true"
-      - run: sh scripts/go-test-split.sh containers -run '^$' -exec /bin/true
+      - run: sh scripts/go-test-split.sh containers -run '^$' -exec true
       - name: Look up the Testcontainers image cache
         id: docker-cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4

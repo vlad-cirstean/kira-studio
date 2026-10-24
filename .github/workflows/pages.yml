@@ -1,17 +1,6 @@
 name: Pages
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'site/**'
-      - 'screenshots/**'
-      - 'packages/theme/src/tokens.css'
-      - 'apps/kira-studio/build/appicon.icon/**'
-      - 'apps/kira-studio/build/appicon.png'
-      - 'package.json'
-      - 'bun.lock'
-      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
