@@ -2438,6 +2438,9 @@
     "off": {
       "status": "Off"
     },
+    "ofTotal": {
+      "label": "{value} of {total}"
+    },
     "openElsewhere": {
       "tooltip": "Open in another window"
     },
@@ -11878,12 +11881,6 @@
       },
       "lastPage": {
         "label": "Last page"
-      },
-      "position": {
-        "label": "Page {input}"
-      },
-      "positionOf": {
-        "label": "Page {input} of {total}"
       }
     },
     "project": {
@@ -13283,11 +13280,6 @@
       },
       "increase": {
         "tooltip": "Increase"
-      }
-    },
-    "scriptProgress": {
-      "elapsedOf": {
-        "label": "{elapsed} of {timeout}"
       }
     },
     "varText": {
