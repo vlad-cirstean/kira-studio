@@ -227,15 +227,13 @@ const ensureKeyTypesDebounced = useDebounceFn((range: { start: number; end: numb
 }, TIMING.search);
 onBeforeUnmount(() => ensureKeyTypesDebounced.cancel());
 
-// D12: a container descends; a leaf opens the existing keyvalue tab — the same tab kind the tree
-// has always opened a redis key / s3 object into.
+// D12: a container descends; a leaf previews in the split. The context menu opens a standalone tab.
 function onRowOpen(node: TreeNode): void {
   if (node.hasChildren) {
     void browseViewStore.descend(props.tab.id, node.path);
     return;
   }
-  if (!props.tab.connectionId) return;
-  tabsStore.openKeyValueTab(props.tab.connectionId, node.path);
+  onRowClick(node);
 }
 
 // The list navigation claims Enter and the arrows; Space mirrors a single click.

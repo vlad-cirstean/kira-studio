@@ -23,7 +23,7 @@ import {
   postgresConnectionSummary,
 } from './support/postgresFixture';
 import { openRedisBrowse, REDIS_DB0 } from './support/redisFixture';
-import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
+import { connectionRow, expandRow, findRow, openBrowseLeaf, openRowMenu } from './support/tree';
 
 // P264: one key set for every list. The project tree is the Studio list bound through the shared
 // useListNavigation today (Left/Right and expansion are covered in tree.spec.ts); rows here are
@@ -356,7 +356,7 @@ test('keyvalue — arrows, Home/End, Space selects, Shift+F10 menu and focus ret
   const browse = page.locator('[data-testid="browse-view"]');
   await browse.locator(`[data-testid="browse-row"][data-path="${REDIS_USER_NS}"]`).dblclick();
   await browse.locator(`[data-testid="browse-row"][data-path="${REDIS_USER1_NS}"]`).dblclick();
-  await browse.locator(`[data-testid="browse-row"][data-path="${REDIS_BIGHASH}"]`).dblclick();
+  await openBrowseLeaf(page, REDIS_BIGHASH);
   const view = page.locator(`[data-testid="keyvalue-view"][data-path="${REDIS_BIGHASH}"]`);
   const rows = view.locator('[data-testid="keyvalue-row"]');
   await expect(rows.first()).toBeVisible({ timeout: 15_000 });

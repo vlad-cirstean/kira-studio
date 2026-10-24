@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, type Relaunch, test } from '../../ui/fixtures';
 import { acceptConfirm } from '../../ui/support/dialogs';
 import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
@@ -51,6 +51,11 @@ async function setup(relaunch: Relaunch): Promise<Page> {
   return window;
 }
 
+async function openLeaf(row: Locator): Promise<void> {
+  await row.click({ button: 'right' });
+  await row.page().click('[data-testid="menu-item-open"]');
+}
+
 test('redis (frontend, mocked IPC) — connect, tree, keyvalue tabs, console', async ({
   relaunch,
   consoleErrors,
@@ -96,7 +101,7 @@ test('redis (frontend, mocked IPC) — connect, tree, keyvalue tabs, console', a
   await expect(hashKeyRow).toHaveAttribute('data-kind', 'key');
 
   // --- 4: hash key tab — type badge, field/value rows -------------------------------------
-  await hashKeyRow.dblclick();
+  await openLeaf(hashKeyRow);
   const view = page.locator('[data-testid="keyvalue-view"]');
   await expect(view).toBeVisible();
   await expect(view.locator('[data-testid="keyvalue-type"]')).toHaveText('hash');
@@ -120,7 +125,7 @@ test('redis (frontend, mocked IPC) — connect, tree, keyvalue tabs, console', a
     `[data-testid="browse-row"][data-path="${BIG_HASH_KEY_PATH}"]`,
   );
   await expect(bigHashRow).toBeVisible();
-  await bigHashRow.dblclick();
+  await openLeaf(bigHashRow);
   const bigHashView = page.locator(
     `[data-testid="keyvalue-view"][data-path="${BIG_HASH_KEY_PATH}"]`,
   );
@@ -148,7 +153,7 @@ test('redis (frontend, mocked IPC) — connect, tree, keyvalue tabs, console', a
   await expect(browseView).toHaveAttribute('data-level', QUEUE_NS_PATH);
   const listKeyRow = browseView.locator(`[data-testid="browse-row"][data-path="${LIST_KEY_PATH}"]`);
   await expect(listKeyRow).toBeVisible();
-  await listKeyRow.dblclick();
+  await openLeaf(listKeyRow);
   const listView = page.locator(`[data-testid="keyvalue-view"][data-path="${LIST_KEY_PATH}"]`);
   await expect(listView).toBeVisible();
   await expect(listView.locator('[data-testid="keyvalue-type"]')).toHaveText('list');
@@ -173,7 +178,7 @@ test('redis (frontend, mocked IPC) — connect, tree, keyvalue tabs, console', a
     hasText: 'session:abc',
   });
   await expect(ttlKeyRow).toBeVisible();
-  await ttlKeyRow.dblclick();
+  await openLeaf(ttlKeyRow);
   await expect(page.locator('[data-testid="keyvalue-type"]').last()).toHaveText('string');
   await expect(page.locator('[data-testid="keyvalue-ttl"]').last()).not.toContainText('No expiry');
   await expect(page.locator('[data-testid="keyvalue-memory"]').last()).not.toContainText('unknown');

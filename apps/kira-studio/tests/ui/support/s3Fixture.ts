@@ -1,6 +1,9 @@
+import type { Page } from '@playwright/test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ControlSnapshot } from '../../ipc/support/types';
+import { expect } from '../fixtures';
 import { IPC } from './ipcChannels';
+import { connectionRow, expandRow, findRow, openRowMenu } from './tree';
 
 // Hand-built, not a capture: no S3 IPC fixture exists, and what the stale-gate specs need is
 // only the S3 capability set (internal/adapters/s3/caps.go) plus one bucket with a prefix and an
@@ -121,3 +124,20 @@ export const s3Control: ControlSnapshot[] = [
     },
   },
 ];
+
+export async function openS3Browse(page: Page): Promise<void> {
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
+    'data-status',
+    'connected',
+    { timeout: 10_000 },
+  );
+  await expandRow(page, '');
+  await (await findRow(page, BUCKET_PATH)).dblclick();
+  await expect(page.locator('[data-testid="browse-view"]')).toHaveAttribute(
+    'data-level',
+    BUCKET_PATH,
+  );
+  await expect(page.locator('[data-testid="browse-row"]').first()).toBeVisible();
+}

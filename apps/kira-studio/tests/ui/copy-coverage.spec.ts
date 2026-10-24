@@ -37,7 +37,7 @@ import {
 } from './support/mongoFixture';
 import { APP_PATH, COMPOSITE_PK_PATH } from './support/postgresFixture';
 import { openSettings } from './support/settings';
-import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
+import { connectionRow, expandRow, findRow, openBrowseLeaf, openRowMenu } from './support/tree';
 
 // P265: with the pseudo-locale on, every catalog message shows wrapped in ⟦…⟧, so any letter
 // outside a marker is a literal that skipped t(). Fixture names go through `allow`. Surfaces reuse the fixtures of the existing UI specs.
@@ -328,7 +328,7 @@ test('key-value view', async ({ relaunch }) => {
   await expectCatalogText(browse, { allow: [...ALLOW, REDIS, /user|db0|key|\d/i] });
   await browse.locator(`[data-testid="browse-row"][data-path="${ns}"]`).dblclick();
   await browse.locator(`[data-testid="browse-row"][data-path="${ns1}"]`).dblclick();
-  await browse.locator(`[data-testid="browse-row"][data-path="${key}"]`).dblclick();
+  await openBrowseLeaf(page, key);
   const view = page.locator(`[data-testid="keyvalue-view"][data-path="${key}"]`);
   await expect(view.locator('[data-testid="keyvalue-row"]').first()).toBeVisible({
     timeout: 15_000,

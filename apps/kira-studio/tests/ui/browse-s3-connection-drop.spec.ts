@@ -3,31 +3,20 @@ import { DATA_OP } from '@shared/protocol/dataOps';
 import { CHANNEL } from '@shared/protocol/events';
 import { expect, test } from './fixtures';
 import { emitWailsEvent } from './support/mockRuntime';
-import { BUCKET_PATH, CAPS, OBJECT_PATH, S3_ID, s3Control } from './support/s3Fixture';
-import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
+import {
+  BUCKET_PATH,
+  CAPS,
+  OBJECT_PATH,
+  openS3Browse,
+  S3_ID,
+  s3Control,
+} from './support/s3Fixture';
 
 // S3 Browse write gates after a connection drop: Upload (toolbar, container menu, dialog) and
 // object Delete (menu, confirm). The listing stays; nothing reaches the server. The gates live in
 // the renderer, so there is no backend half.
 
 const PREFIX_PATH = `${BUCKET_PATH}/prefix:logs`;
-
-async function openS3Browse(page: Page): Promise<void> {
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-connect"]');
-  await expect(connectionRow(page).locator('.status-dot')).toHaveAttribute(
-    'data-status',
-    'connected',
-    { timeout: 10_000 },
-  );
-  await expandRow(page, '');
-  await (await findRow(page, BUCKET_PATH)).dblclick();
-  await expect(page.locator('[data-testid="browse-view"]')).toHaveAttribute(
-    'data-level',
-    BUCKET_PATH,
-  );
-  await expect(page.locator('[data-testid="browse-row"]').first()).toBeVisible();
-}
 
 function rowMenu(page: Page, path: string) {
   return page

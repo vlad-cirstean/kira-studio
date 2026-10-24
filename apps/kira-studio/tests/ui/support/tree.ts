@@ -178,3 +178,11 @@ export function connectionRow(page: Page, name?: string): Locator {
   const base = page.locator('[data-testid="tree-row"][data-kind="connection"]');
   return name ? base.filter({ hasText: name }) : base;
 }
+
+/** Opens a Browse leaf (redis key, s3 object) in a standalone tab via its context menu. */
+export async function openBrowseLeaf(page: Page, path: string): Promise<void> {
+  await page
+    .locator(`[data-testid="browse-view"] [data-testid="browse-row"][data-path="${path}"]`)
+    .click({ button: 'right' });
+  await page.click('[data-testid="menu-item-open"]');
+}
