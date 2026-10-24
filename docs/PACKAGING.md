@@ -358,9 +358,7 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
 **Status:** applied. `.github/workflows/` holds `pr.yml`, `pr-auto-merge.yml`, `pr-rerun-flaky.yml`,
 `release-on-merge.yml`, `release.yml`, `cache-warm.yml` and `pages.yml`
 (`db-compat.yml` and `test-matrix.yml` existed at one point but were folded into `release.yml`'s own
-jobs, see `docs/ARCHITECTURE.md`). P330's files are staged under `docs/pending-changes/` and
-`docs/pending-workflows/` until a session with the `workflow` scope applies them. Whoever applies
-them deletes this line in the same commit.
+jobs, see `docs/ARCHITECTURE.md`).
 
 **`pr.yml`** (trigger: `pull_request` to `main` plus `workflow_dispatch`; no push, so `main` is reached
 only through a PR). No job `needs` another; every job starts at once:
@@ -535,26 +533,22 @@ gone.
 
 ### Repository settings (user-applied)
 
-1. Apply the staged workflows onto `chapter/v0.2.12` from a Mac session, before the chapter closes.
-   Run `git apply docs/pending-changes/.github__workflows__pr.yml.patch docs/pending-changes/.github__workflows__release.yml.patch`.
-   Copy `docs/pending-workflows/*.yml` to `.github/workflows/`. Delete every applied pending file
-   in the same commit, then push.
-2. Ruleset "Protected branches" (`refs/heads/main`): add **Require status checks to pass**, source
+1. Ruleset "Protected branches" (`refs/heads/main`): add **Require status checks to pass**, source
    GitHub Actions. Add these checks: `checks (macOS)`, `checks (Linux)`, `ui (Linux, shard 1/4)`,
    `ui (Linux, shard 2/4)`, `ui (Linux, shard 3/4)`, `ui (Linux, shard 4/4)`, `ui-extra (Linux)`,
-   `go (Linux)`, `go-containers (Linux)`. Leave "Require branches to be up to date" off. Keep the
-   squash-only and PR rules. **Do this before step 3.** With no required checks, auto-merge merges
+   `go (Linux)`, `go-containers (Linux)`. Leave "Require branches to be up to date" off: one chapter PR at a time, a stale base is rare, and a forced rebase would rerun full CI. Keep the
+   squash-only and PR rules. **Do this before step 2.** With no required checks, auto-merge merges
    the moment it is enabled.
-3. Settings, General, Pull Requests: enable **Allow auto-merge**. Squash stays allowed.
-4. New branch ruleset "Branch names", enforcement Active. Target: include all branches (`~ALL`),
+2. Settings, General, Pull Requests: enable **Allow auto-merge**. Squash stays allowed.
+3. New branch ruleset "Branch names", enforcement Active. Target: include all branches (`~ALL`),
    exclude `refs/heads/main` and `refs/heads/chapter/v*`. Rule: **Restrict creations**. The
    "Restrict branch names" metadata rule (regex) needs GitHub Enterprise. Use it if the UI offers it:
    `^(main|chapter/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))$`. Otherwise
    fnmatch cannot express semver, and the hook is the exact check. Existing legacy branches stay
    untouched. Apply after the `chapter/v2.0`, `v2.6`, `v2.8` and `v0.2.10` renames.
-5. Leave the "Protected tags" ruleset disabled. Its "Restrict creations" would block the workflow's
+4. Leave the "Protected tags" ruleset disabled. Its "Restrict creations" would block the workflow's
    tag. If it is ever enabled, it needs GitHub Actions as a bypass actor.
-6. Settings, Actions, General, Workflow permissions: default read stays. Every job declares its own.
+5. Settings, Actions, General, Workflow permissions: default read stays. Every job declares its own.
    "Allow GitHub Actions to create and approve pull requests" is not needed.
 
 ## 8. Kira Space packaging
