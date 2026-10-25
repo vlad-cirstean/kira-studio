@@ -7897,6 +7897,12 @@
             "label": "Start review agent"
           }
         },
+        "copy": {
+          "none": {
+            "tooltip": "No open review comments to copy"
+          },
+          "tooltip": "Copy the review comments as one message"
+        },
         "forward": {
           "blocked": {
             "tooltip": "{product} is waiting for an answer in its terminal"

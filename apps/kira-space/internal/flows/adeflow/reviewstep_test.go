@@ -510,6 +510,18 @@ func TestReviewForwardComments(t *testing.T) {
 		t.Fatal("ForwardReviewComments succeeded before the review agent runs")
 	}
 
+	copied, err := f.app.W.AdeTask.ReviewForwardText(ctx, args)
+	if err != nil || !strings.Contains(copied.Text, "rename this") || !strings.Contains(copied.Text, "why twice?") ||
+		strings.Contains(copied.Text, "already handled") {
+		t.Fatalf("ReviewForwardText = %q, %v, want the two open comments with no agent running", copied.Text, err)
+	}
+	f.app.Contract(t, "ade-review-forward", "AdeTaskService.ReviewForwardText", copied)
+	for _, c := range f.comments(t) {
+		if c.SentAt != nil {
+			t.Fatalf("ReviewForwardText stamped comment %d sent", c.ID)
+		}
+	}
+
 	launch, err := f.app.W.AdeTask.LaunchReviewAgent(ctx, adewire.TaskArgs{TaskID: f.taskID})
 	if err != nil {
 		t.Fatal(err)
@@ -527,6 +539,9 @@ func TestReviewForwardComments(t *testing.T) {
 		p := string(raw)
 		return strings.Contains(p, "rename this") && strings.Contains(p, "why twice?")
 	})
+	if p := fakeFile(t, f.app, "api-2.prompt"); !strings.Contains(p, strings.TrimSpace(copied.Text)) {
+		t.Fatalf("forwarded prompt differs from the copy text:\n%s\nvs\n%s", p, copied.Text)
+	}
 	if p := fakeFile(t, f.app, "api-2.prompt"); strings.Contains(p, "already handled") || strings.Contains(p, "reply_review_comment") {
 		t.Fatalf("forwarded prompt carries an addressed comment or the round tool:\n%s", p)
 	}

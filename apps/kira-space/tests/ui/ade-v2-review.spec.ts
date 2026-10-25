@@ -248,6 +248,44 @@ reviewTest('contract: forward review comments', async ({ relaunch }) => {
   expect(forwarded()[0]?.args).toEqual({ branchId: target.branchId });
 });
 
+// Contract ade-review-forward, backend half: adeflow TestReviewForwardComments.
+reviewTest(
+  'contract: copy puts the forwarded message on the clipboard and sends nothing',
+  async ({ relaunch }) => {
+    const result = contract<{ text: string }>(
+      'ade-review-forward',
+      'AdeTaskService.ReviewForwardText',
+    );
+    const { page, control } = await openForward(
+      relaunch,
+      [openComment(1), openComment(2)],
+      [{ channel: IPC.adeTaskReviewForwardText, response: result }],
+    );
+    await page.evaluate(() => {
+      const w = window as unknown as { __clipboard: string[] };
+      w.__clipboard = [];
+      navigator.clipboard.writeText = async (text: string) => {
+        w.__clipboard.push(text);
+      };
+    });
+    const button = page.locator(t('ade-review-copy'));
+    await expect(button).toBeEnabled();
+    await button.click();
+    await expect(button).toHaveText('Copied');
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __clipboard: string[] }).__clipboard))
+      .toEqual([result.text]);
+    const calls = (channel: string) => control.log().filter((e) => e.channel === channel);
+    expect(calls(IPC.adeTaskReviewForwardText)).toHaveLength(1);
+    expect(calls(IPC.adeTaskForwardReviewComments)).toHaveLength(0);
+  },
+);
+
+reviewTest('copy is disabled with no open comment', async ({ relaunch }) => {
+  const { page } = await openForward(relaunch, [openComment(1, 'addressed')]);
+  await expect(page.locator(t('ade-review-copy'))).toBeDisabled();
+});
+
 reviewTest(
   'forward is disabled while the agent waits on input or nothing is open',
   async ({ relaunch }) => {

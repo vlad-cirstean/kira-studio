@@ -834,6 +834,11 @@ type ForwardReviewResult struct {
 	Count int `json:"count"`
 }
 
+// ReviewForwardText is the message ForwardReviewComments would send, composed for copying.
+type ReviewForwardText struct {
+	Text string `json:"text"`
+}
+
 // ViewedSyncStatus: 'ok' | 'noPr' | 'prClosed' | 'disabled' | 'cliMissing' | 'unauthenticated' |
 // 'unavailable' | 'headNotFetched' | 'unsupported'.
 type ViewedSyncStatus string

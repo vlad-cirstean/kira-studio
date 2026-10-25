@@ -564,6 +564,9 @@ export interface ReviewAgentLaunch {
   resumed: boolean;
   note: string /* '' or why a fresh one started */;
 }
+export interface ReviewForwardText {
+  text: string;
+}
 export interface ForwardReviewResult {
   count: number;
 }

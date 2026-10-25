@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
@@ -89,6 +90,53 @@ func (b *TaskBoard) ReviewAgent(taskID string) (*adewire.Session, error) {
 	return &w, nil
 }
 
+// forwardMessage composes the forward message for the branch's open comments; the task mutex is held.
+func (b *TaskBoard) forwardMessage(ctx context.Context, tc *taskCtx, sb model.AdeTaskBranch) (string, []gitreview.Comment, adewire.ReviewWindowTarget, *gitreview.Store, error) {
+	none := adewire.ReviewWindowTarget{}
+	if err := b.reviewableBranch(tc, sb); err != nil {
+		return "", nil, none, nil, err
+	}
+	store, err := b.reviewStore()
+	if err != nil {
+		return "", nil, none, nil, err
+	}
+	tgt, err := b.reviewTarget(ctx, tc, sb)
+	if err != nil {
+		return "", nil, none, nil, err
+	}
+	open, err := store.OpenComments(ctx, tgt.GitRepoID, tgt.Branch)
+	if err != nil {
+		return "", nil, none, nil, err
+	}
+	if len(open) == 0 {
+		return "", nil, none, nil, invalid("%s", i18n.T("backend.space.ade.reviewStep.noOpen.body", nil))
+	}
+	message := llmprompts.AdeReviewForwardMessage.Text(b.prompts(), llmprompts.ReviewRoundVars{
+		Title: taskTitle(tc.task, tc.branches), JiraKey: tc.task.JiraKey, JiraURL: tc.task.JiraURL,
+		Repo: tc.nick[sb.CodeRepoID], Branch: sb.Name, Base: tgt.Base, Worktree: tgt.Worktree,
+		Comments: commentVars(open),
+	})
+	return message, open, tgt, store, nil
+}
+
+// ReviewForwardText returns the message ForwardReviewComments would send, for copying. It sends
+// nothing and stamps no comment.
+func (b *TaskBoard) ReviewForwardText(ctx context.Context, branchID string) (string, error) {
+	sb, err := b.deps.Tasks.GetBranch(branchID)
+	if err != nil {
+		return "", err
+	}
+	mu := b.taskMu(sb.TaskID)
+	mu.Lock()
+	defer mu.Unlock()
+	tc, err := b.loadTaskCtx(sb.TaskID)
+	if err != nil {
+		return "", err
+	}
+	message, _, _, _, err := b.forwardMessage(ctx, tc, sb)
+	return message, err
+}
+
 // ForwardReviewComments pastes the branch's open review comments into the running review agent and
 // stamps them sent. It returns how many it forwarded.
 func (b *TaskBoard) ForwardReviewComments(ctx context.Context, branchID string) (int, error) {
@@ -117,26 +165,10 @@ func (b *TaskBoard) ForwardReviewComments(ctx context.Context, branchID string) 
 	if row == nil || row.State != model.AdeSessionStateRunning {
 		return 0, invalid("%s", i18n.T("backend.space.ade.reviewForward.notRunning.body", nil))
 	}
-	store, err := b.reviewStore()
+	message, open, tgt, store, err := b.forwardMessage(ctx, tc, sb)
 	if err != nil {
 		return 0, err
 	}
-	tgt, err := b.reviewTarget(ctx, tc, sb)
-	if err != nil {
-		return 0, err
-	}
-	open, err := store.OpenComments(ctx, tgt.GitRepoID, tgt.Branch)
-	if err != nil {
-		return 0, err
-	}
-	if len(open) == 0 {
-		return 0, invalid("%s", i18n.T("backend.space.ade.reviewStep.noOpen.body", nil))
-	}
-	message := llmprompts.AdeReviewForwardMessage.Text(b.prompts(), llmprompts.ReviewRoundVars{
-		Title: taskTitle(tc.task, tc.branches), JiraKey: tc.task.JiraKey, JiraURL: tc.task.JiraURL,
-		Repo: tc.nick[sb.CodeRepoID], Branch: sb.Name, Base: tgt.Base, Worktree: tgt.Worktree,
-		Comments: commentVars(open),
-	})
 	if err := tr.Send(row.ID, message); err != nil {
 		return 0, err
 	}

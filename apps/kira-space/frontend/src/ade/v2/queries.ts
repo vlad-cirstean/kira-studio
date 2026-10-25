@@ -32,6 +32,7 @@ import type {
   RepoBranches,
   RepoBranchesArgs,
   ReviewAgentLaunch,
+  ReviewForwardText,
   RunArgs,
   SaveWorkflowArgs,
   SaveWorkflowYamlArgs,
@@ -359,6 +360,13 @@ export function useForwardReviewComments() {
   return useMutation({
     mutationFn: (args: BranchArgs): Promise<ForwardReviewResult> =>
       control.adeTaskForwardReviewComments(args),
+  });
+}
+
+export function useReviewForwardText() {
+  return useMutation({
+    mutationFn: (args: BranchArgs): Promise<ReviewForwardText> =>
+      control.adeTaskReviewForwardText(args),
   });
 }
 

@@ -1046,6 +1046,15 @@ func (s *AdeTaskService) ForwardReviewComments(ctx context.Context, args adewire
 	return adewire.ForwardReviewResult{Count: n}, adeTaskError(err)
 }
 
+// ReviewForwardText returns the message ForwardReviewComments would send. It sends and stamps nothing.
+func (s *AdeTaskService) ReviewForwardText(ctx context.Context, args adewire.BranchArgs) (adewire.ReviewForwardText, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return adewire.ReviewForwardText{}, err
+	}
+	text, err := s.Engine.ReviewForwardText(ctx, args.BranchID)
+	return adewire.ReviewForwardText{Text: text}, adeTaskError(err)
+}
+
 // ViewedSyncPlan reports what syncing the branch's reviewed files to its PR would do.
 func (s *AdeTaskService) ViewedSyncPlan(ctx context.Context, args adewire.BranchArgs) (adewire.ViewedSyncPlan, error) {
 	if err := validateAdeTaskID(args.BranchID, "branchId"); err != nil {
