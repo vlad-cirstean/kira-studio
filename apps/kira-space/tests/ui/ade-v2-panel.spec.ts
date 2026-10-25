@@ -5,7 +5,7 @@ import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
-// The Plan's right-hand panel: task fields, notes, branch details and changes, force push, resize.
+// The Plan's right-hand panel: task fields, notes, branch details, force push, resize.
 
 interface BoardFx {
   tasks: { id: string; est: string }[];
@@ -193,7 +193,7 @@ test('typing in Notes saves once, debounced', async ({ relaunch }) => {
   expect(args.patch.notes).toContain('check the digest');
 });
 
-test('a branch opens Details with merged and deployed rows; Changes; back to the task', async ({
+test('a branch opens Details with merged and deployed rows; back to the task', async ({
   relaunch,
 }) => {
   const board = adeFixture<BoardFx>('board');
@@ -216,43 +216,8 @@ test('a branch opens Details with merged and deployed rows; Changes; back to the
   await expect(
     details.locator('[data-testid="ade-branch-deploy"][data-env="preview"]'),
   ).toContainText('Unknown');
-  await page.locator('[data-testid="ade-panel-tab-changes"]').click();
-  await expect(page.locator('[data-testid="ade-changes-tab"]')).toBeVisible();
   await page.locator('[data-testid="ade-panel-back"]').click();
   await expect(page.locator('[data-testid="ade-task-tab"]')).toBeVisible();
-});
-
-// Contract ade-review-open. Backend half: adeflow TestReviewOpenFacts. The fixture branch b_auth
-// keeps its identity and takes the backend's committed files and commits.
-test('contract: the Changes tab lists the branch files by path only', async ({ relaunch }) => {
-  const facts = contract<{
-    files: { path: string }[];
-    commits: { sha: string; message: string }[];
-    commitCount: number;
-  }>('ade-review-open', 'AdeTaskService.Branch#committed');
-  const { window: page } = await openPlan(relaunch, [
-    {
-      channel: IPC.adeTaskBoard,
-      response: adeBoard((b) => {
-        const br = b.branches.find((x) => x.id === 'b_auth');
-        if (!br) throw new Error('fixture branch missing');
-        const { files, commits, commitCount } = facts;
-        Object.assign(br, { files, commits, commitCount });
-      }),
-    },
-  ]);
-  await openTask(page, 'T_auth');
-  await page.locator('[data-testid="ade-task-branch"][data-branch-id="b_auth"]').click();
-  await page.locator('[data-testid="ade-panel-tab-changes"]').click();
-  const rows = page.locator('[data-testid="ade-changes-file-row"]');
-  await expect(rows).toHaveCount(facts.files.length);
-  for (const [i, f] of facts.files.entries()) {
-    await expect(rows.nth(i)).toHaveText(f.path);
-    expect(await rows.nth(i).innerText()).not.toMatch(/[+\u2212-]\d+/);
-  }
-  await expect(page.locator('[data-testid="ade-changes-commit-row"]')).toHaveCount(
-    facts.commits.length,
-  );
 });
 
 test('a branch row on the Plan selects the branch', async ({ relaunch }) => {

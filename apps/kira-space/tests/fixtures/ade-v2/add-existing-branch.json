@@ -54,18 +54,6 @@
     "conflictsIfRebased": [],
     "conflictCheck": "done",
     "conflictCheckReason": "",
-    "files": [
-      {
-        "path": "src/api/limits.ts"
-      }
-    ],
-    "commits": [
-      {
-        "sha": "7a1c9e2",
-        "message": "Rate limits per workspace"
-      }
-    ],
-    "commitCount": 3,
     "dirty": [],
     "lastCommitAt": 1789893600000,
     "addedAt": 1790067540000,

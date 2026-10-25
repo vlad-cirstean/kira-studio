@@ -9,14 +9,7 @@ export interface Jira {
   key: string;
   url: string;
 }
-interface FileChange {
-  path: string;
-}
-export interface Commit {
-  sha: string;
-  message: string;
-}
-export interface DirtyEntry {
+interface DirtyEntry {
   code: string;
   path: string;
 }
@@ -206,9 +199,6 @@ export interface Branch {
   conflictsIfRebased: string[] /* D1: paths conflicting if rebased onto latest base */;
   conflictCheck: 'checking' | 'done' | 'failed';
   conflictCheckReason: string /* '' unless failed */;
-  files: FileChange[];
-  commits: Commit[];
-  commitCount: number;
   dirty: DirtyEntry[];
   lastCommitAt: number | null;
   addedAt: number;

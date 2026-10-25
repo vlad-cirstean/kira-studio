@@ -215,8 +215,6 @@ for (const phase of ['uncommitted', 'committed'] as const) {
       ahead: number;
       base: string;
       dirty: unknown[];
-      commitCount: number;
-      files: unknown[];
     }>('ade-review-open', `AdeTaskService.Branch#${phase}`);
     const { window: page, control } = await openPlan(relaunch, [
       OPEN,
@@ -226,8 +224,8 @@ for (const phase of ['uncommitted', 'committed'] as const) {
           for (const r of b.tasks.find((x) => x.id === 'T_deps')?.runs ?? []) r.state = 'done';
           const br = b.branches.find((x) => x.id === 'b_deps');
           if (!br) throw new Error('fixture branch missing');
-          const { name, ahead, base, dirty, commitCount, files } = facts;
-          Object.assign(br, { name, ahead, base, dirty, commitCount, files });
+          const { name, ahead, base, dirty } = facts;
+          Object.assign(br, { name, ahead, base, dirty });
         }),
       },
     ]);

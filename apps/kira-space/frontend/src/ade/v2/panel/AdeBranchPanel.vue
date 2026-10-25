@@ -30,13 +30,12 @@ import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { ACTION_CLASS, TONE_SOLID_CLASS } from '../tones';
 import type { ChangeRequest, Deployment, Integration, Run } from '../wire';
-import AdeChangesTab from './AdeChangesTab.vue';
 import AdePanelFrame from './AdePanelFrame.vue';
 import AdeRunOutcome from './AdeRunOutcome.vue';
 import AdeWorktreeSetup from './AdeWorktreeSetup.vue';
 import { type HeaderAction, headerActions } from './headerActions';
 
-// Branch mode: header (back link, git status, name, facts, Force push), Details and Changes tabs.
+// Branch mode: header (back link, git status, name, facts, Force push), Details and Sessions tabs.
 const props = defineProps<{ card: CardModel; row: CardModel['rows'][number]; model: PlanModel }>();
 
 const ui = useAdeBoardUiStore();
@@ -131,11 +130,6 @@ function run(a: HeaderAction, ev?: MouseEvent): void {
 }
 const actionClass = (a: HeaderAction): string => ACTION_CLASS[a.tone];
 const canForcePush = computed(() => props.row.tag.actions.some((a) => a.kind === 'forcePush'));
-const shared = computed(() => {
-  const a = props.model.view.after.get(branch.value.id);
-  const other = a ? graph.value.byBranch.get(a.id) : undefined;
-  return a && other ? `${other.name} · ${a.file}` : '';
-});
 
 // ---- Details rows
 const changeRequest = computed(
@@ -253,7 +247,6 @@ function deployNote(d: Deployment): string {
     :title="t('common.field.branch.label')"
     :tabs="[
       { value: 'details', label: t('common.details.title') },
-      { value: 'changes', label: t('space.ade.branchPanel.changes.label') },
       { value: 'sessions', label: t('space.ade.panel.sessionsTab.label', { count: sessionCount }) },
     ]"
   >
@@ -491,12 +484,7 @@ function deployNote(d: Deployment): string {
         }}</InlineState>
       </div>
     </div>
-    <AdeSessionsTab
-      v-else-if="ui.branchTab === 'sessions'"
-      :task-id="card.task.id"
-      :branch-id="branch.id"
-    />
-    <AdeChangesTab v-else :branch="branch" :base="baseName" :shared="shared" />
+    <AdeSessionsTab v-else :task-id="card.task.id" :branch-id="branch.id" />
 
     <AdeForcePushDialog
       :target="forcePush ? { branchId: branch.id, branchName: branch.name, repo: row.repo } : null"

@@ -37,15 +37,6 @@ type Jira struct {
 	URL string `json:"url"`
 }
 
-type FileChange struct {
-	Path string `json:"path"`
-}
-
-type Commit struct {
-	Sha     string `json:"sha"`
-	Message string `json:"message"`
-}
-
 type DirtyEntry struct {
 	Code string `json:"code"`
 	Path string `json:"path"`
@@ -290,9 +281,6 @@ type Branch struct {
 	ConflictsIfRebased  []string       `json:"conflictsIfRebased"`
 	ConflictCheck       string         `json:"conflictCheck"`       // 'checking' | 'done' | 'failed'
 	ConflictCheckReason string         `json:"conflictCheckReason"` // '' unless failed
-	Files               []FileChange   `json:"files"`
-	Commits             []Commit       `json:"commits"`
-	CommitCount         int            `json:"commitCount"`
 	Dirty               []DirtyEntry   `json:"dirty"`
 	LastCommitAt        *int64         `json:"lastCommitAt"`
 	AddedAt             int64          `json:"addedAt"`

@@ -16,11 +16,8 @@ func TestAgentCommitReachesBoard(t *testing.T) {
 	waitRun(t, app, f.taskID, "one", "done")
 
 	br := branchOf(t, board(t, app), f.taskID, f.repoID)
-	if br.Ahead != 1 || br.CommitCount != 1 || len(br.Commits) != 1 || br.Commits[0].Message != "agent change" {
-		t.Fatalf("branch after the agent commit = ahead %d, commits %+v, want the one agent commit", br.Ahead, br.Commits)
-	}
-	if len(br.Files) != 1 || br.Files[0].Path != "agent.txt" || br.Dirty == nil || len(br.Dirty) != 0 {
-		t.Fatalf("branch files = %+v dirty = %+v, want agent.txt and a clean tree", br.Files, br.Dirty)
+	if br.Ahead != 1 || br.Dirty == nil || len(br.Dirty) != 0 {
+		t.Fatalf("branch after the agent commit = ahead %d dirty %+v, want the one agent commit and a clean tree", br.Ahead, br.Dirty)
 	}
 
 	// The remote moves on, the worktree rebases: pushing needs a lease-checked force push.

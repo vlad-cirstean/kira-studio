@@ -9,14 +9,11 @@
     "basePendingFrom": "",
     "behind": 0,
     "codeRepoId": "<id:1>",
-    "commitCount": 1,
-    "commits": [],
     "conflictCheck": "done",
     "conflictCheckReason": "",
     "conflictsIfRebased": [],
     "deployments": [],
     "dirty": [],
-    "files": [],
     "id": "<id:2>",
     "integration": [],
     "kind": "mine",
@@ -51,17 +48,6 @@
     "basePendingFrom": "",
     "behind": 2,
     "codeRepoId": "<id:4>",
-    "commitCount": 2,
-    "commits": [
-      {
-        "message": "add clash.txt",
-        "sha": "<masked>"
-      },
-      {
-        "message": "work a",
-        "sha": "<masked>"
-      }
-    ],
     "conflictCheck": "done",
     "conflictCheckReason": "",
     "conflictsIfRebased": [
@@ -71,14 +57,6 @@
     "dirty": [
       {
         "code": "M",
-        "path": "clash.txt"
-      }
-    ],
-    "files": [
-      {
-        "path": "a.txt"
-      },
-      {
         "path": "clash.txt"
       }
     ],

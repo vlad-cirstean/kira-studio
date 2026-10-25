@@ -7347,23 +7347,8 @@
         }
       },
       "changes": {
-        "conflicts": {
-          "label": "Conflicts"
-        },
-        "createdOnStart": {
-          "status": "Created on start"
-        },
-        "noWorktree": {
-          "status": "No worktree"
-        },
-        "shares": {
-          "label": "Shares"
-        },
         "uncommitted": {
           "label": "Uncommitted"
-        },
-        "worktreeDirty": {
-          "label": "{where} · {count} uncommitted"
         }
       },
       "dayOffConfirm": {

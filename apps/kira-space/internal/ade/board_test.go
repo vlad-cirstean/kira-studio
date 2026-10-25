@@ -76,7 +76,7 @@ func (h *boardHarness) addTask(id, kind string, specs ...branchSpec) {
 			Position: i, HadCommits: s.hadCommits, AddedAt: 1,
 		})
 	}
-	if _, err := h.repos.AdeTasks.CreateTask(model.AdeTask{ID: id, Kind: kind, Title: id, CreatedAt: 1}, bs); err != nil {
+	if _, err := h.repos.AdeTasks.CreateTask(model.AdeTask{ID: id, Kind: kind, Title: id, CreatedAt: 1}, bs, nil); err != nil {
 		h.t.Fatalf("create task %s: %v", id, err)
 	}
 }
@@ -149,7 +149,7 @@ func TestTaskBoard_snapshotAssembly(t *testing.T) {
 	if b1.Base != "main" || b1.BaseBranchID != "" || b1.Ahead != 1 || b1.Owner != "" {
 		t.Fatalf("b1 %+v", b1)
 	}
-	if b2.Base != "feat-a" || b2.BaseBranchID != "b1" || b2.BaseOwner != "" || b2.Ahead != 1 || b2.CommitCount != 2 {
+	if b2.Base != "feat-a" || b2.BaseBranchID != "b1" || b2.BaseOwner != "" || b2.Ahead != 1 || b2.MergedIntoMain {
 		t.Fatalf("b2 stacked on my branch: %+v", b2)
 	}
 	if b5.BaseBranchID != "b4" || b5.BaseOwner != queueOtherName {
@@ -226,7 +226,7 @@ func TestTaskBoard_notCreatedAndTooOldGit(t *testing.T) {
 		t.Fatal(err)
 	}
 	b2 := boardBranch(t, board, "b2")
-	if b2.Name != "" || b2.Tip != "" || b2.Base != "main" || b2.ConflictCheck != conflictDone || b2.Files == nil || b2.Dirty == nil {
+	if b2.Name != "" || b2.Tip != "" || b2.Base != "main" || b2.ConflictCheck != conflictDone || b2.Dirty == nil {
 		t.Fatalf("not-created branch %+v", b2)
 	}
 

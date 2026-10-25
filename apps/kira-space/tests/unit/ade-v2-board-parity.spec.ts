@@ -12,7 +12,6 @@ import type {
   Board,
   Branch,
   ChangeRequestsResult,
-  Pair,
   ReposResult,
   SessionsResult,
   Workflow,
@@ -76,21 +75,7 @@ function normalizeBoard(raw: Board, sess: SessionsResult): Board {
       );
       return r.state === 'running' && stuck ? { ...r, state: 'stuck' as const } : r;
     });
-  const pairs: Pair[] = [];
-  const bs = raw.branches;
-  for (let i = 0; i < bs.length; i++) {
-    for (let j = i + 1; j < bs.length; j++) {
-      const a = bs[i] as Branch;
-      const b = bs[j] as Branch;
-      if (a.codeRepoId !== b.codeRepoId) continue;
-      const files = new Set(b.files.map((f) => f.path));
-      const shared = a.files.map((f) => f.path).filter((p) => files.has(p));
-      if (!shared.length) continue;
-      const review = a.kind === 'review' || b.kind === 'review';
-      pairs.push({ a: a.id, b: b.id, shared, conflicts: review ? shared : [] });
-    }
-  }
-  return { ...raw, tasks: raw.tasks.map((t) => ({ ...t, runs: runs(t) })), pairs };
+  return { ...raw, tasks: raw.tasks.map((t) => ({ ...t, runs: runs(t) })) };
 }
 
 beforeAll(() => {

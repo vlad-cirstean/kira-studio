@@ -43,7 +43,6 @@ type branchFactsKey struct{ TipParent, TipBranch string }
 type branchFactsValue struct {
 	Ahead, Behind int
 	Files         []porcelain.FileChange
-	Commits       []porcelain.RangeCommit
 }
 
 type mergeTreeKey struct{ TipA, TipB string }
@@ -205,7 +204,7 @@ func findRemoteRow(inventory []porcelain.InventoryRef, remote, short string) (po
 }
 
 // rangeFacts is the (parentTip, tip)-keyed LRU cache (§4.2's own 512-entry bound) around
-// ahead/behind/files/commits — the one git-cost-bearing step the TaskBoard
+// ahead/behind/files — the one git-cost-bearing step the TaskBoard
 // repeats often enough (every board build, every branch) to be worth caching on immutable object ids.
 func rangeFacts(ctx context.Context, entry *gitsession.RepoEntry, caches *repoCaches, parentTip, tip string) (branchFactsValue, error) {
 	key := branchFactsKey{TipParent: parentTip, TipBranch: tip}
@@ -220,11 +219,7 @@ func rangeFacts(ctx context.Context, entry *gitsession.RepoEntry, caches *repoCa
 	if err != nil {
 		return branchFactsValue{}, err
 	}
-	commits, err := entry.RangeCommits(ctx, parentTip, tip, 50)
-	if err != nil {
-		return branchFactsValue{}, err
-	}
-	v := branchFactsValue{Ahead: ahead, Behind: behind, Files: files, Commits: commits}
+	v := branchFactsValue{Ahead: ahead, Behind: behind, Files: files}
 	caches.branch.Add(key, v)
 	return v, nil
 }
