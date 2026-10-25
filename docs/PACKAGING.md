@@ -102,6 +102,9 @@ flags and the README's macOS 14+ product claim. The template hardcodes `12.0.0`,
 `wails3 task common:update:build-assets` run reverts both plists — re-narrow them after regenerating.
 Kira Space's plists also carry a generated document-type block (P332); rerun
 `go run ./apps/kira-space/tools/gendoctypes` after the regeneration.
+All four plists also carry hand-added `UIDesignRequiresCompatibility=true` (P344). macOS 26 picks window
+chrome by linked SDK: release links the runner's 15.5 SDK, a dev build on Xcode 26 links 26 and gets larger
+traffic lights. The key makes both render the same. Regeneration drops it; `verify-packaging.sh` S14/A6 catch that.
 The floor is 14 rather than 13 because Go 1.27 builds its own objects for macOS 13 minimum: a lower
 `-mmacosx-version-min` only earns a linker warning that the object file was built for a newer macOS
 than is being linked.
