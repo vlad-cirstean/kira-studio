@@ -92,6 +92,10 @@ func TestReviewWindowAndAgent(t *testing.T) {
 	if got := app.WindowMgr.Focused; len(got) == 0 || got[len(got)-1] != rec.Key {
 		t.Fatalf("focused %v, want %s", got, rec.Key)
 	}
+	if n := len(app.WindowMgr.Opened); n != 1 {
+		t.Fatalf("windows opened = %d after the second press, want 1", n)
+	}
+	app.Contract(t, "ade-review-open", "AdeTaskService.OpenReviewWindow#existing", false)
 	tgt, err := app.W.AdeTask.ReviewWindowTarget(ctx, adewire.WindowKeyArgs{WindowKey: rec.Key})
 	if err != nil || tgt == nil {
 		t.Fatalf("ReviewWindowTarget = %+v, %v", tgt, err)

@@ -82,6 +82,7 @@
     "upstreamBehind": 0,
     "worktree": "<home>/wt/api/api-open"
   },
+  "AdeTaskService.OpenReviewWindow#existing": false,
   "args:AdeTaskService.OpenReviewWindow": {
     "branchId": "<id:2>"
   }

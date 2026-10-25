@@ -2351,7 +2351,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 
 ### Review code (P150)
 
-- The per-branch Review code button opens an ephemeral Wails window via OpenReviewWindow; a second call returns false.
+- The per-branch Review code button opens an ephemeral Wails window via OpenReviewWindow; a second call returns false and only focuses the window. The focus path (WindowRegistry.Focus) dispatches the App-level unhide to the main thread via InvokeSync, because AppKit aborts the process on it off-thread (P354).
 - Review window rows live in ade_review_windows, are never restored on relaunch and are purged at boot (purgeReviewWindows).
 - closeDecision keeps the main window from closing while a review window is open.
 - The review window has three panes: git-ui review files (reviewFilter needsReview), diff tabs, and the review agent panel.
@@ -3075,7 +3075,7 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **Parts of an interactive `claude` turn are unobserved (P147, P149, P150).** The real suite (`bun run test:claude:space`) launches the TUI, sees hooks including `Stop`, and drives `Send` into a session. Never seen against a real `claude`: the folder-trust prompt (the suite pre-trusts the folder), `claude --resume` of a stopped session, the initial ` -- ` message, send-then-archive completing after the turn, and for the P150 review agent `--add-dir` resume, a paste into a `working` turn and the 10 s no-submit hint. Delete once checked on an authenticated desktop build.
 - **A taken-over review round has no reply or finish tools (P286).** `TakeOver` of a round opens the plain interactive session: `reply_review_comment` and `finish_step` are not on it, so its comments stay open until answered by hand. Delete once a take-over loads them.
 - **GitHub viewed sync is unobserved against real GitHub (P150).** Sandbox has no authenticated `gh`; the smoke used a fake `gh` (argv log, JSON state). The GraphQL schema half is checked offline. Delete once one sync marks and one un-review unmarks a file on a real PR.
-- **Native close/hide wiring of review windows is unobserved (P150).** A server build has no native window; `closeDecision` has a test, the Wails hooks do not. Delete once checked on a desktop build.
+- **Native close/hide wiring of review windows is unobserved (P150).** A server build has no native window; `closeDecision` has a test, the Wails hooks do not. The P354 main-thread unhide fix on a second Review code press is covered by an ordering test only; the AppKit abort itself is unobserved. Delete once checked on a desktop build.
 - **Tab switch remounts above the 50 ms product budget in the WebKit sandbox (P139 Part 2)**. Every
   switch remounts `DataView` and SlickGrid, no tab caching. The sandbox measures p95 159-363 ms and
   gates at 300 ms (`budgets.spec.ts`); ~47 ms of it is Vue component work, and Tailwind v4's
