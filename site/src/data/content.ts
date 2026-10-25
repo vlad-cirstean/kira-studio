@@ -31,7 +31,7 @@ export interface AppContent {
 export const SITE = {
   title: 'Kira Studio and Kira Space',
   tagline: 'Two native macOS apps. Databases and APIs. Git and coding agents.',
-  availability: 'Free and open source. macOS 14+ on Apple Silicon.',
+  availability: 'Free and open source. macOS 26+ on Apple Silicon.',
 } as const;
 
 export const APPS: readonly AppContent[] = [

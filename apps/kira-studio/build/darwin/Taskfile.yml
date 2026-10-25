@@ -54,7 +54,9 @@ tasks:
       # vtool invalidates the linker's ad-hoc signature; arm64 refuses to exec an unsigned binary.
       - codesign --force --sign - "{{.OUTPUT}}"
     vars:
-      MACOS_MIN: "14.0"
+      # Compile floor stays at what the runner SDK (15.5) accepts; the app floor is the stamped minos.
+      MACOS_COMPILE_MIN: "14.0"
+      MACOS_MIN: "26.0"
       MACOS_SDK_STAMP: "26.0"
       # `-X {{.VERSION_VAR}}` is what makes internal/buildinfo report a real version instead of its
       # development literal; it is in both branches so a dev build and a packaged one agree about
@@ -66,9 +68,9 @@ tasks:
       GOOS: darwin
       CGO_ENABLED: 1
       GOARCH: '{{.ARCH | default ARCH}}'
-      CGO_CFLAGS: "-mmacosx-version-min={{.MACOS_MIN}}"
-      CGO_LDFLAGS: "-mmacosx-version-min={{.MACOS_MIN}}"
-      MACOSX_DEPLOYMENT_TARGET: "{{.MACOS_MIN}}"
+      CGO_CFLAGS: "-mmacosx-version-min={{.MACOS_COMPILE_MIN}}"
+      CGO_LDFLAGS: "-mmacosx-version-min={{.MACOS_COMPILE_MIN}}"
+      MACOSX_DEPLOYMENT_TARGET: "{{.MACOS_COMPILE_MIN}}"
 
   build:universal:
     summary: Builds darwin universal binary (arm64 + amd64)

@@ -47,7 +47,7 @@ Memory: every fact shows its origin and scope.
 ## Status
 
 - **Beta.** Expect bugs and breaking changes between builds.
-- **macOS 14+ on Apple Silicon (`arm64`) only, dark mode only.**
+- **macOS 26+ on Apple Silicon (`arm64`) only, dark mode only.**
 - Builds are **ad-hoc signed, not notarized**. Because each new build counts as a different app to
   the Keychain, the first launch after an update may ask to use "confidential information stored
   in…" — choose **Always Allow** once for that build.
@@ -190,7 +190,7 @@ databases under rules you set. It is off by default and enabled from Settings �
 
 ## Requirements (building from source)
 
-- macOS 14 or later, Apple Silicon (`arm64`), with Xcode command-line tools.
+- macOS 26 or later, Apple Silicon (`arm64`), with Xcode command-line tools.
 - [Go](https://go.dev) 1.27+ and the [Wails v3](https://v3.wails.io) CLI (`wails3`; `bun run setup`
   installs the version pinned in `go.mod`).
 - [Bun](https://bun.sh) — package manager, script runner and test runner. Build tooling only;

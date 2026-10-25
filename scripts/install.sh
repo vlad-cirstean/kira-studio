@@ -170,14 +170,14 @@ APPLESCRIPT_EOF
   # ---- 2: preflight -------------------------------------------------------------------------
   # sysctl, not `uname -m` — a Rosetta shell reports x86_64 on Apple Silicon.
   if [ "$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)" != "1" ]; then
-    die "this Mac is not Apple Silicon (arm64) — $APP_NAME requires macOS 14+ on Apple Silicon"
+    die "this Mac is not Apple Silicon (arm64) — $APP_NAME requires macOS 26+ on Apple Silicon"
   fi
   OS_MAJOR="$(sw_vers -productVersion | cut -d. -f1)"
   case "$OS_MAJOR" in
     '' | *[!0-9]*) die "couldn't read this Mac's macOS version" ;;
   esac
-  if [ "$OS_MAJOR" -lt 14 ]; then
-    die "macOS $OS_MAJOR is too old — $APP_NAME requires macOS 14 or later"
+  if [ "$OS_MAJOR" -lt 26 ]; then
+    die "macOS $OS_MAJOR is too old — $APP_NAME requires macOS 26 or later"
   fi
   if [ ! -d /Applications ] || [ ! -w /Applications ]; then
     die "/Applications isn't writable by this user — run as an admin user."
