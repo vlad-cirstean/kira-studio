@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import Spinner from '@theme/components/Spinner.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import {
@@ -134,22 +136,22 @@ async function dismissAll(): Promise<void> {
               :data-id="u.project ? undefined : u.items[0]?.id"
               :data-status="u.project ? undefined : u.items[0]?.status"
             >
-              <div class="flex items-center gap-1.5">
+              <div class="flex min-w-0 items-center gap-1.5">
                 <Checkbox
                   :id="`restore-${u.key}`"
                   :model-value="isChecked(u)"
                   :disabled="u.waiting"
                   @update:model-value="(v) => toggle(u, v)"
                 />
-                <Label :for="`restore-${u.key}`" class="cursor-default">{{
+                <Label :for="`restore-${u.key}`" class="min-w-0 cursor-default truncate">{{
                   u.project ? t('docker.restore.dialog.project.label', { name: u.project }) : u.items[0]?.name
                 }}</Label>
-                <template v-if="u.waiting">
+                <span v-if="u.waiting" class="ml-auto flex shrink-0 items-center gap-1">
                   <Spinner label="" />
                   <span class="text-kira-sm text-muted-foreground">{{
                     t('docker.restore.dialog.waiting.label')
                   }}</span>
-                </template>
+                </span>
               </div>
               <ul
                 v-if="u.project"
@@ -182,12 +184,21 @@ async function dismissAll(): Promise<void> {
 
         <Collapsible v-if="back.length" v-model:open="showBack" data-testid="docker-restore-back">
           <CollapsibleTrigger as-child>
-            <Button variant="toolbar" size="kira" data-testid="docker-restore-back-toggle">{{
-              `${t('docker.restore.dialog.back.title')} (${back.length})`
-            }}</Button>
+            <Button
+              variant="toolbar"
+              size="kira"
+              class="w-full justify-start"
+              data-testid="docker-restore-back-toggle"
+            >
+              <CodiconIcon :name="showBack ? 'chevron-down' : 'chevron-right'" :size="13" />
+              {{ t('docker.restore.dialog.back.title') }}
+              <Badge>{{ back.length }}</Badge>
+            </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-kira-sm text-muted-foreground">
+            <ul
+              class="m-0 flex list-none flex-col gap-0.5 p-0 pl-6 text-kira-sm text-muted-foreground"
+            >
               <li
                 v-for="i in back"
                 :key="i.id"
@@ -204,7 +215,9 @@ async function dismissAll(): Promise<void> {
 
         <FieldSet v-if="gone.length" data-testid="docker-restore-gone">
           <FieldLegend>{{ t('docker.restore.dialog.gone.title') }}</FieldLegend>
-          <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-kira-sm text-muted-foreground">
+          <ul
+            class="m-0 flex list-none flex-col gap-0.5 p-0 pl-6 text-kira-sm text-muted-foreground"
+          >
             <li
               v-for="i in gone"
               :key="i.id"

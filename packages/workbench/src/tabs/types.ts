@@ -44,6 +44,8 @@ export interface TabKindDef<
    *  closeToTheRight/closeAll/duplicateTab/moveTab all guard against it. Absent (not `false`) for
    *  every other kind, so this costs those kinds no line. */
   pinned?: true;
+  /** View stays mounted, hidden, from first activation until the tab closes. */
+  keepMounted?: true;
 }
 
 export type TabKindRegistry<

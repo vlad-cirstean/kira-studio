@@ -1,15 +1,12 @@
 <script setup lang="ts">
 // The pinned first tab: the real @kira/git-ui graph mount, read-only — modelled on
-// RepoDiffView.vue's own mount lifecycle: mount() on onMounted, unmount() on onUnmounted (a mere
-// tab switch away, not a workspace close — the transport itself outlives that, cached per repo
-// workspace by gitTransportFor; each mount holds its own lease over that shared transport — so
-// this mount's own unmount/dispose never tears down the graph tab's peers).
-//
-// A tab switch away unmounts this view; the transport outlives it and view state restores
-// through TabViewStateStore.
+// RepoDiffView.vue's own mount lifecycle: mount() on onMounted, unmount() on onUnmounted. MainView
+// keeps this view mounted, hidden with v-show, from first activation until the tab closes
+// (`keepMounted`); `active` drives git-ui's setVisible. Unmount means tab or workspace closed.
+// Each mount holds its own lease over the per-workspace transport (gitTransportFor).
 import type { MountHandle } from '@kira/git-ui';
 import EmptyState from '@theme/components/EmptyState.vue';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { loadGitUi } from '../../repo/git/gitUiModule';
 import { takePendingBlameReveal } from '../../repo/git/hostHandlers';
 import { repoHeadOf } from '../../repo/git/repoHead';
@@ -21,16 +18,20 @@ import { useSettingsStore } from '../../state/settings';
 import type { RepoGraphTabRecord } from '../../state/tabDomain';
 import { noRepositoryMessage, repoIdOfTab } from '../../state/workspace';
 
-const props = defineProps<{ tab: RepoGraphTabRecord }>();
+const props = defineProps<{ tab: RepoGraphTabRecord; active?: boolean }>();
 
 const errorMessage = ref('');
 const container = ref<HTMLElement | null>(null);
 let handle: MountHandle | null = null;
+let stopSync: (() => void) | undefined;
+
+const currentRepoHead = () =>
+  repoHeadOf(useCodeReposStore().codeRepoRecord(repoIdOfTab(props.tab)));
 
 async function mountGraph(): Promise<void> {
   const settingsStore = useSettingsStore();
   const layoutStore = useLayoutStore();
-  const repoHead = repoHeadOf(useCodeReposStore().codeRepoRecord(repoIdOfTab(props.tab)));
+  const repoHead = currentRepoHead();
   const repoId = repoIdOfTab(props.tab);
   if (!repoId) {
     errorMessage.value = noRepositoryMessage();
@@ -49,8 +50,7 @@ async function mountGraph(): Promise<void> {
     transport: gitTransportFor(repoId),
     viewState: new TabViewStateStore(props.tab.id, parsePersistedViewState),
     view: 'graph', // never 'review' — the C11 boundary (§9): this excludes the whole review layer.
-    // P72 §9.1: Kira Studio's own app-wide appearance.dateFormat — read once here, at mount time,
-    // not reactively (main.ts's own MountOptions.dateFormat doc comment).
+    // P72 §9.1: app-wide appearance.dateFormat; later changes go through handle.update below.
     dateFormat: settingsStore.appearance.dateFormat,
     repoHead,
     pendingUiAction: pendingReveal ? { action: 'revealCommit', target: pendingReveal } : null,
@@ -59,16 +59,38 @@ async function mountGraph(): Promise<void> {
       if (!layoutStore.panel.operations.visible) layoutStore.toggleOperationsPanel();
     },
   });
+  // Covers a hide that landed while loadGitUi() was in flight.
+  handle.setVisible?.(props.active !== false);
+  stopSync = watch(
+    () => [settingsStore.appearance.dateFormat, currentRepoHead()] as const,
+    ([dateFormat, head]) => handle?.update?.({ dateFormat, repoHead: head }),
+  );
 }
+
+// Hide reaches git-ui before display:none applies (CommitGrid's resize guard keys off it).
+watch(
+  () => props.active,
+  (v) => {
+    if (v === false) handle?.setVisible?.(false);
+  },
+  { flush: 'sync' },
+);
+// Show lands after the DOM is visible so the catch-up rebuild measures real size.
+watch(
+  () => props.active,
+  (v) => {
+    if (v !== false) handle?.setVisible?.(true);
+  },
+  { flush: 'post' },
+);
 
 onMounted(() => void mountGraph());
 
-// A mere tab switch away, not a workspace close — git-ui's own AppRoot/App.vue instance is torn
-// down (this is what ViewStateStore exists for), but the transport itself is cached per repo
-// workspace (gitTransportFor) and outlives it; only closing the workspace disposes it.
-// This mount's own transport is a lease — its dispose(), triggered by App.vue's own
+// Tab or workspace closed. The transport is cached per repo workspace (gitTransportFor); only
+// closing the workspace disposes it. This mount's own transport is a lease — its dispose(), triggered by App.vue's own
 // teardown chain on unmount, releases only this mount's subscriptions, never the shared socket.
 onUnmounted(() => {
+  stopSync?.();
   handle?.unmount();
   handle = null;
 });

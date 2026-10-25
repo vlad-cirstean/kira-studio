@@ -1157,9 +1157,6 @@
           "body": "That run no longer exists."
         },
         "sandbox": {
-          "auth": {
-            "body": "{agent} can’t sign in because the sandbox blocks the keychain. Turn on keychain access in the {product} settings, or run {command} setup-token and export the token from your shell profile."
-          },
           "blocked": {
             "body": "Sandbox blocked {op} {target}."
           },
@@ -2437,6 +2434,9 @@
     },
     "off": {
       "status": "Off"
+    },
+    "ofTotal": {
+      "label": "{value} of {total}"
     },
     "openElsewhere": {
       "tooltip": "Open in another window"
@@ -8112,12 +8112,6 @@
           "enforced": {
             "status": "Enforced by macOS"
           },
-          "keychain": {
-            "label": "Keychain"
-          },
-          "keychainOn": {
-            "status": "Allowed"
-          },
           "network": {
             "label": "Network access"
           },
@@ -9095,10 +9089,6 @@
         },
         "notifyRunEnded": {
           "label": "When a background ADE run ends"
-        },
-        "sandboxKeychain": {
-          "description": "Lets sandboxed agents read the macOS keychain so {agent} can sign in. Off by default. Without it, set a token from {command} setup-token. Applies on macOS only.",
-          "label": "Keychain access for sandboxed agents"
         },
         "usage": {
           "description": "Shows the 5-hour and weekly limits that {product} sessions started from Kira Space report. {product} hands the numbers to a status-line hook on this Mac. Nothing is sent anywhere, and no login or token is read. Applies to sessions started after you change it. Available on {agent} subscription plans only.",
@@ -11878,12 +11868,6 @@
       },
       "lastPage": {
         "label": "Last page"
-      },
-      "position": {
-        "label": "Page {input}"
-      },
-      "positionOf": {
-        "label": "Page {input} of {total}"
       }
     },
     "project": {
@@ -13283,11 +13267,6 @@
       },
       "increase": {
         "tooltip": "Increase"
-      }
-    },
-    "scriptProgress": {
-      "elapsedOf": {
-        "label": "{elapsed} of {timeout}"
       }
     },
     "varText": {

@@ -365,7 +365,6 @@ type RunSandboxDetail struct {
 	Read     []string `json:"read"`
 	Allow    []string `json:"allow"`
 	Network  bool     `json:"network"`
-	Keychain bool     `json:"keychain"`
 	Profile  string   `json:"profile"`
 	// Denials are the first distinct denials; DenialCount counts every one.
 	Denials     []SandboxDenial `json:"denials"`

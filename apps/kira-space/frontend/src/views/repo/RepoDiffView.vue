@@ -56,7 +56,7 @@ async function mount(): Promise<void> {
   }
 
   const { left, right, review } = props.tab.state;
-  diffEditor = useDiffEditor(container, {
+  const handle = useDiffEditor(container, {
     editorKey: props.tab.id,
     repoId,
     path: props.tab.path,
@@ -65,14 +65,17 @@ async function mount(): Promise<void> {
     review: review !== null,
     reviewBranch: review?.branch,
   });
-  await diffEditor.mount();
-  state.value = diffEditor.state.value;
-  errorMessage.value = diffEditor.errorMessage.value;
+  diffEditor = handle;
+  await handle.mount();
+  if (diffEditor !== handle) return; // Unmounted while mount() awaited.
+  state.value = handle.state.value;
+  errorMessage.value = handle.errorMessage.value;
   if (state.value !== 'found') return;
 
-  const editor = diffEditor.editor.value;
-  if (!editor) return; // Unmounted while mount() awaited above — nothing left to wire.
+  const editor = handle.editor.value;
+  if (!editor) return;
   const mod = await loadMonaco();
+  if (diffEditor !== handle) return;
   const gitRepoId = left === null ? undefined : gitRepoIdFor(repoId);
 
   // The modified (worktree) pane, never the HEAD pane — the same reasoning

@@ -1796,9 +1796,9 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - The pinned first tab of every repo workspace (views/repo/RepoGraphView.vue) mounts packages/git-ui's own graph by calling mount() directly in the native window, with no reimplementation and no fork of git-ui.
 - ServeGitStream in apps/kira-space/internal/bridge/gitstream.go mirrors ServeEngineStream over gitrpc.Router as an in-process Wails stream, with no handshake and no pairing token because the peer is this process's own webview.
 - packages/git-ipc/src/streamChannel.ts is a Wails-stream channel using the blob-frame body shape with no length prefix, no recvBuffer and no drain loop, because a Wails stream is already message-framed.
-- In Kira Space a tab switch fully unmounts and remounts the graph; there is no KeepAlive around MainView.vue's component :is, so continuity comes from persisted view state.
-- RepoGraphView.vue constructs a TabViewStateStore per mount; git-ui's unmount()/mount() serialize the lane layout, scroll position and loaded rows into the pinned graph tab's persisted state.viewState and rebuild from it on the next mount.
-- graphVisibility.ts's GRAPH_VISIBLE_KEY/MountHandle.setVisible (background-pause optimization) is unreachable in Kira Space because no caller invokes it and there is no mounted-but-backgrounded state; RepoGraphView.vue has no such hooks.
+- Kira Space graph view stays mounted, hidden via v-show in MainView.vue, from first activation until its tab closes or 4 more recently used kept views displace it (evicted views restore cold from view state). Opt-in by TabKindDef.keepMounted; only repo-graph sets it. A full-layout module (ADE) keeps MainView mounted and passes `suspended`, so kept views go inactive.
+- RepoGraphView.vue constructs a TabViewStateStore per mount; git-ui's unmount()/mount() serialize the lane layout, scroll position and loaded rows into the pinned graph tab's persisted state.viewState. Restore applies to a cold mount only (app restart, tab reopen).
+- RepoGraphView.vue drives MountHandle.setVisible from its active prop (graphVisibility.ts's GRAPH_VISIBLE_KEY). A hidden graph defers grid rebuilds and GraphViewState auto-refresh (setSuspended) to one catch-up on show. RepoGraphView pushes appearance.dateFormat and the repo head through MountHandle.update.
 - Change request ancestry is rebuilt with a base cutoff (state/changeRequests.ts rebuildAncestry): each baseRef is resolved locally via rowOfBranchTip (a decoration scan, no new RPC) and its ancestors excluded, so badges no longer tag nearly all loaded history behind a branch.
 - Bursts of individually-resolving change request branches coalesce into one ancestry rebuild per tick via scheduleAncestryRebuild's nextTick drain.
 - There is no gitrpc method allowlist (removed in P243 Part 2 with the extension): every gitrpc method is served, and a method the contract does not name does not exist.
@@ -2168,9 +2168,10 @@ and `docs/HISTORY.md (v2.0)`.
 - The engine side of the sandbox is in ade.sandbox.go (prepareSandbox, watchSandbox, sandboxOutcome).
 - The sandbox profile starts with (allow default) then denies and re-allows; the last matching rule wins.
 - Profile reads are restricted through file-read-data, never file-read-metadata, because realpath of ancestors must work.
-- The profile denies file writes outside the policy, keychain, AppleEvents, LaunchServices, the SSH agent socket, signals to other processes, and ~/.claude config and extension writes.
+- The profile denies file writes outside the policy, keychain writes, AppleEvents, LaunchServices, the SSH agent socket, signals to other processes, and ~/.claude config and extension writes.
 - Git rules: the worktree is read-write except its .git file; the linked gitdir is read-write except gitdir, commondir, locked, config.worktree; common objects are append-only; the run's own branch ref, lock and reflog are writable.
 - The rest of the git common dir is read-only, so branch, worktree, tag, stash, remote-ref, config and hook writes fail with EPERM; allow entries never open these because the protections come last.
+- Sandboxed agents always read the macOS keychain; the CLI signs in from it. Keychain writes stay denied (P341).
 - A step without a sandbox block defaults to access write with network on.
 - The sandbox covers headless agents from superviseAgent (steps, review rounds, rebase runs with every stack worktree writable) and scriptruns smart runs in dir mode worktree.
 - The sandbox does not cover TUI sessions and Take over, script steps, setup scripts, folder-mode automations, or memory claude calls.
@@ -2183,9 +2184,8 @@ and `docs/HISTORY.md (v2.0)`.
 - With network off, Seatbelt allows loopback only; HTTPS_PROXY points at an in-app goproxy CONNECT proxy that passes the Claude API hosts, chaining an upstream proxy from the environment.
 - One shared /usr/bin/log stream child runs while a sandboxed run is live; events map to a run by pid ancestry (Handler.OnStart gives the root pid).
 - Tracker keeps the first 50 distinct denials and counts all of them.
-- A failed run with denials gets reason 'Sandbox blocked <op> <path>.'; a sign-in failure with the keychain denied gets the token hint; denial and notice lines go to the run log on stdout.
+- A failed run with denials gets reason 'Sandbox blocked <op> <path>.'; denial and notice lines go to the run log on stdout.
 - Sandbox data is stored in table ade_run_sandbox (migration 0037): access, enforced, resolved policy JSON, profile, denials; AdeTaskService.Run.sandbox carries the badge and RunSandbox returns the detail.
-- Setting ade.sandboxKeychain defaults to false.
 - fetch_remote and push_branch run in the app, unsandboxed (TaskBoard implements agentmcp.SandboxGit via Grant.Sandbox).
 - push_branch pushes the run's branch to the same-named remote branch (RemoteOpParams.RemoteBranch), refuses protected branches, and is refused for read steps.
 - request_branch remains the way to create a branch and its worktree.
@@ -2989,6 +2989,7 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **MongoDB 8.x/9.x servers are unverified in CI.** Every 8.x/9.x image exits at startup on runner kernels
   6.19-7.0.13 (SERVER-125742; SERVER-136848 for Ubuntu). Test and db-compat max pin `mongo:7.0.45`. Restore an
   8.x/9.x max once runner kernels leave that range. 7.0 support ends 2027-08-31.
+- **Sandboxed OAuth token refresh is unverified on a real Mac (P341).** The profile still denies `file-write*` under `~/Library/Keychains`. The legacy file keychain writes `login.keychain-db` in-process, so a `claude` refresh of an expired token from a sandboxed run may fail. `setup-token` is gone, so no supported workaround exists. Check: `DEV_ENVIRONMENT.md` Mac checklist step 9. If refresh fails, allow writes on the login keychain file literals (db, journal, lock) only.
 - **The sandbox profile leaves some macOS services open (P287).** The profile allows by default and lists
   denies, so a launchd or XPC service that acts for the agent (for example `launchctl submit`) is not closed
   beyond the listed denies.

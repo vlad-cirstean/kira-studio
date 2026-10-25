@@ -28,17 +28,15 @@ import (
 
 // sandboxRun is the live sandbox of one run.
 type sandboxRun struct {
-	access     agentsandbox.Access
-	prep       agentsandbox.Prepared
-	policy     agentsandbox.Policy
-	tracker    agentsandbox.Tracker
-	keychain   bool
-	authFailed func(string) bool
-	agent      agentsandbox.Namer
-	grant      *agentmcp.SandboxGrant
-	scratch    string
-	notes      []string
-	release    func()
+	access  agentsandbox.Access
+	prep    agentsandbox.Prepared
+	policy  agentsandbox.Policy
+	tracker agentsandbox.Tracker
+	agent   agentsandbox.Namer
+	grant   *agentmcp.SandboxGrant
+	scratch string
+	notes   []string
+	release func()
 }
 
 // sandboxTarget is what the sandbox git tools act on: the run's own repo, branch and worktree.
@@ -62,9 +60,6 @@ func (b *TaskBoard) sandboxInput(run model.AdeRun, l agentLaunch, sd adewire.Ste
 		Scratch: filepath.Join(b.deps.AgentDir, "sandbox", run.ID), Cache: filepath.Join(b.deps.AgentDir, "sandbox-cache"),
 		ConfigDir: b.deps.AgentDir,
 		Ports:     []int{b.agent.Port()}, RunDir: l.path,
-	}
-	if b.deps.SandboxKeychain != nil {
-		in.Keychain = b.deps.SandboxKeychain()
 	}
 	if run.Purpose == model.AdeRunPurposeRebase {
 		spec, err := specOf(run)
@@ -109,7 +104,7 @@ func (b *TaskBoard) prepareSandbox(ctx context.Context, run model.AdeRun, l agen
 		sd = adewire.DefaultSandbox()
 	}
 	agent := l.agent
-	sr := &sandboxRun{access: agentsandbox.Access(sd.Access), authFailed: agent.IsAuthFailure, agent: agent}
+	sr := &sandboxRun{access: agentsandbox.Access(sd.Access), agent: agent}
 	if sr.access == agentsandbox.AccessOff {
 		return sr, b.storeSandbox(run.ID, sr, false, "")
 	}
@@ -127,7 +122,7 @@ func (b *TaskBoard) prepareSandbox(ctx context.Context, run model.AdeRun, l agen
 		_ = os.RemoveAll(pol.Scratch)
 		return nil, err
 	}
-	sr.policy, sr.prep, sr.notes, sr.scratch, sr.keychain = pol, prep, notes, pol.Scratch, pol.Keychain
+	sr.policy, sr.prep, sr.notes, sr.scratch = pol, prep, notes, pol.Scratch
 	sr.release = func() { b.deps.Sandbox.Release(run.ID) }
 	sr.grant = sandboxGrantFor(rebase, sr.access)
 	if sr.grant != nil {
@@ -279,18 +274,12 @@ func (b *TaskBoard) countDenials(runID string, delta int, listJSON string) {
 	}
 }
 
-// sandboxOutcome maps a failed run to its sandbox cause: a sign-in blocked by the keychain denial,
-// else the first denial. lastErr is the last stderr line.
-func (sr *sandboxRun) sandboxOutcome(out outcome, lastErr string) outcome {
+// sandboxOutcome maps a failed run to its first sandbox denial.
+func (sr *sandboxRun) sandboxOutcome(out outcome) outcome {
 	if !sr.on() || out.state != model.AdeRunFailed {
 		return out
 	}
-	reason := out.out.Reason
-	if !out.out.Reported && !sr.keychain && sr.authFailed(lastErr+" "+out.out.LastError) {
-		reason = agentsandbox.AuthReason(sr.agent)
-	} else {
-		reason = sr.tracker.BlockedReason(reason)
-	}
+	reason := sr.tracker.BlockedReason(out.out.Reason)
 	out.note, out.out.Reason = reason, reason
 	return out
 }
@@ -502,7 +491,7 @@ func (b *TaskBoard) RunSandbox(_ context.Context, runID string) (adewire.RunSand
 	var pol agentsandbox.Policy
 	if err := json.Unmarshal([]byte(row.PolicyJSON), &pol); err == nil {
 		out.Write, out.Read, out.Allow = nonNil(pol.Write), nonNil(pol.Read), nonNil(pol.Allow)
-		out.Network, out.Keychain = pol.Network, pol.Keychain
+		out.Network = pol.Network
 	}
 	var list []agentsandbox.Denial
 	if err := json.Unmarshal([]byte(row.DenialsJSON), &list); err == nil {

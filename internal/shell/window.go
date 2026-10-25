@@ -80,17 +80,13 @@ func Options(sec SecurityOptions, w WindowRecord, primaryWorkArea *application.R
 		Permissions:      sec.Permissions,
 		EnableFileDrop:   false,
 		// Not `Frameless`: it hides the traffic-light controls and the app would draw its own.
-		// `UseToolbar` with `MacToolbarStyleUnifiedCompact` gives the compact unified title bar
-		// that `--kira-titlebar-h` (theme/tokens.css) is sized to match.
+		// No toolbar: the compact unified toolbar renders the traffic lights smaller than native.
 		Mac: application.MacWindow{
 			WebviewPreferences: sec.Webview,
 			TitleBar: application.MacTitleBar{
-				AppearsTransparent:   true,
-				HideTitle:            true,
-				FullSizeContent:      true,
-				UseToolbar:           true,
-				HideToolbarSeparator: true,
-				ToolbarStyle:         application.MacToolbarStyleUnifiedCompact,
+				AppearsTransparent: true,
+				HideTitle:          true,
+				FullSizeContent:    true,
 			},
 		},
 	}

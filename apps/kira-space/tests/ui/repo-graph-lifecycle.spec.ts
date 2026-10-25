@@ -1,5 +1,15 @@
 import { expect, test } from './fixtures';
-import { installGitStreamMock } from './support/gitStreamMock';
+import { freezeClock, runCoalesceWindow } from './support/clock';
+import { gitStreamEmit, gitStreamRequests, installGitStreamMock } from './support/gitStreamMock';
+import {
+  manyRowShas,
+  manyRows,
+  openPortGraph,
+  PORT_CONTROL,
+  PORT_REPO,
+  refsAtTip,
+  singleRowChunks,
+} from './support/gitUiPortFixtures';
 import { IPC } from './support/ipcChannels';
 import { repoRowById, repoTab, treeRow } from './support/repoRows';
 import type { ControlSnapshot } from './support/types';
@@ -74,49 +84,48 @@ test('bug 2 regression: a cold repo open reaches the graph with no boot-retry cl
   await expect(page.locator('[data-testid="boot-retry"]')).toHaveCount(0);
 });
 
-// Opening a file (or anything that unmounts RepoGraphView.vue, e.g. closing the tab or an LRU
-// eviction past KEEP_ALIVE_MAX still unmounts it the same way) tore down the ONE shared Transport
-// every mount in the repo workspace shared — gitTransportFor's own cache handed back the same
-// now-dead object, so returning to the pinned graph tab (or switching the panel to Review, sharing
-// that same transport) hit a boot error instead of remounting live. The fix
-// (repo/git/transport.ts's per-mount lease) makes each mount's own dispose() release only its own
-// subscriptions, never the shared socket.
-test('bug 1 regression: opening a file and returning to the graph tab keeps the graph (and Review) alive', async ({
+// Closing a file tab disposes that mount's lease (inline blame) while the graph stays live. The
+// dispose must release only its own registrations: a lease that closed the shared socket would
+// leave the graph unable to auto-refresh. Each mount holds a per-mount lease
+// (repo/git/transport.ts).
+test("bug 1 regression: disposing another mount's lease leaves the graph live", async ({
   relaunch,
 }) => {
-  const { window: page } = await relaunch({ control: CONTROL });
-  await installGitStreamMock(page, REPO.repoId);
-
-  await repoRowById(page, REPO.id).click();
-  await page.locator('[data-testid="git-panel-tab-files"]').click();
-  await expect(page.locator('[data-testid="repo-graph-host"]')).toBeVisible();
+  const page = await openPortGraph(relaunch, {
+    chunks: singleRowChunks(manyRows(3)),
+    results: { 'refs.list': refsAtTip(manyRowShas(0)) },
+    control: [
+      ...PORT_CONTROL,
+      {
+        channel: IPC.codeWorkspaceReadFile,
+        args: { id: PORT_REPO.id, path: 'a.ts' },
+        response: {
+          kind: 'found',
+          text: 'export const a = 1;\n',
+          bytes: 21,
+          limitBytes: 8 * 1024 * 1024,
+          language: 'typescript',
+        },
+      },
+    ],
+  });
   await expect(connectionStateIn(page, 'repo-graph-host')).toHaveText('connected');
 
-  // Open a file from the tree — RepoGraphView.vue is now KeepAlive-included
-  // (MainView.vue), so this deactivates it rather than unmounting it; a deactivated component's
-  // DOM moves to Vue's internal storage container, outside the live document tree, so it's still
-  // unreachable here exactly as a genuine unmount would be (verified empirically, not assumed:
-  // a standalone Chromium + WebKit repro confirmed `document.querySelector`/a Playwright locator
-  // both return zero matches for a deactivated component's host element).
+  await page.locator('[data-testid="git-panel-tab-files"]').click();
   await treeRow(page, 'a.ts').click();
   await expect(page.locator('[data-testid="repo-file-editor"]')).toBeVisible();
-  await expect(page.locator('[data-testid="repo-graph-host"]')).toHaveCount(0);
-
-  // Return to the pinned graph tab — the bug: a dead, shared transport meant this mount's own
-  // bootstrap() hung forever (a request sent over a closed socket never resolves), so
-  // connection-state never reaches 'connected' and no boot error fires either — the container div
-  // alone (repo-graph-host) is visible either way, which is why the real assertion is the
-  // connection state reaching 'connected', not merely the host existing.
-  await repoTab(page, 'repo-graph').click();
+  await repoTab(page, 'repo-file').hover();
+  await repoTab(page, 'repo-file').locator('[data-testid="tab-close"]').click();
+  await expect(page.locator('[data-testid="repo-file-editor"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="repo-graph-host"]')).toBeVisible();
-  await expect(connectionStateIn(page, 'repo-graph-host')).toHaveText('connected');
-  await expect(page.locator('[data-testid="boot-error"]')).toHaveCount(0);
 
-  // The Review tab shares the same underlying client (a separate lease, §2.1) — it must mount
-  // live too, not inherit whatever the graph tab's own mount/unmount did to the transport.
-  // P92 item 6: Review moved from the Files body's own segment to GitPanel's top-level tab row.
-  await page.locator('[data-testid="git-panel-tab-review"]').click();
-  await expect(page.locator('[data-testid="repo-review-host"]')).toBeVisible();
-  await expect(connectionStateIn(page, 'repo-review-host')).toHaveText('connected');
+  const before = (await gitStreamRequests(page)).filter((m) => m === 'graph.refresh').length;
+  await freezeClock(page);
+  await gitStreamEmit(page, 'repo.changed', { repoId: PORT_REPO.repoId, kind: 'refsChanged' });
+  await runCoalesceWindow(page);
+  await expect
+    .poll(async () => (await gitStreamRequests(page)).filter((m) => m === 'graph.refresh').length)
+    .toBe(before + 1);
+  await expect(connectionStateIn(page, 'repo-graph-host')).toHaveText('connected');
   await expect(page.locator('[data-testid="boot-error"]')).toHaveCount(0);
 });

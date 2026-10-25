@@ -6921,3 +6921,26 @@ Every container test image is pinned to an exact patch tag, because PR CI caches
 The Kafka SASL fixture waits for broker readiness with a SASL client, like plain Kafka, because it raced the broker start.
 The container test scripts log the Docker host kernel so a kernel-dependent failure is recognizable.
 The Mongo adapter's Connect now runs listDatabases (names only) so a missing-credentials connect fails on auth-enabled servers before 8.0, where buildInfo needs no authentication.
+
+<!-- chapter v0.2.14 -->
+## v0.2.14
+Source: docs/v0.2.14/ at 61c50e990f72. 3 phases.
+
+### v0.2.14 P340 (Done)
+Docker restore-containers: banner action moved from absolute `AlertAction` into an in-flow wrapper, so text and Review button wrap without overlap. Restore dialog uses chevron + Badge disclosure, truncating unit labels, indented lists.
+Redis and S3 browse: `onRowOpen` on a leaf previews in the split instead of opening a KeyValue tab that replaced the browse tab. Context menu Open still opens a standalone tab.
+`browse-folder-nav.spec.ts` added (red before fix); `openS3Browse` moved to `s3Fixture.ts`; `openBrowseLeaf` added to `support/tree.ts`. Fixed flaky push race in `docker-restore.spec.ts`.
+
+### v0.2.14 P341 (Done)
+"Keychain access for sandboxed agents" option removed; profiles always render keychain-on. `Policy.Keychain`/`Input.Keychain` gone, no `SecurityServer` mach-lookup deny, `~/Library/Keychains` readable, writes still denied.
+Auth-failure path removed (`AuthReason`, `IsAuthFailure`, `authFailed`, `setup-token` hint). `Namer` narrowed to `Label()`.
+Setting `ade.sandboxKeychain` removed across model, repo, wire, appwire, scriptruns, ADE board, settings pane, popover and i18n; migration 0046 deletes the stale row.
+Space visual baselines rebaselined (4px short of current render).
+Open: token refresh writes the keychain and sandboxed runs deny keychain file writes; sign-in after OAuth token expiry may fail. Unverified on a real Mac (checklist step 9). Record a failure as a Known open item.
+
+### v0.2.14 P342 (Done)
+Git graph reloaded from scratch after a tab switch: MainView rendered only the active tab, so `RepoGraphView` unmounted and remounted with a fresh git-ui app and re-walk.
+Fix: opt-in `TabKindDef.keepMounted` (set on `repo-graph`); MainView keeps visited kept tabs mounted with `v-show` until the tab closes. `RepoGraphView` takes `active` and drives `MountHandle.setVisible`. Scroll survives `display:none`.
+Fixed `RepoDiffView` null deref when unmounted during `mount()` await. `repo-graph-keep-state.spec.ts` added (3 cases).
+Code review round 1 (base ac9b371): 7 findings, all fixed; findings file dropped.
+<!-- /chapter v0.2.14 -->

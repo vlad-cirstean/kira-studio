@@ -25,7 +25,7 @@ var mainStateDirs = []string{"rebase-merge", "rebase-apply", "sequencer"}
 func Profile(p Policy, rt Runtime) string {
 	b := &sbpl{}
 	b.line("(version 1)")
-	b.line(fmt.Sprintf(";; %s run=%s access=%s network=%t keychain=%t", GeneratorVersion, p.RunID, p.Access, p.Network, p.Keychain))
+	b.line(fmt.Sprintf(";; %s run=%s access=%s network=%t", GeneratorVersion, p.RunID, p.Access, p.Network))
 	if len(p.Ports) > 0 {
 		b.line(";; loopback ports: " + joinInts(p.Ports))
 	}
@@ -36,11 +36,6 @@ func Profile(p Policy, rt Runtime) string {
 	b.rule("deny", "mach-lookup", gname("com.apple.coreservices.launchservicesd"), gprefix("com.apple.lsd."), gname("com.apple.pasteboard.1"))
 	b.line("(deny signal)")
 	b.line("(allow signal (target same-sandbox))")
-
-	if !p.Keychain {
-		b.section("keychain")
-		b.rule("deny", "mach-lookup", gname("com.apple.SecurityServer"), gprefix("com.apple.securityd"), gprefix("com.apple.security."))
-	}
 
 	b.section("reads")
 	denyRead := []string{sub("/Users"), sub("/Volumes")}
@@ -56,10 +51,7 @@ func Profile(p Policy, rt Runtime) string {
 		for _, f := range shellRC {
 			allowRead = append(allowRead, lit(filepath.Join(h, f)))
 		}
-		allowRead = append(allowRead, sub(filepath.Join(h, ".kira-memory")))
-		if p.Keychain {
-			allowRead = append(allowRead, sub(filepath.Join(h, "Library", "Keychains")))
-		}
+		allowRead = append(allowRead, sub(filepath.Join(h, ".kira-memory")), sub(filepath.Join(h, "Library", "Keychains")))
 	}
 	allowRead = append(allowRead, subs(rt.PathPrefixes)...)
 	if rt.Agent.InstallPrefix != "" {
@@ -79,9 +71,6 @@ func Profile(p Policy, rt Runtime) string {
 		allowRead = append(allowRead, rx("^"+regexp.QuoteMeta(p.ConfigDir)+"/"+regexp.QuoteMeta(p.RunID)+`-([0-9]+|user)\.mcp\.json$`))
 	}
 	b.rule("allow", "file-read-data", dedupe(allowRead)...)
-	if !p.Keychain && rt.Home != "" {
-		b.rule("deny", "file-read-data", sub(filepath.Join(rt.Home, "Library", "Keychains")))
-	}
 
 	b.section("writes")
 	b.line("(deny file-write*)")

@@ -25,5 +25,6 @@
     "allow": [
       "mcp__codegraph__*"
     ]
-  }
+  },
+  "autoCompactWindow": 350000
 }

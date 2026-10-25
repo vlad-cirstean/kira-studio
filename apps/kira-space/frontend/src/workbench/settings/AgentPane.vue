@@ -71,10 +71,6 @@ function setUsage(on: boolean): void {
   props.draft.agent.usageEnabled = on;
 }
 
-function setSandboxKeychain(on: boolean): void {
-  props.draft.ade.sandboxKeychain = on;
-}
-
 function setKeepAwake(on: boolean): void {
   props.draft.agent.keepAwakeWithAgents = on;
 }
@@ -102,31 +98,6 @@ function setKeepAwake(on: boolean): void {
       />
       <FieldDescription>
         {{ t('space.settings.agent.keepAwake.description') }}
-      </FieldDescription>
-    </Field>
-
-    <Field>
-      <div class="flex items-center justify-between gap-1">
-        <Label :for="`${switchId}-sandboxKeychain`">{{
-          t('space.settings.agent.sandboxKeychain.label')
-        }}</Label>
-        <TooltipIconButton
-          icon="discard"
-          :label="t('common.action.resetToDefault.label')"
-          data-testid="settings-reset-ade-sandboxKeychain"
-          :disabled-trigger="isAtDefault('ade', 'sandboxKeychain')"
-          :disabled="isAtDefault('ade', 'sandboxKeychain')"
-          @click="resetLeaf('ade', 'sandboxKeychain')"
-        />
-      </div>
-      <Switch
-        :id="`${switchId}-sandboxKeychain`"
-        :model-value="draft.ade.sandboxKeychain"
-        data-testid="settings-agent-sandbox-keychain"
-        @update:model-value="(v) => setSandboxKeychain(v === true)"
-      />
-      <FieldDescription>
-        {{ t('space.settings.agent.sandboxKeychain.description') }}
       </FieldDescription>
     </Field>
 

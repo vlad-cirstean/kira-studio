@@ -105,8 +105,8 @@ const props = defineProps<{
    *  Mirrors `ui.action`'s own shape — this is the extension's own cold-boot document, not the
    *  wire. */
   pendingUiAction?: { action: UiActionKind; target?: { repoId: string; sha: string } } | null;
-  /** P72 §9.1: Kira Space's own app-wide `appearance.dateFormat`, read once at mount time — see
-   *  `main.ts`'s own `MountOptions.dateFormat` doc comment (not reactive). Preferred over
+  /** P72 §9.1: Kira Space's own app-wide `appearance.dateFormat`, mount value, then live through
+   *  `MountHandle.update` — see `main.ts`'s own `MountOptions.dateFormat`. Preferred over
    *  `app.init`'s `dateFormat` and the persisted value whenever present. */
   dateFormat?: DateFormat;
   /** P173: opens the host's Operations log (`MountOptions.onShowOperations`); absent where the host has none. */
@@ -122,6 +122,8 @@ const connectionState = bridge.connectionState;
 // alongside `graphView.reset()` in `handleRepoOpened` below.
 const graphOrder = new GraphOrderState();
 const graphView = new GraphViewState(bridge, undefined, graphOrder);
+// Hidden kept mount: no background re-walk or relayout until shown.
+watch(useGraphVisible(), (visible) => graphView.setSuspended(!visible), { immediate: true });
 // A fresh CommitStore for the life of this component (graphView is never swapped out from under
 // it — a repo switch resets the same GraphViewState instance rather than replacing it, matching
 // CommitGrid.vue's own documented assumption), so this can be constructed once, directly.
@@ -168,6 +170,12 @@ const columnWidths = ref<ColumnWidths>(DEFAULT_COLUMN_WIDTHS);
 // Drawn graph column width reported by CommitGrid; differs from the persisted one when lanes need more.
 const gridGraphWidth = ref(DEFAULT_COLUMN_WIDTHS.graph);
 const dateFormat = ref<DateFormat>(props.dateFormat ?? 'relative');
+watch(
+  () => props.dateFormat,
+  (v) => {
+    if (v) dateFormat.value = v;
+  },
+);
 const detailWidth = ref(DEFAULT_DETAIL_WIDTH);
 const scrollRow = ref(0);
 /** G-UX D9: the graph search row's own open/closed state — closed by default, toggled by `/`/
@@ -1400,7 +1408,7 @@ function breakpointFor(width: number): Breakpoint {
 
 const rootEl = ref<HTMLDivElement | null>(null);
 // `main.ts`'s own `mount()` provides this per instance only for a Kira Space graph tab
-// (a `KeepAlive`d sibling among possibly several) — always `true` everywhere else
+// (a kept-mounted sibling among possibly several) — always `true` everywhere else
 // (this package's own tests), so `onDocumentKeydown` below behaves exactly as before
 // wherever only one instance ever exists.
 const graphVisible = useGraphVisible();
@@ -1549,7 +1557,7 @@ useEventListener(
 
 function onDocumentKeydown(event: KeyboardEvent): void {
   // Kira Space mounts several git-ui apps into one document — one per graph tab
-  // (`KeepAlive`d while hidden) plus the review sidebar (`v-show`). Every instance's own
+  // (kept mounted, v-show, while hidden) plus the review sidebar (`v-show`). Every instance's own
   // `document`-level listener otherwise fires for every keydown regardless of which one is
   // visible or focused. Handle it here only when the key landed inside this
   // instance's own DOM, or — for a shortcut typed with focus elsewhere entirely (the host chrome,

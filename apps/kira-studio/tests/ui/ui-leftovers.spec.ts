@@ -21,7 +21,7 @@ import {
   postgresConnectionSummary,
 } from './support/postgresFixture';
 import { openRedisBrowse, REDIS_DB0 } from './support/redisFixture';
-import { expandRow, findRow } from './support/tree';
+import { expandRow, findRow, openBrowseLeaf } from './support/tree';
 
 // P267 Stream A: UI leftover unification. Written, not run in the authoring session.
 
@@ -283,7 +283,7 @@ test('right-click on a KeyValue row selects it before the menu shows', async ({ 
   const browse = page.locator('[data-testid="browse-view"]');
   await browse.locator(`[data-testid="browse-row"][data-path="${REDIS_USER_NS}"]`).dblclick();
   await browse.locator(`[data-testid="browse-row"][data-path="${REDIS_USER1_NS}"]`).dblclick();
-  await browse.locator(`[data-testid="browse-row"][data-path="${REDIS_BIGHASH}"]`).dblclick();
+  await openBrowseLeaf(page, REDIS_BIGHASH);
   const view = page.locator(`[data-testid="keyvalue-view"][data-path="${REDIS_BIGHASH}"]`);
   const rows = view.locator('[data-testid="keyvalue-row"]');
   await expect(rows.nth(2)).toBeVisible({ timeout: 15_000 });

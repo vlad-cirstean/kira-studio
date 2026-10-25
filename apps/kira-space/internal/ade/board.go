@@ -96,11 +96,10 @@ type TaskBoardDeps struct {
 	ScriptRunsOf  func(taskID string, limit int) ([]scriptruns.Run, error)
 	// HeadlessSettingSources returns the ade.headlessSettingSources setting, read fresh per run.
 	HeadlessSettingSources func() string
-	// Sandbox confines headless agents (P287); nil = no sandbox. SandboxKeychain reads the
-	// ade.sandboxKeychain setting per run. RunSandbox stores each run's policy and denials.
-	Sandbox         agentsandbox.Enforcer
-	SandboxKeychain func() bool
-	RunSandbox      *repos.AdeRunSandboxRepo
+	// Sandbox confines headless agents (P287); nil = no sandbox. RunSandbox stores each run's
+	// policy and denials.
+	Sandbox    agentsandbox.Enforcer
+	RunSandbox *repos.AdeRunSandboxRepo
 	// RebaseTimeout bounds a rebase run; 0 = defaultRebaseTimeout.
 	RebaseTimeout time.Duration
 	// SetRepoSettings writes git_repo_settings leaves through the path git-ui's repoSettings.set

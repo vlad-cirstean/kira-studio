@@ -1063,9 +1063,8 @@ test('the Git panel top-level tabs render at 4px radius with normal letter spaci
 // The desktop app's own DOM-level check for the collapse/branch-order feature —
 // `graph-branch-order.spec.ts` (webview-interaction) already covers the toolbar toggle, the
 // dashed fork stubs and the no-overlap/no-scrollbar cases in detail; this only exercises what is
-// specific to the desktop host: `RepoGraphView.vue`'s own `KeepAlive` (a tab switch away and back
-// keeps the mounted `git-ui` app alive rather than tearing it down, `MainView.vue`'s
-// `KEEP_ALIVE_VIEWS`) and `revealAndSelectSha`'s auto-expand-on-search-reveal path
+// specific to the desktop host: `RepoGraphView.vue`'s kept-mounted model (a tab switch away and back
+// keeps the mounted `git-ui` app alive, hidden with v-show, `MainView.vue`) and `revealAndSelectSha`'s auto-expand-on-search-reveal path
 // (`App.vue:490`). `buildMultiBranchChunk`/`buildMultiBranchRefsList` (`graphStreamFixture.ts`)
 // port `fakeGraphHost.ts`'s own fixture table — see that file's doc comment for the row/parent
 // layout: `main` (HEAD, 3 commits, never collapses), `feature-newer` (5 commits, collapses by
@@ -1128,19 +1127,9 @@ test.describe('a repo workspace: graph branch collapse (P93 §8.4)', () => {
     );
   });
 
-  // RepoGraphView.vue's own KeepAlive (MainView.vue's KEEP_ALIVE_VIEWS) is what this asserts:
-  // switching to a sibling tab and back deactivates/reactivates the same mounted instance rather
-  // than tearing it down, so in-memory state (a manually expanded group; the toolbar's own
-  // collapse-off choice) survives without needing `PersistedViewState` at all.
-  //
-  // §8.4's own wording also asks that "the persisted `collapseBranches` survives a relaunch (v8's
-  // own round trip)" — not reachable at this test tier: `fixtures.ts`'s own doc comment on
-  // `relaunch()` says plainly that a second call opens an entirely fresh page with fresh mocks,
-  // "there is nothing to persist to" (no `KIRA_HOME`, no real backend), and `TabViewStateStore`
-  // only round-trips through a genuine `RepoGraphView` unmount+remount, which this KeepAlive
-  // (`:max="20"`, one pinned graph tab per open repo workspace) makes impractical to force within
-  // a single page session. The closest verifiable analog: the same value survives the one kind of
-  // "return to this tab" a KeepAlive'd session can actually exercise.
+  // MainView keeps RepoGraphView mounted (hidden with v-show) while a sibling tab is active, so
+  // in-memory state (a manually expanded group; the toolbar's own collapse-off choice) survives
+  // a switch away and back without `PersistedViewState`.
   test('a manual expand and the toolbar collapse-off choice both survive a tab switch and back', async ({
     relaunch,
   }) => {
@@ -1161,7 +1150,7 @@ test.describe('a repo workspace: graph branch collapse (P93 §8.4)', () => {
       'false',
     );
 
-    // Switch to the Files tab (a real, non-KeepAlive'd tab) and back to the pinned graph tab.
+    // Switch to the Files tab (a real, unkept tab) and back to the pinned graph tab.
     await page.locator('[data-testid="git-panel-tab-files"]').click();
     await expect(treeRow(page, 'a.ts')).toBeVisible();
     await treeRow(page, 'a.ts').click();

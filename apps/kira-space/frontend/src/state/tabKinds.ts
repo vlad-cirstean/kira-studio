@@ -116,6 +116,7 @@ export const TAB_KINDS: TabKindRegistry<SpaceTabKind, TabRecord, TabIcon, Palett
       menuExtras: () => [],
       parseState: parseStateWith(repoGraphTabStateSchema),
       pinned: true,
+      keepMounted: true,
     },
     // One opened repository file, rendered by Monaco (read-only). The same seti icon the file tree
     // already shows for this path (RepoTreeRow.vue's own fileIconStyle, repo/fileIcon.ts).

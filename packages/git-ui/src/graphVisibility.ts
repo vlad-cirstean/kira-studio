@@ -1,4 +1,4 @@
-// Lets a KeepAlive host (Kira Space's `RepoGraphView.vue`) tell this mount's own `CommitGrid.vue`
+// Lets a kept-mounted host (Kira Space's `RepoGraphView.vue`, hidden with v-show via its `active` prop) tell this mount's own `CommitGrid.vue`
 // it has been backgrounded, so a `repo.changed`-
 // driven generation bump (`graphView.generation`/`search.searchGeneration`/`pr.generation`/
 // `stack.generation`, CommitGrid.vue's own four-watcher pattern) defers its full rebuild

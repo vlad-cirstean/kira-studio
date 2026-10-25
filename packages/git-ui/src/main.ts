@@ -1,7 +1,7 @@
 import type { Transport, UiActionKind } from '@kira/git-ipc';
 import { i18n } from '@theme/i18n';
 import { provideShellServices } from '@workbench/bootstrapShell';
-import { createApp, shallowRef, type App as VueApp } from 'vue';
+import { createApp, shallowReactive, shallowRef, type App as VueApp } from 'vue';
 import AppRoot from './App.vue';
 import type { RepoHead } from './components/GitViewHead.vue';
 import ReviewView from './components/review/ReviewView.vue';
@@ -12,7 +12,7 @@ import type { DateFormat, ViewStateStore } from './state/viewState.ts';
 
 export interface MountHandle {
   unmount(): void;
-  /** `false` while backgrounded (a KeepAlive deactivate) lets
+  /** `false` while backgrounded (host hidden but kept mounted) lets
    *  `CommitGrid.vue`'s own generation-triggered rebuild defer to a single catch-up on the next
    *  `true`, instead of paying that cost once per missed bump against a grid nobody can see. Only
    *  meaningful for `view: "graph"` — a no-op call for a `"review"` mount, which has no
@@ -20,6 +20,8 @@ export interface MountHandle {
    *  package's own tests) that never calls it keeps today's always-visible behavior exactly. See
    *  `graphVisibility.ts`. */
   setVisible?(visible: boolean): void;
+  /** Pushes new `dateFormat`/`repoHead` into the mounted view; an omitted key is left as is. */
+  update?(next: { dateFormat?: DateFormat; repoHead?: RepoHead }): void;
 }
 
 export interface MountOptions {
@@ -53,10 +55,8 @@ export interface MountOptions {
    *  preferred over `PersistedViewState.dateFormat` when present (`App.vue`'s own `bootstrap()`).
    *  `undefined`/absent keeps today's behaviour: `PersistedViewState`'s own stored value, or its
    *  `'relative'` default — the shape every call site (and every test that constructs
-   *  `MountOptions` without this field) already gets for free. Not reactive: this is the value as
-   *  of this webview's cold mount, not a live prop — a later change to the app-wide setting reaches
-   *  an already-mounted graph on its next remount (a closed tab, or a KeepAlive `:max` eviction,
-   *  `RepoGraphView.vue`), not while it stays cached. */
+   *  `MountOptions` without this field) already gets for free. The value at mount; a later change
+   *  to the app-wide setting reaches a mounted graph through `MountHandle.update`. */
   readonly dateFormat?: DateFormat;
   /** P173: only meaningful when `view === "graph"` — opens the host's Operations log. Absent where
    *  the host has none; the failure banner then names it in text instead. */
@@ -94,22 +94,16 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
   // P131 Part 2 §3.5: MountRoot wraps whichever root this mounts in the one TooltipProvider every
   // Tooltip/TooltipTrigger/TooltipContent trio in this package needs — git-ui is its own Vue app,
   // so neither host's own <App.vue> TooltipProvider reaches it.
-  const app: VueApp =
+  // Shallow: `transport`/`viewState` must not be proxied; `update` swaps top-level props.
+  const rootProps = shallowReactive<Record<string, unknown>>(
     view === 'review'
-      ? createApp(MountRoot, {
-          root: ReviewView,
-          rootProps: { ...rest, target, reviewFilter, onReviewMarked, onReviewApi, repoHead },
-        })
-      : createApp(MountRoot, {
-          root: AppRoot,
-          rootProps: {
-            ...rest,
-            pendingUiAction,
-            dateFormat,
-            showOperations: onShowOperations,
-            repoHead,
-          },
-        });
+      ? { ...rest, target, reviewFilter, onReviewMarked, onReviewApi, repoHead }
+      : { ...rest, pendingUiAction, dateFormat, showOperations: onShowOperations, repoHead },
+  );
+  const app: VueApp = createApp(MountRoot, {
+    root: view === 'review' ? ReviewView : AppRoot,
+    rootProps,
+  });
   // P79 review fix: scoped to this one app instance, not module-level — several repo workspaces'
   // graphs can be mounted (and independently backgrounded) at once. A no-op provide for a
   // `"review"` mount (no CommitGrid.vue there to read it) is harmless.
@@ -127,6 +121,11 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
     },
     setVisible(visible: boolean): void {
       graphVisible.value = visible;
+    },
+    update(next): void {
+      if (next.repoHead !== undefined) rootProps.repoHead = next.repoHead;
+      if (next.dateFormat !== undefined && view !== 'review')
+        rootProps.dateFormat = next.dateFormat;
     },
   };
 }

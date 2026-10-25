@@ -68,8 +68,6 @@ type AdeSettings struct {
 	// HeadlessSettingSources is the claude -p --setting-sources scope: "all" (user, project, local)
 	// or "user" (ignore repo-committed settings).
 	HeadlessSettingSources string `json:"headlessSettingSources"`
-	// SandboxKeychain lets sandboxed agents reach the macOS keychain so `claude` signs in from it (P287).
-	SandboxKeychain bool `json:"sandboxKeychain"`
 }
 
 // AgentSettings embeds appsettings.Agent (the provider both apps share) plus this app's agent
@@ -216,7 +214,6 @@ type AdePatch struct {
 	SpanDayShare    *float64  `json:"spanDayShare,omitempty"`
 
 	HeadlessSettingSources *string `json:"headlessSettingSources,omitempty"`
-	SandboxKeychain        *bool   `json:"sandboxKeychain,omitempty"`
 }
 
 // AgentPatch mirrors AgentSettings' own `.partial()` shape.

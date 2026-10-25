@@ -3,7 +3,6 @@ package claude
 import (
 	"net/url"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/internal/harness"
@@ -12,7 +11,6 @@ import (
 var (
 	configFiles   = []string{"settings.json", "settings.local.json", "CLAUDE.md", "keybindings.json"}
 	extensionDirs = []string{"commands", "agents", "skills", "plugins", "hooks", "output-styles"}
-	authFailure   = regexp.MustCompile(`(?i)login|invalid api key|not logged in|oauth`)
 )
 
 // SandboxNeeds: the install tree is two levels above bin/claude for an npm-style install, else the
@@ -76,5 +74,3 @@ func (*Provider) APIHosts(getenv func(string) string) (exact, suffixes []string)
 	}
 	return exact, suffixes
 }
-
-func (*Provider) IsAuthFailure(text string) bool { return authFailure.MatchString(text) }

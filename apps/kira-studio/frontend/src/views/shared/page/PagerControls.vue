@@ -86,11 +86,11 @@ function onJump(e: Event): void {
       class="inline-flex items-center whitespace-nowrap gap-0.5 text-kira-sm text-muted-foreground"
     >
       <CatalogText
-        :k="pageCount ? 'studio.pager.positionOf.label' : 'studio.pager.position.label'"
-        :params="{ total: pageCount ?? 0 }"
+        k="common.ofTotal.label"
+        :params="{ total: pageCount ?? '?' }"
         class="inline-flex items-center gap-0.5"
       >
-        <template #input>
+        <template #value>
           <div class="w-14">
             <Input
               v-model="pageInputValue"

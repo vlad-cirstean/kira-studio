@@ -4,10 +4,9 @@ import { type AdeBoardFx, adeBoard, adeFixture, openBillTask, openPlan } from '.
 import { contract } from './support/contract';
 import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
-import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
 
-// The agent sandbox: run-line badge and popover, the step inspector section, the keychain setting.
+// The agent sandbox: run-line badge and popover, the step inspector section.
 // Contract ade-sandbox; backend half: adeflow TestSandbox* (sandbox_test.go). The task, branch and
 // run ids are the fixture board's; every other field is the backend's.
 
@@ -72,7 +71,6 @@ test('contract: the run line shows the policy in the popover', async ({ relaunch
   await expect(pop.locator(t('ade-run-sandbox-enforced'))).toHaveText('Enforced by macOS');
   await expect(pop.locator(t('ade-run-sandbox-write'))).toContainText('/api-sb');
   await expect(pop.locator(t('ade-run-sandbox-network'))).toHaveText('All hosts');
-  await expect(pop.locator(t('ade-run-sandbox-keychain'))).toHaveText('Blocked');
   await expect(pop.locator(t('ade-run-sandbox-denial'))).toHaveCount(0);
 });
 
@@ -195,27 +193,4 @@ test('an OS that cannot enforce shows the notice in the inspector', async ({ rel
   ]);
   await openStep(page, 'plan');
   await expect(page.locator(t('ade-wf-sandbox-notice'))).toContainText('runs on macOS only');
-});
-
-test('the Claude Code keychain switch saves ade.sandboxKeychain with the dialog', async ({
-  relaunch,
-}) => {
-  const { window: page, control } = await openPlan(relaunch);
-  await emitWailsEvent(page, IPC.openSettings, undefined);
-  await page.locator('[data-testid="settings-section-Agent"]').click();
-  const sw = page.locator(t('settings-agent-sandbox-keychain'));
-  await expect(sw).toHaveAttribute('aria-checked', 'false');
-  await sw.click();
-  await page.locator(t('settings-save')).click();
-  await expect
-    .poll(() =>
-      control
-        .log()
-        .some(
-          (e) =>
-            e.channel === IPC.settingsSet &&
-            JSON.stringify(e.args).includes('"sandboxKeychain":true'),
-        ),
-    )
-    .toBe(true);
 });

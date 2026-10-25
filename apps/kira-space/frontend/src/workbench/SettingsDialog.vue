@@ -65,7 +65,6 @@ async function save(patch: SettingsPatch): Promise<void> {
       memory: defaultSettings.memory,
       ade: {
         headlessSettingSources: defaultSettings.ade.headlessSettingSources,
-        sandboxKeychain: defaultSettings.ade.sandboxKeychain,
       },
     }"
     :current="{
@@ -76,7 +75,6 @@ async function save(patch: SettingsPatch): Promise<void> {
       memory: settingsStore.memory,
       ade: {
         headlessSettingSources: settingsStore.ade.headlessSettingSources,
-        sandboxKeychain: settingsStore.ade.sandboxKeychain,
       },
     }"
     :save="save"

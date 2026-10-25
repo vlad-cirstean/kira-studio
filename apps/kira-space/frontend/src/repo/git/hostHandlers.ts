@@ -29,6 +29,7 @@ import type {
   Transport,
 } from '@kira/git-ipc';
 import { copyText } from '@workbench/behaviour/clipboard';
+import { nextTick } from 'vue';
 import { control } from '../../bridge/control';
 import { useCodeReposStore } from '../../state/coderepos';
 import { useLayoutStore } from '../../state/layout';
@@ -352,10 +353,13 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       const graphTabId = pinnedGraphTabId(codeRepoId);
       if (!graphTabId) return { revealed: false };
       const target = { repoId: gitRepoId, sha };
+      useTabsStore().activateTab(graphTabId);
+      // Reveal after the kept graph is shown: a hidden grid (display:none) cannot scroll.
+      await nextTick();
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       if (!deps.emitLocal('ui.action', { action: 'revealCommit', target })) {
         stashPendingBlameReveal(codeRepoId, target);
       }
-      useTabsStore().activateTab(graphTabId);
       return { revealed: true };
     },
 

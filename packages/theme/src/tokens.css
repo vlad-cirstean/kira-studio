@@ -74,11 +74,11 @@
   --kira-radius-lg: 8px;
   --kira-radius-pill: 10px;
   --kira-border-width: 1px;
-  /* Custom title bar (workbench/TitleBar.vue). --kira-titlebar-h is 38px to match the compact
-     unified toolbar style set in internal/shell/window.go, measured on a real Mac. Re-measure on
-     a real Mac before changing it. --kira-titlebar-inset-left clears the traffic-light cluster. */
+  /* Custom title bar (workbench/TitleBar.vue). --kira-titlebar-h is 34px, taller than the standard
+     28px macOS title bar (no toolbar, internal/shell/window.go) so the strip matches
+     --kira-bar-h. The traffic lights stay pinned near the top. Tune on a real Mac. --kira-titlebar-inset-left clears the traffic-light cluster. */
   --kira-bar-h: 34px;
-  --kira-titlebar-h: 38px;
+  --kira-titlebar-h: 34px;
   --kira-tabbar-h: var(--kira-bar-h);
   --kira-statusbar-h: 20px;
   --kira-titlebar-inset-left: 78px;

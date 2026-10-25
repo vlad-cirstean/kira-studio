@@ -8,23 +8,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/agentsandbox"
 )
 
-// sandboxFixture runs the real enforcer: enforcing on macOS, "not enforced" elsewhere. On macOS the
-// agent needs a way to sign in without the keychain: the setting below, or an env token.
+// sandboxFixture runs the real enforcer: enforcing on macOS, "not enforced" elsewhere. The agent
+// signs in from the keychain, which the sandbox always allows.
 func sandboxFixture(t *testing.T) *adeFixture {
 	t.Helper()
-	f := newAdeFixtureWith(t, nil, flowharness.WithSandbox(agentsandbox.System()))
-	on := true
-	if _, err := f.W.Settings.Set(bridge.SettingsSetArgs{Patch: model.SettingsPatch{Ade: &model.AdePatch{SandboxKeychain: &on}}}); err != nil {
-		t.Fatal(err)
-	}
-	return f
+	return newAdeFixtureWith(t, nil, flowharness.WithSandbox(agentsandbox.System()))
 }
 
 func sandboxStep(allowed, prompt, sandbox string) string {

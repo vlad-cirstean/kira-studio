@@ -63,11 +63,14 @@ const fullView = computed(() => (def.value.layout === 'full' ? def.value.view : 
     </template>
     <template #main>
       <component :is="fullView" v-if="isFull" />
-      <MainView v-else>
-        <template #empty>
-          <component :is="modeStart" />
-        </template>
-      </MainView>
+      <!-- Stays mounted behind a full module so kept graphs survive (MainView `suspended`). -->
+      <div v-show="!isFull" class="contents">
+        <MainView :suspended="isFull">
+          <template #empty>
+            <component :is="modeStart" />
+          </template>
+        </MainView>
+      </div>
     </template>
     <template #dock>
       <OperationsPanel />

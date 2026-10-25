@@ -37,9 +37,8 @@ type Policy struct {
 	// Read are the step's read folders plus the worktree for read access.
 	Read []string
 	// Allow are the step's extra read-write paths.
-	Allow    []string
-	Network  bool
-	Keychain bool
+	Allow   []string
+	Network bool
 	// Git is one layout per worktree that is a git checkout.
 	Git []GitLayout
 	// Scratch is TMPDIR's parent: <AgentDir>/sandbox/<runID>.
@@ -75,7 +74,6 @@ type Input struct {
 	RunDir      string
 	Read, Allow []string
 	Network     bool
-	Keychain    bool
 	Scratch     string
 	Cache       string
 	// ConfigDir is the folder the run's MCP config files are written to: <run>-<n>.mcp.json and <run>-user.mcp.json.
@@ -117,7 +115,7 @@ func ResolvePolicy(in Input, rt Runtime) (Policy, []string, error) {
 	if len(in.Worktrees) == 0 {
 		return Policy{}, nil, errors.New("agentsandbox: a policy needs a worktree")
 	}
-	p := Policy{RunID: in.RunID, Access: in.Access, Network: in.Network, Keychain: in.Keychain, Ports: in.Ports}
+	p := Policy{RunID: in.RunID, Access: in.Access, Network: in.Network, Ports: in.Ports}
 	real := func(path string) (string, error) {
 		abs, err := ExpandHome(path, rt.Home)
 		if err != nil {

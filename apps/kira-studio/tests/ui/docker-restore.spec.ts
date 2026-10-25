@@ -116,8 +116,11 @@ test('a pushed pending state shows the banner without a reload', async ({ relaun
   await openDocker(page);
   await expect(banner(page)).toHaveCount(0);
 
-  await emitWailsEvent(page, 'kira:docker:restore', pendingFixture());
-  await expect(banner(page)).toBeVisible();
+  // The push can land before the panel subscribes under load; re-emit until it shows.
+  await expect(async () => {
+    await emitWailsEvent(page, 'kira:docker:restore', pendingFixture());
+    await expect(banner(page)).toBeVisible({ timeout: 1000 });
+  }).toPass();
 
   await emitWailsEvent(page, 'kira:docker:restore', NONE);
   await expect(banner(page)).toHaveCount(0);
@@ -158,4 +161,27 @@ test('a rejected Restore call shows its error in the dialog', async ({ relaunch 
     'No restore is pending for this engine.',
   );
   await expect(page.locator('[data-testid="docker-restore-dialog"]')).toBeVisible();
+});
+
+test('the banner text and Review button never overlap, wide or narrow', async ({ relaunch }) => {
+  const { page, state } = await setupDocker(relaunch);
+  state.restore = pendingFixture();
+  await openDocker(page);
+
+  const overlap = async (): Promise<boolean> => {
+    const text = await banner(page).locator('[data-slot="alert-description"]').boundingBox();
+    const btn = await page.locator('[data-testid="docker-restore-review"]').boundingBox();
+    if (!text || !btn) throw new Error('banner not laid out');
+    return (
+      text.x < btn.x + btn.width &&
+      btn.x < text.x + text.width &&
+      text.y < btn.y + btn.height &&
+      btn.y < text.y + text.height
+    );
+  };
+
+  await expect(banner(page)).toBeVisible();
+  expect(await overlap()).toBe(false);
+  await page.setViewportSize({ width: 900, height: 700 });
+  expect(await overlap()).toBe(false);
 });

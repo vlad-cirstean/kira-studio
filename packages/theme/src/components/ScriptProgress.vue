@@ -64,7 +64,7 @@ const elapsed = computed(() => {
         data-testid="script-progress-elapsed"
       >
         {{
-          state === 'running' && timeout ? t('theme.scriptProgress.elapsedOf.label', { elapsed, timeout }) : elapsed
+          state === 'running' && timeout ? t('common.ofTotal.label', { value: elapsed, total: timeout }) : elapsed
         }}
       </span>
       <span class="flex-1" />

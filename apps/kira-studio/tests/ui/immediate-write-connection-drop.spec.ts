@@ -15,7 +15,7 @@ import {
 } from './support/mongoFixture';
 import { connectionsDisconnectSnapshot } from './support/postgresFixture';
 import { openRedisBrowse, REDIS_DB0 } from './support/redisFixture';
-import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
+import { connectionRow, expandRow, findRow, openBrowseLeaf, openRowMenu } from './support/tree';
 
 // Documents, KeyValue and Browse keep their data on a connection drop, read-only behind the stale
 // strip; open editors keep their buffer and no write reaches the server before the reconnect.
@@ -111,7 +111,7 @@ test('a key/value tab keeps its value read-only after a drop', async ({ relaunch
   await openRedisBrowse(page);
   const browse = page.locator('[data-testid="browse-view"]');
   await browse.locator(`[data-testid="browse-row"][data-path="${SESSION_NS}"]`).dblclick();
-  await browse.locator(`[data-testid="browse-row"][data-path="${SESSION_KEY}"]`).dblclick();
+  await openBrowseLeaf(page, SESSION_KEY);
   const view = page.locator(`[data-testid="keyvalue-view"][data-path="${SESSION_KEY}"]`);
   await expect(view.locator('[data-testid="keyvalue-row"]').first()).toBeVisible({
     timeout: 15_000,

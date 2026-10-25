@@ -284,7 +284,6 @@ export interface RunSandboxDetail {
   read: string[];
   allow: string[];
   network: boolean;
-  keychain: boolean;
   /** The SBPL text as written; '' for access off. */
   profile: string;
   denials: SandboxDenial[];
