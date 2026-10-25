@@ -6,7 +6,6 @@ import { t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { onMounted, onUnmounted, ref } from 'vue';
-import { useAdeReviewWindowStore } from '../../ade/v2/state/adeReviewWindow';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 // The diff editor mount, modelled on RepoFileView.vue line for line — same lazy Monaco
@@ -24,7 +23,6 @@ import { gitTransportFor } from '../../repo/git/transport';
 // registrations, and review-decorations wiring.
 import type { RepoDiffTabRecord } from '../../state/tabDomain';
 import { noRepositoryMessage, repoIdOfTab } from '../../state/workspace';
-import { attachAskReviewAgent } from './askReviewAgent';
 import { loadMonaco } from './monaco';
 import { attachReviewDecorations, type ReviewDecorationsHandle } from './reviewDecorations';
 import { useDiffEditor } from './useDiffEditor';
@@ -36,8 +34,6 @@ const container = ref<HTMLElement | null>(null);
 let unregisterFind: (() => void) | null = null;
 let unregisterGoToFile: (() => void) | null = null;
 let reviewDecorations: ReviewDecorationsHandle | null = null;
-let detachAsk: (() => void) | null = null;
-const reviewWindow = useAdeReviewWindowStore();
 
 type ViewState = 'loading' | 'found' | 'binary' | 'tooLarge' | 'bothMissing' | 'error';
 const state = ref<ViewState>('loading');
@@ -102,10 +98,6 @@ async function mount(): Promise<void> {
       leftRev: left,
       review,
     });
-    // A review window's questions panel quotes this diff's selection.
-    if (reviewWindow.target) {
-      detachAsk = attachAskReviewAgent(modifiedEditor, props.tab.path, reviewWindow);
-    }
   }
 }
 
@@ -120,8 +112,6 @@ onUnmounted(() => {
   unregisterGoToFile = null;
   reviewDecorations?.dispose();
   reviewDecorations = null;
-  detachAsk?.();
-  detachAsk = null;
   diffEditor?.dispose();
   diffEditor = null;
 });

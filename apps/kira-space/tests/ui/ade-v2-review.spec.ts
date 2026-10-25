@@ -13,7 +13,7 @@ import type { ControlSnapshot } from './support/types';
 // The review window: three panes for one branch, the review agent and the GitHub sync.
 
 const t = (id: string) => `[data-testid="${id}"]`;
-const target = adeFixture<{ gitRepoId: string }>('review-target');
+const target = adeFixture<{ gitRepoId: string; codeRepoId: string }>('review-target');
 const agent = adeFixture<{ session: { terminalId: string } }>('review-agent');
 
 const change = (path: string) => ({
@@ -87,12 +87,61 @@ test('any other window boots the normal workbench', async ({ relaunch }) => {
   await expect(page.locator(t('ade-review-window'))).toHaveCount(0);
 });
 
-reviewTest('the files pane lists only what needs review', async ({ relaunch }) => {
+reviewTest('the files pane lists every changed file like the git module', async ({ relaunch }) => {
   const page = await openReview(relaunch);
   const left = page.locator(t('ade-review-left'));
   await expect(left).toContainText('pending.ts');
   await expect(left).toContainText('moved.ts');
-  await expect(left).not.toContainText('done.ts');
+  await expect(left).toContainText('done.ts');
+  await expect(left.getByText('Needs review')).toHaveCount(0);
+});
+
+reviewTest('a review diff opens side by side', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: reviewControl([
+      { channel: IPC.windowsEnsure, response: { mode: 'git' } },
+      {
+        channel: IPC.codeWorkspaceListRepos,
+        response: [
+          {
+            id: target.codeRepoId,
+            name: 'web-app',
+            root: '/tmp/web-app',
+            repoId: target.gitRepoId,
+            sortOrder: 1,
+            color: 'none',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      },
+    ]),
+    gitStream: {
+      ...GIT,
+      extraResults: {
+        ...GIT.extraResults,
+        'file.read': { kind: 'found', content: 'export const a = 1;\n' },
+        'review.snapshot': { kind: 'none', text: null, reviewedAtSha: null },
+        'review.fileDiff': {
+          path: 'src/pending.ts',
+          deltaSource: 'noSnapshot',
+          body: { kind: 'text', hunks: [] },
+          reviewedRanges: [],
+          lineCount: 1,
+          reviewedAtSha: null,
+        },
+      },
+    },
+  });
+  await page.locator(t('ade-review-window')).waitFor();
+  await page
+    .locator(`${t('review-files-tree')} ${t('file-tree-row')}`, { hasText: 'pending.ts' })
+    .click();
+  const editor = page.locator(t('repo-diff-editor'));
+  await expect(editor.locator('.monaco-diff-editor .editor.original')).toBeVisible();
+  const width = await editor
+    .locator('.monaco-diff-editor .editor.original')
+    .evaluate((el) => el.getBoundingClientRect().width);
+  expect(width).toBeGreaterThan(100);
 });
 
 reviewTest('with no review agent the panel offers to start one', async ({ relaunch }) => {

@@ -54,7 +54,6 @@ const props = defineProps<{
   transport: Transport;
   viewState: ViewStateStore;
   target?: ReviewTarget | null;
-  reviewFilter?: 'all' | 'needsReview';
   onReviewMarked?: (path: string) => void;
   onReviewApi?: (api: { selectFile: (path: string) => void }) => void;
   repoHead?: RepoHead;
@@ -566,7 +565,6 @@ useReviewAnnouncements(review, announce);
           :actions="filesActions"
           :list-mode="listMode"
           :filter="filter"
-          :review-filter="reviewFilter"
         />
 
         <ReviewCommentsPane

@@ -4917,17 +4917,8 @@
         "markError": {
           "error": "Couldn’t update that file’s review status: {error}"
         },
-        "needsReview": {
-          "label": "Needs review · {count}"
-        },
         "neverReviewed": {
           "status": "Never reviewed, showing the full range diff"
-        },
-        "nothingToReview": {
-          "emptyHint": "Nothing changed since your last review."
-        },
-        "showing": {
-          "aria": "Which files to list"
         },
         "sinceReview": {
           "label": "Since review"
@@ -8998,9 +8989,6 @@
         },
         "anchorStale": {
           "status": "Lines as of {sha}, {branch}’s history was rewritten since"
-        },
-        "askReviewAgent": {
-          "label": "Ask review agent"
         },
         "binaryCompare": {
           "empty": "This file is binary and can’t be compared"

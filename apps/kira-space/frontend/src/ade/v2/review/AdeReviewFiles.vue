@@ -39,7 +39,6 @@ onMounted(async () => {
         base: props.target.base,
         pane: 'files',
       },
-      reviewFilter: 'needsReview',
       onReviewMarked: (path) => emit('marked', path),
       onReviewApi: (a) => {
         api = a;

@@ -249,6 +249,8 @@ export function useDiffEditor(
       renderGutterMenu: false,
       automaticLayout: true,
       renderSideBySide: true,
+      // A narrow pane (the review window centre) must not flip to inline.
+      useInlineViewWhenSpaceIsLimited: false,
       ignoreTrimWhitespace: false,
       // C11 §7.3 gotcha 2: 0.56.0 has no public API to expand one specific collapsed unchanged
       // region, so a comment anchored inside one would be invisible — only the review variant

@@ -2354,7 +2354,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - The per-branch Review code button opens an ephemeral Wails window via OpenReviewWindow; a second call returns false and only focuses the window. The focus path (WindowRegistry.Focus) dispatches the App-level unhide to the main thread via InvokeSync, because AppKit aborts the process on it off-thread (P354).
 - Review window rows live in ade_review_windows, are never restored on relaunch and are purged at boot (purgeReviewWindows).
 - closeDecision keeps the main window from closing while a review window is open.
-- The review window has three panes: git-ui review files (reviewFilter needsReview), diff tabs, and the review agent panel.
+- The review window has three panes: git-ui review files (every changed file, target locked), diff tabs, and the review agent panel.
 - The files pane calls ensureRepoOpen first, because the git socket needs repo.open on its connection.
 - The since-review review_session is pinned (SetPinned, gitreview 0003) so rebases cannot drop the reviewed blobs.
 - The since-review diff's left side is the stored snapshot (review.snapshot), not a git ref; a renamed unchanged file keeps its review.
