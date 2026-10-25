@@ -32,13 +32,19 @@ test('Space on a focused card head selects the task', async ({ relaunch }) => {
   await card(page, 'T_bill').focus();
   await page.keyboard.press('Space');
   await expect(page.locator('[data-testid="ade-panel"]')).toBeVisible();
-  await expect(page.locator('[data-testid="ade-panel-title"]')).toHaveValue(/PAY-102/);
+  await expect(page.locator('[data-testid="ade-panel-title"]')).toHaveAttribute(
+    'placeholder',
+    /PAY-102/,
+  );
 });
 
 test('selecting a task shows its facts; status is read-only', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await openTask(page, 'T_bill');
-  await expect(page.locator('[data-testid="ade-panel-title"]')).toHaveValue(/PAY-102/);
+  await expect(page.locator('[data-testid="ade-panel-title"]')).toHaveAttribute(
+    'placeholder',
+    /PAY-102/,
+  );
   await expect(page.locator('[data-testid="ade-panel-facts"]')).toContainText(
     '3 branches in api, web-app',
   );
@@ -114,7 +120,7 @@ test('a refused estimate shows the backend error', async ({ relaunch }) => {
   ]);
   await openTask(page, 'T_bill');
   await page.locator('[data-testid="ade-estimate-num"]').fill('1');
-  await page.locator('[data-testid="ade-estimate-unit-d"]').click();
+  await page.locator('[data-testid="ade-estimate-num"]').press('Tab');
   await expect(page.locator('[data-testid="ade-estimate-error"]')).toContainText(
     'Enter an estimate like 2h or 3d.',
   );

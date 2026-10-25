@@ -2379,25 +2379,7 @@
     {
       "a": "b_bill",
       "b": "b_sara",
-      "shared": ["src/payments/client.ts", "src/payments/invoice.ts"],
-      "conflicts": ["src/payments/client.ts", "src/payments/invoice.ts"]
-    },
-    {
-      "a": "b_billdash",
-      "b": "b_notif",
-      "shared": ["src/ui/nav/Sidebar.tsx"],
-      "conflicts": []
-    },
-    {
-      "a": "b_li",
-      "b": "b_search",
-      "shared": ["src/search/schema.ts"],
-      "conflicts": ["src/search/schema.ts"]
-    },
-    {
-      "a": "b_search",
-      "b": "b_deps",
-      "shared": ["package.json"],
+      "shared": ["src/payments/client.ts"],
       "conflicts": []
     }
   ],
