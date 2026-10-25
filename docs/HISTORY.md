@@ -6947,7 +6947,7 @@ Code review round 1 (base ac9b371): 7 findings, all fixed; findings file dropped
 
 <!-- chapter v0.2.15 -->
 ## v0.2.15
-Source: docs/v0.2.15/ at f87bc24a0da8. 3 phases.
+Source: docs/v0.2.15/ at 932771836629. 5 phases.
 
 ### v0.2.15 P343 (Done)
 Commit detail panel vanished when opening a file diff from a commit. Root cause: hidden graph tab (`v-show`) reads 0x0; `App.vue` breakpoint went `overlay`, then click-outside closed the detail pane.
@@ -6955,10 +6955,20 @@ Fix in `packages/git-ui/src/App.vue`: `syncBreakpoint` and overlay click-outside
 `trackErrors` ignores benign `ResizeObserver loop` notice. Two load flakes fixed: `graph-blank-rows` (now polls) and `copy-coverage` (content settled before locale switch).
 
 ### v0.2.15 P344 (Done)
-macOS dev traffic lights larger than released app. Root cause not window config: one `Options` path builds both windows. Release runner `macos-15` links 15.5 SDK; dev on a Mac with macOS 26 links 26 SDK, giving larger traffic lights.
-Fix: `UIDesignRequiresCompatibility=true` in all four Info plists (Studio and Space, release and dev). Guard: `verify-packaging.sh` S14 (source plists) and A6 (built bundles). Docs: `PACKAGING.md`, `ARCHITECTURE.md` (stale title-bar line, SDK note, Known open items entry).
-macOS behaviour unverified (Linux session). User must confirm on a Mac: SDK split via `xcrun --show-sdk-version` and `vtool -show-build`; `bun run dev:studio` and `bun run dev:space` traffic lights match released app, 78px inset clears them. If key has no effect, fallback is pinning both builds to one SDK; raise with user first.
+Superseded by P345. Found macOS dev traffic lights larger than released app; root cause is linked SDK (release runner `macos-15` links 15.5, dev links 26), not window config. Tried `UIDesignRequiresCompatibility=true` in four Info plists; no effect on a real Mac, then user ruled the larger buttons correct. Key reverted in P345.
 
 ### v0.2.15 P345 (Done)
-Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.15/` removed.
+AppKit picks window chrome by the executable's linked SDK. Final direction: larger macOS 26 buttons are correct; no SDK stamp (stamp experiments dropped); minimum macOS 26.0 on purpose (14 and 15 dropped).
+`LSMinimumSystemVersion` `26.0.0` in four plists, `install.sh` preflight, READMEs, site copy, `ARCHITECTURE.md`, `PACKAGING.md`. Both darwin Taskfiles derive `MACOS_MIN` from `xcrun --show-sdk-version` (26.0 with SDK 26+, else 14.0) for `-mmacosx-version-min` and `MACOSX_DEPLOYMENT_TARGET`.
+Guards: `verify-packaging.sh` S14 (plist floor) and A6 (bundle with SDK 26+ needs minos 26.0). User moved CI and release to `macos-26` in `f8175023a`, so release links SDK 26 like dev.
+macOS behaviour unverified from Linux; user confirmed dev and runner moves themselves.
+
+### v0.2.15 P346 (Done)
+Git graph branches rendered from nowhere. Root cause: P93 branch-major order for the whole graph put non-HEAD branches below all loaded main rows; upward links were dropped and a dashed stub drew from nowhere.
+Backend walks `git log --date-order`. New `packages/git-core/src/graph/displayOrder.ts` (`localTopoOrder`, `flatqueue` min-heap): store order kept, only sibling chains from one fork commit that interleave become contiguous. `rowPlan.ts` collapses per run; `projectLayoutInput` asserts no upward link. Fork stub code and `hitTest.ts` removed.
+Tests: unit `displayOrder.spec.ts` and `rowPlan.spec.ts`, flow `TestGraphForkInterleaveDateOrder`, UI spec in `repo-graph-branch-order.spec.ts`; P93 expectations rewritten. Perf at 20000 commits: `--date-order` 245.78ms vs `--topo-order` 249.99ms. `test:ui:space` 677 pass.
+Known: display order is not final on arrival; a later page can join chains and move rows near the loaded boundary.
+
+### v0.2.15 P347 (Done)
+Chapter closed by hand: this block replaces the stale 3-phase v0.2.15 block from the earlier premature close. `docs/v0.2.15/` removed.
 <!-- /chapter v0.2.15 -->
