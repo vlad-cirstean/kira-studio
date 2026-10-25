@@ -103,12 +103,16 @@ flags and the README's macOS 14+ product claim. The template hardcodes `12.0.0`,
 Kira Space's plists also carry a generated document-type block (P332); rerun
 `go run ./apps/kira-space/tools/gendoctypes` after the regeneration.
 Both darwin Taskfiles' `build:native` stamp the linked binary's SDK to `26.0` (minos stays `14.0`) with
-`vtool -set-build-version`, then re-sign it ad hoc (P345). AppKit picks window chrome by the recorded SDK:
-the release runner (`macos-15`) links 15.5 and gets smaller traffic lights, so release is stamped up to
-26.0 for the larger macOS 26 chrome, and dev matches. Regeneration drops the stamp; `verify-packaging.sh`
-S14 (Taskfiles) and A6 (built bundles, expects `sdk 26.0`) catch that. A later switch to a macOS 26 runner
-image would make the stamp redundant; workflow files cannot be pushed from this session
-(`docs/DEV_ENVIRONMENT.md`).
+`vtool -set-build-version`, then re-sign it ad hoc (P345). AppKit picks window chrome by the recorded SDK,
+while the runtime OS decides availability; this is how VS Code and Electron apps get the macOS 26 look:
+compile against the newest SDK with a low deployment target. The release runner (`macos-15`) links 15.5 and
+gets smaller traffic lights, so the stamp emulates a newer SDK, and dev matches. The minimum stays 14.0
+(`LSMinimumSystemVersion`, `-mmacosx-version-min`). Regeneration drops the stamp; `verify-packaging.sh`
+S14 (Taskfiles) and A6 (built bundles, expects `minos 14.0`, `sdk 26.0`) catch that.
+Long-term fix, pending: `docs/pending-changes/.github__workflows__{release,pr,cache-warm}.yml.patch` move
+the runners to `macos-26` (workflow files cannot be pushed from a Linux session, `docs/DEV_ENVIRONMENT.md`).
+Once release links the real SDK 26 the stamp is redundant. Then APIs newer than macOS 14 need availability
+guards, and a smoke test on macOS 14/15 is advisable.
 The floor is 14 rather than 13 because Go 1.27 builds its own objects for macOS 13 minimum: a lower
 `-mmacosx-version-min` only earns a linker warning that the object file was built for a newer macOS
 than is being linked.
