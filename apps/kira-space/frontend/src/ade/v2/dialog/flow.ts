@@ -212,7 +212,7 @@ async function onArchiveTurns(
       deps.setActionError(taskId, 'The session ended before archiving; archive again when ready');
       return;
     }
-    await archiveIfClear(deps, taskId, true);
+    await archiveIfClear(deps, taskId);
   } catch (err) {
     deps.setActionError(taskId, errMessage(err));
   } finally {
@@ -296,7 +296,7 @@ export async function requestArchive(deps: FlowDeps, taskId: string): Promise<vo
   const key = `archive:${taskId}`;
   deps.pending.add(key);
   try {
-    await archiveIfClear(deps, taskId);
+    await archiveIfClear(deps, taskId, true);
   } catch (err) {
     deps.setActionError(taskId, errMessage(err));
   } finally {

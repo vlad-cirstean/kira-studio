@@ -123,6 +123,8 @@ for (const [key, atRisk] of [
         '1 uncommitted, 1 unmerged commit',
       );
       await page.locator(t('ade-dialog-delete')).click();
+    } else {
+      await page.locator(t('confirm-dialog-confirm')).click();
     }
     await expect.poll(() => calls(control, IPC.adeTaskArchiveTask)).toHaveLength(1);
     const sent = calls(control, IPC.adeTaskArchiveTask)[0]?.args as Record<string, unknown>;
