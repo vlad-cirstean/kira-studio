@@ -106,13 +106,9 @@ The minimum macOS is 26.0 on purpose: macOS 14 and 15 are dropped (`LSMinimumSys
 machine has, the VS Code/Electron model: newest SDK, AppKit styles by the linked SDK (larger macOS 26 traffic
 lights), the runtime OS decides availability. `build:native` sets `-mmacosx-version-min` and
 `MACOSX_DEPLOYMENT_TARGET` to `MACOS_MIN`, resolved from `xcrun --show-sdk-version`: 26.0 with an SDK 26+, else
-14.0. The fallback keeps the current `macos-15` runner (SDK 15.5, cannot target 26) building until it moves.
-Until `docs/pending-changes/.github__workflows__{release,pr,cache-warm}.yml.patch` is applied (the user
-applies it; workflow files cannot be pushed from a Linux session, `docs/DEV_ENVIRONMENT.md`), release still
-links SDK 15.5 with smaller buttons and minos 14.0 in the binary, though `LSMinimumSystemVersion` already
-blocks launch below 26. Once applied, dev and release match. `verify-packaging.sh` A6 fails if a bundle links
-SDK 26+ without minos 26.0, and only prints a warning note while the SDK is below 26, so the unpatched runner
-does not break.
+14.0. The fallback keeps a runner with an older SDK building. CI and release run on `macos-26` (SDK 26+), so
+CI and release binaries link SDK 26 with minos 26.0, matching dev. `verify-packaging.sh` A6 fails if a bundle
+links SDK 26+ without minos 26.0, and only prints a warning note while the SDK is below 26.
 The floor is 14 rather than 13 because Go 1.27 builds its own objects for macOS 13 minimum: a lower
 `-mmacosx-version-min` only earns a linker warning that the object file was built for a newer macOS
 than is being linked.
@@ -376,7 +372,7 @@ only through a PR). No job `needs` another; every job starts at once:
 
 | Job | Runner | What it does |
 |---|---|---|
-| `checks (macOS)` | `macos-15` (pinned, not `macos-latest`) | cgo-aware `go vet`/build (catches darwin build-tag breaks) and the darwin&&cgo-only test packages |
+| `checks (macOS)` | `macos-26` (pinned, not `macos-latest`) | cgo-aware `go vet`/build (catches darwin build-tag breaks) and the darwin&&cgo-only test packages |
 | `checks (Linux)` | `ubuntu-latest` | lint, typecheck, frontend builds, `lint:dead`, `verify:packaging` and the bun unit tests |
 | `ui (Linux, shard N/4)` | `ubuntu-latest` | Playwright `ui` project in 4 shards, fail-fast off |
 | `ui-extra (Linux)` | `ubuntu-latest` | ipc-frontend (chromium), visual (webkit), then ui-timing alone on an idle machine |

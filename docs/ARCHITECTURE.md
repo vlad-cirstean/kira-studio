@@ -28,7 +28,7 @@ whatever sandbox a session happens to be in),
 
 - The desktop shell is Wails v3 (v3.0.0-beta.28) in Go, targeting macOS 26+ on arm64 only.
 - The window uses a custom MacTitleBar (AppearsTransparent, HideTitle, FullSizeContent, no toolbar) over a full-size-content window, not the OS-drawn bar, drawn by the shared packages/workbench/src/components/TitleBar.vue.
-- On macOS 26 AppKit picks window chrome by the executable's linked-SDK field. The SDK is the building machine's Xcode; releases get SDK 26 once the runner is `macos-26` (see Known open items), so dev and release then match.
+- On macOS 26 AppKit picks window chrome by the executable's linked-SDK field. The SDK is the building machine's Xcode; CI and release run on `macos-26`, so dev and release both link SDK 26.
 - Each app's own frontend/src/workbench/TitleBar.vue supplies its title-bar buttons and mode tabs through the shared TitleBar shell's default slot.
 - TypeScript is pinned to 6 (below TS 7) on purpose: TS7 has no stable programmatic compiler API until 7.1, and vue-tsc (run by typecheck:web:studio) consumes that API in-process.
 - The tsgo binary from @typescript/native-preview (used by typecheck:tests:studio and typecheck:unit:studio) is a separate tool already at latest upstream; the plan is to converge on one toolchain once TS 7.1 ships and vue-tsc adopts it.

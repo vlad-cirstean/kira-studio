@@ -8,7 +8,7 @@ First phase `P343` (highest in `docs/HISTORY.md` is `P342`). Branch `chapter/v0.
 | P344 | macOS traffic-light window buttons differ between dev server and released bundled app; released buttons are smaller. Make dev render identical to released app. (Direction changed in P345: the larger buttons are correct.) Investigate window chrome config: titlebar style, button position/size, dev vs production build differences. | Done (superseded by P345) |
 | P345 | Rework macOS traffic-light fix. `UIDesignRequiresCompatibility` had no effect on user's Mac; dev buttons still larger than released. Re-investigate (dev may run raw binary, not bundle, so plist keys are not read; SDK linking; Wails titlebar options). Revert ineffective plist key and S14/A6 checks if confirmed useless. Fix for real. Update docs. | Done |
 | P346 | Git graph: branches do not show where they fork from. Last few branches start from main but render as starting from nowhere. Intended: only where two branches forking from the same commit have interleaved/overlapping commits (time order), group them topologically at that locality. NOT topological ordering for the whole graph. Fork point and edge to parent must render. | Done |
-| P347 | Close chapter v0.2.15 (hand-fold per `CLAUDE.md`, rewrite the existing `<!-- chapter v0.2.15 -->` block in `docs/HISTORY.md`). Do NOT run until user explicitly says to close. | Todo |
+| P347 | Close chapter v0.2.15 (hand-fold per `CLAUDE.md`, rewrite the existing `<!-- chapter v0.2.15 -->` block in `docs/HISTORY.md`). Do NOT run until user explicitly says to close. | Done |
 
 ## Results
 
@@ -32,9 +32,9 @@ Direction changes from user, final: larger macOS 26 buttons are correct; drop th
 
 Root cause: AppKit picks window chrome by the executable's linked SDK. Released binaries read `sdk 15.5` (runner `macos-15`, smaller buttons); dev links the user's Xcode SDK (26+, larger). Window code is identical in both builds. `UIDesignRequiresCompatibility` (P344) did not help; reverted from four plists.
 
-Fix, Electron model: no stamp; SDK is whatever the building Xcode provides. Floor 26.0: `LSMinimumSystemVersion` `26.0.0` in four plists, `install.sh` preflight, README, Space README, site copy, ARCHITECTURE, PACKAGING checklist. Both darwin Taskfiles set `-mmacosx-version-min` and `MACOSX_DEPLOYMENT_TARGET` from `MACOS_MIN`, resolved from `xcrun --show-sdk-version` (26.0 with SDK 26+, else 14.0), so the SDK 15.5 runner, which cannot target 26, keeps building. Guards: S14 checks `LSMinimumSystemVersion` is 26.0.0 in the four plists; A6 fails when a bundle links SDK 26+ without minos 26.0 and only notes a warning while the SDK is below 26 (current runner). Pending: `docs/pending-changes/.github__workflows__{release,pr,cache-warm}.yml.patch` switch runners to `macos-26`; the user applies them (workflow files cannot be pushed here, `docs/DEV_ENVIRONMENT.md`). Until applied, release still links SDK 15.5 (smaller buttons); once applied, dev and release match. Docs: `PACKAGING.md`, `ARCHITECTURE.md` (Known open items). Checks run: `verify:packaging`, gendoctypes `--check`, xmllint, YAML parse, pre-commit hook. shellcheck not installed here.
+Fix, Electron model: no stamp; SDK is whatever the building Xcode provides. Floor 26.0: `LSMinimumSystemVersion` `26.0.0` in four plists, `install.sh` preflight, README, Space README, site copy, ARCHITECTURE, PACKAGING checklist. Both darwin Taskfiles set `-mmacosx-version-min` and `MACOSX_DEPLOYMENT_TARGET` from `MACOS_MIN`, resolved from `xcrun --show-sdk-version` (26.0 with SDK 26+, else 14.0), so the SDK 15.5 runner, which cannot target 26, keeps building. Guards: S14 checks `LSMinimumSystemVersion` is 26.0.0 in the four plists; A6 fails when a bundle links SDK 26+ without minos 26.0 and only notes a warning while the SDK is below 26. Runners: user applied the patches in `f8175023a` (`ci: build on macos-26 runners`); `release.yml`, `pr.yml`, `cache-warm.yml` run `macos-26`, so release links SDK 26 like dev. Pending patch files and the Known open items entry removed. Docs: `PACKAGING.md`, `ARCHITECTURE.md`. Checks run: `verify:packaging`, gendoctypes `--check`, xmllint, YAML parse, pre-commit hook. shellcheck not installed here.
 
-macOS behaviour unverified here (Linux session). Quick confirm on a Mac: dev build `vtool -show-build "apps/kira-studio/bin/Kira Studio.dev.app/Contents/MacOS/Kira Studio"` shows `sdk 26.x` and `minos 26.0` and the buttons are the larger ones. Release matches only after the runner patch is applied. Fallback if dev clang or ld rejects `-mmacosx-version-min=26.0`: set the dev floor back to 14.0 in `MACOS_MIN` and keep the plist floor; if buttons still differ with equal SDKs, re-investigate.
+macOS behaviour unverified from Linux. User moved dev and runners to SDK 26 and confirmed the buttons themselves.
 
 ### P346
 
@@ -53,3 +53,7 @@ Perf (`KIRA_GIT_PERF=1`, 20000 commits, first chunk): `--topo-order` 249.99ms, `
 Results: bun tests git-core and git-ui 460 pass; typecheck, lint, `lint:dead` clean; Go gitclient, gitsearch, gitflow, reviewflow pass; full `test:ui:space` 677 pass after the one fix above (graph-blank-rows 4/4 re-run); git-module visual spec 7/7, no baseline change.
 
 Known: display order is not final on arrival. A later page can join two chains and move rows next to the loaded boundary; the grid repaints on every plan publish.
+
+### P347
+
+User asked to close. Hand-folded into `docs/HISTORY.md`, rewriting the stale v0.2.15 block (3 phases, wrong content). `docs/v0.2.15/` removed. PR #10 retitled to cover all 5 phases.
