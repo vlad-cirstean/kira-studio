@@ -37,6 +37,8 @@ export class RepoScopedReload {
     this.#unsubscribe = bridge.on('repo.changed', (event) => {
       if (this.#repoId !== event.repoId) return;
       if (opts.kind !== undefined && event.kind !== opts.kind) return;
+      // Host-side data only; nothing a repo-scoped git reload reads.
+      if (opts.kind === undefined && event.kind === 'changeRequestsChanged') return;
       opts.onChanged();
     });
   }

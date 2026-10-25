@@ -8,6 +8,8 @@ export type {
   BaseCandidate,
   BaseResolution,
   BaseResolutionReason,
+  BranchChangeRequests,
+  ChangeRequestIndex,
   ChangeRequestLookup,
   ChangeRequestRecord,
   CheckoutBlocker,

@@ -44,6 +44,48 @@ func (r *Router) handleBranchResolveChangeRequest(ctx context.Context, c *gitses
 	)
 }
 
+// handleBranchChangeRequestIndex is branch.changeRequestIndex's own handler: the persisted index,
+// served from SQLite whatever the host is doing.
+func (r *Router) handleBranchChangeRequestIndex(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+	return handleRepoCall(ctx, c, "branch.changeRequestIndex", params,
+		func(p BranchChangeRequestIndexParams) (string, error) {
+			if err := requireNonEmpty("branch.changeRequestIndex", "repoId", p.RepoID); err != nil {
+				return "", err
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, _ BranchChangeRequestIndexParams) (BranchChangeRequestIndexResult, error) {
+			idx := entry.ChangeRequestIndex(ctx)
+			out := BranchChangeRequestIndexResult{Complete: idx.Complete, SyncedAt: idx.SyncedAt, Branches: make([]BranchChangeRequests, 0, len(idx.Branches))}
+			for _, b := range idx.Branches {
+				crs := make([]ChangeRequestRecord, 0, len(b.ChangeRequests))
+				for _, cr := range b.ChangeRequests {
+					crs = append(crs, changeRequestRecordFrom(cr))
+				}
+				out.Branches = append(out.Branches, BranchChangeRequests{Name: b.Name, ChangeRequests: crs})
+			}
+			return out, nil
+		},
+	)
+}
+
+// handleBranchSyncChangeRequests is branch.syncChangeRequests's own handler: ask the entry's
+// syncer for a run now. It answers {} whether or not a run started (a gate, the min gap).
+func (r *Router) handleBranchSyncChangeRequests(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+	return handleRepoCall(ctx, c, "branch.syncChangeRequests", params,
+		func(p BranchSyncChangeRequestsParams) (string, error) {
+			if err := requireNonEmpty("branch.syncChangeRequests", "repoId", p.RepoID); err != nil {
+				return "", err
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p BranchSyncChangeRequestsParams) (struct{}, error) {
+			entry.SyncChangeRequests(ctx, p.Focused, p.Wait)
+			return struct{}{}, nil
+		},
+	)
+}
+
 // handleChangeRequestBrowserUrl is changeRequest.browserUrl's own handler (P74 §3.3) — a thin projection of
 // (*gitsession.RepoEntry).ChangeRequestURL onto the wire's own {url: string|null} shape.
 func (r *Router) handleChangeRequestBrowserUrl(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {

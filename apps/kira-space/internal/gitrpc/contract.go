@@ -183,7 +183,10 @@ package gitrpc
 // and gh fields become changeRequests and status. kiraSpace.github.enabled (boolean) becomes
 // kiraSpace.gitHost.provider (string). Two new requests, gitHost.info and gitHost.providers, name
 // the host a repository resolves to and every registered host.
-const ContractVersion = 50
+// P352: 50 -> 51, additive. Two new requests, branch.changeRequestIndex (the persisted change
+// request index of a repository) and branch.syncChangeRequests (sync it now). repo.changed gains
+// the kind changeRequestsChanged. ChangeRequestRecord gains draft, reviewDecision and checksState.
+const ContractVersion = 51
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

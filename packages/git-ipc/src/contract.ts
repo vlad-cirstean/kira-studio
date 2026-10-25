@@ -1156,6 +1156,26 @@ export interface ChangeRequestRecord {
   readonly baseRef: string;
   /** Unix milliseconds. */
   readonly updatedAt: number;
+  /** Set by the persisted index only. */
+  readonly draft?: boolean;
+  readonly reviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED';
+  readonly checksState?: 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED';
+}
+
+/** One head branch's cached change requests, newest first. */
+export interface BranchChangeRequests {
+  readonly name: string;
+  readonly changeRequests: readonly ChangeRequestRecord[];
+}
+
+/** branch.changeRequestIndex's result: the persisted change request index of a repository, served
+ *  from SQLite. `complete` means every change request was ingested, so a branch not listed has
+ *  none; incomplete lists what is cached so far. */
+export interface ChangeRequestIndex {
+  readonly complete: boolean;
+  /** Last sync, Unix milliseconds; 0 when never synced. */
+  readonly syncedAt: number;
+  readonly branches: readonly BranchChangeRequests[];
 }
 
 /** commit.resolveChangeRequests / branch.resolveChangeRequest's own shared result shape.
@@ -2035,6 +2055,19 @@ export type Contract = {
       params: { repoId: string; branch: string };
       result: ChangeRequestLookup;
     };
+    /** The persisted change request index (P352): every branch's change requests in one read,
+     *  from SQLite and so answering before any host call. Same-repo heads only. Go-served. */
+    'branch.changeRequestIndex': {
+      params: { repoId: string };
+      result: ChangeRequestIndex;
+    };
+    /** Syncs the index now (within the server's min gap and rate limit gates). `focused: false`
+     *  only records that the window blurred, slowing the periodic cadence. `wait` blocks until the
+     *  run ends. Go-served. */
+    'branch.syncChangeRequests': {
+      params: { repoId: string; focused?: boolean; wait?: boolean };
+      result: Record<string, never>;
+    };
     // ---- P74 §3.3: opening a PR in the external browser, never in place -------------------
     /** Server-composed: the renderer names a PR by number, never a URL (the boundary
      *  `GitHostService.OpenChangeRequestURL`'s own host/path check already defends). `null` when
@@ -2139,7 +2172,10 @@ export type Contract = {
     };
   };
   events: {
-    'repo.changed': { repoId: string; kind: 'refsChanged' | 'worktreeChanged' };
+    'repo.changed': {
+      repoId: string;
+      kind: 'refsChanged' | 'worktreeChanged' | 'changeRequestsChanged';
+    };
     /** G18 D4/D7: fanned out to every connected client whenever `repoSettings.set` succeeds
      *  anywhere, not only to the connection that made the change. `repoId` names which repo's own
      *  write triggered the emit; a viewer decides for itself whether it is relevant. */
