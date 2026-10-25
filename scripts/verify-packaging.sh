@@ -10,7 +10,7 @@
 #
 # Static checks (S1, S2, S5) always run — S3/S4 were electron-builder.yml checks removed in the
 # P57 rewrite; the numbering was never closed up, and check IDs stay as-is since docs/PACKAGING.md
-# cross-references them. Artifact checks (A1, A3, A5, N2 over the .app; A4, N3 over the .dmg P10
+# cross-references them. Artifact checks (A1, A3, A5, A6, N2 over the .app; A4, N3 over the .dmg P10
 # ships) run only when that artifact exists; otherwise they print "skipped" and pass.
 #
 # Every check runs before the script exits, so one run reports everything wrong, not just the
@@ -169,6 +169,16 @@ else
   note "skipped S13 — go not on PATH"
 fi
 
+# --- S14: dev and release windows render the same chrome on macOS 26 (P344) -------------------
+# A 26-SDK dev build gets larger traffic lights than the 15-SDK release unless the plist opts into
+# compatibility. wails3 task common:update:build-assets drops the key.
+for plist in apps/kira-studio/build/darwin/Info.plist apps/kira-studio/build/darwin/Info.dev.plist \
+  apps/kira-space/build/darwin/Info.plist apps/kira-space/build/darwin/Info.dev.plist; do
+  if ! grep -A1 '<key>UIDesignRequiresCompatibility</key>' "$plist" 2>/dev/null | grep -q '<true/>'; then
+    fail "design compatibility key missing" "$plist lacks UIDesignRequiresCompatibility=true — dev and release traffic lights would differ (P344); re-add after regenerating build assets"
+  fi
+done
+
 if command -v shellcheck >/dev/null 2>&1; then
   if ! shellcheck -s sh scripts/install.sh; then
     fail "shellcheck failed" "shellcheck -s sh scripts/install.sh reported issues — see above"
@@ -242,6 +252,16 @@ else
     note "skipped A5 — PlistBuddy not available on this runner"
   fi
 
+  # A6: the bundle opts into compatibility window chrome (P344).
+  if command -v /usr/libexec/PlistBuddy >/dev/null 2>&1; then
+    DESIGN_COMPAT="$(/usr/libexec/PlistBuddy -c 'Print :UIDesignRequiresCompatibility' "$APP/Contents/Info.plist" 2>/dev/null || echo '')"
+    if [ "$DESIGN_COMPAT" != "true" ]; then
+      fail "design compatibility key missing from bundle" "UIDesignRequiresCompatibility is '$DESIGN_COMPAT' in $APP, expected true"
+    fi
+  else
+    note "skipped A6 — PlistBuddy not available on this runner"
+  fi
+
   # --- N2: the whole bundle verifies deep-signed -------------------------------------------------
   if command -v codesign >/dev/null 2>&1; then
     if ! codesign --verify --deep --strict "$APP" >/dev/null 2>&1; then
@@ -310,6 +330,16 @@ else
     fi
   else
     note "skipped A5 — PlistBuddy not available on this runner"
+  fi
+
+  # A6: the bundle opts into compatibility window chrome (P344).
+  if command -v /usr/libexec/PlistBuddy >/dev/null 2>&1; then
+    SPACE_DESIGN_COMPAT="$(/usr/libexec/PlistBuddy -c 'Print :UIDesignRequiresCompatibility' "$SPACE_APP/Contents/Info.plist" 2>/dev/null || echo '')"
+    if [ "$SPACE_DESIGN_COMPAT" != "true" ]; then
+      fail "design compatibility key missing from bundle" "UIDesignRequiresCompatibility is '$SPACE_DESIGN_COMPAT' in $SPACE_APP, expected true"
+    fi
+  else
+    note "skipped A6 — PlistBuddy not available on this runner"
   fi
 
   # --- N2: the whole bundle verifies deep-signed -------------------------------------------------
