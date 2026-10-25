@@ -273,7 +273,7 @@ test('refs that run ahead of the graph keep the list, then the refresh adds the 
   const after = await snapshot(page);
   expect(after.rowCount).toBe(String(Number(before.rowCount) + 1));
   expect(after.subjects[0]).toBe(before.subjects[0]);
-  expect(await gridProblems(page)).toEqual([]);
+  await expect.poll(() => gridProblems(page)).toEqual([]);
   await setScrollTop(page, 0);
   await expect(subjectOf(page, 0)).toHaveText('head moved');
   expect(errors).toEqual([]);
