@@ -64,7 +64,7 @@ apps/kira-studio/bin/Kira Studio.app/
     Info.plist                       CFBundleName/CFBundleExecutable "Kira Studio",
                                      CFBundleIdentifier com.kirathecat.kira-studio
     Resources/
-      icons.icns                     the only icon the bundle carries; no Assets.car ships (§6)
+      icons.icns                     fallback icon; Assets.car (compiled from appicon.icon on macos-26) is the primary (§6)
     MacOS/
       Kira Studio                    the compiled Go binary — the literal filename, space included,
                                      must equal CFBundleExecutable or the bundle neither launches
@@ -96,7 +96,7 @@ builds and runs a `Kira Studio.dev.app` from `build/darwin/Info.dev.plist` witho
 **`apps/kira-studio/build/darwin/Info.plist`** — `CFBundleName` and `CFBundleExecutable` are both `Kira Studio`,
 `CFBundleIdentifier` is `com.kirathecat.kira-studio`, `CFBundleVersion`/`CFBundleShortVersionString`
 `0.0.0` (the scaffolded value; the *bundle's* copy is stamped at packaging time, below),
-`CFBundleIconFile` `icons`, `LSMinimumSystemVersion` `26.0.0`. That floor is hand-narrowed
+`CFBundleIconFile` `icons`, `CFBundleIconName` `appicon`, `LSMinimumSystemVersion` `26.0.0`. That floor is hand-narrowed
 from Wails' template default of `12.0.0`, and matches the build's deployment target and the README's macOS 26+ product claim. The template hardcodes `12.0.0`, so a
 `wails3 task common:update:build-assets` run reverts both plists — re-narrow them after regenerating.
 Kira Space's plists also carry a generated document-type block (P332); rerun
@@ -144,7 +144,7 @@ workspace root, and nothing in the app or the build reads it.
 | `create:dmg` | `wails3 tool package --format dmg` over the built `.app` — background `darwin/dmg-background.png`, volume icon *and* file icon `darwin/icons.icns`, window 540×380. The tool adds the `/Applications` symlink and places the two icons itself. macOS only (`platforms: [darwin]`) |
 | `darwin:package` | `deps: build`, then `create:app:bundle`. Still callable on its own when all you want is the bundle |
 | `darwin:build` → `build:native` | preconditioned on `uname -s = Darwin` — there is no off-macOS branch any more (§5); `deps` = `common:go:mod:tidy`, `common:build:frontend`, `common:generate:icons`; then `go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/Kira Studio` with `GOOS=darwin CGO_ENABLED=1 GOARCH=$ARCH` (host arch unless overridden) and `MACOSX_DEPLOYMENT_TARGET=14.0` (`MACOS_MIN`: 26.0 with an SDK 26+, else 14.0, P346) |
-| `create:app:bundle` | `rm -rf`s any previous bundle, then makes `Contents/{MacOS,Resources}` and copies `icons.icns`, `Assets.car` (if one is ever added back), the binary and `Info.plist`, then ends unconditionally with `codesign:adhoc` — only reachable behind `build`'s own Darwin precondition, so there is no off-macOS fallback to speak of. The `rm -rf` matters: every other step only copies *into* the bundle, so without it a resource an earlier build produced outlives the build that stopped producing it |
+| `create:app:bundle` | `rm -rf`s any previous bundle, then makes `Contents/{MacOS,Resources}` and copies `icons.icns`, `Assets.car` (when actool 26 produced one), the binary and `Info.plist`, then ends unconditionally with `codesign:adhoc` — only reachable behind `build`'s own Darwin precondition, so there is no off-macOS fallback to speak of. The `rm -rf` matters: every other step only copies *into* the bundle, so without it a resource an earlier build produced outlives the build that stopped producing it |
 
 `common:build:frontend` runs the same `bun run build:studio` the checklist above already ran; Task's
 `sources`/`generates` up-to-date checking makes the second invocation a no-op against fresh output, so
@@ -339,26 +339,19 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
 - **§4 items 1, 2, 3 and 10 passed on real macOS 26.5.2 arm64 hardware (P10); item 11 is partial;
   items 4-9 are still unrun.** Whoever next has macOS hardware should run items 4-9 and finish
   item 11's outstanding half — the drag-onto-Applications gesture and how the Finder window looks.
-- **The bundle has no `Assets.car`, and the icon comes from `icons.icns` alone.** `appicon.png` and
-  `appicon.icon/Assets/kira_icon_vector.svg` are the app's real icon, swapped in from Wails'
-  scaffolded default; `wails3 task common:generate:icons` regenerates `darwin/icons.icns` from that
-  artwork correctly. The asset catalog could not follow: building one needs Apple's `actool`
-  (`wails3 generate icons`'s `-iconcomposerinput`/`-macassetdir` flags), which ships with full Xcode
-  and not with the Command Line Tools, and which fails silently rather than loudly when absent. The
-  scaffolded, Wails-artwork `Assets.car` therefore sat in the repo unchanged — and won, because
-  `CFBundleIconName` resolves against `Assets.car` **before** `CFBundleIconFile` falls back to
-  `icons.icns`, so a packaged app showed the old Wails icon while `icons.icns` beside it was right.
-  Both the file and the `CFBundleIconName` key are now gone from `darwin/`, which leaves
-  `icons.icns` as `CFBundleIconFile`'s only path and ships the correct icon. Note `wails3 update
-  build-assets` adds that key back on its own whenever an `Assets.car` is present, so the two belong
-  together: reintroduce both or neither. `appicon.icon` is kept for whoever regenerates a catalog on
-  a machine with Xcode — the cost of going without one is that macOS composes no appearance
-  variants (dark, tinted) from the icon. `icon.json` was simplified when the artwork was swapped in:
-  the scaffolded layer was tuned for a small monochrome glyph over an automatic gray background
-  (0.85 scale, forced near-white/gray recolor in dark/tinted appearances, a specular highlight and
-  translucency) — all wrong for a full-color, pre-composed 1024×1024 icon, so those were replaced
-  with a 1.0-scale, unrecolored, non-specular single layer. That JSON is still unverified beyond
-  `wails3 generate icons` accepting it; whoever builds the catalog should eyeball the result.
+- **`Assets.car` ships, compiled from a full-bleed `appicon.icon` (P349).** On a macOS 26 host with
+  Xcode 26 (`macos-26` CI runner), `wails3 generate icons` runs `actool` over `appicon.icon`, writes
+  `darwin/Assets.car`, and overwrites `darwin/icons.icns` with actool's own render. Both are generated
+  and gitignored (`Assets.car`, `temp.plist`); `create:app:bundle` copies `Assets.car` in. The plists
+  carry `CFBundleIconName` `appicon` beside `CFBundleIconFile` `icons`; the two belong together, as
+  `CFBundleIconName` resolves against `Assets.car` first. The SVG layer is full-bleed (artwork scaled
+  to the whole 1024 canvas, no rounded clip) because the system applies the squircle mask; the old
+  pre-masked layer left a transparent margin that showed the default light fill as a white ring.
+  `icon.json` sets a document-level solid `fill` matching each background's top stop. The tracked
+  `icons.icns` and `appicon.png` are the fallback for hosts without actool 26 (never a shipped macOS
+  build). `verify-packaging.sh` S15 checks the sources; A7 checks `Assets.car` and `CFBundleIconName`
+  in the built bundles. Unverified off-macOS: the `fill` key form under actool; if actool rejects it,
+  take the form Icon Composer 26 writes.
 
 ## 7. CI, releases, install and update
 
