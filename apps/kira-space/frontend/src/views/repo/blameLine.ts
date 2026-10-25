@@ -221,13 +221,12 @@ export function createBlameLineController(deps: BlameLineControllerDeps): BlameL
 
   const cursorSub = deps.cursor.onDidChangeCursorPosition(() => refresh());
 
-  // §4.3: cheap to just re-resolve rather than narrow by `kind` — the same posture
-  // `blameWidget.ts`'s own `notifyRepoChanged` takes. Clearing `lastLine` before calling
-  // `refresh()` makes it re-trigger even though the cursor itself hasn't moved.
+  // §4.3: re-resolve on any change but host data, which cannot change blame. Clearing `lastLine`
+  // before `refresh()` re-triggers it even though the cursor hasn't moved.
   const unsubscribeRepoChanged = deps.transport.on(
     'repo.changed',
     (event: EventPayload<'repo.changed'>) => {
-      if (event.repoId !== deps.gitRepoId) return;
+      if (event.repoId !== deps.gitRepoId || event.kind === 'changeRequestsChanged') return;
       cache.clear();
       lastLine = undefined;
       refresh();
