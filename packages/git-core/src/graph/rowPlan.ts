@@ -6,7 +6,7 @@ import type { LayoutInput } from './types.ts';
 /**
  * The row plan: a pure projection from `CommitStore`'s arrival order (store rows, date order from
  * `git log --date-order`: a commit's parents always have a strictly larger row index than the
- * commit itself) onto a *display* order. P346: display order is date order; only sibling chains
+ * commit itself) onto a *display* order. P347: display order is date order; only sibling chains
  * forking from one commit that interleave are made contiguous (`displayOrder.ts`).
  *
  * **Group assignment is final on arrival.** `priority(row) = min(tipPriority(sha(row)), min over

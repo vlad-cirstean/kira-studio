@@ -3,7 +3,7 @@ import { assert } from '../lib/assert.ts';
 import type { LayoutInput } from './types.ts';
 
 /**
- * P346: the display order of the graph. The store holds commits in `git log --date-order`
+ * P347: the display order of the graph. The store holds commits in `git log --date-order`
  * (children before parents, newest first among what is ready). This projection keeps that order
  * and changes it in one case only: sibling chains forking from the same commit that interleave
  * in date order are made contiguous, so each branch reads as one run at that spot.
