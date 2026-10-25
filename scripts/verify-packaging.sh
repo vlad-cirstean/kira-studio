@@ -169,13 +169,11 @@ else
   note "skipped S13 — go not on PATH"
 fi
 
-# --- S14: dev and release windows render the same chrome on macOS 26 (P344) -------------------
-# A 26-SDK dev build gets larger traffic lights than the 15-SDK release unless the plist opts into
-# compatibility. wails3 task common:update:build-assets drops the key.
+# --- S14: the app floor is macOS 26 in every bundle plist (P346) -------------------------------
 for plist in apps/kira-studio/build/darwin/Info.plist apps/kira-studio/build/darwin/Info.dev.plist \
   apps/kira-space/build/darwin/Info.plist apps/kira-space/build/darwin/Info.dev.plist; do
-  if ! grep -A1 '<key>UIDesignRequiresCompatibility</key>' "$plist" 2>/dev/null | grep -q '<true/>'; then
-    fail "design compatibility key missing" "$plist lacks UIDesignRequiresCompatibility=true — dev and release traffic lights would differ (P344); re-add after regenerating build assets"
+  if ! grep -A1 '<key>LSMinimumSystemVersion</key>' "$plist" 2>/dev/null | grep -q '<string>26.0.0</string>'; then
+    fail "macOS floor wrong" "$plist LSMinimumSystemVersion is not 26.0.0 (P346); re-narrow after regenerating build assets"
   fi
 done
 
@@ -252,14 +250,19 @@ else
     note "skipped A5 — PlistBuddy not available on this runner"
   fi
 
-  # A6: the bundle opts into compatibility window chrome (P344).
-  if command -v /usr/libexec/PlistBuddy >/dev/null 2>&1; then
-    DESIGN_COMPAT="$(/usr/libexec/PlistBuddy -c 'Print :UIDesignRequiresCompatibility' "$APP/Contents/Info.plist" 2>/dev/null || echo '')"
-    if [ "$DESIGN_COMPAT" != "true" ]; then
-      fail "design compatibility key missing from bundle" "UIDesignRequiresCompatibility is '$DESIGN_COMPAT' in $APP, expected true"
+  # A6: minos 26.0 always; SDK >= 26 once the runner is macos-26 (P346). Until then (SDK 15.5) only a note.
+  if command -v vtool >/dev/null 2>&1; then
+    LINKED_SDK="$(vtool -show-build "$APP/Contents/MacOS/Kira Studio" 2>/dev/null | awk '$1=="sdk"{print $2}')"
+    LINKED_MINOS="$(vtool -show-build "$APP/Contents/MacOS/Kira Studio" 2>/dev/null | awk '$1=="minos"{print $2}')"
+    if [ "${LINKED_SDK%%.*}" -ge 26 ] 2>/dev/null; then
+      if [ "$LINKED_MINOS" != "26.0" ]; then
+        fail "linked minos wrong" "linked minos is '$LINKED_MINOS' in $APP, expected 26.0"
+      fi
+    else
+      note "A6 warning — $APP links SDK '$LINKED_SDK' (< 26): minos '$LINKED_MINOS', smaller traffic lights until the macos-26 runner patch in docs/pending-changes/ is applied"
     fi
   else
-    note "skipped A6 — PlistBuddy not available on this runner"
+    note "skipped A6 — vtool not available on this runner"
   fi
 
   # --- N2: the whole bundle verifies deep-signed -------------------------------------------------
@@ -332,14 +335,19 @@ else
     note "skipped A5 — PlistBuddy not available on this runner"
   fi
 
-  # A6: the bundle opts into compatibility window chrome (P344).
-  if command -v /usr/libexec/PlistBuddy >/dev/null 2>&1; then
-    SPACE_DESIGN_COMPAT="$(/usr/libexec/PlistBuddy -c 'Print :UIDesignRequiresCompatibility' "$SPACE_APP/Contents/Info.plist" 2>/dev/null || echo '')"
-    if [ "$SPACE_DESIGN_COMPAT" != "true" ]; then
-      fail "design compatibility key missing from bundle" "UIDesignRequiresCompatibility is '$SPACE_DESIGN_COMPAT' in $SPACE_APP, expected true"
+  # A6: minos 26.0 always; SDK >= 26 once the runner is macos-26 (P346). Until then (SDK 15.5) only a note.
+  if command -v vtool >/dev/null 2>&1; then
+    SPACE_LINKED_SDK="$(vtool -show-build "$SPACE_APP/Contents/MacOS/Kira Space" 2>/dev/null | awk '$1=="sdk"{print $2}')"
+    SPACE_LINKED_MINOS="$(vtool -show-build "$SPACE_APP/Contents/MacOS/Kira Space" 2>/dev/null | awk '$1=="minos"{print $2}')"
+    if [ "${SPACE_LINKED_SDK%%.*}" -ge 26 ] 2>/dev/null; then
+      if [ "$SPACE_LINKED_MINOS" != "26.0" ]; then
+        fail "linked minos wrong" "linked minos is '$SPACE_LINKED_MINOS' in $SPACE_APP, expected 26.0"
+      fi
+    else
+      note "A6 warning — $SPACE_APP links SDK '$SPACE_LINKED_SDK' (< 26): minos '$SPACE_LINKED_MINOS', smaller traffic lights until the macos-26 runner patch in docs/pending-changes/ is applied"
     fi
   else
-    note "skipped A6 — PlistBuddy not available on this runner"
+    note "skipped A6 — vtool not available on this runner"
   fi
 
   # --- N2: the whole bundle verifies deep-signed -------------------------------------------------

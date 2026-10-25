@@ -17,7 +17,7 @@ and Vue 3. Its modules are Git, Agents, Automations and Memory.
   moved them here, unchanged in behavior, into a standalone app with no database or API tooling of
   its own. See the root [`README.md`](../../README.md) for that sibling app and
   [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md)'s Git module section for the fuller history.
-- **macOS 14+, Apple Silicon (`arm64`) only. Dark mode only.**
+- **macOS 26+, Apple Silicon (`arm64`) only. Dark mode only.**
 - The packaged build is **unsigned (ad-hoc)** — code signing and notarization are deferred past
   v1, the same posture as Kira Studio's own build. The first launch after installing a new build
   may show one "Kira Space wants to use your confidential information stored in…" prompt —
@@ -133,7 +133,7 @@ Two limits worth knowing up front:
 
 ## Requirements
 
-- macOS 14 or later, Apple Silicon (`arm64`).
+- macOS 26 or later, Apple Silicon (`arm64`).
 - [Git](https://git-scm.com) 2.38 or newer on `PATH`. The native Git module needs nothing beyond
   that.
 - Optional: an authenticated `claude` CLI for Agents

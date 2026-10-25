@@ -16,7 +16,7 @@ Two native macOS apps share one repository.
 
 ## Platform
 
-- macOS 14 or later, Apple Silicon only.
+- macOS 26 or later, Apple Silicon only.
 - Dark mode only.
 - Beta. Expect bugs and breaking changes between builds.
 

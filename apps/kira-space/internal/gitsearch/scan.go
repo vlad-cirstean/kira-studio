@@ -106,7 +106,7 @@ func Scan(ctx context.Context, deps Deps, opts Options) (Result, error) {
 	splitter := porcelain.NewRecordSplitter(0)
 	grouper := porcelain.NewFieldGrouper(porcelain.ScanFieldCount)
 	deadline := time.Now().Add(budget)
-	// expired wakes a read blocked while git emits nothing (a --topo-order walk with no
+	// expired wakes a read blocked while git emits nothing (a --date-order walk with no
 	// commit-graph prints nothing until it has walked everything).
 	timer := time.NewTimer(budget)
 	defer timer.Stop()

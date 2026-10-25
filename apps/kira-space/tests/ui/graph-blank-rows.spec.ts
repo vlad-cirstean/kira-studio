@@ -163,6 +163,18 @@ async function setScrollTop(p: Page, top: number | 'end'): Promise<void> {
   await frames(p);
 }
 
+/** Scrolls from the top until a collapsed placeholder is rendered. Collapsed runs sit inside the
+ *  history in date order, and a click expands every run of its group. */
+async function scrollToCollapsedRow(p: Page): Promise<void> {
+  const collapsed = p.locator(`${GRID} [data-testid="graph-collapsed-row"]`);
+  const step = await p.locator(VIEWPORT).evaluate((viewport) => viewport.clientHeight);
+  for (let top = 0; top < 40 * step; top += step) {
+    await setScrollTop(p, top);
+    if ((await collapsed.count()) > 0) return;
+  }
+  throw new Error('no collapsed row rendered in the first 40 viewports');
+}
+
 async function wheel(p: Page, steps: number, deltaY: number): Promise<void> {
   const box = (await p.locator(VIEWPORT).boundingBox())!;
   await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -332,7 +344,7 @@ test('a relayout that races a scroll and a click leaves the rows painted and the
   }
 
   for (const depth of [0, 1, 2, 3]) {
-    await setScrollTop(page, 'end');
+    await scrollToCollapsedRow(page);
     await race(depth, () =>
       page.locator(`${GRID} [data-testid="graph-collapsed-row"]`).first().click(),
     );
