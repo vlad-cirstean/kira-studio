@@ -424,7 +424,11 @@ func (e *RepoEntry) ensureSnapshot(ctx context.Context) ([]githost.ChangeRequest
 	case cacheFresh:
 		return crs, githost.Status{Kind: githost.KindOK}
 	case cacheStale:
-		e.refreshInBackground("snapshot", func(ctx context.Context) { e.fetchSnapshot(ctx) })
+		e.refreshInBackground("snapshot", func(ctx context.Context) {
+			if _, st := e.host.snapshotGet(); st == cacheStale {
+				e.fetchSnapshot(ctx)
+			}
+		})
 		return crs, githost.Status{Kind: githost.KindOK}
 	}
 	return e.fetchSnapshot(ctx)
@@ -489,7 +493,11 @@ func (e *RepoEntry) ResolveCommitChangeRequests(ctx context.Context, sha string)
 	case cacheFresh:
 		return okResult(crs)
 	case cacheStale:
-		e.refreshInBackground("commit:"+sha, func(ctx context.Context) { e.fetchCommitChangeRequests(ctx, p, repo, sha, gen) })
+		e.refreshInBackground("commit:"+sha, func(ctx context.Context) {
+			if _, st := e.host.commitCacheGet(sha); st == cacheStale {
+				e.fetchCommitChangeRequests(ctx, p, repo, sha, gen)
+			}
+		})
 		return okResult(crs)
 	}
 	return e.fetchCommitChangeRequests(ctx, p, repo, sha, gen)
@@ -568,7 +576,11 @@ func (e *RepoEntry) resolveBranchChangeRequest(ctx context.Context, branch strin
 	case cacheFresh:
 		return branchResult(cached)
 	case cacheStale:
-		e.refreshInBackground("branch:"+branch, func(ctx context.Context) { e.fetchBranchChangeRequest(ctx, p, repo, branch, gen) })
+		e.refreshInBackground("branch:"+branch, func(ctx context.Context) {
+			if _, st := e.host.branchCacheGet(branch); st == cacheStale {
+				e.fetchBranchChangeRequest(ctx, p, repo, branch, gen)
+			}
+		})
 		return branchResult(cached)
 	}
 	return e.fetchBranchChangeRequest(ctx, p, repo, branch, gen)
