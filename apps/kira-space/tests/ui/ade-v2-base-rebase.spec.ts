@@ -140,7 +140,7 @@ test('a branch behind a develop base offers Rebase onto develop, run in the back
   await expect(tag).toHaveText('Rebase');
   await tag.hover();
   await expect(
-    page.locator('[data-testid="var-chip"][data-var="base"]', { hasText: 'develop' }).first(),
+    page.locator('[data-testid="branch-chip"][data-var="base"]', { hasText: 'develop' }).first(),
   ).toBeVisible();
   await tag.click();
   await expect(page.locator(t('ade-dialog-message'))).toHaveValue(/Rebase/);
