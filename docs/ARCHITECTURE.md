@@ -1858,6 +1858,11 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - CommitGrid emits the drawn graph width and UncommittedChangesStrip sizes its cell from it.
 - Edge records (EDGE_STRIDE 6) carry three lanes: fromLane (source node), EDGE_RUN_LANE (lane on pass-through rows, set at append, never patched) and toLane (target node); edges carry no kind.
 - Convergence at the target row patches toLane only, so a branch-out edge that later converges keeps running in its own lane and bends into the claiming lane in its last row; rowSvg.edgeCommand draws from the three lanes.
+- The graph walks git log --date-order (children before parents, which lanes need); the walk, the tail scan and the ranged review walk share it.
+- Display order is date order. Only sibling chains forking from one commit that interleave are made contiguous, client-side in git-core graph/displayOrder.ts (localTopoOrder, flatqueue min-heap); with no such siblings display order equals store order.
+- Group assignment (rowPlan assignRowRanks) is final on arrival; display order is not, since a later page can join two chains and rows next to the loaded boundary can move.
+- Collapse contracts each maximal run of one non-zero group's consecutive rows (more than 3) to tip, placeholder and oldest; a group can form several runs, and expanding its key expands all of them.
+- The graph has no fork stubs: the display order is topological, so every fork is a real lane, and an unloaded fork parent keeps a pending lane running off the bottom.
 
 ### Code review, ported natively (C11)
 
