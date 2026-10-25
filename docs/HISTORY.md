@@ -6962,3 +6962,24 @@ macOS behaviour unverified (Linux session). User must confirm on a Mac: SDK spli
 ### v0.2.15 P345 (Done)
 Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.15/` removed.
 <!-- /chapter v0.2.15 -->
+
+<!-- chapter v0.2.16 -->
+## v0.2.16
+Source: docs/v0.2.16/ at 187297938449. 3 phases.
+
+### v0.2.16 P346 (Done)
+macOS window chrome rework; supersedes v0.2.15 P344's ineffective `UIDesignRequiresCompatibility` plist key (removed from four plists). Larger macOS 26 buttons are correct.
+Root cause: AppKit picks chrome by the executable's linked SDK. Released binaries linked SDK 15.5 (runner `macos-15`); dev links the user's Xcode SDK (26+). Window code identical in both builds.
+Fix, Electron model: no SDK stamp, SDK is the building Xcode's. Min macOS 26.0 (14 and 15 dropped on purpose): `LSMinimumSystemVersion` `26.0.0` in four plists, `install.sh` preflight, README, site copy, ARCHITECTURE, PACKAGING. Darwin Taskfiles set `-mmacosx-version-min` and `MACOSX_DEPLOYMENT_TARGET` from `MACOS_MIN` (26.0 with SDK 26+, else 14.0). Runners moved to `macos-26`. Guards: `verify-packaging.sh` S14 (plist floor) and A6 (minos 26.0 when SDK 26+).
+macOS behaviour unverified from Linux. Runner move confirmed by user; look not yet confirmed on a Mac. Check: `vtool -show-build` on dev and released binaries shows `sdk 26.x`, `minos 26.0`; buttons larger. Fallback if dev toolchain rejects `-mmacosx-version-min=26.0`: dev floor back to 14.0 in `MACOS_MIN`, keep plist floor.
+
+### v0.2.16 P347 (Done)
+Git graph: branches rendered as starting from nowhere. Root cause: P93 made display order branch-major for the whole graph; `--topo-order` put every non-HEAD branch below all loaded main rows, `projectLayoutInput` dropped each upward link, `planForkStub` drew a dashed stub.
+Fix: backend walks `git log --date-order` (log walk, tail scan, ranged review walk share `logBaseArgs`). New `packages/git-core/src/graph/displayOrder.ts` (`localTopoOrder`, `flatqueue` 3.1.0 min-heap, ISC, zero dependencies): store order kept; only sibling chains from one fork commit that interleave become contiguous. Heap unbounded. `rowPlan.ts`: `assignRowRanks` returns per-row rank; `collapseRuns` contracts each maximal run of one group; `projectLayoutInput` asserts no upward link. Removed `forkParentOf`, `forkStub`, `planForkStub`, `EdgePathPlan.dashed`, stub click and `hitTest.ts`. Review range view order changed with the shared walk.
+Tests: unit `displayOrder.spec.ts` (300-DAG property check), `rowPlan.spec.ts`, `rowSvg.spec.ts`; flow `TestGraphForkInterleaveDateOrder`; UI spec in `repo-graph-branch-order.spec.ts`; P93 expectations rewritten. `graph-blank-rows.spec.ts` scrolls from the top until a collapsed row renders.
+Perf (`KIRA_GIT_PERF=1`, 20000 commits, first chunk): `--topo-order` 249.99ms, `--date-order` 245.78ms. No regression. Full `test:ui:space` 677 pass.
+Known: display order is not final on page load. A later page can join two chains and move rows next to the loaded boundary; grid repaints on every plan publish.
+
+### v0.2.16 P348 (Done)
+Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.16/` removed.
+<!-- /chapter v0.2.16 -->

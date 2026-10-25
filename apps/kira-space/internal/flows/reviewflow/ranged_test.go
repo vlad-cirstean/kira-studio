@@ -150,7 +150,7 @@ func TestRangedWalkMatchesGitLog(t *testing.T) {
 	repo, base := reviewTopology(app)
 	id := openRepo(t, gs, repo.Dir)
 
-	want := strings.Fields(repo.Git("log", "--topo-order", "--format=%H", base+"..topic"))
+	want := strings.Fields(repo.Git("log", "--date-order", "--format=%H", base+"..topic"))
 	if len(want) != 2 {
 		t.Fatalf("git log reports %d commits, want 2", len(want))
 	}

@@ -525,9 +525,7 @@
 		<key>CFBundleVersion</key>
 		<string>0.0.0</string>
 		<key>LSMinimumSystemVersion</key>
-		<string>14.0.0</string>
-		<key>UIDesignRequiresCompatibility</key>
-		<true/>
+		<string>26.0.0</string>
 		<key>NSAppTransportSecurity</key>
 		<dict>
 			<key>NSAllowsLocalNetworking</key>

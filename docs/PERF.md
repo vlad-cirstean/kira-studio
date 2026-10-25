@@ -956,7 +956,7 @@ component classes replaced duplicated `.kv-*` styling. Container build, not a pa
 
 ## 3. Manual procedures (macOS, packaged build)
 
-Not yet run — no macOS hardware here. Run these once on macOS 14+ arm64 and record the results
+Not yet run — no macOS hardware here. Run these once on macOS 26+ arm64 and record the results
 here. **Rewritten for the Wails/Go bundle at P57 M8**: the steps below are a
 re-pointed procedure, not a re-measurement — nothing in this section has been executed on real
 hardware since the migration, and no number in this file changed as a result of the rewrite.
@@ -1074,7 +1074,7 @@ All three resolved in P13. Their cache coverage moved to Go with L2/L3 (P58a A21
 ## 5. Test-suite duration (P294, replaces the v1.4 P1 baseline)
 
 Measured on this box (4 cores, 15 GB, Docker 29, real WebKit). Plan and method:
-`git show ca2fa17c172b:docs/v2.6/plans/P294-test-ci-speed.md`. CI numbers are pending the pending-changes patch.
+`git show ca2fa17c172b:docs/v2.6/plans/P294-test-ci-speed.md`. CI numbers were not measured.
 
 | Item | Before | After |
 |---|---|---|

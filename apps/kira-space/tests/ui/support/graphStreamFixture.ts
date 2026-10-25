@@ -205,3 +205,88 @@ export function buildGraphStreamChunk(
     blob: Buffer.from(encoded.commits.d).toString('base64'),
   };
 }
+
+// Fork-interleave fixture: the backend flow test's `TestGraphForkInterleaveDateOrder` history in
+// `git log --date-order` order. `feat` (f1..f3) and `fix` (x1, x2) fork from m1 and interleave;
+// the plan makes `fix` contiguous at that spot. HEAD is `main`.
+export const FORK_INTERLEAVE_SUBJECTS = [
+  'f3',
+  'm6',
+  'm5',
+  'm4',
+  'm3',
+  'm2',
+  'x2',
+  'f2',
+  'x1',
+  'f1',
+  'm1',
+  'm0',
+] as const;
+
+/** Display order the plan wants for `FORK_INTERLEAVE_SUBJECTS`. */
+export const FORK_INTERLEAVE_DISPLAY_SUBJECTS = [
+  'f3',
+  'm6',
+  'm5',
+  'm4',
+  'm3',
+  'm2',
+  'x2',
+  'x1',
+  'f2',
+  'f1',
+  'm1',
+  'm0',
+] as const;
+
+const FORK_INTERLEAVE_PARENT_ROWS: readonly (readonly number[])[] = [
+  [7],
+  [2],
+  [3],
+  [4],
+  [5],
+  [10],
+  [8],
+  [9],
+  [10],
+  [10],
+  [11],
+  [],
+];
+
+export function buildForkInterleaveChunk(): PackedCommitChunk {
+  return buildPackedChunk(
+    FORK_INTERLEAVE_SUBJECTS.map((subject, row) => ({
+      sha: multiBranchSha(row),
+      subject,
+      parents: FORK_INTERLEAVE_PARENT_ROWS[row].map(multiBranchSha),
+    })),
+  );
+}
+
+export function buildForkInterleaveRefsList(): unknown {
+  const branch = (name: string, row: number, committerDate: number, isHead: boolean) => ({
+    refname: `refs/heads/${name}`,
+    kind: 'branch',
+    shortName: name,
+    objectId: multiBranchSha(row),
+    peeledObjectId: undefined,
+    upstream: undefined,
+    track: undefined,
+    committerDate,
+    isHead,
+    checkedOutIn: undefined,
+    annotation: undefined,
+  });
+  return {
+    branches: [
+      branch('main', 1, WIDEST_SAMPLE_TIMESTAMP, true),
+      branch('feat', 0, WIDEST_SAMPLE_TIMESTAMP + 2000, false),
+      branch('fix', 6, WIDEST_SAMPLE_TIMESTAMP + 1000, false),
+    ],
+    remoteBranches: [],
+    tags: [],
+    head: { kind: 'branch', name: 'main' },
+  };
+}

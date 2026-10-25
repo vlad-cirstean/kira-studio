@@ -20,7 +20,8 @@ const FieldCount = 10
 
 // logBaseArgs is the walk's fixed argv prefix, shared by every consumer of LogFormat: decorate=
 // full is load-bearing (short ref names cannot be classified — see parseDecorationToken),
-// topo-order is what makes the graph's lanes meaningful, and -z terminates each record with the
+// date-order keeps children before parents, which the graph's lanes need (grouping of sibling
+// branches is client-side), and -z terminates each record with the
 // same NUL byte LogFormat's own %x00 already uses between fields — the format's own last
 // field carries no trailing delimiter, so -z's automatic per-record NUL lands exactly once, right
 // after it, with no double delimiter and nothing to strip. Field and record boundaries are the
@@ -36,7 +37,7 @@ const FieldCount = 10
 func logBaseArgs(format string) []string {
 	return []string{
 		"log", "--decorate=full", "--decorate-refs-exclude=refs/remotes/*/HEAD",
-		"--topo-order", "-z", "--format=" + format,
+		"--date-order", "-z", "--format=" + format,
 	}
 }
 
@@ -104,7 +105,7 @@ const ScanFieldCount = 11
 
 // LogScanArgs is the tail-scan argv: the same log vocabulary and the same WalkArgs(spec) call
 // LogSessionArgs makes, with ScanFormat in place of LogFormat — this is what makes the ordering
-// property hold: the paging walk and the scan are the same --topo-order walk over the same rev
+// property hold: the paging walk and the scan are the same --date-order walk over the same rev
 // set, so the loaded rows are a PREFIX of the scan's sequence and git-ui's buildCommitHits can
 // concatenate the two halves without sorting anything. --decorate=full (and its own
 // --decorate-refs-exclude, logBaseArgs' own doc comment) is kept even though ParseScanRecord

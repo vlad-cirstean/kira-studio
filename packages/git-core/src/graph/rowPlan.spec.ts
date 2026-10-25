@@ -4,7 +4,7 @@ import { buildRowPlan, identityRowPlan, projectLayoutInput, type TipRef } from '
 
 /**
  * `rowPlan.ts` clears `CLAUDE.md`'s unit-test bar on its own — priority propagation and
- * group-major ordering interact, index math (display-vs-store) has real boundaries, contraction
+ * per-run contraction interact, index math (display-vs-store) has real boundaries, contraction
  * has several interacting rules of its own, and "final on arrival" is an
  * incremental-arrival invariant invisible in the output of any single call.
  *
@@ -88,7 +88,7 @@ describe('buildRowPlan — assignment and ordering', () => {
     expect(plan.entryAt(plan.displayRowOf(1)).groupIndex).toBe(1);
   });
 
-  test('ordering is group-major, store order within a group, and deterministic across rebuilds', () => {
+  test('display order is store order here and deterministic across rebuilds', () => {
     const store = new CommitStore();
     store.appendPage(records());
     const planA = buildRowPlan(store, tips(), noOptions);
@@ -96,8 +96,8 @@ describe('buildRowPlan — assignment and ordering', () => {
     const orderA = Array.from({ length: planA.length }, (_, d) => planA.storeRowAt(d));
     const orderB = Array.from({ length: planB.length }, (_, d) => planB.storeRowAt(d));
     expect(orderA).toEqual(orderB);
-    // Group 0 (rows 0, 1, 3) entirely before group 1 (row 2).
-    expect(orderA).toEqual([0, 1, 3, 2]);
+    // No interleaving siblings: groups do not reorder anything.
+    expect(orderA).toEqual([0, 1, 2, 3]);
   });
 
   test('every row renders when collapse is disabled, however large a group is', () => {
@@ -247,10 +247,90 @@ describe('buildRowPlan — contraction (§4.1/§4.3)', () => {
   });
 });
 
+describe('buildRowPlan — collapse per run', () => {
+  /** `main` M0 ... M1 R; branch B's rows come in two runs of `r1` and `r2` rows, separated by
+   *  3-row runs of branch C (forking from a different commit, so B and C never regroup). Display
+   *  order equals store order. */
+  function interleaved(r1: number, r2: number) {
+    const kinds = [
+      'M0',
+      ...Array<string>(r1).fill('B'),
+      ...Array<string>(3).fill('C'),
+      ...Array<string>(r2).fill('B'),
+      ...Array<string>(3).fill('C'),
+      'M1',
+      'R',
+    ];
+    const m1 = kinds.length - 2;
+    const root = kinds.length - 1;
+    const records = kinds.map((kind, i) => {
+      if (kind === 'M0') return commit(i, [m1]);
+      if (kind === 'M1') return commit(i, [root]);
+      if (kind === 'R') return commit(i, []);
+      const next = kinds.indexOf(kind, i + 1);
+      return commit(i, [next >= 0 ? next : kind === 'B' ? root : m1]);
+    });
+    const tips = [tip(0, 'main'), tip(1, 'b'), tip(1 + r1, 'c')];
+    return { records, tips };
+  }
+  const collapseOn = { expandedKeys: new Set<string>(), collapseEnabled: true, revision: 1 };
+  const kindsOf = (plan: ReturnType<typeof buildRowPlan>) =>
+    Array.from({ length: plan.length }, (_, d) => plan.entryAt(d).kind);
+
+  test('two separate runs of one group each contract on their own', () => {
+    const { records, tips } = interleaved(4, 4);
+    const store = new CommitStore();
+    store.appendPage(records);
+    const plan = buildRowPlan(store, tips, collapseOn);
+
+    // M0, [b tip, placeholder, b oldest], C x3, [b tip, placeholder, b oldest], C x3, M1, R
+    expect(plan.length).toBe(1 + 3 + 3 + 3 + 3 + 2);
+    const placeholders = kindsOf(plan).filter((k) => k === 'collapsed');
+    expect(placeholders).toHaveLength(2);
+    for (let d = 0; d < plan.length; d++) {
+      const entry = plan.entryAt(d);
+      if (entry.kind === 'collapsed') {
+        expect(entry.hiddenCount).toBe(2);
+        expect(plan.groupKeyAt(d)).toBe('b');
+      }
+    }
+  });
+
+  test('a run of exactly MIN_COLLAPSIBLE stays full while its sibling run collapses', () => {
+    const { records, tips } = interleaved(3, 4);
+    const store = new CommitStore();
+    store.appendPage(records);
+    const plan = buildRowPlan(store, tips, collapseOn);
+    expect(kindsOf(plan).filter((k) => k === 'collapsed')).toHaveLength(1);
+    expect(plan.length).toBe(store.rowCount - 1);
+  });
+
+  test('expanding the key expands every run of the group', () => {
+    const { records, tips } = interleaved(4, 4);
+    const store = new CommitStore();
+    store.appendPage(records);
+    const plan = buildRowPlan(store, tips, { ...collapseOn, expandedKeys: new Set(['b']) });
+    expect(kindsOf(plan)).not.toContain('collapsed');
+    expect(plan.length).toBe(store.rowCount);
+  });
+
+  test('a collapsed plan projects only downward links', () => {
+    const { records, tips } = interleaved(4, 4);
+    const store = new CommitStore();
+    store.appendPage(records);
+    const plan = buildRowPlan(store, tips, collapseOn);
+    const input = projectLayoutInput(plan, store.layoutInput(0, store.rowCount));
+    for (let d = 0; d < plan.length; d++) {
+      for (let slot = input.parentOffsets[d]; slot < input.parentOffsets[d + 1]; slot++) {
+        expect(input.parentRows[slot]).toBeGreaterThan(d);
+      }
+    }
+  });
+});
+
 describe('projectLayoutInput', () => {
   /** `main` (tip row 0): 0 -> 1 -> 7 (row 7 the shared root). `feature` (tip row 2): 2 -> 3 -> 4
-   *  -> 5 -> 6 -> 7 — row 6, feature's own oldest, forks off row 7, which display-order places
-   *  *earlier* (group 0 beats group 1) — the one upward link in this fixture, at row 6. */
+   *  -> 5 -> 6 -> 7. */
   function records() {
     return [
       commit(0, [1]),
@@ -267,7 +347,7 @@ describe('projectLayoutInput', () => {
     return [tip(0, 'main'), tip(2, 'feature', 'feature/x')];
   }
 
-  test('every projected link points strictly down, and the fork row reports its target', () => {
+  test('every projected link points strictly down, fork edge included', () => {
     const store = new CommitStore();
     store.appendPage(records());
     const plan = buildRowPlan(store, tips(), noOptions);
@@ -282,14 +362,11 @@ describe('projectLayoutInput', () => {
         expect(input.parentRows[slot]).toBeGreaterThan(d);
       }
     }
-    // Row 6's parent (row 7) lands in the higher-priority group, earlier in display order —
-    // dropped from the CSR and surfaced as this row's fork stub instead.
+    // Row 6 forks off row 7: an ordinary downward link.
     const forkDisplayRow = plan.displayRowOf(6);
-    const targetDisplayRow = plan.displayRowOf(7);
-    expect(plan.forkParentOf(forkDisplayRow)).toBe(targetDisplayRow);
     const start = input.parentOffsets[forkDisplayRow];
     const end = input.parentOffsets[forkDisplayRow + 1];
-    expect(Array.from(input.parentRows.subarray(start, end))).not.toContain(targetDisplayRow);
+    expect(Array.from(input.parentRows.subarray(start, end))).toEqual([plan.displayRowOf(7)]);
   });
 
   test('the identity plan projects every link unchanged (downward only)', () => {
@@ -301,7 +378,6 @@ describe('projectLayoutInput', () => {
 
     expect(Array.from(input.parentOffsets)).toEqual(Array.from(base.parentOffsets));
     expect(Array.from(input.parentRows)).toEqual(Array.from(base.parentRows));
-    for (let d = 0; d < plan.length; d++) expect(plan.forkParentOf(d)).toBe(-1);
   });
 });
 

@@ -1,37 +1,36 @@
 import { assert } from '../lib/assert.ts';
 import type { CommitStore } from '../store/commitStore.ts';
+import { localTopoOrder } from './displayOrder.ts';
 import type { LayoutInput } from './types.ts';
 
 /**
- * P93 §3: the branch-grouped row plan — a pure projection from `CommitStore`'s arrival order
- * (store rows, topological: a commit's parents always have a strictly larger row index than the
- * commit itself) onto a *display* order (checked-out branch first, then every other branch's
- * group, most-recently-active first).
+ * The row plan: a pure projection from `CommitStore`'s arrival order (store rows, date order from
+ * `git log --date-order`: a commit's parents always have a strictly larger row index than the
+ * commit itself) onto a *display* order. P347: display order is date order; only sibling chains
+ * forking from one commit that interleave are made contiguous (`displayOrder.ts`).
  *
  * **Group assignment is final on arrival.** `priority(row) = min(tipPriority(sha(row)), min over
  * children c of row: priority(c))`, computed in one forward pass over rows in arrival order
- * (`buildRowPlan` below). Under `--topo-order` every commit that can reach a row is already
- * loaded when that row arrives, so no later page can lower a row's priority — a plan rebuilt
- * after page 5 agrees with one rebuilt after page 1 about every row page 1 already held
- * (`rowPlan.spec.ts`'s "final on arrival" case).
+ * (`buildRowPlan` below). Every commit that can reach a row is already loaded when that row
+ * arrives, so no later page can lower a row's priority — a plan rebuilt after page 5 agrees with
+ * one rebuilt after page 1 about every row page 1 already held (`rowPlan.spec.ts`'s "final on
+ * arrival" case). Group assignment feeds collapse labels and keys only; the display order is not
+ * final on arrival (see `displayOrder.ts`).
  *
  * `buildRowPlan` reprocesses the whole `[0, store.rowCount)` range on every call rather than
- * keeping `claimed`/`pendingBySha` state across calls — a deliberate simplification against this
- * module's own production call site (`GraphViewState`'s rebuild, P93 §5.3 step 1), which always
- * passes the *whole* store on every plan-affecting change anyway (a page landing already forces a
- * full relayout downstream, §5.1). Finality still holds identically either way; a per-call
- * `claimed`/`pendingBySha` cache would only ever be exercised in a call pattern nothing in this
- * codebase uses.
+ * keeping `claimed`/`pendingBySha` state across calls: its production call site
+ * (`GraphViewState`'s rebuild) always passes the *whole* store on every plan-affecting change
+ * anyway, since a page landing already forces a full relayout downstream.
  *
  * No Vue, no DOM — `App.vue`/`GraphOrderState` own the tip list and the expanded-group set;
  * this module only ever reads `CommitStore` and the `RowPlan`/`LayoutInput` shapes.
  *
- * `buildRowPlan` also performs §4's contraction: a collapsed group (`options.collapseEnabled`,
- * not group 0, not in `options.expandedKeys`, more than `MIN_COLLAPSIBLE` members) renders as its
- * tip, one placeholder entry contracting every member between, and its oldest own commit — never
- * a nested collapse, since a branch off a branch is its own group at its own priority (§3.1).
- * `projectLayoutInput` (§4.3/§6.2, below) is the display-row projection `lanes.ts` runs against;
- * it already handles a contracted placeholder's folded parent links.
+ * `buildRowPlan` also performs contraction: each maximal run of consecutive display rows of one
+ * group (`options.collapseEnabled`, not group 0, not in `options.expandedKeys`, more than
+ * `MIN_COLLAPSIBLE` rows) renders as its tip, one placeholder entry contracting every row
+ * between, and its oldest row. A group can form several runs; each contracts on its own.
+ * `projectLayoutInput` (below) is the display-row projection `lanes.ts` runs against; it folds a
+ * contracted placeholder's parent links.
  */
 
 /** One branch/stash/tag tip the plan groups commits under, in priority order — index 0 is the
@@ -86,11 +85,6 @@ export interface RowPlan {
    *  hiding it. Always resolves for a loaded row. */
   containingDisplayRow(storeRow: number): number;
   groupKeyAt(displayRow: number): string;
-  /** This row's nearest upward link — the display row of the parent that lands
-   *  *above* it, or `-1` when every parent lands below (every row of the checked-out group, and
-   *  most rows everywhere else). Populated by `projectLayoutInput`; `-1` for every row until that
-   *  runs. */
-  forkParentOf(displayRow: number): number;
 }
 
 export interface RowPlanOptions {
@@ -107,15 +101,7 @@ const MIN_COLLAPSIBLE = 3;
  *  can never collide with a caller-supplied `TipRef.key`. */
 export const OTHER_GROUP_KEY = '\u0000other';
 
-/** Only `projectLayoutInput` (same module) writes `forkParentOf` — every other
- *  reader of `RowPlan` sees it read-only. Kept as a narrow internal protocol rather than a public
- *  `RowPlan` method so `identityRowPlan`'s trivial implementation (whose links never point up)
- *  does not need one at all. */
-interface InternalRowPlan {
-  _setForkParent?(displayRow: number, target: number): void;
-}
-
-class RowPlanImpl implements RowPlan, InternalRowPlan {
+class RowPlanImpl implements RowPlan {
   readonly length: number;
   readonly revision: number;
   readonly storeLength: number;
@@ -123,7 +109,6 @@ class RowPlanImpl implements RowPlan, InternalRowPlan {
   readonly #storeRowToDisplayRow: Int32Array;
   readonly #storeRowToContainingDisplayRow: Int32Array;
   readonly #groupKeyByIndex: readonly string[];
-  readonly #forkParent: Int32Array;
 
   constructor(
     entries: readonly RowPlanEntry[],
@@ -139,7 +124,6 @@ class RowPlanImpl implements RowPlan, InternalRowPlan {
     this.#storeRowToDisplayRow = storeRowToDisplayRow;
     this.#storeRowToContainingDisplayRow = storeRowToContainingDisplayRow;
     this.#groupKeyByIndex = groupKeyByIndex;
-    this.#forkParent = new Int32Array(entries.length).fill(-1);
   }
 
   entryAt(displayRow: number): RowPlanEntry {
@@ -170,18 +154,6 @@ class RowPlanImpl implements RowPlan, InternalRowPlan {
 
   groupKeyAt(displayRow: number): string {
     return this.#groupKeyByIndex[this.entryAt(displayRow).groupIndex];
-  }
-
-  forkParentOf(displayRow: number): number {
-    assert(
-      displayRow >= 0 && displayRow < this.#forkParent.length,
-      `RowPlan.forkParentOf(${displayRow}): out of range`,
-    );
-    return this.#forkParent[displayRow];
-  }
-
-  _setForkParent(displayRow: number, target: number): void {
-    this.#forkParent[displayRow] = target;
   }
 }
 
@@ -243,14 +215,6 @@ class IdentityRowPlan implements RowPlan {
     );
     return 'identity';
   }
-
-  forkParentOf(displayRow: number): number {
-    assert(
-      displayRow >= 0 && displayRow < this.length,
-      `RowPlan.forkParentOf(${displayRow}): out of range`,
-    );
-    return -1;
-  }
 }
 
 // Phase 1 (P94 pass 3 §4.3): first tip wins a shared sha (a branch and a tag on the same commit
@@ -264,20 +228,17 @@ function rankTips(tips: readonly TipRef[]): Map<string, number> {
 }
 
 // One forward pass over store rows computing `priority(row) = min(tipPriority(sha(row)),
-// min over children c of row: priority(c))` (this module's own doc comment) and bucketing each
-// row by its rank. `bucketCount` is `tips.length + 1` — one bucket per tip plus the catch-all
-// "other" bucket at `otherRank`.
+// min over children c of row: priority(c))` (this module's own doc comment). Returns each
+// row's rank; `otherRank` (`tips.length`) is the catch-all "other" group.
 function assignRowRanks(
   store: CommitStore,
   tipRankBySha: ReadonlyMap<string, number>,
   otherRank: number,
   rowCount: number,
-  bucketCount: number,
-): number[][] {
+): Int32Array {
   const claimed = new Int32Array(rowCount);
   const pendingByRow = new Int32Array(rowCount).fill(-1);
   const pendingBySha = new Map<string, number>();
-  const buckets: number[][] = Array.from({ length: bucketCount }, () => []);
 
   for (let row = 0; row < rowCount; row++) {
     const sha = store.shaAt(row);
@@ -289,7 +250,6 @@ function assignRowRanks(
     if (fromChildRow >= 0 && fromChildRow < rank) rank = fromChildRow;
     if (fromChildSha !== undefined && fromChildSha < rank) rank = fromChildSha;
     claimed[row] = rank;
-    buckets[rank].push(row);
     pendingBySha.delete(sha);
 
     const parentRows = store.parentsOf(row);
@@ -308,90 +268,83 @@ function assignRowRanks(
       if (existing === -1 || rank < existing) pendingByRow[parentRow] = rank;
     }
   }
-  return buckets;
+  return claimed;
 }
 
-interface CollapsedBuckets {
+interface CollapsedRuns {
   entries: RowPlanEntry[];
   storeRowToDisplayRow: Int32Array;
   storeRowToContainingDisplayRow: Int32Array;
 }
 
-// The contraction: group 0 (bucket index 0, the checked-out branch — or stash, if the
-// caller placed it there, though `App.vue` never does) never collapses; every other bucket
-// collapses when enabled, not manually expanded, and large enough that contracting saves a real
-// row count. `bucket` is already tip-first/oldest-last (store order === arrival order === the
-// forward walk that visits a child before its still-loading parent, assignRowRanks' own
-// `assert(parentRow > row, ...)`).
-function collapseBuckets(
-  buckets: readonly number[][],
+// The contraction, per maximal run of consecutive display rows of one group. Group 0 (the
+// checked-out branch — or stash, if the caller placed it there, though `App.vue` never does)
+// never collapses; every other run collapses when enabled, not manually expanded, and long
+// enough that contracting saves a real row count. `order` is display order, so a run is tip-first
+// and oldest-last.
+function collapseRuns(
+  order: Int32Array,
+  rank: Int32Array,
   groupKeyByIndex: readonly string[],
   options: RowPlanOptions,
   rowCount: number,
-): CollapsedBuckets {
+): CollapsedRuns {
   const entries: RowPlanEntry[] = [];
   const storeRowToDisplayRow = new Int32Array(rowCount).fill(-1);
   const storeRowToContainingDisplayRow = new Int32Array(rowCount).fill(-1);
 
-  for (let bucketIndex = 0; bucketIndex < buckets.length; bucketIndex++) {
-    const bucket = buckets[bucketIndex] as number[];
-    const key = groupKeyByIndex[bucketIndex] as string;
+  const pushCommit = (row: number, groupIndex: number) => {
+    const displayRow = entries.length;
+    entries.push({ kind: 'commit', storeRow: row, groupIndex, hiddenCount: 0 });
+    storeRowToDisplayRow[row] = displayRow;
+    storeRowToContainingDisplayRow[row] = displayRow;
+  };
+
+  let start = 0;
+  while (start < rowCount) {
+    const groupIndex = rank[order[start]];
+    let end = start + 1;
+    while (end < rowCount && rank[order[end]] === groupIndex) end++;
+    const length = end - start;
     const collapse =
       options.collapseEnabled &&
-      bucketIndex !== 0 &&
-      bucket.length > MIN_COLLAPSIBLE &&
-      !options.expandedKeys.has(key);
+      groupIndex !== 0 &&
+      length > MIN_COLLAPSIBLE &&
+      !options.expandedKeys.has(groupKeyByIndex[groupIndex]);
 
     if (!collapse) {
-      for (const row of bucket) {
-        const displayRow = entries.length;
-        entries.push({ kind: 'commit', storeRow: row, groupIndex: bucketIndex, hiddenCount: 0 });
-        storeRowToDisplayRow[row] = displayRow;
-        storeRowToContainingDisplayRow[row] = displayRow;
-      }
+      for (let i = start; i < end; i++) pushCommit(order[i], groupIndex);
+      start = end;
       continue;
     }
 
-    const tipRow = bucket[0] as number;
-    const tipDisplayRow = entries.length;
-    entries.push({ kind: 'commit', storeRow: tipRow, groupIndex: bucketIndex, hiddenCount: 0 });
-    storeRowToDisplayRow[tipRow] = tipDisplayRow;
-    storeRowToContainingDisplayRow[tipRow] = tipDisplayRow;
-
-    // `bucket.length > MIN_COLLAPSIBLE` (>3) guarantees at least 2 hidden members here.
-    const hiddenRows = bucket.slice(1, bucket.length - 1);
+    pushCommit(order[start], groupIndex);
+    // `length > MIN_COLLAPSIBLE` (>3) guarantees at least 2 hidden rows here.
     const placeholderDisplayRow = entries.length;
     entries.push({
       kind: 'collapsed',
-      storeRow: hiddenRows[0] as number,
-      groupIndex: bucketIndex,
-      hiddenCount: hiddenRows.length,
+      storeRow: order[start + 1],
+      groupIndex,
+      hiddenCount: length - 2,
     });
-    for (const row of hiddenRows) {
-      // `storeRowToDisplayRow[row]` stays -1 — a hidden row has no display row of its own
-      // (`RowPlan.displayRowOf`'s own doc comment); only `containingDisplayRow` resolves it.
-      storeRowToContainingDisplayRow[row] = placeholderDisplayRow;
+    // `storeRowToDisplayRow` stays -1 for a hidden row — it has no display row of its own
+    // (`RowPlan.displayRowOf`'s own doc comment); only `containingDisplayRow` resolves it.
+    for (let i = start + 1; i < end - 1; i++) {
+      storeRowToContainingDisplayRow[order[i]] = placeholderDisplayRow;
     }
-
-    const oldestRow = bucket[bucket.length - 1] as number;
-    const oldestDisplayRow = entries.length;
-    entries.push({ kind: 'commit', storeRow: oldestRow, groupIndex: bucketIndex, hiddenCount: 0 });
-    storeRowToDisplayRow[oldestRow] = oldestDisplayRow;
-    storeRowToContainingDisplayRow[oldestRow] = oldestDisplayRow;
+    pushCommit(order[end - 1], groupIndex);
+    start = end;
   }
 
   return { entries, storeRowToDisplayRow, storeRowToContainingDisplayRow };
 }
 
 /**
- * Builds the branch-grouped `RowPlan` for the store's current rows against `tips`
- * (already in priority order — index 0 is the group that never collapses). This first cut always
- * renders every group in full; `options.expandedKeys`/`options.collapseEnabled` are threaded
- * through the public signature now (the `RowPlan`/`RowPlanOptions` shape does not change again)
- * but contraction itself lands in a later commit.
+ * Builds the `RowPlan` for the store's current rows against `tips` (already in priority order —
+ * index 0 is the group that never collapses).
  *
- * Three phases: rankTips (tip priority by sha), assignRowRanks (the forward
- * `priority(row)` pass, bucketed by rank), collapseBuckets (contraction into display rows).
+ * Phases: rankTips (tip priority by sha), assignRowRanks (the forward `priority(row)` pass),
+ * localTopoOrder (display order), collapseRuns (contraction into display rows).
  */
 export function buildRowPlan(
   store: CommitStore,
@@ -402,13 +355,18 @@ export function buildRowPlan(
   const otherRank = tips.length;
 
   const tipRankBySha = rankTips(tips);
-  const buckets = assignRowRanks(store, tipRankBySha, otherRank, rowCount, tips.length + 1);
+  const rank = assignRowRanks(store, tipRankBySha, otherRank, rowCount);
+  const order = localTopoOrder(
+    store.layoutInput(0, rowCount),
+    (row) => store.commitAt(row).parents[0],
+  );
 
   const groupKeyByIndex: string[] = tips.map((t) => t.key);
   groupKeyByIndex.push(OTHER_GROUP_KEY);
 
-  const { entries, storeRowToDisplayRow, storeRowToContainingDisplayRow } = collapseBuckets(
-    buckets,
+  const { entries, storeRowToDisplayRow, storeRowToContainingDisplayRow } = collapseRuns(
+    order,
+    rank,
     groupKeyByIndex,
     options,
     rowCount,
@@ -425,22 +383,17 @@ export function buildRowPlan(
 
 /**
  * Re-expresses `base` (a `CommitStore.layoutInput()` slice, in store-row
- * coordinates) as a `LayoutInput` in `plan`'s *display*-row coordinates — the projection that
- * keeps `lanes.ts` itself branch-order-blind (it never sees an upward link at all, only ever
- * downward ones, exactly like today).
+ * coordinates) as a `LayoutInput` in `plan`'s *display*-row coordinates, so `lanes.ts` runs
+ * against display rows.
  *
  * Every real parent link classifies against the two rows' *containing* display rows (a
  * contracted row's own display row is its placeholder's):
  * - **downward** (`parentDisplayRow > displayRow`): kept, deduplicated per row — a placeholder
  *   folds several hidden commits' parents into one row, and two of them landing on the same
- *   later group must not become two lanes into it.
- * - **upward** (`parentDisplayRow < displayRow`): dropped from the CSR entirely and recorded as
- *   this row's fork stub instead (`RowPlan.forkParentOf`) — the *nearest* (largest) such target,
- *   since a stub draws one short dashed line, not a fan of them. Never mind lane assignment for
- *   an upward link at all: `lanes.ts` stays a one-directional forward pass unchanged by this
- *   module.
+ *   later row must not become two lanes into it.
  * - **internal** (`parentDisplayRow === displayRow`, only possible inside a collapsed
  *   placeholder): dropped — a placeholder's own hidden commits never draw a lane to each other.
+ * - **upward** cannot occur: the display order is a topological order of the loaded rows.
  *
  * An unresolved parent (`-1` in `base.parentRows`, no target row to classify at all) always
  * stays downward and is never deduplicated — each is a distinct future edge, not yet reachable
@@ -454,7 +407,6 @@ export function projectLayoutInput(plan: RowPlan, base: LayoutInput): LayoutInpu
   const length = plan.length;
   const unresolvedCounts = new Uint32Array(length);
   const resolvedTargets: (Set<number> | undefined)[] = new Array(length);
-  const upwardBest = new Int32Array(length).fill(-1);
 
   for (let storeRow = base.from; storeRow < base.to; storeRow++) {
     const displayRow = plan.containingDisplayRow(storeRow);
@@ -467,17 +419,17 @@ export function projectLayoutInput(plan: RowPlan, base: LayoutInput): LayoutInpu
         continue;
       }
       const parentDisplayRow = plan.containingDisplayRow(parentStoreRow);
-      if (parentDisplayRow > displayRow) {
-        let targets = resolvedTargets[displayRow];
-        if (targets === undefined) {
-          targets = new Set();
-          resolvedTargets[displayRow] = targets;
-        }
-        targets.add(parentDisplayRow);
-      } else if (parentDisplayRow < displayRow && parentDisplayRow > upwardBest[displayRow]) {
-        upwardBest[displayRow] = parentDisplayRow;
+      assert(
+        parentDisplayRow >= displayRow,
+        `rowPlan: parent display row ${parentDisplayRow} < child display row ${displayRow}`,
+      );
+      if (parentDisplayRow === displayRow) continue;
+      let targets = resolvedTargets[displayRow];
+      if (targets === undefined) {
+        targets = new Set();
+        resolvedTargets[displayRow] = targets;
       }
-      // parentDisplayRow === displayRow: internal to a placeholder, dropped.
+      targets.add(parentDisplayRow);
     }
   }
 
@@ -497,11 +449,6 @@ export function projectLayoutInput(plan: RowPlan, base: LayoutInput): LayoutInpu
     if (targets !== undefined) {
       for (const target of targets) parentRows[cursor++] = target;
     }
-  }
-
-  const internalPlan = plan as InternalRowPlan;
-  for (let d = 0; d < length; d++) {
-    if (upwardBest[d] >= 0) internalPlan._setForkParent?.(d, upwardBest[d]);
   }
 
   return {
