@@ -145,6 +145,7 @@ test('Cmd/Ctrl+Shift+R reviews the focused or selected target', async ({ relaunc
 test('the task panel header opens the review', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch, [OPEN]);
   await page.locator(`${card('T_deps')} ${t('ade-card-head')}`).click();
+  await expect(page.locator(t('ade-panel-review')).locator('.codicon-git-compare')).toBeVisible();
   await page.locator(t('ade-panel-review')).click();
   await expect.poll(() => calls(control)).toHaveLength(1);
   expect(calls(control)[0]?.args).toEqual({ branchId: 'b_deps' });
@@ -153,8 +154,7 @@ test('the task panel header opens the review', async ({ relaunch }) => {
 test('a branch with only uncommitted changes is disabled and says why', async ({ relaunch }) => {
   const board = adeBoard((b) => {
     const br = b.branches.find((x) => x.id === 'b_deps');
-    if (br)
-      Object.assign(br, { ahead: 0, files: [], commits: [], dirty: [{ code: 'M', path: 'a.ts' }] });
+    if (br) Object.assign(br, { ahead: 0, dirty: [{ code: 'M', path: 'a.ts' }] });
   });
   const { window: page, control } = await openPlan(relaunch, [
     OPEN,
@@ -204,6 +204,22 @@ test('the earlier entry points still open their branch', async ({ relaunch }) =>
     .click();
   await expect.poll(() => calls(control)).toHaveLength(3);
   expect(calls(control)[2]?.args).toEqual({ branchId: 'b_auth' });
+});
+
+// Contract ade-review-open, backend half: adeflow TestReviewWindowAndAgent. A press on an open
+// window answers false: the app only focuses it (P354).
+test('Review code on an open review window only focuses it', async ({ relaunch }) => {
+  const existing = contract<boolean>('ade-review-open', 'AdeTaskService.OpenReviewWindow#existing');
+  const { window: page, control } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskOpenReviewWindow, response: existing },
+  ]);
+  const btn = page.locator(`${card('T_deps')} ${t('ade-card-review')}`);
+  await btn.click();
+  await btn.click();
+  await expect.poll(() => calls(control)).toHaveLength(2);
+  for (const c of calls(control)) expect(c.args).toEqual({ branchId: 'b_deps' });
+  await expect(page.locator(t('ade-panel-action-error'))).toHaveCount(0);
+  await expect(page.locator(card('T_deps'))).toBeVisible();
 });
 
 // Contract ade-review-open. Backend half: adeflow TestReviewOpenFacts. The fixture branch b_deps

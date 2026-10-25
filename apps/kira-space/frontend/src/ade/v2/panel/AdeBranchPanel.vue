@@ -329,6 +329,7 @@ function deployNote(d: Deployment): string {
                 :data-testid="`ade-panel-action-${a.kind}`"
                 @click="run(a)"
               >
+                <CodiconIcon name="git-compare" :size="13" />
                 {{ a.label }}
               </Button>
             </TooltipDisabledTrigger>
