@@ -65,3 +65,17 @@ func TestWalkDeltaPageCap(t *testing.T) {
 		t.Fatalf("walk = %+v, want reached with 2 items", w)
 	}
 }
+
+// A continuation armed before MinGap elapses is refused by trigger and slips to the full interval.
+func TestContinueWaitHonoursMinGap(t *testing.T) {
+	s := newCRSyncer(nil, nil, CRSyncConfig{ContinueDelay: 5 * time.Second, MinGap: 30 * time.Second})
+	now := time.Now()
+	s.lastStart = now.Add(-12 * time.Second)
+	if got := s.continueWaitLocked(now); got < 18*time.Second {
+		t.Fatalf("wait = %v, want >= 18s (MinGap left)", got)
+	}
+	s.lastStart = now.Add(-time.Minute)
+	if got := s.continueWaitLocked(now); got != 5*time.Second {
+		t.Fatalf("wait = %v, want ContinueDelay", got)
+	}
+}

@@ -191,6 +191,12 @@ func (s *crSyncer) waitLocked(now time.Time) time.Duration {
 	return d
 }
 
+// continueWaitLocked is the wait before a backfill continuation: past the min gap measured from
+// the run's start, or trigger would refuse it and fall back to the full interval.
+func (s *crSyncer) continueWaitLocked(now time.Time) time.Duration {
+	return max(s.cfg.ContinueDelay, s.cfg.MinGap-now.Sub(s.lastStart), s.notBefore.Sub(now), s.rateUntil.Sub(now))
+}
+
 var closedChan = func() chan struct{} { c := make(chan struct{}); close(c); return c }()
 
 // trigger starts a run, or joins the one in flight. started is false when nothing will run (a
@@ -228,7 +234,7 @@ func (s *crSyncer) loop(done chan struct{}) {
 		s.again, s.running = false, false
 		wait := s.waitLocked(now)
 		if s.more {
-			wait = max(s.cfg.ContinueDelay, s.notBefore.Sub(now), s.rateUntil.Sub(now))
+			wait = s.continueWaitLocked(now)
 		}
 		s.armLocked(wait)
 		s.mu.Unlock()
