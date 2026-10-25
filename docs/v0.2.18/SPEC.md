@@ -1,6 +1,6 @@
 # v0.2.18
 
-Not started. First phase `P357` (highest in `docs/v0.2.17/SPEC.md` is `P356`). Branch `chapter/v0.2.18`. Phases run top to bottom.
+Not started. First phase `P357` (highest in `docs/HISTORY.md` is `P356`). Branch `chapter/v0.2.18`. Phases run top to bottom.
 
 | # | Phase | Status |
 |---|-------|--------|

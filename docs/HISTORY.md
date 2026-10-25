@@ -6983,3 +6983,42 @@ Known: display order is not final on page load. A later page can join two chains
 ### v0.2.16 P348 (Done)
 Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.16/` removed.
 <!-- /chapter v0.2.16 -->
+
+<!-- chapter v0.2.17 -->
+## v0.2.17
+Source: docs/v0.2.17/ at 12648ef3de1e. 8 phases.
+
+### v0.2.17 P349 (Done)
+macOS app icon white ring fixed at source: full-bleed Icon Composer SVG, root fill set in `icon.json`. `CFBundleIconName=appicon`, `Assets.car` shipped. `verify-packaging` S15/A7 cover it.
+Unverified: macOS look and `actool` acceptance of root fill; no macOS in Linux sandbox.
+
+### v0.2.17 P350 (Done)
+Git graph `collapseRuns` shows tip, then placeholder holding every other run member; oldest member hidden. git-core 221 pass, `test:ui:space` 679 pass, visual 19 pass.
+
+### v0.2.17 P351 (Done)
+`ToolbarSeparator` primitive in `packages/workbench`; graph toolbar (`AppToolbar.vue`) and 8 Studio toolbars use it. Lint rule U104 bans hand-rolled dividers. Geometry spec `repo-graph-toolbar.spec.ts`. Two hand-styled status indicators (restacking, remote-progress) left as-is by user decision.
+Intermittent `graph-blank-rows.spec.ts:294` was a spec race (baseline before final-page relayout); spec fixed, no app change.
+
+### v0.2.17 P352 (Done)
+Persisted per-repo change request index. Migration 0047 (`git_host_change_requests`, `git_host_sync_state`), key `lower(provider|host|owner/name)`. Optional `githost.ChangeRequestSync` role (Page, Probe, Checks); GitHub uses GraphQL pages, `gh api -i` ETag probe, `nodes(ids)` checks.
+`gitsession/crsync.go`: resumable backfill, probe then delta walk, checks refresh, `backoff/v4` plus rate-limit gate, account and schema invalidation. Contract 51: `branch.changeRequestIndex`, `branch.syncChangeRequests`, event kind `changeRequestsChanged`. git-ui fills badges from one index read; focus regain syncs (debounced).
+Flow test `githostflow/sync_test.go`, UI spec `repo-graph-change-request-index.spec.ts`. Unverified: live GitHub 304; sandbox proxy blocks the API.
+Deviations: INTEGER ms times, `node_id` column, NOCASE `head_owner`, Checks take node ids, `wait`/`focused` sync params, time-based sweep (15 min), deletion only via missing Checks node for open rows, `head_sha` rule dropped.
+
+### v0.2.17 P353 (Done)
+ADE task flow. `CreateTaskArgs.Day` (nil = Later); add popover sends today or next work day, no repos or bases. Repoless task refuses Start until a repo is added. Archive asks `confirm-dialog`. Changes tab, `AdeChangesTab`, Branch `files`/`commits`/`commitCount` and `RangeCommits` removed. Estimate set, change, clear any time; `ErrEstimateShrink` gone. Panel title is the inline field; Name row gone.
+Flake `TestRefsChanged_StaleRefreshIsSingleFlight`: late stale observer re-claimed refresh key; background closures now recheck `cacheStale` after claim. `-race -count=300`: 0 failures. Regenerated stale `graphChunkFrame` golden.
+
+### v0.2.17 P354 (Done)
+ADE review. Review code button has `git-compare` icon. Crash root cause: `WindowRegistry.Focus` called `[NSApp unhide:]` off the main thread; now via `application.InvokeSync`, second press only focuses. macOS fix unobservable here; covered by `TestRaiseUnhidesOnMainThreadBeforeWindowCalls`.
+Diff side by side: Monaco `useInlineViewWhenSpaceIsLimited` set `false`. Window-only differences removed (review filter, Ask review agent action, session resume/save, target switching). Git-ui `lockTarget` fixes the left bar to the window's branch.
+Review agent is a plain terminal; `AdeReviewCompose` and question input gone. "Send review comments · N" calls `ForwardReviewComments` (`Tracker.Send`, `MarkSent`); prompt `ade.review.forward.message` editable. Copy button (`ReviewForwardText`) puts same message on clipboard, no Send.
+Real `claude` tests `TestAdeReviewStep|TestAdeReviewLost|TestAdeManualSession` pass.
+
+### v0.2.17 P355 (Done)
+ADE branch styling. Root cause: plain branch names went through `VarText` as template-variable chips (dashed border, blue text). New `BranchChip` (theme): `Badge` with `git-branch` codicon, variants `default`, `info`, `warn`. `TextPart` gains `kind?: 'branch'`; `branchParts` builds branch-name parts; branch-only callers switched. Real variable chips unchanged. Base marker, review branch name, base picker and branch panel restyled.
+New visual spec `ade-plan-branches.spec.ts`; 4 new baselines, existing baselines zero diffs.
+
+### v0.2.17 P356 (Done)
+Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.17/` removed.
+<!-- /chapter v0.2.17 -->
