@@ -97,22 +97,22 @@ builds and runs a `Kira Studio.dev.app` from `build/darwin/Info.dev.plist` witho
 `CFBundleIdentifier` is `com.kirathecat.kira-studio`, `CFBundleVersion`/`CFBundleShortVersionString`
 `0.0.0` (the scaffolded value; the *bundle's* copy is stamped at packaging time, below),
 `CFBundleIconFile` `icons`, `LSMinimumSystemVersion` `26.0.0`. That floor is hand-narrowed
-from Wails' template default of `12.0.0`, and matches the stamped minos and the README's macOS 26+ product claim. The template hardcodes `12.0.0`, so a
+from Wails' template default of `12.0.0`, and matches the build's deployment target and the README's macOS 26+ product claim. The template hardcodes `12.0.0`, so a
 `wails3 task common:update:build-assets` run reverts both plists — re-narrow them after regenerating.
 Kira Space's plists also carry a generated document-type block (P332); rerun
 `go run ./apps/kira-space/tools/gendoctypes` after the regeneration.
-Both darwin Taskfiles' `build:native` stamp the linked binary with `vtool -set-build-version macos 26.0 26.0`
-(minos 26.0, sdk 26.0), then re-sign it ad hoc (P345). AppKit picks window chrome by the recorded SDK, while
-the runtime OS decides availability; this is how VS Code and Electron apps get the macOS 26 look (newest SDK
-at link time). The release runner (`macos-15`) links 15.5 and gets smaller traffic lights, so the stamp
-emulates SDK 26, and dev matches. The minimum macOS is 26.0 on purpose: macOS 14 and 15 are dropped
-(`LSMinimumSystemVersion`, the stamped minos, `install.sh` preflight, README and site copy). Compile-time
-`-mmacosx-version-min` and `MACOSX_DEPLOYMENT_TARGET` stay 14.0 (`MACOS_COMPILE_MIN`) because clang against
-the runner's SDK 15.5 cannot target 26; the stamp alone sets the recorded minos. Regeneration drops the
-stamp; `verify-packaging.sh` S14 (Taskfiles) and A6 (built bundles, expects `minos 26.0`, `sdk 26.0`) catch that.
-Long-term fix, pending: `docs/pending-changes/.github__workflows__{release,pr,cache-warm}.yml.patch` move
-the runners to `macos-26` (workflow files cannot be pushed from a Linux session, `docs/DEV_ENVIRONMENT.md`).
-Once release links the real SDK 26 the stamp is redundant, and `MACOS_COMPILE_MIN` can become 26.0.
+The minimum macOS is 26.0 on purpose: macOS 14 and 15 are dropped (`LSMinimumSystemVersion` in all four plists,
+`install.sh` preflight, README and site copy; S14 guards the plists). The SDK is whatever Xcode the building
+machine has, the VS Code/Electron model: newest SDK, AppKit styles by the linked SDK (larger macOS 26 traffic
+lights), the runtime OS decides availability. `build:native` sets `-mmacosx-version-min` and
+`MACOSX_DEPLOYMENT_TARGET` to `MACOS_MIN`, resolved from `xcrun --show-sdk-version`: 26.0 with an SDK 26+, else
+14.0. The fallback keeps the current `macos-15` runner (SDK 15.5, cannot target 26) building until it moves.
+Until `docs/pending-changes/.github__workflows__{release,pr,cache-warm}.yml.patch` is applied (the user
+applies it; workflow files cannot be pushed from a Linux session, `docs/DEV_ENVIRONMENT.md`), release still
+links SDK 15.5 with smaller buttons and minos 14.0 in the binary, though `LSMinimumSystemVersion` already
+blocks launch below 26. Once applied, dev and release match. `verify-packaging.sh` A6 fails if a bundle links
+SDK 26+ without minos 26.0, and only prints a warning note while the SDK is below 26, so the unpatched runner
+does not break.
 The floor is 14 rather than 13 because Go 1.27 builds its own objects for macOS 13 minimum: a lower
 `-mmacosx-version-min` only earns a linker warning that the object file was built for a newer macOS
 than is being linked.
@@ -147,7 +147,7 @@ workspace root, and nothing in the app or the build reads it.
 | `darwin:package:dmg` | what `bun run package:studio` invokes: `deps: package`, then `create:dmg` |
 | `create:dmg` | `wails3 tool package --format dmg` over the built `.app` — background `darwin/dmg-background.png`, volume icon *and* file icon `darwin/icons.icns`, window 540×380. The tool adds the `/Applications` symlink and places the two icons itself. macOS only (`platforms: [darwin]`) |
 | `darwin:package` | `deps: build`, then `create:app:bundle`. Still callable on its own when all you want is the bundle |
-| `darwin:build` → `build:native` | preconditioned on `uname -s = Darwin` — there is no off-macOS branch any more (§5); `deps` = `common:go:mod:tidy`, `common:build:frontend`, `common:generate:icons`; then `go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/Kira Studio` with `GOOS=darwin CGO_ENABLED=1 GOARCH=$ARCH` (host arch unless overridden) and `MACOSX_DEPLOYMENT_TARGET=14.0`; then `vtool -set-build-version macos 14.0 26.0` and an ad-hoc `codesign` re-sign of the binary (P345) |
+| `darwin:build` → `build:native` | preconditioned on `uname -s = Darwin` — there is no off-macOS branch any more (§5); `deps` = `common:go:mod:tidy`, `common:build:frontend`, `common:generate:icons`; then `go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/Kira Studio` with `GOOS=darwin CGO_ENABLED=1 GOARCH=$ARCH` (host arch unless overridden) and `MACOSX_DEPLOYMENT_TARGET=14.0` (`MACOS_MIN`: 26.0 with an SDK 26+, else 14.0, P345) |
 | `create:app:bundle` | `rm -rf`s any previous bundle, then makes `Contents/{MacOS,Resources}` and copies `icons.icns`, `Assets.car` (if one is ever added back), the binary and `Info.plist`, then ends unconditionally with `codesign:adhoc` — only reachable behind `build`'s own Darwin precondition, so there is no off-macOS fallback to speak of. The `rm -rf` matters: every other step only copies *into* the bundle, so without it a resource an earlier build produced outlives the build that stopped producing it |
 
 `common:build:frontend` runs the same `bun run build:studio` the checklist above already ran; Task's

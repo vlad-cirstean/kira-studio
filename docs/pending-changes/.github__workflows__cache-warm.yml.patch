@@ -1,4 +1,4 @@
-# Why: build on the macOS 26 image so the linker records the real SDK 26 (deployment target stays 14.0); makes the P345 vtool SDK stamp redundant. Apply, then delete this file and (once verified on a Mac) the stamp, S14/A6 and the ARCHITECTURE.md Known open items entry.
+# Why: build on the macOS 26 image so the linker records the real SDK 26 and minos 26.0 (larger traffic lights, matching dev). Until applied, release links SDK 15.5. Apply, then delete this file and the ARCHITECTURE.md Known open items entry.
 diff --git a/.github/workflows/cache-warm.yml b/.github/workflows/cache-warm.yml
 index d532695a7..d85232e9c 100644
 --- a/.github/workflows/cache-warm.yml
