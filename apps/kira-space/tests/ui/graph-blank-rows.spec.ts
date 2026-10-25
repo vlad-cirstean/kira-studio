@@ -304,6 +304,9 @@ test('a refresh keeps the list until the re-walked history lands', async ({ rela
   const errors = trackErrors(page);
   await loadButton(page).click();
   await expect(loadButton(page)).toHaveCount(0);
+  // The button goes once the last page lands, before its relayout publishes. Snapshotting then
+  // caught the first page's 901-row plan; the full 2000-row history collapses to 1802 rows.
+  await expect(page.locator(HOST)).toHaveAttribute('aria-rowcount', '1802');
   await setScrollTop(page, 4000);
   const before = await snapshot(page);
   expect(await gridProblems(page)).toEqual([]);
