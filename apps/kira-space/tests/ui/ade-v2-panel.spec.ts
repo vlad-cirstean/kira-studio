@@ -32,13 +32,13 @@ test('Space on a focused card head selects the task', async ({ relaunch }) => {
   await card(page, 'T_bill').focus();
   await page.keyboard.press('Space');
   await expect(page.locator('[data-testid="ade-panel"]')).toBeVisible();
-  await expect(page.locator('[data-testid="ade-panel-title"]')).toContainText('PAY-102');
+  await expect(page.locator('[data-testid="ade-panel-title"]')).toHaveValue(/PAY-102/);
 });
 
 test('selecting a task shows its facts; status is read-only', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await openTask(page, 'T_bill');
-  await expect(page.locator('[data-testid="ade-panel-title"]')).toContainText('PAY-102');
+  await expect(page.locator('[data-testid="ade-panel-title"]')).toHaveValue(/PAY-102/);
   await expect(page.locator('[data-testid="ade-panel-facts"]')).toContainText(
     '3 branches in api, web-app',
   );
@@ -46,10 +46,10 @@ test('selecting a task shows its facts; status is read-only', async ({ relaunch 
   await expect(page.locator('[data-testid="ade-task-branch"]')).toHaveCount(3);
 });
 
-test('Escape in the task name reverts the text and writes nothing', async ({ relaunch }) => {
+test('Escape in the panel title reverts the text and writes nothing', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch);
   await openTask(page, 'T_notif');
-  const name = page.locator('[data-testid="ade-task-name"]');
+  const name = page.locator('[data-testid="ade-panel-title"]');
   const original = await name.inputValue();
   await name.fill('Discard me');
   await name.press('Escape');
@@ -60,7 +60,7 @@ test('Escape in the task name reverts the text and writes nothing', async ({ rel
 test('name, Jira, GitHub and Not merging write UpdateTask patches', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch);
   await openTask(page, 'T_notif');
-  const name = page.locator('[data-testid="ade-task-name"]');
+  const name = page.locator('[data-testid="ade-panel-title"]');
   await name.fill('Notify on mention');
   await name.press('Enter');
   await expect.poll(() => updates(control)).toHaveLength(1);
