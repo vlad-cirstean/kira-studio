@@ -259,7 +259,7 @@ else
         fail "linked minos wrong" "linked minos is '$LINKED_MINOS' in $APP, expected 26.0"
       fi
     else
-      note "A6 warning — $APP links SDK '$LINKED_SDK' (< 26): minos '$LINKED_MINOS', smaller traffic lights until the macos-26 runner patch in docs/pending-changes/ is applied"
+      note "A6 warning — $APP links SDK '$LINKED_SDK' (< 26): minos '$LINKED_MINOS', smaller traffic lights; build with Xcode 26+ (CI runs macos-26)"
     fi
   else
     note "skipped A6 — vtool not available on this runner"
@@ -344,7 +344,7 @@ else
         fail "linked minos wrong" "linked minos is '$SPACE_LINKED_MINOS' in $SPACE_APP, expected 26.0"
       fi
     else
-      note "A6 warning — $SPACE_APP links SDK '$SPACE_LINKED_SDK' (< 26): minos '$SPACE_LINKED_MINOS', smaller traffic lights until the macos-26 runner patch in docs/pending-changes/ is applied"
+      note "A6 warning — $SPACE_APP links SDK '$SPACE_LINKED_SDK' (< 26): minos '$SPACE_LINKED_MINOS', smaller traffic lights; build with Xcode 26+ (CI runs macos-26)"
     fi
   else
     note "skipped A6 — vtool not available on this runner"

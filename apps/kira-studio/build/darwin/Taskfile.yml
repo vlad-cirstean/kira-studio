@@ -46,8 +46,8 @@ tasks:
     cmds:
       - '{{if eq .OBFUSCATED "true"}}garble {{.GARBLE_ARGS}} build{{else}}go build{{end}} {{.BUILD_FLAGS}} -o "{{.OUTPUT}}"'
     vars:
-      # P346: the app floor is macOS 26. A pre-26 SDK (the macos-15 runner, 15.5) cannot target 26, so
-      # fall back to 14.0 there until the runner moves to macos-26 (docs/pending-changes/).
+      # P346: the app floor is macOS 26. A pre-26 SDK (older Xcode on a dev Mac) cannot target 26, so
+      # fall back to 14.0 there so the build still compiles. CI runs macos-26 and always gets 26.0.
       MACOS_MIN:
         sh: 'sdk=$(xcrun --sdk macosx --show-sdk-version 2>/dev/null | cut -d. -f1); if [ "${sdk:-0}" -ge 26 ]; then echo 26.0; else echo 14.0; fi'
       # `-X {{.VERSION_VAR}}` is what makes internal/buildinfo report a real version instead of its
