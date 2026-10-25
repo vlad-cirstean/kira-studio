@@ -36,7 +36,7 @@ type Watcher interface {
 // (*rpcstream.Session).Emit's own json.Marshal.
 type Event struct {
 	RepoID string `json:"repoId"`
-	Kind   string `json:"kind"` // "refsChanged" | "worktreeChanged"
+	Kind   string `json:"kind"` // "refsChanged" | "worktreeChanged" | "changeRequestsChanged"
 }
 
 // subscriptionID is Subscribe's own per-call token — unique for the life of a RepoEntry
@@ -143,6 +143,9 @@ type RepoEntry struct {
 	host  *hostState
 	hosts githost.Selector
 
+	// crSync keeps the persisted change request index in step with the host; nil without a store.
+	crSync *crSyncer
+
 	// isOpen is the cross-window query, threaded in from Registry.IsOpen — a plain func,
 	// the same "this package imports only gitclient/gitreview/stdlib, so a cross-entry fact reaches
 	// here as a closure, never as a *Registry field" discipline settings/repoSettingsGet already
@@ -170,7 +173,7 @@ func newRepoEntry(
 	summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher,
 	settings func() ([]string, int, string), repoSettingsGet func(string) (model.GitRepoSettings, error),
 	review *gitreview.Store, hosts githost.Selector, isOpen func(string) bool,
-	skipInitialAutoFetch bool, opLog *oplog.Log,
+	skipInitialAutoFetch bool, opLog *oplog.Log, crStore ChangeRequestStore, crCfg CRSyncConfig,
 ) *RepoEntry {
 	life, lifeStop := context.WithCancel(context.Background())
 	e := &RepoEntry{
@@ -204,6 +207,10 @@ func newRepoEntry(
 	go e.pump()
 	if _, minutes, _ := settings(); minutes > 0 && !skipInitialAutoFetch {
 		e.startAutoFetch(minutes)
+	}
+	if crStore != nil {
+		e.crSync = newCRSyncer(e, crStore, crCfg)
+		e.crSync.start()
 	}
 	return e
 }
@@ -256,6 +263,9 @@ func (e *RepoEntry) note(sig gitclient.Signal) {
 		// delays this signal's fan-out to subscribers.
 		e.host.markStale()
 		go e.eagerResolveClosedBranches()
+		if e.crSync != nil {
+			e.crSync.onRefsChanged()
+		}
 	}
 	e.mu.Lock()
 	subs := make([]*subscriber, 0, len(e.subs))
@@ -452,6 +462,9 @@ func (e *RepoEntry) teardown() {
 	e.lifeStop()
 
 	e.stopAutoFetch()
+	if e.crSync != nil {
+		e.crSync.stop()
+	}
 	e.remoteOp.forceCancel()
 	e.restack.forceCancel() // G26 D6/D9: a restack in flight is killed, not left orphaned.
 	_ = e.watcher.Close()

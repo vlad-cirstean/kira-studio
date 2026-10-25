@@ -35,6 +35,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/github"
 	githostproviders "github.com/kirathecat/kira-studio/apps/kira-space/internal/githost/providers"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
@@ -64,6 +65,7 @@ type options struct {
 	seed            func(*App)
 	embedSpec       *embed.Spec
 	provider        harness.Provider
+	crSync          gitsession.CRSyncConfig
 }
 
 // Opt tweaks New.
@@ -80,6 +82,11 @@ func WithoutGh() Opt { return func(o *options) { o.noGh = true } }
 func WithGitHost(p githost.Provider) Opt {
 	return func(o *options) { o.gitHosts = append(o.gitHosts, p) }
 }
+
+// WithChangeRequestSync replaces the sync config. Flows default to a manual one: no startup run, no
+// timer, no run on a refs change, a 1 ns min gap and checks interval, and a short backoff, so a
+// test drives each run through branch.syncChangeRequests.
+func WithChangeRequestSync(c gitsession.CRSyncConfig) Opt { return func(o *options) { o.crSync = c } }
 
 // WithoutClaude leaves claude off PATH entirely, system installs included.
 func WithoutClaude() Opt { return func(o *options) { o.noClaude = true } }
@@ -153,6 +160,12 @@ func New(t *testing.T, opts ...Opt) *App {
 	var o options
 	for _, opt := range opts {
 		opt(&o)
+	}
+	if o.crSync == (gitsession.CRSyncConfig{}) {
+		o.crSync = gitsession.CRSyncConfig{
+			Disabled: true, MinGap: time.Nanosecond, ChecksInterval: time.Nanosecond,
+			BackoffInitial: 20 * time.Millisecond, BackoffMax: 100 * time.Millisecond,
+		}
 	}
 	root, err := os.MkdirTemp("", "ksf")
 	if err != nil {
@@ -305,7 +318,7 @@ func (a *App) build() {
 	}
 	a.W = appwire.Build(appwire.Options{
 		Providers: registry,
-		GitHosts:  githostproviders.New(ghOptions, a.opts.gitHosts...), TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, Sandbox: a.opts.sandbox, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll,
+		GitHosts:  githostproviders.New(ghOptions, a.opts.gitHosts...), TrackerGrace: a.opts.trackerGrace, RebaseTimeout: a.opts.rebaseTimeout, SmartTimeout: a.opts.smartTimeout, Sandbox: a.opts.sandbox, ScheduleTimeout: a.opts.scheduleTimeout, Clock: a.opts.clock, EmbedSpec: a.opts.embedSpec, MobilePoll: a.opts.mobilePoll, ChangeRequestSync: a.opts.crSync,
 		Repos: r, DB: db, Emitter: a.Events, Browser: a.Browser, Dialogs: a.Dialogs,
 		Locator: gitclient.NewHostLocator(), KeepAwakeDriver: a.KeepAwake, FileHandlers: a.opts.fileHandlers,
 		MobileAssets: fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>phone</title>")}},

@@ -82,6 +82,11 @@ type Registry struct {
 	// the real GitHub provider; tests override it with providers over a fake/counting runner.
 	Hosts githost.Selector
 
+	// CRStore persists each repository's change request index; nil turns the sync off. CRSync tunes
+	// it. Set both before the first Acquire.
+	CRStore ChangeRequestStore
+	CRSync  CRSyncConfig
+
 	// OpLog records user-initiated writes (RunOp, UndoRun, RunRemote with a conn, RunRestack).
 	// Nil turns logging off. Set before the first Acquire.
 	OpLog *oplog.Log
@@ -167,7 +172,7 @@ func (reg *Registry) acquire(
 	repo := gitclient.NewRepo(summary, reg.runner, gitPath)
 	entry := newRepoEntry(
 		summary, repo, w, reg.Settings, reg.RepoSettingsGet, reg.Review, reg.Hosts, reg.IsOpen,
-		skipInitialAutoFetch, reg.OpLog,
+		skipInitialAutoFetch, reg.OpLog, reg.CRStore, reg.CRSync,
 	)
 	reg.entries[summary.RepoID] = &slot{entry: entry, refs: 1}
 	return entry, reg.releaseFunc(summary.RepoID), nil

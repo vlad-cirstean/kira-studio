@@ -305,7 +305,7 @@ func shutdownTracker(tracker *ade.Tracker, hooks *harness.Hooks) {
 }
 
 // wireGit builds the git runner, discovery (over locator), session registry and router.
-func wireGit(repositories *repos.Repos, locator gitclient.Locator, hosts *githost.Registry) gitWired {
+func wireGit(repositories *repos.Repos, locator gitclient.Locator, hosts *githost.Registry, crSync gitsession.CRSyncConfig) gitWired {
 	gitRunner := gitclient.NewExecRunner()
 	gitDiscovery := gitclient.NewDiscovery(locator, gitRunner, gitclient.NewRealClock())
 	gitRegistry := gitsession.NewRegistry(gitRunner)
@@ -324,6 +324,8 @@ func wireGit(repositories *repos.Repos, locator gitclient.Locator, hosts *githos
 	}
 	gitRegistry.RepoSettingsGet = repositories.GitRepoSettings.Get
 	gitRegistry.RepoSettingsSet = repositories.GitRepoSettings.Set
+	gitRegistry.CRStore = repositories.GitHostChangeRequests
+	gitRegistry.CRSync = crSync
 
 	askpassBroker, err := gitaskpass.New(gitaskpass.Options{})
 	if err != nil {

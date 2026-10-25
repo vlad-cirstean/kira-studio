@@ -27,6 +27,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/lannet"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileterm"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/mobileweb"
@@ -93,6 +94,9 @@ type Options struct {
 	EmbedSpec *embed.Spec
 	// Providers is the agent harness registry; nil means providers.New() (a flow-test seam).
 	Providers *harness.Registry
+	// ChangeRequestSync tunes the change request index sync; the zero value is production's (a
+	// flow-test seam).
+	ChangeRequestSync gitsession.CRSyncConfig
 }
 
 // ShellHooks completes the window-manager seams once the shell exists. CloseWindow, FocusWindow and
@@ -189,7 +193,7 @@ func Build(opts Options) *Wired {
 
 	credentialRelay := gitcred.New()
 	w.Windows = shell.NewWindowRegistry()
-	git := wireGit(repositories, opts.Locator, opts.GitHosts)
+	git := wireGit(repositories, opts.Locator, opts.GitHosts, opts.ChangeRequestSync)
 	w.Git, w.CredentialRelay = git, credentialRelay
 
 	// The tap feeds every window-wide event to the phone event hub, which drops what is not allowlisted.

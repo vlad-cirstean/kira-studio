@@ -224,6 +224,13 @@ func (s *hostState) releaseRefresh(key string) {
 	s.mu.Unlock()
 }
 
+// breakerUntil is when the armed breaker lapses.
+func (s *hostState) breakerUntil() time.Time {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.blockedUntil
+}
+
 func (s *hostState) armBreaker(status githost.Status) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -406,6 +413,12 @@ func (e *RepoEntry) hostRepoGen(ctx context.Context) (githost.Provider, githost.
 // only the first caller (the leader) fetch; every other concurrent caller waits on that fetch and
 // shares its result.
 func (e *RepoEntry) ensureSnapshot(ctx context.Context) ([]githost.ChangeRequest, githost.Status) {
+	// A complete persisted index is the snapshot: no host call, and it survives a restart.
+	if p, repo, ok := e.hostRepo(ctx); ok {
+		if crs, ok := e.indexedOpen(p, repo); ok {
+			return crs, githost.Status{Kind: githost.KindOK}
+		}
+	}
 	crs, state := e.host.snapshotGet()
 	switch state {
 	case cacheFresh:
@@ -515,6 +528,15 @@ func (e *RepoEntry) resolveBranchChangeRequest(ctx context.Context, branch strin
 		return disabledResult()
 	}
 
+	// A complete persisted index answers a branch it holds with no host call. The eager purge pass
+	// (fresh) skips it: that pass needs the host's current state.
+	if !fresh {
+		if cr, ok := e.indexedBranch(p, repo, branch); ok {
+			e.maybePurgeClosed(ctx, branch, &cr)
+			return okResult([]githost.ChangeRequest{cr})
+		}
+	}
+
 	// Reading the snapshot cache alone never populates it; ensureSnapshot does. On a cold cache the
 	// first lookup pays one bulk Open call and warms the snapshot for every other branch with an
 	// open change request; only a since-closed one, or the breaker or a fetch failure, falls
@@ -578,6 +600,7 @@ func (e *RepoEntry) fetchBranchChangeRequest(ctx context.Context, p githost.Prov
 		latest = &c
 	}
 	e.host.branchCachePut(gen, branch, latest)
+	e.reconcileBranch(p, repo, branch, crs)
 	e.maybePurgeClosed(ctx, branch, latest)
 	return branchResult(latest)
 }

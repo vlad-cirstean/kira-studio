@@ -5,7 +5,7 @@ CREATE TABLE git_host_change_requests (
     number          INTEGER NOT NULL,
     node_id         TEXT    NOT NULL DEFAULT '',
     head_ref        TEXT    NOT NULL,
-    head_owner      TEXT    NOT NULL,
+    head_owner      TEXT    NOT NULL COLLATE NOCASE,
     head_sha        TEXT    NOT NULL,
     base_ref        TEXT    NOT NULL,
     state           TEXT    NOT NULL,
