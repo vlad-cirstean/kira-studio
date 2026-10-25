@@ -254,8 +254,9 @@ else
   # A6: the linked binary carries the stamped SDK (P345).
   if command -v vtool >/dev/null 2>&1; then
     LINKED_SDK="$(vtool -show-build "$APP/Contents/MacOS/Kira Studio" 2>/dev/null | awk '$1=="sdk"{print $2}')"
-    if [ "$LINKED_SDK" != "26.0" ]; then
-      fail "linked SDK stamp wrong" "linked SDK is '$LINKED_SDK' in $APP, expected 26.0"
+    LINKED_MINOS="$(vtool -show-build "$APP/Contents/MacOS/Kira Studio" 2>/dev/null | awk '$1=="minos"{print $2}')"
+    if [ "$LINKED_SDK" != "26.0" ] || [ "$LINKED_MINOS" != "14.0" ]; then
+      fail "linked SDK stamp wrong" "linked minos/sdk are '$LINKED_MINOS'/'$LINKED_SDK' in $APP, expected 14.0/26.0"
     fi
   else
     note "skipped A6 — vtool not available on this runner"
@@ -334,8 +335,9 @@ else
   # A6: the linked binary carries the stamped SDK (P345).
   if command -v vtool >/dev/null 2>&1; then
     SPACE_LINKED_SDK="$(vtool -show-build "$SPACE_APP/Contents/MacOS/Kira Space" 2>/dev/null | awk '$1=="sdk"{print $2}')"
-    if [ "$SPACE_LINKED_SDK" != "26.0" ]; then
-      fail "linked SDK stamp wrong" "linked SDK is '$SPACE_LINKED_SDK' in $SPACE_APP, expected 26.0"
+    SPACE_LINKED_MINOS="$(vtool -show-build "$SPACE_APP/Contents/MacOS/Kira Space" 2>/dev/null | awk '$1=="minos"{print $2}')"
+    if [ "$SPACE_LINKED_SDK" != "26.0" ] || [ "$SPACE_LINKED_MINOS" != "14.0" ]; then
+      fail "linked SDK stamp wrong" "linked minos/sdk are '$SPACE_LINKED_MINOS'/'$SPACE_LINKED_SDK' in $SPACE_APP, expected 14.0/26.0"
     fi
   else
     note "skipped A6 — vtool not available on this runner"
