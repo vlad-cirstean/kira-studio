@@ -12,7 +12,7 @@ import {
 
 // Date-ordered layout over the multi-branch fixture: main (3 commits), feature-newer (5,
 // collapses by default) and feature-older (2). Display follows store order; no sibling branches
-// interleave. Collapsed order: F0 [placeholder] F4 G0 G1 M0 M1 M2 (8 rows); expanded: 10 rows.
+// interleave. Collapsed order: F0 [placeholder] G0 G1 M0 M1 M2 (7 rows); expanded: 10 rows.
 // The fork-interleave fixture covers sibling branches that do interleave. The collapse toggle
 // itself and the search reveal are covered in repo-workspace.spec.ts.
 
@@ -23,7 +23,7 @@ async function bootBranchOrder(relaunch: Relaunch): Promise<Page> {
     chunks: [buildGraphStreamChunk(PORT_REPO.repoId, 0, buildMultiBranchChunk())],
     results: { 'refs.list': buildMultiBranchRefsList() },
   });
-  await expect(page.locator(`${grid} .slick-row[data-row="7"]`)).toBeVisible();
+  await expect(page.locator(`${grid} .slick-row[data-row="6"]`)).toBeVisible();
   return page;
 }
 
@@ -35,20 +35,34 @@ const rowPaths = (p: Page, row: number) =>
 
 const pathCount = (p: Page, row: number) => rowPaths(p, row).count();
 
-test('no dashed fork stubs; F4 and G1 connect by lane down to M1 and M2', async ({ relaunch }) => {
+test('no dashed fork stubs; the placeholder and G1 connect by lane down to M1 and M2', async ({
+  relaunch,
+}) => {
   const page = await bootBranchOrder(relaunch);
 
   await expect(page.locator(`${grid} path[stroke-dasharray]`)).toHaveCount(0);
-  // Rows: 0 F0, 1 placeholder, 2 F4, 3 G0, 4 G1, 5 M0, 6 M1, 7 M2.
-  await expect(messageCell(page, 2)).toContainText('feature-newer oldest (F4)');
-  await expect(messageCell(page, 6)).toContainText('main M1');
-  await expect(messageCell(page, 4)).toContainText('feature-older oldest (G1)');
-  await expect(messageCell(page, 7)).toContainText('main root (M2)');
-  // F4 runs to M1 (rows 3-5 pass through) and G1 runs to M2 (rows 5-6 pass through).
-  for (const row of [3, 4, 5]) {
+  // Rows: 0 F0, 1 placeholder, 2 G0, 3 G1, 4 M0, 5 M1, 6 M2.
+  await expect(messageCell(page, 5)).toContainText('main M1');
+  await expect(messageCell(page, 3)).toContainText('feature-older oldest (G1)');
+  await expect(messageCell(page, 6)).toContainText('main root (M2)');
+  // The placeholder's lane runs to M1 (rows 2-4 pass through) and G1 runs to M2 (rows 4-5 pass through).
+  for (const row of [2, 3, 4]) {
     expect(await pathCount(page, row)).toBeGreaterThanOrEqual(2);
   }
-  expect(await pathCount(page, 6)).toBeGreaterThanOrEqual(2);
+  expect(await pathCount(page, 5)).toBeGreaterThanOrEqual(2);
+});
+
+test('a collapsed run shows its tip then the placeholder, never its oldest commit', async ({
+  relaunch,
+}) => {
+  const page = await bootBranchOrder(relaunch);
+
+  await expect(messageCell(page, 0)).toContainText('feature-newer tip (F0)');
+  const placeholder = messageCell(page, 1);
+  await expect(placeholder).toHaveAttribute('data-testid', 'graph-collapsed-row');
+  await expect(placeholder).toContainText('4 more commits on feature-newer');
+  await expect(messageCell(page, 2)).toContainText('feature-older tip (G0)');
+  await expect(page.locator(grid).getByText('feature-newer oldest (F4)')).toHaveCount(0);
 });
 
 test('expanding a collapsed group lists its members in order', async ({ relaunch }) => {
@@ -93,7 +107,11 @@ test('collapse toggled off lists every row in store order and never overlaps row
     return Array.from(document.querySelectorAll(`${sel} .slick-row`))
       .map((el) => {
         const rect = el.getBoundingClientRect();
-        return { row: Number(el.getAttribute('data-row')), top: rect.top, bottom: rect.bottom };
+        return {
+          row: Number(el.getAttribute('data-row')),
+          top: rect.top,
+          bottom: rect.bottom,
+        };
       })
       .sort((a, b) => a.row - b.row);
   }, grid);

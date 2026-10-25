@@ -28,10 +28,10 @@ const CONTROL: ControlSnapshot[] = [
   },
 ];
 
-// Collapsed default display order: F0 [placeholder] F4 G0 G1 M0 M1 M2. feature-older: G0 tip
-// (row 3), G1 oldest (row 4).
-const TIP_ROW = 3;
-const NON_TIP_ROW = 4;
+// Collapsed default display order: F0 [placeholder] G0 G1 M0 M1 M2. feature-older: G0 tip
+// (row 2), G1 oldest (row 3).
+const TIP_ROW = 2;
+const NON_TIP_ROW = 3;
 
 function message(page: import('@playwright/test').Page, row: number) {
   return page.locator(
