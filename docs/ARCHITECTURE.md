@@ -720,6 +720,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - Use SearchField for search and filter boxes and focus it through its exposed focus(), because biome forbids autofocus.
 - Use font weights 400/500 only; font-semibold only in PanelHeader and font-bold only for ANSI log data. Icon sizes are 12, 13, 16, 24.
 - Buttons use dialog*/toolbar* variants with kira* sizes; the retired shadcn variants and sizes no longer exist.
+- Toolbar dividers use ToolbarSeparator (packages/workbench), never a hand-rolled w-px div or a bare vertical Separator; U104 enforces it.
 - scripts/check-ui-primitives.sh, part of bun run lint, enforces the UI language rules and holds the named exemptions (CommandPalette, LogsView ANSI bold, AdeBacklogRow inline edit, mobile 44px touch inputs, git-ui SearchBox two-stage Escape); an exemption that stops matching fails the run.
 - The tone vocabulary is ok, warn, error, info (Badge, Alert, StatusDot); neutral is muted text. Chips tint /16, banners /10 with /20 border; app code never writes a tone alpha.
 - Error sentences use FieldError and list/popover lines use InlineState; Alert takes icon and strip and no layout classes.
