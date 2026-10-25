@@ -340,7 +340,9 @@ watch(graphView.loadedRows, resolvePendingSelection);
 
 /** Checked-out branch (or detached HEAD) first, then every stash entry, then locals+remotes
  *  interleaved by `committerDate` descending, then tags likewise — `buildRowPlan`'s own
- *  `other` bucket (index `tips.length`) implicitly catches everything left over. Rebuilt whole
+ *  `other` group (index `tips.length`) implicitly catches everything left over. Tip order only
+ *  decides which group owns a shared commit (collapse labels and keys); it no longer orders
+ *  the rows. Rebuilt whole
  *  on every relevant ref/stash change (the watch below) rather than diffed — cheap next to the
  *  relayout it drives, and `buildRowPlan` only cares about each tip's identity, not stability
  *  across rebuilds. */

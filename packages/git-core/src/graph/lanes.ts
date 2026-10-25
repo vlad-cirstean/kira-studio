@@ -2,9 +2,9 @@
  * §5.2's forward pass: "a single forward pass over the topologically ordered commit list
  * maintaining an array of open lanes; for each commit, claim the leftmost lane whose expected
  * child is this commit, route remaining parents into free or newly-allocated lanes, and emit
- * edge segments." `--topo-order` (§4.4) is what makes this valid: a commit's parents always
- * have a strictly larger row index than the commit itself (children before parents), so the
- * pass never needs to look behind itself.
+ * edge segments." Children-before-parents order (§4.4) is what makes this valid: a commit's
+ * parents always have a strictly larger row index than the commit itself, so the pass never
+ * needs to look behind itself.
  *
  * Convergence — multiple lanes turning out to share a target — is decided **only** by steps
  * 1-2 below, at the shared target row's own processing, never speculatively when a parent link

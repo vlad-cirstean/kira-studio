@@ -48,15 +48,10 @@ export function readSlice(
       segments: reusable,
       segmentCount: 0,
       isHead: false,
-      forkStub: undefined,
     };
   }
   const entry = plan.entryAt(row);
   const segmentCount = layout.segmentsInRow(row, reusable);
-  // P93 §6.2: the parent is always above (a smaller display row, already laid out in the same
-  // pass) whenever `forkParentOf` returns one, so `layout.colorOf` needs no extra bounds check.
-  const forkParentRow = plan.forkParentOf(row);
-  const forkStub = forkParentRow >= 0 ? { color: layout.colorOf(forkParentRow) } : undefined;
 
   if (entry.kind === 'collapsed') {
     // P93 §6.1: a placeholder has no single commit's parent count or decorations to derive a
@@ -71,7 +66,6 @@ export function readSlice(
       segments: reusable,
       segmentCount,
       isHead: false,
-      forkStub,
     };
   }
 
@@ -88,7 +82,6 @@ export function readSlice(
     // G19 D1: the identical shape F1 found `columns.ts`'s own row-bold indicator already computes
     // — the single source of truth (`isHeadDecoration`), not a second heuristic.
     isHead: decoration.some(isHeadDecoration),
-    forkStub,
   };
 }
 

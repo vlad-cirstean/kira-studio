@@ -127,7 +127,6 @@ const PERMISSIVE_PLAN: RowPlan = {
   displayRowOf: (storeRow) => storeRow,
   containingDisplayRow: (storeRow) => storeRow,
   groupKeyAt: () => 'identity',
-  forkParentOf: () => -1,
 };
 
 const NO_COLLAPSED_ROW_CONTEXT: CollapsedRowContext = {
