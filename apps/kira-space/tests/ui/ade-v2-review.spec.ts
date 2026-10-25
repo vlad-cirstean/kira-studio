@@ -7,6 +7,7 @@ import {
   emitAgentSessions,
   openPlan,
 } from './support/adeV2';
+import { gitStreamRequests } from './support/gitStreamMock';
 import { IPC } from './support/ipcChannels';
 import type { ControlSnapshot } from './support/types';
 
@@ -94,6 +95,18 @@ reviewTest('the files pane lists every changed file like the git module', async 
   await expect(left).toContainText('moved.ts');
   await expect(left).toContainText('done.ts');
   await expect(left.getByText('Needs review')).toHaveCount(0);
+});
+
+reviewTest("the left bar stays on the window's branch", async ({ relaunch }) => {
+  const page = await openReview(relaunch);
+  await expect(page.locator(t('review-branch-name'))).toHaveText('feat/billing-dashboard');
+  await expect(page.locator(t('review-base-name'))).toHaveText('main');
+  for (const id of ['review-back-button', 'review-swap-button', 'base-selector-trigger']) {
+    await expect(page.locator(t(id))).toHaveCount(0);
+  }
+  await page.locator(t('review-pane-commits')).click();
+  await page.locator(t('review-pane-files')).click();
+  expect(await gitStreamRequests(page)).not.toContain('review.session.save');
 });
 
 reviewTest('a review diff opens side by side', async ({ relaunch }) => {

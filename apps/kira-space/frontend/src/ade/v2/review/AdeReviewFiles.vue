@@ -8,8 +8,7 @@ import { gitTransportFor } from '../../../repo/git/transport';
 import { ensureRepoOpen } from '../../../state/repoOpenHold';
 import type { ReviewWindowTarget } from '../wire';
 
-// The review window's left pane: git-ui's review view on this window's branch and base, listing
-// only the files that changed since their last review.
+// The review window's left pane: git-ui's review view locked to this window's branch and base.
 const props = defineProps<{ target: ReviewWindowTarget }>();
 const emit = defineEmits<{ marked: [path: string] }>();
 
@@ -39,6 +38,7 @@ onMounted(async () => {
         base: props.target.base,
         pane: 'files',
       },
+      lockTarget: true,
       onReviewMarked: (path) => emit('marked', path),
       onReviewApi: (a) => {
         api = a;
