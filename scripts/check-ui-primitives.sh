@@ -239,6 +239,8 @@ U100@@v@@@@form <DialogContent without dirty (the discard guard)@@(?s)\A(?=.*<Di
 U101@@v@@@@Badge variant="count" outside attention owners (a plain count is rowMeta)@@<Badge\b(?&t)\svariant="count"
 U102@@v@@@@shortSha(/shortId( in a component (use Identifier :short)@@\bshort(?:Sha|Id)\(
 U103@@vt@@@@bare .sort() (end on a stable key)@@\.sort\(\)
+U104@@v@@@@toolbar divider must use ToolbarSeparator (P351)@@class="[^"]*(?:\bw-px\b[^"]*\bh-3\.5\b|\bh-3\.5\b[^"]*\bw-px\b)
+U104@@v@@ToolbarSeparator.vue@@toolbar divider must use ToolbarSeparator (P351)@@<Separator\b(?&t)\sorientation="vertical"
 GUARDS
 
 # hits: "U<n> path"
