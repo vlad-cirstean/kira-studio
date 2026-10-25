@@ -12,9 +12,9 @@ export function anchorParts(
   const vars = { branch, sha: shortSha(comment.anchorSha) };
   switch (comment.anchor) {
     case 'removed':
-      return catalogParts('space.repo.view.anchorRemoved.status', vars);
+      return catalogParts('space.repo.view.anchorRemoved.status', vars, {}, ['branch']);
     case 'stale':
-      return catalogParts('space.repo.view.anchorStale.status', vars);
+      return catalogParts('space.repo.view.anchorStale.status', vars, {}, ['branch']);
     default:
       return undefined;
   }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import BranchChip from '@theme/components/BranchChip.vue';
 import InlineState from '@theme/components/InlineState.vue';
 import KeyValueList from '@theme/components/KeyValueList.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
@@ -373,16 +374,16 @@ function deployNote(d: Deployment): string {
         <dd class="flex min-h-row min-w-0 items-center gap-2">
           <AdeChip :label="chipLabel" :tone="row.tag.tone" wide />
           <template v-if="branch.name">
-            <a
-              v-if="branchUrl"
-              :href="branchUrl"
-              class="min-w-0 max-w-1/2 truncate font-data text-kira-md text-info"
-              @click="(e) => open(branchUrl, e)"
-              >{{
-                branch.name
-              }}</a
-            >
-            <Identifier v-else :value="branch.name" />
+            <AdeTip :text="branch.name">
+              <a
+                v-if="branchUrl"
+                :href="branchUrl"
+                class="min-w-0 max-w-1/2 rounded-kira-sm no-underline"
+                @click="(e) => open(branchUrl, e)"
+                ><BranchChip :name="branch.name" class="max-w-full" /></a
+              >
+              <BranchChip v-else :name="branch.name" class="max-w-1/2" />
+            </AdeTip>
             <span class="flex-1" />
             <TooltipIconButton
               :icon="copied && copiedKey === 'branch' ? 'check' : 'copy'"

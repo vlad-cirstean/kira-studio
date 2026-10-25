@@ -3,7 +3,7 @@ import type { TextPart } from '@theme/varText';
 import { formatCompactDuration } from '@workbench/behaviour/format';
 import type { Branch, Plan, Run, Session, Task } from '../wire';
 import { type BranchGraph, shortBranchName } from './branchGraph';
-import { catalogParts } from './catalogParts';
+import { branchParts } from './catalogParts';
 import type { TaskProgress } from './progress';
 import { type RebaseAct, rebaseActs } from './rebaseActions';
 import type { DerivedStatus } from './status';
@@ -481,7 +481,7 @@ const rebasePending: Rule = (i) => {
   const run = lastRebase(i);
   const reason = run?.outcome?.reason ? `\n${run.outcome.reason}` : '';
   const parts: TextPart[] = [
-    ...catalogParts('space.ade.board.branchTag.rebasePendingNote.hint', {
+    ...branchParts('space.ade.board.branchTag.rebasePendingNote.hint', {
       from: b.basePendingFrom,
       to: b.base,
     }),
@@ -535,7 +535,7 @@ const rebaseInProgress: Rule = (i) =>
 const baseMissing: Rule = (i) => {
   const b = i.branch;
   if (b.kind !== 'mine' || !b.baseMissing) return null;
-  const parts = catalogParts('space.ade.board.branchTag.baseMissing.tooltip', { base: b.base });
+  const parts = branchParts('space.ade.board.branchTag.baseMissing.tooltip', { base: b.base });
   return {
     ...tag(
       t('space.ade.board.branchTag.baseMissing.label'),

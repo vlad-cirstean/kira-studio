@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import BranchChip from '@theme/components/BranchChip.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Kbd } from '@theme/components/ui/kbd';
@@ -126,6 +127,14 @@ const progClass = computed(() => {
   if (tone === 'green') return 'text-tone-green';
   return tone === 'grey' ? 'text-muted-foreground' : 'text-tone-amber';
 });
+const baseName = computed(() => {
+  const part = props.row.base?.label.find((p) => typeof p !== 'string');
+  return part && typeof part !== 'string' ? part.value : '';
+});
+const baseVariant = computed(() => {
+  if (props.row.base?.pending) return 'warn';
+  return props.row.base?.tone === 'blue' ? 'info' : 'default';
+});
 const elbowClass = computed(() =>
   props.row.base?.tone === 'blue' ? 'border-tone-blue-solid' : 'border-border-strong',
 );
@@ -174,18 +183,13 @@ const rowBgClass = computed(() => {
       }}</Badge
     >
     <AdeTip v-if="row.base" :parts="row.base.tip">
-      <Badge
-        variant="chip"
-        data
-        class="max-w-27.5 truncate"
-        :class="[
-          row.base.tone === 'blue' ? TONE_TAG_CLASS.blue : 'bg-field text-fg',
-          row.base.pending ? 'border border-dashed border-tone-amber-solid' : '',
-        ]"
+      <BranchChip
+        :name="baseName"
+        :variant="baseVariant"
+        class="max-w-27.5"
         data-testid="ade-base-marker"
         :data-pending="row.base.pending || undefined"
-        ><VarText :parts="row.base.label" /></Badge
-      >
+      />
     </AdeTip>
     <AdeAttention v-if="row.attention" :tip="row.attention" :item="row.attentionItem" />
     <AdeTip v-if="row.isReview" :text="t('space.ade.plan.branchRow.review.tooltip')">
@@ -202,7 +206,7 @@ const rowBgClass = computed(() => {
       <AdeTip :text="row.name">
         <span
           class="truncate font-data text-kira-md font-medium leading-4"
-          :class="row.isReview ? 'text-tone-blue' : row.draft ? 'italic text-muted-foreground' : 'text-fg'"
+          :class="row.draft ? 'italic text-muted-foreground' : 'text-fg'"
           data-testid="ade-branch-name"
           >{{
             row.name

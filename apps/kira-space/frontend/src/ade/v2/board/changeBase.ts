@@ -42,7 +42,7 @@ export function changeBaseChoices(card: CardModel, c: Ctx): ChangeBaseChoice[] {
         tip: act.tip,
         parts: [
           `${row.repo} · ${row.name} · `,
-          { name: 'base', value: baseOf(row.branch, c.graph, mainName) },
+          { name: 'base', value: baseOf(row.branch, c.graph, mainName), kind: 'branch' },
         ],
         disabled: act.disabled,
         act,

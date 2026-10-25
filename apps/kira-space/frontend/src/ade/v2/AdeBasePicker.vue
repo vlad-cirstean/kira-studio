@@ -10,9 +10,7 @@ import {
   CommandList,
 } from '@theme/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
-import VarText from '@theme/components/VarText.vue';
 import { t } from '@theme/i18n';
-import type { TextPart } from '@theme/varText';
 import { computed, ref } from 'vue';
 import AdeTip from './AdeTip.vue';
 import { useRepoBranches } from './queries';
@@ -50,7 +48,6 @@ const shown = computed(() => {
     return data.value?.branches.find((b) => b.branchId === m.branchId)?.name || m.branchId;
   return m.ref || data.value?.mainName || 'main';
 });
-const parts = computed((): TextPart[] => [{ name: 'base', value: shown.value }]);
 
 function label(b: BasePick): string {
   return b.name || b.taskTitle;
@@ -66,9 +63,8 @@ const pickOf = (b: BasePick): BaseChoice =>
 <template>
   <Popover v-model:open="open">
     <PopoverTrigger as-child>
-      <PickerTrigger size="kira" data-testid="ade-base-picker">
+      <PickerTrigger size="kira" :label="shown" data-testid="ade-base-picker">
         <template #leading><CodiconIcon name="git-branch" :size="12" /></template>
-        <VarText :parts="parts" />
       </PickerTrigger>
     </PopoverTrigger>
     <PopoverContent align="start" class="w-80 gap-0 p-0" data-testid="ade-base-popover">
@@ -87,7 +83,7 @@ const pickOf = (b: BasePick): BaseChoice =>
               data-testid="ade-base-option-previous"
               @select="choose({ ref: data.previous, branchId: '' })"
             >
-              <VarText :parts="[{ name: 'base', value: data.previous }]" />
+              <span class="min-w-0 truncate font-data">{{ data.previous }}</span>
             </CommandItem>
           </CommandGroup>
           <CommandGroup :heading="t('space.ade.basePicker.main.label')">
@@ -96,7 +92,7 @@ const pickOf = (b: BasePick): BaseChoice =>
               :data-testid="`ade-base-option-${data?.mainName ?? 'main'}`"
               @select="choose(MAIN)"
             >
-              <VarText :parts="[{ name: 'base', value: data?.mainName ?? 'main' }]" />
+              <span class="min-w-0 truncate font-data">{{ data?.mainName ?? 'main' }}</span>
             </CommandItem>
           </CommandGroup>
           <CommandGroup v-if="planner.length" :heading="t('space.ade.basePicker.planner.label')">
@@ -110,7 +106,7 @@ const pickOf = (b: BasePick): BaseChoice =>
                 <span class="min-w-0 flex-1 truncate">
                   {{ b.taskTitle }}
                   ·
-                  <VarText v-if="b.name" :parts="[{ name: 'base', value: b.name }]" />
+                  <span v-if="b.name" class="font-data">{{ b.name }}</span>
                   <span v-else class="text-subtle">{{
                     t('space.ade.board.branchTag.notCreated.label')
                   }}</span>
@@ -126,7 +122,7 @@ const pickOf = (b: BasePick): BaseChoice =>
                 :data-testid="`ade-base-option-${b.name}`"
                 @select="choose(pickOf(b))"
               >
-                <VarText :parts="[{ name: 'base', value: b.name }]" />
+                <span class="min-w-0 truncate font-data">{{ b.name }}</span>
                 <span v-if="!b.local" class="ml-auto text-kira-sm text-subtle">{{
                   t('space.ade.basePicker.remote.status')
                 }}</span>
