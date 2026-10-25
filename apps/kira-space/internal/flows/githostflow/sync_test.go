@@ -2,6 +2,7 @@ package githostflow_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness/fakehost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 )
 
 // syncRig is a plain clone whose origin lives on the fake forge; no ADE task is involved.
@@ -269,5 +271,40 @@ func TestChangeRequestIndexSkipsDeletedMergedBranch(t *testing.T) {
 	by := r.byBranch()
 	if _, ok := by["gone"]; ok || len(by) != 3 {
 		t.Fatalf("index = %+v, want the 3 live branches only", by)
+	}
+}
+
+// A delta that overflows the page cap resumes as a walk that stops at the pre-delta watermark,
+// not at the end of history.
+func TestChangeRequestIndexDeltaOverflowStopsAtFloor(t *testing.T) {
+	forge := fakehost.New()
+	now := time.Now().UnixMilli()
+	for i := range 150 {
+		forge.AddChangeRequest(cr(i+1, "open", fmt.Sprintf("old/%d", i), now-48*int64(time.Hour/time.Millisecond)-int64(i)*60_000))
+	}
+	r := newSyncRig(t, forge, flowharness.WithChangeRequestSync(gitsession.CRSyncConfig{
+		Disabled: true, MinGap: time.Nanosecond, ChecksInterval: time.Nanosecond, PageCap: 1,
+		BackoffInitial: 20 * time.Millisecond, BackoffMax: 100 * time.Millisecond,
+	}))
+	r.sync()
+	r.sync()
+	if !r.index().Complete {
+		t.Fatal("backfill incomplete after two single-page runs of 150 requests")
+	}
+	for i := range 250 {
+		forge.AddChangeRequest(cr(1000+i, "open", fmt.Sprintf("new/%d", i), now+int64(i)*1000))
+	}
+	pages := forge.Count("Page:")
+	r.sync()
+	if r.index().Complete {
+		t.Fatal("index complete after a delta that overflowed the page cap")
+	}
+	r.sync()
+	r.sync()
+	if !r.index().Complete {
+		t.Fatal("resumed walk did not complete at the floor")
+	}
+	if got := forge.Count("Page:") - pages; got != 3 {
+		t.Fatalf("pages read = %d, want 3 (delta 1, resumed walk 2): the walk must stop at the floor", got)
 	}
 }

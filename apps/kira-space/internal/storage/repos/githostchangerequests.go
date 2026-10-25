@@ -125,9 +125,9 @@ func (r *GitHostChangeRequestsRepo) SyncState(repoKey string) (model.GitHostSync
 	var s model.GitHostSyncState
 	var complete int
 	err := r.DB.QueryRow(`SELECT account, watermark_updated_at, etag, last_full_sync_at, last_delta_at, last_checks_at,
-		backfill_cursor, backfill_complete, schema_version FROM git_host_sync_state WHERE repo_key = ?`, repoKey).
+		backfill_cursor, backfill_complete, schema_version, delta_floor FROM git_host_sync_state WHERE repo_key = ?`, repoKey).
 		Scan(&s.Account, &s.WatermarkUpdatedAt, &s.ETag, &s.LastFullSyncAt, &s.LastDeltaAt, &s.LastChecksAt,
-			&s.BackfillCursor, &complete, &s.SchemaVersion)
+			&s.BackfillCursor, &complete, &s.SchemaVersion, &s.DeltaFloor)
 	if err == sql.ErrNoRows {
 		return model.GitHostSyncState{}, false, nil
 	}
@@ -141,14 +141,14 @@ func (r *GitHostChangeRequestsRepo) SyncState(repoKey string) (model.GitHostSync
 // PutSyncState writes the repository's sync state.
 func (r *GitHostChangeRequestsRepo) PutSyncState(repoKey string, s model.GitHostSyncState) error {
 	if _, err := r.DB.Exec(`INSERT INTO git_host_sync_state (repo_key, account, watermark_updated_at, etag, last_full_sync_at,
-		last_delta_at, last_checks_at, backfill_cursor, backfill_complete, schema_version, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		last_delta_at, last_checks_at, backfill_cursor, backfill_complete, schema_version, updated_at, delta_floor) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (repo_key) DO UPDATE SET account = excluded.account, watermark_updated_at = excluded.watermark_updated_at,
 			etag = excluded.etag, last_full_sync_at = excluded.last_full_sync_at, last_delta_at = excluded.last_delta_at,
 			last_checks_at = excluded.last_checks_at, backfill_cursor = excluded.backfill_cursor,
 			backfill_complete = excluded.backfill_complete, schema_version = excluded.schema_version,
-			updated_at = excluded.updated_at`,
+			updated_at = excluded.updated_at, delta_floor = excluded.delta_floor`,
 		repoKey, s.Account, s.WatermarkUpdatedAt, s.ETag, s.LastFullSyncAt, s.LastDeltaAt, s.LastChecksAt,
-		s.BackfillCursor, boolInt(s.BackfillComplete), s.SchemaVersion, time.Now().UnixMilli()); err != nil {
+		s.BackfillCursor, boolInt(s.BackfillComplete), s.SchemaVersion, time.Now().UnixMilli(), s.DeltaFloor); err != nil {
 		return fmt.Errorf("repos: write sync state of %s: %w", repoKey, err)
 	}
 	return nil

@@ -516,14 +516,20 @@ func (r *crRun) backfill() bool {
 		if !status.OK() {
 			return r.fail(status)
 		}
-		if !r.store(page.Items) {
+		items, reached := page.Items, false
+		if r.st.DeltaFloor > 0 {
+			var keep int
+			keep, reached = deltaStop(items, r.st.DeltaFloor, r.s.cfg.Skew)
+			items = items[:keep]
+		}
+		if !r.store(items) {
 			return false
 		}
-		for _, cr := range page.Items {
+		for _, cr := range items {
 			r.st.WatermarkUpdatedAt = max(r.st.WatermarkUpdatedAt, cr.UpdatedAt)
 		}
-		if !page.HasNext || page.EndCursor == "" {
-			r.st.BackfillComplete, r.st.BackfillCursor = true, ""
+		if reached || !page.HasNext || page.EndCursor == "" {
+			r.st.BackfillComplete, r.st.BackfillCursor, r.st.DeltaFloor = true, "", 0
 			r.st.LastFullSyncAt, r.st.LastChecksAt = r.nowMs, r.nowMs
 			r.s.mu.Lock()
 			r.s.lastPending = time.Now()
@@ -548,7 +554,8 @@ func (r *crRun) backfill() bool {
 }
 
 // delta reads what changed since the last run: a conditional probe, then pages from the newest
-// until the watermark. A walk that hits the page cap first falls back to a resumable backfill.
+// until the watermark. A walk that hits the page cap first falls back to a resumable backfill that
+// stops at the pre-delta watermark (DeltaFloor).
 func (r *crRun) delta() bool {
 	changed, etag, status := r.sp.Probe(r.ctx, r.repo, r.st.ETag)
 	if !status.OK() {
@@ -567,12 +574,13 @@ func (r *crRun) delta() bool {
 	if !r.store(walk.items) {
 		return false
 	}
+	floor := r.st.WatermarkUpdatedAt
 	for _, cr := range walk.items {
 		r.st.WatermarkUpdatedAt = max(r.st.WatermarkUpdatedAt, cr.UpdatedAt)
 	}
 	r.st.ETag = etag
 	if !walk.reached {
-		r.st.BackfillComplete, r.st.BackfillCursor = false, walk.cursor
+		r.st.BackfillComplete, r.st.BackfillCursor, r.st.DeltaFloor = false, walk.cursor, floor
 		r.s.mu.Lock()
 		r.s.more = true
 		r.s.mu.Unlock()
