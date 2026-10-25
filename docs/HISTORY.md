@@ -6950,53 +6950,15 @@ Code review round 1 (base ac9b371): 7 findings, all fixed; findings file dropped
 Source: docs/v0.2.15/ at f87bc24a0da8. 3 phases.
 
 ### v0.2.15 P343 (Done)
-Commit detail panel vanished when opening a file diff from a commit. Root cause: hidden graph tab () reads 0x0;  breakpoint went , then click-outside closed the detail pane.
-Fix in :  and overlay click-outside skip while ;  resyncs on show. One UI spec in .
- ignores benign  notice. Two load flakes fixed:  (now polls) and  (content settled before locale switch).
+Commit detail panel vanished when opening a file diff from a commit. Root cause: hidden graph tab (`v-show`) reads 0x0; `App.vue` breakpoint went `overlay`, then click-outside closed the detail pane.
+Fix in `packages/git-ui/src/App.vue`: `syncBreakpoint` and overlay click-outside skip while `!graphVisible`; `watch(graphVisible)` resyncs on show. One UI spec in `repo-graph-keep-state.spec.ts`.
+`trackErrors` ignores benign `ResizeObserver loop` notice. Two load flakes fixed: `graph-blank-rows` (now polls) and `copy-coverage` (content settled before locale switch).
 
 ### v0.2.15 P344 (Done)
-macOS dev traffic lights larger than released app. Root cause not window config: one  path builds both windows. Release runner  links 15.5 SDK; dev on a Mac with macOS 26 links 26 SDK, giving larger traffic lights.
-Fix:  in all four Info plists (Studio and Space, release and dev). Guard:  S14 (source plists) and A6 (built bundles). Docs: ,  (stale title-bar line, SDK note, Known open items entry).
-macOS behaviour unverified (Linux session). User must confirm on a Mac: SDK split via  and ; setup: bun install (workspace root + every apps/*/frontend)
-bun install v1.4.4 (38afee6c8)
-
-Checked 994 installs across 1144 packages (no changes) [89.00ms]
-setup: go mod download
-setup: wails3 task common:generate:bindings (apps/kira-studio)
-Wails v3.0.0-beta.28 › Generate Bindings
-[30;46m[30;46m INFO [0m[0m [96m[96mProcessed: 869 Packages, 32 Services, 193 Methods, 9 Enums, 347 Models, 0 Events in 6.696598873s.[0m[0m
-[30;46m[30;46m INFO [0m[0m [96m[96mOutput directory: /home/user/kira-studio/apps/kira-studio/frontend/bindings[0m[0m
-[92m[0m
-[92mNeed documentation? Run: [0m[94m]8;;https://v3.wails.io/getting-started/your-first-app/\[4mwails3 docs[0m[94m]8;;\[0m
-[31;107m[31;107m ♥  [0m[0m [92m[92mIf Wails is useful to you or your company, please consider sponsoring the project: [94m]8;;https://github.com/sponsors/leaanthony\[4mwails3 sponsor[0m[92m[94m]8;;\[0m[92m[0m[0m
-setup: wails3 task common:generate:bindings (apps/kira-space)
-Wails v3.0.0-beta.28 › Generate Bindings
-[30;46m[30;46m INFO [0m[0m [96m[96mProcessed: 479 Packages, 28 Services, 203 Methods, 7 Enums, 351 Models, 0 Events in 5.511759894s.[0m[0m
-[30;46m[30;46m INFO [0m[0m [96m[96mOutput directory: /home/user/kira-studio/apps/kira-space/frontend/bindings[0m[0m
-[92m[0m
-[92mNeed documentation? Run: [0m[94m]8;;https://v3.wails.io/getting-started/your-first-app/\[4mwails3 docs[0m[94m]8;;\[0m
-[31;107m[31;107m ♥  [0m[0m [92m[92mIf Wails is useful to you or your company, please consider sponsoring the project: [94m]8;;https://github.com/sponsors/leaanthony\[4mwails3 sponsor[0m[92m[94m]8;;\[0m[92m[0m[0m
-Wails v3.0.0-beta.28 › Build
-[30;101m[30;101m  ERROR  [0m[0m [91m[91mtask: Failed to run task "build": task: precondition not met[0m[0m
-[30;101m[30;101m  ERROR  [0m[0m [91m[91mstarting processes: exit status 1[0m[0m
-[30;101m[30;101m  ERROR  [0m[0m [91m[91mtask: Failed to run task "dev": exit status 1[0m[0m and setup: bun install (workspace root + every apps/*/frontend)
-bun install v1.4.4 (38afee6c8)
-
-Checked 994 installs across 1144 packages (no changes) [43.00ms]
-setup: go mod download
-setup: wails3 task common:generate:bindings (apps/kira-studio)
-[92m[0m
-[92mNeed documentation? Run: [0m[94m]8;;https://v3.wails.io/getting-started/your-first-app/\[4mwails3 docs[0m[94m]8;;\[0m
-[31;107m[31;107m ♥  [0m[0m [92m[92mIf Wails is useful to you or your company, please consider sponsoring the project: [94m]8;;https://github.com/sponsors/leaanthony\[4mwails3 sponsor[0m[92m[94m]8;;\[0m[92m[0m[0m
-setup: wails3 task common:generate:bindings (apps/kira-space)
-[92m[0m
-[92mNeed documentation? Run: [0m[94m]8;;https://v3.wails.io/getting-started/your-first-app/\[4mwails3 docs[0m[94m]8;;\[0m
-[31;107m[31;107m ♥  [0m[0m [92m[92mIf Wails is useful to you or your company, please consider sponsoring the project: [94m]8;;https://github.com/sponsors/leaanthony\[4mwails3 sponsor[0m[92m[94m]8;;\[0m[92m[0m[0m
-Wails v3.0.0-beta.28 › Build
-[30;101m[30;101m  ERROR  [0m[0m [91m[91mtask: Failed to run task "build": task: precondition not met[0m[0m
-[30;101m[30;101m  ERROR  [0m[0m [91m[91mstarting processes: exit status 1[0m[0m
-[30;101m[30;101m  ERROR  [0m[0m [91m[91mtask: Failed to run task "dev": exit status 1[0m[0m traffic lights match released app, 78px inset clears them. If key has no effect, fallback is pinning both builds to one SDK; raise with user first.
+macOS dev traffic lights larger than released app. Root cause not window config: one `Options` path builds both windows. Release runner `macos-15` links 15.5 SDK; dev on a Mac with macOS 26 links 26 SDK, giving larger traffic lights.
+Fix: `UIDesignRequiresCompatibility=true` in all four Info plists (Studio and Space, release and dev). Guard: `verify-packaging.sh` S14 (source plists) and A6 (built bundles). Docs: `PACKAGING.md`, `ARCHITECTURE.md` (stale title-bar line, SDK note, Known open items entry).
+macOS behaviour unverified (Linux session). User must confirm on a Mac: SDK split via `xcrun --show-sdk-version` and `vtool -show-build`; `bun run dev:studio` and `bun run dev:space` traffic lights match released app, 78px inset clears them. If key has no effect, fallback is pinning both builds to one SDK; raise with user first.
 
 ### v0.2.15 P345 (Done)
-Chapter folded by hand into .  removed.
+Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.15/` removed.
 <!-- /chapter v0.2.15 -->
