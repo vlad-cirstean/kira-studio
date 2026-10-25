@@ -38,6 +38,6 @@ type GitHostSyncState struct {
 	BackfillComplete bool
 	// DeltaFloor is the watermark before a delta that overflowed the page cap; the resumed walk
 	// completes on reaching it. 0 for a first backfill, which walks the whole history.
-	DeltaFloor int64
-	SchemaVersion    int
+	DeltaFloor    int64
+	SchemaVersion int
 }

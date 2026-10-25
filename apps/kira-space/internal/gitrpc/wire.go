@@ -708,7 +708,7 @@ type BranchChangeRequestIndexResult struct {
 	// Complete means every change request was ingested: a branch not listed has none.
 	Complete bool `json:"complete"`
 	// SyncedAt is the last sync, Unix milliseconds; 0 when never synced.
-	SyncedAt int64                  `json:"syncedAt"`
+	SyncedAt int64                 `json:"syncedAt"`
 	Branches []BranchChangeRequest `json:"branches"`
 }
 
