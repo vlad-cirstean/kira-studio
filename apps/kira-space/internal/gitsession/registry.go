@@ -8,6 +8,7 @@ package gitsession
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -91,6 +92,8 @@ type Registry struct {
 	// Nil turns logging off. Set before the first Acquire.
 	OpLog *oplog.Log
 
+	pruneOnce sync.Once
+
 	mu      sync.Mutex
 	entries map[string]*slot
 }
@@ -146,6 +149,8 @@ func (reg *Registry) acquire(
 		return nil, nil, err
 	}
 
+	reg.pruneChangeRequests()
+
 	reg.mu.Lock()
 	defer reg.mu.Unlock()
 
@@ -176,6 +181,21 @@ func (reg *Registry) acquire(
 	)
 	reg.entries[summary.RepoID] = &slot{entry: entry, refs: 1}
 	return entry, reg.releaseFunc(summary.RepoID), nil
+}
+
+// pruneChangeRequests drops repositories idle past the retention, once per process and before any
+// entry's syncer reads sync state: a prune racing a run would let its state write resurrect a
+// pruned repository as complete with no rows.
+func (reg *Registry) pruneChangeRequests() {
+	if reg.CRStore == nil {
+		return
+	}
+	reg.pruneOnce.Do(func() {
+		before := time.Now().Add(-reg.CRSync.withDefaults().IdleRetention).UnixMilli()
+		if err := reg.CRStore.PruneIdle(before); err != nil {
+			slog.Warn("githost: prune change request index", "scope", "gitsession", "err", err)
+		}
+	})
 }
 
 func (reg *Registry) releaseFunc(repoID string) func() {

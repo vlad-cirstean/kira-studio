@@ -24,13 +24,13 @@ const SignalChangeRequestsChanged gitclient.Signal = "changeRequestsChanged"
 type ChangeRequestStore interface {
 	UpsertChangeRequests(repoKey string, rows []model.GitHostChangeRequest) (changed int, err error)
 	DeleteChangeRequest(repoKey string, number int) (bool, error)
-	ChangeRequestsForRepo(repoKey, headOwner string) ([]model.GitHostChangeRequest, error)
+	NewestPerBranch(repoKey, headOwner string) ([]model.GitHostChangeRequest, error)
 	ChangeRequestsForBranch(repoKey, headOwner, headRef string) ([]model.GitHostChangeRequest, error)
 	OpenChangeRequests(repoKey string) ([]model.GitHostChangeRequest, error)
 	SyncState(repoKey string) (model.GitHostSyncState, bool, error)
 	PutSyncState(repoKey string, s model.GitHostSyncState) error
 	DropRepo(repoKey string) error
-	PruneIdle(before int64, keep string) error
+	PruneIdle(before int64) error
 }
 
 // CRSyncConfig tunes the change request sync; a zero field takes its default.
@@ -118,7 +118,6 @@ type crSyncer struct {
 	bo        *backoff.ExponentialBackOff
 	// lastPending spaces pending-checks refreshes; zero until the first.
 	lastPending time.Time
-	pruned      bool
 	// key is the repo key of the last run, to drop its rows if the host is switched off.
 	key string
 	// more is set by a run that stopped at its page cap, to run again sooner than the interval.
@@ -412,8 +411,7 @@ func (r *crRun) storeErr(err error) bool {
 	return false
 }
 
-// prepare loads the sync state, drops rows read as another account or an older layout, and prunes
-// repositories idle past the retention once.
+// prepare loads the sync state and drops rows read as another account or an older layout.
 func (r *crRun) prepare() bool {
 	s := r.s
 	account := r.p.Account(r.ctx, r.repo.Host)
@@ -429,15 +427,6 @@ func (r *crRun) prepare() bool {
 		st = model.GitHostSyncState{Account: account, SchemaVersion: model.GitHostSchemaVersion}
 	}
 	r.st = st
-	s.mu.Lock()
-	prune := !s.pruned
-	s.pruned = true
-	s.mu.Unlock()
-	if prune {
-		if err := s.store.PruneIdle(time.Now().Add(-s.cfg.IdleRetention).UnixMilli(), r.key); err != nil {
-			slog.Warn("githost: prune change request index", "scope", "gitsession", "repo", s.e.Summary.RepoID, "err", err)
-		}
-	}
 	return true
 }
 
@@ -752,7 +741,7 @@ func (e *RepoEntry) ChangeRequestIndex(ctx context.Context) ChangeRequestIndex {
 		slog.Warn("githost: read change request sync state", "scope", "gitsession", "repo", e.Summary.RepoID, "err", err)
 		return ChangeRequestIndex{}
 	}
-	rows, err := store.ChangeRequestsForRepo(key, repo.Owner)
+	rows, err := store.NewestPerBranch(key, repo.Owner)
 	if err != nil {
 		slog.Warn("githost: read change request index", "scope", "gitsession", "repo", e.Summary.RepoID, "err", err)
 		return ChangeRequestIndex{}
@@ -768,13 +757,11 @@ func (e *RepoEntry) ChangeRequestIndex(ctx context.Context) ChangeRequestIndex {
 				live[name] = true
 			}
 		}
+	} else {
+		// Without refs the merged and closed rows cannot be narrowed, so the list is partial.
+		out.Complete = false
 	}
-	seen := map[string]bool{}
 	for _, row := range rows {
-		if seen[row.HeadRef] {
-			continue
-		}
-		seen[row.HeadRef] = true
 		if cr := crFromRow(row); live[row.HeadRef] || cr.State == "open" || cr.State == "draft" {
 			out.Branches = append(out.Branches, BranchChangeRequest{Name: row.HeadRef, ChangeRequest: cr})
 		}

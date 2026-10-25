@@ -20,22 +20,16 @@ func TestGitHostChangeRequestsRepo_PruneIdleKeepsActiveBackfill(t *testing.T) {
 	if err := repo.PutSyncState("b", model.GitHostSyncState{Account: "a", BackfillCursor: "c1"}); err != nil {
 		t.Fatalf("put b: %v", err)
 	}
-	if err := repo.PutSyncState("c", model.GitHostSyncState{Account: "a"}); err != nil {
-		t.Fatalf("put c: %v", err)
-	}
-	if err := repo.PruneIdle(time.Now().Add(-time.Hour).UnixMilli(), "c"); err != nil {
+	if err := repo.PruneIdle(time.Now().Add(-time.Hour).UnixMilli()); err != nil {
 		t.Fatalf("prune: %v", err)
 	}
 	if _, have, _ := repo.SyncState("b"); !have {
 		t.Fatal("active backfill state pruned")
 	}
-	if err := repo.PruneIdle(time.Now().Add(time.Hour).UnixMilli(), "c"); err != nil {
+	if err := repo.PruneIdle(time.Now().Add(time.Hour).UnixMilli()); err != nil {
 		t.Fatalf("prune idle: %v", err)
 	}
 	if _, have, _ := repo.SyncState("b"); have {
 		t.Fatal("idle state kept")
-	}
-	if _, have, _ := repo.SyncState("c"); !have {
-		t.Fatal("keep repo pruned")
 	}
 }

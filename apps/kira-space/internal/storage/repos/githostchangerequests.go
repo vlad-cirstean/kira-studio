@@ -87,10 +87,13 @@ func (r *GitHostChangeRequestsRepo) DeleteChangeRequest(repoKey string, number i
 	return n > 0, nil
 }
 
-// ChangeRequestsForRepo returns the rows whose head lives in headOwner's repository, newest first.
-func (r *GitHostChangeRequestsRepo) ChangeRequestsForRepo(repoKey, headOwner string) ([]model.GitHostChangeRequest, error) {
-	rows, err := r.DB.Query(`SELECT `+gitHostCRColumns+` FROM git_host_change_requests
-		WHERE repo_key = ? AND head_owner = ? ORDER BY updated_at DESC, number DESC`, repoKey, headOwner)
+// NewestPerBranch returns each head branch's newest row among those whose head lives in
+// headOwner's repository, newest first.
+func (r *GitHostChangeRequestsRepo) NewestPerBranch(repoKey, headOwner string) ([]model.GitHostChangeRequest, error) {
+	rows, err := r.DB.Query(`SELECT `+gitHostCRColumns+` FROM (
+			SELECT `+gitHostCRColumns+`, row_number() OVER (PARTITION BY head_ref ORDER BY updated_at DESC, number DESC) AS rn
+			FROM git_host_change_requests WHERE repo_key = ? AND head_owner = ?)
+		WHERE rn = 1 ORDER BY updated_at DESC, number DESC`, repoKey, headOwner)
 	out, err := sqlitex.QueryAll(rows, err, scanGitHostCR)
 	if err != nil {
 		return nil, fmt.Errorf("repos: list change requests of %s: %w", repoKey, err)
@@ -159,10 +162,10 @@ func (r *GitHostChangeRequestsRepo) DropRepo(repoKey string) error {
 	return r.dropWhere(`repo_key = ?`, repoKey)
 }
 
-// PruneIdle drops every repository, except keep, with no sync state write since before.
-func (r *GitHostChangeRequestsRepo) PruneIdle(before int64, keep string) error {
-	return r.dropWhere(`repo_key <> ? AND repo_key IN (SELECT repo_key FROM git_host_sync_state
-		WHERE max(last_full_sync_at, last_delta_at, last_checks_at, updated_at) < ?)`, keep, before)
+// PruneIdle drops every repository with no sync state write since before.
+func (r *GitHostChangeRequestsRepo) PruneIdle(before int64) error {
+	return r.dropWhere(`repo_key IN (SELECT repo_key FROM git_host_sync_state
+		WHERE max(last_full_sync_at, last_delta_at, last_checks_at, updated_at) < ?)`, before)
 }
 
 func (r *GitHostChangeRequestsRepo) dropWhere(cond string, args ...any) error {

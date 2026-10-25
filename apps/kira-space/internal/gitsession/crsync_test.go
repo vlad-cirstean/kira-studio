@@ -1,7 +1,10 @@
 package gitsession
 
 import (
+	"context"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -77,5 +80,40 @@ func TestContinueWaitHonoursMinGap(t *testing.T) {
 	s.lastStart = now.Add(-time.Minute)
 	if got := s.continueWaitLocked(now); got != 5*time.Second {
 		t.Fatalf("wait = %v, want ContinueDelay", got)
+	}
+}
+
+type pruneRecorder struct {
+	ChangeRequestStore
+	calls atomic.Int32
+}
+
+func (p *pruneRecorder) PruneIdle(int64) error { p.calls.Add(1); return nil }
+
+// Every entry's first run used to prune the others' state while their runs held it in memory.
+// The registry prunes once, at the first Acquire, before any syncer exists.
+func TestRegistryPrunesChangeRequestsOnce(t *testing.T) {
+	store := &pruneRecorder{}
+	reg := newTestRegistry()
+	reg.CRStore, reg.CRSync = store, CRSyncConfig{Disabled: true}
+	var wg sync.WaitGroup
+	for _, path := range []string{"/repo-a", "/repo-b", "/repo-c"} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, release, err := reg.Acquire(context.Background(), "/usr/bin/git", path)
+			if err != nil {
+				t.Errorf("Acquire %s: %v", path, err)
+				return
+			}
+			defer release()
+			if n := store.calls.Load(); n != 1 {
+				t.Errorf("PruneIdle calls after Acquire = %d, want 1", n)
+			}
+		}()
+	}
+	wg.Wait()
+	if n := store.calls.Load(); n != 1 {
+		t.Fatalf("PruneIdle calls = %d, want 1", n)
 	}
 }
