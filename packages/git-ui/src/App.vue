@@ -1409,8 +1409,8 @@ function breakpointFor(width: number): Breakpoint {
 const rootEl = ref<HTMLDivElement | null>(null);
 // `main.ts`'s own `mount()` provides this per instance only for a Kira Space graph tab
 // (a kept-mounted sibling among possibly several) — always `true` everywhere else
-// (this package's own tests), so `onDocumentKeydown` below behaves exactly as before
-// wherever only one instance ever exists.
+// (this package's own tests). Gates `onDocumentKeydown`, breakpoint sync and the overlay
+// click-outside, so those behave as before wherever only one instance ever exists.
 const graphVisible = useGraphVisible();
 const overlayDetailRegionEl = ref<HTMLElement | null>(null);
 const breakpoint = ref<Breakpoint>('wide');
@@ -1578,6 +1578,7 @@ function onDocumentKeydown(event: KeyboardEvent): void {
 onClickOutside(
   overlayDetailRegionEl,
   () => {
+    if (!graphVisible.value) return;
     if (breakpoint.value === 'overlay' && detailOpen.value) closeDetail();
   },
   // A FileTree row menu (RowContextMenu, DropdownMenu) can open while the
@@ -1588,11 +1589,17 @@ onClickOutside(
   { ignore: ['[data-reka-popper-content-wrapper]'] },
 );
 
+// A hidden kept-mounted host reads 0×0, not a real width (CommitGrid's scheduleResize guard).
+function syncBreakpoint(): void {
+  if (!graphVisible.value || !rootEl.value) return;
+  breakpoint.value = breakpointFor(rootEl.value.clientWidth);
+}
+
 function scheduleBreakpointUpdate(): void {
   if (breakpointRaf !== 0) return;
   breakpointRaf = requestAnimationFrame(() => {
     breakpointRaf = 0;
-    if (rootEl.value) breakpoint.value = breakpointFor(rootEl.value.clientWidth);
+    syncBreakpoint();
   });
 }
 
@@ -1633,10 +1640,11 @@ const hasSelection = computed(
 
 useEventListener(document, 'keydown', onDocumentKeydown);
 useResizeObserver(rootEl, scheduleBreakpointUpdate);
-
-onMounted(() => {
-  if (rootEl.value) breakpoint.value = breakpointFor(rootEl.value.clientWidth);
+watch(graphVisible, (visible) => {
+  if (visible) scheduleBreakpointUpdate();
 });
+
+onMounted(syncBreakpoint);
 
 onBeforeUnmount(() => {
   if (breakpointRaf !== 0) cancelAnimationFrame(breakpointRaf);
