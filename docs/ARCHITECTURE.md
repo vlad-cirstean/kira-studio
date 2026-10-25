@@ -26,7 +26,7 @@ whatever sandbox a session happens to be in),
 
 ## Stack
 
-- The desktop shell is Wails v3 (v3.0.0-beta.28) in Go, targeting macOS 14+ on arm64 only.
+- The desktop shell is Wails v3 (v3.0.0-beta.28) in Go, targeting macOS 26+ on arm64 only.
 - The window uses a custom MacTitleBar (AppearsTransparent, HideTitle, FullSizeContent, no toolbar) over a full-size-content window, not the OS-drawn bar, drawn by the shared packages/workbench/src/components/TitleBar.vue.
 - On macOS 26 AppKit picks window chrome by the executable's linked-SDK field. Both darwin builds stamp `sdk 26.0` post-link with `vtool` (release runner links 15.5, which gives smaller buttons), so dev and release both render the larger macOS 26 chrome.
 - Each app's own frontend/src/workbench/TitleBar.vue supplies its title-bar buttons and mode tabs through the shared TitleBar shell's default slot.
@@ -2985,7 +2985,7 @@ repo's CI runs.
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
-- **Release binaries record SDK 26.0 by stamp, not by link (P345).** The `macos-15` runner links 15.5, so `vtool` stamps `sdk 26.0` (minos stays 14.0) in both darwin Taskfiles for macOS 26 chrome. Other linked-on-or-after behaviour (AppKit, WebKit) follows the stamp, not the SDK actually used. Unverified on a Mac. Pending: `docs/pending-changes/` patches move runners to `macos-26`; then delete the stamp, verify-packaging S14/A6 and this entry together, add availability guards for APIs newer than macOS 14, and smoke-test macOS 14/15.
+- **Release binaries record SDK 26.0 and minos 26.0 by stamp, not by link (P345).** The `macos-15` runner links 15.5, so `vtool` stamps both in the darwin Taskfiles (compile flags stay 14.0, which the runner SDK accepts). Other linked-on-or-after behaviour (AppKit, WebKit) follows the stamp, not the SDK actually used. macOS 14 and 15 are dropped on purpose. Unverified on a Mac. Pending: `docs/pending-changes/` patches move runners to `macos-26`; then delete the stamp, verify-packaging S14/A6 and this entry together and raise `MACOS_COMPILE_MIN` to 26.0.
 - **The macOS default-app switch is unverified on a real Mac (P332).** No Mac was available: the cgo registry, the document types in LaunchServices, whether a system prompt appears when setting a content-type default, and the UTI of each imported row are untested. Check: install the DMG, run it once from `/Applications`, then `lsregister -dump` lists both document types, Open With lists Kira Space, and the pane's switch changes `mdls -name kMDItemContentType` output.
 - **MCP `run_query` read verdicts run under `READ ONLY` wrap, which does not stop every side effect (P329).** A statement classified read runs in `BEGIN READ ONLY` (Postgres) or `START TRANSACTION READ ONLY` (MySQL/MariaDB) unless writes are allowed. Postgres still permits `pg_terminate_backend`, `pg_cancel_backend` and `dblink_exec`; MySQL/MariaDB still permits `GET_LOCK` and writes to temporary tables. SQLite and ClickHouse get no per-request wrap: no write-capable function is reachable from a read there.
 - **MongoDB 8.x/9.x servers are unverified in CI.** Every 8.x/9.x image exits at startup on runner kernels

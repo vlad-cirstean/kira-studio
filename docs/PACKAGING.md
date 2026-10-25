@@ -96,23 +96,23 @@ builds and runs a `Kira Studio.dev.app` from `build/darwin/Info.dev.plist` witho
 **`apps/kira-studio/build/darwin/Info.plist`** — `CFBundleName` and `CFBundleExecutable` are both `Kira Studio`,
 `CFBundleIdentifier` is `com.kirathecat.kira-studio`, `CFBundleVersion`/`CFBundleShortVersionString`
 `0.0.0` (the scaffolded value; the *bundle's* copy is stamped at packaging time, below),
-`CFBundleIconFile` `icons`, `LSMinimumSystemVersion` `14.0.0`. That floor is hand-narrowed
-from Wails' template default of `12.0.0`, and matches the build's `MACOSX_DEPLOYMENT_TARGET`/`CGO_*`
-flags and the README's macOS 14+ product claim. The template hardcodes `12.0.0`, so a
+`CFBundleIconFile` `icons`, `LSMinimumSystemVersion` `26.0.0`. That floor is hand-narrowed
+from Wails' template default of `12.0.0`, and matches the stamped minos and the README's macOS 26+ product claim. The template hardcodes `12.0.0`, so a
 `wails3 task common:update:build-assets` run reverts both plists — re-narrow them after regenerating.
 Kira Space's plists also carry a generated document-type block (P332); rerun
 `go run ./apps/kira-space/tools/gendoctypes` after the regeneration.
-Both darwin Taskfiles' `build:native` stamp the linked binary's SDK to `26.0` (minos stays `14.0`) with
-`vtool -set-build-version`, then re-sign it ad hoc (P345). AppKit picks window chrome by the recorded SDK,
-while the runtime OS decides availability; this is how VS Code and Electron apps get the macOS 26 look:
-compile against the newest SDK with a low deployment target. The release runner (`macos-15`) links 15.5 and
-gets smaller traffic lights, so the stamp emulates a newer SDK, and dev matches. The minimum stays 14.0
-(`LSMinimumSystemVersion`, `-mmacosx-version-min`). Regeneration drops the stamp; `verify-packaging.sh`
-S14 (Taskfiles) and A6 (built bundles, expects `minos 14.0`, `sdk 26.0`) catch that.
+Both darwin Taskfiles' `build:native` stamp the linked binary with `vtool -set-build-version macos 26.0 26.0`
+(minos 26.0, sdk 26.0), then re-sign it ad hoc (P345). AppKit picks window chrome by the recorded SDK, while
+the runtime OS decides availability; this is how VS Code and Electron apps get the macOS 26 look (newest SDK
+at link time). The release runner (`macos-15`) links 15.5 and gets smaller traffic lights, so the stamp
+emulates SDK 26, and dev matches. The minimum macOS is 26.0 on purpose: macOS 14 and 15 are dropped
+(`LSMinimumSystemVersion`, the stamped minos, `install.sh` preflight, README and site copy). Compile-time
+`-mmacosx-version-min` and `MACOSX_DEPLOYMENT_TARGET` stay 14.0 (`MACOS_COMPILE_MIN`) because clang against
+the runner's SDK 15.5 cannot target 26; the stamp alone sets the recorded minos. Regeneration drops the
+stamp; `verify-packaging.sh` S14 (Taskfiles) and A6 (built bundles, expects `minos 26.0`, `sdk 26.0`) catch that.
 Long-term fix, pending: `docs/pending-changes/.github__workflows__{release,pr,cache-warm}.yml.patch` move
 the runners to `macos-26` (workflow files cannot be pushed from a Linux session, `docs/DEV_ENVIRONMENT.md`).
-Once release links the real SDK 26 the stamp is redundant. Then APIs newer than macOS 14 need availability
-guards, and a smoke test on macOS 14/15 is advisable.
+Once release links the real SDK 26 the stamp is redundant, and `MACOS_COMPILE_MIN` can become 26.0.
 The floor is 14 rather than 13 because Go 1.27 builds its own objects for macOS 13 minimum: a lower
 `-mmacosx-version-min` only earns a linker warning that the object file was built for a newer macOS
 than is being linked.
@@ -220,7 +220,7 @@ Not verifiable off macOS (needs a human on real hardware — see §4): code sign
 quarantine behavior, launching the app at all, `~/.kira-studio/` creation, cold-start timing, packaged
 RSS, and the `.app` size.
 
-## 4. Human checklist (run on macOS 14+ arm64)
+## 4. Human checklist (run on macOS 26+ arm64)
 
 Every item is a pass/fail a human should record here after running it for real. Since P295 these run after the release is published (§7), against its published assets, not before it. Items 1–3, 10 and 11
 are also checked automatically on macOS by `release.yml`'s own "Assert packaged bundle and disk
