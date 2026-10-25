@@ -16,6 +16,7 @@ import { ICON } from '@theme/icons';
 import RunState from '@theme/RunState.vue';
 import { copyOrReportError } from '@workbench/behaviour/clipboard';
 import { matchesQuery } from '@workbench/behaviour/match';
+import ToolbarSeparator from '@workbench/components/ToolbarSeparator.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
@@ -273,7 +274,7 @@ const breadcrumb = computed(() => {
           @click="onRefresh"
         />
       </div>
-      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+      <ToolbarSeparator />
       <div class="flex items-center gap-1.5 min-w-0">
         <SecondaryTabs
           :model-value="pane"
@@ -298,7 +299,7 @@ const breadcrumb = computed(() => {
         <!-- D7: Copy/notes describe the Source pane's raw text specifically — Structure has its
              own per-section content and count badges, nothing to copy as one document. -->
         <template v-if="pane === 'source'">
-          <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+          <ToolbarSeparator />
           <Tooltip>
             <TooltipTrigger as-child>
               <Button variant="toolbar" size="kira" data-testid="definition-copy" @click="onCopy">

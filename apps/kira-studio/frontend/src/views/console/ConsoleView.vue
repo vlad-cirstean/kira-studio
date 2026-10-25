@@ -14,6 +14,7 @@ import {
 import { colorMarkClass } from '@theme/connColor';
 import { t } from '@theme/i18n';
 import RunState from '@theme/RunState.vue';
+import ToolbarSeparator from '@workbench/components/ToolbarSeparator.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
@@ -325,7 +326,7 @@ onUnmounted(() => {
         </TooltipTrigger>
         <TooltipContent>{{ explainTooltip }}</TooltipContent>
       </Tooltip>
-      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
+      <ToolbarSeparator />
       <TooltipIconButton
         icon="layers"
         :label="tab.state.newResultSet
@@ -336,7 +337,7 @@ onUnmounted(() => {
         data-testid="console-new-result-toggle"
         @click="setNewResultSet(tab.id, !tab.state.newResultSet)"
       />
-      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
+      <ToolbarSeparator />
       <div class="relative">
         <Tooltip>
           <TooltipTrigger as-child>
@@ -361,7 +362,7 @@ onUnmounted(() => {
           <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="onSavedMenuClose" />
         </Popover>
       </div>
-      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
+      <ToolbarSeparator />
       <TooltipIconButton
         v-if="!activeResultIsPlan"
         icon="search"

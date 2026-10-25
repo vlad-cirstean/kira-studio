@@ -6,6 +6,7 @@ import { formatCount } from '@workbench/behaviour/format';
 import { errorText } from '@workbench/bridge/codedError';
 import FindBar from '@workbench/components/FindBar.vue';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
+import ToolbarSeparator from '@workbench/components/ToolbarSeparator.vue';
 import { computed, onUnmounted, ref, watch } from 'vue';
 import type { SearchHandle } from './scan';
 import type { PageSearchApi } from './search';
@@ -247,7 +248,7 @@ onUnmounted(() => {
         v-model:regex="regex"
         :testid-prefix="`${testidPrefix}search-`"
       />
-      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+      <ToolbarSeparator />
       <TooltipIconButton
         icon="filter"
         :label="t(filtering ? 'studio.search.filteringRows.tooltip' : 'studio.search.filterRows.tooltip')"
@@ -256,7 +257,7 @@ onUnmounted(() => {
         :data-testid="`${testidPrefix}search-filter-rows`"
         @click="toggleFilter"
       />
-      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+      <ToolbarSeparator />
       <span class="text-kira-sm text-subtle" :data-testid="`${testidPrefix}search-scope`">
         <template v-if="filtering && filteredRowCount !== null">
           {{ t(scopeFilteredKey, { shown: formatCount(filteredRowCount), count: loadedRowCount }) }}

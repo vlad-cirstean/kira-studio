@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
 import RunState from '@theme/RunState.vue';
+import ToolbarSeparator from '@workbench/components/ToolbarSeparator.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
 import { useRunState } from '../../state/runState';
@@ -76,7 +77,7 @@ const projectionCount = computed(() => {
         @click="documentViewStore.stop(tab.id)"
       />
     </div>
-    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
+    <ToolbarSeparator />
     <PagerControls
       :page-index="tab.state.pageIndex"
       :page-size="tab.state.pageSize"
@@ -97,7 +98,7 @@ const projectionCount = computed(() => {
       data-testid="document-page-size-picker"
       @update:model-value="(v) => documentViewStore.setPageSize(tab.id, Number(v) as PageSize)"
     />
-    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
+    <ToolbarSeparator />
     <!-- DataToolbar's [count, columns, preview] group — this collection's equivalents are
          the exact count, the fields/projection menu, and expand/collapse-all. -->
     <div class="flex items-center gap-1.5 min-w-0">
@@ -170,7 +171,7 @@ const projectionCount = computed(() => {
         @click="emit('collapseAll')"
       />
     </div>
-    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
+    <ToolbarSeparator />
     <!-- DataToolbar's [add-row, delete-row, search] group — this collection has no delete
          affordance in the toolbar (deletion lives on the row's own context menu). -->
     <div class="flex items-center gap-1.5 min-w-0">
