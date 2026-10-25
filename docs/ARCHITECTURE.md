@@ -1996,6 +1996,10 @@ and `docs/HISTORY.md (v2.0)`.
 - A workflow step runs once (on the first mine branch in task order), each repo, or only <repo>, with one run per step and branch.
 - Task status is derived from the workflow and runs, never typed (decision D10), so the Status field is read-only.
 - Backlog items are not on the plan until promoted.
+- CreateTask takes an optional plan day (nil lands in Later). The UI sends today, or the next work day, and no repos; repos arrive via AddTaskRepo, AddExistingBranch or agent declare_repos.
+- A repoless task refuses Start (no branch to run on) until a repo is added. This is designed behavior.
+- An estimate is free text h or d, settable, changeable and clearable at any time; only the cap (480h, 60d) applies.
+- The Branch wire carries no files or commits list or commit count; ahead, behind and dirty remain. Board facts still use the range file set for shared-file pairs.
 
 ### Process wiring
 
@@ -2029,7 +2033,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 - FileChange carries only path, status kind, rename original path and similarity, all from one --name-status spawn (porcelain.ParseNameStatusRecords); file lists have no line counts and no binary flag (P257).
 - --numstat survives only in stash list and the global stash log, as record framing for FileCount; the FileTree directory row keeps N files.
-- Board facts per repo (branch inventory, ahead/behind against base, files, commits, dirty state, caches keyed by tip pairs) run on the ade-board.
+- Board facts per repo (branch inventory, ahead/behind against base, files, dirty state, caches keyed by tip pairs) run on the ade-board.
 - Board refresh fetches the default remote and then derives facts again through the same path; without a remote it rescans locally and the chip reads no remote. Autofetch interval is a setting.
 - The board opens repos with GitStatus().Path (discovery), never the raw git.gitPath setting (empty by default); non-ok git fails the open with: ade: git is unavailable
 - lastFetchAt is the mtime of the worktree git dir's FETCH_HEAD.
