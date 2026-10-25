@@ -57,7 +57,10 @@ const titleEdit = useInlineEdit({
   commit: async (title) => {
     await update.mutateAsync({ taskId: props.card.task.id, patch: taskPatch({ title }) });
   },
-  allowEmpty: true,
+  // A task without a Jira key needs its title.
+  get allowEmpty() {
+    return Boolean(props.card.task.jira);
+  },
 });
 
 /** A finished task shows Archive as its step action; any other task gets the quiet one. */
