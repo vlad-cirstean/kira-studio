@@ -48,14 +48,14 @@ tasks:
     cmds:
       - '{{if eq .OBFUSCATED "true"}}garble {{.GARBLE_ARGS}} build{{else}}go build{{end}} {{.BUILD_FLAGS}} -o "{{.OUTPUT}}"'
       # P345: AppKit picks window chrome by the main executable's linked-SDK field. Release links the
-      # runner's 15.5 SDK; a dev build on Xcode 26+ would get larger traffic lights. Stamp both alike.
+      # runner's 15.5 SDK (smaller traffic lights); stamp dev and release up to 26.0 for macOS 26 chrome.
       - vtool -set-build-version macos {{.MACOS_MIN}} {{.MACOS_SDK_STAMP}} -replace -output "{{.OUTPUT}}.stamped" "{{.OUTPUT}}"
       - mv "{{.OUTPUT}}.stamped" "{{.OUTPUT}}"
       # vtool invalidates the linker's ad-hoc signature; arm64 refuses to exec an unsigned binary.
       - codesign --force --sign - "{{.OUTPUT}}"
     vars:
       MACOS_MIN: "14.0"
-      MACOS_SDK_STAMP: "15.5"
+      MACOS_SDK_STAMP: "26.0"
       # `-X {{.VERSION_VAR}}` is what makes internal/buildinfo report a real version instead of its
       # development literal; it is in both branches so a dev build and a packaged one agree about
       # what they are.
