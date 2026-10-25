@@ -138,7 +138,7 @@ function bendCommand(xFrom: number, xTo: number, yStart: number, yEnd: number): 
   );
 }
 
-export interface EdgePathPlan {
+interface EdgePathPlan {
   readonly color: number;
   readonly d: string;
 }

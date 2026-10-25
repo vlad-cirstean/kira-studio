@@ -26,7 +26,7 @@ import { splitHighlights } from './searchHighlight.ts';
  *  (SlickGrid's `Column<T>.field` is typed against `T`'s own leaf paths); formatters here read
  *  `dataContext` directly and ignore `value`, so which leaf each column claims is otherwise
  *  arbitrary — chosen for readability, not because the formatter uses it. */
-export const GRAPH_COLUMN_ID = 'graph';
+const GRAPH_COLUMN_ID = 'graph';
 const MESSAGE_COLUMN_ID = 'message';
 const AUTHOR_COLUMN_ID = 'author';
 const DATE_COLUMN_ID = 'date';
