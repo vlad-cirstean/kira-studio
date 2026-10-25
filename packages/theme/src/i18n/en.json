@@ -1088,9 +1088,6 @@
         "estimateInvalid": {
           "body": "Enter an estimate like 2h or 3d."
         },
-        "estimateShrink": {
-          "body": "An estimate can only grow once it’s set."
-        },
         "estimateTooLong": {
           "body": "An estimate can be at most 480h or 60d."
         },
@@ -7353,12 +7350,11 @@
         "title": "Move tasks?"
       },
       "estimate": {
+        "clear": {
+          "tooltip": "Clear estimate"
+        },
         "days": {
           "option": "Days"
-        },
-        "extend": {
-          "aria": "Extend estimate",
-          "label": "Extend"
         },
         "field": {
           "label": "Estimate"

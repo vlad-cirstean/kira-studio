@@ -24,8 +24,6 @@ var (
 	ErrRunNotFound   = errors.New("repos: run not found")
 	// ErrBranchNameTaken marks a created-branch name already used by a live branch of the repo.
 	ErrBranchNameTaken = errors.New("repos: a live branch in that repo already has that name")
-	// ErrEstimateShrink: once an estimate is set, a patch may only grow it (same unit).
-	ErrEstimateShrink = errors.New("repos: estimate can only grow once set")
 )
 
 // maxColorSlots is the task colour slot count (0-19).
@@ -50,23 +48,6 @@ func EstOverCap(est string) bool {
 		return n > MaxEstHours
 	}
 	return n > MaxEstDays
-}
-
-// checkEstExtends guards an estimate patch: once set, it may only grow, same unit (h or d). An
-// estimate stored above the cap may be replaced by any valid one, so a typo is recoverable.
-func checkEstExtends(old, next string) error {
-	if old == "" || EstOverCap(old) {
-		return nil
-	}
-	if next == "" || next[len(next)-1] != old[len(old)-1] {
-		return ErrEstimateShrink
-	}
-	o, _ := strconv.ParseFloat(old[:len(old)-1], 64)
-	n, _ := strconv.ParseFloat(next[:len(next)-1], 64)
-	if n < o {
-		return ErrEstimateShrink
-	}
-	return nil
 }
 
 const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, host_url, workflow_id, entry_step_id, since_json, workflow_json, workflow_hash, est, notes, color, created_at, archived_at`
@@ -271,7 +252,7 @@ func (r *AdeTaskRepo) CreateTask(t model.AdeTask, branches []model.AdeTaskBranch
 	return out, nil
 }
 
-// UpdateTask writes the patched leaves. Est may only grow; kind moves only between task and parked,
+// UpdateTask writes the patched leaves. Kind moves only between task and parked,
 // and a review task refuses any kind change.
 func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask, error) {
 	tx, err := r.DB.Begin()
@@ -288,9 +269,6 @@ func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask
 	}
 	prevKind := cur.Kind
 	if p.Est != nil {
-		if err := checkEstExtends(cur.Est, *p.Est); err != nil {
-			return model.AdeTask{}, err
-		}
 		cur.Est = *p.Est
 	}
 	if p.Kind != nil && *p.Kind != cur.Kind {

@@ -44,3 +44,19 @@ func TestNewTaskLandsTodayWithoutRepos(t *testing.T) {
 	}
 	branchOf(t, board(t, app), task.ID, rec.ID)
 }
+
+func TestEstimateSetChangeClear(t *testing.T) {
+	app := flowharness.New(t)
+	task, err := app.W.AdeTask.CreateTask(ctx, adewire.CreateTaskArgs{Title: "Est"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, est := range []string{"3d", "1d", "2h", ""} {
+		if _, err := app.W.AdeTask.UpdateTask(ctx, adewire.UpdateTaskArgs{TaskID: task.ID, Patch: adewire.TaskPatch{Est: &est}}); err != nil {
+			t.Fatalf("est %q: %v", est, err)
+		}
+		if got := taskOf(t, board(t, app), task.ID).Est; got != est {
+			t.Fatalf("est = %q, want %q", got, est)
+		}
+	}
+}

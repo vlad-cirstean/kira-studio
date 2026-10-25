@@ -95,7 +95,6 @@ var adeTaskCatalog = []struct {
 	{ade.ErrStale, ipcerr.CodeConflict, "backend.space.ade.taskMoved.body"},
 	{ade.ErrWorkflowChanged, ipcerr.CodeConflict, "backend.space.ade.workflowChanged.body"},
 	{ade.ErrSetupPending, ipcerr.CodePreparing, "backend.space.ade.setupPending.body"},
-	{repos.ErrEstimateShrink, ipcerr.CodeBadRequest, "backend.space.ade.estimateShrink.body"},
 	{repos.ErrBranchOnTask, ipcerr.CodeConflict, "backend.space.ade.branchOnTask.body"},
 	{repos.ErrRepoOnTask, ipcerr.CodeConflict, "backend.space.ade.repoOnTask.body"},
 	{ade.ErrSessionRunning, ipcerr.CodeConflict, "backend.space.ade.sessionRunning.body"},
@@ -192,11 +191,11 @@ func validateCreateTask(a adewire.CreateTaskArgs) error {
 		if err := validateAdeBaseChoice(c, "bases"); err != nil {
 			return err
 		}
+	}
 	if a.Day != nil {
 		if err := validateAdeISODate(*a.Day); err != nil {
 			return err
 		}
-	}
 	}
 	return validateAdeTaskRepoIDs(a.CodeRepoIDs)
 }

@@ -161,7 +161,7 @@ func (b *TaskBoard) CreateTask(ctx context.Context, args adewire.CreateTaskArgs)
 	return b.wireTask(stored)
 }
 
-// UpdateTask applies a patch; the estimate may only grow, kind moves only between task and parked.
+// UpdateTask applies a patch; kind moves only between task and parked.
 func (b *TaskBoard) UpdateTask(_ context.Context, args adewire.UpdateTaskArgs) (adewire.Task, error) {
 	p := args.Patch
 	if p.Jira != nil && p.ClearJira {

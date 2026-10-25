@@ -90,29 +90,6 @@ test('name, Jira, GitHub and Not merging write UpdateTask patches', async ({ rel
   expect(updates(control)[3]?.args).toMatchObject({ patch: { kind: 'parked' } });
 });
 
-test('estimate: unset takes number and unit, set only extends, a backend refusal shows', async ({
-  relaunch,
-}) => {
-  const board = adeFixture<BoardFx>('board');
-  const target = board.tasks.find((t) => t.id === 'T_notif');
-  if (target) target.est = '';
-  const { window: page, control } = await openPlan(relaunch, [
-    { channel: IPC.adeTaskBoard, response: board },
-  ]);
-  await openTask(page, 'T_notif');
-  await page.locator('[data-testid="ade-estimate-num"]').fill('3');
-  await page.locator('[data-testid="ade-estimate-unit-d"]').click();
-  await expect.poll(() => updates(control)).toHaveLength(1);
-  expect(updates(control)[0]?.args).toMatchObject({ patch: { est: '3d' } });
-
-  await openTask(page, 'T_bill');
-  await expect(page.locator('[data-testid="ade-estimate-total"]')).toHaveText('2d');
-  await page.locator('[data-testid="ade-estimate-extend"]').fill('1');
-  await page.locator('[data-testid="ade-estimate-extend-submit"]').click();
-  await expect.poll(() => updates(control)).toHaveLength(2);
-  expect(updates(control)[1]?.args).toMatchObject({ taskId: 'T_bill', patch: { est: '3d' } });
-});
-
 test('a refused git host link shows the backend error', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch, [
     {
@@ -132,14 +109,14 @@ test('a refused estimate shows the backend error', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch, [
     {
       channel: IPC.adeTaskUpdateTask,
-      error: { code: 'invalid', message: 'estimate can only grow' },
+      error: { code: 'invalid', message: 'Enter an estimate like 2h or 3d.' },
     },
   ]);
   await openTask(page, 'T_bill');
-  await page.locator('[data-testid="ade-estimate-extend"]').fill('1');
-  await page.locator('[data-testid="ade-estimate-extend-submit"]').click();
+  await page.locator('[data-testid="ade-estimate-num"]').fill('1');
+  await page.locator('[data-testid="ade-estimate-unit-d"]').click();
   await expect(page.locator('[data-testid="ade-estimate-error"]')).toContainText(
-    'estimate can only grow',
+    'Enter an estimate like 2h or 3d.',
   );
 });
 
