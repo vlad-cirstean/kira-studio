@@ -169,13 +169,12 @@ else
   note "skipped S13 — go not on PATH"
 fi
 
-# --- S14: dev and release windows render the same chrome on macOS 26 (P344) -------------------
-# A 26-SDK dev build gets larger traffic lights than the 15-SDK release unless the plist opts into
-# compatibility. wails3 task common:update:build-assets drops the key.
-for plist in apps/kira-studio/build/darwin/Info.plist apps/kira-studio/build/darwin/Info.dev.plist \
-  apps/kira-space/build/darwin/Info.plist apps/kira-space/build/darwin/Info.dev.plist; do
-  if ! grep -A1 '<key>UIDesignRequiresCompatibility</key>' "$plist" 2>/dev/null | grep -q '<true/>'; then
-    fail "design compatibility key missing" "$plist lacks UIDesignRequiresCompatibility=true — dev and release traffic lights would differ (P344); re-add after regenerating build assets"
+# --- S14: dev and release windows render the same chrome on macOS 26 (P345) -------------------
+# AppKit picks window chrome by the executable's linked-SDK field. Both darwin builds stamp it to
+# the release value; wails3 task common:update:build-assets would drop the stamp.
+for taskfile in apps/kira-studio/build/darwin/Taskfile.yml apps/kira-space/build/darwin/Taskfile.yml; do
+  if ! grep -q 'vtool -set-build-version macos' "$taskfile" 2>/dev/null; then
+    fail "SDK stamp missing" "$taskfile build:native lacks the vtool SDK stamp — dev and release traffic lights would differ (P345)"
   fi
 done
 
@@ -252,14 +251,14 @@ else
     note "skipped A5 — PlistBuddy not available on this runner"
   fi
 
-  # A6: the bundle opts into compatibility window chrome (P344).
-  if command -v /usr/libexec/PlistBuddy >/dev/null 2>&1; then
-    DESIGN_COMPAT="$(/usr/libexec/PlistBuddy -c 'Print :UIDesignRequiresCompatibility' "$APP/Contents/Info.plist" 2>/dev/null || echo '')"
-    if [ "$DESIGN_COMPAT" != "true" ]; then
-      fail "design compatibility key missing from bundle" "UIDesignRequiresCompatibility is '$DESIGN_COMPAT' in $APP, expected true"
+  # A6: the linked binary carries the stamped SDK (P345).
+  if command -v vtool >/dev/null 2>&1; then
+    LINKED_SDK="$(vtool -show-build "$APP/Contents/MacOS/Kira Studio" 2>/dev/null | awk '$1=="sdk"{print $2}')"
+    if [ "$LINKED_SDK" != "15.5" ]; then
+      fail "linked SDK stamp wrong" "linked SDK is '$LINKED_SDK' in $APP, expected 15.5"
     fi
   else
-    note "skipped A6 — PlistBuddy not available on this runner"
+    note "skipped A6 — vtool not available on this runner"
   fi
 
   # --- N2: the whole bundle verifies deep-signed -------------------------------------------------
@@ -332,14 +331,14 @@ else
     note "skipped A5 — PlistBuddy not available on this runner"
   fi
 
-  # A6: the bundle opts into compatibility window chrome (P344).
-  if command -v /usr/libexec/PlistBuddy >/dev/null 2>&1; then
-    SPACE_DESIGN_COMPAT="$(/usr/libexec/PlistBuddy -c 'Print :UIDesignRequiresCompatibility' "$SPACE_APP/Contents/Info.plist" 2>/dev/null || echo '')"
-    if [ "$SPACE_DESIGN_COMPAT" != "true" ]; then
-      fail "design compatibility key missing from bundle" "UIDesignRequiresCompatibility is '$SPACE_DESIGN_COMPAT' in $SPACE_APP, expected true"
+  # A6: the linked binary carries the stamped SDK (P345).
+  if command -v vtool >/dev/null 2>&1; then
+    SPACE_LINKED_SDK="$(vtool -show-build "$SPACE_APP/Contents/MacOS/Kira Space" 2>/dev/null | awk '$1=="sdk"{print $2}')"
+    if [ "$SPACE_LINKED_SDK" != "15.5" ]; then
+      fail "linked SDK stamp wrong" "linked SDK is '$SPACE_LINKED_SDK' in $SPACE_APP, expected 15.5"
     fi
   else
-    note "skipped A6 — PlistBuddy not available on this runner"
+    note "skipped A6 — vtool not available on this runner"
   fi
 
   # --- N2: the whole bundle verifies deep-signed -------------------------------------------------
