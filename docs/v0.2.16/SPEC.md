@@ -4,9 +4,9 @@ First phase `P346` (highest in `docs/HISTORY.md` is `P345`). Branch `chapter/v0.
 
 | # | Phase | Status |
 |---|-------|--------|
-| P346 | macOS window chrome rework. v0.2.15 P344 plist key (`UIDesignRequiresCompatibility`) was ineffective; superseded. Larger macOS 26 buttons are correct. Min macOS 26.0, real SDK via `macos-26` runners, no SDK stamp. | Todo |
-| P347 | Git graph date order. Branches did not show their fork point. Display order is `--date-order` with local sibling grouping, fork lanes, no fork stubs. | Todo |
-| P348 | Close chapter v0.2.16 (hand-fold per `CLAUDE.md`). | Todo |
+| P346 | macOS window chrome rework. v0.2.15 P344 plist key (`UIDesignRequiresCompatibility`) was ineffective; superseded. Larger macOS 26 buttons are correct. Min macOS 26.0, real SDK via `macos-26` runners, no SDK stamp. | Done |
+| P347 | Git graph date order. Branches did not show their fork point. Display order is `--date-order` with local sibling grouping, fork lanes, no fork stubs. | Done |
+| P348 | Close chapter v0.2.16 (hand-fold per `CLAUDE.md`). | Done |
 
 ## Results
 
