@@ -23,7 +23,7 @@ func TestGraphFirstPage(t *testing.T) {
 
 	page := 100
 	r.setSettings(id, gitrpc.RepoSettingsPatchWire{GraphPageSize: &page})
-	want := repo.RevList("--exclude=refs/kira/*", "--all", "--topo-order")
+	want := repo.RevList("--exclude=refs/kira/*", "--all", "--date-order")
 	var firstPage []flowharness.GraphRow
 	for _, c := range r.gs.Stream("graph.stream", m{"repoId": id}, 1).Drain() {
 		_, got := c.Graph(t)
@@ -39,7 +39,7 @@ func TestGraphFirstPage(t *testing.T) {
 		t.Fatalf("graph shas differ from git rev-list: got %d rows, want %d", len(got), len(want))
 	}
 	parents := map[string]string{}
-	for _, l := range lines(repo.Git("log", "--all", "--topo-order", "--format=%H %P")) {
+	for _, l := range lines(repo.Git("log", "--all", "--date-order", "--format=%H %P")) {
 		f := strings.SplitN(l, " ", 2)
 		parents[f[0]] = ""
 		if len(f) == 2 {
@@ -122,7 +122,7 @@ func TestGraphPagesToEnd(t *testing.T) {
 				}
 				seen[row.Sha] = true
 			}
-			want := repo.RevList("--exclude=refs/kira/*", "--all", "--topo-order")
+			want := repo.RevList("--exclude=refs/kira/*", "--all", "--date-order")
 			if len(rows) != len(want) {
 				t.Fatalf("paged %d rows, git has %d", len(rows), len(want))
 			}
@@ -179,7 +179,7 @@ func TestGraphRefreshAfterExternalCommit(t *testing.T) {
 	if len(rows) == 0 || rows[0].Sha != newSha {
 		t.Fatalf("top row after refresh = %v, want the external commit %s", firstSha(rows), newSha)
 	}
-	want := repo.RevList("--exclude=refs/kira/*", "--all", "--topo-order")[:len(rows)]
+	want := repo.RevList("--exclude=refs/kira/*", "--all", "--date-order")[:len(rows)]
 	for i := range rows {
 		if rows[i].Sha != want[i] {
 			t.Fatalf("row %d after refresh = %s, want %s", i, rows[i].Sha, want[i])
@@ -190,6 +190,57 @@ func TestGraphRefreshAfterExternalCommit(t *testing.T) {
 			t.Fatalf("refresh kept %d rows, want at least the %d loaded before", len(rows), st.Loaded)
 		}
 	})
+}
+
+// Guards the date-ordered walk: sibling branches forking from one commit interleave in git's
+// order, and every branch lists the fork commit as parent with that commit present in the rows.
+func TestGraphForkInterleaveDateOrder(t *testing.T) {
+	r := newRig(t)
+	repo := r.app.NewRepo("fork")
+	repo.Commit("m0", nil)
+	m1 := repo.Commit("m1", nil)
+	repo.Branch("feat", "")
+	repo.Branch("fix", "")
+	repo.Checkout("feat")
+	f1 := repo.Commit("f1", nil)
+	repo.Checkout("fix")
+	x1 := repo.Commit("x1", nil)
+	repo.Checkout("feat")
+	repo.Commit("f2", nil)
+	repo.Checkout("fix")
+	repo.Commit("x2", nil)
+	repo.Checkout("main")
+	for _, name := range []string{"m2", "m3", "m4", "m5", "m6"} {
+		repo.Commit(name, nil)
+	}
+	repo.Checkout("feat")
+	repo.Commit("f3", nil)
+	id := r.open(repo.Dir).RepoID
+
+	rows := graphAll(t, r.gs, id, 2)
+
+	want := repo.RevList("--exclude=refs/kira/*", "--all", "--date-order")
+	if strings.Join(shas(rows), "\n") != strings.Join(want, "\n") {
+		t.Fatalf("graph shas differ from git rev-list --date-order: got %d rows, want %d", len(rows), len(want))
+	}
+	var subjects []string
+	index := map[string]int{}
+	for i, row := range rows {
+		subjects = append(subjects, row.Subject)
+		index[row.Sha] = i
+	}
+	if got, wantSubjects := strings.Join(subjects, " "), "f3 m6 m5 m4 m3 m2 x2 f2 x1 f1 m1 m0"; got != wantSubjects {
+		t.Fatalf("subjects = %q, want %q", got, wantSubjects)
+	}
+	if _, ok := index[m1]; !ok {
+		t.Fatalf("fork commit %s missing from rows", m1)
+	}
+	for _, branchBottom := range []string{x1, f1} {
+		row := rows[index[branchBottom]]
+		if len(row.Parents) != 1 || row.Parents[0] != m1 {
+			t.Fatalf("row %s parents = %v, want [%s]", row.Subject, row.Parents, m1)
+		}
+	}
 }
 
 func firstSha(rows []flowharness.GraphRow) string {

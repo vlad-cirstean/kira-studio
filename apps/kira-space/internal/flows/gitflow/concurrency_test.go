@@ -81,7 +81,7 @@ func TestParallelOpsOneRepo(t *testing.T) {
 			t.Fatalf("stream %s branches %v, want %v", name, got, want)
 		}
 		rows := graphAll(t, gs, id, 2)
-		wantShas := pair.x.RevList("--exclude=refs/kira/*", "--all", "--topo-order")
+		wantShas := pair.x.RevList("--exclude=refs/kira/*", "--all", "--date-order")
 		if strings.Join(shas(rows), "\n") != strings.Join(wantShas, "\n") {
 			t.Fatalf("stream %s graph has %d rows, git rev-list has %d", name, len(rows), len(wantShas))
 		}
