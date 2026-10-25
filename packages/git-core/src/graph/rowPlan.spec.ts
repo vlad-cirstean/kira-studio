@@ -122,8 +122,7 @@ describe('buildRowPlan — contraction (§4.1/§4.3)', () => {
   /** Same shape as the ordering fixtures above: `main` (tip row 0) chains 0 -> 1 -> 7 (row 7 the
    *  shared root); `feature` (tip row 2) chains 2 -> 3 -> 4 -> 5 -> 6 -> 7. Group 0 (main) claims
    *  rows 0, 1, 7 — exactly `MIN_COLLAPSIBLE`, so it never collapses either way. Group 1 (feature)
-   *  claims rows 2, 3, 4, 5, 6 — 5 members, collapsing to tip (2), a placeholder hiding 3/4/5, and
-   *  oldest (6). */
+   *  claims rows 2, 3, 4, 5, 6 — 5 members, collapsing to tip (2) and a placeholder hiding 3/4/5/6. */
   function records() {
     return [
       commit(0, [1]),
@@ -140,22 +139,21 @@ describe('buildRowPlan — contraction (§4.1/§4.3)', () => {
     return [tip(0, 'main'), tip(2, 'feature', 'feature/x')];
   }
 
-  test('a group of more than MIN_COLLAPSIBLE members collapses to tip, placeholder, oldest', () => {
+  test('a group of more than MIN_COLLAPSIBLE members collapses to tip then placeholder', () => {
     const store = new CommitStore();
     store.appendPage(records());
     const plan = buildRowPlan(store, tips(), { ...noOptions, collapseEnabled: true });
 
-    expect(plan.length).toBe(6); // group 0's 3 rows + group 1's tip/placeholder/oldest
+    expect(plan.length).toBe(5); // group 0's 3 rows + group 1's tip/placeholder
     expect(plan.entryAt(plan.displayRowOf(2)).kind).toBe('commit'); // tip
-    expect(plan.entryAt(plan.displayRowOf(6)).kind).toBe('commit'); // oldest
 
     const placeholderDisplayRow = plan.containingDisplayRow(4);
     const placeholder = plan.entryAt(placeholderDisplayRow);
     expect(placeholder.kind).toBe('collapsed');
-    expect(placeholder.hiddenCount).toBe(3);
+    expect(placeholder.hiddenCount).toBe(4);
     expect(placeholder.storeRow).toBe(3); // the first hidden row
 
-    for (const row of [3, 4, 5]) {
+    for (const row of [3, 4, 5, 6]) {
       expect(plan.displayRowOf(row)).toBe(-1); // hidden — no display row of its own
       expect(plan.containingDisplayRow(row)).toBe(placeholderDisplayRow);
     }
@@ -241,9 +239,9 @@ describe('buildRowPlan — contraction (§4.1/§4.3)', () => {
 
     for (const target of targets) expect(target).toBeGreaterThan(placeholderDisplayRow);
     expect(new Set(targets).size).toBe(targets.length);
-    // Exactly one kept link: down to the oldest row (6), the placeholder's only non-internal,
+    // Exactly one kept link: down to the root (7), the placeholder's only non-internal,
     // non-upward parent target.
-    expect(targets).toEqual([plan.displayRowOf(6)]);
+    expect(targets).toEqual([plan.displayRowOf(7)]);
   });
 });
 
@@ -283,14 +281,14 @@ describe('buildRowPlan — collapse per run', () => {
     store.appendPage(records);
     const plan = buildRowPlan(store, tips, collapseOn);
 
-    // M0, [b tip, placeholder, b oldest], C x3, [b tip, placeholder, b oldest], C x3, M1, R
-    expect(plan.length).toBe(1 + 3 + 3 + 3 + 3 + 2);
+    // M0, [b tip, placeholder], C x3, [b tip, placeholder], C x3, M1, R
+    expect(plan.length).toBe(1 + 2 + 3 + 2 + 3 + 2);
     const placeholders = kindsOf(plan).filter((k) => k === 'collapsed');
     expect(placeholders).toHaveLength(2);
     for (let d = 0; d < plan.length; d++) {
       const entry = plan.entryAt(d);
       if (entry.kind === 'collapsed') {
-        expect(entry.hiddenCount).toBe(2);
+        expect(entry.hiddenCount).toBe(3);
         expect(plan.groupKeyAt(d)).toBe('b');
       }
     }
@@ -302,7 +300,7 @@ describe('buildRowPlan — collapse per run', () => {
     store.appendPage(records);
     const plan = buildRowPlan(store, tips, collapseOn);
     expect(kindsOf(plan).filter((k) => k === 'collapsed')).toHaveLength(1);
-    expect(plan.length).toBe(store.rowCount - 1);
+    expect(plan.length).toBe(store.rowCount - 2);
   });
 
   test('expanding the key expands every run of the group', () => {
