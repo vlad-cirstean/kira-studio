@@ -3,6 +3,7 @@ package repos
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
@@ -140,13 +141,14 @@ func (r *GitHostChangeRequestsRepo) SyncState(repoKey string) (model.GitHostSync
 // PutSyncState writes the repository's sync state.
 func (r *GitHostChangeRequestsRepo) PutSyncState(repoKey string, s model.GitHostSyncState) error {
 	if _, err := r.DB.Exec(`INSERT INTO git_host_sync_state (repo_key, account, watermark_updated_at, etag, last_full_sync_at,
-		last_delta_at, last_checks_at, backfill_cursor, backfill_complete, schema_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		last_delta_at, last_checks_at, backfill_cursor, backfill_complete, schema_version, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (repo_key) DO UPDATE SET account = excluded.account, watermark_updated_at = excluded.watermark_updated_at,
 			etag = excluded.etag, last_full_sync_at = excluded.last_full_sync_at, last_delta_at = excluded.last_delta_at,
 			last_checks_at = excluded.last_checks_at, backfill_cursor = excluded.backfill_cursor,
-			backfill_complete = excluded.backfill_complete, schema_version = excluded.schema_version`,
+			backfill_complete = excluded.backfill_complete, schema_version = excluded.schema_version,
+			updated_at = excluded.updated_at`,
 		repoKey, s.Account, s.WatermarkUpdatedAt, s.ETag, s.LastFullSyncAt, s.LastDeltaAt, s.LastChecksAt,
-		s.BackfillCursor, boolInt(s.BackfillComplete), s.SchemaVersion); err != nil {
+		s.BackfillCursor, boolInt(s.BackfillComplete), s.SchemaVersion, time.Now().UnixMilli()); err != nil {
 		return fmt.Errorf("repos: write sync state of %s: %w", repoKey, err)
 	}
 	return nil
@@ -157,10 +159,10 @@ func (r *GitHostChangeRequestsRepo) DropRepo(repoKey string) error {
 	return r.dropWhere(`repo_key = ?`, repoKey)
 }
 
-// PruneIdle drops every repository, except keep, whose last sync is older than before.
+// PruneIdle drops every repository, except keep, with no sync state write since before.
 func (r *GitHostChangeRequestsRepo) PruneIdle(before int64, keep string) error {
 	return r.dropWhere(`repo_key <> ? AND repo_key IN (SELECT repo_key FROM git_host_sync_state
-		WHERE max(last_full_sync_at, last_delta_at, last_checks_at) < ?)`, keep, before)
+		WHERE max(last_full_sync_at, last_delta_at, last_checks_at, updated_at) < ?)`, keep, before)
 }
 
 func (r *GitHostChangeRequestsRepo) dropWhere(cond string, args ...any) error {

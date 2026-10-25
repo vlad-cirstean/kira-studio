@@ -63,6 +63,7 @@ var names = []sqlitex.MigrationSource{
 	{Version: 45, Name: "p332_file_handler_previous", File: "0045_p332_file_handler_previous.sql"},
 	{Version: 46, Name: "p341_drop_sandbox_keychain", File: "0046_p341_drop_sandbox_keychain.sql"},
 	{Version: 47, Name: "p352_git_host_change_requests", File: "0047_p352_git_host_change_requests.sql"},
+	{Version: 48, Name: "p352_git_host_sync_activity", File: "0048_p352_git_host_sync_activity.sql"},
 }
 
 // All returns every migration in ascending version order.
