@@ -24,8 +24,9 @@ type Options struct {
 type Provider struct{ client *Client }
 
 var (
-	_ githost.Provider       = (*Provider)(nil)
-	_ githost.FileReviewSync = (*Provider)(nil)
+	_ githost.Provider          = (*Provider)(nil)
+	_ githost.FileReviewSync    = (*Provider)(nil)
+	_ githost.ChangeRequestSync = (*Provider)(nil)
 )
 
 // New builds the GitHub provider over the `gh` CLI.
@@ -144,7 +145,7 @@ func (p *Provider) SetFilesViewed(ctx context.Context, r githost.Repo, nodeID st
 func toStatus(s Status) githost.Status {
 	return githost.Status{
 		Kind: s.Kind, Path: s.Path, Version: s.Version, Host: s.Host, Account: s.Account,
-		Probed: s.Probed, Reason: s.Reason, RateLimited: isRateLimited(s),
+		Probed: s.Probed, Reason: s.Reason, RateLimited: isRateLimited(s), ResetAt: s.ResetAt, Gone: s.Gone,
 	}
 }
 
@@ -157,7 +158,26 @@ func toChangeRequests(prs []PR) []githost.ChangeRequest {
 		out = append(out, githost.ChangeRequest{
 			Number: p.Number, Title: p.Title, URL: p.URL, State: p.State, HeadRef: p.HeadRef, HeadSha: p.HeadSha,
 			HeadOwner: p.HeadRepoOwner, BaseRef: p.BaseRef, UpdatedAt: p.UpdatedAt,
+			NodeID: p.NodeID, Draft: p.Draft, ReviewDecision: p.ReviewDecision, ChecksState: p.ChecksState,
 		})
 	}
 	return out
+}
+
+func (p *Provider) Page(ctx context.Context, r githost.Repo, cursor string, first int) (githost.ChangeRequestPage, githost.Status) {
+	pg, s := p.client.PullsPage(ctx, Repo(r), cursor, first)
+	return githost.ChangeRequestPage{
+		Items: toChangeRequests(pg.Items), EndCursor: pg.EndCursor, HasNext: pg.HasNext,
+		RateLimit: githost.RateLimit{Remaining: pg.Remaining, ResetAt: pg.RateLimitResetAt},
+	}, toStatus(s)
+}
+
+func (p *Provider) Probe(ctx context.Context, r githost.Repo, etag string) (bool, string, githost.Status) {
+	changed, newETag, s := p.client.Probe(ctx, Repo(r), etag)
+	return changed, newETag, toStatus(s)
+}
+
+func (p *Provider) Checks(ctx context.Context, r githost.Repo, nodeIDs []string) ([]githost.ChangeRequest, githost.Status) {
+	prs, s := p.client.PullsByNodeID(ctx, Repo(r), nodeIDs)
+	return toChangeRequests(prs), toStatus(s)
 }
