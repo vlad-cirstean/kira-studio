@@ -1085,6 +1085,21 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   expect(pagerBox.x).toBeLessThan(searchToggleBox.x);
   await expect(page.locator('[data-testid="pager-next"]')).toBeEnabled();
 
+  // --- Dividers match the graph toolbar's (repo-graph-toolbar.spec.ts): 1x14, centred, border-strong.
+  const dataBar = await page.locator('[data-testid="data-toolbar"]').boundingBox();
+  if (!dataBar) throw new Error('data-toolbar has no bounding box');
+  const separators = page.locator('[data-testid="data-toolbar"] [data-testid="toolbar-separator"]');
+  expect(await separators.count()).toBeGreaterThanOrEqual(1);
+  for (let i = 0; i < (await separators.count()); i++) {
+    const box = await separators.nth(i).boundingBox();
+    if (!box) throw new Error('separator has no bounding box');
+    expect(box.width).toBe(1);
+    expect(box.height).toBe(14);
+    expect(Math.abs(box.y + box.height / 2 - (dataBar.y + dataBar.height / 2))).toBeLessThanOrEqual(
+      0.5,
+    );
+  }
+
   // --- The assertion exists to prove nothing reserves width between the toolbar's right-most
   // control and its right edge (the reflow it fixed). The pager used to be that control; with it
   // moved back to the reading edge, RunState is — it still renders ahead of #toolbar-end, whose
