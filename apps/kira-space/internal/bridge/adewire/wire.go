@@ -639,6 +639,8 @@ type CreateTaskArgs struct {
 	WorkflowID  string   `json:"workflowId"`
 	// Bases maps a code repo id to the base of its branch; a missing repo starts from main.
 	Bases map[string]BaseChoice `json:"bases"`
+	// Day is the plan day (YYYY-MM-DD) the task lands on; nil lands in Later.
+	Day *string `json:"day"`
 }
 
 type TaskPatch struct {

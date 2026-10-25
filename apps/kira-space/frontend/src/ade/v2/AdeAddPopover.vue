@@ -8,24 +8,22 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { Textarea } from '@theme/components/ui/textarea';
-import { Toggle } from '@theme/components/ui/toggle';
 import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref, watch } from 'vue';
-import { useRepoLinksStore } from '../../repo/state/repoLinks';
 import { useRepos } from '../../repo/state/reposQueries';
-import { repoTint } from '../../state/coderepos';
-import AdeBasePicker from './AdeBasePicker.vue';
 import AdeCandidateRow from './AdeCandidateRow.vue';
+import { firstWork, offsetToIso } from './board/calendar';
 import { parseJira } from './jira';
+import { usePlanModel } from './plan/usePlanModel';
 import { useAddExistingBranch, useCandidates, useCreateTask } from './queries';
 import { useAdeAddUiStore } from './state/adeAddUi';
 import { useAdeBoardUiStore } from './state/adeBoardUi';
-import type { BaseChoice, CandidateBranch } from './wire';
+import type { CandidateBranch } from './wire';
 
-// Add: a new task (lands in Later, branchless) or an existing branch of any repo.
+// Add: a new task (lands Today, or the next work day; repos are added later) or an existing branch.
 const ui = useAdeBoardUiStore();
 const addUi = useAdeAddUiStore();
 const open = computed({
@@ -45,8 +43,6 @@ const tabItems = computed(() => [
 const error = ref('');
 
 const repos = useRepos();
-const repoLinks = useRepoLinksStore();
-const tintOf = (id: string) => repoTint(repoLinks.repoColorOf(id), true);
 const repoLabel = (id: string): string => {
   const r = repos.data.value?.repos.find((x) => x.codeRepoId === id);
   return r?.nickname || r?.name || id;
@@ -55,11 +51,8 @@ const repoLabel = (id: string): string => {
 const title = ref('');
 const jira = ref('');
 const notes = ref('');
-const picked = ref<string[]>([]);
-/** Per repo; a repo without an entry starts from its main. */
-const bases = ref<Record<string, BaseChoice>>({});
-const MAIN: BaseChoice = { ref: '', branchId: '' };
 const createTask = useCreateTask();
+const { model, today } = usePlanModel();
 
 watch(open, (o) => {
   if (!o) {
@@ -68,24 +61,9 @@ watch(open, (o) => {
   }
   error.value = '';
   if (addUi.attachTo) tab.value = 'branch';
-  if (picked.value.length === 0) {
-    const first = repos.data.value?.repos[0];
-    if (first) picked.value = [first.codeRepoId];
-  }
 });
 
-function toggleRepo(id: string): void {
-  picked.value = picked.value.includes(id)
-    ? picked.value.filter((x) => x !== id)
-    : [...picked.value, id];
-  bases.value = Object.fromEntries(
-    Object.entries(bases.value).filter(([k]) => picked.value.includes(k)),
-  );
-}
-
-const cantAdd = computed(
-  () => title.value.trim() === '' || picked.value.length === 0 || createTask.isPending.value,
-);
+const cantAdd = computed(() => title.value.trim() === '' || createTask.isPending.value);
 
 async function addNew(): Promise<void> {
   error.value = '';
@@ -96,15 +74,15 @@ async function addNew(): Promise<void> {
       jira: j.key ? j : null,
       hostUrl: '',
       notes: notes.value,
-      codeRepoIds: picked.value,
+      codeRepoIds: [],
       workflowId: '',
-      bases: bases.value,
+      bases: {},
+      day: model.value ? offsetToIso(today.value, firstWork(model.value.cal, 0)) : today.value,
     });
     ui.select(task.id);
     title.value = '';
     jira.value = '';
     notes.value = '';
-    bases.value = {};
     open.value = false;
   } catch (err) {
     error.value = errorText(err);
@@ -175,38 +153,6 @@ async function pick(b: CandidateBranch): Promise<void> {
           :placeholder="t('space.ade.add.jira.placeholder')"
           data-testid="ade-nw-jira"
         />
-        <span class="text-muted-foreground">{{ t('common.module.repositories.label') }}</span>
-        <fieldset
-          :aria-label="t('common.module.repositories.label')"
-          class="m-0 flex min-w-0 flex-wrap gap-1.5 border-0 p-0"
-        >
-          <Toggle
-            v-for="r in repos.data.value?.repos ?? []"
-            :key="r.codeRepoId"
-            variant="outline"
-            size="kira"
-            class="text-muted-foreground"
-            :class="picked.includes(r.codeRepoId) ? tintOf(r.codeRepoId).class : ''"
-            :style="picked.includes(r.codeRepoId) ? tintOf(r.codeRepoId).style : undefined"
-            :model-value="picked.includes(r.codeRepoId)"
-            data-testid="ade-nw-repo"
-            @update:model-value="toggleRepo(r.codeRepoId)"
-          >
-            {{ r.nickname || r.name }}
-          </Toggle>
-        </fieldset>
-        <template v-for="id in picked" :key="id">
-          <span class="text-muted-foreground" data-testid="ade-nw-base-label">{{
-            t('space.ade.add.base.label', { repo: repoLabel(id) })
-          }}</span>
-          <div class="min-w-0" :data-repo-id="id" data-testid="ade-nw-base">
-            <AdeBasePicker
-              :code-repo-id="id"
-              :model-value="bases[id] ?? MAIN"
-              @update:model-value="(c) => c && (bases[id] = c)"
-            />
-          </div>
-        </template>
         <Label for="ade-nw-notes" class="self-start pt-1.5 text-muted-foreground">{{
           t('space.common.notes.label')
         }}</Label>
@@ -226,7 +172,7 @@ async function pick(b: CandidateBranch): Promise<void> {
             data-testid="ade-nw-add"
             @click="addNew"
           >
-            {{ t('space.ade.add.addToLater.label') }}
+            {{ t('space.ade.add.addToToday.label') }}
           </Button>
           <span class="text-kira-sm text-subtle">{{ t('space.ade.add.noBranchesYet.hint') }}</span>
         </div>

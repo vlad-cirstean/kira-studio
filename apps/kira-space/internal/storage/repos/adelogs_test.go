@@ -18,7 +18,7 @@ func TestAdeLogsRepo_PurgeArchived(t *testing.T) {
 
 	const cutoff = int64(1_000_000_000_000)
 	for id, archivedAt := range map[string]int64{"A": cutoff, "B": cutoff + 1, "C": 0} {
-		if _, err := tasks.CreateTask(model.AdeTask{ID: id, Kind: model.AdeTaskKindTask, Title: id, CreatedAt: 1}, nil); err != nil {
+		if _, err := tasks.CreateTask(model.AdeTask{ID: id, Kind: model.AdeTaskKindTask, Title: id, CreatedAt: 1}, nil, nil); err != nil {
 			t.Fatalf("create %s: %v", id, err)
 		}
 		if archivedAt != 0 {

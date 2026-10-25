@@ -6737,20 +6737,17 @@
         }
       },
       "add": {
-        "addToLater": {
-          "label": "Add to later"
+        "addToToday": {
+          "label": "Add to today"
         },
         "attach": {
           "label": "Adding to: {title}"
-        },
-        "base": {
-          "label": "Base · {repo}"
         },
         "jira": {
           "placeholder": "Paste a link or key (optional)"
         },
         "noBranchesYet": {
-          "hint": "No branches yet. {agent} creates one per repository on start."
+          "hint": "Add repositories from the task panel, or {agent} declares them."
         },
         "notes": {
           "placeholder": "Context for {agent} (optional)"

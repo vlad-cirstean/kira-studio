@@ -168,9 +168,9 @@ func (r *AdeTaskRepo) GetTask(id string) (model.AdeTask, error) {
 	return t, nil
 }
 
-// insertTask writes the task, its branches and a plan row at the end (Later), in tx. It assigns
+// insertTask writes the task, its branches and a plan row at the end of `day` (Later when nil), in tx. It assigns
 // the task's color: the first slot no live task uses, else the least-used slot overall.
-func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch) (model.AdeTask, error) {
+func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch, day *string) (model.AdeTask, error) {
 	if err := t.Validate(); err != nil {
 		return model.AdeTask{}, err
 	}
@@ -214,7 +214,7 @@ func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch) (mo
 		}
 	}
 	if _, err := tx.Exec(`INSERT INTO ade_task_plan (task_id, day, position)
-		SELECT ?, NULL, COALESCE(MAX(position) + 1, 0) FROM ade_task_plan`, t.ID); err != nil {
+		SELECT ?, ?, COALESCE(MAX(position) + 1, 0) FROM ade_task_plan`, t.ID, day); err != nil {
 		return model.AdeTask{}, fmt.Errorf("repos: insert ade task plan %s: %w", t.ID, err)
 	}
 	return t, nil
@@ -253,15 +253,15 @@ func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
-// CreateTask inserts a task, its branches and a Later plan row at the end in one transaction and
-// returns the stored task (color assigned).
-func (r *AdeTaskRepo) CreateTask(t model.AdeTask, branches []model.AdeTaskBranch) (model.AdeTask, error) {
+// CreateTask inserts a task, its branches and a plan row at the end of `day` (Later when nil) in
+// one transaction and returns the stored task (color assigned).
+func (r *AdeTaskRepo) CreateTask(t model.AdeTask, branches []model.AdeTaskBranch, day *string) (model.AdeTask, error) {
 	tx, err := r.DB.Begin()
 	if err != nil {
 		return model.AdeTask{}, fmt.Errorf("repos: begin create ade task: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck
-	out, err := insertTask(tx, t, branches)
+	out, err := insertTask(tx, t, branches, day)
 	if err != nil {
 		return model.AdeTask{}, err
 	}

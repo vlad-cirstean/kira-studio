@@ -28,14 +28,15 @@ test('Enter in the capture box files a backlog item and confirms it', async ({ r
   });
 });
 
-test('New task creates a branchless task in chosen repos and selects it', async ({ relaunch }) => {
+test('New task lands today without repos and selects it', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch, [
     { channel: IPC.adeTaskCreateTask, response: visibleTask() },
   ]);
   await page.locator('[data-testid="ade-add"]').click();
   await page.locator('[data-testid="ade-nw-title"]').fill('Export CSV');
   await page.locator('[data-testid="ade-nw-jira"]').fill('PAY-77');
-  await page.locator('[data-testid="ade-nw-repo"]', { hasText: 'api' }).click();
+  await expect(page.locator('[data-testid="ade-nw-repo"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="ade-nw-base"]')).toHaveCount(0);
   await page.locator('[data-testid="ade-nw-add"]').click();
   await expect
     .poll(() => control.log().filter((e) => e.channel === IPC.adeTaskCreateTask))
@@ -45,9 +46,10 @@ test('New task creates a branchless task in chosen repos and selects it', async 
     jira: { key: 'PAY-77', url: '' },
     hostUrl: '',
     notes: '',
-    codeRepoIds: ['repo-web-app', 'repo-api'],
+    codeRepoIds: [],
     workflowId: '',
     bases: {},
+    day: '2026-09-22',
   });
   await expect(page.locator('[data-testid="ade-add-popover"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="ade-task"][data-task-id="T_deps"]')).toHaveAttribute(

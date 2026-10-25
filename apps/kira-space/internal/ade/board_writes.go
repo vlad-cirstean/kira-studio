@@ -113,15 +113,12 @@ func jiraFields(j *adewire.Jira) (key, url string) {
 
 // --- tasks -------------------------------------------------------------------------------------
 
-// CreateTask creates a task with one not-created branch per repo, appended to the plan as Later.
+// CreateTask creates a task with one not-created branch per repo, appended to the plan on `Day` (Later when nil).
 func (b *TaskBoard) CreateTask(ctx context.Context, args adewire.CreateTaskArgs) (adewire.Task, error) {
 	jiraKey, jiraURL := jiraFields(args.Jira)
 	title := strings.TrimSpace(args.Title)
 	if title == "" && jiraKey == "" {
 		return adewire.Task{}, invalid("a task needs a title or a Jira key")
-	}
-	if len(args.CodeRepoIDs) == 0 {
-		return adewire.Task{}, invalid("a task needs at least one repo")
 	}
 	if err := b.requireRepos(args.CodeRepoIDs); err != nil {
 		return adewire.Task{}, err
@@ -156,7 +153,7 @@ func (b *TaskBoard) CreateTask(ctx context.Context, args adewire.CreateTaskArgs)
 			Position: i, AddedAt: task.CreatedAt, Base: base, BaseBranchID: baseBranchID,
 		}
 	}
-	stored, err := b.deps.Tasks.CreateTask(task, branches)
+	stored, err := b.deps.Tasks.CreateTask(task, branches, args.Day)
 	if err != nil {
 		return adewire.Task{}, err
 	}
@@ -376,7 +373,7 @@ func (b *TaskBoard) attachExistingBranch(ctx context.Context, args adewire.AddEx
 			task.Kind, task.Owner = model.AdeTaskKindReview, row.AuthorName
 		}
 		sb = model.AdeTaskBranch{ID: b.newID(), TaskID: task.ID, CodeRepoID: args.CodeRepoID, Name: args.Name, Kind: kind, AddedAt: now}
-		if task, err = b.deps.Tasks.CreateTask(task, []model.AdeTaskBranch{sb}); err != nil {
+		if task, err = b.deps.Tasks.CreateTask(task, []model.AdeTaskBranch{sb}, nil); err != nil {
 			return adewire.AddExistingBranchResult{}, err
 		}
 	} else {

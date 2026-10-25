@@ -192,6 +192,11 @@ func validateCreateTask(a adewire.CreateTaskArgs) error {
 		if err := validateAdeBaseChoice(c, "bases"); err != nil {
 			return err
 		}
+	if a.Day != nil {
+		if err := validateAdeISODate(*a.Day); err != nil {
+			return err
+		}
+	}
 	}
 	return validateAdeTaskRepoIDs(a.CodeRepoIDs)
 }

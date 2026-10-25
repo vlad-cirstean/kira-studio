@@ -632,6 +632,8 @@ export interface CreateTaskArgs {
   workflowId: string;
   /** Per repo id; a missing repo starts from its main. */
   bases: Record<string, BaseChoice>;
+  /** Plan day (YYYY-MM-DD) the task lands on; null lands in Later. */
+  day: string | null;
 }
 /** A base: a planner branch (branchId), a git ref (ref), or both empty for the repo main. */
 export interface BaseChoice {
