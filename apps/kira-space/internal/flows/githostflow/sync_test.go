@@ -308,3 +308,24 @@ func TestChangeRequestIndexDeltaOverflowStopsAtFloor(t *testing.T) {
 		t.Fatalf("pages read = %d, want 3 (delta 1, resumed walk 2): the walk must stop at the floor", got)
 	}
 }
+
+// An unfinished walk continues from the timer after the min gap, not after the periodic interval.
+func TestChangeRequestIndexTimerContinuesWalk(t *testing.T) {
+	forge := fakehost.New()
+	now := time.Now().UnixMilli()
+	for i := range 250 {
+		forge.AddChangeRequest(cr(i+1, "open", fmt.Sprintf("p/%d", i), now-int64(i)*1000))
+	}
+	r := newSyncRig(t, forge, flowharness.WithChangeRequestSync(gitsession.CRSyncConfig{
+		StartDelay: time.Millisecond, MinGap: 300 * time.Millisecond, ContinueDelay: time.Millisecond,
+		PageCap: 1, FocusedInterval: time.Hour, ChecksInterval: time.Hour,
+		BackoffInitial: 20 * time.Millisecond, BackoffMax: 100 * time.Millisecond,
+	}))
+	deadline := time.Now().Add(5 * time.Second)
+	for !r.index().Complete {
+		if time.Now().After(deadline) {
+			t.Fatal("walk did not complete from timer-driven continuations")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
