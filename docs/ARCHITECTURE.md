@@ -28,7 +28,7 @@ whatever sandbox a session happens to be in),
 
 - The desktop shell is Wails v3 (v3.0.0-beta.28) in Go, targeting macOS 14+ on arm64 only.
 - The window uses a custom MacTitleBar (AppearsTransparent, HideTitle, FullSizeContent, no toolbar) over a full-size-content window, not the OS-drawn bar, drawn by the shared packages/workbench/src/components/TitleBar.vue.
-- On macOS 26 window chrome follows the linked SDK. Both apps set `UIDesignRequiresCompatibility` in Info.plist so a 26-SDK dev build renders like the 15-SDK release.
+- On macOS 26 AppKit picks window chrome by the executable's linked-SDK field. Both darwin builds stamp `sdk 15.5` post-link with `vtool`, so dev renders like release.
 - Each app's own frontend/src/workbench/TitleBar.vue supplies its title-bar buttons and mode tabs through the shared TitleBar shell's default slot.
 - TypeScript is pinned to 6 (below TS 7) on purpose: TS7 has no stable programmatic compiler API until 7.1, and vue-tsc (run by typecheck:web:studio) consumes that API in-process.
 - The tsgo binary from @typescript/native-preview (used by typecheck:tests:studio and typecheck:unit:studio) is a separate tool already at latest upstream; the plan is to converge on one toolchain once TS 7.1 ships and vue-tsc adopts it.
@@ -2985,7 +2985,7 @@ repo's CI runs.
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
-- **`UIDesignRequiresCompatibility` is temporary and unverified on a Mac (P344).** Apple documents the key as a stopgap; an SDK that stops honouring it (Xcode 27) brings macOS 26 chrome back to whichever build links it first. Delete when the app adopts the new chrome or the key is gone. Unverified: key effect on the dev window. Check: `vtool -show-build` on both binaries for the SDK split, then `bun run dev:studio` beside the released app. If dev still differs, pin both builds to one SDK.
+- **App runs on pre-26 linked-on-or-after behaviour (AppKit, WebKit) via the SDK stamp (P345).** Unverified on a Mac. Delete the stamp in both darwin Taskfiles, verify-packaging S14/A6 and this entry together when the app adopts macOS 26 chrome.
 - **The macOS default-app switch is unverified on a real Mac (P332).** No Mac was available: the cgo registry, the document types in LaunchServices, whether a system prompt appears when setting a content-type default, and the UTI of each imported row are untested. Check: install the DMG, run it once from `/Applications`, then `lsregister -dump` lists both document types, Open With lists Kira Space, and the pane's switch changes `mdls -name kMDItemContentType` output.
 - **MCP `run_query` read verdicts run under `READ ONLY` wrap, which does not stop every side effect (P329).** A statement classified read runs in `BEGIN READ ONLY` (Postgres) or `START TRANSACTION READ ONLY` (MySQL/MariaDB) unless writes are allowed. Postgres still permits `pg_terminate_backend`, `pg_cancel_backend` and `dblink_exec`; MySQL/MariaDB still permits `GET_LOCK` and writes to temporary tables. SQLite and ClickHouse get no per-request wrap: no write-capable function is reachable from a read there.
 - **MongoDB 8.x/9.x servers are unverified in CI.** Every 8.x/9.x image exits at startup on runner kernels

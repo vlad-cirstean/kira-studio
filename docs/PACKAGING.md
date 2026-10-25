@@ -102,9 +102,10 @@ flags and the README's macOS 14+ product claim. The template hardcodes `12.0.0`,
 `wails3 task common:update:build-assets` run reverts both plists — re-narrow them after regenerating.
 Kira Space's plists also carry a generated document-type block (P332); rerun
 `go run ./apps/kira-space/tools/gendoctypes` after the regeneration.
-All four plists also carry hand-added `UIDesignRequiresCompatibility=true` (P344). macOS 26 picks window
-chrome by linked SDK: release links the runner's 15.5 SDK, a dev build on Xcode 26 links 26 and gets larger
-traffic lights. The key makes both render the same. Regeneration drops it; `verify-packaging.sh` S14/A6 catch that.
+Both darwin Taskfiles' `build:native` stamp the linked binary's SDK to `15.5` with `vtool -set-build-version`,
+then re-sign it ad hoc (P345). macOS 26 picks window chrome by linked SDK: release links the runner's
+15.5 SDK, a dev build on Xcode 26 links 26 and gets larger traffic lights. The stamp makes both report
+`sdk 15.5`. Regeneration drops it; `verify-packaging.sh` S14 (Taskfiles) and A6 (built bundles) catch that.
 The floor is 14 rather than 13 because Go 1.27 builds its own objects for macOS 13 minimum: a lower
 `-mmacosx-version-min` only earns a linker warning that the object file was built for a newer macOS
 than is being linked.
@@ -139,7 +140,7 @@ workspace root, and nothing in the app or the build reads it.
 | `darwin:package:dmg` | what `bun run package:studio` invokes: `deps: package`, then `create:dmg` |
 | `create:dmg` | `wails3 tool package --format dmg` over the built `.app` — background `darwin/dmg-background.png`, volume icon *and* file icon `darwin/icons.icns`, window 540×380. The tool adds the `/Applications` symlink and places the two icons itself. macOS only (`platforms: [darwin]`) |
 | `darwin:package` | `deps: build`, then `create:app:bundle`. Still callable on its own when all you want is the bundle |
-| `darwin:build` → `build:native` | preconditioned on `uname -s = Darwin` — there is no off-macOS branch any more (§5); `deps` = `common:go:mod:tidy`, `common:build:frontend`, `common:generate:icons`; then `go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/Kira Studio` with `GOOS=darwin CGO_ENABLED=1 GOARCH=$ARCH` (host arch unless overridden) and `MACOSX_DEPLOYMENT_TARGET=14.0` |
+| `darwin:build` → `build:native` | preconditioned on `uname -s = Darwin` — there is no off-macOS branch any more (§5); `deps` = `common:go:mod:tidy`, `common:build:frontend`, `common:generate:icons`; then `go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/Kira Studio` with `GOOS=darwin CGO_ENABLED=1 GOARCH=$ARCH` (host arch unless overridden) and `MACOSX_DEPLOYMENT_TARGET=14.0`; then `vtool -set-build-version macos 14.0 15.5` and an ad-hoc `codesign` re-sign of the binary (P345) |
 | `create:app:bundle` | `rm -rf`s any previous bundle, then makes `Contents/{MacOS,Resources}` and copies `icons.icns`, `Assets.car` (if one is ever added back), the binary and `Info.plist`, then ends unconditionally with `codesign:adhoc` — only reachable behind `build`'s own Darwin precondition, so there is no off-macOS fallback to speak of. The `rm -rf` matters: every other step only copies *into* the bundle, so without it a resource an earlier build produced outlives the build that stopped producing it |
 
 `common:build:frontend` runs the same `bun run build:studio` the checklist above already ran; Task's
