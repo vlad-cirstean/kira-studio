@@ -42,13 +42,15 @@ function buildChain(length: number): { store: CommitStore; shas: string[] } {
   return { store, shas };
 }
 
+const EMPTY_INDEX = { complete: false, syncedAt: 0, branches: [] };
+
 describe('ChangeRequestState — per-commit selection debounce', () => {
   test('selecting several shas within the debounce window issues exactly one request, for the last one', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
     const pr = new ChangeRequestState(bridge);
     pr.setRepoId(REPO);
-    transport.calls.length = 0; // setRepoId itself issues no request; keep the assertion focused.
+    transport.calls.length = 0; // setRepoId's own index and host reads are not under test here.
 
     transport.onRequest = () => ({ kind: 'ok', changeRequests: [] });
     pr.select('sha1');
@@ -640,9 +642,11 @@ describe('ChangeRequestState — F9: a stale resolveBranch across a same-repo re
     transport.onRequest = (method) =>
       method === 'gitHost.info'
         ? { host: null }
-        : new Promise((resolve) => {
-            resolvers.push(resolve);
-          });
+        : method === 'branch.changeRequestIndex'
+          ? EMPTY_INDEX
+          : new Promise((resolve) => {
+              resolvers.push(resolve);
+            });
 
     // A: the first (soon-to-be-stale) resolveBranch — left hanging.
     const requestA = pr.resolveBranch('feature');
@@ -703,6 +707,71 @@ describe('ChangeRequestState — F9: a stale resolveBranch across a same-repo re
     await requestB;
 
     expect(pr.byBranch.value.get('feature')?.number).toBe(2);
+    pr.dispose();
+  });
+});
+
+describe('ChangeRequestState — persisted index', () => {
+  const rec = (number: number, head: string) => ({
+    number,
+    title: 't',
+    url: 'u',
+    state: 'open',
+    headRef: head,
+    headSha: sha(number),
+    baseRef: 'main',
+    updatedAt: 0,
+  });
+
+  test('a complete index fills byBranch in one bump and ends per-branch lookups', async () => {
+    const transport = new FakeTransport();
+    const pr = new ChangeRequestState(new BridgeClient(transport));
+    transport.onRequest = (method) =>
+      method === 'branch.changeRequestIndex'
+        ? {
+            complete: true,
+            syncedAt: 1,
+            branches: [
+              { name: 'a', changeRequests: [rec(1, 'a')] },
+              { name: 'b', changeRequests: [rec(2, 'b')] },
+            ],
+          }
+        : { host: null };
+    const before = pr.generation.value;
+    pr.setRepoId(REPO);
+    await sleep();
+    expect([...pr.byBranch.value.keys()]).toEqual(['a', 'b']);
+    expect(pr.generation.value - before).toBe(2); // the repo switch's clear, then the index
+    transport.calls.length = 0;
+    await pr.ensureSnapshot(['a', 'c']);
+    await pr.resolveBranch('c');
+    expect(transport.calls).toHaveLength(0);
+    pr.dispose();
+  });
+
+  test('changeRequestsChanged events coalesce to one request in flight and one queued', async () => {
+    const transport = new FakeTransport();
+    const pr = new ChangeRequestState(new BridgeClient(transport));
+    const resolvers: Array<(v: unknown) => void> = [];
+    transport.onRequest = (method) =>
+      method === 'branch.changeRequestIndex'
+        ? new Promise((resolve) => {
+            resolvers.push(resolve);
+          })
+        : { host: null };
+    pr.setRepoId(REPO);
+    await sleep();
+    for (let i = 0; i < 5; i++) {
+      transport.emit('repo.changed', { repoId: REPO, kind: 'changeRequestsChanged' });
+    }
+    await sleep();
+    expect(resolvers).toHaveLength(1);
+    resolvers[0]?.(EMPTY_INDEX);
+    await sleep();
+    expect(resolvers).toHaveLength(2);
+    resolvers[1]?.(EMPTY_INDEX);
+    await sleep();
+    expect(resolvers).toHaveLength(2);
     pr.dispose();
   });
 });
