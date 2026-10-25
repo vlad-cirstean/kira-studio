@@ -13,8 +13,8 @@
       <stop offset="0" stop-color="#C6CFA6"/>
       <stop offset="1" stop-color="#8FA077"/>
     </radialGradient>
-    <clipPath id="squircle">
-      <rect x="100" y="100" width="824" height="824" rx="185"/>
+    <clipPath id="artBounds">
+      <rect x="100" y="100" width="824" height="824"/>
     </clipPath>
     <clipPath id="headClip">
       <ellipse cx="512" cy="390" rx="175" ry="150"/>
@@ -22,7 +22,9 @@
     </clipPath>
   </defs>
 
-  <g clip-path="url(#squircle)">
+  <!-- full-bleed: the system applies the mask -->
+  <g transform="matrix(1.242718 0 0 1.242718 -124.2718 -124.2718)">
+  <g clip-path="url(#artBounds)">
     <rect x="100" y="100" width="824" height="824" fill="url(#bg)"/>
     <rect x="100" y="100" width="824" height="824" fill="url(#glow)"/>
 
@@ -169,5 +171,6 @@
         <path d="M 570 500 Q 658 520 712 538"/>
       </g>
     </g>
+  </g>
   </g>
 </svg>

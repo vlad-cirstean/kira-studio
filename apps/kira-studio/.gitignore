@@ -3,3 +3,5 @@ bin
 frontend/dist
 frontend/bindings
 frontend/node_modules
+build/darwin/Assets.car
+build/darwin/temp.plist
