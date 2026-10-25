@@ -6881,6 +6881,10 @@
           "label": "{count} working"
         }
       },
+      "archiveConfirm": {
+        "body": "{title} leaves the board. Its running sessions stop and its worktrees are removed.",
+        "title": "Archive task?"
+      },
       "automation": {
         "chipBlocked": {
           "label": "{name} · needs you"

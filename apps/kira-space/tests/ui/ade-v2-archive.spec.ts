@@ -5,7 +5,7 @@ import { contract } from './support/contract';
 import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
 
-// Archiving a task: straight when nothing is at risk, else the Claude dialog; archived sessions.
+// Archiving a task: after a confirmation when nothing is at risk, else the Claude dialog; archived sessions.
 
 const t = (id: string) => `[data-testid="${id}"]`;
 
@@ -29,11 +29,12 @@ const risk = (branches: Record<string, unknown>[]) => ({ taskId: 'T_cart', branc
 
 const AT_RISK = risk([branchRisk({ dirty: [{ code: 'M', path: 'src/cart.ts' }], unmerged: 2 })]);
 
-test('nothing at risk archives directly', async ({ relaunch }) => {
+test('nothing at risk asks to confirm, then archives', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch, [
     { channel: IPC.adeTaskArchiveRisk, response: risk([branchRisk()]) },
   ]);
   await openArchive(page);
+  await page.locator(t('confirm-dialog-confirm')).click();
   await expect.poll(() => calls(control, IPC.adeTaskArchiveTask)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskArchiveTask)[0]?.args).toEqual({ taskId: 'T_cart' });
   await expect(page.locator(t('ade-dialog'))).toHaveCount(0);

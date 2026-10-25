@@ -1,4 +1,6 @@
+import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { defineStore } from 'pinia';
 import { reactive, ref } from 'vue';
 import type { RebaseAct } from '../board/rebaseActions';
@@ -36,6 +38,7 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
   const ui = useAdeBoardUiStore();
   const ctx = useDialogCtx();
   const launchOpener = useLaunchOpener();
+  const confirmDialog = useConfirmDialogStore();
 
   const spec = ref<DialogSpec | null>(null);
   /** `null` = the unedited template. */
@@ -95,6 +98,13 @@ export const useAdeDialogsStore = defineStore('adeDialogs', () => {
       recordMerge: (a) => mergeM.mutateAsync(a),
       archiveTask: (a) => archiveM.mutateAsync(a),
       archiveRisk: (a) => riskM.mutateAsync(a),
+      confirmArchive: (taskId) =>
+        confirmDialog.confirm({
+          tone: 'danger',
+          title: t('space.ade.archiveConfirm.title'),
+          message: t('space.ade.archiveConfirm.body', { title: c.taskTitle(taskId) }),
+          confirmLabel: t('space.common.archive.label'),
+        }),
       pending: { add: (k) => pending.add(k), remove: (k) => pending.delete(k) },
       setError: (m) => {
         setupWait.stop();
