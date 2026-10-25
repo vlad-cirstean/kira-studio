@@ -1118,6 +1118,11 @@
         "reviewConversationReset": {
           "body": "The previous review conversation ran in {path}, which no longer exists. Started a new one."
         },
+        "reviewForward": {
+          "notRunning": {
+            "body": "Start the review agent first."
+          }
+        },
         "reviewStep": {
           "badTarget": {
             "body": "That agent run can’t take the review."
@@ -5402,6 +5407,13 @@
           "body": "Sent when a review step sends comments to the implementer session or to a later round of a review agent."
         }
       },
+      "adeReviewForwardMessage": {
+        "description": "Sent to the interactive review agent with the open review comments you wrote.",
+        "title": "Review forward message",
+        "usedBy": {
+          "body": "Sent when you forward review comments from the review window."
+        }
+      },
       "adeReviewMessage": {
         "description": "The first message of the review agent. It lists the task, notes, and each branch with its base and worktree.",
         "title": "Review message",
@@ -7875,7 +7887,7 @@
             "hint": "That window is gone."
           },
           "intro": {
-            "hint": "Ask questions about this branch in a {product} session."
+            "hint": "Review this branch with {product} in its terminal."
           },
           "label": "Review agent",
           "resume": {
@@ -7885,22 +7897,13 @@
             "label": "Start review agent"
           }
         },
-        "compose": {
-          "answering": {
-            "loading": "Answering…"
-          },
+        "forward": {
           "blocked": {
             "tooltip": "{product} is waiting for an answer in its terminal"
           },
-          "dropReference": {
-            "aria": "Drop the code reference"
-          },
-          "noSubmit": {
-            "hint": "{product} did not take the message; press Enter in its terminal."
-          },
-          "question": {
-            "aria": "Question for the review agent",
-            "placeholder": "Ask about this branch"
+          "label": "Send review comments · {count}",
+          "none": {
+            "tooltip": "No open review comments to send"
           }
         },
         "header": {

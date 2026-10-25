@@ -6,6 +6,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/llmprompts"
 	"github.com/kirathecat/kira-studio/packages/theme/src/i18n"
 )
 
@@ -86,4 +87,66 @@ func (b *TaskBoard) ReviewAgent(taskID string) (*adewire.Session, error) {
 	}
 	w := toWireSession(*row)
 	return &w, nil
+}
+
+// ForwardReviewComments pastes the branch's open review comments into the running review agent and
+// stamps them sent. It returns how many it forwarded.
+func (b *TaskBoard) ForwardReviewComments(ctx context.Context, branchID string) (int, error) {
+	sb, err := b.deps.Tasks.GetBranch(branchID)
+	if err != nil {
+		return 0, err
+	}
+	mu := b.taskMu(sb.TaskID)
+	mu.Lock()
+	defer mu.Unlock()
+	tc, err := b.loadTaskCtx(sb.TaskID)
+	if err != nil {
+		return 0, err
+	}
+	if err := b.reviewableBranch(tc, sb); err != nil {
+		return 0, err
+	}
+	tr, err := b.tracker()
+	if err != nil {
+		return 0, err
+	}
+	row, err := b.deps.Sessions.ReviewAgent(sb.TaskID)
+	if err != nil {
+		return 0, err
+	}
+	if row == nil || row.State != model.AdeSessionStateRunning {
+		return 0, invalid("%s", i18n.T("backend.space.ade.reviewForward.notRunning.body", nil))
+	}
+	store, err := b.reviewStore()
+	if err != nil {
+		return 0, err
+	}
+	tgt, err := b.reviewTarget(ctx, tc, sb)
+	if err != nil {
+		return 0, err
+	}
+	open, err := store.OpenComments(ctx, tgt.GitRepoID, tgt.Branch)
+	if err != nil {
+		return 0, err
+	}
+	if len(open) == 0 {
+		return 0, invalid("%s", i18n.T("backend.space.ade.reviewStep.noOpen.body", nil))
+	}
+	message := llmprompts.AdeReviewForwardMessage.Text(b.prompts(), llmprompts.ReviewRoundVars{
+		Title: taskTitle(tc.task, tc.branches), JiraKey: tc.task.JiraKey, JiraURL: tc.task.JiraURL,
+		Repo: tc.nick[sb.CodeRepoID], Branch: sb.Name, Base: tgt.Base, Worktree: tgt.Worktree,
+		Comments: commentVars(open),
+	})
+	if err := tr.Send(row.ID, message); err != nil {
+		return 0, err
+	}
+	ids := make([]int64, len(open))
+	for i, c := range open {
+		ids[i] = c.ID
+	}
+	if err := store.MarkSent(ctx, tgt.GitRepoID, tgt.Branch, ids, b.deps.Now()); err != nil {
+		return 0, err
+	}
+	b.emitReview(sb.TaskID, sb.ID)
+	return len(open), nil
 }

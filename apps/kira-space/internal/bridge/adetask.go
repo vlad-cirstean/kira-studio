@@ -1037,6 +1037,15 @@ func (s *AdeTaskService) LaunchReviewAgent(ctx context.Context, args adewire.Tas
 	return l, adeTaskError(err)
 }
 
+// ForwardReviewComments pastes the branch's open review comments into its task's running review agent.
+func (s *AdeTaskService) ForwardReviewComments(ctx context.Context, args adewire.BranchArgs) (adewire.ForwardReviewResult, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return adewire.ForwardReviewResult{}, err
+	}
+	n, err := s.Engine.ForwardReviewComments(ctx, args.BranchID)
+	return adewire.ForwardReviewResult{Count: n}, adeTaskError(err)
+}
+
 // ViewedSyncPlan reports what syncing the branch's reviewed files to its PR would do.
 func (s *AdeTaskService) ViewedSyncPlan(ctx context.Context, args adewire.BranchArgs) (adewire.ViewedSyncPlan, error) {
 	if err := validateAdeTaskID(args.BranchID, "branchId"); err != nil {

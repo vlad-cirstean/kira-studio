@@ -203,6 +203,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeTaskOpenReviewWindow: 'AdeTaskService.OpenReviewWindow',
   adeTaskReviewWindowTarget: 'AdeTaskService.ReviewWindowTarget',
   adeTaskReviewAgent: 'AdeTaskService.ReviewAgent',
+  adeTaskForwardReviewComments: 'AdeTaskService.ForwardReviewComments',
   adeTaskLaunchReviewAgent: 'AdeTaskService.LaunchReviewAgent',
   adeTaskViewedSyncPlan: 'AdeTaskService.ViewedSyncPlan',
   adeTaskViewedSyncApply: 'AdeTaskService.ViewedSyncApply',

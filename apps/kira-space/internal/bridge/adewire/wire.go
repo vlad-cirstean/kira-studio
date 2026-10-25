@@ -829,6 +829,11 @@ type ReviewAgentLaunch struct {
 	Note    string `json:"note"`
 }
 
+// ForwardReviewResult counts the open review comments pasted into the review agent.
+type ForwardReviewResult struct {
+	Count int `json:"count"`
+}
+
 // ViewedSyncStatus: 'ok' | 'noPr' | 'prClosed' | 'disabled' | 'cliMissing' | 'unauthenticated' |
 // 'unavailable' | 'headNotFetched' | 'unsupported'.
 type ViewedSyncStatus string

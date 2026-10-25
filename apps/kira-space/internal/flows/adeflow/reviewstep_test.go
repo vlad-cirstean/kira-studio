@@ -489,3 +489,57 @@ func TestReviewRefusals(t *testing.T) {
 		t.Fatalf("comments after the refused reply = %+v", got)
 	}
 }
+
+// P354: the interactive review agent takes the user's open comments through one button. Contract
+// ade-review-forward: tests/ui/ade-v2-review.spec.ts reads these.
+func TestReviewForwardComments(t *testing.T) {
+	hold := filepath.Join(t.TempDir(), "hold")
+	f := newReviewFx(t, "implementer",
+		fakeagent.Action{Name: "done", Sh: rvImplement},
+		fakeagent.Action{WaitFile: hold, Name: "done"})
+	f.toReview(t, "feat/api-review-forward")
+	f.window(t)
+	first := f.comment(t, 1, "rename this", "")
+	second := f.comment(t, 3, "why twice?", "question")
+	done := f.comment(t, 2, "already handled", "")
+	f.setState(t, done.ID, "addressed")
+
+	args := adewire.BranchArgs{BranchID: f.br.ID}
+	f.app.Contract(t, "ade-review-forward", "args:AdeTaskService.ForwardReviewComments", args)
+	if _, err := f.app.W.AdeTask.ForwardReviewComments(ctx, args); err == nil {
+		t.Fatal("ForwardReviewComments succeeded before the review agent runs")
+	}
+
+	launch, err := f.app.W.AdeTask.LaunchReviewAgent(ctx, adewire.TaskArgs{TaskID: f.taskID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	openLaunch(t, f.app, launch.Launch)
+	waitSession(t, f.app, launch.Launch.SessionID, "running")
+
+	res, err := f.app.W.AdeTask.ForwardReviewComments(ctx, args)
+	if err != nil || res.Count != 2 {
+		t.Fatalf("ForwardReviewComments = %+v, %v, want 2 comments", res, err)
+	}
+	f.app.Contract(t, "ade-review-forward", "AdeTaskService.ForwardReviewComments", res)
+	testx.WaitUntil(t, waitFor, func() bool {
+		raw, _ := os.ReadFile(filepath.Join(f.app.FakeDir, "api-2.prompt"))
+		p := string(raw)
+		return strings.Contains(p, "rename this") && strings.Contains(p, "why twice?")
+	})
+	if p := fakeFile(t, f.app, "api-2.prompt"); strings.Contains(p, "already handled") || strings.Contains(p, "reply_review_comment") {
+		t.Fatalf("forwarded prompt carries an addressed comment or the round tool:\n%s", p)
+	}
+	for _, c := range f.comments(t) {
+		sent := c.SentAt != nil
+		if sent != (c.ID == first.ID || c.ID == second.ID) {
+			t.Fatalf("comment %d sentAt = %v, want it stamped only on the forwarded two", c.ID, c.SentAt)
+		}
+	}
+
+	f.setState(t, first.ID, "addressed")
+	f.setState(t, second.ID, "addressed")
+	if _, err := f.app.W.AdeTask.ForwardReviewComments(ctx, args); err == nil {
+		t.Fatal("ForwardReviewComments succeeded with no open comment")
+	}
+}

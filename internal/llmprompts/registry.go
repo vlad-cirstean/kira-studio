@@ -1078,6 +1078,18 @@ var AdeReviewFollowupMessage = define(Entry{
 {{template "ade.review.comments" .}}`,
 }, reviewRoundExample)
 
+// AdeReviewForwardMessage carries the user's open review comments into the interactive review agent.
+var AdeReviewForwardMessage = define(Entry{
+	ID: "ade.review.forward.message", Kind: KindMessage, Apps: spaceApp, Applies: NextCall,
+	TitleKey:   "llmPrompts.entry.adeReviewForwardMessage.title",
+	PurposeKey: "llmPrompts.entry.adeReviewForwardMessage.description",
+	UsedByKey:  "llmPrompts.entry.adeReviewForwardMessage.usedBy.body",
+	Default: `My review comments on {{.Repo}} {{.Branch}} (base {{.Base}}):
+{{range .Comments}}#{{.ID}} {{.Kind}} {{.Path}}:{{.Lines}}
+{{.Body}}
+{{end}}Answer each question. Make the change a change comment asks for.`,
+}, reviewRoundExample)
+
 // AdeStartMessage is the first message of a branch-level Start session.
 var AdeStartMessage = define(Entry{
 	ID: "ade.start.message", Kind: KindMessage, Apps: spaceApp, Applies: NextCall,
