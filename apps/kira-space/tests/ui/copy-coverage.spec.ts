@@ -172,9 +172,18 @@ reviewTest('review window', async ({ relaunch }) => {
     },
   });
   await page.locator(t('ade-review-window')).waitFor();
+  // The file list and range announcement load async; settle them so the run is deterministic.
+  await expect(page.getByText('pending.ts').first()).toBeVisible();
+  await expect(page.locator('[data-testid=live-announcements]')).toContainText('3 commits');
   await setPseudoLocale(page);
   await expectCatalogText(page.locator(t('ade-review-window')), {
-    allow: [...fixtureData(), /^src\/pending\.ts$|^pending\.ts$/],
+    allow: [
+      ...fixtureData(),
+      /^src\/pending\.ts$|^pending\.ts$/,
+      // Folder name is data; the live-region announcement is one-shot, made before the locale switch.
+      /^src$/,
+      /^Comparing .+, 3 commits$/,
+    ],
   });
 });
 

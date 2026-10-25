@@ -251,3 +251,22 @@ test('closing the workspace unmounts the kept graph; reopening mounts cold', asy
   await expect(page.locator(grid)).not.toHaveAttribute('data-p342', 'kept');
   expect(errors).toEqual([]);
 });
+
+test('opening a diff and returning keeps the commit detail pane open', async ({ relaunch }) => {
+  const page = await boot(relaunch);
+  const errors = trackErrors(page);
+  const detail = page.locator('[data-testid="detail-region"]');
+  await page.locator(`${grid} .slick-row`).nth(3).click();
+  await expect(detail).toBeVisible();
+  await detail.evaluate((el) => {
+    (el as HTMLElement).dataset.p343 = 'kept';
+  });
+
+  await openDiff(page);
+  await page.locator('[data-testid="repo-diff-editor"]').click();
+  await repoTab(page, 'repo-graph').click();
+
+  await expect(detail).toBeVisible();
+  await expect(detail).toHaveAttribute('data-p343', 'kept');
+  expect(errors).toEqual([]);
+});

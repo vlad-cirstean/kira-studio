@@ -6944,3 +6944,21 @@ Fix: opt-in `TabKindDef.keepMounted` (set on `repo-graph`); MainView keeps visit
 Fixed `RepoDiffView` null deref when unmounted during `mount()` await. `repo-graph-keep-state.spec.ts` added (3 cases).
 Code review round 1 (base ac9b371): 7 findings, all fixed; findings file dropped.
 <!-- /chapter v0.2.14 -->
+
+<!-- chapter v0.2.15 -->
+## v0.2.15
+Source: docs/v0.2.15/ at f87bc24a0da8. 3 phases.
+
+### v0.2.15 P343 (Done)
+Commit detail panel vanished when opening a file diff from a commit. Root cause: hidden graph tab (`v-show`) reads 0x0; `App.vue` breakpoint went `overlay`, then click-outside closed the detail pane.
+Fix in `packages/git-ui/src/App.vue`: `syncBreakpoint` and overlay click-outside skip while `!graphVisible`; `watch(graphVisible)` resyncs on show. One UI spec in `repo-graph-keep-state.spec.ts`.
+`trackErrors` ignores benign `ResizeObserver loop` notice. Two load flakes fixed: `graph-blank-rows` (now polls) and `copy-coverage` (content settled before locale switch).
+
+### v0.2.15 P344 (Done)
+macOS dev traffic lights larger than released app. Root cause not window config: one `Options` path builds both windows. Release runner `macos-15` links 15.5 SDK; dev on a Mac with macOS 26 links 26 SDK, giving larger traffic lights.
+Fix: `UIDesignRequiresCompatibility=true` in all four Info plists (Studio and Space, release and dev). Guard: `verify-packaging.sh` S14 (source plists) and A6 (built bundles). Docs: `PACKAGING.md`, `ARCHITECTURE.md` (stale title-bar line, SDK note, Known open items entry).
+macOS behaviour unverified (Linux session). User must confirm on a Mac: SDK split via `xcrun --show-sdk-version` and `vtool -show-build`; `bun run dev:studio` and `bun run dev:space` traffic lights match released app, 78px inset clears them. If key has no effect, fallback is pinning both builds to one SDK; raise with user first.
+
+### v0.2.15 P345 (Done)
+Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.15/` removed.
+<!-- /chapter v0.2.15 -->

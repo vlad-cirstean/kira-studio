@@ -20,6 +20,8 @@
 		<string>0.0.0</string>
 		<key>LSMinimumSystemVersion</key>
 		<string>14.0.0</string>
+		<key>UIDesignRequiresCompatibility</key>
+		<true/>
 		<key>NSHighResolutionCapable</key>
 		<string>true</string>
 		<key>NSHumanReadableCopyright</key>
