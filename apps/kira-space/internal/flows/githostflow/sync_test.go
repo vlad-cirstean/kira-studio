@@ -32,6 +32,9 @@ func newSyncRig(t *testing.T, forge *fakehost.Forge, opts ...flowharness.Opt) *s
 	bare.PushFrom(seed)
 	bare.Clone(dir)
 	git(t, dir, "remote", "set-url", "origin", "https://forge.test/acme/r.git")
+	// A merged request lists only while its branch exists.
+	git(t, dir, "branch", "feat/a")
+	git(t, dir, "branch", "feat/b")
 	r := &syncRig{t: t, app: app, forge: forge, dir: dir}
 	r.open()
 	return r
@@ -87,7 +90,7 @@ func (r *syncRig) waitChanged(want int) {
 func (r *syncRig) byBranch() map[string][]gitrpc.ChangeRequestRecord {
 	out := map[string][]gitrpc.ChangeRequestRecord{}
 	for _, b := range r.index().Branches {
-		out[b.Name] = b.ChangeRequests
+		out[b.Name] = []gitrpc.ChangeRequestRecord{b.ChangeRequest}
 	}
 	return out
 }
@@ -254,5 +257,17 @@ func TestChangeRequestIndexRateLimit(t *testing.T) {
 	}
 	if ix := r.index(); !ix.Complete || ix.Branches == nil || r.byBranch()["feat/a"][0].State != "open" {
 		t.Fatalf("index while rate limited = %+v, want the cached rows", ix)
+	}
+}
+
+// A merged request whose branch is gone has no tip to badge: the index leaves it out.
+func TestChangeRequestIndexSkipsDeletedMergedBranch(t *testing.T) {
+	forge := seedForge()
+	forge.AddChangeRequest(cr(9, "merged", "gone", time.Now().UnixMilli()-4000))
+	r := newSyncRig(t, forge)
+	r.sync()
+	by := r.byBranch()
+	if _, ok := by["gone"]; ok || len(by) != 3 {
+		t.Fatalf("index = %+v, want the 3 live branches only", by)
 	}
 }

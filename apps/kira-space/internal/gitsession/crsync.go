@@ -707,20 +707,21 @@ func crFromRow(row model.GitHostChangeRequest) githost.ChangeRequest {
 	}
 }
 
-// BranchChangeRequests is one head branch's cached change requests, newest first.
-type BranchChangeRequests struct {
-	Name           string
-	ChangeRequests []githost.ChangeRequest
+// BranchChangeRequest is one head branch's newest cached change request.
+type BranchChangeRequest struct {
+	Name          string
+	ChangeRequest githost.ChangeRequest
 }
 
 // ChangeRequestIndex is the persisted index of a repository's change requests whose head lives in
-// the repository itself (a fork's request from a commonly named branch is not this repo's branch).
+// the repository itself (a fork's request from a commonly named branch is not this repo's branch),
+// narrowed to branches that exist in refs plus open requests: a deleted merged branch has no tip.
 type ChangeRequestIndex struct {
 	// Complete reports the full history was ingested, so a branch missing from Branches has none.
 	Complete bool
 	// SyncedAt is the last full or delta sync, Unix milliseconds; 0 when never synced.
 	SyncedAt int64
-	Branches []BranchChangeRequests
+	Branches []BranchChangeRequest
 }
 
 // ChangeRequestIndex answers from SQLite at once, whatever the host is doing. A repository with no
@@ -749,16 +750,25 @@ func (e *RepoEntry) ChangeRequestIndex(ctx context.Context) ChangeRequestIndex {
 		return ChangeRequestIndex{}
 	}
 	out := ChangeRequestIndex{Complete: st.BackfillComplete, SyncedAt: max(st.LastFullSyncAt, st.LastDeltaAt)}
-	at := map[string]int{}
-	for _, row := range rows {
-		i, seen := at[row.HeadRef]
-		if !seen {
-			i = len(out.Branches)
-			at[row.HeadRef] = i
-			out.Branches = append(out.Branches, BranchChangeRequests{Name: row.HeadRef})
+	live := map[string]bool{}
+	if refs, err := e.Refs(ctx); err == nil {
+		for _, b := range refs.Branches {
+			live[b.ShortName] = true
 		}
-		if b := &out.Branches[i]; len(b.ChangeRequests) < maxBranchChangeRequests {
-			b.ChangeRequests = append(b.ChangeRequests, crFromRow(row))
+		for _, b := range refs.RemoteBranches {
+			if _, name, ok := strings.Cut(b.ShortName, "/"); ok {
+				live[name] = true
+			}
+		}
+	}
+	seen := map[string]bool{}
+	for _, row := range rows {
+		if seen[row.HeadRef] {
+			continue
+		}
+		seen[row.HeadRef] = true
+		if cr := crFromRow(row); live[row.HeadRef] || cr.State == "open" || cr.State == "draft" {
+			out.Branches = append(out.Branches, BranchChangeRequest{Name: row.HeadRef, ChangeRequest: cr})
 		}
 	}
 	return out

@@ -57,13 +57,13 @@ const FIRST_INDEX = {
   branches: [
     {
       name: 'feature-older',
-      changeRequests: [record(42, 'feature-older', MULTI_BRANCH_SHAS.featureOlderTip, 'open')],
+      changeRequest: record(42, 'feature-older', MULTI_BRANCH_SHAS.featureOlderTip, 'open'),
     },
     {
       name: 'feature-newer',
-      changeRequests: [record(43, 'feature-newer', MULTI_BRANCH_SHAS.featureNewerTip, 'draft')],
+      changeRequest: record(43, 'feature-newer', MULTI_BRANCH_SHAS.featureNewerTip, 'draft'),
     },
-    { name: 'main', changeRequests: [record(44, 'main', MULTI_BRANCH_SHAS.mainTip, 'merged')] },
+    { name: 'main', changeRequest: record(44, 'main', MULTI_BRANCH_SHAS.mainTip, 'merged') },
   ],
 };
 
@@ -72,7 +72,7 @@ const SECOND_INDEX = {
   branches: [
     {
       name: 'feature-older',
-      changeRequests: [record(45, 'feature-older', MULTI_BRANCH_SHAS.featureOlderTip, 'open')],
+      changeRequest: record(45, 'feature-older', MULTI_BRANCH_SHAS.featureOlderTip, 'open'),
     },
     ...FIRST_INDEX.branches.slice(1),
   ],

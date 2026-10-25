@@ -732,8 +732,8 @@ describe('ChangeRequestState — persisted index', () => {
             complete: true,
             syncedAt: 1,
             branches: [
-              { name: 'a', changeRequests: [rec(1, 'a')] },
-              { name: 'b', changeRequests: [rec(2, 'b')] },
+              { name: 'a', changeRequest: rec(1, 'a') },
+              { name: 'b', changeRequest: rec(2, 'b') },
             ],
           }
         : { host: null };

@@ -56,13 +56,9 @@ func (r *Router) handleBranchChangeRequestIndex(ctx context.Context, c *gitsessi
 		},
 		func(ctx context.Context, entry *gitsession.RepoEntry, _ BranchChangeRequestIndexParams) (BranchChangeRequestIndexResult, error) {
 			idx := entry.ChangeRequestIndex(ctx)
-			out := BranchChangeRequestIndexResult{Complete: idx.Complete, SyncedAt: idx.SyncedAt, Branches: make([]BranchChangeRequests, 0, len(idx.Branches))}
+			out := BranchChangeRequestIndexResult{Complete: idx.Complete, SyncedAt: idx.SyncedAt, Branches: make([]BranchChangeRequest, 0, len(idx.Branches))}
 			for _, b := range idx.Branches {
-				crs := make([]ChangeRequestRecord, 0, len(b.ChangeRequests))
-				for _, cr := range b.ChangeRequests {
-					crs = append(crs, changeRequestRecordFrom(cr))
-				}
-				out.Branches = append(out.Branches, BranchChangeRequests{Name: b.Name, ChangeRequests: crs})
+				out.Branches = append(out.Branches, BranchChangeRequest{Name: b.Name, ChangeRequest: changeRequestRecordFrom(b.ChangeRequest)})
 			}
 			return out, nil
 		},

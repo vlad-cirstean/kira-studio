@@ -697,10 +697,10 @@ type BranchChangeRequestIndexParams struct {
 	RepoID string `json:"repoId"`
 }
 
-// BranchChangeRequests is one head branch's cached change requests, newest first.
-type BranchChangeRequests struct {
-	Name           string                `json:"name"`
-	ChangeRequests []ChangeRequestRecord `json:"changeRequests"`
+// BranchChangeRequest is one head branch's newest cached change request.
+type BranchChangeRequest struct {
+	Name          string              `json:"name"`
+	ChangeRequest ChangeRequestRecord `json:"changeRequest"`
 }
 
 // BranchChangeRequestIndexResult is the persisted change request index of a repository.
@@ -709,7 +709,7 @@ type BranchChangeRequestIndexResult struct {
 	Complete bool `json:"complete"`
 	// SyncedAt is the last sync, Unix milliseconds; 0 when never synced.
 	SyncedAt int64                  `json:"syncedAt"`
-	Branches []BranchChangeRequests `json:"branches"`
+	Branches []BranchChangeRequest `json:"branches"`
 }
 
 // BranchSyncChangeRequestsParams is branch.syncChangeRequests's own request. Focused false only

@@ -8,7 +8,7 @@ export type {
   BaseCandidate,
   BaseResolution,
   BaseResolutionReason,
-  BranchChangeRequests,
+  BranchChangeRequest,
   ChangeRequestIndex,
   ChangeRequestLookup,
   ChangeRequestRecord,

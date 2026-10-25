@@ -1162,20 +1162,20 @@ export interface ChangeRequestRecord {
   readonly checksState?: 'SUCCESS' | 'FAILURE' | 'PENDING' | 'ERROR' | 'EXPECTED';
 }
 
-/** One head branch's cached change requests, newest first. */
-export interface BranchChangeRequests {
+/** One head branch's newest cached change request. */
+export interface BranchChangeRequest {
   readonly name: string;
-  readonly changeRequests: readonly ChangeRequestRecord[];
+  readonly changeRequest: ChangeRequestRecord;
 }
 
 /** branch.changeRequestIndex's result: the persisted change request index of a repository, served
  *  from SQLite. `complete` means every change request was ingested, so a branch not listed has
- *  none; incomplete lists what is cached so far. */
+ *  none; incomplete lists what is cached so far. Only branches in refs, plus open requests. */
 export interface ChangeRequestIndex {
   readonly complete: boolean;
   /** Last sync, Unix milliseconds; 0 when never synced. */
   readonly syncedAt: number;
-  readonly branches: readonly BranchChangeRequests[];
+  readonly branches: readonly BranchChangeRequest[];
 }
 
 /** commit.resolveChangeRequests / branch.resolveChangeRequest's own shared result shape.

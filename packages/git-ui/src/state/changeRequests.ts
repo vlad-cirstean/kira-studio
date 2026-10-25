@@ -253,8 +253,7 @@ export class ChangeRequestState {
     if (index.branches.length === 0 && !index.complete) return;
     const next = new Map<string, ChangeRequestRecord>();
     for (const branch of index.branches) {
-      const first = branch.changeRequests[0];
-      if (first !== undefined) next.set(branch.name, first);
+      next.set(branch.name, branch.changeRequest);
     }
     // A partial index only adds; a complete one is authoritative and also removes.
     const merged = index.complete ? next : new Map([...this.byBranch.value, ...next]);
