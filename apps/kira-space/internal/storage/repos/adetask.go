@@ -19,6 +19,7 @@ var (
 	ErrBranchOnTask  = errors.New("repos: branch is already on a task")
 	ErrRepoOnTask    = errors.New("repos: task already has a branch in that repo")
 	ErrReviewKind    = errors.New("repos: a task only moves between task and parked, and a review task keeps its kind")
+	ErrTaskUnnamed   = errors.New("a task needs a title or a Jira key")
 	ErrBranchMissing = errors.New("repos: branch not found")
 	ErrBacklogGone   = errors.New("repos: backlog item not found")
 	ErrRunNotFound   = errors.New("repos: run not found")
@@ -297,6 +298,10 @@ func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask
 			return model.AdeTask{}, fmt.Errorf("repos: color %d out of range", *p.Color)
 		}
 		cur.Color = *p.Color
+	}
+	// A branch-derived task may start with neither; a patch must not strip the last of them.
+	if (p.Title != nil || p.JiraKey != nil) && cur.Title == "" && cur.JiraKey == "" {
+		return model.AdeTask{}, ErrTaskUnnamed
 	}
 	if p.Kind != nil && *p.Kind != prevKind {
 		from, to := model.AdeBranchKindMine, model.AdeBranchKindParked

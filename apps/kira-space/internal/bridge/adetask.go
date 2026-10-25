@@ -120,6 +120,9 @@ func adeTaskError(err error) error {
 			return ipcerr.T(c.code, c.key, nil)
 		}
 	}
+	if errors.Is(err, repos.ErrTaskUnnamed) {
+		return ipcerr.BadRequest(err.Error())
+	}
 	if errors.Is(err, ade.ErrInvalidInput) {
 		// The detail is a refusal the person can act on (a cycle, a missing base), not a bug.
 		return ipcerr.BadRequest(strings.TrimPrefix(err.Error(), ade.ErrInvalidInput.Error()+": "))

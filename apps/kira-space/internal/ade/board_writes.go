@@ -179,23 +179,6 @@ func (b *TaskBoard) UpdateTask(_ context.Context, args adewire.UpdateTaskArgs) (
 		empty := ""
 		patch.JiraKey, patch.JiraURL = &empty, &empty
 	}
-	// A branch-derived task may start with neither; a patch must not strip the last of them.
-	if patch.Title != nil || p.ClearJira {
-		stored, err := b.deps.Tasks.GetTask(args.TaskID)
-		if err != nil {
-			return adewire.Task{}, err
-		}
-		title, jiraKey := stored.Title, stored.JiraKey
-		if patch.Title != nil {
-			title = *patch.Title
-		}
-		if patch.JiraKey != nil {
-			jiraKey = *patch.JiraKey
-		}
-		if title == "" && jiraKey == "" {
-			return adewire.Task{}, invalid("a task needs a title or a Jira key")
-		}
-	}
 	task, err := b.deps.Tasks.UpdateTask(args.TaskID, patch)
 	if err != nil {
 		return adewire.Task{}, err
