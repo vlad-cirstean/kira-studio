@@ -1060,17 +1060,17 @@ test('the Git panel top-level tabs render at 4px radius with normal letter spaci
   expect(filesSpacing).toBe('normal');
 });
 
-// The desktop app's own DOM-level check for the collapse/branch-order feature —
-// `graph-branch-order.spec.ts` (webview-interaction) already covers the toolbar toggle, the
-// dashed fork stubs and the no-overlap/no-scrollbar cases in detail; this only exercises what is
+// The desktop app's own DOM-level check for the collapse feature —
+// `repo-graph-branch-order.spec.ts` already covers the toolbar toggle, the
+// fork lanes and the no-overlap/no-scrollbar cases in detail; this only exercises what is
 // specific to the desktop host: `RepoGraphView.vue`'s kept-mounted model (a tab switch away and back
 // keeps the mounted `git-ui` app alive, hidden with v-show, `MainView.vue`) and `revealAndSelectSha`'s auto-expand-on-search-reveal path
 // (`App.vue:490`). `buildMultiBranchChunk`/`buildMultiBranchRefsList` (`graphStreamFixture.ts`)
 // port `fakeGraphHost.ts`'s own fixture table — see that file's doc comment for the row/parent
 // layout: `main` (HEAD, 3 commits, never collapses), `feature-newer` (5 commits, collapses by
-// default), `feature-older` (2 commits, always full). Collapsed-by-default display order: `M0,
-// M1, M2, F0, [placeholder], F4, G0, G1` (8 rows, row 7 last); fully expanded: 10 rows (row 9
-// last).
+// default), `feature-older` (2 commits, always full). Display follows store order.
+// Collapsed-by-default: `F0, [placeholder], F4, G0, G1, M0, M1, M2` (8 rows, row 7 last); fully
+// expanded: 10 rows (row 9 last).
 test.describe('a repo workspace: graph branch collapse (P93 §8.4)', () => {
   async function bootMultiBranchGraph(
     page: import('@playwright/test').Page,
@@ -1116,8 +1116,8 @@ test.describe('a repo workspace: graph branch collapse (P93 §8.4)', () => {
     const { window: page } = await relaunch({ control: CONTROL });
     await bootMultiBranchGraph(page);
 
-    await expect(messageCell(page, 0)).toContainText('main tip (M0)');
-    const placeholder = messageCell(page, 4);
+    await expect(messageCell(page, 5)).toContainText('main tip (M0)');
+    const placeholder = messageCell(page, 1);
     await expect(placeholder).toHaveAttribute('data-testid', 'graph-collapsed-row');
     await expect(placeholder).toContainText(
       `${MULTI_BRANCH_FEATURE_NEWER_HIDDEN_COUNT} more commits on ${MULTI_BRANCH_FEATURE_NEWER_NAME}`,
@@ -1136,7 +1136,7 @@ test.describe('a repo workspace: graph branch collapse (P93 §8.4)', () => {
     const { window: page } = await relaunch({ control: CONTROL });
     await bootMultiBranchGraph(page);
 
-    await messageCell(page, 4).click(); // expand feature-newer
+    await messageCell(page, 1).click(); // expand feature-newer
     await expect(
       page.locator('[data-testid="commit-grid"] .slick-row[data-row="9"]'),
     ).toBeVisible();
@@ -1169,7 +1169,7 @@ test.describe('a repo workspace: graph branch collapse (P93 §8.4)', () => {
 
   // App.vue's `revealAndSelectSha` (search.ts's `activeHit` watcher) auto-expands a collapsed
   // group before scrolling — `CommitGrid.vue`'s own `scrollToRow` doc comment. `'F2'` is a unique
-  // substring of exactly one commit ('feature-newer F2', row 5 once expanded, hidden inside the
+  // substring of exactly one commit ('feature-newer F2', row 2 once expanded, hidden inside the
   // placeholder while collapsed) — the loaded-only scan (`searchLoadedCommits`) is synchronous
   // over this fixture's one, fully-exhausted chunk, so no `search.run` tail request is needed.
   test('a search reveal into a collapsed group expands it and selects the hit', async ({
@@ -1190,8 +1190,8 @@ test.describe('a repo workspace: graph branch collapse (P93 §8.4)', () => {
     await searchInput.press('Enter');
 
     await expect(page.locator('[data-testid="graph-collapsed-row"]')).toHaveCount(0);
-    // Expanded order: M0, M1, M2, F0, F1, F2, F3, F4, G0, G1 — 'F2' is row 5.
-    const targetRow = page.locator('[data-testid="commit-grid"] .slick-row[data-row="5"]');
+    // Expanded order: F0, F1, F2, F3, F4, G0, G1, M0, M1, M2 — 'F2' is row 2.
+    const targetRow = page.locator('[data-testid="commit-grid"] .slick-row[data-row="2"]');
     await expect(targetRow).toContainText('feature-newer F2');
     await expect(targetRow).toBeVisible();
     await expect(targetRow).toHaveClass(/kira-row-selected/);
