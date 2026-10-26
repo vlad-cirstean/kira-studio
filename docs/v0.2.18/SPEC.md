@@ -7,7 +7,7 @@ First phase `P357` (highest in `docs/HISTORY.md` is `P356`). Branch `chapter/v0.
 | P357 | Review window diff shows hunks only. Today it renders entire files. Show changed hunks plus a few lines of context, collapse the rest. User asked for this before; verify against the real window, not just the code path. | Done |
 | P358 | Review window: mark a folder reviewed (marks every file under it). Add next/previous change buttons and an inline/side-by-side diff toggle to the bar that holds go-to-file. | Done |
 | P359 | Skip the agent-finished notification while the app window is focused. | Done |
-| P360 | Terminal sessions (incl. Claude Code TUI): Cmd+Enter inserts a newline. TUI scroll too slow, match VS Code terminal scroll behavior. Darker terminal background, a dark grey from the app palette, not black. | Pending |
+| P360 | Terminal sessions (incl. Claude Code TUI): Cmd+Enter inserts a newline. TUI scroll too slow, match VS Code terminal scroll behavior. Darker terminal background, a dark grey from the app palette, not black. | Done |
 | P361 | Postman import: collection variables and environment values missing, only keys import. Import every value. | Pending |
 | P362 | API module left panel: multiselect, drag and drop, delete of selection. | Pending |
 | P363 | Code review, 1 round, over the full diff since the base (see CLAUDE.md). | Pending |
@@ -36,3 +36,17 @@ Finished notes (`KindFinished`) skip while any app window, review windows includ
 Tests: `TestFocusedAppSkipsFinished` (new), `TestFocusedTabSuppresses` now on needs-input, proves app focus does not suppress it. `go test -race` notifyflow and shell ok, `go test ./apps/kira-space/internal/flows/...` ok. No frontend half: renderer and IPC unchanged.
 
 Not verified on desktop: `isKeyWindow` reads only on macOS Wails; Linux sandbox cannot run it. Known edge: screen locked with Kira Space frontmost keeps the window key, so finished notes skip while user is away.
+
+## P360 Result
+
+Every terminal (repo, Automations, Docker exec, ADE pane, phone) builds through `terminalRenderer.ts`; one edit covers all.
+
+Cmd+Enter: `attachCustomKeyEventHandler` sends `ESC CR` (xterm's own Alt+Enter bytes) via `term.input`, swallows all events of the chord, calls `preventDefault`. Cmd+Shift+Enter and plain Enter untouched. `check-ui-primitives.sh` gets a permanent U41 exemption for `terminalRenderer.ts` (xterm engine host).
+
+Scroll: xterm sends one wheel report per DOM event, same as VS Code. Gap is Claude Code: without XTVERSION or `TERM_PROGRAM=vscode` it scrolls 1 row per report. `sessionEnv` now sets `CLAUDE_CODE_SCROLL_SPEED=3` unless already set; `scrollOnEraseInDisplay: true` added (VS Code parity). Declined: `TERM_PROGRAM=vscode`, XTVERSION answer, wheel repeat, xterm 6.1 beta (reasons in `plans/P360.md` §2.2).
+
+Background: terminal theme and `TerminalHostView` frame use `--kira-bg-chrome` (`#181818`, VS Code Dark Modern panel). No new token.
+
+Tests: `repo-workspace.spec.ts` "Cmd+Enter in a terminal sends meta-Enter (ESC CR); plain Enter stays CR" (new; checks `Gw0=` then `DQ==`). Terminal specs 3/3 pass. No backend test: env entry is a constant. Frame computed `rgb(24, 24, 24)`.
+
+Only user can verify on real macOS: Cmd+Enter in Claude Code (repo terminal, ADE pane, review flow) inserts a newline and does not submit; in Kira Studio it does not fire the "Run statement" menu item (WKWebView forwarding after `preventDefault`); zsh continuation line; Claude Code fullscreen scroll feel with trackpad and wheel versus VS Code (hard flicks accelerate less; next lever is user's `CLAUDE_CODE_SCROLL_SPEED`); background shade on a real display.
