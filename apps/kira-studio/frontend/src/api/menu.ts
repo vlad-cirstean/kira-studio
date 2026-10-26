@@ -22,11 +22,12 @@ export interface CollectionMenuActions {
   newCollection(): void;
   rename(row: CollectionRowVm): void;
   duplicate(row: CollectionRowVm): void;
-  remove(row: CollectionRowVm): void;
+  /** Confirms, then deletes the rows with their subtrees. */
+  remove(rows: readonly CollectionRowVm[]): void;
   /** Every collection, as the Move to collection submenu's choices. */
   collections(): readonly CollectionChoice[];
-  moveTo(row: CollectionRowVm, collectionId: string): void;
-  moveToNewCollection(row: CollectionRowVm): void;
+  moveTo(rows: readonly CollectionRowVm[], collectionId: string): void;
+  moveToNewCollection(rows: readonly CollectionRowVm[]): void;
   copyUrl(row: CollectionRowVm): void;
   importPostman(): void;
   /** P7 D12: the background menu's own "Import from curl…" item — opens the paste-a-curl-command
@@ -43,19 +44,43 @@ export interface CollectionMenuActions {
   dynamicValues(): void;
 }
 
-// Request and folder rows only: a move lands at a collection's root, so the row's own collection
-// is a valid target only when the row sits inside a folder.
-function moveMenu(row: CollectionRowVm, actions: CollectionMenuActions): MenuItem {
+// Request and folder rows only: a move lands at a collection's root, so a collection is a valid
+// target unless every row already sits at its root.
+function moveMenu(rows: readonly CollectionRowVm[], actions: CollectionMenuActions): MenuItem {
+  const home = rows.every((r) => r.collectionId === rows[0].collectionId)
+    ? rows[0].collectionId
+    : null;
   return moveToCollectionMenu({
     collections: actions.collections(),
-    current: row.collectionId,
+    current: home,
     allowNone: false,
-    canMoveTo: (id) => !(id === row.collectionId && row.parentId === null),
+    canMoveTo: (id) => !rows.every((r) => r.collectionId === id && r.parentId === null),
     onMove: (id) => {
-      if (id !== null) actions.moveTo(row, id);
+      if (id !== null) actions.moveTo(rows, id);
     },
-    onNew: () => actions.moveToNewCollection(row),
+    onNew: () => actions.moveToNewCollection(rows),
   });
+}
+
+/** The menu for two or more selected rows: the actions that apply to a set. */
+export function menuForSelection(
+  rows: readonly CollectionRowVm[],
+  actions: CollectionMenuActions,
+): MenuItem[] {
+  const items: MenuItem[] = [];
+  if (rows.every((r) => r.kind !== 'collection')) {
+    items.push(moveMenu(rows, actions), { type: 'separator' });
+  }
+  items.push({
+    type: 'item',
+    id: 'delete',
+    label: t('studio.api.collections.deleteMany.label', { count: rows.length }),
+    icon: ICON.delete,
+    danger: true,
+    shortcut: 'tree.delete',
+    run: () => actions.remove(rows),
+  });
+  return items;
 }
 
 export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions): MenuItem[] {
@@ -94,7 +119,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
         disabled: !row.url,
         run: () => actions.copyUrl(row),
       },
-      moveMenu(row, actions),
+      moveMenu([row], actions),
       { type: 'separator' },
       {
         type: 'item',
@@ -103,7 +128,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
         icon: ICON.delete,
         danger: true,
         shortcut: 'tree.delete',
-        run: () => actions.remove(row),
+        run: () => actions.remove([row]),
       },
     ];
   }
@@ -168,7 +193,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       shortcut: 'tree.duplicate',
       run: () => actions.duplicate(row),
     });
-    items.push(moveMenu(row, actions));
+    items.push(moveMenu([row], actions));
   }
 
   items.push(
@@ -180,7 +205,7 @@ export function menuForRow(row: CollectionRowVm, actions: CollectionMenuActions)
       icon: ICON.delete,
       danger: true,
       shortcut: 'tree.delete',
-      run: () => actions.remove(row),
+      run: () => actions.remove([row]),
     },
   );
   return items;

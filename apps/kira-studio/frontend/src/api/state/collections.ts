@@ -20,6 +20,7 @@ import { queryClient } from '@workbench/state/queryClient';
 import { defineStore } from 'pinia';
 import { computed, reactive, toRef, toRefs, watch } from 'vue';
 import { control } from '../../bridge/control';
+import { type Placement, topmost } from '../collectionDrop';
 import {
   closeVariableSetTabsForOwner,
   openCollectionGrpcRequestTab,
@@ -424,28 +425,24 @@ export const useCollectionsStore = defineStore('collections', () => {
     }
   }
 
-  const moveRowMutation = useMutation(
+  const moveRowsMutation = useMutation(
     {
       mutationKey: ['apiCollectionsTree', 'moveItems'],
-      mutationFn: (args: { itemId: string; collectionId: string }) =>
-        control.collectionsMoveItems({
-          itemIds: [args.itemId],
-          collectionId: args.collectionId,
-          parentId: null,
-          beforeId: null,
-        }),
+      mutationFn: (args: { itemIds: string[]; placement: Placement }) =>
+        control.collectionsMoveItems({ itemIds: args.itemIds, ...args.placement }),
       onSuccess: afterTreeListChange,
     },
     queryClient,
   );
 
-  /** Moves a request or folder, with its subtree, to the root of another collection. Returns
-   *  whether it moved. */
-  async function moveRow(row: CollectionRowVm, collectionId: string): Promise<boolean> {
+  /** Moves requests and folders, each with its subtree, to `placement`, keeping their order. The
+   *  moved rows become the selection. Returns whether it moved. */
+  async function moveRows(itemIds: readonly string[], placement: Placement): Promise<boolean> {
     try {
-      await moveRowMutation.mutateAsync({ itemId: row.id, collectionId });
-      revealItem(collectionId, null);
-      selection.selectOnly(itemKey(row.id));
+      await moveRowsMutation.mutateAsync({ itemIds: [...itemIds], placement });
+      revealItem(placement.collectionId, placement.parentId);
+      const keys = itemIds.map(itemKey);
+      selection.selectMany(keys, keys[0]);
       state.error = null;
       return true;
     } catch (err) {
@@ -454,11 +451,22 @@ export const useCollectionsStore = defineStore('collections', () => {
     }
   }
 
-  /** Creates a collection, moves the row into it, and opens the new collection for naming. */
-  async function moveRowToNewCollection(row: CollectionRowVm): Promise<void> {
+  /** Moves rows to the root of another collection. Returns whether it moved. */
+  function moveRowsToCollection(
+    rows: readonly CollectionRowVm[],
+    collectionId: string,
+  ): Promise<boolean> {
+    return moveRows(
+      rows.map((r) => r.id),
+      { collectionId, parentId: null, beforeId: null },
+    );
+  }
+
+  /** Creates a collection, moves the rows into it, and opens the new collection for naming. */
+  async function moveRowsToNewCollection(rows: readonly CollectionRowVm[]): Promise<void> {
     try {
       const collection = await createCollectionMutation.mutateAsync();
-      if (!(await moveRow(row, collection.id))) return;
+      if (!(await moveRowsToCollection(rows, collection.id))) return;
       state.renamingKey = collectionKey(collection.id);
     } catch (err) {
       state.error = errorText(err);
@@ -498,49 +506,48 @@ export const useCollectionsStore = defineStore('collections', () => {
     return ids;
   }
 
-  const deleteRowMutation = useMutation(
+  const deleteRowsMutation = useMutation(
     {
       mutationKey: ['apiCollectionsTree', 'delete'],
-      mutationFn: (args: { id: string; target: 'collection' | 'item' }) =>
-        control.collectionsDeleteMany(
-          args.target === 'collection'
-            ? { collectionIds: [args.id], itemIds: [] }
-            : { collectionIds: [], itemIds: [args.id] },
-        ),
+      mutationFn: (args: { collectionIds: string[]; itemIds: string[] }) =>
+        control.collectionsDeleteMany(args),
       onSuccess: afterTreeListChange,
     },
     queryClient,
   );
 
-  async function deleteRow(row: CollectionRowVm): Promise<void> {
-    const target = row.kind === 'collection' ? 'collection' : 'item';
-    const orphaned = subtreeItemIds(row);
+  /** What deleting `rows` removes: the topmost rows, and every item id their subtrees hold. */
+  function planDelete(rows: readonly CollectionRowVm[]): {
+    top: CollectionRowVm[];
+    itemIds: Set<string>;
+  } {
+    const top = topmost(rows, items.value);
+    const itemIds = new Set<string>();
+    for (const row of top) for (const id of subtreeItemIds(row)) itemIds.add(id);
+    return { top, itemIds };
+  }
+
+  /** Deletes `rows` with their subtrees in one call. */
+  async function deleteRows(rows: readonly CollectionRowVm[]): Promise<void> {
+    const { top, itemIds } = planDelete(rows);
+    if (top.length === 0) return;
     try {
-      await deleteRowMutation.mutateAsync({ id: row.id, target });
-      // Deleting a request does **not** close its open tabs (the orphan rule): a tab is an
-      // editing surface with its own persisted state, and silently closing one because a tree row
-      // went away would lose work. Its cached saved request goes, though, so the tab reads as
-      // unsaved — and so does every *descendant* request's cache entry a
-      // folder/collection delete just cascaded away, so `savedRequestFor` correctly reports null
-      // for all of them instead of a stale entry that `onSave` would fail against with no visible
-      // error.
-      // Writes `null` into each orphaned id's own query directly rather than only relying on
-      // afterTreeListChange's reconcileTree (already awaited above, inside onSuccess, by the time
-      // mutateAsync resolves) — explicit and idempotent either way, and it never depends on exactly
-      // when reconcileTree ran relative to this line. `null` is itself the orphan marker —
-      // spares any still-open tab's own ensureSavedRequestLoaded a doomed GetRequest/GetGrpcRequest
-      // round trip that would only reach the same conclusion via a fetch.
-      for (const id of orphaned) {
+      await deleteRowsMutation.mutateAsync({
+        collectionIds: top.filter((r) => r.kind === 'collection').map((r) => r.id),
+        itemIds: top.filter((r) => r.kind !== 'collection').map((r) => r.id),
+      });
+      // Deleting a request does not close its open tabs (the orphan rule): a tab is an editing
+      // surface with its own persisted state, and closing one because a row went away would lose
+      // work. Its cached saved request goes, so the tab reads as unsaved. `null` is the orphan
+      // marker, written for every cascaded descendant too and explicitly, so it never depends on
+      // when reconcileTree ran.
+      for (const id of itemIds) {
         queryClient.setQueryData(apiSavedRequestKey(id), null);
         queryClient.setQueryData(apiSavedGrpcRequestKey(id), null);
       }
-      // P17 D16: unlike a request tab, a variable-set tab has no state of its own worth preserving
-      // once its owner (the collection) is gone — deleting it closes any open tab for it.
-      if (row.kind === 'collection') {
-        closeVariableSetTabsForOwner('collection', row.id);
-        // P108 F9's own listCache eviction is gone with listCache itself (P112) — afterTreeListChange
-        // above (reconcileTree) now evicts the collection's own cached variables query, local
-        // mutation or remote push alike.
+      // A variable-set tab has no state worth keeping once its owner is gone.
+      for (const row of top) {
+        if (row.kind === 'collection') closeVariableSetTabsForOwner('collection', row.id);
       }
       state.error = null;
     } catch (err) {
@@ -867,9 +874,11 @@ export const useCollectionsStore = defineStore('collections', () => {
     createItem,
     createGrpcItem,
     renameRow,
-    moveRow,
-    moveRowToNewCollection,
-    deleteRow,
+    moveRows,
+    moveRowsToCollection,
+    moveRowsToNewCollection,
+    planDelete,
+    deleteRows,
     duplicateRow,
     openRequestRow,
     beginRename,

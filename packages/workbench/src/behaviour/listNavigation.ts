@@ -267,9 +267,9 @@ export function useListNavigation<T>(opts: ListNavigationOptions<T>) {
     const action = navigate(cx.view, cx.activeIndex, e.key, opts.tree !== undefined);
     if (action.kind === 'move') {
       const item = cx.list[action.index];
-      // focusKey sets activeKey first (which may reset a selection); extend after it.
-      void focusKey(opts.key(item));
+      // Extend first: focusKey then sets the stop the extension already moved to.
       opts.onExtend(item);
+      void focusKey(opts.key(item));
     }
     return true;
   }
