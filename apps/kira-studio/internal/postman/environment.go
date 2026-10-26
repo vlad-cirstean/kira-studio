@@ -13,6 +13,8 @@ type Environment struct {
 	Variables []Variable
 	// Disabled counts values skipped because Postman marks them `enabled: false`.
 	Disabled int
+	// Empty counts imported values that are "": Postman exports only shared values.
+	Empty int
 }
 
 // File is what ParseFile found: exactly one of Collection and Environment is set.
@@ -56,17 +58,17 @@ func parseEnvironment(doc map[string]json.RawMessage) *Environment {
 		if obj == nil {
 			continue
 		}
-		key, ok := decodeScalarString(obj["key"])
-		if !ok || key == "" {
-			continue
-		}
-		if enabled, ok := decodeBool(obj["enabled"]); ok && !enabled {
+		v, ok, off := decodeVariableEntry(obj)
+		switch {
+		case !ok:
+		case off:
 			env.Disabled++
-			continue
+		default:
+			if v.Value == "" {
+				env.Empty++
+			}
+			env.Variables = append(env.Variables, v)
 		}
-		value, _ := decodeScalarString(obj["value"])
-		typ, _ := decodeString(obj["type"])
-		env.Variables = append(env.Variables, Variable{Name: key, Value: value, Secret: typ == "secret", Type: typ})
 	}
 	return env
 }

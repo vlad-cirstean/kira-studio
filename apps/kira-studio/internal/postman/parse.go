@@ -91,10 +91,17 @@ func parseCollection(doc map[string]json.RawMessage) (*Tree, error) {
 	// D15: the collection level is promoted, not inert — scripts and auth still count as inert
 	// here, but `variable` does not go through countInertMembers at this one level.
 	countScriptsAndAuth(doc, &tree.Report)
-	tree.Variables = decodeVariables(doc["variable"])
+	var disabledVars, emptyVars int
+	tree.Variables, disabledVars, emptyVars = decodeVariables(doc["variable"])
 	delete(tree.Origin, "variable")
 	if len(tree.Variables) > 0 {
 		tree.Report.warnN(WarnVariablesImported, len(tree.Variables))
+	}
+	if disabledVars > 0 {
+		tree.Report.warnN(WarnDisabledVariables, disabledVars)
+	}
+	if emptyVars > 0 {
+		tree.Report.warnN(WarnEmptyValues, emptyVars)
 	}
 	if raw := doc["item"]; len(raw) > 0 && raw[0] == '[' {
 		dec := json.NewDecoder(bytes.NewReader(raw))
@@ -110,27 +117,66 @@ func parseCollection(doc map[string]json.RawMessage) (*Tree, error) {
 	return tree, nil
 }
 
-// decodeVariables decodes a collection-level `variable[]` array. `key` is the name (the
-// decodeScalarString, since Postman's variable.value is untyped); `type == "secret"` marks an
-// entry secret, and the original `type` string is preserved per entry so an unrecognised one
-// survives export unchanged.
-func decodeVariables(raw json.RawMessage) []Variable {
-	out := []Variable{}
+// VariableValue renders a Postman variable `value` as text. The schema leaves it untyped: a
+// string, number or boolean renders as its literal; an object or array as compact JSON; null or
+// absent as "". Exported because storage's legacy promotion must decode the same way.
+func VariableValue(raw json.RawMessage) string {
+	if s, ok := decodeScalarString(raw); ok {
+		return s
+	}
+	if len(raw) == 0 || (raw[0] != '{' && raw[0] != '[') {
+		return ""
+	}
+	var buf bytes.Buffer
+	if err := json.Compact(&buf, raw); err != nil {
+		return ""
+	}
+	return buf.String()
+}
+
+// decodeVariableEntry is the one rule set for a collection `variable[]` entry and an environment
+// `values[]` entry. `type == "secret"` marks the entry secret; the original `type` string is kept so
+// an unrecognised one survives export. disabled is `enabled: false` or `disabled: true`.
+func decodeVariableEntry(obj map[string]json.RawMessage) (v Variable, ok, disabled bool) {
+	name, isScalar := decodeScalarString(obj["key"])
+	if !isScalar || name == "" {
+		return Variable{}, false, false
+	}
+	if enabled, has := decodeBool(obj["enabled"]); has && !enabled {
+		disabled = true
+	}
+	if off, has := decodeBool(obj["disabled"]); has && off {
+		disabled = true
+	}
+	typ, _ := decodeString(obj["type"])
+	return Variable{
+		Name: name, Value: VariableValue(obj["value"]), Secret: typ == "secret", Type: typ,
+		Description: decodeDescription(obj["description"]),
+	}, true, disabled
+}
+
+// decodeVariables decodes a collection-level `variable[]` array. Disabled entries are skipped and
+// counted; empty counts imported entries whose value is "".
+func decodeVariables(raw json.RawMessage) (vars []Variable, disabled, empty int) {
+	vars = []Variable{}
 	for _, entry := range decodeArray(raw) {
 		obj := decodeObject(entry)
 		if obj == nil {
 			continue
 		}
-		name, ok := decodeScalarString(obj["key"])
-		if !ok || name == "" {
-			continue
+		v, ok, off := decodeVariableEntry(obj)
+		switch {
+		case !ok:
+		case off:
+			disabled++
+		default:
+			if v.Value == "" {
+				empty++
+			}
+			vars = append(vars, v)
 		}
-		value, _ := decodeScalarString(obj["value"])
-		typ, _ := decodeString(obj["type"])
-		description := decodeDescription(obj["description"])
-		out = append(out, Variable{Name: name, Value: value, Secret: typ == "secret", Type: typ, Description: description})
 	}
-	return out
+	return vars, disabled, empty
 }
 
 // checkSchemaVersion: v2.1 parses, an absent or unrecognised `info.schema` parses anyway

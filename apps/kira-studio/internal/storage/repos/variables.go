@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strconv"
 
 	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
@@ -1139,40 +1138,14 @@ func (r *VariablesRepo) mergeSecrets(out map[string]string, column, ownerID stri
 // ---- import promotion (P4 D9's hand-off, closed by D15/F5) ----
 
 // promotedVariableRow is one collection-level `variable[]` entry as it appears in a collection's
-// origin_json. Decoded independently of internal/postman's own decoders (which are
-// unexported, and this package must not reach past that) — this is the one place a
-// collection-level variable array needs decoding with no postman.Tree machinery around it.
+// origin_json. Decoded here with no postman.Tree machinery around it; the value goes through
+// postman.VariableValue so it matches a fresh import.
 type promotedVariableRow struct {
 	Key   string          `json:"key"`
 	Value json.RawMessage `json:"value"`
 	Type  string          `json:"type"`
-}
-
-// scalarString mirrors postman's own decodeScalarString for the one field (variable.value) this
-// package needs to decode the same lenient way: a JSON string, number or boolean, rendered as its
-// literal text — F2's own finding that Postman's variable.value is untyped.
-func scalarString(raw json.RawMessage) string {
-	if len(raw) == 0 {
-		return ""
-	}
-	switch raw[0] {
-	case '"':
-		var s string
-		if json.Unmarshal(raw, &s) == nil {
-			return s
-		}
-	case 't', 'f':
-		var b bool
-		if json.Unmarshal(raw, &b) == nil {
-			return strconv.FormatBool(b)
-		}
-	case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-		var n json.Number
-		if json.Unmarshal(raw, &n) == nil {
-			return n.String()
-		}
-	}
-	return ""
+	// Disabled mirrors Postman's `disabled: true`; such an entry is not promoted.
+	Disabled bool `json:"disabled"`
 }
 
 // promoteIfNeeded is the one-shot: a collection still carries its top-level `variable[]` inside
@@ -1226,11 +1199,11 @@ func (r *VariablesRepo) promoteIfNeeded(collectionID string) error {
 		}
 		now := kiratime.NowISO()
 		for _, entry := range entries {
-			if entry.Key == "" {
+			if entry.Key == "" || entry.Disabled {
 				continue
 			}
 			isSecret := entry.Type == "secret"
-			plain := scalarString(entry.Value)
+			plain := postman.VariableValue(entry.Value)
 			storedValue, storedSecret, err := r.encryptFor(plain, isSecret)
 			if err != nil {
 				return err
