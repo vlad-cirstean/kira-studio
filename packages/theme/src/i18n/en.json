@@ -1663,6 +1663,9 @@
         "importRollbackFailed": {
           "error": "{detail} (also couldn’t remove the partially imported collection “{name}”: {rollbackDetail}). It remains visible. Delete it manually."
         },
+        "invalidMove": {
+          "body": "That item can’t move there."
+        },
         "writeFailed": {
           "error": "Couldn’t write {path}: {detail}"
         }

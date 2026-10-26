@@ -22,7 +22,7 @@ type treeNode struct {
 	collectionID string
 	parentID     string // "" = collection root
 	kind         string
-	index        int    // position among its parent's children
+	index        int // position among its parent's children
 }
 
 type nodeKey struct{ collectionID, parentID string }

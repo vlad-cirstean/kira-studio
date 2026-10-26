@@ -151,9 +151,9 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
 
     const captured: { deletedId: string | null } = { deletedId: null };
     (
-      control as unknown as { collectionsDelete: typeof control.collectionsDelete }
-    ).collectionsDelete = async (id: string) => {
-      captured.deletedId = id;
+      control as unknown as { collectionsDeleteMany: typeof control.collectionsDeleteMany }
+    ).collectionsDeleteMany = async (args) => {
+      captured.deletedId = args.itemIds[0] ?? args.collectionIds[0] ?? null;
     };
     (control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
       async () => ({
@@ -204,8 +204,8 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
     expect(savedRequestCache('req-4')).not.toBeNull();
 
     (
-      control as unknown as { collectionsDelete: typeof control.collectionsDelete }
-    ).collectionsDelete = async () => {};
+      control as unknown as { collectionsDeleteMany: typeof control.collectionsDeleteMany }
+    ).collectionsDeleteMany = async () => {};
     (control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
       async () => ({
         collections: [],

@@ -1,0 +1,11 @@
+{
+  "args:CollectionsService.DeleteMany": {
+    "collectionIds": [
+      "<id:1>"
+    ],
+    "itemIds": [
+      "<id:2>",
+      "<id:3>"
+    ]
+  }
+}

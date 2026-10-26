@@ -219,10 +219,14 @@ export const apiControl = {
     unwrap(CollectionsService.CreateGrpcItem({ ...args, request: args.request ?? null })),
   collectionsRename: (id: string, target: 'collection' | 'item', name: string): Promise<void> =>
     unwrap(CollectionsService.Rename({ id, target, name })),
-  collectionsDelete: (id: string, target: 'collection' | 'item'): Promise<void> =>
-    unwrap(CollectionsService.Delete({ id, target })),
-  collectionsMoveItem: (itemId: string, collectionId: string): Promise<void> =>
-    unwrap(CollectionsService.MoveItem({ itemId, collectionId })),
+  collectionsDeleteMany: (args: { collectionIds: string[]; itemIds: string[] }): Promise<void> =>
+    unwrap(CollectionsService.DeleteMany(args)),
+  collectionsMoveItems: (args: {
+    itemIds: string[];
+    collectionId: string;
+    parentId: string | null;
+    beforeId: string | null;
+  }): Promise<void> => unwrap(CollectionsService.MoveItems(args)),
   collectionsImport: (paths: string[]): Promise<ImportResult> =>
     unwrap(CollectionsService.Import({ paths })).then((r) => trust<ImportResult>(r)),
   // P5 D16: ExportReport.secretCount is what lets the panel say "N secret values were not

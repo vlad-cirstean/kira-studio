@@ -185,8 +185,8 @@ describe('deleteRow (collections.ts) evicts the collection-scope variables query
     expect(queryClient.getQueryData(apiVariablesKey('collection', collectionId))).toHaveLength(1);
 
     (
-      control as unknown as { collectionsDelete: typeof control.collectionsDelete }
-    ).collectionsDelete = async () => {};
+      control as unknown as { collectionsDeleteMany: typeof control.collectionsDeleteMany }
+    ).collectionsDeleteMany = async () => {};
     (control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
       async () => ({ collections: [], items: [] });
 

@@ -437,9 +437,14 @@ export const useCollectionsStore = defineStore('collections', () => {
 
   const moveRowMutation = useMutation(
     {
-      mutationKey: ['apiCollectionsTree', 'moveItem'],
+      mutationKey: ['apiCollectionsTree', 'moveItems'],
       mutationFn: (args: { itemId: string; collectionId: string }) =>
-        control.collectionsMoveItem(args.itemId, args.collectionId),
+        control.collectionsMoveItems({
+          itemIds: [args.itemId],
+          collectionId: args.collectionId,
+          parentId: null,
+          beforeId: null,
+        }),
       onSuccess: afterTreeListChange,
     },
     queryClient,
@@ -508,7 +513,11 @@ export const useCollectionsStore = defineStore('collections', () => {
     {
       mutationKey: ['apiCollectionsTree', 'delete'],
       mutationFn: (args: { id: string; target: 'collection' | 'item' }) =>
-        control.collectionsDelete(args.id, args.target),
+        control.collectionsDeleteMany(
+          args.target === 'collection'
+            ? { collectionIds: [args.id], itemIds: [] }
+            : { collectionIds: [], itemIds: [args.id] },
+        ),
       onSuccess: afterTreeListChange,
     },
     queryClient,

@@ -221,39 +221,60 @@ func (s *CollectionsService) Rename(args CollectionsTargetArgs) error {
 	return nil
 }
 
-func (s *CollectionsService) Delete(args CollectionsTargetArgs) error {
-	if err := validTarget(args); err != nil {
-		return err
+type CollectionsDeleteManyArgs struct {
+	CollectionIDs []string `json:"collectionIds"`
+	ItemIDs       []string `json:"itemIds"`
+}
+
+// DeleteMany deletes collections and items, each with its subtree, in one transaction.
+func (s *CollectionsService) DeleteMany(args CollectionsDeleteManyArgs) error {
+	if len(args.CollectionIDs) == 0 && len(args.ItemIDs) == 0 {
+		return ipcerr.Required("collectionIds or itemIds")
 	}
-	if err := s.Deps.Repos.Collections.Delete(args.ID, args.Target); err != nil {
-		return ipcerr.InternalErr(err)
+	if err := s.Deps.Repos.Collections.DeleteMany(args.CollectionIDs, args.ItemIDs); err != nil {
+		return collectionsWriteErr(err)
 	}
-	if args.Target == "collection" {
-		emitApiData(s.Deps.Events, treeChange(), variablesChange(model.VariableScopeCollection, args.ID))
-	} else {
-		emitApiData(s.Deps.Events, treeChange())
+	changes := []ApiDataChange{treeChange()}
+	for _, id := range args.CollectionIDs {
+		changes = append(changes, variablesChange(model.VariableScopeCollection, id))
 	}
+	emitApiData(s.Deps.Events, changes...)
 	return nil
 }
 
-type CollectionsMoveItemArgs struct {
-	ItemID       string `json:"itemId"`
-	CollectionID string `json:"collectionId"`
+type CollectionsMoveItemsArgs struct {
+	ItemIDs      []string `json:"itemIds"`
+	CollectionID string   `json:"collectionId"`
+	ParentID     *string  `json:"parentId"`
+	BeforeID     *string  `json:"beforeId"`
 }
 
-// MoveItem moves a request or folder, with its subtree, to the root of another collection.
-func (s *CollectionsService) MoveItem(args CollectionsMoveItemArgs) error {
-	if args.ItemID == "" {
-		return ipcerr.Required("itemId")
+// MoveItems moves requests and folders, each with its subtree, under parentId (null = collection
+// root) of collectionId, before beforeId or last when null.
+func (s *CollectionsService) MoveItems(args CollectionsMoveItemsArgs) error {
+	if len(args.ItemIDs) == 0 {
+		return ipcerr.Required("itemIds")
 	}
 	if args.CollectionID == "" {
 		return ipcerr.Required("collectionId")
 	}
-	if err := s.Deps.Repos.Collections.MoveItem(args.ItemID, args.CollectionID); err != nil {
-		return ipcerr.InternalErr(err)
+	if err := s.Deps.Repos.Collections.MoveItems(args.ItemIDs, args.CollectionID, args.ParentID, args.BeforeID); err != nil {
+		return collectionsWriteErr(err)
 	}
 	emitApiData(s.Deps.Events, treeChange())
 	return nil
+}
+
+// collectionsWriteErr maps a batch write failure: a refused placement is E_BAD_REQUEST, a missing
+// id E_NOT_FOUND, anything else E_INTERNAL.
+func collectionsWriteErr(err error) error {
+	switch {
+	case errors.Is(err, repos.ErrInvalidMove):
+		return ipcerr.T(ipcerr.CodeBadRequest, "backend.studio.collection.invalidMove.body", nil)
+	case errors.Is(err, repos.ErrItemNotFound), errors.Is(err, repos.ErrCollectionNotFound):
+		return ipcerr.NotFound(err.Error())
+	}
+	return ipcerr.InternalErr(err)
 }
 
 func validTarget(args CollectionsTargetArgs) error {

@@ -149,14 +149,17 @@ test('contract: collections — a request moves to another collection from its c
   const { window: page, control } = await relaunch({
     control: [
       { channel: IPC.collectionsList, response: tree },
-      { channel: IPC.collectionsMoveItem, response: null },
+      { channel: IPC.collectionsMoveItems, response: null },
       {
         channel: IPC.collectionsCreateCollection,
         response: tree.collections[2],
       },
     ],
   });
-  const moveArgs = contract<Record<string, string>>('api-move', 'args:CollectionsService.MoveItem');
+  const moveArgs = contract<Record<string, unknown>>(
+    'api-move-many',
+    'args:CollectionsService.MoveItems',
+  );
   await openHttpMode(page);
   await collectionRow(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
 
@@ -168,8 +171,14 @@ test('contract: collections — a request moves to another collection from its c
   );
   await page.locator('[data-testid="menu-item-move-to-col-2"]').click();
   await expect
-    .poll(() => control.log().find((e) => e.channel === IPC.collectionsMoveItem)?.args)
-    .toEqual({ ...moveArgs, itemId: 'item-health', collectionId: 'col-2' });
+    .poll(() => control.log().find((e) => e.channel === IPC.collectionsMoveItems)?.args)
+    .toEqual({
+      ...moveArgs,
+      itemIds: ['item-health'],
+      collectionId: 'col-2',
+      parentId: null,
+      beforeId: null,
+    });
 
   await collectionRow(page, 'item-health').click({ button: 'right' });
   await page.locator('[data-testid="menu-item-move-to-collection"]').hover();
@@ -179,10 +188,16 @@ test('contract: collections — a request moves to another collection from its c
       () =>
         control
           .log()
-          .filter((e) => e.channel === IPC.collectionsMoveItem)
+          .filter((e) => e.channel === IPC.collectionsMoveItems)
           .at(-1)?.args,
     )
-    .toEqual({ ...moveArgs, itemId: 'item-health', collectionId: 'col-new' });
+    .toEqual({
+      ...moveArgs,
+      itemIds: ['item-health'],
+      collectionId: 'col-new',
+      parentId: null,
+      beforeId: null,
+    });
   await expect(page.locator('[data-testid="collection-rename-input"]')).toBeFocused();
 });
 

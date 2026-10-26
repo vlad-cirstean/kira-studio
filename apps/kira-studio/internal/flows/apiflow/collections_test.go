@@ -70,7 +70,7 @@ func TestSavedRequestHistory(t *testing.T) {
 	}
 
 	mark = app.Events.Mark()
-	if err := app.W.Collections.Delete(bridge.CollectionsTargetArgs{ID: col.ID, Target: "collection"}); err != nil {
+	if err := app.W.Collections.DeleteMany(bridge.CollectionsDeleteManyArgs{CollectionIDs: []string{col.ID}}); err != nil {
 		t.Fatal(err)
 	}
 	ch = apiChanges(t, app, mark)
@@ -446,11 +446,11 @@ func TestMoveRenameGrpcItem(t *testing.T) {
 	if err := cs.Rename(bridge.CollectionsTargetArgs{ID: item.ID, Target: "item", Name: "renamed"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := cs.MoveItem(bridge.CollectionsMoveItemArgs{ItemID: folder.ID, CollectionID: to.ID}); err != nil {
+	if err := cs.MoveItems(bridge.CollectionsMoveItemsArgs{ItemIDs: []string{folder.ID}, CollectionID: to.ID}); err != nil {
 		t.Fatal(err)
 	}
-	if err := cs.MoveItem(bridge.CollectionsMoveItemArgs{ItemID: folder.ID, CollectionID: "missing"}); err == nil {
-		t.Fatal("MoveItem into an unknown collection succeeded")
+	if err := cs.MoveItems(bridge.CollectionsMoveItemsArgs{ItemIDs: []string{folder.ID}, CollectionID: "missing"}); err == nil {
+		t.Fatal("MoveItems into an unknown collection succeeded")
 	}
 
 	check := func(label string) {
@@ -494,11 +494,9 @@ func TestMoveRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	args := bridge.CollectionsMoveItemArgs{ItemID: item.ID, CollectionID: to.ID}
-	if err := cs.MoveItem(args); err != nil {
+	if err := cs.MoveItems(bridge.CollectionsMoveItemsArgs{ItemIDs: []string{item.ID}, CollectionID: to.ID}); err != nil {
 		t.Fatal(err)
 	}
-	app.Contract(t, "api-move", "args:CollectionsService.MoveItem", args)
 	all, err := cs.List()
 	if err != nil {
 		t.Fatal(err)
@@ -633,5 +631,127 @@ func TestPostmanImportCollectionAndEnvironment(t *testing.T) {
 	sort.Strings(kinds)
 	if strings.Join(kinds, ",") != "environments,tree" {
 		t.Errorf("change events = %v, want one tree and one environments change", kinds)
+	}
+}
+
+// childOrder lists a parent's children names in sort_order, asserting the order is dense.
+func childOrder(t *testing.T, app *flowharness.App, collectionID string, parentID *string) []string {
+	t.Helper()
+	all, err := app.W.Collections.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, it := range all.Items {
+		if it.CollectionID != collectionID || (it.ParentID == nil) != (parentID == nil) ||
+			(parentID != nil && *it.ParentID != *parentID) {
+			continue
+		}
+		if it.SortOrder >= len(all.Items) {
+			t.Fatalf("sort order %d out of range", it.SortOrder)
+		}
+		for len(names) <= it.SortOrder {
+			names = append(names, "")
+		}
+		if names[it.SortOrder] != "" {
+			t.Fatalf("sort order %d used twice under %v", it.SortOrder, parentID)
+		}
+		names[it.SortOrder] = it.Name
+	}
+	for _, n := range names {
+		if n == "" {
+			t.Fatalf("sort order has a gap under %v: %v", parentID, names)
+		}
+	}
+	return names
+}
+
+func TestBatchMoveDelete(t *testing.T) {
+	app := flowharness.New(t)
+	cs := app.W.Collections
+	orders, billing := newCollection(t, app, "orders"), newCollection(t, app, "billing")
+	mk := func(col model.Collection, parent *model.CollectionItem, kind, name string) model.CollectionItem {
+		t.Helper()
+		args := bridge.CollectionsCreateItemArgs{CollectionID: col.ID, Kind: kind, Name: name}
+		if parent != nil {
+			args.ParentID = &parent.ID
+		}
+		it, err := cs.CreateItem(args)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return it
+	}
+	f := mk(orders, nil, model.CollectionItemFolder, "F")
+	a := mk(orders, &f, model.CollectionItemRequest, "a")
+	b := mk(orders, nil, model.CollectionItemRequest, "b")
+	mk(orders, nil, model.CollectionItemRequest, "c")
+	g := mk(billing, nil, model.CollectionItemFolder, "G")
+	d := mk(billing, &g, model.CollectionItemRequest, "d")
+
+	mark := app.Events.Mark()
+	move := bridge.CollectionsMoveItemsArgs{ItemIDs: []string{b.ID, f.ID}, CollectionID: billing.ID, ParentID: &g.ID, BeforeID: &d.ID}
+	if err := cs.MoveItems(move); err != nil {
+		t.Fatal(err)
+	}
+	if ch := apiChanges(t, app, mark); len(ch) != 1 || len(ch[0]) != 1 || ch[0][0].Kind != bridge.ApiDataTree {
+		t.Errorf("MoveItems events = %+v, want one tree change", ch)
+	}
+	app.Contract(t, "api-move-many", "args:CollectionsService.MoveItems", move)
+	var paths []string
+	for _, line := range tree(t, app, billing.ID) {
+		paths = append(paths, strings.SplitN(line, "|", 2)[0])
+	}
+	sort.Strings(paths)
+	if diff := cmp.Diff([]string{"G", "G/F", "G/F/a", "G/b", "G/d"}, paths); diff != "" {
+		t.Errorf("billing paths (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"b", "F", "d"}, childOrder(t, app, billing.ID, &g.ID)); diff != "" {
+		t.Errorf("G children order (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"c"}, childOrder(t, app, orders.ID, nil)); diff != "" {
+		t.Errorf("orders root after the move (-want +got):\n%s", diff)
+	}
+
+	mark = app.Events.Mark()
+	if err := cs.MoveItems(bridge.CollectionsMoveItemsArgs{ItemIDs: []string{g.ID}, CollectionID: billing.ID, ParentID: &f.ID}); ipcErr(t, err).Code != "E_BAD_REQUEST" {
+		t.Fatalf("move a folder into its own descendant = %v, want E_BAD_REQUEST", err)
+	}
+	if ch := apiChanges(t, app, mark); len(ch) != 0 {
+		t.Errorf("a refused move emitted %+v", ch)
+	}
+
+	if err := cs.MoveItems(bridge.CollectionsMoveItemsArgs{ItemIDs: []string{d.ID}, CollectionID: billing.ID, ParentID: &g.ID, BeforeID: &b.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff([]string{"d", "b", "F"}, childOrder(t, app, billing.ID, &g.ID)); diff != "" {
+		t.Errorf("G children after reorder (-want +got):\n%s", diff)
+	}
+
+	// a is inside F, so the deleted collection covers it and the delete skips it.
+	mark = app.Events.Mark()
+	del := bridge.CollectionsDeleteManyArgs{CollectionIDs: []string{orders.ID}, ItemIDs: []string{f.ID, a.ID}}
+	if err := cs.DeleteMany(del); err != nil {
+		t.Fatal(err)
+	}
+	app.Contract(t, "api-delete-many", "args:CollectionsService.DeleteMany", del)
+	ch := apiChanges(t, app, mark)
+	if len(ch) != 1 || !hasChange(ch[0], bridge.ApiDataChange{Kind: bridge.ApiDataTree}) ||
+		!hasChange(ch[0], bridge.ApiDataChange{Kind: bridge.ApiDataVariables, Scope: model.VariableScopeCollection, OwnerID: orders.ID}) {
+		t.Errorf("DeleteMany events = %+v, want tree and the collection's variables", ch)
+	}
+	all, err := cs.List()
+	if err != nil || len(all.Collections) != 1 || all.Collections[0].ID != billing.ID {
+		t.Fatalf("collections after delete = %+v (%v), want only billing", all.Collections, err)
+	}
+	if diff := cmp.Diff([]string{"d", "b"}, childOrder(t, app, billing.ID, &g.ID)); diff != "" {
+		t.Errorf("G children after delete (-want +got):\n%s", diff)
+	}
+
+	if err := cs.DeleteMany(bridge.CollectionsDeleteManyArgs{ItemIDs: []string{b.ID, "missing"}}); ipcErr(t, err).Code != "E_NOT_FOUND" {
+		t.Fatalf("DeleteMany with a missing id = %v, want E_NOT_FOUND", err)
+	}
+	if diff := cmp.Diff([]string{"d", "b"}, childOrder(t, app, billing.ID, &g.ID)); diff != "" {
+		t.Errorf("a failed batch must delete nothing (-want +got):\n%s", diff)
 	}
 }
