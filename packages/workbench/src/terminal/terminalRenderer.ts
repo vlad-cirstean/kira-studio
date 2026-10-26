@@ -89,6 +89,8 @@ export function getOrCreateTerminal(tabId: string, deps: TerminalRendererDeps): 
     scrollback: 5000,
     cursorBlink: true,
     allowProposedApi: false,
+    // VS Code parity: keeps screens cleared with ED2 in scrollback.
+    scrollOnEraseInDisplay: true,
     fontFamily: appearance.fontFamily,
     fontSize: appearance.fontSize,
     theme: terminalTheme(),
