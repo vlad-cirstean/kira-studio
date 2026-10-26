@@ -2,6 +2,7 @@ package repos_test
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -263,9 +264,9 @@ func TestSaveRequestShedsOnlyTheChangedOriginMembers(t *testing.T) {
 	}
 }
 
-// 5. MoveItem rewrites the collection of a whole subtree at depth, lands the item last at the
+// 5. MoveItems rewrites the collection of a whole subtree at depth, lands the item last at the
 // target root, and re-indexes the siblings it left behind dense.
-func TestMoveItemCarriesTheSubtreeAndReindexesBothSides(t *testing.T) {
+func TestMoveItemsCarryTheSubtreeAndReindexBothSides(t *testing.T) {
 	r := newCollectionsRepo(t)
 	src, err := r.CreateCollection("Source")
 	if err != nil {
@@ -282,10 +283,10 @@ func TestMoveItemCarriesTheSubtreeAndReindexesBothSides(t *testing.T) {
 	mustCreateItem(t, r, src.ID, nil, model.CollectionItemRequest, "after")
 	mustCreateItem(t, r, dst.ID, nil, model.CollectionItemRequest, "existing")
 
-	if err := r.MoveItem(folder.ID, "no-such-collection"); err == nil {
+	if err := r.MoveItems([]string{folder.ID}, "no-such-collection", nil, nil); err == nil {
 		t.Fatal("moving into an unknown collection was accepted")
 	}
-	if err := r.MoveItem(folder.ID, dst.ID); err != nil {
+	if err := r.MoveItems([]string{folder.ID}, dst.ID, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -307,5 +308,31 @@ func TestMoveItemCarriesTheSubtreeAndReindexesBothSides(t *testing.T) {
 	}
 	if byName["before"].SortOrder != 0 || byName["after"].SortOrder != 1 || byName["before"].ID != before.ID {
 		t.Errorf("source siblings not dense: before=%d after=%d", byName["before"].SortOrder, byName["after"].SortOrder)
+	}
+}
+
+// 6. MoveItems into a parent: batch order is kept, beforeID places the batch, a descendant of a
+// moved item rides along, and a move into the item itself or a descendant is refused untouched.
+func TestMoveItemsPlacesTheBatchAndRefusesIntoDescendant(t *testing.T) {
+	r := newCollectionsRepo(t)
+	col, err := r.CreateCollection("Orders")
+	if err != nil {
+		t.Fatal(err)
+	}
+	folder := mustCreateItem(t, r, col.ID, nil, model.CollectionItemFolder, "F")
+	inner := mustCreateItem(t, r, col.ID, &folder.ID, model.CollectionItemFolder, "inner")
+	mustCreateItem(t, r, col.ID, &folder.ID, model.CollectionItemRequest, "a")
+	b := mustCreateItem(t, r, col.ID, nil, model.CollectionItemRequest, "b")
+	c := mustCreateItem(t, r, col.ID, nil, model.CollectionItemRequest, "c")
+
+	if err := r.MoveItems([]string{folder.ID}, col.ID, &inner.ID, nil); !errors.Is(err, repos.ErrInvalidMove) {
+		t.Fatalf("move into a descendant = %v, want ErrInvalidMove", err)
+	}
+	if err := r.MoveItems([]string{c.ID, b.ID}, col.ID, &folder.ID, &inner.ID); err != nil {
+		t.Fatal(err)
+	}
+	orders := ordersByName(t, r, col.ID)
+	if orders["c"] != 0 || orders["b"] != 1 || orders["inner"] != 2 || orders["a"] != 3 || orders["F"] != 0 {
+		t.Errorf("orders after batch move: %v", orders)
 	}
 }
