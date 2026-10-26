@@ -408,6 +408,19 @@ export function attachReviewDecorations(
   // True while the shown banner is a failed comment load, so a later success clears only that.
   let commentsLoadFailed = false;
 
+  // Monaco's hideUnchangedRegions feature unhides every line a selection touches
+  // (hideUnchangedRegionsFeature.js, onDidChangeCursorPosition); no public API reveals one line.
+  function revealCommentLines(): void {
+    const max = modifiedEditor.getModel()?.getLineCount() ?? 0;
+    const lines = [...new Set(comments.map((c) => c.range.start))]
+      .filter((l) => l >= 1 && l <= max)
+      .sort((a, b) => a - b);
+    const [first] = lines;
+    if (first === undefined) return;
+    modifiedEditor.setSelections(lines.map((l) => new mod.Selection(l, 1, l, 1)));
+    modifiedEditor.setSelection(new mod.Selection(first, 1, first, 1));
+  }
+
   async function loadComments(): Promise<void> {
     const seq = ++commentsSeq;
     let commentsResult: Awaited<ReturnType<typeof deps.transport.request<'review.comment.list'>>>;
@@ -436,6 +449,7 @@ export function attachReviewDecorations(
       closeErrorZone();
     }
     paint();
+    revealCommentLines();
   }
 
   /** The mount-time (and Retry-button) load only — reloads reachable from onReviewRepaint's own
@@ -633,11 +647,15 @@ export function attachReviewDecorations(
     }
   });
 
+  // Regions rebuild on every diff compute, which can re-collapse lines revealed earlier.
+  const diffUpdateDisposable = diffEditor.onDidUpdateDiff(revealCommentLines);
+
   void load();
 
   return {
     dispose(): void {
       disposed = true;
+      diffUpdateDisposable.dispose();
       unsubscribeRepaint();
       closeZone();
       closeErrorZone();
