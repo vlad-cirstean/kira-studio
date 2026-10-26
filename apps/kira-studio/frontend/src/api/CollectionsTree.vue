@@ -9,11 +9,13 @@ import { useTreeShortcuts } from '@workbench/behaviour/treeShortcuts';
 import { useTreeVirtualRows } from '@workbench/behaviour/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/behaviour/virtualRows';
 import { useRowHeight } from '@workbench/lib/rowHeight';
+import { isPrimaryModifier } from '@workbench/shortcuts/keys';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
-import { computed, ref, useTemplateRef } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 import CollectionRow from './CollectionRow.vue';
 import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menu';
+import { useCollectionSelectionStore } from './state/collectionSelection';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 import { useImportCurlStore } from './state/curl';
 import { useDynamicValuesStore } from './state/dynamicValues';
@@ -24,6 +26,7 @@ const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
 const dynamicValuesStore = useDynamicValuesStore();
 const collectionsStore = useCollectionsStore();
+const selection = useCollectionSelectionStore();
 const importCurlStore = useImportCurlStore();
 const variablesStore = useVariablesStore();
 
@@ -44,9 +47,30 @@ async function reveal(key: string): Promise<void> {
 }
 defineExpose({ reveal });
 
-function onSelect(row: CollectionRowVm): void {
-  collectionsStore.selectRow(row.key);
+const visibleKeys = computed(() => collectionsStore.visibleRows.map((r) => r.key));
+
+// A click picks, Ctrl/Cmd toggles, Shift extends a range, both add a range. A select with no event
+// is the keyboard (Space) or focus landing on an unselected row.
+function onSelect(row: CollectionRowVm, event?: MouseEvent): void {
+  if (!event) {
+    if (!selection.isSelected(row.key) || selection.focusKey !== row.key) {
+      selection.selectOnly(row.key);
+    }
+    return;
+  }
+  if (event.shiftKey) selection.extendTo(row.key, visibleKeys.value, isPrimaryModifier(event));
+  else if (isPrimaryModifier(event)) selection.toggle(row.key);
+  else selection.selectOnly(row.key);
 }
+
+// A row that leaves the visible list (collapse, search, delete, a change from another window)
+// leaves the selection too, so a bulk action never reaches a row the user cannot see. A row just
+// selected but not yet listed stays: only rows seen before and gone now are dropped.
+watch(visibleKeys, (next, prev) => {
+  const now = new Set(next);
+  const gone = new Set(prev.filter((key) => !now.has(key)));
+  selection.drop(gone);
+});
 
 // The twisty always expands/collapses; unlike Studio's tree there is no adapter call behind it and
 // no synthetic group row to special-case (F15) — the whole tree is already in memory.
@@ -150,9 +174,9 @@ function onRename(row: CollectionRowVm, name: string): void {
 // is the roving stop. The tree.* chords dispatch through the menu builder a right-click would call,
 // so the printed shortcut and the executed action are the same object.
 const activeKey = computed({
-  get: () => collectionsStore.selected,
+  get: () => selection.focusKey,
   set: (key) => {
-    if (key) collectionsStore.selectRow(key);
+    if (key) selection.selectOnly(key);
   },
 });
 const nav = useListNavigation<CollectionRowVm>({
@@ -168,7 +192,8 @@ const nav = useListNavigation<CollectionRowVm>({
     collapse: collectionsStore.collapseRow,
   },
   onOpen,
-  onSelect,
+  onSelect: (row) => onSelect(row),
+  onExtend: (row) => selection.extendTo(row.key, visibleKeys.value, false),
   onMenu: (row, rect) =>
     contextMenuStore.openContextMenuAt(rect.left, rect.bottom, menuForRow(row, actions), {
       onRestoreFocus: () => void nav.focusKey(row.key),
@@ -186,14 +211,24 @@ function viaMenu(id: ShortcutId): (key: string) => void {
   };
 }
 useTreeShortcuts(nav, {
+  'tree.selectAll': () => selection.selectAll(visibleKeys.value),
   'tree.rename': viaMenu('tree.rename'),
   'tree.delete': viaMenu('tree.delete'),
   'tree.duplicate': viaMenu('tree.duplicate'),
 });
 
-const hasVisibleSelection = computed(() =>
-  collectionsStore.visibleRows.some((r) => r.key === collectionsStore.selected),
+const hasVisibleFocus = computed(() =>
+  collectionsStore.visibleRows.some((r) => r.key === selection.focusKey),
 );
+
+// Escape collapses a multi-selection to the focused row. A rename input or a drag claims its own
+// Escape first.
+useEventListener(scrollEl, 'keydown', (e: KeyboardEvent) => {
+  if (e.key !== 'Escape' || e.defaultPrevented || selection.count < 2) return;
+  if ((e.target as HTMLElement | null)?.closest('input, textarea')) return;
+  e.preventDefault();
+  selection.collapseToFocus();
+});
 
 // The tree background has no interactive role of its own: bind its listener via VueUse.
 const treeBodyEl = useTemplateRef<HTMLElement>('treeBodyEl');
@@ -208,6 +243,7 @@ useEventListener(treeBodyEl, 'contextmenu', onBackgroundContextMenu);
         class="virtual-list h-full overflow-auto"
         data-testid="virtual-list"
         role="tree"
+        aria-multiselectable="true"
         :aria-label="t('studio.api.collections.tree.aria')"
         @scroll="onScroll"
       >
@@ -217,7 +253,8 @@ useEventListener(treeBodyEl, 'contextmenu', onBackgroundContextMenu);
               :class="STICKY_ROW_CLASS"
               :style="{ top: `${slot.top}px`, height: `${rowHeight}px` }"
               :row="slot.row"
-              :selected="collectionsStore.selected === slot.row.key"
+              :selected="selection.isSelected(slot.row.key)"
+              :focused="selection.focusKey === slot.row.key"
               :sticky="true"
               @select="onSelect"
               @toggle="onToggle"
@@ -234,8 +271,9 @@ useEventListener(treeBodyEl, 'contextmenu', onBackgroundContextMenu);
               :class="VIRTUAL_ROW_CLASS"
               :style="{ transform: `translateY(${item.start}px)`, height: `${item.size}px` }"
               :row="collectionsStore.visibleRows[item.index]"
-              :selected="collectionsStore.selected === collectionsStore.visibleRows[item.index].key"
-              :tabbable="!hasVisibleSelection && item.index === 0"
+              :selected="selection.isSelected(collectionsStore.visibleRows[item.index].key)"
+              :focused="selection.focusKey === collectionsStore.visibleRows[item.index].key"
+              :tabbable="!hasVisibleFocus && item.index === 0"
               :sticky="false"
               @select="onSelect"
               @toggle="onToggle"

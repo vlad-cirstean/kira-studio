@@ -42,6 +42,8 @@ import {
   reconcileTree,
   refreshApiQuery,
 } from './apiQueries';
+import { collectionKey, itemKey } from './collectionKeys';
+import { useCollectionSelectionStore } from './collectionSelection';
 import { useSaveRequestDialogStore } from './saveRequestDialog';
 
 // Api's own tree store. Studio's tree is lazy because its data is remote — expanding a
@@ -75,14 +77,6 @@ export interface CollectionRowVm {
   matched: boolean;
 }
 
-/** TreeHost requires a unique string key per row, and the two id spaces are separate tables. */
-function collectionKey(id: string): string {
-  return `c:${id}`;
-}
-function itemKey(id: string): string {
-  return `i:${id}`;
-}
-
 function rowMatches(name: string, url: string, query: string): boolean {
   if (!query) return false;
   return matchesQuery(name, query) || matchesQuery(url, query);
@@ -92,7 +86,6 @@ function rowMatches(name: string, url: string, query: string): boolean {
 // apiSavedRequest(Grpc)Key query now (null data === confirmed orphan, undefined === not loaded yet,
 // apiQueries.ts's own convention), not a second local Record.
 interface CollectionsState {
-  selected: string | null;
   search: string;
   /** The row key whose label is currently an inline rename input, if any. */
   renamingKey: string | null;
@@ -116,8 +109,8 @@ interface CollectionsState {
 // two stores calling each other for everything that matters.
 
 export const useCollectionsStore = defineStore('collections', () => {
+  const selection = useCollectionSelectionStore();
   const state = reactive<CollectionsState>({
-    selected: null,
     search: '',
     renamingKey: null,
     busy: false,
@@ -275,10 +268,6 @@ export const useCollectionsStore = defineStore('collections', () => {
 
   // ---- selection and expansion ----
 
-  function selectRow(key: string): void {
-    state.selected = key;
-  }
-
   function toggleRow(row: CollectionRowVm): void {
     if (!row.hasChildren) return;
     if (expandedSet.has(row.key)) expandedSet.delete(row.key);
@@ -333,7 +322,7 @@ export const useCollectionsStore = defineStore('collections', () => {
     try {
       const collection = await createCollectionMutation.mutateAsync();
       const key = collectionKey(collection.id);
-      state.selected = key;
+      selection.selectOnly(key);
       state.renamingKey = key;
       state.error = null;
     } catch (err) {
@@ -372,7 +361,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       const item = await createItemMutation.mutateAsync({ collectionId, parentId, kind });
       revealItem(collectionId, parentId);
       const key = itemKey(item.id);
-      state.selected = key;
+      selection.selectOnly(key);
       state.renamingKey = key;
       state.error = null;
     } catch (err) {
@@ -400,7 +389,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       const item = await createGrpcItemMutation.mutateAsync({ collectionId, parentId });
       revealItem(collectionId, parentId);
       const key = itemKey(item.id);
-      state.selected = key;
+      selection.selectOnly(key);
       state.renamingKey = key;
       state.error = null;
     } catch (err) {
@@ -456,7 +445,7 @@ export const useCollectionsStore = defineStore('collections', () => {
     try {
       await moveRowMutation.mutateAsync({ itemId: row.id, collectionId });
       revealItem(collectionId, null);
-      state.selected = itemKey(row.id);
+      selection.selectOnly(itemKey(row.id));
       state.error = null;
       return true;
     } catch (err) {
@@ -553,7 +542,6 @@ export const useCollectionsStore = defineStore('collections', () => {
         // above (reconcileTree) now evicts the collection's own cached variables query, local
         // mutation or remote push alike.
       }
-      if (state.selected === row.key) state.selected = null;
       state.error = null;
     } catch (err) {
       state.error = errorText(err);
@@ -618,7 +606,7 @@ export const useCollectionsStore = defineStore('collections', () => {
   }
 
   function beginRename(row: CollectionRowVm): void {
-    state.selected = row.key;
+    selection.selectOnly(row.key);
     state.renamingKey = row.key;
   }
 
@@ -764,7 +752,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       const first = result.files.find((f) => f.collection)?.collection;
       if (first) {
         expandedSet.add(collectionKey(first.collectionId));
-        state.selected = collectionKey(first.collectionId);
+        selection.selectOnly(collectionKey(first.collectionId));
       }
       return true;
     } catch (err) {
@@ -872,7 +860,6 @@ export const useCollectionsStore = defineStore('collections', () => {
     treeLoadError,
     activeSearchQuery,
     visibleRows,
-    selectRow,
     toggleRow,
     expandRow,
     collapseRow,
