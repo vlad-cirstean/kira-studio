@@ -94,6 +94,76 @@ func collectionExists(tx *sql.Tx, id string) error {
 	return nil
 }
 
+// topmostIDs returns ids, deduped, minus any whose ancestor is also in ids; each must exist.
+func topmostIDs(nodes map[string]treeNode, ids []string) ([]string, error) {
+	ids = dedupe(ids)
+	all := toSet(ids)
+	moved := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := nodes[id]; !ok {
+			return nil, fmt.Errorf("%w: %s", ErrItemNotFound, id)
+		}
+		if !hasAncestorIn(nodes, id, all) {
+			moved = append(moved, id)
+		}
+	}
+	return moved, nil
+}
+
+// checkMoveTarget validates the destination of a move and returns the target parent id ("" = root).
+func checkMoveTarget(nodes map[string]treeNode, moved map[string]struct{}, collectionID string, parentID, beforeID *string) (string, error) {
+	target := ""
+	if parentID != nil {
+		target = *parentID
+		node, ok := nodes[target]
+		if !ok {
+			return "", fmt.Errorf("%w: %s", ErrItemNotFound, target)
+		}
+		if node.collectionID != collectionID {
+			return "", fmt.Errorf("%w: parent %s is outside the target collection", ErrInvalidMove, target)
+		}
+		if node.kind != model.CollectionItemFolder {
+			return "", fmt.Errorf("%w: parent %s is not a folder", ErrInvalidMove, target)
+		}
+		if _, self := moved[target]; self || hasAncestorIn(nodes, target, moved) {
+			return "", fmt.Errorf("%w: into the item itself or a descendant", ErrInvalidMove)
+		}
+	}
+	if beforeID != nil {
+		node, ok := nodes[*beforeID]
+		if !ok {
+			return "", fmt.Errorf("%w: %s", ErrItemNotFound, *beforeID)
+		}
+		if _, moving := moved[*beforeID]; moving || node.collectionID != collectionID || node.parentID != target {
+			return "", fmt.Errorf("%w: before %s", ErrInvalidMove, *beforeID)
+		}
+	}
+	return target, nil
+}
+
+// orderWithMoved is siblings without the moved ids, the moved ids spliced in before beforeID or last.
+func orderWithMoved(siblings, moved []string, movedSet map[string]struct{}, beforeID *string) []string {
+	order := make([]string, 0, len(siblings)+len(moved))
+	placed := false
+	place := func() {
+		order = append(order, moved...)
+		placed = true
+	}
+	for _, id := range siblings {
+		if _, moving := movedSet[id]; moving {
+			continue
+		}
+		if beforeID != nil && id == *beforeID {
+			place()
+		}
+		order = append(order, id)
+	}
+	if !placed {
+		place()
+	}
+	return order
+}
+
 // MoveItems moves items, each with its subtree, under parentID of collectionID (nil = collection
 // root), in argument order, before beforeID or last when beforeID is nil. One transaction: the
 // target parent's order is rewritten dense, every parent the items left re-indexes dense, and a
@@ -115,85 +185,27 @@ func (r *CollectionsRepo) MoveItems(ids []string, collectionID string, parentID,
 	if err != nil {
 		return err
 	}
-	ids = dedupe(ids)
-	all := toSet(ids)
-	for _, id := range ids {
-		if _, ok := nodes[id]; !ok {
-			return fmt.Errorf("%w: %s", ErrItemNotFound, id)
-		}
-	}
-	moved := make([]string, 0, len(ids))
-	for _, id := range ids {
-		if !hasAncestorIn(nodes, id, all) {
-			moved = append(moved, id)
-		}
+	moved, err := topmostIDs(nodes, ids)
+	if err != nil {
+		return err
 	}
 	movedSet := toSet(moved)
-
-	target := ""
-	if parentID != nil {
-		target = *parentID
-		node, ok := nodes[target]
-		if !ok {
-			return fmt.Errorf("%w: %s", ErrItemNotFound, target)
-		}
-		if node.collectionID != collectionID {
-			return fmt.Errorf("%w: parent %s is outside the target collection", ErrInvalidMove, target)
-		}
-		if node.kind != model.CollectionItemFolder {
-			return fmt.Errorf("%w: parent %s is not a folder", ErrInvalidMove, target)
-		}
-		if _, self := movedSet[target]; self || hasAncestorIn(nodes, target, movedSet) {
-			return fmt.Errorf("%w: into the item itself or a descendant", ErrInvalidMove)
-		}
+	target, err := checkMoveTarget(nodes, movedSet, collectionID, parentID, beforeID)
+	if err != nil {
+		return err
 	}
-	siblings := children[nodeKey{collectionID, target}]
-	if beforeID != nil {
-		node, ok := nodes[*beforeID]
-		if !ok {
-			return fmt.Errorf("%w: %s", ErrItemNotFound, *beforeID)
-		}
-		if _, moving := movedSet[*beforeID]; moving || node.collectionID != collectionID || node.parentID != target {
-			return fmt.Errorf("%w: before %s", ErrInvalidMove, *beforeID)
-		}
-	}
-
-	order := make([]string, 0, len(siblings)+len(moved))
-	placed := false
-	place := func() {
-		order = append(order, moved...)
-		placed = true
-	}
-	for _, id := range siblings {
-		if _, moving := movedSet[id]; moving {
-			continue
-		}
-		if beforeID != nil && id == *beforeID {
-			place()
-		}
-		order = append(order, id)
-	}
-	if !placed {
-		place()
-	}
+	order := orderWithMoved(children[nodeKey{collectionID, target}], moved, movedSet, beforeID)
 
 	now := kiratime.NowISO()
 	leftBehind := map[nodeKey]struct{}{}
 	for _, id := range moved {
 		node := nodes[id]
-		old := nodeKey{node.collectionID, node.parentID}
-		if old != (nodeKey{collectionID, target}) {
+		if old := (nodeKey{node.collectionID, node.parentID}); old != (nodeKey{collectionID, target}) {
 			leftBehind[old] = struct{}{}
 		}
 		if node.collectionID != collectionID {
-			if _, err := tx.Exec(
-				`WITH RECURSIVE sub(id) AS (
-				   SELECT ? UNION ALL SELECT i.id FROM api_items i JOIN sub ON i.parent_id = sub.id
-				 )
-				 UPDATE api_items SET collection_id = ?, updated_at = ? WHERE id IN (SELECT id FROM sub)`,
-				id, collectionID, now,
-			); err != nil {
-				return fmt.Errorf("repos/collections: move subtree of %s: %w", id, err)
+			if err := moveSubtreeCollection(tx, id, collectionID, now); err != nil {
+				return err
 			}
 		}
 	}
@@ -216,6 +228,19 @@ func (r *CollectionsRepo) MoveItems(ids []string, collectionID string, parentID,
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("repos/collections: commit: %w", err)
+	}
+	return nil
+}
+
+func moveSubtreeCollection(tx *sql.Tx, rootID, collectionID, now string) error {
+	if _, err := tx.Exec(
+		`WITH RECURSIVE sub(id) AS (
+		   SELECT ? UNION ALL SELECT i.id FROM api_items i JOIN sub ON i.parent_id = sub.id
+		 )
+		 UPDATE api_items SET collection_id = ?, updated_at = ? WHERE id IN (SELECT id FROM sub)`,
+		rootID, collectionID, now,
+	); err != nil {
+		return fmt.Errorf("repos/collections: move subtree of %s: %w", rootID, err)
 	}
 	return nil
 }
