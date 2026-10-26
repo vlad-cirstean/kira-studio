@@ -458,59 +458,18 @@ func (r *CollectionsRepo) Rename(id, target, name string) error {
 	return sqlitex.RequireOneRow(res, target+" "+id)
 }
 
-// Delete removes a collection (and its whole item tree) or one item (and its subtree). The cascade
-// is genuine: db.go's DSN sets _foreign_keys=1 on every connection the pool opens, so
-// api_items.parent_id REFERENCES api_items(id) ON DELETE CASCADE deletes a subtree at any depth
-// in one statement, with no recursive delete in Go. Surviving siblings are re-indexed dense.
-func (r *CollectionsRepo) Delete(id, target string) error {
-	table, err := targetTable(target)
-	if err != nil {
-		return err
-	}
+// DeleteCollection removes a collection and its whole item tree. The cascade is genuine: db.go's
+// DSN sets _foreign_keys=1 on every connection the pool opens, so api_items rows go with it. Item
+// deletes, which re-index siblings, go through DeleteMany.
+func (r *CollectionsRepo) DeleteCollection(id string) error {
 	if id == "" {
 		return fmt.Errorf("repos/collections: id is required")
 	}
-
-	tx, err := r.DB.Begin()
+	res, err := r.DB.Exec(`DELETE FROM api_collections WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("repos/collections: begin: %w", err)
+		return fmt.Errorf("repos/collections: delete collection %s: %w", id, err)
 	}
-	defer func() { _ = tx.Rollback() }()
-
-	var (
-		collectionID string
-		parentID     *string
-	)
-	if target == "item" {
-		var parent sql.NullString
-		err := tx.QueryRow(`SELECT collection_id, parent_id FROM api_items WHERE id = ?`, id).Scan(&collectionID, &parent)
-		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("repos/collections: no item %s", id)
-		}
-		if err != nil {
-			return fmt.Errorf("repos/collections: read item %s: %w", id, err)
-		}
-		if parent.Valid {
-			parentID = &parent.String
-		}
-	}
-
-	res, err := tx.Exec(`DELETE FROM `+table+` WHERE id = ?`, id)
-	if err != nil {
-		return fmt.Errorf("repos/collections: delete %s %s: %w", target, id, err)
-	}
-	if err := sqlitex.RequireOneRow(res, target+" "+id); err != nil {
-		return err
-	}
-	if target == "item" {
-		if err := reindexSiblings(tx, collectionID, parentID); err != nil {
-			return err
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("repos/collections: commit: %w", err)
-	}
-	return nil
+	return sqlitex.RequireOneRow(res, "collection "+id)
 }
 
 func targetTable(target string) (string, error) {

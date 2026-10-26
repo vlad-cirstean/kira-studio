@@ -64,7 +64,7 @@ func TestSortOrderStaysDenseAcrossInsertsAndDeletes(t *testing.T) {
 		t.Fatalf("a root child indexed against the wrong parent: %d", root.SortOrder)
 	}
 
-	if err := r.Delete(second.ID, "item"); err != nil {
+	if err := r.DeleteMany(nil, []string{second.ID}); err != nil {
 		t.Fatal(err)
 	}
 	orders := ordersByName(t, r, collection.ID)
@@ -109,7 +109,7 @@ func TestDeletingAFolderCascadesAtDepthAndSparesItsSiblings(t *testing.T) {
 	kept := mustCreateItem(t, r, collection.ID, nil, model.CollectionItemFolder, "kept")
 	mustCreateItem(t, r, collection.ID, &kept.ID, model.CollectionItemRequest, "spared")
 
-	if err := r.Delete(doomed.ID, "item"); err != nil {
+	if err := r.DeleteMany(nil, []string{doomed.ID}); err != nil {
 		t.Fatal(err)
 	}
 	orders := ordersByName(t, r, collection.ID)
@@ -125,7 +125,7 @@ func TestDeletingAFolderCascadesAtDepthAndSparesItsSiblings(t *testing.T) {
 	}
 
 	// The same cascade one level up: deleting the collection takes every remaining item.
-	if err := r.Delete(collection.ID, "collection"); err != nil {
+	if err := r.DeleteCollection(collection.ID); err != nil {
 		t.Fatal(err)
 	}
 	if left := ordersByName(t, r, collection.ID); len(left) != 0 {

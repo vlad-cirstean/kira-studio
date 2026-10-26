@@ -497,7 +497,7 @@ func (s *CollectionsService) importCollection(tree *postman.Tree) (importedFile,
 		if err := s.Deps.Repos.Variables.ImportVariables(collection.ID, tree.Variables); err != nil {
 			// Folding a failed compensating delete into the returned error lets the UI say the
 			// collection is still there.
-			if delErr := s.Deps.Repos.Collections.Delete(collection.ID, "collection"); delErr != nil {
+			if delErr := s.Deps.Repos.Collections.DeleteCollection(collection.ID); delErr != nil {
 				slog.Error("rolling back a collection import after ImportVariables failed",
 					"scope", "bridge/collections", "collectionId", collection.ID, "importVariablesErr", err, "deleteErr", delErr)
 				return out, ipcerr.T(ipcerr.CodeInternal, "backend.studio.collection.importRollbackFailed.error",
