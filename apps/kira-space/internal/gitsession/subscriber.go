@@ -24,6 +24,7 @@ type subscriber struct {
 	mu       sync.Mutex
 	refs     bool
 	worktree bool
+	crs      bool
 
 	wake chan struct{} // capacity 1: a pending wake, never more.
 	done chan struct{}
@@ -48,6 +49,8 @@ func (s *subscriber) note(sig gitclient.Signal) {
 		s.refs = true
 	case gitclient.SignalWorktreeChanged:
 		s.worktree = true
+	case SignalChangeRequestsChanged:
+		s.crs = true
 	}
 	s.mu.Unlock()
 
@@ -62,8 +65,8 @@ func (s *subscriber) run() {
 		select {
 		case <-s.wake:
 			s.mu.Lock()
-			refs, worktree := s.refs, s.worktree
-			s.refs, s.worktree = false, false
+			refs, worktree, crs := s.refs, s.worktree, s.crs
+			s.refs, s.worktree, s.crs = false, false, false
 			s.mu.Unlock()
 
 			// Refs first, matching upstream's own ordering when both fire together.
@@ -72,6 +75,9 @@ func (s *subscriber) run() {
 			}
 			if worktree {
 				s.deliver(Event{RepoID: s.repoID, Kind: string(gitclient.SignalWorktreeChanged)})
+			}
+			if crs {
+				s.deliver(Event{RepoID: s.repoID, Kind: string(SignalChangeRequestsChanged)})
 			}
 		case <-s.done:
 			return

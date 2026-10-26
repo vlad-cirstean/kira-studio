@@ -9,6 +9,7 @@ import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import ToolbarSeparator from '@workbench/components/ToolbarSeparator.vue';
 import { computed, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
@@ -283,7 +284,7 @@ function onDeleteRow(): void {
   <!-- LAW 01/10: ViewChrome's own Refresh/Stop group renders ahead of this slot's content, so
        the leading sep below matches every other view's #toolbar (KeyValueView.vue,
        DocumentView.vue) rather than assuming its own hand-rolled equivalent (F1/F3). -->
-  <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+  <ToolbarSeparator />
 
   <!-- By user report: navigation belongs beside the page-size picker it pages through, at the
        toolbar's reading edge, not alone at the far right. The pager is a jump-to-page input rather
@@ -313,7 +314,7 @@ function onDeleteRow(): void {
     @update:model-value="(v) => onPageSize(Number(v) as PageSize)"
   />
 
-  <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+  <ToolbarSeparator />
 
   <div class="flex items-center gap-1.5 min-w-0">
     <Tooltip>
@@ -371,7 +372,7 @@ function onDeleteRow(): void {
     </Popover>
   </div>
 
-  <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+  <ToolbarSeparator />
 
   <div class="flex items-center gap-1.5 min-w-0">
     <TooltipIconButton

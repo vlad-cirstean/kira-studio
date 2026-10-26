@@ -1,4 +1,10 @@
-import type { GitStatus, RepoCandidate, RepoOpenResult, RepoSummary } from '@kira/git-ipc';
+import type {
+  EventPayload,
+  GitStatus,
+  RepoCandidate,
+  RepoOpenResult,
+  RepoSummary,
+} from '@kira/git-ipc';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 
@@ -20,7 +26,7 @@ export class RepoState {
   readonly candidates: ShallowRef<readonly RepoCandidate[]> = shallowRef([]);
   readonly activeRepo: ShallowRef<RepoSummary | undefined> = shallowRef(undefined);
   readonly lastChange: ShallowRef<
-    { readonly kind: 'refsChanged' | 'worktreeChanged'; readonly count: number } | undefined
+    { readonly kind: EventPayload<'repo.changed'>['kind']; readonly count: number } | undefined
   > = shallowRef(undefined);
   /** True while any `open()` call is in flight (a worktree switch, a reveal-in-graph, a
    *  reconnect, a bootstrap candidate, a `NoRepositoryPanel` pick — every path funnels through

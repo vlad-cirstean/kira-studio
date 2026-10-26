@@ -1088,9 +1088,6 @@
         "estimateInvalid": {
           "body": "Enter an estimate like 2h or 3d."
         },
-        "estimateShrink": {
-          "body": "An estimate can only grow once it’s set."
-        },
         "estimateTooLong": {
           "body": "An estimate can be at most 480h or 60d."
         },
@@ -1120,6 +1117,11 @@
         },
         "reviewConversationReset": {
           "body": "The previous review conversation ran in {path}, which no longer exists. Started a new one."
+        },
+        "reviewForward": {
+          "notRunning": {
+            "body": "Start the review agent first."
+          }
         },
         "reviewStep": {
           "badTarget": {
@@ -4920,17 +4922,8 @@
         "markError": {
           "error": "Couldn’t update that file’s review status: {error}"
         },
-        "needsReview": {
-          "label": "Needs review · {count}"
-        },
         "neverReviewed": {
           "status": "Never reviewed, showing the full range diff"
-        },
-        "nothingToReview": {
-          "emptyHint": "Nothing changed since your last review."
-        },
-        "showing": {
-          "aria": "Which files to list"
         },
         "sinceReview": {
           "label": "Since review"
@@ -5412,6 +5405,13 @@
         "title": "Review follow-up message",
         "usedBy": {
           "body": "Sent when a review step sends comments to the implementer session or to a later round of a review agent."
+        }
+      },
+      "adeReviewForwardMessage": {
+        "description": "Sent to the interactive review agent with the open review comments you wrote.",
+        "title": "Review forward message",
+        "usedBy": {
+          "body": "Sent when you forward review comments from the review window."
         }
       },
       "adeReviewMessage": {
@@ -6737,20 +6737,17 @@
         }
       },
       "add": {
-        "addToLater": {
-          "label": "Add to later"
+        "addToToday": {
+          "label": "Add to today"
         },
         "attach": {
           "label": "Adding to: {title}"
-        },
-        "base": {
-          "label": "Base · {repo}"
         },
         "jira": {
           "placeholder": "Paste a link or key (optional)"
         },
         "noBranchesYet": {
-          "hint": "No branches yet. {agent} creates one per repository on start."
+          "hint": "Add repositories from the task panel, or {agent} declares them."
         },
         "notes": {
           "placeholder": "Context for {agent} (optional)"
@@ -6886,6 +6883,10 @@
         "summaryWorking": {
           "label": "{count} working"
         }
+      },
+      "archiveConfirm": {
+        "body": "{title} leaves the board. Its running sessions stop and its worktrees are removed.",
+        "title": "Archive task?"
       },
       "automation": {
         "chipBlocked": {
@@ -7347,23 +7348,8 @@
         }
       },
       "changes": {
-        "conflicts": {
-          "label": "Conflicts"
-        },
-        "createdOnStart": {
-          "status": "Created on start"
-        },
-        "noWorktree": {
-          "status": "No worktree"
-        },
-        "shares": {
-          "label": "Shares"
-        },
         "uncommitted": {
           "label": "Uncommitted"
-        },
-        "worktreeDirty": {
-          "label": "{where} · {count} uncommitted"
         }
       },
       "dayOffConfirm": {
@@ -7371,12 +7357,11 @@
         "title": "Move tasks?"
       },
       "estimate": {
+        "clear": {
+          "tooltip": "Clear estimate"
+        },
         "days": {
           "option": "Days"
-        },
-        "extend": {
-          "aria": "Extend estimate",
-          "label": "Extend"
         },
         "field": {
           "label": "Estimate"
@@ -7902,7 +7887,7 @@
             "hint": "That window is gone."
           },
           "intro": {
-            "hint": "Ask questions about this branch in a {product} session."
+            "hint": "Review this branch with {product} in its terminal."
           },
           "label": "Review agent",
           "resume": {
@@ -7912,22 +7897,19 @@
             "label": "Start review agent"
           }
         },
-        "compose": {
-          "answering": {
-            "loading": "Answering…"
+        "copy": {
+          "none": {
+            "tooltip": "No open review comments to copy"
           },
+          "tooltip": "Copy the review comments as one message"
+        },
+        "forward": {
           "blocked": {
             "tooltip": "{product} is waiting for an answer in its terminal"
           },
-          "dropReference": {
-            "aria": "Drop the code reference"
-          },
-          "noSubmit": {
-            "hint": "{product} did not take the message; press Enter in its terminal."
-          },
-          "question": {
-            "aria": "Question for the review agent",
-            "placeholder": "Ask about this branch"
+          "label": "Send review comments · {count}",
+          "none": {
+            "tooltip": "No open review comments to send"
           }
         },
         "header": {
@@ -9016,9 +8998,6 @@
         },
         "anchorStale": {
           "status": "Lines as of {sha}, {branch}’s history was rewritten since"
-        },
-        "askReviewAgent": {
-          "label": "Ask review agent"
         },
         "binaryCompare": {
           "empty": "This file is binary and can’t be compared"

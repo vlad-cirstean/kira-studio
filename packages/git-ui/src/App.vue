@@ -21,9 +21,17 @@ import { TransportError } from '@kira/git-ipc';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ResizeHandle } from '@theme/components/ui/resizable';
-import { onClickOutside, useEventListener, useResizeObserver } from '@vueuse/core';
+import {
+  onClickOutside,
+  useDebounceFn,
+  useDocumentVisibility,
+  useEventListener,
+  useResizeObserver,
+  useWindowFocus,
+} from '@vueuse/core';
 import { useLiveRegion } from '@workbench/behaviour/liveRegion';
 import { compareNatural } from '@workbench/behaviour/match';
+import { TIMING } from '@workbench/behaviour/timing';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from './bridge/client.ts';
@@ -1647,6 +1655,21 @@ watch(graphVisible, (visible) => {
 });
 
 onMounted(syncBreakpoint);
+
+// The server syncs the change request index on its own cadence; a regained focus syncs at once
+// and a blur slows it. Debounced so a quick blur/focus pair sends a single request.
+const windowFocused = useWindowFocus();
+const documentVisibility = useDocumentVisibility();
+const appFocused = computed(
+  () => windowFocused.value && documentVisibility.value === 'visible' && graphVisible.value,
+);
+const sendFocus = useDebounceFn(
+  (focused: boolean) => changeRequestState.syncFocus(focused),
+  TIMING.focusSync,
+);
+watch(appFocused, (focused) => {
+  void sendFocus(focused);
+});
 
 onBeforeUnmount(() => {
   if (breakpointRaf !== 0) cancelAnimationFrame(breakpointRaf);

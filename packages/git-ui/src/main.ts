@@ -35,9 +35,9 @@ export interface MountOptions {
    *  learns which branch to review" (see `ReviewView.vue`'s own doc comment). `undefined`/`null`
    *  is the "no branch yet" state; ignored entirely for `view: "graph"`. */
   readonly target?: ReviewTarget | null;
-  /** Only meaningful when `view === "review"`: `needsReview` lists just the files that changed since
-   *  their last review behind a `Needs review | All` toggle; absent shows the plain list. */
-  readonly reviewFilter?: 'all' | 'needsReview';
+  /** Only meaningful when `view === "review"` with a `target`: the view stays on it. No back,
+   *  swap or base pick, no `review.target` push, no session resume or save. */
+  readonly lockTarget?: boolean;
   /** Only meaningful when `view === "review"`: called with the path after each file-list mark. */
   readonly onReviewMarked?: (path: string) => void;
   /** Only meaningful when `view === "review"`: receives a handle that opens a file's diff, as a click in the Files pane does. */
@@ -82,7 +82,7 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
   const {
     view = 'graph',
     target,
-    reviewFilter,
+    lockTarget,
     onReviewMarked,
     onReviewApi,
     pendingUiAction,
@@ -97,7 +97,7 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
   // Shallow: `transport`/`viewState` must not be proxied; `update` swaps top-level props.
   const rootProps = shallowReactive<Record<string, unknown>>(
     view === 'review'
-      ? { ...rest, target, reviewFilter, onReviewMarked, onReviewApi, repoHead }
+      ? { ...rest, target, lockTarget, onReviewMarked, onReviewApi, repoHead }
       : { ...rest, pendingUiAction, dateFormat, showOperations: onShowOperations, repoHead },
   );
   const app: VueApp = createApp(MountRoot, {

@@ -18,6 +18,7 @@ import type {
   CreateTaskArgs,
   FinishReviewArgs,
   FocusSessionArgs,
+  ForwardReviewResult,
   ImportWorkflowArgs,
   LaunchStepArgs,
   MoveBacklogItemArgs,
@@ -31,6 +32,7 @@ import type {
   RepoBranches,
   RepoBranchesArgs,
   ReviewAgentLaunch,
+  ReviewForwardText,
   RunArgs,
   SaveWorkflowArgs,
   SaveWorkflowYamlArgs,
@@ -352,6 +354,20 @@ export function useSendReview() {
 
 export function useFinishReview() {
   return useMutation({ mutationFn: (args: FinishReviewArgs) => control.adeTaskFinishReview(args) });
+}
+
+export function useForwardReviewComments() {
+  return useMutation({
+    mutationFn: (args: BranchArgs): Promise<ForwardReviewResult> =>
+      control.adeTaskForwardReviewComments(args),
+  });
+}
+
+export function useReviewForwardText() {
+  return useMutation({
+    mutationFn: (args: BranchArgs): Promise<ReviewForwardText> =>
+      control.adeTaskReviewForwardText(args),
+  });
 }
 
 export function useLaunchReviewAgent() {

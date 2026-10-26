@@ -221,6 +221,8 @@ export const IPC = {
   adeTaskSend: 'kira:adetask:send',
   adeTaskFocusSession: 'kira:adetask:focusSession',
   adeTaskReviewAgent: 'kira:adetask:reviewAgent',
+  adeTaskForwardReviewComments: 'kira:adetask:forwardReviewComments',
+  adeTaskReviewForwardText: 'kira:adetask:reviewForwardText',
   adeTaskLaunchReviewAgent: 'kira:adetask:launchReviewAgent',
   adeTaskOpenReviewWindow: 'kira:adetask:openReviewWindow',
   adeTaskReviewWindowTarget: 'kira:adetask:reviewWindowTarget',

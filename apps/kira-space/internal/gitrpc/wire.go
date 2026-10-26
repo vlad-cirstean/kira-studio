@@ -642,12 +642,17 @@ type ChangeRequestRecord struct {
 	HeadSha   string `json:"headSha"`
 	BaseRef   string `json:"baseRef"`
 	UpdatedAt int64  `json:"updatedAt"`
+	// Draft, ReviewDecision and ChecksState are set by the persisted index only.
+	Draft          bool   `json:"draft,omitempty"`
+	ReviewDecision string `json:"reviewDecision,omitempty"`
+	ChecksState    string `json:"checksState,omitempty"`
 }
 
 func changeRequestRecordFrom(p githost.ChangeRequest) ChangeRequestRecord {
 	return ChangeRequestRecord{
 		Number: p.Number, Title: p.Title, URL: p.URL, State: p.State,
 		HeadRef: p.HeadRef, HeadSha: p.HeadSha, BaseRef: p.BaseRef, UpdatedAt: p.UpdatedAt,
+		Draft: p.Draft, ReviewDecision: p.ReviewDecision, ChecksState: p.ChecksState,
 	}
 }
 
@@ -685,6 +690,34 @@ type CommitResolveChangeRequestsParams struct {
 type BranchResolveChangeRequestParams struct {
 	RepoID string `json:"repoId"`
 	Branch string `json:"branch"`
+}
+
+// BranchChangeRequestIndexParams is branch.changeRequestIndex's own request.
+type BranchChangeRequestIndexParams struct {
+	RepoID string `json:"repoId"`
+}
+
+// BranchChangeRequest is one head branch's newest cached change request.
+type BranchChangeRequest struct {
+	Name          string              `json:"name"`
+	ChangeRequest ChangeRequestRecord `json:"changeRequest"`
+}
+
+// BranchChangeRequestIndexResult is the persisted change request index of a repository.
+type BranchChangeRequestIndexResult struct {
+	// Complete means every change request was ingested: a branch not listed has none.
+	Complete bool `json:"complete"`
+	// SyncedAt is the last sync, Unix milliseconds; 0 when never synced.
+	SyncedAt int64                 `json:"syncedAt"`
+	Branches []BranchChangeRequest `json:"branches"`
+}
+
+// BranchSyncChangeRequestsParams is branch.syncChangeRequests's own request. Focused false only
+// records that the window blurred; absent or true syncs now. Wait blocks until the run ends.
+type BranchSyncChangeRequestsParams struct {
+	RepoID  string `json:"repoId"`
+	Focused *bool  `json:"focused,omitempty"`
+	Wait    bool   `json:"wait,omitempty"`
 }
 
 // ChangeRequestBrowserUrlParams is changeRequest.browserUrl's own request —

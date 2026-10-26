@@ -3,7 +3,7 @@ import type { TextPart } from '@theme/varText';
 import type { BranchRowModel, CardModel } from '../plan/usePlanModel';
 import type { Task } from '../wire';
 import type { BranchGraph } from './branchGraph';
-import { catalogParts } from './catalogParts';
+import { branchParts } from './catalogParts';
 
 // One rule for every Review code control: hidden, disabled with a reason, or enabled with a preview.
 
@@ -37,18 +37,18 @@ export function reviewChoice(
     tip,
   });
   if (b.name === '')
-    return choice(true, catalogParts('space.ade.board.reviewChoice.createFirst.tooltip'));
+    return choice(true, branchParts('space.ade.board.reviewChoice.createFirst.tooltip'));
   if (b.baseMissing) {
-    return choice(true, catalogParts('space.ade.rebase.baseMissing.tooltip', vars));
+    return choice(true, branchParts('space.ade.rebase.baseMissing.tooltip', vars));
   }
   if (b.ahead === 0 && b.dirty.length > 0) {
-    return choice(true, catalogParts('space.ade.board.reviewChoice.uncommitted.hint', vars));
+    return choice(true, branchParts('space.ade.board.reviewChoice.uncommitted.hint', vars));
   }
   if (b.ahead === 0) {
-    return choice(true, catalogParts('space.ade.board.reviewChoice.noCommits.tooltip', vars));
+    return choice(true, branchParts('space.ade.board.reviewChoice.noCommits.tooltip', vars));
   }
   const working = task.runs.some((r) => r.branchId === row.id && r.state === 'running');
-  const tip = catalogParts('space.ade.board.reviewChoice.review.tooltip', vars);
+  const tip = branchParts('space.ade.board.reviewChoice.review.tooltip', vars);
   if (working) tip.push(`\n${t('space.ade.board.reviewChoice.working.tooltip')}`);
   return choice(false, tip);
 }
@@ -61,5 +61,5 @@ export function reviewChoices(card: CardModel, graph: BranchGraph): ReviewChoice
 export function taskReviewTip(choices: readonly ReviewChoice[]): readonly TextPart[] {
   return choices.length === 1
     ? choices[0].tip
-    : catalogParts('space.ade.board.reviewChoice.pick.tooltip');
+    : branchParts('space.ade.board.reviewChoice.pick.tooltip');
 }

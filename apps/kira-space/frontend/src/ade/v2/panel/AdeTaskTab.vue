@@ -2,12 +2,10 @@
 import KeyValueList from '@theme/components/KeyValueList.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Switch } from '@theme/components/ui/switch';
 import { t } from '@theme/i18n';
-import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { useRepos } from '../../../repo/state/reposQueries';
@@ -53,15 +51,6 @@ async function write(patch: Partial<TaskPatch>): Promise<boolean> {
     return false;
   }
 }
-
-// ---- name
-const nameEdit = useInlineEdit({
-  source: () => task.value.title,
-  commit: async (title) => {
-    await write({ title });
-  },
-  allowEmpty: true,
-});
 
 // ---- status
 const statusTone = computed(() => (props.card.parked ? 'grey' : STATUS_TONE[props.card.status]));
@@ -122,20 +111,6 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
     data-testid="ade-task-tab"
   >
     <KeyValueList class="items-center">
-      <dt><Label for="ade-task-name">{{ t('common.field.name.label') }}</Label></dt>
-      <dd
-        ><Input
-          id="ade-task-name"
-          :model-value="nameEdit.text.value"
-          :placeholder="card.defaultTitle"
-          size="kira-lg"
-          class="font-medium"
-          data-testid="ade-task-name"
-          @update:model-value="nameEdit.onInput"
-          @blur="nameEdit.onCommit"
-          @keydown="nameEdit.onKeydown"
-        /></dd
-      >
       <dt>{{ t('common.field.status.label') }}</dt>
       <dd class="flex min-h-row items-center gap-2">
         <AdeChip :label="statusLabel" :tone="statusTone" />

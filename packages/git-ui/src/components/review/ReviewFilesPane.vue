@@ -25,7 +25,7 @@ import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { FieldError } from '@theme/components/ui/field';
 import { type MessageKey, t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { ACTION_ICONS } from '../../icons/index.ts';
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
@@ -48,20 +48,7 @@ const props = defineProps<{
   // renders no toolbar of its own (show-toolbar="false") and so never emits an update to forward.
   listMode: FileListMode;
   filter: string;
-  /** Set by a host that wants the `Needs review | All` toggle; its value is the initial choice. */
-  reviewFilter?: 'all' | 'needsReview';
 }>();
-
-const showing = ref<'all' | 'needsReview'>(props.reviewFilter ?? 'all');
-const hasFilter = computed(() => props.reviewFilter !== undefined);
-
-function needsReview(status: ReviewFileStatus): boolean {
-  return status.kind !== 'full' || status.changedSinceReview;
-}
-
-const needsReviewCount = computed(
-  () => props.reviewFiles.files.value.filter((e) => needsReview(e.review)).length,
-);
 
 const diffModeOptions: readonly DiffModeOption[] = [
   { id: 'sinceReview', icon: ACTION_ICONS.diffSingle, label: 'git.review.files.sinceReview.label' },
@@ -75,28 +62,7 @@ const diffModeItems = computed(() =>
     tooltip: t(o.label),
   })),
 );
-const showingItems = computed(() => [
-  {
-    value: 'needsReview',
-    label: t('git.review.files.needsReview.label', { count: needsReviewCount.value }),
-  },
-  { value: 'all', label: t('common.state.all.option') },
-]);
-
-const shown = computed(() =>
-  hasFilter.value && showing.value === 'needsReview'
-    ? props.reviewFiles.files.value.filter((e) => needsReview(e.review))
-    : props.reviewFiles.files.value,
-);
-const files = computed(() => shown.value.map((entry) => entry.change));
-const nothingToReview = computed(
-  () =>
-    hasFilter.value &&
-    showing.value === 'needsReview' &&
-    !props.reviewFiles.loading.value &&
-    props.reviewFiles.files.value.length > 0 &&
-    files.value.length === 0,
-);
+const files = computed(() => props.reviewFiles.files.value.map((entry) => entry.change));
 
 const reviewStatesMap = computed<ReadonlyMap<string, ReviewFileStatus>>(() => {
   const map = new Map<string, ReviewFileStatus>();
@@ -176,22 +142,8 @@ function onToggleReviewed(path: string): void {
         {{ t('git.review.files.markError.error', { error: reviewFiles.markError.value }) }}
       </FieldError>
 
-      <ViewToolbar v-if="hasFilter" class="font-ui">
-        <SecondaryTabs
-          variant="segmented"
-          :aria-label="t('git.review.files.showing.aria')"
-          :model-value="showing"
-          :items="showingItems"
-          @update:model-value="(v) => (showing = v as 'all' | 'needsReview')"
-        />
-      </ViewToolbar>
-      <p v-if="nothingToReview" class="m-0 p-3 text-muted-foreground">
-        {{ t('git.review.files.nothingToReview.emptyHint') }}
-      </p>
-
       <FileTree
         data-testid="review-files-tree"
-        v-else
         class="flex-auto min-h-0 border-b border-border"
         :files="files"
         :selected-file="selectedIndex"

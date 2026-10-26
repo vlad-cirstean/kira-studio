@@ -7,13 +7,18 @@ import {
   emitAgentSessions,
   openPlan,
 } from './support/adeV2';
+import { contract } from './support/contract';
+import { gitStreamRequests } from './support/gitStreamMock';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
 
 // The review window: three panes for one branch, the review agent and the GitHub sync.
 
 const t = (id: string) => `[data-testid="${id}"]`;
-const target = adeFixture<{ gitRepoId: string }>('review-target');
+const target = adeFixture<{ gitRepoId: string; codeRepoId: string; branchId: string }>(
+  'review-target',
+);
 const agent = adeFixture<{ session: { terminalId: string } }>('review-agent');
 
 const change = (path: string) => ({
@@ -87,12 +92,73 @@ test('any other window boots the normal workbench', async ({ relaunch }) => {
   await expect(page.locator(t('ade-review-window'))).toHaveCount(0);
 });
 
-reviewTest('the files pane lists only what needs review', async ({ relaunch }) => {
+reviewTest('the files pane lists every changed file like the git module', async ({ relaunch }) => {
   const page = await openReview(relaunch);
   const left = page.locator(t('ade-review-left'));
   await expect(left).toContainText('pending.ts');
   await expect(left).toContainText('moved.ts');
-  await expect(left).not.toContainText('done.ts');
+  await expect(left).toContainText('done.ts');
+  await expect(left.getByText('Needs review')).toHaveCount(0);
+});
+
+reviewTest("the left bar stays on the window's branch", async ({ relaunch }) => {
+  const page = await openReview(relaunch);
+  await expect(page.locator(t('review-branch-name'))).toHaveText('feat/billing-dashboard');
+  await expect(page.locator(t('review-base-name'))).toHaveText('main');
+  for (const id of ['review-back-button', 'review-swap-button', 'base-selector-trigger']) {
+    await expect(page.locator(t(id))).toHaveCount(0);
+  }
+  await page.locator(t('review-pane-commits')).click();
+  await page.locator(t('review-pane-files')).click();
+  expect(await gitStreamRequests(page)).not.toContain('review.session.save');
+});
+
+reviewTest('a review diff opens side by side', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: reviewControl([
+      { channel: IPC.windowsEnsure, response: { mode: 'git' } },
+      {
+        channel: IPC.codeWorkspaceListRepos,
+        response: [
+          {
+            id: target.codeRepoId,
+            name: 'web-app',
+            root: '/tmp/web-app',
+            repoId: target.gitRepoId,
+            sortOrder: 1,
+            color: 'none',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      },
+    ]),
+    gitStream: {
+      ...GIT,
+      extraResults: {
+        ...GIT.extraResults,
+        'file.read': { kind: 'found', content: 'export const a = 1;\n' },
+        'review.snapshot': { kind: 'none', text: null, reviewedAtSha: null },
+        'review.fileDiff': {
+          path: 'src/pending.ts',
+          deltaSource: 'noSnapshot',
+          body: { kind: 'text', hunks: [] },
+          reviewedRanges: [],
+          lineCount: 1,
+          reviewedAtSha: null,
+        },
+      },
+    },
+  });
+  await page.locator(t('ade-review-window')).waitFor();
+  await page
+    .locator(`${t('review-files-tree')} ${t('file-tree-row')}`, { hasText: 'pending.ts' })
+    .click();
+  const editor = page.locator(t('repo-diff-editor'));
+  await expect(editor.locator('.monaco-diff-editor .editor.original')).toBeVisible();
+  const width = await editor
+    .locator('.monaco-diff-editor .editor.original')
+    .evaluate((el) => el.getBoundingClientRect().width);
+  expect(width).toBeGreaterThan(100);
 });
 
 reviewTest('with no review agent the panel offers to start one', async ({ relaunch }) => {
@@ -101,32 +167,141 @@ reviewTest('with no review agent the panel offers to start one', async ({ relaun
   await expect(page.locator(t('ade-review-compose'))).toHaveCount(0);
 });
 
-reviewTest('Send is disabled while the agent waits on input', async ({ relaunch }) => {
-  const terminalId = agent.session.terminalId;
-  const page = await openReview(relaunch, [{ channel: IPC.adeTaskReviewAgent, response: agent }]);
-  await emitAgentSessions(page, [terminalId]);
-  const send = page.locator(t('ade-review-send'));
-  await page.locator(t('ade-review-question')).fill('why this change?');
-  await expect(send).toBeEnabled();
-  await emitAgentEvent(page, terminalId, 'Notification');
-  await expect(send).toBeDisabled();
+const openComment = (id: number, state: 'open' | 'addressed' = 'open') => ({
+  id,
+  path: 'src/billing.ts',
+  range: { start: 10 * id, end: 10 * id },
+  body: `Comment ${id}`,
+  anchor: 'exact',
+  anchorSha: 'a'.repeat(40),
+  createdAt: 1_790_036_500_000,
+  kind: 'change',
+  state,
+  reply: '',
+  repliedAt: null,
+  sentAt: null,
 });
 
-reviewTest('a watched turn ends when the agent terminal disappears', async ({ relaunch }) => {
-  const terminalId = agent.session.terminalId;
-  const page = await openReview(relaunch, [
-    { channel: IPC.adeTaskReviewAgent, response: agent },
-    { channel: IPC.adeTaskSend },
-  ]);
-  await emitAgentSessions(page, [terminalId]);
-  await page.locator(t('ade-review-question')).fill('why this change?');
-  await page.locator(t('ade-review-send')).click();
-  await emitAgentEvent(page, terminalId, 'UserPromptSubmit');
-  await expect(page.locator(t('ade-review-status'))).toBeVisible();
-  await emitAgentSessions(page, [terminalId]);
-  await emitAgentSessions(page, []);
-  await expect(page.locator(t('ade-review-status'))).toHaveCount(0);
+async function openForward(
+  relaunch: Parameters<Parameters<typeof reviewTest>[2]>[0]['relaunch'],
+  comments: readonly unknown[],
+  extra: readonly ControlSnapshot[] = [],
+): Promise<{ page: Page; control: { log(): { channel: string; args?: unknown }[] } }> {
+  const { window: page, control } = await relaunch({
+    control: reviewControl([{ channel: IPC.adeTaskReviewAgent, response: agent }, ...extra]),
+    gitStream: {
+      ...GIT,
+      extraResults: {
+        ...GIT.extraResults,
+        'review.comment.list': { at: 'a'.repeat(40), comments },
+      },
+    },
+  });
+  await page.locator(t('ade-review-window')).waitFor();
+  await emitAgentSessions(page, [agent.session.terminalId]);
+  return { page, control };
+}
+
+reviewTest('the running review agent is a plain terminal', async ({ relaunch }) => {
+  const { page } = await openForward(
+    relaunch,
+    [],
+    [{ channel: IPC.mobileLaunchOpened, response: null }],
+  );
+  await emitWailsEvent(page, IPC.mobileOpenLaunch, {
+    launch: {
+      ...adeFixture<object>('launch'),
+      terminalId: agent.session.terminalId,
+      sessionId: 'rv01',
+    },
+    taskId: 'T_bill',
+    branchId: 'b_billdash',
+  });
+  await expect(page.locator(t('ade-tui-pane'))).toBeVisible();
+  await expect(page.locator(t('ade-review-question'))).toHaveCount(0);
+  await expect(page.locator(t('ade-review-compose'))).toHaveCount(0);
 });
+
+// Contract ade-review-forward, backend half: adeflow TestReviewForwardComments.
+reviewTest('contract: forward review comments', async ({ relaunch }) => {
+  const args = contract<{ branchId: string }>(
+    'ade-review-forward',
+    'args:AdeTaskService.ForwardReviewComments',
+  );
+  const result = contract<{ count: number }>(
+    'ade-review-forward',
+    'AdeTaskService.ForwardReviewComments',
+  );
+  const { page, control } = await openForward(
+    relaunch,
+    [openComment(1), openComment(2), openComment(3, 'addressed')],
+    [{ channel: IPC.adeTaskForwardReviewComments, response: result }],
+  );
+  const button = page.locator(t('ade-review-forward'));
+  await expect(button).toHaveText('Send review comments · 2');
+  await expect(button).toBeEnabled();
+  await button.click();
+  const forwarded = () =>
+    control.log().filter((e) => e.channel === IPC.adeTaskForwardReviewComments);
+  await expect.poll(forwarded).toHaveLength(1);
+  expect(Object.keys(args)).toEqual(Object.keys(forwarded()[0]?.args as object));
+  expect(forwarded()[0]?.args).toEqual({ branchId: target.branchId });
+});
+
+// Contract ade-review-forward, backend half: adeflow TestReviewForwardComments.
+reviewTest(
+  'contract: copy puts the forwarded message on the clipboard and sends nothing',
+  async ({ relaunch }) => {
+    const result = contract<{ text: string }>(
+      'ade-review-forward',
+      'AdeTaskService.ReviewForwardText',
+    );
+    const { page, control } = await openForward(
+      relaunch,
+      [openComment(1), openComment(2)],
+      [{ channel: IPC.adeTaskReviewForwardText, response: result }],
+    );
+    await page.evaluate(() => {
+      const w = window as unknown as { __clipboard: string[] };
+      w.__clipboard = [];
+      navigator.clipboard.writeText = async (text: string) => {
+        w.__clipboard.push(text);
+      };
+    });
+    const button = page.locator(t('ade-review-copy'));
+    await expect(button).toBeEnabled();
+    await button.click();
+    await expect(button).toHaveText('Copied');
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __clipboard: string[] }).__clipboard))
+      .toEqual([result.text]);
+    const calls = (channel: string) => control.log().filter((e) => e.channel === channel);
+    expect(calls(IPC.adeTaskReviewForwardText)).toHaveLength(1);
+    expect(calls(IPC.adeTaskForwardReviewComments)).toHaveLength(0);
+  },
+);
+
+reviewTest('copy is disabled with no open comment', async ({ relaunch }) => {
+  const { page } = await openForward(relaunch, [openComment(1, 'addressed')]);
+  await expect(page.locator(t('ade-review-copy'))).toBeDisabled();
+});
+
+reviewTest(
+  'forward is disabled while the agent waits on input or nothing is open',
+  async ({ relaunch }) => {
+    const { page } = await openForward(relaunch, [openComment(1)]);
+    const button = page.locator(t('ade-review-forward'));
+    await expect(button).toBeEnabled();
+    await emitAgentEvent(page, agent.session.terminalId, 'Notification');
+    await expect(button).toBeDisabled();
+
+    const empty = await openForward(relaunch, [openComment(1, 'addressed')]);
+    await expect(empty.page.locator(t('ade-review-forward'))).toBeDisabled();
+    await expect(empty.page.locator(t('ade-review-forward'))).toHaveText(
+      'Send review comments · 0',
+    );
+  },
+);
 
 reviewTest(
   'the sync button lists what it will do and why it skips the rest',

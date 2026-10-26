@@ -1069,7 +1069,7 @@ test('the Git panel top-level tabs render at 4px radius with normal letter spaci
 // port `fakeGraphHost.ts`'s own fixture table — see that file's doc comment for the row/parent
 // layout: `main` (HEAD, 3 commits, never collapses), `feature-newer` (5 commits, collapses by
 // default), `feature-older` (2 commits, always full). Display follows store order.
-// Collapsed-by-default: `F0, [placeholder], F4, G0, G1, M0, M1, M2` (8 rows, row 7 last); fully
+// Collapsed-by-default: `F0, [placeholder], G0, G1, M0, M1, M2` (7 rows, row 6 last); fully
 // expanded: 10 rows (row 9 last).
 test.describe('a repo workspace: graph branch collapse (P93 §8.4)', () => {
   async function bootMultiBranchGraph(
@@ -1100,7 +1100,7 @@ test.describe('a repo workspace: graph branch collapse (P93 §8.4)', () => {
     await repoRowById(page, REPO.id).click();
     await expect(page.locator('[data-testid="repo-graph-host"]')).toBeVisible();
     await expect(
-      page.locator('[data-testid="commit-grid"] .slick-row[data-row="7"]'),
+      page.locator('[data-testid="commit-grid"] .slick-row[data-row="6"]'),
     ).toBeVisible();
   }
 
@@ -1116,13 +1116,13 @@ test.describe('a repo workspace: graph branch collapse (P93 §8.4)', () => {
     const { window: page } = await relaunch({ control: CONTROL });
     await bootMultiBranchGraph(page);
 
-    await expect(messageCell(page, 5)).toContainText('main tip (M0)');
+    await expect(messageCell(page, 4)).toContainText('main tip (M0)');
     const placeholder = messageCell(page, 1);
     await expect(placeholder).toHaveAttribute('data-testid', 'graph-collapsed-row');
     await expect(placeholder).toContainText(
       `${MULTI_BRANCH_FEATURE_NEWER_HIDDEN_COUNT} more commits on ${MULTI_BRANCH_FEATURE_NEWER_NAME}`,
     );
-    await expect(page.locator('[data-testid="commit-grid"] .slick-row[data-row="8"]')).toHaveCount(
+    await expect(page.locator('[data-testid="commit-grid"] .slick-row[data-row="7"]')).toHaveCount(
       0,
     );
   });

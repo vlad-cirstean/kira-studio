@@ -37,15 +37,6 @@ type Jira struct {
 	URL string `json:"url"`
 }
 
-type FileChange struct {
-	Path string `json:"path"`
-}
-
-type Commit struct {
-	Sha     string `json:"sha"`
-	Message string `json:"message"`
-}
-
 type DirtyEntry struct {
 	Code string `json:"code"`
 	Path string `json:"path"`
@@ -290,9 +281,6 @@ type Branch struct {
 	ConflictsIfRebased  []string       `json:"conflictsIfRebased"`
 	ConflictCheck       string         `json:"conflictCheck"`       // 'checking' | 'done' | 'failed'
 	ConflictCheckReason string         `json:"conflictCheckReason"` // '' unless failed
-	Files               []FileChange   `json:"files"`
-	Commits             []Commit       `json:"commits"`
-	CommitCount         int            `json:"commitCount"`
 	Dirty               []DirtyEntry   `json:"dirty"`
 	LastCommitAt        *int64         `json:"lastCommitAt"`
 	AddedAt             int64          `json:"addedAt"`
@@ -651,6 +639,8 @@ type CreateTaskArgs struct {
 	WorkflowID  string   `json:"workflowId"`
 	// Bases maps a code repo id to the base of its branch; a missing repo starts from main.
 	Bases map[string]BaseChoice `json:"bases"`
+	// Day is the plan day (YYYY-MM-DD) the task lands on; nil lands in Later.
+	Day *string `json:"day"`
 }
 
 type TaskPatch struct {
@@ -837,6 +827,16 @@ type ReviewAgentLaunch struct {
 	Launch  Launch `json:"launch"`
 	Resumed bool   `json:"resumed"`
 	Note    string `json:"note"`
+}
+
+// ForwardReviewResult counts the open review comments pasted into the review agent.
+type ForwardReviewResult struct {
+	Count int `json:"count"`
+}
+
+// ReviewForwardText is the message ForwardReviewComments would send, composed for copying.
+type ReviewForwardText struct {
+	Text string `json:"text"`
 }
 
 // ViewedSyncStatus: 'ok' | 'noPr' | 'prClosed' | 'disabled' | 'cliMissing' | 'unauthenticated' |

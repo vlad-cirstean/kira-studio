@@ -19,13 +19,12 @@ var (
 	ErrBranchOnTask  = errors.New("repos: branch is already on a task")
 	ErrRepoOnTask    = errors.New("repos: task already has a branch in that repo")
 	ErrReviewKind    = errors.New("repos: a task only moves between task and parked, and a review task keeps its kind")
+	ErrTaskUnnamed   = errors.New("a task needs a title or a Jira key")
 	ErrBranchMissing = errors.New("repos: branch not found")
 	ErrBacklogGone   = errors.New("repos: backlog item not found")
 	ErrRunNotFound   = errors.New("repos: run not found")
 	// ErrBranchNameTaken marks a created-branch name already used by a live branch of the repo.
 	ErrBranchNameTaken = errors.New("repos: a live branch in that repo already has that name")
-	// ErrEstimateShrink: once an estimate is set, a patch may only grow it (same unit).
-	ErrEstimateShrink = errors.New("repos: estimate can only grow once set")
 )
 
 // maxColorSlots is the task colour slot count (0-19).
@@ -50,23 +49,6 @@ func EstOverCap(est string) bool {
 		return n > MaxEstHours
 	}
 	return n > MaxEstDays
-}
-
-// checkEstExtends guards an estimate patch: once set, it may only grow, same unit (h or d). An
-// estimate stored above the cap may be replaced by any valid one, so a typo is recoverable.
-func checkEstExtends(old, next string) error {
-	if old == "" || EstOverCap(old) {
-		return nil
-	}
-	if next == "" || next[len(next)-1] != old[len(old)-1] {
-		return ErrEstimateShrink
-	}
-	o, _ := strconv.ParseFloat(old[:len(old)-1], 64)
-	n, _ := strconv.ParseFloat(next[:len(next)-1], 64)
-	if n < o {
-		return ErrEstimateShrink
-	}
-	return nil
 }
 
 const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, host_url, workflow_id, entry_step_id, since_json, workflow_json, workflow_hash, est, notes, color, created_at, archived_at`
@@ -168,9 +150,9 @@ func (r *AdeTaskRepo) GetTask(id string) (model.AdeTask, error) {
 	return t, nil
 }
 
-// insertTask writes the task, its branches and a plan row at the end (Later), in tx. It assigns
+// insertTask writes the task, its branches and a plan row at the end of `day` (Later when nil), in tx. It assigns
 // the task's color: the first slot no live task uses, else the least-used slot overall.
-func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch) (model.AdeTask, error) {
+func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch, day *string) (model.AdeTask, error) {
 	if err := t.Validate(); err != nil {
 		return model.AdeTask{}, err
 	}
@@ -214,7 +196,7 @@ func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch) (mo
 		}
 	}
 	if _, err := tx.Exec(`INSERT INTO ade_task_plan (task_id, day, position)
-		SELECT ?, NULL, COALESCE(MAX(position) + 1, 0) FROM ade_task_plan`, t.ID); err != nil {
+		SELECT ?, ?, COALESCE(MAX(position) + 1, 0) FROM ade_task_plan`, t.ID, day); err != nil {
 		return model.AdeTask{}, fmt.Errorf("repos: insert ade task plan %s: %w", t.ID, err)
 	}
 	return t, nil
@@ -253,15 +235,15 @@ func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
-// CreateTask inserts a task, its branches and a Later plan row at the end in one transaction and
-// returns the stored task (color assigned).
-func (r *AdeTaskRepo) CreateTask(t model.AdeTask, branches []model.AdeTaskBranch) (model.AdeTask, error) {
+// CreateTask inserts a task, its branches and a plan row at the end of `day` (Later when nil) in
+// one transaction and returns the stored task (color assigned).
+func (r *AdeTaskRepo) CreateTask(t model.AdeTask, branches []model.AdeTaskBranch, day *string) (model.AdeTask, error) {
 	tx, err := r.DB.Begin()
 	if err != nil {
 		return model.AdeTask{}, fmt.Errorf("repos: begin create ade task: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck
-	out, err := insertTask(tx, t, branches)
+	out, err := insertTask(tx, t, branches, day)
 	if err != nil {
 		return model.AdeTask{}, err
 	}
@@ -271,7 +253,7 @@ func (r *AdeTaskRepo) CreateTask(t model.AdeTask, branches []model.AdeTaskBranch
 	return out, nil
 }
 
-// UpdateTask writes the patched leaves. Est may only grow; kind moves only between task and parked,
+// UpdateTask writes the patched leaves. Kind moves only between task and parked,
 // and a review task refuses any kind change.
 func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask, error) {
 	tx, err := r.DB.Begin()
@@ -288,9 +270,6 @@ func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask
 	}
 	prevKind := cur.Kind
 	if p.Est != nil {
-		if err := checkEstExtends(cur.Est, *p.Est); err != nil {
-			return model.AdeTask{}, err
-		}
 		cur.Est = *p.Est
 	}
 	if p.Kind != nil && *p.Kind != cur.Kind {
@@ -319,6 +298,10 @@ func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask
 			return model.AdeTask{}, fmt.Errorf("repos: color %d out of range", *p.Color)
 		}
 		cur.Color = *p.Color
+	}
+	// A branch-derived task may start with neither; a patch must not strip the last of them.
+	if (p.Title != nil || p.JiraKey != nil) && cur.Title == "" && cur.JiraKey == "" {
+		return model.AdeTask{}, ErrTaskUnnamed
 	}
 	if p.Kind != nil && *p.Kind != prevKind {
 		from, to := model.AdeBranchKindMine, model.AdeBranchKindParked

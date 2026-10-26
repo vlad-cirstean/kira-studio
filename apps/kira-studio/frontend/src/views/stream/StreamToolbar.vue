@@ -18,6 +18,7 @@ import RunState from '@theme/RunState.vue';
 import { formatCount } from '@workbench/behaviour/format';
 import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
 import { errorText } from '@workbench/bridge/codedError';
+import ToolbarSeparator from '@workbench/components/ToolbarSeparator.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref, watch } from 'vue';
@@ -185,7 +186,7 @@ async function onDeleteMessage(): Promise<void> {
         @click="streamViewStore.stop(tab.id)"
       />
     </div>
-    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+    <ToolbarSeparator />
 
     <div class="flex items-center gap-1.5 min-w-0">
       <Tooltip>
@@ -278,7 +279,7 @@ async function onDeleteMessage(): Promise<void> {
       />
     </div>
 
-    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+    <ToolbarSeparator />
 
     <SecondaryTabs
       variant="segmented"
@@ -288,7 +289,7 @@ async function onDeleteMessage(): Promise<void> {
       @update:model-value="(v) => streamViewStore.setPageSize(tab.id, Number(v) as PageSize)"
     />
 
-    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+    <ToolbarSeparator />
 
     <div class="flex items-center gap-1.5 min-w-0">
       <div class="relative">

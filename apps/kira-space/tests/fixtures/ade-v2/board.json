@@ -1320,18 +1320,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "src/cart/cart.test.ts"
-        }
-      ],
-      "commits": [
-        {
-          "sha": "4be21c9",
-          "message": "Use fake timers in cart test"
-        }
-      ],
-      "commitCount": 1,
       "dirty": [],
       "lastCommitAt": 1790064000000,
       "addedAt": 1789894800000,
@@ -1378,28 +1366,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "src/payments/client.ts"
-        },
-        {
-          "path": "src/payments/invoice.ts"
-        },
-        {
-          "path": "src/metering/usage.ts"
-        }
-      ],
-      "commits": [
-        {
-          "sha": "0de4f71",
-          "message": "Meter API usage per workspace"
-        },
-        {
-          "sha": "6b2c8e9",
-          "message": "Invoice line items from usage"
-        }
-      ],
-      "commitCount": 5,
       "dirty": [
         {
           "code": "M",
@@ -1451,25 +1417,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "checking",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "src/ui/billing/Dashboard.tsx"
-        },
-        {
-          "path": "src/ui/nav/Sidebar.tsx"
-        }
-      ],
-      "commits": [
-        {
-          "sha": "7e1c0aa",
-          "message": "Usage chart"
-        },
-        {
-          "sha": "b4402df",
-          "message": "Upcoming invoice card"
-        }
-      ],
-      "commitCount": 3,
       "dirty": [],
       "lastCommitAt": 1790059560000,
       "addedAt": 1789722000000,
@@ -1532,25 +1479,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "src/metering/store.ts"
-        },
-        {
-          "path": "src/routes/usage.ts"
-        }
-      ],
-      "commits": [
-        {
-          "sha": "11aa22b",
-          "message": "Metering table"
-        },
-        {
-          "sha": "33cc44d",
-          "message": "Usage endpoint"
-        }
-      ],
-      "commitCount": 4,
       "dirty": [],
       "lastCommitAt": 1790057340000,
       "addedAt": 1789635600000,
@@ -1605,31 +1533,8 @@
         }
       ],
       "conflictsIfRebased": ["src/auth/session.ts"],
-      "files": [
-        {
-          "path": "src/auth/oauth.ts"
-        },
-        {
-          "path": "src/auth/session.ts"
-        }
-      ],
       "conflictCheck": "failed",
       "conflictCheckReason": "git merge-tree exited 128: unable to read base tree",
-      "commits": [
-        {
-          "sha": "e41a7d2",
-          "message": "Add OAuth provider config"
-        },
-        {
-          "sha": "9bc0f13",
-          "message": "Callback route + token exchange"
-        },
-        {
-          "sha": "1f8e6aa",
-          "message": "Persist refresh tokens"
-        }
-      ],
-      "commitCount": 7,
       "dirty": [
         {
           "code": "M",
@@ -1685,18 +1590,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "src/ui/LoginScreen.tsx"
-        }
-      ],
-      "commits": [
-        {
-          "sha": "c7d21e0",
-          "message": "Login screen with provider buttons"
-        }
-      ],
-      "commitCount": 4,
       "dirty": [
         {
           "code": "M",
@@ -1773,18 +1666,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "src/auth/callback.ts"
-        }
-      ],
-      "commits": [
-        {
-          "sha": "aa01bb2",
-          "message": "Token exchange endpoint"
-        }
-      ],
-      "commitCount": 3,
       "dirty": [],
       "lastCommitAt": 1790050680000,
       "addedAt": 1789376400000,
@@ -1847,25 +1728,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "src/hooks/registry.ts"
-        },
-        {
-          "path": "src/hooks/sign.ts"
-        }
-      ],
-      "commits": [
-        {
-          "sha": "aa11bb2",
-          "message": "Webhook registry"
-        },
-        {
-          "sha": "cc33dd4",
-          "message": "Signing"
-        }
-      ],
-      "commitCount": 4,
       "dirty": [],
       "lastCommitAt": 1790048460000,
       "addedAt": 1789290000000,
@@ -1918,18 +1780,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "src/hooks/retry.ts"
-        }
-      ],
-      "commits": [
-        {
-          "sha": "ee55ff6",
-          "message": "Exponential backoff"
-        }
-      ],
-      "commitCount": 2,
       "dirty": [
         {
           "code": "M",
@@ -1981,21 +1831,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "src/payments/client.ts"
-        },
-        {
-          "path": "src/payments/invoice.ts"
-        }
-      ],
-      "commits": [
-        {
-          "sha": "f02b9c4",
-          "message": "Split payment client into adapters"
-        }
-      ],
-      "commitCount": 9,
       "dirty": [],
       "lastCommitAt": 1790044020000,
       "addedAt": 1789117200000,
@@ -2042,18 +1877,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "src/search/schema.ts"
-        }
-      ],
-      "commits": [
-        {
-          "sha": "9f1a2b3",
-          "message": "Schema v2 + migration"
-        }
-      ],
-      "commitCount": 4,
       "dirty": [],
       "lastCommitAt": 1790041800000,
       "addedAt": 1789030800000,
@@ -2100,28 +1923,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "src/search/indexer.ts"
-        },
-        {
-          "path": "src/search/schema.ts"
-        },
-        {
-          "path": "package.json"
-        }
-      ],
-      "commits": [
-        {
-          "sha": "3d8e1f0",
-          "message": "Write hook"
-        },
-        {
-          "sha": "c2a7b95",
-          "message": "Backfill job"
-        }
-      ],
-      "commitCount": 6,
       "dirty": [
         {
           "code": "M",
@@ -2173,13 +1974,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "src/ui/search/Results.tsx"
-        }
-      ],
-      "commits": [],
-      "commitCount": 0,
       "dirty": [],
       "lastCommitAt": null,
       "addedAt": 1788858000000,
@@ -2226,21 +2020,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "src/notifications/model.ts"
-        },
-        {
-          "path": "src/ui/nav/Sidebar.tsx"
-        }
-      ],
-      "commits": [
-        {
-          "sha": "5c9d0e1",
-          "message": "Notifications model"
-        }
-      ],
-      "commitCount": 4,
       "dirty": [],
       "lastCommitAt": 1790035140000,
       "addedAt": 1788771600000,
@@ -2287,18 +2066,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "package.json"
-        }
-      ],
-      "commits": [
-        {
-          "sha": "0f9e8d7",
-          "message": "Bump 23 packages"
-        }
-      ],
-      "commitCount": 1,
       "dirty": [],
       "lastCommitAt": 1790032920000,
       "addedAt": 1788685200000,
@@ -2338,18 +2105,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "app/settings/Push.tsx"
-        }
-      ],
-      "commits": [
-        {
-          "sha": "abab123",
-          "message": "Settings screen"
-        }
-      ],
-      "commitCount": 2,
       "dirty": [],
       "lastCommitAt": 1790030700000,
       "addedAt": 1788598800000,
@@ -2402,18 +2157,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "src/push/tokens.ts"
-        }
-      ],
-      "commits": [
-        {
-          "sha": "9090aaa",
-          "message": "Device token table"
-        }
-      ],
-      "commitCount": 2,
       "dirty": [],
       "lastCommitAt": 1790028480000,
       "addedAt": 1788512400000,
@@ -2460,13 +2203,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [
-        {
-          "path": "src/ui/Header.tsx"
-        }
-      ],
-      "commits": [],
-      "commitCount": 6,
       "dirty": [
         {
           "code": "M",
@@ -2505,9 +2241,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [],
-      "commits": [],
-      "commitCount": 0,
       "dirty": [],
       "lastCommitAt": null,
       "addedAt": 1790065800000,
@@ -2541,9 +2274,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [],
-      "commits": [],
-      "commitCount": 0,
       "dirty": [],
       "lastCommitAt": null,
       "addedAt": 1790065800000,
@@ -2577,9 +2307,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [],
-      "commits": [],
-      "commitCount": 0,
       "dirty": [],
       "lastCommitAt": null,
       "addedAt": 1790065800000,
@@ -2613,9 +2340,6 @@
       "conflictsIfRebased": [],
       "conflictCheck": "done",
       "conflictCheckReason": "",
-      "files": [],
-      "commits": [],
-      "commitCount": 0,
       "dirty": [],
       "lastCommitAt": null,
       "addedAt": 1790065800000,

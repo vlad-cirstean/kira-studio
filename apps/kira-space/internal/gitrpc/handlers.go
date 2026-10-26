@@ -295,6 +295,12 @@ var requestHandlers = map[string]requestHandler{
 	"branch.resolveChangeRequest": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleBranchResolveChangeRequest(ctx, c, params)
 	},
+	"branch.changeRequestIndex": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleBranchChangeRequestIndex(ctx, c, params)
+	},
+	"branch.syncChangeRequests": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleBranchSyncChangeRequests(ctx, c, params)
+	},
 	"gitHost.info": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleGitHostInfo(ctx, c, params)
 	},

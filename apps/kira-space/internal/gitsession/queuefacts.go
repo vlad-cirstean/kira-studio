@@ -140,22 +140,6 @@ func (e *RepoEntry) RangeChanges(ctx context.Context, base, tip string) ([]porce
 	return e.fileChanges(ctx, porcelain.NameStatusArgs(&from, tip))
 }
 
-// RangeCommits is `log --format=%H%x1f%s -z -N base..tip` (porcelain.RangeSubjectsArgs/
-// ParseRangeSubjects), newest first, capped at limit. The full count comes from AheadBehind
-// separately (commitCount = ahead) — this wrapper drops ParseRangeSubjects' own truncated flag
-// rather than serving a second, redundant count.
-func (e *RepoEntry) RangeCommits(ctx context.Context, base, tip string, limit int) ([]porcelain.RangeCommit, error) {
-	raw, err := e.runOne(ctx, porcelain.RangeSubjectsArgs(base, tip, limit))
-	if err != nil {
-		return nil, err
-	}
-	commits, _, err := porcelain.ParseRangeSubjects(raw, limit)
-	if err != nil {
-		return nil, err
-	}
-	return commits, nil
-}
-
 // Ancestors reports which of among (a set of refnames) are ancestors of tip — `for-each-ref
 // --merged=<tip> <among...>`, computeAncestry's ancestry input.
 func (e *RepoEntry) Ancestors(ctx context.Context, tip string, among []string) ([]string, error) {

@@ -6,6 +6,7 @@ package githost
 import (
 	"context"
 	"net/url"
+	"time"
 )
 
 // Repo is one hosted repository. Owner may be a nested group path for hosts that allow one.
@@ -23,6 +24,14 @@ type ChangeRequest struct {
 	HeadOwner string `json:"headOwner"`
 	BaseRef   string `json:"baseRef"`
 	UpdatedAt int64  `json:"updatedAt"` // Unix milliseconds.
+	// NodeID is the host's opaque id, for batched refreshes; "" when the host has none.
+	NodeID string `json:"nodeId,omitempty"`
+	// Draft marks an open change request not yet ready for review.
+	Draft bool `json:"draft,omitempty"`
+	// ReviewDecision is "" | APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED.
+	ReviewDecision string `json:"reviewDecision,omitempty"`
+	// ChecksState is "" | SUCCESS | FAILURE | PENDING | ERROR | EXPECTED.
+	ChecksState string `json:"checksState,omitempty"`
 }
 
 // Status kinds.
@@ -44,6 +53,10 @@ type Status struct {
 	Reason  string   `json:"reason,omitempty"`
 	// RateLimited arms the per-repo breaker.
 	RateLimited bool `json:"-"`
+	// ResetAt is when a rate limited call may be retried; zero when the host did not say.
+	ResetAt time.Time `json:"-"`
+	// Gone marks a repository the host reports as not found or not visible.
+	Gone bool `json:"-"`
 }
 
 // OK reports whether s is a successful probe or call.
@@ -124,4 +137,33 @@ type FileReviewSync interface {
 	ChangeFiles(ctx context.Context, r Repo, number int) (ChangeFiles, Status)
 	// SetFilesViewed marks or unmarks paths; failed maps a path to the host's error for it.
 	SetFilesViewed(ctx context.Context, r Repo, nodeID string, paths []string, viewed bool) (failed map[string]string, s Status)
+}
+
+// ChangeRequestSync is optional: a provider that pages every change request by recency, probes for
+// change cheaply and refreshes review and checks state in batches. Without it a repository keeps
+// the per-branch lookups and the open snapshot only.
+type ChangeRequestSync interface {
+	// Page returns change requests, closed ones included, ordered by update time descending, after
+	// cursor ("" is the newest).
+	Page(ctx context.Context, r Repo, cursor string, first int) (ChangeRequestPage, Status)
+	// Probe reports whether anything changed since etag ("" always reports a change). A probe costs
+	// no rate limit when nothing changed.
+	Probe(ctx context.Context, r Repo, etag string) (changed bool, newETag string, s Status)
+	// Checks returns the current review and checks state of the change requests with nodeIDs. An id
+	// missing from the result no longer exists or is no longer visible.
+	Checks(ctx context.Context, r Repo, nodeIDs []string) ([]ChangeRequest, Status)
+}
+
+// ChangeRequestPage is one page of a ChangeRequestSync.Page walk.
+type ChangeRequestPage struct {
+	Items     []ChangeRequest
+	EndCursor string
+	HasNext   bool
+	RateLimit RateLimit
+}
+
+// RateLimit is the host's remaining call budget; the zero value means unknown.
+type RateLimit struct {
+	Remaining int
+	ResetAt   time.Time
 }

@@ -77,6 +77,20 @@ func (b *TaskBoard) reviewTarget(ctx context.Context, tc *taskCtx, sb model.AdeT
 	}, nil
 }
 
+// reviewableBranch rejects a branch a review cannot target: archived, not mine or review, or not created.
+func (b *TaskBoard) reviewableBranch(tc *taskCtx, sb model.AdeTaskBranch) error {
+	if sb.ArchivedAt != nil {
+		return invalid("the branch is archived")
+	}
+	if sb.Kind != model.AdeBranchKindMine && sb.Kind != model.AdeBranchKindReview {
+		return invalid("only a mine or review branch can be reviewed")
+	}
+	if sb.Name == "" {
+		return invalid("the branch of %s is not created yet", b.repoNick(tc, sb))
+	}
+	return nil
+}
+
 // OpenReviewWindow records the review window of a created branch and pins its review session.
 func (b *TaskBoard) OpenReviewWindow(ctx context.Context, branchID string) (ReviewWindowOpen, error) {
 	if b.deps.ReviewWindows == nil || b.deps.Windows == nil || b.deps.Registry == nil || b.deps.Registry.Review == nil {
@@ -93,14 +107,8 @@ func (b *TaskBoard) OpenReviewWindow(ctx context.Context, branchID string) (Revi
 	if err != nil {
 		return ReviewWindowOpen{}, err
 	}
-	if sb.ArchivedAt != nil {
-		return ReviewWindowOpen{}, invalid("the branch is archived")
-	}
-	if sb.Kind != model.AdeBranchKindMine && sb.Kind != model.AdeBranchKindReview {
-		return ReviewWindowOpen{}, invalid("only a mine or review branch can be reviewed")
-	}
-	if sb.Name == "" {
-		return ReviewWindowOpen{}, invalid("the branch of %s is not created yet", b.repoNick(tc, sb))
+	if err := b.reviewableBranch(tc, sb); err != nil {
+		return ReviewWindowOpen{}, err
 	}
 	if existing, err := b.deps.ReviewWindows.ByBranch(sb.ID); err != nil {
 		return ReviewWindowOpen{}, err

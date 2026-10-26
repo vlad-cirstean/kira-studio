@@ -87,7 +87,7 @@ func classify(host string, res Result, runErr, ctxErr error) Status {
 	case hasStatus && status == 429:
 		return Status{Kind: KindForbidden, Host: host, Reason: "GitHub API rate limit exhausted — try again later"}
 	case hasStatus && status == 404:
-		return Status{Kind: KindForbidden, Host: host, Reason: "not found, or you cannot see it"}
+		return gone(host)
 	case hasStatus && status >= 500:
 		return Status{Kind: KindForbidden, Host: host, Reason: "GitHub did not answer — try again later"}
 	default:

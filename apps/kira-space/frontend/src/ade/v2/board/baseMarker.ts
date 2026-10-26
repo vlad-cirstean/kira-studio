@@ -2,7 +2,7 @@ import { t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
 import type { Branch } from '../wire';
 import { type BranchGraph, isDraft, shortBranchName } from './branchGraph';
-import { catalogParts } from './catalogParts';
+import { branchParts } from './catalogParts';
 
 export interface BaseMarker {
   /** `⑂` for a base inside the same task, else `⑂ <base without its first path segment>`. */
@@ -14,7 +14,7 @@ export interface BaseMarker {
   pending: boolean;
 }
 
-const base = (value: string): TextPart => ({ name: 'base', value });
+const base = (value: string): TextPart => ({ name: 'base', value, kind: 'branch' });
 
 /** Mockup v2 line 1818: nothing when the branch starts from main. */
 export function baseMarker(b: Branch, graph: BranchGraph, mainName: string): BaseMarker | null {
@@ -26,8 +26,8 @@ export function baseMarker(b: Branch, graph: BranchGraph, mainName: string): Bas
     const vars = { base: p.name };
     const tip =
       p.kind === 'review'
-        ? catalogParts('space.ade.baseMarker.startsFromOwner.tooltip', vars, { owner: p.owner })
-        : catalogParts(
+        ? branchParts('space.ade.baseMarker.startsFromOwner.tooltip', vars, { owner: p.owner })
+        : branchParts(
             outside
               ? 'space.ade.baseMarker.startsFromOtherTask.tooltip'
               : 'space.ade.baseMarker.startsFromNotMain.tooltip',
@@ -45,7 +45,7 @@ export function baseMarker(b: Branch, graph: BranchGraph, mainName: string): Bas
       ? {
           label: ['⑂ ', base(b.base || mainName)],
           tone: 'grey',
-          tip: catalogParts('space.ade.baseMarker.startsFrom.tooltip', {
+          tip: branchParts('space.ade.baseMarker.startsFrom.tooltip', {
             base: b.base || mainName,
           }),
           pending,
@@ -57,8 +57,8 @@ export function baseMarker(b: Branch, graph: BranchGraph, mainName: string): Bas
     label: ['⑂ ', base(shortBranchName(b.base))],
     tone: owner ? 'blue' : 'grey',
     tip: owner
-      ? catalogParts('space.ade.baseMarker.startsFromOwner.tooltip', { base: b.base }, { owner })
-      : catalogParts('space.ade.baseMarker.startsFromNotMain.tooltip', { base: b.base }),
+      ? branchParts('space.ade.baseMarker.startsFromOwner.tooltip', { base: b.base }, { owner })
+      : branchParts('space.ade.baseMarker.startsFromNotMain.tooltip', { base: b.base }),
     pending,
   };
 }

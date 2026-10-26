@@ -10,7 +10,7 @@
 #
 # Static checks (S1, S2, S5) always run — S3/S4 were electron-builder.yml checks removed in the
 # P57 rewrite; the numbering was never closed up, and check IDs stay as-is since docs/PACKAGING.md
-# cross-references them. Artifact checks (A1, A3, A5, A6, N2 over the .app; A4, N3 over the .dmg P10
+# cross-references them. Artifact checks (A1, A3, A5, A6, A7, N2 over the .app; A4, N3 over the .dmg P10
 # ships) run only when that artifact exists; otherwise they print "skipped" and pass.
 #
 # Every check runs before the script exits, so one run reports everything wrong, not just the
@@ -177,6 +177,27 @@ for plist in apps/kira-studio/build/darwin/Info.plist apps/kira-studio/build/dar
   fi
 done
 
+# --- S15: the app icon is a full-bleed Icon Composer layer named by CFBundleIconName (P349) ------
+for app in kira-studio kira-space; do
+  svg="apps/$app/build/appicon.icon/Assets/kira_icon_vector.svg"
+  if tr '\n' ' ' <"$svg" | grep -Eq '<clipPath[^>]*>[^<]*<rect[^>]* rx='; then
+    fail "icon layer pre-masked" "$svg has a rounded clipPath; the layer must be full-bleed, the system applies the mask (P349)"
+  fi
+  if ! grep -q 'matrix(1.242718' "$svg"; then
+    fail "icon layer not full-bleed" "$svg lacks the matrix(1.242718 ...) scale that maps the artwork onto the full canvas (P349)"
+  fi
+  if command -v jq >/dev/null 2>&1; then
+    jq -e '.fill' "apps/$app/build/appicon.icon/icon.json" >/dev/null 2>&1 || fail "icon fill missing" "apps/$app/build/appicon.icon/icon.json has no top-level fill (P349)"
+  elif ! grep -q '"fill"' "apps/$app/build/appicon.icon/icon.json"; then
+    fail "icon fill missing" "apps/$app/build/appicon.icon/icon.json has no top-level fill (P349)"
+  fi
+  for plist in "apps/$app/build/darwin/Info.plist" "apps/$app/build/darwin/Info.dev.plist"; do
+    if ! grep -A1 '<key>CFBundleIconName</key>' "$plist" 2>/dev/null | grep -q '<string>appicon</string>'; then
+      fail "icon name missing" "$plist CFBundleIconName is not appicon (P349)"
+    fi
+  done
+done
+
 if command -v shellcheck >/dev/null 2>&1; then
   if ! shellcheck -s sh scripts/install.sh; then
     fail "shellcheck failed" "shellcheck -s sh scripts/install.sh reported issues — see above"
@@ -265,6 +286,23 @@ else
     note "skipped A6 — vtool not available on this runner"
   fi
 
+  # A7: Assets.car ships with the appicon icon, named by CFBundleIconName (P349).
+  if [ ! -f "$APP/Contents/Resources/Assets.car" ]; then
+    fail "Assets.car missing" "$APP/Contents/Resources/Assets.car not found; actool 26 compiles appicon.icon on macos-26 (P349)"
+  fi
+  if [ -x /usr/libexec/PlistBuddy ]; then
+    if [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$APP/Contents/Info.plist" 2>/dev/null || echo '')" != "appicon" ]; then
+      fail "icon name wrong" "CFBundleIconName in $APP is not appicon (P349)"
+    fi
+  fi
+  if command -v xcrun >/dev/null 2>&1 && xcrun --sdk macosx --find assetutil >/dev/null 2>&1; then
+    if ! xcrun --sdk macosx assetutil --info "$APP/Contents/Resources/Assets.car" 2>/dev/null | grep -q '"Name" : "appicon"'; then
+      fail "icon asset missing" "Assets.car in $APP has no appicon asset (P349)"
+    fi
+  else
+    note "skipped A7 assetutil — xcrun assetutil not available on this runner"
+  fi
+
   # --- N2: the whole bundle verifies deep-signed -------------------------------------------------
   if command -v codesign >/dev/null 2>&1; then
     if ! codesign --verify --deep --strict "$APP" >/dev/null 2>&1; then
@@ -348,6 +386,23 @@ else
     fi
   else
     note "skipped A6 — vtool not available on this runner"
+  fi
+
+  # A7: Assets.car ships with the appicon icon, named by CFBundleIconName (P349).
+  if [ ! -f "$SPACE_APP/Contents/Resources/Assets.car" ]; then
+    fail "Assets.car missing" "$SPACE_APP/Contents/Resources/Assets.car not found; actool 26 compiles appicon.icon on macos-26 (P349)"
+  fi
+  if [ -x /usr/libexec/PlistBuddy ]; then
+    if [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$SPACE_APP/Contents/Info.plist" 2>/dev/null || echo '')" != "appicon" ]; then
+      fail "icon name wrong" "CFBundleIconName in $SPACE_APP is not appicon (P349)"
+    fi
+  fi
+  if command -v xcrun >/dev/null 2>&1 && xcrun --sdk macosx --find assetutil >/dev/null 2>&1; then
+    if ! xcrun --sdk macosx assetutil --info "$SPACE_APP/Contents/Resources/Assets.car" 2>/dev/null | grep -q '"Name" : "appicon"'; then
+      fail "icon asset missing" "Assets.car in $SPACE_APP has no appicon asset (P349)"
+    fi
+  else
+    note "skipped A7 assetutil — xcrun assetutil not available on this runner"
   fi
 
   # --- N2: the whole bundle verifies deep-signed -------------------------------------------------

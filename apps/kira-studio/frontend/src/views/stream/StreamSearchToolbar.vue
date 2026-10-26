@@ -4,6 +4,7 @@ import { t } from '@theme/i18n';
 import CatalogText from '@theme/i18n/CatalogText.vue';
 import { formatCount } from '@workbench/behaviour/format';
 import FindBar from '@workbench/components/FindBar.vue';
+import ToolbarSeparator from '@workbench/components/ToolbarSeparator.vue';
 import { computed, onUnmounted, ref, watch } from 'vue';
 import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { getPage, pageVersion } from './page';
@@ -97,7 +98,7 @@ onUnmounted(() => {
         data-testid="stream-search-filter-rows"
         @click="toggleFilter"
       />
-      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+      <ToolbarSeparator />
       <span class="text-kira-sm text-subtle" data-testid="stream-search-scope">
         <template v-if="filtering && filteredRowCount !== null">
           {{

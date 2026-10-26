@@ -1,5 +1,6 @@
 import type { CommitStore } from '@kira/git-core';
 import type {
+  ChangeRequestIndex,
   ChangeRequestLookup,
   ChangeRequestRecord,
   GitHostInfo,
@@ -28,10 +29,23 @@ const CHANGE_REQUEST_ANCESTRY_WALK_BUDGET = 50_000;
 /** Repos whose last-known PR facts are kept for an instant restore on a tab/repo switch. */
 const CHANGE_REQUEST_REPO_CACHE_CAP = 8;
 
+function sameRecords(
+  a: ReadonlyMap<string, ChangeRequestRecord>,
+  b: ReadonlyMap<string, ChangeRequestRecord>,
+): boolean {
+  if (a.size !== b.size) return false;
+  for (const [name, record] of a) {
+    const other = b.get(name);
+    if (other === undefined || JSON.stringify(record) !== JSON.stringify(other)) return false;
+  }
+  return true;
+}
+
 interface RepoFacts {
   readonly bySha: ReadonlyMap<string, readonly ChangeRequestRecord[]>;
   readonly byBranch: ReadonlyMap<string, ChangeRequestRecord>;
   readonly noBranchChangeRequest: ReadonlySet<string>;
+  readonly indexComplete: boolean;
 }
 
 /**
@@ -136,6 +150,11 @@ export class ChangeRequestState {
    *  warm-up/resolve from continuing to run — and apply its answers — straight through a
    *  same-repo `refsChanged` clear. */
   #clearGeneration = 0;
+  /** True once the server's persisted index holds every change request of the repo: a branch
+   *  absent from `byBranch` then has none, so the per-branch lookups below are skipped. */
+  #indexComplete = false;
+  #indexInFlight = false;
+  #indexQueued = false;
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
@@ -144,8 +163,8 @@ export class ChangeRequestState {
     // re-requests below settle.
     this.#unsubscribe = bridge.on('repo.changed', (event) => {
       if (this.#repoId !== event.repoId) return;
-      if (event.kind !== 'refsChanged') return;
-      this.#revalidate();
+      if (event.kind === 'changeRequestsChanged') void this.#loadIndex();
+      else if (event.kind === 'refsChanged') this.#revalidate();
     });
     this.#unsubscribeSettings = bridge.on('repoSettings.changed', (event) => {
       if (this.#repoId !== event.repoId) return;
@@ -177,15 +196,74 @@ export class ChangeRequestState {
     this.#hostSetting = undefined;
     this.#clear();
     this.host.value = null;
-    if (repoId !== undefined) void this.#loadHost(repoId);
+    if (repoId !== undefined) {
+      void this.#loadHost(repoId);
+      void this.#loadIndex();
+    }
     const facts = repoId === undefined ? undefined : this.#repoFacts.get(repoId);
     if (facts === undefined) return;
     this.bySha.value = facts.bySha;
     this.byBranch.value = facts.byBranch;
     this.#noBranchChangeRequest.clear();
     for (const name of facts.noBranchChangeRequest) this.#noBranchChangeRequest.add(name);
+    this.#indexComplete = facts.indexComplete;
     this.generation.value++;
-    void this.#revalidateBranches();
+    if (!this.#indexComplete) void this.#revalidateBranches();
+  }
+
+  /** Tells the server the window gained or lost focus: a regain syncs now, a blur only slows the
+   *  periodic cadence. Fail-open like every lookup here. */
+  async syncFocus(focused: boolean): Promise<void> {
+    const repoId = this.#repoId;
+    if (repoId === undefined) return;
+    try {
+      await this.#bridge.request('branch.syncChangeRequests', { repoId, focused });
+    } catch {
+      // Fail-open: the server's own cadence still syncs.
+    }
+  }
+
+  /** Reads the persisted index in one request and applies it in one assignment. Reloads coalesce:
+   *  one in flight, one queued behind it. */
+  async #loadIndex(): Promise<void> {
+    if (this.#indexInFlight) {
+      this.#indexQueued = true;
+      return;
+    }
+    const repoId = this.#repoId;
+    if (repoId === undefined) return;
+    this.#indexInFlight = true;
+    const generation = this.#clearGeneration;
+    try {
+      const index = await this.#bridge.request('branch.changeRequestIndex', { repoId });
+      if (this.#repoId !== repoId || this.#clearGeneration !== generation) return;
+      this.#applyIndex(index);
+    } catch {
+      // Fail-open: the per-branch lookups still answer.
+    } finally {
+      this.#indexInFlight = false;
+      if (this.#indexQueued) {
+        this.#indexQueued = false;
+        void this.#loadIndex();
+      }
+    }
+  }
+
+  #applyIndex(index: ChangeRequestIndex): void {
+    if (index.branches.length === 0 && !index.complete) return;
+    const next = new Map<string, ChangeRequestRecord>();
+    for (const branch of index.branches) {
+      next.set(branch.name, branch.changeRequest);
+    }
+    // A partial index only adds; a complete one is authoritative and also removes.
+    const merged = index.complete ? next : new Map([...this.byBranch.value, ...next]);
+    const changed =
+      index.complete !== this.#indexComplete || !sameRecords(this.byBranch.value, merged);
+    this.#indexComplete = index.complete;
+    if (index.complete) this.#noBranchChangeRequest.clear();
+    if (!changed) return;
+    this.byBranch.value = merged;
+    this.generation.value++;
   }
 
   async #loadHost(repoId: string): Promise<void> {
@@ -203,6 +281,7 @@ export class ChangeRequestState {
       bySha: this.bySha.value,
       byBranch: this.byBranch.value,
       noBranchChangeRequest: new Set(this.#noBranchChangeRequest),
+      indexComplete: this.#indexComplete,
     });
     for (const oldest of this.#repoFacts.keys()) {
       if (this.#repoFacts.size <= CHANGE_REQUEST_REPO_CACHE_CAP) break;
@@ -222,6 +301,7 @@ export class ChangeRequestState {
     this.#sha = null;
     this.#noBranchChangeRequest.clear();
     this.#disabledForRepo = false;
+    this.#indexComplete = false;
     this.bySha.value = new Map();
     this.byBranch.value = new Map();
     this.changeRequestByAncestry.value = new Map();
@@ -240,7 +320,8 @@ export class ChangeRequestState {
     if (this.#repoId !== undefined) void this.#loadHost(this.#repoId);
     const sha = this.#sha;
     if (sha !== null) void this.#requestCommit(sha);
-    void this.#revalidateBranches();
+    void this.#loadIndex();
+    if (!this.#indexComplete) void this.#revalidateBranches();
   }
 
   async #revalidateBranches(): Promise<void> {
@@ -345,6 +426,7 @@ export class ChangeRequestState {
     // stop this repo's answers from being applied (wasted host calls against a repo
     // nobody is looking at any more otherwise keep firing for as long as `toFetch` has entries).
     const generation = this.#clearGeneration;
+    if (this.#indexComplete) return;
     const toFetch = branchNames.filter(
       (name) =>
         !this.byBranch.value.has(name) &&
@@ -371,7 +453,7 @@ export class ChangeRequestState {
   async resolveBranch(branch: string): Promise<void> {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
-    if (this.#disabledForRepo) return;
+    if (this.#disabledForRepo || this.#indexComplete) return;
     if (
       this.byBranch.value.has(branch) ||
       this.#noBranchChangeRequest.has(branch) ||

@@ -62,6 +62,24 @@ let oracle: MockupComponent;
 let timeline: TimelineView;
 let progress: Map<string, TaskProgress>;
 
+/** The pairs the mockup oracle derives from the captures' shared files (the wire no longer carries files). */
+const ORACLE_PAIRS: Pair[] = [
+  {
+    a: 'b_bill',
+    b: 'b_sara',
+    shared: ['src/payments/client.ts', 'src/payments/invoice.ts'],
+    conflicts: ['src/payments/client.ts', 'src/payments/invoice.ts'],
+  },
+  { a: 'b_billdash', b: 'b_notif', shared: ['src/ui/nav/Sidebar.tsx'], conflicts: [] },
+  {
+    a: 'b_li',
+    b: 'b_search',
+    shared: ['src/search/schema.ts'],
+    conflicts: ['src/search/schema.ts'],
+  },
+  { a: 'b_search', b: 'b_deps', shared: ['package.json'], conflicts: [] },
+];
+
 function normalizeBoard(raw: Board, sess: SessionsResult): Board {
   const runs = (t: Board['tasks'][number]) =>
     t.runs.map((r) => {
@@ -76,21 +94,7 @@ function normalizeBoard(raw: Board, sess: SessionsResult): Board {
       );
       return r.state === 'running' && stuck ? { ...r, state: 'stuck' as const } : r;
     });
-  const pairs: Pair[] = [];
-  const bs = raw.branches;
-  for (let i = 0; i < bs.length; i++) {
-    for (let j = i + 1; j < bs.length; j++) {
-      const a = bs[i] as Branch;
-      const b = bs[j] as Branch;
-      if (a.codeRepoId !== b.codeRepoId) continue;
-      const files = new Set(b.files.map((f) => f.path));
-      const shared = a.files.map((f) => f.path).filter((p) => files.has(p));
-      if (!shared.length) continue;
-      const review = a.kind === 'review' || b.kind === 'review';
-      pairs.push({ a: a.id, b: b.id, shared, conflicts: review ? shared : [] });
-    }
-  }
-  return { ...raw, tasks: raw.tasks.map((t) => ({ ...t, runs: runs(t) })), pairs };
+  return { ...raw, tasks: raw.tasks.map((t) => ({ ...t, runs: runs(t) })), pairs: ORACLE_PAIRS };
 }
 
 beforeAll(() => {

@@ -26,6 +26,11 @@ type PR struct {
 	HeadRepoOwner string `json:"headRepoOwner"`
 	BaseRef       string `json:"baseRef"`
 	UpdatedAt     int64  `json:"updatedAt"` // Unix milliseconds.
+	// NodeID, Draft, ReviewDecision and ChecksState are read by the sync queries only.
+	NodeID         string `json:"nodeId,omitempty"`
+	Draft          bool   `json:"draft,omitempty"`
+	ReviewDecision string `json:"reviewDecision,omitempty"`
+	ChecksState    string `json:"checksState,omitempty"`
 }
 
 // rawPull is the GitHub REST response shape, decoded exactly as the API sends it — never exported,
@@ -94,6 +99,7 @@ func (p rawPull) toPR() PR {
 		HeadRepoOwner: headRepoOwner,
 		BaseRef:       p.Base.Ref,
 		UpdatedAt:     updatedAtMillis,
+		Draft:         p.Draft && p.State == "open" && (p.Merged == nil || *p.Merged == ""),
 	}
 }
 

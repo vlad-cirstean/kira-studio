@@ -5,7 +5,7 @@ import { contract } from './support/contract';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
-// The Plan's right-hand panel: task fields, notes, branch details and changes, force push, resize.
+// The Plan's right-hand panel: task fields, notes, branch details, force push, resize.
 
 interface BoardFx {
   tasks: { id: string; est: string }[];
@@ -32,13 +32,19 @@ test('Space on a focused card head selects the task', async ({ relaunch }) => {
   await card(page, 'T_bill').focus();
   await page.keyboard.press('Space');
   await expect(page.locator('[data-testid="ade-panel"]')).toBeVisible();
-  await expect(page.locator('[data-testid="ade-panel-title"]')).toContainText('PAY-102');
+  await expect(page.locator('[data-testid="ade-panel-title"]')).toHaveAttribute(
+    'placeholder',
+    /PAY-102/,
+  );
 });
 
 test('selecting a task shows its facts; status is read-only', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   await openTask(page, 'T_bill');
-  await expect(page.locator('[data-testid="ade-panel-title"]')).toContainText('PAY-102');
+  await expect(page.locator('[data-testid="ade-panel-title"]')).toHaveAttribute(
+    'placeholder',
+    /PAY-102/,
+  );
   await expect(page.locator('[data-testid="ade-panel-facts"]')).toContainText(
     '3 branches in api, web-app',
   );
@@ -46,10 +52,10 @@ test('selecting a task shows its facts; status is read-only', async ({ relaunch 
   await expect(page.locator('[data-testid="ade-task-branch"]')).toHaveCount(3);
 });
 
-test('Escape in the task name reverts the text and writes nothing', async ({ relaunch }) => {
+test('Escape in the panel title reverts the text and writes nothing', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch);
   await openTask(page, 'T_notif');
-  const name = page.locator('[data-testid="ade-task-name"]');
+  const name = page.locator('[data-testid="ade-panel-title"]');
   const original = await name.inputValue();
   await name.fill('Discard me');
   await name.press('Escape');
@@ -60,7 +66,7 @@ test('Escape in the task name reverts the text and writes nothing', async ({ rel
 test('name, Jira, GitHub and Not merging write UpdateTask patches', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch);
   await openTask(page, 'T_notif');
-  const name = page.locator('[data-testid="ade-task-name"]');
+  const name = page.locator('[data-testid="ade-panel-title"]');
   await name.fill('Notify on mention');
   await name.press('Enter');
   await expect.poll(() => updates(control)).toHaveLength(1);
@@ -90,29 +96,6 @@ test('name, Jira, GitHub and Not merging write UpdateTask patches', async ({ rel
   expect(updates(control)[3]?.args).toMatchObject({ patch: { kind: 'parked' } });
 });
 
-test('estimate: unset takes number and unit, set only extends, a backend refusal shows', async ({
-  relaunch,
-}) => {
-  const board = adeFixture<BoardFx>('board');
-  const target = board.tasks.find((t) => t.id === 'T_notif');
-  if (target) target.est = '';
-  const { window: page, control } = await openPlan(relaunch, [
-    { channel: IPC.adeTaskBoard, response: board },
-  ]);
-  await openTask(page, 'T_notif');
-  await page.locator('[data-testid="ade-estimate-num"]').fill('3');
-  await page.locator('[data-testid="ade-estimate-unit-d"]').click();
-  await expect.poll(() => updates(control)).toHaveLength(1);
-  expect(updates(control)[0]?.args).toMatchObject({ patch: { est: '3d' } });
-
-  await openTask(page, 'T_bill');
-  await expect(page.locator('[data-testid="ade-estimate-total"]')).toHaveText('2d');
-  await page.locator('[data-testid="ade-estimate-extend"]').fill('1');
-  await page.locator('[data-testid="ade-estimate-extend-submit"]').click();
-  await expect.poll(() => updates(control)).toHaveLength(2);
-  expect(updates(control)[1]?.args).toMatchObject({ taskId: 'T_bill', patch: { est: '3d' } });
-});
-
 test('a refused git host link shows the backend error', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch, [
     {
@@ -132,14 +115,14 @@ test('a refused estimate shows the backend error', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch, [
     {
       channel: IPC.adeTaskUpdateTask,
-      error: { code: 'invalid', message: 'estimate can only grow' },
+      error: { code: 'invalid', message: 'Enter an estimate like 2h or 3d.' },
     },
   ]);
   await openTask(page, 'T_bill');
-  await page.locator('[data-testid="ade-estimate-extend"]').fill('1');
-  await page.locator('[data-testid="ade-estimate-extend-submit"]').click();
+  await page.locator('[data-testid="ade-estimate-num"]').fill('1');
+  await page.locator('[data-testid="ade-estimate-num"]').press('Tab');
   await expect(page.locator('[data-testid="ade-estimate-error"]')).toContainText(
-    'estimate can only grow',
+    'Enter an estimate like 2h or 3d.',
   );
 });
 
@@ -193,7 +176,7 @@ test('typing in Notes saves once, debounced', async ({ relaunch }) => {
   expect(args.patch.notes).toContain('check the digest');
 });
 
-test('a branch opens Details with merged and deployed rows; Changes; back to the task', async ({
+test('a branch opens Details with merged and deployed rows; back to the task', async ({
   relaunch,
 }) => {
   const board = adeFixture<BoardFx>('board');
@@ -216,43 +199,8 @@ test('a branch opens Details with merged and deployed rows; Changes; back to the
   await expect(
     details.locator('[data-testid="ade-branch-deploy"][data-env="preview"]'),
   ).toContainText('Unknown');
-  await page.locator('[data-testid="ade-panel-tab-changes"]').click();
-  await expect(page.locator('[data-testid="ade-changes-tab"]')).toBeVisible();
   await page.locator('[data-testid="ade-panel-back"]').click();
   await expect(page.locator('[data-testid="ade-task-tab"]')).toBeVisible();
-});
-
-// Contract ade-review-open. Backend half: adeflow TestReviewOpenFacts. The fixture branch b_auth
-// keeps its identity and takes the backend's committed files and commits.
-test('contract: the Changes tab lists the branch files by path only', async ({ relaunch }) => {
-  const facts = contract<{
-    files: { path: string }[];
-    commits: { sha: string; message: string }[];
-    commitCount: number;
-  }>('ade-review-open', 'AdeTaskService.Branch#committed');
-  const { window: page } = await openPlan(relaunch, [
-    {
-      channel: IPC.adeTaskBoard,
-      response: adeBoard((b) => {
-        const br = b.branches.find((x) => x.id === 'b_auth');
-        if (!br) throw new Error('fixture branch missing');
-        const { files, commits, commitCount } = facts;
-        Object.assign(br, { files, commits, commitCount });
-      }),
-    },
-  ]);
-  await openTask(page, 'T_auth');
-  await page.locator('[data-testid="ade-task-branch"][data-branch-id="b_auth"]').click();
-  await page.locator('[data-testid="ade-panel-tab-changes"]').click();
-  const rows = page.locator('[data-testid="ade-changes-file-row"]');
-  await expect(rows).toHaveCount(facts.files.length);
-  for (const [i, f] of facts.files.entries()) {
-    await expect(rows.nth(i)).toHaveText(f.path);
-    expect(await rows.nth(i).innerText()).not.toMatch(/[+\u2212-]\d+/);
-  }
-  await expect(page.locator('[data-testid="ade-changes-commit-row"]')).toHaveCount(
-    facts.commits.length,
-  );
 });
 
 test('a branch row on the Plan selects the branch', async ({ relaunch }) => {

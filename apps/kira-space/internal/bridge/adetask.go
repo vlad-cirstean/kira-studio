@@ -95,7 +95,6 @@ var adeTaskCatalog = []struct {
 	{ade.ErrStale, ipcerr.CodeConflict, "backend.space.ade.taskMoved.body"},
 	{ade.ErrWorkflowChanged, ipcerr.CodeConflict, "backend.space.ade.workflowChanged.body"},
 	{ade.ErrSetupPending, ipcerr.CodePreparing, "backend.space.ade.setupPending.body"},
-	{repos.ErrEstimateShrink, ipcerr.CodeBadRequest, "backend.space.ade.estimateShrink.body"},
 	{repos.ErrBranchOnTask, ipcerr.CodeConflict, "backend.space.ade.branchOnTask.body"},
 	{repos.ErrRepoOnTask, ipcerr.CodeConflict, "backend.space.ade.repoOnTask.body"},
 	{ade.ErrSessionRunning, ipcerr.CodeConflict, "backend.space.ade.sessionRunning.body"},
@@ -120,6 +119,9 @@ func adeTaskError(err error) error {
 		if errors.Is(err, c.err) {
 			return ipcerr.T(c.code, c.key, nil)
 		}
+	}
+	if errors.Is(err, repos.ErrTaskUnnamed) {
+		return ipcerr.BadRequest(err.Error())
 	}
 	if errors.Is(err, ade.ErrInvalidInput) {
 		// The detail is a refusal the person can act on (a cycle, a missing base), not a bug.
@@ -190,6 +192,11 @@ func validateCreateTask(a adewire.CreateTaskArgs) error {
 			return err
 		}
 		if err := validateAdeBaseChoice(c, "bases"); err != nil {
+			return err
+		}
+	}
+	if a.Day != nil {
+		if err := validateAdeISODate(*a.Day); err != nil {
 			return err
 		}
 	}
@@ -1031,6 +1038,24 @@ func (s *AdeTaskService) LaunchReviewAgent(ctx context.Context, args adewire.Tas
 	}
 	l, err := s.Engine.LaunchReviewAgent(ctx, args.TaskID)
 	return l, adeTaskError(err)
+}
+
+// ForwardReviewComments pastes the branch's open review comments into its task's running review agent.
+func (s *AdeTaskService) ForwardReviewComments(ctx context.Context, args adewire.BranchArgs) (adewire.ForwardReviewResult, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return adewire.ForwardReviewResult{}, err
+	}
+	n, err := s.Engine.ForwardReviewComments(ctx, args.BranchID)
+	return adewire.ForwardReviewResult{Count: n}, adeTaskError(err)
+}
+
+// ReviewForwardText returns the message ForwardReviewComments would send. It sends and stamps nothing.
+func (s *AdeTaskService) ReviewForwardText(ctx context.Context, args adewire.BranchArgs) (adewire.ReviewForwardText, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return adewire.ReviewForwardText{}, err
+	}
+	text, err := s.Engine.ReviewForwardText(ctx, args.BranchID)
+	return adewire.ReviewForwardText{Text: text}, adeTaskError(err)
 }
 
 // ViewedSyncPlan reports what syncing the branch's reviewed files to its PR would do.

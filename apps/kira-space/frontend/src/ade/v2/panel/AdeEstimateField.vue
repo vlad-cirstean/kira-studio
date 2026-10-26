@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { t } from '@theme/i18n';
 import { computed, ref, watch } from 'vue';
 
-// Estimate row. Unset: number plus an hours/days toggle, written on `change`. Set: extend-only
-// (D16), so only an "Extend" input adds to the total and the backend refuses a shrink.
+// Estimate row: number + h/d, written on change; empty clears.
 const props = defineProps<{
   /** `Task.est`: `''` none, else `<n>h` / `<n>d`. */
   est: string;
@@ -27,19 +26,11 @@ function split(est: string): { num: string; unit: 'h' | 'd' } {
 const parsed = computed(() => split(props.est));
 const num = ref(parsed.value.num);
 const unit = ref<'h' | 'd'>(parsed.value.unit);
-const extendBy = ref('');
 
 watch(parsed, (next) => {
   num.value = next.num;
   unit.value = next.unit;
-  extendBy.value = '';
 });
-
-const MAX_EST = { h: 480, d: 60 };
-// An estimate stored above the cap unlocks so a typo can be replaced.
-const locked = computed(
-  () => props.est !== '' && !(Number.parseFloat(parsed.value.num) > MAX_EST[parsed.value.unit]),
-);
 
 function commit(): void {
   const numStr = String(num.value).trim();
@@ -51,14 +42,9 @@ function pickUnit(next: 'h' | 'd'): void {
   if (String(num.value).trim()) commit();
 }
 
-const canExtend = computed(() => Number(extendBy.value) > 0);
-
-function extend(): void {
-  if (!canExtend.value) return;
-  const total =
-    Math.round((Number.parseFloat(parsed.value.num) + Number(extendBy.value)) * 100) / 100;
-  emit('save', `${total}${parsed.value.unit}`);
-  extendBy.value = '';
+function clear(): void {
+  num.value = '';
+  emit('save', '');
 }
 
 const unitItems = computed(() => [
@@ -73,38 +59,7 @@ const hint = computed(() =>
 
 <template>
   <div class="flex flex-col gap-0.5">
-    <div v-if="locked" class="flex min-h-row items-center gap-1.5">
-      <span class="text-kira-md text-fg" data-testid="ade-estimate-total">{{ est }}</span>
-      <Label for="ade-estimate-extend" class="sr-only">{{
-        t('space.ade.estimate.extend.aria')
-      }}</Label>
-      <Input
-        id="ade-estimate-extend"
-        v-model="extendBy"
-        type="number"
-        min="0.5"
-        step="0.5"
-        size="kira-lg"
-        class="w-20"
-        :aria-invalid="error ? true : undefined"
-        :aria-describedby="error ? 'ade-estimate-error-text' : undefined"
-        data-testid="ade-estimate-extend"
-      />
-      <span class="text-kira-sm text-muted-foreground">{{
-        parsed.unit === 'd' ? t('space.ade.estimate.days.option') : t('space.ade.estimate.hours.option')
-      }}</span>
-      <Button
-        variant="dialog"
-        size="kira-lg"
-        :disabled="!canExtend"
-        data-testid="ade-estimate-extend-submit"
-        @click="extend"
-      >
-        {{ t('space.ade.estimate.extend.label') }}
-      </Button>
-      <span class="text-kira-sm text-muted-foreground">{{ hint }}</span>
-    </div>
-    <div v-else class="flex min-h-row items-center gap-1.5">
+    <div class="flex min-h-row items-center gap-1.5">
       <Label for="ade-est-num" class="sr-only">{{ t('space.ade.estimate.field.label') }}</Label>
       <Input
         id="ade-est-num"
@@ -128,6 +83,13 @@ const hint = computed(() =>
         :aria-label="t('space.ade.estimate.unit.aria')"
         @mousedown.prevent
         @update:model-value="(v) => pickUnit(v === 'd' ? 'd' : 'h')"
+      />
+      <TooltipIconButton
+        v-if="est !== ''"
+        icon="close"
+        :label="t('space.ade.estimate.clear.tooltip')"
+        data-testid="ade-estimate-clear"
+        @click="clear"
       />
       <span class="text-kira-sm text-muted-foreground">{{ hint }}</span>
     </div>

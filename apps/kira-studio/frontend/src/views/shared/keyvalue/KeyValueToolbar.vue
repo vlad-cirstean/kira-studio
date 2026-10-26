@@ -7,6 +7,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
 import { formatBytes, formatCompactDuration, formatCount } from '@workbench/behaviour/format';
+import ToolbarSeparator from '@workbench/components/ToolbarSeparator.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, useTemplateRef } from 'vue';
 import { pageSizeOptions } from '../page/sizes';
@@ -123,7 +124,7 @@ defineExpose({
     </div>
 
     <template v-if="!gate.isSingleObjectPage.value">
-      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+      <ToolbarSeparator />
       <SecondaryTabs
         variant="segmented"
         :model-value="String(host?.pageSize ?? 100)"
@@ -135,7 +136,7 @@ defineExpose({
       />
     </template>
 
-    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+    <ToolbarSeparator />
 
     <div class="flex items-center gap-1.5 min-w-0">
       <TooltipIconButton
@@ -146,7 +147,7 @@ defineExpose({
       />
     </div>
 
-    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+    <ToolbarSeparator />
 
     <div class="flex items-center gap-1.5 min-w-0">
       <KeyValueAddPopover

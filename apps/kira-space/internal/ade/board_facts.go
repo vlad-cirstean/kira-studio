@@ -32,8 +32,7 @@ func zeroBranch(sb model.AdeTaskBranch, base string, setup *adewire.WorktreeSetu
 		ID: sb.ID, TaskID: sb.TaskID, CodeRepoID: sb.CodeRepoID, Name: sb.Name, Kind: sb.Kind, Base: base,
 		BaseBranchID: sb.BaseBranchID, BasePendingFrom: sb.BasePendingFrom,
 		Setup: setup, Integration: []adewire.Integration{}, Deployments: []adewire.Deployment{},
-		ConflictsIfRebased: []string{}, ConflictCheck: conflictDone, Files: []adewire.FileChange{},
-		Commits: []adewire.Commit{}, Dirty: []adewire.DirtyEntry{}, AddedAt: sb.AddedAt, Origin: sb.Origin,
+		ConflictsIfRebased: []string{}, ConflictCheck: conflictDone, Dirty: []adewire.DirtyEntry{}, AddedAt: sb.AddedAt, Origin: sb.Origin,
 	}
 }
 
@@ -315,15 +314,12 @@ func (b *TaskBoard) computeBranch(ctx context.Context, sc *boardCtx, sb model.Ad
 			return out, err
 		}
 		wb.Ahead, wb.Behind = rf.Ahead, rf.Behind
-		wb.Files = toWireFiles(rf.Files)
-		wb.Commits = toWireCommits(rf.Commits)
 		files = rf.Files
 	}
 	depth, err := sc.mainDepth(ctx, sb, row, wb.Ahead)
 	if err != nil {
 		return out, err
 	}
-	wb.CommitCount = depth
 
 	if wb.Worktree != "" {
 		status, err := sc.entry.WorktreeStatus(ctx, wb.Worktree)
@@ -400,22 +396,6 @@ func (sc *boardCtx) mainDepth(ctx context.Context, sb model.AdeTaskBranch, row p
 	}
 	ahead, _, err := sc.entry.AheadBehind(ctx, row.Tip, sc.mainTip)
 	return ahead, err
-}
-
-func toWireFiles(changes []porcelain.FileChange) []adewire.FileChange {
-	out := make([]adewire.FileChange, len(changes))
-	for i, c := range changes {
-		out[i] = adewire.FileChange{Path: c.Path}
-	}
-	return out
-}
-
-func toWireCommits(commits []porcelain.RangeCommit) []adewire.Commit {
-	out := make([]adewire.Commit, len(commits))
-	for i, c := range commits {
-		out[i] = adewire.Commit{Sha: c.Sha, Message: c.Subject}
-	}
-	return out
 }
 
 // loadFacts reads the configured integration targets, environments, stored marks and env states of

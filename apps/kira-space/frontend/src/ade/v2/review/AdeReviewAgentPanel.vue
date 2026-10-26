@@ -1,23 +1,34 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { FieldDescription } from '@theme/components/ui/field';
+import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
 import { useAgentInfo } from '@workbench/agent/agentInfo';
+import { useCopy } from '@workbench/behaviour/clipboard';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import { useTerminalsStore } from '../../../state/terminals';
 import { useAgentSessionsStore } from '../../state';
-import { withTuiActivity } from '../activity';
+import AdeTip from '../AdeTip.vue';
+import { activityKind, withTuiActivity } from '../activity';
 import { blockingSetups } from '../board/setupGate';
 import { useLaunchOpener } from '../dialog/useLaunchOpener';
 import AdeSetupProgress from '../panel/AdeSetupProgress.vue';
-import { useBoard, useFocusSession, useLaunchReviewAgent, useReviewAgent } from '../queries';
+import {
+  useBoard,
+  useFocusSession,
+  useForwardReviewComments,
+  useLaunchReviewAgent,
+  useReviewAgent,
+  useReviewForwardText,
+} from '../queries';
 import AdeTuiPane from '../sessions/AdeTuiPane.vue';
 import { type SessionLookup, sessionView } from '../sessions/sessionView';
 import { isPreparing, useSetupWait } from '../state/useSetupWait';
 import type { ReviewWindowTarget } from '../wire';
-import AdeReviewCompose from './AdeReviewCompose.vue';
+import { useReviewComments } from './useReviewComments';
 
 // The review agent of this window's task: its terminal when this window runs it, a pointer to the
 // window that does, or a Start button. One process per task, never two.
@@ -29,6 +40,10 @@ const agentStore = useAgentSessionsStore();
 const agent = useReviewAgent(() => props.target.taskId);
 const launchM = useLaunchReviewAgent();
 const focusM = useFocusSession();
+const forwardM = useForwardReviewComments();
+const textM = useReviewForwardText();
+const { copy: copyText, copied } = useCopy();
+const comments = useReviewComments(() => props.target);
 
 const board = useBoard();
 // The review window's worktree may still be preparing: Start waits for it instead of failing.
@@ -50,6 +65,41 @@ const running = computed(() => session.value?.state === 'running');
 const here = computed(
   () => running.value && terminals.terminalSession(session.value?.terminalId ?? '') !== undefined,
 );
+
+const openCount = computed(
+  () => (comments.query.data.value ?? []).filter((c) => c.state === 'open').length,
+);
+const waitingOnInput = computed(
+  () => session.value !== null && activityKind(session.value) === 'input',
+);
+const forwardTip = computed(() => {
+  if (waitingOnInput.value) return t('space.ade.review.forward.blocked.tooltip');
+  if (openCount.value === 0) return t('space.ade.review.forward.none.tooltip');
+  return '';
+});
+const copyOff = computed(() => openCount.value === 0 || textM.isPending.value);
+const forwardOff = computed(() => forwardTip.value !== '' || forwardM.isPending.value);
+
+async function forward(): Promise<void> {
+  error.value = '';
+  try {
+    await forwardM.mutateAsync({ branchId: props.target.branchId });
+  } catch (err) {
+    error.value = errorText(err);
+  } finally {
+    await comments.refresh();
+  }
+}
+
+async function copyComments(): Promise<void> {
+  error.value = '';
+  try {
+    const { text } = await textM.mutateAsync({ branchId: props.target.branchId });
+    await copyText(text);
+  } catch (err) {
+    error.value = errorText(err);
+  }
+}
 
 const { info: agentInfo } = useAgentInfo();
 const lookup = computed<SessionLookup>(() => ({
@@ -97,6 +147,42 @@ async function focus(): Promise<void> {
       <AlertDescription>{{ note }}</AlertDescription>
     </Alert>
     <template v-if="session && running && view">
+      <div
+        class="flex flex-none items-center gap-2 border-b border-border px-2 py-1.5"
+        data-testid="ade-review-forward-bar"
+      >
+        <AdeTip :text="forwardTip">
+          <TooltipDisabledTrigger :disabled="forwardOff">
+            <Button
+              variant="dialog"
+              size="kira"
+              :pending="forwardM.isPending.value"
+              :disabled="forwardOff"
+              data-testid="ade-review-forward"
+              @click="forward"
+            >
+              <CodiconIcon name="comment-discussion" :size="13" />
+              {{ t('space.ade.review.forward.label', { count: openCount }) }}
+            </Button>
+          </TooltipDisabledTrigger>
+        </AdeTip>
+        <AdeTip
+          :text="openCount === 0 ? t('space.ade.review.copy.none.tooltip') : t('space.ade.review.copy.tooltip')"
+        >
+          <TooltipDisabledTrigger :disabled="copyOff">
+            <Button
+              variant="toolbar"
+              size="kira"
+              :disabled="copyOff"
+              data-testid="ade-review-copy"
+              @click="copyComments"
+            >
+              <CodiconIcon :name="copied ? 'check' : 'copy'" :size="13" />
+              {{ copied ? t('common.copy.copied.announce') : t('common.action.copy.label') }}
+            </Button>
+          </TooltipDisabledTrigger>
+        </AdeTip>
+      </div>
       <AdeTuiPane v-if="here" :view="view" class="min-h-0 flex-1" />
       <div
         v-else
@@ -111,7 +197,6 @@ async function focus(): Promise<void> {
           t('space.ade.review.agent.gone.hint')
         }}</FieldDescription>
       </div>
-      <AdeReviewCompose :target="target" :repo-label="repoLabel" :session="session" />
     </template>
     <div
       v-else

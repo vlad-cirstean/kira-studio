@@ -9,23 +9,11 @@
     "basePendingFrom": "",
     "behind": 0,
     "codeRepoId": "<id:1>",
-    "commitCount": 1,
-    "commits": [
-      {
-        "message": "add wip",
-        "sha": "<masked>"
-      }
-    ],
     "conflictCheck": "done",
     "conflictCheckReason": "",
     "conflictsIfRebased": [],
     "deployments": [],
     "dirty": [],
-    "files": [
-      {
-        "path": "wip.txt"
-      }
-    ],
     "id": "<id:2>",
     "integration": [],
     "kind": "mine",
@@ -60,8 +48,6 @@
     "basePendingFrom": "",
     "behind": 0,
     "codeRepoId": "<id:1>",
-    "commitCount": 0,
-    "commits": [],
     "conflictCheck": "done",
     "conflictCheckReason": "",
     "conflictsIfRebased": [],
@@ -72,7 +58,6 @@
         "path": "wip.txt"
       }
     ],
-    "files": [],
     "id": "<id:2>",
     "integration": [],
     "kind": "mine",
@@ -97,6 +82,7 @@
     "upstreamBehind": 0,
     "worktree": "<home>/wt/api/api-open"
   },
+  "AdeTaskService.OpenReviewWindow#existing": false,
   "args:AdeTaskService.OpenReviewWindow": {
     "branchId": "<id:2>"
   }

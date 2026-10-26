@@ -40,8 +40,8 @@ func TestTaskBoard_RefreshFetchesMovedReviewBranch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if b := boardBranch(t, board, "b"); b.CommitCount != 2 {
-		t.Fatalf("rv commit count = %d, want 2 (facts rerun on the moved ref)", b.CommitCount)
+	if b := boardBranch(t, board, "b"); b.Ahead != 2 {
+		t.Fatalf("rv ahead = %d, want 2 (facts rerun on the moved ref)", b.Ahead)
 	}
 }
 

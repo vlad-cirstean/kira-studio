@@ -192,7 +192,10 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // 'ChangeRequestLookup'; the lookup's 'prs' and 'gh' fields become 'changeRequests' and 'status'.
 // 'kiraSpace.github.enabled' (boolean) becomes 'kiraSpace.gitHost.provider' (string). Two new
 // requests, 'gitHost.info' and 'gitHost.providers', name a repository's host and every host.
-export const CONTRACT_VERSION = 50;
+// P352: 50 -> 51, additive. New requests 'branch.changeRequestIndex' and 'branch.syncChangeRequests';
+// 'repo.changed' gains kind 'changeRequestsChanged'; 'ChangeRequestRecord' gains 'draft',
+// 'reviewDecision' and 'checksState'.
+export const CONTRACT_VERSION = 51;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -302,6 +305,8 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'review.session.load': true,
   'commit.resolveChangeRequests': true,
   'branch.resolveChangeRequest': true,
+  'branch.changeRequestIndex': true,
+  'branch.syncChangeRequests': true,
   'gitHost.info': true,
   'gitHost.providers': true,
   'changeRequest.browserUrl': true,

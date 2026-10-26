@@ -26,11 +26,11 @@ import SplitButton from '@theme/components/SplitButton.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { DropdownMenuContent } from '@theme/components/ui/dropdown-menu';
-import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MessageKey, t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
 import MenuItems from '@workbench/components/MenuItems.vue';
+import ToolbarSeparator from '@workbench/components/ToolbarSeparator.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, ref } from 'vue';
 import { type MenuSection, sectionsToMenuItems } from '../lib/menuModel.ts';
@@ -312,7 +312,7 @@ const stashDisabled = computed(
       <Spinner icon="sync" label="" />
       {{ t('git.toolbar.restacking.loading') }}
     </span>
-    <Separator orientation="vertical" class="h-3.5 self-center mx-0.5 bg-border-strong" />
+    <ToolbarSeparator />
     <RefreshButton
       ref="refreshButtonRef"
       :graph-view="graphView"
@@ -321,7 +321,7 @@ const stashDisabled = computed(
     />
 
     <template v-if="hasRemote">
-      <Separator orientation="vertical" class="h-3.5 self-center mx-0.5 bg-border-strong" />
+      <ToolbarSeparator />
       <Tooltip>
         <TooltipTrigger as-child>
           <Button
@@ -383,7 +383,7 @@ const stashDisabled = computed(
       <TooltipContent>{{ autoFetchTooltip }}</TooltipContent>
     </Tooltip>
 
-    <Separator orientation="vertical" class="h-3.5 self-center mx-0.5 bg-border-strong" />
+    <ToolbarSeparator />
     <Tooltip>
       <TooltipTrigger as-child>
         <Button

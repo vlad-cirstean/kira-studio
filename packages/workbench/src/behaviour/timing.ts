@@ -35,6 +35,8 @@ export const TIMING = {
   scrollPersist: 300,
   /** How long an agent paste waits for the terminal to settle. */
   agentPasteWait: 10000,
+  /** Settle time for window focus changes before the server is told. */
+  focusSync: 1000,
   clockTick: 1000,
   clockTickSlow: 30000,
 } as const;

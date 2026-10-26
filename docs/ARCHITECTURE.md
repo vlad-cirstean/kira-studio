@@ -118,6 +118,7 @@ whatever sandbox a session happens to be in),
 - golangci-lint and knip run only in the pre-push hook and CI (.githooks/pre-push), not per commit.
 - The app's SQLite database lives at ~/.kira-studio/kira.db and is accessed from Go via database/sql with modernc.org/sqlite (pure Go, no cgo), with SetMaxOpenConns(1); there is no ORM and Drizzle is gone.
 - Packaging uses wails3 task darwin:package:dmg plus scripts/sign-bundle.sh; the .app and .dmg are ad-hoc signed (identity -), with no notarization.
+- App icon is an Icon Composer `appicon.icon` with one full-bleed layer; the system applies the mask. actool 26 compiles it to `Assets.car`, named by `CFBundleIconName` `appicon` (P349).
 - The DMG is a styled disk image with an /Applications shortcut, has no silent auto-update (a user-initiated one is scripts/install.sh, P119), and has no runtime/ tree to vendor or sign.
 - No DMG carries a .vsix, because Kira Space's VS Code extension was removed in P243 Part 2.
 - Real-container DB adapter tests are written in Go with testcontainers-go (apps/kira-studio/internal/adapters/testsupport/, run by bun run test:go), not in Bun; Colima is the container runtime.
@@ -719,6 +720,7 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - Use SearchField for search and filter boxes and focus it through its exposed focus(), because biome forbids autofocus.
 - Use font weights 400/500 only; font-semibold only in PanelHeader and font-bold only for ANSI log data. Icon sizes are 12, 13, 16, 24.
 - Buttons use dialog*/toolbar* variants with kira* sizes; the retired shadcn variants and sizes no longer exist.
+- Toolbar dividers use ToolbarSeparator (packages/workbench), never a hand-rolled w-px div or a bare vertical Separator; U104 enforces it.
 - scripts/check-ui-primitives.sh, part of bun run lint, enforces the UI language rules and holds the named exemptions (CommandPalette, LogsView ANSI bold, AdeBacklogRow inline edit, mobile 44px touch inputs, git-ui SearchBox two-stage Escape); an exemption that stops matching fails the run.
 - The tone vocabulary is ok, warn, error, info (Badge, Alert, StatusDot); neutral is muted text. Chips tint /16, banners /10 with /20 border; app code never writes a tone alpha.
 - Error sentences use FieldError and list/popover lines use InlineState; Alert takes icon and strip and no layout classes.
@@ -1573,7 +1575,7 @@ packaged app does not), where the identical application code runs unchanged over
 - The Unix socket (git.sock) that served a separately-installed VS Code extension, and the extension itself, are gone since P243 Part 2; removeLegacyGitSocket in main.go deletes the git.sock and git.sock.lock left by older builds in KIRA_SPACE_HOME.
 - An flock on ${KIRA_SPACE_HOME}/app.lock is the single-instance guard: config.AcquireLock takes it before storage.Open, and if not acquired the process logs and exits 0.
 - A SIGKILLed instance's app.lock is released by the kernel, so no stale-pid file or manual cleanup exists.
-- gitrpc.ContractVersion and CONTRACT_VERSION in packages/git-ipc/src/validate.ts must be equal (48 currently), asserted by tests on both sides; a mismatch is a build bug since both sides ship in one binary.
+- gitrpc.ContractVersion and CONTRACT_VERSION in packages/git-ipc/src/validate.ts must be equal (51 currently), asserted by tests on both sides; a mismatch is a build bug since both sides ship in one binary.
 - app.init returns {contractVersion, serverVersion, git, dateFormat}, where dateFormat is Space's app-wide appearance.dateFormat.
 - Contract version 47 (P246) dropped credential.request and credential.provide from the stream; credentials go through the relay snapshot and GitCredentialService.Provide.
 - Contract version 46 removed the extension-only surface (worktree.prepare, worktree.cancelPrepare, worktree.openWindow, editor.resolveConflict, worktree.progress, settings.changed and connection.changed events, app.init's host/settings/capabilities, and injected params scope, pageSize, baseCandidates, strategySetting); the server reads stored kiraSpace.* repo settings instead.
@@ -1650,7 +1652,7 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 | `gitsearch` | The cancellable, time-boxed tail scan and the Go matcher, plus the RE2/`RegExp` dialect reconciliation (below) |
 | `gitreview` | `review.db`'s whole surface: compressed content snapshots, fast/slow-path diff selection, partial-review ranges, the flat AI-comment list, and the TTL reaper (Storage, above) |
 | `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `githost` and stdlib only |
-| `gitrpc` | The method table (`app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**50**, P318), and the wire types |
+| `gitrpc` | The method table (`app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**51**, P352), and the wire types |
 | `gitwire` | Generated FlatBuffers code for the git data plane |
 | `gitaskpass` | The credential broker and its `GIT_ASKPASS` shim, over its own private socket, with a bounded wait |
 | `gitprepare` | The worktree prepare script's execution seam, called by ADE only — the one shell exception, below |
@@ -1918,8 +1920,16 @@ Conn (internal/gitsession): one per native stream (ServeGitStream) or ADE connec
 - providers.New builds the Registry: github first, then extras. appwire.Options.GitHosts (a Registry; nil is github alone) and flowharness.WithGitHost add providers. flowharness/fakehost is the test-only second host (forge.test, merge requests).
 - Selector.Resolve(setting, remoteURL) picks the provider. Setting kiraSpace.gitHost.provider (per repo) is auto, off or a provider id. auto picks the first provider that parses the origin remote and Claims its host. An unknown id logs a warning and falls back to auto. A pinned id that does not parse the remote resolves to none.
 - The server composes every link (changeRequest.browserUrl, ChangeRequestsResult.BranchURLs, HostLink on tasks and backlog items); the renderer never builds a host URL. Only URLs a provider approves via IsChangeRequestURL open.
-- git-ipc adds gitHost.info (the repo's resolved host, null for none) and gitHost.providers. Space adds GitHostService.Providers and AdeTaskService.HostProviders (phone). Contract version 50 renames the PR-named requests and fields to change request names.
-- Breaker, snapshot and per-branch caches live in the repo entry's host state, not in a provider.
+- git-ipc adds gitHost.info (the repo's resolved host, null for none) and gitHost.providers. Space adds GitHostService.Providers and AdeTaskService.HostProviders (phone). Contract version 50 renames the PR-named requests and fields to change request names. Contract 51 adds branch.changeRequestIndex, branch.syncChangeRequests and the changeRequestsChanged event kind.
+- Breaker, snapshot and per-branch caches live in the repo entry's host state, not in a provider. The snapshot and per-branch caches are the fallback for a provider without ChangeRequestSync and while the persisted index is incomplete.
+- ChangeRequestSync (P352) is an optional role beside FileReviewSync: Page (newest-updated first, cursor), Probe (conditional listing check) and Checks (batch refresh by node id). GitHub implements it with GraphQL pages, `gh api -i` plus If-None-Match for Probe, and nodes(ids) for Checks. A 304 probe costs no rate limit. The 304 path is covered by golden header blocks only; the sandbox proxy blocks the GitHub API, so no live 304 was observed.
+- The index persists in git_host_change_requests and git_host_sync_state (migration 0047). Key `repo_key` is `lower(provider|host|owner/name)`, so clones and worktrees of one repo share rows. Times are INTEGER ms. head_owner is NOCASE. Sync state holds etag, watermark_updated_at, backfill_complete and cursor, last-sync stamps, account and schema_version.
+- Sync order per run (gitsession/crsync.go, one single-flight crSyncer per RepoEntry): backfill while incomplete (resumable pages, newest first, PageCap 10 per run, cursor saved); else Probe, and on change a delta walk from the top until updatedAt falls below watermark minus 2 min; then a checks refresh. Hitting the page cap in a delta resets backfill_complete and saves the old watermark as delta_floor (migration 0049); the resumed walk completes on reaching it.
+- Checks refresh: pending or expected non-draft rows every 2 min while focused, every open row on a 15 min sweep. A node missing from the result deletes its row. A merged or closed row deleted on the host stays until invalidation, since only open rows are checked.
+- Triggers: start (2 s delay), timer (5 min focused, 15 min blurred), refs change, and branch.syncChangeRequests (focus regain; `wait` blocks until the run ends). All but the explicit call are off when CRSyncConfig.Disabled. MinGap 30 s and the rate-limit gate bind every trigger, a backfill continuation included (armed past MinGap); an explicit one skips only the failure backoff.
+- Failure: cenkalti/backoff/v4 ExponentialBackOff (30 s to 15 min), a hard gate until the host's reset time, the existing per-repo breaker, and a stop under 200 remaining GraphQL budget. A transient remote-read failure never drops rows.
+- Invalidation: a different signed-in account or a bumped GitHostSchemaVersion drops the repo's rows. Turning the host setting off drops them. Rows of a repo with no sync-state write (updated_at, migration 0048) in 30 days are pruned once per process, at the first Registry.Acquire before any syncer reads state, so no run can resurrect a pruned repo as complete.
+- Delivery: repo.changed kind changeRequestsChanged goes through the coalescing subscriber after a run that changed rows. branch.changeRequestIndex serves one record per head branch from SQLite (newest row per branch picked in SQL, so cost tracks branch count), reports `complete` false when refs cannot be read, only branches present in refs plus open requests; git-ui fills byBranch in one assignment, skips per-branch lookups when `complete`, and reloads on the event (one in flight, one queued). Repo-scoped git reloads ignore the kind.
 - ADE storage: ade_tasks.host_url, ade_backlog.host_url, ade_viewed_sync (provider, change_number). Migration 0044 renames github_url, ade_gh_synced and pr_number.
 - No CI status or change request comment roles exist. Add one as a new optional role beside FileReviewSync.
 
@@ -1986,6 +1996,10 @@ and `docs/HISTORY.md (v2.0)`.
 - A workflow step runs once (on the first mine branch in task order), each repo, or only <repo>, with one run per step and branch.
 - Task status is derived from the workflow and runs, never typed (decision D10), so the Status field is read-only.
 - Backlog items are not on the plan until promoted.
+- CreateTask takes an optional plan day (nil lands in Later). The UI sends today, or the next work day, and no repos; repos arrive via AddTaskRepo, AddExistingBranch or agent declare_repos.
+- A repoless task refuses Start (no branch to run on) until a repo is added. This is designed behavior.
+- An estimate is free text h or d, settable, changeable and clearable at any time; only the cap (480h, 60d) applies.
+- The Branch wire carries no files or commits list or commit count; ahead, behind and dirty remain. Board facts still use the range file set for shared-file pairs.
 
 ### Process wiring
 
@@ -2019,7 +2033,7 @@ and `docs/HISTORY.md (v2.0)`.
 
 - FileChange carries only path, status kind, rename original path and similarity, all from one --name-status spawn (porcelain.ParseNameStatusRecords); file lists have no line counts and no binary flag (P257).
 - --numstat survives only in stash list and the global stash log, as record framing for FileCount; the FileTree directory row keeps N files.
-- Board facts per repo (branch inventory, ahead/behind against base, files, commits, dirty state, caches keyed by tip pairs) run on the ade-board.
+- Board facts per repo (branch inventory, ahead/behind against base, files, dirty state, caches keyed by tip pairs) run on the ade-board.
 - Board refresh fetches the default remote and then derives facts again through the same path; without a remote it rescans locally and the chip reads no remote. Autofetch interval is a setting.
 - The board opens repos with GitStatus().Path (discovery), never the raw git.gitPath setting (empty by default); non-ok git fails the open with: ade: git is unavailable
 - lastFetchAt is the mtime of the worktree git dir's FETCH_HEAD.
@@ -2337,17 +2351,17 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 
 ### Review code (P150)
 
-- The per-branch Review code button opens an ephemeral Wails window via OpenReviewWindow; a second call returns false.
+- The per-branch Review code button opens an ephemeral Wails window via OpenReviewWindow; a second call returns false and only focuses the window. The focus path (WindowRegistry.Focus) dispatches the App-level unhide to the main thread via InvokeSync, because AppKit aborts the process on it off-thread (P354).
 - Review window rows live in ade_review_windows, are never restored on relaunch and are purged at boot (purgeReviewWindows).
 - closeDecision keeps the main window from closing while a review window is open.
-- The review window has three panes: git-ui review files (reviewFilter needsReview), diff tabs, and the review agent panel.
+- The review window has three panes: git-ui review files (every changed file, target locked), diff tabs, and the review agent panel.
 - The files pane calls ensureRepoOpen first, because the git socket needs repo.open on its connection.
 - The since-review review_session is pinned (SetPinned, gitreview 0003) so rebases cannot drop the reviewed blobs.
 - The since-review diff's left side is the stored snapshot (review.snapshot), not a git ref; a renamed unchanged file keeps its review.
 - The review agent is one interactive TUI session per task, stored as a row with purpose='review' (unique per task), step id review, cwd the first created branch's worktree, other branches via --add-dir.
 - A stopped review agent row resumes with --resume and the same claudeSessionId; if the recorded cwd is gone, the old row loses purpose and a new one launches.
 - TakeOver of the review agent row goes through launchReviewAgent.
-- Questions to the review agent are pasted bracketed through Tracker.Send, and Send is disabled while the agent waits on input.
+- The review agent is a plain terminal with no question box. ForwardReviewComments pastes ade.review.forward.message with the branch's open comments through Tracker.Send and stamps sentAt; the button is disabled while the agent waits on input or no comment is open.
 - Viewed sync is one way and needs a provider with FileReviewSync (status unsupported otherwise): ViewedSyncPlan decides per file, and Apply marks files through the provider. The github provider uses one aliased markFileAsViewed mutation via gh api graphql.
 - ade_viewed_sync (provider, change_number per row) records files this app marked as viewed; a row of another provider or change request drops at the next plan; un-reviewing one fires unmarkFileAsViewed server side through the unmark observer (SetObserver), for ledger files only. Partial reviews never sync.
 - Review comments carry kind (change|question) and state (open|addressed) plus the agent's reply, repliedAt and sentAt (gitreview 0004); older rows read as change/open.
@@ -2356,7 +2370,7 @@ role (`harness.UsageReporter`): only a provider that reports it feeds the servic
 - Keep Monaco objects in shallowRef (useDiffEditor), because a deep ref hangs the page.
 - Review entry rule (P240): board/reviewCode.ts reviewChoice hides (parked), disables with a reason (uncreated branch, ahead === 0) or enables each branch; useReviewCode is the one caller of OpenReviewWindow.
 - The ade.reviewCode command uses Cmd/Ctrl+Shift+R as a local binding with no accel.go row; a task with several branches shows a picker.
-- Interpolated UI values render through VarText (packages/theme, TextPart) as the resolved value in a marked chip; MenuItem.hint takes TextPart[].
+- Interpolated UI values render through VarText (packages/theme, TextPart) as the resolved value in a marked chip; MenuItem.hint takes TextPart[]. A part with `kind: 'branch'` renders as `BranchChip` (git-branch Badge, the git graph ref-badge recipe); ADE builds branch-name parts with `branchParts`.
 
 ### Tests
 
@@ -3058,10 +3072,10 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   real phone.
 - **Console reads on PostgreSQL and MySQL/MariaDB drain past the cap (P174).** At the cap `rows.Close()` discards the remaining rows off the wire: memory is bounded, server and network time are not. The Stop button ends a long drain. Delete once a driver offers a cheap server-side stop that keeps later statements in the batch intact.
 - **Some Redis console commands are read whole before the cap (P174).** `SUNION`, `SINTER`, `SDIFF`, `EVAL`/`FCALL`, module commands and `GET` of a huge string have no bounded form; go-redis reads the reply whole, then the page is capped. Delete once those commands get bounded rewrites or a streaming reader.
-- **Parts of an interactive `claude` turn are unobserved (P147, P149, P150).** The real suite (`bun run test:claude:space`) launches the TUI, sees hooks including `Stop`, and drives `Send` into a session. Never seen against a real `claude`: the folder-trust prompt (the suite pre-trusts the folder), `claude --resume` of a stopped session, the initial ` -- ` message, send-then-archive completing after the turn, and for the P150 review agent `--add-dir` resume, a paste into a `working` turn and the 10 s no-submit hint. Delete once checked on an authenticated desktop build.
+- **Parts of an interactive `claude` turn are unobserved (P147, P149, P150).** The real suite (`bun run test:claude:space`) launches the TUI, sees hooks including `Stop`, and drives `Send` into a session. Never seen against a real `claude`: the folder-trust prompt (the suite pre-trusts the folder), `claude --resume` of a stopped session, the initial ` -- ` message, send-then-archive completing after the turn, and for the P150 review agent `--add-dir` resume, a paste into a `working` turn and a forwarded comment paste (P354). Delete once checked on an authenticated desktop build.
 - **A taken-over review round has no reply or finish tools (P286).** `TakeOver` of a round opens the plain interactive session: `reply_review_comment` and `finish_step` are not on it, so its comments stay open until answered by hand. Delete once a take-over loads them.
 - **GitHub viewed sync is unobserved against real GitHub (P150).** Sandbox has no authenticated `gh`; the smoke used a fake `gh` (argv log, JSON state). The GraphQL schema half is checked offline. Delete once one sync marks and one un-review unmarks a file on a real PR.
-- **Native close/hide wiring of review windows is unobserved (P150).** A server build has no native window; `closeDecision` has a test, the Wails hooks do not. Delete once checked on a desktop build.
+- **Native close/hide wiring of review windows is unobserved (P150).** A server build has no native window; `closeDecision` has a test, the Wails hooks do not. The P354 main-thread unhide fix on a second Review code press is covered by an ordering test only; the AppKit abort itself is unobserved. Delete once checked on a desktop build.
 - **Tab switch remounts above the 50 ms product budget in the WebKit sandbox (P139 Part 2)**. Every
   switch remounts `DataView` and SlickGrid, no tab caching. The sandbox measures p95 159-363 ms and
   gates at 300 ms (`budgets.spec.ts`); ~47 ms of it is Vue component work, and Tailwind v4's

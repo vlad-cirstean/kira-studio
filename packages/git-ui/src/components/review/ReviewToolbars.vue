@@ -21,6 +21,8 @@ const props = defineProps<{
   refsState: RefsState;
   filesCount: number;
   commentsCount: number;
+  /** The compared sides are fixed: no back, swap or base pick. */
+  locked?: boolean;
 }>();
 const emit = defineEmits<{ back: [] }>();
 const listMode = defineModel<FileListMode>('listMode', { required: true });
@@ -106,6 +108,7 @@ const summaryLabel = computed(() => {
        session pointing at a deleted branch or base lands there. -->
   <ViewToolbar>
     <TooltipIconButton
+      v-if="!locked"
       icon="chevron-left"
       :label="t('git.review.back.tooltip')"
       data-testid="review-back-button"
@@ -120,12 +123,22 @@ const summaryLabel = computed(() => {
       }}</span
     >
     <span class="text-muted-foreground shrink-0" aria-hidden="true">↔</span>
+    <span
+      v-if="locked"
+      class="min-w-0 truncate font-data text-kira-md text-fg"
+      data-testid="review-base-name"
+      >{{
+        review.resolution.value?.base
+      }}</span
+    >
     <BaseSelector
+      v-else
       :resolution="review.resolution.value"
       :refs-state="refsState"
       @select="review.setBase($event)"
     />
     <TooltipIconButton
+      v-if="!locked"
       icon="arrow-swap"
       :label="t('git.review.swap.tooltip')"
       data-testid="review-swap-button"

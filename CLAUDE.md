@@ -168,7 +168,7 @@ duplicated here; this file only points at them.
   `Source: docs/<ch>/ at <commit>. N phases.` with the true row count, then one `### <ch> <id> (Done)`
   heading per `SPEC.md` row in table order, distilled from each row's Result. Fix links to the chapter
   by hand. Commit. Then `git rm -r docs/<ch>/` (and `docs/history-runs/` if it exists) and commit.
-  Push, then open the PR from `chapter/v<version>` to `main` (command in `docs/DEV_ENVIRONMENT.md`). It auto-merges once CI passes.
+  Push, then open the PR from `chapter/v<version>` to `main` (command in `docs/DEV_ENVIRONMENT.md`). It auto-merges once CI passes. Opening the PR is part of closing, unless changes are still pending (uncommitted, unpushed or unfinished work) — then report them and hold the PR.
   Between chapters no `docs/v*/` exists. Open the next with `docs/v<new>/SPEC.md`
   (intro: first `P` is highest plus one, branch `chapter/v<new>`) and `plans/`.
   Data a test or script reads at runtime never lives under `docs/v*/`; it goes in its reader's `testdata/`.

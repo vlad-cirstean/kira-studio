@@ -93,8 +93,8 @@ export interface RowPlanOptions {
   readonly revision: number;
 }
 
-/** §4.1: a group of `MIN_COLLAPSIBLE` (3) or fewer members always renders in full — contracting
- *  tip + placeholder + oldest into the identical 3 rows saves nothing and costs a click. */
+/** §4.1: a group of `MIN_COLLAPSIBLE` (3) or fewer members always renders in full; a longer one
+ *  becomes its tip plus one placeholder. */
 const MIN_COLLAPSIBLE = 3;
 
 /** Never a real ref name or stash key (both come from git, which never emits a NUL byte), so this
@@ -281,7 +281,8 @@ interface CollapsedRuns {
 // checked-out branch — or stash, if the caller placed it there, though `App.vue` never does)
 // never collapses; every other run collapses when enabled, not manually expanded, and long
 // enough that contracting saves a real row count. `order` is display order, so a run is tip-first
-// and oldest-last.
+// and oldest-last. A collapsed run shows the tip, then a placeholder holding every other member
+// (the oldest included).
 function collapseRuns(
   order: Int32Array,
   rank: Int32Array,
@@ -319,20 +320,19 @@ function collapseRuns(
     }
 
     pushCommit(order[start], groupIndex);
-    // `length > MIN_COLLAPSIBLE` (>3) guarantees at least 2 hidden rows here.
+    // `length > MIN_COLLAPSIBLE` (>3) guarantees at least 3 hidden rows here.
     const placeholderDisplayRow = entries.length;
     entries.push({
       kind: 'collapsed',
       storeRow: order[start + 1],
       groupIndex,
-      hiddenCount: length - 2,
+      hiddenCount: length - 1,
     });
     // `storeRowToDisplayRow` stays -1 for a hidden row — it has no display row of its own
     // (`RowPlan.displayRowOf`'s own doc comment); only `containingDisplayRow` resolves it.
-    for (let i = start + 1; i < end - 1; i++) {
+    for (let i = start + 1; i < end; i++) {
       storeRowToContainingDisplayRow[order[i]] = placeholderDisplayRow;
     }
-    pushCommit(order[end - 1], groupIndex);
     start = end;
   }
 

@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
@@ -48,6 +51,17 @@ const reviewDisabled = computed(
   () => reviewCode.pending.value || choices.value.every((c) => c.disabled),
 );
 const notesError = ref('');
+
+const titleEdit = useInlineEdit({
+  source: () => props.card.task.title,
+  commit: async (title) => {
+    await update.mutateAsync({ taskId: props.card.task.id, patch: taskPatch({ title }) });
+  },
+  // A task without a Jira key needs its title.
+  get allowEmpty() {
+    return Boolean(props.card.task.jira);
+  },
+});
 
 /** A finished task shows Archive as its step action; any other task gets the quiet one. */
 const quietArchive = computed(
@@ -120,6 +134,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
             data-testid="ade-panel-review"
             @click="(ev: MouseEvent) => reviewCode.openTask(card, ev.currentTarget as HTMLElement)"
           >
+            <CodiconIcon name="git-compare" :size="13" />
             {{ t('space.ade.board.taskMenu.reviewCode.label') }}
           </Button>
         </TooltipDisabledTrigger>
@@ -141,15 +156,21 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
           data-testid="ade-panel-dot"
         />
         <AdeChip :label="label" :tone="tone" />
-        <AdeTip :text="card.title">
-          <h3
-            class="m-0 line-clamp-2 min-w-0 flex-1 break-words text-kira-lg font-medium text-fg"
-            data-testid="ade-panel-title"
-          >
-            {{ card.title }}
-          </h3>
-        </AdeTip>
+        <Input
+          :model-value="titleEdit.text.value"
+          :placeholder="card.defaultTitle"
+          :aria-label="t('common.field.name.label')"
+          appearance="inline"
+          class="min-w-0 flex-1 text-kira-lg font-medium"
+          data-testid="ade-panel-title"
+          @update:model-value="titleEdit.onInput"
+          @blur="titleEdit.onCommit"
+          @keydown="titleEdit.onKeydown"
+        />
       </div>
+      <Alert v-if="titleEdit.error.value" variant="error" data-testid="ade-title-error"
+        ><AlertDescription>{{ titleEdit.error.value }}</AlertDescription></Alert
+      >
       <div class="truncate text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{
         facts
       }}</div>

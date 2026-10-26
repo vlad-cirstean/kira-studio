@@ -142,9 +142,8 @@ func closeDecision(isEphemeral bool, otherRealWindows int) (hide, deleteRow bool
 }
 
 // Focus brings key's own window to the front — AdeTaskService.FocusSession's own cross-window Open.
-// false for an unknown key (the window closed between the lookup and this
-// call). Show/UnMinimise/Focus each wrap their real work in application.InvokeSync internally
-// (vendored webview_window.go), so this is safe to call from any goroutine.
+// false for an unknown key (the window closed between the lookup and this call). Callable from any
+// goroutine: Show/UnMinimise/Focus self-dispatch to the main thread (vendored webview_window.go).
 func (r *WindowRegistry) Focus(key string) bool {
 	r.mu.Lock()
 	e, ok := r.entries[key]
@@ -152,7 +151,8 @@ func (r *WindowRegistry) Focus(key string) bool {
 	if !ok || e.win == nil {
 		return false
 	}
-	unhideApp()
+	// The App-level unhide does not self-dispatch; AppKit aborts when [NSApp unhide:] runs off the main thread.
+	application.InvokeSync(unhideApp)
 	e.win.Show()
 	e.win.UnMinimise()
 	e.win.Focus()

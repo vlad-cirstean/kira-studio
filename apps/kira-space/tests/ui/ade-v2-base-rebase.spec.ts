@@ -84,21 +84,6 @@ async function open(relaunch: Parameters<typeof openPlan>[0], edit: Edit, extra 
 const authTask = (page: Page) =>
   page.locator(`${row('b_auth')} >> xpath=ancestor::*[@data-testid="ade-task"][1]`);
 
-test('New task: the base of a repo is picked and sent with CreateTask', async ({ relaunch }) => {
-  const { window: page, control } = await openPlan(relaunch);
-  await page.locator(t('ade-add')).click();
-  await page.locator(t('ade-nw-title')).fill('Export CSV');
-  await page.locator(t('ade-nw-repo'), { hasText: 'api' }).click();
-  const api = page.locator(`${t('ade-nw-base')}[data-repo-id="repo-api"]`);
-  await api.locator(t('ade-base-picker')).click();
-  await page.locator(t('ade-base-option-develop')).click();
-  await page.locator(t('ade-nw-add')).click();
-  await expect.poll(() => calls(control, IPC.adeTaskCreateTask)).toHaveLength(1);
-  expect(calls(control, IPC.adeTaskCreateTask)[0]?.args).toMatchObject({
-    bases: { 'repo-api': { ref: 'develop', branchId: '' } },
-  });
-});
-
 test('the picker disables a branch and its descendants and shows Previous base only when pending', async ({
   relaunch,
 }) => {
@@ -155,7 +140,7 @@ test('a branch behind a develop base offers Rebase onto develop, run in the back
   await expect(tag).toHaveText('Rebase');
   await tag.hover();
   await expect(
-    page.locator('[data-testid="var-chip"][data-var="base"]', { hasText: 'develop' }).first(),
+    page.locator('[data-testid="branch-chip"][data-var="base"]', { hasText: 'develop' }).first(),
   ).toBeVisible();
   await tag.click();
   await expect(page.locator(t('ade-dialog-message'))).toHaveValue(/Rebase/);
@@ -402,35 +387,6 @@ test('a failed step that reported detail shows it in its step block', async ({ r
 
 // Contract ade-base. Backend half: adeflow TestTaskBase and TestRebaseRun. Fixture ids replace the
 // backend's; every other field is the backend's.
-test('contract: a remote-only develop is offered as a base and sent with CreateTask', async ({
-  relaunch,
-}) => {
-  const picker = contract<{ branches: { name: string }[] }>(
-    'ade-base',
-    'AdeTaskService.RepoBranches',
-  );
-  const choice = contract<{ ref: string; branchId: string }>(
-    'ade-base',
-    'args:AdeTaskService.CreateTask.bases#develop',
-  );
-  const { window: page, control } = await openPlan(relaunch, [
-    { channel: IPC.adeTaskRepoBranches, response: picker },
-  ]);
-  await page.locator(t('ade-add')).click();
-  await page.locator(t('ade-nw-title')).fill('Export CSV');
-  await page.locator(t('ade-nw-repo'), { hasText: 'api' }).click();
-  await page
-    .locator(`${t('ade-nw-base')}[data-repo-id="repo-api"]`)
-    .locator(t('ade-base-picker'))
-    .click();
-  await page.locator(t(`ade-base-option-${picker.branches[0]?.name}`)).click();
-  await page.locator(t('ade-nw-add')).click();
-  await expect.poll(() => calls(control, IPC.adeTaskCreateTask)).toHaveLength(1);
-  expect(calls(control, IPC.adeTaskCreateTask)[0]?.args).toMatchObject({
-    bases: { 'repo-api': choice },
-  });
-});
-
 test('contract: a conflicting rebase is reported, left in progress, and Abort rebase asks first', async ({
   relaunch,
 }) => {

@@ -45,7 +45,7 @@ export const MULTI_BRANCH_SHAS = {
 } as const;
 export const MULTI_BRANCH_FEATURE_NEWER_NAME = 'feature-newer';
 export const MULTI_BRANCH_FEATURE_OLDER_NAME = 'feature-older';
-export const MULTI_BRANCH_FEATURE_NEWER_HIDDEN_COUNT = 3; // F1, F2, F3 — hidden once collapsed
+export const MULTI_BRANCH_FEATURE_NEWER_HIDDEN_COUNT = 4; // F1, F2, F3, F4 — hidden once collapsed
 
 const MULTI_BRANCH_SUBJECTS = [
   'feature-newer tip (F0)',

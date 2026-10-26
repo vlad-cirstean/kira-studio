@@ -9,14 +9,7 @@ export interface Jira {
   key: string;
   url: string;
 }
-interface FileChange {
-  path: string;
-}
-export interface Commit {
-  sha: string;
-  message: string;
-}
-export interface DirtyEntry {
+interface DirtyEntry {
   code: string;
   path: string;
 }
@@ -206,9 +199,6 @@ export interface Branch {
   conflictsIfRebased: string[] /* D1: paths conflicting if rebased onto latest base */;
   conflictCheck: 'checking' | 'done' | 'failed';
   conflictCheckReason: string /* '' unless failed */;
-  files: FileChange[];
-  commits: Commit[];
-  commitCount: number;
   dirty: DirtyEntry[];
   lastCommitAt: number | null;
   addedAt: number;
@@ -574,6 +564,12 @@ export interface ReviewAgentLaunch {
   resumed: boolean;
   note: string /* '' or why a fresh one started */;
 }
+export interface ReviewForwardText {
+  text: string;
+}
+export interface ForwardReviewResult {
+  count: number;
+}
 type ViewedSyncStatus =
   | 'ok'
   | 'noPr'
@@ -642,6 +638,8 @@ export interface CreateTaskArgs {
   workflowId: string;
   /** Per repo id; a missing repo starts from its main. */
   bases: Record<string, BaseChoice>;
+  /** Plan day (YYYY-MM-DD) the task lands on; null lands in Later. */
+  day: string | null;
 }
 /** A base: a planner branch (branchId), a git ref (ref), or both empty for the repo main. */
 export interface BaseChoice {

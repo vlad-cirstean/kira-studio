@@ -1,5 +1,7 @@
 package github
 
+import "time"
+
 // Status is the four-kind actionability union ("ok" | "notFound" | "unauthenticated" | "forbidden")
 // widened to carry the real six-shape failure surface as Reason detail rather than as a fifth/sixth
 // Kind: the badge/search/reaper callers above this package only ever need to know WHICH of these
@@ -25,6 +27,10 @@ type Status struct {
 	// code becomes user-facing text (D12: the commit-detail pane is the only surface that ever
 	// shows it). Empty for "ok".
 	Reason string `json:"reason,omitempty"`
+	// ResetAt is when a rate limited call may be retried; zero when GitHub did not say.
+	ResetAt time.Time `json:"-"`
+	// Gone marks a repository GitHub reports as not found or not visible.
+	Gone bool `json:"-"`
 }
 
 // OK reports whether s represents a successful probe/call.

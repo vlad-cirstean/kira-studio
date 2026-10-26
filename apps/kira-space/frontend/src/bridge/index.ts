@@ -445,6 +445,12 @@ const spaceControl = {
     unwrap(AdeTaskService.ReviewAgent(args)).then((r) => trust<V2.ReviewAgentState>(r)),
   adeTaskLaunchReviewAgent: (args: V2.TaskArgs): Promise<V2.ReviewAgentLaunch> =>
     unwrap(AdeTaskService.LaunchReviewAgent(args)).then((r) => trust<V2.ReviewAgentLaunch>(r)),
+  adeTaskForwardReviewComments: (args: V2.BranchArgs): Promise<V2.ForwardReviewResult> =>
+    unwrap(AdeTaskService.ForwardReviewComments(args)).then((r) =>
+      trust<V2.ForwardReviewResult>(r),
+    ),
+  adeTaskReviewForwardText: (args: V2.BranchArgs): Promise<V2.ReviewForwardText> =>
+    unwrap(AdeTaskService.ReviewForwardText(args)).then((r) => trust<V2.ReviewForwardText>(r)),
   adeTaskViewedSyncPlan: (args: V2.BranchArgs): Promise<V2.ViewedSyncPlan> =>
     unwrap(AdeTaskService.ViewedSyncPlan(args)).then((r) => trust<V2.ViewedSyncPlan>(r)),
   adeTaskViewedSyncApply: (args: V2.BranchArgs): Promise<V2.ViewedSyncResult> =>

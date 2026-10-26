@@ -54,7 +54,7 @@ const props = defineProps<{
   transport: Transport;
   viewState: ViewStateStore;
   target?: ReviewTarget | null;
-  reviewFilter?: 'all' | 'needsReview';
+  lockTarget?: boolean;
   onReviewMarked?: (path: string) => void;
   onReviewApi?: (api: { selectFile: (path: string) => void }) => void;
   repoHead?: RepoHead;
@@ -159,11 +159,13 @@ async function bootstrap(): Promise<void> {
   reviewFiles.value.onMarked = (path) => props.onReviewMarked?.(path);
   reviewComments.value = new ReviewCommentsState(bridge);
 
-  unsubscribeTarget = bridge.on('review.target', (event) => {
-    applyTarget(event.repoId, event.branch).catch((err: unknown) =>
-      reportAsyncError(err, 'git.review.async.switchTarget.error'),
-    );
-  });
+  if (!props.lockTarget) {
+    unsubscribeTarget = bridge.on('review.target', (event) => {
+      applyTarget(event.repoId, event.branch).catch((err: unknown) =>
+        reportAsyncError(err, 'git.review.async.switchTarget.error'),
+      );
+    });
+  }
   // G11 D17: the palette's own route into this already-mounted webview — toggles the file
   // currently open in the Files pane, or announces there is none to toggle.
   unsubscribeUiAction = bridge.on('ui.action', (event) => {
@@ -239,6 +241,7 @@ function scheduleSessionSave(): void {
 }
 
 async function persistSession(): Promise<void> {
+  if (props.lockTarget) return;
   const id = repoId.value;
   const r = review.value;
   if (!id || !r?.branch.value) return;
@@ -492,6 +495,7 @@ useReviewAnnouncements(review, announce);
         :refs-state="refsState"
         :files-count="filesChangedCount"
         :comments-count="commentsCount"
+        :locked="lockTarget"
         @back="goBackToSelection"
       />
 
@@ -566,7 +570,6 @@ useReviewAnnouncements(review, announce);
           :actions="filesActions"
           :list-mode="listMode"
           :filter="filter"
-          :review-filter="reviewFilter"
         />
 
         <ReviewCommentsPane

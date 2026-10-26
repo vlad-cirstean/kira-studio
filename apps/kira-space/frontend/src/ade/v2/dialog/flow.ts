@@ -35,6 +35,8 @@ export interface FlowDeps {
   recordMerge: (args: RecordMergeArgs) => Promise<void>;
   archiveTask: (args: TaskArgs) => Promise<void>;
   archiveRisk: (args: TaskArgs) => Promise<ArchiveRisk>;
+  /** Asks the person to confirm archiving a task with nothing at risk. */
+  confirmArchive: (taskId: string) => Promise<boolean>;
   /** In-flight keys (`rebase:<branch>`, `merge:<branch>:<target>`, `archive:<task>`). */
   pending: { add: (key: string) => void; remove: (key: string) => void };
   /** A failure while the dialog is open. */
@@ -273,9 +275,9 @@ function blockedText(deps: FlowDeps, risk: ArchiveRisk): string {
   return t('space.ade.flow.cantArchive.error', { parts: parts.join('; ') });
 }
 
-/** Reads the risk and archives when clear. A blocked branch is an action error; work at risk opens
- *  the dialog, with fresh risk after a send-then-archive turn. */
-async function archiveIfClear(deps: FlowDeps, taskId: string): Promise<void> {
+/** Reads the risk and archives when clear, after `confirm` asks when set. A blocked branch is an
+ *  action error; work at risk opens the dialog, with fresh risk after a send-then-archive turn. */
+async function archiveIfClear(deps: FlowDeps, taskId: string, confirm = false): Promise<void> {
   const risk = await deps.archiveRisk({ taskId });
   if (risk.branches.some((r) => r.blocked !== '')) {
     deps.setActionError(taskId, blockedText(deps, risk));
@@ -285,15 +287,16 @@ async function archiveIfClear(deps: FlowDeps, taskId: string): Promise<void> {
     deps.openDialog(archiveSpec(deps.ctx, risk));
     return;
   }
+  if (confirm && !(await deps.confirmArchive(taskId))) return;
   await deps.archiveTask({ taskId });
 }
 
-/** The panel's Archive click: nothing at risk archives directly, else the dialog. */
+/** The Archive click: nothing at risk asks to confirm, else the dialog. */
 export async function requestArchive(deps: FlowDeps, taskId: string): Promise<void> {
   const key = `archive:${taskId}`;
   deps.pending.add(key);
   try {
-    await archiveIfClear(deps, taskId);
+    await archiveIfClear(deps, taskId, true);
   } catch (err) {
     deps.setActionError(taskId, errMessage(err));
   } finally {

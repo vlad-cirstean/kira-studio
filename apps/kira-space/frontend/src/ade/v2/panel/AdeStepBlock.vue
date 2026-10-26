@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Card } from '@theme/components/ui/card';
@@ -442,6 +443,7 @@ function logToggleLabel(runId: string): string {
             data-testid="ade-review-code"
             @click="onReview(row.id)"
           >
+            <CodiconIcon name="git-compare" :size="13" />
             {{ t('space.ade.board.taskMenu.reviewCode.label') }}
           </Button>
         </TooltipDisabledTrigger>
