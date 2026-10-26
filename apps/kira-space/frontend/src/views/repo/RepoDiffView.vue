@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/components/EmptyState.vue';
+import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -23,11 +24,28 @@ import { gitTransportFor } from '../../repo/git/transport';
 // registrations, and review-decorations wiring.
 import type { RepoDiffTabRecord } from '../../state/tabDomain';
 import { noRepositoryMessage, repoIdOfTab } from '../../state/workspace';
+import { type DiffLayout, useDiffLayout } from './diffLayout';
 import { loadMonaco } from './monaco';
 import { attachReviewDecorations, type ReviewDecorationsHandle } from './reviewDecorations';
 import { useDiffEditor } from './useDiffEditor';
 
 const props = defineProps<{ tab: RepoDiffTabRecord }>();
+
+const layout = useDiffLayout();
+const layoutItems = [
+  {
+    value: 'sideBySide',
+    label: t('space.repo.view.diffLayoutSideBySide.label'),
+    icon: 'split-horizontal',
+    testid: 'repo-diff-layout-side-by-side',
+  },
+  {
+    value: 'inline',
+    label: t('space.repo.view.diffLayoutInline.label'),
+    icon: 'diff-single',
+    testid: 'repo-diff-layout-inline',
+  },
+];
 
 const errorMessage = ref('');
 const container = ref<HTMLElement | null>(null);
@@ -126,6 +144,19 @@ onUnmounted(() => {
         <CodiconIcon name="go-to-file" :size="13" />
         {{ t('common.goToFile.label') }}
       </Button>
+      <SecondaryTabs
+        class="ml-auto"
+        variant="segmented"
+        :aria-label="t('space.repo.view.diffLayout.aria')"
+        :model-value="layout"
+        :items="layoutItems"
+        @update:model-value="(value) => (layout = value as DiffLayout)"
+      >
+        <template #item="{ item }">
+          <CodiconIcon :name="item.icon ?? ''" :size="13" />
+          <span class="sr-only">{{ item.label }}</span>
+        </template>
+      </SecondaryTabs>
     </ViewToolbar>
     <div
       v-if="state === 'loading' || state === 'found'"

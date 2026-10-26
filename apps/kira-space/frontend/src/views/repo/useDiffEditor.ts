@@ -15,12 +15,13 @@ import type { DiffSide } from '@shared/domain/repo';
 import { t } from '@theme/i18n';
 import { errorText } from '@workbench/bridge/codedError';
 import { logWarn } from '@workbench/bridge/log';
-import { type Ref, ref, shallowRef } from 'vue';
+import { type Ref, ref, shallowRef, type WatchStopHandle, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 import { openRepoFileTab } from '../../state/repoTabs';
 import { useSettingsStore } from '../../state/settings';
+import { useDiffLayout } from './diffLayout';
 import { registerDiffEditor, unmountEditor } from './editors';
 import { monacoLanguageFor } from './language';
 import {
@@ -192,6 +193,7 @@ export function useDiffEditor(
   const errorMessage = ref('');
   const editor = shallowRef<import('monaco-editor').editor.IStandaloneDiffEditor | null>(null);
   let goToFileImpl: (() => void) | null = null;
+  let stopLayoutWatch: WatchStopHandle | null = null;
 
   async function mount(): Promise<void> {
     const settingsStore = useSettingsStore();
@@ -217,6 +219,7 @@ export function useDiffEditor(
       return;
     }
 
+    const layout = useDiffLayout();
     const mod = await loadMonaco();
     // Unmounted (tab closed/switched away, or the section collapsed) while the read/import above
     // was in flight.
@@ -248,7 +251,7 @@ export function useDiffEditor(
       renderMarginRevertIcon: false,
       renderGutterMenu: false,
       automaticLayout: true,
-      renderSideBySide: true,
+      renderSideBySide: layout.value === 'sideBySide',
       // A narrow pane (the review window centre) must not flip to inline.
       useInlineViewWhenSpaceIsLimited: false,
       ignoreTrimWhitespace: false,
@@ -271,6 +274,10 @@ export function useDiffEditor(
       fixedOverflowWidgets: true,
       overflowWidgetsDomNode: overflowWidgetsContainer(),
     });
+    // Outside any component scope (mount() is async), so the stop handle is kept for dispose().
+    stopLayoutWatch = watch(layout, (value) => {
+      created.updateOptions({ renderSideBySide: value === 'sideBySide' });
+    });
     created.setModel({ original, modified });
     registerDiffEditor(editorKey, [headUri.toString(), worktreeUri.toString()], created);
     editor.value = created;
@@ -286,6 +293,8 @@ export function useDiffEditor(
 
   function dispose(): void {
     goToFileImpl = null;
+    stopLayoutWatch?.();
+    stopLayoutWatch = null;
     editor.value = null;
     unmountEditor(params.editorKey);
   }

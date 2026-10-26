@@ -9014,6 +9014,15 @@
         "comment": {
           "placeholder": "Leave a review comment"
         },
+        "diffLayout": {
+          "aria": "Diff layout"
+        },
+        "diffLayoutInline": {
+          "label": "Inline"
+        },
+        "diffLayoutSideBySide": {
+          "label": "Side by side"
+        },
         "missing": {
           "empty": "This file no longer exists"
         },
