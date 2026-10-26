@@ -154,7 +154,7 @@ export interface DiffEditorParams {
    *  supplies both (a root commit's left is git's well-known empty-tree sha, never null). */
   left: string | null;
   right: string | null;
-  /** Only toggles hideUnchangedRegions/glyphMargin (§7.3 gotchas 1/2) — the review object itself,
+  /** Only toggles glyphMargin (§7.3 gotcha 1) — the review object itself,
    *  and attaching its comment-thread layer, stay the caller's own concern. */
   review: boolean;
   /** The reviewed branch of a review diff; the left side then comes from `review.snapshot` when
@@ -252,10 +252,12 @@ export function useDiffEditor(
       // A narrow pane (the review window centre) must not flip to inline.
       useInlineViewWhenSpaceIsLimited: false,
       ignoreTrimWhitespace: false,
-      // C11 §7.3 gotcha 2: 0.56.0 has no public API to expand one specific collapsed unchanged
-      // region, so a comment anchored inside one would be invisible — only the review variant
-      // disables this; C6/C10's plain diff keeps it enabled, byte-identical.
-      hideUnchangedRegions: { enabled: !review },
+      hideUnchangedRegions: {
+        enabled: true,
+        contextLineCount: 3,
+        minimumLineCount: 3,
+        revealLineCount: 20,
+      },
       // §7.3 gotcha 1: the registered option default and the .d.ts prose disagree — set explicitly
       // for the review variant rather than depend on either being right in a future Monaco bump.
       // The plain diff passes nothing, unchanged from before this phase.
