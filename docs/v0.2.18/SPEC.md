@@ -11,7 +11,7 @@ First phase `P357` (highest in `docs/HISTORY.md` is `P356`). Branch `chapter/v0.
 | P361 | Postman import: collection variables and environment values missing, only keys import. Import every value. | Done |
 | P362 | API module left panel: multiselect, drag and drop, delete of selection. | Done |
 | P363 | Code review, 1 round, over the full diff since the base (see CLAUDE.md). | Done |
-| P364 | Close chapter, open PR. | Pending |
+| P364 | Close chapter, open PR. | Done |
 
 ## P357 Result
 
@@ -78,3 +78,7 @@ Tests: flow `TestBatchMoveDelete` (contracts `api-move-many`, `api-delete-many`;
 Round 1 review (`plans/P363-review-r1.md`, base `b407b4e`): 8 findings, all fixed. R1-1: `revealCommentLines` restores the saved selections after the reveal. R1-2: new `postman.DecodeVariables` drives legacy promotion, so `enabled:false` skips and badly typed fields decode like a fresh import; a non-array `variable` now stays in origin. R1-3: `ReviewView` caches the ordered path list in a `computed`, `adjacentFile` is an index lookup, and the navigator map is `shallowReactive` so the next/previous buttons refresh. R1-4: `menuForSelection` takes the topmost count; the label is pluralised. R1-5: `CollectionsRepo.Delete` narrowed to `DeleteCollection`; item-delete tests use `DeleteMany`. R1-6: minimal fix, not a refcounted syncer. The syncer leans on per-entry state (life context, `hostRepo`, breaker), so one shared syncer needs owner handoff. New `crShared` on `Registry`: a per-key gate held from sync state read to write, shared pending-checks spacing, and index changes notify every entry on the key. Remaining cost: each entry still probes the host once per interval (ETag, cheap). R1-7: `MarkSent` failure after a successful send logs and returns the count. R1-8: `verify-packaging.sh` A6 fails under `CI=true` below SDK 26, both apps. Also fixed a failing pre-existing unit test: `graphChunkFrame.bin` carried contract version 51, patched to 52.
 
 Tests: `crshare_test.go` (gate serialises read-write, key independence, context, peers), `go test -race ./internal/gitsession`. Unit 1957 pass. Playwright: `ade-v2-review*` and `repo-review-interaction` 60 passed, studio `collections.spec.ts` 14 passed. Go flows studio ok.
+
+## P364 Result
+
+Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.18/` removed. PR opened from `chapter/v0.2.18` to `main`.
