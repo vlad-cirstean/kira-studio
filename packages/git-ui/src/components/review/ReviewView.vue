@@ -33,7 +33,7 @@ import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
-import { adjacentFilePath } from '../../lib/fileTreeModel.ts';
+import { adjacentInOrder, orderedFilePaths } from '../../lib/fileTreeModel.ts';
 import { createReviewFilesActions } from '../../lib/reviewFilesActions.ts';
 import { useReviewAnnouncements } from '../../lib/useReviewAnnouncements.ts';
 import type { MountOptions } from '../../main.ts';
@@ -379,14 +379,7 @@ const filesActions = createReviewFilesActions(bridge, () => repoId.value, announ
 onMounted(() => {
   props.onReviewApi?.({
     selectFile: (path) => reviewFiles.value?.selectFile(path),
-    adjacentFile: (path, dir) =>
-      adjacentFilePath(
-        (reviewFiles.value?.files.value ?? []).map((entry) => entry.change),
-        filter.value,
-        listMode.value,
-        path,
-        dir,
-      ),
+    adjacentFile: (path, dir) => adjacentInOrder(orderedPaths.value, path, dir),
   });
   // Mirrors `App.vue`'s own first-paint mark (the review-view perf metric measures from this, not
   // merely from `kira:page-parsed`). Unlike the graph panel there is no lane-layout
@@ -421,6 +414,14 @@ onBeforeUnmount(() => {
 // (show-toolbar="false") and receive these as plain props.
 const listMode = ref<FileListMode>('tree');
 const filter = ref('');
+// Reactive so a host computed reading the navigator refreshes when the list order changes.
+const orderedPaths = computed(() =>
+  orderedFilePaths(
+    (reviewFiles.value?.files.value ?? []).map((entry) => entry.change),
+    filter.value,
+    listMode.value,
+  ),
+);
 
 // The write half of durable persistence — one watch() over the same fields the
 // snapshot lists (listMode/filter live here; branch/resolution/pane/diffMode are read fresh

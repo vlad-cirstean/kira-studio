@@ -222,7 +222,7 @@ export function flattenTreeRows(
 
 /** Review file paths in the order the list shows them: the filtered tree fully expanded in tree
  *  mode, the flat sort otherwise. */
-function orderedFilePaths(
+export function orderedFilePaths(
   files: readonly FileChange[],
   filter: string,
   listMode: 'tree' | 'flat',
@@ -234,15 +234,12 @@ function orderedFilePaths(
   );
 }
 
-/** The path after/before `path` in `orderedFilePaths`, or null at an end or when unlisted. */
-export function adjacentFilePath(
-  files: readonly FileChange[],
-  filter: string,
-  listMode: 'tree' | 'flat',
+/** The path after/before `path` in `order`, or null at an end or when unlisted. */
+export function adjacentInOrder(
+  order: readonly string[],
   path: string,
   dir: 'next' | 'previous',
 ): string | null {
-  const order = orderedFilePaths(files, filter, listMode);
   const at = order.indexOf(path);
   return at === -1 ? null : (order[dir === 'next' ? at + 1 : at - 1] ?? null);
 }

@@ -57,7 +57,7 @@ let reviewDecorations: ReviewDecorationsHandle | null = null;
 
 const navigation = useReviewNavigationStore();
 const diffNavigation = shallowRef<DiffNavigation | null>(null);
-// The review list's navigator is not reactive, so adjacency is recomputed when this bumps.
+// Bumped when the editor's change cursor moves; the navigator itself is reactive.
 const navTick = ref(0);
 const isReview = props.tab.state.review !== null;
 const repoIdForNav = repoIdOfTab(props.tab);

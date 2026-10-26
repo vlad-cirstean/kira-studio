@@ -2,9 +2,10 @@
  * Cross-file review navigation. The git-ui review list owns file order and selection; the centre
  * diff tabs ask it for the adjacent file. The two sit in separate app boundaries, so the list
  * registers here (keyed by code repo id) and a tab that runs out of changes reads it.
+ * `adjacentFile` reads reactive state, so a computed calling it stays current.
  */
 import { defineStore } from 'pinia';
-import { markRaw, ref } from 'vue';
+import { markRaw, ref, shallowReactive } from 'vue';
 
 export interface ReviewNavigator {
   adjacentFile(path: string, dir: 'next' | 'previous'): string | null;
@@ -18,7 +19,8 @@ export interface ReviewArrival {
 }
 
 export const useReviewNavigationStore = defineStore('reviewNavigation', () => {
-  const navigators = new Map<string, ReviewNavigator>();
+  // Reactive so a diff tab mounted before the list registers its navigator picks it up.
+  const navigators = shallowReactive(new Map<string, ReviewNavigator>());
   const arrival = ref<ReviewArrival | null>(null);
 
   /** Returns the unregister function; a later registration for the same repo is not removed by it. */
