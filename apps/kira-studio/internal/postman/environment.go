@@ -30,6 +30,7 @@ func ParseFile(r io.Reader) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
+	doc = unwrapAPIDocument(doc)
 	if _, ok := doc["info"]; ok {
 		tree, err := parseCollection(doc)
 		if err != nil {
@@ -45,6 +46,28 @@ func ParseFile(r io.Reader) (*File, error) {
 		return &File{Environment: parseEnvironment(doc)}, nil
 	}
 	return nil, errors.New("postman: not a Postman collection or environment")
+}
+
+// unwrapAPIDocument unwraps one level of the Postman API envelope: `GET /collections/{id}` answers
+// `{"collection":{info,...}}` and `GET /environments/{id}` `{"environment":{values,...}}`. Only a
+// document with neither `info` nor `values` unwraps, and only when the member's own shape
+// classifies; `collection` wins when both are present.
+func unwrapAPIDocument(doc map[string]json.RawMessage) map[string]json.RawMessage {
+	if _, ok := doc["info"]; ok {
+		return doc
+	}
+	if _, ok := doc["values"]; ok {
+		return doc
+	}
+	if inner := decodeObject(doc["collection"]); inner != nil && decodeObject(inner["info"]) != nil {
+		return inner
+	}
+	if inner := decodeObject(doc["environment"]); inner != nil {
+		if raw := inner["values"]; len(raw) > 0 && raw[0] == '[' {
+			return inner
+		}
+	}
+	return doc
 }
 
 func parseEnvironment(doc map[string]json.RawMessage) *Environment {

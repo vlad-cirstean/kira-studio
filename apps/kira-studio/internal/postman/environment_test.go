@@ -42,6 +42,21 @@ func TestParseFile(t *testing.T) {
 		{name: "globals refused", in: open("globals.json"), wantErr: "globals export is not supported"},
 		{name: "not postman", in: `{"hello":"world"}`, wantErr: "not a Postman collection or environment"},
 		{
+			name: "environment api wrapper",
+			in:   `{"environment":{"name":"W","values":[{"key":"a","value":{"x":1}},{"key":"b"}]}}`,
+			want: &Environment{
+				Name:      "W",
+				Variables: []Variable{{Name: "a", Value: `{"x":1}`}, {Name: "b"}},
+				Empty:     1,
+			},
+		},
+		{name: "collection api wrapper", in: `{"collection":{"info":{"name":"C"},"item":[]}}`, wantCol: "C"},
+		{name: "collection wins over environment", in: `{"collection":{"info":{"name":"C"}},"environment":{"values":[]}}`, wantCol: "C"},
+		{name: "plain collection ignores collection member", in: `{"info":{"name":"P"},"collection":{"info":{"name":"X"}}}`, wantCol: "P"},
+		{name: "collection member not an object", in: `{"collection":"x"}`, wantErr: "not a Postman collection or environment"},
+		{name: "wrapper without info", in: `{"collection":{"item":[]}}`, wantErr: "not a Postman collection or environment"},
+		{name: "wrapper two levels refused", in: `{"collection":{"collection":{"info":{}}}}`, wantErr: "not a Postman collection or environment"},
+		{
 			name: "blank name falls back",
 			in:   `{"name":"  ","values":[]}`,
 			want: &Environment{Name: "Imported environment", Variables: []Variable{}},
@@ -62,6 +77,9 @@ func TestParseFile(t *testing.T) {
 			if tc.wantCol != "" {
 				if f.Collection == nil || f.Environment != nil {
 					t.Fatalf("File = %+v, want a collection", f)
+				}
+				if f.Collection.Name != tc.wantCol && tc.wantCol != "set" {
+					t.Fatalf("collection name = %q, want %q", f.Collection.Name, tc.wantCol)
 				}
 				return
 			}

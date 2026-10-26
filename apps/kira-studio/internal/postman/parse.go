@@ -40,7 +40,7 @@ func Parse(r io.Reader) (*Tree, error) {
 	if err != nil {
 		return nil, err
 	}
-	return parseCollection(doc)
+	return parseCollection(unwrapAPIDocument(doc))
 }
 
 // readDocument reads one bounded JSON object, the shared first step of Parse and ParseFile.
