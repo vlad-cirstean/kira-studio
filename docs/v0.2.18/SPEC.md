@@ -8,7 +8,7 @@ First phase `P357` (highest in `docs/HISTORY.md` is `P356`). Branch `chapter/v0.
 | P358 | Review window: mark a folder reviewed (marks every file under it). Add next/previous change buttons and an inline/side-by-side diff toggle to the bar that holds go-to-file. | Done |
 | P359 | Skip the agent-finished notification while the app window is focused. | Done |
 | P360 | Terminal sessions (incl. Claude Code TUI): Cmd+Enter inserts a newline. TUI scroll too slow, match VS Code terminal scroll behavior. Darker terminal background, a dark grey from the app palette, not black. | Done |
-| P361 | Postman import: collection variables and environment values missing, only keys import. Import every value. | Pending |
+| P361 | Postman import: collection variables and environment values missing, only keys import. Import every value. | Done |
 | P362 | API module left panel: multiselect, drag and drop, delete of selection. | Pending |
 | P363 | Code review, 1 round, over the full diff since the base (see CLAUDE.md). | Pending |
 | P364 | Close chapter, open PR. | Pending |
@@ -50,3 +50,13 @@ Background: terminal theme and `TerminalHostView` frame use `--kira-bg-chrome` (
 Tests: `repo-workspace.spec.ts` "Cmd+Enter in a terminal sends meta-Enter (ESC CR); plain Enter stays CR" (new; checks `Gw0=` then `DQ==`). Terminal specs 3/3 pass. No backend test: env entry is a constant. Frame computed `rgb(24, 24, 24)`.
 
 Only user can verify on real macOS: Cmd+Enter in Claude Code (repo terminal, ADE pane, review flow) inserts a newline and does not submit; in Kira Studio it does not fire the "Run statement" menu item (WKWebView forwarding after `preventDefault`); zsh continuation line; Claude Code fullscreen scroll feel with trackpad and wheel versus VS Code (hard flicks accelerate less; next lever is user's `CLAUDE_CODE_SCROLL_SPEED`); background shade on a real display.
+
+## P361 Result
+
+Leading suspected cause, outside this app: Postman exports empty values for non-shared variables. Since its September 2025 variables model a value is local by default, and only a value the user shared is written to `value`. An unshared variable exports as the key with `"value": ""`. That matches the report: keys present, values missing, "some" in environments. The app cannot import a value the file does not contain. Not an app bug. The user's own export was not checked (none in the repo); if one has non-empty `value`s that fail to import, that is a separate bug.
+
+New warning `empty_values` (collections and environments): "{count} variables arrived without a value. Postman exports only shared values; share them in Postman, then export again." Counts imported entries whose value is `""`; disabled entries never count. Counts only, no value text logged.
+
+In-app gaps fixed: G1 object and array `value` imported as `""`, now compact JSON. G2 Postman API envelopes `{"collection":...}` and `{"environment":...}` were refused, now unwrapped (one level, `unwrapAPIDocument`). G3 collection `variable[]` ignored `disabled: true`, now skipped and counted `disabled_variables`. G4 legacy promotion in `repos/variables.go` had its own scalar decode (`scalarString`), now `postman.VariableValue`, and skips `disabled: true`. Collection and environment parsers share `decodeVariableEntry`. `docs/ARCHITECTURE.md` updated.
+
+Tests: `TestDecodeVariableEntry` (new, both paths), `TestParseFile` extended (wrappers, negatives, counts), `apiflow.TestPostmanImportCollectionAndEnvironment` extended (values via `VariablesService.List`, both warnings, wrapper file; contract `api-postman-multi` regenerated), `collections.spec.ts` "Postman import of a collection, an environment and a bad file" asserts `empty_values` lines. `TestPostmanImportSendExport` green with no fixture edit. Out of scope: globals, Collection v2.0, full data dump, folder-level variables.
