@@ -6,7 +6,7 @@ First phase `P357` (highest in `docs/HISTORY.md` is `P356`). Branch `chapter/v0.
 |---|-------|--------|
 | P357 | Review window diff shows hunks only. Today it renders entire files. Show changed hunks plus a few lines of context, collapse the rest. User asked for this before; verify against the real window, not just the code path. | Done |
 | P358 | Review window: mark a folder reviewed (marks every file under it). Add next/previous change buttons and an inline/side-by-side diff toggle to the bar that holds go-to-file. | Done |
-| P359 | Skip the agent-finished notification while the app window is focused. | Pending |
+| P359 | Skip the agent-finished notification while the app window is focused. | Done |
 | P360 | Terminal sessions (incl. Claude Code TUI): Cmd+Enter inserts a newline. TUI scroll too slow, match VS Code terminal scroll behavior. Darker terminal background, a dark grey from the app palette, not black. | Pending |
 | P361 | Postman import: collection variables and environment values missing, only keys import. Import every value. | Pending |
 | P362 | API module left panel: multiselect, drag and drop, delete of selection. | Pending |
@@ -28,3 +28,11 @@ Next/previous change: `diffNavigation.ts` keeps its own index over `getLineChang
 Layout toggle: `kira.repo.diffLayout` (`usePersistedState`, per device), all repo diff editors follow it.
 
 Tests: `TestReviewMarkFolder`, `TestReviewNavigationFiles` (contracts `git-review-folder.json`, `git-review-nav.json`); `ade-v2-review.spec.ts` "a folder checkbox marks every file under it", "next and previous change walk hunks and cross files", "the diff layout toggle switches to inline and persists". Go flows ok. `test:ui:space` 692 passed, 1 failed: the nav test raced the diff compute; fixed (ready gate), then 72/72 on 3x8 repeats. Screenshots checked. Linux webkit tier only; desktop WKWebView build not run.
+
+## P359 Result
+
+Finished notes (`KindFinished`) skip while any app window, review windows included, is the macOS key window. `WindowRegistry.AnyFocused` probes native `IsFocused` outside `r.mu`. `agentnotify.notifyTerminal` calls the new `Deps.AppFocused` before taking `n.mu`; a skipped note burns no cooldown. Dead `Deps.Focus` removed. `appwire` holds the probe in an `atomic.Pointer` (hook goroutine reads, `BindShell` writes); `ShellHooks.AppFocused` overrides it. Other kinds keep the per-window tab rule from `ReportFocus`. No renderer, contract or i18n change.
+
+Tests: `TestFocusedAppSkipsFinished` (new), `TestFocusedTabSuppresses` now on needs-input, proves app focus does not suppress it. `go test -race` notifyflow and shell ok, `go test ./apps/kira-space/internal/flows/...` ok. No frontend half: renderer and IPC unchanged.
+
+Not verified on desktop: `isKeyWindow` reads only on macOS Wails; Linux sandbox cannot run it. Known edge: screen locked with Kira Space frontmost keeps the window key, so finished notes skip while user is away.
