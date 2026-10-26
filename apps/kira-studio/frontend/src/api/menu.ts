@@ -62,9 +62,11 @@ function moveMenu(rows: readonly CollectionRowVm[], actions: CollectionMenuActio
   });
 }
 
-/** The menu for two or more selected rows: the actions that apply to a set. */
+/** The menu for two or more selected rows: the actions that apply to a set. `deleteCount` is the
+ *  topmost rows a delete removes, so the label matches the confirm prompt. */
 export function menuForSelection(
   rows: readonly CollectionRowVm[],
+  deleteCount: number,
   actions: CollectionMenuActions,
 ): MenuItem[] {
   const items: MenuItem[] = [];
@@ -74,7 +76,7 @@ export function menuForSelection(
   items.push({
     type: 'item',
     id: 'delete',
-    label: t('studio.api.collections.deleteMany.label', { count: rows.length }),
+    label: t('studio.api.collections.deleteMany.label', { count: deleteCount }),
     icon: ICON.delete,
     danger: true,
     shortcut: 'tree.delete',

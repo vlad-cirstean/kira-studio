@@ -204,7 +204,11 @@ async function confirmAndDeleteRows(rows: readonly CollectionRowVm[]): Promise<v
 /** The menu a right-click on `row` opens: the set's when `row` is one of several selected. */
 function menuItemsFor(row: CollectionRowVm) {
   return selection.isSelected(row.key) && selection.count > 1
-    ? menuForSelection(selectedRows.value, actions)
+    ? menuForSelection(
+        selectedRows.value,
+        collectionsStore.planDelete(selectedRows.value).top.length,
+        actions,
+      )
     : menuForRow(row, actions);
 }
 

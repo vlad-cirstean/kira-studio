@@ -9379,7 +9379,7 @@
           "title": "Delete folder?"
         },
         "deleteMany": {
-          "label": "Delete {count} items"
+          "label": "Delete {count} item | Delete {count} items"
         },
         "deleteManyConfirm": {
           "body": "Deletes {list}.",
