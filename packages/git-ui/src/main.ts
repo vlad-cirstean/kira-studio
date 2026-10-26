@@ -39,7 +39,7 @@ export interface MountOptions {
    *  swap or base pick, no `review.target` push, no session resume or save. */
   readonly lockTarget?: boolean;
   /** Only meaningful when `view === "review"`: called with the path after each file-list mark. */
-  readonly onReviewMarked?: (path: string) => void;
+  readonly onReviewMarked?: (paths: readonly string[]) => void;
   /** Only meaningful when `view === "review"`: receives a handle that opens a file's diff, as a click in the Files pane does. */
   readonly onReviewApi?: (api: { selectFile: (path: string) => void }) => void;
   /** Only meaningful when `view === "graph"` — the exact mirror of `target` above, for a

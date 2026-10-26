@@ -449,6 +449,7 @@ export const REVIEW_RESULTS = {
     ],
   },
   'review.mark': {},
+  'review.markMany': { results: [] },
   'commit.detail': COMMIT_DETAIL,
 };
 

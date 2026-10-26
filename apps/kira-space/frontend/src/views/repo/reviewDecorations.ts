@@ -646,7 +646,7 @@ export function attachReviewDecorations(
   const unsubscribeRepaint = onReviewRepaint((event) => {
     if (event.repoId !== deps.gitRepoId || event.branch !== deps.review.branch) return;
     if (event.kind === 'mark') {
-      if (event.path !== deps.path) return;
+      if (!event.paths.includes(deps.path)) return;
       void loadDiff();
     } else {
       void loadComments();

@@ -78,8 +78,8 @@ export class ReviewFilesState {
   // explanation. Mirrors loadError/diffError's own pattern exactly.
   readonly markError: ShallowRef<string | undefined> = shallowRef(undefined);
 
-  /** Host hook: called with the path after each successful `review.mark`. */
-  onMarked: ((path: string) => void) | undefined;
+  /** Host hook: called with the paths after each successful `review.mark`/`review.markMany`. */
+  onMarked: ((paths: readonly string[]) => void) | undefined;
 
   readonly #bridge: BridgeClient;
   #target: ReviewFilesTarget | undefined;
@@ -274,6 +274,59 @@ export class ReviewFilesState {
     await run;
   }
 
+  /** Whole-file mark of several paths in one `review.markMany` call, queued with `mark()`. A failure
+   *  reloads the list: earlier files in the batch may have been written. */
+  async markMany(paths: readonly string[], reviewed: boolean): Promise<void> {
+    const target = this.#target;
+    if (!target || paths.length === 0) return;
+    this.#lastQueuedKey = undefined;
+    const state = this.#markState;
+    state.count++;
+    this.pending.value = true;
+    const run = this.#markChain.then(() => this.#runMarkMany(target, state, paths, reviewed));
+    this.#markChain = run;
+    await run;
+  }
+
+  async #runMarkMany(
+    target: ReviewFilesTarget,
+    state: { count: number },
+    paths: readonly string[],
+    reviewed: boolean,
+  ): Promise<void> {
+    try {
+      if (this.#target !== target) return;
+      this.markError.value = undefined;
+      try {
+        const { results } = await this.#bridge.request('review.markMany', {
+          repoId: target.repoId,
+          branch: target.branch,
+          paths,
+          reviewed,
+        });
+        if (this.#target !== target) return;
+        const byPath = new Map(results.map((r) => [r.path, r.review]));
+        this.files.value = this.files.value.map((entry) => {
+          const review = byPath.get(entry.change.path);
+          return review ? { ...entry, review } : entry;
+        });
+        this.onMarked?.(paths);
+        const selected = this.selectedPath.value;
+        if (selected !== null && byPath.has(selected)) await this.#loadDiff();
+      } catch (error) {
+        if (this.#target !== target) return;
+        this.markError.value = errorText(error);
+        this.reload();
+      }
+    } finally {
+      state.count--;
+      if (state === this.#markState && state.count === 0) {
+        this.pending.value = false;
+        this.#lastQueuedKey = undefined;
+      }
+    }
+  }
+
   async #runMark(
     target: ReviewFilesTarget,
     state: { count: number },
@@ -295,7 +348,7 @@ export class ReviewFilesState {
       this.files.value = this.files.value.map((entry) =>
         entry.change.path === path ? { ...entry, review: result.review } : entry,
       );
-      this.onMarked?.(path);
+      this.onMarked?.([path]);
       if (this.selectedPath.value === path) await this.#loadDiff();
     } catch (error) {
       if (this.#target !== target) return;
