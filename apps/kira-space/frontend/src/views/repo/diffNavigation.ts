@@ -1,9 +1,11 @@
 import type { editor } from 'monaco-editor';
-import { type ComputedRef, computed, ref } from 'vue';
+import { type ComputedRef, computed, type Ref, ref } from 'vue';
 
 type DiffEditor = editor.IStandaloneDiffEditor;
 
 export interface DiffNavigation {
+  /** False until Monaco has computed the diff; moving before then would read an empty change list. */
+  readonly ready: Ref<boolean>;
   /** Whether a change lies beyond the current one in this file. */
   readonly canNext: ComputedRef<boolean>;
   readonly canPrevious: ComputedRef<boolean>;
@@ -24,13 +26,14 @@ export function attachDiffNavigation(diffEditor: DiffEditor): DiffNavigation {
   const modifiedEditor = diffEditor.getModifiedEditor();
   const anchors = ref<number[]>([]);
   const index = ref(-1);
+  const ready = ref(false);
   let pending: 'first' | 'last' | null = null;
 
   function refresh(): void {
+    const lineChanges = diffEditor.getLineChanges();
+    ready.value = lineChanges !== null;
     // A pure deletion reports modifiedEndLineNumber 0; its start is the line above.
-    anchors.value = (diffEditor.getLineChanges() ?? []).map((c) =>
-      Math.max(1, c.modifiedStartLineNumber),
-    );
+    anchors.value = (lineChanges ?? []).map((c) => Math.max(1, c.modifiedStartLineNumber));
     if (index.value >= anchors.value.length) index.value = anchors.value.length - 1;
   }
 
@@ -64,6 +67,7 @@ export function attachDiffNavigation(diffEditor: DiffEditor): DiffNavigation {
   refresh();
 
   return {
+    ready,
     canNext: computed(() => index.value < anchors.value.length - 1),
     canPrevious: computed(() => index.value > 0),
     next(): boolean {

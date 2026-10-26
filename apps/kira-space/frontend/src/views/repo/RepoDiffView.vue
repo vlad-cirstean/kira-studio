@@ -66,13 +66,18 @@ function hasAdjacentFile(dir: 'next' | 'previous'): boolean {
   if (!isReview || !repoIdForNav) return false;
   return navigation.navigatorFor(repoIdForNav)?.adjacentFile(props.tab.path, dir) != null;
 }
+// Off until the diff is computed: an empty change list would send the move straight to the next file.
 const canNext = computed(() => {
   navTick.value;
-  return (diffNavigation.value?.canNext.value ?? false) || hasAdjacentFile('next');
+  const nav = diffNavigation.value;
+  if (nav && !nav.ready.value) return false;
+  return (nav?.canNext.value ?? false) || hasAdjacentFile('next');
 });
 const canPrevious = computed(() => {
   navTick.value;
-  return (diffNavigation.value?.canPrevious.value ?? false) || hasAdjacentFile('previous');
+  const nav = diffNavigation.value;
+  if (nav && !nav.ready.value) return false;
+  return (nav?.canPrevious.value ?? false) || hasAdjacentFile('previous');
 });
 
 // Past the last (first) change of this file, open the next (previous) file in the review list.
