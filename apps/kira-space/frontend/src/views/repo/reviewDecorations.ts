@@ -69,6 +69,8 @@ export interface ReviewDecorationsDeps {
 }
 
 export interface ReviewDecorationsHandle {
+  /** Settles once the first diff and comment load finished (or failed). */
+  readonly ready: Promise<void>;
   dispose(): void;
 }
 
@@ -656,9 +658,12 @@ export function attachReviewDecorations(
   // Regions rebuild on every diff compute, which can re-collapse lines revealed earlier.
   const diffUpdateDisposable = diffEditor.onDidUpdateDiff(revealCommentLines);
 
-  void load();
+  const ready = load().catch((err: unknown) =>
+    logError('reviewDecorations', 'initial load failed', err),
+  );
 
   return {
+    ready,
     dispose(): void {
       disposed = true;
       diffUpdateDisposable.dispose();

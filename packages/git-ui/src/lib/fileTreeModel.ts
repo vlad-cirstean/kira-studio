@@ -220,6 +220,33 @@ export function flattenTreeRows(
   return rows;
 }
 
+/** Review file paths in the order the list shows them: the filtered tree fully expanded in tree
+ *  mode, the flat sort otherwise. */
+function orderedFilePaths(
+  files: readonly FileChange[],
+  filter: string,
+  listMode: 'tree' | 'flat',
+): string[] {
+  const indexed = filterFiles(files, filter);
+  if (listMode === 'flat') return buildFlatList(indexed).map((node) => node.path);
+  return flattenTreeRows(buildFileTree(indexed), () => true).flatMap((row) =>
+    row.kind === 'file' ? [row.node.path] : [],
+  );
+}
+
+/** The path after/before `path` in `orderedFilePaths`, or null at an end or when unlisted. */
+export function adjacentFilePath(
+  files: readonly FileChange[],
+  filter: string,
+  listMode: 'tree' | 'flat',
+  path: string,
+  dir: 'next' | 'previous',
+): string | null {
+  const order = orderedFilePaths(files, filter, listMode);
+  const at = order.indexOf(path);
+  return at === -1 ? null : (order[dir === 'next' ? at + 1 : at - 1] ?? null);
+}
+
 /** §8's render cap page: 500 rows, then a "Show more" row, never a second virtualizer. */
 export const FILE_TREE_PAGE_SIZE = 500;
 

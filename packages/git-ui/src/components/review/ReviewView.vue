@@ -33,8 +33,10 @@ import { usePanelHeaderSearch } from '@workbench/behaviour/panelSearch';
 import { errorText } from '@workbench/bridge/codedError';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
+import { adjacentFilePath } from '../../lib/fileTreeModel.ts';
 import { createReviewFilesActions } from '../../lib/reviewFilesActions.ts';
 import { useReviewAnnouncements } from '../../lib/useReviewAnnouncements.ts';
+import type { MountOptions } from '../../main.ts';
 import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts';
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
@@ -56,7 +58,7 @@ const props = defineProps<{
   target?: ReviewTarget | null;
   lockTarget?: boolean;
   onReviewMarked?: (paths: readonly string[]) => void;
-  onReviewApi?: (api: { selectFile: (path: string) => void }) => void;
+  onReviewApi?: MountOptions['onReviewApi'];
   repoHead?: RepoHead;
 }>();
 
@@ -375,7 +377,17 @@ const rowActions = computed<DetailActions | undefined>(() => review.value?.rowAc
 const filesActions = createReviewFilesActions(bridge, () => repoId.value, announce);
 
 onMounted(() => {
-  props.onReviewApi?.({ selectFile: (path) => reviewFiles.value?.selectFile(path) });
+  props.onReviewApi?.({
+    selectFile: (path) => reviewFiles.value?.selectFile(path),
+    adjacentFile: (path, dir) =>
+      adjacentFilePath(
+        (reviewFiles.value?.files.value ?? []).map((entry) => entry.change),
+        filter.value,
+        listMode.value,
+        path,
+        dir,
+      ),
+  });
   // Mirrors `App.vue`'s own first-paint mark (the review-view perf metric measures from this, not
   // merely from `kira:page-parsed`). Unlike the graph panel there is no lane-layout
   // worker to wait a frame for, so this can mark right after mount rather than waiting on a

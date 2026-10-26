@@ -9026,6 +9026,9 @@
         "missing": {
           "empty": "This file no longer exists"
         },
+        "nextChange": {
+          "label": "Next change"
+        },
         "noChanges": {
           "empty": "No changed files"
         },
@@ -9037,6 +9040,9 @@
         },
         "openFileFailed": {
           "error": "Couldn’t open this file."
+        },
+        "previousChange": {
+          "label": "Previous change"
         },
         "reading": {
           "label": "Reading"

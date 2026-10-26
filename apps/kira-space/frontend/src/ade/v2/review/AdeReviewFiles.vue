@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import type { MountHandle } from '@kira/git-ui';
+import type { MountHandle, ReviewApi } from '@kira/git-ui';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { errorText } from '@workbench/bridge/codedError';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { loadGitUi } from '../../../repo/git/gitUiModule';
 import { gitTransportFor } from '../../../repo/git/transport';
 import { ensureRepoOpen } from '../../../state/repoOpenHold';
+import { useReviewNavigationStore } from '../../../state/reviewNavigation';
 import type { ReviewWindowTarget } from '../wire';
 
 // The review window's left pane: git-ui's review view locked to this window's branch and base.
@@ -15,7 +16,9 @@ const emit = defineEmits<{ marked: [paths: readonly string[]] }>();
 const errorMessage = ref('');
 const container = ref<HTMLElement | null>(null);
 let handle: MountHandle | null = null;
-let api: { selectFile: (path: string) => void } | null = null;
+let api: ReviewApi | null = null;
+let unregisterNavigator: (() => void) | null = null;
+const navigation = useReviewNavigationStore();
 
 // Opens a file's diff in the centre tabs, as a click in the file list does.
 defineExpose({ selectFile: (path: string) => api?.selectFile(path) });
@@ -42,6 +45,8 @@ onMounted(async () => {
       onReviewMarked: (paths) => emit('marked', paths),
       onReviewApi: (a) => {
         api = a;
+        unregisterNavigator?.();
+        unregisterNavigator = navigation.register(props.target.codeRepoId, a);
       },
     });
   } catch (err) {
@@ -50,6 +55,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  unregisterNavigator?.();
+  unregisterNavigator = null;
   handle?.unmount();
   handle = null;
 });

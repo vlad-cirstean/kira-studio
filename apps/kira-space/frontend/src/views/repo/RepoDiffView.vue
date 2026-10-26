@@ -6,7 +6,7 @@ import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 // The diff editor mount, modelled on RepoFileView.vue line for line — same lazy Monaco
@@ -22,9 +22,11 @@ import { gitTransportFor } from '../../repo/git/transport';
 // shared with RepoMultiDiffView.vue's own per-file sections — this view keeps only what stays
 // single-active-view scoped: repoId resolution, the view.find/repo.goToFileFromDiff command
 // registrations, and review-decorations wiring.
+import { useReviewNavigationStore } from '../../state/reviewNavigation';
 import type { RepoDiffTabRecord } from '../../state/tabDomain';
 import { noRepositoryMessage, repoIdOfTab } from '../../state/workspace';
 import { type DiffLayout, useDiffLayout } from './diffLayout';
+import { attachDiffNavigation, type DiffNavigation } from './diffNavigation';
 import { loadMonaco } from './monaco';
 import { attachReviewDecorations, type ReviewDecorationsHandle } from './reviewDecorations';
 import { useDiffEditor } from './useDiffEditor';
@@ -53,6 +55,48 @@ let unregisterFind: (() => void) | null = null;
 let unregisterGoToFile: (() => void) | null = null;
 let reviewDecorations: ReviewDecorationsHandle | null = null;
 
+const navigation = useReviewNavigationStore();
+const diffNavigation = shallowRef<DiffNavigation | null>(null);
+// The review list's navigator is not reactive, so adjacency is recomputed when this bumps.
+const navTick = ref(0);
+const isReview = props.tab.state.review !== null;
+const repoIdForNav = repoIdOfTab(props.tab);
+
+function hasAdjacentFile(dir: 'next' | 'previous'): boolean {
+  if (!isReview || !repoIdForNav) return false;
+  return navigation.navigatorFor(repoIdForNav)?.adjacentFile(props.tab.path, dir) != null;
+}
+const canNext = computed(() => {
+  navTick.value;
+  return (diffNavigation.value?.canNext.value ?? false) || hasAdjacentFile('next');
+});
+const canPrevious = computed(() => {
+  navTick.value;
+  return (diffNavigation.value?.canPrevious.value ?? false) || hasAdjacentFile('previous');
+});
+
+// Past the last (first) change of this file, open the next (previous) file in the review list.
+function crossFile(dir: 'next' | 'previous'): void {
+  if (!repoIdForNav) return;
+  const navigator = navigation.navigatorFor(repoIdForNav);
+  const target = navigator?.adjacentFile(props.tab.path, dir);
+  if (!navigator || target == null) return;
+  navigation.requestArrival({
+    repoId: repoIdForNav,
+    path: target,
+    at: dir === 'next' ? 'first' : 'last',
+  });
+  navigator.selectFile(target);
+}
+function onNextChange(): void {
+  if (diffNavigation.value?.next()) navTick.value++;
+  else crossFile('next');
+}
+function onPreviousChange(): void {
+  if (diffNavigation.value?.previous()) navTick.value++;
+  else crossFile('previous');
+}
+
 type ViewState = 'loading' | 'found' | 'binary' | 'tooLarge' | 'bothMissing' | 'error';
 const state = ref<ViewState>('loading');
 function onGoToFile(): void {
@@ -80,10 +124,12 @@ async function mount(): Promise<void> {
     reviewBranch: review?.branch,
   });
   diffEditor = handle;
+  const arrival = repoId ? navigation.takeArrival(repoId, props.tab.path) : null;
   await handle.mount();
   if (diffEditor !== handle) return; // Unmounted while mount() awaited.
   state.value = handle.state.value;
   errorMessage.value = handle.errorMessage.value;
+  navTick.value++;
   if (state.value !== 'found') return;
 
   const editor = handle.editor.value;
@@ -117,6 +163,17 @@ async function mount(): Promise<void> {
       review,
     });
   }
+
+  // After the decorations so its listener runs once comment lines were revealed.
+  const changeNav = attachDiffNavigation(editor);
+  diffNavigation.value = changeNav;
+  editor.onDidUpdateDiff(() => navTick.value++);
+  navTick.value++;
+  if (arrival) {
+    changeNav.land(arrival);
+    await reviewDecorations?.ready;
+    if (diffNavigation.value === changeNav) changeNav.settle();
+  }
 }
 
 onMounted(() => void mount());
@@ -130,6 +187,8 @@ onUnmounted(() => {
   unregisterGoToFile = null;
   reviewDecorations?.dispose();
   reviewDecorations = null;
+  diffNavigation.value?.dispose();
+  diffNavigation.value = null;
   diffEditor?.dispose();
   diffEditor = null;
 });
@@ -139,12 +198,41 @@ onUnmounted(() => {
   <div class="h-full flex flex-col">
     <!-- P92 item 7: the same action the repo.goToFileFromDiff palette command runs — P74 built the
          behaviour and gave it no other affordance. -->
-    <ViewToolbar v-if="state === 'found'">
-      <Button variant="toolbar" size="kira" data-testid="repo-diff-go-to-file" @click="onGoToFile">
+    <ViewToolbar v-if="state === 'found' || (isReview && state !== 'loading')">
+      <Button
+        variant="toolbar"
+        size="kira"
+        data-testid="repo-diff-prev-change"
+        :disabled="!canPrevious"
+        :aria-label="t('space.repo.view.previousChange.label')"
+        :data-kira-tip="t('space.repo.view.previousChange.label')"
+        @click="onPreviousChange"
+      >
+        <CodiconIcon name="arrow-up" :size="13" />
+      </Button>
+      <Button
+        variant="toolbar"
+        size="kira"
+        data-testid="repo-diff-next-change"
+        :disabled="!canNext"
+        :aria-label="t('space.repo.view.nextChange.label')"
+        :data-kira-tip="t('space.repo.view.nextChange.label')"
+        @click="onNextChange"
+      >
+        <CodiconIcon name="arrow-down" :size="13" />
+      </Button>
+      <Button
+        v-if="state === 'found'"
+        variant="toolbar"
+        size="kira"
+        data-testid="repo-diff-go-to-file"
+        @click="onGoToFile"
+      >
         <CodiconIcon name="go-to-file" :size="13" />
         {{ t('common.goToFile.label') }}
       </Button>
       <SecondaryTabs
+        v-if="state === 'found'"
         class="ml-auto"
         variant="segmented"
         :aria-label="t('space.repo.view.diffLayout.aria')"
