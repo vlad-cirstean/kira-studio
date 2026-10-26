@@ -2238,7 +2238,8 @@ agent PTY) and the board's `OnRuns` (headless runs, which have no hooks).
 
 - An agent notification is named by the ADE task title, else the code repository whose root holds the cwd, else the cwd basename.
 - Terminal tabs are not persisted, so no tab title exists to use as the notification name.
-- Agent notifications are suppressed while the owning window is focused and shows that terminal (ActiveTerminalID) or that ADE task.
+- Finished notes skip while any app window (review windows included) is the key window (WindowRegistry.AnyFocused, native, checked at decision time; P359).
+- Other kinds are suppressed while the owning window is focused and shows that terminal (ActiveTerminalID) or that ADE task.
 - Each window reports focus through AgentNotifyService.ReportFocus, debounced 150 ms (state/agentNotify.ts).
 - Agent notifications have a cooldown of 10 s per (terminal or run, kind).
 - A note id is <kind>:<id> so a newer note replaces the older one.
