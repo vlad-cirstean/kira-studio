@@ -39,6 +39,8 @@ Failure: a review file has at least one comment. The user selects lines 40-55 in
 
 Fix: save `getSelections()` before the reveal and restore it after. Restore through `setSelections` with the saved ranges, so the hidden-region feature still sees the comment lines first. An alternative is to reveal only on the first load and on a diff update after a model change. Never reveal on a comment-only reload while the user has a non-empty selection.
 
+Status: Fixed: selections saved before the reveal and restored after.
+
 ### R1-2 Low: legacy variable promotion diverges from fresh import
 `apps/kira-studio/internal/storage/repos/variables.go:1143` (`promotedVariableRow`), `:1202`.
 
@@ -48,12 +50,16 @@ Failure 2: the strict struct decode fails for the whole array when one entry has
 
 Fix: export one entry decoder from `internal/postman` (for example a `DecodeVariableEntries(raw)` wrapping `decodeVariableEntry`) and use it here. The JSON-shape rules then stay in one place. Also, never drop `origin["variable"]` when decoding failed.
 
+Status: Fixed: promotion uses `postman.DecodeVariables`; a non-array `variable` stays in origin.
+
 ### R1-3 Low: cross-file adjacency rebuilds the tree on each read and goes stale
 `apps/kira-space/frontend/src/views/repo/RepoDiffView.vue:65` (`hasAdjacentFile`), `packages/git-ui/src/components/review/ReviewView.vue:382`, `packages/git-ui/src/lib/fileTreeModel.ts` (`orderedFilePaths`).
 
 Failure: each `canNext`/`canPrevious` evaluation runs a full filter, tree build and flatten. That happens twice per `navTick`, which bumps on every diff update and every change step. Cost is O(n log n) for a large review list. The navigator is not reactive, so the buttons go stale until the next tick when filter, list mode or file list change. Example: a restored diff tab mounts before the list loads, so "next change" stays disabled at the last change of the file.
 
 Fix: keep the ordered path list as a `computed` in `ReviewView` over files, filter and listMode. Answer `adjacentFile` by index lookup in it. Let the host subscribe to a change callback, or bump `navTick` from `onReviewApi`, so the buttons refresh when the order changes.
+
+Status: Fixed: cached ordered paths, index lookup, reactive navigator map.
 
 ### R1-4 Low: multi-select delete label counts nested rows
 `apps/kira-studio/frontend/src/api/menu.ts:77`.
@@ -62,12 +68,16 @@ Failure: the user selects collection C and request R inside it. The menu reads "
 
 Fix: pass the topmost count to the label. Either `menuForSelection` takes `topmost(rows, items)`, or `CollectionsTree` passes `planDelete(rows).top.length`.
 
+Status: Fixed: menu label uses the topmost row count.
+
 ### R1-5 Low: item branch of `CollectionsRepo.Delete` has no production caller
 `apps/kira-studio/internal/storage/repos/collections.go:465`.
 
 Failure: after P362 the only production caller is import rollback, with target `"collection"` (`bridge/collections.go:500`). The item path keeps its own sibling re-index, duplicating `DeleteMany`, and only tests use it (`collections_test.go:67`, `:112`). Two delete paths can drift apart.
 
 Fix: narrow it to `DeleteCollection(id)`, or route rollback through `DeleteMany([]string{id}, nil)`. Move the item-delete tests onto `DeleteMany`.
+
+Status: Fixed: `Delete` narrowed to `DeleteCollection`; tests on `DeleteMany`.
 
 ### R1-6 Medium: one change request syncer per RepoEntry, many per repo key
 `apps/kira-space/internal/gitsession/entry.go:212` (`newCRSyncer` per entry), `crsync.go:418` (`SyncState` read in `prepare`), `:450` and `:529` (`PutSyncState`).
@@ -76,6 +86,8 @@ Failure: a linked worktree is its own RepoEntry (`registry.go:265`). Two clones 
 
 Fix: own one refcounted syncer per repo key on `Registry`; entries attach and detach. Fan `noteChangeRequests` out to every attached entry. Minimum fix: a per-key mutex around a run, with state re-read under it before each `PutSyncState`.
 
+Status: Fixed (minimal): per-key gate, shared checks spacing, fan-out to all entries on the key. No refcounted syncer.
+
 ### R1-7 Low: forward reports failure after the comments were sent
 `apps/kira-space/internal/ade/review_agent.go:172-180` (`ForwardReviewComments`).
 
@@ -83,9 +95,13 @@ Failure: `tr.Send` pastes the comments into the agent. `store.MarkSent` then fai
 
 Fix: treat a `MarkSent` failure after a successful send as success with a logged warning, and still return the count. Or stamp first inside a transaction and roll back if `Send` fails.
 
+Status: Fixed: `MarkSent` failure after send logs a warning and returns the count.
+
 ### R1-8 Low: packaging A6 stays a soft note on CI
 `scripts/verify-packaging.sh:274`, `:376`.
 
 Failure: A6 fails only when the linked SDK is 26 or later; below that it prints a note and passes. Its comment says the soft path holds "until the runner is macos-26". This range moved all three workflows to `macos-26`, but the soft path stayed. If CI ever links an older SDK (image drift, pinned Xcode), the release ships binaries with `minos 14.0` under an `LSMinimumSystemVersion 26.0.0` plist, and verify passes.
 
 Fix: fail A6 when the SDK is below 26 under `CI=true`. Keep the note for local runs only. Update the comment.
+
+Status: Fixed: A6 fails under `CI=true` below SDK 26.
