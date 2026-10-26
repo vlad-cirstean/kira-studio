@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/flowharness"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
@@ -519,21 +520,22 @@ func TestPostmanImportCollectionAndEnvironment(t *testing.T) {
 		}
 		return p
 	}
-	collection := write("collection.json", `{"info":{"name":"Multi","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},"item":[{"name":"Ping","request":{"method":"GET","url":"https://example.test/ping"}}]}`)
+	collection := write("collection.json", `{"info":{"name":"Multi","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},"variable":[{"key":"base","value":"https://example.test"},{"key":"blank","value":""},{"key":"cfg","value":{"k":[1]}},{"key":"off","value":"x","disabled":true}],"item":[{"name":"Ping","request":{"method":"GET","url":"https://example.test/ping"}}]}`)
 	env, err := os.ReadFile(filepath.Join("testdata", "environment.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	environment := write("environment.json", string(env))
 	bad := write("bad.json", `{"hello":"world"}`)
+	wrapped := write("wrapped.json", `{"environment":{"name":"Wrapped","values":[{"key":"a","value":"1"},{"key":"b","value":""}]}}`)
 
 	// Contract api-postman-multi, read by tests/ui/collections.spec.ts "Postman import of a
 	// collection, an environment and a bad file".
 	const sc = "api-postman-multi"
 	pathOpts := []flowharness.ContractOption{flowharness.Replace(dir, "<tmp>")}
-	app.Dialogs.QueueOpenFiles(collection, environment, bad)
+	app.Dialogs.QueueOpenFiles(collection, environment, bad, wrapped)
 	chosen, err := app.W.Files.ChooseOpenMany(bridge.FilesChooseOpenArgs{})
-	if err != nil || len(chosen.Files) != 3 {
+	if err != nil || len(chosen.Files) != 4 {
 		t.Fatalf("ChooseOpenMany = %+v (%v)", chosen, err)
 	}
 	app.Contract(t, sc, "FilesService.ChooseOpenMany", chosen, append(pathOpts, flowharness.Mask("size"))...)
@@ -550,29 +552,66 @@ func TestPostmanImportCollectionAndEnvironment(t *testing.T) {
 	}
 	app.Contract(t, sc, "CollectionsService.Import", res, pathOpts...)
 
-	if len(res.Files) != 3 {
+	if len(res.Files) != 4 {
 		t.Fatalf("files = %+v, want one entry per path", res.Files)
 	}
-	if res.Files[0].Kind != "collection" || res.Files[0].Collection == nil || res.Files[0].Collection.Requests != 1 {
-		t.Errorf("collection entry = %+v", res.Files[0])
+	warningCounts := func(ws []bridge.ImportWarning) map[string]int {
+		m := map[string]int{}
+		for _, w := range ws {
+			m[w.Kind] = w.Count
+		}
+		return m
+	}
+	colEntry := res.Files[0]
+	if colEntry.Kind != "collection" || colEntry.Collection == nil || colEntry.Collection.Requests != 1 {
+		t.Fatalf("collection entry = %+v", colEntry)
+	}
+	if diff := cmp.Diff(map[string]int{
+		postman.WarnVariablesImported: 3, postman.WarnEmptyValues: 1, postman.WarnDisabledVariables: 1,
+	}, warningCounts(colEntry.Collection.Warnings)); diff != "" {
+		t.Errorf("collection warnings (-want +got):\n%s", diff)
 	}
 	envEntry := res.Files[1]
-	if envEntry.Kind != "environment" || envEntry.Environment == nil || envEntry.Environment.Variables != 4 ||
-		len(envEntry.Environment.Warnings) != 1 || envEntry.Environment.Warnings[0].Kind != postman.WarnDisabledVariables {
-		t.Errorf("environment entry = %+v, want 4 variables and a disabled-variables warning", envEntry)
+	if envEntry.Kind != "environment" || envEntry.Environment == nil || envEntry.Environment.Variables != 6 {
+		t.Fatalf("environment entry = %+v, want 6 variables", envEntry)
+	}
+	if diff := cmp.Diff(map[string]int{postman.WarnDisabledVariables: 1, postman.WarnEmptyValues: 1},
+		warningCounts(envEntry.Environment.Warnings)); diff != "" {
+		t.Errorf("environment warnings (-want +got):\n%s", diff)
 	}
 	if res.Files[2].Kind != "" || res.Files[2].Error == nil {
 		t.Errorf("bad file entry = %+v, want a failure", res.Files[2])
 	}
+	wrapEntry := res.Files[3]
+	if wrapEntry.Kind != "environment" || wrapEntry.Environment == nil || wrapEntry.Environment.Name != "Wrapped" ||
+		wrapEntry.Environment.Variables != 2 ||
+		!cmp.Equal(map[string]int{postman.WarnEmptyValues: 1}, warningCounts(wrapEntry.Environment.Warnings)) {
+		t.Errorf("wrapped entry = %+v, want Wrapped with 2 variables and one empty value", wrapEntry)
+	}
 
-	if got := tree(t, app, res.Files[0].Collection.CollectionID); len(got) != 1 {
+	if got := tree(t, app, colEntry.Collection.CollectionID); len(got) != 1 {
 		t.Errorf("collection tree = %q, want the one request", got)
 	}
-	envs, err := app.W.Variables.ListEnvironments()
-	if err != nil || len(envs) != 1 || envs[0].Name != "Staging" {
-		t.Fatalf("environments = %+v (%v), want Staging", envs, err)
+	colVars, err := app.W.Variables.List(bridge.VariablesScopeArgs{Scope: model.VariableScopeCollection, OwnerID: colEntry.Collection.CollectionID})
+	if err != nil {
+		t.Fatal(err)
 	}
-	vars, err := app.W.Variables.List(bridge.VariablesScopeArgs{Scope: model.VariableScopeEnvironment, OwnerID: envs[0].ID})
+	gotCol := map[string]string{}
+	for _, v := range colVars {
+		gotCol[v.Name] = v.Value
+	}
+	if diff := cmp.Diff(map[string]string{"base": "https://example.test", "blank": "", "cfg": `{"k":[1]}`}, gotCol); diff != "" {
+		t.Errorf("collection variables (-want +got):\n%s", diff)
+	}
+	envs, err := app.W.Variables.ListEnvironments()
+	if err != nil || len(envs) != 2 {
+		t.Fatalf("environments = %+v (%v), want Staging and Wrapped", envs, err)
+	}
+	envIDs := map[string]string{}
+	for _, e := range envs {
+		envIDs[e.Name] = e.ID
+	}
+	vars, err := app.W.Variables.List(bridge.VariablesScopeArgs{Scope: model.VariableScopeEnvironment, OwnerID: envIDs["Staging"]})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -581,8 +620,9 @@ func TestPostmanImportCollectionAndEnvironment(t *testing.T) {
 	for _, v := range vars {
 		got[v.Name] = v
 	}
-	if len(got) != 4 || got["token"].Value != "" || !got["token"].IsSecret || got["host"].Value != "https://staging.example.test" || got["legacy"].Name != "" {
-		t.Errorf("variables = %+v, want 4 with a blank-listed secret and the disabled one skipped", got)
+	if len(got) != 6 || got["token"].Value != "" || !got["token"].IsSecret || got["host"].Value != "https://staging.example.test" ||
+		got["config"].Value != `{"retry":[1,2]}` || got["blank"].Value != "" || got["legacy"].Name != "" {
+		t.Errorf("variables = %+v, want 6 with a blank-listed secret, a compact object value and the disabled one skipped", got)
 	}
 	var kinds []string
 	for _, c := range apiChanges(t, app, mark) {

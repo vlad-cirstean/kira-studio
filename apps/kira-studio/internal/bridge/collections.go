@@ -287,6 +287,7 @@ type ImportReport struct {
 // importWarningKinds is D12's order: warnings are reported in this order.
 var importWarningKinds = []string{
 	postman.WarnScriptsInert, postman.WarnAuthInert, postman.WarnVariablesInert, postman.WarnVariablesImported,
+	postman.WarnEmptyValues, postman.WarnDisabledVariables,
 	postman.WarnGraphQLBody, postman.WarnUnsupportedMethod, postman.WarnUnresolvedFile,
 	postman.WarnInlineFileContent, postman.WarnDisabledBody, postman.WarnMalformedItem,
 }
@@ -316,6 +317,8 @@ func importWarningDetail(kind string, n int) string {
 		return i18n.T("backend.studio.collection.import.disabledBody.body", map[string]string{"count": c})
 	case postman.WarnMalformedItem:
 		return i18n.T("backend.studio.collection.import.malformedItem.body", map[string]string{"count": c})
+	case postman.WarnEmptyValues:
+		return i18n.T("backend.studio.collection.import.emptyValues.body", map[string]string{"count": c})
 	case postman.WarnDisabledVariables:
 		return i18n.T("backend.studio.collection.import.disabledVariables.body", map[string]string{"count": c})
 	}
@@ -439,6 +442,12 @@ func (s *CollectionsService) importEnvironment(env *postman.Environment) (*Envir
 		report.Warnings = append(report.Warnings, ImportWarning{
 			Kind: postman.WarnDisabledVariables, Count: env.Disabled,
 			Detail: importWarningDetail(postman.WarnDisabledVariables, env.Disabled),
+		})
+	}
+	if env.Empty > 0 {
+		report.Warnings = append(report.Warnings, ImportWarning{
+			Kind: postman.WarnEmptyValues, Count: env.Empty,
+			Detail: importWarningDetail(postman.WarnEmptyValues, env.Empty),
 		})
 	}
 	return report, nil

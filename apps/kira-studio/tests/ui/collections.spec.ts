@@ -572,17 +572,28 @@ test('collections — Postman import of a collection, an environment and a bad f
   await emitWailsEvent(page, CHANNEL.importPostman, undefined);
 
   const files = page.locator('[data-testid="import-report-file"]');
-  await expect(files).toHaveCount(3);
+  await expect(files).toHaveCount(4);
   await expect(files.nth(0)).toHaveAttribute('data-kind', 'collection');
   await expect(files.nth(0)).toContainText('Imported “Multi”: 1 request, 0 folders.');
+  await expect(files.nth(0).locator('li[data-kind="empty_values"]')).toContainText(
+    '1 variables arrived without a value. Postman exports only shared values; share them in Postman, then export again.',
+  );
   await expect(files.nth(1)).toHaveAttribute('data-kind', 'environment');
-  await expect(files.nth(1)).toContainText('Imported environment “Staging”: 4 variables.');
+  await expect(files.nth(1)).toContainText('Imported environment “Staging”: 6 variables.');
   await expect(files.nth(1).locator('li[data-kind="disabled_variables"]')).toContainText(
     '1 disabled variables were skipped.',
+  );
+  await expect(files.nth(1).locator('li[data-kind="empty_values"]')).toContainText(
+    '1 variables arrived without a value.',
   );
   await expect(files.nth(2)).toHaveAttribute('data-kind', 'failed');
   await expect(files.nth(2)).toContainText(
     'Couldn’t import bad.json: postman: not a Postman collection or environment',
+  );
+  await expect(files.nth(3)).toHaveAttribute('data-kind', 'environment');
+  await expect(files.nth(3)).toContainText('Imported environment “Wrapped”: 2 variables.');
+  await expect(files.nth(3).locator('li[data-kind="empty_values"]')).toContainText(
+    '1 variables arrived without a value.',
   );
   const importCalls = control.log().filter((e) => e.channel === IPC.collectionsImport);
   expect(importCalls[0].args).toEqual(

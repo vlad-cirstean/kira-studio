@@ -1632,6 +1632,9 @@
           "disabledVariables": {
             "body": "{count} disabled variables were skipped."
           },
+          "emptyValues": {
+            "body": "{count} variables arrived without a value. Postman exports only shared values; share them in Postman, then export again."
+          },
           "graphqlBody": {
             "body": "{count} {format} bodies were imported as JSON bodies carrying the same query."
           },
