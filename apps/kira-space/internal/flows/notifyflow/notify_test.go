@@ -75,24 +75,45 @@ func TestWakeArmedStopSilent(t *testing.T) {
 	}
 }
 
-func TestFocusedTabSuppresses(t *testing.T) {
+func TestFocusedAppSkipsFinished(t *testing.T) {
 	app, sink := newApp(t)
 	setCooldown(t, time.Millisecond)
 	cwd := agentTab(t, app, "tab-1")
 
-	focus(t, app, bridge.ReportFocusArgs{Focused: true, Module: "terminal", ActiveTerminalID: "tab-1"})
+	app.WindowMgr.SetAppFocused(true)
 	stop(t, app, "tab-1", cwd, "a")
 	sink.none(t)
 
-	focus(t, app, bridge.ReportFocusArgs{Focused: true, Module: "terminal", ActiveTerminalID: "tab-2"})
+	time.Sleep(5 * time.Millisecond)
+	app.WindowMgr.SetAppFocused(false)
 	stop(t, app, "tab-1", cwd, "b")
 	if len(sink.all()) != 1 {
-		t.Fatalf("notes = %+v, want one while another tab is active", sink.all())
+		t.Fatalf("notes = %+v, want one once the app is blurred", sink.all())
+	}
+}
+
+func TestFocusedTabSuppresses(t *testing.T) {
+	app, sink := newApp(t)
+	setCooldown(t, time.Millisecond)
+	cwd := agentTab(t, app, "tab-1")
+	needsInput := func() {
+		hook(t, app, "tab-1", `{"hook_event_name":"Notification","notification_type":"permission_prompt","cwd":`+quote(cwd)+`,"message":"allow?"}`)
+	}
+
+	focus(t, app, bridge.ReportFocusArgs{Focused: true, Module: "terminal", ActiveTerminalID: "tab-1"})
+	needsInput()
+	sink.none(t)
+
+	app.WindowMgr.SetAppFocused(true)
+	focus(t, app, bridge.ReportFocusArgs{Focused: true, Module: "terminal", ActiveTerminalID: "tab-2"})
+	needsInput()
+	if len(sink.all()) != 1 {
+		t.Fatalf("notes = %+v, want one while another tab is active, app focus aside", sink.all())
 	}
 
 	time.Sleep(5 * time.Millisecond)
 	focus(t, app, bridge.ReportFocusArgs{Focused: false, Module: "terminal", ActiveTerminalID: "tab-1"})
-	stop(t, app, "tab-1", cwd, "c")
+	needsInput()
 	if len(sink.all()) != 2 {
 		t.Fatalf("notes = %+v, want a second one while the window is blurred", sink.all())
 	}

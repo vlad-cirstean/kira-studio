@@ -108,7 +108,22 @@ type WindowManager struct {
 	// OpenedKeyed records the keys of windows opened for an external file open.
 	OpenedKeyed []string
 	// Known is the set of window keys Close and Focus report true for.
-	Known map[string]bool
+	Known      map[string]bool
+	appFocused bool
+}
+
+// SetAppFocused sets what AppFocused reports; default false.
+func (w *WindowManager) SetAppFocused(v bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.appFocused = v
+}
+
+// AppFocused reports whether a test marked any app window key.
+func (w *WindowManager) AppFocused() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.appFocused
 }
 
 func newWindowManager() *WindowManager {

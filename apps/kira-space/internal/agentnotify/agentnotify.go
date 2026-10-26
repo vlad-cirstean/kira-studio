@@ -84,10 +84,11 @@ type Deps struct {
 	Describe  func(terminalID, cwd string) Target
 	TaskTitle func(taskID string) string
 	// Alive reports whether a window still exists; a closed window's last focus report is ignored.
-	Alive  func(windowKey string) bool
-	Focus  func(windowKey string) bool
-	Reveal func(n Note)
-	Now    func() time.Time
+	Alive func(windowKey string) bool
+	// AppFocused reports whether any app window is the key window; nil reads false.
+	AppFocused func() bool
+	Reveal     func(n Note)
+	Now        func() time.Time
 	// AgentLabel names the active agent in titles when a target names none; nil reads "Agent".
 	AgentLabel func() string
 }
@@ -197,6 +198,10 @@ func needsInput(ev harness.AgentEvent) bool {
 func (n *Notifier) notifyTerminal(kind Kind, ev harness.AgentEvent, message string) {
 	p := n.d.Prefs()
 	if !p.Enabled || (kind == KindFinished && !p.OnFinished) || (kind == KindNeedsInput && !p.OnNeedsInput) {
+		return
+	}
+	// Outside n.mu: AppFocused blocks on the main thread.
+	if kind == KindFinished && n.d.AppFocused != nil && n.d.AppFocused() {
 		return
 	}
 	t := n.d.Describe(ev.TerminalID, ev.Cwd)
