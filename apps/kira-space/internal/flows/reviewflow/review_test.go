@@ -1,6 +1,7 @@
 package reviewflow_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -98,6 +99,39 @@ func TestReviewSessionRoundTrip(t *testing.T) {
 	if cleared := call[gitrpc.ReviewCommentClearResult](t, gs, "review.comment.clear", gitrpc.ReviewCommentClearParams{RepoID: id, Branch: "feat"}); cleared.Removed != 0 {
 		t.Fatalf("second clear removed %d, want 0", cleared.Removed)
 	}
+}
+
+// A one-line edit in a 200-line file: the diff carries one hunk, not the file; the UI shows only that hunk.
+func TestReviewDiffLargeFileHunks(t *testing.T) {
+	app := flowharness.New(t)
+	gs := app.OpenGitStream()
+	repo := app.NewRepo("proj")
+	lines := make([]string, 200)
+	for i := range lines {
+		lines[i] = fmt.Sprintf("line %d", i+1)
+	}
+	base := repo.Commit("base", map[string]string{"big.txt": strings.Join(lines, "\n") + "\n"})
+	repo.Git("checkout", "-q", "-b", "feat")
+	lines[99] = "CHANGED 100"
+	tip := repo.Commit("edit", map[string]string{"big.txt": strings.Join(lines, "\n") + "\n"})
+	repo.Checkout("main")
+	id := openRepo(t, gs, repo.Dir)
+
+	left := call[gitsession.BlobResult](t, gs, "file.read", gitrpc.FileReadParams{RepoID: id, Rev: base, Path: "big.txt"})
+	right := call[gitsession.BlobResult](t, gs, "file.read", gitrpc.FileReadParams{RepoID: id, Rev: tip, Path: "big.txt"})
+	if left.Kind != "found" || right.Kind != "found" || strings.Split(right.Content, "\n")[99] != "CHANGED 100" {
+		t.Fatalf("file.read left = %q, right = %q; want found sides with line 100 changed", left.Kind, right.Kind)
+	}
+	diff := call[gitsession.ReviewFileDiffResult](t, gs, "review.fileDiff", gitrpc.ReviewFileDiffParams{RepoID: id, Branch: "feat", Base: "main", Path: "big.txt", Mode: "range"})
+	if diff.Body.Kind != "text" || len(diff.Body.Hunks) != 1 || diff.LineCount != 200 {
+		t.Fatalf("range diff = kind %q, %d hunks, %d lines; want text, 1 hunk, 200 lines", diff.Body.Kind, len(diff.Body.Hunks), diff.LineCount)
+	}
+	if h := diff.Body.Hunks[0]; h.NewStart > 100 || h.NewStart+h.NewLines <= 100 {
+		t.Fatalf("hunk = %+v, want it to cover line 100", h)
+	}
+	app.Contract(t, "git-review-hunks", "git:file.read#left", left)
+	app.Contract(t, "git-review-hunks", "git:file.read#right", right)
+	app.Contract(t, "git-review-hunks", "git:review.fileDiff#range", diff, flowharness.Mask("baseSha", "headSha"))
 }
 
 func wireErrCode(gs *flowharness.GitStream, method string, params any) string {
