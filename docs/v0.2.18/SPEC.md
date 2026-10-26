@@ -9,7 +9,7 @@ First phase `P357` (highest in `docs/HISTORY.md` is `P356`). Branch `chapter/v0.
 | P359 | Skip the agent-finished notification while the app window is focused. | Done |
 | P360 | Terminal sessions (incl. Claude Code TUI): Cmd+Enter inserts a newline. TUI scroll too slow, match VS Code terminal scroll behavior. Darker terminal background, a dark grey from the app palette, not black. | Done |
 | P361 | Postman import: collection variables and environment values missing, only keys import. Import every value. | Done |
-| P362 | API module left panel: multiselect, drag and drop, delete of selection. | Pending |
+| P362 | API module left panel: multiselect, drag and drop, delete of selection. | Done |
 | P363 | Code review, 1 round, over the full diff since the base (see CLAUDE.md). | Pending |
 | P364 | Close chapter, open PR. | Pending |
 
@@ -60,3 +60,15 @@ New warning `empty_values` (collections and environments): "{count} variables ar
 In-app gaps fixed: G1 object and array `value` imported as `""`, now compact JSON. G2 Postman API envelopes `{"collection":...}` and `{"environment":...}` were refused, now unwrapped (one level, `unwrapAPIDocument`). G3 collection `variable[]` ignored `disabled: true`, now skipped and counted `disabled_variables`. G4 legacy promotion in `repos/variables.go` had its own scalar decode (`scalarString`), now `postman.VariableValue`, and skips `disabled: true`. Collection and environment parsers share `decodeVariableEntry`. `docs/ARCHITECTURE.md` updated.
 
 Tests: `TestDecodeVariableEntry` (new, both paths), `TestParseFile` extended (wrappers, negatives, counts), `apiflow.TestPostmanImportCollectionAndEnvironment` extended (values via `VariablesService.List`, both warnings, wrapper file; contract `api-postman-multi` regenerated), `collections.spec.ts` "Postman import of a collection, an environment and a bad file" asserts `empty_values` lines. `TestPostmanImportSendExport` green with no fixture edit. Out of scope: globals, Collection v2.0, full data dump, folder-level variables.
+
+## P362 Result
+
+Backend: `MoveItems` and `DeleteMany` (repo `collections_batch.go`, bridge `CollectionsService`) replace `MoveItem` and `Delete`; each is one transaction. Move places the batch in argument order under any parent of any collection, before `beforeId` or last, rewrites the target dense and re-indexes every parent left. A move into the item itself or a descendant, under a non-folder, or before a foreign sibling is refused as `invalidMove` (bad request, i18n) and changes nothing. Delete skips ids a cascade already covers; a missing id deletes nothing. One `kira:api:dataChanged` emit per call (tree plus a variables change per deleted collection).
+
+Frontend: `workbench/behaviour/treePointerDrag.ts` extracted from `connectionReorder.ts`; both trees use it. `useListNavigation` gains `onExtend` (Shift+Up/Down/Home/End); shortcut `tree.selectAll`. New `useCollectionSelectionStore` (focus, anchor, key set) replaces `state.selected`; rows leave it when they leave the visible list. Click, Ctrl/Cmd toggle, Shift range, Shift+arrows, Ctrl/Cmd+A, Escape collapse. `api/collectionDrop.ts` holds drop zones, `topmost`, placement and refusals; collection rows never drag; before/after refused while searching. Right-click inside a multi-selection opens `menuForSelection` (move, "Delete N items"); `tree.delete` and Shift+F10 use it. Bulk delete asks one confirmation with per-kind counts, a nested note and an open-tabs note.
+
+Deleted requests' open tabs stay open as unsaved (existing orphan rule: saved-request caches write `null` for every cascaded id); a deleted collection closes its variable-set tab.
+
+Deviations from the plan: no `cursor-not-allowed` while dragging (lint U35 forbids it); drag badge uses the popover z tier; count labels reuse `studio.api.importReport.*` keys (catalog C3).
+
+Tests: flow `TestBatchMoveDelete` (contracts `api-move-many`, `api-delete-many`; `api-move` removed), repo tests for move and reindex, unit `api-collection-drop.spec.ts`, UI specs for multi-drag plus bulk delete (contract half), set menu, keyboard, search refusal. `go test` storage, bridge, apiflow ok; `go vet ./internal/...` clean; unit 871 passed; `ui` project 610 passed (includes `connection-order.spec.ts`). Screenshot viewed: selection highlight, `into` ring on the target folder, drag count badge. Not run: desktop WKWebView build (Linux sandbox), so Cmd+A versus the macOS Edit-menu select-all role is unverified.
