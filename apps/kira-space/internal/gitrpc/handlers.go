@@ -262,6 +262,9 @@ var requestHandlers = map[string]requestHandler{
 	"review.mark": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleReviewMark(ctx, c, params)
 	},
+	"review.markMany": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleReviewMarkMany(ctx, c, params)
+	},
 	"review.comment.add": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleReviewCommentAdd(ctx, c, params)
 	},

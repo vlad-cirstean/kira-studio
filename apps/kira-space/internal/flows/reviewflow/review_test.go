@@ -137,3 +137,84 @@ func TestReviewDiffLargeFileHunks(t *testing.T) {
 func wireErrCode(gs *flowharness.GitStream, method string, params any) string {
 	return flowharness.ErrorCode(gs.Request(method, params, nil))
 }
+
+// Folder mark: one batch call marks every distinct path at one tip; an unmark touches only its paths.
+func TestReviewMarkFolder(t *testing.T) {
+	app := flowharness.New(t)
+	gs := app.OpenGitStream()
+	repo := app.NewRepo("proj")
+	repo.Commit("base", map[string]string{"src/a.txt": "a\n", "src/b.txt": "b\n", "README.md": "r\n"})
+	repo.Git("checkout", "-q", "-b", "feat")
+	repo.Commit("edit", map[string]string{"src/a.txt": "a2\n", "src/b.txt": "b2\n", "README.md": "r2\n"})
+	repo.Checkout("main")
+	id := openRepo(t, gs, repo.Dir)
+
+	marked := call[gitrpc.ReviewMarkManyResult](t, gs, "review.markMany", gitrpc.ReviewMarkManyParams{
+		RepoID: id, Branch: "feat", Paths: []string{"src/a.txt", "src/b.txt", "src/a.txt"}, Reviewed: true,
+	})
+	if len(marked.Results) != 2 || marked.Results[0].Path != "src/a.txt" || marked.Results[1].Path != "src/b.txt" ||
+		marked.Results[0].Review.Kind != "full" || marked.Results[1].Review.Kind != "full" {
+		t.Fatalf("markMany = %+v, want src/a.txt and src/b.txt full", marked.Results)
+	}
+	files := reviewFiles(t, gs, id, "feat", "main")
+	a, b, readme := fileEntry(t, files, "src/a.txt"), fileEntry(t, files, "src/b.txt"), fileEntry(t, files, "README.md")
+	if a.Review.Kind != "full" || b.Review.Kind != "full" || readme.Review.Kind != "none" {
+		t.Fatalf("review.files = %+v %+v %+v, want full, full, none", a.Review, b.Review, readme.Review)
+	}
+	if a.Review.ReviewedAtSHA == nil || b.Review.ReviewedAtSHA == nil || *a.Review.ReviewedAtSHA != *b.Review.ReviewedAtSHA {
+		t.Fatalf("reviewedAtSha = %v and %v, want one shared tip", a.Review.ReviewedAtSHA, b.Review.ReviewedAtSHA)
+	}
+	app.Contract(t, "git-review-folder", "git:review.markMany#mark", marked, flowharness.Mask("reviewedAtSha", "reviewedAt"))
+
+	unmarked := call[gitrpc.ReviewMarkManyResult](t, gs, "review.markMany", gitrpc.ReviewMarkManyParams{
+		RepoID: id, Branch: "feat", Paths: []string{"src/a.txt"}, Reviewed: false,
+	})
+	if len(unmarked.Results) != 1 || unmarked.Results[0].Review.Kind != "none" {
+		t.Fatalf("unmark = %+v, want src/a.txt none", unmarked.Results)
+	}
+	files = reviewFiles(t, gs, id, "feat", "main")
+	if fileEntry(t, files, "src/b.txt").Review.Kind != "full" {
+		t.Fatalf("src/b.txt = %+v after unmarking src/a.txt, want full", fileEntry(t, files, "src/b.txt").Review)
+	}
+	app.Contract(t, "git-review-folder", "git:review.markMany#unmark", unmarked, flowharness.Mask("reviewedAtSha", "reviewedAt"))
+	app.Contract(t, "git-review-folder", "git:review.files#after-mark", files, flowharness.Mask("baseSha", "headSha", "reviewedAtSha", "reviewedAt"))
+
+	badRequest(t, gs, "review.markMany", gitrpc.ReviewMarkManyParams{RepoID: id, Branch: "feat", Paths: []string{}, Reviewed: true}, "paths")
+	badRequest(t, gs, "review.markMany", gitrpc.ReviewMarkManyParams{RepoID: id, Branch: "feat", Paths: []string{""}, Reviewed: true}, "path")
+}
+
+// Two files, one with two separate hunks: the data next/previous change walks across files.
+func TestReviewNavigationFiles(t *testing.T) {
+	app := flowharness.New(t)
+	gs := app.OpenGitStream()
+	repo := app.NewRepo("proj")
+	mk := func(changed ...int) string {
+		lines := make([]string, 200)
+		for i := range lines {
+			lines[i] = fmt.Sprintf("line %d", i+1)
+		}
+		for _, n := range changed {
+			lines[n-1] = fmt.Sprintf("CHANGED %d", n)
+		}
+		return strings.Join(lines, "\n") + "\n"
+	}
+	base := repo.Commit("base", map[string]string{"src/a.txt": mk(), "src/b.txt": mk()})
+	repo.Git("checkout", "-q", "-b", "feat")
+	tip := repo.Commit("edit", map[string]string{"src/a.txt": mk(20, 150), "src/b.txt": mk(60)})
+	repo.Checkout("main")
+	id := openRepo(t, gs, repo.Dir)
+
+	hunks := map[string]int{"src/a.txt": 2, "src/b.txt": 1}
+	for _, path := range []string{"src/a.txt", "src/b.txt"} {
+		key := strings.TrimSuffix(strings.TrimPrefix(path, "src/"), ".txt")
+		left := call[gitsession.BlobResult](t, gs, "file.read", gitrpc.FileReadParams{RepoID: id, Rev: base, Path: path})
+		right := call[gitsession.BlobResult](t, gs, "file.read", gitrpc.FileReadParams{RepoID: id, Rev: tip, Path: path})
+		diff := call[gitsession.ReviewFileDiffResult](t, gs, "review.fileDiff", gitrpc.ReviewFileDiffParams{RepoID: id, Branch: "feat", Base: "main", Path: path, Mode: "range"})
+		if diff.Body.Kind != "text" || len(diff.Body.Hunks) != hunks[path] {
+			t.Fatalf("%s diff = kind %q, %d hunks, want text, %d hunks", path, diff.Body.Kind, len(diff.Body.Hunks), hunks[path])
+		}
+		app.Contract(t, "git-review-nav", "git:file.read#"+key+"-left", left)
+		app.Contract(t, "git-review-nav", "git:file.read#"+key+"-right", right)
+		app.Contract(t, "git-review-nav", "git:review.fileDiff#"+key, diff, flowharness.Mask("baseSha", "headSha"))
+	}
+}

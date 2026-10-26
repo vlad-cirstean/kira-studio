@@ -124,6 +124,54 @@ func (r *Router) handleReviewMark(ctx context.Context, c *gitsession.Conn, param
 	)
 }
 
+func (r *Router) handleReviewMarkMany(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+	return handleRepoCall(ctx, c, "review.markMany", params,
+		func(p ReviewMarkManyParams) (string, error) {
+			if err := requireNonEmpty("review.markMany", "repoId", p.RepoID); err != nil {
+				return "", err
+			}
+			if err := validRefArg("branch", p.Branch); err != nil {
+				return "", err
+			}
+			if len(p.Paths) == 0 {
+				return "", ipcerr.Contract("gitrpc: review.markMany: paths must not be empty")
+			}
+			for _, path := range p.Paths {
+				if path == "" {
+					return "", ipcerr.Contract("gitrpc: review.markMany: path must not be empty")
+				}
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p ReviewMarkManyParams) (ReviewMarkManyResult, error) {
+			paths := dedupePaths(p.Paths)
+			// Each file's record is independent: a mid-batch error keeps earlier writes.
+			recs, err := entry.MarkFiles(ctx, p.Branch, paths, p.Reviewed)
+			if err != nil {
+				return ReviewMarkManyResult{}, mapDetailError(err)
+			}
+			out := make([]ReviewMarkManyEntry, len(recs))
+			for i, rec := range recs {
+				out[i] = ReviewMarkManyEntry{Path: paths[i], Review: gitsession.ReviewFileStatusFor(rec)}
+			}
+			return ReviewMarkManyResult{Results: out}, nil
+		},
+	)
+}
+
+func dedupePaths(paths []string) []string {
+	seen := make(map[string]struct{}, len(paths))
+	out := make([]string, 0, len(paths))
+	for _, p := range paths {
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		out = append(out, p)
+	}
+	return out
+}
+
 func (r *Router) handleReviewSnapshot(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	return handleRepoCall(ctx, c, "review.snapshot", params,
 		func(p ReviewSnapshotParams) (string, error) {

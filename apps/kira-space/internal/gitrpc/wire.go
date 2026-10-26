@@ -448,6 +448,25 @@ type ReviewMarkResult struct {
 	Review gitsession.ReviewFileStatus `json:"review"`
 }
 
+// ReviewMarkManyParams is review.markMany's own request: whole-file marks for several paths.
+type ReviewMarkManyParams struct {
+	RepoID   string   `json:"repoId"`
+	Branch   string   `json:"branch"`
+	Paths    []string `json:"paths"`
+	Reviewed bool     `json:"reviewed"`
+}
+
+// ReviewMarkManyEntry is one path's resulting status.
+type ReviewMarkManyEntry struct {
+	Path   string                      `json:"path"`
+	Review gitsession.ReviewFileStatus `json:"review"`
+}
+
+// ReviewMarkManyResult is review.markMany's own result, one entry per distinct path.
+type ReviewMarkManyResult struct {
+	Results []ReviewMarkManyEntry `json:"results"`
+}
+
 // ReviewSnapshotParams is review.snapshot's own request (P150).
 type ReviewSnapshotParams struct {
 	RepoID string `json:"repoId"`

@@ -1,0 +1,73 @@
+{
+  "git:review.files#after-mark": [
+    {
+      "change": {
+        "kind": "modified",
+        "path": "README.md"
+      },
+      "review": {
+        "changedSinceReview": false,
+        "kind": "none"
+      }
+    },
+    {
+      "change": {
+        "kind": "modified",
+        "path": "src/a.txt"
+      },
+      "review": {
+        "changedSinceReview": false,
+        "kind": "none",
+        "reviewedAt": 0,
+        "reviewedAtSha": "<masked>"
+      }
+    },
+    {
+      "change": {
+        "kind": "modified",
+        "path": "src/b.txt"
+      },
+      "review": {
+        "changedSinceReview": false,
+        "kind": "full",
+        "reviewedAt": 0,
+        "reviewedAtSha": "<masked>"
+      }
+    }
+  ],
+  "git:review.markMany#mark": {
+    "results": [
+      {
+        "path": "src/a.txt",
+        "review": {
+          "changedSinceReview": false,
+          "kind": "full",
+          "reviewedAt": 0,
+          "reviewedAtSha": "<masked>"
+        }
+      },
+      {
+        "path": "src/b.txt",
+        "review": {
+          "changedSinceReview": false,
+          "kind": "full",
+          "reviewedAt": 0,
+          "reviewedAtSha": "<masked>"
+        }
+      }
+    ]
+  },
+  "git:review.markMany#unmark": {
+    "results": [
+      {
+        "path": "src/a.txt",
+        "review": {
+          "changedSinceReview": false,
+          "kind": "none",
+          "reviewedAt": 0,
+          "reviewedAtSha": "<masked>"
+        }
+      }
+    ]
+  }
+}
