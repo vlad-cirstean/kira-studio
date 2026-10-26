@@ -2,6 +2,7 @@ package ade
 
 import (
 	"context"
+	"log/slog"
 	"os"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
@@ -176,8 +177,10 @@ func (b *TaskBoard) ForwardReviewComments(ctx context.Context, branchID string) 
 	for i, c := range open {
 		ids[i] = c.ID
 	}
+	// The agent already has the comments: failing here would invite a second forward that pastes
+	// them again.
 	if err := store.MarkSent(ctx, tgt.GitRepoID, tgt.Branch, ids, b.deps.Now()); err != nil {
-		return 0, err
+		slog.Warn("ade: mark forwarded review comments sent", "scope", "ade", "branch", sb.ID, "err", err)
 	}
 	b.emitReview(sb.TaskID, sb.ID)
 	return len(open), nil
