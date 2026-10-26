@@ -102,6 +102,7 @@ type crSyncer struct {
 	e     *RepoEntry
 	store ChangeRequestStore
 	cfg   CRSyncConfig
+	share *crShared
 
 	mu      sync.Mutex
 	running bool
@@ -116,20 +117,18 @@ type crSyncer struct {
 	notBefore time.Time
 	rateUntil time.Time
 	bo        *backoff.ExponentialBackOff
-	// lastPending spaces pending-checks refreshes; zero until the first.
-	lastPending time.Time
 	// key is the repo key of the last run, to drop its rows if the host is switched off.
 	key string
 	// more is set by a run that stopped at its page cap, to run again sooner than the interval.
 	more bool
 }
 
-func newCRSyncer(e *RepoEntry, store ChangeRequestStore, cfg CRSyncConfig) *crSyncer {
+func newCRSyncer(e *RepoEntry, store ChangeRequestStore, cfg CRSyncConfig, share *crShared) *crSyncer {
 	cfg = cfg.withDefaults()
 	bo := backoff.NewExponentialBackOff()
 	bo.InitialInterval, bo.MaxInterval, bo.MaxElapsedTime = cfg.BackoffInitial, cfg.BackoffMax, 0
 	bo.Reset()
-	return &crSyncer{e: e, store: store, cfg: cfg, focused: true, bo: bo}
+	return &crSyncer{e: e, store: store, cfg: cfg, share: share, focused: true, bo: bo}
 }
 
 // start arms the first run.
@@ -149,6 +148,9 @@ func (s *crSyncer) stop() {
 	if s.timer != nil {
 		s.timer.Stop()
 		s.timer = nil
+	}
+	if s.key != "" {
+		s.share.detach(s.key, s.e)
 	}
 }
 
@@ -273,6 +275,7 @@ func (s *crSyncer) sync(ctx context.Context, focused *bool, wait bool) {
 // crRun is the state of one run.
 type crRun struct {
 	s       *crSyncer
+	k       *crKey
 	ctx     context.Context
 	sp      githost.ChangeRequestSync
 	p       githost.Provider
@@ -311,15 +314,34 @@ func (s *crSyncer) runOnce() {
 		return
 	}
 
-	r := &crRun{s: s, ctx: ctx, sp: sp, p: p, repo: repo, key: crRepoKey(p, repo), nowMs: time.Now().UnixMilli()}
+	key := crRepoKey(p, repo)
 	s.mu.Lock()
-	s.key = r.key
+	old := s.key
+	s.key = key
 	s.mu.Unlock()
+	if old != "" && old != key {
+		s.share.detach(old, e)
+	}
+	s.share.attach(key, e)
+	// Held from the state read to the state write: a peer's run on this key cannot interleave.
+	k, release, ok := s.share.acquire(ctx, key)
+	if !ok {
+		return
+	}
+	defer release()
+	r := &crRun{s: s, k: k, ctx: ctx, sp: sp, p: p, repo: repo, key: key, nowMs: time.Now().UnixMilli()}
 	if r.prepare() && r.sync() {
 		s.succeeded()
 	}
 	if r.changed {
-		e.noteChangeRequests()
+		s.noteKey(key)
+	}
+}
+
+// noteKey tells every window on the repository that the index changed.
+func (s *crSyncer) noteKey(key string) {
+	for _, peer := range s.share.peers(key) {
+		peer.noteChangeRequests()
 	}
 }
 
@@ -345,7 +367,8 @@ func (s *crSyncer) dropForgotten() {
 		slog.Warn("githost: drop change request index", "scope", "gitsession", "repo", s.e.Summary.RepoID, "err", err)
 		return
 	}
-	s.e.noteChangeRequests()
+	s.noteKey(key)
+	s.share.detach(key, s.e)
 }
 
 func (s *crSyncer) failed(status githost.Status) {
@@ -520,9 +543,7 @@ func (r *crRun) backfill() bool {
 		if reached || !page.HasNext || page.EndCursor == "" {
 			r.st.BackfillComplete, r.st.BackfillCursor, r.st.DeltaFloor = true, "", 0
 			r.st.LastFullSyncAt, r.st.LastChecksAt = r.nowMs, r.nowMs
-			r.s.mu.Lock()
-			r.s.lastPending = time.Now()
-			r.s.mu.Unlock()
+			r.k.lastPending = time.Now()
 			break
 		}
 		r.st.BackfillCursor = page.EndCursor
@@ -631,8 +652,9 @@ func (r *crRun) refreshChecks() bool {
 	s := r.s
 	now := time.Now()
 	s.mu.Lock()
-	pendingDue := s.focused && now.Sub(s.lastPending) >= s.cfg.ChecksInterval
+	focused := s.focused
 	s.mu.Unlock()
+	pendingDue := focused && now.Sub(r.k.lastPending) >= s.cfg.ChecksInterval
 	sweepDue := r.nowMs-r.st.LastChecksAt >= s.cfg.SweepInterval.Milliseconds()
 	if !pendingDue && !sweepDue {
 		return true
@@ -671,9 +693,7 @@ func (r *crRun) refreshChecks() bool {
 			r.changed = r.changed || gone
 		}
 	}
-	s.mu.Lock()
-	s.lastPending = now
-	s.mu.Unlock()
+	r.k.lastPending = now
 	if sweepDue {
 		r.st.LastChecksAt = r.nowMs
 	}

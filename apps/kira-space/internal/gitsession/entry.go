@@ -173,7 +173,7 @@ func newRepoEntry(
 	summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher,
 	settings func() ([]string, int, string), repoSettingsGet func(string) (model.GitRepoSettings, error),
 	review *gitreview.Store, hosts githost.Selector, isOpen func(string) bool,
-	skipInitialAutoFetch bool, opLog *oplog.Log, crStore ChangeRequestStore, crCfg CRSyncConfig,
+	skipInitialAutoFetch bool, opLog *oplog.Log, crStore ChangeRequestStore, crCfg CRSyncConfig, crShare *crShared,
 ) *RepoEntry {
 	life, lifeStop := context.WithCancel(context.Background())
 	e := &RepoEntry{
@@ -209,7 +209,7 @@ func newRepoEntry(
 		e.startAutoFetch(minutes)
 	}
 	if crStore != nil {
-		e.crSync = newCRSyncer(e, crStore, crCfg)
+		e.crSync = newCRSyncer(e, crStore, crCfg, crShare)
 		e.crSync.start()
 	}
 	return e
