@@ -45,6 +45,7 @@ import {
   STATUS_COLOR_CLASS,
   STATUS_LETTERS,
 } from '../lib/fileTreeModel.ts';
+import { buildFolderReview, folderToggle } from '../lib/folderReview.ts';
 import { sectionsToMenuItems } from '../lib/menuModel.ts';
 import { buildFileRowMenu } from '../lib/rowMenuModel.ts';
 import type { FileListMode } from '../state/detail.ts';
@@ -100,6 +101,8 @@ const emit = defineEmits<{
    *  it used to live in DiffView.vue's own review adornment). Never emitted when reviewStates is
    *  absent. */
   (e: 'toggleReviewed', path: string): void;
+  /** A directory checkbox's click: the files under it that change, and the state to set. */
+  (e: 'toggleReviewedFolder', paths: string[], reviewed: boolean): void;
 }>();
 
 const filterInput = ref(props.filter);
@@ -416,6 +419,23 @@ function reviewCheckboxState(path: string): boolean | 'indeterminate' {
   if (kind === 'partial') return 'indeterminate';
   return false;
 }
+
+const folderReview = computed(() => buildFolderReview(tree.value, props.reviewStates));
+
+function folderState(path: string): boolean | 'indeterminate' {
+  return folderReview.value.get(path)?.state ?? false;
+}
+function folderToggleTitle(path: string): string {
+  return folderState(path) === true
+    ? t('common.markFolderUnreviewed.tooltip')
+    : t('common.markFolderReviewed.tooltip');
+}
+function onToggleFolder(path: string): void {
+  const folder = folderReview.value.get(path);
+  if (!folder) return;
+  const change = folderToggle(folder);
+  emit('toggleReviewedFolder', change.paths, change.reviewed);
+}
 </script>
 
 <template>
@@ -465,9 +485,21 @@ function reviewCheckboxState(path: string): boolean | 'indeterminate' {
         @contextmenu="onRowContextMenu($event, row, index)"
       >
         <template v-if="row.kind === 'directory'">
-          <!-- P75 §4.3: no mark on a directory row, but a same-width empty slot keeps the file
-               rows' checkbox column aligned underneath it. -->
-          <span v-if="reviewStates" class="w-3.5 shrink-0" aria-hidden="true"></span>
+          <Checkbox
+            v-if="reviewStates"
+            class="shrink-0"
+            data-testid="review-folder-check"
+            :model-value="folderState(row.node.path)"
+            :aria-label="folderToggleTitle(row.node.path)"
+            :data-kira-tip="folderToggleTitle(row.node.path)"
+            @click.stop
+            @update:model-value="() => onToggleFolder(row.node.path)"
+          >
+            <CodiconIcon
+              :name="folderState(row.node.path) === 'indeterminate' ? 'dash' : 'check'"
+              :size="13"
+            />
+          </Checkbox>
           <TreeTwisty
             :expanded="row.expanded"
             :has-children="true"

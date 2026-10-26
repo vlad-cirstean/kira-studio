@@ -2327,6 +2327,12 @@
     "mainWorktree": {
       "tooltip": "Main worktree"
     },
+    "markFolderReviewed": {
+      "tooltip": "Mark folder reviewed"
+    },
+    "markFolderUnreviewed": {
+      "tooltip": "Mark folder unreviewed"
+    },
     "markReviewed": {
       "tooltip": "Mark reviewed"
     },
