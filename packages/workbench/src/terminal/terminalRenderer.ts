@@ -61,7 +61,7 @@ function cssVar(name: string): string {
 // deliberate, not an oversight (§6.4's own stated reasoning).
 function terminalTheme(): import('@xterm/xterm').ITheme {
   return {
-    background: cssVar('--kira-bg'),
+    background: cssVar('--kira-bg-chrome'),
     foreground: cssVar('--kira-fg'),
     cursor: cssVar('--kira-fg'),
     selectionBackground: cssVar('--kira-select'),

@@ -828,6 +828,9 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - P128 deleted views/repo/RepoTerminalView.vue, which had been a hand-kept-identical second copy of the terminal tab body for repo-scoped terminals.
 - A repo terminal differs from an Automations terminal only in the workspaceId/codeRepoId the opener stamps on the tab record: openRepoTerminalTab (repo-scoped) versus Automations' openTerminalTab (workspace-scoped, visibleWorkspace()'s id).
 - TerminalTabView.vue/TerminalHostView.vue read neither workspaceId nor codeRepoId; the tab prop is typed against TerminalHostView's own prop shape, not either app's tab-record type.
+- Cmd+Enter in every terminal sends `ESC CR` (meta-Enter) via one custom key handler in `terminalRenderer.ts`; a newline in Claude Code and zsh.
+- Terminal scroll options match VS Code (xterm defaults plus `scrollOnEraseInDisplay`). `sessionEnv` sets `CLAUDE_CODE_SCROLL_SPEED=3` unless already set: xterm 6.0.0 has no XTVERSION, so Claude Code otherwise falls back to 1 row per wheel report.
+- Terminal background is `--kira-bg-chrome`, VS Code Dark Modern panel/terminal colour.
 - The Operations dock is a full-width flex sibling below the shell's project/main row, outside any split, because nesting it as a vertical group hung the render process on a tree-row click (never root-caused).
 - WorkbenchShell.vue renders the project panel and the dock through ResizeHandle (px, clamped to [180, 480] and [100, 500]), previewing locally and emitting resize-project/resize-ops on release; project and main share one row so their heights match.
 - Project width and dock height are keyed by active module (`modes.<mode>.project.width`, `modes.<mode>.project.widthUserSet`, `modes.<mode>.operations.height`); each shell passes `layoutStore.sizesFor(modeStore.active)`. Visibility and cell editor height stay app-wide.
