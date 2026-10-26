@@ -1,6 +1,5 @@
-import { useElementByPoint, useEventListener, useMouse, useRafFn } from '@vueuse/core';
-import { DRAG_TOLERANCE_PX } from '@workbench/behaviour/sortableReorder';
-import { type Ref, shallowRef, watch } from 'vue';
+import { useTreePointerDrag } from '@workbench/behaviour/treePointerDrag';
+import { computed, type Ref } from 'vue';
 
 const CONNECTION_ROW = '[role="treeitem"][data-kind="connection"]';
 
@@ -19,9 +18,8 @@ function orderAfterDrop(ids: readonly string[], dragged: string, drop: Connectio
 }
 
 /**
- * Pointer drag reorder for the virtualized project tree. Sortable cannot serve it: only the visible
- * window is mounted, rows are absolutely positioned, and child rows interleave the connection
- * rows. A drop lands before or after the connection row under the pointer.
+ * Pointer drag reorder for the virtualized project tree, on the shared tree pointer drag. A drop
+ * lands before or after the connection row under the pointer.
  */
 export function useConnectionReorder(opts: {
   container: Ref<HTMLElement | null>;
@@ -33,98 +31,31 @@ export function useConnectionReorder(opts: {
   draggingId: Readonly<Ref<string | null>>;
   drop: Readonly<Ref<ConnectionDrop | null>>;
 } {
-  const draggingId = shallowRef<string | null>(null);
-  const drop = shallowRef<ConnectionDrop | null>(null);
-  let pressId: string | null = null;
-  let pressAt = { x: 0, y: 0 };
-  let swallowClick = false;
-
-  const { x, y } = useMouse({ type: 'client' });
-  const hit = useElementByPoint({
-    x,
-    y,
-    scheduler: (cb) => useRafFn(cb, { immediate: false }),
-  });
-  const scroller = useRafFn(
-    () => {
-      const el = opts.container.value;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const zone = opts.rowHeight();
-      const step = zone / 4;
-      if (y.value < rect.top + zone) el.scrollTop -= step;
-      else if (y.value > rect.bottom - zone) el.scrollTop += step;
+  let draggedId: string | null = null;
+  const { dragging, drop } = useTreePointerDrag<ConnectionDrop>({
+    container: opts.container,
+    pressable: (target) => target.closest<HTMLElement>(CONNECTION_ROW),
+    disabled: opts.disabled,
+    rowHeight: opts.rowHeight,
+    onStart: (pressed) => {
+      draggedId = pressed.dataset.connectionId ?? null;
+      return draggedId !== null;
     },
-    { immediate: false },
-  );
-
-  watch([hit.element, y], ([el]) => {
-    if (!draggingId.value) return;
-    const row = el?.closest<HTMLElement>(CONNECTION_ROW);
-    const id = row?.dataset.connectionId;
-    if (!row || !id || id === draggingId.value) {
-      drop.value = null;
-      return;
-    }
-    const rect = row.getBoundingClientRect();
-    drop.value = { id, edge: y.value < rect.top + rect.height / 2 ? 'top' : 'bottom' };
-  });
-
-  function reset(): void {
-    pressId = null;
-    draggingId.value = null;
-    drop.value = null;
-    hit.pause();
-    scroller.pause();
-  }
-
-  function finish(commit: boolean): void {
-    const dragged = draggingId.value;
-    const target = drop.value;
-    reset();
-    if (!commit || !dragged || !target) return;
-    const current = opts.ids();
-    const next = orderAfterDrop(current, dragged, target);
-    if (next.some((id, i) => id !== current[i])) opts.onReorder(next);
-  }
-
-  useEventListener(opts.container, 'pointerdown', (e: PointerEvent) => {
-    swallowClick = false;
-    if (e.button !== 0 || !e.isPrimary || opts.disabled()) return;
-    const id = (e.target as HTMLElement | null)?.closest<HTMLElement>(CONNECTION_ROW)?.dataset
-      .connectionId;
-    if (!id) return;
-    pressId = id;
-    pressAt = { x: e.clientX, y: e.clientY };
-  });
-
-  useEventListener(document, 'pointermove', (e: PointerEvent) => {
-    if (pressId === null || draggingId.value !== null) return;
-    if (Math.hypot(e.clientX - pressAt.x, e.clientY - pressAt.y) < DRAG_TOLERANCE_PX) return;
-    draggingId.value = pressId;
-    swallowClick = true;
-    hit.resume();
-    scroller.resume();
-  });
-  useEventListener(document, 'pointerup', () => {
-    if (draggingId.value) finish(true);
-    else pressId = null;
-  });
-  useEventListener(document, 'pointercancel', () => finish(false));
-  useEventListener(document, 'keydown', (e: KeyboardEvent) => {
-    if (draggingId.value && e.key === 'Escape') finish(false);
-  });
-  // A finished drag must not also select or open the row the pointer came up on.
-  useEventListener(
-    opts.container,
-    'click',
-    (e: MouseEvent) => {
-      if (!swallowClick) return;
-      swallowClick = false;
-      e.stopPropagation();
+    resolve: (el, y) => {
+      const row = el?.closest<HTMLElement>(CONNECTION_ROW);
+      const id = row?.dataset.connectionId;
+      if (!row || !id || id === draggedId) return null;
+      const rect = row.getBoundingClientRect();
+      return { id, edge: y < rect.top + rect.height / 2 ? 'top' : 'bottom' };
     },
-    { capture: true },
-  );
-
+    onDrop: (source, target) => {
+      const dragged = source.dataset.connectionId;
+      if (!dragged) return;
+      const current = opts.ids();
+      const next = orderAfterDrop(current, dragged, target);
+      if (next.some((id, i) => id !== current[i])) opts.onReorder(next);
+    },
+  });
+  const draggingId = computed(() => dragging.value?.dataset.connectionId ?? null);
   return { draggingId, drop };
 }
