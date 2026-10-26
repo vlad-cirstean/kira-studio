@@ -425,8 +425,11 @@ export function attachReviewDecorations(
     if (first === undefined) return;
     revealColumn = revealColumn === 1 ? 2 : 1;
     const col = revealColumn;
+    // Restore after: a repaint must not collapse the user's selection or move their cursor.
+    const saved = modifiedEditor.getSelections();
     modifiedEditor.setSelections(lines.map((l) => new mod.Selection(l, col, l, col)));
     modifiedEditor.setSelection(new mod.Selection(first, col, first, col));
+    if (saved?.length) modifiedEditor.setSelections(saved);
   }
 
   async function loadComments(): Promise<void> {
