@@ -410,6 +410,10 @@ export function attachReviewDecorations(
 
   // Monaco's hideUnchangedRegions feature unhides every line a selection touches
   // (hideUnchangedRegionsFeature.js, onDidChangeCursorPosition); no public API reveals one line.
+  // It unhides contiguously from the nearer region edge to the line, so context around a comment
+  // in the middle of a long unchanged stretch is wider than three lines.
+  // The event fires only when the primary cursor moves, so alternate the column per call.
+  let revealColumn = 1;
   function revealCommentLines(): void {
     const max = modifiedEditor.getModel()?.getLineCount() ?? 0;
     const lines = [...new Set(comments.map((c) => c.range.start))]
@@ -417,8 +421,10 @@ export function attachReviewDecorations(
       .sort((a, b) => a - b);
     const [first] = lines;
     if (first === undefined) return;
-    modifiedEditor.setSelections(lines.map((l) => new mod.Selection(l, 1, l, 1)));
-    modifiedEditor.setSelection(new mod.Selection(first, 1, first, 1));
+    revealColumn = revealColumn === 1 ? 2 : 1;
+    const col = revealColumn;
+    modifiedEditor.setSelections(lines.map((l) => new mod.Selection(l, col, l, col)));
+    modifiedEditor.setSelection(new mod.Selection(first, col, first, col));
   }
 
   async function loadComments(): Promise<void> {

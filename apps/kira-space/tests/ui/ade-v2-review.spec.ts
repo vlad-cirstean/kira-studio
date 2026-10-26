@@ -161,6 +161,80 @@ reviewTest('a review diff opens side by side', async ({ relaunch }) => {
   expect(width).toBeGreaterThan(100);
 });
 
+reviewTest('a review diff shows only the hunk and the commented line', async ({ relaunch }) => {
+  const read = (side: 'left' | 'right') => contract('git-review-hunks', `git:file.read#${side}`);
+  const comment = {
+    id: 1,
+    path: 'src/pending.ts',
+    range: { start: 12, end: 12 },
+    body: 'Why this?',
+    anchor: 'exact',
+    anchorSha: 'a'.repeat(40),
+    createdAt: 1_790_036_500_000,
+    kind: 'change',
+    state: 'open',
+    reply: '',
+    repliedAt: null,
+    sentAt: null,
+  };
+  const { window: page } = await relaunch({
+    control: reviewControl([
+      { channel: IPC.windowsEnsure, response: { mode: 'git' } },
+      {
+        channel: IPC.codeWorkspaceListRepos,
+        response: [
+          {
+            id: target.codeRepoId,
+            name: 'web-app',
+            root: '/tmp/web-app',
+            repoId: target.gitRepoId,
+            sortOrder: 1,
+            color: 'none',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      },
+    ]),
+    gitStream: {
+      ...GIT,
+      extraResults: {
+        ...GIT.extraResults,
+        'file.read': { __sequence: [read('left'), read('right')] },
+        'review.snapshot': { kind: 'none', text: null, reviewedAtSha: null },
+        'review.fileDiff': {
+          ...contract<object>('git-review-hunks', 'git:review.fileDiff#range'),
+          path: 'src/pending.ts',
+        },
+        'review.comment.list': { at: 'a'.repeat(40), comments: [comment] },
+      },
+    },
+  });
+  await page.locator(t('ade-review-window')).waitFor();
+  await page
+    .locator(`${t('review-files-tree')} ${t('file-tree-row')}`, { hasText: 'pending.ts' })
+    .click();
+  const modified = page.locator(t('repo-diff-editor')).locator('.editor.modified');
+  const lines = modified.locator('.view-lines .view-line');
+  const rendered = (text: string) =>
+    lines.filter({ hasText: new RegExp(`^\\s*${text.replace(' ', '\\s')}$`) });
+
+  await expect(rendered('CHANGED 100')).toHaveCount(1);
+  for (const n of [97, 98, 99, 101, 102, 103, 12]) {
+    await expect(rendered(`line ${n}`)).toHaveCount(1);
+  }
+  await expect(modified.locator('.kira-review-glyph-comment')).toHaveCount(1);
+  for (const n of [50, 150]) await expect(rendered(`line ${n}`)).toHaveCount(0);
+  expect(await lines.count()).toBeLessThan(40);
+  const placeholders = modified.locator('.diff-hidden-lines');
+  await expect(placeholders).toHaveCount(2);
+
+  await page.screenshot({ path: 'test-results/review-hunks-only.png' });
+
+  const before = await lines.count();
+  await placeholders.last().locator('a').first().click();
+  await expect.poll(() => lines.count()).toBeGreaterThan(before);
+});
+
 reviewTest('with no review agent the panel offers to start one', async ({ relaunch }) => {
   const page = await openReview(relaunch);
   await expect(page.locator(t('ade-review-start'))).toHaveText('Start review agent');
