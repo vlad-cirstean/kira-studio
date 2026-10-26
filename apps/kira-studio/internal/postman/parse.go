@@ -119,7 +119,7 @@ func parseCollection(doc map[string]json.RawMessage) (*Tree, error) {
 
 // VariableValue renders a Postman variable `value` as text. The schema leaves it untyped: a
 // string, number or boolean renders as its literal; an object or array as compact JSON; null or
-// absent as "". Exported because storage's legacy promotion must decode the same way.
+// absent as "".
 func VariableValue(raw json.RawMessage) string {
 	if s, ok := decodeScalarString(raw); ok {
 		return s
@@ -153,6 +153,16 @@ func decodeVariableEntry(obj map[string]json.RawMessage) (v Variable, ok, disabl
 		Name: name, Value: VariableValue(obj["value"]), Secret: typ == "secret", Type: typ,
 		Description: decodeDescription(obj["description"]),
 	}, true, disabled
+}
+
+// DecodeVariables is decodeVariables for storage's legacy promotion, so promoted entries follow
+// the fresh-import rules. ok is false when raw is not a JSON array.
+func DecodeVariables(raw json.RawMessage) (vars []Variable, ok bool) {
+	if t := bytes.TrimSpace(raw); len(t) == 0 || t[0] != '[' {
+		return nil, false
+	}
+	vars, _, _ = decodeVariables(raw)
+	return vars, true
 }
 
 // decodeVariables decodes a collection-level `variable[]` array. Disabled entries are skipped and

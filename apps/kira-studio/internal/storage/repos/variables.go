@@ -1137,17 +1137,6 @@ func (r *VariablesRepo) mergeSecrets(out map[string]string, column, ownerID stri
 
 // ---- import promotion (P4 D9's hand-off, closed by D15/F5) ----
 
-// promotedVariableRow is one collection-level `variable[]` entry as it appears in a collection's
-// origin_json. Decoded here with no postman.Tree machinery around it; the value goes through
-// postman.VariableValue so it matches a fresh import.
-type promotedVariableRow struct {
-	Key   string          `json:"key"`
-	Value json.RawMessage `json:"value"`
-	Type  string          `json:"type"`
-	// Disabled mirrors Postman's `disabled: true`; such an entry is not promoted.
-	Disabled bool `json:"disabled"`
-}
-
 // promoteIfNeeded is the one-shot: a collection still carries its top-level `variable[]` inside
 // origin_json (variables_promoted = 0). This moves it into rows,
 // sheds the member from origin_json so the exporter never re-emits it from there, and stamps the
@@ -1183,14 +1172,16 @@ func (r *VariablesRepo) promoteIfNeeded(collectionID string) error {
 		}
 	}
 
-	var entries []promotedVariableRow
+	var entries []postman.Variable
 	if raw, ok := origin["variable"]; ok {
-		if err := json.Unmarshal(raw, &entries); err != nil {
-			slog.Warn("collection variable[] is not an array; nothing to promote", "scope", "storage/variables", "collectionId", collectionID)
-			entries = nil
+		decoded, isArray := postman.DecodeVariables(raw)
+		if isArray {
+			entries = decoded
+			delete(origin, "variable")
+		} else {
+			slog.Warn("collection variable[] is not an array; left in origin", "scope", "storage/variables", "collectionId", collectionID)
 		}
 	}
-	delete(origin, "variable")
 
 	if len(entries) > 0 {
 		order, err := sqlitex.NextSortOrder(tx, "api_variables", "collection_id = ?", collectionID)
@@ -1199,19 +1190,14 @@ func (r *VariablesRepo) promoteIfNeeded(collectionID string) error {
 		}
 		now := kiratime.NowISO()
 		for _, entry := range entries {
-			if entry.Key == "" || entry.Disabled {
-				continue
-			}
-			isSecret := entry.Type == "secret"
-			plain := postman.VariableValue(entry.Value)
-			storedValue, storedSecret, err := r.encryptFor(plain, isSecret)
+			storedValue, storedSecret, err := r.encryptFor(entry.Value, entry.Secret)
 			if err != nil {
 				return err
 			}
 			if _, err := tx.Exec(
 				`INSERT INTO api_variables (id, collection_id, environment_id, name, value, is_secret, secret_value, sort_order, created_at, updated_at)
 				 VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`,
-				uuid.NewString(), collectionID, entry.Key, storedValue, boolToInt(isSecret), storedSecret, order, now, now,
+				uuid.NewString(), collectionID, entry.Name, storedValue, boolToInt(entry.Secret), storedSecret, order, now, now,
 			); err != nil {
 				return fmt.Errorf("repos/variables: insert promoted variable: %w", err)
 			}
