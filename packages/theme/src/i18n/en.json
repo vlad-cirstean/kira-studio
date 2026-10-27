@@ -2185,6 +2185,14 @@
     "details": {
       "title": "Details"
     },
+    "dialog": {
+      "resizeHeight": {
+        "label": "Resize dialog height"
+      },
+      "resizeWidth": {
+        "label": "Resize dialog width"
+      }
+    },
     "discard": {
       "body": "Unsaved edits are lost.",
       "title": "Discard unsaved edits"
