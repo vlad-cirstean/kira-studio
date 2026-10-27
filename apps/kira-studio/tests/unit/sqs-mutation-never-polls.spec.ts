@@ -104,6 +104,9 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
       receiveAcknowledged: false,
       searchOpen: false,
       selectedRow: 1,
+      offsetDraft: null,
+      timestampDraft: null,
+      partitionsDraft: null,
     };
 
     let invalidated = false;
@@ -151,6 +154,9 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
       receiveAcknowledged: false,
       searchOpen: false,
       selectedRow: null,
+      offsetDraft: null,
+      timestampDraft: null,
+      partitionsDraft: null,
     };
 
     let readCalled = false;
@@ -193,6 +199,9 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
       receiveAcknowledged: false,
       searchOpen: false,
       selectedRow: null,
+      offsetDraft: null,
+      timestampDraft: null,
+      partitionsDraft: null,
     };
 
     let readCalled = false;

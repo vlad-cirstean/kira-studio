@@ -45,6 +45,10 @@ interface StreamViewRuntime extends PagedViewRuntime {
   /** The row last clicked, for the cell-editor preview (item 6) and — for SQS — Delete message's
    *  target; `null` once the page reloads out from under it (see stream/page.ts's pageVersion). */
   selectedRow: number | null;
+  /** Unapplied filter-row input; `null` shows the committed value. Survives a tab switch (P375). */
+  offsetDraft: string | null;
+  timestampDraft: string | null;
+  partitionsDraft: number[] | null;
 }
 
 function defaultRuntime(): StreamViewRuntime {
@@ -55,6 +59,9 @@ function defaultRuntime(): StreamViewRuntime {
     polled: false,
     receiveAcknowledged: false,
     selectedRow: null,
+    offsetDraft: null,
+    timestampDraft: null,
+    partitionsDraft: null,
   };
 }
 
@@ -324,9 +331,24 @@ export const useStreamViewStore = defineStore('streamView', () => {
     return connectionId ? useStaleDataStore().isStale(tabId, tabId, connectionId) : false;
   }
 
+  function setFilterDraft(
+    tabId: string,
+    draft: {
+      offset?: string | null;
+      timestamp?: string | null;
+      partitions?: number[] | null;
+    },
+  ): void {
+    const rt = ensureRuntime(tabId);
+    if (draft.offset !== undefined) rt.offsetDraft = draft.offset;
+    if (draft.timestamp !== undefined) rt.timestampDraft = draft.timestamp;
+    if (draft.partitions !== undefined) rt.partitionsDraft = draft.partitions;
+  }
+
   return {
     runtime,
     isStale,
+    setFilterDraft,
     load,
     reload,
     runCount,

@@ -57,8 +57,16 @@ function sortToText(sort: SortSpec | null): string {
     .join(', ');
 }
 
-const whereText = ref('');
-const orderByText = ref('');
+// Typed-but-unapplied text lives in the runtime store (P375): the tab-next/tab-prev shortcuts
+// switch tabs without a blur, which would otherwise drop it.
+const whereText = computed({
+  get: () => gridViewStore.runtime[props.tab.id]?.whereDraft ?? props.tab.state.filter ?? '',
+  set: (v: string) => gridViewStore.setFilterDraft(props.tab.id, { where: v }),
+});
+const orderByText = computed({
+  get: () => gridViewStore.runtime[props.tab.id]?.orderByDraft ?? sortToText(props.tab.state.sort),
+  set: (v: string) => gridViewStore.setFilterDraft(props.tab.id, { orderBy: v }),
+});
 
 // Watched as two separate primitive-returning getters, not `watch(tab, ...)` on the whole
 // object: DataView.vue keys this component's ancestor by tab.id (remounted on tab switch, so
@@ -68,19 +76,15 @@ const orderByText = ref('');
 // column-header click (DataGrid.vue's onHeaderClick calls setSort, which does exactly this
 // in-place patch): the ORDER BY field kept showing whatever was there before the click, so
 // blurring it (or pressing Enter) re-applied the stale text and clobbered the header's sort.
+// An external change to the committed value wins over any draft. Not immediate: a remount must
+// keep the draft.
 watch(
   () => props.tab.state.filter,
-  (filter) => {
-    whereText.value = filter ?? '';
-  },
-  { immediate: true },
+  () => gridViewStore.setFilterDraft(props.tab.id, { where: null }),
 );
 watch(
   () => props.tab.state.sort,
-  (sort) => {
-    orderByText.value = sortToText(sort);
-  },
-  { immediate: true },
+  () => gridViewStore.setFilterDraft(props.tab.id, { orderBy: null }),
 );
 
 function recordHistory(where: string | null, orderBy: SortSpec | null): void {
@@ -96,8 +100,12 @@ async function applyWhere(): Promise<void> {
   const value = whereText.value.trim() === '' ? null : whereText.value.trim();
   // A blur fires on every focus loss, not just an edit — re-applying an unchanged WHERE would
   // reset paging/count for no reason (and, worse, race an in-flight runCount for this same filter).
-  if (value === (props.tab.state.filter ?? null)) return;
+  if (value === (props.tab.state.filter ?? null)) {
+    gridViewStore.setFilterDraft(props.tab.id, { where: null });
+    return;
+  }
   await gridViewStore.setFilter(props.tab.id, value);
+  gridViewStore.setFilterDraft(props.tab.id, { where: null });
   recordHistory(value, props.tab.state.sort);
 }
 
@@ -105,6 +113,7 @@ async function applyOrderBy(): Promise<void> {
   const text = orderByText.value.trim();
   const sort: SortSpec | null = text === '' ? null : { kind: 'text', text };
   await gridViewStore.setSort(props.tab.id, sort);
+  gridViewStore.setFilterDraft(props.tab.id, { orderBy: null });
   recordHistory(props.tab.state.filter, sort);
 }
 
@@ -112,10 +121,10 @@ async function applyOrderBy(): Promise<void> {
 // using the same setFilter/setSort the blur handlers already call — there is no separate "hide
 // the row" affordance to build, since the row never goes away.
 async function onClear(): Promise<void> {
-  whereText.value = '';
-  orderByText.value = '';
+  gridViewStore.setFilterDraft(props.tab.id, { where: '', orderBy: '' });
   await gridViewStore.setFilter(props.tab.id, null);
   await gridViewStore.setSort(props.tab.id, null);
+  gridViewStore.setFilterDraft(props.tab.id, { where: null, orderBy: null });
   recordHistory(null, null);
 }
 
@@ -124,11 +133,11 @@ async function onClear(): Promise<void> {
 // focus is still genuinely on the field itself, and blurring the active element is exactly
 // blurring it.
 function onWhereEscape(): void {
-  whereText.value = props.tab.state.filter ?? '';
+  gridViewStore.setFilterDraft(props.tab.id, { where: null });
   (document.activeElement as HTMLElement | null)?.blur();
 }
 function onOrderByEscape(): void {
-  orderByText.value = sortToText(props.tab.state.sort);
+  gridViewStore.setFilterDraft(props.tab.id, { orderBy: null });
   (document.activeElement as HTMLElement | null)?.blur();
 }
 
@@ -138,11 +147,11 @@ const historyOpen = ref(false);
 const historyTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 
 function applyFromHistory(where: string | null, orderBy: SortSpec | null): void {
-  whereText.value = where ?? '';
-  orderByText.value = sortToText(orderBy);
+  gridViewStore.setFilterDraft(props.tab.id, { where: where ?? '', orderBy: sortToText(orderBy) });
   void gridViewStore
     .setFilter(props.tab.id, where)
-    .then(() => gridViewStore.setSort(props.tab.id, orderBy));
+    .then(() => gridViewStore.setSort(props.tab.id, orderBy))
+    .then(() => gridViewStore.setFilterDraft(props.tab.id, { where: null, orderBy: null }));
 }
 </script>
 

@@ -16,7 +16,7 @@ import { rowVariants } from '@theme/lib/rowVariants';
 import { useInlineEdit } from '@workbench/behaviour/inlineEdit';
 import QueryState from '@workbench/components/QueryState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import type { StreamTabRecord } from '../../state/tabDomain';
 import DateTimePicker from '../shared/DateTimePicker.vue';
@@ -43,6 +43,37 @@ const timestampEdit = useInlineEdit({
 });
 const timestampText = timestampEdit.text;
 const selectedPartitions = ref<number[]>([...props.tab.state.partitions]);
+
+// Unapplied input lives in the runtime store (P375): tab-next/tab-prev switch tabs without a
+// blur. Seed from a kept draft, then mirror edits back; `null` means equal to the committed value.
+const draftRt = streamViewStore.runtime[props.tab.id];
+if (draftRt?.offsetDraft != null) offsetText.value = draftRt.offsetDraft;
+if (draftRt?.timestampDraft != null) timestampText.value = draftRt.timestampDraft;
+if (draftRt?.partitionsDraft != null) selectedPartitions.value = [...draftRt.partitionsDraft];
+watch(
+  () => [offsetText.value, props.tab.state.offsetFilter] as const,
+  ([text, committed]) =>
+    streamViewStore.setFilterDraft(props.tab.id, {
+      offset: text === (committed ?? '') ? null : text,
+    }),
+);
+watch(
+  () => [timestampText.value, props.tab.state.timestampFilter] as const,
+  ([text, committed]) =>
+    streamViewStore.setFilterDraft(props.tab.id, {
+      timestamp: text === (committed ?? '') ? null : text,
+    }),
+);
+watch(
+  () => [[...selectedPartitions.value].sort((a, b) => a - b), props.tab.state.partitions] as const,
+  ([selected, committed]) =>
+    streamViewStore.setFilterDraft(props.tab.id, {
+      partitions:
+        selected.length === committed.length && selected.every((p, i) => p === committed[i])
+          ? null
+          : selected,
+    }),
+);
 
 function currentFilterInput() {
   return {

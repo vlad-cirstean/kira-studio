@@ -32,6 +32,9 @@ interface DocumentViewRuntime extends PagedViewRuntime {
   /** P43 F3/D4: highlight-only local UI state, narrowed to a single row index since a document has
    *  no columns to select within — this view mounts no cell editor dock to publish into at all. */
   selectedRow: number | null;
+  /** Unapplied filter-row text; `null` shows the committed value. Survives a tab switch (P375). */
+  searchDraft: string | null;
+  sortDraft: string | null;
 }
 
 function defaultRuntime(): DocumentViewRuntime {
@@ -40,6 +43,8 @@ function defaultRuntime(): DocumentViewRuntime {
     rowCount: 0,
     prevToken: null,
     selectedRow: null,
+    searchDraft: null,
+    sortDraft: null,
   };
 }
 
@@ -243,9 +248,19 @@ export const useDocumentViewStore = defineStore('documentView', () => {
     return connectionId ? useStaleDataStore().isStale(tabId, tabId, connectionId) : false;
   }
 
+  function setFilterDraft(
+    tabId: string,
+    draft: { search?: string | null; sort?: string | null },
+  ): void {
+    const rt = ensureRuntime(tabId);
+    if (draft.search !== undefined) rt.searchDraft = draft.search;
+    if (draft.sort !== undefined) rt.sortDraft = draft.sort;
+  }
+
   return {
     runtime,
     isStale,
+    setFilterDraft,
     load,
     reload,
     runCount,

@@ -9,6 +9,7 @@ import { openHttpModeAndNewRequest } from './support/apiMode';
 import { connectAndExpand, connectionCreateArgs } from './support/connect';
 import { acceptConfirm } from './support/dialogs';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 import type { StudioPortSnapshot } from './support/mockStream';
 import {
   APP_PATH,
@@ -293,4 +294,32 @@ test('http request field filter survives a tab switch', async ({ relaunch }) => 
     'aria-pressed',
     'true',
   );
+});
+
+test('grid WHERE draft survives a shortcut tab switch without being applied', async ({
+  relaunch,
+}) => {
+  test.setTimeout(90_000);
+  const { window: page, stream } = await relaunch({ control: CONTROL, stream: PORT });
+  await connectAndExpand(page, 'Tab Filter DB', 'green');
+
+  const tabs = page.locator('[data-testid="tab"]');
+  await (await findRow(page, BIG_ROWS_PATH)).dblclick();
+  await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
+  await (await findRow(page, NULLS_PATH)).dblclick();
+  await expect(tabs).toHaveCount(2);
+  await tabs.nth(0).click();
+
+  const where = page.locator('[data-testid="filter-where-input"]');
+  const readsBefore = (await stream.ops()).filter((o) => o.op === DATA_OP.read).length;
+  await where.fill('id < 4');
+
+  // A shortcut switch fires no blur, so the draft is never applied.
+  await emitWailsEvent(page, IPC.tabNext, null);
+  await expect(tabs.nth(1)).toHaveAttribute('data-active', 'true');
+  await emitWailsEvent(page, IPC.tabPrev, null);
+  await expect(tabs.nth(0)).toHaveAttribute('data-active', 'true');
+
+  await expect(where).toHaveValue('id < 4');
+  expect((await stream.ops()).filter((o) => o.op === DATA_OP.read)).toHaveLength(readsBefore);
 });
