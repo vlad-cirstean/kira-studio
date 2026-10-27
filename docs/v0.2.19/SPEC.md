@@ -10,7 +10,7 @@ First phase `P365` (highest in `HISTORY.md` is `P364`). Branch `chapter/v0.2.19`
 | P368 | Move reviews between columns on the planning board. | Done |
 | P369 | Review window header: merge title bar and second bar into one title bar. Remove the sync-to-GitHub button and its functionality entirely (frontend, bridge, backend, docs). | Done |
 | P370 | Review window: dropdown with GitHub's review actions (approve, comment, request changes), like the GitHub VS Code extension. Add PR-level comments, sent to the PR. | Done |
-| P371 | Review comment dialog resizes and fits the available space. Hunk checkmark must not move when the add-comment mark appears on hover. | Pending |
+| P371 | Review comment dialog resizes and fits the available space. Hunk checkmark must not move when the add-comment mark appears on hover. | Done |
 | P372 | Code review, 1 round, over the full diff since the base (see CLAUDE.md). | Pending |
 | P373 | Close chapter, open PR. | Pending |
 
@@ -94,3 +94,22 @@ Assumptions to check:
 - A4: Errors show inline in the dialog (the repo has no toast primitive), and success shows a short status line in the title bar with an "Open PR" link.
 - A5: The review is recorded against the PR's current head on GitHub, not the local branch tip. A differing local tip only warns.
 - A6: A pending review the user started on github.com makes GitHub refuse a new one (422). That refusal is shown as is; the app does not submit or discard the pending review.
+
+## P371 Result
+
+Plan: `plans/P371.md`. Commits: glyph lanes fix, `DialogContent` `resizable`, review dialog, docs.
+
+Hunk mark: Monaco lays glyph lanes out per line, so hovering a hunk line added the Left add-comment lane and shifted the mark and the whole margin. Fix in `reviewDecorations.ts`: `persistLane` on hunk, comment and add-comment glyphs, plus a `laneCollection` placeholder on line 1 reserving the Left lane. The margin is always two lanes wide. `docs/ARCHITECTURE.md` updated. Spec `the hunk mark stays put when the add-comment mark shows` failed on the old tree (mark x 645 to 663 on hover), passes now.
+
+Dialog: opt-in `resizable` prop on theme `DialogContent`: `ResizeHandle` on the right and bottom edges (`dialog-resize-x`, `dialog-resize-y`), half-size handle math for the centred box, bounds 320 by 240 up to 90% by 80% of the window; i18n `common.dialog.resizeWidth.label` and `resizeHeight.label`. `AdeReviewSubmitDialog` uses it; its textarea fills the body (`min-h-24 flex-auto resize-none field-sizing-fixed`). Specs `the review dialog fits a small window` and `the review dialog resizes from its edges`.
+
+Pre-existing flake fixed: `estimate: set, change and clear at any time` retyped before the board refetch reset the field (4 of 20 runs failed); the spec now waits for the reset value. 30 of 30 pass.
+
+Checked: typecheck, lint, knip (pre-commit and pre-push), `build:test:space`, full `test:ui:space` (696 pass, 1 flake above, fixed), `test:visual:space` (20 pass, no baseline moved).
+
+Assumptions to check:
+- A1: "Review comment dialog" is `AdeReviewSubmitDialog` (Review dropdown and Comment on PR), the only dialog in the review window. The inline compose box in the diff (`ReviewThread.vue`, a Monaco view zone) is not a dialog and stays out. Its `resize-y` textarea grows inside a zone whose height is measured once at mount, so it scrolls instead of growing. If the user meant that box, it is a separate fix (re-lay the zone on a `useResizeObserver` callback, capped at the editor height).
+- A2: "Fits the available space" means: never larger than the window (90% by 80%, the existing variant bounds), the textarea fills whatever height the dialog has, and the footer stays visible at small windows. The default open size stays `md` (480 px); it does not open full-window.
+- A3: Resize is by the right and bottom edges, mouse and keyboard, growing from the centre. No corner grip and no left or top edge.
+- A4: Size is not remembered between opens.
+- A5: The review diff's glyph margin is now always two lanes wide (about one line height wider than a hunk-only file today). That is the cost of marks that never move, and it also gives comment and hunk marks their own columns.
