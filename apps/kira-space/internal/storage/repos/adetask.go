@@ -18,7 +18,7 @@ var (
 	ErrTaskNotFound  = errors.New("repos: task not found")
 	ErrBranchOnTask  = errors.New("repos: branch is already on a task")
 	ErrRepoOnTask    = errors.New("repos: task already has a branch in that repo")
-	ErrReviewKind    = errors.New("repos: a task only moves between task and parked, and a review task keeps its kind")
+	ErrReviewKind    = errors.New("repos: a task only moves between task and parked, and a review task only becomes a task")
 	ErrTaskUnnamed   = errors.New("a task needs a title or a Jira key")
 	ErrBranchMissing = errors.New("repos: branch not found")
 	ErrBacklogGone   = errors.New("repos: backlog item not found")
@@ -253,8 +253,8 @@ func (r *AdeTaskRepo) CreateTask(t model.AdeTask, branches []model.AdeTaskBranch
 	return out, nil
 }
 
-// UpdateTask writes the patched leaves. Kind moves only between task and parked,
-// and a review task refuses any kind change.
+// UpdateTask writes the patched leaves. Kind moves only between task and parked; a review task
+// only becomes a task, clearing its owner and turning its review branches into mine.
 func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask, error) {
 	tx, err := r.DB.Begin()
 	if err != nil {
@@ -273,10 +273,9 @@ func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask
 		cur.Est = *p.Est
 	}
 	if p.Kind != nil && *p.Kind != cur.Kind {
-		if cur.Kind == model.AdeTaskKindReview || (*p.Kind != model.AdeTaskKindTask && *p.Kind != model.AdeTaskKindParked) {
-			return model.AdeTask{}, ErrReviewKind
+		if err := moveTaskKind(&cur, *p.Kind); err != nil {
+			return model.AdeTask{}, err
 		}
-		cur.Kind = *p.Kind
 	}
 	if p.Title != nil {
 		cur.Title = *p.Title
@@ -303,23 +302,47 @@ func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask
 	if (p.Title != nil || p.JiraKey != nil) && cur.Title == "" && cur.JiraKey == "" {
 		return model.AdeTask{}, ErrTaskUnnamed
 	}
-	if p.Kind != nil && *p.Kind != prevKind {
-		from, to := model.AdeBranchKindMine, model.AdeBranchKindParked
-		if *p.Kind == model.AdeTaskKindTask {
-			from, to = to, from
-		}
-		if _, err := tx.Exec(`UPDATE ade_task_branches SET kind = ? WHERE task_id = ? AND kind = ?`, to, id, from); err != nil {
-			return model.AdeTask{}, fmt.Errorf("repos: move ade task branches to %s: %w", to, err)
+	if cur.Kind != prevKind {
+		if err := moveBranchKinds(tx, id, prevKind, cur.Kind); err != nil {
+			return model.AdeTask{}, err
 		}
 	}
-	if _, err := tx.Exec(`UPDATE ade_tasks SET kind = ?, title = ?, jira_key = ?, jira_url = ?, host_url = ?, est = ?, notes = ?, color = ? WHERE id = ?`,
-		cur.Kind, cur.Title, cur.JiraKey, cur.JiraURL, cur.HostURL, cur.Est, cur.Notes, cur.Color, id); err != nil {
+	if _, err := tx.Exec(`UPDATE ade_tasks SET kind = ?, owner = ?, title = ?, jira_key = ?, jira_url = ?, host_url = ?, est = ?, notes = ?, color = ? WHERE id = ?`,
+		cur.Kind, cur.Owner, cur.Title, cur.JiraKey, cur.JiraURL, cur.HostURL, cur.Est, cur.Notes, cur.Color, id); err != nil {
 		return model.AdeTask{}, fmt.Errorf("repos: update ade task %s: %w", id, err)
 	}
 	if err := tx.Commit(); err != nil {
 		return model.AdeTask{}, fmt.Errorf("repos: commit update ade task %s: %w", id, err)
 	}
 	return cur, nil
+}
+
+// moveTaskKind sets cur's kind: task <-> parked, or review -> task (which clears the owner).
+func moveTaskKind(cur *model.AdeTask, to string) error {
+	toTask := to == model.AdeTaskKindTask
+	if (cur.Kind == model.AdeTaskKindReview && !toTask) || (!toTask && to != model.AdeTaskKindParked) {
+		return ErrReviewKind
+	}
+	if cur.Kind == model.AdeTaskKindReview {
+		cur.Owner = ""
+	}
+	cur.Kind = to
+	return nil
+}
+
+// moveBranchKinds flips a task's branches to follow its kind move.
+func moveBranchKinds(tx *sql.Tx, id string, prev, to string) error {
+	from, toKind := model.AdeBranchKindMine, model.AdeBranchKindParked
+	if to == model.AdeTaskKindTask {
+		from, toKind = model.AdeBranchKindParked, model.AdeBranchKindMine
+		if prev == model.AdeTaskKindReview {
+			from = model.AdeBranchKindReview
+		}
+	}
+	if _, err := tx.Exec(`UPDATE ade_task_branches SET kind = ? WHERE task_id = ? AND kind = ?`, toKind, id, from); err != nil {
+		return fmt.Errorf("repos: move ade task branches to %s: %w", toKind, err)
+	}
+	return nil
 }
 
 // AddBranch appends b to its task after the last branch. A task holds at most one live branch per

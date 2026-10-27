@@ -96,6 +96,9 @@ export function useTaskMenu(card: MaybeRefOrGetter<CardModel>) {
             patch: taskPatch({ kind: cmd.parked ? 'parked' : 'task' }),
           });
           return;
+        case 'makeTask':
+          await update.mutateAsync({ taskId, patch: taskPatch({ kind: 'task' }) });
+          return;
         case 'link':
           return await control.openExternal(cmd.url);
         case 'copy':

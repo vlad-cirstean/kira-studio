@@ -7244,6 +7244,10 @@
           "liveBlocked": {
             "tooltip": "Stop its running agents first"
           },
+          "makeTask": {
+            "label": "Convert to work item",
+            "tooltip": "Work on {owner}’s branch as your own task. Gets a worktree; can’t be undone"
+          },
           "markMerging": {
             "label": "Mark as merging"
           },

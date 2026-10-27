@@ -161,8 +161,9 @@ func (b *TaskBoard) CreateTask(ctx context.Context, args adewire.CreateTaskArgs)
 	return b.wireTask(stored)
 }
 
-// UpdateTask applies a patch; kind moves only between task and parked.
-func (b *TaskBoard) UpdateTask(_ context.Context, args adewire.UpdateTaskArgs) (adewire.Task, error) {
+// UpdateTask applies a patch; kind moves only between task and parked. A review task that becomes
+// a task gets a worktree and prepare script on each branch, as an attached own branch does.
+func (b *TaskBoard) UpdateTask(ctx context.Context, args adewire.UpdateTaskArgs) (adewire.Task, error) {
 	p := args.Patch
 	if p.Jira != nil && p.ClearJira {
 		return adewire.Task{}, invalid("jira and clearJira are mutually exclusive")
@@ -179,11 +180,33 @@ func (b *TaskBoard) UpdateTask(_ context.Context, args adewire.UpdateTaskArgs) (
 		empty := ""
 		patch.JiraKey, patch.JiraURL = &empty, &empty
 	}
+	var converted []model.AdeTaskBranch
+	if p.Kind != nil && *p.Kind == model.AdeTaskKindTask {
+		prev, err := b.deps.Tasks.GetTask(args.TaskID)
+		if err != nil {
+			return adewire.Task{}, err
+		}
+		if prev.Kind == model.AdeTaskKindReview {
+			live, err := b.deps.Tasks.BranchesLive()
+			if err != nil {
+				return adewire.Task{}, err
+			}
+			for _, sb := range live {
+				if sb.TaskID == args.TaskID && sb.Kind == model.AdeBranchKindReview && sb.Name != "" {
+					sb.Kind = model.AdeBranchKindMine
+					converted = append(converted, sb)
+				}
+			}
+		}
+	}
 	task, err := b.deps.Tasks.UpdateTask(args.TaskID, patch)
 	if err != nil {
 		return adewire.Task{}, err
 	}
 	b.notifyBoard()
+	for _, sb := range converted {
+		b.prepareAttached(ctx, sb)
+	}
 	return b.wireTask(task)
 }
 

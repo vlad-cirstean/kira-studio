@@ -24,6 +24,7 @@ export type TaskMenuCmd =
   | { kind: 'automation'; scriptId: string }
   | { kind: 'plan'; day: number }
   | { kind: 'park'; parked: boolean }
+  | { kind: 'makeTask' }
   | { kind: 'link'; url: string }
   | { kind: 'copy'; text: string }
   | { kind: 'review'; branchId: string }
@@ -243,6 +244,20 @@ export function taskMenuModel(i: TaskMenuInput): TaskMenuEntry[] {
   const live = c.task.runs.some((r) => r.state === 'running');
   const running = i.sessions.filter((s) => s.state === 'running' && s.mode === 'tui');
 
+  if (review) {
+    out.push(
+      {
+        type: 'item',
+        id: 'ade-task-make-task',
+        label: t('space.ade.board.taskMenu.makeTask.label'),
+        cmd: { kind: 'makeTask' },
+        hint: t('space.ade.board.taskMenu.makeTask.tooltip', {
+          owner: c.task.owner || t('space.ade.taskPanel.someone.label'),
+        }),
+      },
+      { type: 'separator' },
+    );
+  }
   if (!review) {
     if (c.action && c.action.kind !== 'archive') {
       out.push({
