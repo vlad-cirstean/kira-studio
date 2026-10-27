@@ -8175,6 +8175,14 @@
           "label": "Worktree setup"
         }
       },
+      "statusPicker": {
+        "back": {
+          "tooltip": "Previous status"
+        },
+        "next": {
+          "tooltip": "Next status"
+        }
+      },
       "step": {
         "failedContinued": {
           "status": "Failed, continued"

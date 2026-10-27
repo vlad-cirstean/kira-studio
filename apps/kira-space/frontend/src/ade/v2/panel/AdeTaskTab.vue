@@ -23,6 +23,7 @@ import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import type { TaskPatch } from '../wire';
 import AdeEstimateField from './AdeEstimateField.vue';
 import AdeLinkRow from './AdeLinkRow.vue';
+import AdeStatusPicker from './AdeStatusPicker.vue';
 import AdeWorkflowBlock from './AdeWorkflowBlock.vue';
 import { useLinkFields } from './useLinkFields';
 
@@ -111,7 +112,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
     <KeyValueList class="items-center">
       <dt>{{ t('common.field.status.label') }}</dt>
       <dd class="flex min-h-row items-center gap-2">
-        <AdeChip :label="card.status.name" :tone="card.status.tone" />
+        <AdeStatusPicker :card="card" />
         <AdeChip
           v-if="card.blocked"
           :label="t('space.common.status.blocked.status')"

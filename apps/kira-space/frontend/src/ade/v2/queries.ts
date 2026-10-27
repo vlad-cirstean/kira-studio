@@ -138,6 +138,8 @@ function withTaskPatch(board: Board, args: UpdateTaskArgs): Board {
       notes: p.notes ?? t.notes,
       color: p.color ?? t.color,
       kind: p.kind ?? t.kind,
+      statusId: p.statusId ?? t.statusId,
+      statusBy: p.statusId ? 'user' : t.statusBy,
     };
   });
   return { ...board, tasks };
