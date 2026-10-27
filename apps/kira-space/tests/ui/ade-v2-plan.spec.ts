@@ -69,10 +69,10 @@ test('branch rows show base markers and the derived branch tags', async ({ relau
   const markers = await page.locator('[data-testid="ade-base-marker"]').allInnerTexts();
   expect(markers.map((m) => m.replace(/\s+/g, ''))).toContain('search-schema');
   const tags = await page.locator('[data-testid="ade-tag"]').allInnerTexts();
-  expect(tags).toContain('↓3 main');
+  expect(tags).toContain('3 behind main');
   expect(tags).toContain('Checking…');
   expect(tags).toContain('Conflict check failed');
-  expect(tags).toContain('✕ Setup failed');
+  expect(tags).toContain('Setup failed');
 });
 
 test('a repo chip hides and shows its branches', async ({ relaunch }) => {
@@ -234,10 +234,22 @@ test('line 2 shows merged and deployed chips with stale in amber and tooltips', 
   const stale = auth.locator('[data-testid="ade-branch-merged"]');
   await expect(stale).toHaveText('dev ⚠');
   await expect(stale).toHaveCSS('color', 'rgb(240, 184, 92)');
-  await stale.hover();
+  await auth.hover();
   await expect(
-    page.getByText('stale in develop: 2 commits since it was merged').first(),
+    page
+      .locator('[data-testid="ade-branch-tip"]')
+      .getByText('stale in develop: 2 commits since it was merged'),
   ).toBeVisible();
+});
+
+test('branch tooltip shows plan colours', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await page.locator('[data-testid="ade-branch-row"][data-branch-id="b_auth"]').first().hover();
+  const tip = page.locator('[data-testid="ade-branch-tip"]');
+  await expect(tip).toBeVisible();
+  await expect(tip.locator('[data-testid="ade-chip"]').first()).toBeVisible();
+  await expect(tip.locator('[data-var="base"]').first()).toBeVisible();
+  await expect(tip.getByText('stale in develop: 2 commits since it was merged')).toBeVisible();
 });
 
 test('a repo chip reports what the last fetch changed', async ({ relaunch }) => {

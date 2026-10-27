@@ -18,6 +18,14 @@ test('plan branch chips and branch panel', async ({ relaunch }) => {
   await expect(window.locator(card('T_search'))).toHaveScreenshot('plan-branches-stacked.png');
   await expect(window.locator(card('R_li'))).toHaveScreenshot('plan-branches-review.png');
   await expect(window.locator(row('b_auth'))).toHaveScreenshot('plan-branches-pending.png');
+  await window.locator(row('b_auth')).hover();
+  await expect(window.locator('[data-testid="ade-branch-tip"]')).toHaveScreenshot(
+    'plan-branch-tip.png',
+  );
+  await window.locator(`${card('T_search')} [data-testid="ade-card-review"]`).hover();
+  await expect(
+    window.locator('[data-slot="tooltip-content"][data-variant="default"]'),
+  ).toHaveScreenshot('plan-branch-plain-tip.png');
   await window.locator('[data-testid="ade-branch-row"][data-branch-id="b_search"]').click();
   await expect(window.locator('[data-testid="ade-branch-details"]')).toHaveScreenshot(
     'branch-panel-details.png',
