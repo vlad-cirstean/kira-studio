@@ -1,0 +1,21 @@
+P365: add timeout-minutes to build and deploy jobs (default was 360).
+diff --git a/.github/workflows/pages.yml b/.github/workflows/pages.yml
+index 2730f0bc6..4f24abf5b 100644
+--- a/.github/workflows/pages.yml
++++ b/.github/workflows/pages.yml
+@@ -15,6 +15,7 @@ concurrency:
+ jobs:
+   build:
+     runs-on: ubuntu-latest
++    timeout-minutes: 10
+     steps:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+@@ -35,6 +36,7 @@ jobs:
+   deploy:
+     needs: build
+     runs-on: ubuntu-latest
++    timeout-minutes: 10
+     environment:
+       name: github-pages
+       url: ${{ steps.deployment.outputs.page_url }}
