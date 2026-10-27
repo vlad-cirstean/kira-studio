@@ -465,7 +465,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
       ],
     });
     await openPanel(page);
-    await page.locator('[data-testid="script-plain-1"]').click();
+    await page.locator('[data-testid="script-plain-1"] [data-testid="script-play"]').click();
     await expect(page.locator('[data-testid="run-command"]')).toHaveText('deploy.sh');
     await page.locator('[data-testid="run-start"]').click();
     await expect

@@ -1,7 +1,7 @@
 import type { ScriptRun, ScriptRunState } from '@shared/domain/scriptRuns';
 import type { ScriptRunTabState, TerminalTabState } from '@shared/domain/tabs';
 import { useAutomationsModule } from './module';
-import { scriptRunState } from './runs/runStates';
+import { scriptRunState, terminalRunState } from './runs/runStates';
 
 /** One tab per key: the script and the ADE task and branch it runs for ('' when none). */
 export interface ScriptTabKey {
@@ -42,14 +42,16 @@ function tabKey(tab: ScriptTabLike): ScriptTabKey | null {
 
 const LIVE_RUN: readonly ScriptRunState[] = ['running', 'waiting'];
 
-/** Live: a terminal still starting, running or not yet mounted; a run still running or waiting. */
+/** Live: a terminal whose session has not ended and whose run is not over; a run still running or waiting. */
 export function isLiveTab(
   tab: ScriptTabLike,
   terminalStatus: (tabId: string) => string | undefined,
 ): boolean {
   if (tab.kind === 'terminal') {
     const status = terminalStatus(tab.id);
-    return status === undefined || status === 'starting' || status === 'running';
+    if (status === 'exited' || status === 'failed') return false;
+    const run = terminalRunState(tab.id);
+    return run === undefined || LIVE_RUN.includes(run);
   }
   const state = scriptRunState((tab.state as ScriptRunTabState).runId);
   return state !== undefined && LIVE_RUN.includes(state);
