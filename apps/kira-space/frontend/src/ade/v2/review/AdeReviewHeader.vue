@@ -6,7 +6,6 @@ import AdeRepoTag from '../AdeRepoTag.vue';
 import { taskTitle } from '../board/labels';
 import { taskColor } from '../palette';
 import type { ReviewWindowTarget } from '../wire';
-import AdeReviewSync from './AdeReviewSync.vue';
 import { useReviewContext } from './useReviewContext';
 
 const props = defineProps<{ target: ReviewWindowTarget }>();
@@ -39,9 +38,6 @@ const dirtyCount = computed(() => branch.value?.dirty.length ?? 0);
       <span class="shrink-0 text-kira-sm text-muted-foreground" data-testid="ade-review-base">{{
         t('space.ade.review.header.base.label', { base: target.base })
       }}</span>
-      <div class="ml-auto flex items-center gap-2">
-        <AdeReviewSync :target="target" />
-      </div>
     </div>
     <FieldDescription
       v-if="dirtyCount > 0"

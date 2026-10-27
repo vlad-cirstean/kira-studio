@@ -7928,68 +7928,6 @@
             "hint": "{count} uncommitted change in the worktree is not in this review. | {count} uncommitted changes in the worktree are not in this review."
           }
         },
-        "sync": {
-          "account": {
-            "label": "Syncing as {account}"
-          },
-          "button": {
-            "label": "Sync to {label}"
-          },
-          "buttonCount": {
-            "label": "Sync to {label} · {count}"
-          },
-          "changedSinceReview": {
-            "status": "Changed since review"
-          },
-          "cliMissing": {
-            "tooltip": "Install the {cli}"
-          },
-          "closed": {
-            "tooltip": "{changeRequestShort} #{number} is closed"
-          },
-          "confirm": {
-            "label": "Mark {count} file viewed on {changeRequestShort} #{number} | Mark {count} files viewed on {changeRequestShort} #{number}"
-          },
-          "confirmUnmark": {
-            "label": "Mark {count} file viewed on {changeRequestShort} #{number}, unmark {unmarked} | Mark {count} files viewed on {changeRequestShort} #{number}, unmark {unmarked}"
-          },
-          "differsFromHead": {
-            "status": "Differs from the {changeRequestShort} head"
-          },
-          "headDiffers": {
-            "label": "{changeRequestShort} head {head} ≠ local {local}"
-          },
-          "loadFailed": {
-            "error": "Couldn’t load the sync plan: {error}"
-          },
-          "mark": {
-            "label": "Mark"
-          },
-          "nothing": {
-            "empty": "Nothing to sync"
-          },
-          "notInChangeRequest": {
-            "status": "Not in the {changeRequestShort}"
-          },
-          "notReviewed": {
-            "status": "Not reviewed"
-          },
-          "partial": {
-            "status": "Partly reviewed"
-          },
-          "refreshRepo": {
-            "label": "Refresh repository"
-          },
-          "synced": {
-            "status": "Synced {count} file | Synced {count} files"
-          },
-          "syncedFailed": {
-            "status": "Synced {count} file · {failed} failed | Synced {count} files · {failed} failed"
-          },
-          "unmark": {
-            "label": "Unmark"
-          }
-        },
         "window": {
           "diffs": {
             "aria": "Diffs"

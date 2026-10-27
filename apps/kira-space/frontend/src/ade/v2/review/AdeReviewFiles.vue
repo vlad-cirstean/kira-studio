@@ -11,7 +11,6 @@ import type { ReviewWindowTarget } from '../wire';
 
 // The review window's left pane: git-ui's review view locked to this window's branch and base.
 const props = defineProps<{ target: ReviewWindowTarget }>();
-const emit = defineEmits<{ marked: [paths: readonly string[]] }>();
 
 const errorMessage = ref('');
 const container = ref<HTMLElement | null>(null);
@@ -42,7 +41,6 @@ onMounted(async () => {
         pane: 'files',
       },
       lockTarget: true,
-      onReviewMarked: (paths) => emit('marked', paths),
       onReviewApi: (a) => {
         api = a;
         unregisterNavigator?.();

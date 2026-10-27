@@ -13,7 +13,7 @@ import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
 
-// The review window: three panes for one branch, the review agent and the GitHub sync.
+// The review window: three panes for one branch, and the review agent.
 
 const t = (id: string) => `[data-testid="${id}"]`;
 const target = adeFixture<{ gitRepoId: string; codeRepoId: string; branchId: string }>(
@@ -61,8 +61,6 @@ function reviewControl(extra: readonly ControlSnapshot[] = []): ControlSnapshot[
   const defaults: ControlSnapshot[] = [
     { channel: IPC.adeTaskReviewWindowTarget, response: target },
     { channel: IPC.adeTaskReviewAgent, response: { session: null, hostWindowKey: '' } },
-    { channel: IPC.adeTaskViewedSyncPlan, response: adeFixture('viewed-sync-plan') },
-    { channel: IPC.adeTaskViewedSyncApply, response: adeFixture('viewed-sync-result') },
   ];
   const overridden = new Set(extra.map((e) => e.channel));
   return adeV2Control([...defaults.filter((d) => !overridden.has(d.channel)), ...extra]);
@@ -546,63 +544,6 @@ reviewTest(
 );
 
 reviewTest(
-  'the sync button lists what it will do and why it skips the rest',
-  async ({ relaunch }) => {
-    const page = await openReview(relaunch);
-    await page.locator(t('ade-review-sync')).click();
-    const popover = page.locator(t('ade-review-sync-popover'));
-    await expect(popover.locator(t('ade-review-sync-rows'))).toContainText('src/a.ts');
-    const trigger = await page.locator(t('ade-review-sync')).boundingBox();
-    const box = await popover.boundingBox();
-    expect(box!.y).toBeGreaterThanOrEqual(0);
-    expect(box!.y - (trigger!.y + trigger!.height)).toBeLessThanOrEqual(16);
-    expect(Math.abs(box!.x + box!.width - (trigger!.x + trigger!.width))).toBeLessThanOrEqual(2);
-    await popover.locator(t('ade-review-sync-skipped')).getByRole('button').first().click();
-    await expect(popover.locator(t('ade-review-sync-skipped'))).toContainText(
-      'Changed since review',
-    );
-    await expect(popover.locator(t('ade-review-sync-skipped'))).toContainText('Not in the PR');
-  },
-);
-
-reviewTest('a failed fetch from the sync popover shows its error', async ({ relaunch }) => {
-  const failed = {
-    repos: [
-      {
-        codeRepoId: 'repo-web-app',
-        refsChanged: 0,
-        mergedInto: [],
-        error: { kind: 'network', message: 'Could not fetch origin', remoteMessage: '' },
-      },
-    ],
-  };
-  const plan = {
-    ...adeFixture<object>('viewed-sync-plan'),
-    status: 'headNotFetched',
-    message: 'PR head not fetched',
-  };
-  const page = await openReview(relaunch, [
-    { channel: IPC.adeTaskRefresh, response: failed },
-    { channel: IPC.adeTaskViewedSyncPlan, response: plan },
-  ]);
-  await page.locator(t('ade-review-sync')).click();
-  await page.locator(t('ade-review-sync-refresh')).click();
-  await expect(page.locator(t('ade-review-sync-error'))).toHaveText('Could not fetch origin');
-});
-
-reviewTest('the sync button is hidden when the branch has no PR', async ({ relaunch }) => {
-  const plan = {
-    ...adeFixture<object>('viewed-sync-plan'),
-    status: 'noPr',
-    changeRequest: null,
-    files: [],
-  };
-  const page = await openReview(relaunch, [{ channel: IPC.adeTaskViewedSyncPlan, response: plan }]);
-  await expect(page.locator(t('ade-review-header'))).toBeVisible();
-  await expect(page.locator(t('ade-review-sync'))).toHaveCount(0);
-});
-
-reviewTest(
   'dragging a pane handle stores the dragged width; a click stores none',
   async ({ relaunch }) => {
     const page = await openReview(relaunch);
@@ -635,16 +576,3 @@ reviewTest('arrow keys on a pane handle resize and store the left width', async 
   const stored = await page.evaluate(() => localStorage.getItem('kira.ade.review.leftWidth'));
   expect(Number(stored)).toBeGreaterThan(start);
 });
-
-reviewTest(
-  'the sync button stays visible and disabled when its plan fails to load',
-  async ({ relaunch }) => {
-    const page = await openReview(relaunch, [
-      { channel: IPC.adeTaskViewedSyncPlan, error: { code: 'invalid', message: 'gh exploded' } },
-    ]);
-    const button = page.locator(t('ade-review-sync'));
-    await expect(button).toBeDisabled();
-    await button.locator('xpath=..').hover();
-    await expect(page.getByText('Couldn’t load the sync plan: gh exploded').first()).toBeVisible();
-  },
-);
