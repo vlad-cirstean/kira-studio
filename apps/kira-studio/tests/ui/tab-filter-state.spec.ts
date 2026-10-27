@@ -5,6 +5,7 @@ import {
 } from '../ipc/redis/redis.fixture';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { openHttpModeAndNewRequest } from './support/apiMode';
 import { connectAndExpand, connectionCreateArgs } from './support/connect';
 import { acceptConfirm } from './support/dialogs';
 import { IPC } from './support/ipcChannels';
@@ -269,4 +270,27 @@ test('definition structure filter survives a tab switch', async ({ relaunch }) =
   await expect(filter).toHaveValue('quantity');
   await expect(columns).toContainText('quantity');
   await expect(columns).not.toContainText('order_id');
+});
+
+test('http request field filter survives a tab switch', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: [] });
+  await openHttpModeAndNewRequest(page);
+  await page.click('[data-testid="new-request"]');
+  const tabs = page.locator('[data-testid="tab"]');
+  await expect(tabs).toHaveCount(2);
+
+  await tabs.nth(0).click();
+  await page.click('[data-testid="http-request-pane-headers"]');
+  await page.click('[data-testid="http-field-filter-toggle"]');
+  await page.fill('[data-testid="http-field-filter"]', 'accept');
+
+  await tabs.nth(1).click();
+  await expect(page.locator('[data-testid="http-field-filter"]')).toHaveCount(0);
+  await tabs.nth(0).click();
+
+  await expect(page.locator('[data-testid="http-field-filter"]')).toHaveValue('accept');
+  await expect(page.locator('[data-testid="http-field-filter-toggle"]')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 });

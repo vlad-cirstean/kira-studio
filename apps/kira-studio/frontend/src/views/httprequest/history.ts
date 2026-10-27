@@ -11,6 +11,8 @@ import { control } from '../../bridge/control';
 interface Extra {
   /** Compare selection (D12), at most two. */
   selected: string[];
+  /** List filter text (P375); per-tab so a tab switch keeps it. */
+  filterQuery: string;
 }
 
 const history = createHistoryQueries<ResponseHistoryEntry, ResponseHistorySnapshot, Extra>({
@@ -20,7 +22,7 @@ const history = createHistoryQueries<ResponseHistoryEntry, ResponseHistorySnapsh
   remove: (id) => control.historyDelete(id),
   clear: (itemId, tabId) => control.historyClear(itemId, tabId),
   findTab: findHttpRequestTab,
-  extra: () => ({ selected: [] }),
+  extra: () => ({ selected: [], filterQuery: '' }),
 });
 
 export const useHttpHistoryList = history.useHistoryList;
@@ -48,6 +50,10 @@ export const useHttpHistoryStore = defineStore('httpHistory', () => {
     if (state) state.selected = [];
   }
 
+  function setFilterQuery(tabId: string, query: string): void {
+    ensure(tabId).filterQuery = query;
+  }
+
   /** D12: a checkbox per row, capped at two — toggling a third selected row is a no-op rather than
    *  silently evicting the first (the caller disables an unchecked row's checkbox once two are
    *  already selected, so this is reached only for a check/uncheck of an eligible row). */
@@ -70,5 +76,6 @@ export const useHttpHistoryStore = defineStore('httpHistory', () => {
     deleteHistoryEntry,
     clearHistory,
     toggleSelected,
+    setFilterQuery,
   };
 });

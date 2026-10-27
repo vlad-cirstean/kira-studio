@@ -192,7 +192,10 @@ watch(variableSetStore.revealedValues, (values) => {
 });
 
 const headCell = cn(tableHeadClass, 'px-0');
-const filterQuery = ref('');
+const filterQuery = computed({
+  get: () => variableSetStore.filterQueryFor(props.tab.id),
+  set: (v: string) => variableSetStore.setFilterQuery(props.tab.id, v),
+});
 const isFiltered = computed(() => filterQuery.value.trim() !== '');
 
 const allRealRows = computed<ApiVariable[]>(() => {
@@ -431,8 +434,8 @@ function onHistoryClickFor(row: ApiVariable): void {
 
 // ---- bulk `.env` mode ----
 //
-// A component-local lens, not tab state (the "a lens, not a setting" rule, same as filterQuery
-// above): reopening this tab must never silently resurrect an unapplied text buffer. `v-if` below
+// A component-local lens, not tab state (the "a lens, not a setting" rule, as for filterQuery
+// above, which lives in the per-tab runtime instead): reopening this tab must never silently resurrect an unapplied text buffer. `v-if` below
 // (not `v-show`) is load-bearing — it means BulkVariablesEditor is freshly mounted every time bulk
 // mode is entered, so its own baseline snapshot is always taken from the rows the table holds *at
 // that moment*, never a stale one from an earlier visit.

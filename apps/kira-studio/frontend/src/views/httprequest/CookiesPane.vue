@@ -11,15 +11,17 @@ import { t } from '@theme/i18n';
 import { ICON } from '@theme/icons';
 import { matchesQuery } from '@workbench/behaviour/match';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { useSettingsStore } from '../../state/settings';
 import { clearJarCookies, deleteJarCookie } from './cookies';
+import { useHttpRequestViewStore } from './state';
 
 // P90 item 2 (§3): one component, two hosts — HttpRequestView.vue's request segment (what the
 // jar would send next) and ResponsePane.vue's response segment (what one exchange actually sent
 // and received), same list shape either way (§3's own reasoning for keeping this one component).
 const props = defineProps<{
   mode: 'request' | 'response';
+  tabId: string;
   /** request mode only — the jar listing for `url` (HttpRequestView.vue owns the query, so the
    *  debounced key is computed once and the segment badge reads the same result). */
   url?: string;
@@ -33,7 +35,11 @@ const props = defineProps<{
 const settingsStore = useSettingsStore();
 const confirmDialogStore = useConfirmDialogStore();
 
-const filter = ref('');
+const httpRequestViewStore = useHttpRequestViewStore();
+const filter = computed({
+  get: () => httpRequestViewStore.runtime[props.tabId]?.cookieFilter[props.mode] ?? '',
+  set: (v: string) => httpRequestViewStore.setCookieFilter(props.tabId, props.mode, v),
+});
 
 function matches(c: HttpCookieWire, q: string): boolean {
   return matchesQuery(c.name, q) || matchesQuery(c.value, q);

@@ -60,7 +60,10 @@ const atCap = computed(() => entries.value.length >= HISTORY_PER_SCOPE_LIMIT);
 
 // P16 D15: matches method, URL, status text, or environment name — the fields already on screen
 // in each row.
-const filterQuery = ref('');
+const filterQuery = computed({
+  get: () => ui.value?.filterQuery ?? '',
+  set: (v: string) => httpHistoryStore.setFilterQuery(props.tab.id, v),
+});
 const isFiltered = computed(() => filterQuery.value.trim() !== '');
 const filteredEntries = computed<ResponseHistoryEntry[]>(() => {
   const q = filterQuery.value;
