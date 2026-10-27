@@ -745,6 +745,19 @@ reviewTest('the review dialog resizes from its edges', async ({ relaunch }) => {
   };
   const d0 = await boxOf(dialog);
   const t0 = await boxOf(body);
+  const handleX = page.locator(t('dialog-resize-x'));
+  await expect(handleX).toHaveAttribute('aria-valuenow', String(Math.round(d0.width)));
+  await expect(handleX).toHaveAttribute('aria-valuemin', '320');
+
+  // An aborted drag (window blur) drops the live size.
+  const hb = await boxOf(handleX);
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(hb.x + hb.width / 2 + 80, hb.y + hb.height / 2, { steps: 6 });
+  await expect.poll(async () => (await boxOf(dialog)).width).toBeGreaterThan(d0.width + 100);
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await expect.poll(async () => (await boxOf(dialog)).width).toBeCloseTo(d0.width, -1);
+  await page.mouse.up();
 
   await drag('dialog-resize-x', 100, 0);
   await expect.poll(async () => (await boxOf(dialog)).width).toBeGreaterThan(d0.width + 196);

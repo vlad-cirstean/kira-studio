@@ -26,6 +26,8 @@ const props = withDefaults(
     container?: HTMLElement | null;
     direction?: ResizeDirection;
     step?: number;
+    /** Size change per pixel of pointer travel; 2 for a centred box. */
+    scale?: number;
     /** The 1px divider between flat panes inside one view; framed panes pass `false`. */
     line?: boolean;
     class?: HTMLAttributes['class'];
@@ -53,6 +55,7 @@ const { handleProps } = usePaneResize({
   container: () => props.container,
   direction: props.direction,
   step: props.step,
+  scale: props.scale,
   onLive: (size) => emit('live', size),
   onCommit: (size) => emit('commit', size),
   onCancel: () => emit('cancel'),
