@@ -7,6 +7,7 @@ import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import { type BranchAction, type Tone, tagLabel } from '../board/actions';
 import { ACTION_CLASS, TONE_SOLID_CLASS } from '../tones';
+import AdeBranchTip from './AdeBranchTip.vue';
 import { type BranchRowModel, usePlanModel } from './usePlanModel';
 
 // One cell of the left action column: the derived tag and, for a branch, its action buttons.
@@ -51,7 +52,15 @@ const TESTID: Record<BranchAction['kind'], string> = {
     :class="tall ? 'h-board-row-tall' : 'h-board-row'"
     data-testid="ade-action-cell"
   >
-    <AdeTip :text="tag.tip" :parts="tag.tipParts">
+    <AdeBranchTip v-if="row" :row="row" :color="color ?? null">
+      <AdeChip
+        :label="label"
+        :tone="tag.tone"
+        class="max-w-30 shrink truncate"
+        data-testid="ade-tag"
+      />
+    </AdeBranchTip>
+    <AdeTip v-else :text="tag.tip" :parts="tag.tipParts">
       <AdeChip
         :label="label"
         :tone="tag.tone"

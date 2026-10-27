@@ -128,7 +128,6 @@ const boxClass = computed(() => {
         @contextmenu="(ev: MouseEvent) => card.review && taskMenu.open(ev)"
       />
     </div>
-    <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the keyboard opens the menu from the header. -->
     <Card
       variant="section"
       :data-task-id="card.task.id"

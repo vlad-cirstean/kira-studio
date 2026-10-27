@@ -7700,6 +7700,11 @@
             "tooltip": "Someone else’s branch, read-only here"
           }
         },
+        "branchTip": {
+          "progress": {
+            "label": "Progress"
+          }
+        },
         "card": {
           "changeBase": {
             "tooltip": "Change the base of a branch"
