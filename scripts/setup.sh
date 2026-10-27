@@ -21,7 +21,7 @@ echo "setup: bun install (workspace root + every apps/*/frontend)"
 (cd "$ROOT_DIR" && bun install)
 
 echo "setup: go mod download"
-(cd "$ROOT_DIR" && go mod download)
+(cd "$ROOT_DIR" && retry 3 0 go mod download)
 
 # Saved before ensure_gopath_on_path patches $PATH for the rest of this process (below) — the
 # "add this to your shell profile" hint further down needs the *pre-patch* value, or it can never
@@ -90,7 +90,7 @@ if [ "$NEED_INSTALL" = "1" ]; then
   # GOTOOLCHAIN pinned explicitly to go.mod's own directive — never `auto` (picks the target
   # module's floor, go1.26.8 here) and never `local` (this container's base toolchain, go1.24.7,
   # is below Wails' own floor and `local` refuses outright).
-  GOTOOLCHAIN="go$GO_DIRECTIVE" go install "github.com/wailsapp/wails/v3/cmd/wails3@$PINNED_VERSION"
+  retry 3 0 env GOTOOLCHAIN="go$GO_DIRECTIVE" go install "github.com/wailsapp/wails/v3/cmd/wails3@$PINNED_VERSION"
   case ":$ORIGINAL_PATH:" in
     *":$(go env GOPATH)/bin:"*) ;;
     *)

@@ -78,9 +78,9 @@ pull_images() {
           */*) _src="mirror.gcr.io/$_img" ;;
           *) _src="mirror.gcr.io/library/$_img" ;;
         esac
-        docker pull -q "$_src" >/dev/null 2>"$_dir/$_n.err" && docker tag "$_src" "$_img" 2>>"$_dir/$_n.err"
+        retry 3 300 docker pull -q "$_src" >/dev/null 2>"$_dir/$_n.err" && docker tag "$_src" "$_img" 2>>"$_dir/$_n.err"
       else
-        docker pull -q "$_img" >/dev/null 2>"$_dir/$_n.err"
+        retry 3 300 docker pull -q "$_img" >/dev/null 2>"$_dir/$_n.err"
       fi
     ) &
     echo "$! $_img" >>"$_dir/pids"
@@ -96,4 +96,25 @@ pull_images() {
   done <"$_dir/pids"
   rm -rf "$_dir"
   return "$_failed"
+}
+
+# retry <attempts> <seconds> <command>... — runs <command> up to <attempts> times, sleeping 10 s,
+# 20 s, ... between. <seconds> > 0 bounds each attempt with timeout(1) where it exists (CI's Linux
+# runners); 0, or no timeout(1) (stock macOS), runs unbounded and leaves the bound to the CI step.
+retry() {
+  _retry_max="$1"
+  _retry_secs="$2"
+  shift 2
+  _retry_n=1
+  while :; do
+    if [ "$_retry_secs" -gt 0 ] && command -v timeout >/dev/null 2>&1; then
+      timeout --kill-after=10 "$_retry_secs" "$@" && return 0 || _retry_rc=$?
+    else
+      "$@" && return 0 || _retry_rc=$?
+    fi
+    [ "$_retry_n" -lt "$_retry_max" ] || return "$_retry_rc"
+    echo "retry: attempt $_retry_n/$_retry_max of '$*' failed (exit $_retry_rc); retrying in $((_retry_n * 10))s" >&2
+    sleep $((_retry_n * 10))
+    _retry_n=$((_retry_n + 1))
+  done
 }
