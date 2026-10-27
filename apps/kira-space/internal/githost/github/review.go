@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // PullReview is the review facts of one pull request.
@@ -57,6 +58,12 @@ func (c *Client) PullForReview(ctx context.Context, repo Repo, number int) (Pull
 	return out, status
 }
 
+// writeTimeout bounds a mutating `gh api` call. POSTs are slow on large PRs and are never retried.
+const (
+	writeTimeout       = 30 * time.Second
+	writeTimeoutReason = "GitHub did not respond within 30s. The request may have been recorded; open the PR to check before trying again"
+)
+
 // SubmitReview creates and submits a review in one call. An empty body is left out of the request.
 func (c *Client) SubmitReview(ctx context.Context, repo Repo, number int, event, body, commitID string) Status {
 	ghEvent, ok := reviewEvents[event]
@@ -68,11 +75,11 @@ func (c *Client) SubmitReview(ctx context.Context, repo Repo, number int, event,
 		fields = append(fields, field{"body", body})
 	}
 	path := fmt.Sprintf("repos/%s/pulls/%d/reviews", repo.Path(), number)
-	return c.call(ctx, repo, writeArgv(repo.Host, path, fields), nil)
+	return c.callWithin(ctx, repo, writeArgv(repo.Host, path, fields), nil, writeTimeout, true)
 }
 
 // CommentOnPull posts a conversation comment: `repos/{owner}/{repo}/issues/{n}/comments`.
 func (c *Client) CommentOnPull(ctx context.Context, repo Repo, number int, body string) Status {
 	path := fmt.Sprintf("repos/%s/issues/%d/comments", repo.Path(), number)
-	return c.call(ctx, repo, writeArgv(repo.Host, path, []field{{"body", body}}), nil)
+	return c.callWithin(ctx, repo, writeArgv(repo.Host, path, []field{{"body", body}}), nil, writeTimeout, true)
 }

@@ -3,6 +3,8 @@ package github
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"time"
 )
 
 // apiVersionHeader is GitHub's own REST API version pin (D4) — every `gh api` call this package
@@ -64,13 +66,22 @@ func (c *Client) get(ctx context.Context, repo Repo, path string, out any) Statu
 
 // call runs one `gh api` argv under the same auth gate, timeout and classification as get.
 func (c *Client) call(ctx context.Context, repo Repo, args []string, out any) Status {
+	return c.callWithin(ctx, repo, args, out, apiTimeout, false)
+}
+
+// callWithin is call with an explicit timeout. A write that times out may still have landed, so
+// its reason says so instead of reading as "not sent" and inviting a duplicate.
+func (c *Client) callWithin(ctx context.Context, repo Repo, args []string, out any, timeout time.Duration, write bool) Status {
 	authStatus := c.discovery.Status(ctx, repo.Host)
 	if !authStatus.OK() {
 		return authStatus
 	}
 
-	res, runErr := c.runner.Run(ctx, authStatus.Path, Spec{Args: args, Timeout: apiTimeout})
+	res, runErr := c.runner.Run(ctx, authStatus.Path, Spec{Args: args, Timeout: timeout})
 	status := classify(repo.Host, res, runErr, ctx.Err())
+	if write && ctx.Err() == nil && errors.Is(runErr, context.DeadlineExceeded) {
+		status.Reason = writeTimeoutReason
+	}
 	if !status.OK() {
 		return status
 	}
