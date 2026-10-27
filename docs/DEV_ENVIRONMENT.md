@@ -454,7 +454,7 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`. Run `bun run build:space-
   path in `KIRA_FAKE_SCEN`, call records (`.args`, `.cwd`, `.prompt`) in `KIRA_FAKE_DIR`.
 - Second code host: `flowharness.WithGitHost(fakehost.New())` registers an in-process `forge.test` host
   (merge requests) after GitHub. No CLI, no PATH. Use `WithoutGh()` to prove no step reaches `gh`.
-  `fakehost.WithoutSync` hides `FileReviewSync`. Flow: `flows/githostflow`; UI half
+  Flow: `flows/githostflow`; UI half
   `tests/ui/git-host-provider.spec.ts`.
 - Harness roots use a short `os.MkdirTemp("", "ksf")` path: unix-socket paths cap near 108 bytes.
 - Many watchers per parallel test can hit the inotify limit; raise `fs.inotify.max_user_instances`.
