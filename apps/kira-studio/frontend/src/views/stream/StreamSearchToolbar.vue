@@ -5,12 +5,16 @@ import CatalogText from '@theme/i18n/CatalogText.vue';
 import { formatCount } from '@workbench/behaviour/format';
 import FindBar from '@workbench/components/FindBar.vue';
 import ToolbarSeparator from '@workbench/components/ToolbarSeparator.vue';
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { getPage, pageVersion } from './page';
 import { useStreamSearchStore } from './search';
 
-const props = defineProps<{ tabId: string }>();
+const props = defineProps<{
+  tabId: string;
+  /** Live read of the owner's open flag; props are stale at unmount. */
+  isOpen: () => boolean;
+}>();
 const emit = defineEmits<{ goToMatch: [row: number]; close: [] }>();
 
 const pageSearchFilterStore = usePageSearchFilterStore();
@@ -32,7 +36,8 @@ function toggleFilter(): void {
   pageSearchFilterStore.setSearchFiltering(props.tabId, !filtering.value);
 }
 
-const query = ref('');
+// P375: restored from the kept scan after a tab switch.
+const query = ref(streamSearchStore.searchState[props.tabId]?.query ?? '');
 const entry = computed(() => streamSearchStore.searchState[props.tabId]);
 
 // The scan decodes every cell of the page synchronously, so useFindBar debounces it per keystroke.
@@ -69,8 +74,18 @@ function close(): void {
   emit('close');
 }
 
+onMounted(() => {
+  if (query.value === '') return;
+  const e = streamSearchStore.searchState[props.tabId];
+  if (!e || e.page?.deref() !== getPage(props.tabId)) {
+    streamSearchStore.runSearch(props.tabId, query.value);
+  }
+});
+
 onUnmounted(() => {
   closed = true;
+  // Still open: a tab switch, not a close. Keep the query, toggle and scan.
+  if (props.isOpen()) return;
   streamSearchStore.clearSearchState(props.tabId);
   // P31 D18: Cmd+F toggling the toolbar off unmounts this component without ever calling close()
   // above — the toggle must reset here too (mirrors views/shared/page/SearchToolbar.vue's own note).

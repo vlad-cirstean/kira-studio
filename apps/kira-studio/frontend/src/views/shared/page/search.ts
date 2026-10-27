@@ -26,7 +26,15 @@ export interface PageSearchApi<M extends { row: number }> {
    *  is (mid-scan and completed alike), `undefined` only for a tab with no search state at all. */
   searchState: Record<
     string,
-    { matches: M[]; index: number; pending?: boolean; found?: number; matchedRows?: number[] }
+    {
+      matches: M[];
+      index: number;
+      pending?: boolean;
+      found?: number;
+      matchedRows?: number[];
+      /** Page the completed scan ran over; a mismatch on remount means rescan. */
+      page?: WeakRef<object>;
+    }
   >;
   matchedRows(tabId: string): number[] | null;
   pageVersion: { n: number };

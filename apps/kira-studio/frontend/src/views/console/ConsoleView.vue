@@ -454,6 +454,7 @@ onUnmounted(() => {
           <SearchToolbar
             v-if="rt.searchOpen && !activeResultIsPlan"
             :tab-id="tab.id"
+            :is-open="() => !!consoleViewStore.runtime[tab.id]?.searchOpen"
             testid-prefix="console-"
             kind="rows"
             :api="pageSearchApi"
