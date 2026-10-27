@@ -2111,6 +2111,9 @@
       "magenta": {
         "label": "Magenta"
       },
+      "purple": {
+        "label": "Purple"
+      },
       "red": {
         "label": "Red"
       }
@@ -8175,6 +8178,41 @@
           "label": "Worktree setup"
         }
       },
+      "statuses": {
+        "add": {
+          "label": "Add status"
+        },
+        "category": {
+          "active": {
+            "label": "In progress"
+          },
+          "description": "Each status counts as one of four kinds of progress. Every kind needs at least one status.",
+          "label": "Counts as",
+          "review": {
+            "label": "In review"
+          },
+          "todo": {
+            "label": "To do"
+          }
+        },
+        "delete": {
+          "tooltip": "Delete status"
+        },
+        "deleteDialog": {
+          "body": "{count} tasks are in {status}. Move them to another status first.",
+          "title": "Delete status and move its tasks"
+        },
+        "description": "Statuses a task moves through. Workflow steps set one automatically; you can move a task by hand at any time.",
+        "lastOfCategory": {
+          "tooltip": "Each category needs one status"
+        },
+        "newName": {
+          "label": "New status"
+        },
+        "reassign": {
+          "label": "Move tasks to"
+        }
+      },
       "statusPicker": {
         "back": {
           "tooltip": "Previous status"
@@ -8556,6 +8594,9 @@
             "example": "./scripts/release.sh",
             "hint": "Runs in each branch’s worktree. A non-zero exit fails the step. {tokens} are shell-quoted when needed."
           },
+          "editStatuses": {
+            "label": "Edit statuses"
+          },
           "end": {
             "title": "How it ends"
           },
@@ -8609,6 +8650,9 @@
           },
           "status": {
             "label": "Task status while in this step"
+          },
+          "statusMissing": {
+            "label": "{id} (missing, uses {fallback})"
           },
           "tools": {
             "example": "Bash(git *), Edit",
@@ -9327,6 +9371,9 @@
         },
         "mobileAccess": {
           "label": "Mobile access"
+        },
+        "taskStatuses": {
+          "label": "Task statuses"
         }
       }
     },

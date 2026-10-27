@@ -34,6 +34,7 @@ import type {
   ReviewAgentLaunch,
   ReviewForwardText,
   RunArgs,
+  SaveStatusesArgs,
   SaveWorkflowArgs,
   SaveWorkflowYamlArgs,
   SendArgs,
@@ -149,6 +150,24 @@ export function useUpdateTask() {
   return useMutation({
     mutationFn: (args: UpdateTaskArgs) => control.adeTaskUpdateTask(args),
     ...optimisticUpdate<Board, UpdateTaskArgs>(queryClient, boardKey, withTaskPatch),
+  });
+}
+
+/** The saved set replaces `board.statuses`; the backend's board push brings the reassigned tasks. */
+function withSavedStatuses(board: Board, args: SaveStatusesArgs): Board {
+  return {
+    ...board,
+    statuses: args.statuses.map((s) => ({
+      ...s,
+      id: s.id || board.statuses.find((o) => o.name === s.name)?.id || s.name,
+    })),
+  };
+}
+
+export function useSaveStatuses() {
+  return useMutation({
+    mutationFn: (args: SaveStatusesArgs) => control.adeTaskSaveStatuses(args),
+    ...optimisticUpdate<Board, SaveStatusesArgs>(queryClient, boardKey, withSavedStatuses),
   });
 }
 
