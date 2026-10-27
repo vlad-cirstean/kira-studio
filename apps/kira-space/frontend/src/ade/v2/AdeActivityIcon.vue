@@ -18,7 +18,7 @@ const dot = computed(() => (big.value ? 'size-2.5' : 'size-2'));
       <span
         v-if="kind === 'input'"
         :class="badge"
-        class="flex items-center justify-center rounded-full bg-tone-amber-solid text-kira-sm font-extrabold leading-none text-tone-ink"
+        class="flex items-center justify-center rounded-full bg-tone-amber-solid text-kira-sm font-medium leading-none text-tone-ink"
         >!</span
       >
       <span

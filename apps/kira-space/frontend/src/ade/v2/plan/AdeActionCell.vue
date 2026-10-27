@@ -3,16 +3,19 @@ import { Button } from '@theme/components/ui/button';
 import { TooltipDisabledTrigger } from '@theme/components/ui/tooltip';
 import type { TextPart } from '@theme/varText';
 import { computed } from 'vue';
+import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import { type BranchAction, type Tone, tagLabel } from '../board/actions';
-import { ACTION_CLASS, TONE_SOLID_CLASS, TONE_TAG_CLASS } from '../tones';
-import { usePlanModel } from './usePlanModel';
+import { ACTION_CLASS, TONE_SOLID_CLASS } from '../tones';
+import { type BranchRowModel, usePlanModel } from './usePlanModel';
 
 // One cell of the left action column: the derived tag and, for a branch, its action buttons.
 const props = defineProps<{
   tag: { label: string; tone: Tone; tip: string; tipParts?: readonly TextPart[]; since?: number };
   tall?: boolean;
   actions?: readonly BranchAction[];
+  row?: BranchRowModel;
+  color?: string | null;
 }>();
 const { liveNow } = usePlanModel();
 const label = computed(() => tagLabel(props.tag, liveNow.value.getTime()));
@@ -49,14 +52,12 @@ const TESTID: Record<BranchAction['kind'], string> = {
     data-testid="ade-action-cell"
   >
     <AdeTip :text="tag.tip" :parts="tag.tipParts">
-      <span
-        class="box-border max-w-30 shrink truncate rounded-kira-sm px-1.5 py-0.5 text-kira-sm font-medium"
-        :class="TONE_TAG_CLASS[tag.tone]"
+      <AdeChip
+        :label="label"
+        :tone="tag.tone"
+        class="max-w-30 shrink truncate"
         data-testid="ade-tag"
-        >{{
-          label
-        }}</span
-      >
+      />
     </AdeTip>
     <AdeTip v-for="a in actions" :key="a.act?.id ?? a.kind" :text="a.tip" :parts="a.tipParts">
       <TooltipDisabledTrigger :disabled="a.disabled === true">

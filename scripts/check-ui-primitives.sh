@@ -107,9 +107,6 @@ U62 apps/kira-studio/frontend/src/views/console/ConsoleView.vue # Monaco host ex
 U47 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue # 2D arrow navigation between text inputs; useListNavigation ignores text fields
 U62 apps/kira-studio/frontend/src/views/shared/fields/FieldRowsTable.vue # moves focus between sibling inputs and sets the caret
 # B (apps/kira-space, W/memory)
-U88 apps/kira-space/frontend/src/ade/v2/plan/AdeTaskCard.vue # P129 board canvas density
-U88 apps/kira-space/frontend/src/ade/v2/plan/AdeDayBand.vue # P129 board canvas density
-U88 apps/kira-space/frontend/src/ade/v2/plan/AdeBranchRow.vue # P129 board canvas density
 U101 apps/kira-space/frontend/src/ade/v2/shell/AdeShell.vue # count badge marks sessions needing attention, not a tab count
 U101 apps/kira-space/frontend/mobile/TabBar.vue # count badge marks items needing attention, not a tab count
 U91 apps/kira-space/frontend/src/workbench/OperationsPanel.vue # tooltip shows the repo root, not the truncated name
@@ -150,7 +147,7 @@ U7@@v@@@@<Button without variant, or retired variant default/secondary/outline/d
 U8@@v@@@@<Button without size, or retired size default/xs/sm/lg/icon/icon-xs/icon-lg/icon-sm@@<Button\b(?:(?!(?&t)\s:?size=)|(?&t)\ssize="(?:default|xs|sm|lg|icon|icon-xs|icon-lg|icon-sm)")
 U9@@v@@NumberStepperInput.vue@@Input/NativeSelect/Textarea/InputGroup with size="default" or h-/rounded-/bg-/border-/px-/py- class@@<(?:Input|NativeSelect|Textarea|InputGroup)\b(?:(?&t)\ssize="default"|(?&t)\s:?class="[^"]*${TOK}(?:h|rounded|bg|border|px|py)-)
 U10@@v@@@@raw <label>/<select> (use FieldLabel/Label, NativeSelect)@@<(?:label|select)\b
-U11@@vt@@@@font-bold or font-semibold (headings use SectionHeading, FieldLegend)@@${TOK}font-(?:bold|semibold)(?![\w-])
+U11@@vt@@@@font-bold, font-semibold, font-extrabold or font-black (headings use SectionHeading, FieldLegend)@@${TOK}font-(?:bold|semibold|extrabold|black)(?![\w-])
 U12@@v@@@@CodiconIcon :size outside 12/13/16/24@@<CodiconIcon\b(?&t)\s:size="(?!(?:12|13|16|24)")\d+"
 U13@@v@@PanelHeader.vue@@hand-rolled panel header/toolbar bar (use PanelHeader/ViewToolbar)@@\bclass="(?=[^"]*${TOK}h-bar(?![\w-]))(?=[^"]*${TOK}gap-1(?![\w.-]))(?=[^"]*${TOK}border-b(?![\w-]))(?:(?=[^"]*${TOK}px-1\.5(?![\w-]))(?=[^"]*${TOK}text-kira-sm(?![\w-]))|(?=[^"]*${TOK}px-2(?![\w-]))(?=[^"]*${TOK}shrink-0(?![\w-])))
 U14@@v@@@@EmptyMedia variant="icon", or Alert faking an empty state@@<EmptyMedia\b(?&t)\svariant="icon"|<Alert\b(?&t)\sclass="[^"]*${TOK}bg-transparent
@@ -242,6 +239,7 @@ U102@@v@@@@shortSha(/shortId( in a component (use Identifier :short)@@\bshort(?:
 U103@@vt@@@@bare .sort() (end on a stable key)@@\.sort\(\)
 U104@@v@@@@toolbar divider must use ToolbarSeparator (P351)@@class="[^"]*(?:\bw-px\b[^"]*\bh-3\.5\b|\bh-3\.5\b[^"]*\bw-px\b)
 U104@@v@@ToolbarSeparator.vue@@toolbar divider must use ToolbarSeparator (P351)@@<Separator\b(?&t)\sorientation="vertical"
+U105@@vt@@@@repeating gradient texture (surfaces are flat tokens)@@repeating-(?:linear|radial|conic)-gradient
 GUARDS
 
 # hits: "U<n> path"

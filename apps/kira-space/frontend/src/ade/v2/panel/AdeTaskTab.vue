@@ -219,7 +219,7 @@ const chipClass = (t: 'muted' | 'stale' | 'unknown'): string =>
         </AdeTip>
         <span
           class="min-w-0 flex-1 truncate font-data text-kira-md"
-          :class="row.draft ? 'italic text-muted-foreground' : ''"
+          :class="row.draft ? 'text-muted-foreground' : ''"
           >{{
             branchLabel(row)
           }}</span

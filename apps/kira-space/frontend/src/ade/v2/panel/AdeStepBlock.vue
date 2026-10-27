@@ -227,7 +227,7 @@ function logToggleLabel(runId: string): string {
     >
       <div class="flex min-h-control items-center gap-2">
         <span
-          class="box-border flex size-4 shrink-0 items-center justify-center rounded-kira-sm text-kira-sm font-extrabold"
+          class="box-border flex size-4 shrink-0 items-center justify-center rounded-kira-sm text-kira-sm font-medium"
           :class="glyphClass(block.step.state)"
           >{{
             STEP_GLYPH[block.step.state]
@@ -281,7 +281,7 @@ function logToggleLabel(runId: string): string {
           :data-branch-id="rl.run.branchId"
         >
           <span
-            class="w-3.5 shrink-0 text-center text-kira-sm font-extrabold"
+            class="w-3.5 shrink-0 text-center text-kira-sm font-medium"
             :class="TONE_TEXT_CLASS[rl.tone]"
             data-testid="ade-run-glyph"
             >{{

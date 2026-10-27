@@ -23,7 +23,7 @@ import { TONE_TAG_CLASS } from '../tones';
 import AdeAttention from './AdeAttention.vue';
 import { type BranchRowModel, usePlanModel } from './usePlanModel';
 
-const props = defineProps<{ row: BranchRowModel; merged: boolean }>();
+const props = defineProps<{ row: BranchRowModel; color: string | null }>();
 const emit = defineEmits<{ forcePush: [] }>();
 const ui = useAdeBoardUiStore();
 const dialogs = useAdeDialogsStore();
@@ -138,23 +138,14 @@ const baseVariant = computed(() => {
 const elbowClass = computed(() =>
   props.row.base?.tone === 'blue' ? 'border-tone-blue-solid' : 'border-border-strong',
 );
-const rowBgClass = computed(() => {
-  if (props.merged) return 'bg-tone-purple-solid/8';
-  return props.row.isReview
-    ? 'bg-[repeating-linear-gradient(135deg,color-mix(in_srgb,var(--kira-info)_8%,transparent)_0_8px,color-mix(in_srgb,var(--kira-info)_3%,transparent)_8px_16px)]'
-    : '';
-});
 </script>
 
 <template>
   <!-- biome-ignore lint/a11y/useSemanticElements: the row holds block content a button cannot. -->
   <div
     ref="rowEl"
-    class="group box-border flex h-board-row w-full items-center gap-1.5 border-l-3 px-2.5"
-    :class="[
-      rowBgClass,
-      selected ? 'border-l-focus' : 'border-l-transparent',
-    ]"
+    class="group box-border flex h-board-row w-full items-center gap-1.5 px-2"
+    :class="selected ? 'ring-1 ring-inset ring-focus' : ''"
     role="button"
     tabindex="0"
     :data-selected="selected || undefined"
@@ -186,7 +177,7 @@ const rowBgClass = computed(() => {
       <BranchChip
         :name="baseName"
         :variant="baseVariant"
-        class="max-w-27.5"
+        class="max-w-28"
         data-testid="ade-base-marker"
         :data-pending="row.base.pending || undefined"
       />
@@ -206,7 +197,7 @@ const rowBgClass = computed(() => {
       <AdeTip :text="row.name">
         <span
           class="truncate font-data text-kira-md font-medium leading-4"
-          :class="row.draft ? 'italic text-muted-foreground' : 'text-fg'"
+          :class="row.draft ? 'text-muted-foreground' : 'text-fg'"
           data-testid="ade-branch-name"
           >{{
             row.name
@@ -227,13 +218,12 @@ const rowBgClass = computed(() => {
                 :class="segClass(seg)"
               />
             </span>
-            <span class="text-kira-sm font-medium" :class="progClass">{{ row.prog.label }}</span>
+            <span class="text-kira-sm" :class="progClass">{{ row.prog.label }}</span>
           </span>
         </AdeTip>
         <span
           v-if="row.context"
           class="truncate text-kira-sm text-subtle"
-          :class="row.draft ? 'italic' : ''"
           data-testid="ade-branch-context"
           >{{
             row.context
@@ -241,7 +231,7 @@ const rowBgClass = computed(() => {
         >
         <AdeTip v-for="c in row.chips.merged" :key="c.label" :text="c.tip">
           <span
-            class="shrink-0 text-kira-sm font-medium"
+            class="shrink-0 text-kira-sm"
             :class="c.tone === 'stale' ? 'text-tone-amber' : 'text-subtle'"
             data-testid="ade-branch-merged"
             >{{
@@ -252,7 +242,7 @@ const rowBgClass = computed(() => {
         <span v-if="row.chips.divider" class="h-2.5 w-px shrink-0 bg-border-strong" />
         <AdeTip v-for="c in row.chips.deployed" :key="c.label" :text="c.tip">
           <span
-            class="shrink-0 text-kira-sm font-medium"
+            class="shrink-0 text-kira-sm"
             :class="c.tone === 'stale' ? 'text-tone-amber' : 'text-subtle'"
             data-testid="ade-branch-deployed"
             >{{

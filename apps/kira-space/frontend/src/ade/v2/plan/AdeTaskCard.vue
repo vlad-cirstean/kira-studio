@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
+import { Card } from '@theme/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,7 @@ import { errorText } from '@workbench/bridge/codedError';
 import { formatShortcut } from '@workbench/shortcuts/keys';
 import { useShortcut } from '@workbench/shortcuts/useShortcut';
 import { computed, useTemplateRef } from 'vue';
+import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import AdeAutomationChip from '../automation/AdeAutomationChip.vue';
 import type { BranchAction } from '../board/actions';
@@ -26,7 +28,6 @@ import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
-import { TONE_SOLID_CLASS, TONE_TAG_CLASS } from '../tones';
 import AdeActionCell from './AdeActionCell.vue';
 import AdeAttention from './AdeAttention.vue';
 import AdeBranchRow from './AdeBranchRow.vue';
@@ -84,10 +85,9 @@ const segClass = (state: string): string => {
   if (state === 'skipped') return 'bg-border';
   return p.value.bad ? 'bg-tone-red-solid' : 'bg-tone-amber-solid';
 };
-const labelClass = computed(() => {
-  if (p.value.finished) return TONE_TAG_CLASS.green;
-  if (p.value.bad) return TONE_SOLID_CLASS.red;
-  return TONE_TAG_CLASS.amber;
+const labelTone = computed(() => {
+  if (p.value.finished) return 'green';
+  return p.value.bad ? 'red' : 'amber';
 });
 
 // The left border colour is task data (`card.color`) except on a review card, which wears blue.
@@ -97,18 +97,12 @@ const boxStyle = computed(() =>
 const boxClass = computed(() => {
   const c = props.card;
   return [
-    c.parked
-      ? 'border-dashed bg-[repeating-linear-gradient(135deg,var(--kira-bg-elevated)_0_7px,var(--kira-bg-chrome)_7px_14px)]'
-      : '',
+    c.parked ? 'bg-bg' : '',
     c.review ? 'cursor-default border-l-tone-blue-solid' : 'cursor-grab',
     c.allMerged ? 'border-y-tone-purple-solid/60 border-r-tone-purple-solid/60' : '',
-    c.ripple && !c.selected ? 'outline outline-1 outline-dashed outline-tone-amber-solid' : '',
+    c.ripple && !c.selected ? 'outline outline-1 outline-tone-amber-solid' : '',
   ];
 });
-
-const headStyle = computed(() =>
-  props.card.selected ? undefined : { background: `${props.card.color}1c` },
-);
 </script>
 
 <template>
@@ -127,15 +121,18 @@ const headStyle = computed(() =>
         v-for="row in card.rows"
         :key="row.id"
         :tag="row.tag"
+        :row="row"
+        :color="card.color"
         :actions="row.tag.actions"
         @act="(a) => act(row, a)"
         @contextmenu="(ev: MouseEvent) => card.review && taskMenu.open(ev)"
       />
     </div>
     <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the keyboard opens the menu from the header. -->
-    <div
+    <Card
+      variant="section"
       :data-task-id="card.task.id"
-      class="box-border flex min-w-0 flex-1 flex-col overflow-hidden rounded-kira-pill border border-l-4 border-border-strong bg-elevated shadow-kira"
+      class="box-border flex min-w-0 flex-1 flex-col overflow-hidden border-l-4"
       :class="boxClass"
       :style="boxStyle"
       data-testid="ade-card"
@@ -145,9 +142,8 @@ const headStyle = computed(() =>
       <div
         v-if="!card.review"
         ref="head"
-        class="box-border flex h-17 w-full flex-col justify-center gap-1 border-b border-l-3 border-b-border px-2.5 py-1.5"
-        :class="card.selected ? 'border-l-focus bg-hover' : 'border-l-transparent'"
-        :style="headStyle"
+        class="box-border flex h-17 w-full flex-col justify-center gap-1 border-b border-b-border px-2 py-1.5"
+        :class="card.selected ? 'bg-hover' : ''"
         role="button"
         tabindex="0"
         data-testid="ade-card-head"
@@ -158,7 +154,7 @@ const headStyle = computed(() =>
         <div class="flex h-4.5 min-w-0 items-center gap-1.5">
           <span
             class="box-border size-3 shrink-0 rounded-kira-xs"
-            :class="card.parked ? 'border-2 border-dashed' : ''"
+            :class="card.parked ? 'border-2' : ''"
             :style="card.parked ? { borderColor: card.color } : { background: card.color }"
             data-testid="ade-card-dot"
           />
@@ -176,14 +172,12 @@ const headStyle = computed(() =>
                 />
               </span>
             </AdeTip>
-            <span
-              class="max-w-37.5 shrink-0 truncate rounded-kira-sm px-1.5 py-px text-kira-sm"
-              :class="labelClass"
+            <AdeChip
+              :label="p.label"
+              :tone="labelTone"
+              class="max-w-36 shrink-0 truncate"
               data-testid="ade-step-label"
-              >{{
-                p.label
-              }}</span
-            >
+            />
             <AdeTip v-if="p.showBar" :text="p.barTip">
               <span class="inline-flex shrink-0 items-center gap-1">
                 <span
@@ -268,7 +262,7 @@ const headStyle = computed(() =>
             type="button"
             variant="link"
             size="inline"
-            class="line-clamp-2 block justify-start whitespace-normal break-words rounded-none border-0 text-left text-kira-lg leading-4"
+            class="line-clamp-2 block justify-start whitespace-normal break-words rounded-none border-0 text-left text-kira-lg font-medium leading-4"
             :class="card.parked ? 'text-muted-foreground' : 'text-fg'"
             :aria-label="t('space.ade.plan.card.open.aria', { title: card.title })"
             data-testid="ade-card-title"
@@ -282,9 +276,9 @@ const headStyle = computed(() =>
         v-for="row in card.rows"
         :key="row.id"
         :row="row"
-        :merged="row.branch.mergedIntoMain"
+        :color="card.color"
         @force-push="emit('forcePush', row)"
       />
-    </div>
+    </Card>
   </div>
 </template>
