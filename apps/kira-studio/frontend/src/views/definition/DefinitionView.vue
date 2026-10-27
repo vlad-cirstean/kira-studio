@@ -142,7 +142,14 @@ const constraintRows = computed(() =>
 // over each section's *rows*, applied here (once, over the arrays every section already receives
 // as props) rather than teaching four section components their own filtering —
 // ColumnsSection/IndexesSection/ConstraintsSection stay unchanged.
-const searchOpen = ref(false);
+const searchOpen = computed({
+  get: () => rt.value?.searchOpen ?? false,
+  set: (v: boolean) => definitionViewStore.setSearchOpen(props.tab.id, v),
+});
+const structureFilterQuery = computed({
+  get: () => rt.value?.structureFilter ?? '',
+  set: (v: string) => definitionViewStore.setStructureFilter(props.tab.id, v),
+});
 function toggleSearch(): void {
   searchOpen.value = !searchOpen.value;
   // D13's own rule (HttpRequestView.vue's toggleFieldFilter): closing must restore every hidden
@@ -154,7 +161,6 @@ function closeSearch(): void {
   structureFilterQuery.value = '';
 }
 
-const structureFilterQuery = ref('');
 const structureFilterActive = computed(
   () => searchOpen.value && pane.value === 'structure' && structureFilterQuery.value.trim() !== '',
 );

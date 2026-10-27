@@ -17,10 +17,21 @@ interface DefinitionViewRuntime {
   // D8: Structure's columns/indexes come from the same describe() the grid already calls — an
   // independently-cached second load, not a field ObjectDefinition duplicates.
   meta: ObjectMeta | null;
+  // P375: find-bar state outlives the view's unmount on tab switch; session-only.
+  searchOpen: boolean;
+  structureFilter: string;
 }
 
 function defaultRuntime(): DefinitionViewRuntime {
-  return { status: 'idle', error: null, source: null, definition: null, meta: null };
+  return {
+    status: 'idle',
+    error: null,
+    source: null,
+    definition: null,
+    meta: null,
+    searchOpen: false,
+    structureFilter: '',
+  };
 }
 
 export const useDefinitionViewStore = defineStore('definitionView', () => {
@@ -87,5 +98,13 @@ export const useDefinitionViewStore = defineStore('definitionView', () => {
     return connectionId ? useStaleDataStore().isStale(tabId, tabId, connectionId) : false;
   }
 
-  return { runtime, isStale, load };
+  function setSearchOpen(tabId: string, open: boolean): void {
+    ensureRuntime(tabId).searchOpen = open;
+  }
+
+  function setStructureFilter(tabId: string, query: string): void {
+    ensureRuntime(tabId).structureFilter = query;
+  }
+
+  return { runtime, isStale, load, setSearchOpen, setStructureFilter };
 });

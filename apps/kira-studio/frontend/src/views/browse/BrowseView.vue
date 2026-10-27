@@ -120,13 +120,14 @@ const filterText = computed({
 
 // The app's own shared search idiom (HttpRequestView.vue's toggleFieldFilter) replaces
 // this file's own always-visible `.filter-field` — `rt.filter`/`filteredNodes`/`countText` below
-// are untouched, only the affordance moves. Component-local, not tab state: a lens, not a setting,
-// same rule fieldFilterOpen already follows.
-const filterOpen = ref(false);
+// are untouched, only the affordance moves. Runtime store, not tab state: a lens, not a setting.
+// Kept across tab switches (P375) so an active filter never hides rows behind a closed bar.
+const filterOpen = computed(() => rt.value?.filterOpen ?? false);
 function toggleFilter(): void {
-  filterOpen.value = !filterOpen.value;
+  const open = !filterOpen.value;
+  browseViewStore.setFilterOpen(props.tab.id, open);
   // D13's own rule (restated here): closing must restore every hidden row.
-  if (!filterOpen.value) filterText.value = '';
+  if (!open) filterText.value = '';
 }
 
 const filteredNodes = computed<TreeNode[]>(() => {

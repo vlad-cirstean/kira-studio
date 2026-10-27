@@ -27,6 +27,8 @@ interface BrowseViewRuntime {
   truncated: boolean;
   /** Substring filter over `nodes` (D18), runtime-only — mirrors grid/state.ts's `searchOpen`. */
   filter: string;
+  /** Filter bar visibility; kept here so a tab switch does not hide a still-active filter. */
+  filterOpen: boolean;
   /** The row that holds the list's roving tab stop, by path. */
   selected: string | null;
   /** Monotonic per tab. `load()` captures it before its own await and drops its
@@ -63,6 +65,7 @@ function defaultRuntime(): BrowseViewRuntime {
     nodes: [],
     truncated: false,
     filter: '',
+    filterOpen: false,
     selected: null,
     loadSeq: 0,
     previewPageIndex: 0,
@@ -184,6 +187,10 @@ export const useBrowseViewStore = defineStore('browseView', () => {
     if (rt) rt.filter = filter;
   }
 
+  function setFilterOpen(tabId: string, open: boolean): void {
+    ensureRuntime(tabId).filterOpen = open;
+  }
+
   function selectRow(tabId: string, path: string | null): void {
     const rt = runtime[tabId];
     if (!rt) return;
@@ -287,6 +294,7 @@ export const useBrowseViewStore = defineStore('browseView', () => {
     ascend,
     goToLevel,
     setFilter,
+    setFilterOpen,
     selectRow,
     ensureKeyTypes,
     invalidateLevel,

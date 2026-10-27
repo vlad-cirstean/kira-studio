@@ -1,4 +1,8 @@
 import { DATA_OP } from '@shared/protocol/dataOps';
+import {
+  controlSnapshots as redisControl,
+  portSnapshots as redisPorts,
+} from '../ipc/redis/redis.fixture';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { connectAndExpand, connectionCreateArgs } from './support/connect';
@@ -6,13 +10,17 @@ import { acceptConfirm } from './support/dialogs';
 import { IPC } from './support/ipcChannels';
 import type { StudioPortSnapshot } from './support/mockStream';
 import {
+  APP_PATH,
   BIG_ROWS_PATH,
   bigRowsFixture,
   NULLS_AND_UNICODE_PAGE,
   NULLS_META,
   NULLS_PATH,
+  ORDER_ITEMS_PATH,
+  orderItemsFixture,
   postgresConnectionSummary,
 } from './support/postgresFixture';
+import { openRedisBrowse } from './support/redisFixture';
 import { readOnlySqsSnapshots, SQS_QUEUE_PATH } from './support/sqsFixture';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
@@ -21,6 +29,43 @@ import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
 const CONNECTION_ID = 'conn-tab-filter';
 const FIXTURE = bigRowsFixture(CONNECTION_ID);
+
+const ORDER_PRODUCTS_PATH = `${APP_PATH}/table:products`;
+const ORDER_FIXTURE = orderItemsFixture('conn-tab-filter-def');
+
+function definitionOf(path: string, qualifiedName: string) {
+  return {
+    path,
+    kind: 'table' as const,
+    qualifiedName,
+    statements: [`CREATE TABLE ${qualifiedName} (\n  id integer NOT NULL\n)`],
+    language: 'sql' as const,
+    origin: 'composed' as const,
+    notes: [],
+    constraints: [],
+    documentSchema: null,
+    sections: [],
+    generatedAt: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+const DEFINITION_CONTROL: ControlSnapshot[] = [
+  { channel: IPC.connectionsList, response: [] },
+  {
+    channel: IPC.connectionsCreate,
+    args: connectionCreateArgs('Tab Filter DB', 'green'),
+    response: postgresConnectionSummary('conn-tab-filter-def', 'Tab Filter DB', 'green'),
+  },
+  ...ORDER_FIXTURE.control,
+  ...[
+    [ORDER_ITEMS_PATH, 'app.order_items'],
+    [ORDER_PRODUCTS_PATH, 'app.products'],
+  ].map(([path, name]) => ({
+    channel: IPC.treeDefinition,
+    args: { connectionId: 'conn-tab-filter-def', path, refresh: false, tabId: null },
+    response: { definition: definitionOf(path, name), source: 'server' as const },
+  })),
+];
 
 const CONTROL: ControlSnapshot[] = [
   { channel: IPC.connectionsList, response: [] },
@@ -162,4 +207,66 @@ test('stream find: query and filtered rows survive a tab switch', async ({ relau
   );
   await expect(page.locator('[data-testid="stream-search-count"]')).toContainText('1 of 1');
   await expect(page.locator('[data-testid="stream-row"]')).toHaveCount(1);
+});
+
+test('browse filter: open bar, text and filtered list survive a tab switch', async ({
+  relaunch,
+}) => {
+  test.setTimeout(90_000);
+  const { window: page } = await relaunch({ control: redisControl, stream: redisPorts });
+  await openRedisBrowse(page);
+
+  const tabs = page.locator('[data-testid="tab"]');
+  await (await findRow(page, 'database:db1')).dblclick();
+  await expect(tabs).toHaveCount(2);
+
+  await tabs.nth(0).click();
+  await page.click('[data-testid="browse-filter-toggle"]');
+  await page.fill('[data-testid="browse-filter"]', 'queue');
+  await expect(page.locator('[data-testid="browse-row"]')).toHaveCount(1);
+
+  await tabs.nth(1).click();
+  await expect(page.locator('[data-testid="browse-view"]')).toHaveAttribute(
+    'data-level',
+    'database:db1',
+  );
+  await tabs.nth(0).click();
+
+  await expect(page.locator('[data-testid="browse-filter"]')).toHaveValue('queue');
+  await expect(page.locator('[data-testid="browse-row"]')).toHaveCount(1);
+});
+
+test('definition structure filter survives a tab switch', async ({ relaunch }) => {
+  test.setTimeout(90_000);
+  const { window: page } = await relaunch({
+    control: DEFINITION_CONTROL,
+    stream: ORDER_FIXTURE.port,
+  });
+  await connectAndExpand(page, 'Tab Filter DB', 'green');
+
+  const tabs = page.locator('[data-testid="tab"]');
+  await openRowMenu(page, ORDER_ITEMS_PATH);
+  await page.click('[data-testid="menu-item-open-definition"]');
+  await expect(page.locator('[data-testid="definition-view"]')).toBeVisible();
+  await openRowMenu(page, ORDER_PRODUCTS_PATH);
+  await page.click('[data-testid="menu-item-open-definition"]');
+  await expect(tabs).toHaveCount(2);
+
+  await tabs.nth(0).click();
+  await page.click('[data-testid="definition-search-toggle"]');
+  const filter = page.locator('[data-testid="definition-structure-filter"]');
+  await filter.fill('quantity');
+  const columns = page.locator('[data-testid="definition-columns"]');
+  await expect(columns).not.toContainText('order_id');
+
+  await tabs.nth(1).click();
+  await expect(page.locator('[data-testid="definition-view"]')).toHaveAttribute(
+    'data-path',
+    ORDER_PRODUCTS_PATH,
+  );
+  await tabs.nth(0).click();
+
+  await expect(filter).toHaveValue('quantity');
+  await expect(columns).toContainText('quantity');
+  await expect(columns).not.toContainText('order_id');
 });
