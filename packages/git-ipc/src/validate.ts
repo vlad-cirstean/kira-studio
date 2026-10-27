@@ -197,7 +197,8 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // 'reviewDecision' and 'checksState'.
 // P358: 51 -> 52, additive. New request 'review.markMany' (batch whole-file mark).
 // P369: 52 -> 53, breaking. 'GitHostInfo' loses 'fileReviewSync' (GitHub viewed sync removed).
-export const CONTRACT_VERSION = 53;
+// P370: 53 -> 54, additive. New requests 'changeRequest.reviewState', 'changeRequest.submitReview' and 'changeRequest.comment' (review a change request, comment on its conversation).
+export const CONTRACT_VERSION = 54;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -313,6 +314,9 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'gitHost.info': true,
   'gitHost.providers': true,
   'changeRequest.browserUrl': true,
+  'changeRequest.reviewState': true,
+  'changeRequest.submitReview': true,
+  'changeRequest.comment': true,
   'changeRequest.openExternal': true,
   'link.openExternal': true,
   'worktree.list': true,

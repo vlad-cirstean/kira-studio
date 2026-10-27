@@ -1202,6 +1202,35 @@ export type ChangeRequestLookup =
   | { readonly kind: 'disabled' }
   | { readonly kind: 'unavailable'; readonly status: HostStatus };
 
+export type ChangeRequestReviewEvent = 'approve' | 'comment' | 'requestChanges';
+
+/** changeRequest.reviewState's result. `disabled`: host off, no provider, or one that cannot review.
+ *  `none`: the branch has no change request. */
+export type ChangeRequestReviewState =
+  | { readonly kind: 'disabled' }
+  | { readonly kind: 'none' }
+  | { readonly kind: 'unavailable'; readonly status: HostStatus }
+  | {
+      readonly kind: 'ok';
+      readonly host: GitHostInfo;
+      readonly number: number;
+      readonly title: string;
+      readonly state: ChangeRequestRecord['state'];
+      /** The head the host shows now; a submitted review applies to it. */
+      readonly headSha: string;
+      /** The local branch tip; '' when the branch is gone. */
+      readonly localHeadSha: string;
+      readonly author: string;
+      readonly viewer: string;
+      /** The viewer opened it: the host refuses approve and request changes. */
+      readonly own: boolean;
+    };
+
+export type ChangeRequestPostResult =
+  | { readonly kind: 'ok' }
+  | { readonly kind: 'disabled' }
+  | { readonly kind: 'unavailable'; readonly status: HostStatus };
+
 export type RepoOpenResult =
   | { readonly kind: 'ok'; readonly repo: RepoSummary }
   | { readonly kind: 'notARepository'; readonly path: string }
@@ -2084,6 +2113,27 @@ export type Contract = {
     'changeRequest.browserUrl': {
       params: { repoId: string; number: number };
       result: { readonly url: string } | { readonly url: null };
+    };
+    /** Fresh review facts of the branch's change request. Go-served. */
+    'changeRequest.reviewState': {
+      params: { repoId: string; branch: string };
+      result: ChangeRequestReviewState;
+    };
+    /** Submits a review on the host, applied to `headSha`. Go-served. */
+    'changeRequest.submitReview': {
+      params: {
+        repoId: string;
+        number: number;
+        event: ChangeRequestReviewEvent;
+        body: string;
+        headSha: string;
+      };
+      result: ChangeRequestPostResult;
+    };
+    /** Posts a conversation comment on the change request. Go-served. */
+    'changeRequest.comment': {
+      params: { repoId: string; number: number; body: string };
+      result: ChangeRequestPostResult;
     };
     /** The provider a repository's change-request calls go to under its `kiraSpace.gitHost.provider`
      *  setting; `host: null` when the setting is `off` or no provider matches the origin remote. */

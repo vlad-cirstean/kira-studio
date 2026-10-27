@@ -1268,6 +1268,9 @@
         "gitUnavailable": {
           "body": "Git is unavailable."
         },
+        "hostCommentTooLong": {
+          "body": "A comment can’t be longer than 65,536 bytes."
+        },
         "noSharedHistory": {
           "body": "The base and the branch share no history."
         },
@@ -1288,6 +1291,9 @@
         },
         "resultTooLarge": {
           "body": "The result is too large to send."
+        },
+        "reviewNeedsText": {
+          "body": "A review that comments or requests changes needs text."
         },
         "reviewStoreClosed": {
           "body": "The review store is closed because Kira Space is shutting down."

@@ -766,6 +766,64 @@ type GitHostInfoResult struct {
 	Host *githost.Info `json:"host"`
 }
 
+// ChangeRequestReview is changeRequest.reviewState's "ok" payload.
+type ChangeRequestReview struct {
+	Host         githost.Info `json:"host"`
+	Number       int          `json:"number"`
+	Title        string       `json:"title"`
+	State        string       `json:"state"`
+	HeadSha      string       `json:"headSha"`
+	LocalHeadSha string       `json:"localHeadSha"`
+	Author       string       `json:"author"`
+	Viewer       string       `json:"viewer"`
+	Own          bool         `json:"own"`
+}
+
+// ChangeRequestReviewStateResult mirrors @kira/git-ipc's ChangeRequestReviewState. The embedded
+// pointer flattens the ok payload and is omitted for every other kind.
+type ChangeRequestReviewStateResult struct {
+	Kind   string      `json:"kind"`
+	Status *HostStatus `json:"status,omitempty"`
+	*ChangeRequestReview
+}
+
+// ChangeRequestReviewStateParams is changeRequest.reviewState's own request.
+type ChangeRequestReviewStateParams struct {
+	RepoID string `json:"repoId"`
+	Branch string `json:"branch"`
+}
+
+// ChangeRequestSubmitReviewParams is changeRequest.submitReview's own request.
+type ChangeRequestSubmitReviewParams struct {
+	RepoID  string `json:"repoId"`
+	Number  int    `json:"number"`
+	Event   string `json:"event"`
+	Body    string `json:"body"`
+	HeadSha string `json:"headSha"`
+}
+
+// ChangeRequestCommentParams is changeRequest.comment's own request.
+type ChangeRequestCommentParams struct {
+	RepoID string `json:"repoId"`
+	Number int    `json:"number"`
+	Body   string `json:"body"`
+}
+
+// ChangeRequestPostResult mirrors @kira/git-ipc's ChangeRequestPostResult.
+type ChangeRequestPostResult struct {
+	Kind   string      `json:"kind"`
+	Status *HostStatus `json:"status,omitempty"`
+}
+
+func changeRequestPostResultFrom(r gitsession.ChangeRequestPost) ChangeRequestPostResult {
+	out := ChangeRequestPostResult{Kind: r.Kind}
+	if r.Status != nil {
+		s := hostStatusFrom(*r.Status)
+		out.Status = &s
+	}
+	return out
+}
+
 // ---------------------------------------------------------------------------------------
 // Worktree support. worktree.list/preflight.worktreeAdd/preflight.worktreeRemove's
 // own results are gitsession's/gitpreflight's own wire-shaped types ([]gitsession.WorktreeEntry
