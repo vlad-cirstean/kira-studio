@@ -7890,6 +7890,62 @@
         }
       },
       "review": {
+        "actions": {
+          "closed": {
+            "hint": "This {short} is closed."
+          },
+          "conversation": {
+            "label": "Comment on {short}"
+          },
+          "dialogApprove": {
+            "title": "Approve {short} #{number}"
+          },
+          "dialogBody": {
+            "placeholder": "Leave a comment"
+          },
+          "dialogComment": {
+            "title": "Comment review on {short} #{number}"
+          },
+          "dialogConversation": {
+            "title": "Comment on {short} #{number}"
+          },
+          "dialogRequestChanges": {
+            "title": "Request changes on {short} #{number}"
+          },
+          "errorDisabled": {
+            "body": "Reviews are off for this repository."
+          },
+          "headDiffers": {
+            "hint": "Your local branch is not at the {short} head. The review applies to the {short} head."
+          },
+          "merged": {
+            "hint": "This {short} is merged."
+          },
+          "open": {
+            "label": "View {short}"
+          },
+          "optional": {
+            "hint": "A message is optional for an approval."
+          },
+          "own": {
+            "hint": "You can’t approve or request changes on your own {short}."
+          },
+          "postedComment": {
+            "status": "Comment posted"
+          },
+          "postedReview": {
+            "status": "Review submitted"
+          },
+          "requestChanges": {
+            "label": "Request changes"
+          },
+          "required": {
+            "hint": "A message is required."
+          },
+          "submitReview": {
+            "label": "Submit review"
+          }
+        },
         "agent": {
           "elsewhere": {
             "hint": "The review agent is open in another window."

@@ -69,8 +69,12 @@ function reviewControl(extra: readonly ControlSnapshot[] = []): ControlSnapshot[
 async function openReview(
   relaunch: Parameters<Parameters<typeof reviewTest>[2]>[0]['relaunch'],
   extra: readonly ControlSnapshot[] = [],
+  git: Record<string, unknown> = {},
 ): Promise<Page> {
-  const { window: page } = await relaunch({ control: reviewControl(extra), gitStream: GIT });
+  const { window: page } = await relaunch({
+    control: reviewControl(extra),
+    gitStream: { ...GIT, extraResults: { ...GIT.extraResults, ...git } },
+  });
   await page.locator(t('ade-review-window')).waitFor();
   return page;
 }
@@ -582,4 +586,76 @@ reviewTest('arrow keys on a pane handle resize and store the left width', async 
   await expect.poll(async () => (await left.boundingBox())?.width ?? 0).toBeGreaterThan(start);
   const stored = await page.evaluate(() => localStorage.getItem('kira.ade.review.leftWidth'));
   expect(Number(stored)).toBeGreaterThan(start);
+});
+
+const ACTIONS = 'ade-review-actions';
+const actionsGit = (own = false) => ({
+  'changeRequest.reviewState': contract(
+    ACTIONS,
+    `git:changeRequest.reviewState${own ? '#own' : ''}`,
+  ),
+  'changeRequest.submitReview': contract(
+    ACTIONS,
+    `git:changeRequest.submitReview${own ? '#own' : ''}`,
+  ),
+  'changeRequest.comment': contract(ACTIONS, 'git:changeRequest.comment'),
+});
+const actionsHead = (contract(ACTIONS, 'git:changeRequest.reviewState') as { headSha: string })
+  .headSha;
+
+reviewTest('contract: approving a change request submits the review', async ({ relaunch }) => {
+  const page = await openReview(relaunch, [], actionsGit());
+  await page.locator(t('ade-review-actions-trigger')).click();
+  await page.locator(t('ade-review-action-approve')).click();
+  await expect(page.getByRole('dialog')).toContainText('Approve MR #7');
+  await page.locator(t('ade-review-submit-body')).fill('LGTM');
+  await page.locator(t('ade-review-submit')).click();
+  await expect(page.locator(t('ade-review-posted'))).toContainText('Review submitted');
+  expect(await gitStreamParams(page, 'changeRequest.submitReview')).toEqual([
+    { repoId: target.gitRepoId, number: 7, event: 'approve', body: 'LGTM', headSha: actionsHead },
+  ]);
+});
+
+reviewTest('contract: a change request comment posts to the conversation', async ({ relaunch }) => {
+  const page = await openReview(relaunch, [], actionsGit());
+  await page.locator(t('ade-review-cr-comment')).click();
+  await page.locator(t('ade-review-submit-body')).fill('@alice thanks');
+  await page.locator(t('ade-review-submit')).click();
+  await expect(page.locator(t('ade-review-posted'))).toContainText('Comment posted');
+  expect(await gitStreamParams(page, 'changeRequest.comment')).toEqual([
+    { repoId: target.gitRepoId, number: 7, body: '@alice thanks' },
+  ]);
+});
+
+reviewTest(
+  'contract: your own change request disables approve and request changes',
+  async ({ relaunch }) => {
+    const page = await openReview(relaunch, [], actionsGit(true));
+    await page.locator(t('ade-review-actions-trigger')).click();
+    for (const event of ['approve', 'requestChanges']) {
+      await expect(page.locator(t(`ade-review-action-${event}`))).toHaveAttribute(
+        'data-disabled',
+        '',
+      );
+      await expect(page.locator(t(`ade-review-action-${event}-reason`))).toContainText(
+        'your own MR',
+      );
+    }
+    await expect(page.locator(t('ade-review-action-comment'))).not.toHaveAttribute(
+      'data-disabled',
+      '',
+    );
+  },
+);
+
+reviewTest('contract: a refused review shows the host reason', async ({ relaunch }) => {
+  const page = await openReview(relaunch, [], actionsGit(true));
+  await page.locator(t('ade-review-actions-trigger')).click();
+  await page.locator(t('ade-review-action-comment')).click();
+  await page.locator(t('ade-review-submit-body')).fill('please look');
+  await page.locator(t('ade-review-submit')).click();
+  await expect(page.locator(t('ade-review-submit-error'))).toContainText(
+    'you cannot approve your own merge request',
+  );
+  await expect(page.getByRole('dialog')).toBeVisible();
 });

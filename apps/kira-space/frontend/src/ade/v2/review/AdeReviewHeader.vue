@@ -8,6 +8,7 @@ import AdeRepoTag from '../AdeRepoTag.vue';
 import { taskTitle } from '../board/labels';
 import { taskColor } from '../palette';
 import type { ReviewWindowTarget } from '../wire';
+import AdeReviewActions from './AdeReviewActions.vue';
 import { useReviewContext } from './useReviewContext';
 
 const props = defineProps<{ target: ReviewWindowTarget }>();
@@ -55,5 +56,6 @@ const hint = computed(() =>
         <TooltipContent>{{ hint }}</TooltipContent>
       </Tooltip>
     </div>
+    <AdeReviewActions :target="target" />
   </TitleBarBase>
 </template>
