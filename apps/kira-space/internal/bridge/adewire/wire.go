@@ -839,40 +839,6 @@ type ReviewForwardText struct {
 	Text string `json:"text"`
 }
 
-// ViewedSyncStatus: 'ok' | 'noPr' | 'prClosed' | 'disabled' | 'cliMissing' | 'unauthenticated' |
-// 'unavailable' | 'headNotFetched' | 'unsupported'.
-type ViewedSyncStatus string
-
-type ViewedSyncFile struct {
-	Path   string `json:"path"`
-	Action string `json:"action"` // 'mark' | 'unmark' | 'alreadyViewed' | 'skip'
-	Reason string `json:"reason"` // '' | 'notReviewed' | 'partial' | 'changedSinceReview' | 'differsFromPrHead' | 'notInPr'
-}
-
-type ViewedSyncPlan struct {
-	Status        ViewedSyncStatus `json:"status"`
-	Message       string           `json:"message"`
-	Account       string           `json:"account"`
-	ChangeRequest *ChangeRequest   `json:"changeRequest"`
-	Host          *githost.Info    `json:"host"`
-	HeadSha       string           `json:"headSha"`
-	LocalTip      string           `json:"localTip"`
-	Files         []ViewedSyncFile `json:"files"`
-}
-
-type ViewedSyncFailure struct {
-	Path  string `json:"path"`
-	Error string `json:"error"`
-}
-
-type ViewedSyncResult struct {
-	Status   ViewedSyncStatus    `json:"status"`
-	Message  string              `json:"message"`
-	Marked   []string            `json:"marked"`
-	Unmarked []string            `json:"unmarked"`
-	Failed   []ViewedSyncFailure `json:"failed"`
-}
-
 type ReadLogArgs struct {
 	Kind     LogKind `json:"kind"`
 	ID       string  `json:"id"`

@@ -175,8 +175,8 @@ func (b *TaskBoard) ReviewWindowTarget(ctx context.Context, key string) (*adewir
 	return &tgt, nil
 }
 
-// teardownReview unpins and purges the task's review sessions, closes its review windows and drops
-// its GitHub sync ledger (Archive; no GitHub call).
+// teardownReview unpins and purges the task's review sessions, and closes its review
+// windows (Archive).
 func (b *TaskBoard) teardownReview(ctx context.Context, tc *taskCtx) {
 	if b.deps.Registry != nil && b.deps.Registry.Review != nil {
 		for _, sb := range tc.branches {
@@ -209,11 +209,5 @@ func (b *TaskBoard) teardownReview(ctx context.Context, tc *taskCtx) {
 		if err := b.deps.ReviewWindows.DeleteByTask(tc.task.ID); err != nil {
 			slog.Warn("ade: review teardown: windows", "scope", "ade", "task", tc.task.ID, "err", err)
 		}
-	}
-	if b.deps.ViewedSync == nil {
-		return
-	}
-	if err := b.deps.ViewedSync.DeleteByTask(tc.task.ID); err != nil {
-		slog.Warn("ade: review teardown: sync ledger", "scope", "ade", "task", tc.task.ID, "err", err)
 	}
 }

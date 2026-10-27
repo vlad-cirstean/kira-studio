@@ -210,9 +210,6 @@ func (s *Store) updateComments(ctx context.Context, repoID, branch, set string, 
 	if err != nil {
 		return false, fmt.Errorf("gitreview: read RowsAffected: %w", err)
 	}
-	if n > 0 {
-		s.notify(ReviewChange{RepoID: repoID, Branch: branch, State: "comment"})
-	}
 	return n > 0, nil
 }
 

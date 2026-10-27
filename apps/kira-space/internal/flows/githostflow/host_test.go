@@ -157,13 +157,7 @@ func (r *rig) branchLookup() gitrpc.ChangeRequestLookup {
 		gitrpc.BranchResolveChangeRequestParams{RepoID: r.gitID, Branch: branch})
 }
 
-func (r *rig) markReviewed() {
-	r.t.Helper()
-	call[gitrpc.ReviewMarkResult](r.t, r.gs, "review.mark",
-		gitrpc.ReviewMarkParams{RepoID: r.gitID, Branch: branch, Path: "a.txt", Reviewed: true})
-}
-
-// A second host registered next to GitHub drives lookups, links, URLs and viewed sync with its own
+// A second host registered next to GitHub drives lookups, links and URLs with its own
 // words, and no step reaches `gh` (the app boots without it).
 func TestSecondGitHostRegistered(t *testing.T) {
 	forge := fakehost.New()
@@ -246,42 +240,6 @@ func TestSecondGitHostRegistered(t *testing.T) {
 		}
 	}
 
-	// Viewed sync: marks flow through the host's FileReviewSync and the ledger records the provider.
-	plan, err := r.app.W.AdeTask.ViewedSyncPlan(ctx, adewire.BranchArgs{BranchID: r.branch.ID})
-	if err != nil || plan.Status != "ok" || plan.Host == nil || plan.Host.ID != "forge" || plan.Account != "forger" ||
-		len(plan.Files) != 1 || plan.Files[0].Action != "skip" || plan.Files[0].Reason != "notReviewed" {
-		t.Fatalf("plan before review = %+v, %v, want a.txt skipped as notReviewed", plan, err)
-	}
-	r.markReviewed()
-	plan, err = r.app.W.AdeTask.ViewedSyncPlan(ctx, adewire.BranchArgs{BranchID: r.branch.ID})
-	if err != nil || plan.Status != "ok" || len(plan.Files) != 1 || plan.Files[0].Action != "mark" {
-		t.Fatalf("plan after review = %+v, %v, want a.txt marked", plan, err)
-	}
-	res, err := r.app.W.AdeTask.ViewedSyncApply(ctx, adewire.BranchArgs{BranchID: r.branch.ID})
-	if err != nil || res.Status != "ok" || !slices.Equal(res.Marked, []string{"a.txt"}) || len(res.Failed) != 0 {
-		t.Fatalf("apply = %+v, %v, want a.txt marked", res, err)
-	}
-	if !forge.Viewed(7, "a.txt") {
-		t.Fatal("the host never recorded a.txt as viewed")
-	}
-	var provider string
-	var number int
-	if err := r.app.DB().QueryRow(`SELECT provider, change_number FROM ade_viewed_sync WHERE branch_id = ? AND path = 'a.txt'`, r.branch.ID).Scan(&provider, &number); err != nil || provider != "forge" || number != 7 {
-		t.Fatalf("ledger row = %q #%d, %v, want forge #7", provider, number, err)
-	}
-
-	// A ledger row of another provider is dropped by the next plan.
-	if _, err := r.app.DB().Exec(`INSERT INTO ade_viewed_sync (branch_id, path, change_number, provider, marked_at) VALUES (?, 'ghost.txt', 7, 'github', 1)`, r.branch.ID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := r.app.W.AdeTask.ViewedSyncPlan(ctx, adewire.BranchArgs{BranchID: r.branch.ID}); err != nil {
-		t.Fatal(err)
-	}
-	var ghosts int
-	if err := r.app.DB().QueryRow(`SELECT COUNT(*) FROM ade_viewed_sync WHERE path = 'ghost.txt'`).Scan(&ghosts); err != nil || ghosts != 0 {
-		t.Fatalf("other-provider ledger rows left = %d, %v, want 0", ghosts, err)
-	}
-
 	// Settings: off disables lookups without a host call, a provider id pins it, an unknown id falls back to auto.
 	before := len(forge.Calls())
 	r.setProvider("off")
@@ -329,23 +287,6 @@ func TestOriginPicksTheProvider(t *testing.T) {
 	}
 	if n := len(forge.Calls()); n != 0 {
 		t.Fatalf("forge called %d times for a github.com repo, want none", n)
-	}
-}
-
-// A host without per-file viewed state reports unsupported and is never called.
-func TestHostWithoutFileReviewSync(t *testing.T) {
-	forge := fakehost.New()
-	r := newRig(t, forge, fakehost.WithoutSync(forge))
-	r.markReviewed()
-	plan, err := r.app.W.AdeTask.ViewedSyncPlan(ctx, adewire.BranchArgs{BranchID: r.branch.ID})
-	if err != nil || plan.Status != "unsupported" || len(plan.Files) != 0 {
-		t.Fatalf("plan = %+v, %v, want unsupported with no files", plan, err)
-	}
-	if plan.Host == nil || plan.Host.FileReviewSync {
-		t.Fatalf("plan host = %+v, want forge without FileReviewSync", plan.Host)
-	}
-	if n := forge.Count("ChangeFiles"); n != 0 {
-		t.Fatalf("ChangeFiles called %d times, want none", n)
 	}
 }
 
