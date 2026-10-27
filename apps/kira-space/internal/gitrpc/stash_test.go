@@ -41,11 +41,11 @@ func initStashRpcRepo(t *testing.T) string {
 	return dir
 }
 
-// TestContractVersion_Is51 is P7 item 2's own literal exit-criteria assertion, moved forward again
-// (50 -> 51, P352) in the same commit that bumps the constant.
-func TestContractVersion_Is51(t *testing.T) {
-	if ContractVersion != 52 {
-		t.Fatalf("ContractVersion = %d, want 52", ContractVersion)
+// TestContractVersion_Is54 is P7 item 2's own literal exit-criteria assertion, moved forward again
+// (53 -> 54, P370) in the same commit that bumps the constant.
+func TestContractVersion_Is54(t *testing.T) {
+	if ContractVersion != 54 {
+		t.Fatalf("ContractVersion = %d, want 54", ContractVersion)
 	}
 }
 

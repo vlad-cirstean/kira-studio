@@ -23,35 +23,34 @@ const ID = "forge"
 // Host is the one host name the fake claims.
 const Host = "forge.test"
 
-// Forge is a githost.Provider, githost.FileReviewSync and githost.ChangeRequestSync over in-memory
-// data. Every call is recorded.
+// Forge is a githost.Provider, githost.ChangeRequestSync and githost.ChangeRequestReviews over
+// in-memory data. Every call is recorded.
 type Forge struct {
-	mu     sync.Mutex
-	crs    []githost.ChangeRequest
-	files  map[int][]string
-	viewed map[string]bool
-	calls  []string
+	mu    sync.Mutex
+	crs   []githost.ChangeRequest
+	calls []string
 	// rev changes whenever the listing a Probe sees changes: every mutation but a checks state.
-	rev     int
-	account string
-	limited time.Time
+	rev      int
+	account  string
+	limited  time.Time
+	authors  map[int]string
+	reviews  map[int][]githost.Review
+	comments map[int][]string
 }
 
 var (
 	_ githost.Provider          = (*Forge)(nil)
-	_ githost.FileReviewSync    = (*Forge)(nil)
 	_ githost.ChangeRequestSync = (*Forge)(nil)
+
+	_ githost.ChangeRequestReviews = (*Forge)(nil)
 )
 
 // New returns an empty fake host.
 func New() *Forge {
-	return &Forge{files: map[int][]string{}, viewed: map[string]bool{}, account: "forger"}
+	return &Forge{
+		account: "forger", authors: map[int]string{}, reviews: map[int][]githost.Review{}, comments: map[int][]string{},
+	}
 }
-
-// WithoutSync hides p's FileReviewSync, to exercise a host with no per-file viewed state.
-func WithoutSync(p githost.Provider) githost.Provider { return plain{p} }
-
-type plain struct{ githost.Provider }
 
 // AddChangeRequest registers cr. Set HeadOwner to the repo owner for the branch to badge.
 func (f *Forge) AddChangeRequest(cr githost.ChangeRequest) {
@@ -121,20 +120,6 @@ func (f *Forge) SetHead(number int, sha string) {
 	}
 }
 
-// SetFiles sets the changed files of merge request number.
-func (f *Forge) SetFiles(number int, paths ...string) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.files[number] = paths
-}
-
-// Viewed reports whether path is marked viewed on merge request number.
-func (f *Forge) Viewed(number int, path string) bool {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.viewed[viewKey(number, path)]
-}
-
 // Calls returns every recorded call, in order, as "Method" or "Method:arg".
 func (f *Forge) Calls() []string {
 	f.mu.Lock()
@@ -158,8 +143,6 @@ func (f *Forge) record(call string) {
 	f.calls = append(f.calls, call)
 	f.mu.Unlock()
 }
-
-func viewKey(number int, path string) string { return fmt.Sprintf("%d:%s", number, path) }
 
 func (f *Forge) ID() string { return ID }
 
@@ -252,36 +235,6 @@ func (f *Forge) ParseLink(raw string) (githost.Link, bool) {
 	return githost.Link{Provider: ID, Kind: githost.LinkIssue, Ref: m[1] + "#" + m[3]}, true
 }
 
-func (f *Forge) ChangeFiles(_ context.Context, _ githost.Repo, number int) (githost.ChangeFiles, githost.Status) {
-	f.record(fmt.Sprintf("ChangeFiles:%d", number))
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	out := githost.ChangeFiles{NodeID: fmt.Sprintf("MR_%d", number)}
-	for _, cr := range f.crs {
-		if cr.Number == number {
-			out.HeadSha, out.Open = cr.HeadSha, cr.State == "open" || cr.State == "draft"
-		}
-	}
-	for _, p := range f.files[number] {
-		out.Files = append(out.Files, githost.ChangedFile{Path: p, Viewed: f.viewed[viewKey(number, p)]})
-	}
-	return out, githost.Status{Kind: githost.KindOK, Host: Host, Account: "forger"}
-}
-
-func (f *Forge) SetFilesViewed(_ context.Context, _ githost.Repo, nodeID string, paths []string, viewed bool) (map[string]string, githost.Status) {
-	var number int
-	if _, err := fmt.Sscanf(nodeID, "MR_%d", &number); err != nil {
-		return nil, githost.Status{Kind: githost.KindNotFound, Reason: "unknown node " + nodeID}
-	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	for _, p := range paths {
-		f.calls = append(f.calls, fmt.Sprintf("SetFilesViewed:%d:%s:%t", number, p, viewed))
-		f.viewed[viewKey(number, p)] = viewed
-	}
-	return nil, githost.Status{Kind: githost.KindOK, Host: Host}
-}
-
 // rateLimit is the failed status of a call made while SetRateLimited is in force.
 func (f *Forge) rateLimit() (githost.Status, bool) {
 	f.mu.Lock()
@@ -355,4 +308,85 @@ func (f *Forge) Checks(_ context.Context, _ githost.Repo, nodeIDs []string) ([]g
 		}
 	}
 	return out, githost.Status{Kind: githost.KindOK, Host: Host}
+}
+
+// SetAuthor sets the login that opened merge request number.
+func (f *Forge) SetAuthor(number int, login string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.authors[number] = login
+}
+
+// Reviews returns the reviews submitted on merge request number.
+func (f *Forge) Reviews(number int) []githost.Review {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.reviews[number])
+}
+
+// Comments returns the conversation comments posted on merge request number.
+func (f *Forge) Comments(number int) []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.comments[number])
+}
+
+func (f *Forge) goneStatus() githost.Status {
+	return githost.Status{Kind: githost.KindForbidden, Host: Host, Reason: "not found", Gone: true}
+}
+
+// find returns merge request number, under f.mu.
+func (f *Forge) find(number int) (githost.ChangeRequest, bool) {
+	for _, cr := range f.crs {
+		if cr.Number == number {
+			return cr, true
+		}
+	}
+	return githost.ChangeRequest{}, false
+}
+
+func (f *Forge) ReviewTarget(_ context.Context, _ githost.Repo, number int) (githost.ReviewTarget, githost.Status) {
+	f.record("ReviewTarget:" + strconv.Itoa(number))
+	if st, limited := f.rateLimit(); limited {
+		return githost.ReviewTarget{}, st
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	cr, ok := f.find(number)
+	if !ok {
+		return githost.ReviewTarget{}, f.goneStatus()
+	}
+	return githost.ReviewTarget{State: cr.State, HeadSha: cr.HeadSha, Author: f.authors[number]},
+		githost.Status{Kind: githost.KindOK, Host: Host}
+}
+
+func (f *Forge) SubmitReview(_ context.Context, _ githost.Repo, number int, rv githost.Review) githost.Status {
+	f.record("SubmitReview:" + strconv.Itoa(number))
+	if st, limited := f.rateLimit(); limited {
+		return st
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.find(number); !ok {
+		return f.goneStatus()
+	}
+	if rv.Event != githost.ReviewComment && strings.EqualFold(f.authors[number], f.account) {
+		return githost.Status{Kind: githost.KindForbidden, Host: Host, Reason: "you cannot approve your own merge request"}
+	}
+	f.reviews[number] = append(f.reviews[number], rv)
+	return githost.Status{Kind: githost.KindOK, Host: Host}
+}
+
+func (f *Forge) Comment(_ context.Context, _ githost.Repo, number int, body string) githost.Status {
+	f.record("Comment:" + strconv.Itoa(number))
+	if st, limited := f.rateLimit(); limited {
+		return st
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.find(number); !ok {
+		return f.goneStatus()
+	}
+	f.comments[number] = append(f.comments[number], body)
+	return githost.Status{Kind: githost.KindOK, Host: Host}
 }

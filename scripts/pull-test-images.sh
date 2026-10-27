@@ -7,14 +7,15 @@
 set -eu
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+# shellcheck source=./lib.sh
+. "$SCRIPT_DIR/lib.sh"
 MIRROR=mirror.gcr.io
 
 pull_mirror_only() {
   _img="$MIRROR/$1"
   if docker image inspect "$_img" >/dev/null 2>&1; then
     echo "present $_img"
-  elif docker pull -q "$_img" >/dev/null 2>&1; then
+  elif retry 2 240 docker pull -q "$_img" >/dev/null 2>&1; then
     echo "pulled  $_img"
   else
     echo "FAILED  $_img (the flow tests pull it themselves)"
@@ -29,7 +30,7 @@ pull_one() {
   esac
   if docker image inspect "$_img" >/dev/null 2>&1; then
     echo "present $_img"
-  elif docker pull -q "$_mirrored" >/dev/null 2>&1 && docker tag "$_mirrored" "$_img"; then
+  elif retry 2 240 docker pull -q "$_mirrored" >/dev/null 2>&1 && docker tag "$_mirrored" "$_img"; then
     echo "pulled  $_img"
   else
     echo "FAILED  $_img (testcontainers will pull it from Docker Hub)"

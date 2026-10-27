@@ -46,12 +46,27 @@ const SETTINGS = {
 };
 
 // The product words differ from the mockup's only by sentence case (P265): compare lowercased.
-const lc = (v: string | undefined) => v?.toLowerCase();
-const lcAll = (v: readonly string[]) => v.map((x) => x.toLowerCase());
+// Ours dropped the mockup's symbol glyphs from labels (colour and codicons carry them).
+const REWORD: [RegExp, string][] = [
+  [/^↓(\d+) (.+)$/, '$1 behind $2'],
+  [/^↻ (.+)$/, 'after $1'],
+  [/^⏳ (.+)$/, 'waits for $1'],
+  [/^▶ (?!run$|start$)(.+)$/i, 'start $1'],
+];
+const plain = (v: string): string => {
+  let r = v;
+  for (const [re, to] of REWORD) r = r.replace(re, to);
+  return r
+    .replace(/[←-⯿]️?/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+const lc = (v: string | undefined) => (v === undefined ? v : plain(v).toLowerCase());
+const lcAll = (v: readonly string[]) => v.map((x) => plain(x).toLowerCase());
 
 /** Branch id -> what the new logic shows instead of the mockup, with the reason. */
 const DIVERGENCE: Record<string, { mockup: string; ours: string; why: string }> = {
-  b_deps: { mockup: 'CI failing', ours: '✓ Clean', why: 'D9: no CI badge' },
+  b_deps: { mockup: 'CI failing', ours: 'Clean', why: 'D9: no CI badge' },
 };
 
 let board: Board;
@@ -405,11 +420,11 @@ describe('rebase-conflict check states', () => {
 
   test('done with paths is a conflict with Rebase, done without is clean', () => {
     expect(tagFor({ conflictsIfRebased: ['a.ts', 'b.ts'] })).toEqual([
-      '✕ Conflict',
+      'Conflict',
       ['Rebase'],
       'Conflicts with main if rebased: a.ts, b.ts',
     ]);
-    expect(tagFor({})[0]).toBe('✓ Clean');
+    expect(tagFor({})[0]).toBe('Clean');
   });
 
   test('checking and failed never read as clean', () => {

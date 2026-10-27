@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
+	"testing/synctest"
 )
 
 // The route table is the whole API surface. This walks every method against every allowlisted and
@@ -131,25 +131,30 @@ func TestStatic_ShellAndFallback(t *testing.T) {
 
 func TestRoutes_ConcurrentBoardReadsShareOneFetch(t *testing.T) {
 	t.Parallel()
+	// synctest.Wait returns once all five requests are durably blocked: one inside the gated fetch,
+	// four joined on the flight. No sleep, so load cannot let a request arrive after the gate opens.
+	// The server is built outside the bubble: its idempotency cache starts a goroutine that never exits.
 	s, store, reader := newTestServer(t)
-	reader.gate = make(chan struct{})
 	cookie := store.addDevice(t, "dev1")
-	var wg sync.WaitGroup
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if rec := do(s, http.MethodGet, "/api/ade/board", "127.0.0.1:50000", withCookie(cookie)); rec.Code != 200 {
-				t.Errorf("board status %d", rec.Code)
-			}
-		}()
-	}
-	time.Sleep(100 * time.Millisecond)
-	close(reader.gate)
-	wg.Wait()
-	reader.mu.Lock()
-	defer reader.mu.Unlock()
-	if reader.calls != 1 {
-		t.Fatalf("5 concurrent reads made %d fetches, want 1", reader.calls)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		reader.gate = make(chan struct{})
+		var wg sync.WaitGroup
+		for i := 0; i < 5; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if rec := do(s, http.MethodGet, "/api/ade/board", "127.0.0.1:50000", withCookie(cookie)); rec.Code != 200 {
+					t.Errorf("board status %d", rec.Code)
+				}
+			}()
+		}
+		synctest.Wait()
+		close(reader.gate)
+		wg.Wait()
+		reader.mu.Lock()
+		defer reader.mu.Unlock()
+		if reader.calls != 1 {
+			t.Fatalf("5 concurrent reads made %d fetches, want 1", reader.calls)
+		}
+	})
 }

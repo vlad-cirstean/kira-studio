@@ -226,8 +226,6 @@ export const IPC = {
   adeTaskLaunchReviewAgent: 'kira:adetask:launchReviewAgent',
   adeTaskOpenReviewWindow: 'kira:adetask:openReviewWindow',
   adeTaskReviewWindowTarget: 'kira:adetask:reviewWindowTarget',
-  adeTaskViewedSyncPlan: 'kira:adetask:viewedSyncPlan',
-  adeTaskViewedSyncApply: 'kira:adetask:viewedSyncApply',
   adeTaskArchiveRisk: 'kira:adetask:archiveRisk',
   adeTaskArchiveTask: 'kira:adetask:archiveTask',
   adeTaskRecordMerge: 'kira:adetask:recordMerge',

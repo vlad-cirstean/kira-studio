@@ -144,7 +144,6 @@ reviewTest('review window', async ({ relaunch }) => {
     control: adeV2Control([
       { channel: IPC.adeTaskReviewWindowTarget, response: target },
       { channel: IPC.adeTaskReviewAgent, response: { session: null, hostWindowKey: '' } },
-      { channel: IPC.adeTaskViewedSyncPlan, response: adeFixture('viewed-sync-plan') },
     ]),
     gitStream: {
       repoId: target.gitRepoId,

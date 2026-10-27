@@ -29,6 +29,8 @@ export interface PaneResizeOptions {
   container?: MaybeComputedElementRef;
   direction?: ResizeDirection;
   step?: number;
+  /** Size change per pixel of pointer travel; 2 for a centred box whose edge moves half the change. */
+  scale?: number;
   /** Every pointer move and keyboard step: render this size. */
   onLive?: (size: number) => void;
   /** Pointer release, keyboard step, Home or End: persist this size. */
@@ -44,6 +46,7 @@ export function usePaneResize(options: PaneResizeOptions) {
   const unit = options.unit ?? 'px';
   const direction = options.direction ?? 'normal';
   const step = options.step ?? RESIZE_KEY_STEP;
+  const scale = options.scale ?? 1;
 
   function containerPx(): number {
     if (unit === 'px') return 0;
@@ -83,7 +86,7 @@ export function usePaneResize(options: PaneResizeOptions) {
       last = undefined;
     },
     onMove: (_pos, e) => {
-      last = sizeAfterDrag(startSize, pointerOf(e) - origin, direction, bounds());
+      last = sizeAfterDrag(startSize, (pointerOf(e) - origin) * scale, direction, bounds());
       options.onLive?.(last);
     },
     onEnd: (_pos, e) => {

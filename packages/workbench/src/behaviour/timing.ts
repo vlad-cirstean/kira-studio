@@ -19,6 +19,8 @@ export const TIMING = {
   typeahead: 500,
   /** Live-region clear-then-set gap. */
   reannounce: 100,
+  /** How long the status line stays after a review or comment is posted. */
+  postedStatus: 6000,
   /** Hover info popup delay. */
   hoverInfo: 400,
   pollFast: 5000,

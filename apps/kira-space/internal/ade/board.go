@@ -87,7 +87,6 @@ type TaskBoardDeps struct {
 	// review windows (Archive).
 	Windows            *repos.WindowsRepo
 	ReviewWindows      *repos.AdeReviewWindowsRepo
-	ViewedSync         *repos.AdeViewedSyncRepo
 	CloseReviewWindows func(taskID string)
 	// ScriptRunsOf lists the script runs started for a task, newest first (run_outcome kind automation).
 	// CustomScripts and ScriptsHome resolve the smart script of a workflow step and its own folder.
@@ -158,10 +157,6 @@ type TaskBoard struct {
 	wg               sync.WaitGroup // background setups and runs; Close waits
 	closeMu          sync.Mutex     // orders goTracked's wg.Add before Close's wg.Wait
 	closed           bool
-
-	syncMu      sync.Mutex             // guards syncLocks, syncPending
-	syncLocks   map[string]*sync.Mutex // branch id -> serializes its GitHub sync
-	syncPending map[string]bool        // branch id -> an unmark worker is queued
 }
 
 // prompts is the source of every LLM prompt the board sends.
@@ -183,7 +178,6 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 		repoMus: map[string]*sync.Mutex{}, byGitRepoID: map[string]string{}, gitRepoIDOf: map[string]string{},
 		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, live: map[string]*liveRun{}, tuiGrants: map[string]tuiBinding{}, setupLive: map[string]*liveRun{},
 		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]agentmcp.Finish{}, claims: map[string]string{}, stepMsgs: map[string]string{},
-		syncLocks: map[string]*sync.Mutex{}, syncPending: map[string]bool{},
 	}
 	b.agent = agentmcp.NewServer(agentmcp.Options{Dir: deps.AgentDir, OnFinish: b.recordFinish, Space: b, Outcomes: b, Review: b, SandboxGit: b, Prompts: b.prompts()})
 	b.conn = gitsession.NewConn(boardConnID, "ade-board", boardConnLabel, b.handleEmit)

@@ -39,17 +39,24 @@ runs:
         echo "GOCACHE_DIR=$(go env GOCACHE)" >> "$GITHUB_ENV"
         echo "GOMODCACHE_DIR=$(go env GOMODCACHE)" >> "$GITHUB_ENV"
     - name: Cache Go modules (keyed on go.sum)
+      id: gomod
       if: inputs.cache-save == 'true'
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: ${{ env.GOMODCACHE_DIR }}
         key: gomod-${{ runner.os }}-${{ hashFiles('go.sum') }}
     - name: Restore Go modules (keyed on go.sum)
+      id: gomod-restore
       if: inputs.cache-save != 'true'
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: ${{ env.GOMODCACHE_DIR }}
         key: gomod-${{ runner.os }}-${{ hashFiles('go.sum') }}
+    - name: Download Go modules on a cache miss (retried; go has no retry of its own)
+      if: steps.gomod.outputs.cache-hit != 'true' && steps.gomod-restore.outputs.cache-hit != 'true'
+      shell: bash
+      # Worst case 3 x 120 s + 30 s sleeps = 390 s; with the apt step it fits the caller's 10-minute step.
+      run: sh scripts/retry.sh 3 120 go mod download
     - name: Cache Go build and test results (saved per commit, restored from the newest entry; setup-go's go.sum-keyed entry is never refreshed and goes stale)
       if: inputs.go-cache != '' && inputs.cache-save == 'true'
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -112,12 +119,10 @@ runs:
           apps/kira-studio/frontend/bindings
           apps/kira-studio/.task
         key: wails-bindings-${{ hashFiles('go.mod') }}
-    - name: Install GTK4/WebKitGTK headers (cgo builds; also needed at runtime to even invoke a cached wails3 binary for its version check, not just to build one on a cache miss)
+    - name: Install GTK4/WebKitGTK headers (cgo builds; also needed at runtime to even invoke a cached wails3 binary for its version check, not just to build one on a cache miss; bounded and retried, scripts/ci-apt-install.sh)
       if: runner.os == 'Linux' && (inputs.gtk == 'true' || inputs.bindings == 'true')
       shell: bash
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
+      run: sh scripts/ci-apt-install.sh libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
     - name: Generate Wails bindings
       if: inputs.bindings == 'true'
       shell: bash
@@ -126,8 +131,7 @@ runs:
       if: runner.os == 'Linux' && inputs.visual-fonts == 'true'
       shell: bash
       run: |
-        sudo apt-get update
-        sudo apt-get install -y fonts-inter
+        sh scripts/ci-apt-install.sh fonts-inter
         sudo install -m 644 apps/kira-studio/tests/visual/support/fontconfig/56-prefer-inter.conf /etc/fonts/conf.d/
         sudo fc-cache -f
         test "$(fc-match sans-serif -f '%{family}')" = Inter

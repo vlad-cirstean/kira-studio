@@ -8,13 +8,14 @@ type DiffEditor = import('monaco-editor').editor.IStandaloneDiffEditor;
 type Monaco = Awaited<ReturnType<typeof loadMonaco>>;
 type Model = import('monaco-editor').editor.ITextModel;
 
-// Read-only Monaco diff of two texts. Inline below Monaco's width breakpoint.
+// Read-only Monaco diff of two texts. Inline below Monaco's width breakpoint. Callers size it with a wrapper, not a height class.
 const props = withDefaults(
   defineProps<{ original: string; modified: string; language?: EditorLanguageId }>(),
   { language: 'plain' },
 );
 
 const root = ref<HTMLElement | null>(null);
+const host = ref<HTMLElement | null>(null);
 let diff: DiffEditor | null = null;
 let mod: Monaco | null = null;
 let originalModel: Model | null = null;
@@ -28,12 +29,12 @@ function syncDebugText(): void {
 
 onMounted(async () => {
   const loaded = await loadMonaco();
-  if (!root.value) return;
+  if (!host.value) return;
   mod = loaded;
   const languageId = monacoLanguageIdFor(props.language);
   originalModel = mod.editor.createModel(props.original, languageId);
   modifiedModel = mod.editor.createModel(props.modified, languageId);
-  diff = mod.editor.createDiffEditor(root.value, {
+  diff = mod.editor.createDiffEditor(host.value, {
     theme: KIRA_EDITOR_THEME,
     readOnly: true,
     domReadOnly: true,
@@ -82,5 +83,7 @@ watch(
   <div
     ref="root"
     class="relative h-full min-h-40 overflow-hidden rounded-kira-sm border border-border"
-  ></div>
+  >
+    <div ref="host" class="absolute inset-0"></div>
+  </div>
 </template>

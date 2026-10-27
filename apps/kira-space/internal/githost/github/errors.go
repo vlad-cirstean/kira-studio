@@ -15,7 +15,8 @@ import (
 // classify below parses rather than relying on gh's exit code alone (gh exits 1 for every API
 // error regardless of status).
 type apiErrorBody struct {
-	Message string `json:"message"`
+	Message string            `json:"message"`
+	Errors  []json.RawMessage `json:"errors"`
 }
 
 // httpStatusFromStderr extracts the numeric status gh's own stderr names — "gh: Bad credentials
@@ -88,6 +89,8 @@ func classify(host string, res Result, runErr, ctxErr error) Status {
 		return Status{Kind: KindForbidden, Host: host, Reason: "GitHub API rate limit exhausted — try again later"}
 	case hasStatus && status == 404:
 		return gone(host)
+	case hasStatus && status == 422:
+		return Status{Kind: KindForbidden, Host: host, Reason: reasonOrDefault(validationMessage(res.Stdout), "GitHub refused the request")}
 	case hasStatus && status >= 500:
 		return Status{Kind: KindForbidden, Host: host, Reason: "GitHub did not answer — try again later"}
 	default:
@@ -100,6 +103,28 @@ func apiErrorMessage(stdout []byte) string {
 	var body apiErrorBody
 	if err := json.Unmarshal(stdout, &body); err != nil {
 		return ""
+	}
+	return body.Message
+}
+
+// validationMessage is the first entry of a 422 body's errors array (a string, or an object's
+// message), else the body's message.
+func validationMessage(stdout []byte) string {
+	var body apiErrorBody
+	if err := json.Unmarshal(stdout, &body); err != nil {
+		return ""
+	}
+	if len(body.Errors) > 0 {
+		var text string
+		if json.Unmarshal(body.Errors[0], &text) == nil && text != "" {
+			return text
+		}
+		var obj struct {
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(body.Errors[0], &obj) == nil && obj.Message != "" {
+			return obj.Message
+		}
 	}
 	return body.Message
 }

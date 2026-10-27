@@ -187,7 +187,10 @@ package gitrpc
 // request index of a repository) and branch.syncChangeRequests (sync it now). repo.changed gains
 // the kind changeRequestsChanged. ChangeRequestRecord gains draft, reviewDecision and checksState.
 // P358: 51 -> 52, additive. One new request, review.markMany (batch whole-file mark).
-const ContractVersion = 52
+// P369: 52 -> 53, breaking. GitHostInfo loses fileReviewSync (GitHub viewed sync removed).
+// P370: 53 -> 54, additive. New requests changeRequest.reviewState, changeRequest.submitReview and
+// changeRequest.comment (review a change request, comment on its conversation).
+const ContractVersion = 54
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

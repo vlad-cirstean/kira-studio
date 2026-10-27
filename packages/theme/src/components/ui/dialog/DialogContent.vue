@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import DialogOverlay from '@theme/components/ui/dialog/DialogOverlay.vue';
+import DialogResizeHandles from '@theme/components/ui/dialog/DialogResizeHandles.vue';
 import { CONFIRM_DISCARD_KEY, DIALOG_REQUEST_CLOSE_KEY } from '@theme/components/ui/dialog/discard';
+import type { DialogSize } from '@theme/components/ui/dialog/resizeSize';
 import { t } from '@theme/i18n';
 import { cn } from '@theme/lib/utils';
 import { reactiveOmit } from '@vueuse/core';
@@ -9,10 +11,11 @@ import {
   DialogContent,
   DialogPortal,
   injectDialogRootContext,
+  useForwardExpose,
   useForwardPropsEmits,
 } from 'reka-ui';
 import type { HTMLAttributes } from 'vue';
-import { computed, inject, provide } from 'vue';
+import { computed, inject, provide, ref } from 'vue';
 import type { DialogContentSizeVariants } from '.';
 import { dialogContentSizeVariants } from '.';
 
@@ -31,17 +34,28 @@ const props = withDefaults(
       destructive?: boolean;
       /** Unsaved edits: an outside click is ignored; Esc and the header X ask to discard first. */
       dirty?: boolean;
+      /** Right and bottom edge handles; the dialog grows from its centre and never exceeds the size variant's bounds. */
+      resizable?: boolean;
     }
   >(),
   {
     fixedHeight: false,
     destructive: false,
     dirty: false,
+    resizable: false,
   },
 );
 const emits = defineEmits<DialogContentEmits>();
 
-const delegatedProps = reactiveOmit(props, 'class', 'size', 'fixedHeight', 'destructive', 'dirty');
+const delegatedProps = reactiveOmit(
+  props,
+  'class',
+  'size',
+  'fixedHeight',
+  'destructive',
+  'dirty',
+  'resizable',
+);
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits);
 
@@ -91,6 +105,17 @@ function onPointerDownOutside(event: Event): void {
   if (props.dirty) event.preventDefault();
 }
 
+const { forwardRef, currentElement } = useForwardExpose();
+const size = ref<DialogSize>({ width: null, height: null });
+const sizeStyle = computed(() =>
+  props.resizable
+    ? {
+        width: size.value.width === null ? undefined : `${size.value.width}px`,
+        height: size.value.height === null ? undefined : `${size.value.height}px`,
+      }
+    : undefined,
+);
+
 const contentClass = computed(() =>
   cn(
     'bg-elevated text-fg data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-fg/10 rounded-kira-pill text-kira-md ring-1 duration-100 fixed top-1/2 left-1/2 z-(--kira-z-dialog) shadow-kira-dialog -translate-x-1/2 -translate-y-1/2 outline-none',
@@ -106,13 +131,16 @@ const contentClass = computed(() =>
     <DialogContent
       data-slot="dialog-content"
       v-bind="{ ...$attrs, ...forwarded }"
+      :ref="forwardRef"
       :class="contentClass"
+      :style="sizeStyle"
       :data-dirty="dirty || undefined"
       @open-auto-focus="onOpenAutoFocus"
       @escape-key-down="onEscapeKeyDown"
       @pointer-down-outside="onPointerDownOutside"
     >
       <slot />
+      <DialogResizeHandles v-if="resizable" v-model="size" :target="currentElement" />
     </DialogContent>
   </DialogPortal>
 </template>

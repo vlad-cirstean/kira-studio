@@ -3,15 +3,11 @@ import SecondaryTabs from '@theme/components/SecondaryTabs.vue';
 import { ResizeHandle } from '@theme/components/ui/resizable';
 import { useLiveSize } from '@theme/components/ui/resizable/useLiveSize';
 import { t } from '@theme/i18n';
-import { tryOnScopeDispose } from '@vueuse/core';
 import { usePersistedState } from '@workbench/behaviour/persisted';
 import MainView from '@workbench/components/MainView.vue';
 import TabStrip from '@workbench/components/TabStrip.vue';
-import TitleBarBase from '@workbench/components/TitleBar.vue';
-import { queryClient } from '@workbench/state/queryClient';
 import { computed, useTemplateRef } from 'vue';
-import { onReviewRepaint } from '../../../repo/git/transport';
-import { useReviewStep, viewedSyncPlanPrefix } from '../queries';
+import { useReviewStep } from '../queries';
 import { useAdeReviewWindowStore } from '../state/adeReviewWindow';
 import AdeReviewAgentPanel from './AdeReviewAgentPanel.vue';
 import AdeReviewFiles from './AdeReviewFiles.vue';
@@ -26,16 +22,6 @@ const target = computed(() => store.target);
 const { repoLabel } = useReviewContext(() => store.target as NonNullable<typeof store.target>);
 
 const files = useTemplateRef('files');
-
-// A mark from the file list or from a diff editor can change what a sync would do.
-function refreshSyncPlan(): void {
-  void queryClient.invalidateQueries({ queryKey: viewedSyncPlanPrefix });
-}
-tryOnScopeDispose(
-  onReviewRepaint((e) => {
-    if (e.kind === 'mark' && e.repoId === target.value?.gitRepoId) refreshSyncPlan();
-  }),
-);
 
 // The Workflow review tab shows while the branch has a review step run; it opens first while that
 // run waits, and the user's own pick wins afterwards.
@@ -84,11 +70,6 @@ const right = useLiveSize(
 
 <template>
   <div v-if="target" class="flex h-full flex-col" data-testid="ade-review-window">
-    <TitleBarBase>
-      <span class="truncate text-kira-md text-muted-foreground">{{
-        t('space.ade.review.window.title.title', { branch: target.branch })
-      }}</span>
-    </TitleBarBase>
     <AdeReviewHeader :target="target" />
     <div class="flex min-h-0 flex-1 gap-0.5 bg-chrome px-1.5 pb-0.5">
       <section
@@ -97,7 +78,7 @@ const right = useLiveSize(
         :aria-label="t('space.ade.review.window.files.aria')"
         data-testid="ade-review-left"
       >
-        <AdeReviewFiles ref="files" :target="target" @marked="refreshSyncPlan" />
+        <AdeReviewFiles ref="files" :target="target" />
       </section>
       <ResizeHandle
         :label="t('space.ade.panel.resize.label')"

@@ -313,6 +313,15 @@ var requestHandlers = map[string]requestHandler{
 	"changeRequest.browserUrl": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleChangeRequestBrowserUrl(ctx, c, params)
 	},
+	"changeRequest.reviewState": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleChangeRequestReviewState(ctx, c, params)
+	},
+	"changeRequest.submitReview": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleChangeRequestSubmitReview(ctx, c, params)
+	},
+	"changeRequest.comment": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleChangeRequestComment(ctx, c, params)
+	},
 	"worktree.list": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleWorktreeList(ctx, c, params)
 	},

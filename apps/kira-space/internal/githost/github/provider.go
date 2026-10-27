@@ -25,8 +25,9 @@ type Provider struct{ client *Client }
 
 var (
 	_ githost.Provider          = (*Provider)(nil)
-	_ githost.FileReviewSync    = (*Provider)(nil)
 	_ githost.ChangeRequestSync = (*Provider)(nil)
+
+	_ githost.ChangeRequestReviews = (*Provider)(nil)
 )
 
 // New builds the GitHub provider over the `gh` CLI.
@@ -127,20 +128,6 @@ func (p *Provider) ParseLink(raw string) (githost.Link, bool) {
 	return githost.Link{Provider: ProviderID, Kind: kind, Ref: m[2] + "#" + m[4]}, true
 }
 
-func (p *Provider) ChangeFiles(ctx context.Context, r githost.Repo, number int) (githost.ChangeFiles, githost.Status) {
-	f, s := p.client.PullFiles(ctx, Repo(r), number)
-	out := githost.ChangeFiles{NodeID: f.NodeID, HeadSha: f.HeadSha, Open: f.State == "OPEN", Truncated: f.Truncated}
-	for _, pf := range f.Files {
-		out.Files = append(out.Files, githost.ChangedFile{Path: pf.Path, Viewed: pf.Viewed})
-	}
-	return out, toStatus(s)
-}
-
-func (p *Provider) SetFilesViewed(ctx context.Context, r githost.Repo, nodeID string, paths []string, viewed bool) (map[string]string, githost.Status) {
-	failed, s := p.client.SetFilesViewed(ctx, Repo(r), nodeID, paths, viewed)
-	return failed, toStatus(s)
-}
-
 // toStatus arms RateLimited on exactly the statuses the per-repo breaker has always armed on.
 func toStatus(s Status) githost.Status {
 	return githost.Status{
@@ -180,4 +167,17 @@ func (p *Provider) Probe(ctx context.Context, r githost.Repo, etag string) (bool
 func (p *Provider) Checks(ctx context.Context, r githost.Repo, nodeIDs []string) ([]githost.ChangeRequest, githost.Status) {
 	prs, s := p.client.PullsByNodeID(ctx, Repo(r), nodeIDs)
 	return toChangeRequests(prs), toStatus(s)
+}
+
+func (p *Provider) ReviewTarget(ctx context.Context, r githost.Repo, number int) (githost.ReviewTarget, githost.Status) {
+	pr, s := p.client.PullForReview(ctx, Repo(r), number)
+	return githost.ReviewTarget{State: pr.State, HeadSha: pr.HeadSha, Author: pr.Author}, toStatus(s)
+}
+
+func (p *Provider) SubmitReview(ctx context.Context, r githost.Repo, number int, rv githost.Review) githost.Status {
+	return toStatus(p.client.SubmitReview(ctx, Repo(r), number, rv.Event, rv.Body, rv.CommitSHA))
+}
+
+func (p *Provider) Comment(ctx context.Context, r githost.Repo, number int, body string) githost.Status {
+	return toStatus(p.client.CommentOnPull(ctx, Repo(r), number, body))
 }

@@ -13,13 +13,11 @@ type Terms struct {
 type Info struct {
 	ID string `json:"id"`
 	Terms
-	FileReviewSync bool `json:"fileReviewSync"`
 }
 
 // Describe projects p onto Info.
 func Describe(p Provider) Info {
-	_, sync := p.(FileReviewSync)
-	return Info{ID: p.ID(), Terms: p.Terms(), FileReviewSync: sync}
+	return Info{ID: p.ID(), Terms: p.Terms()}
 }
 
 // Providers is the wire result of listing every registered provider.

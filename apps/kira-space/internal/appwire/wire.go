@@ -213,7 +213,7 @@ func wireAdeTask(
 		Sandbox:         runs.Sandbox, RunSandbox: repositories.AdeRunSandbox,
 		Tracker:       tracker,
 		CloseTerminal: closeTerminal,
-		Windows:       repositories.Windows, ReviewWindows: repositories.AdeReview, ViewedSync: repositories.AdeViewedSync,
+		Windows:       repositories.Windows, ReviewWindows: repositories.AdeReview,
 		CloseReviewWindows: closeReviewWindows,
 		OnRuns: func(ev adewire.RunsChangedEvent) {
 			bridge.AdeTaskRunsChanged(events, ev)
@@ -254,7 +254,6 @@ func wireAdeTask(
 	if err := board.Recover(); err != nil {
 		slog.Warn("ade: recover task board", "scope", "ade", "err", err)
 	}
-	board.WatchReviews()
 	board.Start()
 	return board
 }

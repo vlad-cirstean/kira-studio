@@ -27,31 +27,6 @@ type Store struct {
 	closeErr  error
 
 	locks *keyedMutex
-
-	obsMu    sync.RWMutex
-	observer func(ReviewChange)
-}
-
-// ReviewChange describes one committed mark change. State is "full", "partial" or "deleted".
-type ReviewChange struct {
-	RepoID, Branch, Path, State string
-}
-
-// SetObserver registers fn to run after each committed Put or Delete, outside the transaction.
-// Set once before serving; nil clears it.
-func (s *Store) SetObserver(fn func(ReviewChange)) {
-	s.obsMu.Lock()
-	s.observer = fn
-	s.obsMu.Unlock()
-}
-
-func (s *Store) notify(c ReviewChange) {
-	s.obsMu.RLock()
-	fn := s.observer
-	s.obsMu.RUnlock()
-	if fn != nil {
-		fn(c)
-	}
 }
 
 // SetPinned pins or unpins (repoID, branch): a pinned session survives the idle sweep and Purge.
@@ -381,7 +356,6 @@ func (s *Store) Put(ctx context.Context, repoID, branch string, rec FileRecord, 
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	s.notify(ReviewChange{RepoID: repoID, Branch: branch, Path: rec.Path, State: rec.State})
 	return nil
 }
 
@@ -401,7 +375,6 @@ func (s *Store) Delete(ctx context.Context, repoID, branch, path string) error {
 	); err != nil {
 		return fmt.Errorf("gitreview: delete review_file: %w", err)
 	}
-	s.notify(ReviewChange{RepoID: repoID, Branch: branch, Path: path, State: "deleted"})
 	return nil
 }
 

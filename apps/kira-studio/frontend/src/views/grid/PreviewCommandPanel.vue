@@ -148,7 +148,9 @@ function close(): void {
             </Button>
           </li>
         </ul>
-        <MonacoDiff v-if="sides" class="h-60" data-testid="pending-diff" v-bind="sides" />
+        <div v-if="sides" class="h-60">
+          <MonacoDiff data-testid="pending-diff" v-bind="sides" />
+        </div>
       </template>
       <InlineState v-else-if="isLoading" kind="loading">{{
         t('common.state.loading.loading')

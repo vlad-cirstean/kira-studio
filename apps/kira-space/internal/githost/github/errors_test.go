@@ -49,6 +49,12 @@ func TestClassify_D5Table(t *testing.T) {
 			wantKind: KindForbidden, wantReason: "rate limit",
 		},
 		{
+			name: "HTTP 422 validation",
+			res: Result{ExitCode: 1, Stdout: []byte(`{"message":"Unprocessable Entity","errors":["Can not approve your own pull request"]}`),
+				Stderr: []byte("gh: Unprocessable Entity (HTTP 422)")},
+			wantKind: KindForbidden, wantReason: "Can not approve your own pull request",
+		},
+		{
 			name: "HTTP 403 SAML/SSO",
 			res: Result{ExitCode: 1, Stderr: []byte(
 				"gh: Resource protected by organization SAML enforcement. (HTTP 403)")},

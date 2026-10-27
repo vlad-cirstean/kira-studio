@@ -57,7 +57,6 @@ const props = defineProps<{
   viewState: ViewStateStore;
   target?: ReviewTarget | null;
   lockTarget?: boolean;
-  onReviewMarked?: (paths: readonly string[]) => void;
   onReviewApi?: MountOptions['onReviewApi'];
   repoHead?: RepoHead;
 }>();
@@ -158,7 +157,6 @@ async function bootstrap(): Promise<void> {
   await bridge.init();
   review.value = new ReviewSessionState(bridge);
   reviewFiles.value = new ReviewFilesState(bridge);
-  reviewFiles.value.onMarked = (paths) => props.onReviewMarked?.(paths);
   reviewComments.value = new ReviewCommentsState(bridge);
 
   if (!props.lockTarget) {

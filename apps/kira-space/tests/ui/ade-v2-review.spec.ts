@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, reviewTest, test } from './fixtures';
 import {
   adeFixture,
@@ -13,7 +13,7 @@ import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
 
-// The review window: three panes for one branch, the review agent and the GitHub sync.
+// The review window: three panes for one branch, and the review agent.
 
 const t = (id: string) => `[data-testid="${id}"]`;
 const target = adeFixture<{ gitRepoId: string; codeRepoId: string; branchId: string }>(
@@ -61,8 +61,6 @@ function reviewControl(extra: readonly ControlSnapshot[] = []): ControlSnapshot[
   const defaults: ControlSnapshot[] = [
     { channel: IPC.adeTaskReviewWindowTarget, response: target },
     { channel: IPC.adeTaskReviewAgent, response: { session: null, hostWindowKey: '' } },
-    { channel: IPC.adeTaskViewedSyncPlan, response: adeFixture('viewed-sync-plan') },
-    { channel: IPC.adeTaskViewedSyncApply, response: adeFixture('viewed-sync-result') },
   ];
   const overridden = new Set(extra.map((e) => e.channel));
   return adeV2Control([...defaults.filter((d) => !overridden.has(d.channel)), ...extra]);
@@ -71,8 +69,12 @@ function reviewControl(extra: readonly ControlSnapshot[] = []): ControlSnapshot[
 async function openReview(
   relaunch: Parameters<Parameters<typeof reviewTest>[2]>[0]['relaunch'],
   extra: readonly ControlSnapshot[] = [],
+  git: Record<string, unknown> = {},
 ): Promise<Page> {
-  const { window: page } = await relaunch({ control: reviewControl(extra), gitStream: GIT });
+  const { window: page } = await relaunch({
+    control: reviewControl(extra),
+    gitStream: { ...GIT, extraResults: { ...GIT.extraResults, ...git } },
+  });
   await page.locator(t('ade-review-window')).waitFor();
   return page;
 }
@@ -85,6 +87,13 @@ reviewTest('a review window boots three panes for its branch', async ({ relaunch
   await expect(page.locator(t('ade-review-centre'))).toBeVisible();
   await expect(page.locator(t('ade-review-right'))).toBeVisible();
   await expect(page.locator(t('ade-review-empty'))).toBeVisible();
+  // One title bar: the identity sits inside the drag strip, no second bar.
+  const bar = page.locator('.wails-drag');
+  await expect(bar.locator(t('ade-review-header'))).toBeVisible();
+  await expect(bar.locator(t('ade-review-title'))).toBeVisible();
+  await expect(bar.locator(t('ade-review-branch'))).toBeVisible();
+  expect((await bar.boundingBox())?.height).toBe(34);
+  await expect(page.getByText('Review · ')).toHaveCount(0);
 });
 
 test('any other window boots the normal workbench', async ({ relaunch }) => {
@@ -161,7 +170,9 @@ reviewTest('a review diff opens side by side', async ({ relaunch }) => {
   expect(width).toBeGreaterThan(100);
 });
 
-reviewTest('a review diff shows only the hunk and the commented line', async ({ relaunch }) => {
+async function openHunkDiff(
+  relaunch: Parameters<Parameters<typeof reviewTest>[2]>[0]['relaunch'],
+): Promise<{ page: Page; modified: Locator }> {
   const read = (side: 'left' | 'right') => contract('git-review-hunks', `git:file.read#${side}`);
   const comment = {
     id: 1,
@@ -214,6 +225,11 @@ reviewTest('a review diff shows only the hunk and the commented line', async ({ 
     .locator(`${t('review-files-tree')} ${t('file-tree-row')}`, { hasText: 'pending.ts' })
     .click();
   const modified = page.locator(t('repo-diff-editor')).locator('.editor.modified');
+  return { page, modified };
+}
+
+reviewTest('a review diff shows only the hunk and the commented line', async ({ relaunch }) => {
+  const { page, modified } = await openHunkDiff(relaunch);
   const lines = modified.locator('.view-lines .view-line');
   const rendered = (text: string) =>
     lines.filter({ hasText: new RegExp(`^\\s*${text.replace(' ', '\\s')}$`) });
@@ -233,6 +249,37 @@ reviewTest('a review diff shows only the hunk and the commented line', async ({ 
   const before = await lines.count();
   await placeholders.last().locator('a').first().click();
   await expect.poll(() => lines.count()).toBeGreaterThan(before);
+});
+
+reviewTest('the hunk mark stays put when the add-comment mark shows', async ({ relaunch }) => {
+  const { page, modified } = await openHunkDiff(relaunch);
+  const mark = modified
+    .locator('.kira-review-glyph-actionable, .kira-review-glyph-reviewed')
+    .first();
+  const viewLines = modified.locator('.view-lines');
+  const add = modified.locator('.kira-review-glyph-add');
+  const box = async (l: Locator) => {
+    const b = await l.boundingBox();
+    if (!b) throw new Error('no box');
+    return b;
+  };
+  await expect(mark).toBeVisible();
+  await page.mouse.move(0, 0);
+  const markBefore = await box(mark);
+  const linesBefore = await box(viewLines);
+
+  await page.mouse.move(linesBefore.x + 40, markBefore.y + markBefore.height / 2);
+  await expect(add).toHaveCount(1);
+  expect((await box(add)).y).toBe(markBefore.y);
+  expect(await box(mark)).toEqual(markBefore);
+  expect((await box(viewLines)).x).toBe(linesBefore.x);
+
+  const commentMark = await box(modified.locator('.kira-review-glyph-comment'));
+  expect(commentMark.x).toBeLessThan(markBefore.x);
+
+  await page.mouse.move(0, 0);
+  await expect(add).toHaveCount(0);
+  expect(await box(mark)).toEqual(markBefore);
 });
 
 async function openDiffWindow(
@@ -546,63 +593,6 @@ reviewTest(
 );
 
 reviewTest(
-  'the sync button lists what it will do and why it skips the rest',
-  async ({ relaunch }) => {
-    const page = await openReview(relaunch);
-    await page.locator(t('ade-review-sync')).click();
-    const popover = page.locator(t('ade-review-sync-popover'));
-    await expect(popover.locator(t('ade-review-sync-rows'))).toContainText('src/a.ts');
-    const trigger = await page.locator(t('ade-review-sync')).boundingBox();
-    const box = await popover.boundingBox();
-    expect(box!.y).toBeGreaterThanOrEqual(0);
-    expect(box!.y - (trigger!.y + trigger!.height)).toBeLessThanOrEqual(16);
-    expect(Math.abs(box!.x + box!.width - (trigger!.x + trigger!.width))).toBeLessThanOrEqual(2);
-    await popover.locator(t('ade-review-sync-skipped')).getByRole('button').first().click();
-    await expect(popover.locator(t('ade-review-sync-skipped'))).toContainText(
-      'Changed since review',
-    );
-    await expect(popover.locator(t('ade-review-sync-skipped'))).toContainText('Not in the PR');
-  },
-);
-
-reviewTest('a failed fetch from the sync popover shows its error', async ({ relaunch }) => {
-  const failed = {
-    repos: [
-      {
-        codeRepoId: 'repo-web-app',
-        refsChanged: 0,
-        mergedInto: [],
-        error: { kind: 'network', message: 'Could not fetch origin', remoteMessage: '' },
-      },
-    ],
-  };
-  const plan = {
-    ...adeFixture<object>('viewed-sync-plan'),
-    status: 'headNotFetched',
-    message: 'PR head not fetched',
-  };
-  const page = await openReview(relaunch, [
-    { channel: IPC.adeTaskRefresh, response: failed },
-    { channel: IPC.adeTaskViewedSyncPlan, response: plan },
-  ]);
-  await page.locator(t('ade-review-sync')).click();
-  await page.locator(t('ade-review-sync-refresh')).click();
-  await expect(page.locator(t('ade-review-sync-error'))).toHaveText('Could not fetch origin');
-});
-
-reviewTest('the sync button is hidden when the branch has no PR', async ({ relaunch }) => {
-  const plan = {
-    ...adeFixture<object>('viewed-sync-plan'),
-    status: 'noPr',
-    changeRequest: null,
-    files: [],
-  };
-  const page = await openReview(relaunch, [{ channel: IPC.adeTaskViewedSyncPlan, response: plan }]);
-  await expect(page.locator(t('ade-review-header'))).toBeVisible();
-  await expect(page.locator(t('ade-review-sync'))).toHaveCount(0);
-});
-
-reviewTest(
   'dragging a pane handle stores the dragged width; a click stores none',
   async ({ relaunch }) => {
     const page = await openReview(relaunch);
@@ -636,15 +626,163 @@ reviewTest('arrow keys on a pane handle resize and store the left width', async 
   expect(Number(stored)).toBeGreaterThan(start);
 });
 
+const ACTIONS = 'ade-review-actions';
+const actionsGit = (own = false) => ({
+  'changeRequest.reviewState': contract(
+    ACTIONS,
+    `git:changeRequest.reviewState${own ? '#own' : ''}`,
+  ),
+  'changeRequest.submitReview': contract(
+    ACTIONS,
+    `git:changeRequest.submitReview${own ? '#own' : ''}`,
+  ),
+  'changeRequest.comment': contract(ACTIONS, 'git:changeRequest.comment'),
+});
+const actionsHead = (contract(ACTIONS, 'git:changeRequest.reviewState') as { headSha: string })
+  .headSha;
+
+reviewTest('contract: approving a change request submits the review', async ({ relaunch }) => {
+  const page = await openReview(relaunch, [], actionsGit());
+  await page.locator(t('ade-review-actions-trigger')).click();
+  await page.locator(t('ade-review-action-approve')).click();
+  await expect(page.getByRole('dialog')).toContainText('Approve MR #7');
+  await page.locator(t('ade-review-submit-body')).fill('LGTM');
+  await page.locator(t('ade-review-submit')).click();
+  await expect(page.locator(t('ade-review-posted'))).toContainText('Review submitted');
+  expect(await gitStreamParams(page, 'changeRequest.submitReview')).toEqual([
+    { repoId: target.gitRepoId, number: 7, event: 'approve', body: 'LGTM', headSha: actionsHead },
+  ]);
+});
+
+reviewTest('contract: a change request comment posts to the conversation', async ({ relaunch }) => {
+  const page = await openReview(relaunch, [], actionsGit());
+  await page.locator(t('ade-review-cr-comment')).click();
+  await page.locator(t('ade-review-submit-body')).fill('@alice thanks');
+  await page.locator(t('ade-review-submit')).click();
+  await expect(page.locator(t('ade-review-posted'))).toContainText('Comment posted');
+  expect(await gitStreamParams(page, 'changeRequest.comment')).toEqual([
+    { repoId: target.gitRepoId, number: 7, body: '@alice thanks' },
+  ]);
+});
+
 reviewTest(
-  'the sync button stays visible and disabled when its plan fails to load',
+  'contract: your own change request disables approve and request changes',
   async ({ relaunch }) => {
-    const page = await openReview(relaunch, [
-      { channel: IPC.adeTaskViewedSyncPlan, error: { code: 'invalid', message: 'gh exploded' } },
-    ]);
-    const button = page.locator(t('ade-review-sync'));
-    await expect(button).toBeDisabled();
-    await button.locator('xpath=..').hover();
-    await expect(page.getByText('Couldn’t load the sync plan: gh exploded').first()).toBeVisible();
+    const page = await openReview(relaunch, [], actionsGit(true));
+    await page.locator(t('ade-review-actions-trigger')).click();
+    for (const event of ['approve', 'requestChanges']) {
+      await expect(page.locator(t(`ade-review-action-${event}`))).toHaveAttribute(
+        'data-disabled',
+        '',
+      );
+      await expect(page.locator(t(`ade-review-action-${event}-reason`))).toContainText(
+        'your own MR',
+      );
+    }
+    await expect(page.locator(t('ade-review-action-comment'))).not.toHaveAttribute(
+      'data-disabled',
+      '',
+    );
   },
 );
+
+reviewTest('contract: a refused review shows the host reason', async ({ relaunch }) => {
+  const page = await openReview(relaunch, [], actionsGit(true));
+  await page.locator(t('ade-review-actions-trigger')).click();
+  await page.locator(t('ade-review-action-comment')).click();
+  await page.locator(t('ade-review-submit-body')).fill('please look');
+  await page.locator(t('ade-review-submit')).click();
+  await expect(page.locator(t('ade-review-submit-error'))).toContainText(
+    'you cannot approve your own merge request',
+  );
+  await expect(page.getByRole('dialog')).toBeVisible();
+});
+
+const openCommentDialog = async (
+  relaunch: Parameters<Parameters<typeof reviewTest>[2]>[0]['relaunch'],
+  viewport?: { width: number; height: number },
+): Promise<Page> => {
+  const page = await openReview(relaunch, [], actionsGit());
+  if (viewport) await page.setViewportSize(viewport);
+  await page.locator(t('ade-review-cr-comment')).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  return page;
+};
+
+const boxOf = async (l: Locator) => {
+  const b = await l.boundingBox();
+  if (!b) throw new Error('no box');
+  return b;
+};
+
+reviewTest('the review dialog fits a small window', async ({ relaunch }) => {
+  const viewport = { width: 560, height: 420 };
+  const page = await openCommentDialog(relaunch, viewport);
+  const d = await boxOf(page.getByRole('dialog'));
+  expect(d.x).toBeGreaterThanOrEqual(0);
+  expect(d.y).toBeGreaterThanOrEqual(0);
+  expect(d.x + d.width).toBeLessThanOrEqual(viewport.width);
+  expect(d.y + d.height).toBeLessThanOrEqual(viewport.height);
+  await expect(page.locator(t('ade-review-submit'))).toBeInViewport();
+  await expect(page.locator(t('ade-review-submit-body'))).toBeInViewport();
+  expect((await boxOf(page.locator(t('ade-review-submit-body')))).height).toBeGreaterThanOrEqual(
+    96,
+  );
+});
+
+reviewTest('the review dialog resizes from its edges', async ({ relaunch }) => {
+  const page = await openCommentDialog(relaunch);
+  const dialog = page.getByRole('dialog');
+  const body = page.locator(t('ade-review-submit-body'));
+  const drag = async (id: string, dx: number, dy: number) => {
+    const h = await boxOf(page.locator(t(id)));
+    const x = h.x + h.width / 2;
+    const y = h.y + h.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + dx, y + dy, { steps: 8 });
+    await page.mouse.up();
+  };
+  const d0 = await boxOf(dialog);
+  const t0 = await boxOf(body);
+  const handleX = page.locator(t('dialog-resize-x'));
+  await expect(handleX).toHaveAttribute('aria-valuenow', String(Math.round(d0.width)));
+  await expect(handleX).toHaveAttribute('aria-valuemin', '320');
+
+  // An aborted drag (window blur) drops the live size.
+  const hb = await boxOf(handleX);
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(hb.x + hb.width / 2 + 80, hb.y + hb.height / 2, { steps: 6 });
+  await expect.poll(async () => (await boxOf(dialog)).width).toBeGreaterThan(d0.width + 100);
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await expect.poll(async () => (await boxOf(dialog)).width).toBeCloseTo(d0.width, -1);
+  await page.mouse.up();
+
+  await drag('dialog-resize-x', 100, 0);
+  await expect.poll(async () => (await boxOf(dialog)).width).toBeGreaterThan(d0.width + 196);
+  const d1 = await boxOf(dialog);
+  expect(Math.abs(d1.x + d1.width - (d0.x + d0.width) - 100)).toBeLessThanOrEqual(2);
+  expect(Math.abs(d1.width - d0.width - 200)).toBeLessThanOrEqual(4);
+
+  await drag('dialog-resize-y', 0, 80);
+  await expect.poll(async () => (await boxOf(body)).height).toBeGreaterThanOrEqual(t0.height + 150);
+
+  const viewportWidth = page.viewportSize()?.width ?? 0;
+  await drag('dialog-resize-x', 2000, 0);
+  await expect
+    .poll(async () => (await boxOf(dialog)).width)
+    .toBeGreaterThan(viewportWidth * 0.9 - 2);
+  const wide = (await boxOf(dialog)).width;
+  expect(wide).toBeLessThanOrEqual(viewportWidth * 0.9 + 1);
+
+  await page.locator(t('dialog-resize-x')).focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(async () => (await boxOf(dialog)).width).toBeLessThan(wide);
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await page.locator(t('ade-review-cr-comment')).click();
+  await expect(dialog).toBeVisible();
+  await expect.poll(async () => (await boxOf(dialog)).width).toBeCloseTo(d0.width, -1);
+});

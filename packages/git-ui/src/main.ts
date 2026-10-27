@@ -38,8 +38,6 @@ export interface MountOptions {
   /** Only meaningful when `view === "review"` with a `target`: the view stays on it. No back,
    *  swap or base pick, no `review.target` push, no session resume or save. */
   readonly lockTarget?: boolean;
-  /** Only meaningful when `view === "review"`: called with the path after each file-list mark. */
-  readonly onReviewMarked?: (paths: readonly string[]) => void;
   /** Only meaningful when `view === "review"`: receives a handle that opens a file's diff, as a click in the Files pane does. */
   readonly onReviewApi?: (api: ReviewApi) => void;
   /** Only meaningful when `view === "graph"` — the exact mirror of `target` above, for a
@@ -83,7 +81,6 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
     view = 'graph',
     target,
     lockTarget,
-    onReviewMarked,
     onReviewApi,
     pendingUiAction,
     dateFormat,
@@ -97,7 +94,7 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
   // Shallow: `transport`/`viewState` must not be proxied; `update` swaps top-level props.
   const rootProps = shallowReactive<Record<string, unknown>>(
     view === 'review'
-      ? { ...rest, target, lockTarget, onReviewMarked, onReviewApi, repoHead }
+      ? { ...rest, target, lockTarget, onReviewApi, repoHead }
       : { ...rest, pendingUiAction, dateFormat, showOperations: onShowOperations, repoHead },
   );
   const app: VueApp = createApp(MountRoot, {

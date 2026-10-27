@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
-import { expect, reviewTest, test } from './fixtures';
-import { adeBoard, adeFixture, adeV2Control, openPlan } from './support/adeV2';
+import { expect, test } from './fixtures';
+import { adeBoard, adeFixture, openPlan } from './support/adeV2';
 import {
   COMMIT_DETAIL,
   openPortGraph,
@@ -10,7 +10,6 @@ import {
   singleRowChunks,
 } from './support/gitUiPortFixtures';
 import { IPC } from './support/ipcChannels';
-import type { ControlSnapshot } from './support/types';
 
 // A second code host (merge requests on Forge) drives every label, link and button. Backend half:
 // githostflow TestSecondGitHostRegistered.
@@ -22,7 +21,6 @@ const FORGE = {
   changeRequestNoun: 'merge request',
   changeRequestShort: 'MR',
   cli: 'Forge CLI',
-  fileReviewSync: true,
 };
 const GITHUB = adeFixture<{ providers: object[] }>('host-providers').providers[0];
 const PROVIDERS = { providers: [GITHUB, FORGE] };
@@ -146,75 +144,4 @@ test('the branch panel and the task link use the host words', async ({ relaunch 
   await expect(
     page.locator(t('ade-branch-details')).locator('a', { hasText: 'feat/oauth-login' }),
   ).toHaveAttribute('href', 'https://forge.test/acme/web-app/-/tree/feat/oauth-login');
-});
-
-// The review window's sync button.
-
-const target = adeFixture<{ gitRepoId: string }>('review-target');
-
-function syncControl(plan: object): ControlSnapshot[] {
-  return adeV2Control([
-    { channel: IPC.adeTaskReviewWindowTarget, response: target },
-    { channel: IPC.adeTaskReviewAgent, response: { session: null, hostWindowKey: '' } },
-    { channel: IPC.adeTaskViewedSyncPlan, response: plan },
-    { channel: IPC.gitHostProviders, response: PROVIDERS },
-  ]);
-}
-
-const forgePlan = (patch: object) => ({
-  ...adeFixture<object>('viewed-sync-plan'),
-  host: FORGE,
-  changeRequest: { number: 7, title: 'Fix login', state: 'open', url: MR_URL },
-  ...patch,
-});
-
-async function openSync(
-  relaunch: Parameters<Parameters<typeof reviewTest>[2]>[0]['relaunch'],
-  plan: object,
-): Promise<Page> {
-  const { window: page } = await relaunch({
-    control: syncControl(plan),
-    gitStream: {
-      repoId: target.gitRepoId,
-      extraResults: {
-        'review.resolveBase': {
-          branch: 'feat/billing-dashboard',
-          base: 'main',
-          reason: 'override',
-          range: { kind: 'ready', commitCount: 3 },
-          candidates: [],
-        },
-        'review.files': { branchTip: 'a'.repeat(40), mergeBase: 'b'.repeat(40), files: [] },
-        'review.session.load': null,
-        'repo.open': null,
-      },
-    },
-  });
-  await page.locator(t('ade-review-window')).waitFor();
-  return page;
-}
-
-reviewTest('the sync button names the host and its merge requests', async ({ relaunch }) => {
-  const page = await openSync(relaunch, forgePlan({}));
-  await expect(page.locator(t('ade-review-sync'))).toHaveText('Sync to Forge · 2');
-  await page.locator(t('ade-review-sync')).click();
-  await page.locator(t('ade-review-sync-skipped')).getByRole('button').first().click();
-  await expect(page.locator(t('ade-review-sync-skipped'))).toContainText('Not in the MR');
-});
-
-reviewTest('a missing host CLI is named in the sync button tooltip', async ({ relaunch }) => {
-  const page = await openSync(relaunch, forgePlan({ status: 'cliMissing', files: [] }));
-  await page.locator(t('ade-review-sync')).locator('..').hover();
-  await expect(page.locator('[data-slot="tooltip-content"]')).toContainText(
-    'Install the Forge CLI',
-  );
-});
-
-reviewTest('a host without file review sync hides the sync button', async ({ relaunch }) => {
-  const page = await openSync(
-    relaunch,
-    forgePlan({ status: 'unsupported', files: [], host: { ...FORGE, fileReviewSync: false } }),
-  );
-  await expect(page.locator(t('ade-review-header'))).toBeVisible();
-  await expect(page.locator(t('ade-review-sync'))).toHaveCount(0);
 });

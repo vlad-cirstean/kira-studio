@@ -1,5 +1,6 @@
 import { t } from '@theme/i18n';
 import type { TextPart } from '@theme/varText';
+import { taskColor } from '../palette';
 import type { Branch } from '../wire';
 import { type BranchGraph, isDraft, shortBranchName } from './branchGraph';
 import { branchParts } from './catalogParts';
@@ -12,9 +13,16 @@ export interface BaseMarker {
   tip: TextPart[];
   /** The base changed and no verified rebase has moved the branch onto it yet. */
   pending: boolean;
+  /** Work colour of the parent task's branch, `null` for trunk. */
+  color: string | null;
 }
 
 const base = (value: string): TextPart => ({ name: 'base', value, kind: 'branch' });
+
+function withVariant(tip: TextPart[], tone: 'grey' | 'blue', pending: boolean): TextPart[] {
+  const variant = pending ? 'warn' : tone === 'blue' ? 'info' : 'default';
+  return tip.map((p) => (typeof p === 'string' || p.kind !== 'branch' ? p : { ...p, variant }));
+}
 
 /** Mockup v2 line 1818: nothing when the branch starts from main. */
 export function baseMarker(b: Branch, graph: BranchGraph, mainName: string): BaseMarker | null {
@@ -33,11 +41,14 @@ export function baseMarker(b: Branch, graph: BranchGraph, mainName: string): Bas
               : 'space.ade.baseMarker.startsFromNotMain.tooltip',
             vars,
           );
+    const tone = p.kind === 'review' ? 'blue' : 'grey';
+    const parentTask = graph.byTask.get(p.taskId);
     return {
       label: outside ? ['⑂ ', base(shortBranchName(p.name))] : ['⑂'],
-      tone: p.kind === 'review' ? 'blue' : 'grey',
-      tip,
+      tone,
+      tip: withVariant(tip, tone, pending),
       pending,
+      color: parentTask ? taskColor(parentTask.color) : null,
     };
   }
   if (b.base === '' || b.base === mainName) {
@@ -45,21 +56,27 @@ export function baseMarker(b: Branch, graph: BranchGraph, mainName: string): Bas
       ? {
           label: ['⑂ ', base(b.base || mainName)],
           tone: 'grey',
-          tip: branchParts('space.ade.baseMarker.startsFrom.tooltip', {
-            base: b.base || mainName,
-          }),
+          tip: withVariant(
+            branchParts('space.ade.baseMarker.startsFrom.tooltip', { base: b.base || mainName }),
+            'grey',
+            pending,
+          ),
           pending,
+          color: null,
         }
       : null;
   }
   const owner = b.baseOwner;
+  const tone = owner ? 'blue' : 'grey';
+  const tip = owner
+    ? branchParts('space.ade.baseMarker.startsFromOwner.tooltip', { base: b.base }, { owner })
+    : branchParts('space.ade.baseMarker.startsFromNotMain.tooltip', { base: b.base });
   return {
     label: ['⑂ ', base(shortBranchName(b.base))],
-    tone: owner ? 'blue' : 'grey',
-    tip: owner
-      ? branchParts('space.ade.baseMarker.startsFromOwner.tooltip', { base: b.base }, { owner })
-      : branchParts('space.ade.baseMarker.startsFromNotMain.tooltip', { base: b.base }),
+    tone,
+    tip: withVariant(tip, tone, pending),
     pending,
+    color: null,
   };
 }
 

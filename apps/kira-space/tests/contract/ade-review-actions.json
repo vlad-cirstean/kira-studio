@@ -1,0 +1,54 @@
+{
+  "git:changeRequest.comment": {
+    "kind": "ok"
+  },
+  "git:changeRequest.reviewState": {
+    "author": "alice",
+    "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "host": {
+      "changeRequest": "Merge request",
+      "changeRequestNoun": "merge request",
+      "changeRequestShort": "MR",
+      "cli": "Forge CLI",
+      "id": "forge",
+      "label": "Forge"
+    },
+    "kind": "ok",
+    "localHeadSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "number": 7,
+    "own": false,
+    "state": "open",
+    "title": "Fix login",
+    "viewer": "forger"
+  },
+  "git:changeRequest.reviewState#own": {
+    "author": "forger",
+    "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "host": {
+      "changeRequest": "Merge request",
+      "changeRequestNoun": "merge request",
+      "changeRequestShort": "MR",
+      "cli": "Forge CLI",
+      "id": "forge",
+      "label": "Forge"
+    },
+    "kind": "ok",
+    "localHeadSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "number": 7,
+    "own": true,
+    "state": "open",
+    "title": "Fix login",
+    "viewer": "forger"
+  },
+  "git:changeRequest.submitReview": {
+    "kind": "ok"
+  },
+  "git:changeRequest.submitReview#own": {
+    "kind": "unavailable",
+    "status": {
+      "host": "forge.test",
+      "kind": "forbidden",
+      "reason": "you cannot approve your own merge request"
+    }
+  }
+}

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertAction, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
@@ -353,16 +354,16 @@ function onForcePush(row: BranchRowModel): void {
               </AlertAction>
             </Alert>
           </div>
-          <div v-if="!ui.showHistory" class="mb-2.5 ml-15">
+          <div v-if="!ui.showHistory" class="mb-2 ml-15">
             <Button
-              variant="dialog"
+              variant="toolbar"
               size="kira-lg"
-              class="w-full border-dashed bg-transparent text-muted-foreground"
+              class="w-full justify-center text-muted-foreground"
               data-testid="ade-load-history"
               @click="openHistory"
             >
-              <span>↑</span>
-              <span class="font-medium text-fg">{{ model.view.historyButtonLabel }}</span>
+              <CodiconIcon name="arrow-up" :size="12" />
+              <span>{{ model.view.historyButtonLabel }}</span>
             </Button>
           </div>
           <template v-for="band in model.view.bands" :key="band.key">
@@ -390,21 +391,23 @@ function onForcePush(row: BranchRowModel): void {
               @drag-end="drag.end"
             />
           </template>
-          <div v-if="model.view.hiddenCount > 0" class="ml-15 mt-2.5">
-            <Button
-              variant="dialog"
-              size="kira-lg"
-              class="w-full border-dashed bg-transparent "
-              data-testid="ade-load-all"
-              @click="ui.showAllItems = true"
-            >
-              ↓ {{ model.view.moreButtonLabel }}
-            </Button>
-          </div>
-          <div v-if="model.view.canCollapse" class="ml-15 mt-2.5">
+          <div v-if="model.view.hiddenCount > 0" class="ml-15 mt-2">
             <Button
               variant="toolbar"
               size="kira-lg"
+              class="w-full justify-center text-muted-foreground"
+              data-testid="ade-load-all"
+              @click="ui.showAllItems = true"
+            >
+              <CodiconIcon name="arrow-down" :size="12" />
+              <span>{{ model.view.moreButtonLabel }}</span>
+            </Button>
+          </div>
+          <div v-if="model.view.canCollapse" class="ml-15 mt-2">
+            <Button
+              variant="toolbar"
+              size="kira-lg"
+              class="w-full justify-center text-muted-foreground"
               data-testid="ade-collapse"
               @click="ui.showAllItems = false"
             >

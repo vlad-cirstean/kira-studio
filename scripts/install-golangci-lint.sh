@@ -6,9 +6,12 @@
 set -e
 VERSION=v2.13.2
 GOVERSION=go1.27.1
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck source=./lib.sh
+. "$SCRIPT_DIR/lib.sh"
 BIN="$(go env GOPATH)/bin/golangci-lint"
 
 if [ -x "$BIN" ] && "$BIN" --version 2>/dev/null | grep -q "version ${VERSION#v} built with $GOVERSION"; then
   exit 0
 fi
-GOTOOLCHAIN=$GOVERSION go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$VERSION"
+retry 3 0 env GOTOOLCHAIN=$GOVERSION go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$VERSION"

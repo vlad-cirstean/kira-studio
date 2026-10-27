@@ -78,9 +78,6 @@ export class ReviewFilesState {
   // explanation. Mirrors loadError/diffError's own pattern exactly.
   readonly markError: ShallowRef<string | undefined> = shallowRef(undefined);
 
-  /** Host hook: called with the paths after each successful `review.mark`/`review.markMany`. */
-  onMarked: ((paths: readonly string[]) => void) | undefined;
-
   readonly #bridge: BridgeClient;
   #target: ReviewFilesTarget | undefined;
   /** Marks run one at a time, in call order; `#runMark` never rejects. */
@@ -310,7 +307,6 @@ export class ReviewFilesState {
           const review = byPath.get(entry.change.path);
           return review ? { ...entry, review } : entry;
         });
-        this.onMarked?.(paths);
         const selected = this.selectedPath.value;
         if (selected !== null && byPath.has(selected)) await this.#loadDiff();
       } catch (error) {
@@ -348,7 +344,6 @@ export class ReviewFilesState {
       this.files.value = this.files.value.map((entry) =>
         entry.change.path === path ? { ...entry, review: result.review } : entry,
       );
-      this.onMarked?.([path]);
       if (this.selectedPath.value === path) await this.#loadDiff();
     } catch (error) {
       if (this.#target !== target) return;

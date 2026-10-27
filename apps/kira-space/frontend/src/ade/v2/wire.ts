@@ -570,42 +570,6 @@ export interface ReviewForwardText {
 export interface ForwardReviewResult {
   count: number;
 }
-type ViewedSyncStatus =
-  | 'ok'
-  | 'noPr'
-  | 'prClosed'
-  | 'disabled'
-  | 'cliMissing'
-  | 'unauthenticated'
-  | 'unavailable'
-  | 'headNotFetched'
-  | 'unsupported';
-interface ViewedSyncFile {
-  path: string;
-  action: 'mark' | 'unmark' | 'alreadyViewed' | 'skip';
-  reason: '' | 'notReviewed' | 'partial' | 'changedSinceReview' | 'differsFromPrHead' | 'notInPr';
-}
-export interface ViewedSyncPlan {
-  status: ViewedSyncStatus;
-  message: string;
-  account: string;
-  changeRequest: ChangeRequest | null;
-  host: HostInfo | null;
-  headSha: string;
-  localTip: string;
-  files: ViewedSyncFile[];
-}
-interface ViewedSyncFailure {
-  path: string;
-  error: string;
-}
-export interface ViewedSyncResult {
-  status: ViewedSyncStatus;
-  message: string;
-  marked: string[];
-  unmarked: string[];
-  failed: ViewedSyncFailure[];
-}
 
 // ---- push payloads
 export interface RunsChangedEvent {

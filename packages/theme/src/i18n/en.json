@@ -1268,6 +1268,9 @@
         "gitUnavailable": {
           "body": "Git is unavailable."
         },
+        "hostCommentTooLong": {
+          "body": "A comment can’t be longer than 65,536 bytes."
+        },
         "noSharedHistory": {
           "body": "The base and the branch share no history."
         },
@@ -1288,6 +1291,9 @@
         },
         "resultTooLarge": {
           "body": "The result is too large to send."
+        },
+        "reviewNeedsText": {
+          "body": "A review that comments or requests changes needs text."
         },
         "reviewStoreClosed": {
           "body": "The review store is closed because Kira Space is shutting down."
@@ -2178,6 +2184,14 @@
     },
     "details": {
       "title": "Details"
+    },
+    "dialog": {
+      "resizeHeight": {
+        "label": "Resize dialog height"
+      },
+      "resizeWidth": {
+        "label": "Resize dialog width"
+      }
     },
     "discard": {
       "body": "Unsaved edits are lost.",
@@ -6996,11 +7010,11 @@
             "label": "Base conflict"
           },
           "baseMissing": {
-            "label": "✕ Base missing",
+            "label": "Base missing",
             "tooltip": "Base {base} no longer exists"
           },
           "behind": {
-            "label": "↓{behind} {base}",
+            "label": "{behind} behind {base}",
             "tooltip": "{count} commit behind {base} | {count} commits behind {base}"
           },
           "checkFailed": {
@@ -7011,11 +7025,11 @@
             "tooltip": "Checking whether a rebase would conflict"
           },
           "clean": {
-            "label": "✓ Clean",
+            "label": "Clean",
             "tooltip": "No shared files with work merging before it"
           },
           "conflict": {
-            "label": "✕ Conflict"
+            "label": "Conflict"
           },
           "merged": {
             "tooltip": "Landed on main"
@@ -7025,39 +7039,38 @@
             "tooltip": "{agent} creates it when the task starts"
           },
           "notPushed": {
-            "label": "↑ Not pushed",
+            "label": "Not pushed",
             "tooltip": "Rebased locally; the remote still has the old commits"
           },
           "parked": {
             "tooltip": "Kept out of the merge order"
           },
           "preparing": {
-            "label": "⚙ Preparing {duration}",
+            "label": "Preparing {duration}",
             "tooltip": "Running the prepare-worktree script"
           },
           "rebaseConflicts": {
             "tooltip": "Conflicts with {base} if rebased: {files}"
           },
           "rebaseFailed": {
-            "label": "✕ Rebase failed",
+            "label": "Rebase failed",
             "tooltip": "The last rebase failed"
           },
           "rebaseInProgress": {
-            "label": "⚠ Rebase in progress",
+            "label": "Rebase in progress",
             "tooltip": "A rebase is left half-done in the worktree"
           },
           "rebaseNeedsYou": {
-            "label": "✋ Rebase needs you",
+            "label": "Rebase needs you",
             "tooltip": "The rebase agent needs you"
           },
           "rebasePending": {
-            "label": "⚠ Base changed, rebase pending"
+            "label": "Base changed, rebase pending"
           },
           "rebasePendingNote": {
             "hint": "Base changed from {from} to {to}. The branch isn’t rebased onto it yet."
           },
           "rebasing": {
-            "label": "⟳ Rebasing",
             "tooltip": "A background run is rebasing this branch"
           },
           "review": {
@@ -7072,25 +7085,23 @@
             "tooltip": "Open the rebase log"
           },
           "setupFailed": {
-            "label": "✕ Setup failed",
             "tooltip": "The prepare-worktree script failed"
           },
           "setupLog": {
             "tooltip": "Open the setup log"
           },
           "sharesFiles": {
-            "label": "↻ {branch}",
+            "label": "After {branch}",
             "tooltip": "Shares {file} with {branch}; merges after it"
           },
           "start": {
-            "label": "▶ Start",
             "tooltip": "Start {product} in its worktree"
           },
           "takeOver": {
             "tooltip": "Continue the rebase yourself in {product}"
           },
           "waiting": {
-            "label": "⏳ {owner}",
+            "label": "Waits for {owner}",
             "tooltip": "Based on {branch}"
           }
         },
@@ -7141,9 +7152,6 @@
           "reMerge": {
             "label": "Re-merge into {target} (stale)"
           }
-        },
-        "merged": {
-          "label": "✓ Merged"
         },
         "newTask": {
           "label": "New task"
@@ -7203,7 +7211,7 @@
             "tooltip": "{step} is done"
           },
           "finish": {
-            "label": "Finish ✓",
+            "label": "Finish",
             "tooltip": "Finish the workflow"
           },
           "retryFailed": {
@@ -7211,9 +7219,6 @@
           },
           "retryStuck": {
             "tooltip": "{step} is stuck; see its output on the task tab"
-          },
-          "run": {
-            "label": "▶ Run"
           },
           "runAgents": {
             "tooltip": "Run {step} with background agents ({headless})"
@@ -7225,7 +7230,7 @@
             "tooltip": "Run: {command}"
           },
           "session": {
-            "label": "▶ {step}",
+            "label": "Start {step}",
             "tooltip": "Open an interactive {product} session for {step}"
           },
           "takeOver": {
@@ -7420,7 +7425,7 @@
           "label": "Created when the pipeline runs"
         },
         "startAgent": {
-          "label": "▶ Start agent"
+          "label": "Start agent"
         }
       },
       "headless": {
@@ -7700,6 +7705,11 @@
             "tooltip": "Someone else’s branch, read-only here"
           }
         },
+        "branchTip": {
+          "progress": {
+            "label": "Progress"
+          }
+        },
         "card": {
           "changeBase": {
             "tooltip": "Change the base of a branch"
@@ -7726,7 +7736,7 @@
         },
         "history": {
           "current": {
-            "label": "Current work ↓"
+            "label": "Current work"
           },
           "goTo": {
             "label": "Go to"
@@ -7888,6 +7898,65 @@
         }
       },
       "review": {
+        "actions": {
+          "closed": {
+            "hint": "This {short} is closed."
+          },
+          "conversation": {
+            "label": "Comment on {short}"
+          },
+          "dialogApprove": {
+            "title": "Approve {short} #{number}"
+          },
+          "dialogBody": {
+            "placeholder": "Leave a comment"
+          },
+          "dialogComment": {
+            "title": "Comment review on {short} #{number}"
+          },
+          "dialogConversation": {
+            "title": "Comment on {short} #{number}"
+          },
+          "dialogRequestChanges": {
+            "title": "Request changes on {short} #{number}"
+          },
+          "errorDisabled": {
+            "body": "Reviews are off for this repository."
+          },
+          "headDiffers": {
+            "hint": "Your local branch is not at the {short} head. The review applies to the {short} head."
+          },
+          "merged": {
+            "hint": "This {short} is merged."
+          },
+          "open": {
+            "label": "View {short}"
+          },
+          "optional": {
+            "hint": "A message is optional for an approval."
+          },
+          "own": {
+            "hint": "You can’t approve or request changes on your own {short}."
+          },
+          "postedComment": {
+            "status": "Comment posted"
+          },
+          "postedReview": {
+            "status": "Review submitted"
+          },
+          "requestChanges": {
+            "label": "Request changes"
+          },
+          "required": {
+            "hint": "A message is required."
+          },
+          "stateFailed": {
+            "hint": "Couldn’t load the review state: {reason}."
+          },
+          "submitReview": {
+            "label": "Submit review"
+          }
+        },
         "agent": {
           "elsewhere": {
             "hint": "The review agent is open in another window."
@@ -7929,69 +7998,8 @@
             "label": "Base {base}"
           },
           "uncommitted": {
-            "hint": "{count} uncommitted change in the worktree is not in this review. | {count} uncommitted changes in the worktree are not in this review."
-          }
-        },
-        "sync": {
-          "account": {
-            "label": "Syncing as {account}"
-          },
-          "button": {
-            "label": "Sync to {label}"
-          },
-          "buttonCount": {
-            "label": "Sync to {label} · {count}"
-          },
-          "changedSinceReview": {
-            "status": "Changed since review"
-          },
-          "cliMissing": {
-            "tooltip": "Install the {cli}"
-          },
-          "closed": {
-            "tooltip": "{changeRequestShort} #{number} is closed"
-          },
-          "confirm": {
-            "label": "Mark {count} file viewed on {changeRequestShort} #{number} | Mark {count} files viewed on {changeRequestShort} #{number}"
-          },
-          "confirmUnmark": {
-            "label": "Mark {count} file viewed on {changeRequestShort} #{number}, unmark {unmarked} | Mark {count} files viewed on {changeRequestShort} #{number}, unmark {unmarked}"
-          },
-          "differsFromHead": {
-            "status": "Differs from the {changeRequestShort} head"
-          },
-          "headDiffers": {
-            "label": "{changeRequestShort} head {head} ≠ local {local}"
-          },
-          "loadFailed": {
-            "error": "Couldn’t load the sync plan: {error}"
-          },
-          "mark": {
-            "label": "Mark"
-          },
-          "nothing": {
-            "empty": "Nothing to sync"
-          },
-          "notInChangeRequest": {
-            "status": "Not in the {changeRequestShort}"
-          },
-          "notReviewed": {
-            "status": "Not reviewed"
-          },
-          "partial": {
-            "status": "Partly reviewed"
-          },
-          "refreshRepo": {
-            "label": "Refresh repository"
-          },
-          "synced": {
-            "status": "Synced {count} file | Synced {count} files"
-          },
-          "syncedFailed": {
-            "status": "Synced {count} file · {failed} failed | Synced {count} files · {failed} failed"
-          },
-          "unmark": {
-            "label": "Unmark"
+            "hint": "{count} uncommitted change in the worktree is not in this review. | {count} uncommitted changes in the worktree are not in this review.",
+            "label": "{count} uncommitted | {count} uncommitted"
           }
         },
         "window": {
@@ -8003,9 +8011,6 @@
           },
           "files": {
             "aria": "Files to review"
-          },
-          "title": {
-            "title": "Review · {branch}"
           }
         }
       },

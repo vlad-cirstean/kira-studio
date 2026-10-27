@@ -1057,21 +1057,3 @@ func (s *AdeTaskService) ReviewForwardText(ctx context.Context, args adewire.Bra
 	text, err := s.Engine.ReviewForwardText(ctx, args.BranchID)
 	return adewire.ReviewForwardText{Text: text}, adeTaskError(err)
 }
-
-// ViewedSyncPlan reports what syncing the branch's reviewed files to its PR would do.
-func (s *AdeTaskService) ViewedSyncPlan(ctx context.Context, args adewire.BranchArgs) (adewire.ViewedSyncPlan, error) {
-	if err := validateAdeTaskID(args.BranchID, "branchId"); err != nil {
-		return adewire.ViewedSyncPlan{}, err
-	}
-	p, err := s.Engine.ViewedSyncPlan(ctx, args.BranchID)
-	return p, adeTaskError(err)
-}
-
-// ViewedSyncApply marks and unmarks the branch's files on its PR as planned.
-func (s *AdeTaskService) ViewedSyncApply(ctx context.Context, args adewire.BranchArgs) (adewire.ViewedSyncResult, error) {
-	if err := validateAdeTaskID(args.BranchID, "branchId"); err != nil {
-		return adewire.ViewedSyncResult{}, err
-	}
-	r, err := s.Engine.ViewedSyncApply(ctx, args.BranchID)
-	return r, adeTaskError(err)
-}

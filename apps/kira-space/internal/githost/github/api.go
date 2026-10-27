@@ -3,6 +3,8 @@ package github
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"time"
 )
 
 // apiVersionHeader is GitHub's own REST API version pin (D4) — every `gh api` call this package
@@ -40,8 +42,12 @@ func (c *Client) Account(ctx context.Context, host string) string {
 // one of the three calls in pr.go, and this file's own argv-golden test, share byte-for-byte the
 // same flags.
 func commonArgv(host, path string) []string {
+	return methodArgv(host, "GET", path)
+}
+
+func methodArgv(host, method, path string) []string {
 	return []string{
-		"api", "--hostname", host, "--method", "GET",
+		"api", "--hostname", host, "--method", method,
 		"-H", "Accept: application/vnd.github+json",
 		"-H", "X-GitHub-Api-Version: " + apiVersionHeader,
 		path,
@@ -55,13 +61,27 @@ func commonArgv(host, path string) []string {
 // it, mirroring gitclient.Classify's own "cancellation first" discipline (errors.go's own doc
 // comment says the same).
 func (c *Client) get(ctx context.Context, repo Repo, path string, out any) Status {
+	return c.call(ctx, repo, commonArgv(repo.Host, path), out)
+}
+
+// call runs one `gh api` argv under the same auth gate, timeout and classification as get.
+func (c *Client) call(ctx context.Context, repo Repo, args []string, out any) Status {
+	return c.callWithin(ctx, repo, args, out, apiTimeout, false)
+}
+
+// callWithin is call with an explicit timeout. A write that times out may still have landed, so
+// its reason says so instead of reading as "not sent" and inviting a duplicate.
+func (c *Client) callWithin(ctx context.Context, repo Repo, args []string, out any, timeout time.Duration, write bool) Status {
 	authStatus := c.discovery.Status(ctx, repo.Host)
 	if !authStatus.OK() {
 		return authStatus
 	}
 
-	res, runErr := c.runner.Run(ctx, authStatus.Path, Spec{Args: commonArgv(repo.Host, path), Timeout: apiTimeout})
+	res, runErr := c.runner.Run(ctx, authStatus.Path, Spec{Args: args, Timeout: timeout})
 	status := classify(repo.Host, res, runErr, ctx.Err())
+	if write && ctx.Err() == nil && errors.Is(runErr, context.DeadlineExceeded) {
+		status.Reason = writeTimeoutReason
+	}
 	if !status.OK() {
 		return status
 	}

@@ -3,6 +3,7 @@ package gitrpc
 import (
 	"context"
 	"encoding/json"
+	"slices"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/githost"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
@@ -126,4 +127,98 @@ func (r *Router) handleGitHostInfo(ctx context.Context, c *gitsession.Conn, para
 // repository settings choice.
 func (r *Router) handleGitHostProviders(_ context.Context, _ *gitsession.Conn, _ json.RawMessage) (any, error) {
 	return githost.Providers{Providers: r.deps.Registry.Hosts.Registry.Infos()}, nil
+}
+
+// handleChangeRequestReviewState is changeRequest.reviewState's own handler: the review facts of
+// the branch's change request, read fresh from the host.
+func (r *Router) handleChangeRequestReviewState(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+	return handleRepoCall(ctx, c, "changeRequest.reviewState", params,
+		func(p ChangeRequestReviewStateParams) (string, error) {
+			if err := requireNonEmpty("changeRequest.reviewState", "repoId", p.RepoID); err != nil {
+				return "", err
+			}
+			if err := validRefArg("branch", p.Branch); err != nil {
+				return "", err
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p ChangeRequestReviewStateParams) (ChangeRequestReviewStateResult, error) {
+			s, err := entry.ChangeRequestReviewState(ctx, p.Branch)
+			if err != nil {
+				return ChangeRequestReviewStateResult{}, mapDetailError(err)
+			}
+			out := ChangeRequestReviewStateResult{Kind: s.Kind}
+			if s.Status != nil {
+				st := hostStatusFrom(*s.Status)
+				out.Status = &st
+			}
+			if s.Kind == "ok" {
+				out.ChangeRequestReview = &ChangeRequestReview{
+					Host: s.Host, Number: s.Number, Title: s.Title, State: s.State, HeadSha: s.HeadSha,
+					LocalHeadSha: s.LocalHeadSha, Author: s.Author, Viewer: s.Viewer, Own: s.Own,
+				}
+			}
+			return out, nil
+		},
+	)
+}
+
+// handleChangeRequestSubmitReview is changeRequest.submitReview's own handler. A host refusal is a
+// result kind, never an RPC error.
+func (r *Router) handleChangeRequestSubmitReview(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+	var body string // set by resolve, read by call: normalized once.
+	return handleRepoCall(ctx, c, "changeRequest.submitReview", params,
+		func(p ChangeRequestSubmitReviewParams) (string, error) {
+			if err := requireNonEmpty("changeRequest.submitReview", "repoId", p.RepoID); err != nil {
+				return "", err
+			}
+			if p.Number <= 0 {
+				return "", ipcerr.Contract("gitrpc: changeRequest.submitReview: a positive number is required")
+			}
+			if !slices.Contains([]string{githost.ReviewApprove, githost.ReviewComment, githost.ReviewRequestChanges}, p.Event) {
+				return "", ipcerr.Contract("gitrpc: changeRequest.submitReview: event must be approve, comment or requestChanges")
+			}
+			if err := validObjectID("headSha", p.HeadSha); err != nil {
+				return "", err
+			}
+			body = normalizeCommentBody(p.Body)
+			if body == "" && p.Event != githost.ReviewApprove {
+				return "", ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.reviewNeedsText.body", nil)
+			}
+			if len(body) > githost.MaxHostCommentBytes {
+				return "", ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.hostCommentTooLong.body", nil)
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p ChangeRequestSubmitReviewParams) (ChangeRequestPostResult, error) {
+			return changeRequestPostResultFrom(entry.SubmitChangeRequestReview(ctx, p.Number,
+				githost.Review{Event: p.Event, Body: body, CommitSHA: p.HeadSha})), nil
+		},
+	)
+}
+
+// handleChangeRequestComment is changeRequest.comment's own handler: a conversation comment.
+func (r *Router) handleChangeRequestComment(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+	var body string // set by resolve, read by call: normalized once.
+	return handleRepoCall(ctx, c, "changeRequest.comment", params,
+		func(p ChangeRequestCommentParams) (string, error) {
+			if err := requireNonEmpty("changeRequest.comment", "repoId", p.RepoID); err != nil {
+				return "", err
+			}
+			if p.Number <= 0 {
+				return "", ipcerr.Contract("gitrpc: changeRequest.comment: a positive number is required")
+			}
+			body = normalizeCommentBody(p.Body)
+			if body == "" {
+				return "", ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.commentEmpty.body", nil)
+			}
+			if len(body) > githost.MaxHostCommentBytes {
+				return "", ipcerr.T(ipcerr.CodeBadRequest, "backend.space.gitrpc.hostCommentTooLong.body", nil)
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p ChangeRequestCommentParams) (ChangeRequestPostResult, error) {
+			return changeRequestPostResultFrom(entry.CommentOnChangeRequest(ctx, p.Number, body)), nil
+		},
+	)
 }

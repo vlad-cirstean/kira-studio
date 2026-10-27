@@ -67,6 +67,8 @@ test('estimate: set, change and clear at any time', async ({ relaunch }) => {
   await page.locator(t('ade-estimate-num')).press('Tab');
   await expect.poll(patches).toHaveLength(2);
   expect(patches()[1]).toMatchObject({ taskId: 'T_bill', patch: { est: '1d' } });
+  // The board refetch after a save resets the field; wait for it before typing again.
+  await expect(page.locator(t('ade-estimate-num'))).toHaveValue('2');
 
   await page.locator(t('ade-estimate-num')).fill('1');
   await page.locator(t('ade-estimate-unit-h')).click();

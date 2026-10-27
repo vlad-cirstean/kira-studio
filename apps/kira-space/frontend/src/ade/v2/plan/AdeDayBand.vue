@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
 import { SORTABLE_CHOSEN_CLASS, SORTABLE_GHOST_CLASS } from '@workbench/behaviour/sortableReorder';
@@ -69,13 +70,7 @@ const over = computed(() => props.band.overflowTaskIds.length > 0 && !greyed.val
 const accepts = computed(() => !props.band.isPast && !props.band.dayOff);
 const highlight = computed(() => props.dragOver && accepts.value);
 
-const rowBgClass = computed(() => {
-  if (greyed.value) {
-    return 'bg-[repeating-linear-gradient(135deg,color-mix(in_srgb,var(--kira-fg)_2%,transparent)_0_6px,transparent_6px_12px)]';
-  }
-  if (overdue.value) return 'bg-tone-amber-solid/4';
-  return props.band.isPast ? 'bg-fg/2' : '';
-});
+const rowBgClass = computed(() => (greyed.value ? 'bg-chrome' : ''));
 const rulerBorderClass = computed(() => {
   if (props.band.isToday) return 'border-r-tone-amber-solid';
   return props.band.isPast || greyed.value ? 'border-r-border' : 'border-r-border-strong';
@@ -106,7 +101,7 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
   <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only; the band holds nested interactive rows. -->
   <div
     class="flex border-t"
-    :class="[solidBorder ? 'border-t-border-strong' : 'border-dashed border-t-border', rowBgClass]"
+    :class="[solidBorder ? 'border-t-border-strong' : 'border-t-border', rowBgClass]"
     data-testid="ade-day-band"
     data-ade-band
     :data-ade-day="band.key"
@@ -114,7 +109,7 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
   >
     <div
       class="relative box-border w-15 shrink-0 border-r-2 text-right"
-      :class="[empty ? 'px-2.5 py-0.5 pl-0' : 'py-1.5 pl-0 pr-2.5', rulerBorderClass]"
+      :class="['py-1.5 pl-0 pr-2', rulerBorderClass]"
     >
       <span
         class="absolute box-border rounded-full border-2"
@@ -122,7 +117,7 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
       />
       <div
         class="whitespace-nowrap"
-        :class="[empty ? 'text-kira-sm font-medium' : 'text-kira-md font-medium', band.dayOff ? 'line-through' : '', labelClass]"
+        :class="['text-kira-md font-medium', band.dayOff ? 'line-through' : '', labelClass]"
         data-testid="ade-band-label"
       >
         {{ band.label }}
@@ -130,10 +125,10 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
       <div class="text-kira-sm" :class="subClass">{{ sub }}</div>
     </div>
     <div
-      class="box-border flex min-w-0 flex-1 flex-col gap-2.5 rounded-kira"
+      class="box-border flex min-w-0 flex-1 flex-col gap-2 rounded-kira"
       :class="[
-        empty ? (greyed ? 'min-h-4' : 'min-h-control') : 'pb-2.5 pl-2 pt-2',
-        highlight ? 'outline outline-1 outline-dashed outline-focus bg-focus/10' : '',
+        empty ? (greyed ? 'min-h-4' : 'min-h-control') : 'pb-2 pl-2 pt-2',
+        highlight ? 'outline outline-1 outline-focus' : '',
       ]"
       ref="dropEl"
       data-testid="ade-band-drop"
@@ -143,12 +138,12 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
         v-for="h in history"
         :key="h.key"
         variant="toolbar"
-        class="ml-54.5 h-row w-auto justify-start gap-2 bg-tone-purple-solid/6 px-2.5 font-normal"
+        class="ml-54.5 h-row w-auto justify-start gap-2 px-2 font-normal"
         :data-selected="ui.selectedTaskId === h.key || undefined"
         data-testid="ade-history-row"
         @click="ui.select(h.key)"
       >
-        <span class="font-medium text-tone-purple">✓</span>
+        <CodiconIcon name="check" :size="12" class="shrink-0 text-tone-purple" />
         <span class="shrink-0 whitespace-nowrap text-kira-sm text-tone-purple">{{ h.how }}</span>
         <span class="shrink-0 whitespace-nowrap text-kira-sm text-muted-foreground">{{
           h.repos
@@ -172,7 +167,8 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
         <Button
           variant="dialog"
           size="kira"
-          class="max-w-90 truncate border-tone-red-solid bg-transparent text-tone-red"
+          class="max-w-90 truncate"
+          :class="TONE_SOLID_CLASS.red"
           data-testid="ade-band-overflow-move"
           @click="emit('overflowMove')"
         >
@@ -191,12 +187,12 @@ const solidBorder = computed(() => props.band.isMonday || props.band.isLater || 
         v-for="s in spans"
         :key="s.taskId"
         variant="toolbar"
-        class="ml-54.5 h-row w-auto justify-start gap-2 border border-l-3 border-dashed border-border-strong px-2.5 font-normal"
+        class="ml-54.5 h-row w-auto justify-start gap-2 border border-l-4 border-border px-2 font-normal"
         :style="{ borderLeftColor: s.color }"
         data-testid="ade-span-row"
         @click="emit('select', s.taskId)"
       >
-        <span class="text-subtle">↳</span>
+        <CodiconIcon name="indent" :size="12" class="shrink-0 text-subtle" />
         <span
           class="shrink-0 whitespace-nowrap text-kira-sm"
           :class="s.merges ? 'text-tone-amber' : 'text-subtle'"

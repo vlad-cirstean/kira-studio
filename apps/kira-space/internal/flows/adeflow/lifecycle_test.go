@@ -4,12 +4,10 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/flowharness"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/internal/flowtest/fakeagent"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
@@ -200,7 +198,7 @@ func githubClone(t *testing.T, app *flowharness.App) (adewire.Branch, string) {
 func TestGitHubWithoutGh(t *testing.T) {
 	app := flowharness.New(t, flowharness.WithoutGh())
 	claude(app, map[string][]fakeagent.Action{"*": {{Name: "done"}}})
-	br, repoID := githubClone(t, app)
+	_, repoID := githubClone(t, app)
 
 	var prs adewire.ChangeRequestsResult
 	testx.WaitUntil(t, waitFor, func() bool {
@@ -211,23 +209,9 @@ func TestGitHubWithoutGh(t *testing.T) {
 	if prs.Repos[0].Kind != "unavailable" || len(prs.Branches) != 0 {
 		t.Fatalf("Prs = %+v, want unavailable and no PRs", prs)
 	}
-	plan, err := app.W.AdeTask.ViewedSyncPlan(ctx, adewire.BranchArgs{BranchID: br.ID})
-	if err != nil {
-		t.Fatalf("ViewedSyncPlan returned an error, want a status: %v", err)
-	}
-	if plan.Host == nil || plan.Host.CLI == "" {
-		t.Fatalf("plan host = %+v, want the host naming the missing CLI", plan.Host)
-	}
-	if plan.Status != "cliMissing" || plan.ChangeRequest != nil || len(plan.Files) != 0 {
-		t.Fatalf("plan = %+v, want an unavailable state with no files", plan)
-	}
-	res, err := app.W.AdeTask.ViewedSyncApply(ctx, adewire.BranchArgs{BranchID: br.ID})
-	if err != nil || res.Status != plan.Status || len(res.Marked) != 0 {
-		t.Fatalf("apply = %+v, %v, want status %s and nothing marked", res, err, plan.Status)
-	}
 }
 
-func TestGitHubSyncWithFakeGh(t *testing.T) {
+func TestGitHubChangeRequestsWithFakeGh(t *testing.T) {
 	flowharness.Complete(t)
 	app := flowharness.New(t)
 	gh := t.TempDir()
@@ -240,24 +224,15 @@ func TestGitHubSyncWithFakeGh(t *testing.T) {
 	}
 	pulls := write("pulls.json", `[{"number":7,"title":"Fix login","html_url":"https://github.com/acme/api/pull/7","state":"open","draft":false,`+
 		`"merged_at":null,"head":{"ref":"feat/api-gh","sha":"x","repo":{"owner":{"login":"acme"}}},"base":{"ref":"main"},"updated_at":"2026-03-01T00:00:00Z"}]`)
-	files := filepath.Join(gh, "files.json")
 	app.Scenario(fakeagent.Scenario{
-		Claude: map[string][]fakeagent.Action{"*": {{Name: "done", Sh: "echo a > a.txt && git add -A && git commit -q -m add-a"}}},
+		Claude: map[string][]fakeagent.Action{"*": {{Name: "done"}}},
 		Gh: []fakeagent.GhRule{
 			{Match: "--version", Emit: write("version.txt", "gh version 2.42.0 (2024-01-08)\n")},
 			{Match: "auth status", Emit: write("auth.txt", "github.com\n  Logged in to github.com account octocat (keyring)\n")},
-			{Match: "viewerViewedState", Emit: files},
-			{Match: "FileAsViewed", Emit: write("mutation.json", `{"data":{"m0":{"clientMutationId":null}}}`)},
 			{Match: "/pulls?", Emit: pulls},
 		},
 	})
 	br, repoID := githubClone(t, app)
-	tip := gitOut(t, br.Worktree, "rev-parse", "HEAD")
-	prFiles := func(viewed string) {
-		write("files.json", `{"data":{"repository":{"pullRequest":{"id":"PR_node","headRefOid":"`+tip+`","state":"OPEN",`+
-			`"files":{"nodes":[{"path":"a.txt","viewerViewedState":"`+viewed+`"}],"pageInfo":{"hasNextPage":false,"endCursor":""}}}}}}`)
-	}
-	prFiles("UNVIEWED")
 
 	prs, err := app.W.AdeTask.ChangeRequests(ctx)
 	if err != nil || len(prs.Repos) != 1 || prs.Repos[0].CodeRepoID != repoID || prs.Repos[0].Kind != "ok" {
@@ -266,59 +241,4 @@ func TestGitHubSyncWithFakeGh(t *testing.T) {
 	if pr := prs.Branches[br.ID]; pr.Number != 7 || pr.State != "open" || pr.URL != "https://github.com/acme/api/pull/7" {
 		t.Fatalf("branch PR = %+v, want #7 open", pr)
 	}
-
-	plan, err := app.W.AdeTask.ViewedSyncPlan(ctx, adewire.BranchArgs{BranchID: br.ID})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if plan.Status != "ok" || plan.Account != "octocat" || plan.HeadSha != tip || plan.ChangeRequest == nil || plan.ChangeRequest.Number != 7 ||
-		len(plan.Files) != 1 || plan.Files[0].Path != "a.txt" || plan.Files[0].Action != "skip" || plan.Files[0].Reason != "notReviewed" {
-		t.Fatalf("plan before review = %+v, want a.txt skipped as notReviewed", plan)
-	}
-
-	gs := app.OpenGitStream()
-	var init gitrpc.AppInitResult
-	gs.MustRequest("app.init", nil, &init)
-	var opened gitrpc.RepoOpenResult
-	gs.MustRequest("repo.open", gitrpc.RepoOpenParams{Path: filepath.Join(app.Work, "api")}, &opened)
-	if opened.Kind != "ok" {
-		t.Fatalf("repo.open = %+v", opened)
-	}
-	mark := func(reviewed bool) {
-		var res gitrpc.ReviewMarkResult
-		gs.MustRequest("review.mark", gitrpc.ReviewMarkParams{RepoID: opened.Repo.RepoID, Branch: "feat/api-gh", Path: "a.txt", Reviewed: reviewed}, &res)
-	}
-	mark(true)
-
-	plan, err = app.W.AdeTask.ViewedSyncPlan(ctx, adewire.BranchArgs{BranchID: br.ID})
-	if err != nil || plan.Status != "ok" || len(plan.Files) != 1 || plan.Files[0].Action != "mark" {
-		t.Fatalf("plan after review = %+v, %v, want a.txt marked", plan, err)
-	}
-	res, err := app.W.AdeTask.ViewedSyncApply(ctx, adewire.BranchArgs{BranchID: br.ID})
-	if err != nil || res.Status != "ok" || !slices.Equal(res.Marked, []string{"a.txt"}) || len(res.Failed) != 0 {
-		t.Fatalf("apply = %+v, %v, want a.txt marked", res, err)
-	}
-	if !ghCalled(app, "markFileAsViewed", "a.txt") {
-		t.Fatal("no gh mutation marked a.txt viewed")
-	}
-
-	prFiles("VIEWED")
-	mark(false)
-	testx.WaitUntil(t, waitFor, func() bool { return ghCalled(app, "unmarkFileAsViewed", "a.txt") })
-}
-
-// ghCalled reports whether a recorded gh invocation carries every needle.
-func ghCalled(app *flowharness.App, needles ...string) bool {
-	matches, _ := filepath.Glob(filepath.Join(app.FakeDir, "gh-*.args"))
-	for _, m := range matches {
-		raw, _ := os.ReadFile(m)
-		ok := true
-		for _, n := range needles {
-			ok = ok && strings.Contains(string(raw), n)
-		}
-		if ok {
-			return true
-		}
-	}
-	return false
 }

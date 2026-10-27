@@ -151,7 +151,7 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
       <div class="flex items-start gap-2">
         <span
           class="mt-1 box-border size-3 shrink-0 rounded-kira-xs"
-          :class="card.parked ? 'border-2 border-dashed' : ''"
+          :class="card.parked ? 'border-2' : ''"
           :style="card.parked ? { borderColor: card.color } : { background: card.color }"
           data-testid="ade-panel-dot"
         />

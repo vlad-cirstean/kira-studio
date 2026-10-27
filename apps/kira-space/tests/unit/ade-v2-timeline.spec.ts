@@ -106,6 +106,20 @@ describe('merge order', () => {
     expect(v.entries.get('rev')?.day).toBe(1);
   });
 
+  test('a review item with a plan day sits on that day and places nothing', () => {
+    const b = board([
+      { id: 'a', day: 0, est: '1h' },
+      { id: 'b', day: 1, est: '1h' },
+      { id: 'rev', kind: 'review', day: 2 },
+    ]);
+    const stacked = b.branches.find((x) => x.id === 'b_b');
+    if (stacked) stacked.baseBranchId = 'b_rev';
+    const v = view(b);
+    expect(v.seq.map((e) => e.taskId)).toEqual(['a', 'b', 'rev']);
+    expect(v.entries.get('rev')?.day).toBe(2);
+    expect(v.entries.get('rev')?.auto).toBe(false);
+  });
+
   test('an unplaced review item goes to Later', () => {
     const v = view(
       board([
@@ -177,12 +191,14 @@ describe('capacity and overdue', () => {
       board([
         { id: 'a', day: -2, est: '1h' },
         { id: 'b', day: -2, est: '1h', merged: true },
+        { id: 'r1', kind: 'review', day: -2 },
+        { id: 'r2', kind: 'review', day: -2, merged: true },
       ]),
       { showHistory: true },
     );
     const band = v.bands.find((x) => x.key === -2);
     expect(band?.isPast).toBe(true);
-    expect(band?.overdueTaskIds).toEqual(['a']);
+    expect(band?.overdueTaskIds).toEqual(['a', 'r1']);
   });
 
   test('unplanned tasks land in the Later band, which is always last', () => {

@@ -47,12 +47,12 @@ export function shiftPlanArgs(
   return { order: [...rest.slice(0, at), ...ids, ...rest.slice(at)], days };
 }
 
-/** Mockup `dropOn` / band `drop`: a card is never dropped on itself or a review item, and a band
- *  takes a drop only when it is neither past nor a day off. */
+/** Mockup `dropOn` / band `drop`: a card is never dropped on itself, a card dropped on an
+ *  auto-placed review item counts as a drop on its band, and a band takes a drop only when it is neither past nor a day off. */
 export function dropVerdict(
   view: {
     bands: readonly Pick<TimelineBand, 'key' | 'isPast' | 'dayOff'>[];
-    entries: ReadonlyMap<string, Pick<TimelineEntry, 'day' | 'kind'>>;
+    entries: ReadonlyMap<string, Pick<TimelineEntry, 'day' | 'auto'>>;
   },
   plan: Plan,
   today: string,
@@ -62,12 +62,12 @@ export function dropVerdict(
   if (target === null) return { kind: 'refuse' };
   if (target.kind === 'card') {
     const entry = view.entries.get(target.taskId);
-    if (!entry || target.taskId === draggedId || entry.kind === 'review') return { kind: 'refuse' };
+    if (!entry || target.taskId === draggedId) return { kind: 'refuse' };
     const cardBand = view.bands.find((b) => b.key === entry.day);
     if (cardBand && (cardBand.isPast || cardBand.dayOff)) return { kind: 'refuse' };
     return {
       kind: 'move',
-      args: movePlanArgs(plan, today, draggedId, target.taskId, entry.day),
+      args: movePlanArgs(plan, today, draggedId, entry.auto ? null : target.taskId, entry.day),
     };
   }
   const band = view.bands.find((b) => b.key === target.day);

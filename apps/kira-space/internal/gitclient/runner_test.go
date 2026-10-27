@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
-	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -255,14 +255,14 @@ func TestStart_CancellationStopsEscalationTimerAfterCleanExit(t *testing.T) {
 	gracefulStopDelay = 100 * time.Millisecond
 	t.Cleanup(func() { gracefulStopDelay = oldDelay })
 
-	var mu sync.Mutex
-	var sigkillCalls int
+	// Only a SIGKILL sent after Wait returned proves a leaked timer. One sent earlier is a
+	// legitimate escalation of a process still alive, which load can cause.
+	var reaped atomic.Bool
+	var sigkillAfterReap atomic.Int32
 	oldKillGroup := killGroup
 	killGroup = func(pid int, sig syscall.Signal) error {
-		if sig == syscall.SIGKILL {
-			mu.Lock()
-			sigkillCalls++
-			mu.Unlock()
+		if sig == syscall.SIGKILL && reaped.Load() {
+			sigkillAfterReap.Add(1)
 		}
 		return oldKillGroup(pid, sig)
 	}
@@ -284,15 +284,13 @@ func TestStart_CancellationStopsEscalationTimerAfterCleanExit(t *testing.T) {
 	if _, err := p.Wait(); err != nil {
 		t.Fatalf("Wait: %v", err)
 	}
+	reaped.Store(true)
 
-	// The process is confirmed reaped at this point — reap() must already have stopped the
-	// escalation timer armed above. Wait comfortably past gracefulStopDelay and confirm no SIGKILL
-	// was ever attempted against it.
+	// reap() must already have stopped the escalation timer. Wait past gracefulStopDelay and
+	// confirm no SIGKILL fires after the reap.
 	time.Sleep(3 * gracefulStopDelay)
-	mu.Lock()
-	defer mu.Unlock()
-	if sigkillCalls != 0 {
-		t.Fatalf("SIGKILL attempted %d time(s) after a clean SIGTERM exit — the escalation timer was not stopped", sigkillCalls)
+	if n := sigkillAfterReap.Load(); n != 0 {
+		t.Fatalf("SIGKILL attempted %d time(s) after reap — the escalation timer was not stopped", n)
 	}
 }
 

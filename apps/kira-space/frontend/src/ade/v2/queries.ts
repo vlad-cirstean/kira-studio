@@ -51,8 +51,6 @@ import type {
   UpdateBacklogItemArgs,
   UpdateTaskArgs,
   ValidateWorkflowYamlArgs,
-  ViewedSyncPlan,
-  ViewedSyncResult,
 } from './wire';
 
 export {
@@ -71,7 +69,6 @@ export {
 
 export const workflowYamlKey = ['adetask', 'workflowYaml'] as const;
 const candidatesKey = ['adetask', 'candidates'] as const;
-export const viewedSyncPlanPrefix = ['adetask', 'viewedSyncPlan'] as const;
 export const reviewStepPrefix = ['adetask', 'reviewStep'] as const;
 export const reviewTargetKey = (windowKey: string) =>
   ['adetask', 'reviewTarget', windowKey] as const;
@@ -374,25 +371,6 @@ export function useLaunchReviewAgent() {
   return useMutation({
     mutationFn: (args: TaskArgs): Promise<ReviewAgentLaunch> =>
       control.adeTaskLaunchReviewAgent(args),
-  });
-}
-
-/** What a viewed sync would do for the branch; re-asked on focus, mark and popover open, not on board pushes (each load pages the change request's files). */
-export function useViewedSyncPlan(branchId: MaybeRefOrGetter<string>) {
-  return useQuery({
-    queryKey: ['adetask', 'viewedSyncPlan', branchId] as const,
-    queryFn: (): Promise<ViewedSyncPlan> =>
-      control.adeTaskViewedSyncPlan({ branchId: toValue(branchId) }),
-    staleTime: 0,
-    refetchOnWindowFocus: true,
-  });
-}
-
-export function useViewedSyncApply() {
-  return useMutation({
-    mutationFn: (args: BranchArgs): Promise<ViewedSyncResult> =>
-      control.adeTaskViewedSyncApply(args),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: viewedSyncPlanPrefix }),
   });
 }
 

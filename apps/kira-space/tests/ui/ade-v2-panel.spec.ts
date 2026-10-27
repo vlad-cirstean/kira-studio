@@ -491,7 +491,9 @@ test('agent-made branches carry a sparkle and the workflow shows its Kira Space 
   const sparkle = page.locator('[data-testid="ade-branch-agent"]');
   await expect(sparkle).toHaveCount(1);
   await sparkle.hover();
-  await expect(page.getByText('Added or named by the agent').first()).toBeVisible();
+  await expect(
+    page.locator('[data-testid="ade-branch-tip"]').getByText('Added or named by the agent').first(),
+  ).toBeVisible();
   await page
     .locator('[data-testid="ade-branch-row"]:has([data-testid="ade-branch-agent"])')
     .click();

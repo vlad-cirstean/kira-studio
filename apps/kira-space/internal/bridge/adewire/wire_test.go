@@ -43,8 +43,6 @@ func TestFixturesMatchWireTypes(t *testing.T) {
 		"review-target.json":       func() any { return new(ReviewWindowTarget) },
 		"review-agent.json":        func() any { return new(ReviewAgentState) },
 		"review-agent-launch.json": func() any { return new(ReviewAgentLaunch) },
-		"viewed-sync-plan.json":    func() any { return new(ViewedSyncPlan) },
-		"viewed-sync-result.json":  func() any { return new(ViewedSyncResult) },
 	}
 
 	entries, err := os.ReadDir(fixtureDir)

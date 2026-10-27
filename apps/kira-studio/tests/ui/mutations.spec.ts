@@ -278,6 +278,12 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
     original: originalName,
     modified: 'edited via UI',
   });
+  const diffHost = diffPanel.locator('[data-testid="pending-diff"]');
+  await expect(
+    diffHost.locator('.editor.modified .view-line').filter({ hasText: 'edited via UI' }),
+  ).toBeVisible();
+  const diffBox = await diffHost.locator('.monaco-diff-editor').boundingBox();
+  expect(diffBox?.height ?? 0).toBeGreaterThan(200);
   await diffPanel.locator('[data-testid="preview-command-view-sql"]').click();
   await expect(diffPanel.locator('[data-testid="pending-diff"]')).toHaveCount(0);
   await page.click('[data-testid="preview-command-close"]');

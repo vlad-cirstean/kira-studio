@@ -52,16 +52,16 @@ describe('dropVerdict', () => {
       { key: 1, isPast: false, dayOff: true },
     ],
     entries: new Map([
-      ['a', { day: 0, kind: 'task' as const }],
-      ['r', { day: 0, kind: 'review' as const }],
-      ['p', { day: -1, kind: 'task' as const }],
-      ['o', { day: 1, kind: 'task' as const }],
+      ['a', { day: 0, auto: false }],
+      ['r', { day: 0, auto: true }],
+      ['q', { day: 0, auto: false }],
+      ['p', { day: -1, auto: false }],
+      ['o', { day: 1, auto: false }],
     ]),
   };
-  test('refuses itself, review cards, cards and bands that are past or a day off', () => {
+  test('refuses itself, cards and bands that are past or a day off', () => {
     for (const target of [
       { kind: 'card', taskId: 'a' },
-      { kind: 'card', taskId: 'r' },
       { kind: 'card', taskId: 'p' },
       { kind: 'card', taskId: 'o' },
       { kind: 'band', day: -1 },
@@ -75,6 +75,10 @@ describe('dropVerdict', () => {
     expect(dropVerdict(view, plan, TODAY, 'd', { kind: 'card', taskId: 'a' })).toEqual({
       kind: 'move',
       args: { order: ['d', 'a', 'b', 'c'], days: { d: '2026-09-22' } },
+    });
+    expect(dropVerdict(view, plan, TODAY, 'd', { kind: 'card', taskId: 'r' })).toEqual({
+      kind: 'move',
+      args: { order: ['a', 'b', 'c', 'd'], days: { d: '2026-09-22' } },
     });
     expect(dropVerdict(view, plan, TODAY, 'b', { kind: 'band', day: 0 })).toEqual({
       kind: 'move',
