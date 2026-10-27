@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { FieldDescription } from '@theme/components/ui/field';
+import { Badge } from '@theme/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { t } from '@theme/i18n';
+import TitleBarBase from '@workbench/components/TitleBar.vue';
 import { computed } from 'vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import { taskTitle } from '../board/labels';
@@ -15,36 +17,43 @@ const title = computed(() =>
   task.value ? taskTitle(task.value, branch.value, '') : props.target.branch,
 );
 const dirtyCount = computed(() => branch.value?.dirty.length ?? 0);
+const hint = computed(() =>
+  t('space.ade.review.header.uncommitted.hint', { count: dirtyCount.value }),
+);
 </script>
 
 <template>
-  <header
-    class="flex flex-none flex-col border-b border-border bg-chrome"
-    data-testid="ade-review-header"
-  >
-    <div class="flex items-center gap-2 px-3 py-1.5">
+  <TitleBarBase>
+    <div class="flex min-w-0 flex-1 items-center gap-2" data-testid="ade-review-header">
       <span
         class="inline-block size-2.5 shrink-0 rounded-kira-xs"
         :style="{ background: taskColor(task?.color ?? 0) }"
         data-testid="ade-review-task-colour"
       />
-      <span class="line-clamp-2 min-w-0 text-kira-lg font-medium" data-testid="ade-review-title">{{
+      <span class="min-w-0 truncate text-kira-md font-medium" data-testid="ade-review-title">{{
         title
       }}</span>
       <AdeRepoTag :code-repo-id="target.codeRepoId" :label="repoLabel" />
-      <span class="truncate font-data text-kira-sm" data-testid="ade-review-branch">{{
+      <span class="min-w-0 truncate font-data text-kira-sm" data-testid="ade-review-branch">{{
         target.branch
       }}</span>
       <span class="shrink-0 text-kira-sm text-muted-foreground" data-testid="ade-review-base">{{
         t('space.ade.review.header.base.label', { base: target.base })
       }}</span>
+      <Tooltip v-if="dirtyCount > 0">
+        <TooltipTrigger as-child>
+          <Badge
+            variant="warn"
+            tabindex="0"
+            class="wails-no-drag shrink-0"
+            :aria-label="hint"
+            data-testid="ade-review-uncommitted"
+          >
+            {{ t('space.ade.review.header.uncommitted.label', { count: dirtyCount }) }}
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent>{{ hint }}</TooltipContent>
+      </Tooltip>
     </div>
-    <FieldDescription
-      v-if="dirtyCount > 0"
-      class="border-t border-border px-3 py-1"
-      data-testid="ade-review-uncommitted"
-    >
-      {{ t('space.ade.review.header.uncommitted.hint', { count: dirtyCount }) }}
-    </FieldDescription>
-  </header>
+  </TitleBarBase>
 </template>

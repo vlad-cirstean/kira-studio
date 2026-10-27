@@ -83,6 +83,13 @@ reviewTest('a review window boots three panes for its branch', async ({ relaunch
   await expect(page.locator(t('ade-review-centre'))).toBeVisible();
   await expect(page.locator(t('ade-review-right'))).toBeVisible();
   await expect(page.locator(t('ade-review-empty'))).toBeVisible();
+  // One title bar: the identity sits inside the drag strip, no second bar.
+  const bar = page.locator('.wails-drag');
+  await expect(bar.locator(t('ade-review-header'))).toBeVisible();
+  await expect(bar.locator(t('ade-review-title'))).toBeVisible();
+  await expect(bar.locator(t('ade-review-branch'))).toBeVisible();
+  expect((await bar.boundingBox())?.height).toBe(34);
+  await expect(page.getByText('Review · ')).toHaveCount(0);
 });
 
 test('any other window boots the normal workbench', async ({ relaunch }) => {

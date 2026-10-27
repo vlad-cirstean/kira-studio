@@ -7925,7 +7925,8 @@
             "label": "Base {base}"
           },
           "uncommitted": {
-            "hint": "{count} uncommitted change in the worktree is not in this review. | {count} uncommitted changes in the worktree are not in this review."
+            "hint": "{count} uncommitted change in the worktree is not in this review. | {count} uncommitted changes in the worktree are not in this review.",
+            "label": "{count} uncommitted | {count} uncommitted"
           }
         },
         "window": {
@@ -7937,9 +7938,6 @@
           },
           "files": {
             "aria": "Files to review"
-          },
-          "title": {
-            "title": "Review · {branch}"
           }
         }
       },

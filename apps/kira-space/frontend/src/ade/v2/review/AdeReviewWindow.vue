@@ -6,7 +6,6 @@ import { t } from '@theme/i18n';
 import { usePersistedState } from '@workbench/behaviour/persisted';
 import MainView from '@workbench/components/MainView.vue';
 import TabStrip from '@workbench/components/TabStrip.vue';
-import TitleBarBase from '@workbench/components/TitleBar.vue';
 import { computed, useTemplateRef } from 'vue';
 import { useReviewStep } from '../queries';
 import { useAdeReviewWindowStore } from '../state/adeReviewWindow';
@@ -71,11 +70,6 @@ const right = useLiveSize(
 
 <template>
   <div v-if="target" class="flex h-full flex-col" data-testid="ade-review-window">
-    <TitleBarBase>
-      <span class="truncate text-kira-md text-muted-foreground">{{
-        t('space.ade.review.window.title.title', { branch: target.branch })
-      }}</span>
-    </TitleBarBase>
     <AdeReviewHeader :target="target" />
     <div class="flex min-h-0 flex-1 gap-0.5 bg-chrome px-1.5 pb-0.5">
       <section
