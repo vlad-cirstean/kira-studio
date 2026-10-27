@@ -196,7 +196,8 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // 'repo.changed' gains kind 'changeRequestsChanged'; 'ChangeRequestRecord' gains 'draft',
 // 'reviewDecision' and 'checksState'.
 // P358: 51 -> 52, additive. New request 'review.markMany' (batch whole-file mark).
-export const CONTRACT_VERSION = 52;
+// P369: 52 -> 53, breaking. 'GitHostInfo' loses 'fileReviewSync' (GitHub viewed sync removed).
+export const CONTRACT_VERSION = 53;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;

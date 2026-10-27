@@ -1195,8 +1195,6 @@ export interface GitHostInfo {
   readonly changeRequestShort: string;
   /** "GitHub CLI (gh)"; empty when the host needs no CLI. */
   readonly cli: string;
-  /** Whether the host can sync per-file viewed marks. */
-  readonly fileReviewSync: boolean;
 }
 
 export type ChangeRequestLookup =

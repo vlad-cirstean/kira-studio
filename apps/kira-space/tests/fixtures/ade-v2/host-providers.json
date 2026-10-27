@@ -6,8 +6,7 @@
       "changeRequest": "Pull request",
       "changeRequestNoun": "pull request",
       "changeRequestShort": "PR",
-      "cli": "GitHub CLI (gh)",
-      "fileReviewSync": true
+      "cli": "GitHub CLI (gh)"
     }
   ]
 }

@@ -75,20 +75,6 @@ const (
 	LinkIssue         = "issue"
 )
 
-// ChangedFile is one file of a change request and whether the viewer marked it viewed.
-type ChangedFile struct {
-	Path   string
-	Viewed bool
-}
-
-// ChangeFiles is a change request's files with the viewer's viewed state.
-type ChangeFiles struct {
-	NodeID, HeadSha string
-	Open            bool
-	Files           []ChangedFile
-	Truncated       bool
-}
-
 // Provider is one code host.
 type Provider interface {
 	// ID is the setting value, e.g. "github".
@@ -130,13 +116,6 @@ type URLs interface {
 	// IsChangeRequestURL re-validates a composed URL right before the OS browser opens it.
 	IsChangeRequestURL(ctx context.Context, u *url.URL) bool
 	ParseLink(raw string) (Link, bool)
-}
-
-// FileReviewSync is optional: the host stores per-file viewed state on a change request.
-type FileReviewSync interface {
-	ChangeFiles(ctx context.Context, r Repo, number int) (ChangeFiles, Status)
-	// SetFilesViewed marks or unmarks paths; failed maps a path to the host's error for it.
-	SetFilesViewed(ctx context.Context, r Repo, nodeID string, paths []string, viewed bool) (failed map[string]string, s Status)
 }
 
 // ChangeRequestSync is optional: a provider that pages every change request by recency, probes for

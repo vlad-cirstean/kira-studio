@@ -44,12 +44,12 @@ type rig struct {
 	gitID  string
 }
 
-// newRig boots an app with host registered after GitHub and one ADE task branch of an acme/r repo
+// newRig boots an app with forge registered after GitHub and one ADE task branch of an acme/r repo
 // whose origin lives on forge.test. Merge request 7 is registered on the branch before any lookup.
-func newRig(t *testing.T, forge *fakehost.Forge, host githost.Provider, opts ...flowharness.Opt) *rig {
+func newRig(t *testing.T, forge *fakehost.Forge, opts ...flowharness.Opt) *rig {
 	t.Helper()
 	forge.AddChangeRequest(forgeCR)
-	app := flowharness.New(t, append(opts, flowharness.WithGitHost(host), flowharness.WithoutGh())...)
+	app := flowharness.New(t, append(opts, flowharness.WithGitHost(forge), flowharness.WithoutGh())...)
 	app.Scenario(fakeagent.Scenario{Claude: map[string][]fakeagent.Action{
 		"*": {{Name: "done", Sh: "echo a > a.txt && git add -A && git commit -q -m add-a"}},
 	}})
@@ -95,7 +95,6 @@ func newRig(t *testing.T, forge *fakehost.Forge, host githost.Provider, opts ...
 	br = branchIn(t, app, task.ID, rec.ID)
 	tip := git(t, br.Worktree, "rev-parse", "HEAD")
 	forge.SetHead(7, tip)
-	forge.SetFiles(7, "a.txt")
 
 	gs := app.OpenGitStream()
 	var opened gitrpc.RepoOpenResult
@@ -161,11 +160,11 @@ func (r *rig) branchLookup() gitrpc.ChangeRequestLookup {
 // words, and no step reaches `gh` (the app boots without it).
 func TestSecondGitHostRegistered(t *testing.T) {
 	forge := fakehost.New()
-	r := newRig(t, forge, forge)
+	r := newRig(t, forge)
 
 	list := call[githost.Providers](t, r.gs, "gitHost.providers", struct{}{})
 	if len(list.Providers) != 2 || list.Providers[0].ID != "github" || list.Providers[1].ID != "forge" ||
-		list.Providers[1].ChangeRequestShort != "MR" || !list.Providers[1].FileReviewSync {
+		list.Providers[1].ChangeRequestShort != "MR" {
 		t.Fatalf("gitHost.providers = %+v, want github then forge", list)
 	}
 	if got := r.app.W.GitHost.Providers(); len(got.Providers) != 2 {

@@ -21,7 +21,6 @@ const FORGE = {
   changeRequestNoun: 'merge request',
   changeRequestShort: 'MR',
   cli: 'Forge CLI',
-  fileReviewSync: true,
 };
 const GITHUB = adeFixture<{ providers: object[] }>('host-providers').providers[0];
 const PROVIDERS = { providers: [GITHUB, FORGE] };
