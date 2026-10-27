@@ -97,18 +97,18 @@ const staleClass = (tone: string): string => (tone === 'stale' ? 'text-tone-ambe
         <template v-if="row.chips.merged.length">
           <dt>{{ t('space.ade.branchPanel.mergedInto.label') }}</dt>
           <dd class="flex flex-col">
-            <span v-for="c in row.chips.merged" :key="c.label">
-              <span :class="staleClass(c.tone)">{{ c.label }}</span>
-              <span class="text-muted-foreground"> {{ c.tip }}</span>
+            <span v-for="c in row.chips.merged" :key="c.label" class="flex gap-1">
+              <span class="shrink-0" :class="staleClass(c.tone)">{{ c.label }}</span>
+              <span class="text-muted-foreground">{{ c.tip }}</span>
             </span>
           </dd>
         </template>
         <template v-if="row.chips.deployed.length">
           <dt>{{ t('space.ade.branchPanel.deployedTo.label') }}</dt>
           <dd class="flex flex-col">
-            <span v-for="c in row.chips.deployed" :key="c.label">
-              <span :class="staleClass(c.tone)">{{ c.label }}</span>
-              <span class="text-muted-foreground"> {{ c.tip }}</span>
+            <span v-for="c in row.chips.deployed" :key="c.label" class="flex gap-1">
+              <span class="shrink-0" :class="staleClass(c.tone)">{{ c.label }}</span>
+              <span class="text-muted-foreground">{{ c.tip }}</span>
             </span>
           </dd>
         </template>

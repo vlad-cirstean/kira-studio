@@ -1308,7 +1308,8 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
 - CodiconIcon size must be one of 12, 13, 16, 24; RunState is a Spinner at size 12 or a StatusDot error.
 - .kira-prose in base.css is the one prose layer.
 - Elevation tiers: Popover z-(--kira-z-popover) + shadow-kira; Dialog, overlay, CommandDialog z-(--kira-z-dialog) + shadow-kira-dialog; DropdownMenu z-(--kira-z-menu) + shadow-kira; Tooltip z-(--kira-z-tooltip) with no shadow; in-pane layers z-1..3.
-- Density scale is 0.5, 1, 1.5, 2, 3, 4; 0.25/1.25/1.75/2.5/3.5 are not allowed outside the P129 board canvas. Dialog width uses size variants only.
+- TooltipContent has two variants: `default` (inverted ground, arrow, plain text) and `surface` (elevated popover ground, no arrow, no shadow) for rich content using the ADE tones, which are dark-only. A branch chip inside a default tooltip renders neutral via `data-chip="branch"`.
+- Density scale is 0.5, 1, 1.5, 2, 3, 4; 0.25/1.25/1.75/2.5/3.5 are not allowed anywhere. Dialog width uses size variants only.
 - With DialogContent dirty, outside click is ignored, and Esc and the header X ask the discard confirm; footer Cancel never asks.
 - Every host (Studio, Space, Space mobile, git-ui mount()) calls provideShellServices(app) from bootstrapShell.ts once per createApp, providing CONFIRM_DISCARD_KEY backed by the confirm store, because theme cannot import the store.
 - Each host mounts one ConfirmDialog; mobile passes touch for 44px buttons. Tabs ask before closing a dirty tab (TabKindDef.isDirty).
@@ -2008,6 +2009,7 @@ and `docs/HISTORY.md (v2.0)`.
 - A workflow step runs once (on the first mine branch in task order), each repo, or only <repo>, with one run per step and branch.
 - Task status is derived from the workflow and runs, never typed (decision D10), so the Status field is read-only.
 - Backlog items are not on the plan until promoted.
+- The Plan uses flat token surfaces only: no textures, shadows, dashed borders or tint washes. State shows as rail, border, outline or chip colour. Each branch row has one `surface` tooltip (`AdeBranchTip`) in the plan colour coding.
 - CreateTask takes an optional plan day (nil lands in Later). The UI sends today, or the next work day, and no repos; repos arrive via AddTaskRepo, AddExistingBranch or agent declare_repos.
 - A repoless task refuses Start (no branch to run on) until a repo is added. This is designed behavior.
 - An estimate is free text h or d, settable, changeable and clearable at any time; only the cap (480h, 60d) applies.

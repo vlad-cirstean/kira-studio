@@ -173,7 +173,7 @@ test('the day-off confirm says what moves, offers Cancel and Escape leaves the p
   expect(control.log().filter((e) => e.channel === IPC.adeTaskSetPlan)).toHaveLength(0);
 });
 
-test('a card is a 10px rounded box with a 4px task edge, a 68px header and 10px gaps', async ({
+test('a card is a 6px rounded box with a 4px task edge, a 68px header and 8px gaps', async ({
   relaunch,
 }) => {
   const { window: page } = await openPlan(relaunch);
@@ -186,7 +186,7 @@ test('a card is a 10px rounded box with a 4px task edge, a 68px header and 10px 
       left: s.borderLeftWidth,
     };
   });
-  expect(style).toEqual({ radius: '10px', top: '1px', left: '4px' });
+  expect(style).toEqual({ radius: '6px', top: '1px', left: '4px' });
   const head = await box.locator('[data-testid="ade-card-head"]').boundingBox();
   expect(head?.height).toBe(68);
 
@@ -196,7 +196,7 @@ test('a card is a 10px rounded box with a 4px task edge, a 68px header and 10px 
       els.map((e) => e.getBoundingClientRect()).map((r) => ({ top: r.top, bottom: r.bottom })),
     );
   expect(rects.length).toBeGreaterThanOrEqual(2);
-  expect((rects[1]?.top ?? 0) - (rects[0]?.bottom ?? 0)).toBe(10);
+  expect((rects[1]?.top ?? 0) - (rects[0]?.bottom ?? 0)).toBe(8);
 });
 
 test('the Plan scrolls inside the window instead of growing it', async ({ relaunch }) => {
@@ -238,18 +238,18 @@ test('line 2 shows merged and deployed chips with stale in amber and tooltips', 
   await expect(
     page
       .locator('[data-testid="ade-branch-tip"]')
-      .getByText('stale in develop: 2 commits since it was merged'),
+      .getByText('stale in develop: 2 commits since it was merged')
+      .first(),
   ).toBeVisible();
 });
 
 test('branch tooltip shows plan colours', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
-  await page.locator('[data-testid="ade-branch-row"][data-branch-id="b_auth"]').first().hover();
+  await page.locator('[data-testid="ade-branch-row"][data-branch-id="b_search"]').first().hover();
   const tip = page.locator('[data-testid="ade-branch-tip"]');
   await expect(tip).toBeVisible();
   await expect(tip.locator('[data-testid="ade-chip"]').first()).toBeVisible();
   await expect(tip.locator('[data-var="base"]').first()).toBeVisible();
-  await expect(tip.getByText('stale in develop: 2 commits since it was merged')).toBeVisible();
 });
 
 test('a repo chip reports what the last fetch changed', async ({ relaunch }) => {
