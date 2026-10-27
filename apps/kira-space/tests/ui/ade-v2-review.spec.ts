@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, reviewTest, test } from './fixtures';
 import {
   adeFixture,
@@ -170,7 +170,9 @@ reviewTest('a review diff opens side by side', async ({ relaunch }) => {
   expect(width).toBeGreaterThan(100);
 });
 
-reviewTest('a review diff shows only the hunk and the commented line', async ({ relaunch }) => {
+async function openHunkDiff(
+  relaunch: Parameters<Parameters<typeof reviewTest>[2]>[0]['relaunch'],
+): Promise<{ page: Page; modified: Locator }> {
   const read = (side: 'left' | 'right') => contract('git-review-hunks', `git:file.read#${side}`);
   const comment = {
     id: 1,
@@ -223,6 +225,11 @@ reviewTest('a review diff shows only the hunk and the commented line', async ({ 
     .locator(`${t('review-files-tree')} ${t('file-tree-row')}`, { hasText: 'pending.ts' })
     .click();
   const modified = page.locator(t('repo-diff-editor')).locator('.editor.modified');
+  return { page, modified };
+}
+
+reviewTest('a review diff shows only the hunk and the commented line', async ({ relaunch }) => {
+  const { page, modified } = await openHunkDiff(relaunch);
   const lines = modified.locator('.view-lines .view-line');
   const rendered = (text: string) =>
     lines.filter({ hasText: new RegExp(`^\\s*${text.replace(' ', '\\s')}$`) });
@@ -242,6 +249,37 @@ reviewTest('a review diff shows only the hunk and the commented line', async ({ 
   const before = await lines.count();
   await placeholders.last().locator('a').first().click();
   await expect.poll(() => lines.count()).toBeGreaterThan(before);
+});
+
+reviewTest('the hunk mark stays put when the add-comment mark shows', async ({ relaunch }) => {
+  const { page, modified } = await openHunkDiff(relaunch);
+  const mark = modified
+    .locator('.kira-review-glyph-actionable, .kira-review-glyph-reviewed')
+    .first();
+  const viewLines = modified.locator('.view-lines');
+  const add = modified.locator('.kira-review-glyph-add');
+  const box = async (l: Locator) => {
+    const b = await l.boundingBox();
+    if (!b) throw new Error('no box');
+    return b;
+  };
+  await expect(mark).toBeVisible();
+  await page.mouse.move(0, 0);
+  const markBefore = await box(mark);
+  const linesBefore = await box(viewLines);
+
+  await page.mouse.move(linesBefore.x + 40, markBefore.y + markBefore.height / 2);
+  await expect(add).toHaveCount(1);
+  expect((await box(add)).y).toBe(markBefore.y);
+  expect(await box(mark)).toEqual(markBefore);
+  expect((await box(viewLines)).x).toBe(linesBefore.x);
+
+  const commentMark = await box(modified.locator('.kira-review-glyph-comment'));
+  expect(commentMark.x).toBeLessThan(markBefore.x);
+
+  await page.mouse.move(0, 0);
+  await expect(add).toHaveCount(0);
+  expect(await box(mark)).toEqual(markBefore);
 });
 
 async function openDiffWindow(

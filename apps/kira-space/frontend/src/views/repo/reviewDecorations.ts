@@ -12,7 +12,9 @@
  *
  * Two decoration lanes keep a hunk glyph and a comment glyph from colliding on the same line:
  * hunk state renders in `GlyphMarginLane.Right`, comment/add-comment glyphs in
- * `GlyphMarginLane.Left`.
+ * `GlyphMarginLane.Left`. Monaco lays lanes out per line, so both persist (`persistLane`) and
+ * `laneCollection` reserves Left up front: the margin is always two lanes wide and hovering a
+ * line never shifts a glyph.
  */
 
 import {
@@ -153,6 +155,7 @@ export function attachReviewDecorations(
   const hunkCollection = modifiedEditor.createDecorationsCollection([]);
   const commentCollection = modifiedEditor.createDecorationsCollection([]);
   const addGlyphCollection = modifiedEditor.createDecorationsCollection([]);
+  const laneCollection = modifiedEditor.createDecorationsCollection([]);
 
   let hoverLine: number | null = null;
   let openThreadCommentId: number | null = null;
@@ -244,7 +247,7 @@ export function attachReviewDecorations(
         range: new mod.Range(hoverLine, 1, hoverLine, 1),
         options: {
           glyphMarginClassName: 'codicon codicon-add kira-review-glyph kira-review-glyph-add',
-          glyphMargin: { position: mod.editor.GlyphMarginLane.Left },
+          glyphMargin: { position: mod.editor.GlyphMarginLane.Left, persistLane: true },
           glyphMarginHoverMessage: { value: t('space.repo.reviewEditor.addComment.tooltip') },
         },
       },
@@ -291,7 +294,7 @@ export function attachReviewDecorations(
             glyphMarginClassName: reviewed
               ? 'codicon codicon-pass-filled kira-review-glyph kira-review-glyph-reviewed'
               : 'codicon codicon-circle-large-outline kira-review-glyph kira-review-glyph-actionable',
-            glyphMargin: { position: mod.editor.GlyphMarginLane.Right },
+            glyphMargin: { position: mod.editor.GlyphMarginLane.Right, persistLane: true },
             glyphMarginHoverMessage: {
               value: reviewed
                 ? t('common.markUnreviewed.tooltip')
@@ -314,13 +317,23 @@ export function attachReviewDecorations(
           options: {
             glyphMarginClassName:
               'codicon codicon-comment kira-review-glyph kira-review-glyph-comment',
-            glyphMargin: { position: mod.editor.GlyphMarginLane.Left },
+            glyphMargin: { position: mod.editor.GlyphMarginLane.Left, persistLane: true },
             glyphMarginHoverMessage: commentHoverMessage(c),
           },
         }),
       ),
     );
     paintAddGlyph();
+    // Monaco drops a decoration with an empty glyph class, so the name must be non-empty.
+    laneCollection.set([
+      {
+        range: new mod.Range(1, 1, 1, 1),
+        options: {
+          glyphMarginClassName: 'kira-review-lane',
+          glyphMargin: { position: mod.editor.GlyphMarginLane.Left, persistLane: true },
+        },
+      },
+    ]);
 
     // A repaint can move or remove the line the open thread was anchored to (a mark/comment
     // mutation elsewhere, §7.6) — close it rather than leave it pointing at a stale line.
@@ -683,6 +696,7 @@ export function attachReviewDecorations(
       hunkCollection.clear();
       commentCollection.clear();
       addGlyphCollection.clear();
+      laneCollection.clear();
       // 7d (P68 review): this module is what leases deps.transport (gitTransportFor, called once
       // per mount by RepoDiffView.vue) — nothing else holds a reference to release it.
       deps.transport.dispose();
