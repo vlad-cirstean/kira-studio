@@ -7063,3 +7063,60 @@ Also fixed pre-existing failing unit test: `graphChunkFrame.bin` patched to cont
 ### v0.2.18 P364 (Done)
 Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.18/` removed. PR opened to `main`.
 <!-- /chapter v0.2.18 -->
+
+<!-- chapter v0.2.19 -->
+## v0.2.19
+Source: docs/v0.2.19/ at c7f81cd12450. 9 phases.
+
+### v0.2.19 P365 (Done)
+CI resilience. `retry` in `scripts/lib.sh` (used by `pull_images`, `setup.sh`, `install-golangci-lint.sh`, `pull-test-images.sh`), `scripts/retry.sh`, `scripts/ci-apt-install.sh` (apt retries and timeouts, per-attempt `timeout`, drops first mirror between rounds). `.github/actions/setup/action.yml` installs apt via the script, retries `go mod download` on cache miss. `docs/PACKAGING.md` section 7.
+Workflow patches (`pr.yml` step timeouts and Playwright retry, `pr-rerun-flaky.yml` rerun of timeout-cancelled runs with newest-run guard, `pages.yml` job timeouts) went through `docs/pending-changes/`. Checked: `sh -n`, `yq` parse, `git apply --check`, local `retry.sh` runs. `ci-apt-install.sh` verified by CI only.
+
+### v0.2.19 P366 (Done)
+ADE design pass. Scope: shell top bar, Plan tab, four panel spots. Uniform set: flat token surfaces, no textures, shadows, dashed borders, tint washes, italic or extrabold; `font-medium` on entity names only; density-scale spacing; codicons over glyph icons; state by rail, border, outline or chip colour. Step label and tag use `AdeChip`.
+Branch tooltip: `TooltipContent` `surface` variant and `AdeBranchTip` in plan colours (work-colour dot, repo chip, tag chip, base marker, progress, merged and deployed). Guards: U105 bans repeating gradients, U11 covers extrabold and black. Five duplicate ADE i18n keys deleted. New baselines `plan-branch-tip`, `plan-branch-plain-tip`; others refreshed. Unit 1957, space `ui` 695, `visual` 20 pass.
+
+### v0.2.19 P367 (Done)
+SQL pending-changes diff (`PreviewCommandPanel`, `MonacoDiff`) rendered 0 px tall; data was whole. Cause: root `h-full min-h-40` beat the caller's `h-60`, and `h-full` under a parent with only `max-height` is `auto`. Fix: Monaco mounts on inner `absolute inset-0` host; caller sizes with an `h-60` wrapper. `mutations.spec.ts` 1b asserts modified line visible and diff taller than 200 px (failed with 0 before).
+
+### v0.2.19 P368 (Done)
+Review items move between Plan day bands (frontend only; `SetPlan` and `ade_task_plan.day` already carried a review's day). Pinned review behaves like a task; no day keeps merge-order auto placement; Later clears the day. `board/timeline.ts`, `dropPlan.ts`, `menu.ts`, `AdeTaskCard.vue` changed. Tests: flow `TestReviewPlanDay`, UI `ade-v2-plan`, `ade-v2-task-menu`, unit dropplan and timeline. Drag spec waits two animation frames before release (1 in 8 flaky before).
+Assumptions (user to check):
+- A1. "Columns" means Plan day bands, including Later. No status kanban exists; status is derived.
+- A2. Moving to Later un-pins; a planned task that builds on or conflicts with the review still shows it on that task's day.
+- A3. Pinned review joins overdue rollover; adds no hours, stays out of overflow and the day-off move confirm.
+- A4. Pinned review on a later day than its dependent task is allowed.
+
+### v0.2.19 P369 (Done)
+Review header: `AdeReviewHeader` renders inside shared `TitleBar` (34px, drag region, 78px traffic-light inset); second bar and "Review · branch" text gone.
+GitHub sync removed end to end: `AdeReviewSync`, wire types, bridge methods, i18n keys, git-ui hooks; Go `ade/viewedsync*`, `gitsession/viewedsync*`, `githost.FileReviewSync`/`ChangeFiles`, GitHub `PullFiles`/`SetFilesViewed`, fakehost state. Migration 0050 drops `ade_viewed_sync`. Git IPC contract 52 to 53 (`GitHostInfo.fileReviewSync` removed). `TestGitHubSyncWithFakeGh` became `TestGitHubChangeRequestsWithFakeGh`. Baseline `review-step-panel` moved. `test:ui:space` 690, visual 20 pass.
+Unverified: merged bar clearing macOS traffic lights on a real WKWebView window.
+
+### v0.2.19 P370 (Done)
+Review actions. Optional `githost.ChangeRequestReviews` (ReviewTarget, SubmitReview, Comment). GitHub uses `gh api` REST (GET pulls/{n}, POST pulls/{n}/reviews, POST issues/{n}/comments); fields via `-f`, never `-F` (argv test). `classify` gains 422 arm reporting GitHub's first `errors[]` entry. Wire `changeRequest.reviewState`, `.submitReview`, `.comment`; contract 53 to 54, additive. Flow test `TestChangeRequestReviewActions` writes `tests/contract/ade-review-actions.json`, read by four `contract:` UI specs. UI: `AdeReviewActions` (Review dropdown: Comment, Approve, Request changes; Comment on PR) and `AdeReviewSubmitDialog`. `test:ui:space` 694, visual 20 pass.
+Not verified: real GitHub calls; sandbox cannot reach the API.
+Assumptions:
+- A1. Local inline comments stay agent-only; a submitted review carries only the dialog message. Mapping them to PR threads would need diff mapping, and GitHub refuses the whole review for one out-of-diff line.
+- A2. "Comment" review event and "Comment on PR" are separate, as on GitHub.
+- A3. Merged or closed PR disables all three review events; conversation comment stays.
+- A4. Errors show inline in the dialog (no toast primitive); success is a title-bar status line with "Open PR" link.
+- A5. Review records against the PR's current head, not the local tip; differing tip only warns.
+- A6. A pending review started on github.com makes GitHub refuse a new one (422); shown as is.
+
+### v0.2.19 P371 (Done)
+Hunk mark: Monaco lays glyph lanes per line, so hover added the Left add-comment lane and shifted the margin. Fix in `reviewDecorations.ts`: `persistLane` on hunk, comment and add-comment glyphs plus a `laneCollection` placeholder on line 1; margin always two lanes wide.
+Dialog: opt-in `resizable` on theme `DialogContent` (right and bottom handles, bounds 320 by 240 to 90% by 80% of window, i18n resize labels). `AdeReviewSubmitDialog` uses it; textarea fills body. Fixed pre-existing `estimate: set, change and clear at any time` flake (4 of 20 failed; 30 of 30 pass). `test:ui:space` 696, visual 20 pass.
+Assumptions:
+- A1. "Review comment dialog" is `AdeReviewSubmitDialog`. The inline compose box (`ReviewThread.vue`, Monaco view zone) stays out; a fix there is separate (re-lay zone on resize observer).
+- A2. "Fits" means never larger than window, textarea fills dialog height, footer visible at small windows; opens at `md` (480 px).
+- A3. Resize from right and bottom edges, mouse and keyboard, grows from centre; no corner grip.
+- A4. Size not remembered between opens.
+- A5. Glyph margin always two lanes wide, about one line height wider for hunk-only files.
+
+### v0.2.19 P372 (Done)
+Review, 1 round, base `d1975b05b`: 11 findings (0 high, 3 medium, 8 low), all fixed. CI: `ci-apt-install.sh` bounds only the download and repairs dpkg before each round; new `scripts/playwright-install.sh`; `go mod download` 3 x 120 s. Docs: stale patch pointer dropped; unobserved live GitHub POSTs listed under Known open items. Tests: escalation test counts only post-`Wait` SIGKILLs; board-reads test uses `testing/synctest`; both pass `-count=50 -race`. Review item done once all `review` branches merged; merged pinned reviews not overdue. Submit dialog waits for refetch, re-applies `reviewGate`, blocks on failed refresh; title bar shows disabled Review button with reason. `SubmitReview` and `CommentOnPull` 30 s write timeout. Resize handles moved to `DialogResizeHandles.vue`, `ResizeHandle` gains `scale`, aborted drag restores last size.
+Pending user action: apply `docs/pending-changes/.github__workflows__pr.yml.patch` (points both Playwright install steps at `scripts/playwright-install.sh`), delete the patch in the same commit.
+
+### v0.2.19 P373 (Done)
+Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.19/` removed.
+<!-- /chapter v0.2.19 -->
