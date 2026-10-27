@@ -6996,11 +6996,11 @@
             "label": "Base conflict"
           },
           "baseMissing": {
-            "label": "✕ Base missing",
+            "label": "Base missing",
             "tooltip": "Base {base} no longer exists"
           },
           "behind": {
-            "label": "↓{behind} {base}",
+            "label": "{behind} behind {base}",
             "tooltip": "{count} commit behind {base} | {count} commits behind {base}"
           },
           "checkFailed": {
@@ -7011,11 +7011,11 @@
             "tooltip": "Checking whether a rebase would conflict"
           },
           "clean": {
-            "label": "✓ Clean",
+            "label": "Clean",
             "tooltip": "No shared files with work merging before it"
           },
           "conflict": {
-            "label": "✕ Conflict"
+            "label": "Conflict"
           },
           "merged": {
             "tooltip": "Landed on main"
@@ -7025,39 +7025,38 @@
             "tooltip": "{agent} creates it when the task starts"
           },
           "notPushed": {
-            "label": "↑ Not pushed",
+            "label": "Not pushed",
             "tooltip": "Rebased locally; the remote still has the old commits"
           },
           "parked": {
             "tooltip": "Kept out of the merge order"
           },
           "preparing": {
-            "label": "⚙ Preparing {duration}",
+            "label": "Preparing {duration}",
             "tooltip": "Running the prepare-worktree script"
           },
           "rebaseConflicts": {
             "tooltip": "Conflicts with {base} if rebased: {files}"
           },
           "rebaseFailed": {
-            "label": "✕ Rebase failed",
+            "label": "Rebase failed",
             "tooltip": "The last rebase failed"
           },
           "rebaseInProgress": {
-            "label": "⚠ Rebase in progress",
+            "label": "Rebase in progress",
             "tooltip": "A rebase is left half-done in the worktree"
           },
           "rebaseNeedsYou": {
-            "label": "✋ Rebase needs you",
+            "label": "Rebase needs you",
             "tooltip": "The rebase agent needs you"
           },
           "rebasePending": {
-            "label": "⚠ Base changed, rebase pending"
+            "label": "Base changed, rebase pending"
           },
           "rebasePendingNote": {
             "hint": "Base changed from {from} to {to}. The branch isn’t rebased onto it yet."
           },
           "rebasing": {
-            "label": "⟳ Rebasing",
             "tooltip": "A background run is rebasing this branch"
           },
           "review": {
@@ -7072,25 +7071,23 @@
             "tooltip": "Open the rebase log"
           },
           "setupFailed": {
-            "label": "✕ Setup failed",
             "tooltip": "The prepare-worktree script failed"
           },
           "setupLog": {
             "tooltip": "Open the setup log"
           },
           "sharesFiles": {
-            "label": "↻ {branch}",
+            "label": "After {branch}",
             "tooltip": "Shares {file} with {branch}; merges after it"
           },
           "start": {
-            "label": "▶ Start",
             "tooltip": "Start {product} in its worktree"
           },
           "takeOver": {
             "tooltip": "Continue the rebase yourself in {product}"
           },
           "waiting": {
-            "label": "⏳ {owner}",
+            "label": "Waits for {owner}",
             "tooltip": "Based on {branch}"
           }
         },
@@ -7141,9 +7138,6 @@
           "reMerge": {
             "label": "Re-merge into {target} (stale)"
           }
-        },
-        "merged": {
-          "label": "✓ Merged"
         },
         "newTask": {
           "label": "New task"
@@ -7203,7 +7197,7 @@
             "tooltip": "{step} is done"
           },
           "finish": {
-            "label": "Finish ✓",
+            "label": "Finish",
             "tooltip": "Finish the workflow"
           },
           "retryFailed": {
@@ -7211,9 +7205,6 @@
           },
           "retryStuck": {
             "tooltip": "{step} is stuck; see its output on the task tab"
-          },
-          "run": {
-            "label": "▶ Run"
           },
           "runAgents": {
             "tooltip": "Run {step} with background agents ({headless})"
@@ -7225,7 +7216,7 @@
             "tooltip": "Run: {command}"
           },
           "session": {
-            "label": "▶ {step}",
+            "label": "Start {step}",
             "tooltip": "Open an interactive {product} session for {step}"
           },
           "takeOver": {
@@ -7420,7 +7411,7 @@
           "label": "Created when the pipeline runs"
         },
         "startAgent": {
-          "label": "▶ Start agent"
+          "label": "Start agent"
         }
       },
       "headless": {
@@ -7731,7 +7722,7 @@
         },
         "history": {
           "current": {
-            "label": "Current work ↓"
+            "label": "Current work"
           },
           "goTo": {
             "label": "Go to"

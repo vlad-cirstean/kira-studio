@@ -157,7 +157,7 @@ function automaticAction(p: TaskProgress): TaskAction | null {
   if (s.state === 'pending' && untouched && p.stepIndex === p.entryIndex) {
     return {
       kind: 'run',
-      label: t('space.ade.board.taskAction.run.label'),
+      label: t('common.action.run.label'),
       tip:
         s.kind === 'script'
           ? t('space.ade.board.taskAction.runScript.tooltip', { command: s.command })
@@ -196,7 +196,7 @@ export function taskCell(i: TaskCellInput): TaskCell | null {
   if (progress.finished || (allMerged && !progress.hasWorkflow)) {
     return {
       tag: {
-        label: t('space.ade.board.merged.label'),
+        label: t('common.merged.status'),
         tone: 'purple',
         tip: t('space.ade.board.taskMerged.tooltip'),
       },
@@ -332,7 +332,7 @@ const preparing: Rule = (i) => {
 const setupFailed: Rule = (i) =>
   i.branch.setup?.state === 'failed'
     ? tag(
-        t('space.ade.board.branchTag.setupFailed.label'),
+        t('space.ade.needs.kind.setupFailed.label'),
         'red',
         i.branch.setup.note || t('space.ade.board.branchTag.setupFailed.tooltip'),
         [
@@ -347,11 +347,7 @@ const setupFailed: Rule = (i) =>
 
 const merged: Rule = (i) =>
   i.branch.mergedIntoMain
-    ? tag(
-        t('space.ade.board.merged.label'),
-        'purple',
-        t('space.ade.board.branchTag.merged.tooltip'),
-      )
+    ? tag(t('common.merged.status'), 'purple', t('space.ade.board.branchTag.merged.tooltip'))
     : null;
 
 const parked: Rule = (i) =>
@@ -467,7 +463,7 @@ const rebasing: Rule = (i) => {
   const run = lastRebase(i);
   return run && (run.state === 'running' || run.state === 'pending')
     ? tag(
-        t('space.ade.board.branchTag.rebasing.label'),
+        t('git.op.inProgress.rebase.label'),
         'blue',
         t('space.ade.board.branchTag.rebasing.tooltip'),
         [seeLog()],
@@ -695,7 +691,7 @@ export function branchTag(i: BranchTagInput): BranchTag {
   if (b.kind === 'mine' && b.name !== '' && !b.mergedIntoMain && !i.hadSession && setupOk) {
     result.actions.push({
       kind: 'start',
-      label: t('space.ade.board.branchTag.start.label'),
+      label: t('common.action.start.label'),
       tip: t('space.ade.board.branchTag.start.tooltip'),
     });
   }
