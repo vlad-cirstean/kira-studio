@@ -8,7 +8,7 @@ First phase `P365` (highest in `HISTORY.md` is `P364`). Branch `chapter/v0.2.19`
 | P366 | ADE page design pass. Too many textures, patterns and fonts; make surfaces, type and spacing uniform. Redo the branch tooltips, still ugly, using the plan's color coding. | Done |
 | P367 | SQL diff broken: output almost entirely truncated. Root-cause and fix. | Done |
 | P368 | Move reviews between columns on the planning board. | Done |
-| P369 | Review window header: merge title bar and second bar into one title bar. Remove the sync-to-GitHub button and its functionality entirely (frontend, bridge, backend, docs). | Pending |
+| P369 | Review window header: merge title bar and second bar into one title bar. Remove the sync-to-GitHub button and its functionality entirely (frontend, bridge, backend, docs). | Done |
 | P370 | Review window: dropdown with GitHub's review actions (approve, comment, request changes), like the GitHub VS Code extension. Add PR-level comments, sent to the PR. | Pending |
 | P371 | Review comment dialog resizes and fits the available space. Hunk checkmark must not move when the add-comment mark appears on hover. | Pending |
 | P372 | Code review, 1 round, over the full diff since the base (see CLAUDE.md). | Pending |
@@ -60,3 +60,15 @@ Assumptions (user to check):
 - A4. A pinned review on a later day than its dependent task is allowed; the Plan shows it where the user put it.
 
 Checked: typecheck, lint, knip, unit specs (44 pass), `TestReviewPlanDay` and `TestQueueMergeTree`, `build:test:space`, Playwright ui `ade-v2-plan`, `ade-v2-task-menu`, `ade-v2-review-open` (37 pass; drag spec 25/25 repeats). No visual spec covers the change.
+
+## P369 Result
+
+Plan: `plans/P369.md`. Commits: UI sync removal, merged title bar, Go engine/ledger removal, host role + contract 53, docs.
+
+Header: `AdeReviewHeader` now renders inside the shared `TitleBar` strip (34px, drag region, 78px traffic-light inset); the second bar and the "Review · branch" text are gone. Title truncates to one line. Uncommitted hint is a warn `Badge` plus tooltip (`wails-no-drag`). Spec `ade-v2-review.spec.ts` "boots three panes" asserts identity inside `.wails-drag`, bar height 34, no "Review · " text.
+
+Sync removal: `AdeReviewSync`, `syncParts`, queries, wire types, bridge methods, `space.ade.review.sync.*` and `window.title.title` i18n keys, git-ui `onReviewMarked`/`onMarked`; Go `ade/viewedsync*`, `ViewedSync` bridge/wire, `AdeViewedSyncRepo`, `gitreview` observer, `gitsession/viewedsync*`, `githost.FileReviewSync`/`ChangeFiles`, GitHub `PullFiles`/`SetFilesViewed`, fakehost viewed state. Migration 0050 drops `ade_viewed_sync`. Git IPC contract 52 to 53 (`GitHostInfo.fileReviewSync` removed); `graphChunkFrame` golden regenerated for the version. `TestGitHubSyncWithFakeGh` became `TestGitHubChangeRequestsWithFakeGh`. Visual baseline `review-step-panel` moved (right pane 35px taller: second bar gone).
+
+Checked: typecheck, biome, lint:rules, lint:go, knip, `go build ./...`, `go test ./apps/kira-space/...` (gitclient and mobileweb timing tests failed only under concurrent UI load, pass alone), flow tests, `bun test packages/git-ipc`, full `test:ui:space` (690 pass), full `test:visual:space` (20 pass). Leftover-name grep clean except migrations 0012/0044/0050, ARCHITECTURE migration note, contract comments, `HISTORY.md` and memory-eval testdata.
+
+Not verifiable on Linux: merged bar clearing the macOS traffic lights on a real WKWebView window. It reuses the main window's 78px inset and drag strip.
