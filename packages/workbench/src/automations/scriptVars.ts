@@ -15,7 +15,7 @@ export interface ScriptVarSource {
 const PARAM_ENV_PREFIX = 'KIRA_PARAM_';
 const BUILTIN_ENV_PREFIX = 'KIRA_';
 
-function paramEnvName(name: string): string {
+export function paramEnvName(name: string): string {
   return PARAM_ENV_PREFIX + name.toUpperCase();
 }
 

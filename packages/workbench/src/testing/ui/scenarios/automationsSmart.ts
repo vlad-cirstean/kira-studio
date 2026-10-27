@@ -228,7 +228,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     await dialog.locator('[data-testid="script-dialog-tab-params"]').click();
     await dialog.locator('[data-testid="param-add"]').click();
     await dialog.locator('[data-testid="param-name-0"]').fill('topic');
-    await dialog.locator('[data-testid="param-type-0"]').selectOption('select');
+    await dialog.locator('[data-testid="param-type-0-select"]').click();
     await dialog.locator('[data-testid="param-option-add-0"]').click();
     await dialog.locator('[data-testid="param-option-0-0"]').fill('dev');
 
@@ -301,8 +301,14 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     const dialog = page.locator('[data-testid="run-dialog"]');
     await expect(dialog).toBeVisible();
     await expect(dialog.locator('[data-testid="run-param-input-topic"]')).toHaveValue('build');
-    await expect(dialog.locator('[data-testid="run-param-input-env"]')).toHaveValue('dev');
-    await expect(dialog.locator('[data-testid="run-param-input-areas"]')).toContainText('api');
+    await expect(dialog.locator('[data-testid="run-param-option-env-dev"]')).toHaveAttribute(
+      'data-state',
+      'checked',
+    );
+    await expect(dialog.locator('[data-testid="run-param-option-areas-api"]')).toHaveAttribute(
+      'data-state',
+      'checked',
+    );
     await expect(
       dialog.locator('[data-testid="run-prompt-text"] [data-testid="var-chip"][data-var="env"]'),
     ).toBeVisible();
@@ -313,8 +319,7 @@ export function registerSmartScenarios(env: Env, extra?: (ctx: Ctx) => void): vo
     await expect(dialog).toContainText('Your Claude settings files are not loaded.');
     await expect(dialog.locator('[data-testid="run-start"]')).toBeEnabled();
 
-    await dialog.locator('[data-testid="run-param-input-areas"]').click();
-    await page.locator('[data-testid="run-param-option-areas-ui"]').click();
+    await dialog.locator('[data-testid="run-param-option-areas-ui"]').click();
     await expect
       .poll(
         () =>
