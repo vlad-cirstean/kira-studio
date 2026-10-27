@@ -7,6 +7,7 @@ import { usePersistedState } from '@workbench/behaviour/persisted';
 import { queryClient } from '@workbench/state/queryClient';
 import { computed, type MaybeRefOrGetter, toValue } from 'vue';
 import { useAutomationsModule } from '../module';
+import { keyOf, useScriptTabs } from '../scriptTabs';
 import { mirrorRuns } from './runStates';
 
 // P242: server state for Automations runs. Keys are flat [domain, ...ids] tuples.
@@ -107,13 +108,15 @@ export function useStopScriptRun() {
 
 /** Resumes an interrupted smart run and opens the new run's tab. */
 export function useResumeScriptRun() {
-  const { runs, openRunTab } = useAutomationsModule();
+  const { runs } = useAutomationsModule();
+  const tabs = useScriptTabs();
   return useMutation(
     {
       mutationKey: ['scriptRuns', 'resume'],
       mutationFn: async (run: ScriptRun) => ({ run, started: await runs.resume(run.id) }),
       onSuccess: ({ run, started }) => {
-        if (started.runId) openRunTab(started.runId, run.scriptName);
+        if (started.runId)
+          tabs.openRun({ ...keyOf(run), runId: started.runId, label: run.scriptName });
       },
     },
     queryClient,

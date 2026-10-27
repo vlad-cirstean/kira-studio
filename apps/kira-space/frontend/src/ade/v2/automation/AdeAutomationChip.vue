@@ -3,6 +3,7 @@ import { t } from '@theme/i18n';
 import { useAutomationsModule } from '@workbench/automations/module';
 import RunElapsed from '@workbench/automations/runs/RunElapsed.vue';
 import { useScriptRuns, useSeenRuns } from '@workbench/automations/runs/runsQueries';
+import { keyOf, useScriptTabs } from '@workbench/automations/scriptTabs';
 import SmartBadge from '@workbench/automations/smart/SmartBadge.vue';
 import { computed } from 'vue';
 import { useTabsStore } from '../../../state/tabs';
@@ -13,6 +14,7 @@ import { chipRun, runReason } from './automationRuns';
 const props = defineProps<{ taskId: string }>();
 const ctx = useAutomationsModule();
 const tabs = useTabsStore();
+const scriptTabs = useScriptTabs();
 const { data } = useScriptRuns();
 const { seen, markSeen } = useSeenRuns();
 const run = computed(() => chipRun(data.value ?? [], props.taskId, seen.value));
@@ -35,8 +37,9 @@ function open(): void {
   if (!r) return;
   markSeen(r.id);
   ctx.showAutomations();
-  if (r.kind === 'smart') ctx.openRunTab(r.id, r.scriptName);
-  else if (r.terminalId) tabs.activateTab(r.terminalId);
+  if (r.kind === 'smart') {
+    scriptTabs.openRun({ ...keyOf(r), runId: r.id, label: r.scriptName });
+  } else if (r.terminalId) tabs.activateTab(r.terminalId);
 }
 </script>
 

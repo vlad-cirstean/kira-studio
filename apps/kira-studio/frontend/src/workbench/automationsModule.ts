@@ -20,13 +20,23 @@ export function createAutomationsModule(): AutomationsModuleContext {
   return {
     defaultCwd: () => terminalsStore.terminalDefaults.cwd,
     openTerminalTab: (opts) => {
-      openTerminalTab({ workspaceId: 'automations', cwd: opts.cwd, launch: opts.launch });
+      openTerminalTab({
+        workspaceId: 'automations',
+        cwd: opts.cwd,
+        launch: opts.launch,
+        replace: opts.replace,
+      });
     },
-    openRunTab: (runId, label) => {
-      tabsStore.openTab('script-run', null, runId, () => ({ runId, label }), {
+    openRunTab: (state, replace) => {
+      tabsStore.openTab('script-run', null, state.runId, () => state, {
         reuse: true,
         workspaceId: 'automations',
+        replace,
       });
+    },
+    tabs: {
+      list: () => tabsStore.tabsForWorkspace('automations'),
+      activate: (id) => tabsStore.activateTab(id),
     },
     host: {
       rendererDeps: {

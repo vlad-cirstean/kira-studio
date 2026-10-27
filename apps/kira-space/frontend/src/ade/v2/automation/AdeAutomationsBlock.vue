@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ScriptRun } from '@shared/domain/scriptRuns';
 import SectionHeading from '@theme/components/SectionHeading.vue';
 import { Button } from '@theme/components/ui/button';
 import { t } from '@theme/i18n';
@@ -11,6 +12,7 @@ import {
   useStopScriptRun,
   useTaskScriptRuns,
 } from '@workbench/automations/runs/runsQueries';
+import { keyOf, useScriptTabs } from '@workbench/automations/scriptTabs';
 import SmartBadge from '@workbench/automations/smart/SmartBadge.vue';
 import { computed, ref } from 'vue';
 
@@ -19,12 +21,18 @@ const ctx = useAutomationsModule();
 const { data } = useTaskScriptRuns(() => props.taskId);
 const stop = useStopScriptRun();
 const { markSeen } = useSeenRuns();
+const scriptTabs = useScriptTabs();
 const expanded = ref<string | null>(null);
 const rows = computed(() => data.value ?? []);
 
 function toggle(id: string): void {
   markSeen(id);
   expanded.value = expanded.value === id ? null : id;
+}
+
+function openRun(run: ScriptRun): void {
+  ctx.showAutomations();
+  scriptTabs.openRun({ ...keyOf(run), runId: run.id, label: run.scriptName });
 }
 </script>
 
@@ -67,7 +75,7 @@ function toggle(id: string): void {
           variant="dialog"
           size="kira-lg"
           data-testid="ade-automation-open"
-          @click="ctx.showAutomations(); ctx.openRunTab(run.id, run.scriptName)"
+          @click="openRun(run)"
         >
           {{ t('common.action.open.label') }}
         </Button>

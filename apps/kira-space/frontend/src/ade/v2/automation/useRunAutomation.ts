@@ -1,5 +1,6 @@
 import { t } from '@theme/i18n';
 import { useScriptRunDialogStore } from '@workbench/automations/run/runDialog';
+import { useScriptTabs } from '@workbench/automations/scriptTabs';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { useCustomScriptsStore } from '../../../state/customScripts';
 import { automationItems } from './automationItems';
@@ -8,9 +9,10 @@ import { automationItems } from './automationItems';
 export function useRunAutomation() {
   const scripts = useCustomScriptsStore();
   const dialog = useScriptRunDialogStore();
+  const tabs = useScriptTabs();
 
   function start(scriptId: string, taskId: string, branchId = ''): void {
-    if (scriptId === '') return;
+    if (scriptId === '' || tabs.focusLive({ scriptId, taskId, branchId })) return;
     dialog.open({ scriptId, taskId, branchId, from: 'ade' });
   }
 

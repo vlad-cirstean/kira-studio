@@ -26,6 +26,7 @@ import { useAutomationsModule } from '../module';
 import ParamsForm from '../run/ParamsForm.vue';
 import RunPreview from '../run/RunPreview.vue';
 import { useScriptRuns } from '../runs/runsQueries';
+import { useScriptTabs } from '../scriptTabs';
 import SmartBadge from '../smart/SmartBadge.vue';
 import { clockText } from './scheduleText';
 
@@ -34,6 +35,7 @@ import { clockText } from './scheduleText';
 const props = defineProps<{ scriptId: string; runId: string | null; more: number }>();
 const emit = defineEmits<{ close: [] }>();
 const ctx = useAutomationsModule();
+const scriptTabs = useScriptTabs();
 
 const script = computed(() => ctx.scripts.records().find((s) => s.id === props.scriptId) ?? null);
 const secretParams = computed(() => (script.value?.params ?? []).filter((p) => p.secret));
@@ -76,7 +78,14 @@ const accept = useMutation({
       : ctx.runs.runScheduleNow(props.scriptId, current.hash, secrets.value);
   },
   onSuccess: (started) => {
-    ctx.openRunTab(started.runId, script.value?.name ?? t('common.script.label'));
+    const sched = script.value?.schedule;
+    scriptTabs.openRun({
+      scriptId: props.scriptId,
+      taskId: sched?.taskId ?? '',
+      branchId: sched?.branchId ?? '',
+      runId: started.runId,
+      label: script.value?.name ?? t('common.script.label'),
+    });
     emit('close');
   },
   onError: (err) => {

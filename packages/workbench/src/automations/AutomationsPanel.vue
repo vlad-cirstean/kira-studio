@@ -33,6 +33,7 @@ import ScriptRow from './ScriptRow.vue';
 import { useScheduleConfirmStore } from './schedule/confirmDialog';
 import { useRemoveScript } from './scriptActions';
 import type { EditorTab } from './scriptErrors';
+import { useScriptTabs } from './scriptTabs';
 
 const contextMenuStore = useContextMenuStore();
 const confirmDialogStore = useConfirmDialogStore();
@@ -303,6 +304,7 @@ useTreeShortcuts(
 
 const confirmStore = useScheduleConfirmStore();
 const startScript = useRunScript();
+const scriptTabs = useScriptTabs();
 async function runScript(script: CustomScript): Promise<void> {
   actionError.value = await startScript(script);
 }
@@ -359,7 +361,12 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
             id: 'run-now',
             label: t('automations.script.runNow.label'),
             icon: 'debug-start',
-            run: () => confirmStore.openNow(script.id),
+            run: () => {
+              const { taskId, branchId } = script.schedule ?? { taskId: '', branchId: '' };
+              if (!scriptTabs.focusLive({ scriptId: script.id, taskId, branchId })) {
+                confirmStore.openNow(script.id);
+              }
+            },
           },
           {
             type: 'item',

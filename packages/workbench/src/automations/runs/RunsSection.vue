@@ -10,7 +10,7 @@ import { cn } from '@theme/lib/utils';
 import { usePersistedState } from '@workbench/behaviour/persisted';
 import PanelBar from '@workbench/components/PanelBar.vue';
 import { computed, ref } from 'vue';
-import { useAutomationsModule } from '../module';
+import { keyOf, useScriptTabs } from '../scriptTabs';
 import SmartBadge from '../smart/SmartBadge.vue';
 import RunElapsed from './RunElapsed.vue';
 import RunOutcomeBlock from './RunOutcomeBlock.vue';
@@ -18,7 +18,7 @@ import RunStatusBadge from './RunStatusBadge.vue';
 import { useScriptRuns, useStopScriptRun } from './runsQueries';
 
 const emit = defineEmits<{ rerun: [run: ScriptRun] }>();
-const ctx = useAutomationsModule();
+const tabs = useScriptTabs();
 
 type Filter = 'all' | 'running' | 'failed';
 const open = usePersistedState('kira.automations.runsOpen', true);
@@ -43,7 +43,7 @@ const rows = computed(() => {
 function toggle(run: ScriptRun): void {
   // A run without a terminal (smart or headless) lives in its own tab; a skipped one only has a reason.
   if (run.state !== 'skipped' && (run.kind === 'smart' || run.terminalId === '')) {
-    ctx.openRunTab(run.id, run.scriptName);
+    tabs.openRun({ ...keyOf(run), runId: run.id, label: run.scriptName });
     return;
   }
   expanded.value = expanded.value === run.id ? null : run.id;

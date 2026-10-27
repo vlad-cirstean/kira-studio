@@ -14,6 +14,7 @@ import type {
   ScriptMcpServer,
   ScriptMcpTool,
 } from '@shared/domain/scripts';
+import type { ScriptRunTabState } from '@shared/domain/tabs';
 import { type ComputedRef, computed, type InjectionKey, inject } from 'vue';
 import type { TerminalLaunch } from '../state/createTerminalTabs';
 import type { TerminalHostDeps } from '../terminal/terminalHost';
@@ -81,9 +82,15 @@ export interface ScriptRunsSeam {
 
 export interface AutomationsModuleContext {
   defaultCwd(): string;
-  openTerminalTab(opts: { cwd: string; launch?: TerminalLaunch }): void;
-  /** Opens (or focuses) the tab of one smart script run. */
-  openRunTab(runId: string, label: string): void;
+  /** `replace` names a tab the new one takes the strip slot of. */
+  openTerminalTab(opts: { cwd: string; launch?: TerminalLaunch; replace?: string }): void;
+  /** Opens or focuses the tab of one script run by run id; `replace` names a tab it takes over. */
+  openRunTab(state: ScriptRunTabState, replace?: string): void;
+  /** The automations workspace's tabs, in strip order. */
+  tabs: {
+    list(): readonly { id: string; kind: string; state: unknown }[];
+    activate(id: string): void;
+  };
   host: TerminalHostDeps;
   scripts: ScriptsSeam;
   runs: ScriptRunsSeam;

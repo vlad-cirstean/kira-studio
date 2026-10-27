@@ -25,6 +25,7 @@ import { shortcutKeydown } from '@workbench/shortcuts/useShortcut';
 import { computed, ref } from 'vue';
 import { errorText } from '../../bridge/codedError';
 import { useAutomationsModule } from '../module';
+import { useScriptTabs } from '../scriptTabs';
 import SmartBadge from '../smart/SmartBadge.vue';
 import AdeContextFields from './AdeContextFields.vue';
 import ParamsForm from './ParamsForm.vue';
@@ -39,6 +40,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ close: [] }>();
 const ctx = useAutomationsModule();
+const scriptTabs = useScriptTabs();
 
 const script = computed(() => ctx.scripts.records().find((s) => s.id === props.scriptId) ?? null);
 const isSmart = computed(() => script.value?.kind === 'smart');
@@ -65,6 +67,9 @@ const args = computed<ScriptRunArgs>(() => ({
   taskId: taskId.value,
   branchId: branchId.value,
 }));
+function runKey() {
+  return { scriptId: props.scriptId, taskId: taskId.value, branchId: branchId.value };
+}
 const debounced = refDebounced(args, TIMING.preview);
 
 const preview = useQuery({
@@ -84,9 +89,14 @@ const start = useMutation({
   mutationFn: async () => {
     const current = pv.value;
     if (!current) throw new Error(t('automations.error.nothingToRun.error'));
+    if (scriptTabs.focusLive(runKey())) return null;
     return ctx.runs.start(args.value, current.hash);
   },
   onSuccess: (started) => {
+    if (started === null) {
+      emit('close');
+      return;
+    }
     const s = script.value;
     if (!s) return;
     if (started.terminal) {
@@ -100,10 +110,13 @@ const start = useMutation({
           kind: 'script',
           scriptId: s.id,
           launchToken: started.terminal.token,
+          taskId: taskId.value,
+          branchId: branchId.value,
         },
+        replace: scriptTabs.replaceTarget(runKey()),
       });
     } else {
-      ctx.openRunTab(started.runId, s.name);
+      scriptTabs.openRun({ ...runKey(), runId: started.runId, label: s.name });
     }
     emit('close');
   },

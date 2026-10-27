@@ -4,13 +4,14 @@ import { t } from '@theme/i18n';
 import { errorText } from '../bridge/codedError';
 import { useAutomationsModule } from './module';
 import { type RunDialogRequest, useScriptRunDialogStore } from './run/runDialog';
+import { useScriptTabs } from './scriptTabs';
 import { isBuiltinVar, varsUsed } from './smart/smartSettings';
 
 /** The task and branch a run is for, and where it was started from. */
 export type RunContext = Pick<RunDialogRequest, 'taskId' | 'branchId' | 'from'>;
 
 /** Starts a script. A normal script without params opens a terminal tab at its resolved folder; any
- *  other script opens the run dialog, where the person confirms a preview. Answers a message when
+ *  other script opens the run dialog, where the person confirms a preview. A script whose tab is still running only focuses that tab. Answers a message when
  *  the folder blocks the run (nothing opens), null on start. */
 export function useRunScript(): (
   script: CustomScript,
@@ -19,7 +20,14 @@ export function useRunScript(): (
 ) => Promise<string | null> {
   const ctx = useAutomationsModule();
   const dialog = useScriptRunDialogStore();
+  const tabs = useScriptTabs();
   return async (script, prefill, context) => {
+    const key = {
+      scriptId: script.id,
+      taskId: context?.taskId ?? '',
+      branchId: context?.branchId ?? '',
+    };
+    if (tabs.focusLive(key)) return null;
     const usesTask = ctx.ade && varsUsed(script.command).some(isBuiltinVar);
     if (script.kind === 'smart' || script.params.length > 0 || usesTask || context?.taskId) {
       dialog.open({ scriptId: script.id, prefill, ...context });
@@ -40,7 +48,10 @@ export function useRunScript(): (
         color: script.color,
         kind: 'script',
         scriptId: script.id,
+        taskId: key.taskId,
+        branchId: key.branchId,
       },
+      replace: tabs.replaceTarget(key),
     });
     return null;
   };
