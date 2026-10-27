@@ -12,7 +12,7 @@ First phase `P365` (highest in `HISTORY.md` is `P364`). Branch `chapter/v0.2.19`
 | P370 | Review window: dropdown with GitHub's review actions (approve, comment, request changes), like the GitHub VS Code extension. Add PR-level comments, sent to the PR. | Done |
 | P371 | Review comment dialog resizes and fits the available space. Hunk checkmark must not move when the add-comment mark appears on hover. | Done |
 | P372 | Code review, 1 round, over the full diff since the base (see CLAUDE.md). | Done |
-| P373 | Close chapter, open PR. | Pending |
+| P373 | Close chapter, open PR. | Done |
 
 ## P365 Result
 
@@ -127,3 +127,7 @@ Rounds: 1. Base `d1975b05b`. Findings: 11 (0 high, 3 medium, 8 low; the review h
 - F10, F11: resize handles moved to `DialogResizeHandles.vue`, mounted only for `resizable`; `ResizeHandle` gains `scale`, so ARIA reports full sizes; an aborted drag restores the last committed size. UI spec extended.
 
 Pending user action: apply `docs/pending-changes/.github__workflows__pr.yml.patch` (`git apply`, then delete the patch file in the same commit). It points both Playwright install steps in `pr.yml` at `scripts/playwright-install.sh`. F2's optional `pr.yml` timeout change was not needed: the fix is in the action.
+
+## P373 Result
+
+Chapter folded by hand into `docs/HISTORY.md`. `docs/v0.2.19/` removed. PR opened by orchestrator.
