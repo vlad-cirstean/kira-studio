@@ -6,7 +6,7 @@ First phase `P365` (highest in `HISTORY.md` is `P364`). Branch `chapter/v0.2.19`
 |---|-------|--------|
 | P365 | CI resilience. Bound the apt step in `.github/actions/setup/action.yml` (`-o Acquire::Retries=3 -o Acquire::http::Timeout=30`, step timeout) after `ui (Linux, shard 4/4)` hung twice on a `libwebkitgtk-6.0-4` download (PR #13). Retry every transient fault that a later run could clear: network fetches in setup and test steps (apt, bun/npm install, Go module download, Playwright browser download), and rerun `cancelled` runs caused by a timeout in `pr-rerun-flaky.yml` (still never a superseded run; the head-SHA guard covers that). Workflow files cannot be pushed from this session: use `docs/pending-changes/` / `docs/pending-workflows/` per `docs/DEV_ENVIRONMENT.md`. | Done |
 | P366 | ADE page design pass. Too many textures, patterns and fonts; make surfaces, type and spacing uniform. Redo the branch tooltips, still ugly, using the plan's color coding. | Done |
-| P367 | SQL diff broken: output almost entirely truncated. Root-cause and fix. | Pending |
+| P367 | SQL diff broken: output almost entirely truncated. Root-cause and fix. | Done |
 | P368 | Move reviews between columns on the planning board. | Pending |
 | P369 | Review window header: merge title bar and second bar into one title bar. Remove the sync-to-GitHub button and its functionality entirely (frontend, bridge, backend, docs). | Pending |
 | P370 | Review window: dropdown with GitHub's review actions (approve, comment, request changes), like the GitHub VS Code extension. Add PR-level comments, sent to the PR. | Pending |
@@ -33,3 +33,13 @@ Branch tooltip: new `TooltipContent` `surface` variant and `AdeBranchTip`, one p
 Labels lost leading glyphs (`en.json`); five duplicate ADE keys deleted in favour of existing ones. Guards: U105 bans repeating gradients, U11 covers extrabold and black, ADE U88 exemptions removed. Docs: `ARCHITECTURE.md` density, tooltip and Plan lines.
 
 Baselines: `plan-branches-stacked`, `-review`, `-pending`, `branch-panel-details` (label text changed), new `plan-branch-tip`, `plan-branch-plain-tip`; space screenshots and site visual baselines refreshed (git-graph, memory and studio shots also drifted). Checked: unit 1957 pass, space `ui` 695 pass, space `visual` 20 pass, screenshots rerun clean, `site:check` green after baseline refresh, lint, lint:dead, typecheck via hooks.
+
+## P367 Result
+
+Plan: `plans/P367.md`. Diff is the SQL data view's pending-changes diff (`PreviewCommandPanel` Changes view, `MonacoDiff`). Data was whole; rendering collapsed.
+
+Root cause: `MonacoDiff` root is `h-full min-h-40`; the caller's `h-60` lost to `h-full`, and `h-full` under a parent with only `max-height` is `auto`, so Monaco's `height: 100%` diff root measured 0 px.
+
+Fix: `MonacoDiff.vue` mounts Monaco on an inner `absolute inset-0` host; `PreviewCommandPanel.vue` sizes it with an `h-60` wrapper; `ARCHITECTURE.md` fact. `mutations.spec.ts` scenario 1b asserts the modified line is visible and `.monaco-diff-editor` is taller than 200 px (failed with 0 before the fix).
+
+Checked: studio `ui` `mutations.spec.ts` and `cell-editor.spec.ts` pass, `build:test:space` builds, lint:dead, typecheck and lint via hooks. No Space spec or visual baseline covers `MonacoDiff`.
