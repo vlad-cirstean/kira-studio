@@ -120,7 +120,9 @@ function pickTask(id: string): void {
       >
         <template #task><VarText :parts="[{ name: 'task', value: ade.taskTitle }]" /></template>
         <template #branch
-          ><VarText :parts="[{ name: 'branch', value: ade.branchLabel ?? '' }]" /></template
+          ><VarText
+            :parts="[{ name: 'branch', value: ade.branchLabel ?? '', kind: 'branch' }]"
+          /></template
         >
       </CatalogText>
     </div>

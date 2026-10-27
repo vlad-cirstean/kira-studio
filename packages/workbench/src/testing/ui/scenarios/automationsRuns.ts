@@ -250,7 +250,7 @@ export function registerRunsScenarios(env: Env, options: Options): void {
     await page.locator('[data-testid="menu-item-edit"]').click();
     const dialog = page.locator('[data-testid="script-dialog"]');
     const notice = dialog.locator('[data-testid="script-dialog-home-notice"]');
-    await expect(notice.locator('[data-testid="var-chip"][data-var="HOME"]')).toContainText(
+    await expect(notice.locator('[data-chip="path"][data-var="HOME"]')).toContainText(
       options.homeText(dir.path),
     );
     await notice.locator('[data-testid="script-dialog-use-kira"]').click();

@@ -41,9 +41,6 @@
         "homeNotice": {
           "description": "Runs in your home folder {home}, the old default. New scripts use the Kira automations folder."
         },
-        "kiraHome": {
-          "label": "Kira home"
-        },
         "nameExample": {
           "example": "Build"
         },
@@ -55,9 +52,6 @@
         },
         "runFolder": {
           "label": "Run folder"
-        },
-        "scriptId": {
-          "label": "Script ID"
         },
         "setOnSave": {
           "status": "Set on save"

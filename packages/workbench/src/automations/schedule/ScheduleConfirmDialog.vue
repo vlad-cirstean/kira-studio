@@ -153,7 +153,9 @@ const onSubmitKey = shortcutKeydown(['form.submit'], run);
                 ><VarText :parts="[{ name: 'task', value: ade.taskTitle }]" /></template
               >
               <template #branch
-                ><VarText :parts="[{ name: 'branch', value: ade.branchLabel ?? '' }]" /></template
+                ><VarText
+                  :parts="[{ name: 'branch', value: ade.branchLabel ?? '', kind: 'branch' }]"
+                /></template
               >
             </CatalogText>
           </div>
