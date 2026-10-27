@@ -6,7 +6,7 @@ Source: user request. Phases run top to bottom.
 
 | Phase | Title | Status |
 |---|---|---|
-| P374 | Script params redesign + shared branch-style components | Todo |
+| P374 | Script params redesign + shared branch-style components | Done |
 | P375 | Studio keeps filter value and results across tab changes | Todo |
 | P376 | Terminal: Shift+Enter inserts newline | Todo |
 | P377 | Foreign-branch review tasks: convert to work item, open normal task view | Todo |
@@ -28,6 +28,8 @@ Script params UI is unusable. Fix:
 - Path params use dotted borders. Replace with the design the agent module uses for branches.
 - Extract that branch design into shared components; agent module and script params both use them.
 - Select-type params: render options as an inline list, 1 click to pick, no dropdown.
+
+Result: plan `plans/P374.md`. Dropped `label` (Go `Param`, zod, hover, fixtures, contracts; stored rows load unchanged). New `ValueChip` base; `BranchChip` and new `PathChip` use it; `VarText` renders `kind: 'path'`. Folder lines in run preview, script dialog and ADE context use path/branch chips. `ParamsEditor` uses a segmented type picker plus a token hint. `ParamsForm` select is a radio list (leading None when optional), multiselect a checkbox list. Removed unused catalog keys `kiraHome`, `scriptId`. Checks: lint, typecheck, lint:go, Go flows, builds, lint:dead, automations UI specs (Studio 81, Space 59) pass.
 
 ### P375 Studio keeps filter value and results across tab changes
 
