@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { emitAgentEvent, openPlan } from './support/adeV2';
+import { adeFixture, emitAgentEvent, openPlan } from './support/adeV2';
 import { contract } from './support/contract';
 import { calls } from './support/ipcCalls';
 import { IPC } from './support/ipcChannels';
@@ -85,7 +85,11 @@ test('a blocked worktree is an action error, not a dialog', async ({ relaunch })
 });
 
 test('a history row opens the archived panel with its sessions', async ({ relaunch }) => {
-  const { window: page } = await openPlan(relaunch);
+  const fx = adeFixture<{ sessions: Record<string, unknown>[] }>('sessions');
+  const stopped = { ...fx.sessions.find((s) => s.id === 'sp11'), id: 'h5s1', taskId: 'H_5' };
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskSessions, response: { ...fx, sessions: [...fx.sessions, stopped] } },
+  ]);
   await page.locator(t('ade-load-history')).click();
   await expect(page.locator(t('ade-history-row'))).toHaveCount(5);
   await page.locator(t('ade-history-row')).first().click();
@@ -93,6 +97,9 @@ test('a history row opens the archived panel with its sessions', async ({ relaun
   await expect(page.locator(t('ade-sessions-tab'))).toBeVisible();
   await expect(page.locator(t('ade-session-takeover'))).toHaveCount(0);
   await expect(page.locator(t('ade-stopped-takeover'))).toHaveCount(0);
+  await expect(page.locator(t('ade-stopped-row')).first()).toBeVisible();
+  await expect(page.locator(t('ade-stopped-trigger'))).toHaveCount(0);
+  await expect(page.locator(t('ade-sessions-empty'))).toHaveCount(0);
 });
 
 // Contract ade-task. Backend half: adeflow TestArchiveRisk. The task and branch ids are the

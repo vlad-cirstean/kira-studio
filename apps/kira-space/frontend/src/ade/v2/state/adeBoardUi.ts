@@ -15,6 +15,8 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
   const branchTab = ref('details');
   /** Session selected in the Sessions tab (`null` = first listed). */
   const sessionId = ref<string | null>(null);
+  /** An explicit open asked the Sessions tab to show this session, even if stopped. */
+  const revealSessionId = ref<string | null>(null);
   /** Days of history shown beyond the settings window after a Go to; in memory only. */
   const historyReach = ref<number | null>(null);
   /** A See error click asked the open branch panel to scroll to its Worktree setup block. */
@@ -55,6 +57,7 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     if (e.branchId) branchTab.value = 'sessions';
     else taskTab.value = 'sessions';
     sessionId.value = e.sessionId;
+    revealSessionId.value = e.sessionId;
   }
 
   function toggleRepo(codeRepoId: string): void {
@@ -70,6 +73,7 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     taskTab,
     branchTab,
     sessionId,
+    revealSessionId,
     historyReach,
     runTaskId,
     focusSetup,
